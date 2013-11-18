@@ -28,7 +28,9 @@
 #include "common/atomic.h"
 #include "util/debug-util.h"
 #include "util/internal-queue.h"
+#include "util/metrics.h"
 #include "util/runtime-profile.h"
+#include "util/spinlock.h"
 
 #include "gen-cpp/Types_types.h" // for TUniqueId
 
@@ -39,7 +41,22 @@ class MemTracker;
 // A MemTracker tracks memory consumption; it contains an optional limit
 // and can be arranged into a tree structure such that the consumption tracked
 // by a MemTracker is also tracked by its ancestors.
-// Thread-safe.
+//
+// By default, memory consumption is tracked via calls to Consume()/Release(), either to
+// the tracker itself or to one of its descendents. Alternatively, a consumption metric
+// can specified, and then the metric's value is used as the consumption rather than the
+// tally maintained by Consume() and Release(). A tcmalloc metric is used to track process
+// memory consumption, since the process memory usage may be higher than the computed
+// total memory (tcmalloc does not release deallocated memory immediately).
+//
+// GcFunctions can be attached to a MemTracker in order to free up memory if the limit is
+// reached. If LimitExceeded() is called and the limit is exceeded, it will first call the
+// GcFunctions to try to free memory and recheck the limit. For example, the process
+// tracker has a GcFunction that releases any unused memory still held by tcmalloc, so
+// this will be called before the process limit is reported as exceeded. GcFunctions are
+// called in the order they are added, so expensive functions should be added last.
+//
+// This class is thread-safe.
 class MemTracker {
  public:
   // byte_limit < 0 means no limit
@@ -51,6 +68,11 @@ class MemTracker {
   // The counter is created with name COUNTER_NAME.
   MemTracker(RuntimeProfile* profile, int64_t byte_limit,
              const std::string& label = std::string(), MemTracker* parent = NULL);
+
+  // C'tor for tracker that uses consumption_metric as the consumption value.
+  // Consume()/Release() can still be called. This is used for the process tracker.
+  MemTracker(Metrics::PrimitiveMetric<uint64_t>* consumption_metric,
+             int64_t byte_limit = -1, const std::string& label = std::string());
 
   ~MemTracker();
 
@@ -72,6 +94,10 @@ class MemTracker {
   void Consume(int64_t bytes) {
     if (bytes == 0) return;
     if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
+    if (consumption_metric_ != NULL) {
+      DCHECK(parent_ == NULL);
+      return;
+    }
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {
       (*tracker)->consumption_->Update(bytes);
@@ -92,8 +118,11 @@ class MemTracker {
         all_trackers_[i]->consumption_->Update(bytes);
       } else {
         if (!all_trackers_[i]->consumption_->TryUpdate(bytes, all_trackers_[i]->limit_)) {
-          // One of the trackers failed
-          break;
+          // One of the trackers failed, attempt to GC memory. If that succeeds,
+          // TryUpdate() again. Bail if either fails.
+          if (all_trackers_[i]->GcMemory(all_trackers_[i]->limit_ + bytes) ||
+              !all_trackers_[i]->consumption_->TryUpdate(
+                  bytes, all_trackers_[i]->limit_)) break;
         }
       }
     }
@@ -113,6 +142,7 @@ class MemTracker {
 
   // Decreases consumption of this tracker and its ancestors by 'bytes'.
   void Release(int64_t bytes) {
+    if (consumption_metric_ != NULL) return;
     if (bytes == 0) return;
     if (UNLIKELY(enable_logging_)) LogUpdate(false, bytes);
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
@@ -132,15 +162,46 @@ class MemTracker {
     return false;
   }
 
-  bool LimitExceeded() const {
-    return limit_ >= 0 && limit_ < consumption_->current_value();
+  // If this tracker has a limit, checks the limit and attempts to free up some memory if
+  // the limit is exceeded by calling any added GC functions. Returns true if the limit is
+  // exceeded after calling the GC functions. Returns false if there is no limit.
+  bool LimitExceeded() {
+    if (UNLIKELY(CheckLimitExceeded())) {
+      if (bytes_over_limit_metric_ != NULL) {
+        bytes_over_limit_metric_->Update(consumption() - limit_);
+      }
+      return GcMemory(limit_);
+    }
+    return false;
   }
 
   int64_t limit() const { return limit_; }
   bool has_limit() const { return limit_ >= 0; }
-  int64_t consumption() const { return consumption_->current_value(); }
+
+  // Returns the memory consumed in bytes.
+  int64_t consumption() const {
+    if (consumption_metric_ != NULL) consumption_->Set(consumption_metric_->value());
+    return consumption_->current_value();
+  }
+
+  // Note that if consumption_ is based on consumption_metric_, this will the max value
+  // we've recorded in consumption(), not necessarily the highest value
+  // consumption_metric_ has ever reached.
   int64_t peak_consumption() const { return consumption_->value(); }
+
   MemTracker* parent() const { return parent_; }
+
+  // Signature for function that can be called to free some memory after limit is reached.
+  typedef boost::function<void ()> GcFunction;
+
+  // Add a function 'f' to be called if the limit is reached.
+  // 'f' does not need to be thread-safe as long as it is added to only one MemTracker.
+  // Note that 'f' must be valid for the lifetime of this MemTracker.
+  void AddGcFunction(GcFunction f) { gc_functions_.push_back(f); }
+
+  // Register this MemTracker's metrics. Each key will be of the form
+  // "<prefix>.<metric name>".
+  void RegisterMetrics(Metrics* metrics, const std::string& prefix);
 
   // Logs the usage of this tracker and all of its children (recursively).
   std::string LogUsage(const std::string& prefix = "") const;
@@ -153,6 +214,16 @@ class MemTracker {
   static const std::string COUNTER_NAME;
 
  private:
+  bool CheckLimitExceeded() const { return limit_ >= 0 && limit_ < consumption(); }
+
+  // If the limit is exceeded, attempts to free memory by calling any added GC functions.
+  // Returns true if the limit is still exceeded. Take gc_lock. Updates metrics if
+  // initialized.
+  bool GcMemory(int64_t max_consumption);
+
+  // Lock to protect GcMemory(). This prevents many GCs from occurring at once.
+  SpinLock gc_lock_;
+
   // All MemTracker objects that are in use and lock protecting it.
   // For memory management, this map contains only weak ptrs.  MemTrackers that are
   // handed out via GetQueryMemTracker() are shared ptrs.  When all the shared ptrs are
@@ -175,6 +246,11 @@ class MemTracker {
   // holds consumption_ counter if not tied to a profile
   RuntimeProfile::HighWaterMarkCounter local_counter_;
 
+  // If non-NULL, used to measure consumption (in bytes) rather than the values provided
+  // to Consume()/Release(). Only used for the process tracker, thus parent_ should be
+  // NULL if consumption_metric_ is set.
+  Metrics::PrimitiveMetric<uint64_t>* consumption_metric_;
+
   std::vector<MemTracker*> all_trackers_;  // this tracker plus all of its ancestors
   std::vector<MemTracker*> limit_trackers_;  // all_trackers_ with valid limits
 
@@ -186,6 +262,9 @@ class MemTracker {
   // Iterator into parent_->child_trackers_ for this object. Stored to have O(1)
   // remove.
   std::list<MemTracker*>::iterator child_tracker_it_;
+
+  // Functions to call after the limit is reached to free memory.
+  std::vector<GcFunction> gc_functions_;
 
   // If true, calls UnregisterFromParent() in the dtor. This is only used for
   // the query wide trackers to remove it from the process mem tracker. The
@@ -207,10 +286,22 @@ class MemTracker {
   void AddChildTracker(MemTracker* tracker);
 
   // Logs the stack of the current consume/release. Used for debugging only.
-  void LogUpdate(bool is_consume, int64_t bytes);
+  void LogUpdate(bool is_consume, int64_t bytes) const;
 
   static std::string LogUsage(const std::string& prefix,
       const std::list<MemTracker*>& trackers);
+
+  // The number of times the GcFunctions were called.
+  Metrics::IntMetric* num_gcs_metric_;
+
+  // The number of bytes freed by the last round of calling the GcFunctions (-1 before any
+  // GCs are performed).
+  Metrics::BytesMetric* bytes_freed_by_last_gc_metric_;
+
+  // The number of bytes over the limit we were the last time LimitExceeded() was called
+  // and the limit was exceeded pre-GC. -1 if there is no limit or the limit was never
+  // exceeded.
+  Metrics::BytesMetric* bytes_over_limit_metric_;
 };
 
 }

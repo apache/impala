@@ -266,6 +266,9 @@ DiskIoMgr::~DiskIoMgr() {
 Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
   DCHECK(process_mem_tracker != NULL);
   process_mem_tracker_ = process_mem_tracker;
+  // If we hit the process limit, see if we can reclaim some memory by removing previously
+  // allocated (but unused) io buffers.
+  process_mem_tracker->AddGcFunction(boost::bind(&DiskIoMgr::GcIoBuffers, this));
 
   for (int i = 0; i < disk_queues_.size(); ++i) {
     disk_queues_[i] = new DiskQueue(i);
@@ -685,13 +688,6 @@ bool DiskIoMgr::GetNextScanRange(DiskQueue* disk_queue, ScanRange** range,
     bool process_limit_exceeded = process_mem_tracker_->LimitExceeded();
     bool reader_limit_exceeded = (*reader)->mem_tracker_ != NULL
         ? (*reader)->mem_tracker_->AnyLimitExceeded() : false;
-
-    if (process_limit_exceeded) {
-      // We hit the process limit but not the reader one.  See if we can reclaim
-      // some memory by removing previously allocated (but unused) io buffers.
-      GcIoBuffers();
-      process_limit_exceeded = process_mem_tracker_->LimitExceeded();
-    }
 
     if (process_limit_exceeded || reader_limit_exceeded) {
       (*reader)->Cancel(Status::MEM_LIMIT_EXCEEDED);

@@ -30,14 +30,14 @@
 #include "runtime/thread-resource-mgr.h"
 #include "statestore/simple-scheduler.h"
 #include "statestore/state-store-subscriber.h"
-#include "util/metrics.h"
-#include "util/mem-metrics.h"
-#include "util/network-util.h"
-#include "util/webserver.h"
-#include "util/default-path-handlers.h"
-#include "util/parse-util.h"
-#include "util/mem-info.h"
 #include "util/debug-util.h"
+#include "util/default-path-handlers.h"
+#include "util/mem-info.h"
+#include "util/metrics.h"
+#include "util/network-util.h"
+#include "util/parse-util.h"
+#include "util/tcmalloc-metric.h"
+#include "util/webserver.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
 using namespace std;
@@ -175,8 +175,27 @@ Status ExecEnv::StartServices() {
                  << PrettyPrinter::Print(min_requirement, TCounterType::BYTES);
   }
 
-  // Limit of 0 means no memory limit.
+  metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
+  client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
+  RegisterTcmallocMetrics(metrics_.get());
+
+#ifndef ADDRESS_SANITIZER
+  // Limit of -1 means no memory limit.
+  mem_tracker_.reset(new MemTracker(TcmallocMetric::PHYSICAL_BYTES_RESERVED,
+                                    bytes_limit > 0 ? bytes_limit : -1, "Process"));
+
+  // Since tcmalloc does not free unused memory, we may exceed the process mem limit even
+  // if Impala is not actually using that much memory. Add a callback to free any unused
+  // memory if we hit the process limit.
+  mem_tracker_->AddGcFunction(boost::bind(&MallocExtension::ReleaseFreeMemory,
+                                          MallocExtension::instance()));
+#else
+  // tcmalloc metrics aren't defined in ASAN builds, just use the default behavior to
+  // track process memory usage (sum of all children trackers).
   mem_tracker_.reset(new MemTracker(bytes_limit > 0 ? bytes_limit : -1, "Process"));
+#endif
+
+  mem_tracker_->RegisterMetrics(metrics_.get(), "mem-tracker.process");
 
   if (bytes_limit > MemInfo::physical_mem()) {
     LOG(WARNING) << "Memory limit "
@@ -188,7 +207,6 @@ Status ExecEnv::StartServices() {
             << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
 
   RETURN_IF_ERROR(disk_io_mgr_->Init(mem_tracker_.get()));
-  client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
 
   // Start services in order to ensure that dependencies between them are met
   if (enable_webserver_) {
@@ -197,9 +215,6 @@ Status ExecEnv::StartServices() {
   } else {
     LOG(INFO) << "Not starting webserver";
   }
-
-  metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
-  RegisterTcmallocMetrics(metrics_.get());
 
   if (scheduler_ != NULL) RETURN_IF_ERROR(scheduler_->Init());
 

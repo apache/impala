@@ -112,8 +112,8 @@ class ImpaladMetrics {
   static Metrics::IntMetric* IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS;
   static Metrics::IntMetric* NUM_RANGES_PROCESSED;
   static Metrics::IntMetric* NUM_RANGES_MISSING_VOLUME_ID;
-  static Metrics::IntMetric* MEM_POOL_TOTAL_BYTES;
-  static Metrics::IntMetric* HASH_TABLE_TOTAL_BYTES;
+  static Metrics::BytesMetric* MEM_POOL_TOTAL_BYTES;
+  static Metrics::BytesMetric* HASH_TABLE_TOTAL_BYTES;
   static Metrics::IntMetric* IO_MGR_NUM_OPEN_FILES;
   static Metrics::IntMetric* IO_MGR_NUM_BUFFERS;
   static Metrics::IntMetric* IO_MGR_TOTAL_BYTES;

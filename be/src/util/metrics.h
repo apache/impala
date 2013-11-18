@@ -24,6 +24,7 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "common/object-pool.h"
+#include "util/debug-util.h"
 #include "util/webserver.h"
 
 namespace impala {
@@ -165,6 +166,16 @@ class Metrics {
   typedef class PrimitiveMetric<double> DoubleMetric;
   typedef class PrimitiveMetric<std::string> StringMetric;
   typedef class PrimitiveMetric<bool> BooleanMetric;
+
+  class BytesMetric : public IntMetric {
+   public:
+    BytesMetric(const std::string& key, const int64_t& value) : IntMetric(key, value) { }
+
+   protected:
+    virtual void PrintValue(std::stringstream* out) {
+      (*out) << PrettyPrinter::Print(value_, TCounterType::BYTES);
+    }
+  };
 
   Metrics();
 

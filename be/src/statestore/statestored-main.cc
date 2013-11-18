@@ -26,7 +26,7 @@
 #include "statestore/state-store.h"
 #include "util/debug-util.h"
 #include "util/metrics.h"
-#include "util/mem-metrics.h"
+#include "util/tcmalloc-metric.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
 

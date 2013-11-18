@@ -78,8 +78,8 @@ Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = NU
 Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_RANGES_PROCESSED = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID = NULL;
-Metrics::IntMetric* ImpaladMetrics::MEM_POOL_TOTAL_BYTES = NULL;
-Metrics::IntMetric* ImpaladMetrics::HASH_TABLE_TOTAL_BYTES = NULL;
+Metrics::BytesMetric* ImpaladMetrics::MEM_POOL_TOTAL_BYTES = NULL;
+Metrics::BytesMetric* ImpaladMetrics::HASH_TABLE_TOTAL_BYTES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_OPEN_FILES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_BUFFERS = NULL;
 Metrics::IntMetric* ImpaladMetrics::IO_MGR_TOTAL_BYTES = NULL;
@@ -119,10 +119,10 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID, 0L);
 
   // Initialize memory usage metrics
-  MEM_POOL_TOTAL_BYTES = m->CreateAndRegisterPrimitiveMetric(
-      ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0L);
-  HASH_TABLE_TOTAL_BYTES = m->CreateAndRegisterPrimitiveMetric(
-      ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0L);
+  MEM_POOL_TOTAL_BYTES = m->RegisterMetric(
+      new Metrics::BytesMetric(ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0L));
+  HASH_TABLE_TOTAL_BYTES = m->RegisterMetric(
+      new Metrics::BytesMetric(ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0L));
 
   // Initialize insert metrics
   NUM_FILES_OPEN_FOR_INSERT = m->CreateAndRegisterPrimitiveMetric(

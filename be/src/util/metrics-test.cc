@@ -14,7 +14,7 @@
 
 #include "util/metrics.h"
 #include "util/non-primitive-metrics.h"
-#include "util/mem-metrics.h"
+#include "util/tcmalloc-metric.h"
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
 

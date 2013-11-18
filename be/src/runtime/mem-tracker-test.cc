@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 
 #include "runtime/mem-tracker.h"
+#include "util/metrics.h"
 
 using namespace std;
 
@@ -26,13 +27,10 @@ TEST(MemTestTest, SingleTrackerNoLimit) {
   EXPECT_FALSE(t.has_limit());
   t.Consume(10);
   EXPECT_EQ(t.consumption(), 10);
-  EXPECT_EQ(t.peak_consumption(), 10);
   t.Consume(10);
   EXPECT_EQ(t.consumption(), 20);
-  EXPECT_EQ(t.peak_consumption(), 20);
   t.Release(15);
   EXPECT_EQ(t.consumption(), 5);
-  EXPECT_EQ(t.peak_consumption(), 20);
   EXPECT_FALSE(t.LimitExceeded());
 }
 
@@ -41,15 +39,47 @@ TEST(MemTestTest, SingleTrackerWithLimit) {
   EXPECT_TRUE(t.has_limit());
   t.Consume(10);
   EXPECT_EQ(t.consumption(), 10);
-  EXPECT_EQ(t.peak_consumption(), 10);
   EXPECT_FALSE(t.LimitExceeded());
   t.Consume(10);
   EXPECT_EQ(t.consumption(), 20);
-  EXPECT_EQ(t.peak_consumption(), 20);
   EXPECT_TRUE(t.LimitExceeded());
   t.Release(15);
   EXPECT_EQ(t.consumption(), 5);
-  EXPECT_EQ(t.peak_consumption(), 20);
+  EXPECT_FALSE(t.LimitExceeded());
+}
+
+TEST(MemTestTest, ConsumptionMetric) {
+  Metrics::PrimitiveMetric<uint64_t> metric("test", 0);
+  EXPECT_EQ(metric.value(), 0);
+
+  MemTracker t(&metric, 100, "");
+  EXPECT_TRUE(t.has_limit());
+  EXPECT_EQ(t.consumption(), 0);
+
+  // Consume()/Release() are supported but no-ops
+  t.Consume(150);
+  EXPECT_EQ(t.consumption(), 0);
+  EXPECT_EQ(t.peak_consumption(), 0);
+  EXPECT_FALSE(t.LimitExceeded());
+  t.Release(5);
+  EXPECT_EQ(t.consumption(), 0);
+  EXPECT_EQ(t.peak_consumption(), 0);
+  EXPECT_FALSE(t.LimitExceeded());
+
+  metric.Increment(10);
+  EXPECT_EQ(t.consumption(), 10);
+  EXPECT_EQ(t.peak_consumption(), 10);
+  metric.Increment(-5);
+  EXPECT_EQ(t.consumption(), 5);
+  EXPECT_EQ(t.peak_consumption(), 10);
+  EXPECT_FALSE(t.LimitExceeded());
+  metric.Increment(150);
+  EXPECT_EQ(t.consumption(), 155);
+  EXPECT_EQ(t.peak_consumption(), 155);
+  EXPECT_TRUE(t.LimitExceeded());
+  metric.Increment(-150);
+  EXPECT_EQ(t.consumption(), 5);
+  EXPECT_EQ(t.peak_consumption(), 155);
   EXPECT_FALSE(t.LimitExceeded());
 }
 
@@ -61,45 +91,36 @@ TEST(MemTestTest, TrackerHierarchy) {
   // everything below limits
   c1.Consume(60);
   EXPECT_EQ(c1.consumption(), 60);
-  EXPECT_EQ(c1.peak_consumption(), 60);
   EXPECT_FALSE(c1.LimitExceeded());
   EXPECT_FALSE(c1.AnyLimitExceeded());
   EXPECT_EQ(c2.consumption(), 0);
-  EXPECT_EQ(c2.peak_consumption(), 0);
   EXPECT_FALSE(c2.LimitExceeded());
   EXPECT_FALSE(c2.AnyLimitExceeded());
   EXPECT_EQ(p.consumption(), 60);
-  EXPECT_EQ(p.peak_consumption(), 60);
   EXPECT_FALSE(p.LimitExceeded());
   EXPECT_FALSE(p.AnyLimitExceeded());
 
   // p goes over limit
   c2.Consume(50);
   EXPECT_EQ(c1.consumption(), 60);
-  EXPECT_EQ(c1.peak_consumption(), 60);
   EXPECT_FALSE(c1.LimitExceeded());
   EXPECT_TRUE(c1.AnyLimitExceeded());
   EXPECT_EQ(c2.consumption(), 50);
-  EXPECT_EQ(c2.peak_consumption(), 50);
   EXPECT_FALSE(c2.LimitExceeded());
   EXPECT_TRUE(c2.AnyLimitExceeded());
   EXPECT_EQ(p.consumption(), 110);
-  EXPECT_EQ(p.peak_consumption(), 110);
   EXPECT_TRUE(p.LimitExceeded());
  
   // c2 goes over limit, p drops below limit
   c1.Release(20);
   c2.Consume(10);
   EXPECT_EQ(c1.consumption(), 40);
-  EXPECT_EQ(c1.peak_consumption(), 60);
   EXPECT_FALSE(c1.LimitExceeded());
   EXPECT_FALSE(c1.AnyLimitExceeded());
   EXPECT_EQ(c2.consumption(), 60);
-  EXPECT_EQ(c2.peak_consumption(), 60);
   EXPECT_TRUE(c2.LimitExceeded());
   EXPECT_TRUE(c2.AnyLimitExceeded());
   EXPECT_EQ(p.consumption(), 100);
-  EXPECT_EQ(p.peak_consumption(), 110);
   EXPECT_FALSE(p.LimitExceeded()); 
 }
 
