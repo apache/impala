@@ -24,7 +24,6 @@ using namespace std;
 using namespace impala;
 
 const int MemPool::DEFAULT_INITIAL_CHUNK_SIZE;
-const int MemPool::MAX_CHUNK_SIZE;
 
 const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
 
@@ -114,9 +113,8 @@ bool MemPool::FindChunk(int min_size, bool check_limits) {
       if (current_chunk_idx_ == 0) {
         chunk_size = DEFAULT_INITIAL_CHUNK_SIZE;
       } else {
-        // double the size of the last chunk in the list, up to a maximum
-        // TODO: stick with constant sizes throughout?
-        chunk_size = ::min(chunks_[current_chunk_idx_ - 1].size * 2, MAX_CHUNK_SIZE);
+        // double the size of the last chunk in the list
+        chunk_size = chunks_[current_chunk_idx_ - 1].size * 2;
       }
     }
     chunk_size = ::max(min_size, chunk_size);

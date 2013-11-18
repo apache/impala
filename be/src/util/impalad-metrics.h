@@ -68,6 +68,9 @@ class ImpaladMetricKeys {
   // Number of IO buffers allocated by the io mgr
   static const char* IO_MGR_NUM_BUFFERS;
 
+  // Number of bytes used by IO buffers (used and unused).
+  static const char* IO_MGR_TOTAL_BYTES;
+
   // Number of IO buffers that are currently unused (and can be GC'ed)
   static const char* IO_MGR_NUM_UNUSED_BUFFERS;
 
@@ -113,6 +116,7 @@ class ImpaladMetrics {
   static Metrics::IntMetric* HASH_TABLE_TOTAL_BYTES;
   static Metrics::IntMetric* IO_MGR_NUM_OPEN_FILES;
   static Metrics::IntMetric* IO_MGR_NUM_BUFFERS;
+  static Metrics::IntMetric* IO_MGR_TOTAL_BYTES;
   static Metrics::IntMetric* IO_MGR_NUM_UNUSED_BUFFERS;
   static Metrics::IntMetric* CATALOG_NUM_DBS;
   static Metrics::IntMetric* CATALOG_NUM_TABLES;

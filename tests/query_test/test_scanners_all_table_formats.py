@@ -9,7 +9,7 @@
 
 import logging
 import pytest
-from copy import copy
+from copy import deepcopy
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.util.test_file_parser import *
@@ -32,7 +32,7 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
         TestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
 
   def test_scanners(self, vector):
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/scanners', new_vector)
 
@@ -93,3 +93,28 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     self.__create_test_table(vector)
     self.run_test_case('QueryTest/test-unmatched-schema', vector)
     self.__drop_test_table(vector)
+
+
+# Tests that scanners can read a single-column, single-row, 10MB table
+class TestWideRow(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestWideRow, cls).add_test_dimensions()
+    # I can't figure out how to load a huge row into hbase
+    cls.TestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format != 'hbase')
+
+  def test_wide_row(self, vector):
+    new_vector = deepcopy(vector)
+    # Use a 5MB scan range, so we will have to perform 5MB of sync reads
+    new_vector.get_value('exec_option')['max_scan_range_length'] = 5 * 1024 * 1024
+    # We need > 10 MB of memory because we're creating extra buffers:
+    # - 10 MB table / 5 MB scan range = 2 scan ranges, each of which may allocate ~20MB
+    # - Sync reads will allocate ~5MB of space
+    # TODO: figure out exact breakdown of memory usage
+    new_vector.get_value('exec_option')['mem_limit'] = 60 * 1024 * 1024
+    self.run_test_case('QueryTest/wide-row', new_vector)

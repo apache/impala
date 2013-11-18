@@ -28,6 +28,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "runtime/thread-resource-mgr.h"
+#include "util/bit-util.h"
 #include "util/internal-queue.h"
 #include "util/runtime-profile.h"
 #include "util/thread.h"
@@ -144,8 +145,6 @@ class DiskIoMgr {
     int64_t len() { return len_; }
     bool eosr() { return eosr_; }
 
-    int capacity() const;
-
     // Returns the offset within the scan range that this buffer starts at
     int64_t scan_range_offset() const { return scan_range_offset_; }
 
@@ -162,7 +161,7 @@ class DiskIoMgr {
     BufferDescriptor(DiskIoMgr* io_mgr);
 
     // Resets the buffer descriptor state for a new reader, range and data buffer.
-    void Reset(ReaderContext* reader, ScanRange* range, char* buffer);
+    void Reset(ReaderContext* reader, ScanRange* range, char* buffer, int64_t buffer_len);
 
     DiskIoMgr* io_mgr_;
 
@@ -178,7 +177,10 @@ class DiskIoMgr {
     // buffer with the read contents
     char* buffer_;
 
-    // len of read contents
+    // length of buffer_
+    int64_t buffer_len_;
+
+    // length of read contents
     int64_t len_;
 
     // true if the current scan range is complete
@@ -331,8 +333,9 @@ class DiskIoMgr {
   //    Specify 0, to have the disk IoMgr query the os for the number of disks.
   //  - threads_per_disk: number of read threads to create per disk. This is also
   //    the max queue depth.
-  //  - max_read_size: maximum read size (in bytes)
-  DiskIoMgr(int num_disks, int threads_per_disk, int max_read_size);
+  //  - min_buffer_size: minimum io buffer size (in bytes)
+  //  - max_buffer_size: maximum io buffer size (in bytes). Also the max read size.
+  DiskIoMgr(int num_disks, int threads_per_disk, int min_buffer_size, int max_buffer_size);
 
   // Create DiskIoMgr with default configs.
   DiskIoMgr();
@@ -414,8 +417,8 @@ class DiskIoMgr {
   // last minute, hour and since the beginning.
   int64_t GetReadThroughput();
 
-  // Returns the read buffer size
-  int read_buffer_size() const { return max_read_size_; }
+  // Returns the maximum read buffer size
+  int max_read_buffer_size() const { return max_buffer_size_; }
 
   // Returns the number of disks on the system
   int num_disks() const { return disk_queues_.size(); }
@@ -442,6 +445,8 @@ class DiskIoMgr {
   struct DiskQueue;
   class ReaderCache;
 
+  friend class DiskIoMgrTest_Buffers_Test;
+
   // Pool to allocate BufferDescriptors
   ObjectPool pool_;
 
@@ -452,8 +457,11 @@ class DiskIoMgr {
   // work to the disk.
   const int num_threads_per_disk_;
 
-  // Maximum read size. This is also the size of each allocated buffer.
-  const int max_read_size_;
+  // Maximum read size. This is also the maximum size of each allocated buffer.
+  const int max_buffer_size_;
+
+  // The minimum size of each read buffer.
+  const int min_buffer_size_;
 
   // Thread group containing all the worker threads.
   ThreadGroup disk_thread_group_;
@@ -477,8 +485,18 @@ class DiskIoMgr {
   // Protects free_buffers_ and free_buffer_descs_
   boost::mutex free_buffers_lock_;
 
-  // List of free buffer descs that can be handed out to clients.
-  std::list<char*> free_buffers_;
+  // Free buffers that can be handed out to clients. There is one list for each buffer
+  // size, indexed by the Log2 of the buffer size in units of min_buffer_size_. The
+  // maximum buffer size is max_buffer_size_, so the maximum index is
+  // Log2(max_buffer_size_ / min_buffer_size_).
+  //
+  // E.g. if min_buffer_size_ = 1024 bytes:
+  //  free_buffers_[0]  => list of free buffers with size 1024 B
+  //  free_buffers_[1]  => list of free buffers with size 2048 B
+  //  free_buffers_[10] => list of free buffers with size 1 MB
+  //  free_buffers_[13] => list of free buffers with size 8 MB
+  //  free_buffers_[n]  => list of free buffers with size 2^n * 1024 B
+  std::vector<std::list<char*> > free_buffers_;
 
   // List of free buffer desc objects that can be handed out to clients
   std::list<BufferDescriptor*> free_buffer_descs_;
@@ -493,9 +511,15 @@ class DiskIoMgr {
   // One queue is allocated for each disk on the system and indexed by disk id
   std::vector<DiskQueue*> disk_queues_;
 
-  // Gets a buffer description object, initialized for this reader, allocating
-  // one as necessary
-  BufferDescriptor* GetBufferDesc(ReaderContext* reader, ScanRange* range, char* buffer);
+  // Returns the index into free_buffers_ for a given buffer size
+  int free_buffers_idx(int64_t buffer_size);
+
+  // Gets a buffer description object, initialized for this reader, allocating one as
+  // necessary. buffer_size / min_buffer_size_ should be a power of 2, and buffer_size
+  // should be <= max_buffer_size_. These constraints will be met if buffer was acquired via
+  // GetFreeBuffer() (which it should have been).
+  BufferDescriptor* GetBufferDesc(
+      ReaderContext* reader, ScanRange* range, char* buffer, int64_t buffer_size);
 
   // Returns a buffer desc object which can now be used for another reader.
   void ReturnBufferDesc(BufferDescriptor* desc);
@@ -504,10 +528,11 @@ class DiskIoMgr {
   // the reader and disk queue state.
   void ReturnBuffer(BufferDescriptor* buffer);
 
-  // Returns a buffer to read into that is the size of max_read_size_. If there is a
+  // Returns a buffer to read into with size between *buffer_size and max_buffer_size_, and
+  // *buffer_size is set to the size of the buffer. If there is an appropriately-sized
   // free buffer in the 'free_buffers_', that is returned, otherwise a new one is
-  // allocated.
-  char* GetFreeBuffer();
+  // allocated. *buffer_size must be between 0 and max_buffer_size_.
+  char* GetFreeBuffer(int64_t* buffer_size);
 
   // Garbage collect all unused io buffers. This is currently only triggered when the
   // process wide limit is hit. This is not good enough. While it is sufficient for
@@ -515,8 +540,10 @@ class DiskIoMgr {
   // TODO: make this run periodically?
   void GcIoBuffers();
 
-  // Returns a buffer to the free list.
-  void ReturnFreeBuffer(char* buffer);
+  // Returns a buffer to the free list. buffer_size / min_buffer_size_ should be a power
+  // of 2, and buffer_size should be <= max_buffer_size_. These constraints will be met if
+  // buffer was acquired via GetFreeBuffer() (which it should have been).
+  void ReturnFreeBuffer(char* buffer, int64_t buffer_size);
 
   // Disk worker thread loop. This function reads the next range from the
   // disk queue if there are available buffers and places the read buffer

@@ -314,7 +314,7 @@ Status DiskIoMgr::ScanRange::ReadFromScanRange(hdfsFS hdfs_connection,
   *eosr = false;
   *bytes_read = 0;
   int bytes_to_read =
-      min(static_cast<int64_t>(io_mgr_->max_read_size_), len_ - bytes_read_);
+      min(static_cast<int64_t>(io_mgr_->max_buffer_size_), len_ - bytes_read_);
 
   if (hdfs_connection != NULL) {
     DCHECK(hdfs_file_ != NULL);

@@ -29,7 +29,8 @@
 using namespace std;
 using namespace boost;
 
-const int BUFFER_SIZE = 1024;
+const int MIN_BUFFER_SIZE = 512;
+const int MAX_BUFFER_SIZE = 1024;
 const int LARGE_MEM_LIMIT = 1024 * 1024 * 1024;
 
 namespace impala {
@@ -130,7 +131,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
                     << " num_read_threads=" << num_read_threads;
 
           if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-          DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
+          DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 1);
 
           Status status = io_mgr.Init(&mem_tracker);
           ASSERT_TRUE(status.ok());
@@ -182,7 +183,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
 
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
+        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 1);
 
         Status status = io_mgr.Init(&mem_tracker);
         ASSERT_TRUE(status.ok());
@@ -251,7 +252,8 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
 
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
+        DiskIoMgr io_mgr(
+            num_disks, num_threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
         Status status = io_mgr.Init(&mem_tracker);
         ASSERT_TRUE(status.ok());
@@ -319,7 +321,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
 
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
+        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 1);
 
         Status status = io_mgr.Init(&mem_tracker);
         ASSERT_TRUE(status.ok());
@@ -380,8 +382,8 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     pool_.reset(new ObjectPool);
     if (++iters % 1000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
-    MemTracker mem_tracker(mem_limit_num_buffers * BUFFER_SIZE);
-    DiskIoMgr io_mgr(1, 1, BUFFER_SIZE);
+    MemTracker mem_tracker(mem_limit_num_buffers * MAX_BUFFER_SIZE);
+    DiskIoMgr io_mgr(1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
     Status status = io_mgr.Init(&mem_tracker);
     ASSERT_TRUE(status.ok());
@@ -484,7 +486,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
                     << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
           if (++iters % 2500 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
-          DiskIoMgr io_mgr(num_disks, threads_per_disk, BUFFER_SIZE);
+          DiskIoMgr io_mgr(num_disks, threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
           Status status = io_mgr.Init(&mem_tracker);
           ASSERT_TRUE(status.ok());
 
@@ -529,6 +531,61 @@ TEST_F(DiskIoMgrTest, StressTest) {
   // Run the test with 5 disks, 5 threads per disk, 10 clients and with cancellation
   DiskIoMgrStress test(5, 5, 10, true);
   test.Run(2); // In seconds
+}
+
+TEST_F(DiskIoMgrTest, Buffers) {
+  // Test default min/max buffer size
+  int min_buffer_size = 1024;
+  int max_buffer_size = 8 * 1024 * 1024; // 8 MB
+  MemTracker mem_tracker(max_buffer_size * 2);
+
+  DiskIoMgr io_mgr(1, 1, min_buffer_size, max_buffer_size);
+  Status status = io_mgr.Init(&mem_tracker);
+  ASSERT_TRUE(status.ok());
+  ASSERT_EQ(mem_tracker.consumption(), 0);
+
+  // buffer length should be rounded up to min buffer size
+  int64_t buffer_len = 1;
+  char* buf = io_mgr.GetFreeBuffer(&buffer_len);
+  EXPECT_EQ(buffer_len, min_buffer_size);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_, 1);
+  io_mgr.ReturnFreeBuffer(buf, buffer_len);
+  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size);
+
+  // reuse buffer
+  buffer_len = min_buffer_size;
+  buf = io_mgr.GetFreeBuffer(&buffer_len);
+  EXPECT_EQ(buffer_len, min_buffer_size);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_, 1);
+  io_mgr.ReturnFreeBuffer(buf, buffer_len);
+  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size);
+
+  // bump up to next buffer size
+  buffer_len = min_buffer_size + 1;
+  buf = io_mgr.GetFreeBuffer(&buffer_len);
+  EXPECT_EQ(buffer_len, min_buffer_size * 2);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_, 2);
+  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size * 3);
+
+  // gc unused buffer
+  io_mgr.GcIoBuffers();
+  EXPECT_EQ(io_mgr.num_allocated_buffers_, 1);
+  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size * 2);
+
+  io_mgr.ReturnFreeBuffer(buf, buffer_len);
+
+  // max buffer size
+  buffer_len = max_buffer_size;
+  buf = io_mgr.GetFreeBuffer(&buffer_len);
+  EXPECT_EQ(buffer_len, max_buffer_size);
+  EXPECT_EQ(io_mgr.num_allocated_buffers_, 2);
+  io_mgr.ReturnFreeBuffer(buf, buffer_len);
+  EXPECT_EQ(mem_tracker.consumption(), min_buffer_size * 2 + max_buffer_size);
+
+  // gc buffers
+  io_mgr.GcIoBuffers();
+  EXPECT_EQ(io_mgr.num_allocated_buffers_, 0);
+  EXPECT_EQ(mem_tracker.consumption(), 0);
 }
 
 }

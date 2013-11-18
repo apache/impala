@@ -30,7 +30,8 @@ static const int MAX_FILE_LEN = 1024;
 static const int MAX_BUFFERS = 12;
 
 // Make sure this is between MIN/MAX FILE_LEN to test more cases
-static const int READ_BUFFER_SIZE = 128;
+static const int MIN_READ_BUFFER_SIZE = 64;
+static const int MAX_READ_BUFFER_SIZE = 128;
 
 static const int CANCEL_READER_PERIOD_MS = 20;  // in ms
 
@@ -69,7 +70,8 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk,
   LOG(INFO) << "Running with rand seed: " << rand_seed;
   srand(rand_seed);
 
-  io_mgr_.reset(new DiskIoMgr(num_disks, num_threads_per_disk, READ_BUFFER_SIZE));
+  io_mgr_.reset(new DiskIoMgr(
+      num_disks, num_threads_per_disk, MIN_READ_BUFFER_SIZE, MAX_READ_BUFFER_SIZE));
   Status status = io_mgr_->Init(&dummy_tracker_);
   CHECK(status.ok());
 

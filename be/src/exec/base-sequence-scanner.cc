@@ -302,6 +302,6 @@ int BaseSequenceScanner::ReadPastSize(int64_t file_offset) {
   // Include some padding
   bytes_left += average_block_size * BLOCK_SIZE_PADDING_PERCENT;
 
-  int max_read_size = state_->io_mgr()->read_buffer_size();
+  int max_read_size = state_->io_mgr()->max_read_buffer_size();
   return min(max(bytes_left, MIN_SYNC_READ_SIZE), max_read_size);
 }

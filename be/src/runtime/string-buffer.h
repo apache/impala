@@ -93,16 +93,16 @@ class StringBuffer {
   }
 
  private:
-  // Grows the buffer backing the string to be at least new_size, copying
-  // over the previous string data into the new buffer.
-  // TODO: some kind of doubling strategy?
+  // Grows the buffer backing the string to be at least new_size, copying over the
+  // previous string data into the new buffer.
   void GrowBuffer(int new_len) {
-    char* new_buffer = reinterpret_cast<char*>(pool_->Allocate(new_len));
+    // TODO: Release/reuse old buffers somehow
+    buffer_size_ = std::max(buffer_size_ * 2, new_len);
+    char* new_buffer = reinterpret_cast<char*>(pool_->Allocate(buffer_size_));
     if (string_value_.len > 0) {
       memcpy(new_buffer, string_value_.ptr, string_value_.len);
     }
     string_value_.ptr = new_buffer;
-    buffer_size_ = new_len;
   }
 
   MemPool* pool_;

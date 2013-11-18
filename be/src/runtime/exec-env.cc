@@ -165,7 +165,7 @@ Status ExecEnv::StartServices() {
   // Minimal IO Buffer requirements:
   //   IO buffer (8MB default) * number of IO buffers per thread (5) *
   //   number of threads per core * number of cores
-  int64_t min_requirement = disk_io_mgr_->read_buffer_size() *
+  int64_t min_requirement = disk_io_mgr_->max_read_buffer_size() *
       DiskIoMgr::DEFAULT_QUEUE_CAPACITY *
       FLAGS_num_threads_per_core * FLAGS_num_cores;
   if (bytes_limit < min_requirement) {

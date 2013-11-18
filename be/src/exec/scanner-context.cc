@@ -120,7 +120,7 @@ void ScannerContext::Stream::AttachCompletedResources(RowBatch* batch, bool done
   if (done) boundary_pool_->FreeAll();
 }
 
-Status ScannerContext::Stream::GetNextBuffer() {
+Status ScannerContext::Stream::GetNextBuffer(int read_past_size) {
   if (parent_->cancelled()) return Status::CANCELLED;
 
   // io_buffer_ should only be null the first time this is called
@@ -142,9 +142,11 @@ Status ScannerContext::Stream::GetNextBuffer() {
   } else {
     SCOPED_TIMER(parent_->state_->total_storage_wait_timer());
     int64_t offset = file_offset() + boundary_buffer_bytes_left_;
+
     int read_past_buffer_size = read_past_size_cb_.empty() ?
                                 DEFAULT_READ_PAST_SIZE : read_past_size_cb_(offset);
-    VLOG_FILE << "read_past_buffer_size = " << read_past_buffer_size;
+    read_past_buffer_size = ::max(read_past_buffer_size, read_past_size);
+
     // TODO: we're reading past this scan range so this is likely a remote read.
     // Update when the IoMgr has better support for remote reads.
     DiskIoMgr::ScanRange* range = parent_->scan_node_->AllocateScanRange(

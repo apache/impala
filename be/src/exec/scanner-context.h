@@ -213,12 +213,17 @@ class ScannerContext {
     Status GetBytesInternal(int requested_len, uint8_t** buffer, bool peek, int* out_len);
 
     // Gets (and blocks) for the next io buffer. After fetching all buffers in the scan
-    // range, performs synchronous reads past the scan range until EOF.  Updates
-    // io_buffer_, io_buffer_bytes_left_, and io_buffer_pos_.  If GetNextBuffer() is
-    // called after all bytes in the file have been returned, io_buffer_bytes_left_ will
-    // be set to 0. In the non-error case, io_buffer_ is never set to NULL, even if it
-    // contains 0 bytes.
-    Status GetNextBuffer();
+    // range, performs synchronous reads past the scan range until EOF.
+    //
+    // When performing a synchronous read, the read size is the max of read_past_size and
+    // the result returned by read_past_size_cb_() (or DEFAULT_READ_PAST_SIZE if no
+    // callback is set). read_past_size is not used otherwise.
+    //
+    // Updates io_buffer_, io_buffer_bytes_left_, and io_buffer_pos_.  If GetNextBuffer()
+    // is called after all bytes in the file have been returned, io_buffer_bytes_left_
+    // will be set to 0. In the non-error case, io_buffer_ is never set to NULL, even if
+    // it contains 0 bytes.
+    Status GetNextBuffer(int read_past_size = 0);
 
     // Attach all completed io buffers and the boundary mem pool to batch.
     void AttachCompletedResources(RowBatch* batch, bool done);

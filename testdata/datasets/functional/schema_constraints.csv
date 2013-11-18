@@ -78,6 +78,10 @@ table_name:tinyinttable, constraint:exclude, table_format:hbase/none/none
 # table cannot be loaded.
 table_name:overflow, constraint:exclude, table_format:hbase/none/none
 
+# widerow has a single column with a single row containing a 10MB string. hbase doesn't
+# seem to like this.
+table_name:widerow, constraint:exclude, table_format:hbase/none/none
+
 # nullformat_custom is used in null-insert tests, which user insert overwrite, 
 # which is not supported in hbase. The schema is also specified in HIVE_CREATE 
 # with no corresponding LOAD statement.

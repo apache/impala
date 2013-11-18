@@ -758,6 +758,19 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/overflow.txt' OVERWRITE INTO
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+widerow
+---- COLUMNS
+string_col string
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/widerow.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 greptiny
 ---- COLUMNS
 field string

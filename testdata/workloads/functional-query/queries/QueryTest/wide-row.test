@@ -1,0 +1,9 @@
+====
+---- QUERY
+# string_col is 10MB
+select length(string_col) from widerow;
+---- RESULTS
+10485760
+---- TYPES
+INT
+====

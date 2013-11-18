@@ -26,6 +26,7 @@ DEFINE_int32(num_disks, 0, "Number of disks on data node.");
 // io and sequential io perform similarly.
 DEFINE_int32(num_threads_per_disk, 0, "number of threads per disk");
 DEFINE_int32(read_size, 8 * 1024 * 1024, "Read Size (in bytes)");
+DEFINE_int32(min_buffer_size, 1024, "The minimum read buffer size (in bytes)");
 
 // Turning this to false will make asan much more effective for IO buffer related
 // bugs.
@@ -151,18 +152,17 @@ DiskIoMgr::BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr) :
   io_mgr_(io_mgr), reader_(NULL), buffer_(NULL) {
 }
 
-int DiskIoMgr::BufferDescriptor::capacity() const {
-  return io_mgr_->read_buffer_size();
-}
-
 void DiskIoMgr::BufferDescriptor::Reset(ReaderContext* reader,
-      ScanRange* range, char* buffer) {
+      ScanRange* range, char* buffer, int64_t buffer_len) {
   DCHECK(io_mgr_ != NULL);
   DCHECK(buffer_ == NULL);
   DCHECK(range != NULL);
+  DCHECK(buffer != NULL);
+  DCHECK_GT(buffer_len, 0);
   reader_ = reader;
   scan_range_ = range;
   buffer_ = buffer;
+  buffer_len_ = buffer_len;
   len_ = 0;
   eosr_ = false;
   status_ = Status::OK;
@@ -176,9 +176,9 @@ void DiskIoMgr::BufferDescriptor::Return() {
 
 void DiskIoMgr::BufferDescriptor::SetMemTracker(MemTracker* tracker) {
   if (mem_tracker_ == tracker) return;
-  if (mem_tracker_ != NULL) mem_tracker_->Release(capacity());
+  if (mem_tracker_ != NULL) mem_tracker_->Release(buffer_len_);
   mem_tracker_ = tracker;
-  if (mem_tracker_ != NULL) mem_tracker_->Consume(capacity());
+  if (mem_tracker_ != NULL) mem_tracker_->Consume(buffer_len_);
 }
 
 static void CheckSseSupport() {
@@ -192,22 +192,29 @@ static void CheckSseSupport() {
 
 DiskIoMgr::DiskIoMgr() :
     num_threads_per_disk_(FLAGS_num_threads_per_disk),
-    max_read_size_(FLAGS_read_size),
+    max_buffer_size_(FLAGS_read_size),
+    min_buffer_size_(FLAGS_min_buffer_size),
     shut_down_(false),
     total_bytes_read_counter_(TCounterType::BYTES),
     read_timer_(TCounterType::TIME_NS) {
+  int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
+  free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
   int num_disks = FLAGS_num_disks;
   if (num_disks == 0) num_disks = DiskInfo::num_disks();
   disk_queues_.resize(num_disks);
   CheckSseSupport();
 }
 
-DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int max_read_size) :
+DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int min_buffer_size,
+                     int max_buffer_size) :
     num_threads_per_disk_(threads_per_disk),
-    max_read_size_(max_read_size),
+    max_buffer_size_(max_buffer_size),
+    min_buffer_size_(min_buffer_size),
     shut_down_(false),
     total_bytes_read_counter_(TCounterType::BYTES),
     read_timer_(TCounterType::TIME_NS) {
+  int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
+  free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
   if (num_disks == 0) num_disks = DiskInfo::num_disks();
   disk_queues_.resize(num_disks);
   CheckSseSupport();
@@ -244,7 +251,11 @@ DiskIoMgr::~DiskIoMgr() {
   DCHECK_EQ(num_buffers_in_readers_, 0);
 
   // Delete all allocated buffers
-  DCHECK_EQ(num_allocated_buffers_, free_buffers_.size());
+  int num_free_buffers = 0;
+  for (int idx = 0; idx < free_buffers_.size(); ++idx) {
+    num_free_buffers += free_buffers_[idx].size();
+  }
+  DCHECK_EQ(num_allocated_buffers_, num_free_buffers);
   GcIoBuffers();
 
   for (int i = 0; i < disk_queues_.size(); ++i) {
@@ -479,9 +490,9 @@ Status DiskIoMgr::Read(ReaderContext* reader,
   DCHECK(buffer != NULL);
   *buffer = NULL;
 
-  if (range->len() > max_read_size_) {
+  if (range->len() > max_buffer_size_) {
     stringstream ss;
-    ss << "Cannot perform sync read larger than " << max_read_size_
+    ss << "Cannot perform sync read larger than " << max_buffer_size_
        << ". Request was " << range->len();
     return Status(ss.str());
   }
@@ -507,7 +518,7 @@ void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
   }
 
   ReaderContext* reader = buffer_desc->reader_;
-  ReturnFreeBuffer(buffer_desc->buffer_);
+  ReturnFreeBuffer(buffer_desc->buffer_, buffer_desc->buffer_len_);
   buffer_desc->SetMemTracker(NULL);
   buffer_desc->buffer_ = NULL;
   ReturnBufferDesc(buffer_desc);
@@ -525,7 +536,7 @@ void DiskIoMgr::ReturnBufferDesc(BufferDescriptor* desc) {
 }
 
 DiskIoMgr::BufferDescriptor* DiskIoMgr::GetBufferDesc(
-    ReaderContext* reader, ScanRange* range, char* buffer) {
+    ReaderContext* reader, ScanRange* range, char* buffer, int64_t buffer_size) {
   BufferDescriptor* buffer_desc;
   {
     unique_lock<mutex> lock(free_buffers_lock_);
@@ -536,29 +547,40 @@ DiskIoMgr::BufferDescriptor* DiskIoMgr::GetBufferDesc(
       free_buffer_descs_.pop_front();
     }
   }
-  buffer_desc->Reset(reader, range, buffer);
+  buffer_desc->Reset(reader, range, buffer, buffer_size);
   buffer_desc->SetMemTracker(reader->mem_tracker_);
   return buffer_desc;
 }
 
-char* DiskIoMgr::GetFreeBuffer() {
+char* DiskIoMgr::GetFreeBuffer(int64_t* buffer_size) {
+  DCHECK_LE(*buffer_size, max_buffer_size_);
+  DCHECK_GT(*buffer_size, 0);
+  *buffer_size = min(static_cast<int64_t>(max_buffer_size_), *buffer_size);
+  int idx = free_buffers_idx(*buffer_size);
+  // Quantize buffer size to nearest power of 2 greater than the specified buffer size and
+  // convert to bytes
+  *buffer_size = (1 << idx) * min_buffer_size_;
+
   unique_lock<mutex> lock(free_buffers_lock_);
   char* buffer = NULL;
-  if (free_buffers_.empty()) {
+  if (free_buffers_[idx].empty()) {
     ++num_allocated_buffers_;
     if (ImpaladMetrics::IO_MGR_NUM_BUFFERS != NULL) {
       ImpaladMetrics::IO_MGR_NUM_BUFFERS->Increment(1L);
     }
+    if (ImpaladMetrics::IO_MGR_TOTAL_BYTES != NULL) {
+      ImpaladMetrics::IO_MGR_TOTAL_BYTES->Increment(*buffer_size);
+    }
     // Update the process mem usage.  This is checked the next time we start
     // a read for the next reader (DiskIoMgr::GetNextScanRange)
-    process_mem_tracker_->Consume(max_read_size_);
-    buffer = new char[max_read_size_];
+    process_mem_tracker_->Consume(*buffer_size);
+    buffer = new char[*buffer_size];
   } else {
     if (ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS != NULL) {
       ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->Increment(-1L);
     }
-    buffer = free_buffers_.front();
-    free_buffers_.pop_front();
+    buffer = free_buffers_[idx].front();
+    free_buffers_[idx].pop_front();
   }
   DCHECK(buffer != NULL);
   return buffer;
@@ -566,22 +588,44 @@ char* DiskIoMgr::GetFreeBuffer() {
 
 void DiskIoMgr::GcIoBuffers() {
   unique_lock<mutex> lock(free_buffers_lock_);
-  for (list<char*>::iterator iter = free_buffers_.begin();
-      iter != free_buffers_.end(); ++iter) {
-    process_mem_tracker_->Release(max_read_size_);
-    --num_allocated_buffers_;
-    delete[] *iter;
+  int buffers_freed = 0;
+  int bytes_freed = 0;
+  for (int idx = 0; idx < free_buffers_.size(); ++idx) {
+    for (list<char*>::iterator iter = free_buffers_[idx].begin();
+         iter != free_buffers_[idx].end(); ++iter) {
+      int64_t buffer_size = (1 << idx) * min_buffer_size_;
+      process_mem_tracker_->Release(buffer_size);
+      --num_allocated_buffers_;
+      delete[] *iter;
+
+      ++buffers_freed;
+      bytes_freed += buffer_size;
+    }
+    free_buffers_[idx].clear();
   }
-  free_buffers_.clear();
+
+  if (ImpaladMetrics::IO_MGR_NUM_BUFFERS != NULL) {
+    ImpaladMetrics::IO_MGR_NUM_BUFFERS->Increment(-buffers_freed);
+  }
+  if (ImpaladMetrics::IO_MGR_TOTAL_BYTES != NULL) {
+    ImpaladMetrics::IO_MGR_TOTAL_BYTES->Increment(-bytes_freed);
+  }
+  if (ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS != NULL) {
+    ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->Update(0);
+  }
 }
 
-void DiskIoMgr::ReturnFreeBuffer(char* buffer) {
+void DiskIoMgr::ReturnFreeBuffer(char* buffer, int64_t buffer_size) {
   DCHECK(buffer != NULL);
+  int idx = free_buffers_idx(buffer_size);
+  DCHECK_EQ(BitUtil::Ceil(buffer_size, min_buffer_size_) & ~(1 << idx), 0)
+      << "buffer_size_ / min_buffer_size_ should be power of 2, got buffer_size = "
+      << buffer_size << ", min_buffer_size_ = " << min_buffer_size_;
   if (FLAGS_reuse_io_buffers) {
     unique_lock<mutex> lock(free_buffers_lock_);
-    free_buffers_.push_back(buffer);
+    free_buffers_[idx].push_back(buffer);
   } else {
-    process_mem_tracker_->Release(max_read_size_);
+    process_mem_tracker_->Release(buffer_size);
     --num_allocated_buffers_;
     delete[] buffer;
   }
@@ -720,7 +764,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
   if (reader->state_ == ReaderContext::Cancelled) {
     state.DecrementReadThreadAndCheckDone(reader);
     DCHECK(reader->Validate()) << endl << reader->DebugString();
-    ReturnFreeBuffer(buffer->buffer_);
+    ReturnFreeBuffer(buffer->buffer_, buffer->buffer_len_);
     buffer->SetMemTracker(NULL);
     buffer->buffer_ = NULL;
     buffer->scan_range_->Cancel(reader->status_);
@@ -738,7 +782,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
   //  3. Middle of scan range
   if (!buffer->status_.ok()) {
     // Error case
-    ReturnFreeBuffer(buffer->buffer_);
+    ReturnFreeBuffer(buffer->buffer_, buffer->buffer_len_);
     buffer->SetMemTracker(NULL);
     buffer->buffer_ = NULL;
     buffer->eosr_ = true;
@@ -782,7 +826,9 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
       break;
     }
 
-    buffer = GetFreeBuffer();
+    int64_t bytes_remaining = range->len_ - range->bytes_read_;
+    int64_t buffer_size = ::min(bytes_remaining, static_cast<int64_t>(max_buffer_size_));
+    buffer = GetFreeBuffer(&buffer_size);
     ++reader->num_used_buffers_;
 
     // Validate more invariants.
@@ -791,7 +837,7 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
     DCHECK(reader != NULL);
     DCHECK(buffer != NULL);
 
-    BufferDescriptor* buffer_desc = GetBufferDesc(reader, range, buffer);
+    BufferDescriptor* buffer_desc = GetBufferDesc(reader, range, buffer, buffer_size);
     DCHECK(buffer_desc != NULL);
 
     // No locks in this section.  Only working on local vars.  We don't want to hold a
@@ -826,4 +872,12 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
   }
 
   DCHECK(shut_down_);
+}
+
+int DiskIoMgr::free_buffers_idx(int64_t buffer_size) {
+  int64_t buffer_size_scaled = BitUtil::Ceil(buffer_size, min_buffer_size_);
+  int idx = BitUtil::Log2(buffer_size_scaled);
+  DCHECK_GE(idx, 0);
+  DCHECK_LT(idx, free_buffers_.size());
+  return idx;
 }

@@ -178,7 +178,6 @@ class MemPool {
 
  private:
   static const int DEFAULT_INITIAL_CHUNK_SIZE = 4 * 1024;
-  static const int MAX_CHUNK_SIZE = 512 * 1024;
 
   struct ChunkInfo {
     bool owns_data;  // true if we eventually need to dealloc data
