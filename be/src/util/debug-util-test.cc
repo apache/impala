@@ -56,28 +56,34 @@ TEST(DebugUtil, QueryIdParsing) {
   EXPECT_TRUE(ParseId("cdabcdabcdabcd:abcdabcd5678", &id));
   EXPECT_EQ(id.hi, 0xcdabcdabcdabcd);
   EXPECT_EQ(id.lo, 0xabcdabcd5678);
+}
 
-  // Pre-CDH5 CM sends query IDs separated by a space, not a colon.
-  EXPECT_FALSE(ParseId("zbcdabcdabcdabcd abcdabcdabcdabcd", &id));
-  EXPECT_FALSE(ParseId("~bcdabcdabcdabcd abcdabcdabcdabcd", &id));
-  EXPECT_FALSE(ParseId("abcdabcdabcdabcd !bcdabcdabcdabcd", &id));
-  EXPECT_FALSE(ParseId("abcdabcdabcdabcd :abcdabcdabcdabc", &id));
-
-  EXPECT_TRUE(ParseId("abcdabcdabcdabcd abcdabcdabcdabcd", &id));
+TEST(DebugUtil, PreCDH5QueryIdParsing) {
+  TUniqueId id;
+  // Pre-CDH5 CM sends query IDs as decimal ints separated by a space.
+  EXPECT_TRUE(ParseId("-6067004223159161907 -6067004223159161907", &id));
   EXPECT_EQ(id.hi, 0xabcdabcdabcdabcd);
   EXPECT_EQ(id.lo, 0xabcdabcdabcdabcd);
 
-  EXPECT_TRUE(ParseId("abcdabcdabcdabcd 1234abcdabcd5678", &id));
+  // Check components are parsed separately
+  EXPECT_TRUE(ParseId("1:2", &id));
+  EXPECT_EQ(1, id.hi);
+  EXPECT_EQ(2, id.lo);
+
+  // Too many components
+  EXPECT_FALSE(
+      ParseId("-6067004223159161907 -6067004223159161907 -6067004223159161907", &id));
+
+  // Extra whitespace ok
+  EXPECT_TRUE(ParseId("-6067004223159161907  -6067004223159161907", &id));
   EXPECT_EQ(id.hi, 0xabcdabcdabcdabcd);
-  EXPECT_EQ(id.lo, 0x1234abcdabcd5678);
+  EXPECT_EQ(id.lo, 0xabcdabcdabcdabcd);
 
-  EXPECT_TRUE(ParseId("cdabcdabcdabcd 1234abcdabcd5678", &id));
-  EXPECT_EQ(id.hi, 0xcdabcdabcdabcd);
-  EXPECT_EQ(id.lo, 0x1234abcdabcd5678);
+  // Unsigned representation of 0xffffffffffffffff -- too large to parse
+  EXPECT_FALSE(ParseId("18446744073709551615 18446744073709551615", &id));
 
-  EXPECT_TRUE(ParseId("cdabcdabcdabcd abcdabcd5678", &id));
-  EXPECT_EQ(id.hi, 0xcdabcdabcdabcd);
-  EXPECT_EQ(id.lo, 0xabcdabcd5678);
+  // Hex but with a space separator
+  EXPECT_FALSE(ParseId("aaaaaaaaaaaaaaaa aaaaaaaaaaaaaaaa", &id));
 }
 
 }

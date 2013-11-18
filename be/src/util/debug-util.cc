@@ -18,6 +18,7 @@
 
 #include <iomanip>
 #include <sstream>
+#include <boost/foreach.hpp>
 
 #include "common/logging.h"
 #include "common/version.h"
@@ -26,6 +27,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/row-batch.h"
 #include "util/cpu-info.h"
+#include "util/string-parser.h"
 #include "gen-cpp/Opcodes_types.h"
 
 #define PRECISION 2
@@ -42,6 +44,7 @@
 #define BILLION (MILLION * 1000)
 
 using namespace std;
+using namespace boost;
 using namespace beeswax;
 using namespace parquet;
 
@@ -103,15 +106,37 @@ string PrintId(const TUniqueId& id, const string& separator) {
 }
 
 bool ParseId(const string& s, TUniqueId* id) {
+  // For backwards compatibility, this method parses two forms of query ID from text:
+  //  - <hex-int64_t><colon><hex-int64_t> - this format is the standard going forward
+  //  - <decimal-int64_t><space><decimal-int64_t> - legacy compatibility with CDH4 CM
   DCHECK(id != NULL);
 
   const char* hi_part = s.c_str();
   char* separator = const_cast<char*>(strchr(hi_part, ':'));
   if (separator == NULL) {
-    // CM pre CDH5 sends query IDs with a space separator
-    separator = const_cast<char*>(strchr(hi_part, ' '));
-    if (separator == NULL) return false;
+    // Legacy compatibility branch
+    char_separator<char> sep(" ");
+    tokenizer< char_separator<char> > tokens(s, sep);
+    int i = 0;
+    BOOST_FOREACH(const string& token, tokens) {
+      StringParser::ParseResult parse_result = StringParser::PARSE_SUCCESS;
+      int64_t component = StringParser::StringToInt<int64_t>(
+          token.c_str(), token.length(), &parse_result);
+      if (parse_result != StringParser::PARSE_SUCCESS) return false;
+      if (i == 0) {
+        id->hi = component;
+      } else if (i == 1) {
+        id->lo = component;
+      } else {
+        // Too many tokens, must be ill-formed.
+        return false;
+      }
+      ++i;
+    }
+    return true;
   }
+
+  // Parse an ID from <int64_t_as_hex><colon><int64_t_as_hex>
   const char* lo_part = separator + 1;
   *separator = '\0';
 
