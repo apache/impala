@@ -184,7 +184,6 @@ static int SaslGetPath(void* context, const char** path) {
 void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   // Minumum lifetime to request for each ticket renewal.
   static const int MIN_TICKET_LIFETIME_IN_MINS = 1440;
-  stringstream sysstream;
 
   // Set the ticket lifetime to an arbitrarily large value or 2x the renewal interval,
   // whichever is larger. The KDC will automatically fall back to using the maximum
@@ -194,19 +193,21 @@ void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
       max(MIN_TICKET_LIFETIME_IN_MINS, FLAGS_kerberos_reinit_interval * 2);
 
   // Pass the path to the key file and the principal. Make the ticket renewable.
-  // Calling kinit -R ensures the ticket makes it to the cache.
-  sysstream << "kinit -R -r " << ticket_lifetime
-            << "m -k -t " << keytab_path_ << " " << principal_ << " 2>&1";
+  // Calling kinit -R ensures the ticket makes it to the cache, and should be a separate
+  // call to kinit.
+  stringstream kinit_cmd_ss;
+  kinit_cmd_ss << "kinit -r " << ticket_lifetime << "m -k -t " << keytab_path_ << " "
+               << principal_ << " 2>&1 " << "&& kinit -R 2>&1";
+  string kinit_cmd = kinit_cmd_ss.str();
 
   bool had_one_success = false;
   int failures = 0;
-  string kreturn;
-
   while (true) {
     LOG(INFO) << "Registering " << principal_ << " key_tab file "
               << keytab_path_;
+    string kreturn;
     bool succeeded = false;
-    FILE* fp = popen(sysstream.str().c_str(), "r");
+    FILE* fp = popen(kinit_cmd.c_str(), "r");
     if (fp == NULL) {
       kreturn = "Failed to execute kinit";
     } else {
