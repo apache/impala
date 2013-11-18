@@ -105,9 +105,8 @@ def exec_hbase_query_from_file(file_name):
 def exec_impala_query_from_file(file_name, result_queue):
   """Execute each query in an Impala query file individually"""
   is_success = True
+  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
   try:
-    impala_client = ImpalaBeeswaxClient(options.impalad,
-        use_kerberos=options.use_kerberos)
     impala_client.connect()
     with open(file_name, 'r+') as query_file:
       queries = sqlparse.split(query_file.read())
@@ -118,6 +117,8 @@ def exec_impala_query_from_file(file_name, result_queue):
   except Exception as e:
     print "Data Loading from Impala failed with error: %s" % str(e)
     is_success = False
+  finally:
+    impala_client.close_connection()
   result_queue.put(is_success)
 
 def exec_bash_script(file_name):
@@ -177,8 +178,14 @@ def exec_impala_query_from_file_parallel(query_files):
   # Refresh Catalog
   print "Invalidating metadata"
   impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
-  impala_client.connect()
-  impala_client.execute('invalidate metadata')
+  try:
+    impala_client.connect()
+    impala_client.execute('invalidate metadata')
+  except Exception, e:
+    print "Could not Invalidate metadata, data loading failed."
+    sys.exit(1)
+  finally:
+    impala_client.close_connection()
   result_queue = Queue()
   threads = []
   for query_file in query_files:
