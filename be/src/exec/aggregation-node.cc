@@ -110,7 +110,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   }
 
   // TODO: how many buckets?
-  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, 1, true, true,
+  hash_tbl_.reset(new HashTable(state, build_exprs_, probe_exprs_, 1, true, true,
       id(), mem_tracker()));
 
   if (probe_exprs_.empty()) {

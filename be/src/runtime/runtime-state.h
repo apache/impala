@@ -183,10 +183,6 @@ class RuntimeState {
   bool is_cancelled() const { return is_cancelled_; }
   void set_is_cancelled(bool v) { is_cancelled_ = v; }
 
-  // sets the state to mem limit exceeded and logs all the registered trackers
-  // Subsequent calls to this will be no-ops.
-  void LogMemLimitExceeded();
-
   RuntimeProfile::Counter* total_cpu_timer() { return total_cpu_timer_; }
   RuntimeProfile::Counter* total_storage_wait_timer() {
     return total_storage_wait_timer_;
@@ -201,6 +197,14 @@ class RuntimeState {
     if (!query_status_.ok()) return;
     query_status_ = Status(err_msg);
   }
+
+  // Sets query_status_ to MEM_LIMIT_EXCEEDED and logs all the registered trackers.
+  // Subsequent calls to this will be no-ops.
+  // If failed_allocation_size is not 0, then it is the size of the allocation (in
+  // bytes) that would have exceeded the limit allocated for 'tracker'.
+  // This value and tracker are only used for error reporting.
+  Status SetMemLimitExceeded(MemTracker* tracker = NULL,
+      int64_t failed_allocation_size = 0);
 
   // Returns a non-OK status if query execution should stop (e.g., the query was cancelled
   // or a mem limit was exceeded). Exec nodes should check this periodically so execution
@@ -290,10 +294,6 @@ class RuntimeState {
 
   // if true, execution should stop with a CANCELLED status
   bool is_cancelled_;
-
-  // if true, execution should stop with MEM_LIMIT_EXCEEDED
-  boost::mutex mem_limit_exceeded_lock_;
-  bool is_mem_limit_exceeded_;
 
   // Non-OK if an error has occurred and query execution should abort. Used only for
   // asynchronously reporting such errors (e.g., when a UDF reports an error), so this

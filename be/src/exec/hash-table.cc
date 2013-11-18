@@ -15,9 +15,10 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/expr.h"
-#include "runtime/raw-value.h"
-#include "runtime/string-value.inline.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/raw-value.h"
+#include "runtime/runtime-state.h"
+#include "runtime/string-value.inline.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 
@@ -29,10 +30,11 @@ const char* HashTable::LLVM_CLASS_NAME = "class.impala::HashTable";
 
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 
-HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& probe_exprs,
-    int num_build_tuples, bool stores_nulls, bool finds_nulls, int32_t initial_seed,
-    MemTracker* mem_tracker, int64_t num_buckets)
-  : build_exprs_(build_exprs),
+HashTable::HashTable(RuntimeState* state, const vector<Expr*>& build_exprs,
+    const vector<Expr*>& probe_exprs, int num_build_tuples, bool stores_nulls,
+    bool finds_nulls, int32_t initial_seed, MemTracker* mem_tracker, int64_t num_buckets)
+  : state_(state),
+    build_exprs_(build_exprs),
     probe_exprs_(probe_exprs),
     num_build_tuples_(num_build_tuples),
     stores_nulls_(stores_nulls),
@@ -42,7 +44,8 @@ HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& prob
     num_filled_buckets_(0),
     nodes_(NULL),
     num_nodes_(0),
-    mem_tracker_(mem_tracker) {
+    mem_tracker_(mem_tracker),
+    mem_limit_exceeded_(false) {
   DCHECK(mem_tracker != NULL);
   DCHECK_EQ(build_exprs_.size(), probe_exprs_.size());
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
@@ -593,9 +596,17 @@ Function* HashTable::CodegenEquals(LlvmCodeGen* codegen) {
 }
 
 void HashTable::ResizeBuckets(int64_t num_buckets) {
-  DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
+  DCHECK_EQ((num_buckets & (num_buckets-1)), 0)
+      << "num_buckets=" << num_buckets << " must be a power of 2";
 
   int64_t old_num_buckets = num_buckets_;
+  // This can be a rather large allocation so check the limit before (to prevent
+  // us from going over the limits too much).
+  int64_t delta_size = (num_buckets - old_num_buckets) * sizeof(Bucket);
+  if (!mem_tracker_->TryConsume(delta_size)) {
+    MemLimitExceeded(delta_size);
+    return;
+  }
   buckets_.resize(num_buckets);
 
   // If we're doubling the number of buckets, all nodes in a particular bucket
@@ -635,22 +646,32 @@ void HashTable::ResizeBuckets(int64_t num_buckets) {
     }
   }
 
-  int64_t delta_bytes = (num_buckets - old_num_buckets) * sizeof(Bucket);
-  mem_tracker_->Consume(delta_bytes);
-
   num_buckets_ = num_buckets;
   num_buckets_till_resize_ = MAX_BUCKET_OCCUPANCY_FRACTION * num_buckets_;
 }
 
 void HashTable::GrowNodeArray() {
   int64_t old_size = nodes_capacity_ * node_byte_size_;
-  nodes_capacity_ = nodes_capacity_ + nodes_capacity_ / 2;
-  int64_t new_size = nodes_capacity_ * node_byte_size_;
+  int64_t new_capacity = nodes_capacity_ + nodes_capacity_ / 2;
+  int64_t new_size = new_capacity * node_byte_size_;
+
+  // This can be a rather large allocation so check the limit before (to prevent
+  // us from going over the limits too much).
+  if (!mem_tracker_->TryConsume(new_size - old_size)) {
+    MemLimitExceeded(new_size - old_size);
+    return;
+  }
+  nodes_capacity_ = new_capacity;
   nodes_ = reinterpret_cast<uint8_t*>(realloc(nodes_, new_size));
   if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
     ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(new_size - old_size);
   }
-  mem_tracker_->Consume(new_size - old_size);
+}
+
+void HashTable::MemLimitExceeded(int64_t allocation_size) {
+  DCHECK(!mem_limit_exceeded_);
+  mem_limit_exceeded_ = true;
+  if (state_ != NULL) state_->SetMemLimitExceeded(mem_tracker_, allocation_size);
 }
 
 string HashTable::DebugString(bool skip_empty, const RowDescriptor* desc) {

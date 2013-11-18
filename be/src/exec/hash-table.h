@@ -33,6 +33,7 @@ class Expr;
 class LlvmCodeGen;
 class MemTracker;
 class RowDescriptor;
+class RuntimeState;
 class Tuple;
 class TupleRow;
 
@@ -87,19 +88,25 @@ class HashTable {
   //  - mem_tracker: if non-empty, all memory allocations for nodes and for buckets are
   //    tracked; the tracker must be valid until the d'tor is called
   //  - initial_seed: Initial seed value to use when computing hashes for rows
-  HashTable(const std::vector<Expr*>& build_exprs, const std::vector<Expr*>& probe_exprs,
-      int num_build_tuples, bool stores_nulls, bool finds_nulls, int32_t initial_seed,
+  HashTable(RuntimeState* state, const std::vector<Expr*>& build_exprs,
+      const std::vector<Expr*>& probe_exprs, int num_build_tuples,
+      bool stores_nulls, bool finds_nulls, int32_t initial_seed,
       MemTracker* mem_tracker, int64_t num_buckets = 1024);
 
   // Call to cleanup any resources. Must be called once.
   void Close();
 
   // Insert row into the hash table.  Row will be evaluated over build_exprs_
-  // This will grow the hash table if necessary
+  // This will grow the hash table if necessary.
+  // If the hash table has or needs to go over the mem limit, the Insert will
+  // be ignored. The caller is assumed to periodically (e.g. per row batch) check
+  // the limits to identify this case.
   void IR_ALWAYS_INLINE Insert(TupleRow* row) {
-    if (num_filled_buckets_ > num_buckets_till_resize_) {
+    if (UNLIKELY(mem_limit_exceeded_)) return;
+    if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
       // TODO: next prime instead of double?
       ResizeBuckets(num_buckets_ * 2);
+      if (UNLIKELY(mem_limit_exceeded_)) return;
     }
     InsertImpl(row);
   }
@@ -130,6 +137,8 @@ class HashTable {
   int64_t byte_size() const {
     return node_byte_size_ * nodes_capacity_ + sizeof(Bucket) * buckets_.size();
   }
+
+  bool mem_limit_exceeded() const { return mem_limit_exceeded_; }
 
   // Returns the results of the exprs at 'expr_idx' evaluated over the last row
   // processed by the HashTable.
@@ -320,9 +329,16 @@ class HashTable {
   // Grow the node array.
   void GrowNodeArray();
 
+  // Sets mem_limit_exceeded_ to true and MEM_LIMIT_EXCEEDED for the query.
+  // allocation_size is the attempted size of the allocation that would have
+  // brought us over the mem limit.
+  void MemLimitExceeded(int64_t allocation_size);
+
   // Load factor that will trigger growing the hash table on insert.  This is
   // defined as the number of non-empty buckets / total_buckets
   static const float MAX_BUCKET_OCCUPANCY_FRACTION;
+
+  RuntimeState* state_;
 
   const std::vector<Expr*>& build_exprs_;
   const std::vector<Expr*>& probe_exprs_;
@@ -350,6 +366,10 @@ class HashTable {
   int64_t nodes_capacity_;
 
   MemTracker* mem_tracker_;
+
+  // Set to true if the hash table exceeds the memory limit. If this is set,
+  // subsequent calls to Insert() will be ignored.
+  bool mem_limit_exceeded_;
 
   std::vector<Bucket> buckets_;
 

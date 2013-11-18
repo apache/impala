@@ -53,8 +53,7 @@ RuntimeState::RuntimeState(const TUniqueId& query_id,
     unreported_error_idx_(0),
     query_id_(query_id),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
-    is_cancelled_(false),
-    is_mem_limit_exceeded_(false) {
+    is_cancelled_(false) {
   Status status = Init(fragment_instance_id, query_options, now, user, exec_env);
   DCHECK(status.ok()) << status.GetErrorMsg();
 }
@@ -66,8 +65,7 @@ RuntimeState::RuntimeState(const string& now, const string& user)
     user_(user),
     exec_env_(ExecEnv::GetInstance()),
     profile_(obj_pool_.get(), "<unnamed>"),
-    is_cancelled_(false),
-    is_mem_limit_exceeded_(false) {
+    is_cancelled_(false) {
   query_options_.batch_size = DEFAULT_BATCH_SIZE;
   now_.reset(new TimestampValue(now.c_str(), now.size()));
 }
@@ -210,30 +208,42 @@ void RuntimeState::GetUnreportedErrors(vector<string>* new_errors) {
   }
 }
 
-void RuntimeState::LogMemLimitExceeded() {
+Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
+    int64_t failed_allocation_size) {
+  DCHECK_GE(failed_allocation_size, 0);
   {
-    lock_guard<mutex> l(mem_limit_exceeded_lock_);
-    if (is_mem_limit_exceeded_) return;
-    is_mem_limit_exceeded_ = true;
+    boost::lock_guard<boost::mutex> l(query_status_lock_);
+    if (query_status_.ok()) {
+      query_status_ = Status::MEM_LIMIT_EXCEEDED;
+    } else {
+      return query_status_;
+    }
   }
+
   DCHECK(query_mem_tracker_.get() != NULL);
   stringstream ss;
   ss << "Memory Limit Exceeded\n";
+  if (failed_allocation_size != 0) {
+    DCHECK(tracker != NULL);
+    ss << "  " << tracker->label() << " could not allocate "
+       << PrettyPrinter::Print(failed_allocation_size, TCounterType::BYTES)
+       << " without exceeding limit."
+       << endl;
+  }
   if (exec_env_->process_mem_tracker()->LimitExceeded()) {
     ss << exec_env_->process_mem_tracker()->LogUsage();
   } else {
     ss << query_mem_tracker_->LogUsage();
   }
   LogError(ss.str());
+  DCHECK(query_status_.IsMemLimitExceeded());
+  return query_status_;
 }
 
 Status RuntimeState::CheckQueryState() {
   // TODO: it would be nice if this also checked for cancellation, but doing so breaks
   // cases where we use Status::CANCELLED to indicate that the limit was reached.
-  if (instance_mem_tracker_->AnyLimitExceeded()) {
-    LogMemLimitExceeded();
-    return Status::MEM_LIMIT_EXCEEDED;
-  }
+  if (instance_mem_tracker_->AnyLimitExceeded()) return SetMemLimitExceeded();
   boost::lock_guard<boost::mutex> l(query_status_lock_);
   return query_status_;
 }

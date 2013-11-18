@@ -403,7 +403,7 @@ void PlanFragmentExecutor::UpdateStatus(const Status& status) {
   {
     lock_guard<mutex> l(status_lock_);
     if (status_.ok()) {
-      if (status.IsMemLimitExceeded()) runtime_state_->LogMemLimitExceeded();
+      if (status.IsMemLimitExceeded()) runtime_state_->SetMemLimitExceeded();
       status_ = status;
     }
   }

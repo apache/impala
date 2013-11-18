@@ -109,7 +109,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   // TODO: default buckets
   bool stores_nulls =
       join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
-  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, build_tuple_size_,
+  hash_tbl_.reset(new HashTable(state, build_exprs_, probe_exprs_, build_tuple_size_,
       stores_nulls, false, id(), mem_tracker()));
 
   probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size(), mem_tracker()));

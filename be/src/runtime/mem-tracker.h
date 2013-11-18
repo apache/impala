@@ -135,7 +135,7 @@ class MemTracker {
     // for error reporting so this is probably okay. Rolling those back is
     // pretty hard; we'd need something like 2PC.
     for (int j = 0; j < i; ++j) {
-      all_trackers_[j]->Release(bytes);
+      all_trackers_[j]->consumption_->Update(-bytes);
     }
     return false;
   }
@@ -177,6 +177,7 @@ class MemTracker {
 
   int64_t limit() const { return limit_; }
   bool has_limit() const { return limit_ >= 0; }
+  const std::string& label() const { return label_; }
 
   // Returns the memory consumed in bytes.
   int64_t consumption() const {

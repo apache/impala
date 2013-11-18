@@ -179,7 +179,7 @@ TEST_F(HashTableTest, BasicTest) {
 
   // Create the hash table and insert the build rows
   MemTracker tracker;
-  HashTable hash_table(build_expr_, probe_expr_, 1, false, false, 0, &tracker);
+  HashTable hash_table(NULL, build_expr_, probe_expr_, 1, false, false, 0, &tracker);
   for (int i = 0; i < 5; ++i) {
     hash_table.Insert(build_rows[i]);
   }
@@ -220,7 +220,7 @@ TEST_F(HashTableTest, BasicTest) {
 // This tests makes sure we can scan ranges of buckets
 TEST_F(HashTableTest, ScanTest) {
   MemTracker tracker;
-  HashTable hash_table(build_expr_, probe_expr_, 1, false, false, 0, &tracker);
+  HashTable hash_table(NULL, build_expr_, probe_expr_, 1, false, false, 0, &tracker);
   // Add 1 row with val 1, 2 with val 2, etc
   vector<TupleRow*> build_rows;
   ProbeTestData probe_rows[15];
@@ -267,7 +267,8 @@ TEST_F(HashTableTest, GrowTableTest) {
   int expected_size = 0;
   MemTracker tracker(1024 * 1024);
   HashTable hash_table(
-      build_expr_, probe_expr_, 1, false, false, 0, &tracker, num_to_add);
+      NULL, build_expr_, probe_expr_, 1, false, false, 0, &tracker, num_to_add);
+  EXPECT_FALSE(hash_table.mem_limit_exceeded());
   EXPECT_TRUE(!tracker.LimitExceeded());
 
   // This inserts about 5M entries
@@ -277,15 +278,15 @@ TEST_F(HashTableTest, GrowTableTest) {
     }
     expected_size += num_to_add;
     num_to_add *= 2;
-    EXPECT_EQ(hash_table.size(), expected_size);
   }
-  EXPECT_TRUE(tracker.LimitExceeded());
+  EXPECT_TRUE(hash_table.mem_limit_exceeded());
+  EXPECT_FALSE(tracker.LimitExceeded());
 
-  // Validate that we can find the entries
+  // Validate that we can find the entries before we went over the limit
   for (int i = 0; i < expected_size * 5; i += 100000) {
     TupleRow* probe_row = CreateTupleRow(i);
     HashTable::Iterator iter = hash_table.Find(probe_row);
-    if (i < expected_size) {
+    if (i < hash_table.size()) {
       EXPECT_TRUE(iter != hash_table.End());
       ValidateMatch(probe_row, iter.GetRow());
     } else {

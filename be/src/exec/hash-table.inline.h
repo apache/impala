@@ -38,7 +38,7 @@ inline HashTable::Iterator HashTable::Find(TupleRow* probe_row) {
 
   return End();
 }
-  
+
 inline HashTable::Iterator HashTable::Begin() {
   int64_t bucket_idx = -1;
   Bucket* bucket = NextBucket(&bucket_idx);
@@ -63,7 +63,10 @@ inline void HashTable::InsertImpl(TupleRow* row) {
 
   uint32_t hash = HashCurrentRow();
   int64_t bucket_idx = hash & (num_buckets_ - 1);
-  if (num_nodes_ == nodes_capacity_) GrowNodeArray();
+  if (num_nodes_ == nodes_capacity_) {
+    GrowNodeArray();
+    if (UNLIKELY(mem_limit_exceeded_)) return;
+  }
   Node* node = GetNode(num_nodes_);
   TupleRow* data = node->data();
   node->hash_ = hash;
@@ -109,7 +112,7 @@ inline void HashTable::Iterator::Next() {
       if (node->hash_ == scan_hash_ && table_->Equals(node->data())) {
         node_idx_ = next_idx;
         return;
-      } 
+      }
       next_idx = node->next_idx_;
     }
     *this = table_->End();
