@@ -286,7 +286,8 @@ public class FunctionCallExpr extends Expr {
       argTypes.add(type);
       intermediateType = ColumnType.createType(type);
     } else if (agg_op_ == BuiltinAggregateFunction.Operator.DISTINCT_PC ||
-          agg_op_ == BuiltinAggregateFunction.Operator.DISTINCT_PCSA) {
+          agg_op_ == BuiltinAggregateFunction.Operator.DISTINCT_PCSA ||
+          agg_op_ == BuiltinAggregateFunction.Operator.NDV) {
       type = PrimitiveType.STRING;
       params_.setIsDistinct(false);
       argTypes.add(arg.getType());

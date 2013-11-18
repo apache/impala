@@ -901,6 +901,7 @@ public class ParserTest {
     ParsesOk("select distinctpc(a), distinctpc(distinct a) from t");
     ParserError("select distinctpc() from t");
     ParsesOk("select distinctpcsa(a), distinctpcsa(distinct a) from t");
+    ParsesOk("select ndv(a), ndv(distinct a) from t");
     ParserError("select distinctpcsa() from t");
     ParsesOk("select group_concat(a) from t");
     ParsesOk("select group_concat(a, ', ') from t");
@@ -1897,7 +1898,7 @@ public class ParserTest {
         "       ^\n" +
         "Encountered: FROM\n" +
         "Expected: ALL, AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
-        "DISTINCTPCSA, FALSE, GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, " +
+        "DISTINCTPCSA, FALSE, GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, SUM, " +
         "TRUE, IDENTIFIER\n");
 
     // missing from
@@ -1924,7 +1925,7 @@ public class ParserTest {
         "                           ^\n" +
         "Encountered: EOF\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, FALSE, " +
-        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -1933,7 +1934,7 @@ public class ParserTest {
         "                            ^\n" +
         "Encountered: GROUP\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, FALSE, " +
-        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
@@ -2001,7 +2002,7 @@ public class ParserTest {
         "                             ^\n" +
         "Encountered: COMMA\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, FALSE, " +
-        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
   }
 

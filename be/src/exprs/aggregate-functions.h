@@ -72,6 +72,17 @@ class AggregateFunctions {
   static void PcMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static StringVal PcFinalize(FunctionContext*, const StringVal& src);
   static StringVal PcsaFinalize(FunctionContext*, const StringVal& src);
+
+  // Hyperloglog distinct estimate algorithm.
+  // See these papers for more details.
+  // 1) Hyperloglog: The analysis of a near-optimal cardinality estimation
+  // algorithm (2007)
+  // 2) HyperLogLog in Practice (paper from google with some improvements)
+  static void HllInit(FunctionContext*, StringVal* slot);
+  template <typename T>
+  static void HllUpdate(FunctionContext*, const T& src, StringVal* dst);
+  static void HllMerge(FunctionContext*, const StringVal& src, StringVal* dst);
+  static StringVal HllFinalize(FunctionContext*, const StringVal& src);
 };
 
 }

@@ -46,7 +46,15 @@ public class BuiltinAggregateFunction extends Function {
     AVG("AVG", TAggregationOp.INVALID, null),
     GROUP_CONCAT("GROUP_CONCAT", TAggregationOp.GROUP_CONCAT,
         // TODO: this needs to switch to CHAR(16)
+        ColumnType.createType(PrimitiveType.STRING)),
+
+    // NDV is the external facing name (i.e. queries should always be written with NDV)
+    // The current implementation of NDV is hyperloglog (but we could change this without
+    // external query changes if we find a better algorithm).
+    NDV("NDV", TAggregationOp.HLL,
+        // TODO: this needs to switch to CHAR(64)
         ColumnType.createType(PrimitiveType.STRING));
+
 
     private final String description;
     private final TAggregationOp thriftOp;

@@ -566,6 +566,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format(
           "select distinctpc(%s) from functional.alltypes",
           typeToLiteralValue.get(type)));
+      AnalyzesOk(String.format(
+          "select ndv(%s) from functional.alltypes",
+          typeToLiteralValue.get(type)));
     }
   }
 

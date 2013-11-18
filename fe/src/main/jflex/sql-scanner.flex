@@ -131,6 +131,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("merge_fn", new Integer(SqlParserSymbols.KW_MERGE_FN));
     keywordMap.put("metadata", new Integer(SqlParserSymbols.KW_METADATA));
     keywordMap.put("min", new Integer(SqlParserSymbols.KW_MIN));
+    keywordMap.put("ndv", new Integer(SqlParserSymbols.KW_NDV));
     keywordMap.put("not", new Integer(SqlParserSymbols.KW_NOT));
     keywordMap.put("null", new Integer(SqlParserSymbols.KW_NULL));
     keywordMap.put("nulls", new Integer(SqlParserSymbols.KW_NULLS));

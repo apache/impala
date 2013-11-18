@@ -105,8 +105,35 @@ string, string, string, string, string, string, string, string, string, string
 '10590','3','7','63','20','1295','936','1020','330','988'
 ====
 ---- QUERY
+# Test the hll aggregate function on all col types without group by
+select
+  ndv(id),
+  ndv(bool_col),
+  ndv(tinyint_col),
+  ndv(smallint_col),
+  ndv(int_col),
+  ndv(bigint_col),
+  ndv(float_col),
+  ndv(double_col),
+  ndv(string_col),
+  ndv(timestamp_col)
+from alltypesagg
+---- TYPES
+string, string, string, string, string, string, string, string, string, string
+---- RESULTS
+'10549','2','9','104','1881','1342','944','991','1178','9880'
+====
+---- QUERY
 # Test the distinctpc aggregate function on empty table
 select distinctpc(field) from EmptyTable
+---- TYPES
+string
+---- RESULTS
+'0'
+====
+---- QUERY
+# Test the hll aggregate function on empty table
+select ndv(field) from EmptyTable
 ---- TYPES
 string
 ---- RESULTS

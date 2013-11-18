@@ -157,6 +157,7 @@ enum TAggregationOp {
   MIN,
   SUM,
   GROUP_CONCAT,
+  HLL,
 }
 
 struct TAggregateFunctionCall {

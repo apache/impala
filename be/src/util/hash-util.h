@@ -30,17 +30,17 @@
 
 namespace impala {
 
-// Utility class to compute hash values.   
+// Utility class to compute hash values.
 class HashUtil {
  public:
 #ifdef __SSE4_2__
-  // Compute the Crc32 hash for data using SSE4 instructions.  The input hash parameter is 
+  // Compute the Crc32 hash for data using SSE4 instructions.  The input hash parameter is
   // the current hash/seed value.
   // This should only be called if SSE is supported.
   // This is ~4x faster than Fvn/Boost Hash.
   // NOTE: Any changes made to this function need to be reflected in Codegen::GetHashFn.
-  // TODO: crc32 hashes with different seeds do not result in different hash functions.  The
-  // resulting hashes are correlated.
+  // TODO: crc32 hashes with different seeds do not result in different hash functions.
+  // The resulting hashes are correlated.
   static uint32_t CrcHash(const void* data, int32_t bytes, uint32_t hash) {
     DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
     uint32_t words = bytes / sizeof(uint32_t);
@@ -62,23 +62,34 @@ class HashUtil {
     // for anyone who only uses the first several bits of the hash.
     hash = (hash << 16) | (hash >> 16);
     return hash;
-  } 
+  }
 #endif
 
   // default values recommended by http://isthe.com/chongo/tech/comp/fnv/
   static const uint32_t FVN_PRIME = 0x01000193; //   16777619
   static const uint32_t FVN_SEED = 0x811C9DC5; // 2166136261
+  static const uint64_t FVN64_PRIME = 1099511628211UL;
+  static const uint64_t FVN64_SEED = 14695981039346656037UL;
 
   // Implementation of the Fowler–Noll–Vo hash function.  This is not as performant
-  // as boost's hash on int types (2x slower) but has bit entropy.  
-  // For ints, boost just returns the value of the int which can be pathological. 
-  // For example, if the data is <1000, 2000, 3000, 4000, ..> and then the mod of 1000 
+  // as boost's hash on int types (2x slower) but has bit entropy.
+  // For ints, boost just returns the value of the int which can be pathological.
+  // For example, if the data is <1000, 2000, 3000, 4000, ..> and then the mod of 1000
   // is taken on the hash, all values will collide to the same bucket.
   // For string values, Fvn is slightly faster than boost.
   static uint32_t FvnHash(const void* data, int32_t bytes, uint32_t hash) {
     const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data);
     while (bytes--) {
       hash = (*ptr ^ hash) * FVN_PRIME;
+      ++ptr;
+    }
+    return hash;
+  }
+
+  static uint64_t FvnHash64(const void* data, int32_t bytes, uint64_t hash) {
+    const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data);
+    while (bytes--) {
+      hash = (*ptr ^ hash) * FVN64_PRIME;
       ++ptr;
     }
     return hash;

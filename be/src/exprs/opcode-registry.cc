@@ -132,6 +132,17 @@ static OpcodeRegistry::AggFnDescriptor DistinctPcsaDesc() {
       (void*)AggregateFunctions::PcsaFinalize);
 }
 
+template<typename T>
+static OpcodeRegistry::AggFnDescriptor HllDesc() {
+  return OpcodeRegistry::AggFnDescriptor(
+      (void*)AggregateFunctions::HllInit,
+      (void*) (void(*)(FunctionContext*, const T&, StringVal*))
+          AggregateFunctions::HllUpdate<T>,
+      (void*)AggregateFunctions::HllMerge,
+      NULL,
+      (void*)AggregateFunctions::HllFinalize);
+}
+
 void InitAggregateBuiltins(OpcodeRegistry::AggregateBuiltins* fns) {
   // Count(*)
   (*fns)[make_pair(TAggregationOp::COUNT, INVALID_TYPE)] = CountStarDesc();
@@ -234,6 +245,18 @@ void InitAggregateBuiltins(OpcodeRegistry::AggregateBuiltins* fns) {
       DistinctPcsaDesc<TimestampVal>();
   (*fns)[make_pair(TAggregationOp::DISTINCT_PCSA, TYPE_STRING)] =
       DistinctPcsaDesc<StringVal>();
+
+  // HLL
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_NULL)] = NullDesc();
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_BOOLEAN)] = HllDesc<BooleanVal>();
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_TINYINT)] = HllDesc<TinyIntVal>();
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_SMALLINT)] = HllDesc<SmallIntVal>();
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_INT)] = HllDesc<IntVal>();
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_BIGINT)] = HllDesc<BigIntVal>();
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_FLOAT)] = HllDesc<FloatVal>();
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_DOUBLE)] = HllDesc<DoubleVal>();
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_TIMESTAMP)] = HllDesc<TimestampVal>();
+  (*fns)[make_pair(TAggregationOp::HLL, TYPE_STRING)] = HllDesc<StringVal>();
 }
 
 }

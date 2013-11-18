@@ -32,6 +32,10 @@ namespace impala {
 // Delimiter to use if the separator is NULL.
 static const StringVal DEFAULT_STRING_CONCAT_DELIM((uint8_t*)", ", 2);
 
+// Hyperloglog precision. Default taken from paper. Doesn't seem to matter very
+// much when between [6,12]
+const int HLL_PRECISION = 10;
+
 void AggregateFunctions::InitNull(FunctionContext*, AnyVal* dst) {
   dst->is_null = true;
 }
@@ -341,6 +345,81 @@ StringVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& 
   return dst;
 }
 
+void AggregateFunctions::HllInit(FunctionContext* ctx, StringVal* dst) {
+  int str_len = pow(2, HLL_PRECISION);
+  dst->is_null = false;
+  dst->ptr = ctx->Allocate(str_len);
+  dst->len = str_len;
+  memset(dst->ptr, 0, str_len);
+}
+
+template <typename T>
+void AggregateFunctions::HllUpdate(FunctionContext* ctx, const T& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, pow(2, HLL_PRECISION));
+  uint64_t hash_value = AnyValUtil::Hash64(src, HashUtil::FVN64_SEED);
+  if (hash_value != 0) {
+    // Use the lower bits to index into the number of streams and then
+    // find the first 1 bit after the index bits.
+    int idx = hash_value % dst->len;
+    uint8_t first_one_bit = __builtin_ctzl(hash_value >> HLL_PRECISION) + 1;
+    dst->ptr[idx] = ::max(dst->ptr[idx], first_one_bit);
+  }
+}
+
+void AggregateFunctions::HllMerge(FunctionContext* ctx, const StringVal& src,
+    StringVal* dst) {
+  DCHECK(!dst->is_null);
+  DCHECK(!src.is_null);
+  DCHECK_EQ(dst->len, pow(2, HLL_PRECISION));
+  DCHECK_EQ(src.len, pow(2, HLL_PRECISION));
+  for (int i = 0; i < src.len; ++i) {
+    dst->ptr[i] = ::max(dst->ptr[i], src.ptr[i]);
+  }
+}
+
+StringVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, pow(2, HLL_PRECISION));
+
+  const int num_streams = pow(2, HLL_PRECISION);
+  // Empirical constants for the algorithm.
+  float alpha = 0;
+  if (num_streams == 16) {
+    alpha = 0.673f;
+  } else if (num_streams == 32) {
+    alpha = 0.697f;
+  } else if (num_streams == 64) {
+    alpha = 0.709f;
+  } else {
+    alpha = 0.7213f / (1 + 1.079f / num_streams);
+  }
+
+  float harmonic_mean = 0;
+  int num_zero_registers = 0;
+  for (int i = 0; i < src.len; ++i) {
+    harmonic_mean += powf(2.0f, -src.ptr[i]);
+    if (src.ptr[i] == 0) ++num_zero_registers;
+  }
+  harmonic_mean = 1.0f / harmonic_mean;
+  int64_t estimate = alpha * num_streams * num_streams * harmonic_mean;
+
+  if (num_zero_registers != 0) {
+    // Estimated cardinality is too low. Hll is too inaccurate here, instead use
+    // linear counting.
+    estimate = num_streams * log(static_cast<float>(num_streams) / num_zero_registers);
+  }
+
+  // Output the estimate as ascii string
+  stringstream out;
+  out << estimate;
+  string out_str = out.str();
+  StringVal result_str(ctx, out_str.size());
+  memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  return result_str;
+}
+
 // Stamp out the templates for the types we need.
 template void AggregateFunctions::InitZero<BigIntVal>(FunctionContext*, BigIntVal* dst);
 
@@ -429,5 +508,24 @@ template void AggregateFunctions::PcsaUpdate(
 template void AggregateFunctions::PcsaUpdate(
     FunctionContext*, const StringVal&, StringVal*);
 template void AggregateFunctions::PcsaUpdate(
+    FunctionContext*, const TimestampVal&, StringVal*);
+
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const BooleanVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const TinyIntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const SmallIntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const BigIntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const FloatVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const DoubleVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
     FunctionContext*, const TimestampVal&, StringVal*);
 }
