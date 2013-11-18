@@ -1,8 +1,5 @@
 ====
 ---- QUERY
-create database if not exists function_ddl_test
-====
----- QUERY
 # Drop the dummy udfs this test uses.
 drop function if exists default.fn();
 drop function if exists function_ddl_test.fn();

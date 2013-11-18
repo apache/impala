@@ -16,7 +16,6 @@ package com.cloudera.impala.catalog;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.ListIterator;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -373,23 +372,16 @@ public class Db implements CatalogObject {
   }
 
   /**
-   * Removes a UDF with the matching signature string. Returns
-   * true if a UDF was removed as a result of this call, false otherwise.
+   * Removes a Function with the matching signature string. Returns the removed Function
+   * if a Function was removed as a result of this call, null otherwise.
+   * TODO: Move away from using signature strings and instead use Function IDs.
    */
-  public boolean removeFunction(String signatureStr) {
+  public Function removeFunction(String signatureStr) {
     synchronized (functions) {
-      for (List<Function> fns: functions.values()) {
-        ListIterator<Function> itr = fns.listIterator();
-        while (itr.hasNext()) {
-          Function fn = itr.next();
-          if (fn.signatureString().equals(signatureStr)) {
-            itr.remove();
-            return true;
-          }
-        }
-      }
+      Function targetFn = getFunction(signatureStr);
+      if (targetFn != null) return removeFunction(targetFn);
     }
-    return false;
+    return null;
   }
 
   /**

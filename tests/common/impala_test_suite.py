@@ -120,9 +120,9 @@ class ImpalaTestSuite(BaseTestSuite):
         else:
           self.client.execute("drop table " + full_tbl_name)
       for fn_name in self.client.execute("show functions in " + db_name).data:
-        self.client.execute("drop function %s.%s" + (db_name, fn_name))
+        self.client.execute("drop function %s.%s" % (db_name, fn_name))
       for fn_name in self.client.execute("show aggregate functions in " + db_name).data:
-        self.client.execute("drop function %s.%s" + (db_name, fn_name))
+        self.client.execute("drop function %s.%s" % (db_name, fn_name))
       self.client.execute("drop database " + db_name)
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False):
