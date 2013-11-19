@@ -222,3 +222,17 @@ HIVE=SUCCESS
 ---- QUERY_HIVE_VIEW_RESULTS
 IMPALA=FAILURE
 ====
+---- CREATE_VIEW
+# Test a view that creates a CROSS JOIN, should work in both Hive and Impala
+create view test as
+select t1.id as t1_id, t2.id as t2_id
+from functional.alltypestiny t1 cross join functional.alltypestiny t2
+order by t1_id, t2_id limit 100;
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+---- QUERY_HIVE_VIEW_RESULTS
+IMPALA=SUCCESS
+---- QUERY_IMPALA_VIEW_RESULTS
+HIVE=SUCCESS
+====

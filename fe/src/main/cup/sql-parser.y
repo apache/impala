@@ -202,7 +202,7 @@ terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC, KW_AVG,
   KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST,
   KW_CHANGE, KW_CHAR, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_COUNT, KW_CREATE,
-  KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DELIMITED,
+  KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DELIMITED,
   KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
   KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
   KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST,
@@ -1366,6 +1366,15 @@ table_ref_list ::=
   :}
   | table_ref_list:list COMMA table_ref:table
   {:
+    list.add(table);
+    RESULT = list;
+  :}
+  | table_ref_list:list KW_CROSS KW_JOIN opt_plan_hints:hints table_ref:table
+  {:
+    table.setJoinOp(JoinOperator.CROSS_JOIN);
+    // We will throw an AnalysisException if there are join hints so that we can provide
+    // a better error message than a parser exception.
+    table.setJoinHints(hints);
     list.add(table);
     RESULT = list;
   :}

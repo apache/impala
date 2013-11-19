@@ -26,6 +26,7 @@ add_library(Exec STATIC
   aggregation-node-ir.cc
   base-sequence-scanner.cc
   catalog-op-executor.cc
+  cross-join-node.cc
   data-sink.cc
   delimited-text-parser.cc
   exec-node.cc
@@ -51,6 +52,7 @@ add_library(Exec STATIC
   hdfs-parquet-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
+  blocking-join-node.cc
   merge-node.cc
   read-write-util.cc
   scan-node.cc
@@ -69,3 +71,4 @@ ADD_BE_TEST(delimited-text-parser-test)
 ADD_BE_TEST(read-write-util-test)
 ADD_BE_TEST(parquet-plain-test)
 ADD_BE_TEST(parquet-version-test)
+ADD_BE_TEST(row-batch-list-test)

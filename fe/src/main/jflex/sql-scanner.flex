@@ -72,6 +72,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("compute", new Integer(SqlParserSymbols.KW_COMPUTE));
     keywordMap.put("count", new Integer(SqlParserSymbols.KW_COUNT));
     keywordMap.put("create", new Integer(SqlParserSymbols.KW_CREATE));
+    keywordMap.put("cross", new Integer(SqlParserSymbols.KW_CROSS));
     keywordMap.put("data", new Integer(SqlParserSymbols.KW_DATA));
     keywordMap.put("database", new Integer(SqlParserSymbols.KW_DATABASE));
     keywordMap.put("databases", new Integer(SqlParserSymbols.KW_DATABASES));

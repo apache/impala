@@ -191,19 +191,20 @@ class HashTable {
 
     // Iterates to the next element.  In the case where the iterator was
     // from a Find, this will lazily evaluate that bucket, only returning
-    // TupleRows that match the current scan row.
+    // TupleRows that match the current scan row. No-op if the iterator is at the end.
     template<bool check_match>
     void Next();
 
-    // Returns the current row or NULL if at end.
+    // Returns the current row. Callers must check the iterator is not AtEnd() before
+    // calling GetRow().
     TupleRow* GetRow() {
-      if (node_idx_ == -1) return NULL;
+      DCHECK(!AtEnd());
       return table_->GetNode(node_idx_)->data();
     }
 
-    // Returns if the iterator is at the end
-    bool HasNext() {
-      return node_idx_ != -1;
+    // Returns true if this iterator is at the end, i.e. GetRow() cannot be called.
+    bool AtEnd() {
+      return node_idx_ == -1;
     }
 
     bool operator==(const Iterator& rhs) {

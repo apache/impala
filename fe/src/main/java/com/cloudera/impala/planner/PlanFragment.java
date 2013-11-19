@@ -184,7 +184,7 @@ public class PlanFragment {
       // propagate parent's row composition to child
       Preconditions.checkState(node.getChildren().size() == 1);
       setRowTupleIds(node.getChild(0), node.rowTupleIds);
-    } else if (node instanceof HashJoinNode) {
+    } else if (node instanceof HashJoinNode || node instanceof CrossJoinNode) {
       // propagate parent's row composition only to left child
       Preconditions.checkState(node.getChildren().size() == 2);
       setRowTupleIds(node.getChild(0), node.rowTupleIds);

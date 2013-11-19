@@ -213,7 +213,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   Expr** conjuncts = &conjuncts_[0];
   int num_conjuncts = conjuncts_.size();
 
-  while (output_iterator_.HasNext() && !row_batch->IsFull()) {
+  while (!output_iterator_.AtEnd() && !row_batch->IsFull()) {
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
     Tuple* agg_tuple = output_iterator_.GetRow()->GetTuple(0);
@@ -227,7 +227,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     }
     output_iterator_.Next<false>();
   }
-  *eos = !output_iterator_.HasNext() || ReachedLimit();
+  *eos = output_iterator_.AtEnd() || ReachedLimit();
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK;
 }

@@ -21,7 +21,8 @@ public enum JoinOperator {
   LEFT_OUTER_JOIN("LEFT OUTER JOIN", TJoinOp.LEFT_OUTER_JOIN),
   LEFT_SEMI_JOIN("LEFT SEMI JOIN", TJoinOp.LEFT_SEMI_JOIN),
   RIGHT_OUTER_JOIN("RIGHT OUTER JOIN", TJoinOp.RIGHT_OUTER_JOIN),
-  FULL_OUTER_JOIN("FULL OUTER JOIN", TJoinOp.FULL_OUTER_JOIN);
+  FULL_OUTER_JOIN("FULL OUTER JOIN", TJoinOp.FULL_OUTER_JOIN),
+  CROSS_JOIN("CROSS JOIN", TJoinOp.CROSS_JOIN);
 
   private final String description;
   private final TJoinOp thriftJoinOp;
@@ -46,5 +47,3 @@ public enum JoinOperator {
         || this == FULL_OUTER_JOIN;
   }
 }
-
-

@@ -224,6 +224,11 @@ public class Planner {
       result = createHashJoinFragment(
           (HashJoinNode) root, childFragments.get(1), childFragments.get(0),
           perNodeMemLimit, fragments, analyzer);
+    } else if (root instanceof CrossJoinNode) {
+      Preconditions.checkState(childFragments.size() == 2);
+      result = createCrossJoinFragment(
+          (CrossJoinNode) root, childFragments.get(1), childFragments.get(0),
+          perNodeMemLimit, fragments, analyzer);
     } else if (root instanceof SelectNode) {
       result = createSelectNodeFragment((SelectNode) root, childFragments, analyzer);
     } else if (root instanceof MergeNode) {
@@ -358,6 +363,24 @@ public class Planner {
    */
   private PlanFragment createScanFragment(PlanNode node) {
     return new PlanFragment(node, DataPartition.RANDOM);
+  }
+
+  /**
+   * Modifies the leftChildFragment to execute a cross join. The right child input is
+   * provided by an ExchangeNode, which is the destination of the rightChildFragment's
+   * output.
+   */
+  private PlanFragment createCrossJoinFragment(CrossJoinNode node,
+      PlanFragment rightChildFragment, PlanFragment leftChildFragment,
+      long perNodeMemLimit, ArrayList<PlanFragment> fragments,
+      Analyzer analyzer) throws AuthorizationException, InternalException {
+    // The rhs tree is going to send data through an exchange node which effectively
+    // compacts the data. No reason to do it again at the rhs root node.
+    rightChildFragment.getPlanRoot().setCompactData(false);
+    node.setChild(0, leftChildFragment.getPlanRoot());
+    connectChildFragment(analyzer, node, 1, leftChildFragment, rightChildFragment);
+    leftChildFragment.setPlanRoot(node);
+    return leftChildFragment;
   }
 
   /**
@@ -956,8 +979,7 @@ public class Planner {
 
         PlanNode rhsPlan = entry.second;
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
-        PlanNode candidate =
-            createHashJoinNode(analyzer, root, rhsPlan, ref, false);
+        PlanNode candidate = createJoinNode(analyzer, root, rhsPlan, ref, false);
         if (candidate == null) continue;
         LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
         if (newRoot == null || candidate.getCardinality() < newRoot.getCardinality()) {
@@ -1003,7 +1025,7 @@ public class Planner {
     for (int i = 1; i < refPlans.size(); ++i) {
       TableRef innerRef = refPlans.get(i).first;
       PlanNode innerPlan = refPlans.get(i).second;
-      root = createHashJoinNode(analyzer, root, innerPlan, innerRef, true);
+      root = createJoinNode(analyzer, root, innerPlan, innerRef, true);
       root.setId(new PlanNodeId(nodeIdGenerator));
       // build side copies data to a compact representation in the tuple buffer.
       root.getChildren().get(1).setCompactData(true);
@@ -1453,11 +1475,18 @@ public class Planner {
   }
 
   /**
-   * Create HashJoinNode to join outer with inner.
+   * Create a node to join outer with inner.
    */
-  private PlanNode createHashJoinNode(
+  private PlanNode createJoinNode(
       Analyzer analyzer, PlanNode outer, PlanNode inner, TableRef innerRef,
       boolean throwOnError) throws ImpalaException {
+    if (innerRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
+      CrossJoinNode result = new CrossJoinNode(outer, inner, innerRef);
+      result.init(analyzer);
+      result.getChildren().get(1).setCompactData(true);
+      return result;
+    }
+
     List<Pair<Expr, Expr>> eqJoinConjuncts = Lists.newArrayList();
     List<Expr> eqJoinPredicates = Lists.newArrayList();
     // get eq join predicates for the TableRefs' ids (not the PlanNodes' ids, which
@@ -1468,7 +1497,8 @@ public class Planner {
       if (!throwOnError) return null;
       throw new NotImplementedException(
           String.format(
-            "Join with '%s' requires at least one conjunctive equality predicate",
+            "Join with '%s' requires at least one conjunctive equality predicate. To " +
+            "perform a Cartesian product between two tables, use a CROSS JOIN.",
             innerRef.getAliasAsName()));
     }
     analyzer.markConjunctsAssigned(eqJoinPredicates);
@@ -1487,7 +1517,6 @@ public class Planner {
 
     // build side of join copies data to a compact representation in the tuple buffer
     result.getChildren().get(1).setCompactData(true);
-
     return result;
   }
 

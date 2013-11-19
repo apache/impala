@@ -197,7 +197,7 @@ from (select * from functional.alltypestiny) t1
   join (select * from functional.alltypestiny) t2 on (t1.id = t2.id)
   join functional.alltypestiny t3 on (coalesce(t1.id, t3.id) = t3.id)
 ---- PLAN
-not implemented: Join with 't3' requires at least one conjunctive equality predicate
+not implemented: Join with 't3' requires at least one conjunctive equality predicate. To perform a Cartesian product between two tables, use a CROSS JOIN.
 ====
 # multiple join predicates;
 # scan predicates get propagated correctly;
@@ -392,7 +392,7 @@ select *
 from functional.testtbl t1 join functional.testtbl t2
 where t1.zip < t2.zip
 ---- PLAN
-not implemented: Join with 't2' requires at least one conjunctive equality predicate
+not implemented: Join with 't2' requires at least one conjunctive equality predicate. To perform a Cartesian product between two tables, use a CROSS JOIN.
 ====
 # equi join with constants in the on clause are not supported
 select a.id, b.id from
@@ -940,4 +940,98 @@ PLAN FRAGMENT 2
 
   0:SCAN HDFS
      table=functional.emptytable #partitions=0/0 size=0B
+====
+# cross join
+select *
+from functional.testtbl t1 cross join functional.testtbl
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  2:CROSS JOIN
+  |  (BROADCAST)
+  |
+  |----1:SCAN HDFS
+  |       table=functional.testtbl #partitions=0/1 size=0B compact
+  |
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0/1 size=0B
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  2:CROSS JOIN
+  |  (BROADCAST)
+  |
+  |----3:EXCHANGE
+  |
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0/1 size=0B
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=functional.testtbl #partitions=0/1 size=0B
+====
+# cross join with where clause
+select *
+from functional.testtbl t1 cross join functional.testtbl t2 where t1.id < t2.id
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  2:CROSS JOIN
+  |  (BROADCAST)
+  |  predicates: t1.id < t2.id
+  |
+  |----1:SCAN HDFS
+  |       table=functional.testtbl #partitions=0/1 size=0B compact
+  |
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0/1 size=0B
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  2:CROSS JOIN
+  |  (BROADCAST)
+  |  predicates: t1.id < t2.id
+  |
+  |----3:EXCHANGE
+  |
+  0:SCAN HDFS
+     table=functional.testtbl #partitions=0/1 size=0B
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=functional.testtbl #partitions=0/1 size=0B
 ====

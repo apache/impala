@@ -33,7 +33,8 @@ enum TPlanNodeType {
   SORT_NODE,
   EXCHANGE_NODE,
   MERGE_NODE,
-  SELECT_NODE
+  SELECT_NODE,
+  CROSS_JOIN_NODE
 }
 
 // phases of an execution node
@@ -134,7 +135,8 @@ enum TJoinOp {
   LEFT_OUTER_JOIN,
   LEFT_SEMI_JOIN,
   RIGHT_OUTER_JOIN,
-  FULL_OUTER_JOIN
+  FULL_OUTER_JOIN,
+  CROSS_JOIN
 }
 
 struct THashJoinNode {

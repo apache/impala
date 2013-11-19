@@ -35,12 +35,12 @@ void AggregationNode::ProcessRowBatchWithGrouping(RowBatch* batch) {
   for (int i = 0; i < batch->num_rows(); ++i) {
     TupleRow* row = batch->GetRow(i);
     Tuple* agg_tuple = NULL;
-    HashTable::Iterator entry = hash_tbl_->Find(row);
-    if (!entry.HasNext()) {
+    HashTable::Iterator it = hash_tbl_->Find(row);
+    if (it.AtEnd()) {
       agg_tuple = ConstructAggTuple();
       hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&agg_tuple));
     } else {
-      agg_tuple = entry.GetRow()->GetTuple(0);
+      agg_tuple = it.GetRow()->GetTuple(0);
     }
     UpdateAggTuple(agg_tuple, row);
   }

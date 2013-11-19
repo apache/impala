@@ -402,6 +402,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "functional.alltypes b using (int_col)");
     AnalyzesOk("select * from functional.alltypes a join [shuffle] " +
         "functional.alltypes b using (int_col)");
+    AnalyzesOk("select * from functional.alltypes a cross join [broadcast] " +
+        "functional.alltypes b");
     AnalysisError(
         "select * from functional.alltypes a join [broadcast,shuffle] " +
          "functional.alltypes b using (int_col)",
@@ -410,6 +412,15 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select * from functional.alltypes a join [bla] " +
          "functional.alltypes b using (int_col)",
         "JOIN hint not recognized: bla");
+    AnalysisError("select * from functional.alltypes a cross join [shuffle] " +
+        "functional.alltypes b",
+        "CROSS JOIN does not support SHUFFLE.");
+    AnalysisError("select * from functional.alltypes a right outer join [broadcast] " +
+        "functional.alltypes b using (int_col)",
+        "RIGHT OUTER JOIN does not support BROADCAST.");
+    AnalysisError("select * from functional.alltypes a full outer join [broadcast] " +
+        "functional.alltypes b using (int_col)",
+        "FULL OUTER JOIN does not support BROADCAST.");
   }
 
   @Test

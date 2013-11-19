@@ -162,11 +162,18 @@ public abstract class TableRef implements ParseNode {
     if (joinHints == null) return;
     for (String hint: joinHints) {
       if (hint.toUpperCase().equals("BROADCAST")) {
+        if (joinOp == JoinOperator.RIGHT_OUTER_JOIN ||
+            joinOp == JoinOperator.FULL_OUTER_JOIN) {
+          throw new AnalysisException(joinOp.toString() + " does not support BROADCAST.");
+        }
         if (isPartitionedJoin) {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
         isBroadcastJoin = true;
       } else if (hint.toUpperCase().equals("SHUFFLE")) {
+        if (joinOp == JoinOperator.CROSS_JOIN) {
+          throw new AnalysisException("CROSS JOIN does not support SHUFFLE.");
+        }
         if (isBroadcastJoin) {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
@@ -186,8 +193,13 @@ public abstract class TableRef implements ParseNode {
       throws AnalysisException, InternalException, AuthorizationException {
     Preconditions.checkState(desc != null);
     analyzeJoinHints();
+    if (joinOp == JoinOperator.CROSS_JOIN) {
+      // A CROSS JOIN is always a broadcast join, regardless of the join hints
+      isBroadcastJoin = true;
+    }
 
     if (usingColNames != null) {
+      Preconditions.checkState(joinOp != JoinOperator.CROSS_JOIN);
       // Turn USING clause into equivalent ON clause.
       Preconditions.checkState(onClause == null);
       for (String colName: usingColNames) {
@@ -238,6 +250,7 @@ public abstract class TableRef implements ParseNode {
     }
 
     if (onClause != null) {
+      Preconditions.checkState(joinOp != JoinOperator.CROSS_JOIN);
       onClause.analyze(analyzer);
       onClause.checkReturnsBool("ON clause", true);
       Set<TupleId> onClauseTupleIds = Sets.newHashSet();
@@ -279,18 +292,13 @@ public abstract class TableRef implements ParseNode {
   private String joinOpToSql() {
     Preconditions.checkState(joinOp != null);
     switch (joinOp) {
-      case INNER_JOIN:
-        return "INNER JOIN";
-      case LEFT_OUTER_JOIN:
-        return "LEFT OUTER JOIN";
-      case LEFT_SEMI_JOIN:
-        return "LEFT SEMI JOIN";
-      case RIGHT_OUTER_JOIN:
-        return "RIGHT OUTER JOIN";
-      case FULL_OUTER_JOIN:
-        return "FULL OUTER JOIN";
-      default:
-        return "bad join op: " + joinOp.toString();
+      case INNER_JOIN: return "INNER JOIN";
+      case LEFT_OUTER_JOIN: return "LEFT OUTER JOIN";
+      case LEFT_SEMI_JOIN: return "LEFT SEMI JOIN";
+      case RIGHT_OUTER_JOIN: return "RIGHT OUTER JOIN";
+      case FULL_OUTER_JOIN: return "FULL OUTER JOIN";
+      case CROSS_JOIN: return "CROSS JOIN";
+      default: return "bad join op: " + joinOp.toString();
     }
   }
 

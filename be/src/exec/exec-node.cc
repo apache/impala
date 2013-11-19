@@ -27,6 +27,7 @@
 #include "exec/hbase-scan-node.h"
 #include "exec/exchange-node.h"
 #include "exec/merge-node.h"
+#include "exec/cross-join-node.h"
 #include "exec/topn-node.h"
 #include "exec/select-node.h"
 #include "runtime/descriptors.h"
@@ -230,6 +231,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       break;
     case TPlanNodeType::HASH_JOIN_NODE:
       *node = pool->Add(new HashJoinNode(pool, tnode, descs));
+      break;
+    case TPlanNodeType::CROSS_JOIN_NODE:
+      *node = pool->Add(new CrossJoinNode(pool, tnode, descs));
       break;
     case TPlanNodeType::EXCHANGE_NODE:
       *node = pool->Add(new ExchangeNode(pool, tnode, descs));

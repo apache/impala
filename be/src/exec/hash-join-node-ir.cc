@@ -57,10 +57,10 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
 
   while (true) {
     // Create output row for each matching build row
-    while (hash_tbl_iterator_.HasNext()) {
+    while (!hash_tbl_iterator_.AtEnd()) {
       TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
       hash_tbl_iterator_.Next<true>();
-      CreateOutputRow(out_row, current_probe_row_, matched_build_row);
+      CreateOutputRow(out_row, current_left_child_row_, matched_build_row);
 
       if (!EvalOtherJoinConjuncts(other_conjuncts, num_other_conjuncts, out_row)) {
         continue;
@@ -86,7 +86,7 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
 
     // Handle left outer-join
     if (!matched_probe_ && match_all_probe_) {
-      CreateOutputRow(out_row, current_probe_row_, NULL);
+      CreateOutputRow(out_row, current_left_child_row_, NULL);
       matched_probe_ = true;
       if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
         ++rows_returned;
@@ -96,12 +96,12 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
         out_row = reinterpret_cast<TupleRow*>(out_row_mem);
       }
     }
-    
-    if (!hash_tbl_iterator_.HasNext()) {
+
+    if (hash_tbl_iterator_.AtEnd()) {
       // Advance to the next probe row
-      if (UNLIKELY(probe_batch_pos_ == probe_rows)) goto end;
-      current_probe_row_ = probe_batch->GetRow(probe_batch_pos_++);
-      hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
+      if (UNLIKELY(left_batch_pos_ == probe_rows)) goto end;
+      current_left_child_row_ = probe_batch->GetRow(left_batch_pos_++);
+      hash_tbl_iterator_ = hash_tbl_->Find(current_left_child_row_);
       matched_probe_ = false;
     }
   }

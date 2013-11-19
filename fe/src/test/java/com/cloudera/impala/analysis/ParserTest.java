@@ -187,6 +187,8 @@ public class ParserTest {
         "functional.alltypes b using (int_col)");
     ParsesOk("select * from functional.alltypes a join [bla,bla] " +
         "functional.alltypes b using (int_col)");
+    ParsesOk("select * from functional.alltypes a cross join [bla,bla] " +
+        "functional.alltypes b"); // Parses but fails during analysis
     ParserError("select * from functional.alltypes a join [bla bla] " +
         "functional.alltypes b using (int_col)");
     ParserError("select * from functional.alltypes a join [1 + 2] " +
@@ -250,6 +252,11 @@ public class ParserTest {
     ParserError("select * from src src1 join src src2 using (1)");
     ParserError("select * from src src1 " +
         "left outer join src src2 on (src1.key = src2.key and)");
+    // Test cross joins
+    ParsesOk("select * from a cross join b");
+    // Cross joins do not accept on/using
+    ParserError("select * from a cross join b on (a.id = b.id)");
+    ParserError("select * from a cross join b using (id)");
   }
 
   @Test
@@ -2005,9 +2012,9 @@ public class ParserTest {
         "select (i + 5)(1 - i) from t\n" +
         "              ^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, GROUP, " +
-        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, OR, " +
-        "ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
+        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, FULL, " +
+        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, " +
+        "OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
         "IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i) from t",
@@ -2015,18 +2022,18 @@ public class ParserTest {
         "(1 - i) from t\n" +
         "^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, GROUP, " +
-        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, OR, " +
-        "ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
+        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, FULL, " +
+        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, " +
+        "OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i)\nfrom t",
         "Syntax error in line 2:\n" +
         "(1 - i)\n" +
         "^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, GROUP, " +
-        "HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, OR, " +
-        "ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
+        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, FULL, " +
+        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, " +
+        "OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
 
     // Long line: error in the middle
     ParserError("select c, b, c,c,c,c,c,c,c,c,c,a a a,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",
@@ -2034,8 +2041,8 @@ public class ParserTest {
         "... b, c,c,c,c,c,c,c,c,c,a a a,c,c,c,c,c,c,c,cd,c,d,d,,c,...\n" +
         "                             ^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, ON, ORDER, " +
-        "RIGHT, UNION, USING, WHERE, COMMA\n");
+        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, ON, " +
+        "ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the start
     ParserError("select a a a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",
@@ -2043,8 +2050,8 @@ public class ParserTest {
         "select a a a, b, c,c,c,c,c,c,c,c,c,c,c,...\n" +
         "           ^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, ON, ORDER, " +
-        "RIGHT, UNION, USING, WHERE, COMMA\n");
+        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, ON, " +
+        "ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the end
     ParserError("select a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t",

@@ -35,8 +35,7 @@ const char* HashJoinNode::LLVM_CLASS_NAME = "class.impala::HashJoinNode";
 
 HashJoinNode::HashJoinNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs),
-    join_op_(tnode.hash_join_node.join_op),
+  : BlockingJoinNode("HashJoinNode", tnode.hash_join_node.join_op, pool, tnode, descs),
     codegen_process_build_batch_fn_(NULL),
     process_build_batch_fn_(NULL),
     codegen_process_probe_batch_fn_(NULL),
@@ -49,7 +48,7 @@ HashJoinNode::HashJoinNode(
 }
 
 Status HashJoinNode::Init(const TPlanNode& tnode) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode));
+  RETURN_IF_ERROR(BlockingJoinNode::Init(tnode));
   DCHECK(tnode.__isset.hash_join_node);
   const vector<TEqJoinCondition>& eq_join_conjuncts =
       tnode.hash_join_node.eq_join_conjuncts;
@@ -66,25 +65,11 @@ Status HashJoinNode::Init(const TPlanNode& tnode) {
   return Status::OK;
 }
 
-HashJoinNode::~HashJoinNode() {
-  // probe_batch_ must be cleaned up in Close() to ensure proper resource freeing.
-  DCHECK(probe_batch_ == NULL);
-}
-
 Status HashJoinNode::Prepare(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Prepare(state));
+  RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
 
-  build_pool_.reset(new MemPool(mem_tracker()));
-  build_timer_ =
-      ADD_TIMER(runtime_profile(), "BuildTime");
-  probe_timer_ =
-      ADD_TIMER(runtime_profile(), "ProbeTime");
-  build_row_counter_ =
-      ADD_COUNTER(runtime_profile(), "BuildRows", TCounterType::UNIT);
   build_buckets_counter_ =
       ADD_COUNTER(runtime_profile(), "BuildBuckets", TCounterType::UNIT);
-  probe_row_counter_ =
-      ADD_COUNTER(runtime_profile(), "ProbeRows", TCounterType::UNIT);
   hash_tbl_load_factor_counter_ =
       ADD_COUNTER(runtime_profile(), "LoadFactor", TCounterType::DOUBLE_VALUE);
 
@@ -96,23 +81,11 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   // other_join_conjuncts_ are evaluated in the context of the rows produced by this node
   RETURN_IF_ERROR(Expr::Prepare(other_join_conjuncts_, state, row_descriptor_, false));
 
-  result_tuple_row_size_ = row_descriptor_.tuple_descriptors().size() * sizeof(Tuple*);
-
-  // pre-compute the tuple index of build tuples in the output row
-  build_tuple_size_ = child(1)->row_desc().tuple_descriptors().size();
-  build_tuple_idx_.reserve(build_tuple_size_);
-  for (int i = 0; i < build_tuple_size_; ++i) {
-    TupleDescriptor* build_tuple_desc = child(1)->row_desc().tuple_descriptors()[i];
-    build_tuple_idx_.push_back(row_descriptor_.GetTupleIdx(build_tuple_desc->id()));
-  }
-
   // TODO: default buckets
   bool stores_nulls =
       join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
   hash_tbl_.reset(new HashTable(state, build_exprs_, probe_exprs_, build_tuple_size_,
       stores_nulls, false, id(), mem_tracker()));
-
-  probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size(), mem_tracker()));
 
   if (state->codegen_enabled()) {
     // Codegen for hashing rows
@@ -144,26 +117,11 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 }
 
 void HashJoinNode::Close(RuntimeState* state) {
-  if (build_pool_.get() != NULL) build_pool_->FreeAll();
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
-  probe_batch_.reset();
-  ExecNode::Close(state);
+  BlockingJoinNode::Close(state);
 }
 
-void HashJoinNode::BuildSideThread(RuntimeState* state, Promise<Status>* status) {
-  Status s;
-  {
-    SCOPED_TIMER(state->total_cpu_timer());
-    s= ConstructHashTable(state);
-  }
-  // Release the thread token as soon as possible (before the main thread joins
-  // on it).  This way, if we had a chain of 10 joins using 1 additional thread,
-  // we'd keep the additional thread busy the whole time.
-  state->resource_pool()->ReleaseThreadToken(false);
-  status->Set(s);
-}
-
-Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
+Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   // Do a full scan of child(1) and store everything in hash_tbl_
   // The hash join node needs to keep in memory all build tuples, including the tuple
   // row ptrs.  The row ptrs are copied into the hash table's internal structure so they
@@ -197,63 +155,13 @@ Status HashJoinNode::ConstructHashTable(RuntimeState* state) {
   return Status::OK;
 }
 
-Status HashJoinNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
-  RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
-
-  eos_ = false;
-
-  // TODO: fix problems with asynchronous cancellation
-  // Kick-off the construction of the build-side table in a separate
-  // thread, so that the left child can do any initialisation in parallel.
-  // Only do this if we can get a thread token.  Otherwise, do this in the
-  // main thread
-  Promise<Status> build_side_status;
-  if (state->resource_pool()->TryAcquireThreadToken()) {
-    AddRuntimeExecOption("Hash Table Built Asynchronously");
-    Thread build_thread("hash-join-node", "build thread",
-        bind(&HashJoinNode::BuildSideThread, this, state, &build_side_status));
+void HashJoinNode::InitGetNext(TupleRow* first_probe_row) {
+  if (first_probe_row == NULL) {
+    hash_tbl_iterator_ = hash_tbl_->Begin();
   } else {
-    build_side_status.Set(ConstructHashTable(state));
+    matched_probe_ = false;
+    hash_tbl_iterator_ = hash_tbl_->Find(first_probe_row);
   }
-
-  // Open the probe-side child so that it may perform any initialisation in parallel.
-  // Don't exit even if we see an error, we still need to wait for the build thread
-  // to finish.
-  Status open_status = child(0)->Open(state);
-
-  // Blocks until ConstructHashTable has returned, after which the hash table is fully
-  // constructed and we can start the probe phase.
-  RETURN_IF_ERROR(build_side_status.Get());
-
-  VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
-  RETURN_IF_ERROR(open_status);
-
-  // seed probe batch and current_probe_row_, etc.
-  while (true) {
-    RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
-    COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
-    probe_batch_pos_ = 0;
-    if (probe_batch_->num_rows() == 0) {
-      if (probe_eos_) {
-        hash_tbl_iterator_ = hash_tbl_->Begin();
-        eos_ = true;
-        break;
-      }
-      probe_batch_->Reset();
-      continue;
-    } else {
-      current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
-      VLOG_ROW << "probe row: " << GetProbeRowOutputString(current_probe_row_);
-      matched_probe_ = false;
-      hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
-      break;
-    }
-  }
-
-  return Status::OK;
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
@@ -283,20 +191,20 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
 
   // Explicitly manage the timer counter to avoid measuring time in the child
   // GetNext call.
-  ScopedTimer<MonotonicStopWatch> probe_timer(probe_timer_);
+  ScopedTimer<MonotonicStopWatch> probe_timer(left_child_timer_);
 
   while (!eos_) {
     // create output rows as long as:
     // 1) we haven't already created an output row for the probe row and are doing
     //    a semi-join;
     // 2) there are more matching build rows
-    while (hash_tbl_iterator_.HasNext()) {
+    while (!hash_tbl_iterator_.AtEnd()) {
       TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
       hash_tbl_iterator_.Next<true>();
 
       int row_idx = out_batch->AddRow();
       TupleRow* out_row = out_batch->GetRow(row_idx);
-      CreateOutputRow(out_row, current_probe_row_, matched_build_row);
+      CreateOutputRow(out_row, current_left_child_row_, matched_build_row);
       if (!EvalConjuncts(other_conjuncts, num_other_conjuncts, out_row)) continue;
       // we have a match for the purpose of the (outer?) join as soon as we
       // satisfy the JOIN clause conjuncts
@@ -323,7 +231,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     if (match_all_probe_ && !matched_probe_) {
       int row_idx = out_batch->AddRow();
       TupleRow* out_row = out_batch->GetRow(row_idx);
-      CreateOutputRow(out_row, current_probe_row_, NULL);
+      CreateOutputRow(out_row, current_left_child_row_, NULL);
       if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
@@ -337,29 +245,29 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       }
     }
 
-    if (probe_batch_pos_ == probe_batch_->num_rows()) {
+    if (left_batch_pos_ == left_batch_->num_rows()) {
       // pass on resources, out_batch might still need them
-      probe_batch_->TransferResourceOwnership(out_batch);
-      probe_batch_pos_ = 0;
+      left_batch_->TransferResourceOwnership(out_batch);
+      left_batch_pos_ = 0;
       if (out_batch->IsFull() || out_batch->AtResourceLimit()) return Status::OK;
       // get new probe batch
-      if (!probe_eos_) {
+      if (!left_side_eos_) {
         while (true) {
           probe_timer.Stop();
-          RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
+          RETURN_IF_ERROR(child(0)->GetNext(state, left_batch_.get(), &left_side_eos_));
           probe_timer.Start();
-          if (probe_batch_->num_rows() == 0) {
+          if (left_batch_->num_rows() == 0) {
             // Empty batches can still contain IO buffers, which need to be passed up to
             // the caller; transferring resources can fill up out_batch.
-            probe_batch_->TransferResourceOwnership(out_batch);
-            if (probe_eos_) {
+            left_batch_->TransferResourceOwnership(out_batch);
+            if (left_side_eos_) {
               eos_ = true;
               break;
             }
             if (out_batch->IsFull() || out_batch->AtResourceLimit()) return Status::OK;
             continue;
           } else {
-            COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+            COUNTER_UPDATE(left_child_row_counter_, left_batch_->num_rows());
             break;
           }
         }
@@ -375,17 +283,17 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     if (eos_) break;
 
     // join remaining rows in probe batch_
-    current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
-    VLOG_ROW << "probe row: " << GetProbeRowOutputString(current_probe_row_);
+    current_left_child_row_ = left_batch_->GetRow(left_batch_pos_++);
+    VLOG_ROW << "probe row: " << GetLeftChildRowString(current_left_child_row_);
     matched_probe_ = false;
-    hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
+    hash_tbl_iterator_ = hash_tbl_->Find(current_left_child_row_);
   }
 
   *eos = true;
   if (match_all_build_) {
     // output remaining unmatched build rows
     TupleRow* build_row = NULL;
-    while (!out_batch->IsFull() && hash_tbl_iterator_.HasNext()) {
+    while (!out_batch->IsFull() && !hash_tbl_iterator_.AtEnd()) {
       build_row = hash_tbl_iterator_.GetRow();
       hash_tbl_iterator_.Next<false>();
       if (joined_build_rows_.find(build_row) != joined_build_rows_.end()) {
@@ -406,7 +314,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       }
     }
     // we're done if there are no more rows left to check
-    *eos = !hash_tbl_iterator_.HasNext();
+    *eos = hash_tbl_iterator_.AtEnd();
   }
   return Status::OK;
 }
@@ -415,7 +323,7 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     RowBatch* out_batch, bool* eos) {
   *eos = eos_;
 
-  ScopedTimer<MonotonicStopWatch> probe_timer(probe_timer_);
+  ScopedTimer<MonotonicStopWatch> probe_timer(left_child_timer_);
   while (!eos_) {
     // Compute max rows that should be added to out_batch
     int64_t max_added_rows = out_batch->capacity() - out_batch->num_rows();
@@ -424,12 +332,12 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     // Continue processing this row batch
     if (process_probe_batch_fn_ == NULL) {
       num_rows_returned_ +=
-          ProcessProbeBatch(out_batch, probe_batch_.get(), max_added_rows);
+          ProcessProbeBatch(out_batch, left_batch_.get(), max_added_rows);
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     } else {
       // Use codegen'd function
       num_rows_returned_ +=
-          process_probe_batch_fn_(this, out_batch, probe_batch_.get(), max_added_rows);
+          process_probe_batch_fn_(this, out_batch, left_batch_.get(), max_added_rows);
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     }
 
@@ -439,18 +347,18 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     }
 
     // Check to see if we're done processing the current probe batch
-    if (!hash_tbl_iterator_.HasNext() && probe_batch_pos_ == probe_batch_->num_rows()) {
-      probe_batch_->TransferResourceOwnership(out_batch);
-      probe_batch_pos_ = 0;
+    if (hash_tbl_iterator_.AtEnd() && left_batch_pos_ == left_batch_->num_rows()) {
+      left_batch_->TransferResourceOwnership(out_batch);
+      left_batch_pos_ = 0;
       if (out_batch->IsFull() || out_batch->AtResourceLimit()) break;
-      if (probe_eos_) {
+      if (left_side_eos_) {
         *eos = eos_ = true;
         break;
       } else {
         probe_timer.Stop();
-        RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
+        RETURN_IF_ERROR(child(0)->GetNext(state, left_batch_.get(), &left_side_eos_));
         probe_timer.Start();
-        COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+        COUNTER_UPDATE(left_child_row_counter_, left_batch_->num_rows());
       }
     }
   }
@@ -458,57 +366,13 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
   return Status::OK;
 }
 
-string HashJoinNode::GetProbeRowOutputString(TupleRow* probe_row) {
-  stringstream out;
-  out << "[";
-  int* build_tuple_idx_ptr_ = &build_tuple_idx_[0];
-  for (int i = 0; i < row_desc().tuple_descriptors().size(); ++i) {
-    if (i != 0) out << " ";
-
-    int* is_build_tuple =
-        ::find(build_tuple_idx_ptr_, build_tuple_idx_ptr_ + build_tuple_size_, i);
-
-    if (is_build_tuple != build_tuple_idx_ptr_ + build_tuple_size_) {
-      out << PrintTuple(NULL, *row_desc().tuple_descriptors()[i]);
-    } else {
-      out << PrintTuple(probe_row->GetTuple(i), *row_desc().tuple_descriptors()[i]);
-    }
-  }
-  out << "]";
-  return out.str();
-}
-
-void HashJoinNode::DebugString(int indentation_level, stringstream* out) const {
-  *out << string(indentation_level * 2, ' ');
-  *out << "HashJoin(eos=" << (eos_ ? "true" : "false")
-       << " probe_batch_pos=" << probe_batch_pos_
-       << " hash_tbl=";
+void HashJoinNode::AddToDebugString(int indentation_level, stringstream* out) const {
+  *out << " hash_tbl=";
   *out << string(indentation_level * 2, ' ');
   *out << "HashTbl("
        << " build_exprs=" << Expr::DebugString(build_exprs_)
        << " probe_exprs=" << Expr::DebugString(probe_exprs_);
   *out << ")";
-  ExecNode::DebugString(indentation_level, out);
-  *out << ")";
-}
-
-// This function is replaced by codegen
-void HashJoinNode::CreateOutputRow(TupleRow* out, TupleRow* probe, TupleRow* build) {
-  if (probe == NULL) {
-    memset(out, 0, result_tuple_row_size_);
-  } else {
-    memcpy(out, probe, result_tuple_row_size_);
-  }
-
-  if (build != NULL) {
-    for (int i = 0; i < build_tuple_size_; ++i) {
-      out->SetTuple(build_tuple_idx_[i], build->GetTuple(i));
-    }
-  } else {
-    for (int i = 0; i < build_tuple_size_; ++i) {
-      out->SetTuple(build_tuple_idx_[i], NULL);
-    }
-  }
 }
 
 // This codegen'd function should only be used for left join cases so it assumes that
