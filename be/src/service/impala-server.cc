@@ -544,12 +544,17 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   writer.String("status");
   writer.String(exec_state.query_status().GetErrorMsg().c_str());
   writer.String("user");
-  writer.String(exec_state.user().c_str());
-  writer.String("impersonator");
+  // If do_as_user() is empty, the "user" field should be set to the connected user
+  // and "impersonator" field should be Null. Otherwise, the "user" should be set to
+  // the current do_as_user() and "impersonator" should be the connected user.
   if (exec_state.do_as_user().empty()) {
+    writer.String(exec_state.user().c_str());
+    writer.String("impersonator");
     writer.Null();
   } else {
     writer.String(exec_state.do_as_user().c_str());
+    writer.String("impersonator");
+    writer.String(exec_state.user().c_str());
   }
   writer.String("statement_type");
   if (request.stmt_type == TStmtType::DDL) {

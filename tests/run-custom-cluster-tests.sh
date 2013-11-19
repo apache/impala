@@ -23,14 +23,14 @@ set -u
 
 RESULTS_DIR=${IMPALA_HOME}/tests/custom_cluster/results
 mkdir -p ${RESULTS_DIR}
-LOG_DIR=${IMPALA_HOME}/tests/custom_cluster/logs/
+LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/custom_cluster/
 mkdir -p ${LOG_DIR}
 
 export LOG_DIR
 
 cd ${IMPALA_HOME}/tests
 . ${IMPALA_HOME}/bin/set-classpath.sh
-py.test custom_cluster/ \
+py.test custom_cluster/ authorization/ \
     --junitxml="${RESULTS_DIR}/TEST-impala-custom-cluster.xml" \
     --resultlog="${RESULTS_DIR}/TEST-impala-custom-cluster.log" "$@"
 EXIT_CODE=$?

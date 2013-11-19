@@ -43,10 +43,7 @@ do
 done
 
 LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/query_tests
-AUTHORIZATION_LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/authorization_tests
 mkdir -p ${LOG_DIR}
-mkdir -p ${AUTHORIZATION_LOG_DIR}
-
 
 # Enable core dumps
 ulimit -c unlimited
@@ -65,18 +62,6 @@ do
 
   # Run backend tests.
   ${IMPALA_HOME}/bin/run-backend-tests.sh
-
-  # Start up a cluster with authorization enabled.
-  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${AUTHORIZATION_LOG_DIR} \
-      --cluster_size=3 --impalad_args="\
-      --authorization_policy_file='/test-warehouse/authz-policy.ini'\
-      --server_name=server1\
-      --authorized_proxy_user_config=hue=$USER"
-
-  # Run authorization tests
-  pushd ${IMPALA_HOME}/tests
-  py.test authorization/test_authorization.py -k test_impersonation
-  popd
 
   # Run the remaining tests against a cluster with authorization disabled.
   ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3

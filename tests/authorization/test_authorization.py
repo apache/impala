@@ -17,21 +17,48 @@
 
 import os
 import pytest
+import shutil
+import tempfile
 import json
-from tests.hs2.test_hs2 import *
-from time import sleep
+from time import sleep, time
 from getpass import getuser
 from cli_service import TCLIService
 from thrift.transport.TSocket import TSocket
-from thrift.transport.TTransport import TBufferedTransport, TTransportException
+from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
-from thrift.Thrift import TApplicationException
-from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
 
-class TestAuthorization(TestHS2):
+class TestAuthorization(CustomClusterTestSuite):
+  AUDIT_LOG_DIR = tempfile.mkdtemp(dir=os.getenv('LOG_DIR'))
+
+  def setup(self):
+    host, port = IMPALAD_HS2_HOST_PORT.split(":")
+    self.socket = TSocket(host, port)
+    self.transport = TBufferedTransport(self.socket)
+    self.transport.open()
+    self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
+    self.hs2_client = TCLIService.Client(self.protocol)
+
+  def teardown(self):
+    if self.socket:
+      self.socket.close()
+    shutil.rmtree(self.AUDIT_LOG_DIR, ignore_errors=True)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--server_name=server1\
+      --authorization_policy_file=/test-warehouse/authz-policy.ini\
+      --authorized_proxy_user_config=hue=%s\
+      --audit_event_log_dir=%s" % (getuser(), AUDIT_LOG_DIR))
   def test_impersonation(self):
     """End-to-end impersonation + authorization test. Expects authorization to be
     configured before running this test"""
+    # TODO: To reuse the HS2 utility code from the TestHS2 test suite we need to import
+    # the module within this test function, rather than as a top-level import. This way
+    # the tests in that module will not get pulled when executing this test suite. The fix
+    # is to split the utility code out of the TestHS2 class and support HS2 as a first
+    # class citizen in our test framework.
+    from tests.hs2.test_hs2 import TestHS2
     open_session_req = TCLIService.TOpenSessionReq()
     open_session_req.username = 'hue'
     open_session_req.configuration = dict()
@@ -48,11 +75,15 @@ class TestAuthorization(TestHS2):
     assert 'User \'%s\' does not have privileges to access' % getuser() in\
         str(execute_statement_resp)
 
+    assert self.__wait_for_audit_record(user=getuser(), impersonator='hue'),\
+        'No matching audit event recorded in time window'
+
     # Now try the same operation on a table we are authorized to access.
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
     execute_statement_req.statement = "describe tpch.lineitem"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+
     TestHS2.check_response(execute_statement_resp)
 
     # Try to impersonate as a user we are not authorized to impersonate.
@@ -62,3 +93,28 @@ class TestAuthorization(TestHS2):
 
     self.socket.close()
     self.socket = None
+
+  def __wait_for_audit_record(self, user, impersonator, timeout_secs=30):
+    """Waits until an audit log record is found that contains the given user and
+    impersonator, or until the timeout is reached.
+    """
+    # The audit event might not show up immediately (the audit logs are flushed to disk
+    # on regular intervals), so poll the audit event logs until a matching record is
+    # found.
+    start_time = time()
+    while time() - start_time < timeout_secs:
+      for audit_file_name in os.listdir(self.AUDIT_LOG_DIR):
+        if self.__find_matching_audit_record(audit_file_name, user, impersonator):
+          return True
+      sleep(1)
+    return False
+
+  def __find_matching_audit_record(self, audit_file_name, user, impersonator):
+    with open(os.path.join(self.AUDIT_LOG_DIR, audit_file_name)) as audit_log_file:
+      for line in audit_log_file.readlines():
+          json_dict = json.loads(line)
+          if len(json_dict) == 0: continue
+          if json_dict[min(json_dict)]['user'] == user and\
+              json_dict[min(json_dict)]['impersonator'] == impersonator:
+            return True
+    return False
