@@ -107,9 +107,9 @@
     <dependency>
       <groupId>parquet</groupId>
       <artifactId>parquet-hive</artifactId>
-      <version>1.0</version>
+      <version>1.2.5</version>
       <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/parquet-hive-1.0.0.jar</systemPath>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/parquet-hive-1.2.5-cdh4.5.0.jar</systemPath>
     </dependency>
 
     <dependency>
