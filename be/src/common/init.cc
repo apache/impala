@@ -53,12 +53,8 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   OsInfo::Init();
 
   if (!CpuInfo::IsSupported(CpuInfo::SSE3)) {
-    LOG(ERROR) << "Machine does not support sse3, which is currently required.";
-    if (FLAGS_abort_on_config_error) {
-      LOG(ERROR) << "Exiting process. You can disable this check by starting up with "
-                 << "--abort_on_config_error=false";
-      exit(1);
-    }
+    LOG(ERROR) << "CPU does not support the SSE3 instruction set, which is required."
+               << " This could lead to instability.";
   }
 
   // Set the default hostname. The user can override this with the hostname flag.
