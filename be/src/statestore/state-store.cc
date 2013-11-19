@@ -191,26 +191,38 @@ void StateStore::RegisterWebpages(Webserver* webserver) {
 }
 
 void StateStore::TopicsHandler(const Webserver::ArgumentMap& args,
-                                stringstream* output) {
+    stringstream* output) {
   (*output) << "<h2>Topics</h2>";
   (*output) << "<table class='table table-striped'>"
-            << "<tr><th>Topic Id</th><th>Number of entries</th></tr>";
+            << "<tr><th>Topic Id</th>"
+            << "<th>Number of entries</th>"
+            << "<th>Version</th>"
+            << "<th>Oldest subscriber version</th>"
+            << "<th>Oldest subscriber Id</th></tr>";
 
   lock_guard<mutex> l(topic_lock_);
   BOOST_FOREACH(const TopicMap::value_type& topic, topics_) {
-    (*output) << "<tr><td>" << topic.second.id() << "</td>";
-    (*output) << "<td>" << topic.second.entries().size() << "</td></tr>";
+    SubscriberId oldest_subscriber_id;
+    TopicEntry::Version oldest_subscriber_version =
+        GetMinSubscriberTopicVersion(topic.first, &oldest_subscriber_id);
+
+    (*output) << "<tr><td>" << topic.second.id() << "</td><td>"
+              << topic.second.entries().size() << "</td><td>"
+              << topic.second.last_version() << "</td><td>"
+              << oldest_subscriber_version  << "</td><td>"
+              << oldest_subscriber_id << "</td></tr>";
   }
   (*output) << "</table>";
 }
 
 void StateStore::SubscribersHandler(const Webserver::ArgumentMap& args,
-                                     stringstream* output) {
+    stringstream* output) {
   (*output) << "<h2>Subscribers</h2>";
   (*output) << "<table class ='table table-striped'>"
             << "<tr><th>Id</th><th>Address</th><th>Subscribed topics</th>"
             << "<th>Transient entries</th>"
             << "<th>Registration Id</th></tr>";
+
   lock_guard<mutex> l(subscribers_lock_);
   BOOST_FOREACH(const SubscriberMap::value_type& subscriber, subscribers_) {
     (*output) << "<tr><td>" << subscriber.second->id() << "</td><td>"
@@ -407,7 +419,7 @@ void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
 }
 
 const StateStore::TopicEntry::Version StateStore::GetMinSubscriberTopicVersion(
-    const TopicId& topic_id) {
+    const TopicId& topic_id, SubscriberId* subscriber_id) {
   lock_guard<mutex> l(subscribers_lock_);
   TopicEntry::Version min_topic_version = numeric_limits<int64_t>::max();
   bool found = false;
@@ -416,8 +428,12 @@ const StateStore::TopicEntry::Version StateStore::GetMinSubscriberTopicVersion(
     if (subscriber.second->subscribed_topics().find(topic_id) !=
         subscriber.second->subscribed_topics().end()) {
       found = true;
-      min_topic_version = min(min_topic_version,
-          subscriber.second->LastTopicVersionProcessed(topic_id));
+      TopicEntry::Version last_processed_version =
+          subscriber.second->LastTopicVersionProcessed(topic_id);
+      if (last_processed_version < min_topic_version) {
+        min_topic_version = last_processed_version;
+        if (subscriber_id != NULL) *subscriber_id = subscriber.second->id();
+      }
     }
   }
   return found ? min_topic_version : Subscriber::TOPIC_INITIAL_VERSION;

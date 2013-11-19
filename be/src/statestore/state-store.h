@@ -212,6 +212,7 @@ class StateStore {
 
     const TopicId& id() const { return topic_id_; }
     const TopicEntryMap& entries() const { return entries_; }
+    TopicEntry::Version last_version() const { return last_version_; }
     const TopicUpdateLog& topic_update_log() const { return topic_update_log_; }
 
    private:
@@ -420,13 +421,16 @@ class StateStore {
   // given topic ID. Calculated by enumerating all subscribers and looking
   // at their LastTopicVersionProcessed() for this topic. The value returned will always
   // be <= topics_[topic_id].last_version_. Returns TOPIC_INITIAL_VERSION if no
-  // subscribers are registered to the topic.
+  // subscribers are registered to the topic. The subscriber ID to whom the
+  // min version belongs can also be retrieved using the optional subscriber_id output
+  // parameter. If multiple subscribers have the same min version, the subscriber_id
+  // may be set to any one of the matching subscribers.
   // Takes the subscribers_ lock.
   // TODO: Update the min subscriber version only when a topic is updated, rather than
   // each time a subscriber is updated. One way to do this would be to keep a priority
   // queue in Topic of each subscriber's last processed version of the topic.
-  // TODO: Expose the topic version and minimum subscriber topic version in /topics.
-  const TopicEntry::Version GetMinSubscriberTopicVersion(const TopicId& topic_id);
+  const TopicEntry::Version GetMinSubscriberTopicVersion(const TopicId& topic_id,
+      SubscriberId* subscriber_id = NULL);
 
   // True if the shutdown flag has been set true, false otherwise.
   bool ShouldExit();
