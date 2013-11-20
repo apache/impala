@@ -29,6 +29,10 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
+// Make sure ldap_simple_bind_s() is available.
+#define LDAP_DEPRECATED 1
+#include <ldap.h>
+
 #include "rpc/auth-provider.h"
 #include "transport/TSaslClientTransport.h"
 #include "util/debug-util.h"
@@ -54,17 +58,30 @@ DEFINE_string(sasl_path, "/usr/lib/sasl2:/usr/lib64/sasl2:/usr/local/lib/sasl2:"
 DEFINE_bool(enable_ldap_auth, false,
     "If true, use LDAP authentication for client connections");
 
+DEFINE_string(ldap_uri, "", "The URI of the LDAP server to authenticate users against");
+DEFINE_bool(ldap_tls, false, "If true, use the secure TLS protocol to connect to the LDAP"
+    " server");
+DEFINE_bool(ldap_manual_config, false, "(Advanced) If true, use a custom SASL config file"
+    " to configure access to an LDAP server.");
+
 namespace impala {
 
-// Array of callbacks for the Sasl library.
+// Array of default callbacks for the Sasl library. Initialised in InitAuth().
 static vector<sasl_callback_t> SASL_CALLBACKS;
 
 // Pattern for hostname substitution.
 static const string HOSTNAME_PATTERN = "_HOST";
 
-// Constants for the two Sasl  mechanisms we support
+// Constants for the two Sasl mechanisms we support
 static const std::string KERBEROS_MECHANISM = "GSSAPI";
 static const std::string PLAIN_MECHANISM = "PLAIN";
+
+// Passed to the SaslGetOption() callback by SASL to indicate that the callback is for
+// LDAP, not any other mechanism.
+static const void* LDAP_AUTH_CONTEXT = reinterpret_cast<void*>(1);
+
+// Our dummy plugin needs a standard name.
+static const string IMPALA_AUXPROP_PLUGIN = "impala-auxprop";
 
 AuthManager* AuthManager::auth_manager_ = new AuthManager();
 
@@ -100,6 +117,47 @@ static int SaslLogCallback(void* context, int level,  const char* message) {
   return SASL_OK;
 }
 
+// Called by the SASL library during LDAP authentication. This is where we 'cheat' and use
+// this callback to confirm the user's credentials without implementing a fully-fledged
+// auxprop plugin.
+//
+// Note that this method uses ldap_simple_bind_s(), which does *not* provide any security
+// to the connection between Impala and the LDAP server. You must either set --ldap_tls,
+// or --ldap_manual_config; the former uses TLS to secure the transport, the latter allows
+// users to write a standard SASL configuration file for custom setups and will bypass
+// this method.
+int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
+    const char *pass, unsigned passlen, struct propctx *propctx) {
+  LDAP* ld;
+  int rc = ldap_initialize(&ld, FLAGS_ldap_uri.c_str());
+  if (rc != LDAP_SUCCESS) {
+    LOG(WARNING) << "Could not initialise connection with LDAP server ("
+                 << FLAGS_ldap_uri << "). Error: " << ldap_err2string(rc);
+    return SASL_FAIL;
+  }
+
+  // Force the LDAP version to 3 to make sure TLS is supported.
+  int ldap_ver = 3;
+  ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &ldap_ver);
+  if (FLAGS_ldap_tls) {
+    int tls_rc = ldap_start_tls_s(ld, NULL, NULL);
+    if (tls_rc != LDAP_SUCCESS) {
+      LOG(WARNING) << "Could not start TLS secure connection to LDAP server ("
+                   << FLAGS_ldap_uri << "). Error: " << ldap_err2string(tls_rc);
+      ldap_unbind(ld);
+      return SASL_FAIL;
+    }
+  }
+
+  string pass_str(pass, passlen);
+  rc = ldap_simple_bind_s(ld, user, pass_str.c_str());
+  // Free ld
+  ldap_unbind(ld);
+  if (rc != LDAP_SUCCESS) return SASL_FAIL;
+
+  return SASL_OK;
+}
+
 // Get Sasl option.
 // context: not used
 // plugin_name: name of plugin for which an option is being requested.
@@ -109,7 +167,16 @@ static int SaslLogCallback(void* context, int level,  const char* message) {
 // Return SASL_FAIL if the option is not handled, this does not fail the handshake.
 static int SaslGetOption(void* context, const char* plugin_name, const char* option,
     const char** result, unsigned* len) {
-  // Handle Sasl Library options
+  // Tell SASL to use our dummy plugin if we are using LDAP. If --ldap_manual_config is
+  // set, users are expecting to override these settings so we don't respond to the SASL
+  // request.
+  if (strcmp("auxprop_plugin", option) == 0 && context == LDAP_AUTH_CONTEXT
+      && !FLAGS_ldap_manual_config) {
+    *result = IMPALA_AUXPROP_PLUGIN.c_str();
+    if (len != NULL) *len = strlen(*result);
+    return SASL_OK;
+  }
+
   if (plugin_name == NULL) {
     // Return the logging level that we want the sasl library to use.
     if (strcmp("log_level", option) == 0) {
@@ -125,6 +192,7 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
       if (len != NULL) *len = strlen(buf);
       return SASL_OK;
     }
+
     // Options can default so don't complain.
     VLOG(3) << "SaslGetOption: Unknown option: " << option;
     return SASL_FAIL;
@@ -141,7 +209,8 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
         if (len != NULL) *len = strlen(*result);
         return SASL_OK;
     }
-    VLOG(3) << "SaslGetOption: Unknown option: " << option;
+    VLOG(3) << "SaslGetOption: Unknown option: " << option << " for plugin_name: "
+            << plugin_name;
     return SASL_FAIL;
   }
 
@@ -269,7 +338,7 @@ Status InitAuth(const string& appname) {
   SASL_CALLBACKS[3].id = SASL_CB_GETPATH;
   SASL_CALLBACKS[3].proc = (int (*)())&SaslGetPath;
   SASL_CALLBACKS[3].context = NULL;
-  SASL_CALLBACKS[4].id = SASL_CB_LIST_END;
+  SASL_CALLBACKS[SASL_CALLBACKS.size() - 1].id = SASL_CB_LIST_END;
 
   try {
     // We assume all impala processes are both server and client.
@@ -372,16 +441,71 @@ Status KerberosAuthProvider::WrapClientTransport(const string& hostname,
   return Status::OK;
 }
 
+
+// This is the one required method to implement a SASL 'auxprop' plugin. It's just a
+// no-op; the work is done in SaslLdapCheckPass();
+void ImpalaAuxpropLookup(void* glob_context, sasl_server_params_t* sparams,
+    unsigned int flags, const char* user, unsigned ulen) {
+  // NO-OP
+}
+
+// Singleton structure used to register auxprop plugin with SASL
+static sasl_auxprop_plug_t impala_auxprop_plugin = {
+  0, // feature flag
+  0, // 'spare'
+  NULL, // global plugin state
+  NULL, // Free global state callback
+  &ImpalaAuxpropLookup, // Auxprop lookup method
+  const_cast<char*>(IMPALA_AUXPROP_PLUGIN.c_str()), // Name of plugin
+  NULL // Store property callback
+};
+
+// Called by SASL during registration of the auxprop plugin.
+int ImpalaAuxpropInit(const sasl_utils_t* utils, int max_version, int* out_version,
+    sasl_auxprop_plug_t** plug, const char* plugname) {
+  LOG(INFO) << "Initialising Impala SASL plugin: " << plugname;
+  *plug = &impala_auxprop_plugin;
+  *out_version = max_version;
+  return SASL_OK;
+}
+
+Status LdapAuthProvider::Start() {
+  sasl_callbacks_.resize(6);
+  sasl_callbacks_[0].id = SASL_CB_LOG;
+  sasl_callbacks_[0].proc = (int (*)())&SaslLogCallback;
+  sasl_callbacks_[0].context = NULL;
+  sasl_callbacks_[1].id = SASL_CB_GETOPT;
+  sasl_callbacks_[1].proc = (int (*)())&SaslGetOption;
+  sasl_callbacks_[1].context = (void*)1;
+  sasl_callbacks_[2].id = SASL_CB_PROXY_POLICY;
+  sasl_callbacks_[2].proc = (int (*)())&SaslAuthorize;
+  sasl_callbacks_[2].context = NULL;
+  sasl_callbacks_[3].id = SASL_CB_GETPATH;
+  sasl_callbacks_[3].proc = (int (*)())&SaslGetPath;
+  sasl_callbacks_[3].context = NULL;
+  // This is where LDAP / PLAIN differs from other SASL mechanisms: we use the checkpass
+  // callback to do authentication.
+  sasl_callbacks_[4].id = SASL_CB_SERVER_USERDB_CHECKPASS;
+  sasl_callbacks_[4].proc = (int (*)())&SaslLdapCheckPass;
+  sasl_callbacks_[4].context = NULL;
+  sasl_callbacks_[sasl_callbacks_.size() - 1].id = SASL_CB_LIST_END;
+
+  return Status::OK;
+}
+
 Status LdapAuthProvider::GetServerTransportFactory(
     shared_ptr<TTransportFactory>* factory) {
   try {
     // TSaslServerTransport::Factory doesn't actually do anything with the properties
     // argument, so we pass in an empty map
     map<string, string> sasl_props;
-    factory->reset(new TSaslServerTransport::Factory(PLAIN_MECHANISM, "", "", 0,
-        sasl_props, SASL_CALLBACKS));
+    // If overriding the hard-coded LDAP configuration, use the default callbacks,
+    // otherwise use those specific to LDAP.
+    factory->reset(
+        new TSaslServerTransport::Factory(PLAIN_MECHANISM, "", "", 0, sasl_props,
+            FLAGS_ldap_manual_config ? SASL_CALLBACKS : sasl_callbacks_));
   } catch (sasl::SaslClientImplException& e) {
-    LOG(ERROR) << "Kerberos client create failed: " << e.what();
+    LOG(ERROR) << "LDAP server factory creation failed: " << e.what();
     return Status(e.what());
   }
   return Status::OK;
@@ -409,7 +533,10 @@ Status AuthManager::Init() {
   // a NoAuthProvider.
   if (FLAGS_enable_ldap_auth) {
     client_auth_provider_.reset(new LdapAuthProvider());
-    RETURN_IF_ERROR(client_auth_provider_->Start());
+    // We only want to register the plugin once for the whole application, so don't
+    // register inside the LdapAuthProvider() instructor.
+    int rc = sasl_auxprop_add_plugin(IMPALA_AUXPROP_PLUGIN.c_str(), &ImpalaAuxpropInit);
+    if (rc != SASL_OK) return Status(sasl_errstring(rc, NULL, NULL));
   } else if (!FLAGS_principal.empty()) {
     client_auth_provider_.reset(
         new KerberosAuthProvider(FLAGS_principal, FLAGS_keytab_file, false));

@@ -18,6 +18,7 @@
 #include <string>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
+#include <sasl/sasl.h>
 
 #include "common/status.h"
 #include "util/promise.h"
@@ -114,7 +115,7 @@ class KerberosAuthProvider : public AuthProvider {
 class LdapAuthProvider : public AuthProvider {
  public:
   LdapAuthProvider() { }
-  virtual Status Start() { return Status::OK; }
+  virtual Status Start();
   virtual Status GetServerTransportFactory(
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
   virtual Status WrapClientTransport(const std::string& hostname,
@@ -122,6 +123,11 @@ class LdapAuthProvider : public AuthProvider {
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
 
   virtual bool is_sasl() { return true; }
+
+ private:
+  // These callbacks override the default callbacks so that we can ensure our custom
+  // checkpass callback is invoked.
+  std::vector<sasl_callback_t> sasl_callbacks_;
 };
 
 // This provider implements no authentication, so any connection is immediately
