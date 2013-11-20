@@ -120,7 +120,7 @@ enum TImpalaQueryOptions {
 
   // If true, waits for the result of all catalog operations to be processed by all
   // active impalad in the cluster before completing.
-  SYNCED_DDL,
+  SYNC_DDL,
 }
 
 // The summary of an insert.

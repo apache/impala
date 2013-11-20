@@ -110,7 +110,7 @@ class ImpalaTestSuite(BaseTestSuite):
   def cleanup_db(self, db_name):
     # To drop a db, we need to first drop all the tables in that db
     self.client.execute("use default")
-    self.client.set_query_options({'synced_ddl': 1})
+    self.client.set_query_options({'sync_ddl': 1})
     if db_name in self.client.execute("show databases", ).data:
       for tbl_name in self.client.execute("show tables in " + db_name).data:
         full_tbl_name = '%s.%s' % (db_name, tbl_name)

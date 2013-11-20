@@ -27,7 +27,7 @@ class TestDdlStatements(ImpalaTestSuite):
         cluster_sizes=ALL_NODES_ONLY,
         disable_codegen_options=[False],
         batch_sizes=[0],
-        synced_ddl=[0, 1]))
+        sync_ddl=[0, 1]))
 
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_constraint(lambda v:\
@@ -188,7 +188,7 @@ class TestDdlStatements(ImpalaTestSuite):
 
   @classmethod
   def __use_multiple_impalad(cls, vector):
-    return vector.get_value('exec_option')['synced_ddl'] == 1
+    return vector.get_value('exec_option')['sync_ddl'] == 1
 
   @classmethod
   def __create_db_synced(cls, db_name, vector):
@@ -196,7 +196,7 @@ class TestDdlStatements(ImpalaTestSuite):
     database available for use before executing the .test file(s).
     """
     cls.client.execute('use default')
-    cls.client.set_query_options({'synced_ddl': 1})
+    cls.client.set_query_options({'sync_ddl': 1})
     cls.client.execute('create database %s' % db_name)
     cls.client.set_query_options(vector.get_value('exec_option'))
 

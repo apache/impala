@@ -26,7 +26,7 @@ class TestInsertQueries(ImpalaTestSuite):
     # tables for each test case to resolve the concurrency problems.
     cls.TestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
-        synced_ddl=[0, 1]))
+        sync_ddl=[0, 1]))
 
     cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
 
@@ -50,9 +50,9 @@ class TestInsertQueries(ImpalaTestSuite):
     vector.get_value('exec_option')['PARQUET_COMPRESSION_CODEC'] = \
         vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert', vector,
-        multiple_impalad=vector.get_value('exec_option')['synced_ddl'] == 1)
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
   @pytest.mark.execute_serially
   def test_insert_overwrite(self, vector):
     self.run_test_case('QueryTest/insert_overwrite', vector,
-        multiple_impalad=vector.get_value('exec_option')['synced_ddl'] == 1)
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)

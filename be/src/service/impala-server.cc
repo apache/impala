@@ -1498,8 +1498,8 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
           return Status(ss.str());
         }
         break;
-      case TImpalaQueryOptions::SYNCED_DDL:
-        query_options->__set_synced_ddl(iequals(value, "true") || iequals(value, "1"));
+      case TImpalaQueryOptions::SYNC_DDL:
+        query_options->__set_sync_ddl(iequals(value, "true") || iequals(value, "1"));
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
@@ -1753,8 +1753,8 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
       case TImpalaQueryOptions::EXPLAIN_LEVEL:
         val << query_option.explain_level;
         break;
-      case TImpalaQueryOptions::SYNCED_DDL:
-        val << query_option.synced_ddl;
+      case TImpalaQueryOptions::SYNC_DDL:
+        val << query_option.sync_ddl;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

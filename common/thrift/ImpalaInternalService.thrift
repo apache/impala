@@ -63,7 +63,7 @@ struct TQueryOptions {
   16: optional bool hbase_cache_blocks = 0
   17: optional i64 parquet_file_size = 0
   18: optional Types.TExplainLevel explain_level
-  19: optional bool synced_ddl = 0
+  19: optional bool sync_ddl = 0
 }
 
 // A scan range plus the parameters needed to execute that scan.
