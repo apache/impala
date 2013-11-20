@@ -120,9 +120,11 @@ class MemTracker {
         if (!all_trackers_[i]->consumption_->TryUpdate(bytes, all_trackers_[i]->limit_)) {
           // One of the trackers failed, attempt to GC memory. If that succeeds,
           // TryUpdate() again. Bail if either fails.
-          if (all_trackers_[i]->GcMemory(all_trackers_[i]->limit_ + bytes) ||
+          if (all_trackers_[i]->GcMemory(all_trackers_[i]->limit_ - bytes) ||
               !all_trackers_[i]->consumption_->TryUpdate(
-                  bytes, all_trackers_[i]->limit_)) break;
+                  bytes, all_trackers_[i]->limit_)) {
+            break;
+          }
         }
       }
     }
@@ -217,9 +219,9 @@ class MemTracker {
  private:
   bool CheckLimitExceeded() const { return limit_ >= 0 && limit_ < consumption(); }
 
-  // If the limit is exceeded, attempts to free memory by calling any added GC functions.
-  // Returns true if the limit is still exceeded. Take gc_lock. Updates metrics if
-  // initialized.
+  // If consumption is higher than max_consumption, attempts to free memory by calling any
+  // added GC functions.  Returns true if max_consumption is still exceeded. Takes
+  // gc_lock. Updates metrics if initialized.
   bool GcMemory(int64_t max_consumption);
 
   // Lock to protect GcMemory(). This prevents many GCs from occurring at once.

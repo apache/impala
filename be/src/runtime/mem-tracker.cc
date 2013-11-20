@@ -206,7 +206,7 @@ bool MemTracker::GcMemory(int64_t max_consumption) {
   // Try to free up some memory
   for (int i = 0; i < gc_functions_.size(); ++i) {
     gc_functions_[i]();
-    if (consumption() < max_consumption) break;
+    if (consumption() <= max_consumption) break;
   }
 
   if (bytes_freed_by_last_gc_metric_ != NULL) {
