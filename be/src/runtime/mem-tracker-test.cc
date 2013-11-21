@@ -56,7 +56,7 @@ TEST(MemTestTest, ConsumptionMetric) {
   EXPECT_TRUE(t.has_limit());
   EXPECT_EQ(t.consumption(), 0);
 
-  // Consume()/Release() are supported but no-ops
+  // Consume()/Release() arguments have no effect
   t.Consume(150);
   EXPECT_EQ(t.consumption(), 0);
   EXPECT_EQ(t.peak_consumption(), 0);
@@ -67,17 +67,23 @@ TEST(MemTestTest, ConsumptionMetric) {
   EXPECT_FALSE(t.LimitExceeded());
 
   metric.Increment(10);
+  // consumption_ is only updated with consumption_metric_ after calls to
+  // Consume()/Release()
+  t.Consume(0);
   EXPECT_EQ(t.consumption(), 10);
   EXPECT_EQ(t.peak_consumption(), 10);
   metric.Increment(-5);
+  t.Consume(0);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 10);
   EXPECT_FALSE(t.LimitExceeded());
   metric.Increment(150);
+  t.Consume(0);
   EXPECT_EQ(t.consumption(), 155);
   EXPECT_EQ(t.peak_consumption(), 155);
   EXPECT_TRUE(t.LimitExceeded());
   metric.Increment(-150);
+  t.Consume(0);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 155);
   EXPECT_FALSE(t.LimitExceeded());

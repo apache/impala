@@ -92,12 +92,13 @@ class MemTracker {
 
   // Increases consumption of this tracker and its ancestors by 'bytes'.
   void Consume(int64_t bytes) {
-    if (bytes == 0) return;
-    if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
     if (consumption_metric_ != NULL) {
       DCHECK(parent_ == NULL);
+      consumption_->Set(consumption_metric_->value());
       return;
     }
+    if (bytes == 0) return;
+    if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {
       (*tracker)->consumption_->Update(bytes);
@@ -110,6 +111,7 @@ class MemTracker {
   // are updated.
   // Returns true if the try succeeded.
   bool TryConsume(int64_t bytes) {
+    if (consumption_metric_ != NULL) consumption_->Set(consumption_metric_->value());
     if (bytes == 0) return true;
     if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
     int i = 0;
@@ -144,7 +146,11 @@ class MemTracker {
 
   // Decreases consumption of this tracker and its ancestors by 'bytes'.
   void Release(int64_t bytes) {
-    if (consumption_metric_ != NULL) return;
+    if (consumption_metric_ != NULL) {
+      DCHECK(parent_ == NULL);
+      consumption_->Set(consumption_metric_->value());
+      return;
+    }
     if (bytes == 0) return;
     if (UNLIKELY(enable_logging_)) LogUpdate(false, bytes);
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
@@ -182,10 +188,7 @@ class MemTracker {
   const std::string& label() const { return label_; }
 
   // Returns the memory consumed in bytes.
-  int64_t consumption() const {
-    if (consumption_metric_ != NULL) consumption_->Set(consumption_metric_->value());
-    return consumption_->current_value();
-  }
+  int64_t consumption() const { return consumption_->current_value(); }
 
   // Note that if consumption_ is based on consumption_metric_, this will the max value
   // we've recorded in consumption(), not necessarily the highest value

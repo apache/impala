@@ -198,6 +198,7 @@ void MemTracker::LogUpdate(bool is_consume, int64_t bytes) const {
 bool MemTracker::GcMemory(int64_t max_consumption) {
   DCHECK_GE(max_consumption, 0);
   ScopedSpinLock l(&gc_lock_);
+  if (consumption_metric_ != NULL) consumption_->Set(consumption_metric_->value());
   uint64_t pre_gc_consumption = consumption();
   // Check if someone gc'd before us
   if (pre_gc_consumption < max_consumption) return false;
@@ -206,6 +207,7 @@ bool MemTracker::GcMemory(int64_t max_consumption) {
   // Try to free up some memory
   for (int i = 0; i < gc_functions_.size(); ++i) {
     gc_functions_[i]();
+    if (consumption_metric_ != NULL) consumption_->Set(consumption_metric_->value());
     if (consumption() <= max_consumption) break;
   }
 
