@@ -178,14 +178,9 @@ def exec_impala_query_from_file_parallel(query_files):
   # Refresh Catalog
   print "Invalidating metadata"
   impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
-  try:
-    impala_client.connect()
-    impala_client.execute('invalidate metadata')
-  except Exception, e:
-    print "Could not Invalidate metadata, data loading failed."
-    sys.exit(1)
-  finally:
-    impala_client.close_connection()
+  impala_client.connect()
+  impala_client.execute('invalidate metadata')
+  impala_client.close_connection()
   result_queue = Queue()
   threads = []
   for query_file in query_files:
