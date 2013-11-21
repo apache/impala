@@ -94,6 +94,14 @@
               
   <repositories>
     <repository>
+      <id>cdh.rcs.releases.repo</id>
+      <url>https://repository.cloudera.com/content/groups/cdh-releases-rcs</url>
+      <name>CDH Releases Repository</name>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+    <repository>
       <id>cdh.releases.repo</id>
       <url>https://repository.cloudera.com/content/repositories/releases</url>
       <name>CDH Releases Repository</name>
