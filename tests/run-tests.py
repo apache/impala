@@ -58,12 +58,14 @@ class TestExecutor:
       sys.exit(exit_code)
     self.tests_failed = exit_code != 0 or self.tests_failed
 
-def build_test_args(log_base_name, valid_dirs):
-  ignored_dirs = build_ignore_dir_arg_list(valid_dirs=valid_dirs)
-  args = LOGGING_ARGS % {'result_dir': TEST_RESULT_DIR, 'log_name': log_base_name}
+def build_test_args(log_base_name, valid_dirs, include_cmdline_args=True):
+  logging_args = LOGGING_ARGS % {'result_dir': TEST_RESULT_DIR, 'log_name': log_base_name}
+  args = '%s %s' % (build_ignore_dir_arg_list(valid_dirs=valid_dirs), logging_args)
 
-  # sys.argv[0] is always the script name, so exclude it
-  return '%s %s %s' % (args, ignored_dirs, ' '.join(sys.argv[1:]))
+  if include_cmdline_args:
+    # sys.argv[0] is always the script name, so exclude it
+    return '%s %s' % (args, ' '.join(sys.argv[1:]))
+  return args
 
 def build_ignore_dir_arg_list(valid_dirs):
   """ Builds a list of directories to ignore """
@@ -95,7 +97,10 @@ if __name__ == "__main__":
   test_executor.run_tests(args)
 
   # Finally, validate impalad/statestored metrics.
-  args = build_test_args(log_base_name='verify-metrics', valid_dirs=['verifiers'])
+  # Do not include any command-line arguments when invoking verifiers because it
+  # can lead to tests being run multiple times should someone pass in a .py file.
+  args = build_test_args(log_base_name='verify-metrics', valid_dirs=['verifiers'],
+      include_cmdline_args=False)
   args += ' verifiers/test_verify_metrics.py'
   test_executor.run_tests(args)
 
