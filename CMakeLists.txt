@@ -103,6 +103,16 @@ add_library(saslstatic STATIC IMPORTED)
 set_target_properties(saslstatic PROPERTIES IMPORTED_LOCATION ${SASL_STATIC_LIBRARY})
 set(SASL_LIBRARY saslstatic)
 
+# find openldap
+find_package(Ldap REQUIRED)
+include_directories(SYSTEM ${LDAP_INCLUDE_DIR})
+add_library(ldapstatic STATIC IMPORTED)
+set_target_properties(ldapstatic PROPERTIES IMPORTED_LOCATION ${LDAP_STATIC_LIBRARY})
+add_library(lberstatic STATIC IMPORTED)
+set_target_properties(lberstatic PROPERTIES IMPORTED_LOCATION ${LBER_STATIC_LIBRARY})
+set(LDAP_LIBRARY ldapstatic)
+set(LBER_LIBRARY lberstatic)
+
 # find thrift headers and libs
 find_package(Thrift REQUIRED)
 include_directories(SYSTEM ${THRIFT_INCLUDE_DIR})

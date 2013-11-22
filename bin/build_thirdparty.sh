@@ -36,6 +36,7 @@ BUILD_GFLAGS=0
 BUILD_GTEST=0
 BUILD_RE2=0
 BUILD_SASL=0
+BUILD_LDAP=0
 BUILD_SNAPPY=0
 BUILD_PPROF=0
 
@@ -73,6 +74,10 @@ do
       BUILD_ALL=0
       BUILD_SASL=1
       ;;
+    -ldap)
+      BUILD_ALL=0
+      BUILD_LDAP=1
+      ;;
     -snappy)
       BUILD_ALL=0
       BUILD_SNAPPY=1
@@ -83,7 +88,7 @@ do
       ;;
     -*)
       echo "Usage: build_thirdparty.sh [-noclean] \
-[-avro -glog -thrift -gflags -gtest -re2 -sasl -snappy -pprof]"
+[-avro -glog -thrift -gflags -gtest -re2 -sasl -ldap -snappy -pprof]"
       exit 1
   esac
 done
@@ -187,6 +192,15 @@ if [ $BUILD_ALL -eq 1 ] || [ $BUILD_RE2 -eq 1 ]; then
   make -j4
 fi
 
+# Build Ldap
+if [ $BUILD_ALL -eq 1 ] || [ $BUILD_LDAP -eq 1 ]; then
+    build_preamble $IMPALA_HOME/thirdparty/openldap-${IMPALA_OPENLDAP_VERSION} Openldap
+    ./configure --enable-slapd=no --prefix=`pwd`/install --enable-static --with-pic
+    make -j4
+    make -j4 depend
+    make install
+fi
+
 # Build Sasl
 if [ $BUILD_ALL -eq 1 ] || [ $BUILD_SASL -eq 1 ]; then
   if [ -z "$USE_PIC_LIB_PATH" ]; then
@@ -194,9 +208,9 @@ if [ $BUILD_ALL -eq 1 ] || [ $BUILD_SASL -eq 1 ]; then
     # Disable everything except those protocols needed -- currently just Kerberos.
     # Sasl does not have a --with-pic configuration.
     CFLAGS="-fPIC -DPIC" CXXFLAGS="-fPIC -DPIC" ./configure \
-      --disable-sql --disable-otp  --enable-ldapdb --with-ldap=/usr/ --with-saslauthd=no \
+      --disable-sql --disable-otp --disable-ldap --disable-digest --with-saslauthd=no \
       --prefix=$IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build \
-      --enable-static --enable-staticdlopen --enable-alwaystrue
+      --enable-static --enable-staticdlopen
     # the first time you do a make it fails, ignore the error.
     (make || true)
     make install

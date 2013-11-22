@@ -201,6 +201,8 @@ set (IMPALA_LINK_LIBS
   thriftstatic
   thriftnbstatic
   ${SASL_LIBRARY}
+  ${LDAP_LIBRARY}
+  ${LBER_LIBRARY}
   ThriftSaslTransport
   ${JAVA_JVM_LIBRARY}
   ${HDFS_LIBS}
