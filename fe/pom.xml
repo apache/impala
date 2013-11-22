@@ -196,20 +196,39 @@
       <artifactId>derby</artifactId>
       <version>10.4.2.0</version>
     </dependency>
+    <!-- The data nucleus dependencies are copied directly from Hive's pom.xml
+         to make our FE build work -->
     <dependency>
       <groupId>org.datanucleus</groupId>
-      <artifactId>datanucleus-connectionpool</artifactId>
-      <version>2.0.3</version>
+      <artifactId>datanucleus-api-jdo</artifactId>
+      <version>3.2.1</version>
+      <scope>compile</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>javax.jdo</groupId>
+          <artifactId>jdo2-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.datanucleus</groupId>
       <artifactId>datanucleus-core</artifactId>
-      <version>2.0.3</version>
+      <version>3.2.2</version>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.datanucleus</groupId>
       <artifactId>datanucleus-rdbms</artifactId>
-      <version>2.0.3</version>
+      <version>3.2.1</version>
+      <scope>compile</scope>
     </dependency>
     <!-- This driver supports PostgreSQL 7.2 and newer -->
     <dependency>
