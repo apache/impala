@@ -219,9 +219,9 @@ class TestDdlStatements(ImpalaTestSuite):
     database available for use before executing the .test file(s).
     """
     cls.client.execute('use default')
-    cls.client.set_query_options({'sync_ddl': 1})
+    cls.client.set_configuration({'sync_ddl': 1})
     cls.client.execute('create database %s' % db_name)
-    cls.client.set_query_options(vector.get_value('exec_option'))
+    cls.client.set_configuration(vector.get_value('exec_option'))
 
   def __get_tbl_properties(self, table_name):
     """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""

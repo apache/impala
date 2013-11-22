@@ -53,7 +53,7 @@ def pytest_addoption(parser):
                    "for the hive metastore client when using kerberos.")
 
   parser.addoption("--use_kerberos", action="store_true", default=False,
-                   help="Use kerberos transport for running tests")
+                   help="use kerberos transport for running tests")
 
   parser.addoption("--sanity", action="store_true", default=False,
                    help="Runs a single test vector from each test to provide a quick "\

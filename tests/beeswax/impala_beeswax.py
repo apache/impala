@@ -95,7 +95,7 @@ class ImpalaBeeswaxClient(object):
     return ["%s=%s" % (k,v) for (k,v) in self.__query_options.iteritems()]
 
   def get_query_options(self):
-    return '\n'.join(["\t%s: %s" % (k,v) for (k,v) in self.__query_options.iteritems()])
+    return self.__query_options
 
   def set_query_option(self, name, value):
     self.__query_options[name.upper()] = value
@@ -192,8 +192,14 @@ class ImpalaBeeswaxClient(object):
         raise ImpalaBeeswaxException("Query aborted:" + error_log, None)
       time.sleep(0.05)
 
+  def get_default_configuration(self):
+    return self.__do_rpc(lambda: self.imp_service.get_default_configuration(False))
+
   def get_state(self, query_handle):
     return self.__do_rpc(lambda: self.imp_service.get_state(query_handle))
+
+  def get_log(self, query_handle):
+    return self.__do_rpc(lambda: self.imp_service.get_log(query_handle))
 
   def refresh(self):
     """Invalidate the Impalad catalog"""

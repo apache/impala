@@ -701,8 +701,8 @@ bigint
 ---- RESULTS
 10000
 ====
-# Select from old (pre-hive 9) rc file table
 ---- QUERY
+# Select from old (pre-hive 9) rc file table
 SELECT * FROM functional_rc.old_rcfile_table
 ---- TYPES
 int, string

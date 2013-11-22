@@ -87,20 +87,20 @@ class TestCancellation(ImpalaTestSuite):
         threading.current_thread().fetch_results_error = None
         try:
           new_client = self.create_impala_client()
-          new_client.fetch_results(query,handle)
+          new_client.fetch(query, handle)
         except Exception as e:
           # We expect the RPC to fail only when the query is cancelled.
           if not (type(e) is ImpalaBeeswaxException and "Cancelled" in str(e)):
             threading.current_thread().fetch_results_error = e
         finally:
-          new_client.close_connection()
+          new_client.close()
 
       thread = threading.Thread(target=fetch_results)
       thread.start()
 
       sleep(vector.get_value('cancel_delay'))
-      assert self.client.get_state(handle) != self.client.query_states['EXCEPTION']
-      cancel_result = self.client.cancel_query(handle)
+      assert self.client.get_state(handle) != self.client.QUERY_STATES['EXCEPTION']
+      cancel_result = self.client.cancel(handle)
       assert cancel_result.status_code == 0,\
           'Unexpected status code from cancel request: %s' % cancel_result
 

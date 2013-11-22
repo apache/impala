@@ -21,8 +21,8 @@ import pprint
 import pytest
 from functools import wraps
 from random import choice
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
 from tests.common.impala_service import ImpaladService
+from tests.common.impala_connection import ImpalaConnection, create_connection
 from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
@@ -38,7 +38,7 @@ from hive_metastore import ThriftHiveMetastore
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
 
-logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format='-- %(message)s')
 LOG = logging.getLogger('impala_test_suite')
 
 IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
@@ -80,7 +80,7 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hive_client = ThriftHiveMetastore.Client(protocol)
     cls.hive_transport.open()
 
-    # The ImpalaBeeswaxClient is used to execute queries in the test suite
+    # Create a connection to Impala.
     cls.client = cls.create_impala_client(IMPALAD)
 
     cls.impalad_test_service = ImpaladService(IMPALAD.split(':')[0])
@@ -98,11 +98,11 @@ class ImpalaTestSuite(BaseTestSuite):
       cls.hive_transport.close()
 
     if cls.client:
-      cls.client.close_connection()
+      cls.client.close()
 
   @classmethod
   def create_impala_client(cls, host_port=IMPALAD):
-    client = ImpalaBeeswaxClient(host_port,
+    client = create_connection(host_port=host_port,
         use_kerberos=pytest.config.option.use_kerberos)
     client.connect()
     return client
@@ -110,7 +110,7 @@ class ImpalaTestSuite(BaseTestSuite):
   def cleanup_db(self, db_name):
     # To drop a db, we need to first drop all the tables in that db
     self.client.execute("use default")
-    self.client.set_query_options({'sync_ddl': 1})
+    self.client.set_configuration({'sync_ddl': 1})
     if db_name in self.client.execute("show databases", ).data:
       for tbl_name in self.client.execute("show tables in " + db_name).data:
         full_tbl_name = '%s.%s' % (db_name, tbl_name)
@@ -148,6 +148,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # user specified database for all targeted impalad.
     for impalad_client in target_impalad_clients:
       ImpalaTestSuite.change_database(impalad_client, table_format_info, use_db)
+      impalad_client.set_configuration(exec_options)
 
     sections = self.load_query_test_file(self.get_workload(), test_file_name)
     for test_section in sections:
@@ -172,7 +173,7 @@ class ImpalaTestSuite(BaseTestSuite):
       target_impalad_client = choice(target_impalad_clients)
       for query in query.split(';'):
         result =\
-            self.execute_query_expect_success(target_impalad_client, query, exec_options)
+            self.execute_query_expect_success(target_impalad_client, query)
       assert result is not None
 
       verify_raw_results(test_section, result,
@@ -219,7 +220,7 @@ class ImpalaTestSuite(BaseTestSuite):
     query = 'use %s' % db_name
     # Clear the exec_options before executing a USE statement.
     # The USE statement should not fail for negative exec_option tests.
-    impala_client.clear_query_options()
+    impala_client.clear_configuration()
     impala_client.execute(query)
 
   def execute_wrapper(function):
@@ -247,28 +248,28 @@ class ImpalaTestSuite(BaseTestSuite):
     return wrapper
 
   @execute_wrapper
-  def execute_query_expect_success(self, impalad_client, query, query_exec_options=None):
+  def execute_query_expect_success(self, impalad_client, query, query_options=None):
     """Executes a query and asserts if the query fails"""
-    result = self.__execute_query(impalad_client, query, query_exec_options)
+    result = self.__execute_query(impalad_client, query, query_options)
     assert result.success
     return result
 
   @execute_wrapper
-  def execute_query(self, query, query_exec_options=None):
-    return self.__execute_query(self.client, query, query_exec_options)
+  def execute_query(self, query, query_options=None):
+    return self.__execute_query(self.client, query, query_options)
 
   def execute_query_using_client(self, client, query, vector):
     self.change_database(client, vector.get_value('table_format'))
     return client.execute(query)
 
   @execute_wrapper
-  def execute_query_async(self, query, query_exec_options=None):
-    self.__set_exec_options(self.client, query_exec_options)
-    return self.client.execute_query_async(query)
+  def execute_query_async(self, query, query_options=None):
+    self.client.set_configuration(query_options)
+    return self.client.execute_async(query)
 
   @execute_wrapper
-  def execute_scalar(self, query, query_exec_options=None):
-    result = self.__execute_query(self.client, query, query_exec_options)
+  def execute_scalar(self, query, query_options=None):
+    result = self.__execute_query(self.client, query, query_options)
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
@@ -306,24 +307,17 @@ class ImpalaTestSuite(BaseTestSuite):
     for partition in self.hive_client.get_partition_names(db_name, table_name, 0):
       self.hive_client.drop_partition_by_name(db_name, table_name, partition, True)
 
-  def __execute_query(self, impalad_client, query, query_exec_options=None):
+  def __execute_query(self, impalad_client, query, query_options=None):
     """Executes the given query against the specified Impalad"""
-    LOG.info('Executing Query(%s): \n%s\n' % (impalad_client.impalad, query))
-    self.__set_exec_options(impalad_client, query_exec_options)
+    if query_options is not None: impalad_client.set_configuration(query_options)
     return impalad_client.execute(query)
 
-  def __execute_query_new_client(self, query, query_exec_options=None,
+  def __execute_query_new_client(self, query, query_options=None,
       use_kerberos=False):
     """Executes the given query against the specified Impalad"""
     new_client = self.create_impala_client()
-    self.__set_exec_options(new_client, query_exec_options)
+    new_client.set_configuration(query_options)
     return new_client.execute(query)
-
-  def __set_exec_options(self, impalad_client, query_exec_options):
-    # Set the specified query exec options, if specified
-    impalad_client.clear_query_options()
-    if query_exec_options is not None:
-      impalad_client.set_query_options(query_exec_options)
 
   def __reset_table(self, db_name, table_name):
     """Resets a table (drops and recreates the table)"""

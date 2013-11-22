@@ -32,12 +32,12 @@ class TestQueryExpiration(CustomClusterTestSuite):
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     num_expired = impalad.service.get_metric_value('impala-server.num-queries-expired')
-    handle = client.execute_query_async("SELECT SLEEP(3000000)")
+    handle = client.execute_async("SELECT SLEEP(3000000)")
 
     impalad.service.wait_for_metric_value('impala-server.num-queries-expired',
                                           num_expired + 1)
 
-    assert client.get_state(handle) == client.query_states['EXCEPTION']
+    assert client.get_state(handle) == client.QUERY_STATES['EXCEPTION']
 
     # A properly executed query should not be cancelled
     # Note: could be flakey if execute() takes too long to call fetch() etc after the
@@ -57,7 +57,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
         self.success = False
 
       def run(self):
-        self.handle = self.client.execute_query_async("SELECT SLEEP(3000000)")
+        self.handle = self.client.execute_async("SELECT SLEEP(3000000)")
 
     class NonExpiringQueryThread(threading.Thread):
       def __init__(self, client):
@@ -91,4 +91,4 @@ class TestQueryExpiration(CustomClusterTestSuite):
 
     for n, e in all_threads:
       assert n.success
-      assert client.get_state(e.handle) == client.query_states['EXCEPTION']
+      assert client.get_state(e.handle) == client.QUERY_STATES['EXCEPTION']

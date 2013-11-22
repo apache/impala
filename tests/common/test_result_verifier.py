@@ -153,6 +153,8 @@ class ResultColumn(object):
       return compare_float(float(self.value), float(other.value), 10e-5)
     elif self.column_type == 'double':
       return compare_float(float(self.value), float(other.value), 10e-10)
+    elif self.column_type == 'boolean':
+      return str(self.value).lower() == str(other.value).lower()
     else:
       return self.value == other.value
 

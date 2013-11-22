@@ -8,7 +8,7 @@ import re
 from copy import copy
 from collections import defaultdict
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_test_suite import ImpalaTestSuite, ALL_NODES_ONLY
+from tests.common.impala_test_suite import ImpalaTestSuite, ALL_NODES_ONLY, LOG
 from tests.common.test_vector import TestDimension
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.util.test_file_parser import QueryTestSectionReader
@@ -91,7 +91,7 @@ class TestFailpoints(ImpalaTestSuite):
     for node_id in node_ids:
       debug_action = '%d:%s:%s' % (node_id, location,
                                    'WAIT' if action == 'CANCEL' else 'FAIL')
-      print 'Current dubug action: SET DEBUG_ACTION=%s' % debug_action
+      LOG.info('Current dubug action: SET DEBUG_ACTION=%s' % debug_action)
       vector.get_value('exec_option')['debug_action'] = debug_action
 
       if action == 'CANCEL':
@@ -112,17 +112,15 @@ class TestFailpoints(ImpalaTestSuite):
                          table_format=vector.get_value('table_format'))
       assert 'Expected Failure'
     except ImpalaBeeswaxException as e:
-      print e
+      LOG.debug(e)
 
   def __execute_cancel_action(self, query, vector):
-    print 'Starting async query execution'
+    LOG.info('Starting async query execution')
     handle = self.execute_query_async(query, vector.get_value('exec_option'),
                                       table_format=vector.get_value('table_format'))
-    print 'Sleeping'
+    LOG.info('Sleeping')
     sleep(3)
-    print 'Issuing Cancel'
-    cancel_result = self.client.cancel_query(handle)
-    print 'Completed Cancel'
+    cancel_result = self.client.cancel(handle)
 
     assert cancel_result.status_code == 0,\
           'Unexpected status code from cancel request: %s' % cancel_result
