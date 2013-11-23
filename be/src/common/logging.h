@@ -37,14 +37,12 @@
   // glog MUST be included before gflags.  Instead of including them,
   // our files should include this file instead.
   #undef _XOPEN_SOURCE
-  // This is including a glog internal file.  We want this to expose the
-  // function to get the stack trace.
-  #include <glog/../utilities.h>
+  #include <glog/logging.h>
   #include <gflags/gflags.h>
 #endif
 
-// Define VLOG levels.  We want display per-row info less than per-file which
-// is less than per-query.  For now per-connection is the same as per-query.
+// Define verbose logging levels.  Per-row logging is ore verbase than per-file / per-rpc
+// logging which is more verbose than per-connection / per-query logging.
 #define VLOG_CONNECTION VLOG(1)
 #define VLOG_RPC        VLOG(2)
 #define VLOG_QUERY      VLOG(1)

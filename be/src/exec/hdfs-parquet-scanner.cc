@@ -15,6 +15,7 @@
 #include "exec/hdfs-parquet-scanner.h"
 
 #include <boost/algorithm/string.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "common/object-pool.h"
 #include "exec/hdfs-scan-node.h"
@@ -41,6 +42,7 @@ using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
 using namespace impala;
+using namespace strings;
 
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
@@ -500,11 +502,9 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
       CreateDictionaryDecoder(dict_values, data_size);
       if (dict_header != NULL &&
           dict_header->num_values != dict_decoder_base_->num_entries()) {
-        stringstream ss;
-        ss << "Invalid dictionary. Expected " << dict_header->num_values
-           << " entries but data contained " << dict_decoder_base_->num_entries()
-           << " entries.";
-        return Status(ss.str());
+        return Status(Substitute(
+            "Invalid dictionary. Expected $0 entries but data contained $1 entries",
+            dict_header->num_values, dict_decoder_base_->num_entries()));
       }
       // Done with dictionary page, read next page
       continue;
@@ -1019,4 +1019,3 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
 
   return Status::OK;
 }
-

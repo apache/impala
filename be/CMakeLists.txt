@@ -208,6 +208,7 @@ set (IMPALA_LINK_LIBS
   ${HDFS_LIBS}
   glogstatic
   gflagsstatic
+  gutil
   pprofstatic
   ${LIBEVENT}
   ${LIBZ}

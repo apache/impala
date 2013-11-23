@@ -30,6 +30,9 @@
 #include "util/string-parser.h"
 #include "gen-cpp/Opcodes_types.h"
 
+// For DumpStackTraceToString
+#include <glog/../utilities.h>
+
 #define PRECISION 2
 #define KILOBYTE (1024)
 #define MEGABYTE (1024 * 1024)
