@@ -14,8 +14,9 @@
 
 #include <iostream>
 #include <gtest/gtest.h>
+
+#include "common/logging.h"
 #include "udf/uda-test-harness.h"
-#include "util/logging.h"
 
 using namespace impala;
 using namespace impala_udf;

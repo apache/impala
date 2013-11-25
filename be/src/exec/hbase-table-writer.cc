@@ -18,10 +18,10 @@
 #include <boost/scoped_array.hpp>
 #include <sstream>
 
+#include "common/logging.h"
 #include "runtime/hbase-table-factory.h"
 #include "util/bit-util.h"
 #include "util/jni-util.h"
-#include "util/logging.h"
 #include "exprs/expr.h"
 #include "runtime/raw-value.h"
 

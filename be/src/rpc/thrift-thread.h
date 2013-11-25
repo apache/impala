@@ -24,9 +24,9 @@
 
 #include <thrift/concurrency/Thread.h>
 
+#include "common/logging.h"
 #include "util/thread.h"
 #include "util/promise.h"
-#include "util/logging.h"
 
 // This file adds an implementation of Thrift's ThreadFactory and Thread that uses
 // Impala's Thread wrapper class, so that all threads are accounted for by Impala's

@@ -17,6 +17,7 @@
 #include <string>
 #include <map>
 
+#include "common/logging.h"
 #include "exec/hdfs-table-sink.h"
 #include "exec/hbase-table-sink.h"
 #include "exec/exec-node.h"
@@ -24,7 +25,6 @@
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/data-stream-sender.h"
 #include "util/container-util.h"
-#include "util/logging.h"
 
 using namespace std;
 using namespace boost;

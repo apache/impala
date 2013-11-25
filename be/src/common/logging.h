@@ -59,4 +59,27 @@
 #define VLOG_ROW_IS_ON VLOG_IS_ON(3)
 #define VLOG_PROGRESS_IS_ON VLOG_IS_ON(2)
 
+// IR modules don't use these methods, and can't see the google namespace used in
+// GetFullLogFilename()'s prototype.
+#ifndef IR_COMPILE
+namespace impala {
+
+// glog doesn't allow multiple invocations of InitGoogleLogging(). This method
+// conditionally calls InitGoogleLogging() only if it hasn't been called before.
+void InitGoogleLoggingSafe(const char* arg);
+
+// Returns the full pathname of the symlink to the most recent log
+// file corresponding to this severity
+void GetFullLogFilename(google::LogSeverity severity, std::string* filename);
+
+// Shuts down the google logging library. Call before exit to ensure that log files are
+// flushed. May only be called once.
+void ShutdownLogging();
+
+// Writes all command-line flags to the log at level INFO.
+void LogCommandLineFlags();
+}
+
+#endif // IR_COMPILE
+
 #endif

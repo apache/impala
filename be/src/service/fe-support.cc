@@ -32,7 +32,6 @@
 #include "util/disk-info.h"
 #include "util/dynamic-util.h"
 #include "util/jni-util.h"
-#include "util/logging.h"
 #include "util/mem-info.h"
 #include "util/symbols-util.h"
 #include "rpc/thrift-util.h"

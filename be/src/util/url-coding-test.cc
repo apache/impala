@@ -16,8 +16,9 @@
 #include <stdio.h>
 #include <iostream>
 #include <gtest/gtest.h>
+
+#include "common/logging.h"
 #include "util/url-coding.h"
-#include "util/logging.h"
 
 using namespace std;
 

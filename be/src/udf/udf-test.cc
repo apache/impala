@@ -16,8 +16,8 @@
 #include <iostream>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include "common/logging.h"
 #include "udf/udf-test-harness.h"
-#include "util/logging.h"
 
 using namespace boost::posix_time;
 using namespace boost::gregorian;
@@ -193,4 +193,3 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

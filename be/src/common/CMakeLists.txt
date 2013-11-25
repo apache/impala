@@ -22,6 +22,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/common")
 
 add_library(Common STATIC
   init.cc
+  logging.cc
   status.cc
 )
 

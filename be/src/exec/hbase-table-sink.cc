@@ -16,7 +16,7 @@
 
 #include <vector>
 
-#include "util/logging.h"
+#include "common/logging.h"
 #include "exprs/expr.h"
 
 using namespace std;

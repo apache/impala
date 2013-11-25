@@ -29,7 +29,6 @@
 #include "service/fe-support.h"
 #include "service/impala-server.h"
 #include "util/jni-util.h"
-#include "util/logging.h"
 #include "testutil/in-process-servers.h"
 
 DEFINE_int32(num_backends, 3, "The number of backends to start");

@@ -15,7 +15,7 @@
 #ifndef IMPALA_UTIL_PROC_UTIL_H
 #define IMPALA_UTIL_PROC_UTIL_H
 
-#include "util/logging.h"
+#include "common/logging.h"
 #include "common/status.h"
 
 namespace impala {

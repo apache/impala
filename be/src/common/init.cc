@@ -13,11 +13,11 @@
 // limitations under the License.
 
 #include "common/init.h"
+#include "common/logging.h"
 #include "common/status.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
-#include "util/logging.h"
 #include "util/logging-support.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"

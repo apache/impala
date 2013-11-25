@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util/logging.h"
+#include "common/logging.h"
 
 #include <boost/thread/mutex.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -24,7 +24,7 @@
 #include <fstream>
 #include "common/logging.h"
 
-DEFINE_string(log_filename, "", 
+DEFINE_string(log_filename, "",
     "Prefix of log filename - "
     "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");
 
@@ -39,7 +39,7 @@ mutex logging_mutex;
 void impala::InitGoogleLoggingSafe(const char* arg) {
   mutex::scoped_lock logging_lock(logging_mutex);
   if (logging_initialized) return;
-  if (!FLAGS_log_filename.empty()) {    
+  if (!FLAGS_log_filename.empty()) {
     for (int severity = google::INFO; severity <= google::FATAL; ++severity) {
       google::SetLogSymlink(severity, FLAGS_log_filename.c_str());
     }
@@ -58,7 +58,7 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
     stringstream ss;
     random_generator uuid_generator;
     ss << FLAGS_log_dir << "/" << "impala_test_log." << uuid_generator();
-    const string file_name = ss.str(); 
+    const string file_name = ss.str();
     ofstream test_file(file_name.c_str());
     if (!test_file.is_open()) {
       stringstream error_msg;
@@ -97,6 +97,6 @@ void impala::ShutdownLogging() {
 }
 
 void impala::LogCommandLineFlags() {
-  LOG(INFO) << "Flags (see also /varz are on debug webserver):" << endl 
+  LOG(INFO) << "Flags (see also /varz are on debug webserver):" << endl
             << google::CommandlineFlagsIntoString();
 }

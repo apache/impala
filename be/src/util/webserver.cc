@@ -31,7 +31,6 @@
 #include "util/mem-info.h"
 #include "util/os-info.h"
 #include "util/url-coding.h"
-#include "util/logging.h"
 #include "util/debug-util.h"
 #include "rpc/thrift-util.h"
 

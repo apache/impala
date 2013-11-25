@@ -13,9 +13,10 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
+
+#include "common/logging.h"
 #include "rpc/authentication.h"
 #include "util/network-util.h"
-#include "util/logging.h"
 #include "util/thread.h"
 
 using namespace std;

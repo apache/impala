@@ -18,8 +18,8 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include "common/logging.h"
 #include "util/thread-pool.h"
-#include "util/logging.h"
 
 using namespace boost;
 using namespace std;

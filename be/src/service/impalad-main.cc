@@ -31,7 +31,6 @@
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "util/jni-util.h"
-#include "util/logging.h"
 #include "util/network-util.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"

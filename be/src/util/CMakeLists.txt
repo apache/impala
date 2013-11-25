@@ -39,7 +39,6 @@ add_library(Util
   hdfs-bulk-ops.cc
   impalad-metrics.cc
   jni-util.cc
-  logging.cc
   logging-support.cc
   mem-info.cc
   metrics.cc

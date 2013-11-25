@@ -21,7 +21,6 @@
 #include <google/malloc_extension.h>
 
 #include "common/logging.h"
-#include "util/logging.h"
 #include "util/webserver.h"
 
 using namespace std;
