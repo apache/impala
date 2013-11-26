@@ -119,7 +119,7 @@ if [ $BUILD_ALL -eq 1 ] || [ $BUILD_THRIFT -eq 1 ]; then
     ./configure --with-pic --prefix=${THRIFT_HOME} \
     --with-php=no --with-java=no --with-perl=no --with-erlang=no \
     --with-ruby=no --with-haskell=no --with-erlang=no --with-d=no \
-    --with-qt4=no "${PIC_LIB_OPTIONS:-}"
+    --with-qt4=no ${PIC_LIB_OPTIONS:-}
   make # Make with -j fails
   make install
   cd ${THRIFT_SRC_DIR}/contrib/fb303
