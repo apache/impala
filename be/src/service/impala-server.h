@@ -305,6 +305,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   boost::shared_ptr<QueryExecState> GetQueryExecState(
       const TUniqueId& query_id, bool lock);
 
+  // Writes the session id, if found, for the given query to the output parameter. Returns
+  // false if no query with the given ID is found.
+  bool GetSessionIdForQuery(const TUniqueId& query_id, TUniqueId* session_id);
+
   // Return exec state for given fragment_instance_id, or NULL if not found.
   boost::shared_ptr<FragmentExecState> GetFragmentExecState(
       const TUniqueId& fragment_instance_id);
@@ -762,7 +766,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // For access to GetSessionState() / MarkSessionInactive()
   friend class ScopedSessionState;
 
-  // Protects session_state_map_
+  // Protects session_state_map_. Should be taken before any query exec-state locks,
+  // including query_exec_state_map_lock_. Should be taken before individual session-state
+  // locks.
   boost::mutex session_state_map_lock_;
 
   // A map from session identifier to a structure containing per-session information
