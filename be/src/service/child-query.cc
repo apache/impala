@@ -92,8 +92,12 @@ Status ChildQuery::ExecAndFetch() {
 }
 
 void ChildQuery::Cancel() {
-  lock_guard<mutex> l(lock_);
-  if (!is_running_) return;
+  // Do not hold lock_ while calling into parent_server_ to avoid deadlock.
+  {
+    lock_guard<mutex> l(lock_);
+    if (!is_running_) return;
+    is_running_ = false;
+  }
   VLOG_QUERY << "Cancelling and closing child query with operation id: "
              << hs2_handle_.operationId.guid;
   // Ignore return statuses because they are not actionable.
@@ -105,7 +109,6 @@ void ChildQuery::Cancel() {
   TCloseOperationReq close_req;
   close_req.operationHandle = hs2_handle_;
   parent_server_->CloseOperation(close_resp, close_req);
-  is_running_ = false;
 }
 
 Status ChildQuery::CheckParentStatus() {
