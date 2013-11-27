@@ -37,7 +37,7 @@ class HashUtil {
   // Compute the Crc32 hash for data using SSE4 instructions.  The input hash parameter is
   // the current hash/seed value.
   // This should only be called if SSE is supported.
-  // This is ~4x faster than Fvn/Boost Hash.
+  // This is ~4x faster than Fnv/Boost Hash.
   // NOTE: Any changes made to this function need to be reflected in Codegen::GetHashFn.
   // TODO: crc32 hashes with different seeds do not result in different hash functions.
   // The resulting hashes are correlated.
@@ -66,36 +66,36 @@ class HashUtil {
 #endif
 
   // default values recommended by http://isthe.com/chongo/tech/comp/fnv/
-  static const uint32_t FVN_PRIME = 0x01000193; //   16777619
-  static const uint32_t FVN_SEED = 0x811C9DC5; // 2166136261
-  static const uint64_t FVN64_PRIME = 1099511628211UL;
-  static const uint64_t FVN64_SEED = 14695981039346656037UL;
+  static const uint32_t FNV_PRIME = 0x01000193; //   16777619
+  static const uint32_t FNV_SEED = 0x811C9DC5; // 2166136261
+  static const uint64_t FNV64_PRIME = 1099511628211UL;
+  static const uint64_t FNV64_SEED = 14695981039346656037UL;
 
   // Implementation of the Fowler–Noll–Vo hash function.  This is not as performant
   // as boost's hash on int types (2x slower) but has bit entropy.
   // For ints, boost just returns the value of the int which can be pathological.
   // For example, if the data is <1000, 2000, 3000, 4000, ..> and then the mod of 1000
   // is taken on the hash, all values will collide to the same bucket.
-  // For string values, Fvn is slightly faster than boost.
-  static uint32_t FvnHash(const void* data, int32_t bytes, uint32_t hash) {
+  // For string values, Fnv is slightly faster than boost.
+  static uint32_t FnvHash(const void* data, int32_t bytes, uint32_t hash) {
     const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data);
     while (bytes--) {
-      hash = (*ptr ^ hash) * FVN_PRIME;
+      hash = (*ptr ^ hash) * FNV_PRIME;
       ++ptr;
     }
     return hash;
   }
 
-  static uint64_t FvnHash64(const void* data, int32_t bytes, uint64_t hash) {
+  static uint64_t FnvHash64(const void* data, int32_t bytes, uint64_t hash) {
     const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data);
     while (bytes--) {
-      hash = (*ptr ^ hash) * FVN64_PRIME;
+      hash = (*ptr ^ hash) * FNV64_PRIME;
       ++ptr;
     }
     return hash;
   }
 
-  // Computes the hash value for data.  Will call either CrcHash or FvnHash
+  // Computes the hash value for data.  Will call either CrcHash or FnvHash
   // depending on hardware capabilities.
   // Seed values for different steps of the query execution should use different seeds
   // to prevent accidental key collisions. (See IMPALA-219 for more details).
@@ -104,10 +104,10 @@ class HashUtil {
     if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
       return CrcHash(data, bytes, seed);
     } else {
-      return FvnHash(data, bytes, seed);
+      return FnvHash(data, bytes, seed);
     }
 #else
-    return FvnHash(data, bytes, seed);
+    return FnvHash(data, bytes, seed);
 #endif
   }
 

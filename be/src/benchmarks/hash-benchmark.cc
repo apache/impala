@@ -40,7 +40,7 @@ using namespace std;
 // buckets so the expected number of collisions is roughly ~1/3.
 //
 // The different hash functions benchmarked:
-//   1. FVN Hash: Fowler-Noll-Vo hash function
+//   1. FNV Hash: Fowler-Noll-Vo hash function
 //   2. Boost Hash: boost hash function
 //   3. Crc: hash using sse4 crc hash instruction
 //   4. Codegen: hash using sse4 with the tuple types baked into the codegen function
@@ -56,14 +56,14 @@ using namespace std;
 // Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // Int Hash:             Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//                            Fvn               96.35                  1X
+//                            Fnv               96.35                  1X
 //                          Boost                 176              1.826X
 //                            Crc               375.6              3.898X
 //                        Codegen               890.2               9.24X
 //
 // Mixed Hash:           Function                Rate          Comparison
 // ----------------------------------------------------------------------
-//                            Fvn               82.01                  1X
+//                            Fnv               82.01                  1X
 //                          Boost               82.71              1.008X
 //                            Crc               271.1              3.305X
 //                        Codegen                 215              2.647X
@@ -78,16 +78,16 @@ struct TestData {
   void* jitted_fn;
 };
 
-void TestFvnIntHash(int batch, void* d) {
+void TestFnvIntHash(int batch, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   int rows = data->num_rows;
   int cols = data->num_cols;
   for (int i = 0; i < batch; ++i) {
     int32_t* values = reinterpret_cast<int32_t*>(data->data);
     for (int j = 0; j < rows; ++j) {
-      size_t hash = HashUtil::FVN_SEED;
+      size_t hash = HashUtil::FNV_SEED;
       for (int k = 0; k < cols; ++k) {
-        hash = HashUtil::FvnHash(&values[k], sizeof(uint32_t), hash);
+        hash = HashUtil::FnvHash(&values[k], sizeof(uint32_t), hash);
       }
       data->results[j] = hash;
       values += cols;
@@ -102,7 +102,7 @@ void TestCrcIntHash(int batch, void* d) {
   for (int i = 0; i < batch; ++i) {
     int32_t* values = reinterpret_cast<int32_t*>(data->data);
     for (int j = 0; j < rows; ++j) {
-      size_t hash = HashUtil::FVN_SEED;
+      size_t hash = HashUtil::FNV_SEED;
       for (int k = 0; k < cols; ++k) {
         hash = HashUtil::CrcHash(&values[k], sizeof(uint32_t), hash);
       }
@@ -119,7 +119,7 @@ void TestBoostIntHash(int batch, void* d) {
   for (int i = 0; i < batch; ++i) {
     int32_t* values = reinterpret_cast<int32_t*>(data->data);
     for (int j = 0; j < rows; ++j) {
-      size_t h = HashUtil::FVN_SEED;
+      size_t h = HashUtil::FNV_SEED;
       for (int k = 0; k < cols; ++k) {
         size_t hash_value = hash<int32_t>().operator()(values[k]);
         hash_combine(h, hash_value);
@@ -140,25 +140,25 @@ void TestCodegenIntHash(int batch, void* d) {
   }
 }
 
-void TestFvnMixedHash(int batch, void* d) {
+void TestFnvMixedHash(int batch, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   int rows = data->num_rows;
   for (int i = 0; i < batch; ++i) {
     char* values = reinterpret_cast<char*>(data->data);
     for (int j = 0; j < rows; ++j) {
-      size_t hash = HashUtil::FVN_SEED;
+      size_t hash = HashUtil::FNV_SEED;
 
-      hash = HashUtil::FvnHash(values, sizeof(int8_t), hash);
+      hash = HashUtil::FnvHash(values, sizeof(int8_t), hash);
       values += sizeof(int8_t);
 
-      hash = HashUtil::FvnHash(values, sizeof(int32_t), hash);
+      hash = HashUtil::FnvHash(values, sizeof(int32_t), hash);
       values += sizeof(int32_t);
 
-      hash = HashUtil::FvnHash(values, sizeof(int64_t), hash);
+      hash = HashUtil::FnvHash(values, sizeof(int64_t), hash);
       values += sizeof(int64_t);
 
       StringValue* str = reinterpret_cast<StringValue*>(values);
-      hash = HashUtil::FvnHash(str->ptr, str->len, hash);
+      hash = HashUtil::FnvHash(str->ptr, str->len, hash);
       values += sizeof(StringValue);
 
       data->results[j] = hash;
@@ -172,7 +172,7 @@ void TestCrcMixedHash(int batch, void* d) {
   for (int i = 0; i < batch; ++i) {
     char* values = reinterpret_cast<char*>(data->data);
     for (int j = 0; j < rows; ++j) {
-      size_t hash = HashUtil::FVN_SEED;
+      size_t hash = HashUtil::FNV_SEED;
 
       hash = HashUtil::CrcHash(values, sizeof(int8_t), hash);
       values += sizeof(int8_t);
@@ -208,7 +208,7 @@ void TestBoostMixedHash(int batch, void* d) {
   for (int i = 0; i < batch; ++i) {
     char* values = reinterpret_cast<char*>(data->data);
     for (int j = 0; j < rows; ++j) {
-      size_t h = HashUtil::FVN_SEED;
+      size_t h = HashUtil::FNV_SEED;
 
       size_t hash_value = hash<int8_t>().operator()(*reinterpret_cast<int8_t*>(values));
       hash_combine(h, hash_value);
@@ -317,7 +317,7 @@ Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
   Value* offset = builder.CreateMul(counter, row_size);
   Value* data = builder.CreateGEP(args[1], offset);
 
-  Value* seed = codegen->GetIntConstant(TYPE_INT, HashUtil::FVN_SEED);
+  Value* seed = codegen->GetIntConstant(TYPE_INT, HashUtil::FNV_SEED);
   seed = builder.CreateCall3(fixed_fn, data, dummy_len, seed);
 
   // Get the string data
@@ -414,14 +414,14 @@ int main(int argc, char **argv) {
   mixed_data.jitted_fn = jitted_hash_mixed;
 
   Benchmark int_suite("Int Hash");
-  int_suite.AddBenchmark("Fvn", TestFvnIntHash, &int_data);
+  int_suite.AddBenchmark("Fnv", TestFnvIntHash, &int_data);
   int_suite.AddBenchmark("Boost", TestBoostIntHash, &int_data);
   int_suite.AddBenchmark("Crc", TestCrcIntHash, &int_data);
   int_suite.AddBenchmark("Codegen", TestCodegenIntHash, &int_data);
   cout << int_suite.Measure() << endl;
 
   Benchmark mixed_suite("Mixed Hash");
-  mixed_suite.AddBenchmark("Fvn", TestFvnMixedHash, &mixed_data);
+  mixed_suite.AddBenchmark("Fnv", TestFnvMixedHash, &mixed_data);
   mixed_suite.AddBenchmark("Boost", TestBoostMixedHash, &mixed_data);
   mixed_suite.AddBenchmark("Crc", TestCrcMixedHash, &mixed_data);
   mixed_suite.AddBenchmark("Codegen", TestCodegenMixedHash, &mixed_data);

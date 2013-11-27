@@ -178,6 +178,15 @@ functions = [
   ['Utility_User', 'STRING', [], 'UtilityFunctions::User', ['user']],
   ['Utility_Sleep', 'BOOLEAN', ['INT'], 'UtilityFunctions::Sleep', ['sleep']],
   ['Utility_Version', 'STRING', [], 'UtilityFunctions::Version', ['version']],
+  ['FnvHash', 'BIGINT', ['TINYINT'], 'UtilityFunctions::FnvHash<1>', ['fnv_hash']],
+  ['FnvHash', 'BIGINT', ['SMALLINT'], 'UtilityFunctions::FnvHash<2>', ['fnv_hash']],
+  ['FnvHash', 'BIGINT', ['INT'], 'UtilityFunctions::FnvHash<4>', ['fnv_hash']],
+  ['FnvHash', 'BIGINT', ['BIGINT'], 'UtilityFunctions::FnvHash<8>', ['fnv_hash']],
+  ['FnvHash', 'BIGINT', ['FLOAT'], 'UtilityFunctions::FnvHash<4>', ['fnv_hash']],
+  ['FnvHash', 'BIGINT', ['DOUBLE'], 'UtilityFunctions::FnvHash<8>', ['fnv_hash']],
+  ['FnvHash', 'BIGINT', ['TIMESTAMP'], 'UtilityFunctions::FnvHash<12>', ['fnv_hash']],
+  ['FnvHash', 'BIGINT', ['STRING'], 'UtilityFunctions::FnvHashString', ['fnv_hash']],
+
 
 # Timestamp Functions
   ['Unix_Timestamp', 'INT', [], \

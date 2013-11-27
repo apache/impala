@@ -24,11 +24,17 @@ class TupleRow;
 
 class UtilityFunctions {
  public:
+  // Implementations of the FnvHash function. Returns the Fowler-Noll-Vo hash of the
+  // input as an int64_t.
+  template <int BYTE_SIZE>
+  static void* FnvHash(Expr* e, TupleRow* row);
+  static void* FnvHashString(Expr* e, TupleRow* row);
+
   // Implementation of the user() function. Returns the username of the user who executed
   // this function.
   static void* User(Expr* e, TupleRow* row);
 
-  // Implementation of the version() function. Returns the version string.  
+  // Implementation of the version() function. Returns the version string.
   static void* Version(Expr* e, TupleRow* row);
 
   // Testing function that sleeps for the specified number of milliseconds. Returns true.

@@ -977,7 +977,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     return fn;
   } else {
     // Don't bother with optimizations without crc hash instruction
-    return GetFunction(IRFunction::HASH_FVN);
+    return GetFunction(IRFunction::HASH_FNV);
   }
 }
 

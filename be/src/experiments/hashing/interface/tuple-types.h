@@ -155,7 +155,7 @@ inline bool TupleCombine(const ProbeTuple* probe, BuildTuple* build) {
 // Compute the Crc32 hash for data using SSE4 instructions.  The input hash parameter is 
 // the current hash/seed value.
 // This should only be called if SSE is supported.
-// This is ~4x faster than Fvn/Boost Hash.
+// This is ~4x faster than Fnv/Boost Hash.
 static inline uint32_t CrcHash(const void* data, int32_t bytes, uint32_t hash) {
   uint32_t words = bytes / sizeof(uint32_t);
   bytes = bytes % sizeof(uint32_t);

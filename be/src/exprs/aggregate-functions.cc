@@ -358,7 +358,7 @@ void AggregateFunctions::HllUpdate(FunctionContext* ctx, const T& src, StringVal
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, pow(2, HLL_PRECISION));
-  uint64_t hash_value = AnyValUtil::Hash64(src, HashUtil::FVN64_SEED);
+  uint64_t hash_value = AnyValUtil::Hash64(src, HashUtil::FNV64_SEED);
   if (hash_value != 0) {
     // Use the lower bits to index into the number of streams and then
     // find the first 1 bit after the index bits.

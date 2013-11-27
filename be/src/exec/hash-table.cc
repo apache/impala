@@ -90,7 +90,7 @@ bool HashTable::EvalRow(TupleRow* row, const vector<Expr*>& exprs) {
   // We don't want(NULL, 1) to hash to the same as (0, 1).
   // This needs to be as big as the biggest primitive type since the bytes
   // get copied directly.
-  int64_t null_value[] = { HashUtil::FVN_SEED, HashUtil::FVN_SEED };
+  int64_t null_value[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED };
 
   bool has_null = false;
   for (int i = 0; i < exprs.size(); ++i) {
@@ -116,7 +116,7 @@ bool HashTable::EvalRow(TupleRow* row, const vector<Expr*>& exprs) {
 // we'll pick a more random value.
 static void CodegenAssignNullValue(LlvmCodeGen* codegen,
     LlvmCodeGen::LlvmBuilder* builder, Value* dst, PrimitiveType type) {
-  int64_t fvn_seed = HashUtil::FVN_SEED;
+  int64_t fvn_seed = HashUtil::FNV_SEED;
 
   if (type == TYPE_STRING) {
     Value* dst_ptr = builder->CreateStructGEP(dst, 0, "string_ptr");

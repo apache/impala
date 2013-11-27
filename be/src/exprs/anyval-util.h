@@ -66,40 +66,40 @@ class AnyValUtil {
   }
 
   static uint64_t Hash64(const BooleanVal& v, int64_t seed) {
-    return HashUtil::FvnHash64(&v.val, 1, seed);
+    return HashUtil::FnvHash64(&v.val, 1, seed);
   }
 
   static uint64_t Hash64(const TinyIntVal& v, int64_t seed) {
-    return HashUtil::FvnHash64(&v.val, 1, seed);
+    return HashUtil::FnvHash64(&v.val, 1, seed);
   }
 
   static uint64_t Hash64(const SmallIntVal& v, int64_t seed) {
-    return HashUtil::FvnHash64(&v.val, 2, seed);
+    return HashUtil::FnvHash64(&v.val, 2, seed);
   }
 
   static uint64_t Hash64(const IntVal& v, int64_t seed) {
-    return HashUtil::FvnHash64(&v.val, 4, seed);
+    return HashUtil::FnvHash64(&v.val, 4, seed);
   }
 
   static uint64_t Hash64(const BigIntVal& v, int64_t seed) {
-    return HashUtil::FvnHash64(&v.val, 8, seed);
+    return HashUtil::FnvHash64(&v.val, 8, seed);
   }
 
   static uint64_t Hash64(const FloatVal& v, int64_t seed) {
-    return HashUtil::FvnHash64(&v.val, 4, seed);
+    return HashUtil::FnvHash64(&v.val, 4, seed);
   }
 
   static uint64_t Hash64(const DoubleVal& v, int64_t seed) {
-    return HashUtil::FvnHash64(&v.val, 8, seed);
+    return HashUtil::FnvHash64(&v.val, 8, seed);
   }
 
   static uint64_t Hash64(const StringVal& v, int64_t seed) {
-    return HashUtil::FvnHash64(v.ptr, v.len, seed);
+    return HashUtil::FnvHash64(v.ptr, v.len, seed);
   }
 
   static uint64_t Hash64(const TimestampVal& v, int64_t seed) {
     TimestampValue tv = TimestampValue::FromTimestampVal(v);
-    return HashUtil::FvnHash64(&tv, 12, seed);
+    return HashUtil::FnvHash64(&tv, 12, seed);
   }
 
   // Returns the byte size of *Val for type t.

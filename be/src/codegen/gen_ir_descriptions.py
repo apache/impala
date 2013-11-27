@@ -32,7 +32,7 @@ ir_functions = [
   ["AGG_NODE_PROCESS_ROW_BATCH_NO_GROUPING", "ProcessRowBatchNoGrouping"],
   ["EXPR_GET_VALUE", "IrExprGetValue"],
   ["HASH_CRC", "IrCrcHash"],
-  ["HASH_FVN", "IrFvnHash"],
+  ["HASH_FNV", "IrFnvHash"],
   ["HASH_JOIN_PROCESS_BUILD_BATCH", "ProcessBuildBatch"],
   ["HASH_JOIN_PROCESS_PROBE_BATCH", "ProcessProbeBatch"],
   ["DECODE_AVRO_DATA", "DecodeAvroData"],

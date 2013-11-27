@@ -449,7 +449,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
         // fvn hash.
         // TODO: fix crc hash/GetHashValue()
         hash_val =
-            RawValue::GetHashValueFvn(partition_val, (*expr)->type(), hash_val);
+            RawValue::GetHashValueFnv(partition_val, (*expr)->type(), hash_val);
       }
       RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
     }

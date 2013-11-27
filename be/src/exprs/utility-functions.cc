@@ -24,6 +24,31 @@ using namespace std;
 
 namespace impala {
 
+void* UtilityFunctions::FnvHashString(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  StringValue* input_val =
+      reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
+  if (input_val == NULL) return NULL;
+  e->result_.bigint_val = HashUtil::FnvHash64(input_val->ptr, input_val->len,
+      HashUtil::FNV_SEED);
+  return &e->result_.bigint_val;
+}
+
+template<int BYTE_SIZE>
+void* UtilityFunctions::FnvHash(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  void* input_val = e->children()[0]->GetValue(row);
+  if (input_val == NULL) return NULL;
+  e->result_.bigint_val = HashUtil::FnvHash64(input_val, BYTE_SIZE, HashUtil::FNV_SEED);
+  return &e->result_.bigint_val;
+}
+
+template void* UtilityFunctions::FnvHash<1>(Expr* e, TupleRow* row);
+template void* UtilityFunctions::FnvHash<2>(Expr* e, TupleRow* row);
+template void* UtilityFunctions::FnvHash<4>(Expr* e, TupleRow* row);
+template void* UtilityFunctions::FnvHash<8>(Expr* e, TupleRow* row);
+template void* UtilityFunctions::FnvHash<12>(Expr* e, TupleRow* row);
+
 void* UtilityFunctions::User(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 0);
   // An empty string indicates the user wasn't set in the session
