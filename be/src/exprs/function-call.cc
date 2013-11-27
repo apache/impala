@@ -32,15 +32,33 @@ FunctionCall::FunctionCall(const TExprNode& node)
 
 Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   RETURN_IF_ERROR(Expr::Prepare(state, row_desc));
-  // Set now timestamp from runtime state.
-  if (opcode_ == TExprOpcode::TIMESTAMP_NOW || opcode_ == TExprOpcode::UNIX_TIMESTAMP) {
-    DCHECK(state != NULL);
-    DCHECK(!state->now()->NotADateTime());
-    result_.timestamp_val = *(state->now());
-  } else if (opcode_ == TExprOpcode::UTILITY_USER) {
-    // Set username from runtime state.
-    DCHECK(state != NULL);
-    result_.SetStringVal(state->user());
+  switch (opcode_) {
+    case TExprOpcode::TIMESTAMP_NOW:
+    case TExprOpcode::UNIX_TIMESTAMP: {
+      DCHECK(state != NULL);
+      DCHECK(!state->now()->NotADateTime());
+      result_.timestamp_val = *(state->now());
+      break;
+    }
+    case TExprOpcode::UNIX_TIMESTAMP_STRINGVALUE_STRINGVALUE:
+    case TExprOpcode::FROM_UNIXTIME_INT_STRINGVALUE:
+    case TExprOpcode::FROM_UNIXTIME_LONG_STRINGVALUE: {
+      if (children_.size() < 2) return Status::OK;
+      if (children_[1]->IsConstant()) {
+        StringValue* fmt = reinterpret_cast<StringValue*>(children_[1]->GetValue(NULL));
+        if (fmt != NULL && fmt->len > 0) SetDateTimeFormatCtx(fmt);
+      } else {
+        SetDateTimeFormatCtx(NULL);
+      }
+      break;
+    }
+    case TExprOpcode::UTILITY_USER: {
+      // Set username from runtime state.
+      DCHECK(state != NULL);
+      result_.SetStringVal(state->user());
+      break;
+    }
+    default: break;
   }
   return Status::OK;
 }
@@ -62,6 +80,18 @@ bool FunctionCall::SetRegex(const string& pattern) {
 
 void FunctionCall::SetReplaceStr(const StringValue* str_val) {
   replace_str_.reset(new string(str_val->ptr, str_val->len));
+}
+
+bool FunctionCall::SetDateTimeFormatCtx(StringValue* fmt) {
+  if (fmt != NULL) {
+    date_time_format_ctx_.reset(new DateTimeFormatContext(fmt->ptr, fmt->len));
+    bool parse_result = TimestampParser::ParseFormatTokens(date_time_format_ctx_.get());
+    if (!parse_result) date_time_format_ctx_.reset(NULL);
+    return parse_result;
+  } else {
+    date_time_format_ctx_.reset(new DateTimeFormatContext());
+    return true;
+  }
 }
 
 }

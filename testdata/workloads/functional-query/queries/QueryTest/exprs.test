@@ -1348,3 +1348,27 @@ FLOAT,DOUBLE,DOUBLE,DOUBLE,DOUBLE
 8.800000190734863,80.8,8.800000190734863,NULL,NULL
 9.899999618530273,90.90000000000001,9.899999618530273,NULL,NULL
 ====
+---- QUERY
+select unix_timestamp(tmp.val, tmp.fmt) from (values
+('1970-01-01 00:00:00' as val, 'yyyy-MM-dd HH:mm:ss' as fmt),
+('01:01:01 02/1971/02', 'HH:mm:ss dd/yyyy/MM'),
+('1972||mar||03||030303', 'yyyy||MMM||dd||HHmmss')) as tmp
+---- TYPES
+int
+---- RESULTS
+0
+34304461
+68439783
+====
+---- QUERY
+select from_unixtime(tmp.val, tmp.fmt) from (values
+(0 as val, 'yyyy-MM-dd HH:mm:ss' as fmt),
+(34304461, 'HH:mm:ss dd/yyyy/MM'),
+(68439783, 'yyyy||MMM||dd||HHmmss')) as tmp
+---- TYPES
+string
+---- RESULTS
+'1970-01-01 00:00:00'
+'01:01:01 02/1971/02'
+'1972||Mar||03||030303'
+====

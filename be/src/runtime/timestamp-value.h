@@ -20,7 +20,7 @@
 #include <ctime>
 #include <boost/cstdint.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-
+#include "runtime/timestamp-parse-util.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
 
@@ -71,7 +71,7 @@ class TimestampValue {
     *this = temp;
   }
   TimestampValue(const char* str, int len);
-
+  TimestampValue(const char* str, int len, const DateTimeFormatContext& dt_ctx);
   TimestampValue(int64_t t) {
     *this = TimestampValue(boost::posix_time::from_time_t(t));
   }
@@ -204,6 +204,15 @@ class TimestampValue {
     return v;
   }
 
+  // Formats the timestamp using the given date/time context and places the result in the
+  // string buffer. The size of the buffer should be at least dt_ctx.fmt_out_len + 1. A
+  // string terminator will be appended to the string.
+  // dt_ctx -- the date/time context containing the format to use
+  // len -- the length of the buffer
+  // buff -- the buffer that will hold the result
+  // Returns the number of characters copied in to the buffer (minus the terminator)
+  int Format(const DateTimeFormatContext& dt_ctx, int len, char* buff);
+
   static const char* LLVM_CLASS_NAME;
 
  private:
@@ -212,27 +221,9 @@ class TimestampValue {
   // Precision of fractional part of the time: nanoseconds.
   static const double FRACTIONAL;
 
-  // Parse a date string into the object.
-  // strp -- pointer to string to parse, points to character after parsing stopped.
-  // lenp -- pointer to the length of the string.  The length will
-  //         be updated to the count of characters left passed the
-  //         parsed string or where the parsing stopped.
-  // The accpeted format is: YYYY-MM-DD.  All components must be present.
-  // Returns true if the date was successfully parsed.
-  inline bool ParseDate(const char** strp, int* lenp);
-
-  // Parse a time string into the object.
-  // strp -- pointer to string to parse, points to character after parsing stopped.
-  // lenp -- pointer to the length of the string.  The length will
-  //         be updated to the count of characters left passed the
-  //         parsed string or where the parsing stopped.
-  // The accepted format is: HH:MM:SS[.ssssssss]
-  // Returns true if the time was successfully parsed.
-  inline bool ParseTime(const char** strp, int* lenp);
-
   // Boost ptime leaves a gap in the structure, so we swap the order to make it
   // 12 contiguous bytes.  We then must convert to and from the boost ptime data type.
-
+  
   // 8 bytes - stores the nanoseconds within the current day
   boost::posix_time::time_duration time_of_day_;
 

@@ -45,6 +45,7 @@ add_library(Runtime STATIC
   runtime-state.cc
   string-value.cc
   thread-resource-mgr.cc
+  timestamp-parse-util.cc
   timestamp-value.cc
   tuple.cc
   tuple-row.cc

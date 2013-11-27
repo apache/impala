@@ -21,6 +21,7 @@
 #include <boost/regex.hpp>
 
 #include "exprs/expr.h"
+#include "runtime/timestamp-parse-util.h"
 
 namespace impala {
 
@@ -31,6 +32,7 @@ class FunctionCall: public Expr {
  protected:
   friend class Expr;
   friend class StringFunctions;
+  friend class TimestampFunctions;
 
   FunctionCall(const TExprNode& node);
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
@@ -43,12 +45,24 @@ class FunctionCall: public Expr {
   void SetReplaceStr(const StringValue* str_val);
   const std::string* GetReplaceStr() const { return replace_str_.get(); }
 
+  // Returns false when an invalid format is specified. NULL may also be passed to
+  // indicate that a generic date/time context is required.
+  bool SetDateTimeFormatCtx(StringValue* fmt);
+  // Format context returned is intentionally mutable, as dynamic formats may be used
+  // which require a place to store parsed tokens.
+  DateTimeFormatContext* const GetDateTimeFormatCtx() {
+    return date_time_format_ctx_.get();
+  }
+
  private:
   // Used in regexp string functions to avoid re-compiling
   // a constant regexp for every function invocation.
   boost::scoped_ptr<boost::regex> regex_;
   // To avoid copying constant replace strings in regexp_replace.
   boost::scoped_ptr<std::string> replace_str_;
+  // Used in timestamp date/time parsing with custom formats to avoid
+  // parsing for every function invocation.
+  boost::scoped_ptr<DateTimeFormatContext> date_time_format_ctx_;
 };
 
 }

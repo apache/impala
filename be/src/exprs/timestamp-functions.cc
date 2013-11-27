@@ -19,6 +19,7 @@
 
 #include "exprs/timestamp-functions.h"
 #include "exprs/expr.h"
+#include "exprs/function-call.h"
 #include "runtime/tuple-row.h"
 #include "runtime/timestamp-value.h"
 #include "util/path-builder.h"
@@ -58,92 +59,74 @@ void* TimestampFunctions::FromUnix(Expr* e, TupleRow* row) {
   // If there is a second argument then it's a format statement.
   // Otherwise the string is in the default format.
   if (e->GetNumChildren() == 2) {
-    Expr* fmtop = e->children()[1];
-    StringValue* format = reinterpret_cast<StringValue*>(fmtop->GetValue(row));
-    if (CheckFormat(format) == NULL) return NULL;
-    if (format->len == 10) {
-      // If the format is yyyy-MM-dd then set the time to invalid.
-      t.set_time(time_duration(not_a_date_time));
-    } 
+    Expr* fmt_op = e->children()[1];
+    FunctionCall* func_expr = static_cast<FunctionCall*>(e);
+    DateTimeFormatContext* const dt_ctx = func_expr->GetDateTimeFormatCtx();
+    if (dt_ctx == NULL) return NULL;
+    // If our format string is constant then we benefit from it only being parsed once in
+    // Expr::Prepare. If it's not constant, then we can reuse a context by resetting it.
+    // This is much cheaper vs alloc/dealloc'ing a context for each evaluation.
+    if (!fmt_op->IsConstant()) {
+      StringValue* fmt = reinterpret_cast<StringValue*>(fmt_op->GetValue(row));
+      dt_ctx->Reset(fmt->ptr, fmt->len);
+      if (!TimestampParser::ParseFormatTokens(dt_ctx)) {
+        ReportBadFormat(fmt);
+        return NULL;
+      }
+    }
+    int buff_len = dt_ctx->fmt_out_len + 1;
+    e->result_.string_data.resize(buff_len);
+    e->result_.SyncStringVal();
+    e->result_.string_val.len = t.Format(*dt_ctx, buff_len, e->result_.string_val.ptr);
+    if (e->result_.string_val.len <= 0) return NULL;
+  } else {
+    e->result_.SetStringVal(lexical_cast<string>(t));
   }
-
-  e->result_.SetStringVal(lexical_cast<string>(t));
   return &e->result_.string_val;
 }
 
 void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
   DCHECK_LE(e->GetNumChildren(), 2);
-  TimestampValue* tv;
+  TimestampValue default_tv;
+  TimestampValue* tv = &default_tv;
   if (e->GetNumChildren() == 0) {
     // Expr::Prepare put the current timestamp here.
     tv = &e->result_.timestamp_val;
   } else if (e->GetNumChildren() == 1) {
     Expr* op = e->children()[0];
     tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
+    if (tv == NULL) return NULL;
   } else {
     Expr* op = e->children()[0];
     StringValue* value = reinterpret_cast<StringValue*>(op->GetValue(row));
-    Expr* fmtop = e->children()[1];
-    StringValue* format = reinterpret_cast<StringValue*>(fmtop->GetValue(row));
-
-    if (value == NULL || format == NULL || CheckFormat(format) == NULL) return NULL;
-
-    // Trim the value of blank space to be more user friendly.
-    StringValue tvalue = value->Trim();
-
-    // Emulate hive by truncating the value to be the same length as the format
-    // (i.e. allow extra text beyond expected format).
-    if (tvalue.len > format->len) {
-      tvalue = tvalue.Substring(0, format->len);
+    if ((value == NULL) || (value->len <= 0)) return NULL;
+    Expr* fmt_op = e->children()[1];
+    FunctionCall* func_expr = static_cast<FunctionCall*>(e);
+    DateTimeFormatContext* const dt_ctx = func_expr->GetDateTimeFormatCtx();
+    if (dt_ctx == NULL) return NULL;
+    // If our format string is constant then we benefit from it only being parsed once in
+    // Expr::Prepare. If it's not constant, then we can reuse a context by resetting it.
+    // This is much cheaper vs alloc/dealloc'ing a context for each evaluation.
+    if (!fmt_op->IsConstant()) {
+      StringValue* fmt = reinterpret_cast<StringValue*>(fmt_op->GetValue(row));
+      if ((fmt == NULL) || (fmt->len <= 0)) return NULL;
+      dt_ctx->Reset(fmt->ptr, fmt->len);
+      if (!TimestampParser::ParseFormatTokens(dt_ctx)) {
+        ReportBadFormat(fmt);
+        return NULL;
+      }
     }
-
-    // TimestampValue will accept just a date when format specifies date and
-    // time, so check that the value is at least as long as the format.
-    if (tvalue.len < format->len) {
-      string fmt(format->ptr, format->len);
-      string str(tvalue.ptr, tvalue.len);
-      LOG(WARNING) << "Timestamp: " << str << " does not match format: " << fmt;
-      return NULL;
-    }
-
-    TimestampValue val(tvalue.ptr, tvalue.len);
-    tv = &val;
+    default_tv = TimestampValue(value->ptr, value->len, *dt_ctx);
   }
-
-  if (tv == NULL || tv->date().is_special()) return NULL;
-
+  if (tv->date().is_special()) return NULL;
   ptime temp;
   tv->ToPtime(&temp);
   e->result_.int_val = static_cast<int32_t>(to_time_t(temp));
   return &e->result_.int_val;
 }
 
-// TODO: accept Java data/time format strings:
-// http://docs.oracle.com/javase/1.4.2/docs/api/java/text/SimpleDateFormat.html
-// Convert them to boost format strings.
-StringValue* TimestampFunctions::CheckFormat(StringValue* format) {
-  if(format == NULL) return NULL;
-
-  // For now the format  must be of the form: yyyy-MM-dd HH:mm:ss
-  // where the time part is optional.
-  switch(format->len) {
-    case 10:
-      if (strncmp(format->ptr, "yyyy-MM-dd", 10) == 0) return format;
-      break;
-    case 19:
-      if (strncmp(format->ptr, "yyyy-MM-dd HH:mm:ss", 19) == 0) return format;
-      break;
-    default: 
-      break;
-  }
-  ReportBadFormat(format);
-  return NULL;
-}
-
 void TimestampFunctions::ReportBadFormat(StringValue* format) {
-  string format_str(format->ptr, format->len);
-  LOG(WARNING) << "Bad date/time conversion format: " << format_str 
-               << " Format must be: 'yyyy-MM-dd[ HH:mm:ss]'";
+  LOG(WARNING) << "Bad date/time conversion format: " << format->DebugString();
 }
 
 void* TimestampFunctions::DayName(Expr* e, TupleRow* row) {
