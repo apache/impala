@@ -44,11 +44,13 @@ const string ScanNode::NUM_SCANNER_THREADS_STARTED =
 
 Status ScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  
+
   scanner_thread_counters_ =
       ADD_THREAD_COUNTERS(runtime_profile(), SCANNER_THREAD_COUNTERS_PREFIX);
   bytes_read_counter_ =
       ADD_COUNTER(runtime_profile(), BYTES_READ_COUNTER, TCounterType::BYTES);
+  bytes_read_timeseries_counter_ = ADD_TIME_SERIES_COUNTER(runtime_profile(),
+      BYTES_READ_COUNTER, bytes_read_counter_);
   rows_read_counter_ =
       ADD_COUNTER(runtime_profile(), ROWS_READ_COUNTER, TCounterType::UNIT);
   total_throughput_counter_ = runtime_profile()->AddRateCounter(

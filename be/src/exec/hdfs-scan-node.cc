@@ -789,6 +789,7 @@ void HdfsScanNode::StopAndFinalizeCounters() {
   if (!counters_running_) return;
   counters_running_ = false;
 
+  PeriodicCounterUpdater::StopTimeSeriesCounter(bytes_read_timeseries_counter_);
   PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
   PeriodicCounterUpdater::StopSamplingCounter(average_scanner_thread_concurrency_);
   PeriodicCounterUpdater::StopSamplingCounter(average_hdfs_read_thread_concurrency_);

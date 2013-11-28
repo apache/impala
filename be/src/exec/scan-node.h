@@ -28,7 +28,8 @@ class TScanRange;
 // Abstract base class of all scan nodes; introduces SetScanRange().
 //
 // Includes ScanNode common counters:
-//   BytesRead - total bytes read by this scan node
+//   BytesRead - total bytes read by this scan node. Provided as a counter as well
+//     as a time series that samples the counter.
 //
 //   TotalRawReadTime - it measures the total time spent in underlying reads.
 //     For HDFS files, this is the time in the disk-io-mgr's reading threads for 
@@ -142,6 +143,8 @@ class ScanNode : public ExecNode {
   const std::vector<TScanRangeParams>* scan_range_params_;
 
   RuntimeProfile::Counter* bytes_read_counter_; // # bytes read from the scanner
+  // Time series of the bytes_read_counter_
+  RuntimeProfile::TimeSeriesCounter* bytes_read_timeseries_counter_;
   // # rows/tuples read from the scanner (including those discarded by EvalConjucts())
   RuntimeProfile::Counter* rows_read_counter_;
   RuntimeProfile::Counter* read_timer_; // total read time

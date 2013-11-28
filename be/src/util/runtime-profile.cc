@@ -25,9 +25,10 @@
 
 #include <iomanip>
 #include <iostream>
+#include <boost/bind.hpp>
+#include <boost/foreach.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread.hpp>
-#include <boost/foreach.hpp>
 
 using namespace boost;
 using namespace std;
@@ -776,7 +777,6 @@ void RuntimeProfile::PrintChildCounters(const string& prefix,
   }
 }
 
-// Create a time series counter to this profile. This begins sampling immediately.
 RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
     const string& name, TCounterType::type type, DerivedCounterFunction fn) {
   DCHECK(fn != NULL);
@@ -788,6 +788,13 @@ RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
   time_series_counter_map_[name] = counter;
   PeriodicCounterUpdater::RegisterTimeSeriesCounter(counter);
   return counter;
+}
+
+RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
+    const string& name, Counter* src_counter) {
+  DCHECK(src_counter != NULL);
+  return AddTimeSeriesCounter(name, src_counter->type(),
+      bind(&Counter::value, src_counter));
 }
 
 void RuntimeProfile::TimeSeriesCounter::ToThrift(TTimeSeriesCounter* counter) {

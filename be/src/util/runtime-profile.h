@@ -44,6 +44,8 @@ namespace impala {
 
 #if ENABLE_COUNTERS
   #define ADD_COUNTER(profile, name, type) (profile)->AddCounter(name, type)
+  #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) \
+      (profile)->AddTimeSeriesCounter(name, src_counter)
   #define ADD_TIMER(profile, name) (profile)->AddCounter(name, TCounterType::TIME_NS)
   #define ADD_CHILD_TIMER(profile, name, parent) \
       (profile)->AddCounter(name, TCounterType::TIME_NS, parent)
@@ -57,6 +59,7 @@ namespace impala {
       MACRO_CONCAT(SCOPED_THREAD_COUNTER_MEASUREMENT, __COUNTER__)(c)
 #else
   #define ADD_COUNTER(profile, name, type) NULL
+  #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) NULL
   #define ADD_TIMER(profile, name) NULL
   #define ADD_CHILD_TIMER(profile, name, parent) NULL
   #define SCOPED_TIMER(c)
@@ -441,12 +444,16 @@ class RuntimeProfile {
   // The src_counter is sampled periodically and the buckets are updated.
   void RegisterBucketingCounters(Counter* src_counter, std::vector<Counter*>* buckets);
 
-  // Create a time series counter to this profile. This begins sampling immediately.
-  // This counter contains a number of samples that are collected periodically by
-  // calling sample_fn().
+  // Create a time series counter. This begins sampling immediately. This counter
+  // contains a number of samples that are collected periodically by calling sample_fn().
   // Note: these counters don't get merged (to make average profiles)
   TimeSeriesCounter* AddTimeSeriesCounter(const std::string& name,
       TCounterType::type type, DerivedCounterFunction sample_fn);
+
+  // Create a time series counter that samples the source counter. Sampling begins
+  // immediately.
+  // Note: these counters don't get merged (to make average profiles)
+  TimeSeriesCounter* AddTimeSeriesCounter(const std::string& name, Counter* src_counter);
 
   // Recursively compute the fraction of the 'total_time' spent in this profile and
   // its children.
