@@ -597,3 +597,125 @@ PLAN FRAGMENT 1
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
 ====
+# test that the planner chooses to repartition before the table sink
+# alltypes has column stats and based on the product of the NDVs of year and month
+# the planner should choose to repartition before the table sink
+insert into table functional.alltypes partition(year, month)
+select * from functional.alltypes
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypes
+    overwrite=false
+    partition keys: functional.alltypes.year,functional.alltypes.month
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: HASH_PARTITIONED: functional.alltypes.year, functional.alltypes.month
+
+  WRITE TO HDFS table=functional.alltypes
+    overwrite=false
+    partition keys: functional.alltypes.year,functional.alltypes.month
+
+  1:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    HASH_PARTITIONED: functional.alltypes.year, functional.alltypes.month
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+====
+# test noshuffle hint to prevent repartitioning (same query as above with hint)
+insert into table functional.alltypes partition(year, month) [noshuffle]
+select * from functional.alltypes
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypes
+    overwrite=false
+    partition keys: functional.alltypes.year,functional.alltypes.month
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: RANDOM
+
+  WRITE TO HDFS table=functional.alltypes
+    overwrite=false
+    partition keys: functional.alltypes.year,functional.alltypes.month
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+====
+# test that the planner does not repartition before the table sink
+# alltypes has column stats and since year only has 2 distinct values the planner
+# should choose not to repartition before the table sink
+insert into table functional.alltypes partition(year, month=1)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col, year
+from functional.alltypes
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypes
+    overwrite=false
+    partition keys: year,1
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: RANDOM
+
+  WRITE TO HDFS table=functional.alltypes
+    overwrite=false
+    partition keys: year,1
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+====
+# test shuffle hint to force repartitioning (same query as above with hint)
+insert into table functional.alltypes partition(year, month=1) [shuffle]
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, date_string_col, string_col, timestamp_col, year
+from functional.alltypes
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  WRITE TO HDFS table=functional.alltypes
+    overwrite=false
+    partition keys: year,1
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: HASH_PARTITIONED: year
+
+  WRITE TO HDFS table=functional.alltypes
+    overwrite=false
+    partition keys: year,1
+
+  1:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    HASH_PARTITIONED: year
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+====

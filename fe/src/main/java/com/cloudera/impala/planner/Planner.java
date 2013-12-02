@@ -141,8 +141,8 @@ public class Planner {
       InsertStmt insertStmt = analysisResult.getInsertStmt();
       if (queryOptions.num_nodes != 1) {
         // repartition on partition keys
-        rootFragment = repartitionForInsert(
-            rootFragment, insertStmt.getPartitionKeyExprs(), analyzer, fragments);
+        rootFragment = chooseInsertDataPartition(
+            rootFragment, insertStmt, analyzer, fragments);
       }
 
       // set up table sink for root fragment
@@ -300,15 +300,21 @@ public class Planner {
   }
 
   /**
-   * Returns plan fragment that partitions the output of 'inputFragment' on
-   * partitionExprs, unless the expected number of partitions is less than the number
-   * of nodes on which inputFragment runs.
+   * Makes a cost-based decision on whether to repartition the output of 'inputFragment'
+   * before feeding its data into the table sink of the given 'insertStmt'. Considers
+   * user-supplied plan hints to determine whether to repartition or not.
+   * Returns a plan fragment that partitions the output of 'inputFragment' on the
+   * partition exprs of 'insertStmt', unless the expected number of partitions is less
+   * than the number of nodes on which inputFragment runs.
    * If it ends up creating a new fragment, appends that to 'fragments'.
    */
-  private PlanFragment repartitionForInsert(
-      PlanFragment inputFragment, List<Expr> partitionExprs, Analyzer analyzer,
+  private PlanFragment chooseInsertDataPartition(
+      PlanFragment inputFragment, InsertStmt insertStmt, Analyzer analyzer,
       ArrayList<PlanFragment> fragments) {
+    List<Expr> partitionExprs = insertStmt.getPartitionKeyExprs();
+    Boolean partitionHint = insertStmt.getRepartitionBeforeSink();
     if (partitionExprs.isEmpty()) return inputFragment;
+    if (partitionHint != null && !partitionHint) return inputFragment;
 
     // we ignore constants for the sake of partitioning
     List<Expr> nonConstPartitionExprs = Lists.newArrayList(partitionExprs);
@@ -339,10 +345,12 @@ public class Planner {
     // in the particular file format of the output table/partition.
     // We should always know on how many nodes our input is running.
     Preconditions.checkState(inputFragment.getNumNodes() != -1);
-    if (numPartitions > 0 && numPartitions <= inputFragment.getNumNodes()) {
+    if (partitionHint == null && numPartitions > 0 &&
+        numPartitions <= inputFragment.getNumNodes()) {
       return inputFragment;
     }
 
+    Preconditions.checkState(partitionHint == null || partitionHint);
     ExchangeNode exchNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
     exchNode.addChild(inputFragment.getPlanRoot(), false);
     exchNode.computeStats(analyzer);

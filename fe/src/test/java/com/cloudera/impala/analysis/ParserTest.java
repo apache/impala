@@ -1051,71 +1051,90 @@ public class ParserTest {
   }
 
   /**
-   * Run positive tests for INSERT INTO/OVERWRITE:
-   *
-   * @param overwrite
-   *          If true, tests INSERT OVERWRITE, else tests INSERT INTO.
+   * Run positive tests for INSERT INTO/OVERWRITE.
    */
-  private void testInsert(boolean overwrite, boolean use_kw_table) {
-    String qualifier = overwrite ? "overwrite" : "into";
-    qualifier = use_kw_table ? qualifier + " table" : qualifier;
-
-    // Entire unpartitioned table.
-    ParsesOk("insert " + qualifier + " t select a from src where b > 5");
-    // Static partition with one partitioning key.
-    ParsesOk(
-        "insert " + qualifier + " t partition (pk1=10) select a from src where b > 5");
-    // Dynamic partition with one partitioning key.
-    ParsesOk("insert " + qualifier + " t partition (pk1) select a from src where b > 5");
-    // Static partition with two partitioning keys.
-    ParsesOk("insert " + qualifier + " t partition (pk1=10, pk2=20) " +
-        "select a from src where b > 5");
-    // Fully dynamic partition with two partitioning keys.
-    ParsesOk("insert " + qualifier + " t partition (pk1, pk2) " +
-        "select a from src where b > 5");
-    // Partially dynamic partition with two partitioning keys.
-    ParsesOk("insert " + qualifier + " t partition (pk1=10, pk2) " +
-        "select a from src where b > 5");
-    // Partially dynamic partition with two partitioning keys.
-    ParsesOk("insert " + qualifier + " t partition (pk1, pk2=20) " +
-        "select a from src where b > 5");
-    // Static partition with two NULL partitioning keys.
-    ParsesOk("insert " + qualifier + " t partition (pk1=NULL, pk2=NULL) " +
-        "select a from src where b > 5");
-    // Static partition with boolean partitioning keys.
-    ParsesOk("insert " + qualifier + " t partition (pk1=false, pk2=true) " +
-        "select a from src where b > 5");
-    // Static partition with arbitrary exprs as partitioning keys.
-    ParsesOk("insert " + qualifier + " t partition (pk1=abc, pk2=(5*8+10)) " +
-        "select a from src where b > 5");
-    ParsesOk("insert " + qualifier + " t partition (pk1=f(a), pk2=!true and false) " +
-        "select a from src where b > 5");
-    // Permutation
-    ParsesOk("insert " + qualifier + " t(a,b,c) values(1,2,3)");
-    // Permutation with mismatched select list (should parse fine)
-    ParsesOk("insert " + qualifier + " t(a,b,c) values(1,2,3,4,5,6)");
-    // Permutation and partition
-    ParsesOk("insert " + qualifier + " t(a,b,c) partition(d) values(1,2,3,4)");
-    // Empty permutation list
-    ParsesOk("insert " + qualifier + " t() select 1 from a");
-    // Permutation with optional query statement
-    ParsesOk("insert " + qualifier + " t() partition(d)");
-    ParsesOk("insert " + qualifier + " t()");
-    // No comma in permutation list
-    ParserError("insert " + qualifier + " t(a b c) select 1 from a");
-    // Can't use strings as identifiers in permutation list
-    ParserError("insert " + qualifier + " t('a') select 1 from a");
-    // Expressions not allowed in permutation list
-    ParserError("insert " + qualifier + " t(a=1, b) select 1 from a");
+  private void testInsert() {
+    for (String qualifier: new String[] {"overwrite", "into"}) {
+      for (String optTbl: new String[] {"", "table"}) {
+        for (String optHints: new String[] {"[shuffle]", "[badhint,noshuffle]", ""}) {
+          // Entire unpartitioned table.
+          ParsesOk(String.format("insert %s %s t %s select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Static partition with one partitioning key.
+          ParsesOk(String.format(
+              "insert %s %s t partition (pk1=10) %s select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Dynamic partition with one partitioning key.
+          ParsesOk(String.format(
+              "insert %s %s t partition (pk1) %s select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Static partition with two partitioning keys.
+          ParsesOk(String.format("insert %s %s t partition (pk1=10, pk2=20) %s " +
+              "select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Fully dynamic partition with two partitioning keys.
+          ParsesOk(String.format(
+              "insert %s %s t partition (pk1, pk2) %s select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Partially dynamic partition with two partitioning keys.
+          ParsesOk(String.format(
+              "insert %s %s t partition (pk1=10, pk2) %s select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Partially dynamic partition with two partitioning keys.
+          ParsesOk(String.format(
+              "insert %s %s t partition (pk1, pk2=20) %s select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Static partition with two NULL partitioning keys.
+          ParsesOk(String.format("insert %s %s t partition (pk1=NULL, pk2=NULL) %s " +
+              "select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Static partition with boolean partitioning keys.
+          ParsesOk(String.format("insert %s %s t partition (pk1=false, pk2=true) %s " +
+              "select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Static partition with arbitrary exprs as partitioning keys.
+          ParsesOk(String.format("insert %s %s t partition (pk1=abc, pk2=(5*8+10)) %s " +
+              "select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          ParsesOk(String.format(
+              "insert %s %s t partition (pk1=f(a), pk2=!true and false) %s " +
+              "select a from src where b > 5",
+              qualifier, optTbl, optHints));
+          // Permutation
+          ParsesOk(String.format("insert %s %s t(a,b,c) %s values(1,2,3)",
+              qualifier, optTbl, optHints));
+          // Permutation with mismatched select list (should parse fine)
+          ParsesOk(String.format("insert %s %s t(a,b,c) %s values(1,2,3,4,5,6)",
+              qualifier, optTbl, optHints));
+          // Permutation and partition
+          ParsesOk(String.format("insert %s %s t(a,b,c) partition(d) %s values(1,2,3,4)",
+              qualifier, optTbl, optHints));
+          // Empty permutation list
+          ParsesOk(String.format("insert %s %s t() %s select 1 from a",
+              qualifier, optTbl, optHints));
+          // Permutation with optional query statement
+          ParsesOk(String.format("insert %s %s t() partition(d) %s",
+              qualifier, optTbl, optHints));
+          ParsesOk(String.format("insert %s %s t() %s",
+              qualifier, optTbl, optHints));
+          // No comma in permutation list
+          ParserError(String.format("insert %s %s t(a b c) %s select 1 from a",
+              qualifier, optTbl, optHints));
+          // Can't use strings as identifiers in permutation list
+          ParserError(String.format("insert %s %s t('a') %s select 1 from a",
+              qualifier, optTbl, optHints));
+          // Expressions not allowed in permutation list
+          ParserError(String.format("insert %s %s t(a=1, b) %s select 1 from a",
+              qualifier, optTbl, optHints));
+        }
+      }
+    }
   }
 
   @Test
   public void TestInsert() {
     // Positive tests.
-    testInsert(true, false);
-    testInsert(true, true);
-    testInsert(false, false);
-    testInsert(false, true);
+    testInsert();
     // Missing query statement
     ParserError("insert into table t");
     // Missing 'overwrite/insert'.
@@ -1139,6 +1158,15 @@ public class ParserTest {
                 "select a from src where b > 5");
     // Missing comma in partition list.
     ParserError("insert into table t partition (pk1=10 pk2=20) " +
+        "select a from src where b > 5");
+    // Misplaced plan hints.
+    ParserError("insert [shuffle] into table t partition (pk1=10 pk2=20) " +
+        "select a from src where b > 5");
+    ParserError("insert into [shuffle] table t partition (pk1=10 pk2=20) " +
+        "select a from src where b > 5");
+    ParserError("insert into table t [shuffle] partition (pk1=10 pk2=20) " +
+        "select a from src where b > 5");
+    ParserError("insert into table t partition [shuffle] (pk1=10 pk2=20) " +
         "select a from src where b > 5");
   }
 

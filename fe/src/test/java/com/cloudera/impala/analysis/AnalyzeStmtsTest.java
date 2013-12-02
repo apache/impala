@@ -1331,10 +1331,35 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Unable to INSERT into target table (functional_seq.alltypes) because Impala " +
         "does not have WRITE access to at least one HDFS path: " +
         "hdfs://localhost:20500/test-warehouse/alltypes_seq/year=2009/month=1");
+
+    // Test plan hints for partitioned Hdfs tables.
+    AnalyzesOk("insert into functional.alltypessmall " +
+        "partition (year, month) [shuffle] select * from functional.alltypes");
+    AnalyzesOk("insert into table functional.alltypessmall " +
+        "partition (year, month) [noshuffle] select * from functional.alltypes");
+    // Multiple non-conflicting hints and case insensitivity of hints.
+    AnalyzesOk("insert into table functional.alltypessmall " +
+        "partition (year, month) [shuffle, ShUfFlE] select * from functional.alltypes");
+    // Unknown plan hint,
+    AnalysisError("insert into functional.alltypessmall " +
+        "partition (year, month) [badhint] select * from functional.alltypes",
+        "INSERT hint not recognized: badhint");
+    // Conflicting plan hints.
+    AnalysisError("insert into table functional.alltypessmall " +
+        "partition (year, month) [shuffle, noshuffle] select * from functional.alltypes",
+        "Conflicting INSERT hint: noshuffle");
+    // Plan hints require a partition clause.
+    AnalysisError("insert into table functional.alltypesnopart [shuffle] " +
+        "select * from functional.alltypesnopart",
+        "INSERT hints are only supported for inserting into partitioned Hdfs tables.");
+    // Plan hints do not make sense for inserting into HBase tables.
+    AnalysisError("insert into table functional_hbase.alltypes [shuffle] " +
+        "select * from functional_hbase.alltypes",
+        "INSERT hints are only supported for inserting into partitioned Hdfs tables.");
   }
 
   /**
-   * Run tests for dynamic partitions for INSERT INTO/OVERWRITE:
+   * Run tests for dynamic partitions for INSERT INTO/OVERWRITE.
    */
   private void testInsertDynamic(String qualifier) throws AnalysisException {
     // Fully dynamic partitions.

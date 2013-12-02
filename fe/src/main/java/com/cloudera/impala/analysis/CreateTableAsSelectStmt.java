@@ -27,7 +27,6 @@ import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.service.DdlExecutor;
 import com.cloudera.impala.thrift.THdfsFileFormat;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 /**
@@ -47,7 +46,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     Preconditions.checkNotNull(createStmt);
     this.createStmt_ = createStmt;
     this.insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false,
-        null, queryStmt, null);
+        null, null, queryStmt, null);
   }
 
   public QueryStmt getQueryStmt() { return insertStmt_.getQueryStmt(); }

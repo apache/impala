@@ -238,7 +238,7 @@ nonterminal SelectStmt select_stmt;
 nonterminal ValuesStmt values_stmt;
 // Select or union statement.
 nonterminal QueryStmt query_stmt;
-nonterminal QueryStmt optional_query_stmt;
+nonterminal QueryStmt opt_query_stmt;
 // Single select_stmt or parenthesized query_stmt.
 nonterminal QueryStmt union_operand;
 // List of select or union blocks connected by UNION operators or a single select block.
@@ -266,7 +266,7 @@ nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr
 nonterminal ArrayList<Expr> expr_list;
 nonterminal String alias_clause;
 nonterminal ArrayList<String> ident_list;
-nonterminal ArrayList<String> optional_ident_list;
+nonterminal ArrayList<String> opt_ident_list;
 nonterminal TableName table_name;
 nonterminal FunctionName function_name;
 nonterminal Expr where_clause;
@@ -296,7 +296,7 @@ nonterminal InlineViewRef inline_view_ref;
 nonterminal ViewRef with_table_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
-nonterminal ArrayList<String> opt_join_hints;
+nonterminal ArrayList<String> opt_plan_hints;
 nonterminal PrimitiveType primitive_type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
@@ -346,7 +346,7 @@ nonterminal String dbs_or_schemas_kw;
 // Used to simplify commands where KW_COLUMN is optional
 nonterminal String optional_kw_column;
 // Used to simplify commands where KW_TABLE is optional
-nonterminal String optional_kw_table;
+nonterminal String opt_kw_table;
 nonterminal Boolean overwrite_val;
 
 // For Create/Drop/Show function ddl
@@ -482,35 +482,37 @@ explain_stmt ::=
 // tbl(col1,...) etc) and the PARTITION clause. If the column permutation is present, the
 // query statement clause is optional as well.
 insert_stmt ::=
-  with_clause:w KW_INSERT KW_OVERWRITE optional_kw_table table_name:table LPAREN
-  optional_ident_list:col_perm RPAREN partition_clause:list optional_query_stmt:query
-  {: RESULT = new InsertStmt(w, table, true, list, query, col_perm); :}
-  | with_clause:w KW_INSERT KW_OVERWRITE optional_kw_table table_name:table
-  partition_clause:list query_stmt:query
-  {: RESULT = new InsertStmt(w, table, true, list, query, null); :}
-  | with_clause:w KW_INSERT KW_INTO optional_kw_table table_name:table LPAREN
-  optional_ident_list:col_perm RPAREN partition_clause:list optional_query_stmt:query
-  {: RESULT = new InsertStmt(w, table, false, list, query, col_perm); :}
-  | with_clause:w KW_INSERT KW_INTO optional_kw_table table_name:table
-  partition_clause:list query_stmt:query
-  {: RESULT = new InsertStmt(w, table, false, list, query, null); :}
+  with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table LPAREN
+  opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
+  opt_query_stmt:query
+  {: RESULT = new InsertStmt(w, table, true, list, hints, query, col_perm); :}
+  | with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table
+  partition_clause:list opt_plan_hints:hints query_stmt:query
+  {: RESULT = new InsertStmt(w, table, true, list, hints, query, null); :}
+  | with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table LPAREN
+  opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
+  opt_query_stmt:query
+  {: RESULT = new InsertStmt(w, table, false, list, hints, query, col_perm); :}
+  | with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table
+  partition_clause:list opt_plan_hints:hints query_stmt:query
+  {: RESULT = new InsertStmt(w, table, false, list, hints, query, null); :}
   ;
 
-optional_query_stmt ::=
+opt_query_stmt ::=
   query_stmt:query
   {: RESULT = query; :}
   | /* empty */
   {: RESULT = null; :}
   ;
 
-optional_ident_list ::=
+opt_ident_list ::=
   ident_list:ident
   {: RESULT = ident; :}
   | /* empty */
   {: RESULT = Lists.newArrayList(); :}
   ;
 
-optional_kw_table ::=
+opt_kw_table ::=
   KW_TABLE
   | /* empty */
   ;
@@ -1345,40 +1347,40 @@ from_clause ::=
   ;
 
 table_ref_list ::=
-  table_ref:t
+  table_ref:table
   {:
     ArrayList<TableRef> list = new ArrayList<TableRef>();
-    list.add(t);
+    list.add(table);
     RESULT = list;
   :}
-  | table_ref_list:list COMMA table_ref:t
+  | table_ref_list:list COMMA table_ref:table
   {:
-    list.add(t);
+    list.add(table);
     RESULT = list;
   :}
-  | table_ref_list:list join_operator:op opt_join_hints:h table_ref:t
+  | table_ref_list:list join_operator:op opt_plan_hints:hints table_ref:table
   {:
-    t.setJoinOp((JoinOperator) op);
-    t.setJoinHints(h);
-    list.add(t);
+    table.setJoinOp((JoinOperator) op);
+    table.setJoinHints(hints);
+    list.add(table);
     RESULT = list;
   :}
-  | table_ref_list:list join_operator:op opt_join_hints:h table_ref:t
+  | table_ref_list:list join_operator:op opt_plan_hints:hints table_ref:table
     KW_ON expr:e
   {:
-    t.setJoinOp((JoinOperator) op);
-    t.setJoinHints(h);
-    t.setOnClause(e);
-    list.add(t);
+    table.setJoinOp((JoinOperator) op);
+    table.setJoinHints(hints);
+    table.setOnClause(e);
+    list.add(table);
     RESULT = list;
   :}
-  | table_ref_list:list join_operator:op opt_join_hints:h table_ref:t
+  | table_ref_list:list join_operator:op opt_plan_hints:hints table_ref:table
     KW_USING LPAREN ident_list:colNames RPAREN
   {:
-    t.setJoinOp((JoinOperator) op);
-    t.setJoinHints(h);
-    t.setUsingClause(colNames);
-    list.add(t);
+    table.setJoinOp((JoinOperator) op);
+    table.setJoinHints(hints);
+    table.setUsingClause(colNames);
+    list.add(table);
     RESULT = list;
   :}
   ;
@@ -1425,7 +1427,7 @@ opt_outer ::=
   |
   ;
 
-opt_join_hints ::=
+opt_plan_hints ::=
   LBRACKET ident_list:l RBRACKET
   {: RESULT = l; :}
   |
