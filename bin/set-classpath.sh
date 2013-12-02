@@ -22,11 +22,7 @@ CLASSPATH=\
 $IMPALA_HOME/fe/src/test/resources:\
 $IMPALA_HOME/fe/target/classes:\
 $IMPALA_HOME/fe/target/dependency:\
-$IMPALA_HOME/fe/target/test-classes:\
-${HIVE_HOME}/lib/datanucleus-core-2.0.3.jar:\
-${HIVE_HOME}/lib/datanucleus-enhancer-2.0.3.jar:\
-${HIVE_HOME}/lib/datanucleus-rdbms-2.0.3.jar:\
-${HIVE_HOME}/lib/datanucleus-connectionpool-2.0.3.jar:
+$IMPALA_HOME/fe/target/test-classes:
 
 for jar in `ls ${IMPALA_HOME}/fe/target/dependency/*.jar`; do
   CLASSPATH=${CLASSPATH}:$jar
