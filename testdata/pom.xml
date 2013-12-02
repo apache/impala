@@ -17,8 +17,8 @@
   <version>0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
-  <name>Build some test data</name>
-  
+  <name>Builds test data generators</name>
+
   <properties>
     <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
@@ -40,26 +40,8 @@
 
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
-      <version>${hadoop.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/hdfs/hadoop-hdfs-${hadoop.version}.jar</systemPath>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/common/hadoop-common-${hadoop.version}.jar</systemPath>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-auth</artifactId>
-      <version>${hadoop.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/common/lib/hadoop-auth-${hadoop.version}.jar</systemPath>
     </dependency>
 
     <dependency>
@@ -68,7 +50,7 @@
       <version>${hbase.version}</version>
     </dependency>
   </dependencies>
-  
+
   <build>
     <plugins>
       <plugin>
@@ -91,7 +73,7 @@
       </plugin>
     </plugins>
   </build>
-              
+
   <repositories>
     <repository>
       <id>cdh.rcs.releases.repo</id>

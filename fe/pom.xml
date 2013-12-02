@@ -44,40 +44,22 @@
   </properties>
 
   <dependencies>
-    <!-- Until the local-read optimisations are available in a
-         published artifact, we grab the local hdfs jar. The downside
-         is that transitive dependencies are not handled by Maven with
-         a local jar. Note: not necessary for the Java-side, but must
-         be available for the NativeBackend. -->
-    <dependency>
-      <groupId>org.hsqldb</groupId>
-      <artifactId>hsqldb</artifactId>
-      <version>2.2.8</version>
-      <scope>test</scope>
-    </dependency>
-
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <version>${hadoop.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/hdfs/hadoop-hdfs-${hadoop.version}.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/common/hadoop-common-${hadoop.version}.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
       <version>${hadoop.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-${hadoop.version}/share/hadoop/common/lib/hadoop-auth-${hadoop.version}.jar</systemPath>
     </dependency>
 
     <dependency>
@@ -107,9 +89,9 @@
     <dependency>
       <groupId>parquet</groupId>
       <artifactId>parquet-hive</artifactId>
-      <version>1.2.5</version>
+      <version>${env.IMPALA_PARQUET_VERSION}</version>
       <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/parquet-hive-1.2.5-cdh4.5.0.jar</systemPath>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/parquet-hive-${env.IMPALA_PARQUET_VERSION}-cdh4.5.0.jar</systemPath>
     </dependency>
 
     <dependency>
@@ -186,50 +168,7 @@
       <artifactId>hive-jdbc</artifactId>
       <version>${hive.version}</version>
     </dependency>
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-exec</artifactId>
-      <version>${hive.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.derby</groupId>
-      <artifactId>derby</artifactId>
-      <version>10.4.2.0</version>
-    </dependency>
-    <!-- The data nucleus dependencies are copied directly from Hive's pom.xml
-         to make our FE build work -->
-    <dependency>
-      <groupId>org.datanucleus</groupId>
-      <artifactId>datanucleus-api-jdo</artifactId>
-      <version>3.2.1</version>
-      <scope>compile</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.jdo</groupId>
-          <artifactId>jdo2-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>junit</groupId>
-          <artifactId>junit</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.datanucleus</groupId>
-      <artifactId>datanucleus-core</artifactId>
-      <version>3.2.2</version>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.datanucleus</groupId>
-      <artifactId>datanucleus-rdbms</artifactId>
-      <version>3.2.1</version>
-      <scope>compile</scope>
-    </dependency>
+
     <!-- This driver supports PostgreSQL 7.2 and newer -->
     <dependency>
       <groupId>postgresql</groupId>
@@ -237,19 +176,9 @@
       <version>9.0-801.jdbc4</version>
     </dependency>
     <dependency>
-      <groupId>commons-dbcp</groupId>
-      <artifactId>commons-dbcp</artifactId>
-      <version>1.4</version>
-    </dependency>
-    <dependency>
-      <groupId>javax.jdo</groupId>
-      <artifactId>jdo2-api</artifactId>
-      <version>2.3-eb</version>
-    </dependency>
-    <dependency>
-      <groupId>org.antlr</groupId>
-      <artifactId>antlr-runtime</artifactId>
-      <version>3.3</version>
+      <groupId>org.apache.derby</groupId>
+      <artifactId>derby</artifactId>
+      <version>10.4.2.0</version>
     </dependency>
 
     <dependency>
@@ -280,24 +209,6 @@
       <artifactId>junit</artifactId>
       <version>4.8.2</version>
       <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>ant-contrib</groupId>
-      <artifactId>ant-contrib</artifactId>
-      <version>1.0b3</version>
-      <exclusions>
-        <exclusion>
-          <groupId>ant</groupId>
-          <artifactId>ant</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.ant</groupId>
-      <artifactId>ant-nodeps</artifactId>
-      <version>1.8.1</version>
     </dependency>
   </dependencies>
 
@@ -356,6 +267,7 @@
           </execution>
         </executions>
       </plugin>
+
       <plugin>
         <groupId>de.jflex</groupId>
         <artifactId>maven-jflex-plugin</artifactId>
@@ -373,6 +285,7 @@
           </execution>
         </executions>
       </plugin>
+
 <!-- PDH - I don't think we need this right now, regardless there's a better way (ie not part of dev workflow) -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -637,5 +550,4 @@
       </properties>
     </profile>
   </profiles>
-
 </project>
