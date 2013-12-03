@@ -144,13 +144,18 @@ struct TAlterTableChangeColParams {
   2: required CatalogObjects.TColumn new_col_def
 }
 
-// Parameters for ALTER TABLE SET TBLPROPERTIES|SERDEPROPERTIES commands.
+// Parameters for ALTER TABLE SET [PARTITION ('k1'='a', 'k2'='b'...)]
+// TBLPROPERTIES|SERDEPROPERTIES commands.
 struct TAlterTableSetTblPropertiesParams {
   // The target table property that is being altered.
   1: required CatalogObjects.TTablePropertyType target
 
   // Map of property names to property values.
   2: required map<string, string> properties
+
+  // If set, alters the properties of the given partition, otherwise
+  // those of the table.
+  3: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
 }
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSpec] FILEFORMAT commands.

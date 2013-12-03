@@ -505,8 +505,8 @@ public class ParserTest {
     // Multiple with clauses. Operands must be in parenthesis to
     // have their own with clause.
     ParsesOk("with t as (select 1) " +
-    		"(with t as (select 2) select * from t) union all " +
-    		"(with t as (select 3) select * from t)");
+        "(with t as (select 2) select * from t) union all " +
+        "(with t as (select 3) select * from t)");
     ParsesOk("with t as (select 1) " +
         "(with t as (select 2) select * from t) union all " +
         "(with t as (select 3) select * from t) order by 1 limit 1");
@@ -955,8 +955,10 @@ public class ParserTest {
     // semantically incorrect negation, but parses ok
     ParsesOk("select a, b, c from t where a = " + notStr + "5");
     // unbalanced parentheses
-    ParserError("select a, b, c from t where (a = 5 " + orStr + " b = 6) " + andStr + " c = 7)");
-    ParserError("select a, b, c from t where ((a = 5 " + orStr + " b = 6) " + andStr + " c = 7");
+    ParserError("select a, b, c from t where " +
+        "(a = 5 " + orStr + " b = 6) " + andStr + " c = 7)");
+    ParserError("select a, b, c from t where " +
+        "((a = 5 " + orStr + " b = 6) " + andStr + " c = 7");
     // incorrectly positioned negation (!)
     ParserError("select a, b, c from t where a = 5 " + orStr + " " + notStr);
     ParserError("select a, b, c from t where " + notStr + "(a = 5) " + orStr + " " + notStr);
@@ -1538,21 +1540,25 @@ public class ParserTest {
     ParserError("ALTER TABLE TestDb.Foo SET");
 
     String[] tblPropTypes = {"TBLPROPERTIES", "SERDEPROPERTIES"};
+    String[] partClauses = {"", "PARTITION(k1=10, k2=20)"};
     for (String propType: tblPropTypes) {
-      ParsesOk(String.format("ALTER TABLE Foo SET %s ('a'='b')", propType));
-      ParsesOk(String.format("ALTER TABLE Foo SET %s ('abc'='123')", propType));
-      ParsesOk(String.format("ALTER TABLE Foo SET %s ('abc'='123', 'a'='1')", propType));
-      ParsesOk(String.format(
-          "ALTER TABLE Foo SET %s ('a'='1', 'b'='2', 'c'='3')", propType));
-      ParserError(String.format("ALTER TABLE Foo SET %s ( )", propType));
-      ParserError(String.format("ALTER TABLE Foo SET %s ('a', 'b')", propType));
-      ParserError(String.format("ALTER TABLE Foo SET %s ('a'='b',)", propType));
-      ParserError(String.format("ALTER TABLE Foo SET %s ('a'=b)", propType));
-      ParserError(String.format("ALTER TABLE Foo SET %s (a='b')", propType));
-      ParserError(String.format("ALTER TABLE Foo SET %s (a=b)", propType));
-      // Setting TBLPROPERTIES/SERDEPROPERTIES on a partition is not currently allowed
-      ParserError(String.format(
-          "ALTER TABLE Foo PARTITION (s='str') SET %s ('a'='b')", propType));
+      for (String part: partClauses) {
+        ParsesOk(String.format("ALTER TABLE Foo %s SET %s ('a'='b')", part, propType));
+        ParsesOk(String.format("ALTER TABLE Foo %s SET %s ('abc'='123')",
+            part, propType));
+        ParsesOk(String.format("ALTER TABLE Foo %s SET %s ('abc'='123', 'a'='1')",
+            part, propType));
+        ParsesOk(String.format("ALTER TABLE Foo %s SET %s ('a'='1', 'b'='2', 'c'='3')",
+            part, propType));
+        ParserError(String.format("ALTER TABLE Foo %s SET %s ( )", part, propType));
+        ParserError(String.format("ALTER TABLE Foo %s SET %s ('a', 'b')",
+            part, propType));
+        ParserError(String.format("ALTER TABLE Foo %s SET %s ('a'='b',)",
+            part, propType));
+        ParserError(String.format("ALTER TABLE Foo %s SET %s ('a'=b)", part, propType));
+        ParserError(String.format("ALTER TABLE Foo %s SET %s (a='b')", part, propType));
+        ParserError(String.format("ALTER TABLE Foo %s SET %s (a=b)", part, propType));
+      }
     }
   }
 

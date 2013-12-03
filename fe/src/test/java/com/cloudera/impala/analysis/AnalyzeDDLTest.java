@@ -254,6 +254,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   public void TestAlterTableSet() throws AnalysisException {
     AnalyzesOk("alter table functional.alltypes set fileformat sequencefile");
     AnalyzesOk("alter table functional.alltypes set location '/a/b'");
+    AnalyzesOk("alter table functional.alltypes set tblproperties('a'='1')");
+    AnalyzesOk("alter table functional.alltypes set serdeproperties('a'='2')");
     AnalyzesOk("alter table functional.alltypes PARTITION (Year=2010, month=11) " +
                "set location '/a/b'");
     AnalyzesOk("alter table functional.alltypes PARTITION (month=11, year=2010) " +
@@ -262,6 +264,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
                "(string_col='partition1') set fileformat parquet");
     AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
                "(string_col='PaRtiTion1') set location '/a/b/c'");
+    AnalyzesOk("alter table functional.alltypes PARTITION (year=2010, month=11) " +
+               "set tblproperties('a'='1')");
+    AnalyzesOk("alter table functional.alltypes PARTITION (year=2010, month=11) " +
+               "set serdeproperties ('a'='2')");
     // Arbitrary exprs as partition key values. Constant exprs are ok.
     AnalyzesOk("alter table functional.alltypes PARTITION " +
                "(year=cast(100*20+10 as INT), month=cast(2+9 as INT)) " +
@@ -283,6 +289,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table functional.alltypes PARTITION (year=2014, month=11) " +
                   "set location '/a/b'",
                   "Partition spec does not exist: (year=2014, month=11)");
+    AnalysisError("alter table functional.alltypes PARTITION (year=2014, month=11) " +
+                  "set tblproperties('a'='1')",
+                  "Partition spec does not exist: (year=2014, month=11)");
+    AnalysisError("alter table functional.alltypes PARTITION (year=2010) " +
+                  "set tblproperties('a'='1')",
+                  "Items in partition spec must exactly match the partition columns " +
+                  "in the table definition: functional.alltypes (1 vs 2)");
     AnalysisError("alter table functional.alltypes PARTITION (year=2010, year=2010) " +
                   "set location '/a/b'",
                   "Duplicate partition key name: year");

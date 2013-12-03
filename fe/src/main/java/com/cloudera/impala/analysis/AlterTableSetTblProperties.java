@@ -23,16 +23,16 @@ import com.cloudera.impala.thrift.TTablePropertyType;
 import com.google.common.base.Preconditions;
 
 /**
-* Represents an ALTER TABLE SET TBLPROPERTIES|SERDEPROPERTIES ('p1'='v1', ...) statement.
+* Represents an ALTER TABLE SET [PARTITION ('k1'='a', 'k2'='b'...)]
+* TBLPROPERTIES|SERDEPROPERTIES ('p1'='v1', ...) statement.
 */
 public class AlterTableSetTblProperties extends AlterTableSetStmt {
   private final TTablePropertyType targetProperty_;
   private final HashMap<String, String> tblProperties_;
 
-  public AlterTableSetTblProperties(TableName tableName,
-      TTablePropertyType targetProperty,
-      HashMap<String, String> tblProperties) {
-   super(tableName, null);
+  public AlterTableSetTblProperties(TableName tableName, PartitionSpec partitionSpec,
+      TTablePropertyType targetProperty, HashMap<String, String> tblProperties) {
+   super(tableName, partitionSpec);
    Preconditions.checkNotNull(tblProperties);
    Preconditions.checkNotNull(targetProperty);
    targetProperty_ = targetProperty;
@@ -50,6 +50,9 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
        new TAlterTableSetTblPropertiesParams();
    tblPropertyParams.setTarget(targetProperty_);
    tblPropertyParams.setProperties(tblProperties_);
+   if (partitionSpec_ != null) {
+     tblPropertyParams.setPartition_spec(partitionSpec_.toThrift());
+   }
    params.setSet_tbl_properties_params(tblPropertyParams);
    return params;
   }

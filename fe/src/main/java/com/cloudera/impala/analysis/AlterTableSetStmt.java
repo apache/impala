@@ -24,7 +24,7 @@ import com.cloudera.impala.common.AnalysisException;
  * Base class for all ALTER TABLE ... SET statements
  */
 public class AlterTableSetStmt extends AlterTableStmt {
-  private final PartitionSpec partitionSpec_;
+  protected final PartitionSpec partitionSpec_;
 
   public AlterTableSetStmt(TableName tableName, PartitionSpec partitionSpec) {
     super(tableName);

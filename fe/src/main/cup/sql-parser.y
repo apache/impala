@@ -545,13 +545,7 @@ alter_tbl_stmt ::=
   {: RESULT = new AlterTableOrViewRenameStmt(table, new_table, true); :}
   | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET
     table_property_type:target LPAREN properties_map:properties RPAREN
-  {:
-    // Include unnecessary partition_spec to avoid a shift/reduce conflict on KW_SET.
-    if (partition != null) {
-      parser.parseError("partition", SqlParserSymbols.KW_PARTITION);
-    }
-    RESULT = new AlterTableSetTblProperties(table, target, properties);
-  :}
+  {: RESULT = new AlterTableSetTblProperties(table, partition, target, properties); :}
   ;
 
 table_property_type ::=

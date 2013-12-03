@@ -1094,29 +1094,53 @@ public class DdlExecutor {
   }
 
   /**
-   * Appends to the table property metadata for the given table, replacing the values
-   * of any keys that already exist.
+   * Appends to the table or partition property metadata for the given table, replacing
+   * the values of any keys that already exist.
    */
   private void alterTableSetTblProperties(TableName tableName,
-      TAlterTableSetTblPropertiesParams params) throws MetaException,
-      InvalidObjectException, TException, DatabaseNotFoundException,
-      TableNotFoundException, TableLoadingException {
+      TAlterTableSetTblPropertiesParams params) throws TException, CatalogException {
     Map<String, String> properties = params.getProperties();
     Preconditions.checkNotNull(properties);
     synchronized (metastoreDdlLock) {
-      org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
-      switch (params.getTarget()) {
-        case TBL_PROPERTY:
-          msTbl.getParameters().putAll(properties);
-          break;
-        case SERDE_PROPERTY:
-          msTbl.getSd().getSerdeInfo().getParameters().putAll(properties);
-          break;
-        default:
-          throw new UnsupportedOperationException(
-              "Unknown target TTablePropertyType: " + params.getTarget());
+      if (params.isSetPartition_spec()) {
+        // Alter partition params.
+        HdfsPartition partition = catalog.getHdfsPartition(
+            tableName.getDb(), tableName.getTbl(), params.getPartition_spec());
+        org.apache.hadoop.hive.metastore.api.Partition msPartition =
+            partition.getMetaStorePartition();
+        Preconditions.checkNotNull(msPartition);
+        switch (params.getTarget()) {
+          case TBL_PROPERTY:
+            msPartition.getParameters().putAll(properties);
+            break;
+          case SERDE_PROPERTY:
+            msPartition.getSd().getSerdeInfo().getParameters().putAll(properties);
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "Unknown target TTablePropertyType: " + params.getTarget());
+        }
+        try {
+          applyAlterPartition(tableName, msPartition);
+        } finally {
+          partition.markDirty();
+        }
+      } else {
+        // Alter table params.
+        org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+        switch (params.getTarget()) {
+          case TBL_PROPERTY:
+            msTbl.getParameters().putAll(properties);
+            break;
+          case SERDE_PROPERTY:
+            msTbl.getSd().getSerdeInfo().getParameters().putAll(properties);
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "Unknown target TTablePropertyType: " + params.getTarget());
+        }
+        applyAlterTable(msTbl);
       }
-      applyAlterTable(msTbl);
     }
   }
 
