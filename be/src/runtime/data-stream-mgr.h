@@ -160,7 +160,12 @@ class DataStreamMgr {
     typedef std::list<std::pair<int, RowBatch*> > RowBatchQueue;
     RowBatchQueue batch_queue_;
 
+    // Number of bytes received
     RuntimeProfile::Counter* bytes_received_counter_;
+
+    // Time series of number of bytes received, samples bytes_received_counter_
+    RuntimeProfile::TimeSeriesCounter* bytes_received_time_series_counter_;
+
     RuntimeProfile::Counter* deserialize_row_batch_timer_;
     MemTracker mem_tracker_;
 

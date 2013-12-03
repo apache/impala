@@ -24,6 +24,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
+#include "util/periodic-counter-updater.h"
 
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -51,6 +52,8 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(RuntimeState* state,
     received_first_batch_(false) {
   bytes_received_counter_ =
       ADD_COUNTER(profile, "BytesReceived", TCounterType::BYTES);
+  bytes_received_time_series_counter_ =
+      ADD_TIME_SERIES_COUNTER(profile, "BytesReceived", bytes_received_counter_);
   deserialize_row_batch_timer_ =
       ADD_TIMER(profile, "DeserializeRowBatchTimer");
   buffer_full_wall_timer_ = ADD_TIMER(profile, "SendersBlockedTimer");
@@ -179,6 +182,7 @@ void DataStreamMgr::StreamControlBlock::CancelStream() {
   // notice that the stream is cancelled and handle it.
   data_arrival_.notify_all();
   data_removal_.notify_all();
+  PeriodicCounterUpdater::StopTimeSeriesCounter(bytes_received_time_series_counter_);
 
   // Delete any batches queued in batch_queue_
   for (RowBatchQueue::iterator it = batch_queue_.begin();
