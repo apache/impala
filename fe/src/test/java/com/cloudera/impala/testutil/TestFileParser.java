@@ -169,7 +169,7 @@ public class TestFileParser {
      * Returns the QUERY section as a string, with each line separated by a " ".
      */
     public String getQuery() {
-      return getSectionAsString(Section.QUERY, false, " ");
+      return getSectionAsString(Section.QUERY, false, "\n");
     }
 
 

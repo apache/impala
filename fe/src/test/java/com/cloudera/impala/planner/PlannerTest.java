@@ -154,7 +154,8 @@ public class PlannerTest {
    * of 'testCase'.
    */
   private void RunTestCase(TestCase testCase, TQueryOptions options,
-      StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
+      StringBuilder errorLog, StringBuilder actualOutput, String dbName)
+      throws CatalogException {
     String query = testCase.getQuery();
     LOG.info("running query " + query);
 
@@ -164,7 +165,7 @@ public class PlannerTest {
     boolean isImplemented = expectedErrorMsg == null;
 
     options.setNum_nodes(1);
-    TSessionState sessionState = new TSessionState(null, null, "default",
+    TSessionState sessionState = new TSessionState(null, null, dbName,
         System.getProperty("user.name"), null);
     TClientRequest request = new TClientRequest(query, options, sessionState);
     request.queryOptions.setExplain_level(TExplainLevel.NORMAL);
@@ -280,7 +281,7 @@ public class PlannerTest {
     }
   }
 
-  private void runPlannerTestFile(String testFile, TQueryOptions options)
+  private void runPlannerTestFile(String testFile, TQueryOptions options, String dbName)
       throws CatalogException {
     String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
@@ -291,7 +292,7 @@ public class PlannerTest {
     for (TestCase testCase : queryFileParser.getTestCases()) {
       actualOutput.append(testCase.getSectionAsString(Section.QUERY, true, "\n"));
       actualOutput.append("\n");
-      RunTestCase(testCase, options, errorLog, actualOutput);
+      RunTestCase(testCase, options, errorLog, actualOutput, dbName);
       actualOutput.append("====\n");
     }
 
@@ -313,19 +314,18 @@ public class PlannerTest {
     }
   }
 
-  private void runPlannerTestFile(String testFile) {
+  private void runPlannerTestFile(String testFile, String dbName) {
     TQueryOptions options = new TQueryOptions();
     options.allow_unsupported_formats = true;
     try {
-      runPlannerTestFile(testFile, options);
+      runPlannerTestFile(testFile, options, dbName);
     } catch (Exception e) {
       fail("Error: " + e.getMessage());
     }
   }
 
-  @Test
-  public void testTest() {
-    //runPlannerTestFile("test");
+  private void runPlannerTestFile(String testFile) {
+    runPlannerTestFile(testFile, "default");
   }
 
   @Test
@@ -425,8 +425,12 @@ public class PlannerTest {
 
   @Test
   public void testTpch() {
-    // TODO: Q20-Q22 are disabled due to IMP-137. Once that bug is resolved they should
-    // be re-enabled.
     runPlannerTestFile("tpch-all");
+  }
+
+  @Test
+  public void testTpcds() {
+    // Join order has been optimized for Impala. Uses ss_date as partition key.
+    runPlannerTestFile("tpcds-all", "tpcds");
   }
 }

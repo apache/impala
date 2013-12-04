@@ -13,3 +13,4 @@ python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_name=functional_hba
     --table_names="alltypessmall,stringids"
 python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=tpch \
     --table_names=customer,lineitem,nation,orders,part,partsupp,region,supplier
+python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=tpcds
