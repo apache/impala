@@ -4,6 +4,7 @@
 # kill HBase, then DFS
 $IMPALA_HOME/testdata/bin/kill-hbase.sh
 $IMPALA_HOME/testdata/bin/kill-mini-dfs.sh
+$IMPALA_HOME/testdata/bin/kill-mini-llama.sh
 $IMPALA_HOME/testdata/bin/kill-hive-server.sh
 
 # kill all impalad and statestored processes
