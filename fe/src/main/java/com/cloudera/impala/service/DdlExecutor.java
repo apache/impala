@@ -564,8 +564,7 @@ public class DdlExecutor {
     MetaStoreClient msClient = catalog.getMetaStoreClient();
     synchronized (metastoreDdlLock) {
       try {
-        msClient.getHiveClient()
-            .dropDatabase(params.getDb(), false, params.if_exists);
+        msClient.getHiveClient().dropDatabase(params.getDb(), true, params.if_exists);
       } finally {
         msClient.release();
       }

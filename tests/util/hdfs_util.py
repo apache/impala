@@ -16,8 +16,9 @@
 # Hdfs access utilities
 
 from xml.etree.ElementTree import parse
-from pywebhdfs.webhdfs import PyWebHdfsClient
+from pywebhdfs.webhdfs import PyWebHdfsClient, errors
 import getpass
+import types
 
 class HdfsConfig(object):
   """Reads an XML configuration file (produced by a mini-cluster) into a dictionary
@@ -41,8 +42,22 @@ def get_hdfs_client_from_conf(conf):
     raise Exception("dfs.namenode.http-address not found in config")
 
   host, port = hostport.split(":")
-  return PyWebHdfsClient(host=host, port=port, user_name=getpass.getuser())
+  return get_hdfs_client(host=host, port=port)
 
-def get_hdfs_client(host, port):
+def __pyweb_hdfs_client_exists(self, path):
+  """The PyWebHdfsClient doesn't provide an API to cleanly detect if a file or directory
+  exists. This method is bound to each client that is created so tests can simply call
+  hdfs_client.exists('path') and get back a bool.
+  """
+  try:
+    self.get_file_dir_status(path)
+  except errors.FileNotFound:
+    return False
+  return True
+
+def get_hdfs_client(host, port, user_name=getpass.getuser()):
   """Returns a new HTTP client for an HDFS cluster using an explict host:port pair"""
-  return PyWebHdfsClient(host=host, port=port, user_name=getpass.getuser())
+  hdfs_client = PyWebHdfsClient(host=host, port=port, user_name=user_name)
+  # Bind our "exists" method to hdfs_client.exists
+  hdfs_client.exists = types.MethodType(__pyweb_hdfs_client_exists, hdfs_client)
+  return hdfs_client

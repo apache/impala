@@ -67,6 +67,29 @@ class TestDdlStatements(ImpalaTestSuite):
     self.hdfs_client.delete_file_dir("test-warehouse/t_part_tmp/", recursive=True)
 
   @pytest.mark.execute_serially
+  def test_drop_cleans_hdfs_dirs(self):
+    self.hdfs_client.delete_file_dir("test-warehouse/ddl_test_db.db/", recursive=True)
+    assert not self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
+
+    self.client.execute('use default')
+    self.client.execute('create database ddl_test_db')
+    # Verify the db directory exists
+    assert self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
+
+    self.client.execute("create table ddl_test_db.t1(i int)")
+    # Verify the table directory exists
+    assert self.hdfs_client.exists("test-warehouse/ddl_test_db.db/t1/")
+
+    # Dropping the table removes the table's directory and preserves the db's directory
+    self.client.execute("drop table ddl_test_db.t1")
+    assert not self.hdfs_client.exists("test-warehouse/ddl_test_db.db/t1/")
+    assert self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
+
+    # Dropping the db removes the db's directory
+    self.client.execute("drop database ddl_test_db")
+    assert not self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
+
+  @pytest.mark.execute_serially
   def test_create(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
     self.__create_db_synced('ddl_test_db', vector)
