@@ -1,98 +1,64 @@
 #!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 # Utility for computing table statistics of tables in the Hive Metastore
 import sys
-from hive_metastore import ThriftHiveMetastore
-from hive_service import ThriftHive
-from hive_service.ttypes import HiveServerException
 from optparse import OptionParser
-from subprocess import call
-from thrift.transport import TTransport
-from thrift.transport import TSocket
-from thrift.protocol import TBinaryProtocol
+from tests.beeswax.impala_beeswax import *
 
-COMPUTE_STATS_STATEMENT =\
-    'ANALYZE TABLE %(db_name)s.%(table_name)s %(partitions)s COMPUTE STATISTICS'
-
-# Compute column stats using fully qualified table names doesn't work (HIVE-4118).
-# Column stats is also broken for empty tables and tables that contain data with errors,
-# so computing column stats across all functional tables will not work. For more
-# information see: HIVE-4119 and HIVE-4122.
-COMPUTE_COLUMN_STATS_STATEMENT =\
-    'USE %(db_name)s; ANALYZE TABLE %(table_name)s COMPUTE STATISTICS FOR COLUMNS %(col)s'
-
-HIVE_ARGS = "-hiveconf hive.root.logger=ERROR,console"
-
-def compute_stats(hive_metastore_host, hive_metastore_port, db_names=None,
-                  table_names=None, continue_on_error=False, hive_cmd='hive'):
+def compute_stats(impala_client, db_names=None, table_names=None,
+    continue_on_error=False):
   """
-  Queries the Hive Metastore and runs compute stats over all tables
-
-  Optionally, a list of table names can be passed and compute stats will only
-  run matching table names
+  Runs COMPUTE STATS over the selected tables. The target tables can be filtered by
+  specifying a list of databases and/or table names. If no filters are specified this will
+  run COMPUTE STATS on all tables in all databases.
   """
-  # Create a Hive Metastore Client
-  # TODO: Consider creating a utility module for this because it is also duplicated in
-  # impala_test_suite.py.
-  hive_transport = TTransport.TBufferedTransport(
-      TSocket.TSocket(hive_metastore_host, int(hive_metastore_port)))
-  protocol = TBinaryProtocol.TBinaryProtocol(hive_transport)
-  hive_metastore_client = ThriftHiveMetastore.Client(protocol)
-  hive_client = ThriftHive.Client(protocol)
-  hive_transport.open()
-
   print "Enumerating databases and tables for compute stats."
 
-  all_dbs = set(name.lower() for name in hive_metastore_client.get_all_databases())
+  all_dbs = set(name.lower() for name in impala_client.execute("show databases").data)
   selected_dbs = all_dbs if db_names is None else set(db_names)
   if db_names is not None:
     print 'Skipping compute stats on databases:\n%s' % '\n'.join(all_dbs - selected_dbs)
 
   for db in all_dbs.intersection(selected_dbs):
-    all_tables = set(name.lower() for name in hive_metastore_client.get_all_tables(db))
+    all_tables =\
+        set([t.lower() for t in impala_client.execute("show tables in %s" % db).data])
     selected_tables = all_tables if table_names is None else set(table_names)
     if table_names:
       print 'Skipping compute stats on tables:\n%s' %\
           '\n'.join(['%s.%s' % (db, tbl)  for tbl in all_tables - selected_tables])
 
     for table in all_tables.intersection(selected_tables):
-      statement = __build_compute_stat_statement(hive_metastore_client, db, table)
+      statement = "compute stats %s.%s" % (db, table)
       print 'Executing: %s' % statement
-      # For some still unknown reason, computing table stats using the hive meta store
-      # client no longer works (it did work at one point in Hive v0.9). No errors are
-      # thrown, but tables are set to have 0 rows. It seems to work fine when run via
-      # the Hive CLI, so just use that for now.
-      exit_code =\
-          call([hive_cmd + " " + HIVE_ARGS + " -e \"" + statement + ";\""], shell=True)
-      if exit_code != 0 and not continue_on_error:
-        sys.exit(exit_code)
-  hive_transport.close()
-
-def __build_compute_stat_statement(metastore_client, db_name, table_name):
-  """Builds the HQL statements to compute table and column stats for the given table"""
-  partitions = metastore_client.get_partition_names(db_name, table_name, 1)
-  partition_str = str()
-  if len(partitions) > 0:
-    partition_names = [p.split('=')[0] for p in partitions[0].split('/')]
-    partition_str = 'PARTITION(%s)' % ', '.join(partition_names)
-  stmt = COMPUTE_STATS_STATEMENT %\
-      {'db_name': db_name, 'table_name': table_name, 'partitions': partition_str}
-  stmt += ';\n'
-  col_names = [f.name for f in metastore_client.get_fields(db_name, table_name)]
-  stmt += COMPUTE_COLUMN_STATS_STATEMENT %\
-      {'db_name': db_name, 'table_name': table_name, 'col': ', '.join(col_names)}
-  return stmt
+      try:
+        result = impala_client.execute(statement)
+        print "  -> %s\n" % '\n'.join(result.data)
+      except Exception, e:
+        print "  -> Error: %s\n" % str(e)
+        if not continue_on_error: raise e
 
 if __name__ == "__main__":
   parser = OptionParser()
   parser.add_option("--continue_on_error", dest="continue_on_error",
-                    action="store_true", default=False, help="If True, continue "\
-                    "if there is an error computing the table or column stats.")
-  parser.add_option("--hive_cmd", dest="hive_cmd", default='hive',
-                    help="The command to use for executing hive.")
-  parser.add_option("--hive_metastore", dest="hive_metastore", default='localhost:9083',
-                    help="<host:port> of hive metastore server to connect to")
+                    action="store_true", default=True, help="If True, continue "\
+                    "if there is an error executing the compute stats statement.")
+  parser.add_option("--impalad", dest="impalad", default="localhost:21000",
+                    help="Impala daemon <host:port> to connect to.")
+  parser.add_option("--use_kerberos", action="store_true", default=False,
+                    help="Compute stats on a kerberized cluster.")
   parser.add_option("--db_names", dest="db_names", default=None,
                     help="Comma-separated list of database names for which to compute "\
                     "stats. Can be used in conjunction with the --table_names flag. "\
@@ -111,6 +77,10 @@ if __name__ == "__main__":
   if options.db_names is not None:
     db_names = [name.lower().strip() for name in options.db_names.split(',')]
 
-  compute_stats(*options.hive_metastore.split(':'), db_names=db_names,
-      table_names=table_names, continue_on_error=options.continue_on_error,
-      hive_cmd=options.hive_cmd)
+  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
+  impala_client.connect()
+  try:
+    compute_stats(impala_client, db_names=db_names,
+        table_names=table_names, continue_on_error=options.continue_on_error)
+  finally:
+    impala_client.close_connection()

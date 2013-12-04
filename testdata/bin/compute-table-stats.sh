@@ -6,8 +6,6 @@ set -e
 set -u
 
 # Run compute stats over as many of the tables used in the Planner tests as possible.
-# Due to Hive bugs HIVE-4119 and HIVE-4122, these tables need to be chosen carefully or
-# Hive will either crash or fail with an error when executing the COMPUTE STATS query.
 python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=functional\
     --table_names="alltypes,alltypesagg,alltypesaggmultifilesnopart,alltypesaggnonulls,
     alltypessmall,alltypestiny,jointbl,dimtbl"

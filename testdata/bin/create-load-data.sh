@@ -48,8 +48,6 @@ if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
 else
   echo "Skipping load of auxilary workloads because directories do not exist"
 fi
-
-./start-impala-cluster.py --kill_only
 popd
 
 # Split HBase table
@@ -134,3 +132,5 @@ ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh
 
 # Copy the test UDF/UDA libraries into HDFS
 ${IMPALA_HOME}/testdata/bin/copy-udfs-udas.sh
+
+${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only

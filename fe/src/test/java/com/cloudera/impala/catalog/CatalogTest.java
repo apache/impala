@@ -373,8 +373,9 @@ public class CatalogTest {
 
     Column stringCol = table.getColumn("string_col");
     assertTrue(
-        stringCol.getStats().getAvgSerializedSize() > PrimitiveType.STRING.getSlotSize());
-    assertEquals(stringCol.getStats().getMaxSize(), 3);
+        stringCol.getStats().getAvgSerializedSize() <= PrimitiveType.STRING.getSlotSize());
+    assertTrue(stringCol.getStats().getAvgSerializedSize() > 0);
+    assertEquals(stringCol.getStats().getMaxSize(), -1);
     assertTrue(!stringCol.getStats().hasNulls());
   }
 
@@ -417,7 +418,7 @@ public class CatalogTest {
 
       // Now try to apply a matching column stats data and ensure it succeeds.
       assertTrue(table.getColumn("string_col").updateStats(stringColStatsData));
-      assertEquals(3, table.getColumn("string_col").getStats().getMaxSize());
+      assertEquals(1178, table.getColumn("string_col").getStats().getNumDistinctValues());
     } finally {
       // Make sure to invalidate the metadata so the next test isn't using bad col stats
       catalog.getDb("functional").invalidateTable("functional");
