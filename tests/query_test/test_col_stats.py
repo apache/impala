@@ -35,6 +35,7 @@ class TestColStats(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestColStats, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
