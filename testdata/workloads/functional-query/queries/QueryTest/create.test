@@ -152,7 +152,7 @@ STRING
 ---- QUERY
 # CREATE TABLE LIKE on partitioned table
 create table alltypes_test like functional_seq_snap.alltypes
-stored as parquetfile
+stored as parquet
 ---- RESULTS
 ====
 ---- QUERY
@@ -254,7 +254,7 @@ INT, STRING
 ====
 ---- QUERY
 # Ensure that a table can be created using CTAS
-create table ctas_join stored as parquetfile as
+create table ctas_join stored as parquet as
 select j.*, a.int_col, 1*2
 from functional.jointbl j join functional_seq_snap.alltypes a
   on (j.alltypes_id=a.id)
@@ -295,7 +295,7 @@ BIGINT, STRING, INT, INT, INT, BIGINT
 ====
 ---- QUERY
 # Since the table already exists, the second CTAS should be a no-op
-create table if not exists ctas_join stored as parquetfile as
+create table if not exists ctas_join stored as parquet as
 select j.*, a.int_col, 1*2
 from functional.jointbl j join functional_seq_snap.alltypes a
   on (j.alltypes_id=a.id) limit 1

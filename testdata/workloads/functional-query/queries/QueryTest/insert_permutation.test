@@ -11,7 +11,7 @@ use insert_permutation_test
 create table perm_nopart(int_col1 int, string_col string, int_col2 int);
 create table perm_part(int_col1 int, string_col string) partitioned by (p1 int, p2 string);
 create table parquet_part(int_col1 int, string_col string)
-partitioned by (p1 int, p2 string) stored as parquetfile;
+partitioned by (p1 int, p2 string) stored as parquet;
 ---- RESULTS
 ====
 ---- QUERY

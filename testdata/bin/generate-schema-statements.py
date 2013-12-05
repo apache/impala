@@ -110,11 +110,11 @@ FILE_FORMAT_MAP = {
   'text': 'TEXTFILE',
   'seq': 'SEQUENCEFILE',
   'rc': 'RCFILE',
-  'parquet': 'PARQUETFILE',
+  'parquet': 'PARQUET',
   'text_lzo':
     "\nINPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'" +
     "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'",
-  'avro': 'AVROFILE',
+  'avro': 'AVRO',
   'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'"
   }
 

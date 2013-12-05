@@ -259,7 +259,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("alter table functional.alltypes PARTITION (month=11, year=2010) " +
                "set fileformat parquetfile");
     AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
-               "(string_col='partition1') set fileformat parquetfile");
+               "(string_col='partition1') set fileformat parquet");
     AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
                "(string_col='PaRtiTion1') set location '/a/b/c'");
     // Arbitrary exprs as partition key values. Constant exprs are ok.
@@ -542,6 +542,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "as select * from functional.jointbl");
     AnalyzesOk("create table newtbl stored as parquetfile " +
         "as select * from functional.alltypes");
+    AnalyzesOk("create table newtbl stored as parquet " +
+        "as select * from functional.alltypes");
     AnalyzesOk("create table newtbl as select int_col from functional.alltypes");
 
     AnalyzesOk("create table functional.newtbl " +
@@ -567,10 +569,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Unsupported file formats
     AnalysisError("create table foo stored as sequencefile as select 1",
         "CREATE TABLE AS SELECT does not support (SEQUENCEFILE) file format. " +
-         "Supported formats are: (PARQUETFILE, TEXTFILE)");
+         "Supported formats are: (PARQUET, TEXTFILE)");
     AnalysisError("create table foo stored as RCFILE as select 1",
         "CREATE TABLE AS SELECT does not support (RCFILE) file format. " +
-         "Supported formats are: (PARQUETFILE, TEXTFILE)");
+         "Supported formats are: (PARQUET, TEXTFILE)");
   }
 
   @Test
@@ -621,16 +623,16 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Analysis of Avro schemas
     AnalyzesOk("create table foo (i int) with serdeproperties ('avro.schema.url'=" +
-        "'hdfs://schema.avsc') stored as avrofile");
-    AnalyzesOk("create table foo (i int) stored as avrofile tblproperties " +
+        "'hdfs://schema.avsc') stored as avro");
+    AnalyzesOk("create table foo (i int) stored as avro tblproperties " +
         "('avro.schema.url'='hdfs://schema.avsc')");
-    AnalyzesOk("create table foo (i int) stored as avrofile tblproperties " +
+    AnalyzesOk("create table foo (i int) stored as avro tblproperties " +
         "('avro.schema.literal'='{\"name\": \"my_record\"}')");
-    AnalysisError("create table foo (i int) stored as avrofile",
+    AnalysisError("create table foo (i int) stored as avro",
         "No Avro schema provided for table: default.foo");
-    AnalysisError("create table foo (i int) stored as avrofile tblproperties ('a'='b')",
+    AnalysisError("create table foo (i int) stored as avro tblproperties ('a'='b')",
         "No Avro schema provided for table: default.foo");
-    AnalysisError("create table foo (i int) stored as avrofile tblproperties " +
+    AnalysisError("create table foo (i int) stored as avro tblproperties " +
         "('avro.schema.url'='schema.avsc')", "avro.schema.url must be of form " +
         "\"http://path/to/schema/file\" or \"hdfs://namenode:port/path/to/schema/file" +
         "\", got schema.avsc");

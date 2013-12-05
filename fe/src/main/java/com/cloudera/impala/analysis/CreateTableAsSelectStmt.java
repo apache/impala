@@ -82,7 +82,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
       throw new AnalysisException(String.format("CREATE TABLE AS SELECT " +
           "does not support (%s) file format. Supported formats are: (%s)",
           createStmt_.getFileFormat().toString().replace("_", ""),
-          "PARQUETFILE, TEXTFILE"));
+          "PARQUET, TEXTFILE"));
     }
 
     // The full privilege check for the database will be done as part of the INSERT

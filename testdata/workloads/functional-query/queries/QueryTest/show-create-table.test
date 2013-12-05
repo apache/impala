@@ -137,20 +137,20 @@ STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
 ====
 ---- CREATE_TABLE
-# testing with parquetfile specified
+# testing with parquet specified
 CREATE TABLE test6 (
   year INT,
   month INT,
   id INT COMMENT 'Add a comment'
 )
-STORED AS PARQUETFILE
+STORED AS PARQUET
 ---- RESULTS
 CREATE TABLE show_create_table_test_db.test6 (
   year INT,
   month INT,
   id INT COMMENT 'Add a comment'
 )
-STORED AS PARQUETFILE
+STORED AS PARQUET
 LOCATION '$$location_uri$$'
 ====
 ---- CREATE_TABLE

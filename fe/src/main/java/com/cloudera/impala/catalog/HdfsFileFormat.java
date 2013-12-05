@@ -136,8 +136,8 @@ public enum HdfsFileFormat {
       case RC_FILE: return "RCFILE";
       case TEXT: return "TEXTFILE";
       case SEQUENCE_FILE: return "SEQUENCEFILE";
-      case AVRO: return "AVROFILE";
-      case PARQUET: return "PARQUETFILE";
+      case AVRO: return "AVRO";
+      case PARQUET: return "PARQUET";
       case LZO_TEXT:
         // It is not currently possible to create a table with LZO compressed text files
         // in Impala, but this is valid in Hive.

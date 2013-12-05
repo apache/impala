@@ -1507,7 +1507,7 @@ public class ParserTest {
   public void TestAlterTableSet() {
     // Supported file formats
     String [] supportedFileFormats =
-        {"TEXTFILE", "SEQUENCEFILE", "PARQUETFILE", "RCFILE", "AVROFILE"};
+        {"TEXTFILE", "SEQUENCEFILE", "PARQUET", "PARQUETFILE", "RCFILE", "AVRO"};
     for (String format: supportedFileFormats) {
       ParsesOk("ALTER TABLE Foo SET FILEFORMAT " + format);
       ParsesOk("ALTER TABLE TestDb.Foo SET FILEFORMAT " + format);
@@ -1530,7 +1530,7 @@ public class ParserTest {
     ParserError("ALTER TABLE Foo PARTITION ('str') SET FILEFORMAT TEXTFILE");
     ParserError("ALTER TABLE Foo PARTITION (a=1, 5) SET FILEFORMAT TEXTFILE");
     ParserError("ALTER TABLE Foo PARTITION () SET FILEFORMAT PARQUETFILE");
-    ParserError("ALTER TABLE Foo PARTITION (,) SET FILEFORMAT PARQUETFILE");
+    ParserError("ALTER TABLE Foo PARTITION (,) SET FILEFORMAT PARQUET");
     ParserError("ALTER TABLE Foo PARTITION (a=1) SET FILEFORMAT");
     ParserError("ALTER TABLE Foo PARTITION (a=1) SET LOCATION");
     ParserError("ALTER TABLE TestDb.Foo SET LOCATION abc");
@@ -1614,7 +1614,7 @@ public class ParserTest {
 
     // Supported file formats
     String [] supportedFileFormats =
-        {"TEXTFILE", "SEQUENCEFILE", "PARQUETFILE", "RCFILE", "AVROFILE"};
+        {"TEXTFILE", "SEQUENCEFILE", "PARQUET", "PARQUETFILE", "RCFILE", "AVRO"};
     for (String format: supportedFileFormats) {
       ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS " + format);
       ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) STORED AS " + format);
@@ -1798,7 +1798,7 @@ public class ParserTest {
     ParsesOk("CREATE TABLE Foo.Bar AS SELECT int_col, bool_col from tbl limit 10");
     ParsesOk("CREATE TABLE Foo.Bar LOCATION '/a/b' AS SELECT * from foo");
     ParsesOk("CREATE TABLE IF NOT EXISTS Foo.Bar LOCATION '/a/b' AS SELECT * from foo");
-    ParsesOk("CREATE TABLE Foo STORED AS PARQUETFILE AS SELECT 1");
+    ParsesOk("CREATE TABLE Foo STORED AS PARQUET AS SELECT 1");
     ParsesOk("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS SELECT 1");
     ParsesOk("CREATE TABLE Foo TBLPROPERTIES ('a'='b', 'c'='d') AS SELECT * from bar");
 
@@ -1806,9 +1806,9 @@ public class ParserTest {
     ParsesOk("CREATE TABLE Foo AS with t1 as (select 1) select * from t1");
 
     // Incomplete AS SELECT statement
-    ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS SELECT");
-    ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS WITH");
-    ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS");
+    ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUET AS SELECT");
+    ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUET AS WITH");
+    ParserError("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUET AS");
 
     // INSERT statements are not allowed
     ParserError("CREATE TABLE Foo AS INSERT INTO Foo SELECT 1");

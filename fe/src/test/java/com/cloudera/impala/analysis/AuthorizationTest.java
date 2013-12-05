@@ -541,7 +541,7 @@ public class AuthorizationTest {
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes CHANGE int_col c1 int");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes DROP int_col");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes RENAME TO functional_seq_snap.t1");
-    AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET FILEFORMAT PARQUETFILE");
+    AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET FILEFORMAT PARQUET");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'/test-warehouse/new_table'");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET TBLPROPERTIES " +
@@ -571,7 +571,7 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to access: " +
         "hdfs://localhost:20510/test-warehouse/new_table");
 
-    AuthzError("ALTER TABLE functional.alltypes SET FILEFORMAT PARQUETFILE",
+    AuthzError("ALTER TABLE functional.alltypes SET FILEFORMAT PARQUET",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
     AuthzError("ALTER TABLE functional.alltypes ADD COLUMNS (c1 int)",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
@@ -587,7 +587,7 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
 
     // Trying to ALTER TABLE a view does not reveal any privileged information.
-    AuthzError("ALTER TABLE functional.view_view SET FILEFORMAT PARQUETFILE",
+    AuthzError("ALTER TABLE functional.view_view SET FILEFORMAT PARQUET",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.view_view");
     AuthzError("ALTER TABLE functional.view_view ADD COLUMNS (c1 int)",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.view_view");
