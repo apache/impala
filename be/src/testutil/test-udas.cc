@@ -47,10 +47,10 @@ StringVal AggFinalize(FunctionContext*, const StringVal& v) { return v;}
 
 
 // Defines Agg(int) returns BIGINT intermediate CHAR(10)
-void Agg(FunctionContext*, const IntVal&, BufferVal) {}
-void AggUpdate(FunctionContext*, const IntVal&, BufferVal) {}
-void AggInit(FunctionContext*, BufferVal) {}
-void AggMerge(FunctionContext*, const BufferVal&, BufferVal) {}
+void Agg(FunctionContext*, const IntVal&, BufferVal*) {}
+void AggUpdate(FunctionContext*, const IntVal&, BufferVal*) {}
+void AggInit(FunctionContext*, BufferVal*) {}
+void AggMerge(FunctionContext*, const BufferVal&, BufferVal*) {}
 BigIntVal AggFinalize(FunctionContext*, const BufferVal&) {
   return BigIntVal::null();
 }

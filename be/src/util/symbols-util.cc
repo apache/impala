@@ -97,7 +97,7 @@ static void AppendSeqId(int seq_id, stringstream* out) {
 
 static void AppendAnyValType(int namespace_id, const ColumnType& type, stringstream* s) {
   if (type.type == TYPE_CHAR) {
-    (*s) << "h";  // TYPE_CHAR just maps to uint8_t* and is a builtin type.
+    (*s) << "Ph"; // TYPE_CHAR just maps to uint8_t* and is a builtin type.
     return;
   }
   (*s) << "N";
@@ -212,9 +212,7 @@ string SymbolsUtil::MangleUserFunction(const string& fn_name,
     if (argument_map.find(ret_arg_type->type) != argument_map.end()) {
       repeated_symbol_idx = argument_map[ret_arg_type->type];
     }
-    if (repeated_symbol_idx == -1 || ret_arg_type->type != TYPE_CHAR) {
-      ss << "P";
-    }
+    ss << "P"; // Return argument is a pointer
 
     if (repeated_symbol_idx != -1) {
       // This is always last and a pointer type.
