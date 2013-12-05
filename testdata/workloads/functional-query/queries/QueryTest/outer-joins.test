@@ -420,11 +420,11 @@ bigint
 ====
 ---- QUERY
 # test nested joins
-select a.id, b.id, c.id, a.day, b.day, c.month, a.month, b.month 
-from alltypesagg a join alltypesagg b on 
-(a.id = b.id and a.month = b.day and b.month = 1 and b.month = b.day and a.day = b.day) 
-left outer join alltypessmall c on 
-(c.id = a.id and a.month = c.id and a.month=c.month) 
+select a.id, b.id, c.id, a.day, b.day, c.month, a.month, b.month
+from alltypesagg a join alltypesagg b on
+(a.id = b.id and a.month = b.day and b.month = 1 and b.month = b.day and a.day = b.day)
+left outer join alltypessmall c on
+(c.id = a.id and a.month = c.id and a.month=c.month)
 where a.id < 10
 ---- TYPES
 int, int, int, int, int, int, int, int
@@ -510,7 +510,7 @@ select z.xa, z.xid, z.ya, z.yid, k.a, k.id from
  full outer join
  (select 20 as a, id from alltypestiny where id = 1) y on x.id = (y.id + 2)
 ) z
-full outer join 
+full outer join
 (select 30 as a, id from alltypestiny where id = 1) k on z.xid = (k.id + 3)
 order by z.xid, z.yid, k.id limit 100
 ---- TYPES
@@ -546,7 +546,7 @@ bigint
 ---- QUERY
 # test multiple outer joins with an inline view to check that nullable tuples
 # are properly sent over the network
-select z.xid, z.yid, k.id from 
+select z.xid, z.yid, k.id from
 (select x.id as xid, y.id as yid from
  (select id from alltypestiny where id = 1) x
  full outer join
@@ -583,4 +583,17 @@ where a.int_col is null or b.int_col is null
 bigint
 ---- RESULTS
 20
+====
+---- QUERY
+# Regression test for IMPALA-676, which exposed a bug in our codegen subexpresssion
+# elimination logic.
+select count(*) from alltypesagg a
+left outer join alltypesagg b
+on (a.id = b.id
+  and (a.int_col = b.int_col + 10000 or (a.int_col is null and b.int_col is null)))
+where b.id is not null
+---- TYPES
+bigint
+---- RESULTS
+10
 ====
