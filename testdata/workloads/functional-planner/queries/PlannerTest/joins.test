@@ -689,7 +689,7 @@ PLAN FRAGMENT 1
   |  limit: 10
   |
   6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
+  |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    a.id = d.id
   |
@@ -709,7 +709,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 14
-    UNPARTITIONED
+    HASH_PARTITIONED: d.id
 
   3:SCAN HDFS
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
@@ -1034,4 +1034,279 @@ PLAN FRAGMENT 2
 
   1:SCAN HDFS
      table=functional.testtbl #partitions=0/1 size=0B
+====
+# Tests that the partitioned join between b and c exploits the existing
+# data partition of its lhs input.
+select * from functional.alltypes a
+inner join [shuffle] functional.alltypes b
+on (a.id = b.id and b.int_col = a.int_col)
+inner join [shuffle] functional.alltypes c
+on (b.id = c.id and c.int_col = b.int_col)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    b.id = c.id
+  |    b.int_col = c.int_col
+  |
+  |----2:SCAN HDFS
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    a.id = b.id
+  |    a.int_col = b.int_col
+  |
+  |----1:SCAN HDFS
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  8:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: a.id, a.int_col
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  4:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    b.id = c.id
+  |    b.int_col = c.int_col
+  |
+  |----7:EXCHANGE
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    a.id = b.id
+  |    a.int_col = b.int_col
+  |
+  |----6:EXCHANGE
+  |
+  5:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: c.id, c.int_col
+
+  2:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: b.id, b.int_col
+
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: a.id, a.int_col
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+====
+# Tests that the partitioned join between a and b exploits the existing
+# data partition of its rhs input.
+select * from functional.alltypes a
+inner join [shuffle]
+  (select count(*), int_col, bool_col
+   from functional.alltypes group by int_col, bool_col) b
+on (a.int_col = b.int_col and b.bool_col = a.bool_col)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  3:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    a.int_col = int_col
+  |    a.bool_col = bool_col
+  |
+  |----2:AGGREGATE (finalize)
+  |    |  output: COUNT(*)
+  |    |  group by: int_col, bool_col
+  |    |
+  |    1:SCAN HDFS
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB
+  |
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  7:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: int_col, bool_col
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  3:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    a.int_col = int_col
+  |    a.bool_col = bool_col
+  |
+  |----5:AGGREGATE (merge finalize)
+  |    |  output: SUM(COUNT(*))
+  |    |  group by: int_col, bool_col
+  |    |
+  |    4:EXCHANGE
+  |
+  6:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    HASH_PARTITIONED: int_col, bool_col
+
+  2:AGGREGATE
+  |  output: COUNT(*)
+  |  group by: int_col, bool_col
+  |
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: a.int_col, a.bool_col
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+====
+# Tests that the partitioned join between b and c exploits the existing
+# data partition of its lhs and rhs inputs.
+select * from functional.alltypes a
+inner join [shuffle] functional.alltypes b
+on(a.int_col = b.int_col and b.bool_col = a.bool_col)
+inner join [shuffle]
+  (select count(*), int_col, bool_col
+   from functional.alltypes group by int_col, bool_col) c
+on (b.int_col = c.int_col and c.bool_col = b.bool_col)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  5:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    a.int_col = b.int_col
+  |    a.bool_col = b.bool_col
+  |
+  |----1:SCAN HDFS
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |
+  4:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    a.int_col = int_col
+  |    a.bool_col = bool_col
+  |
+  |----3:AGGREGATE (finalize)
+  |    |  output: COUNT(*)
+  |    |  group by: int_col, bool_col
+  |    |
+  |    2:SCAN HDFS
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB
+  |
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  10:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: HASH_PARTITIONED: int_col, bool_col
+
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  5:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    a.int_col = b.int_col
+  |    a.bool_col = b.bool_col
+  |
+  |----9:EXCHANGE
+  |
+  4:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    a.int_col = int_col
+  |    a.bool_col = bool_col
+  |
+  |----7:AGGREGATE (merge finalize)
+  |    |  output: SUM(COUNT(*))
+  |    |  group by: int_col, bool_col
+  |    |
+  |    6:EXCHANGE
+  |
+  8:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    HASH_PARTITIONED: b.int_col, b.bool_col
+
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    HASH_PARTITIONED: int_col, bool_col
+
+  3:AGGREGATE
+  |  output: COUNT(*)
+  |  group by: int_col, bool_col
+  |
+  2:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    HASH_PARTITIONED: a.int_col, a.bool_col
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
 ====

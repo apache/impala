@@ -338,7 +338,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
+  |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
   |
@@ -358,7 +358,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 7
-    UNPARTITIONED
+    HASH_PARTITIONED: int_col
 
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
@@ -423,7 +423,7 @@ PLAN FRAGMENT 1
     UNPARTITIONED
 
   4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
+  |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    int_col = int_col
   |
@@ -443,7 +443,7 @@ PLAN FRAGMENT 2
 
   STREAM DATA SINK
     EXCHANGE ID: 7
-    UNPARTITIONED
+    HASH_PARTITIONED: int_col
 
   2:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
@@ -498,13 +498,13 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  9:EXCHANGE
+  8:EXCHANGE
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: int_col
 
   STREAM DATA SINK
-    EXCHANGE ID: 9
+    EXCHANGE ID: 8
     UNPARTITIONED
 
   4:HASH JOIN
@@ -512,27 +512,8 @@ PLAN FRAGMENT 1
   |  hash predicates:
   |    int_col = int_col
   |
-  |----8:EXCHANGE
+  |----7:EXCHANGE
   |
-  7:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: int_col
-
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 3
-  PARTITION: HASH_PARTITIONED: int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: int_col
-
   3:HASH JOIN
   |  join op: LEFT OUTER JOIN (PARTITIONED)
   |  hash predicates:
@@ -542,7 +523,17 @@ PLAN FRAGMENT 3
   |
   5:EXCHANGE
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    HASH_PARTITIONED: int_col
+
+  2:SCAN HDFS
+     table=functional.alltypestiny #partitions=4/4 size=460B
+
+PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -552,7 +543,7 @@ PLAN FRAGMENT 4
   1:SCAN HDFS
      table=functional.alltypestiny #partitions=4/4 size=460B
 
-PLAN FRAGMENT 5
+PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK

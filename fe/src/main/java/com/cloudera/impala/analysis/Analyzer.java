@@ -18,7 +18,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -1077,6 +1076,50 @@ public class Analyzer {
 
   public EquivalenceClassId getEquivClassId(SlotId slotId) {
     return globalState.equivClassBySlotId.get(slotId);
+  }
+
+  /**
+   * Returns true if l1 and l2 only contain SlotRefs, and for all SlotRefs in l1 there
+   * is an equivalent SlotRef in l2, and vice versa.
+   * Returns false otherwise or if l1 or l2 is empty.
+   */
+  public boolean isEquivSlots(List<Expr> l1, List<Expr> l2) {
+    if (l1.isEmpty() || l2.isEmpty()) return false;
+    for (Expr e1: l1) {
+      boolean matched = false;
+      for (Expr e2: l2) {
+        if (isEquivSlots(e1, e2)) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) return false;
+    }
+    for (Expr e2: l2) {
+      boolean matched = false;
+      for (Expr e1: l1) {
+        if (isEquivSlots(e2, e1)) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Returns true if e1 and e2 are equivalent SlotRefs.
+   */
+  public boolean isEquivSlots(Expr e1, Expr e2) {
+    SlotRef aSlot = e1.unwrapSlotRef(true);
+    SlotRef bSlot = e2.unwrapSlotRef(true);
+    if (aSlot == null || bSlot == null) return false;
+    Preconditions.checkNotNull(globalState.equivClassBySlotId.get(aSlot.getSlotId()));
+    Preconditions.checkNotNull(globalState.equivClassBySlotId.get(bSlot.getSlotId()));
+    // Check whether aSlot and bSlot are in the same equivalence class.
+    return globalState.equivClassBySlotId.get(aSlot.getSlotId()).equals(
+        globalState.equivClassBySlotId.get(bSlot.getSlotId()));
   }
 
   /**

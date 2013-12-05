@@ -3225,34 +3225,34 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  23:TOP-N
+  22:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
   |
-  22:EXCHANGE
+  21:EXCHANGE
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: s_name
 
   STREAM DATA SINK
-    EXCHANGE ID: 22
+    EXCHANGE ID: 21
     UNPARTITIONED
 
   12:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
   |
-  21:AGGREGATE (merge finalize)
+  20:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: s_name
   |
-  20:EXCHANGE
+  19:EXCHANGE
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l1.l_orderkey
 
   STREAM DATA SINK
-    EXCHANGE ID: 20
+    EXCHANGE ID: 19
     HASH_PARTITIONED: s_name
 
   11:AGGREGATE
@@ -3266,28 +3266,8 @@ PLAN FRAGMENT 2
   |  other join predicates: l3.l_suppkey != l1.l_suppkey
   |  other predicates: l3.l_orderkey IS NULL
   |
-  |----19:EXCHANGE
+  |----18:EXCHANGE
   |
-  18:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 19
-    HASH_PARTITIONED: l3.l_orderkey
-
-  5:SCAN HDFS
-     table=tpch.lineitem #partitions=1/1 size=718.94MB
-     predicates: l3.l_receiptdate > l3.l_commitdate
-
-PLAN FRAGMENT 4
-  PARTITION: HASH_PARTITIONED: l1.l_orderkey
-
-  STREAM DATA SINK
-    EXCHANGE ID: 18
-    HASH_PARTITIONED: l1.l_orderkey
-
   9:HASH JOIN
   |  join op: LEFT SEMI JOIN (PARTITIONED)
   |  hash predicates:
@@ -3298,7 +3278,18 @@ PLAN FRAGMENT 4
   |
   16:EXCHANGE
 
-PLAN FRAGMENT 5
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 18
+    HASH_PARTITIONED: l3.l_orderkey
+
+  5:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+     predicates: l3.l_receiptdate > l3.l_commitdate
+
+PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3308,7 +3299,7 @@ PLAN FRAGMENT 5
   4:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
 
-PLAN FRAGMENT 6
+PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3339,7 +3330,7 @@ PLAN FRAGMENT 6
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
 
-PLAN FRAGMENT 7
+PLAN FRAGMENT 6
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3350,7 +3341,7 @@ PLAN FRAGMENT 7
      table=tpch.nation #partitions=1/1 size=2.15KB
      predicates: n_name = 'SAUDI ARABIA'
 
-PLAN FRAGMENT 8
+PLAN FRAGMENT 7
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3360,7 +3351,7 @@ PLAN FRAGMENT 8
   1:SCAN HDFS
      table=tpch.supplier #partitions=1/1 size=1.33MB
 
-PLAN FRAGMENT 9
+PLAN FRAGMENT 8
   PARTITION: RANDOM
 
   STREAM DATA SINK
