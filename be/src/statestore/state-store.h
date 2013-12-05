@@ -142,7 +142,7 @@ class StateStore {
     // The Version value used to initialize a new TopicEntry.
     static const Version TOPIC_ENTRY_INITIAL_VERSION = 1L;
 
-    // Representation of an empty Value
+    // Representation of an empty Value. Must have size() == 0.
     static const Value NULL_VALUE;
 
     // Sets the value of this entry to the byte / length
@@ -186,9 +186,11 @@ class StateStore {
   // delta of changes on every update.
   class Topic {
    public:
-    Topic(const TopicId& topic_id)
-        : topic_id_(topic_id),
-          last_version_(0L) { }
+    Topic(const TopicId& topic_id, Metrics::IntMetric* key_size_metric,
+        Metrics::IntMetric* value_size_metric, Metrics::IntMetric* topic_size_metric)
+        : topic_id_(topic_id), last_version_(0L), total_key_size_bytes_(0L),
+          total_value_size_bytes_(0L), key_size_metric_(key_size_metric),
+          value_size_metric_(value_size_metric), topic_size_metric_(topic_size_metric) { }
 
     // Adds an entry with the given key. If bytes == NULL_VALUE, the entry
     // is considered deleted, and may be garbage collected in the
@@ -214,6 +216,8 @@ class StateStore {
     const TopicEntryMap& entries() const { return entries_; }
     TopicEntry::Version last_version() const { return last_version_; }
     const TopicUpdateLog& topic_update_log() const { return topic_update_log_; }
+    int64_t total_key_size_bytes() const { return total_key_size_bytes_; }
+    int64_t total_value_size_bytes() const { return total_value_size_bytes_; }
 
    private:
     // Map from topic entry key to topic entry.
@@ -234,6 +238,18 @@ class StateStore {
     // TopicEntry in the entries_ map. Based on performance needs, we may need to
     // revisit this to find a way to do the look up using a single read.
     TopicUpdateLog topic_update_log_;
+
+    // Total memory occupied by the key strings, in bytes
+    int64_t total_key_size_bytes_;
+
+    // Total memory occupied by the value byte strings, in bytes.
+    int64_t total_value_size_bytes_;
+
+    // Metrics shared across all topics to sum the size in bytes of keys, values and
+    // both
+    Metrics::IntMetric* key_size_metric_;
+    Metrics::IntMetric* value_size_metric_;
+    Metrics::IntMetric* topic_size_metric_;
   };
 
   // Note on locking: Subscribers and Topics should be accessed under their own coarse
@@ -393,6 +409,12 @@ class StateStore {
   // Metric that track the registered, non-failed subscribers.
   Metrics::IntMetric* num_subscribers_metric_;
   SetMetric<std::string>* subscriber_set_metric_;
+
+  // Metrics shared across all topics to sum the size in bytes of keys, values and
+  // both
+  Metrics::IntMetric* key_size_metric_;
+  Metrics::IntMetric* value_size_metric_;
+  Metrics::IntMetric* topic_size_metric_;
 
   // Called by the subscriber heartbeat threadpool to process a single subscriber. Sends a
   // heartbeat to one subscriber (by calling ProcessOneSubscriber) and updates the failure

@@ -49,6 +49,9 @@ DECLARE_int32(statestore_subscriber_timeout_seconds);
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
 const string STATESTORE_LIVE_SUBSCRIBERS = "statestore.live-backends";
 const string STATESTORE_LIVE_SUBSCRIBERS_LIST = "statestore.live-backends.list";
+const string STATESTORE_TOTAL_KEY_SIZE_BYTES = "statestore.total-key-size-bytes";
+const string STATESTORE_TOTAL_VALUE_SIZE_BYTES = "statestore.total-value-size-bytes";
+const string STATESTORE_TOTAL_TOPIC_SIZE_BYTES = "statestore.total-topic-size-bytes";
 
 const StateStore::TopicEntry::Value StateStore::TopicEntry::NULL_VALUE = "";
 
@@ -97,16 +100,31 @@ void StateStore::TopicEntry::SetValue(const StateStore::TopicEntry::Value& bytes
 StateStore::TopicEntry::Version StateStore::Topic::Put(const string& key,
     const StateStore::TopicEntry::Value& bytes) {
   TopicEntryMap::iterator entry_it = entries_.find(key);
+  int64_t key_size_delta = 0L;
+  int64_t value_size_delta = 0L;
   if (entry_it == entries_.end()) {
     entry_it = entries_.insert(make_pair(key, TopicEntry())).first;
+    key_size_delta += key.size();
   } else {
     // Delete the old item from the version history. There is no need to search the
     // version_history because there should only be at most a single item in the history
     // at any given time
     topic_update_log_.erase(entry_it->second.version());
+    value_size_delta -= entry_it->second.value().size();
   }
+  value_size_delta += bytes.size();
+
   entry_it->second.SetValue(bytes, ++last_version_);
   topic_update_log_.insert(make_pair(entry_it->second.version(), key));
+
+  total_key_size_bytes_ += key_size_delta;
+  total_value_size_bytes_ += value_size_delta;
+  DCHECK_GE(total_key_size_bytes_, 0L);
+  DCHECK_GE(total_value_size_bytes_, 0L);
+  key_size_metric_->Increment(key_size_delta);
+  value_size_metric_->Increment(value_size_delta);
+  topic_size_metric_->Increment(key_size_delta + value_size_delta);
+
   return entry_it->second.version();
 }
 
@@ -118,6 +136,11 @@ void StateStore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
     // the old entry
     topic_update_log_.erase(version);
     topic_update_log_.insert(make_pair(++last_version_, key));
+    total_value_size_bytes_ -= entry_it->second.value().size();
+    DCHECK_GE(total_value_size_bytes_, 0L);
+
+    value_size_metric_->Increment(entry_it->second.value().size());
+    topic_size_metric_->Increment(entry_it->second.value().size());
     entry_it->second.SetValue(StateStore::TopicEntry::NULL_VALUE, last_version_);
   }
 }
@@ -177,6 +200,12 @@ StateStore::StateStore(Metrics* metrics)
   subscriber_set_metric_ =
       metrics->RegisterMetric(new SetMetric<string>(STATESTORE_LIVE_SUBSCRIBERS_LIST,
                                                     set<string>()));
+  key_size_metric_ =
+      metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_TOTAL_KEY_SIZE_BYTES, 0L);
+  value_size_metric_ =
+      metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_TOTAL_VALUE_SIZE_BYTES, 0L);
+  topic_size_metric_ =
+      metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0L);
   client_cache_->InitMetrics(metrics, "subscriber");
 }
 
@@ -198,19 +227,26 @@ void StateStore::TopicsHandler(const Webserver::ArgumentMap& args,
             << "<th>Number of entries</th>"
             << "<th>Version</th>"
             << "<th>Oldest subscriber version</th>"
-            << "<th>Oldest subscriber Id</th></tr>";
+            << "<th>Oldest subscriber Id</th>"
+            << "<th>Size (keys/values/total)</th>"
+            << "</tr>";
 
   lock_guard<mutex> l(topic_lock_);
   BOOST_FOREACH(const TopicMap::value_type& topic, topics_) {
     SubscriberId oldest_subscriber_id;
     TopicEntry::Version oldest_subscriber_version =
         GetMinSubscriberTopicVersion(topic.first, &oldest_subscriber_id);
-
+    int64_t key_size = topic.second.total_key_size_bytes();
+    int64_t value_size = topic.second.total_value_size_bytes();
     (*output) << "<tr><td>" << topic.second.id() << "</td><td>"
               << topic.second.entries().size() << "</td><td>"
               << topic.second.last_version() << "</td><td>"
               << oldest_subscriber_version  << "</td><td>"
-              << oldest_subscriber_id << "</td></tr>";
+              << oldest_subscriber_id << "</td><td>"
+              << PrettyPrinter::Print(key_size, TCounterType::BYTES) << " / "
+              << PrettyPrinter::Print(value_size, TCounterType::BYTES) << " / "
+              << PrettyPrinter::Print(key_size + value_size, TCounterType::BYTES)
+              << "</td></tr>";
   }
   (*output) << "</table>";
 }
@@ -249,7 +285,8 @@ Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
       if (topic_it == topics_.end()) {
         LOG(INFO) << "Creating new topic: ''" << topic.topic_name
                   << "' on behalf of subscriber: '" << subscriber_id;
-        topics_.insert(make_pair(topic.topic_name, Topic(topic.topic_name)));
+        topics_.insert(make_pair(topic.topic_name, Topic(topic.topic_name,
+            key_size_metric_, value_size_metric_, topic_size_metric_)));
       }
     }
   }
