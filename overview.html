@@ -1,0 +1,167 @@
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Cloudera Impala</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <!-- Le styles -->
+    <link href="css/bootstrap.css" rel="stylesheet">
+       <style type="text/css">
+      body {
+        padding-top: 20px;
+        padding-bottom: 40px;
+      }
+
+      /* Custom container */
+      .container-narrow {
+        margin: 0 auto;
+        max-width: 700px;
+      }
+      .container-narrow > hr {
+        margin: 30px 0;
+      }
+
+      /* Main marketing message and sign up button */
+      .jumbotron {
+        margin: 60px 0;
+        text-align: center;
+      }
+      .jumbotron h1 {
+        font-size: 72px;
+        line-height: 1;
+      }
+      .jumbotron .btn {
+        font-size: 21px;
+        padding: 14px 24px;
+      }
+
+      /* Supporting marketing content */
+      .marketing {
+        margin: 60px 0;
+      }
+      .marketing p + h4 {
+        margin-top: 28px;
+      }
+	   /* Customize the navbar links to be fill the entire space of the .navbar */
+      .navbar .navbar-inner {
+        padding: 0;
+      }
+      .navbar .nav {
+        margin: 0;
+        display: table;
+        width: 100%;
+      }
+      .navbar .nav li {
+        display: table-cell;
+        width: 1%;
+        float: none;
+      }
+      .navbar .nav li a {
+        font-weight: bold;
+        text-align: center;
+        border-left: 1px solid rgba(255,255,255,.75);
+        border-right: 1px solid rgba(0,0,0,.1);
+      }
+      .navbar .nav li:first-child a {
+        border-left: 0;
+        border-radius: 3px 0 0 3px;
+      }
+      .navbar .nav li:last-child a {
+        border-right: 0;
+        border-radius: 0 3px 3px 0;
+      }
+    </style>
+    <link href="css/bootstrap-responsive.css" rel="stylesheet">
+
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="js/html5shiv.js"></script>
+    <![endif]-->
+
+   
+  </head>
+
+  <body>
+
+    <div class="container">
+     
+      <div class="masthead">
+       <h3 class="muted">Cloudera Impala</h3>
+        <div class="navbar">
+          <div class="navbar-inner">
+           <div class="container">
+              <ul class="nav">
+          <li><a href="index.html">Home</a></li>
+          <li class="active"><a href="overview.html">Overview</a></li>
+          <li><a href="http://www.cloudera.com/content/support/en/documentation/cloudera-impala/cloudera-impala-documentation-v1-latest.html">Docs</a></li>
+          <li><a href="http://www.cloudera.com/content/support/en/downloads.html">Downloads</a></li>
+          <li><a href="https://github.com/cloudera/impala">GitHub</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="http://www.cloudera.com/content/cloudera/en/resources/library/aboutcloudera/cloudera-impala-ebook.html">E-book</a></li>
+        </ul>
+      </div>
+      </div>
+      
+        
+        
+  <div class="row-fluid">
+        <div class="span12">
+  <h2>Impala Overview</h2>
+          <p>Impala raises the bar for SQL query performance on Apache Hadoop while retaining a familiar user experience. With Impala, you can query data, whether stored in HDFS or Apache HBase – including SELECT, JOIN, and aggregate functions – in real time. Furthermore, Impala uses the same metadata, SQL syntax (Hive SQL), ODBC driver, and user interface (Hue Beeswax) as Apache Hive, providing a familiar and unified platform for batch-oriented or real-time queries. (For that reason, Hive users can utilize Impala with little setup overhead.) </p>
+      
+
+  <h3>Architecture</h3>
+          <p>To avoid latency, Impala circumvents MapReduce to directly access the data through a specialized distributed query engine that is very similar to those found in commercial parallel RDBMSs. The result is order-of-magnitude faster performance than Hive, depending on the type of query and configuration. (See <a href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Impala/latest/Cloudera-Impala-Frequently-Asked-Questions/Cloudera-Impala-Frequently-Asked-Questions.html">FAQ</a> for more details.)</p>
+          <p align="center"><img src="img/impala.png"></p>
+
+  <p>There are many advantages to this approach over alternative approaches for querying Hadoop data, including::
+<ul>
+<li>Thanks to local processing on data nodes, network bottlenecks are avoided.</li>
+<li>A single, open, and unified metadata store can be utilized.
+  </li>
+<li>Costly data format conversion is unnecessary and thus no overhead is incurred.</li>
+<li> All data is immediately query-able, with no delays for ETL.
+  </li>
+<li>All hardware is utilized for Impala queries as well as for MapReduce.
+  </li>
+<li>Only a single machine pool is needed to scale.
+  </li>
+  </ul>
+We encourage you to read the <a href="http://www.cloudera.com/content/support/en/documentation/cloudera-impala/cloudera-impala-documentation-v1-latest.html">documentation</a> for further exploration!
+</p>
+
+</div>
+</div>
+
+
+
+
+  
+  <hr>
+
+  <div class="footer">
+        <p class="pull-right"><a href="http://www.cloudera.com"><img src="img/cloudera_logo_blue.png" width="120" height="22" align="right"></a></p>
+        <p class="copyright">Copyright &copy; 2013 Cloudera. All rights reserved. Cloudera Impala is a registered trademark of Cloudera in the United States and in jurisdictions throughout the world. All other company and product names may be trade names or trademarks of their respective owners.</p>
+      </div><!-- /container -->
+
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="js/jquery.js"></script>
+    <script src="js/bootstrap-transition.js"></script>
+    <script src="js/bootstrap-scrollspy.js"></script>
+    <script src="js/bootstrap-tab.js"></script>
+    <script src="js/bootstrap-tooltip.js"></script>
+    <script src="js/bootstrap-popover.js"></script>
+    <script src="js/bootstrap-button.js"></script>
+    <script src="js/bootstrap-collapse.js"></script>
+    <script src="js/bootstrap-typeahead.js"></script>
+
+  </body>
+</html>
