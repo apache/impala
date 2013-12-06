@@ -14,6 +14,7 @@
 
 #include "runtime/lib-cache.h"
 
+#include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
 #include <boost/thread/locks.hpp>
 #include <dlfcn.h>
@@ -21,6 +22,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-state.h"
 #include "util/dynamic-util.h"
+#include "util/hash-util.h"
 #include "util/hdfs-util.h"
 
 using namespace boost;
@@ -184,10 +186,11 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
   (*entry)->type = type;
 
   // Copy the file
+  (*entry)->local_path = MakeLocalPath(hdfs_lib_file, FLAGS_local_library_dir);
   hdfsFS hdfs_conn = hdfs_cache->GetDefaultConnection();
   hdfsFS local_conn = hdfs_cache->GetLocalConnection();
-  (*entry)->copy_file_status = CopyHdfsFile(hdfs_conn, hdfs_lib_file.c_str(), local_conn,
-      FLAGS_local_library_dir.c_str(), &(*entry)->local_path);
+  (*entry)->copy_file_status = CopyHdfsFile(
+      hdfs_conn, hdfs_lib_file, local_conn, (*entry)->local_path);
   RETURN_IF_ERROR((*entry)->copy_file_status);
   if (type == TYPE_SO) {
     // dlopen the local library
@@ -206,3 +209,16 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
   return Status::OK;
 }
 
+string LibCache::MakeLocalPath(const string& hdfs_path, const string& local_dir) {
+  stringstream hash_ss;
+  hash_ss << getpid() << hdfs_path;
+  // Shorten the hash to 16 bits so the filenames aren't too long.
+  uint32_t hash = HashUtil::Hash(hash_ss.str().c_str(), hash_ss.str().size(), 0) >> 16;
+
+  // Append the filename + hash to the local directory.
+  filesystem::path src(hdfs_path);
+  stringstream dst;
+  dst << local_dir << "/" << src.stem().native() << "." << hash
+      << src.extension().native();
+  return dst.str();
+}

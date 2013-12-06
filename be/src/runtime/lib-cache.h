@@ -134,6 +134,13 @@ class LibCache {
   Status GetCacheEntry(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
       LibType type, boost::unique_lock<boost::mutex>* entry_lock,
       LibCacheEntry** entry);
+
+  // Utility function for generating a filename unique to this process and
+  // 'hdfs_path'. This is to prevent multiple impalad processes or different library files
+  // with the same name from clobbering each other. 'hdfs_path' should be the full path
+  // (including the filename) of the file we're going to copy to the local FS, and
+  // 'local_dir' is the local directory prefix of the returned path.
+  std::string MakeLocalPath(const std::string& hdfs_path, const std::string& local_dir);
 };
 
 }

@@ -13,7 +13,7 @@ set -e
 # Copy the test UDF/UDA libraries into HDFS
 # We copy:
 #   libTestUdas.so
-#   libTestUdfs.so  -> to libTestUdfs.so and libTestUdfs.SO
+#   libTestUdfs.so  -> to libTestUdfs.so, libTestUdfs.SO, and test_udf/libTestUdfs.so
 #   hive-exec.jar
 #   impala-hive-udfs.jar
 #   test-udfs.ll
@@ -22,6 +22,9 @@ hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdas.so /test-wa
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so /test-warehouse
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so\
     /test-warehouse/libTestUdfs.SO
+hadoop fs -mkdir -p /test-warehouse/udf_test
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so\
+    /test-warehouse/udf_test/libTestUdfs.so
 hadoop fs -put -f ${HIVE_HOME}/lib/hive-exec-${IMPALA_HIVE_VERSION}.jar\
   /test-warehouse/hive-exec.jar
 hadoop fs -put -f ${IMPALA_HOME}/fe/target/impala-frontend-0.1-SNAPSHOT-tests.jar\

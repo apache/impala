@@ -32,12 +32,8 @@ Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* file
 
 bool IsHiddenFile(const std::string& filename);
 
-// Copy the file at 'src_path' from 'src_conn' to the directory 'dst_dir' in
-// 'dst_conn'. Returns the path of the copy (including the filename) in 'dst_path'.
-// The PID is appended to the filename in order to prevent different processes from
-// clobbering each other's files.
-Status CopyHdfsFile(const hdfsFS& src_conn, const char* src_path,
-                    const hdfsFS& dst_conn, const char* dst_dir,
-                    std::string* dst_path);
+// Copy the file at 'src_path' from 'src_conn' to 'dst_path' in 'dst_conn'.
+Status CopyHdfsFile(const hdfsFS& src_conn, const std::string& src_path,
+                    const hdfsFS& dst_conn, const std::string& dst_path);
 }
 #endif // IMPALA_UTIL_HDFS_UTIL_H

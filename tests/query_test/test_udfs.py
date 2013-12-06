@@ -43,6 +43,10 @@ class TestUdfs(ImpalaTestSuite):
     self.run_test_case('QueryTest/load-hive-udfs', vector)
     self.run_test_case('QueryTest/hive-udf', vector)
 
+  def test_libs_with_same_filenames(self, vector):
+    self.run_test_case('QueryTest/libs_with_same_filenames', vector)
+
+
   def __load_functions(self, template, vector, database, location):
     queries = template.format(database=database, location=location)
     # Split queries and remove empty lines

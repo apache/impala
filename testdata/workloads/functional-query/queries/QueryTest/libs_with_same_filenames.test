@@ -1,0 +1,27 @@
+====
+---- QUERY
+create database if not exists udf_test;
+drop function if exists udf_test.no_args();
+drop function if exists udf_test.no_args2();
+
+create function udf_test.no_args() returns string
+location '/test-warehouse/libTestUdfs.so' symbol='NoArgs';
+
+create function udf_test.no_args2() returns string
+location '/test-warehouse/udf_test/libTestUdfs.so' symbol='NoArgs';
+---- RESULTS
+====
+---- QUERY
+select udf_test.no_args();
+---- TYPES
+string
+---- RESULTS
+'string'
+====
+---- QUERY
+select udf_test.no_args2();
+---- TYPES
+string
+---- RESULTS
+'string'
+====
