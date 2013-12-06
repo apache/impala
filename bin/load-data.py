@@ -33,9 +33,6 @@ parser.add_option("-s", "--scale_factor", dest="scale_factor", default="",
                   help="An optional scale factor to generate the schema for")
 parser.add_option("-f", "--force_reload", dest="force_reload", action="store_true",
                   default=False, help='Skips HDFS exists check and reloads all tables')
-parser.add_option("--compute_stats", dest="compute_stats", action="store_true",
-                  default= False, help="Execute COMPUTE STATISTICS statements on the "\
-                  "tables that are loaded")
 parser.add_option("--impalad", dest="impalad", default="localhost:21000",
                   help="Impala daemon to connect to")
 parser.add_option("--table_names", dest="table_names", default=None,
