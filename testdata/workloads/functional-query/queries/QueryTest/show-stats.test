@@ -99,13 +99,13 @@ show table stats functional_hbase.alltypesagg
 ---- LABELS
 REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
 ---- RESULTS: VERIFY_IS_EQUAL
-regex:.+,'',4,'1.18KB'
-regex:.+,'1',4044,'1.09MB'
-regex:.+,'3',4021,'1.09MB'
-regex:.+,'5',4041,'1.09MB'
-regex:.+,'7',4039,'1.09MB'
-regex:.+,'9',2014,'561.71KB'
-'Total','',18163,'4.93MB'
+regex:.+,'',regex:.+,regex:.+KB
+regex:.+,'1',regex:.+,regex:.+MB
+regex:.+,'3',regex:.+,regex:.+MB
+regex:.+,'5',regex:.+,regex:.+MB
+regex:.+,'7',regex:.+,regex:.+MB
+regex:.+,'9',regex:.+,regex:.+KB
+'Total','',regex:.+,regex:.+MB
 ---- TYPES
 STRING, STRING, BIGINT, STRING
 ====
@@ -137,7 +137,7 @@ show column stats functional_hbase.alltypessmall
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',63,0,4,4
+'id','INT',105,0,4,4
 'bigint_col','BIGINT',10,0,8,8
 'bool_col','BOOLEAN',2,0,1,1
 'date_string_col','STRING',12,0,8,8

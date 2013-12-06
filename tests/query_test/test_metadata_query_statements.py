@@ -32,10 +32,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/show', vector)
 
   def test_show_stats(self, vector):
-    try:
-      self.run_test_case('QueryTest/show-stats', vector)
-    except AssertionError:
-      pytest.xfail('IMPALA-688: HBase show stats/compute stats')
+    self.run_test_case('QueryTest/show-stats', vector)
 
   def test_describe_table(self, vector):
     self.run_test_case('QueryTest/describe', vector)

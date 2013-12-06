@@ -149,8 +149,14 @@ class HBaseTestDataRegionAssigment {
       LOG.info(printKey(entry.getKey().getStartKey()) + " -> " +
           entry.getValue().getHostAndPort());
     }
+
+    // Force a major compaction such that the HBase table is backed by deterministic
+    // physical artifacts (files, WAL, etc.). Our #rows estimate relies on the sizes of
+    // these physical artifacts.
+    LOG.info("Major compacting HBase table: " + tableName);
+    hbaseAdmin.majorCompact(tableName);
   }
-  
+
   /**
    * Returns non-printable characters in escaped octal, otherwise returns the characters.
    */

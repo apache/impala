@@ -21,6 +21,7 @@ import org.apache.log4j.Logger;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
@@ -98,9 +99,11 @@ public class ComputeStatsStmt extends StatementBase {
     // Query for getting the per-column NDVs and number of NULLs.
     StringBuilder columnStatsQueryBuilder = new StringBuilder("SELECT ");
     List<String> columnStatsSelectList = Lists.newArrayList();
-    // Exclude partition columns from stats gathering because Hive's framework cannot
-    // handle storing them as part of the non-partition column stats.
-    for (int i = table_.getNumClusteringCols(); i < table_.getColumns().size(); ++i) {
+    // For Hdfs tables, exclude partition columns from stats gathering because Hive
+    // cannot store them as part of the non-partition column stats. For HBase tables,
+    // include the single clustering column (the row key).
+    int startColIdx = (table_ instanceof HBaseTable) ? 0 : table_.getNumClusteringCols();
+    for (int i = startColIdx; i < table_.getColumns().size(); ++i) {
       Column c = table_.getColumns().get(i);
       // NDV approximation function. Add explicit alias for later identification when
       // updating the Metastore.

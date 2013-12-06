@@ -185,7 +185,7 @@ like functional_hbase.alltypessmall;
 ---- QUERY
 compute stats compute_stats_db.alltypessmall_hbase
 ---- RESULTS
-'Updated 1 partition(s) and 12 column(s).'
+'Updated 1 partition(s) and 13 column(s).'
 ---- TYPES
 STRING
 ====
@@ -194,13 +194,13 @@ show table stats compute_stats_db.alltypessmall_hbase
 ---- LABELS
 REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
 ---- RESULTS: VERIFY_IS_EQUAL
-regex:.+,'',5,regex:.+KB
-regex:.+,'1',42,regex:.+KB
-regex:.+,'3',42,regex:.+KB
-regex:.+,'5',42,regex:.+KB
-regex:.+,'7',42,regex:.+KB
-regex:.+,'9',23,regex:.+KB
-'Total','',196,regex:.+KB
+regex:.+,'',regex:.+,regex:.+KB
+regex:.+,'1',regex:.+,regex:.+KB
+regex:.+,'3',regex:.+,regex:.+KB
+regex:.+,'5',regex:.+,regex:.+KB
+regex:.+,'7',regex:.+,regex:.+KB
+regex:.+,'9',regex:.+,regex:.+KB
+'Total','',regex:.+,regex:.+KB
 ---- TYPES
 STRING, STRING, BIGINT, STRING
 ====
@@ -209,7 +209,7 @@ show column stats compute_stats_db.alltypessmall_hbase
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',-1,-1,4,4
+'id','INT',105,0,4,4
 'bigint_col','BIGINT',10,0,8,8
 'bool_col','BOOLEAN',2,0,1,1
 'date_string_col','STRING',12,0,8,8
@@ -233,7 +233,7 @@ like functional_hbase.alltypessmallbinary;
 ---- QUERY
 compute stats compute_stats_db.alltypessmall_hbase_bin
 ---- RESULTS
-'Updated 1 partition(s) and 12 column(s).'
+'Updated 1 partition(s) and 13 column(s).'
 ---- TYPES
 STRING
 ====
@@ -242,7 +242,7 @@ show table stats compute_stats_db.alltypessmall_hbase_bin
 ---- LABELS
 REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
 ---- RESULTS
-regex:.+,'',1,'315B'
+regex:.+,'',regex:.+,regex:.+
 ---- TYPES
 STRING, STRING, BIGINT, STRING
 ====
@@ -251,7 +251,7 @@ show column stats compute_stats_db.alltypessmall_hbase_bin
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',-1,-1,4,4
+'id','INT',105,0,4,4
 'bigint_col','BIGINT',10,0,8,8
 'bool_col','BOOLEAN',2,0,1,1
 'date_string_col','STRING',12,0,8,8
@@ -300,8 +300,8 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'bigint_col','BIGINT',0,0,8,8
 'float_col','FLOAT',0,0,4,4
 'double_col','DOUBLE',0,0,8,8
-'date_string_col','STRING',0,0,8,8
-'string_col','STRING',0,0,1,1
+'date_string_col','STRING',0,0,0,0
+'string_col','STRING',0,0,0,0
 'timestamp_col','TIMESTAMP',0,0,16,16
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
