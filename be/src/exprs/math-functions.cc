@@ -517,36 +517,18 @@ void* MathFunctions::FmodDouble(Expr* e, TupleRow* row) {
   return &e->result_.double_val;
 }
 
-void* MathFunctions::PositiveBigInt(Expr* e, TupleRow* row) {
+template <typename T> void* MathFunctions::Positive(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
-  int64_t* i = reinterpret_cast<int64_t*>(e->children()[0]->GetValue(row));
+  T* i = reinterpret_cast<T*>(e->children()[0]->GetValue(row));
   if (i == NULL) return NULL;
-  e->result_.bigint_val = *i;
-  return &e->result_.bigint_val;
+  return e->result_.Set(*i);
 }
 
-void* MathFunctions::PositiveDouble(Expr* e, TupleRow* row) {
+template <typename T> void* MathFunctions::Negative(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
-  double* d = reinterpret_cast<double*>(e->children()[0]->GetValue(row));
-  if (d == NULL) return NULL;
-  e->result_.double_val = *d;
-  return &e->result_.double_val;
-}
-
-void* MathFunctions::NegativeBigInt(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  int64_t* i = reinterpret_cast<int64_t*>(e->children()[0]->GetValue(row));
+  T* i = reinterpret_cast<T*>(e->children()[0]->GetValue(row));
   if (i == NULL) return NULL;
-  e->result_.bigint_val = -*i;
-  return &e->result_.bigint_val;
-}
-
-void* MathFunctions::NegativeDouble(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  double* d = reinterpret_cast<double*>(e->children()[0]->GetValue(row));
-  if (d == NULL) return NULL;
-  e->result_.double_val = -*d;
-  return &e->result_.double_val;
+  return e->result_.Set(-*i);
 }
 
 void* MathFunctions::QuotientDouble(Expr* e, TupleRow* row) {
@@ -564,15 +546,15 @@ void* MathFunctions::QuotientBigInt(Expr* e, TupleRow* row) {
   return ComputeFunctions::Int_Divide_long_long(e, row);
 }
 
-template <bool ISLEAST>
-void* MathFunctions::LeastGreatestInt(Expr* e, TupleRow* row) {
+template <typename T, bool ISLEAST>
+void* MathFunctions::LeastGreatest(Expr* e, TupleRow* row) {
   DCHECK_GT(e->GetNumChildren(), 0);
-  int32_t* val = reinterpret_cast<int32_t*>(e->children()[0]->GetValue(row));
+  T* val = reinterpret_cast<T*>(e->children()[0]->GetValue(row));
   if (val == NULL) return NULL;
-  int32_t result_val = *val;
+  T result_val = *val;
   int num_children = e->GetNumChildren();
   for (int i = 1; i < num_children; ++i) {
-    val = reinterpret_cast<int32_t*>(e->children()[i]->GetValue(row));
+    val = reinterpret_cast<T*>(e->children()[i]->GetValue(row));
     if (val == NULL) return NULL;
     if (ISLEAST) {
       if (*val < result_val) result_val = *val;
@@ -580,68 +562,7 @@ void* MathFunctions::LeastGreatestInt(Expr* e, TupleRow* row) {
       if (*val > result_val) result_val = *val;
     }
   }
-  e->result_.int_val = result_val;
-  return &e->result_.int_val;
-}
-
-template <bool ISLEAST>
-void* MathFunctions::LeastGreatestBigInt(Expr* e, TupleRow* row) {
-  DCHECK_GT(e->GetNumChildren(), 0);
-  int64_t* val = reinterpret_cast<int64_t*>(e->children()[0]->GetValue(row));
-  if (val == NULL) return NULL;
-  int64_t result_val = *val;
-  int num_children = e->GetNumChildren();
-  for (int i = 1; i < num_children; ++i) {
-    val = reinterpret_cast<int64_t*>(e->children()[i]->GetValue(row));
-    if (val == NULL) return NULL;
-    if (ISLEAST) {
-      if (*val < result_val) result_val = *val;
-    } else {
-      if (*val > result_val) result_val = *val;
-    }
-  }
-  e->result_.bigint_val = result_val;
-  return &e->result_.bigint_val;
-}
-
-template <bool ISLEAST>
-void* MathFunctions::LeastGreatestFloat(Expr* e, TupleRow* row) {
-  DCHECK_GT(e->GetNumChildren(), 0);
-  float* val = reinterpret_cast<float*>(e->children()[0]->GetValue(row));
-  if (val == NULL) return NULL;
-  float result_val = *val;
-  int num_children = e->GetNumChildren();
-  for (int i = 1; i < num_children; ++i) {
-    val = reinterpret_cast<float*>(e->children()[i]->GetValue(row));
-    if (val == NULL) return NULL;
-    if (ISLEAST) {
-      if (*val < result_val) result_val = *val;
-    } else {
-      if (*val > result_val) result_val = *val;
-    }
-  }
-  e->result_.float_val = result_val;
-  return &e->result_.float_val;
-}
-
-template <bool ISLEAST>
-void* MathFunctions::LeastGreatestDouble(Expr* e, TupleRow* row) {
-  DCHECK_GT(e->GetNumChildren(), 0);
-  double* val = reinterpret_cast<double*>(e->children()[0]->GetValue(row));
-  if (val == NULL) return NULL;
-  double result_val = *val;
-  int num_children = e->GetNumChildren();
-  for (int i = 1; i < num_children; ++i) {
-    val = reinterpret_cast<double*>(e->children()[i]->GetValue(row));
-    if (val == NULL) return NULL;
-    if (ISLEAST) {
-      if (*val < result_val) result_val = *val;
-    } else {
-      if (*val > result_val) result_val = *val;
-    }
-  }
-  e->result_.double_val = result_val;
-  return &e->result_.double_val;
+  return e->result_.Set(result_val);
 }
 
 template <bool ISLEAST>
@@ -666,39 +587,34 @@ void* MathFunctions::LeastGreatestString(Expr* e, TupleRow* row) {
   return &e->result_.string_val;
 }
 
-template <bool ISLEAST>
-void* MathFunctions::LeastGreatestTimestamp(Expr* e, TupleRow* row) {
-  DCHECK_GT(e->GetNumChildren(), 0);
-  TimestampValue* val =
-      reinterpret_cast<TimestampValue*>(e->children()[0]->GetValue(row));
-  if (val == NULL) return NULL;
-  TimestampValue* result_val = val;
-  int num_children = e->GetNumChildren();
-  for (int i = 1; i < num_children; ++i) {
-    val = reinterpret_cast<TimestampValue*>(e->children()[i]->GetValue(row));
-    if (val == NULL) return NULL;
-    if (ISLEAST) {
-      if (*val < *result_val) result_val = val;
-    } else {
-      if (*val > *result_val) result_val = val;
-    }
-  }
-  e->result_.timestamp_val = *result_val;
-  return &e->result_.timestamp_val;
-}
-
-template void* MathFunctions::LeastGreatestInt<true>(Expr* e, TupleRow* row);
-template void* MathFunctions::LeastGreatestBigInt<true>(Expr* e, TupleRow* row);
-template void* MathFunctions::LeastGreatestFloat<true>(Expr* e, TupleRow* row);
-template void* MathFunctions::LeastGreatestDouble<true>(Expr* e, TupleRow* row);
+template void* MathFunctions::Positive<int8_t>(Expr* e, TupleRow* row);
+template void* MathFunctions::Positive<int16_t>(Expr* e, TupleRow* row);
+template void* MathFunctions::Positive<int32_t>(Expr* e, TupleRow* row);
+template void* MathFunctions::Positive<int64_t>(Expr* e, TupleRow* row);
+template void* MathFunctions::Positive<float>(Expr* e, TupleRow* row);
+template void* MathFunctions::Positive<double>(Expr* e, TupleRow* row);
+template void* MathFunctions::Negative<int8_t>(Expr* e, TupleRow* row);
+template void* MathFunctions::Negative<int16_t>(Expr* e, TupleRow* row);
+template void* MathFunctions::Negative<int32_t>(Expr* e, TupleRow* row);
+template void* MathFunctions::Negative<int64_t>(Expr* e, TupleRow* row);
+template void* MathFunctions::Negative<float>(Expr* e, TupleRow* row);
+template void* MathFunctions::Negative<double>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<int8_t, true>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<int16_t, true>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<int32_t, true>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<int64_t, true>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<float, true>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<double, true>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<TimestampValue, true>(Expr* e, TupleRow* row);
 template void* MathFunctions::LeastGreatestString<true>(Expr* e, TupleRow* row);
-template void* MathFunctions::LeastGreatestTimestamp<true>(Expr* e, TupleRow* row);
-template void* MathFunctions::LeastGreatestInt<false>(Expr* e, TupleRow* row);
-template void* MathFunctions::LeastGreatestBigInt<false>(Expr* e, TupleRow* row);
-template void* MathFunctions::LeastGreatestFloat<false>(Expr* e, TupleRow* row);
-template void* MathFunctions::LeastGreatestDouble<false>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<int8_t, false>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<int16_t, false>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<int32_t, false>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<int64_t, false>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<float, false>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<double, false>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatest<TimestampValue, false>(Expr* e, TupleRow* row);
 template void* MathFunctions::LeastGreatestString<false>(Expr* e, TupleRow* row);
-template void* MathFunctions::LeastGreatestTimestamp<false>(Expr* e, TupleRow* row);
 
 }
 

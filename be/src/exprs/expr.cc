@@ -54,6 +54,8 @@ using namespace llvm;
 
 const char* Expr::LLVM_CLASS_NAME = "class.impala::Expr";
 
+namespace impala {
+
 template<class T>
 bool ParseString(const string& str, T* val) {
   istringstream stream(str);
@@ -946,4 +948,6 @@ Function* Expr::CreateIrFunctionPrototype(LlvmCodeGen* codegen, const string& na
   Function* function = prototype.GeneratePrototype(NULL, args[0]);
   DCHECK(function != NULL);
   return function;
+}
+
 }

@@ -28,16 +28,16 @@
 # registry in the FE and BE.
 
 functions = [
-  ['Compound_And', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+  ['Compound_And', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'],
         'CompoundPredicate::AndComputeFn', []],
-  ['Compound_Or', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+  ['Compound_Or', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'],
         'CompoundPredicate::OrComputeFn', []],
-  ['Compound_Not', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+  ['Compound_Not', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'],
         'CompoundPredicate::NotComputeFn', []],
 
-  ['Constant_Regex', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+  ['Constant_Regex', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'],
         'LikePredicate::ConstantRegexFn', []],
-  ['Constant_Substring', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+  ['Constant_Substring', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'],
         'LikePredicate::ConstantSubstringFn', []],
   ['Like', 'BOOLEAN', ['STRING', 'STRING'], 'LikePredicate::LikeFn', []],
   ['Regex', 'BOOLEAN', ['STRING', 'STRING'], 'LikePredicate::RegexFn', []],
@@ -71,54 +71,84 @@ functions = [
   ['Math_Hex', 'STRING', ['BIGINT'], 'MathFunctions::HexInt', ['hex']],
   ['Math_Hex', 'STRING', ['STRING'], 'MathFunctions::HexString', ['hex']],
   ['Math_Unhex', 'STRING', ['STRING'], 'MathFunctions::Unhex', ['unhex']],
-  ['Math_Conv', 'STRING', ['BIGINT', 'TINYINT', 'TINYINT'], \
+  ['Math_Conv', 'STRING', ['BIGINT', 'TINYINT', 'TINYINT'],
         'MathFunctions::ConvInt', ['conv']],
-  ['Math_Conv', 'STRING', ['STRING', 'TINYINT', 'TINYINT'], \
+  ['Math_Conv', 'STRING', ['STRING', 'TINYINT', 'TINYINT'],
         'MathFunctions::ConvString', ['conv']],
   ['Math_Pmod', 'BIGINT', ['BIGINT', 'BIGINT'], 'MathFunctions::PmodBigInt', ['pmod']],
   ['Math_Pmod', 'DOUBLE', ['DOUBLE', 'DOUBLE'], 'MathFunctions::PmodDouble', ['pmod']],
-  ['Math_Fmod', 'FLOAT', ['FLOAT', 'FLOAT'], 'MathFunctions::FmodFloat', ['fmod']],
-  ['Math_Fmod', 'DOUBLE', ['DOUBLE', 'DOUBLE'], 'MathFunctions::FmodDouble', ['fmod']],
-  ['Math_Positive', 'BIGINT', ['BIGINT'], 'MathFunctions::PositiveBigInt', ['positive']],
-  ['Math_Positive', 'DOUBLE', ['DOUBLE'], 'MathFunctions::PositiveDouble', ['positive']],
-  ['Math_Negative', 'BIGINT', ['BIGINT'], 'MathFunctions::NegativeBigInt', ['negative']],
-  ['Math_Negative', 'DOUBLE', ['DOUBLE'], 'MathFunctions::NegativeDouble', ['negative']],
-  ['Math_Quotient', 'BIGINT', ['BIGINT', 'BIGINT'],\
+  ['Math_Fmod', 'FLOAT', ['FLOAT', 'FLOAT'],
+        'MathFunctions::FmodFloat', ['fmod']],
+  ['Math_Fmod', 'DOUBLE', ['DOUBLE', 'DOUBLE'],
+        'MathFunctions::FmodDouble', ['fmod']],
+  ['Math_Positive', 'TINYINT', ['TINYINT'],
+        'MathFunctions::Positive<int8_t>', ['positive']],
+  ['Math_Positive', 'SMALLINT', ['SMALLINT'],
+        'MathFunctions::Positive<int16_t>', ['positive']],
+  ['Math_Positive', 'INT', ['INT'],\
+        'MathFunctions::Positive<int32_t>', ['positive']],
+  ['Math_Positive', 'BIGINT', ['BIGINT'],
+        'MathFunctions::Positive<int64_t>', ['positive']],
+  ['Math_Positive', 'FLOAT', ['FLOAT'],
+        'MathFunctions::Positive<float>', ['positive']],
+  ['Math_Positive', 'DOUBLE', ['DOUBLE'],
+        'MathFunctions::Positive<double>', ['positive']],
+  ['Math_Negative', 'TINYINT', ['TINYINT'],
+        'MathFunctions::Negative<int8_t>', ['negative']],
+  ['Math_Negative', 'SMALLINT', ['SMALLINT'],
+        'MathFunctions::Negative<int16_t>', ['negative']],
+  ['Math_Negative', 'INT', ['INT'],
+        'MathFunctions::Negative<int32_t>', ['negative']],
+  ['Math_Negative', 'BIGINT', ['BIGINT'],
+        'MathFunctions::Negative<int64_t>', ['negative']],
+  ['Math_Negative', 'FLOAT', ['FLOAT'],
+        'MathFunctions::Negative<float>', ['negative']],
+  ['Math_Negative', 'DOUBLE', ['DOUBLE'],
+        'MathFunctions::Negative<double>', ['negative']],
+  ['Math_Quotient', 'BIGINT', ['BIGINT', 'BIGINT'],
         'MathFunctions::QuotientBigInt', ['quotient']],
-  ['Math_Quotient', 'BIGINT', ['DOUBLE', 'DOUBLE'],\
+  ['Math_Quotient', 'BIGINT', ['DOUBLE', 'DOUBLE'],
         'MathFunctions::QuotientDouble', ['quotient']],
-  ['Math_Least', 'INT', ['INT', '...'], \
-        'MathFunctions::LeastGreatestInt<true>', ['least']],
-  ['Math_Least', 'BIGINT', ['BIGINT', '...'], \
-        'MathFunctions::LeastGreatestBigInt<true>', ['least']],
-  ['Math_Least', 'FLOAT', ['FLOAT', '...'], \
-        'MathFunctions::LeastGreatestFloat<true>', ['least']],
-  ['Math_Least', 'DOUBLE', ['DOUBLE', '...'], \
-        'MathFunctions::LeastGreatestDouble<true>', ['least']],
-  ['Math_Least', 'STRING', ['STRING', '...'], \
+  ['Math_Least', 'TINYINT', ['TINYINT', '...'],
+        'MathFunctions::LeastGreatest<int8_t, true>', ['least']],
+  ['Math_Least', 'SMALLINT', ['SMALLINT', '...'],
+        'MathFunctions::LeastGreatest<int16_t, true>', ['least']],
+  ['Math_Least', 'INT', ['INT', '...'],
+        'MathFunctions::LeastGreatest<int32_t, true>', ['least']],
+  ['Math_Least', 'BIGINT', ['BIGINT', '...'],
+        'MathFunctions::LeastGreatest<int64_t, true>', ['least']],
+  ['Math_Least', 'FLOAT', ['FLOAT', '...'],
+        'MathFunctions::LeastGreatest<float, true>', ['least']],
+  ['Math_Least', 'DOUBLE', ['DOUBLE', '...'],
+        'MathFunctions::LeastGreatest<double, true>', ['least']],
+  ['Math_Least', 'TIMESTAMP', ['TIMESTAMP', '...'],
+        'MathFunctions::LeastGreatest<TimestampValue, true>', ['least']],
+  ['Math_Least', 'STRING', ['STRING', '...'],
         'MathFunctions::LeastGreatestString<true>', ['least']],
-  ['Math_Least', 'TIMESTAMP', ['TIMESTAMP', '...'], \
-        'MathFunctions::LeastGreatestTimestamp<true>', ['least']],
-  ['Math_Greatest', 'INT', ['INT', '...'], \
-        'MathFunctions::LeastGreatestInt<false>', ['greatest']],
-  ['Math_Greatest', 'BIGINT', ['BIGINT', '...'], \
-        'MathFunctions::LeastGreatestBigInt<false>', ['greatest']],
-  ['Math_Greatest', 'FLOAT', ['FLOAT', '...'], \
-        'MathFunctions::LeastGreatestFloat<false>', ['greatest']],
-  ['Math_Greatest', 'DOUBLE', ['DOUBLE', '...'], \
-        'MathFunctions::LeastGreatestDouble<false>', ['greatest']],
-  ['Math_Greatest', 'STRING', ['STRING', '...'], \
+  ['Math_Greatest', 'TINYINT', ['TINYINT', '...'],
+        'MathFunctions::LeastGreatest<int8_t, false>', ['greatest']],
+  ['Math_Greatest', 'SMALLINT', ['SMALLINT', '...'],
+        'MathFunctions::LeastGreatest<int16_t, false>', ['greatest']],
+  ['Math_Greatest', 'INT', ['INT', '...'],
+        'MathFunctions::LeastGreatest<int32_t, false>', ['greatest']],
+  ['Math_Greatest', 'BIGINT', ['BIGINT', '...'],
+        'MathFunctions::LeastGreatest<int64_t, false>', ['greatest']],
+  ['Math_Greatest', 'FLOAT', ['FLOAT', '...'],
+        'MathFunctions::LeastGreatest<float, false>', ['greatest']],
+  ['Math_Greatest', 'DOUBLE', ['DOUBLE', '...'],
+        'MathFunctions::LeastGreatest<double, false>', ['greatest']],
+  ['Math_Greatest', 'TIMESTAMP', ['TIMESTAMP', '...'],
+        'MathFunctions::LeastGreatest<TimestampValue, false>', ['greatest']],
+  ['Math_Greatest', 'STRING', ['STRING', '...'],
         'MathFunctions::LeastGreatestString<false>', ['greatest']],
-  ['Math_Greatest', 'TIMESTAMP', ['TIMESTAMP', '...'], \
-        'MathFunctions::LeastGreatestTimestamp<false>', ['greatest']],
 
-  ['String_Substring', 'STRING', ['STRING', 'INT'], \
+  ['String_Substring', 'STRING', ['STRING', 'INT'],
         'StringFunctions::Substring<int32_t>', ['substr', 'substring']],
-  ['String_Substring', 'STRING', ['STRING', 'BIGINT'], \
+  ['String_Substring', 'STRING', ['STRING', 'BIGINT'],
         'StringFunctions::Substring<int64_t>', ['substr', 'substring']],
-  ['String_Substring', 'STRING', ['STRING', 'INT', 'INT'], \
+  ['String_Substring', 'STRING', ['STRING', 'INT', 'INT'],
         'StringFunctions::Substring<int32_t>', ['substr', 'substring']],
-  ['String_Substring', 'STRING', ['STRING', 'BIGINT', 'BIGINT'], \
+  ['String_Substring', 'STRING', ['STRING', 'BIGINT', 'BIGINT'],
         'StringFunctions::Substring<int64_t>', ['substr', 'substring']],
 # left and right are key words, leave them out for now.
   ['String_Left', 'STRING', ['STRING', 'INT'],
@@ -135,13 +165,13 @@ functions = [
         'StringFunctions::Repeat<int32_t>', ['repeat']],
   ['String_Repeat', 'STRING', ['STRING', 'BIGINT'],
         'StringFunctions::Repeat<int64_t>', ['repeat']],
-  ['String_Lpad', 'STRING', ['STRING', 'INT', 'STRING'], \
+  ['String_Lpad', 'STRING', ['STRING', 'INT', 'STRING'],
         'StringFunctions::Lpad<int32_t>', ['lpad']],
-  ['String_Lpad', 'STRING', ['STRING', 'BIGINT', 'STRING'], \
+  ['String_Lpad', 'STRING', ['STRING', 'BIGINT', 'STRING'],
         'StringFunctions::Lpad<int64_t>', ['lpad']],
-  ['String_Rpad', 'STRING', ['STRING', 'INT', 'STRING'], \
+  ['String_Rpad', 'STRING', ['STRING', 'INT', 'STRING'],
         'StringFunctions::Rpad<int32_t>', ['rpad']],
-  ['String_Rpad', 'STRING', ['STRING', 'BIGINT', 'STRING'], \
+  ['String_Rpad', 'STRING', ['STRING', 'BIGINT', 'STRING'],
         'StringFunctions::Rpad<int64_t>', ['rpad']],
   ['String_Length', 'INT', ['STRING'], 'StringFunctions::Length', ['length']],
   ['String_Lower', 'STRING', ['STRING'], 'StringFunctions::Lower', ['lower', 'lcase']],
@@ -156,24 +186,24 @@ functions = [
   ['String_Ascii', 'INT', ['STRING'], 'StringFunctions::Ascii', ['ascii']],
   ['String_Instr', 'INT', ['STRING', 'STRING'], 'StringFunctions::Instr', ['instr']],
   ['String_Locate', 'INT', ['STRING', 'STRING'], 'StringFunctions::Locate', ['locate']],
-  ['String_Locate', 'INT', ['STRING', 'STRING', 'INT'], \
+  ['String_Locate', 'INT', ['STRING', 'STRING', 'INT'],
         'StringFunctions::LocatePos<int32_t>', ['locate']],
-  ['String_Locate', 'INT', ['STRING', 'STRING', 'BIGINT'], \
+  ['String_Locate', 'INT', ['STRING', 'STRING', 'BIGINT'],
         'StringFunctions::LocatePos<int64_t>', ['locate']],
-  ['String_Regexp_Extract', 'STRING', ['STRING', 'STRING', 'INT'], \
+  ['String_Regexp_Extract', 'STRING', ['STRING', 'STRING', 'INT'],
         'StringFunctions::RegexpExtract<int32_t>', ['regexp_extract']],
-  ['String_Regexp_Extract', 'STRING', ['STRING', 'STRING', 'BIGINT'], \
+  ['String_Regexp_Extract', 'STRING', ['STRING', 'STRING', 'BIGINT'],
         'StringFunctions::RegexpExtract<int64_t>', ['regexp_extract']],
-  ['String_Regexp_Replace', 'STRING', ['STRING', 'STRING', 'STRING'], \
+  ['String_Regexp_Replace', 'STRING', ['STRING', 'STRING', 'STRING'],
         'StringFunctions::RegexpReplace', ['regexp_replace']],
   ['String_Concat', 'STRING', ['STRING', '...'], 'StringFunctions::Concat', ['concat']],
-  ['String_Concat_Ws', 'STRING', ['STRING', 'STRING', '...'], \
+  ['String_Concat_Ws', 'STRING', ['STRING', 'STRING', '...'],
         'StringFunctions::ConcatWs', ['concat_ws']],
-  ['String_Find_In_Set', 'INT', ['STRING', 'STRING'], \
+  ['String_Find_In_Set', 'INT', ['STRING', 'STRING'],
         'StringFunctions::FindInSet', ['find_in_set']],
-  ['String_Parse_Url', 'STRING', ['STRING', 'STRING'], \
+  ['String_Parse_Url', 'STRING', ['STRING', 'STRING'],
         'StringFunctions::ParseUrl', ['parse_url']],
-  ['String_Parse_Url', 'STRING', ['STRING', 'STRING', 'STRING'], \
+  ['String_Parse_Url', 'STRING', ['STRING', 'STRING', 'STRING'],
         'StringFunctions::ParseUrlKey', ['parse_url']],
   ['Utility_User', 'STRING', [], 'UtilityFunctions::User', ['user']],
   ['Utility_Sleep', 'BOOLEAN', ['INT'], 'UtilityFunctions::Sleep', ['sleep']],
@@ -189,187 +219,201 @@ functions = [
 
 
 # Timestamp Functions
-  ['Unix_Timestamp', 'INT', [], \
+  ['Unix_Timestamp', 'INT', [],
         'TimestampFunctions::Unix', ['unix_timestamp']],
-  ['Unix_Timestamp', 'INT', ['TIMESTAMP'], \
+  ['Unix_Timestamp', 'INT', ['TIMESTAMP'],
         'TimestampFunctions::Unix', ['unix_timestamp']],
-  ['Unix_Timestamp', 'INT', ['STRING', 'STRING'], \
+  ['Unix_Timestamp', 'INT', ['STRING', 'STRING'],
         'TimestampFunctions::Unix', ['unix_timestamp']],
-  ['From_UnixTime', 'STRING', ['INT'], \
+  ['From_UnixTime', 'STRING', ['INT'],
         'TimestampFunctions::FromUnix<int32_t>', ['from_unixtime']],
-  ['From_UnixTime', 'STRING', ['INT', 'STRING'], \
+  ['From_UnixTime', 'STRING', ['INT', 'STRING'],
         'TimestampFunctions::FromUnix<int32_t>', ['from_unixtime']],
-  ['From_UnixTime', 'STRING', ['BIGINT'], \
+  ['From_UnixTime', 'STRING', ['BIGINT'],
         'TimestampFunctions::FromUnix<int64_t>', ['from_unixtime']],
-  ['From_UnixTime', 'STRING', ['BIGINT', 'STRING'], \
+  ['From_UnixTime', 'STRING', ['BIGINT', 'STRING'],
         'TimestampFunctions::FromUnix<int64_t>', ['from_unixtime']],
-  ['Timestamp_Dayname', 'STRING', ['TIMESTAMP'], \
+  ['Timestamp_Dayname', 'STRING', ['TIMESTAMP'],
         'TimestampFunctions::DayName', ['dayname']],
   ['Timestamp_year', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Year', ['year']],
   ['Timestamp_month', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Month', ['month']],
-  ['Timestamp_dayofmonth', 'INT', ['TIMESTAMP'], \
+  ['Timestamp_dayofmonth', 'INT', ['TIMESTAMP'],
         'TimestampFunctions::DayOfMonth', ['day', 'dayofmonth']],
-  ['Timestamp_dayofweek', 'INT', ['TIMESTAMP'], \
+  ['Timestamp_dayofweek', 'INT', ['TIMESTAMP'],
         'TimestampFunctions::DayOfWeek', ['dayofweek']],
   ['Timestamp_dayofyear', 'INT', ['TIMESTAMP'],
         'TimestampFunctions::DayOfYear', ['dayofyear']],
-  ['Timestamp_weekofyear', 'INT', ['TIMESTAMP'], \
+  ['Timestamp_weekofyear', 'INT', ['TIMESTAMP'],
         'TimestampFunctions::WeekOfYear', ['weekofyear']],
   ['Timestamp_hour', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Hour', ['hour']],
   ['Timestamp_minute', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Minute', ['minute']],
   ['Timestamp_second', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Second', ['second']],
-  ['Timestamp_now', 'TIMESTAMP', [], \
+  ['Timestamp_now', 'TIMESTAMP', [],
         'TimestampFunctions::Now', ['now', 'current_timestamp']],
-  ['Timestamp_to_date', 'STRING', ['TIMESTAMP'], \
+  ['Timestamp_to_date', 'STRING', ['TIMESTAMP'],
         'TimestampFunctions::ToDate', ['to_date']],
-  ['Timestamp_diff', 'INT', ['TIMESTAMP', 'TIMESTAMP'], \
+  ['Timestamp_diff', 'INT', ['TIMESTAMP', 'TIMESTAMP'],
         'TimestampFunctions::DateDiff', ['datediff']],
-  ['From_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], \
+  ['From_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'],
         'TimestampFunctions::FromUtc', ['from_utc_timestamp']],
-  ['To_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], \
+  ['To_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'],
         'TimestampFunctions::ToUtc', ['to_utc_timestamp']],
 
 # Date and time add/sub functions.
-  ['Timestamp_years_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_years_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::DateAddSub<true, int32_t, years>', ['years_add']],
-  ['Timestamp_years_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_years_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::DateAddSub<true, int64_t, years>', ['years_add']],
-  ['Timestamp_years_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_years_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::DateAddSub<false, int32_t, years>', ['years_sub']],
-  ['Timestamp_years_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_years_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::DateAddSub<false, int64_t, years>', ['years_sub']],
-  ['Timestamp_months_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_months_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::DateAddSub<true, int32_t, months>', ['months_add']],
-  ['Timestamp_months_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_months_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::DateAddSub<true, int64_t, months>', ['months_add']],
-  ['Timestamp_months_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_months_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::DateAddSub<false, int32_t, months>', ['months_sub']],
-  ['Timestamp_months_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_months_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::DateAddSub<false, int64_t, months>', ['months_sub']],
-  ['Timestamp_weeks_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_weeks_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::DateAddSub<true, int32_t, weeks>', ['weeks_add']],
-  ['Timestamp_weeks_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_weeks_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::DateAddSub<true, int64_t, weeks>', ['weeks_add']],
-  ['Timestamp_weeks_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_weeks_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::DateAddSub<false, int32_t, weeks>', ['weeks_sub']],
-  ['Timestamp_weeks_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_weeks_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::DateAddSub<false, int64_t, weeks>', ['weeks_sub']],
-  ['Timestamp_days_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::DateAddSub<true, int32_t, days>',\
+  ['Timestamp_days_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
+        'TimestampFunctions::DateAddSub<true, int32_t, days>',
         ['days_add', 'date_add', 'adddate']],
-  ['Timestamp_days_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
-        'TimestampFunctions::DateAddSub<true, int64_t, days>',\
+  ['Timestamp_days_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
+        'TimestampFunctions::DateAddSub<true, int64_t, days>',
         ['days_add', 'date_add', 'adddate']],
-  ['Timestamp_days_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::DateAddSub<false, int32_t, days>',\
+  ['Timestamp_days_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
+        'TimestampFunctions::DateAddSub<false, int32_t, days>',
         ['days_sub', 'date_sub', 'subdate']],
-  ['Timestamp_days_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
-        'TimestampFunctions::DateAddSub<false, int64_t, days>',\
+  ['Timestamp_days_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
+        'TimestampFunctions::DateAddSub<false, int64_t, days>',
         ['days_sub', 'date_sub', 'subdate']],
-  ['Timestamp_hours_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_hours_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::TimeAddSub<true, int32_t, hours>', ['hours_add']],
-  ['Timestamp_hours_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_hours_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::TimeAddSub<true, int64_t, hours>', ['hours_add']],
-  ['Timestamp_hours_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_hours_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::TimeAddSub<false, int32_t, hours>', ['hours_sub']],
-  ['Timestamp_hours_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_hours_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::TimeAddSub<false, int64_t, hours>', ['hours_sub']],
-  ['Timestamp_minutes_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_minutes_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::TimeAddSub<true, int32_t, minutes>', ['minutes_add']],
-  ['Timestamp_minutes_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_minutes_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::TimeAddSub<true, int64_t, minutes>', ['minutes_add']],
-  ['Timestamp_minutes_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_minutes_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::TimeAddSub<false, int32_t, minutes>', ['minutes_sub']],
-  ['Timestamp_minutes_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_minutes_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::TimeAddSub<false, int64_t, minutes>', ['minutes_sub']],
-  ['Timestamp_seconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_seconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::TimeAddSub<true, int32_t, seconds>', ['seconds_add']],
-  ['Timestamp_seconds_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_seconds_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::TimeAddSub<true, int64_t, seconds>', ['seconds_add']],
-  ['Timestamp_seconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+  ['Timestamp_seconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
         'TimestampFunctions::TimeAddSub<false, int32_t, seconds>', ['seconds_sub']],
-  ['Timestamp_seconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
+  ['Timestamp_seconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
         'TimestampFunctions::TimeAddSub<false, int64_t, seconds>', ['seconds_sub']],
-  ['Timestamp_milliseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::TimeAddSub<true, int32_t, milliseconds>',\
+  ['Timestamp_milliseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
+        'TimestampFunctions::TimeAddSub<true, int32_t, milliseconds>',
         ['milliseconds_add']],
-  ['Timestamp_milliseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
-        'TimestampFunctions::TimeAddSub<true, int64_t, milliseconds>',\
+  ['Timestamp_milliseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
+        'TimestampFunctions::TimeAddSub<true, int64_t, milliseconds>',
         ['milliseconds_add']],
-  ['Timestamp_milliseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::TimeAddSub<false, int32_t, milliseconds>',\
+  ['Timestamp_milliseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
+        'TimestampFunctions::TimeAddSub<false, int32_t, milliseconds>',
         ['milliseconds_sub']],
-  ['Timestamp_milliseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
-        'TimestampFunctions::TimeAddSub<false, int64_t, milliseconds>',\
+  ['Timestamp_milliseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
+        'TimestampFunctions::TimeAddSub<false, int64_t, milliseconds>',
         ['milliseconds_sub']],
-  ['Timestamp_microseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::TimeAddSub<true, int32_t, microseconds>',\
+  ['Timestamp_microseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
+        'TimestampFunctions::TimeAddSub<true, int32_t, microseconds>',
         ['microseconds_add']],
-  ['Timestamp_microseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
-        'TimestampFunctions::TimeAddSub<true, int64_t, microseconds>',\
+  ['Timestamp_microseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
+        'TimestampFunctions::TimeAddSub<true, int64_t, microseconds>',
         ['microseconds_add']],
-  ['Timestamp_microseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::TimeAddSub<false, int32_t, microseconds>',\
+  ['Timestamp_microseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
+        'TimestampFunctions::TimeAddSub<false, int32_t, microseconds>',
         ['microseconds_sub']],
-  ['Timestamp_microseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
-        'TimestampFunctions::TimeAddSub<false, int64_t, microseconds>',\
+  ['Timestamp_microseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
+        'TimestampFunctions::TimeAddSub<false, int64_t, microseconds>',
         ['microseconds_sub']],
-  ['Timestamp_nanoseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::TimeAddSub<true, int32_t, nanoseconds>',\
+  ['Timestamp_nanoseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
+        'TimestampFunctions::TimeAddSub<true, int32_t, nanoseconds>',
         ['nanoseconds_add']],
-  ['Timestamp_nanoseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
-        'TimestampFunctions::TimeAddSub<true, int64_t, nanoseconds>',\
+  ['Timestamp_nanoseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
+        'TimestampFunctions::TimeAddSub<true, int64_t, nanoseconds>',
         ['nanoseconds_add']],
-  ['Timestamp_nanoseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::TimeAddSub<false, int32_t, nanoseconds>',\
+  ['Timestamp_nanoseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'],
+        'TimestampFunctions::TimeAddSub<false, int32_t, nanoseconds>',
         ['nanoseconds_sub']],
-  ['Timestamp_nanoseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'], \
-        'TimestampFunctions::TimeAddSub<false, int64_t, nanoseconds>',\
+  ['Timestamp_nanoseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
+        'TimestampFunctions::TimeAddSub<false, int64_t, nanoseconds>',
         ['nanoseconds_sub']],
 
 # Conditional Functions
-  ['Conditional_If', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN', 'BOOLEAN'], \
-        'ConditionalFunctions::IfBool', ['if']],
-  ['Conditional_If', 'TINYINT', ['BOOLEAN', 'TINYINT', 'TINYINT'], \
-        'ConditionalFunctions::IfTinyint', ['if']],
-  ['Conditional_If', 'SMALLINT', ['BOOLEAN', 'SMALLINT', 'SMALLINT'], \
-        'ConditionalFunctions::IfSmallint', ['if']],
-  ['Conditional_If', 'INT', ['BOOLEAN', 'INT', 'INT'], \
-        'ConditionalFunctions::IfInt', ['if']],
-  ['Conditional_If', 'BIGINT', ['BOOLEAN', 'BIGINT', 'BIGINT'], \
-        'ConditionalFunctions::IfBigint', ['if']],
-  ['Conditional_If', 'FLOAT', ['BOOLEAN', 'FLOAT', 'FLOAT'], \
-        'ConditionalFunctions::IfFloat', ['if']],
-  ['Conditional_If', 'DOUBLE', ['BOOLEAN', 'DOUBLE', 'DOUBLE'], \
-        'ConditionalFunctions::IfDouble', ['if']],
-  ['Conditional_If', 'STRING', ['BOOLEAN', 'STRING', 'STRING'], \
-        'ConditionalFunctions::IfString', ['if']],
-  ['Conditional_If', 'TIMESTAMP', ['BOOLEAN', 'TIMESTAMP', 'TIMESTAMP'], \
-        'ConditionalFunctions::IfTimestamp', ['if']],
+  ['Conditional_If', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN', 'BOOLEAN'],
+        'ConditionalFunctions::IfFn<bool>', ['if']],
+  ['Conditional_If', 'TINYINT', ['BOOLEAN', 'TINYINT', 'TINYINT'],
+        'ConditionalFunctions::IfFn<int8_t>', ['if']],
+  ['Conditional_If', 'SMALLINT', ['BOOLEAN', 'SMALLINT', 'SMALLINT'],
+        'ConditionalFunctions::IfFn<int16_t>', ['if']],
+  ['Conditional_If', 'INT', ['BOOLEAN', 'INT', 'INT'],
+        'ConditionalFunctions::IfFn<int32_t>', ['if']],
+  ['Conditional_If', 'BIGINT', ['BOOLEAN', 'BIGINT', 'BIGINT'],
+        'ConditionalFunctions::IfFn<int64_t>', ['if']],
+  ['Conditional_If', 'FLOAT', ['BOOLEAN', 'FLOAT', 'FLOAT'],
+        'ConditionalFunctions::IfFn<float>', ['if']],
+  ['Conditional_If', 'DOUBLE', ['BOOLEAN', 'DOUBLE', 'DOUBLE'],
+        'ConditionalFunctions::IfFn<double>', ['if']],
+  ['Conditional_If', 'STRING', ['BOOLEAN', 'STRING', 'STRING'],
+        'ConditionalFunctions::IfFn<StringValue>', ['if']],
+  ['Conditional_If', 'TIMESTAMP', ['BOOLEAN', 'TIMESTAMP', 'TIMESTAMP'],
+        'ConditionalFunctions::IfFn<TimestampValue>', ['if']],
 
-  ['Conditional_IsNull', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+  ['Conditional_IsNull', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'],
         'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
-  ['Conditional_IsNull', 'INT', ['INT', 'INT'], \
+  ['Conditional_IsNull', 'TINYINT', ['TINYINT', 'TINYINT'],
         'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
-  ['Conditional_IsNull', 'BIGINT', ['BIGINT', 'BIGINT'], \
+  ['Conditional_IsNull', 'SMALLINT', ['SMALLINT', 'SMALLINT'],
         'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
-  ['Conditional_IsNull', 'DOUBLE', ['DOUBLE', 'DOUBLE'], \
+  ['Conditional_IsNull', 'INT', ['INT', 'INT'],
+        'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
+  ['Conditional_IsNull', 'BIGINT', ['BIGINT', 'BIGINT'],
+        'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
+  ['Conditional_IsNull', 'FLOAT', ['FLOAT', 'FLOAT'],
         'ConditionalFunctions::IsNull', ['isnull','ifnull', 'nvl']],
-  ['Conditional_IsNull', 'STRING', ['STRING', 'STRING'], \
+  ['Conditional_IsNull', 'DOUBLE', ['DOUBLE', 'DOUBLE'],
+        'ConditionalFunctions::IsNull', ['isnull','ifnull', 'nvl']],
+  ['Conditional_IsNull', 'STRING', ['STRING', 'STRING'],
         'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
-  ['Conditional_IsNull', 'TIMESTAMP', ['TIMESTAMP', 'TIMESTAMP'], \
+  ['Conditional_IsNull', 'TIMESTAMP', ['TIMESTAMP', 'TIMESTAMP'],
         'ConditionalFunctions::IsNull', ['isnull', 'ifnull', 'nvl']],
 
-  ['Conditional_Coalesce', 'BOOLEAN', ['BOOLEAN', '...'], \
-        'ConditionalFunctions::CoalesceBool', ['coalesce']],
-  ['Conditional_Coalesce', 'BIGINT', ['BIGINT', '...'], \
-        'ConditionalFunctions::CoalesceInt', ['coalesce']],
-  ['Conditional_Coalesce', 'DOUBLE', ['DOUBLE', '...'], \
-        'ConditionalFunctions::CoalesceFloat', ['coalesce']],
-  ['Conditional_Coalesce', 'STRING', ['STRING', '...'], \
-        'ConditionalFunctions::CoalesceString', ['coalesce']],
-  ['Conditional_Coalesce', 'TIMESTAMP', ['TIMESTAMP', '...'], \
-        'ConditionalFunctions::CoalesceTimestamp', ['coalesce']],
+  ['Conditional_Coalesce', 'BOOLEAN', ['BOOLEAN', '...'],
+        'ConditionalFunctions::Coalesce<bool>', ['coalesce']],
+  ['Conditional_Coalesce', 'TINYINT', ['TINYINT', '...'],
+        'ConditionalFunctions::Coalesce<int8_t>', ['coalesce']],
+  ['Conditional_Coalesce', 'SMALLINT', ['SMALLINT', '...'],
+        'ConditionalFunctions::Coalesce<int16_t>', ['coalesce']],
+  ['Conditional_Coalesce', 'INT', ['INT', '...'],
+        'ConditionalFunctions::Coalesce<int32_t>', ['coalesce']],
+  ['Conditional_Coalesce', 'BIGINT', ['BIGINT', '...'],
+        'ConditionalFunctions::Coalesce<int64_t>', ['coalesce']],
+  ['Conditional_Coalesce', 'FLOAT', ['FLOAT', '...'],
+        'ConditionalFunctions::Coalesce<float>', ['coalesce']],
+  ['Conditional_Coalesce', 'DOUBLE', ['DOUBLE', '...'],
+        'ConditionalFunctions::Coalesce<double>', ['coalesce']],
+  ['Conditional_Coalesce', 'STRING', ['STRING', '...'],
+        'ConditionalFunctions::Coalesce<StringValue>', ['coalesce']],
+  ['Conditional_Coalesce', 'TIMESTAMP', ['TIMESTAMP', '...'],
+        'ConditionalFunctions::Coalesce<TimestampValue>', ['coalesce']],
 ]
 
 # These functions are implemented against the UDF interface.

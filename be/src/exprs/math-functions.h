@@ -63,20 +63,12 @@ class MathFunctions {
   static void* PmodDouble(Expr* e, TupleRow* row);
   static void* FmodFloat(Expr* e, TupleRow* row);
   static void* FmodDouble(Expr* e, TupleRow* row);
-  static void* PositiveBigInt(Expr* e, TupleRow* row);
-  static void* PositiveDouble(Expr* e, TupleRow* row);
-  static void* NegativeBigInt(Expr* e, TupleRow* row);
-  static void* NegativeDouble(Expr* e, TupleRow* row);
   static void* QuotientDouble(Expr* e, TupleRow* row);
   static void* QuotientBigInt(Expr* e, TupleRow* row);
-  // TODO: Collapse the numeric implementations in to a template once the new
-  // expression logic is in place.
-  template <bool ISLEAST> static void* LeastGreatestInt(Expr* e, TupleRow* row);
-  template <bool ISLEAST> static void* LeastGreatestBigInt(Expr* e, TupleRow* row);
-  template <bool ISLEAST> static void* LeastGreatestFloat(Expr* e, TupleRow* row);
-  template <bool ISLEAST> static void* LeastGreatestDouble(Expr* e, TupleRow* row);
+  template <typename T> static void* Positive(Expr* e, TupleRow* row);
+  template <typename T> static void* Negative(Expr* e, TupleRow* row);
+  template <typename T, bool ISLEAST> static void* LeastGreatest(Expr* e, TupleRow* row);
   template <bool ISLEAST> static void* LeastGreatestString(Expr* e, TupleRow* row);
-  template <bool ISLEAST> static void* LeastGreatestTimestamp(Expr* e, TupleRow* row);
 
  private:
   static const int32_t MIN_BASE = 2;

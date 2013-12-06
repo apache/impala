@@ -114,6 +114,15 @@ struct ExprValue {
     string_val.len = string_data.size();
   }
 
+  // Setter template with specializations for all types in expr-inline.h.
+  // Returns the address of the set member.
+  // TODO: Clean up built-in functions based on template Get() and Set().
+  template<typename T> void* Set(const T& val);
+
+  // Getter template with specializations for all types in expr-inline.h.
+  // Returns the address of the set member corresponding to T,
+  template<typename T> void* Get();
+
   // Sets the value for type to '0' and returns a pointer to the data
   void* SetToZero(PrimitiveType type) {
     switch (type) {

@@ -67,11 +67,13 @@ class ExprTest : public testing::Test {
   // Maps from enum value of primitive integer type to
   // the minimum value that is outside of the next smaller-resolution type.
   // For example the value for type TYPE_SMALLINT is numeric_limits<int8_t>::max()+1.
-  unordered_map<int, int64_t> min_int_values_;
+  typedef unordered_map<int, int64_t> IntValMap;
+  IntValMap min_int_values_;
 
   // Maps from primitive float type to smallest positive value that is larger
   // than the largest value of the next smaller-resolution type.
-  unordered_map<int, double> min_float_values_;
+  typedef unordered_map<int, double> FloatValMap;
+  FloatValMap min_float_values_;
 
   // Maps from enum value of primitive type to
   // a string representation of a default value for testing.
@@ -1951,16 +1953,32 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("cast(-12345.345 as float) % cast(0 as float)", TYPE_FLOAT);
   TestIsNull("cast(-12345.345 as double) % 0", TYPE_DOUBLE);
 
-  // Test bigint param.
-  TestValue("positive(1234567890)", TYPE_BIGINT, 1234567890);
-  TestValue("positive(-1234567890)", TYPE_BIGINT, -1234567890);
-  TestValue("negative(1234567890)", TYPE_BIGINT, -1234567890);
-  TestValue("negative(-1234567890)", TYPE_BIGINT, 1234567890);
-  // Test double param.
-  TestValue("positive(3.14159265)", TYPE_DOUBLE, 3.14159265);
-  TestValue("positive(-3.14159265)", TYPE_DOUBLE, -3.14159265);
-  TestValue("negative(3.14159265)", TYPE_DOUBLE, -3.14159265);
-  TestValue("negative(-3.14159265)", TYPE_DOUBLE, 3.14159265);
+  // Test positive().
+  TestValue("positive(cast(123 as tinyint))", TYPE_TINYINT, 123);
+  TestValue("positive(cast(123 as smallint))", TYPE_SMALLINT, 123);
+  TestValue("positive(cast(123 as int))", TYPE_INT, 123);
+  TestValue("positive(cast(123 as bigint))", TYPE_BIGINT, 123);
+  TestValue("positive(cast(3.1415 as float))", TYPE_FLOAT, 3.1415f);
+  TestValue("positive(cast(3.1415 as double))", TYPE_DOUBLE, 3.1415);
+  TestValue("positive(cast(-123 as tinyint))", TYPE_TINYINT, -123);
+  TestValue("positive(cast(-123 as smallint))", TYPE_SMALLINT, -123);
+  TestValue("positive(cast(-123 as int))", TYPE_INT, -123);
+  TestValue("positive(cast(-123 as bigint))", TYPE_BIGINT, -123);
+  TestValue("positive(cast(-3.1415 as float))", TYPE_FLOAT, -3.1415f);
+  TestValue("positive(cast(-3.1415 as double))", TYPE_DOUBLE, -3.1415);
+  // Test negative().
+  TestValue("negative(cast(123 as tinyint))", TYPE_TINYINT, -123);
+  TestValue("negative(cast(123 as smallint))", TYPE_SMALLINT, -123);
+  TestValue("negative(cast(123 as int))", TYPE_INT, -123);
+  TestValue("negative(cast(123 as bigint))", TYPE_BIGINT, -123);
+  TestValue("negative(cast(3.1415 as float))", TYPE_FLOAT, -3.1415f);
+  TestValue("negative(cast(3.1415 as double))", TYPE_DOUBLE, -3.1415);
+  TestValue("negative(cast(-123 as tinyint))", TYPE_TINYINT, 123);
+  TestValue("negative(cast(-123 as smallint))", TYPE_SMALLINT, 123);
+  TestValue("negative(cast(-123 as int))", TYPE_INT, 123);
+  TestValue("negative(cast(-123 as bigint))", TYPE_BIGINT, 123);
+  TestValue("negative(cast(-3.1415 as float))", TYPE_FLOAT, 3.1415f);
+  TestValue("negative(cast(-3.1415 as double))", TYPE_DOUBLE, 3.1415);
 
   // Test bigint param.
   TestValue("quotient(12, 6)", TYPE_BIGINT, 2);
@@ -1971,87 +1989,42 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("quotient(-30.5, 2.5)", TYPE_BIGINT, -15);
   TestIsNull("quotient(-30.5, 0.000999)", TYPE_BIGINT);
 
-  // Test int param
-  int32_t int_val = 123456789;
-  string int_val_str = lexical_cast<string>(int_val);
-  TestValue<int32_t>("least(500, 300)", TYPE_INT, 300);
+  // Tests to verify logic of least(). All types but STRING use the same
+  // templated function, so there is no need to run all tests with all types.
+  // Test single value.
+  TestValue("least(1)", TYPE_TINYINT, 1);
+  TestValue<float>("least(1.25)", TYPE_FLOAT, 1.25f);
   // Test ordering
-  TestValue<int32_t>("least(300, 500)", TYPE_INT, 300);
-  // Test to make sure least value is found in a mixed order set
-  TestValue<int32_t>("least(1, 3, 4, 0, 6)", TYPE_INT, 0);
-  // Test to make sure the least value is found from a list of duplicates
-  TestValue<int32_t>("least(1, 1, 1, 1)", TYPE_INT, 1);
-  // Test repeating groups and ordering
-  TestValue<int32_t>("least(2, 2, 1, 1)", TYPE_INT, 1);
-  TestValue<int32_t>("least(0, -2, 1)", TYPE_INT, -2);
-  // Test small single value is returned correctly
-  TestValue<int32_t>("least(1)", TYPE_INT, 1);
-  // Test large single value is returned correctly
-  TestValue<int32_t>("least(" + int_val_str + ")", TYPE_INT, int_val);
-  // Test to make sure mixed integer types are handled correctly
-  TestValue<int32_t>("least(" + int_val_str + ", 10)", TYPE_INT, 10);
-  // Test to make sure large integer types are handled correctly
-  TestValue<int32_t>("least(" + int_val_str + "," + int_val_str + ")", TYPE_INT,
-      int_val);
-  // Test explicit cast
-  TestValue<int32_t>("least(cast(1 as int))", TYPE_INT, 1);
-  TestIsNull("least(1, NULL)", TYPE_INT);
-  // Test bigint param
-  int64_t bigint_val = 12345678900;
-  string bigint_val_str = lexical_cast<string>(bigint_val);
-  TestValue<int64_t>("least(" + bigint_val_str + ", 300)", TYPE_BIGINT, 300);
-  // Test ordering
-  TestValue<int64_t>("least(300, " + bigint_val_str + ")", TYPE_BIGINT, 300);
-  // Test to make sure least value is found in a mixed order set
-  TestValue<int64_t>("least(1, 3, " + bigint_val_str + ", 0, 6)", TYPE_BIGINT, 0);
-  // Test to make sure the least value is found from a list of duplicates
-  TestValue<int64_t>("least(" + bigint_val_str + ", " + bigint_val_str + ", " +
-      bigint_val_str + ", " + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
-  // Test repeating groups and ordering
-  TestValue<int64_t>("least(1, 1, " + bigint_val_str + ", " + bigint_val_str + ")",
-      TYPE_BIGINT, 1);
-  TestValue<int64_t>("least(0, -3147483648, 1)", TYPE_BIGINT, -3147483648);
-  TestValue<int64_t>("least(" + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
-  TestIsNull("least(1, " + bigint_val_str + ", NULL)", TYPE_BIGINT);
-  // Test float param
+  TestValue("least(10, 20)", TYPE_TINYINT, 10);
+  TestValue("least(20, 10)", TYPE_TINYINT, 10);
   TestValue<float>("least(500.25, 300.25)", TYPE_FLOAT, 300.25f);
-  // Test ordering
   TestValue<float>("least(300.25, 500.25)", TYPE_FLOAT, 300.25f);
   // Test to make sure least value is found in a mixed order set
+  TestValue("least(1, 3, 4, 0, 6)", TYPE_TINYINT, 0);
   TestValue<float>("least(1.25, 3.25, 4.25, 0.25, 6.25)", TYPE_FLOAT, 0.25f);
   // Test to make sure the least value is found from a list of duplicates
+  TestValue("least(1, 1, 1, 1)", TYPE_TINYINT, 1);
   TestValue<float>("least(1.0, 1.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
   // Test repeating groups and ordering
+  TestValue("least(2, 2, 1, 1)", TYPE_TINYINT, 1);
+  TestValue("least(0, -2, 1)", TYPE_TINYINT, -2);
   TestValue<float>("least(2.0, 2.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
   TestValue<float>("least(0.0, -2.0, 1.0)", TYPE_FLOAT, -2.0f);
-  TestValue<float>("least(1.25)", TYPE_FLOAT, 1.25f);
-  TestIsNull("least(1.0, NULL)", TYPE_FLOAT);
-  // Test double param
-  double double_val = 12345678900.25;
-  string double_val_str = lexical_cast<string>(double_val);
-  TestValue<double>("least(" + double_val_str + ", 300.25)", TYPE_DOUBLE, 300.25);
-  // Test the ordering of the arguments
-  TestValue<double>("least(300.25, " + double_val_str + ")", TYPE_DOUBLE, 300.25);
-  // Test to make sure least value is found in a mixed order set
-  TestValue<double>("least(1.25, 3.25, " + double_val_str + ", 0.25, 6.25)", TYPE_DOUBLE,
-      0.25);
-  TestValue<double>("least(" + double_val_str + ", " + double_val_str + ", " +
-      double_val_str + ", " + double_val_str + ")", TYPE_DOUBLE, double_val);
-  // Test repeating groups and ordering
-  TestValue<double>("least(" + double_val_str + ", " + double_val_str + ", 1.0, 1.0)",
-      TYPE_DOUBLE, 1.0);
-  TestValue<double>("least(0.0, -" + double_val_str + ", 1.0)", TYPE_DOUBLE,
-      (double_val * -1));
-  TestValue<double>("least(" + double_val_str + ")", TYPE_DOUBLE, double_val);
-  TestIsNull("least(1.0, " + double_val_str + ", NULL)", TYPE_DOUBLE);
-  // Test mixed numeric params
-  TestValue<float>("least(500.25, 1.25, 10)", TYPE_FLOAT, 1.25f);
-  TestValue<float>("least(1.0, 55, 300.25, 100)", TYPE_FLOAT, 1.0f);
-  TestValue<double>("least(500.25, " + double_val_str + ", 10, 1.0)", TYPE_DOUBLE, 1.0);
-  TestValue<double>("least(1.0, 55, " + double_val_str + ", 100)", TYPE_DOUBLE, 1.0);
-  TestIsNull("least(1.0, NULL, 10)", TYPE_FLOAT);
-  TestIsNull("least(1.0, " + double_val_str + ", NULL, 10)", TYPE_DOUBLE);
-  // Test string param
+  // Test all int types.
+  string val_list;
+  val_list = "0";
+  BOOST_FOREACH(IntValMap::value_type& entry, min_int_values_) {
+    string val_str = lexical_cast<string>(entry.second);
+    val_list.append(", " + val_str);
+    PrimitiveType t = static_cast<PrimitiveType>(entry.first);
+    TestValue<int64_t>("least(" + val_list + ")", t, 0);
+  }
+  // Test double type.
+  TestValue<double>("least(0.0, cast(-2.0 as double), 1.0)", TYPE_DOUBLE, -2.0f);
+  // Test timestamp param
+  TestStringValue("cast(least(cast('2014-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-26 12:00:00' as timestamp)) as string)", "2013-09-26 12:00:00");
+  // Test string param.
   TestStringValue("least('2', '5', '12', '3')", "12");
   TestStringValue("least('apples', 'oranges', 'bananas')", "apples");
   TestStringValue("least('apples', 'applis', 'applas')", "applas");
@@ -2071,110 +2044,40 @@ TEST_F(ExprTest, MathFunctions) {
   TestStringValue("least('apples', 'app\fles')", "app\fles");
   TestStringValue("least('apples', 'app\vles')", "app\vles");
   TestStringValue("least('apples', 'app\rles')", "app\rles");
-  TestIsNull("least('apples', 'oranges', 'bananas', NULL)", TYPE_STRING);
-  // Test timestamp param
-  TestStringValue("cast(least(cast('2014-09-26 12:00:00' as timestamp), "
-      "cast('2013-09-26 12:00:00' as timestamp)) as string)", "2013-09-26 12:00:00");
-  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp), "
-      "cast('2013-08-26 12:00:00' as timestamp)) as string)", "2013-08-26 12:00:00");
-  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp), "
-      "cast('2013-09-25 12:00:00' as timestamp)) as string)", "2013-09-25 12:00:00");
-  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp), "
-      "cast('2013-09-26 11:59:59' as timestamp)) as string)", "2013-09-26 11:59:59");
-  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp), "
-      "cast('2013-09-26 12:00:01' as timestamp)) as string)", "2013-09-26 12:00:00");
-  TestStringValue("cast(least(cast('2013-09-26 12:01:00' as timestamp), "
-      "cast('2013-09-26 12:00:01' as timestamp)) as string)", "2013-09-26 12:00:01");
-  TestStringValue("cast(least(cast('12:01:00' as timestamp), "
-      "cast('12:00:01' as timestamp)) as string)", "12:00:01");
-  TestStringValue("cast(least(cast('2013-09-26 12:00:00' as timestamp)) as string)",
-      "2013-09-26 12:00:00");
-  TestStringValue("cast(least(cast('12:00:00' as timestamp)) as string)", "12:00:00");
-  TestIsNull("least(cast('2013-09-26 12:01:00' as timestamp), "
-      "cast('2013-09-26 12:00:01' as timestamp), NULL)", TYPE_TIMESTAMP);
 
-  // Test int param
-  int_val = 123456789;
-  int_val_str = lexical_cast<string>(int_val);
-  TestValue<int32_t>("greatest(500, 300)", TYPE_INT, 500);
+  // Tests to verify logic of greatest(). All types but STRING use the same
+  // templated function, so there is no need to run all tests with all types.
+  TestValue("greatest(1)", TYPE_TINYINT, 1);
+  TestValue<float>("greatest(1.25)", TYPE_FLOAT, 1.25f);
   // Test ordering
-  TestValue<int32_t>("greatest(300, 500)", TYPE_INT, 500);
-  // Test to make sure greatest value is found in a mixed order set
-  TestValue<int32_t>("greatest(1, 3, 4, 0, 6)", TYPE_INT, 6);
-  // Test to make sure the greatest value is found from a list of duplicates
-  TestValue<int32_t>("greatest(1, 1, 1, 1)", TYPE_INT, 1);
-  // Test repeating groups and ordering
-  TestValue<int32_t>("greatest(2, 2, 1, 1)", TYPE_INT, 2);
-  TestValue<int32_t>("greatest(0, -2, 1)", TYPE_INT, 1);
-  // Test small single value is returned correctly
-  TestValue<int32_t>("greatest(1)", TYPE_INT, 1);
-  // Test large single value is returned correctly
-  TestValue<int32_t>("greatest(" + int_val_str + ")", TYPE_INT, int_val);
-  // Test to make sure mixed integer types are handled correctly
-  TestValue<int32_t>("greatest(" + int_val_str + ", 10)", TYPE_INT, int_val);
-  // Test to make sure large integer types are handled correctly
-  TestValue<int32_t>("greatest(" + int_val_str + "," + int_val_str + ")", TYPE_INT,
-      int_val);
-  // Test explicit cast
-  TestValue<int32_t>("greatest(cast(1 as int))", TYPE_INT, 1);
-  TestIsNull("greatest(1, NULL)", TYPE_INT);
-  // Test bigint param
-  bigint_val = 12345678900;
-  bigint_val_str = lexical_cast<string>(bigint_val);
-  TestValue<int64_t>("greatest(" + bigint_val_str + ", 300)", TYPE_BIGINT, bigint_val);
-  // Test ordering
-  TestValue<int64_t>("greatest(300, " + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
-  // Test to make sure greatest value is found in a mixed order set
-  TestValue<int64_t>("greatest(1, 3, " + bigint_val_str + ", 0, 6)", TYPE_BIGINT,
-      bigint_val);
-  // Test to make sure the greatest value is found from a list of duplicates
-  TestValue<int64_t>("greatest(" + bigint_val_str + ", " + bigint_val_str + ", " +
-      bigint_val_str + ", " + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
-  // Test repeating groups and ordering
-  TestValue<int64_t>("greatest(1, 1, " + bigint_val_str + ", " + bigint_val_str + ")",
-      TYPE_BIGINT, bigint_val);
-  TestValue<int64_t>("greatest(0, -3147483648, 1)", TYPE_BIGINT, 1);
-  TestValue<int64_t>("greatest(" + bigint_val_str + ")", TYPE_BIGINT, bigint_val);
-  TestIsNull("greatest(1, " + bigint_val_str + ", NULL)", TYPE_BIGINT);
-  // Test float param
+  TestValue("greatest(10, 20)", TYPE_TINYINT, 20);
+  TestValue("greatest(20, 10)", TYPE_TINYINT, 20);
   TestValue<float>("greatest(500.25, 300.25)", TYPE_FLOAT, 500.25f);
-  // Test ordering
   TestValue<float>("greatest(300.25, 500.25)", TYPE_FLOAT, 500.25f);
-  // Test to make sure greatest value is found in a mixed order set
+  // Test to make sure least value is found in a mixed order set
+  TestValue("greatest(1, 3, 4, 0, 6)", TYPE_TINYINT, 6);
   TestValue<float>("greatest(1.25, 3.25, 4.25, 0.25, 6.25)", TYPE_FLOAT, 6.25f);
-  // Test to make sure the greatest value is found from a list of duplicates
+  // Test to make sure the least value is found from a list of duplicates
+  TestValue("greatest(1, 1, 1, 1)", TYPE_TINYINT, 1);
   TestValue<float>("greatest(1.0, 1.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
   // Test repeating groups and ordering
+  TestValue("greatest(2, 2, 1, 1)", TYPE_TINYINT, 2);
+  TestValue("greatest(0, -2, 1)", TYPE_TINYINT, 1);
   TestValue<float>("greatest(2.0, 2.0, 1.0, 1.0)", TYPE_FLOAT, 2.0f);
   TestValue<float>("greatest(0.0, -2.0, 1.0)", TYPE_FLOAT, 1.0f);
-  TestValue<float>("greatest(1.25)", TYPE_FLOAT, 1.25f);
-  TestIsNull("greatest(1.0, NULL)", TYPE_FLOAT);
-  // Test double param
-  double_val = 12345678900.25;
-  double_val_str = lexical_cast<string>(double_val);
-  TestValue<double>("greatest(" + double_val_str + ", 300.25)", TYPE_DOUBLE, double_val);
-  // Test the ordering of the arguments
-  TestValue<double>("greatest(300.25, " + double_val_str + ")", TYPE_DOUBLE, double_val);
-  // Test to make sure greatest value is found in a mixed order set
-  TestValue<double>("greatest(1.25, 3.25, " + double_val_str + ", 0.25, 6.25)",
-      TYPE_DOUBLE, double_val);
-  TestValue<double>("greatest(" + double_val_str + ", " + double_val_str + ", " +
-      double_val_str + ", " + double_val_str + ")", TYPE_DOUBLE, double_val);
-  // Test repeating groups and ordering
-  TestValue<double>("greatest(" + double_val_str + ", " + double_val_str + ", 1.0, 1.0)",
-      TYPE_DOUBLE, double_val);
-  TestValue<double>("greatest(0.0, -" + double_val_str + ", 1.0)", TYPE_DOUBLE, 1.0);
-  TestValue<double>("greatest(" + double_val_str + ")", TYPE_DOUBLE, double_val);
-  TestIsNull("greatest(1.0, " + double_val_str + ", NULL)", TYPE_DOUBLE);
-  // Test mixed numeric params
-  TestValue<float>("greatest(500.25, 1.25, 10)", TYPE_FLOAT, 500.25f);
-  TestValue<float>("greatest(1.0, 55, 300.25, 100)", TYPE_FLOAT, 300.25f);
-  TestValue<double>("greatest(500.25, " + double_val_str + ", 10, 1.0)", TYPE_DOUBLE,
-      double_val);
-  TestValue<double>("greatest(1.0, 55, " + double_val_str + ", 100)", TYPE_DOUBLE,
-      double_val);
-  TestIsNull("greatest(1.0, NULL, 10)", TYPE_FLOAT);
-  TestIsNull("greatest(1.0, " + double_val_str + ", NULL, 10)", TYPE_DOUBLE);
+  // Test all int types.
+  val_list = "0";
+  BOOST_FOREACH(IntValMap::value_type& entry, min_int_values_) {
+    string val_str = lexical_cast<string>(entry.second);
+    val_list.append(", " + val_str);
+    PrimitiveType t = static_cast<PrimitiveType>(entry.first);
+    TestValue<int64_t>("greatest(" + val_list + ")", t, entry.second);
+  }
+  // Test double type.
+  TestValue<double>("greatest(0.0, cast(-2.0 as double), 1.0)", TYPE_DOUBLE, 1.0);
+  // Test timestamp param
+  TestStringValue("cast(greatest(cast('2014-09-26 12:00:00' as timestamp), "
+      "cast('2013-09-26 12:00:00' as timestamp)) as string)", "2014-09-26 12:00:00");
   // Test string param
   TestStringValue("greatest('2', '5', '12', '3')", "5");
   TestStringValue("greatest('apples', 'oranges', 'bananas')", "oranges");
@@ -2195,27 +2098,6 @@ TEST_F(ExprTest, MathFunctions) {
   TestStringValue("greatest('apples', 'app\fles')", "apples");
   TestStringValue("greatest('apples', 'app\vles')", "apples");
   TestStringValue("greatest('apples', 'app\rles')", "apples");
-  TestIsNull("greatest('apples', 'oranges', 'bananas', NULL)", TYPE_STRING);
-  // Test timestamp param
-  TestStringValue("cast(greatest(cast('2014-09-26 12:00:00' as timestamp), "
-      "cast('2013-09-26 12:00:00' as timestamp)) as string)", "2014-09-26 12:00:00");
-  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp), "
-      "cast('2014-08-26 12:00:00' as timestamp)) as string)", "2014-08-26 12:00:00");
-  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp), "
-      "cast('2013-09-25 12:00:00' as timestamp)) as string)", "2013-09-26 12:00:00");
-  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp), "
-      "cast('2013-09-26 11:59:59' as timestamp)) as string)", "2013-09-26 12:00:00");
-  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp), "
-      "cast('2013-09-26 12:00:01' as timestamp)) as string)", "2013-09-26 12:00:01");
-  TestStringValue("cast(greatest(cast('2013-09-26 12:01:00' as timestamp), "
-      "cast('2013-09-26 12:00:01' as timestamp)) as string)", "2013-09-26 12:01:00");
-  TestStringValue("cast(greatest(cast('12:01:00' as timestamp), "
-      "cast('12:00:01' as timestamp)) as string)", "12:01:00");
-  TestStringValue("cast(greatest(cast('2013-09-26 12:00:00' as timestamp)) as string)",
-      "2013-09-26 12:00:00");
-  TestStringValue("cast(greatest(cast('12:00:00' as timestamp)) as string)", "12:00:00");
-  TestIsNull("greatest(cast('2013-09-26 12:01:00' as timestamp), "
-      "cast('2013-09-26 12:00:01' as timestamp), NULL)", TYPE_TIMESTAMP);
 
   // NULL arguments.
   TestIsNull("abs(NULL)", TYPE_DOUBLE);
@@ -2248,18 +2130,22 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("cast(10.3 as double) % NULL", TYPE_DOUBLE);
   TestIsNull("fmod(NULL, NULL)", TYPE_FLOAT);
   TestIsNull("NULL % NULL", TYPE_NULL);
-  TestIsNull("positive(NULL)", TYPE_BIGINT);
-  TestIsNull("negative(NULL)", TYPE_BIGINT);
+  TestIsNull("positive(NULL)", TYPE_TINYINT);
+  TestIsNull("negative(NULL)", TYPE_TINYINT);
   TestIsNull("quotient(NULL, 1.0)", TYPE_BIGINT);
   TestIsNull("quotient(1.0, NULL)", TYPE_BIGINT);
   TestIsNull("quotient(NULL, NULL)", TYPE_BIGINT);
   TestIsNull("least(NULL)", TYPE_STRING);
+  TestIsNull("least(cast(NULL as tinyint))", TYPE_TINYINT);
+  TestIsNull("least(cast(NULL as smallint))", TYPE_SMALLINT);
   TestIsNull("least(cast(NULL as int))", TYPE_INT);
   TestIsNull("least(cast(NULL as bigint))", TYPE_BIGINT);
   TestIsNull("least(cast(NULL as float))", TYPE_FLOAT);
   TestIsNull("least(cast(NULL as double))", TYPE_DOUBLE);
   TestIsNull("least(cast(NULL as timestamp))", TYPE_TIMESTAMP);
   TestIsNull("greatest(NULL)", TYPE_STRING);
+  TestIsNull("greatest(cast(NULL as tinyint))", TYPE_TINYINT);
+  TestIsNull("greatest(cast(NULL as smallint))", TYPE_SMALLINT);
   TestIsNull("greatest(cast(NULL as int))", TYPE_INT);
   TestIsNull("greatest(cast(NULL as bigint))", TYPE_BIGINT);
   TestIsNull("greatest(cast(NULL as float))", TYPE_FLOAT);
@@ -2692,17 +2578,23 @@ TEST_F(ExprTest, ConditionalFunctions) {
   for (int i = 0; i < 3; ++i) {
     string& f = isnull_aliases[i];
     TestValue(f + "(true, NULL)", TYPE_BOOLEAN, true);
-    TestValue(f + "(1, NULL)", TYPE_INT, 1);
-    TestValue(f + "(1 + 1, NULL)", TYPE_BIGINT, 2);
-    TestValue(f + "(10.0, NULL)", TYPE_DOUBLE, 10.0);
+    TestValue(f + "(1, NULL)", TYPE_TINYINT, 1);
+    TestValue(f + "(cast(1 as smallint), NULL)", TYPE_SMALLINT, 1);
+    TestValue(f + "(cast(1 as int), NULL)", TYPE_INT, 1);
+    TestValue(f + "(cast(1 as bigint), NULL)", TYPE_BIGINT, 1);
+    TestValue(f + "(cast(10.0 as float), NULL)", TYPE_FLOAT, 10.0f);
+    TestValue(f + "(cast(10.0 as double), NULL)", TYPE_DOUBLE, 10.0);
     TestStringValue(f + "('abc', NULL)", "abc");
     TestTimestampValue(f + "(" + default_timestamp_str_ + ", NULL)",
         default_timestamp_val_);
     // Test first argument is NULL.
     TestValue(f + "(NULL, true)", TYPE_BOOLEAN, true);
-    TestValue(f + "(NULL, 1)", TYPE_INT, 1);
-    TestValue(f + "(NULL, 1 + 1)", TYPE_BIGINT, 2);
-    TestValue(f + "(NULL, 10.0)", TYPE_DOUBLE, 10.0);
+    TestValue(f + "(NULL, 1)", TYPE_TINYINT, 1);
+    TestValue(f + "(NULL, cast(1 as smallint))", TYPE_SMALLINT, 1);
+    TestValue(f + "(NULL, cast(1 as int))", TYPE_INT, 1);
+    TestValue(f + "(NULL, cast(1 as bigint))", TYPE_BIGINT, 1);
+    TestValue(f + "(NULL, cast(10.0 as float))", TYPE_FLOAT, 10.0f);
+    TestValue(f + "(NULL, cast(10.0 as double))", TYPE_DOUBLE, 10.0);
     TestStringValue(f + "(NULL, 'abc')", "abc");
     TestTimestampValue(f + "(NULL, " + default_timestamp_str_ + ")",
         default_timestamp_val_);
@@ -2710,20 +2602,28 @@ TEST_F(ExprTest, ConditionalFunctions) {
     TestIsNull(f + "(NULL, NULL)", TYPE_BOOLEAN);
   }
 
-  TestIsNull("coalesce(NULL)", TYPE_DOUBLE);
-  TestIsNull("coalesce(NULL, NULL)", TYPE_DOUBLE);
+  TestIsNull("coalesce(NULL)", TYPE_FLOAT);
+  TestIsNull("coalesce(NULL, NULL)", TYPE_FLOAT);
   TestValue("coalesce(TRUE)", TYPE_BOOLEAN, true);
   TestValue("coalesce(NULL, TRUE, NULL)", TYPE_BOOLEAN, true);
   TestValue("coalesce(FALSE, NULL, TRUE, NULL)", TYPE_BOOLEAN, false);
   TestValue("coalesce(NULL, NULL, NULL, TRUE, NULL, NULL)", TYPE_BOOLEAN, true);
-  TestValue("coalesce(10)", TYPE_BIGINT, 10);
-  TestValue("coalesce(NULL, 10, NULL)", TYPE_BIGINT, 10);
-  TestValue("coalesce(20, NULL, 10, NULL)", TYPE_BIGINT, 20);
-  TestValue("coalesce(NULL, NULL, NULL, 10, NULL, NULL)", TYPE_BIGINT, 10);
-  TestValue("coalesce(5.5)", TYPE_DOUBLE, 5.5);
-  TestValue("coalesce(NULL, 5.5, NULL)", TYPE_DOUBLE, 5.5);
-  TestValue("coalesce(8.8, NULL, 5.5, NULL)", TYPE_DOUBLE, 8.8);
-  TestValue("coalesce(NULL, NULL, NULL, 5.5, NULL, NULL)", TYPE_DOUBLE, 5.5);
+  TestValue("coalesce(10)", TYPE_TINYINT, 10);
+  TestValue("coalesce(NULL, 10)", TYPE_TINYINT, 10);
+  TestValue("coalesce(10, NULL)", TYPE_TINYINT, 10);
+  TestValue("coalesce(NULL, 10, NULL)", TYPE_TINYINT, 10);
+  TestValue("coalesce(20, NULL, 10, NULL)", TYPE_TINYINT, 20);
+  TestValue("coalesce(20, NULL, cast(10 as smallint), NULL)", TYPE_SMALLINT, 20);
+  TestValue("coalesce(20, NULL, cast(10 as int), NULL)", TYPE_INT, 20);
+  TestValue("coalesce(20, NULL, cast(10 as bigint), NULL)", TYPE_BIGINT, 20);
+  TestValue("coalesce(cast(5.5 as float))", TYPE_FLOAT, 5.5f);
+  TestValue("coalesce(NULL, cast(5.5 as float))", TYPE_FLOAT, 5.5f);
+  TestValue("coalesce(cast(5.5 as float), NULL)", TYPE_FLOAT, 5.5f);
+  TestValue("coalesce(NULL, cast(5.5 as float), NULL)", TYPE_FLOAT, 5.5f);
+  TestValue("coalesce(cast(9.8 as float), NULL, cast(5.5 as float), NULL)",
+      TYPE_FLOAT, 9.8f);
+  TestValue("coalesce(cast(9.8 as double), NULL, cast(5.5 as double), NULL)",
+      TYPE_DOUBLE, 9.8);
   TestStringValue("coalesce('abc')", "abc");
   TestStringValue("coalesce(NULL, 'abc', NULL)", "abc");
   TestStringValue("coalesce('defgh', NULL, 'abc', NULL)", "defgh");

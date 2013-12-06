@@ -14,151 +14,13 @@
 
 #include "exprs/conditional-functions.h"
 #include "exprs/expr.h"
+#include "exprs/expr-inline.h"
 #include "exprs/case-expr.h"
 #include "runtime/tuple-row.h"
 
 using namespace std;
 
 namespace impala {
-
-void* ConditionalFunctions::IfBool(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
-  if (cond == NULL || !*cond) {
-    bool* else_val = reinterpret_cast<bool*>(e->children()[2]->GetValue(row));
-    if (else_val == NULL) return NULL;
-    e->result_.bool_val = *else_val;
-  } else {
-    bool* then_val = reinterpret_cast<bool*>(e->children()[1]->GetValue(row));
-    if (then_val == NULL) return NULL;
-    e->result_.bool_val = *then_val;
-  }
-  return &e->result_.bool_val;
-}
-
-void* ConditionalFunctions::IfTinyint(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
-  if (cond == NULL || !*cond) {
-    int8_t* else_val = reinterpret_cast<int8_t*>(e->children()[2]->GetValue(row));
-    if (else_val == NULL) return NULL;
-    e->result_.tinyint_val = *else_val;
-  } else {
-    int8_t* then_val = reinterpret_cast<int8_t*>(e->children()[1]->GetValue(row));
-    if (then_val == NULL) return NULL;
-    e->result_.tinyint_val = *then_val;
-  }
-  return &e->result_.tinyint_val;
-}
-
-void* ConditionalFunctions::IfSmallint(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
-  if (cond == NULL || !*cond) {
-    int16_t* else_val = reinterpret_cast<int16_t*>(e->children()[2]->GetValue(row));
-    if (else_val == NULL) return NULL;
-    e->result_.smallint_val = *else_val;
-  } else {
-    int16_t* then_val = reinterpret_cast<int16_t*>(e->children()[1]->GetValue(row));
-    if (then_val == NULL) return NULL;
-    e->result_.smallint_val = *then_val;
-  }
-  return &e->result_.smallint_val;
-}
-
-void* ConditionalFunctions::IfInt(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
-  if (cond == NULL || !*cond) {
-    int32_t* else_val = reinterpret_cast<int32_t*>(e->children()[2]->GetValue(row));
-    if (else_val == NULL) return NULL;
-    e->result_.int_val = *else_val;
-  } else {
-    int32_t* then_val = reinterpret_cast<int32_t*>(e->children()[1]->GetValue(row));
-    if (then_val == NULL) return NULL;
-    e->result_.int_val = *then_val;
-  }
-  return &e->result_.int_val;
-}
-
-void* ConditionalFunctions::IfBigint(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
-  if (cond == NULL || !*cond) {
-    int64_t* else_val = reinterpret_cast<int64_t*>(e->children()[2]->GetValue(row));
-    if (else_val == NULL) return NULL;
-    e->result_.bigint_val = *else_val;
-  } else {
-    int64_t* then_val = reinterpret_cast<int64_t*>(e->children()[1]->GetValue(row));
-    if (then_val == NULL) return NULL;
-    e->result_.bigint_val = *then_val;
-  }
-  return &e->result_.bigint_val;
-}
-
-void* ConditionalFunctions::IfFloat(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
-  if (cond == NULL || !*cond) {
-    float* else_val = reinterpret_cast<float*>(e->children()[2]->GetValue(row));
-    if (else_val == NULL) return NULL;
-    e->result_.float_val = *else_val;
-  } else {
-    float* then_val = reinterpret_cast<float*>(e->children()[1]->GetValue(row));
-    if (then_val == NULL) return NULL;
-    e->result_.float_val = *then_val;
-  }
-  return &e->result_.float_val;
-}
-
-void* ConditionalFunctions::IfDouble(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
-  if (cond == NULL || !*cond) {
-    double* else_val = reinterpret_cast<double*>(e->children()[2]->GetValue(row));
-    if (else_val == NULL) return NULL;
-    e->result_.double_val = *else_val;
-  } else {
-    double* then_val = reinterpret_cast<double*>(e->children()[1]->GetValue(row));
-    if (then_val == NULL) return NULL;
-    e->result_.double_val = *then_val;
-  }
-  return &e->result_.double_val;
-}
-
-void* ConditionalFunctions::IfString(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
-  if (cond == NULL || !*cond) {
-    StringValue* else_val =
-        reinterpret_cast<StringValue*>(e->children()[2]->GetValue(row));
-    if (else_val == NULL) return NULL;
-    e->result_.string_val = *else_val;
-  } else {
-    StringValue* then_val =
-        reinterpret_cast<StringValue*>(e->children()[1]->GetValue(row));
-    if (then_val == NULL) return NULL;
-    e->result_.string_val = *then_val;
-  }
-  return &e->result_.string_val;
-}
-
-void* ConditionalFunctions::IfTimestamp(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 3);
-  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
-  if (cond == NULL || !*cond) {
-    TimestampValue* else_val =
-        reinterpret_cast<TimestampValue*>(e->children()[2]->GetValue(row));
-    if (else_val == NULL) return NULL;
-    e->result_.timestamp_val = *else_val;
-  } else {
-    TimestampValue* then_val =
-        reinterpret_cast<TimestampValue*>(e->children()[1]->GetValue(row));
-    if (then_val == NULL) return NULL;
-    e->result_.timestamp_val = *then_val;
-  }
-  return &e->result_.timestamp_val;
-}
 
 void* ConditionalFunctions::IsNull(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 2);
@@ -167,72 +29,26 @@ void* ConditionalFunctions::IsNull(Expr* e, TupleRow* row) {
   return e->children()[1]->GetValue(row);
 }
 
-void* ConditionalFunctions::CoalesceBool(Expr* e, TupleRow* row) {
-  DCHECK_GE(e->GetNumChildren(), 1);
-  int num_children = e->children().size();
-  for (int i = 0; i < num_children; ++i) {
-    bool* child = reinterpret_cast<bool*>(e->children()[i]->GetValue(row));
-    if (child != NULL) {
-      e->result_.bool_val = *child;
-      return &e->result_.bool_val;
-    }
+template <typename T> void* ConditionalFunctions::IfFn(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 3);
+  bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
+  if (cond == NULL || !*cond) {
+    T* else_val = reinterpret_cast<T*>(e->children()[2]->GetValue(row));
+    if (else_val == NULL) return NULL;
+    return e->result_.Set(*else_val);
+  } else {
+    T* then_val = reinterpret_cast<T*>(e->children()[1]->GetValue(row));
+    if (then_val == NULL) return NULL;
+    return e->result_.Set(*then_val);
   }
-  // No non-null children.
-  return NULL;
 }
 
-void* ConditionalFunctions::CoalesceInt(Expr* e, TupleRow* row) {
+template <typename T> void* ConditionalFunctions::Coalesce(Expr* e, TupleRow* row) {
   DCHECK_GE(e->GetNumChildren(), 1);
   int num_children = e->children().size();
   for (int i = 0; i < num_children; ++i) {
-    int64_t* child = reinterpret_cast<int64_t*>(e->children()[i]->GetValue(row));
-    if (child != NULL) {
-      e->result_.bigint_val = *child;
-      return &e->result_.bigint_val;
-    }
-  }
-  // No non-null children.
-  return NULL;
-}
-
-void* ConditionalFunctions::CoalesceFloat(Expr* e, TupleRow* row) {
-  DCHECK_GE(e->GetNumChildren(), 1);
-  int num_children = e->children().size();
-  for (int i = 0; i < num_children; ++i) {
-    double* child = reinterpret_cast<double*>(e->children()[i]->GetValue(row));
-    if (child != NULL) {
-      e->result_.double_val = *child;
-      return &e->result_.double_val;
-    }
-  }
-  // No non-null children.
-  return NULL;
-}
-
-void* ConditionalFunctions::CoalesceString(Expr* e, TupleRow* row) {
-  DCHECK_GE(e->GetNumChildren(), 1);
-  int num_children = e->children().size();
-  for (int i = 0; i < num_children; ++i) {
-    StringValue* child = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
-    if (child != NULL) {
-      e->result_.string_val = *child;
-      return &e->result_.string_val;
-    }
-  }
-  // No non-null children.
-  return NULL;
-}
-
-void* ConditionalFunctions::CoalesceTimestamp(Expr* e, TupleRow* row) {
-  DCHECK_GE(e->GetNumChildren(), 1);
-  int num_children = e->children().size();
-  for (int i = 0; i < num_children; ++i) {
-    TimestampValue* child =
-        reinterpret_cast<TimestampValue*>(e->children()[i]->GetValue(row));
-    if (child != NULL) {
-      e->result_.timestamp_val = *child;
-      return &e->result_.timestamp_val;
-    }
+    T* child = reinterpret_cast<T*>(e->children()[i]->GetValue(row));
+    if (child != NULL) return e->result_.Set(*child);
   }
   // No non-null children.
   return NULL;
@@ -260,5 +76,24 @@ void* ConditionalFunctions::NoCaseComputeFn(Expr* e, TupleRow* row) {
   }
   return NULL;
 }
+
+template void* ConditionalFunctions::IfFn<bool>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::IfFn<int8_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::IfFn<int16_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::IfFn<int32_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::IfFn<int64_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::IfFn<float>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::IfFn<double>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::IfFn<TimestampValue>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::IfFn<StringValue>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::Coalesce<bool>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::Coalesce<int8_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::Coalesce<int16_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::Coalesce<int32_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::Coalesce<int64_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::Coalesce<float>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::Coalesce<double>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::Coalesce<TimestampValue>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::Coalesce<StringValue>(Expr* e, TupleRow* row);
 
 }
