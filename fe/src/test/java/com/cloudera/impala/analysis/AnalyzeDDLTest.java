@@ -989,16 +989,28 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "INIT_FN='_Z7AggInitPN10impala_udf15FunctionContextEPNS_6IntValE' " +
         "MERGE_FN='_Z8AggMergePN10impala_udf15FunctionContextERKNS_6IntValEPS2_'");
 
-    // Try with CHAR(N) intermediate
+    // Try with intermediate type
+    // TODO: this is currently not supported. Remove these tests and re-enable
+    // the commented out ones when we do.
     AnalyzesOk("create aggregate function foo(int) RETURNS int " +
-        "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='AggUpdate'");
+        "INTERMEDIATE int" + loc + "UPDATE_FN='AggUpdate'");
     AnalysisError("create aggregate function foo(int) RETURNS int " +
-        "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='Agg' INIT_FN='AggInit' " +
-        "MERGE_FN='AggMerge'" ,
-        "Finalize() is required for this UDA.");
-    AnalyzesOk("create aggregate function foo(int) RETURNS int " +
-        "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='Agg' INIT_FN='AggInit' " +
-        "MERGE_FN='AggMerge' FINALIZE_FN='AggFinalize'");
+        "INTERMEDIATE double" + loc + "UPDATE_FN='AggUpdate'",
+        "UDAs with an intermediate type, DOUBLE, that is different from the " +
+        "return type, INT, are currently not supported.");
+    AnalysisError("create aggregate function foo(int) RETURNS int " +
+        "INTERMEDIATE char(10)" + loc + "UPDATE_FN='AggUpdate'",
+        "UDAs with an intermediate type, CHAR(10), that is different from the " +
+        "return type, INT, are currently not supported.");
+    //AnalyzesOk("create aggregate function foo(int) RETURNS int " +
+    //    "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='AggUpdate'");
+    //AnalysisError("create aggregate function foo(int) RETURNS int " +
+    //    "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='Agg' INIT_FN='AggInit' " +
+    //    "MERGE_FN='AggMerge'" ,
+    //    "Finalize() is required for this UDA.");
+    //AnalyzesOk("create aggregate function foo(int) RETURNS int " +
+    //    "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='Agg' INIT_FN='AggInit' " +
+    //    "MERGE_FN='AggMerge' FINALIZE_FN='AggFinalize'");
 
     // Udf only arguments must not be set.
     AnalysisError("create aggregate function foo(int) RETURNS int" + loc + "SYMBOL='Bad'",

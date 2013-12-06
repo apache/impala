@@ -79,7 +79,10 @@ public class ColumnType {
   }
 
   @Override
-  public String toString() { return type_.toString(); }
+  public String toString() {
+    if (type_ == PrimitiveType.CHAR) return "CHAR(" + len_ + ")";
+    return type_.toString();
+  }
 
   public TColumnType toThrift() {
     TColumnType thrift = new TColumnType();
