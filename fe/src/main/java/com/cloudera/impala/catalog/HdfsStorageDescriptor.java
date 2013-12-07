@@ -176,8 +176,9 @@ public class HdfsStorageDescriptor {
   }
 
   /**
-   * Thrown when constructing an HdfsStorageDescriptor from an invalid
-   * metatore storage descriptor.
+   * Thrown when constructing an HdfsStorageDescriptor from an invalid/unsupported
+   * metastore storage descriptor.
+   * TODO: Should we have different exception types for unsupported vs invalid metadata?
    */
   public static class InvalidStorageDescriptorException extends CatalogException {
     // Mandatory since Exception implements Serialisable
@@ -200,8 +201,9 @@ public class HdfsStorageDescriptor {
       throws InvalidStorageDescriptorException {
     Map<String, Character> delimMap = extractDelimiters(sd.getSerdeInfo());
     if (!COMPATIBLE_SERDES.contains(sd.getSerdeInfo().getSerializationLib())) {
-      throw new InvalidStorageDescriptorException(
-          "Unsupported SerDe: " + sd.getSerdeInfo().getSerializationLib());
+      throw new InvalidStorageDescriptorException(String.format("Impala does not " +
+          "support tables of this type. REASON: SerDe library '%s' is not " +
+          "supported.", sd.getSerdeInfo().getSerializationLib()));
     }
     // Extract the blocksize and compression specification from the SerDe parameters,
     // if present.

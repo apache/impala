@@ -23,6 +23,7 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsURI;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TUniqueId;
@@ -494,6 +495,19 @@ public class CatalogTest {
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
     assertEquals("Unsupported table type 'INDEX_TABLE' for: functional.hive_index_tbl",
         incompleteTable.getCause().getMessage());
+
+    // Table with unsupported SerDe library.
+    table = catalog.getDb("functional").getTable("bad_serde");
+    assertTrue(table instanceof IncompleteTable);
+    incompleteTable = (IncompleteTable) table;
+    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
+    assertEquals("Failed to load metadata for table: bad_serde",
+        incompleteTable.getCause().getMessage());
+    assertTrue(incompleteTable.getCause().getCause()
+        instanceof InvalidStorageDescriptorException);
+    assertEquals("Impala does not support tables of this type. REASON: SerDe" +
+        " library 'org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe' " +
+        "is not supported.", incompleteTable.getCause().getCause().getMessage());
   }
 
   // This table has metadata set so the escape is \n, which is also the tuple delim. This
