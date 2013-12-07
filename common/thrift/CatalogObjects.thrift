@@ -231,6 +231,8 @@ struct TTable {
 
   // Set if there were any errors loading the Table metadata. The remaining fields in
   // the struct may not be set if there were problems loading the table metadata.
+  // By convention, the final error message in the Status should contain the call stack
+  // string pointing to where the metadata loading error occurred.
   3: optional Status.TStatus load_status
 
   // Table identifier.

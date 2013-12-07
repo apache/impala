@@ -229,8 +229,26 @@ public class Db implements CatalogObject {
       table.setCatalogVersion(catalogVersion);
       tableCache.add(table);
     } else {
+      // This table's metadata is incomplete. The error message in the load status
+      // should provide details on why. By convention, the final error message should
+      // be the remote (Catalog Server) call stack. This shouldn't be displayed to the
+      // user under normal circumstances, but needs to be recorded somewhere so append
+      // it to the call stack of the local TableLoadingException created here.
+      // TODO: Provide a mechanism (query option?) to optionally allow returning more
+      // detailed errors (including the full call stack(s)) to the user.
+      List<String> errorMsgs = thriftTable.getLoad_status().getError_msgs();
+      String callStackStr = "<None available>";
+      if (errorMsgs.size() > 1) callStackStr = errorMsgs.remove(errorMsgs.size() - 1);
+
       TableLoadingException loadingException = new TableLoadingException(
-          Joiner.on("\n").join(thriftTable.getLoad_status().getError_msgs()));
+          Joiner.on("\n").join(errorMsgs));
+      List<StackTraceElement> stackTrace =
+          Lists.newArrayList(loadingException.getStackTrace());
+      stackTrace.add(new StackTraceElement("========",
+          "<Remote stack trace on catalogd>: " + callStackStr, "", -1));
+      loadingException.setStackTrace(
+          stackTrace.toArray(new StackTraceElement[stackTrace.size()]));
+
       // This table's metadata is incomplete. It will show up in the catalog, but
       // if it is accessed it will throw a TableLoadingException. The TableId for
       // the table doesn't matter because can never be sent to the BE, so just assign
