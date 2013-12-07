@@ -59,9 +59,10 @@ class DictEncoderBase {
   void ClearIndices() { buffered_indices_.clear(); }
 
   // Returns a conservative estimate of the number of bytes needed to encode the buffered
-  // indices. Used to size the buffer passed to WriteData.
-  // TODO: better estimate
-  int EstimatedDataEncodedSize() { return 1 + bit_width() * buffered_indices_.size(); }
+  // indices. Used to size the buffer passed to WriteData().
+  int EstimatedDataEncodedSize() {
+    return 1 + RleEncoder::MaxBufferSize(bit_width(), buffered_indices_.size());
+  }
 
   // The minimum bit width required to encode the currently buffered indices.
   int bit_width() const {
@@ -70,10 +71,11 @@ class DictEncoderBase {
     return BitUtil::Log2(num_entries());
   }
 
-  // Writes out any buffered indices to buffer preceded by the bit width of this data and
-  // clears the buffered indices, meaning it cannot be called multiple times for the
-  // same buffer. buffer must be preallocated with buffer_len bytes. Use
-  // EstimatedDataEncodedSize() to size buffer.
+  // Writes out any buffered indices to buffer preceded by the bit width of this data.
+  // Returns the number of bytes written.
+  // If the supplied buffer is not big enough, returns -1.
+  // buffer must be preallocated with buffer_len bytes. Use EstimatedDataEncodedSize()
+  // to size buffer.
   int WriteData(uint8_t* buffer, int buffer_len);
 
   int dict_encoded_size() { return dict_encoded_size_; }
@@ -227,12 +229,9 @@ inline int DictEncoderBase::WriteData(uint8_t* buffer, int buffer_len) {
 
   RleEncoder encoder(buffer, buffer_len, bit_width());
   BOOST_FOREACH(int index, buffered_indices_) {
-    bool result = encoder.Put(index);
-    if (!result) return -1;
+    if (!encoder.Put(index)) return -1;
   }
-  // TODO(skye): fix overflow logic
   encoder.Flush();
-  ClearIndices();
   return 1 + encoder.len();
 }
 

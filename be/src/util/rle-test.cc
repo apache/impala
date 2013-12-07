@@ -20,6 +20,7 @@
 #include <gtest/gtest.h>
 #include <math.h>
 
+#include "common/init.h"
 #include "util/rle-encoding.h"
 #include "util/bit-stream-utils.inline.h"
 
@@ -356,34 +357,37 @@ TEST(BitRle, RepeatedPattern) {
 }
 
 TEST(BitRle, Overflow) {
-  // TODO: test overflow
-  return;
-  const int len = 16;
-  uint8_t buffer[len];
-  int num_added = 0;
-  bool parity = true;
+  for (int bit_width = 1; bit_width < 32; bit_width += 3) {
+    const int len = RleEncoder::MinBufferSize(bit_width);
+    uint8_t buffer[len];
+    int num_added = 0;
+    bool parity = true;
 
-  RleEncoder encoder(buffer, len, 1);
-  // Insert alternating true/false until there is no space left
-  while (true) {
-    bool result = encoder.Put(parity);
-    parity = !parity;
-    if (!result) break;
-    ++num_added;
-  }
+    RleEncoder encoder(buffer, len, bit_width);
+    // Insert alternating true/false until there is no space left
+    while (true) {
+      bool result = encoder.Put(parity);
+      parity = !parity;
+      if (!result) break;
+      ++num_added;
+    }
 
-  int bytes_written = encoder.Flush();
-  EXPECT_LE(bytes_written, len);
-  EXPECT_GT(num_added, 0);
+    int bytes_written = encoder.Flush();
+    EXPECT_LE(bytes_written, len);
+    EXPECT_GT(num_added, 0);
 
-  RleDecoder decoder(buffer, bytes_written, 1);
-  parity = true;
-  for (int i = 0; i < num_added; ++i) {
-    uint8_t v;
-    bool result = decoder.Get(&v);
-    EXPECT_TRUE(result);
-    EXPECT_EQ(v, parity);
-    parity = !parity;
+    RleDecoder decoder(buffer, bytes_written, bit_width);
+    parity = true;
+    uint32_t v;
+    for (int i = 0; i < num_added; ++i) {
+      bool result = decoder.Get(&v);
+      EXPECT_TRUE(result);
+      EXPECT_EQ(v, parity);
+      parity = !parity;
+    }
+    // Make sure we get false when reading past end a couple times.
+    EXPECT_FALSE(decoder.Get(&v));
+    EXPECT_FALSE(decoder.Get(&v));
   }
 }
 
@@ -391,6 +395,7 @@ TEST(BitRle, Overflow) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true);
   return RUN_ALL_TESTS();
 }
 

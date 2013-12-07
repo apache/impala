@@ -94,13 +94,14 @@ class HdfsParquetTableWriter::BaseColumnWriter {
       total_compressed_byte_size_(0),
       total_uncompressed_byte_size_(0),
       dict_encoder_base_(NULL),
-      def_levels_(NULL), values_buffer_(NULL) {
+      def_levels_(NULL) {
     Codec::CreateCompressor(NULL, false, codec, &compressor_);
 
     def_levels_ = parent_->state_->obj_pool()->Add(
         new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DATA_PAGE_SIZE),
                        DATA_PAGE_SIZE, 1));
-    values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(DATA_PAGE_SIZE);
+    values_buffer_len_ = DATA_PAGE_SIZE;
+    values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(values_buffer_len_);
   }
 
   virtual ~BaseColumnWriter() {}
@@ -223,6 +224,8 @@ class HdfsParquetTableWriter::BaseColumnWriter {
 
   // Data for buffered values. This is reused across pages.
   uint8_t* values_buffer_;
+  // The size of values_buffer_.
+  int values_buffer_len_;
 };
 
 // Per type column writer.
@@ -231,7 +234,8 @@ class HdfsParquetTableWriter::ColumnWriter :
     public HdfsParquetTableWriter::BaseColumnWriter {
  public:
   ColumnWriter(HdfsParquetTableWriter* parent, Expr* expr,
-      const THdfsCompression::type& codec) : BaseColumnWriter(parent, expr, codec) {
+      const THdfsCompression::type& codec) : BaseColumnWriter(parent, expr, codec),
+      num_values_since_dict_size_check_(0) {
     DCHECK_NE(expr->type(), TYPE_BOOLEAN);
   }
 
@@ -255,8 +259,12 @@ class HdfsParquetTableWriter::ColumnWriter :
         *bytes_added += FinalizeCurrentPage();
         current_encoding_ = Encoding::PLAIN;
         return false;
-      } else if (dict_encoder_->EstimatedDataEncodedSize() >= DATA_PAGE_SIZE) {
-        return false;
+      } else {
+        ++num_values_since_dict_size_check_;
+        if (num_values_since_dict_size_check_ >= DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD) {
+          num_values_since_dict_size_check_ = 0;
+          if (dict_encoder_->EstimatedDataEncodedSize() >= DATA_PAGE_SIZE) return false;
+        }
       }
     } else if (current_encoding_ == Encoding::PLAIN) {
       T* v = reinterpret_cast<T*>(value);
@@ -277,8 +285,20 @@ class HdfsParquetTableWriter::ColumnWriter :
   }
 
  private:
+  // The period, in # of rows, to check the estimated dictionary page size against
+  // the data page size. We want to start a new data page when the estimated size
+  // is at least that big. The estimated size computation is not very cheap and
+  // we can tolerate going over the data page size by some amount.
+  // The expected byte size per dictionary value is < 1B and at most 2 bytes so the
+  // error is pretty low.
+  // TODO: is there a better way?
+  static const int DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD = 100;
+
   // Encoder for dictionary encoding for different columns. Only one is set.
   scoped_ptr<DictEncoder<T> > dict_encoder_;
+
+  // The number of values added since we last checked the dictionary.
+  int num_values_since_dict_size_check_;
 };
 
 // Bools are encoded a bit differently so subclass it explicitly.
@@ -289,7 +309,7 @@ class HdfsParquetTableWriter::BoolColumnWriter :
       const THdfsCompression::type& codec) : BaseColumnWriter(parent, expr, codec) {
     DCHECK_EQ(expr->type(), TYPE_BOOLEAN);
     bool_values_ = parent_->state_->obj_pool()->Add(
-        new BitWriter(values_buffer_, DATA_PAGE_SIZE));
+        new BitWriter(values_buffer_, values_buffer_len_));
     // Dictionary encoding doesn't make sense for bools and is not allowed by
     // the format.
     current_encoding_ = Encoding::PLAIN;
@@ -358,15 +378,15 @@ inline int HdfsParquetTableWriter::BaseColumnWriter::WriteDictDataPage() {
   DCHECK(dict_encoder_base_ != NULL);
   DCHECK_EQ(current_page_->header.uncompressed_page_size, 0);
   if (current_page_->num_non_null == 0) return 0;
-  int buffer_len = DATA_PAGE_SIZE;
-  int len = dict_encoder_base_->WriteData(values_buffer_, buffer_len);
+  int len = dict_encoder_base_->WriteData(values_buffer_, values_buffer_len_);
   while (UNLIKELY(len < 0)) {
     // len < 0 indicates the data doesn't fit into a data page. Allocate a larger data
     // page.
-    buffer_len *= 2;
-    values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(buffer_len);
-    len = dict_encoder_base_->WriteData(values_buffer_, buffer_len);
+    values_buffer_len_ *= 2;
+    values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(values_buffer_len_);
+    len = dict_encoder_base_->WriteData(values_buffer_, values_buffer_len_);
   }
+  dict_encoder_base_->ClearIndices();
   current_page_->header.uncompressed_page_size = len;
   return len;
 }

@@ -19,6 +19,7 @@
 #include <boost/foreach.hpp>
 #include <gtest/gtest.h>
 
+#include "common/init.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
@@ -43,10 +44,11 @@ void ValidateDict(const vector<T>& values) {
   uint8_t dict_buffer[encoder.dict_encoded_size()];
   encoder.WriteDict(dict_buffer);
 
-  int data_buffer_len = encoder.EstimatedDataEncodedSize() * 2;
+  int data_buffer_len = encoder.EstimatedDataEncodedSize();
   uint8_t data_buffer[data_buffer_len];
   int data_len = encoder.WriteData(data_buffer, data_buffer_len);
   EXPECT_GT(data_len, 0);
+  encoder.ClearIndices();
 
   DictDecoder<T> decoder(dict_buffer, encoder.dict_encoded_size());
   decoder.SetData(data_buffer, data_len);
@@ -127,7 +129,7 @@ TEST(DictTest, TestNumbers) {
 }
 
 int main(int argc, char **argv) {
-  impala::CpuInfo::Init();
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true);
   return RUN_ALL_TESTS();
 }
