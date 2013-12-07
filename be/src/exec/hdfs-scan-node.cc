@@ -614,7 +614,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
     // correct way to communicate between this method and ScannerThreadHelper
     unique_lock<mutex> lock(lock_);
     if (done_ || all_ranges_started_ ||
-      active_hdfs_read_thread_counter_.value() >= progress_.remaining() ||
+      active_scanner_thread_counter_.value() >= progress_.remaining() ||
       !pool->TryAcquireThreadToken()) {
       break;
     }
