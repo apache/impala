@@ -602,16 +602,6 @@ PLAN FRAGMENT 1
 # the planner should choose to repartition before the table sink
 insert into table functional.alltypes partition(year, month)
 select * from functional.alltypes
----- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: functional.alltypes.year,functional.alltypes.month
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: functional.alltypes.year, functional.alltypes.month
@@ -635,16 +625,6 @@ PLAN FRAGMENT 1
 # test noshuffle hint to prevent repartitioning (same query as above with hint)
 insert into table functional.alltypes partition(year, month) [noshuffle]
 select * from functional.alltypes
----- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: functional.alltypes.year,functional.alltypes.month
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: RANDOM
@@ -663,16 +643,6 @@ insert into table functional.alltypes partition(year, month=1)
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year
 from functional.alltypes
----- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: year,1
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: RANDOM
@@ -690,15 +660,6 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year
 from functional.alltypes
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: year,1
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: HASH_PARTITIONED: year

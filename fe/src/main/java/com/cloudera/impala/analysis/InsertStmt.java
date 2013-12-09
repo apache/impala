@@ -89,7 +89,7 @@ public class InsertStmt extends StatementBase {
   // True to force re-partitioning before the table sink, false to prevent it. Set in
   // analyze() based on planHints_. Null if no explicit hint was given (the planner
   // should decide whether to re-partition or not).
-  private Boolean repartitionBeforeSink_ = null;
+  private Boolean isRepartition_ = null;
 
   // The column permutation is specified by writing INSERT INTO tbl(col3, col1, col2...)
   //
@@ -142,61 +142,10 @@ public class InsertStmt extends StatementBase {
       selectListExprs = Lists.newArrayList();
     }
 
-    // If the table has not yet been set, load it from the Catalog. This allows for
-    // callers to set a table to analyze that may not actually be created in the Catalog.
-    // One example use case is CREATE TABLE AS SELECT which must run analysis on the
-    // INSERT before the table has actually been created.
-    if (table_ == null) {
-      if (!targetTableName_.isFullyQualified()) {
-        targetTableName_ =
-            new TableName(analyzer.getDefaultDb(), targetTableName_.getTbl());
-      }
-      table_ = analyzer.getTable(targetTableName_, Privilege.INSERT);
-    } else {
-      targetTableName_ = new TableName(table_.getDb().getName(), table_.getName());
-      PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
-      analyzer.getCatalog().checkAccess(analyzer.getUser(),
-          pb.onTable(table_.getDb().getName(), table_.getName()).allOf(Privilege.INSERT)
-          .toRequest());
-    }
-
-    // We do not support inserting into views.
-    if (table_ instanceof View) {
-      throw new AnalysisException(
-          String.format("Impala does not support inserting into views: %s",
-          table_.getFullName()));
-    }
-
-    if (table_ instanceof HdfsTable) {
-      HdfsTable hdfsTable = (HdfsTable) table_;
-      if (!hdfsTable.hasWriteAccess()) {
-        throw new AnalysisException(String.format("Unable to INSERT into target table " +
-            "(%s) because Impala does not have WRITE access to at least one HDFS path" +
-            ": %s", targetTableName_, hdfsTable.getFirstLocationWithoutWriteAccess()));
-      }
-    }
-
-    // Add target table to descriptor table.
-    analyzer.getDescTbl().addReferencedTable(table_);
-
+    // Set target table and perform table-type specific analysis and auth checking.
+    setTargetTable(analyzer);
     boolean isHBaseTable = (table_ instanceof HBaseTable);
     int numClusteringCols = isHBaseTable ? 0 : table_.getNumClusteringCols();
-
-    if (partitionKeyValues_ != null && numClusteringCols == 0) {
-      if (isHBaseTable) {
-        throw new AnalysisException("PARTITION clause is not valid for INSERT into " +
-            "HBase tables. '" + targetTableName_ + "' is an HBase table");
-
-      } else {
-        // Unpartitioned table, but INSERT has PARTITION clause
-        throw new AnalysisException("PARTITION clause is only valid for INSERT into " +
-            "partitioned table. '" + targetTableName_ + "' is not partitioned");
-      }
-    }
-
-    if (isHBaseTable && overwrite_) {
-      throw new AnalysisException("HBase doesn't have a way to perform INSERT OVERWRITE");
-    }
 
     // Analysis of the INSERT statement from this point is basically the act of matching
     // the set of output columns (which come from a column permutation, perhaps
@@ -277,6 +226,102 @@ public class InsertStmt extends StatementBase {
       }
     }
 
+    // Checks that exactly all columns in the target table are assigned an expr.
+    checkColumnCoverage(selectExprTargetColumns, mentionedColumnNames,
+        selectListExprs.size(), numStaticPartitionExprs);
+
+    // Make sure static partition key values only contain const exprs.
+    if (partitionKeyValues_ != null) {
+      for (PartitionKeyValue kv: partitionKeyValues_) {
+        kv.analyze(analyzer);
+      }
+    }
+
+    // Populate partitionKeyExprs from partitionKeyValues and selectExprTargetColumns
+    prepareExpressions(selectExprTargetColumns, selectListExprs, table_, analyzer);
+
+    // Analyze plan hints at the end to prefer reporting other error messages first
+    // (e.g., the PARTITION clause is not applicable to unpartitioned and HBase tables).
+    analyzePlanHints();
+  }
+
+  /**
+   * Sets table_ based on targetTableName_ and performs table-type specific analysis:
+   * - Partition clause is invalid for unpartitioned Hdfs tables and HBase tables
+   * - Overwrite is invalid for HBase tables
+   * - Check INSERT privileges as well as write access to Hdfs paths
+   * - Cannot insert into a view
+   * Adds table_ to the analyzer's descriptor table if analysis succeeds.
+   */
+  private void setTargetTable(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
+    // If the table has not yet been set, load it from the Catalog. This allows for
+    // callers to set a table to analyze that may not actually be created in the Catalog.
+    // One example use case is CREATE TABLE AS SELECT which must run analysis on the
+    // INSERT before the table has actually been created.
+    if (table_ == null) {
+      if (!targetTableName_.isFullyQualified()) {
+        targetTableName_ =
+            new TableName(analyzer.getDefaultDb(), targetTableName_.getTbl());
+      }
+      table_ = analyzer.getTable(targetTableName_, Privilege.INSERT);
+    } else {
+      targetTableName_ = new TableName(table_.getDb().getName(), table_.getName());
+      PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
+      analyzer.getCatalog().checkAccess(analyzer.getUser(),
+          pb.onTable(table_.getDb().getName(), table_.getName()).allOf(Privilege.INSERT)
+          .toRequest());
+    }
+
+    // We do not support inserting into views.
+    if (table_ instanceof View) {
+      throw new AnalysisException(
+          String.format("Impala does not support inserting into views: %s",
+          table_.getFullName()));
+    }
+
+    if (table_ instanceof HdfsTable) {
+      HdfsTable hdfsTable = (HdfsTable) table_;
+      if (!hdfsTable.hasWriteAccess()) {
+        throw new AnalysisException(String.format("Unable to INSERT into target table " +
+            "(%s) because Impala does not have WRITE access to at least one HDFS path" +
+            ": %s", targetTableName_, hdfsTable.getFirstLocationWithoutWriteAccess()));
+      }
+    }
+
+    boolean isHBaseTable = (table_ instanceof HBaseTable);
+    int numClusteringCols = isHBaseTable ? 0 : table_.getNumClusteringCols();
+
+    if (partitionKeyValues_ != null && numClusteringCols == 0) {
+      if (isHBaseTable) {
+        throw new AnalysisException("PARTITION clause is not valid for INSERT into " +
+            "HBase tables. '" + targetTableName_ + "' is an HBase table");
+
+      } else {
+        // Unpartitioned table, but INSERT has PARTITION clause
+        throw new AnalysisException("PARTITION clause is only valid for INSERT into " +
+            "partitioned table. '" + targetTableName_ + "' is not partitioned");
+      }
+    }
+
+    if (isHBaseTable && overwrite_) {
+      throw new AnalysisException("HBase doesn't have a way to perform INSERT OVERWRITE");
+    }
+
+    // Add target table to descriptor table.
+    analyzer.getDescTbl().addReferencedTable(table_);
+  }
+
+  /**
+   * Checks that the column permutation + select list + static partition exprs +
+   * dynamic partition exprs collectively cover exactly all columns in the target table
+   * (not more of fewer).
+   */
+  private void checkColumnCoverage(ArrayList<Column> selectExprTargetColumns,
+      Set<String> mentionedColumnNames, int numSelectListExprs,
+      int numStaticPartitionExprs) throws AnalysisException {
+    boolean isHBaseTable = (table_ instanceof HBaseTable);
+    int numClusteringCols = isHBaseTable ? 0 : table_.getNumClusteringCols();
     // Check that all columns are mentioned by the permutation and partition clauses
     if (selectExprTargetColumns.size() + numStaticPartitionExprs !=
         table_.getColumns().size()) {
@@ -308,9 +353,9 @@ public class InsertStmt extends StatementBase {
     }
 
     // Expect the selectListExpr to have entries for every target column
-    if (selectExprTargetColumns.size() != selectListExprs.size()) {
+    if (selectExprTargetColumns.size() != numSelectListExprs) {
       String comparator =
-          (selectExprTargetColumns.size() < selectListExprs.size()) ? "fewer" : "more";
+          (selectExprTargetColumns.size() < numSelectListExprs) ? "fewer" : "more";
       String partitionClause =
           (partitionKeyValues_ == null) ? "returns" : "and PARTITION clause return";
 
@@ -319,7 +364,7 @@ public class InsertStmt extends StatementBase {
       // table. If there was a column permutation, then the mismatch is between the
       // select-list and the permutation itself.
       if (columnPermutation_ == null) {
-        int totalColumnsMentioned = selectListExprs.size() + numStaticPartitionExprs;
+        int totalColumnsMentioned = numSelectListExprs + numStaticPartitionExprs;
         throw new AnalysisException(String.format(
             "Target table '%s' has %s columns (%s) than the SELECT / VALUES clause %s" +
             " (%s)", table_.getFullName(), comparator,
@@ -330,25 +375,10 @@ public class InsertStmt extends StatementBase {
         throw new AnalysisException(String.format(
             "Column permutation %s %s columns (%s) than " +
             "the SELECT / VALUES clause %s (%s)", partitionPrefix, comparator,
-            selectExprTargetColumns.size(), partitionClause, selectListExprs.size()));
+            selectExprTargetColumns.size(), partitionClause, numSelectListExprs));
       }
     }
-
-    // Make sure static partition key values only contain const exprs.
-    if (partitionKeyValues_ != null) {
-      for (PartitionKeyValue kv: partitionKeyValues_) {
-        kv.analyze(analyzer);
-      }
-    }
-
-    // Populate partitionKeyExprs from partitionKeyValues and selectExprTargetColumns
-    prepareExpressions(selectExprTargetColumns, selectListExprs, table_, analyzer);
-
-    // Analyze plan hints at the end to prefer reporting other error messages first
-    // (e.g., the PARTITION clause is not applicable to unpartitioned and HBase tables).
-    analyzePlanHints();
   }
-
 
   /**
    * Performs three final parts of the analysis:
@@ -497,24 +527,29 @@ public class InsertStmt extends StatementBase {
 
   private void analyzePlanHints() throws AnalysisException {
     if (planHints_ == null) return;
-    if (!planHints_.isEmpty() && partitionKeyValues_ == null) {
+    if (!planHints_.isEmpty() &&
+        (partitionKeyValues_ == null || table_ instanceof HBaseTable)) {
       throw new AnalysisException("INSERT hints are only supported for inserting into " +
           "partitioned Hdfs tables.");
     }
     for (String hint: planHints_) {
       if (hint.equalsIgnoreCase("SHUFFLE")) {
-        if (repartitionBeforeSink_ != null && !repartitionBeforeSink_) {
+        if (isRepartition_ != null && !isRepartition_) {
           throw new AnalysisException("Conflicting INSERT hint: " + hint);
         }
-        repartitionBeforeSink_ = Boolean.TRUE;
+        isRepartition_ = Boolean.TRUE;
       } else if (hint.equalsIgnoreCase("NOSHUFFLE")) {
-        if (repartitionBeforeSink_ != null && repartitionBeforeSink_) {
+        if (isRepartition_ != null && isRepartition_) {
           throw new AnalysisException("Conflicting INSERT hint: " + hint);
         }
-        repartitionBeforeSink_ = Boolean.FALSE;
+        isRepartition_ = Boolean.FALSE;
       } else {
         throw new AnalysisException("INSERT hint not recognized: " + hint);
       }
+    }
+    if (table_ instanceof HBaseTable && isRepartition_) {
+      throw new AnalysisException("INSERT hints are only supported for inserting into " +
+          "partitioned Hdfs tables.");
     }
   }
 
@@ -528,7 +563,7 @@ public class InsertStmt extends StatementBase {
    */
   public QueryStmt getQueryStmt() { return queryStmt_; }
   public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
-  public Boolean getRepartitionBeforeSink() { return repartitionBeforeSink_; }
+  public Boolean isRepartition() { return isRepartition_; }
 
   public DataSink createDataSink() {
     // analyze() must have been called before.

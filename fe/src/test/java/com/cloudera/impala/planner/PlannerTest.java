@@ -158,17 +158,30 @@ public class PlannerTest {
       throws CatalogException {
     String query = testCase.getQuery();
     LOG.info("running query " + query);
-
-    // single-node plan
-    ArrayList<String> expectedPlan = testCase.getSectionContents(Section.PLAN);
-    String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
-    boolean isImplemented = expectedErrorMsg == null;
-
-    options.setNum_nodes(1);
     TSessionState sessionState = new TSessionState(null, null, dbName,
         System.getProperty("user.name"), null);
     TClientRequest request = new TClientRequest(query, options, sessionState);
     request.queryOptions.setExplain_level(TExplainLevel.NORMAL);
+    // single-node plan and scan range locations
+    testSingleNodePlan(testCase, request, errorLog, actualOutput);
+    // distributed plan
+    testDistributedPlan(testCase, request, errorLog, actualOutput);
+  }
+
+  /**
+   * Produces single-node plan for testCase and compares actual plan with expected plan,
+   * as well as the scan range locations.
+   * If testCase contains no expected single-node plan then this function is a no-op.
+   */
+  private void testSingleNodePlan(TestCase testCase, TClientRequest request,
+      StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
+    ArrayList<String> expectedPlan = testCase.getSectionContents(Section.PLAN);
+    // Test case has no expected single-node plan. Do not test it.
+    if (expectedPlan == null || expectedPlan.isEmpty()) return;
+    request.getQueryOptions().setNum_nodes(1);
+    String query = testCase.getQuery();
+    String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
+    boolean isImplemented = expectedErrorMsg == null;
     StringBuilder explainBuilder = new StringBuilder();
 
     TExecRequest execRequest = null;
@@ -212,56 +225,6 @@ public class PlannerTest {
       }
     }
 
-    // nothing else to compare
-    if (!isImplemented) return;
-
-    expectedPlan = testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
-    if (!expectedPlan.isEmpty()) {
-      expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
-      isImplemented = expectedErrorMsg == null;
-      options.setNum_nodes(ImpalaInternalServiceConstants.NUM_NODES_ALL);
-      explainBuilder = new StringBuilder();
-      actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
-      try {
-        // distributed plan
-        execRequest = frontend.createExecRequest(request, explainBuilder);
-        Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
-            || execRequest.stmt_type == TStmtType.QUERY);
-        String explainStr = explainBuilder.toString();
-        actualOutput.append(explainStr);
-        if (!isImplemented) {
-          errorLog.append(
-              "query produced DISTRIBUTEDPLAN\nquery=" + query + "\nplan=\n"
-              + explainStr);
-        } else {
-          LOG.info("distributed plan: " + explainStr);
-          String result = TestUtils.compareOutput(
-              Lists.newArrayList(explainStr.split("\n")), expectedPlan, true);
-          if (!result.isEmpty()) {
-            errorLog.append("section " + Section.DISTRIBUTEDPLAN.toString()
-                + " of query:\n" + query + "\n" + result);
-          }
-        }
-      } catch (ImpalaException e) {
-        if (e instanceof AnalysisException) {
-          errorLog.append(
-              "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
-          return;
-        } else if (e instanceof InternalException) {
-          errorLog.append(
-              "query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
-          return;
-        } if (e instanceof NotImplementedException) {
-          handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
-        } else if (e instanceof CatalogException) {
-          throw (CatalogException) e;
-        } else {
-          errorLog.append(
-              "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
-        }
-      }
-    }
-
     // compare scan range locations
     LOG.info("scan range locations: " + locationsStr);
     ArrayList<String> expectedLocations =
@@ -279,6 +242,64 @@ public class PlannerTest {
       actualOutput.append(locationsStr);
       // TODO: check that scan range locations are identical in both cases
     }
+  }
+
+
+  /**
+  * Produces distributed plan for testCase and compares actual plan with expected plan.
+  * If testCase contains no expected distributed plan then this function is a no-op.
+  */
+ private void testDistributedPlan(TestCase testCase, TClientRequest request,
+     StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
+   ArrayList<String> expectedPlan =
+       testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
+   // Test case has no expected distributed plan. Do not test it.
+   if (expectedPlan == null || expectedPlan.isEmpty()) return;
+   request.getQueryOptions().setNum_nodes(ImpalaInternalServiceConstants.NUM_NODES_ALL);
+   String query = testCase.getQuery();
+   String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
+   boolean isImplemented = expectedErrorMsg == null;
+   StringBuilder explainBuilder = new StringBuilder();
+   actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
+   TExecRequest execRequest = null;
+   try {
+     // distributed plan
+     execRequest = frontend.createExecRequest(request, explainBuilder);
+     Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
+         || execRequest.stmt_type == TStmtType.QUERY);
+     String explainStr = explainBuilder.toString();
+     actualOutput.append(explainStr);
+     if (!isImplemented) {
+       errorLog.append(
+           "query produced DISTRIBUTEDPLAN\nquery=" + query + "\nplan=\n"
+           + explainStr);
+     } else {
+       LOG.info("distributed plan: " + explainStr);
+       String result = TestUtils.compareOutput(
+           Lists.newArrayList(explainStr.split("\n")), expectedPlan, true);
+       if (!result.isEmpty()) {
+         errorLog.append("section " + Section.DISTRIBUTEDPLAN.toString()
+             + " of query:\n" + query + "\n" + result);
+       }
+     }
+   } catch (ImpalaException e) {
+     if (e instanceof AnalysisException) {
+       errorLog.append(
+           "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
+       return;
+     } else if (e instanceof InternalException) {
+       errorLog.append(
+           "query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
+       return;
+     } if (e instanceof NotImplementedException) {
+       handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
+     } else if (e instanceof CatalogException) {
+       throw (CatalogException) e;
+     } else {
+       errorLog.append(
+           "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
+     }
+   }
   }
 
   private void runPlannerTestFile(String testFile, TQueryOptions options, String dbName)

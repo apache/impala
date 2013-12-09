@@ -147,7 +147,7 @@ public class Planner {
       InsertStmt insertStmt = analysisResult.getInsertStmt();
       if (queryOptions.num_nodes != 1) {
         // repartition on partition keys
-        rootFragment = chooseInsertDataPartition(
+        rootFragment = createInsertFragment(
             rootFragment, insertStmt, analyzer, fragments);
       }
 
@@ -278,12 +278,12 @@ public class Planner {
    * than the number of nodes on which inputFragment runs.
    * If it ends up creating a new fragment, appends that to 'fragments'.
    */
-  private PlanFragment chooseInsertDataPartition(
+  private PlanFragment createInsertFragment(
       PlanFragment inputFragment, InsertStmt insertStmt, Analyzer analyzer,
       ArrayList<PlanFragment> fragments)
       throws AuthorizationException, InternalException {
     List<Expr> partitionExprs = insertStmt.getPartitionKeyExprs();
-    Boolean partitionHint = insertStmt.getRepartitionBeforeSink();
+    Boolean partitionHint = insertStmt.isRepartition();
     if (partitionExprs.isEmpty()) return inputFragment;
     if (partitionHint != null && !partitionHint) return inputFragment;
 
