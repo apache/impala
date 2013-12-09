@@ -1,62 +1,54 @@
-# convert all the tpch tables into parquet 
 ====
+# Tests using a larger table.
 ---- QUERY
-insert overwrite table customer
-select * from tpch.customer
----- RESULTS
-: 150000
-====
----- QUERY
-insert overwrite table lineitem
-select * from tpch.lineitem
----- RESULTS
-: 6001215
-====
----- QUERY
-insert overwrite table max_revenue
-select * from tpch.max_revenue
----- RESULTS
-: 1
-====
----- QUERY
-insert overwrite table nation
-select * from tpch.nation
----- RESULTS
-: 25
-====
----- QUERY
-insert overwrite table orders
-select * from tpch.orders
+create table if not exists orders_insert_test like orders;
+insert overwrite table orders_insert_test select * from tpch.orders
 ---- RESULTS
 : 1500000
 ====
 ---- QUERY
-insert overwrite table part
-select * from tpch.part
+select count(distinct o_orderkey) from orders_insert_test
+---- TYPES
+bigint
 ---- RESULTS
-: 200000
+1500000
 ====
 ---- QUERY
-insert overwrite table partsupp
-select * from tpch.partsupp
+select count(distinct o_orderstatus) from orders_insert_test
+---- TYPES
+bigint
 ---- RESULTS
-: 800000
+3
 ====
 ---- QUERY
-insert overwrite table region
-select * from tpch.region
+select count(distinct o_orderdate) from orders_insert_test
+---- TYPES
+bigint
 ---- RESULTS
-: 5
+2406
 ====
 ---- QUERY
-insert overwrite table revenue
-select * from tpch.revenue
+select distinct o_orderpriority from orders_insert_test
+---- TYPES
+string
 ---- RESULTS
-: 10000
+'1-URGENT'
+'2-HIGH'
+'3-MEDIUM'
+'4-NOT SPECIFIED'
+'5-LOW'
 ====
 ---- QUERY
-insert overwrite table supplier
-select * from tpch.supplier
+select o_shippriority, count(1) from orders_insert_test group by 1
+---- TYPES
+int,bigint
 ---- RESULTS
-: 10000
+0,1500000
+====
+---- QUERY
+select count(distinct o_comment) from orders_insert_test
+---- TYPES
+bigint
+---- RESULTS
+1482071
 ====

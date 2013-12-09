@@ -93,6 +93,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
       codec_(codec), current_page_(NULL), num_values_(0),
       total_compressed_byte_size_(0),
       total_uncompressed_byte_size_(0),
+      dict_encoder_base_(NULL),
       def_levels_(NULL), values_buffer_(NULL) {
     Codec::CreateCompressor(NULL, false, codec, &compressor_);
 
@@ -100,7 +101,6 @@ class HdfsParquetTableWriter::BaseColumnWriter {
         new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DATA_PAGE_SIZE),
                        DATA_PAGE_SIZE, 1));
     values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(DATA_PAGE_SIZE);
-    Reset();
   }
 
   virtual ~BaseColumnWriter() {}
@@ -124,11 +124,14 @@ class HdfsParquetTableWriter::BaseColumnWriter {
 
   // Resets all the data accumulated for this column.  Memory can now be reused for
   // the next row group
-  void Reset() {
+  // Any data for previous row groups must be reset (e.g. dictionaries).
+  // Subclasses must call this if they override this function.
+  virtual void Reset() {
     num_data_pages_ = 0;
     current_page_ = NULL;
     num_values_ = 0;
     total_compressed_byte_size_ = 0;
+    current_encoding_ = Encoding::PLAIN;
   }
 
   // Close this writer. This is only called after Flush() and no more rows will
@@ -230,7 +233,10 @@ class HdfsParquetTableWriter::ColumnWriter :
   ColumnWriter(HdfsParquetTableWriter* parent, Expr* expr,
       const THdfsCompression::type& codec) : BaseColumnWriter(parent, expr, codec) {
     DCHECK_NE(expr->type(), TYPE_BOOLEAN);
+  }
 
+  virtual void Reset() {
+    BaseColumnWriter::Reset();
     // Default to dictionary encoding.  If the cardinality ends up being too high,
     // it will fall back to plain.
     current_encoding_ = Encoding::PLAIN_DICTIONARY;
@@ -620,6 +626,7 @@ Status HdfsParquetTableWriter::Init() {
         DCHECK(false);
     }
     columns_[i] = state_->obj_pool()->Add(writer);
+    columns_[i]->Reset();
   }
   RETURN_IF_ERROR(CreateSchema());
   return Status::OK;
