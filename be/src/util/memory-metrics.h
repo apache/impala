@@ -17,11 +17,15 @@
 
 #include "util/metrics.h"
 
+#include <boost/thread/mutex.hpp>
 #include <google/malloc_extension.h>
 
 #include "util/debug-util.h"
+#include "gen-cpp/Frontend_types.h"
 
 namespace impala {
+
+class Thread;
 
 // Specialised metric which exposes numeric properties from tcmalloc.
 class TcmallocMetric : public Metrics::PrimitiveMetric<uint64_t> {
@@ -80,8 +84,52 @@ class TcmallocMetric : public Metrics::PrimitiveMetric<uint64_t> {
   }
 };
 
-// Registers common tcmalloc metrics.
-void RegisterTcmallocMetrics(Metrics* metrics);
+// A JvmMetric corresponds to one value drawn from one 'memory pool' in the JVM. A memory
+// pool is an area of memory assigned for one particular aspect of memory management. For
+// example Hotspot has pools for the permanent generation, the old generation, survivor
+// space, code cache and permanently tenured objects.
+class JvmMetric : public Metrics::PrimitiveMetric<uint64_t> {
+ public:
+  // Registers many Jvm memory metrics: one for every member of JvmMetricType for each
+  // pool (usually ~5 pools plus a synthetic 'total' pool).
+  static Status InitMetrics(Metrics* metrics);
+
+ private:
+  // Each names one of the fields in TJvmMemoryPool.
+  enum JvmMetricType {
+    MAX,
+    INIT,
+    COMMITTED,
+    CURRENT,
+    PEAK_MAX,
+    PEAK_INIT,
+    PEAK_COMMITTED,
+    PEAK_CURRENT
+  };
+
+  // Private constructor to ensure only InitMetrics() can create JvmMetrics.
+  JvmMetric(const std::string& key, const std::string& mempool_name, JvmMetricType type);
+
+  // Searches through jvm_metrics_response_ for a matching memory pool and pulls out the
+  // right value from that structure according to metric_type_.
+  virtual void CalculateValue();
+
+  // Override to ensure value is pretty-printed as bytes.
+  virtual void PrintValue(std::stringstream* out) {
+    (*out) << PrettyPrinter::Print(value_, TCounterType::BYTES);
+  }
+
+  // The name of the memory pool, defined by the Jvm.
+  std::string mempool_name_;
+
+  // Each metric corresponds to one value; this tells us which value from the memory pool
+  // that is.
+  JvmMetricType metric_type_;
+};
+
+// Registers common tcmalloc memory metrics. If register_jvm_metrics is true, the JVM
+// memory metrics are also registered.
+Status RegisterMemoryMetrics(Metrics* metrics, bool register_jvm_metrics);
 
 }
 

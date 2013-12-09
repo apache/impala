@@ -68,21 +68,21 @@ struct THiveUdfExecutorCtorParams {
   // call the Java executor with a buffer for all the inputs.
   // input_byte_offsets[0] is the byte offset in the buffer for the first
   // argument; input_byte_offsets[1] is the second, etc.
-  3: required list<i32> input_byte_offsets;
+  3: required list<i32> input_byte_offsets
 
   // Native input buffer ptr (cast as i64) for the inputs. The input arguments
   // are written to this buffer directly and read from java with no copies
   // input_null_ptr[i] is true if the i-th input is null.
   // input_buffer_ptr[input_byte_offsets[i]] is the value of the i-th input.
-  4: required i64 input_nulls_ptr;
-  5: required i64 input_buffer_ptr;
+  4: required i64 input_nulls_ptr
+  5: required i64 input_buffer_ptr
 
   // Native output buffer ptr. For non-variable length types, the output is
   // written here and read from the native side with no copies.
   // The UDF should set *output_null_ptr to true, if the result of the UDF is
   // NULL.
-  6: required i64 output_null_ptr;
-  7: required i64 output_buffer_ptr;
+  6: required i64 output_null_ptr
+  7: required i64 output_buffer_ptr
 }
 
 // Arguments to getTableNames, which returns a list of tables that match an
@@ -506,5 +506,53 @@ struct TUpdateCatalogCacheRequest {
 // Response from a TUpdateCatalogCacheRequest.
 struct TUpdateCatalogCacheResponse {
   // The catalog service id this version is from.
-  1: required Types.TUniqueId catalog_service_id;
+  1: required Types.TUniqueId catalog_service_id
+}
+
+// Contains all interesting statistics from a single 'memory pool' in the JVM.
+// All numeric values are measured in bytes.
+struct TJvmMemoryPool {
+  // Memory committed by the operating system to this pool (i.e. not just virtual address
+  // space)
+  1: required i64 committed
+
+  // The initial amount of memory committed to this pool
+  2: required i64 init
+
+  // The maximum amount of memory this pool will use.
+  3: required i64 max
+
+  // The amount of memory currently in use by this pool (will be <= committed).
+  4: required i64 used
+
+  // Maximum committed memory over time
+  5: required i64 peak_committed
+
+  // Should be always == init
+  6: required i64 peak_init
+
+  // Peak maximum memory over time (usually will not change)
+  7: required i64 peak_max
+
+  // Peak consumed memory over time
+  8: required i64 peak_used
+
+  // Name of this pool, defined by the JVM
+  9: required string name
+}
+
+// Request to get one or all sets of memory pool metrics.
+struct TGetJvmMetricsRequest {
+  // If set, return all pools
+  1: required bool get_all
+
+  // If get_all is false, this must be set to the name of the memory pool to return.
+  2: optional string memory_pool
+}
+
+// Response from JniUtil::GetJvmMetrics()
+struct TGetJvmMetricsResponse {
+  // One entry for every pool tracked by the Jvm, plus a synthetic aggregate pool called
+  // 'total'
+  1: required list<TJvmMemoryPool> memory_pools
 }

@@ -63,6 +63,7 @@ import com.cloudera.impala.thrift.TGetFunctionsParams;
 import com.cloudera.impala.thrift.TGetFunctionsResult;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
+import com.cloudera.impala.thrift.TJvmMemoryPool;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TLogLevel;

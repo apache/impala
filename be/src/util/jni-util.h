@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "common/status.h"
+#include "gen-cpp/Frontend_types.h"
 
 #define THROW_IF_ERROR_WITH_LOGGING(stmt, env, adaptor) \
   do { \
@@ -217,6 +218,11 @@ class JniUtil {
   static Status GetJniExceptionMsg(JNIEnv* env, bool log_stack = true,
       const std::string& prefix = "");
 
+  // Populates 'result' with a list of memory metrics from the Jvm. Returns Status::OK
+  // unless there is an exception.
+  static Status GetJvmMetrics(const TGetJvmMetricsRequest& request,
+      TGetJvmMetricsResponse* result);
+
   // Utility methods to avoid repeating lots of the JNI call boilerplate. It seems these
   // must be defined in the header to compile properly.
   template <typename T>
@@ -228,6 +234,18 @@ class JniUtil {
     RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
     jni_env->CallObjectMethod(obj, method, request_bytes);
     RETURN_ERROR_IF_EXC(jni_env);
+    return Status::OK;
+  }
+
+  template <typename R>
+  static Status CallJniMethod(const jobject& obj, const jmethodID& method, R* response) {
+    JNIEnv* jni_env = getJNIEnv();
+    JniLocalFrame jni_frame;
+    RETURN_IF_ERROR(jni_frame.push(jni_env));
+    jbyteArray result_bytes = static_cast<jbyteArray>(
+        jni_env->CallObjectMethod(obj, method));
+    RETURN_ERROR_IF_EXC(jni_env);
+    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
     return Status::OK;
   }
 
@@ -271,6 +289,7 @@ class JniUtil {
   static jclass internal_exc_cl_;
   static jmethodID throwable_to_string_id_;
   static jmethodID throwable_to_stack_trace_id_;
+  static jmethodID get_jvm_metrics_id_;
   // List of global references created with GetGlobalClassRef() or LocalToGlobalRef.
   // All global references are deleted in Cleanup().
   static std::vector<jobject> global_refs_;

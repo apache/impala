@@ -27,7 +27,7 @@
 #include "util/jni-util.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
-#include "util/tcmalloc-metric.h"
+#include "util/memory-metrics.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
 
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
 
   scoped_ptr<Metrics> metrics(new Metrics());
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
-  RegisterTcmallocMetrics(metrics.get());
+  EXIT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true));
   metrics->CreateAndRegisterPrimitiveMetric<string>(
       "catalog.version", GetVersionString(true));
 

@@ -58,7 +58,7 @@ add_library(Util
   simple-logger.cc
   symbols-util.cc
   static-asserts.cc
-  tcmalloc-metric.cc
+  memory-metrics.cc
   url-parser.cc
   url-coding.cc
 )

@@ -14,9 +14,13 @@
 
 #include "util/metrics.h"
 #include "util/non-primitive-metrics.h"
-#include "util/tcmalloc-metric.h"
+#include "util/memory-metrics.h"
+
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
+
+#include "util/jni-util.h"
+#include "util/thread.h"
 
 using namespace boost;
 using namespace std;
@@ -49,7 +53,7 @@ class MetricsTest : public testing::Test {
     string_set_metric_ = metrics_->RegisterMetric(new SetMetric<string>("string_set",
                                                                         string_set));
 
-    RegisterTcmallocMetrics(metrics_.get());
+    RegisterMemoryMetrics(metrics_.get(), true);
   }
   Metrics::BooleanMetric* bool_metric_;
   Metrics::IntMetric* int_metric_;
@@ -172,27 +176,39 @@ TEST_F(MetricsTest, MemMetric) {
   // Smoke test to confirm that tcmalloc metrics are returning reasonable values.
   Metrics::Metric<uint64_t>* bytes_in_use =
       metrics()->GetMetric<Metrics::Metric<uint64_t> >("tcmalloc.bytes-in-use");
-  DCHECK(bytes_in_use != NULL);
+  EXPECT_TRUE(bytes_in_use != NULL);
 
   uint64_t cur_in_use = bytes_in_use->value();
   scoped_ptr<uint64_t> chunk(new uint64_t);
-  DCHECK_GT(cur_in_use, 0);
-  DCHECK_GT(bytes_in_use->value(), cur_in_use);
+  EXPECT_GT(cur_in_use, 0);
+  EXPECT_GT(bytes_in_use->value(), cur_in_use);
 
   Metrics::Metric<uint64_t>* total_bytes_reserved =
       metrics()->GetMetric<Metrics::Metric<uint64_t> >("tcmalloc.total-bytes-reserved");
-  DCHECK(total_bytes_reserved != NULL);
-  DCHECK_GT(total_bytes_reserved->value(), 0);
+  EXPECT_TRUE(total_bytes_reserved != NULL);
+  EXPECT_GT(total_bytes_reserved->value(), 0);
 
   Metrics::Metric<uint64_t>* pageheap_free_bytes =
       metrics()->GetMetric<Metrics::Metric<uint64_t> >("tcmalloc.pageheap-free-bytes");
-  DCHECK(pageheap_free_bytes != NULL);
+  EXPECT_TRUE(pageheap_free_bytes != NULL);
 
   Metrics::Metric<uint64_t>* pageheap_unmapped_bytes =
       metrics()->GetMetric<Metrics::Metric<uint64_t> >(
           "tcmalloc.pageheap-unmapped-bytes");
-  DCHECK(pageheap_unmapped_bytes != NULL);
+  EXPECT_TRUE(pageheap_unmapped_bytes != NULL);
 #endif
+}
+
+TEST_F(MetricsTest, JvmMetrics) {
+  Metrics::Metric<uint64_t>* jvm_total_used =
+      metrics()->GetMetric<Metrics::Metric<uint64_t> >("jvm.total.current-usage-bytes");
+  ASSERT_TRUE(jvm_total_used != NULL);
+  EXPECT_GT(jvm_total_used->value(), 0);
+  Metrics::Metric<uint64_t>* jvm_peak_total_used =
+      metrics()->GetMetric<Metrics::Metric<uint64_t> >(
+          "jvm.total.peak-current-usage-bytes");
+  ASSERT_TRUE(jvm_peak_total_used != NULL);
+  EXPECT_GT(jvm_peak_total_used->value(), 0);
 }
 
 }
@@ -200,5 +216,8 @@ TEST_F(MetricsTest, MemMetric) {
 int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
+  impala::InitThreading();
+  impala::JniUtil::Init();
+
   return RUN_ALL_TESTS();
 }

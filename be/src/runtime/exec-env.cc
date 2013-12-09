@@ -37,7 +37,7 @@
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/parse-util.h"
-#include "util/tcmalloc-metric.h"
+#include "util/memory-metrics.h"
 #include "util/webserver.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/CatalogService.h"
@@ -180,7 +180,7 @@ Status ExecEnv::StartServices() {
   metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
   impalad_client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
   catalogd_client_cache_->InitMetrics(metrics_.get(), "catalog.server");
-  RegisterTcmallocMetrics(metrics_.get());
+  RETURN_IF_ERROR(RegisterMemoryMetrics(metrics_.get(), true));
 
 #ifndef ADDRESS_SANITIZER
   // Limit of -1 means no memory limit.
