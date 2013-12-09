@@ -230,11 +230,14 @@ class TimestampValue {
   // Returns true if the time was successfully parsed.
   inline bool ParseTime(const char** strp, int* lenp);
 
-
   // Boost ptime leaves a gap in the structure, so we swap the order to make it
   // 12 contiguous bytes.  We then must convert to and from the boost ptime data type.
-  boost::posix_time::time_duration time_of_day_;  // 8 bytes
-  boost::gregorian::date date_;                   // 4 bytes
+
+  // 8 bytes - stores the nanoseconds within the current day
+  boost::posix_time::time_duration time_of_day_;
+
+  // 4 -bytes - stores the date as a Julian day
+  boost::gregorian::date date_;
 };
 
 // This function must be called 'hash_value' to be picked up by boost.
