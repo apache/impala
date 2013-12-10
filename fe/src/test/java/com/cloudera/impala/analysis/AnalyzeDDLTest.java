@@ -762,6 +762,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'";
     final String udfSuffix = " LOCATION '/test-warehouse/libTestUdfs.so' " +
         "SYMBOL=" + symbol;
+    final String hdfsPath = "hdfs://localhost:20500/test-warehouse/libTestUdfs.so";
 
     AnalyzesOk("create function foo() RETURNS int" + udfSuffix);
     AnalyzesOk("create function foo(int, int, string) RETURNS int" + udfSuffix);
@@ -823,14 +824,14 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "SYMBOL='ab'", "Could not load binary: /blah.so");
     AnalysisError("create function foo() RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " +
-        "SYMBOL='b'", "Could not find symbol 'b' in: /test-warehouse/libTestUdfs.so");
+        "SYMBOL='b'", "Could not find function b() in: " + hdfsPath);
     AnalysisError("create function foo() RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " +
         "SYMBOL=''", "Could not find symbol '' in: /test-warehouse/libTestUdfs.so");
     AnalysisError("create function foo() RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " +
         "SYMBOL='_ZAB'",
-        "Could not find symbol '_ZAB' in: /test-warehouse/libTestUdfs.so");
+        "Could not find symbol '_ZAB' in: " + hdfsPath);
 
     // Infer the fully mangled symbol from the signature
     AnalyzesOk("create function foo() RETURNS int " +
@@ -841,11 +842,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // The part the user specifies is case sensitive
     AnalysisError("create function foo() RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='noArgs'",
-        "Could not find symbol 'noArgs' in: /test-warehouse/libTestUdfs.so");
+        "Could not find function noArgs() in: " + hdfsPath);
     // Types no longer match
     AnalysisError("create function foo(int) RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='NoArgs'",
-        "Could not find symbol 'NoArgs' in: /test-warehouse/libTestUdfs.so");
+        "Could not find function NoArgs(INT) in: " + hdfsPath);
 
     // Check we can match identity for all types
     AnalyzesOk("create function identity(boolean) RETURNS int " +
@@ -951,6 +952,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   @Test
   public void TestUda() throws AnalysisException {
     final String loc = " LOCATION '/test-warehouse/libTestUdas.so' ";
+    final String hdfsLoc = "hdfs://localhost:20500/test-warehouse/libTestUdas.so";
     AnalyzesOk("create aggregate function foo(int) RETURNS int" + loc +
         "UPDATE_FN='AggUpdate'");
     AnalyzesOk("create aggregate function foo(int) RETURNS int" + loc +
@@ -959,7 +961,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "UPDATE_FN='AggUpdate' INIT_FN='AggInit' MERGE_FN='AggMerge'");
     AnalysisError("create aggregate function foo(int) RETURNS int" + loc +
         "UPDATE_FN='AggUpdate' INIT_FN='AGgInit'",
-        "Could not find symbol 'AGgInit' in: /test-warehouse/libTestUdas.so");
+        "Could not find function AGgInit() returns INT in: " + hdfsLoc);
     AnalyzesOk("create aggregate function foo(int, int) RETURNS int" + loc +
         "UPDATE_FN='AggUpdate'");
     AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
@@ -1059,7 +1061,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // prevent mismatched names by accident.
     AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
         "UPDATE_FN='AggUpdate' INIT_FN='AggSerialize'",
-        "Could not find symbol 'AggSerialize' in: /test-warehouse/libTestUdas.so");
+        "Could not find function AggSerialize() returns STRING in: " + hdfsLoc);
     // If you specify a mangled name, we just check it exists.
     // TODO: we should be able to validate better. This is almost certainly going
     // to crash everything.
@@ -1068,24 +1070,24 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "INIT_FN='_Z12AggSerializePN10impala_udf15FunctionContextERKNS_6IntValE'");
     AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
         "UPDATE_FN='AggUpdate' INIT_FN='_ZAggSerialize'",
-        "Could not find symbol '_ZAggSerialize' in: /test-warehouse/libTestUdas.so");
+        "Could not find symbol '_ZAggSerialize' in: " + hdfsLoc);
 
     // Tests for checking the symbol exists
     AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
         "UPDATE_FN='Agg2Update'",
-        "Could not find symbol 'Agg2Init' in: /test-warehouse/libTestUdas.so");
+        "Could not find function Agg2Init() returns STRING in: " + hdfsLoc);
     AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
         "UPDATE_FN='Agg2Update' INIT_FN='AggInit'",
-        "Could not find symbol 'Agg2Merge' in: /test-warehouse/libTestUdas.so");
+        "Could not find function Agg2Merge(STRING) returns STRING in: " + hdfsLoc);
     AnalyzesOk("create aggregate function foo(string, double) RETURNS string" + loc +
         "UPDATE_FN='Agg2Update' INIT_FN='AggInit' MERGE_FN='AggMerge'");
     AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
         "UPDATE_FN='Agg2Update' INIT_FN='AggInit' MERGE_FN='BadFn'",
-        "Could not find symbol 'BadFn' in: /test-warehouse/libTestUdas.so");
+        "Could not find function BadFn(STRING) returns STRING in: " + hdfsLoc);
     AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
         "UPDATE_FN='Agg2Update' INIT_FN='AggInit' MERGE_FN='AggMerge' "+
             "FINALIZE_FN='not there'",
-        "Could not find symbol 'not there' in: /test-warehouse/libTestUdas.so");
+        "Could not find function not there(STRING) in: " + hdfsLoc);
   }
 
   @Test

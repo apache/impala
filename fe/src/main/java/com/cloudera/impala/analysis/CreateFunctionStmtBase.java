@@ -75,7 +75,10 @@ public class CreateFunctionStmtBase extends StatementBase {
   // be null if this function isn't expecting a return argument.
   protected String lookupSymbol(String symbol, ColumnType retArgType, boolean hasVarArgs,
       ColumnType... argTypes) throws AnalysisException {
-    if (symbol.length() == 0) reportSymbolNotFound(symbol, null);
+    if (symbol.length() == 0) {
+      throw new AnalysisException(
+          "Could not find symbol '' in: " + fn_.getLocation().getLocation());
+    }
     if (fn_.getBinaryType() == TFunctionBinaryType.HIVE) {
       // TODO: add this when hive udfs go in.
       return symbol;
@@ -101,7 +104,7 @@ public class CreateFunctionStmtBase extends StatementBase {
               "Could not load binary: " + fn_.getLocation().getLocation() + "\n" +
               result.error_msg);
         case SYMBOL_NOT_FOUND:
-          reportSymbolNotFound(symbol, result.error_msg);
+          throw new AnalysisException(result.error_msg);
         default:
           // Should never get here.
           throw new AnalysisException("Internal Error");
@@ -109,19 +112,6 @@ public class CreateFunctionStmtBase extends StatementBase {
     } catch (InternalException e) {
       throw new AnalysisException("Could not find symbol.", e);
     }
-  }
-
-  protected void reportSymbolNotFound(String symbol, String err)
-      throws AnalysisException {
-    StringBuilder sb = new StringBuilder();
-    sb.append("Could not find symbol '")
-      .append(symbol)
-      .append("' in: ")
-      .append(fn_.getLocation().getLocation());
-    if (err != null) {
-      sb.append("\n").append(err);
-    }
-    throw new AnalysisException(sb.toString());
   }
 
   // Returns optArg[key], first validating that it is set.

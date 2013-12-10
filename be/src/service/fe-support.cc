@@ -127,7 +127,9 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   // The input was already mangled and we couldn't find it, return the error.
   if (SymbolsUtil::IsMangled(params.symbol)) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
-    result->__set_error_msg(status.GetErrorMsg());
+    stringstream ss;
+    ss << "Could not find symbol '" << params.symbol << "' in: " << params.location;
+    result->__set_error_msg(ss.str());
     return;
   }
 
@@ -141,7 +143,21 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
       env->fs_cache(), params.location, type, symbol);
   if (!status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
-    result->__set_error_msg("Could not find symbol.");
+    stringstream ss;
+    ss << "Could not find function " << params.symbol << "(";
+    for (int i = 0; i < arg_types.size(); ++i) {
+      ss << arg_types[i].DebugString();
+      if (i != arg_types.size() - 1) ss << ", ";
+    }
+    ss << ")";
+    if (params.__isset.ret_arg_type) ss << " returns " << ret_type.DebugString();
+    ss << " in: " << params.location;
+    if (params.__isset.ret_arg_type) {
+      ss << "\nCheck that function name, arguments, and return type are correct.";
+    } else {
+      ss << "\nCheck that symbol and argument types are correct.";
+    }
+    result->__set_error_msg(ss.str());
     return;
   }
 
