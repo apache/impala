@@ -122,6 +122,12 @@ public enum PrimitiveType {
     }
   }
 
+  public PrimitiveType getNextResolutionType() {
+    Preconditions.checkState(isNumericType() || isNull());
+    if (this == DOUBLE || this == BIGINT || isNull()) return this;
+    return values()[ordinal() + 1];
+  }
+
   public boolean isNumericType() {
     return isFixedPointType() || isFloatingPointType();
   }

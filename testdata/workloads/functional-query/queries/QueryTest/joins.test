@@ -65,7 +65,7 @@ and a.day=1
 and a.string_col > '88'
 and b.bool_col = false
 ---- TYPES
-tinyint, int, string, bigint
+tinyint, int, string, smallint
 ---- RESULTS
 1,1,'881',2
 1,1,'891',2
@@ -422,5 +422,5 @@ and b.bool_col = false
 1,1,'981',2
 1,1,'991',2
 ---- TYPES
-tinyint, int, string, bigint
+tinyint, int, string, smallint
 ====

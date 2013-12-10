@@ -271,7 +271,7 @@ describe ctas_join
 'test_zip','int',''
 'alltypes_id','int',''
 'int_col','int',''
-'_c2','bigint',''
+'_c2','smallint',''
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -291,7 +291,7 @@ select * from ctas_join
 1006,'Name16',94616,5000,0,2
 1106,'Name16',94616,5000,0,2
 ---- TYPES
-BIGINT, STRING, INT, INT, INT, BIGINT
+BIGINT, STRING, INT, INT, INT, SMALLINT
 ====
 ---- QUERY
 # Since the table already exists, the second CTAS should be a no-op
@@ -320,7 +320,7 @@ select * from ctas_join
 1006,'Name16',94616,5000,0,2
 1106,'Name16',94616,5000,0,2
 ---- TYPES
-BIGINT, STRING, INT, INT, INT, BIGINT
+BIGINT, STRING, INT, INT, INT, SMALLINT
 ====
 ---- QUERY
 # Validate CTAS with LIMIT 0

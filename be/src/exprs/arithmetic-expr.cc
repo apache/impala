@@ -112,21 +112,33 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
     case TExprOpcode::BITNOT_LONG:
       result = builder.CreateNot(lhs_value, "tmp_not");
       break;
+    case TExprOpcode::ADD_CHAR_CHAR:
+    case TExprOpcode::ADD_SHORT_SHORT:
+    case TExprOpcode::ADD_INT_INT:
     case TExprOpcode::ADD_LONG_LONG:
       result = builder.CreateAdd(lhs_value, rhs_value, "tmp_add");
       break;
+    case TExprOpcode::ADD_FLOAT_FLOAT:
     case TExprOpcode::ADD_DOUBLE_DOUBLE:
       result = builder.CreateFAdd(lhs_value, rhs_value, "tmp_add");
       break;
+    case TExprOpcode::SUBTRACT_CHAR_CHAR:
+    case TExprOpcode::SUBTRACT_SHORT_SHORT:
+    case TExprOpcode::SUBTRACT_INT_INT:
     case TExprOpcode::SUBTRACT_LONG_LONG:
       result = builder.CreateSub(lhs_value, rhs_value, "tmp_sub");
       break;
+    case TExprOpcode::SUBTRACT_FLOAT_FLOAT:
     case TExprOpcode::SUBTRACT_DOUBLE_DOUBLE:
       result = builder.CreateFSub(lhs_value, rhs_value, "tmp_sub");
       break;
+    case TExprOpcode::MULTIPLY_CHAR_CHAR:
+    case TExprOpcode::MULTIPLY_SHORT_SHORT:
+    case TExprOpcode::MULTIPLY_INT_INT:
     case TExprOpcode::MULTIPLY_LONG_LONG:
       result = builder.CreateMul(lhs_value, rhs_value, "tmp_mul");
       break;
+    case TExprOpcode::MULTIPLY_FLOAT_FLOAT:
     case TExprOpcode::MULTIPLY_DOUBLE_DOUBLE:
       result = builder.CreateFMul(lhs_value, rhs_value, "tmp_mul");
       break;

@@ -495,7 +495,7 @@ string, string
 ---- QUERY
 select 1+2
 ---- TYPES
-bigint
+smallint
 ---- RESULTS
 3
 ====

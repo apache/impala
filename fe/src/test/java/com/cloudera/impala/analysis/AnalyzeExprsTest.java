@@ -310,16 +310,16 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // arbitrary exprs as operands should fail to analyze
     AnalysisError("select * from functional.alltypes where 1 + 2 and false",
         "Operand '1 + 2' part of predicate '1 + 2 AND FALSE' should return " +
-            "type 'BOOLEAN' but returns type 'BIGINT'.");
+            "type 'BOOLEAN' but returns type 'SMALLINT'.");
     AnalysisError("select * from functional.alltypes where 1 + 2 or true",
         "Operand '1 + 2' part of predicate '1 + 2 OR TRUE' should return " +
-            "type 'BOOLEAN' but returns type 'BIGINT'.");
+            "type 'BOOLEAN' but returns type 'SMALLINT'.");
     AnalysisError("select * from functional.alltypes where not 1 + 2",
         "Operand '1 + 2' part of predicate 'NOT 1 + 2' should return " +
-            "type 'BOOLEAN' but returns type 'BIGINT'.");
+            "type 'BOOLEAN' but returns type 'SMALLINT'.");
     AnalysisError("select * from functional.alltypes where 1 + 2 and true",
         "Operand '1 + 2' part of predicate '1 + 2 AND TRUE' should return " +
-            "type 'BOOLEAN' but returns type 'BIGINT'.");
+            "type 'BOOLEAN' but returns type 'SMALLINT'.");
     AnalysisError("select * from functional.alltypes where false and trim('abc')",
         "Operand 'trim('abc')' part of predicate 'FALSE AND trim('abc')' should " +
             "return type 'BOOLEAN' but returns type 'STRING'.");
@@ -442,7 +442,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       for (PrimitiveType type2 : numericTypes) {
         PrimitiveType compatibleType =
             PrimitiveType.getAssignmentCompatibleType(type1, type2);
-        PrimitiveType promotedType = compatibleType.getMaxResolutionType();
+        PrimitiveType promotedType = compatibleType;
+        if (!(type1.isNull() || type2.isNull())) {
+          promotedType = compatibleType.getNextResolutionType();
+        }
 
         // +, -, *, %
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.ADD, null,

@@ -468,8 +468,8 @@ class ExprTest : public testing::Test {
               numeric_limits<T>::max());
   }
 
-  // Test ops that that always promote to a fixed type (e.g., max resolution type):
-  // ADD, SUBTRACT, MULTIPLY, DIVIDE.
+  // Test ops that that always promote to a fixed type (e.g., next higher
+  // resolution type): ADD, SUBTRACT, MULTIPLY, DIVIDE.
   // Note that adding the " " when generating the expression is not just cosmetic.
   // We have "--" as a comment element in our lexer,
   // so subtraction of a negative value will be ignored without " ".
@@ -479,9 +479,12 @@ class ExprTest : public testing::Test {
     Result cast_b = static_cast<Result>(b);
     string a_str = lexical_cast<string>(cast_a);
     string b_str = lexical_cast<string>(cast_b);
-    TestValue(a_str + " + " + b_str, expected_type, cast_a + cast_b);
-    TestValue(a_str + " - " + b_str, expected_type, cast_a - cast_b);
-    TestValue(a_str + " * " + b_str, expected_type, cast_a * cast_b);
+    TestValue(a_str + " + " + b_str, expected_type,
+        static_cast<Result>(cast_a + cast_b));
+    TestValue(a_str + " - " + b_str, expected_type,
+        static_cast<Result>(cast_a - cast_b));
+    TestValue(a_str + " * " + b_str, expected_type,
+        static_cast<Result>(cast_a * cast_b));
     TestValue(a_str + " / " + b_str, TYPE_DOUBLE,
         static_cast<double>(a) / static_cast<double>(b));
   }
@@ -740,17 +743,17 @@ TEST_F(ExprTest, ArithmeticExprs) {
   TestFixedResultTypeOps<double, double, double>(min_float_values_[TYPE_DOUBLE],
       0.0, TYPE_DOUBLE);
 
-  // Test ops that always promote to fixed type (e.g., max resolution type).
-  TestFixedResultTypeOps<int8_t, int8_t, int64_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_TINYINT], TYPE_BIGINT);
-  TestFixedResultTypeOps<int8_t, int16_t, int64_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_SMALLINT], TYPE_BIGINT);
+  // Test ops that always promote to fixed type (e.g., next higher resolution type).
+  TestFixedResultTypeOps<int8_t, int8_t, int16_t>(min_int_values_[TYPE_TINYINT],
+      min_int_values_[TYPE_TINYINT], TYPE_SMALLINT);
+  TestFixedResultTypeOps<int8_t, int16_t, int32_t>(min_int_values_[TYPE_TINYINT],
+      min_int_values_[TYPE_SMALLINT], TYPE_INT);
   TestFixedResultTypeOps<int8_t, int32_t, int64_t>(min_int_values_[TYPE_TINYINT],
       min_int_values_[TYPE_INT], TYPE_BIGINT);
   TestFixedResultTypeOps<int8_t, int64_t, int64_t>(min_int_values_[TYPE_TINYINT],
       min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
-  TestFixedResultTypeOps<int16_t, int16_t, int64_t>(min_int_values_[TYPE_SMALLINT],
-      min_int_values_[TYPE_SMALLINT], TYPE_BIGINT);
+  TestFixedResultTypeOps<int16_t, int16_t, int32_t>(min_int_values_[TYPE_SMALLINT],
+      min_int_values_[TYPE_SMALLINT], TYPE_INT);
   TestFixedResultTypeOps<int16_t, int32_t, int64_t>(min_int_values_[TYPE_SMALLINT],
       min_int_values_[TYPE_INT], TYPE_BIGINT);
   TestFixedResultTypeOps<int16_t, int64_t, int64_t>(min_int_values_[TYPE_SMALLINT],
@@ -774,15 +777,15 @@ TEST_F(ExprTest, ArithmeticExprs) {
 
   // Test behavior with NULLs.
   TestNullOperandFixedResultTypeOps<float, double>(min_float_values_[TYPE_FLOAT],
-      TYPE_DOUBLE);
+      TYPE_FLOAT);
   TestNullOperandFixedResultTypeOps<double, double>(min_float_values_[TYPE_DOUBLE],
-      TYPE_DOUBLE);
+      TYPE_FLOAT);
   TestNullOperandFixedResultTypeOps<int8_t, int64_t>(min_int_values_[TYPE_TINYINT],
-      TYPE_BIGINT);
+      TYPE_TINYINT);
   TestNullOperandFixedResultTypeOps<int16_t, int64_t>(min_int_values_[TYPE_SMALLINT],
-      TYPE_BIGINT);
+      TYPE_SMALLINT);
   TestNullOperandFixedResultTypeOps<int32_t, int64_t>(min_int_values_[TYPE_INT],
-      TYPE_BIGINT);
+      TYPE_INT);
   TestNullOperandFixedResultTypeOps<int64_t, int64_t>(min_int_values_[TYPE_BIGINT],
       TYPE_BIGINT);
 
@@ -829,11 +832,11 @@ TEST_F(ExprTest, ArithmeticExprs) {
 
   // Tests for dealing with '-'.
   TestValue("-1", TYPE_TINYINT, -1);
-  TestValue("1 - 1", TYPE_BIGINT, 0);
-  TestValue("1 - - 1", TYPE_BIGINT, 2);
-  TestValue("1 - - - 1", TYPE_BIGINT, 0);
-  TestValue("- 1 - 1", TYPE_BIGINT, -2);
-  TestValue("- 1 - - 1", TYPE_BIGINT, 0);
+  TestValue("1 - 1", TYPE_SMALLINT, 0);
+  TestValue("1 - - 1", TYPE_SMALLINT, 2);
+  TestValue("1 - - - 1", TYPE_SMALLINT, 0);
+  TestValue("- 1 - 1", TYPE_SMALLINT, -2);
+  TestValue("- 1 - - 1", TYPE_SMALLINT, 0);
   // The "--" indicates a comment to be ignored.
   // Therefore, the result should be -1.
   TestValue("- 1 --1", TYPE_TINYINT, -1);
@@ -2202,7 +2205,7 @@ TEST_F(ExprTest, UnaryOperators) {
   TestValue("+1.0", TYPE_FLOAT, 1.0f);
   TestValue("-1.0", TYPE_FLOAT, -1.0f);
 
-  TestValue("1 - - - 1", TYPE_BIGINT, 0);
+  TestValue("1 - - - 1", TYPE_SMALLINT, 0);
 }
 
 // TODO: I think a lot of these casts are not necessary and we should fix this

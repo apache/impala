@@ -230,9 +230,9 @@ types = {
 # Operation, [ReturnType], [[Args1], [Args2], ... [ArgsN]]
 functions = [
   # Arithmetic Expr
-  ['Add', ['MAX_TYPES'], [['MAX_TYPES'], ['MAX_TYPES']] ],
-  ['Subtract', ['MAX_TYPES'], [['MAX_TYPES'], ['MAX_TYPES']] ],
-  ['Multiply', ['MAX_TYPES'], [['MAX_TYPES'], ['MAX_TYPES']] ],
+  ['Add', ['NUMERIC_TYPES'], [['NUMERIC_TYPES'], ['NUMERIC_TYPES']] ],
+  ['Subtract', ['NUMERIC_TYPES'], [['NUMERIC_TYPES'], ['NUMERIC_TYPES']] ],
+  ['Multiply', ['NUMERIC_TYPES'], [['NUMERIC_TYPES'], ['NUMERIC_TYPES']] ],
   ['Divide', ['DOUBLE'], [['DOUBLE'], ['DOUBLE']] ],
   ['Int_Divide', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
   ['Mod', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],

@@ -139,9 +139,14 @@ public class ArithmeticExpr extends Expr {
       case MULTIPLY:
       case ADD:
       case SUBTRACT:
-        // numeric ops must be promoted to highest-resolution type
-        // (otherwise we can't guarantee that a <op> b won't overflow/underflow)
-        type = PrimitiveType.getAssignmentCompatibleType(t1, t2).getMaxResolutionType();
+        // If one of the types is null, use the compatible type without promotion.
+        // Otherwise, promote the compatible type to the next higher resolution type,
+        // to ensure that that a <op> b won't overflow/underflow.
+        type = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+        if (!(t1.isNull() || t2.isNull())) {
+          // Both operands are non-null. Use next higher resolution type.
+          type = type.getNextResolutionType();
+        }
         Preconditions.checkState(type.isValid());
         break;
       case MOD:
