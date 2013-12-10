@@ -432,9 +432,10 @@ public class DdlExecutor {
       ColumnStatisticsData colStatsData =
           createHiveColStatsData(entry.getValue(), tableCol.getType());
       if (colStatsData == null) continue;
-      LOG.debug(String.format("Updating column stats for %s: numDVs=%s numNulls=%s",
-          colName, entry.getValue().getNum_distinct_values(),
-          entry.getValue().getNum_nulls()));
+      LOG.debug(String.format("Updating column stats for %s: numDVs=%s numNulls=%s " +
+          "maxSize=%s avgSize=%s", colName, entry.getValue().getNum_distinct_values(),
+          entry.getValue().getNum_nulls(), entry.getValue().getMax_size(),
+          entry.getValue().getAvg_size()));
       ColumnStatisticsObj colStatsObj = new ColumnStatisticsObj(colName,
           tableCol.getType().toString(), colStatsData);
       colStats.addToStatsObj(colStatsObj);
@@ -469,9 +470,10 @@ public class DdlExecutor {
         colStatsData.setDoubleStats(new DoubleColumnStatsData(-1, -1, numNulls, ndvs));
         break;
       case STRING:
-        // TODO: Gather and set the maxColLen/avgColLen stats as well. The planner
-        // currently does not rely on them significantly.
-        colStatsData.setStringStats(new StringColumnStatsData(-1, -1, numNulls, ndvs));
+        long maxStrLen = colStats.getMax_size();
+        double avgStrLen = colStats.getAvg_size();
+        colStatsData.setStringStats(
+            new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndvs));
         break;
       default:
         return null;

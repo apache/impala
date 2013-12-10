@@ -127,8 +127,9 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
 
   // Set per-column stats. For a column at position i in its source table,
   // the NDVs and the number of NULLs are at position i and i + 1 of the
-  // col_stats_row, respectively.
-  for (int i = 0; i < col_stats_row.colVals.size(); i += 2) {
+  // col_stats_row, respectively. Positions i + 2 and i + 3 contain the max/avg
+  // length for string columns, and -1 for non-string columns.
+  for (int i = 0; i < col_stats_row.colVals.size(); i += 4) {
     // The NDVs are written as a string column by the estimation function.
     StringParser::ParseResult parse_result;
     const string& ndvs_str = col_stats_row.colVals[i].stringVal.value;
@@ -139,10 +140,8 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
     TColumnStats col_stats;
     col_stats.__set_num_distinct_values(ndvs);
     col_stats.__set_num_nulls(col_stats_row.colVals[i + 1].i64Val.value);
-    // TODO: Gather and set the maxColLen/avgColLen stats as well. The planner
-    // currently does not rely on them significantly.
-    col_stats.__set_avg_size(-1);
-    col_stats.__set_max_size(-1);
+    col_stats.__set_max_size(col_stats_row.colVals[i + 2].i32Val.value);
+    col_stats.__set_avg_size(col_stats_row.colVals[i + 3].doubleVal.value);
     params->column_stats[col_stats_schema.columns[i].columnName] = col_stats;
   }
   params->__isset.column_stats = true;

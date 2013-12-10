@@ -374,9 +374,9 @@ public class CatalogTest {
 
     Column stringCol = table.getColumn("string_col");
     assertTrue(
-        stringCol.getStats().getAvgSerializedSize() <= PrimitiveType.STRING.getSlotSize());
+        stringCol.getStats().getAvgSerializedSize() >= PrimitiveType.STRING.getSlotSize());
     assertTrue(stringCol.getStats().getAvgSerializedSize() > 0);
-    assertEquals(stringCol.getStats().getMaxSize(), -1);
+    assertTrue(stringCol.getStats().getMaxSize() > 0);
     assertTrue(!stringCol.getStats().hasNulls());
   }
 

@@ -51,21 +51,13 @@ PLAN FRAGMENT 0
   7:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    customer.c_current_addr_sk = customer_address.ca_address_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.customer_address #partitions=1/1 size=5.25MB compact
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
   |    store_sales.ss_item_sk = item.i_item_sk
   |
   |----1:SCAN HDFS
   |       table=tpcds.item #partitions=1/1 size=4.82MB compact
   |       predicates: i_manager_id = 7
   |
-  5:HASH JOIN
+  6:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    customer.c_customer_sk = store_sales.ss_customer_sk
@@ -73,40 +65,48 @@ PLAN FRAGMENT 0
   |----0:SCAN HDFS
   |       table=tpcds.store_sales #partitions=2/120 size=663.52KB compact
   |
-  2:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
+  5:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    customer_address.ca_address_sk = customer.c_current_addr_sk
+  |
+  |----2:SCAN HDFS
+  |       table=tpcds.customer #partitions=1/1 size=12.60MB compact
+  |
+  3:SCAN HDFS
+     table=tpcds.customer_address #partitions=1/1 size=5.25MB
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  18:TOP-N
+  19:TOP-N
   |  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
   |  limit: 100
   |
-  17:EXCHANGE
+  18:EXCHANGE
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: i_brand, i_brand_id, i_manufact_id, i_manufact
 
   STREAM DATA SINK
-    EXCHANGE ID: 17
+    EXCHANGE ID: 18
     UNPARTITIONED
 
   10:TOP-N
   |  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
   |  limit: 100
   |
-  16:AGGREGATE (merge finalize)
+  17:AGGREGATE (merge finalize)
   |  output: SUM(SUM(ss_ext_sales_price))
   |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
   |
-  15:EXCHANGE
+  16:EXCHANGE
 
 PLAN FRAGMENT 2
-  PARTITION: RANDOM
+  PARTITION: HASH_PARTITIONED: customer_address.ca_address_sk
 
   STREAM DATA SINK
-    EXCHANGE ID: 15
+    EXCHANGE ID: 16
     HASH_PARTITIONED: i_brand, i_brand_id, i_manufact_id, i_manufact
 
   9:AGGREGATE
@@ -119,37 +119,36 @@ PLAN FRAGMENT 2
   |    store_sales.ss_store_sk = store.s_store_sk
   |  other predicates: substr(ca_zip, 1, 5) != substr(s_zip, 1, 5)
   |
-  |----14:EXCHANGE
+  |----15:EXCHANGE
   |
   7:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    customer.c_current_addr_sk = customer_address.ca_address_sk
+  |    store_sales.ss_item_sk = item.i_item_sk
   |
-  |----13:EXCHANGE
+  |----14:EXCHANGE
   |
   6:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
+  |    customer.c_customer_sk = store_sales.ss_customer_sk
+  |
+  |----13:EXCHANGE
+  |
+  5:HASH JOIN
+  |  join op: INNER JOIN (PARTITIONED)
+  |  hash predicates:
+  |    customer_address.ca_address_sk = customer.c_current_addr_sk
   |
   |----12:EXCHANGE
   |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    customer.c_customer_sk = store_sales.ss_customer_sk
-  |
-  |----11:EXCHANGE
-  |
-  2:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
+  11:EXCHANGE
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 14
+    EXCHANGE ID: 15
     UNPARTITIONED
 
   4:SCAN HDFS
@@ -159,32 +158,42 @@ PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
+    EXCHANGE ID: 14
     UNPARTITIONED
 
   1:SCAN HDFS
      table=tpcds.item #partitions=1/1 size=4.82MB
      predicates: i_manager_id = 7
 
-PLAN FRAGMENT 6
+PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 11
+    EXCHANGE ID: 13
     UNPARTITIONED
 
   0:SCAN HDFS
      table=tpcds.store_sales #partitions=2/120 size=663.52KB
+
+PLAN FRAGMENT 6
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 12
+    HASH_PARTITIONED: customer.c_current_addr_sk
+
+  2:SCAN HDFS
+     table=tpcds.customer #partitions=1/1 size=12.60MB
+
+PLAN FRAGMENT 7
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    HASH_PARTITIONED: customer_address.ca_address_sk
+
+  3:SCAN HDFS
+     table=tpcds.customer_address #partitions=1/1 size=5.25MB
 ====
 # TPCDS-Q27
 SELECT
@@ -471,17 +480,17 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  19:TOP-N
+  18:TOP-N
   |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
   |  limit: 1000
   |
-  18:EXCHANGE
+  17:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: customer.c_customer_sk
+  PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 18
+    EXCHANGE ID: 17
     UNPARTITIONED
 
   10:TOP-N
@@ -489,20 +498,21 @@ PLAN FRAGMENT 1
   |  limit: 1000
   |
   9:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
+  |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    customer.c_customer_sk = ss_customer_sk
   |
-  |----17:EXCHANGE
+  |----16:EXCHANGE
   |
-  16:EXCHANGE
+  8:SCAN HDFS
+     table=tpcds.customer #partitions=1/1 size=12.60MB
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk
 
   STREAM DATA SINK
-    EXCHANGE ID: 17
-    HASH_PARTITIONED: ss_customer_sk
+    EXCHANGE ID: 16
+    UNPARTITIONED
 
   15:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
@@ -578,16 +588,6 @@ PLAN FRAGMENT 6
   1:SCAN HDFS
      table=tpcds.household_demographics #partitions=1/1 size=148.10KB
      predicates: (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown'), household_demographics.hd_vehicle_count > 0, (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
-
-PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    HASH_PARTITIONED: customer.c_customer_sk
-
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
 ====
 # TPCDS-Q3
 select
@@ -1092,17 +1092,17 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  24:TOP-N
+  25:TOP-N
   |  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
   |  limit: 400
   |
-  23:EXCHANGE
+  24:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
+  PARTITION: HASH_PARTITIONED: ss_customer_sk
 
   STREAM DATA SINK
-    EXCHANGE ID: 23
+    EXCHANGE ID: 24
     UNPARTITIONED
 
   14:TOP-N
@@ -1115,26 +1115,22 @@ PLAN FRAGMENT 1
   |    c.c_current_addr_sk = current_addr.ca_address_sk
   |  other predicates: current_addr.ca_city != ca_city
   |
-  |----22:EXCHANGE
+  |----23:EXCHANGE
   |
   12:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
+  |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    ss_customer_sk = c.c_customer_sk
   |
-  |----21:EXCHANGE
+  |----22:EXCHANGE
   |
-  20:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_coupon_amt)), SUM(SUM(ss_net_profit))
-  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-  |
-  19:EXCHANGE
+  21:EXCHANGE
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 22
+    EXCHANGE ID: 23
     UNPARTITIONED
 
   11:SCAN HDFS
@@ -1144,13 +1140,26 @@ PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 21
-    UNPARTITIONED
+    EXCHANGE ID: 22
+    HASH_PARTITIONED: c.c_customer_sk
 
   10:SCAN HDFS
      table=tpcds.customer #partitions=1/1 size=12.60MB
 
 PLAN FRAGMENT 4
+  PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
+
+  STREAM DATA SINK
+    EXCHANGE ID: 21
+    HASH_PARTITIONED: ss_customer_sk
+
+  20:AGGREGATE (merge finalize)
+  |  output: SUM(SUM(ss_coupon_amt)), SUM(SUM(ss_net_profit))
+  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
+  |
+  19:EXCHANGE
+
+PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -1192,7 +1201,7 @@ PLAN FRAGMENT 4
   0:SCAN HDFS
      table=tpcds.store_sales #partitions=120/120 size=23.42MB
 
-PLAN FRAGMENT 5
+PLAN FRAGMENT 6
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -1203,7 +1212,7 @@ PLAN FRAGMENT 5
      table=tpcds.store #partitions=1/1 size=3.08KB
      predicates: s.s_city IN ('Oak Grove', 'Fairview', 'Midway', 'Five Points', 'Fairview')
 
-PLAN FRAGMENT 6
+PLAN FRAGMENT 7
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -1213,7 +1222,7 @@ PLAN FRAGMENT 6
   3:SCAN HDFS
      table=tpcds.customer_address #partitions=1/1 size=5.25MB
 
-PLAN FRAGMENT 7
+PLAN FRAGMENT 8
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -1224,7 +1233,7 @@ PLAN FRAGMENT 7
      table=tpcds.household_demographics #partitions=1/1 size=148.10KB
      predicates: (hd.hd_dep_count = 9 OR hd.hd_vehicle_count = 0)
 
-PLAN FRAGMENT 8
+PLAN FRAGMENT 9
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -2287,32 +2296,32 @@ PLAN FRAGMENT 0
   7:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    ss_item_sk = item.i_item_sk
+  |    item.i_item_sk = ss_item_sk
   |
-  |----2:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
+  |----1:AGGREGATE (finalize)
+  |    |  output: SUM(ss_sales_price)
+  |    |  group by: ss_store_sk, ss_item_sk
+  |    |
+  |    0:SCAN HDFS
+  |       table=tpcds.store_sales #partitions=24/120 size=4.74MB
   |
-  1:AGGREGATE (finalize)
-  |  output: SUM(ss_sales_price)
-  |  group by: ss_store_sk, ss_item_sk
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=24/120 size=4.74MB
+  2:SCAN HDFS
+     table=tpcds.item #partitions=1/1 size=4.82MB
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  22:TOP-N
+  21:TOP-N
   |  order by: s_store_name ASC, i_item_desc ASC
   |  limit: 100
   |
-  21:EXCHANGE
+  20:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: ss_item_sk
+  PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 21
+    EXCHANGE ID: 20
     UNPARTITIONED
 
   10:TOP-N
@@ -2325,59 +2334,60 @@ PLAN FRAGMENT 1
   |    ss_store_sk = ss_store_sk
   |  other predicates: SUM(ss_sales_price) <= 0.1 * SUM(revenue) / COUNT(revenue)
   |
-  |----20:EXCHANGE
+  |----19:EXCHANGE
   |
   8:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ss_store_sk = store.s_store_sk
   |
-  |----15:EXCHANGE
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    ss_item_sk = item.i_item_sk
-  |
   |----14:EXCHANGE
   |
-  13:EXCHANGE
+  7:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    item.i_item_sk = ss_item_sk
+  |
+  |----13:EXCHANGE
+  |
+  2:SCAN HDFS
+     table=tpcds.item #partitions=1/1 size=4.82MB
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: ss_store_sk
 
   STREAM DATA SINK
-    EXCHANGE ID: 20
+    EXCHANGE ID: 19
     UNPARTITIONED
 
-  19:AGGREGATE (merge finalize)
+  18:AGGREGATE (merge finalize)
   |  output: SUM(SUM(revenue)), SUM(COUNT(revenue))
   |  group by: ss_store_sk
   |
-  18:EXCHANGE
+  17:EXCHANGE
 
 PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: ss_store_sk, ss_item_sk
 
   STREAM DATA SINK
-    EXCHANGE ID: 18
+    EXCHANGE ID: 17
     HASH_PARTITIONED: ss_store_sk
 
   6:AGGREGATE
   |  output: SUM(SUM(ss_sales_price)), COUNT(SUM(ss_sales_price))
   |  group by: ss_store_sk
   |
-  17:AGGREGATE (merge finalize)
+  16:AGGREGATE (merge finalize)
   |  output: SUM(SUM(ss_sales_price))
   |  group by: ss_store_sk, ss_item_sk
   |
-  16:EXCHANGE
+  15:EXCHANGE
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 16
+    EXCHANGE ID: 15
     HASH_PARTITIONED: ss_store_sk, ss_item_sk
 
   5:AGGREGATE
@@ -2391,28 +2401,18 @@ PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 15
+    EXCHANGE ID: 14
     UNPARTITIONED
 
   3:SCAN HDFS
      table=tpcds.store #partitions=1/1 size=3.08KB
 
 PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    HASH_PARTITIONED: item.i_item_sk
-
-  2:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-
-PLAN FRAGMENT 7
   PARTITION: HASH_PARTITIONED: ss_store_sk, ss_item_sk
 
   STREAM DATA SINK
     EXCHANGE ID: 13
-    HASH_PARTITIONED: ss_item_sk
+    UNPARTITIONED
 
   12:AGGREGATE (merge finalize)
   |  output: SUM(SUM(ss_sales_price))
@@ -2420,7 +2420,7 @@ PLAN FRAGMENT 7
   |
   11:EXCHANGE
 
-PLAN FRAGMENT 8
+PLAN FRAGMENT 7
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -2756,17 +2756,17 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  19:TOP-N
+  18:TOP-N
   |  order by: cnt DESC
   |  limit: 100
   |
-  18:EXCHANGE
+  17:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: c.c_customer_sk
+  PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 18
+    EXCHANGE ID: 17
     UNPARTITIONED
 
   10:TOP-N
@@ -2774,20 +2774,21 @@ PLAN FRAGMENT 1
   |  limit: 100
   |
   9:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
+  |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    c.c_customer_sk = ss_customer_sk
   |
-  |----17:EXCHANGE
+  |----16:EXCHANGE
   |
-  16:EXCHANGE
+  8:SCAN HDFS
+     table=tpcds.customer #partitions=1/1 size=12.60MB
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk
 
   STREAM DATA SINK
-    EXCHANGE ID: 17
-    HASH_PARTITIONED: ss_customer_sk
+    EXCHANGE ID: 16
+    UNPARTITIONED
 
   15:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
@@ -2863,16 +2864,6 @@ PLAN FRAGMENT 6
   1:SCAN HDFS
      table=tpcds.date_dim #partitions=1/1 size=9.84MB
      predicates: d.d_dom >= 1, d.d_dom <= 2, d.d_year IN (1999, 1999 + 1, 1999 + 2)
-
-PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    HASH_PARTITIONED: c.c_customer_sk
-
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
 ====
 # TPCDS-Q79
 SELECT
@@ -2969,17 +2960,17 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  18:TOP-N
+  19:TOP-N
   |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
   |  limit: 100
   |
-  17:EXCHANGE
+  18:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
+  PARTITION: HASH_PARTITIONED: ss_customer_sk
 
   STREAM DATA SINK
-    EXCHANGE ID: 17
+    EXCHANGE ID: 18
     UNPARTITIONED
 
   10:TOP-N
@@ -2987,29 +2978,38 @@ PLAN FRAGMENT 1
   |  limit: 100
   |
   9:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
+  |  join op: INNER JOIN (PARTITIONED)
   |  hash predicates:
   |    ss_customer_sk = c.c_customer_sk
   |
-  |----16:EXCHANGE
+  |----17:EXCHANGE
   |
+  16:EXCHANGE
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 17
+    HASH_PARTITIONED: c.c_customer_sk
+
+  8:SCAN HDFS
+     table=tpcds.customer #partitions=1/1 size=12.60MB
+
+PLAN FRAGMENT 3
+  PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
+
+  STREAM DATA SINK
+    EXCHANGE ID: 16
+    HASH_PARTITIONED: ss_customer_sk
+
   15:AGGREGATE (merge finalize)
   |  output: SUM(SUM(ss_coupon_amt)), SUM(SUM(ss_net_profit))
   |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
   |
   14:EXCHANGE
 
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    UNPARTITIONED
-
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
-
-PLAN FRAGMENT 3
+PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3044,7 +3044,7 @@ PLAN FRAGMENT 3
   0:SCAN HDFS
      table=tpcds.store_sales #partitions=120/120 size=23.42MB
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3055,7 +3055,7 @@ PLAN FRAGMENT 4
      table=tpcds.store #partitions=1/1 size=3.08KB
      predicates: s.s_number_employees >= 200, s.s_number_employees <= 295
 
-PLAN FRAGMENT 5
+PLAN FRAGMENT 6
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3066,7 +3066,7 @@ PLAN FRAGMENT 5
      table=tpcds.household_demographics #partitions=1/1 size=148.10KB
      predicates: (hd.hd_dep_count = 8 OR hd.hd_vehicle_count > 0)
 
-PLAN FRAGMENT 6
+PLAN FRAGMENT 7
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -3542,34 +3542,34 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  22:TOP-N
+  21:TOP-N
   |  order by: s_store_name ASC
   |  limit: 100
   |
-  21:EXCHANGE
+  20:EXCHANGE
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: s_store_name
 
   STREAM DATA SINK
-    EXCHANGE ID: 21
+    EXCHANGE ID: 20
     UNPARTITIONED
 
   11:TOP-N
   |  order by: s_store_name ASC
   |  limit: 100
   |
-  20:AGGREGATE (merge finalize)
+  19:AGGREGATE (merge finalize)
   |  output: SUM(SUM(ss_net_profit))
   |  group by: s_store_name
   |
-  19:EXCHANGE
+  18:EXCHANGE
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 19
+    EXCHANGE ID: 18
     HASH_PARTITIONED: s_store_name
 
   10:AGGREGATE
@@ -3581,7 +3581,7 @@ PLAN FRAGMENT 2
   |  hash predicates:
   |    substr(store.s_zip, 1, 2) = substr(substr(ca_zip, 1, 5), 1, 2)
   |
-  |----18:EXCHANGE
+  |----17:EXCHANGE
   |
   8:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
@@ -3597,7 +3597,7 @@ PLAN FRAGMENT 3
   PARTITION: HASH_PARTITIONED: substr(ca_zip, 1, 5)
 
   STREAM DATA SINK
-    EXCHANGE ID: 18
+    EXCHANGE ID: 17
     UNPARTITIONED
 
   7:HASH JOIN
@@ -3605,20 +3605,20 @@ PLAN FRAGMENT 3
   |  hash predicates:
   |    substr(ca_zip, 1, 5) = substr(ca_zip, 1, 5)
   |
-  |----17:EXCHANGE
+  |----16:EXCHANGE
   |
-  16:AGGREGATE (merge finalize)
+  15:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: substr(ca_zip, 1, 5)
   |  having: COUNT(*) > 10
   |
-  15:EXCHANGE
+  14:EXCHANGE
 
 PLAN FRAGMENT 4
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 17
+    EXCHANGE ID: 16
     HASH_PARTITIONED: substr(ca_zip, 1, 5)
 
   6:SCAN HDFS
@@ -3626,10 +3626,10 @@ PLAN FRAGMENT 4
      predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
 
 PLAN FRAGMENT 5
-  PARTITION: HASH_PARTITIONED: customer_address.ca_address_sk
+  PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 15
+    EXCHANGE ID: 14
     HASH_PARTITIONED: substr(ca_zip, 1, 5)
 
   5:AGGREGATE
@@ -3637,36 +3637,27 @@ PLAN FRAGMENT 5
   |  group by: substr(ca_zip, 1, 5)
   |
   4:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
+  |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    customer_address.ca_address_sk = customer.c_current_addr_sk
   |
-  |----14:EXCHANGE
+  |----13:EXCHANGE
   |
-  13:EXCHANGE
+  2:SCAN HDFS
+     table=tpcds.customer_address #partitions=1/1 size=5.25MB
 
 PLAN FRAGMENT 6
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 14
-    HASH_PARTITIONED: customer.c_current_addr_sk
+    EXCHANGE ID: 13
+    UNPARTITIONED
 
   3:SCAN HDFS
      table=tpcds.customer #partitions=1/1 size=12.60MB
      predicates: c_preferred_cust_flag = 'Y'
 
 PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    HASH_PARTITIONED: customer_address.ca_address_sk
-
-  2:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
-
-PLAN FRAGMENT 8
   PARTITION: RANDOM
 
   STREAM DATA SINK

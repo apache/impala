@@ -22,6 +22,7 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
@@ -106,6 +107,16 @@ public class ComputeStatsStmt extends StatementBase {
       columnStatsSelectList.add("NDV(" + c.getName() + ") AS " + c.getName());
       // Count the number of NULL values.
       columnStatsSelectList.add("COUNT(IF(" + c.getName() + " IS NULL, 1, NULL))");
+      // For STRING columns also compute the max and avg string length.
+      if (c.getType() == PrimitiveType.STRING) {
+        columnStatsSelectList.add("MAX(length(" + c.getName() + "))");
+        columnStatsSelectList.add("AVG(length(" + c.getName() + "))");
+      } else {
+        // For non-STRING columns use -1 as the max/avg length to avoid having to
+        // treat STRING columns specially in the BE CatalogOpExecutor.
+        columnStatsSelectList.add("CAST(-1 as INT)");
+        columnStatsSelectList.add("CAST(-1 as DOUBLE)");
+      }
     }
     columnStatsQueryBuilder.append(Joiner.on(", ").join(columnStatsSelectList));
     columnStatsQueryBuilder.append(" FROM " + table_.getFullName());

@@ -58,8 +58,8 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'bigint_col','BIGINT',10,0,8,8
 'float_col','FLOAT',10,0,4,4
 'double_col','DOUBLE',10,0,8,8
-'date_string_col','STRING',666,0,-1,-1
-'string_col','STRING',10,0,-1,-1
+'date_string_col','STRING',666,0,8,8
+'string_col','STRING',10,0,1,1
 'timestamp_col','TIMESTAMP',5678,0,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
@@ -103,8 +103,8 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'bigint_col','BIGINT',10,0,8,8
 'float_col','FLOAT',10,0,4,4
 'double_col','DOUBLE',10,0,8,8
-'date_string_col','STRING',12,0,-1,-1
-'string_col','STRING',10,0,-1,-1
+'date_string_col','STRING',12,0,8,8
+'string_col','STRING',10,0,1,1
 'timestamp_col','TIMESTAMP',101,0,16,16
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
@@ -169,8 +169,8 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'bigint_col','BIGINT',10,0,8,8
 'float_col','FLOAT',10,0,4,4
 'double_col','DOUBLE',10,0,8,8
-'date_string_col','STRING',666,0,-1,-1
-'string_col','STRING',10,0,-1,-1
+'date_string_col','STRING',666,0,8,8
+'string_col','STRING',10,0,1,1
 'timestamp_col','TIMESTAMP',5678,0,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
@@ -212,13 +212,13 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'id','INT',-1,-1,4,4
 'bigint_col','BIGINT',10,0,8,8
 'bool_col','BOOLEAN',2,0,1,1
-'date_string_col','STRING',12,0,-1,-1
+'date_string_col','STRING',12,0,8,8
 'double_col','DOUBLE',10,0,8,8
 'float_col','FLOAT',10,0,4,4
 'int_col','INT',10,0,4,4
 'month','INT',4,0,4,4
 'smallint_col','SMALLINT',10,0,2,2
-'string_col','STRING',10,0,-1,-1
+'string_col','STRING',10,0,1,1
 'timestamp_col','TIMESTAMP',101,0,16,16
 'tinyint_col','TINYINT',10,0,1,1
 'year','INT',1,0,4,4
@@ -254,13 +254,13 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'id','INT',-1,-1,4,4
 'bigint_col','BIGINT',10,0,8,8
 'bool_col','BOOLEAN',2,0,1,1
-'date_string_col','STRING',12,0,-1,-1
+'date_string_col','STRING',12,0,8,8
 'double_col','DOUBLE',10,0,8,8
 'float_col','FLOAT',10,0,4,4
 'int_col','INT',10,0,4,4
 'month','INT',4,0,4,4
 'smallint_col','SMALLINT',10,0,2,2
-'string_col','STRING',10,0,-1,-1
+'string_col','STRING',10,0,1,1
 'timestamp_col','TIMESTAMP',101,0,16,16
 'tinyint_col','TINYINT',10,0,1,1
 'year','INT',1,0,4,4
@@ -300,8 +300,8 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'bigint_col','BIGINT',0,0,8,8
 'float_col','FLOAT',0,0,4,4
 'double_col','DOUBLE',0,0,8,8
-'date_string_col','STRING',0,0,-1,-1
-'string_col','STRING',0,0,-1,-1
+'date_string_col','STRING',0,0,8,8
+'string_col','STRING',0,0,1,1
 'timestamp_col','TIMESTAMP',0,0,16,16
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4

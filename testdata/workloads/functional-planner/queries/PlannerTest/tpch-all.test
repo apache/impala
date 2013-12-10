@@ -1898,50 +1898,41 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  7:AGGREGATE (merge finalize)
+  6:AGGREGATE (merge finalize)
   |  output: SUM(SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END)), SUM(SUM(l_extendedprice * (1.0 - l_discount)))
   |
-  6:EXCHANGE
+  5:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: p.p_partkey
+  PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 6
+    EXCHANGE ID: 5
     UNPARTITIONED
 
   3:AGGREGATE
   |  output: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1.0 - l_discount) ELSE 0.0 END), SUM(l_extendedprice * (1.0 - l_discount))
   |
   2:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
+  |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    p.p_partkey = l.l_partkey
   |
-  |----5:EXCHANGE
+  |----4:EXCHANGE
   |
-  4:EXCHANGE
+  1:SCAN HDFS
+     table=tpch.part #partitions=1/1 size=22.83MB
 
 PLAN FRAGMENT 2
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: l.l_partkey
+    EXCHANGE ID: 4
+    UNPARTITIONED
 
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
      predicates: l.l_shipdate >= '1995-09-01', l.l_shipdate < '1995-10-01'
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: p.p_partkey
-
-  1:SCAN HDFS
-     table=tpch.part #partitions=1/1 size=22.83MB
 ====
 # Q15 - Top Supplier Query
 insert overwrite table tpch.revenue
