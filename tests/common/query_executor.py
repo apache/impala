@@ -46,7 +46,7 @@ from threading import Thread, Lock
 # Setup logging for this module.
 logging.basicConfig(level=logging.INFO, format='[%(name)s] %(threadName)s: %(message)s')
 LOG = logging.getLogger('query_executor')
-LOG.setLevel(level=logging.DEBUG)
+LOG.setLevel(level=logging.INFO)
 
 # globals.
 hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
@@ -239,7 +239,7 @@ def establish_beeswax_connection(query, query_options):
   client = ImpalaBeeswaxClient(query_options.impalad, use_kerberos=use_kerberos)
   # Try connect
   client.connect()
-  LOG.debug('Connected to %s' % query_options.impalad)
+  LOG.info('Connected to %s' % query_options.impalad)
   # Set the exec options.
   client.set_query_options(query_options.exec_options)
   return (True, client)
@@ -264,12 +264,13 @@ def execute_using_impala_beeswax(query, query_options):
   # create a map for query options and the query names to send to the plugin
   context = build_context(query, query_options)
   for i in xrange(query_options.iterations):
-    LOG.debug("Running iteration %d" % (i+1))
+    LOG.info("Running iteration %d" % (i+1))
     context['iteration'] = i
     result = QueryResult()
     if plugin_runner: plugin_runner.run_plugins_pre(context=context, scope="Query")
     try:
       result = client.execute(query.query_str)
+      LOG.info("Iteration %d finished in %f(s)" % (i+1, result.time_taken))
     except Exception, e:
       LOG.error(e)
       client.close_connection()

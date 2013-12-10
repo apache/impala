@@ -31,7 +31,7 @@ WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 IMPALA_HOME = os.environ['IMPALA_HOME']
 
 # Setup Logging
-logging.basicConfig(level=logging.INFO, format='[%(name)s] %(threadName)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format='[%(name)s]: %(message)s')
 LOG = logging.getLogger('workload_runner')
 
 
@@ -243,11 +243,9 @@ class WorkloadRunner(object):
     """
     executor_name = self.__get_executor_name()
     # each list of queries has the same test vector. pick the first one.
-    LOG.info(("Running Test Vector - "
-              "File Format: %s "
-              "Compression: %s / %s" % (queries[0].test_vector.file_format,
-                queries[0].test_vector.compression_codec,
-                queries[0].test_vector.compression_type)))
+    print "\nRunning  Vector: File Format: %s, Compression: %s/%s" % \
+        (queries[0].test_vector.file_format, queries[0].test_vector.compression_codec,
+         queries[0].test_vector.compression_type)
 
     for query in queries:
       self.__summary += "\nQuery (%s): %s\n" % (query.table_format_str, query.name)
@@ -255,7 +253,7 @@ class WorkloadRunner(object):
       if not self.skip_impala:
         self.__summary += " Impala Results: "
         LOG.debug('Running: \n%s\n' % query.query_str)
-        LOG.info('Query Name: \n%s\n' % query.name)
+        LOG.info('Query Name: %s' % query.name)
         exec_result = self.run_query(executor_name, query, stop_on_query_error)
         if exec_result:
           self.__summary += "%s\n" % exec_result
@@ -341,7 +339,8 @@ class WorkloadRunner(object):
       If the scope of execution is a query, run each query individually. Finally,
       aggregate the results.
     """
-    LOG.info('Running workload: %s / Scale factor: %s' % (workload, scale_factor))
+    LOG.info('Running workload %s at Scale Factor %s' % (workload,
+      scale_factor if scale_factor else "None"))
     query_map = WorkloadRunner.__extract_queries_from_test_files(workload, query_names)
     if not query_map:
       LOG.error('No queries selected to run.')

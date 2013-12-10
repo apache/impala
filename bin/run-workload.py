@@ -113,8 +113,7 @@ parser.add_option("--cm_password", dest="cm_password", default='admin',
                   help="The password to the CM server")
 options, args = parser.parse_args()
 
-logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
-
+logging.basicConfig(level=logging.INFO, format='[%(name)s]: %(message)s')
 LOG = logging.getLogger('run-workload')
 
 def save_results(result_map, output_csv_file, is_impala_result=True):
@@ -189,10 +188,10 @@ def write_results(result_map, partial_results = False):
   suffix = '.partial' if partial_results else ''
 
   if not options.skip_impala:
-    LOG.info("Results saving to: %s" % options.results_csv_file)
+    LOG.info("Saving results to: %s" % options.results_csv_file)
     save_results(result_map, options.results_csv_file + suffix, is_impala_result=True)
   if options.skip_impala or options.compare_with_hive:
-    LOG.info("Hive Results saving to: %s" % options.hive_results_csv_file)
+    LOG.info("Saving hive results to: %s" % options.hive_results_csv_file)
     save_results(result_map, options.hive_results_csv_file + suffix,
                  is_impala_result=False)
 
@@ -216,7 +215,9 @@ def run_workloads(workload_runner, failure_injector=None):
 
 def process_results(workload_runner, is_partial_result=False):
   write_results(workload_runner.get_results(), is_partial_result)
-  LOG.info(workload_runner.get_summary_str())
+  print '\nSUMMARY OF RESULTS'
+  print '------------------'
+  print workload_runner.get_summary_str()
 
 if __name__ == "__main__":
   """
