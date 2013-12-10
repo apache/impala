@@ -1914,7 +1914,7 @@ void ImpalaServer::CatalogUpdateCallback(
       // Remove all dropped functions from the library cache.
       // TODO: is this expensive? We'd like to process heartbeats promptly.
       for (int i = 0; i < dropped_functions.size(); ++i) {
-        exec_env_->lib_cache()->RemoveEntry(dropped_functions[i].fn.location);
+        exec_env_->lib_cache()->RemoveEntry(dropped_functions[i].fn.hdfs_location);
       }
     }
   }

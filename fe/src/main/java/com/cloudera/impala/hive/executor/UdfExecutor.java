@@ -107,7 +107,7 @@ public class UdfExecutor {
     JniUtil.deserializeThrift(protocolFactory, request, thriftParams);
 
     String className = request.fn.scalar_fn.symbol;
-    String jarFile = request.fn.location;
+    String jarFile = request.local_location;
     PrimitiveType retType = PrimitiveType.fromThrift(request.fn.ret_type);
     PrimitiveType[] parameterTypes = new PrimitiveType[request.fn.arg_types.size()];
     for (int i = 0; i < request.fn.arg_types.size(); ++i) {

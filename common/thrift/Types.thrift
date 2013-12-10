@@ -149,7 +149,7 @@ struct TFunction {
 
   // HDFS path for the function binary. This binary must exist at the time the
   // function is created.
-  9: optional string location
+  9: optional string hdfs_location
 
   // One of these should be set.
   10: optional TScalarFunction scalar_fn

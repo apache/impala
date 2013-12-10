@@ -61,25 +61,28 @@ struct TSessionState {
 struct THiveUdfExecutorCtorParams {
   1: required Types.TFunction fn
 
+  // Local path to the UDF's jar file
+  2: required string local_location
+
   // The byte offset for each argument in the input buffer. The BE will
   // call the Java executor with a buffer for all the inputs.
   // input_byte_offsets[0] is the byte offset in the buffer for the first
   // argument; input_byte_offsets[1] is the second, etc.
-  2: required list<i32> input_byte_offsets;
+  3: required list<i32> input_byte_offsets;
 
   // Native input buffer ptr (cast as i64) for the inputs. The input arguments
   // are written to this buffer directly and read from java with no copies
   // input_null_ptr[i] is true if the i-th input is null.
   // input_buffer_ptr[input_byte_offsets[i]] is the value of the i-th input.
-  3: required i64 input_nulls_ptr;
-  4: required i64 input_buffer_ptr;
+  4: required i64 input_nulls_ptr;
+  5: required i64 input_buffer_ptr;
 
   // Native output buffer ptr. For non-variable length types, the output is
   // written here and read from the native side with no copies.
   // The UDF should set *output_null_ptr to true, if the result of the UDF is
   // NULL.
-  5: required i64 output_null_ptr;
-  6: required i64 output_buffer_ptr;
+  6: required i64 output_null_ptr;
+  7: required i64 output_buffer_ptr;
 }
 
 // Arguments to getTableNames, which returns a list of tables that match an

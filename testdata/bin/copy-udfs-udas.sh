@@ -27,7 +27,7 @@ hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so\
     /test-warehouse/udf_test/libTestUdfs.so
 hadoop fs -put -f ${HIVE_HOME}/lib/hive-exec-${IMPALA_HIVE_VERSION}.jar\
   /test-warehouse/hive-exec.jar
-hadoop fs -put -f ${IMPALA_HOME}/fe/target/impala-frontend-0.1-SNAPSHOT-tests.jar\
+hadoop fs -put -f ${IMPALA_HOME}/tests/test-hive-udfs/target/test-hive-udfs-1.0.jar\
     /test-warehouse/impala-hive-udfs.jar
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/test-udfs.ll /test-warehouse
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/udf_samples/libudfsample.so\

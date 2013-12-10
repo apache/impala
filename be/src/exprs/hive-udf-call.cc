@@ -133,7 +133,7 @@ void* HiveUdfCall::Evaluate(Expr* e, TupleRow* row) {
   Status status = JniUtil::GetJniExceptionMsg(env);
   if (!status.ok()) {
     stringstream ss;
-    ss << "Hive UDF path=" << udf->udf_.location << " class="
+    ss << "Hive UDF path=" << udf->udf_.hdfs_location << " class="
        << udf->udf_.scalar_fn.symbol
        << " failed due to: " << status.GetErrorMsg();
     udf->state_->LogError(ss.str());
@@ -150,7 +150,7 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
   // Copy the Hive Jar from hdfs to local file system.
   string local_path;
   RETURN_IF_ERROR(state->lib_cache()->GetLocalLibPath(
-        state->fs_cache(), udf_.location, LibCache::TYPE_JAR, &local_path));
+        state->fs_cache(), udf_.hdfs_location, LibCache::TYPE_JAR, &local_path));
 
   JNIEnv* env = getJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");
@@ -170,6 +170,7 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
 
   THiveUdfExecutorCtorParams ctor_params;
   ctor_params.fn = udf_;
+  ctor_params.local_location = local_path;
   for (int i = 0; i < GetNumChildren(); ++i) {
     ctor_params.input_byte_offsets.push_back(input_buffer_size);
     input_byte_offsets_.push_back(input_buffer_size);
@@ -207,7 +208,7 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
 
 string HiveUdfCall::DebugString() const {
   stringstream out;
-  out << "HiveUdfCall(hdfs_location=" << udf_.location
+  out << "HiveUdfCall(hdfs_location=" << udf_.hdfs_location
       << " classname=" << udf_.scalar_fn.symbol << " "
       << Expr::DebugString() << ")";
   return out.str();

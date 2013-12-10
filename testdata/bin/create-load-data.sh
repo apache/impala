@@ -130,6 +130,11 @@ popd
 
 ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh
 
+# Build the test Hive UDFs
+pushd ${IMPALA_HOME}/tests/test-hive-udfs
+mvn clean package
+popd
+
 # Copy the test UDF/UDA libraries into HDFS
 ${IMPALA_HOME}/testdata/bin/copy-udfs-udas.sh
 

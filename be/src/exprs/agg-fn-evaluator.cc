@@ -76,7 +76,7 @@ AggFnEvaluator::AggFnEvaluator(const TAggregateFunctionCall& desc)
     DCHECK_EQ(function_type_, TFunctionBinaryType::NATIVE);
     DCHECK(desc.fn.__isset.aggregate_fn);
 
-    hdfs_location_ = desc.fn.location;
+    hdfs_location_ = desc.fn.hdfs_location;
     init_fn_symbol_ = desc.fn.aggregate_fn.init_fn_symbol;
     update_fn_symbol_ = desc.fn.aggregate_fn.update_fn_symbol;
     merge_fn_symbol_ = desc.fn.aggregate_fn.merge_fn_symbol;

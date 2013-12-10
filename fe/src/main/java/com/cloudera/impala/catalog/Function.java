@@ -232,7 +232,7 @@ public class Function implements CatalogObject {
     fn.setSignature(signatureString());
     fn.setName(name_.toThrift());
     fn.setBinary_type(binaryType_);
-    if (location_ != null) fn.setLocation(location_.toString());
+    if (location_ != null) fn.setHdfs_location(location_.toString());
     fn.setArg_types(PrimitiveType.toThrift(argTypes_));
     fn.setRet_type(getReturnType().toThrift());
     fn.setHas_var_args(hasVarArgs_);
@@ -250,14 +250,14 @@ public class Function implements CatalogObject {
     Function function = null;
     if (fn.isSetScalar_fn()) {
       function = new Udf(FunctionName.fromThrift(fn.getName()), argTypes,
-          PrimitiveType.fromThrift(fn.getRet_type()), new HdfsURI(fn.getLocation()),
+          PrimitiveType.fromThrift(fn.getRet_type()), new HdfsURI(fn.getHdfs_location()),
           fn.getScalar_fn().getSymbol());
     } else if (fn.isSetAggregate_fn()) {
       TAggregateFunction aggFn = fn.getAggregate_fn();
       function = new Uda(FunctionName.fromThrift(fn.getName()), argTypes,
           PrimitiveType.fromThrift(fn.getRet_type()),
           ColumnType.fromThrift(aggFn.getIntermediate_type()),
-          new HdfsURI(fn.getLocation()), aggFn.getUpdate_fn_symbol(),
+          new HdfsURI(fn.getHdfs_location()), aggFn.getUpdate_fn_symbol(),
           aggFn.getInit_fn_symbol(), aggFn.getSerialize_fn_symbol(),
           aggFn.getMerge_fn_symbol(), aggFn.getFinalize_fn_symbol());
     } else {

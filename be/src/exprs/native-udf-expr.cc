@@ -34,7 +34,7 @@ using namespace std;
 NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
   : Expr(node),
     udf_type_(node.fn_call_expr.fn.binary_type),
-    hdfs_location_(node.fn_call_expr.fn.location),
+    hdfs_location_(node.fn_call_expr.fn.hdfs_location),
     symbol_name_(node.fn_call_expr.fn.scalar_fn.symbol),
     vararg_start_idx_(node.fn_call_expr.__isset.vararg_start_idx ?
         node.fn_call_expr.vararg_start_idx : -1),
