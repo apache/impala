@@ -471,12 +471,14 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
 }
 
 void HdfsTextScanner::CopyBoundaryField(FieldLocation* data, MemPool* pool) {
-  const int total_len = data->len + boundary_column_.Size();
+  bool needs_escape = data->len < 0;
+  int copy_len = needs_escape ? -data->len : data->len;
+  int total_len = copy_len + boundary_column_.Size();
   char* str_data = reinterpret_cast<char*>(pool->Allocate(total_len));
   memcpy(str_data, boundary_column_.str().ptr, boundary_column_.Size());
-  memcpy(str_data + boundary_column_.Size(), data->start, data->len);
+  memcpy(str_data + boundary_column_.Size(), data->start, copy_len);
   data->start = str_data;
-  data->len = total_len;
+  data->len = needs_escape ? -total_len : total_len;
 }
 
 int HdfsTextScanner::WritePartialTuple(FieldLocation* fields,
