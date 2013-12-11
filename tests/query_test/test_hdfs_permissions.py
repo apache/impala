@@ -58,7 +58,7 @@ class TestHdfsPermissions(ImpalaTestSuite):
       self.client.execute('insert into table read_only_tbl select 1')
       assert 0, 'Expected INSERT INTO read-only table to fail'
     except Exception, e:
-      assert 'does not have WRITE access to at least one HDFS path' in str(e)
+      assert 'does not have WRITE access to at least one HDFS path: hdfs:' in str(e)
 
     # Should still be able to query this table without any errors.
     assert '0' == self.execute_scalar('select count(*) from read_only_tbl')
@@ -71,3 +71,11 @@ class TestHdfsPermissions(ImpalaTestSuite):
     self.client.execute('insert into table read_only_tbl select 1')
     assert '1' == self.execute_scalar('select count(*) from read_only_tbl')
     self.client.execute('drop table if exists read_only_tbl')
+
+    # Verify with a partitioned table
+    try:
+      self.client.execute('insert into table functional_seq.alltypes '\
+          'partition(year, month) select * from functional.alltypes limit 0')
+      assert 0, 'Expected INSERT INTO read-only partition to fail'
+    except Exception, e:
+      assert 'does not have WRITE access to at least one HDFS path: hdfs:' in str(e)

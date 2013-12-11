@@ -24,6 +24,7 @@ import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog.CatalogInitStrategy;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
+import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.THBaseTable;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
@@ -49,7 +50,8 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestPartitionedTable() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
-    String[] dbNames = {"functional", "functional_avro", "functional_parquet"};
+    String[] dbNames = {"functional", "functional_avro", "functional_parquet",
+                        "functional_seq"};
     for (String dbName: dbNames) {
       Table table = catalog.getTable(dbName, "alltypes");
       TTable thriftTable = table.toThrift();
@@ -95,6 +97,16 @@ public class CatalogObjectToFromThriftTest {
           Assert.assertEquals(hdfsPart.getFileDescriptors().size(), 1);
           Assert.assertTrue(
               hdfsPart.getFileDescriptors().get(0).getFileBlocks().size() > 0);
+
+          // Verify the partition access level is getting set properly. The alltypes_seq
+          // table has two partitions that are read_only.
+          if (dbName.equals("functional_seq") && (
+              hdfsPart.getPartitionName().equals("year=2009/month=1") ||
+              hdfsPart.getPartitionName().equals("year=2009/month=3"))) {
+            Assert.assertEquals(TAccessLevel.READ_ONLY, hdfsPart.getAccessLevel());
+          } else {
+            Assert.assertEquals(TAccessLevel.READ_WRITE, hdfsPart.getAccessLevel());
+          }
         }
       }
       Assert.assertEquals(foundDefaultPartition, true);

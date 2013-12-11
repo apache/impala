@@ -468,6 +468,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         fileFormatDescriptor.getBlockSize(), fileFormatDescriptor.getCompression());
     thriftHdfsPart.setLocation(location);
     thriftHdfsPart.setStats(new TTableStats(numRows));
+    thriftHdfsPart.setAccess_level(accessLevel);
     if (includeFileDescriptorMetadata) {
       // Add block location information
       for (FileDescriptor fd: fileDescriptors) {
