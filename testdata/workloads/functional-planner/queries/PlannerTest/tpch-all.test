@@ -3174,15 +3174,26 @@ PLAN FRAGMENT 0
   |  group by: s_name
   |
   10:HASH JOIN
+  |  join op: LEFT OUTER JOIN
+  |  hash predicates:
+  |    l1.l_orderkey = l3.l_orderkey
+  |  other join predicates: l3.l_suppkey != l1.l_suppkey
+  |  other predicates: l3.l_orderkey IS NULL
+  |
+  |----5:SCAN HDFS
+  |       table=tpch.lineitem #partitions=1/1 size=718.94MB compact
+  |       predicates: l3.l_receiptdate > l3.l_commitdate
+  |
+  9:HASH JOIN
   |  join op: LEFT SEMI JOIN
   |  hash predicates:
   |    l1.l_orderkey = l2.l_orderkey
-  |  other predicates: l2.l_suppkey != l1.l_suppkey, l3.l_orderkey IS NULL
+  |  other predicates: l2.l_suppkey != l1.l_suppkey
   |
   |----4:SCAN HDFS
   |       table=tpch.lineitem #partitions=1/1 size=718.94MB compact
   |
-  9:HASH JOIN
+  8:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
@@ -3191,23 +3202,13 @@ PLAN FRAGMENT 0
   |       table=tpch.nation #partitions=1/1 size=2.15KB compact
   |       predicates: n_name = 'SAUDI ARABIA'
   |
-  8:HASH JOIN
+  7:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
   |    l1.l_suppkey = s.s_suppkey
   |
   |----1:SCAN HDFS
   |       table=tpch.supplier #partitions=1/1 size=1.33MB compact
-  |
-  7:HASH JOIN
-  |  join op: LEFT OUTER JOIN
-  |  hash predicates:
-  |    l1.l_orderkey = l3.l_orderkey
-  |  other join predicates: l3.l_suppkey != l1.l_suppkey
-  |
-  |----5:SCAN HDFS
-  |       table=tpch.lineitem #partitions=1/1 size=718.94MB compact
-  |       predicates: l3.l_receiptdate > l3.l_commitdate
   |
   6:HASH JOIN
   |  join op: INNER JOIN
@@ -3224,34 +3225,34 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  22:TOP-N
+  23:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
   |
-  21:EXCHANGE
+  22:EXCHANGE
 
 PLAN FRAGMENT 1
   PARTITION: HASH_PARTITIONED: s_name
 
   STREAM DATA SINK
-    EXCHANGE ID: 21
+    EXCHANGE ID: 22
     UNPARTITIONED
 
   12:TOP-N
   |  order by: COUNT(*) DESC, s_name ASC
   |  limit: 100
   |
-  20:AGGREGATE (merge finalize)
+  21:AGGREGATE (merge finalize)
   |  output: SUM(COUNT(*))
   |  group by: s_name
   |
-  19:EXCHANGE
+  20:EXCHANGE
 
 PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: l1.l_orderkey
 
   STREAM DATA SINK
-    EXCHANGE ID: 19
+    EXCHANGE ID: 20
     HASH_PARTITIONED: s_name
 
   11:AGGREGATE
@@ -3259,51 +3260,72 @@ PLAN FRAGMENT 2
   |  group by: s_name
   |
   10:HASH JOIN
-  |  join op: LEFT SEMI JOIN (PARTITIONED)
+  |  join op: LEFT OUTER JOIN (PARTITIONED)
   |  hash predicates:
-  |    l1.l_orderkey = l2.l_orderkey
-  |  other predicates: l2.l_suppkey != l1.l_suppkey, l3.l_orderkey IS NULL
+  |    l1.l_orderkey = l3.l_orderkey
+  |  other join predicates: l3.l_suppkey != l1.l_suppkey
+  |  other predicates: l3.l_orderkey IS NULL
   |
-  |----18:EXCHANGE
+  |----19:EXCHANGE
   |
-  17:EXCHANGE
+  18:EXCHANGE
 
 PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
+    EXCHANGE ID: 19
+    HASH_PARTITIONED: l3.l_orderkey
+
+  5:SCAN HDFS
+     table=tpch.lineitem #partitions=1/1 size=718.94MB
+     predicates: l3.l_receiptdate > l3.l_commitdate
+
+PLAN FRAGMENT 4
+  PARTITION: HASH_PARTITIONED: l1.l_orderkey
+
+  STREAM DATA SINK
     EXCHANGE ID: 18
+    HASH_PARTITIONED: l1.l_orderkey
+
+  9:HASH JOIN
+  |  join op: LEFT SEMI JOIN (PARTITIONED)
+  |  hash predicates:
+  |    l1.l_orderkey = l2.l_orderkey
+  |  other predicates: l2.l_suppkey != l1.l_suppkey
+  |
+  |----17:EXCHANGE
+  |
+  16:EXCHANGE
+
+PLAN FRAGMENT 5
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 17
     HASH_PARTITIONED: l2.l_orderkey
 
   4:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 6
   PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 17
+    EXCHANGE ID: 16
     HASH_PARTITIONED: l1.l_orderkey
 
-  9:HASH JOIN
+  8:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
   |
-  |----16:EXCHANGE
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    l1.l_suppkey = s.s_suppkey
-  |
   |----15:EXCHANGE
   |
   7:HASH JOIN
-  |  join op: LEFT OUTER JOIN (BROADCAST)
+  |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    l1.l_orderkey = l3.l_orderkey
-  |  other join predicates: l3.l_suppkey != l1.l_suppkey
+  |    l1.l_suppkey = s.s_suppkey
   |
   |----14:EXCHANGE
   |
@@ -3317,39 +3339,28 @@ PLAN FRAGMENT 4
   0:SCAN HDFS
      table=tpch.lineitem #partitions=1/1 size=718.94MB
 
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpch.nation #partitions=1/1 size=2.15KB
-     predicates: n_name = 'SAUDI ARABIA'
-
-PLAN FRAGMENT 6
+PLAN FRAGMENT 7
   PARTITION: RANDOM
 
   STREAM DATA SINK
     EXCHANGE ID: 15
     UNPARTITIONED
 
-  1:SCAN HDFS
-     table=tpch.supplier #partitions=1/1 size=1.33MB
+  3:SCAN HDFS
+     table=tpch.nation #partitions=1/1 size=2.15KB
+     predicates: n_name = 'SAUDI ARABIA'
 
-PLAN FRAGMENT 7
+PLAN FRAGMENT 8
   PARTITION: RANDOM
 
   STREAM DATA SINK
     EXCHANGE ID: 14
     UNPARTITIONED
 
-  5:SCAN HDFS
-     table=tpch.lineitem #partitions=1/1 size=718.94MB
-     predicates: l3.l_receiptdate > l3.l_commitdate
+  1:SCAN HDFS
+     table=tpch.supplier #partitions=1/1 size=1.33MB
 
-PLAN FRAGMENT 8
+PLAN FRAGMENT 9
   PARTITION: RANDOM
 
   STREAM DATA SINK

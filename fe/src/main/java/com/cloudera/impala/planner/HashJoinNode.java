@@ -23,7 +23,6 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.catalog.ColumnStats;
@@ -130,16 +129,11 @@ public class HashJoinNode extends PlanNode {
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
 
     Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
-    //LOG.info("combinedChildSmap: " + combinedChildSmap.debugString());
     otherJoinConjuncts = Expr.cloneList(otherJoinConjuncts, combinedChildSmap);
-    //LOG.info("HJ.finalized other conjuncts: " + Expr.toSql(otherJoinConjuncts));
-    //LOG.info("HJ.finalized other conjuncts: " + Expr.debugString(otherJoinConjuncts));
     List<Pair<Expr, Expr>> newEqJoinConjuncts = Lists.newArrayList();
     for (Pair<Expr, Expr> c: eqJoinConjuncts) {
       Pair<Expr, Expr> p =
           new Pair(c.first.clone(combinedChildSmap), c.second.clone(combinedChildSmap));
-      //LOG.info(p.first.toSql() + " " + p.second.toSql());
-      //LOG.info(p.first.debugString() + " " + p.second.debugString());
       newEqJoinConjuncts.add(
           new Pair(c.first.clone(combinedChildSmap), c.second.clone(combinedChildSmap)));
     }
@@ -205,6 +199,36 @@ public class HashJoinNode extends PlanNode {
           (double) getChild(0).cardinality
             * (double) getChild(1).cardinality / (double) maxNumDistinct);
     }
+
+    // Impose lower/upper bounds on the cardinality based on the join type.
+    switch (joinOp) {
+      case LEFT_SEMI_JOIN: {
+        if (getChild(0).cardinality != -1) {
+          cardinality = Math.min(getChild(0).cardinality, cardinality);
+        }
+        break;
+      }
+      case LEFT_OUTER_JOIN: {
+        if (getChild(0).cardinality != -1) {
+          cardinality = Math.max(getChild(0).cardinality, cardinality);
+        }
+        break;
+      }
+      case RIGHT_OUTER_JOIN: {
+        if (getChild(1).cardinality != -1) {
+          cardinality = Math.max(getChild(1).cardinality, cardinality);
+        }
+        break;
+      }
+      case FULL_OUTER_JOIN: {
+        if (getChild(0).cardinality != -1 && getChild(1).cardinality != -1) {
+          cardinality =
+              Math.max(getChild(0).cardinality + getChild(1).cardinality, cardinality);
+        }
+        break;
+      }
+    }
+
     Preconditions.checkState(hasValidStats());
     LOG.debug("stats HashJoin: cardinality=" + Long.toString(cardinality));
   }

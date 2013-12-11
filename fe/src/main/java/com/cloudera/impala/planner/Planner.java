@@ -626,7 +626,6 @@ public class Planner {
     exchangeNode.addChild(childFragment.getPlanRoot(), false);
     exchangeNode.init(analyzer);
     PlanFragment parentFragment = new PlanFragment(exchangeNode, parentPartition);
-    exchangeNode.addChild(childFragment.getPlanRoot(), false);
     childFragment.setDestination(parentFragment, exchangeNode.getId());
     childFragment.setOutputPartition(parentPartition);
     return parentFragment;
@@ -879,8 +878,6 @@ public class Planner {
       Analyzer analyzer, List<Pair<TableRef, PlanNode>> refPlans)
       throws ImpalaException {
     LOG.trace("createCheapestJoinPlan");
-    PlanNode cheapestPlan = null;
-    long lowestCost = 0;
     // collect eligible candidates for the leftmost input; list contains
     // (plan, materialized size)
     ArrayList<Pair<TableRef, Long>> candidates = Lists.newArrayList();
@@ -907,9 +904,7 @@ public class Planner {
       }
       Preconditions.checkNotNull(ref.getDesc());
       long materializedSize =
-          (long) Math.ceil(
-            (double) ref.getDesc().getAvgSerializedSize()
-            * (double) plan.getCardinality());
+          (long) Math.ceil(plan.getAvgRowSize() * (double) plan.getCardinality());
       candidates.add(new Pair(ref, new Long(materializedSize)));
       LOG.trace("candidate " + ref.getAlias() + Long.toString(materializedSize));
     }

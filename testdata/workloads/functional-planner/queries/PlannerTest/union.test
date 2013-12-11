@@ -14,50 +14,42 @@ PLAN FRAGMENT 0
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    b.month = month
+  |    month = b.month
   |
-  |----0:MERGE
-  |    |
-  |    |----2:SCAN HDFS
-  |    |       table=functional.alltypes #partitions=2/24 size=40.32KB compact
-  |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypes #partitions=2/24 size=40.32KB compact
+  |----3:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=1/4 size=1.57KB compact
   |
-  3:SCAN HDFS
-     table=functional.alltypessmall #partitions=1/4 size=1.57KB
+  0:MERGE
+  |
+  |----2:SCAN HDFS
+  |       table=functional.alltypes #partitions=2/24 size=40.32KB
+  |
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=2/24 size=40.32KB
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  10:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: b.month
-
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    UNPARTITIONED
-
   4:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
+  |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    b.month = month
+  |    month = b.month
   |
-  |----9:EXCHANGE
+  |----8:EXCHANGE
   |
-  8:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    HASH_PARTITIONED: month
-
   5:EXCHANGE
 
-PLAN FRAGMENT 3
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  3:SCAN HDFS
+     table=functional.alltypessmall #partitions=1/4 size=1.57KB
+
+PLAN FRAGMENT 2
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -67,9 +59,9 @@ PLAN FRAGMENT 3
   7:MERGE
   |
   2:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.32KB compact
+     table=functional.alltypes #partitions=2/24 size=40.32KB
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -79,17 +71,7 @@ PLAN FRAGMENT 4
   6:MERGE
   |
   1:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.32KB compact
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    HASH_PARTITIONED: b.month
-
-  3:SCAN HDFS
-     table=functional.alltypessmall #partitions=1/4 size=1.57KB
+     table=functional.alltypes #partitions=2/24 size=40.32KB
 ====
 // Only UNION ALL, no nested unions
 select * from functional.alltypestiny where year=2009 and month=1

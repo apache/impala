@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -116,6 +117,7 @@ public class InlineViewRef extends TableRef {
       String colName = queryStmt.getColLabels().get(i);
       Expr colExpr = queryStmt.getResultExprs().get(i);
       SlotDescriptor slotDesc = analyzer.registerColumnRef(getAliasAsName(), colName);
+      slotDesc.setStats(ColumnStats.fromExpr(colExpr));
       SlotRef slotRef = new SlotRef(slotDesc);
       smap_.addMapping(slotRef, colExpr);
       baseTblSmap_.addMapping(slotRef, queryStmt.getBaseTblResultExprs().get(i));

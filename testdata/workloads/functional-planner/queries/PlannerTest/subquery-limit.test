@@ -121,64 +121,53 @@ PLAN FRAGMENT 0
   4:HASH JOIN
   |  join op: INNER JOIN
   |  hash predicates:
-  |    functional.alltypes.id = id
+  |    id = functional.alltypes.id
   |  limit: 5
   |
-  |----3:TOP-N
-  |    |  order by: COUNT(*) ASC
-  |    |  limit: 5
-  |    |
-  |    2:AGGREGATE (finalize)
-  |    |  output: COUNT(*)
-  |    |  group by: id
-  |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24/24 size=478.45KB
+  |----0:SCAN HDFS
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       predicates: functional.alltypes.id < 5
   |
-  0:SCAN HDFS
+  3:TOP-N
+  |  order by: COUNT(*) ASC
+  |  limit: 5
+  |
+  2:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |  group by: id
+  |
+  1:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  10:EXCHANGE
-     limit: 5
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    UNPARTITIONED
-
   4:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
-  |    functional.alltypes.id = id
+  |    id = functional.alltypes.id
   |  limit: 5
   |
   |----9:EXCHANGE
-  |       limit: 5
   |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: functional.alltypes.id < 5
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
   8:TOP-N
   |  order by: COUNT(*) ASC
   |  limit: 5
   |
   7:EXCHANGE
 
-PLAN FRAGMENT 3
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: functional.alltypes.id < 5
+
+PLAN FRAGMENT 2
   PARTITION: HASH_PARTITIONED: id
 
   STREAM DATA SINK
@@ -195,7 +184,7 @@ PLAN FRAGMENT 3
   |
   5:EXCHANGE
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 3
   PARTITION: RANDOM
 
   STREAM DATA SINK
