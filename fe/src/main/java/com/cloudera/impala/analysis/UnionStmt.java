@@ -473,7 +473,7 @@ public class UnionStmt extends QueryStmt {
     }
 
     strBuilder.append(operands.get(0).getQueryStmt().toSql());
-    for (int i = 1; i < operands.size() - i; ++i) {
+    for (int i = 1; i < operands.size() - 1; ++i) {
       strBuilder.append(" UNION " +
           ((operands.get(i).getQualifier() == Qualifier.ALL) ? "ALL " : ""));
       if (operands.get(i).getQueryStmt() instanceof UnionStmt) {

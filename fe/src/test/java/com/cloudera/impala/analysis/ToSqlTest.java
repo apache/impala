@@ -218,8 +218,12 @@ public class ToSqlTest extends AnalyzerTest {
         "UNION SELECT bool_col, bigint_col FROM functional.alltypes");
     testToSql("select bool_col, int_col from functional.alltypes " +
         "union all select bool_col, int_col from functional.alltypessmall " +
+        "union all select bool_col, int_col from functional.alltypessmall " +
+        "union all select bool_col, int_col from functional.alltypessmall " +
         "union all select bool_col, bigint_col from functional.alltypes",
         "SELECT bool_col, int_col FROM functional.alltypes " +
+        "UNION ALL SELECT bool_col, int_col FROM functional.alltypessmall " +
+        "UNION ALL SELECT bool_col, int_col FROM functional.alltypessmall " +
         "UNION ALL SELECT bool_col, int_col FROM functional.alltypessmall " +
         "UNION ALL SELECT bool_col, bigint_col FROM functional.alltypes");
     // With 'order by' and 'limit' on union, and also on last select.
