@@ -1050,3 +1050,165 @@ PLAN FRAGMENT 4
      table=tpch.nation #partitions=1/1 size=2.15KB
      predicates: n_name = 'x'
 ====
+# order does not become the leftmost input because of the cross join;
+# the join with nation is done first because it reduces the intermediate output
+select count(*)
+from tpch.customer
+  cross join tpch.orders
+  join tpch.nation on (c_nationkey = n_nationkey)
+where n_name = 'x'
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  5:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |
+  4:CROSS JOIN
+  |  (BROADCAST)
+  |
+  |----1:SCAN HDFS
+  |       table=tpch.orders #partitions=1/1 size=162.56MB compact
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    c_nationkey = n_nationkey
+  |
+  |----2:SCAN HDFS
+  |       table=tpch.nation #partitions=1/1 size=2.15KB compact
+  |       predicates: n_name = 'x'
+  |
+  0:SCAN HDFS
+     table=tpch.customer #partitions=1/1 size=23.08MB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  9:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(*))
+  |
+  8:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  5:AGGREGATE
+  |  output: COUNT(*)
+  |
+  4:CROSS JOIN
+  |  (BROADCAST)
+  |
+  |----7:EXCHANGE
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    c_nationkey = n_nationkey
+  |
+  |----6:EXCHANGE
+  |
+  0:SCAN HDFS
+     table=tpch.customer #partitions=1/1 size=23.08MB
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=tpch.orders #partitions=1/1 size=162.56MB
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  2:SCAN HDFS
+     table=tpch.nation #partitions=1/1 size=2.15KB
+     predicates: n_name = 'x'
+====
+# Test that alltypes stays all the way to the right despite being the largest table.
+# Alltypessmall should be ordered before alltypestiny.
+select * from functional.alltypestiny
+join functional.alltypessmall
+cross join functional.alltypes
+where alltypes.id = alltypestiny.id and alltypes.id = alltypessmall.id
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:CROSS JOIN
+  |  (BROADCAST)
+  |  predicates: alltypes.id = alltypestiny.id, alltypes.id = alltypessmall.id
+  |
+  |----2:SCAN HDFS
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    functional.alltypessmall.id = functional.alltypestiny.id
+  |
+  |----0:SCAN HDFS
+  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
+  |
+  1:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  7:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  4:CROSS JOIN
+  |  (BROADCAST)
+  |  predicates: alltypes.id = alltypestiny.id, alltypes.id = alltypessmall.id
+  |
+  |----6:EXCHANGE
+  |
+  3:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    functional.alltypessmall.id = functional.alltypestiny.id
+  |
+  |----5:EXCHANGE
+  |
+  1:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  2:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  0:SCAN HDFS
+     table=functional.alltypestiny #partitions=4/4 size=460B
+====

@@ -399,7 +399,6 @@ SMALLINT, INT, TINYINT, INT, INT, FLOAT, STRING, INT
 # cross join between hdfs and hbase, where predicate, extra scan predicates, nulls
 # in joins cols and non-equality join predicate
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
-# Should be same result as the test below
 select a.tinyint_col, b.id, a.string_col, a.tinyint_col + b.tinyint_col
 from alltypesagg a cross join functional_hbase.alltypessmall b
 where a.tinyint_col = b.id

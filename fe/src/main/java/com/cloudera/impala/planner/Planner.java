@@ -932,7 +932,8 @@ public class Planner {
       if (joinOp == JoinOperator.LEFT_OUTER_JOIN
           || joinOp == JoinOperator.RIGHT_OUTER_JOIN
           || joinOp == JoinOperator.FULL_OUTER_JOIN
-          || joinOp == JoinOperator.LEFT_SEMI_JOIN) {
+          || joinOp == JoinOperator.LEFT_SEMI_JOIN
+          || joinOp == JoinOperator.CROSS_JOIN) {
         // this cannot appear as the leftmost input
         // TODO: make this less restrictive by considering plans with inverted Outer
         // Join directions
@@ -990,6 +991,10 @@ public class Planner {
       }
     }
     Preconditions.checkNotNull(root);
+    // refs that have been joined. The union of joinedRefs and the refs in remainingRefs
+    // are the set of all table refs.
+    Set<TableRef> joinedRefs = Sets.newHashSet();
+    joinedRefs.add(leftmostRef);
 
     long numOps = 0;
     int i = 0;
@@ -1015,6 +1020,8 @@ public class Planner {
           // TODO: make this less restrictive by considering plans with inverted Outer
           // Join directions
           if (!currentTids.containsAll(ref.getOnClauseTupleIds())) continue;
+        } else if (ref.getJoinOp() == JoinOperator.CROSS_JOIN) {
+          if (!joinedRefs.contains(ref.getLeftTblRef())) continue;
         }
 
         PlanNode rhsPlan = entry.second;
@@ -1039,6 +1046,7 @@ public class Planner {
           + " #rhs=" + Long.toString(rhsCardinality)
           + " #ops=" + Long.toString(numOps));
       remainingRefs.remove(minEntry);
+      joinedRefs.add(minEntry.first);
       root = newRoot;
       // assign id after running through the possible choices in order to end up
       // with a dense sequence of node ids
@@ -1521,6 +1529,7 @@ public class Planner {
       Analyzer analyzer, PlanNode outer, PlanNode inner, TableRef innerRef,
       boolean throwOnError) throws ImpalaException {
     if (innerRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
+      // TODO If there are eq join predicates then we should construct a hash join
       CrossJoinNode result = new CrossJoinNode(outer, inner, innerRef);
       result.init(analyzer);
       result.getChildren().get(1).setCompactData(true);

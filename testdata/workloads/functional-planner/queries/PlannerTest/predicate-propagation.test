@@ -112,6 +112,59 @@ PLAN FRAGMENT 0
      table=functional.alltypes #partitions=24/24 size=478.45KB
      predicates: string_col = 'a'
 ====
+# Predicates are pushed through cross join to the inline views
+select a.int_col
+from
+  (select int_col, id, string_col from functional.alltypes) a
+  cross join (select id, string_col from functional.alltypes) b
+where a.string_col = 'a' and b.string_col = 'b'
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  2:CROSS JOIN
+  |  (BROADCAST)
+  |
+  |----1:SCAN HDFS
+  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
+  |       predicates: string_col = 'b'
+  |
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: string_col = 'a'
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  2:CROSS JOIN
+  |  (BROADCAST)
+  |
+  |----3:EXCHANGE
+  |
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: string_col = 'a'
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+     predicates: string_col = 'b'
+====
 # c1 > 0 does not get propagated into inl view due to limit clauses
 select c1, c2, c3
 from (
@@ -660,6 +713,94 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
 ====
+# Same as above but with cross join
+select a.id, b.id
+from functional.alltypes a
+  cross join (select year, month, id, int_col, count(*) as count_col
+              from functional.alltypessmall
+              where id > 11
+              group by 1, 2, 3, 4
+            ) b
+where a.id = b.id and
+      a.tinyint_col = b.int_col and
+      a.year = b.year and
+      a.month = b.month and
+      a.year = 2009 and
+      b.month <= 2 and
+      b.count_col + 1 = 17 and
+      a.tinyint_col != 5
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  3:CROSS JOIN
+  |  (BROADCAST)
+  |  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+  |
+  |----2:AGGREGATE (finalize)
+  |    |  output: COUNT(*)
+  |    |  group by: year, month, id, int_col
+  |    |  having: COUNT(*) + 1 = 17
+  |    |
+  |    1:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=2/4 size=3.16KB
+  |       predicates: id > 11, functional.alltypessmall.int_col != 5
+  |
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=2/24 size=38.07KB
+     predicates: a.id > 11, a.tinyint_col != 5
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  7:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  3:CROSS JOIN
+  |  (BROADCAST)
+  |  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+  |
+  |----6:EXCHANGE
+  |
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=2/24 size=38.07KB
+     predicates: a.id > 11, a.tinyint_col != 5
+
+PLAN FRAGMENT 2
+  PARTITION: HASH_PARTITIONED: year, month, id, int_col
+
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  5:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(*))
+  |  group by: year, month, id, int_col
+  |  having: COUNT(*) + 1 = 17
+  |
+  4:EXCHANGE
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    HASH_PARTITIONED: year, month, id, int_col
+
+  2:AGGREGATE
+  |  output: COUNT(*)
+  |  group by: year, month, id, int_col
+  |
+  1:SCAN HDFS
+     table=functional.alltypessmall #partitions=2/4 size=3.16KB
+     predicates: id > 11, functional.alltypessmall.int_col != 5
+====
 # no propagation into select block with limit;
 # propagation out of that block is okay;
 # predicates from the enclosing scope on the output of the inline view are applied
@@ -778,6 +919,111 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+====
+# Same as above but with cross join
+select a.id, b.id
+from functional.alltypes a
+  cross join (select year, month, id, int_col, count(*) as count_col
+              from functional.alltypessmall
+              where id > 11
+              group by 1, 2, 3, 4
+              limit 5
+             ) b
+where a.year = 2009 and
+      b.month <= 2 and
+      b.count_col + 1 = 17 and
+      a.tinyint_col != 5 and
+      a.id = b.id and
+      a.tinyint_col = b.int_col and
+      a.year = b.year and
+      a.month = b.month
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:CROSS JOIN
+  |  (BROADCAST)
+  |  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
+  |
+  |----3:SELECT
+  |    |  predicates: COUNT(*) + 1 = 17
+  |    |
+  |    2:AGGREGATE (finalize)
+  |    |  output: COUNT(*)
+  |    |  group by: year, month, id, int_col
+  |    |  limit: 5
+  |    |
+  |    1:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB
+  |       predicates: id > 11
+  |
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=2/24 size=38.07KB
+     predicates: a.id > 11, a.tinyint_col != 5
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  9:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  4:CROSS JOIN
+  |  (BROADCAST)
+  |  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
+  |
+  |----8:EXCHANGE
+  |
+  0:SCAN HDFS
+     table=functional.alltypes #partitions=2/24 size=38.07KB
+     predicates: a.id > 11, a.tinyint_col != 5
+
+PLAN FRAGMENT 2
+  PARTITION: UNPARTITIONED
+
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  3:SELECT
+  |  predicates: COUNT(*) + 1 = 17
+  |
+  7:EXCHANGE
+     limit: 5
+
+PLAN FRAGMENT 3
+  PARTITION: HASH_PARTITIONED: year, month, id, int_col
+
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  6:AGGREGATE (merge finalize)
+  |  output: SUM(COUNT(*))
+  |  group by: year, month, id, int_col
+  |  limit: 5
+  |
+  5:EXCHANGE
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    HASH_PARTITIONED: year, month, id, int_col
+
+  2:AGGREGATE
+  |  output: COUNT(*)
+  |  group by: year, month, id, int_col
+  |
+  1:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+     predicates: id > 11
 ====
 # propagation of z.month=1 to alltypesagg is prevented
 select x.int_col, z.int_col
