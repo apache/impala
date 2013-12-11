@@ -45,7 +45,6 @@ class TestPartitionMetadata(ImpalaTestSuite):
 
   def setup_method(self, method):
     self.cleanup_db(self.TEST_DB)
-    self.client.refresh()
     self.client.execute("create database %s" % self.TEST_DB)
 
   @pytest.mark.execute_serially

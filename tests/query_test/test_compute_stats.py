@@ -37,7 +37,6 @@ class TestComputeStats(ImpalaTestSuite):
   def setup_method(self, method):
     # cleanup and create a fresh test database
     self.cleanup_db(self.TEST_DB_NAME)
-    self.client.refresh()
     self.execute_query("create database %s" % (self.TEST_DB_NAME))
 
   def teardown_method(self, method):
