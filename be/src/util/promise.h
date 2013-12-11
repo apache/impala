@@ -26,16 +26,28 @@ namespace impala {
 template <typename T>
 class Promise {
  public:
-  Promise() : val_is_set_(false) { }
+  // If allow_repeated_set is true, allow multiple calls to Set(). The latest value
+  // is what is returned.
+  Promise(bool allow_repeated_set = false) :
+    allow_repeated_set_(allow_repeated_set), val_is_set_(false) { }
 
-  // Copies val into this promise, and notifies any consumers blocked in Get(). It is an
-  // error to call Set more than once on the same Promise object.
+  // Copies val into this promise, and notifies any consumers blocked in Get().
   void Set(const T& val) {
-    boost::unique_lock<boost::mutex> l(val_lock_);
-    DCHECK(!val_is_set_) << "Called Set(..) twice on the same Promise";
-    val_ = val;
-    val_is_set_ = true;
+    {
+      boost::unique_lock<boost::mutex> l(val_lock_);
+      DCHECK(allow_repeated_set_ || !val_is_set_)
+          << "Called Set(..) twice on the same Promise";
+      val_ = val;
+      val_is_set_ = true;
+    }
     val_set_cond_.notify_all();
+  }
+
+  // Resets the promise to not having any value set. Calling will block in Get()
+  // again.
+  void Reset() {
+    boost::unique_lock<boost::mutex> l(val_lock_);
+    val_is_set_ = false;
   }
 
   // Blocks until a value is set, and then returns a reference to that value. Once Get()
@@ -45,11 +57,12 @@ class Promise {
     while (!val_is_set_) {
       val_set_cond_.wait(l);
     }
-
     return val_;
   }
 
  private:
+  const bool allow_repeated_set_;
+
   // These variables deal with coordination between consumer and producer, and protect
   // access to val_;
   boost::condition_variable val_set_cond_;
