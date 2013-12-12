@@ -136,9 +136,15 @@ public class AggregationNode extends PlanNode {
     }
     // if we ended up with an overflow, the estimate is certain to be wrong
     if (cardinality < 0) cardinality = -1;
-    // An AggregationNode cannot increase the cardinality.
+    // Sanity check the cardinality based on the input cardinality.
     if (getChild(0).getCardinality() != -1) {
-      cardinality = Math.min(getChild(0).getCardinality(), cardinality);
+      if (cardinality == -1) {
+        // A worst-case cardinality is better than an unknown cardinality.
+        cardinality = getChild(0).getCardinality();
+      } else {
+        // An AggregationNode cannot increase the cardinality.
+        cardinality = Math.min(getChild(0).getCardinality(), cardinality);
+      }
     }
     LOG.trace("stats Agg: cardinality=" + Long.toString(cardinality));
   }

@@ -184,6 +184,11 @@ public class HashJoinNode extends PlanNode {
             + Long.toString(rhsTbl.getNumRows()));
         numDistinct = Math.min(numDistinct, rhsTbl.getNumRows());
       }
+      if (getChild(1).cardinality != -1 && numDistinct != -1) {
+        // The number of distinct values of a slot cannot exceed the cardinality
+        // of the plan node the slot is coming from.
+        numDistinct = Math.min(numDistinct, getChild(1).cardinality);
+      }
       maxNumDistinct = Math.max(maxNumDistinct, numDistinct);
       LOG.debug("min slotref=" + rhsSlotRef.toSql() + " #distinct="
           + Long.toString(numDistinct));

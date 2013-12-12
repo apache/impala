@@ -252,41 +252,22 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  17:EXCHANGE
+  16:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: functional.alltypes.id
-
-  STREAM DATA SINK
-    EXCHANGE ID: 17
-    UNPARTITIONED
-
-  8:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    functional.alltypes.id = int_col
-  |
-  |----16:EXCHANGE
-  |
-  15:EXCHANGE
-
-PLAN FRAGMENT 2
   PARTITION: RANDOM
 
   STREAM DATA SINK
     EXCHANGE ID: 16
-    HASH_PARTITIONED: int_col
+    UNPARTITIONED
 
-  1:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 15
-    HASH_PARTITIONED: functional.alltypes.id
-
+  8:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    functional.alltypes.id = int_col
+  |
+  |----15:EXCHANGE
+  |
   7:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
@@ -298,7 +279,17 @@ PLAN FRAGMENT 3
   0:SCAN HDFS
      table=functional.alltypes #partitions=24/24 size=478.45KB
 
-PLAN FRAGMENT 4
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 15
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=functional.alltypes #partitions=24/24 size=478.45KB
+
+PLAN FRAGMENT 3
   PARTITION: UNPARTITIONED
 
   STREAM DATA SINK
@@ -311,7 +302,7 @@ PLAN FRAGMENT 4
   |
   12:EXCHANGE
 
-PLAN FRAGMENT 5
+PLAN FRAGMENT 4
   PARTITION: HASH_PARTITIONED: b.string_col
 
   STREAM DATA SINK
@@ -329,7 +320,7 @@ PLAN FRAGMENT 5
   |
   10:EXCHANGE
 
-PLAN FRAGMENT 6
+PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
@@ -351,7 +342,7 @@ PLAN FRAGMENT 6
      table=functional.alltypesagg #partitions=10/10 size=743.67KB
      predicates: a.bigint_col < 50
 
-PLAN FRAGMENT 7
+PLAN FRAGMENT 6
   PARTITION: RANDOM
 
   STREAM DATA SINK

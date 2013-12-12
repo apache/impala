@@ -567,13 +567,13 @@ PLAN FRAGMENT 0
 PLAN FRAGMENT 0
   PARTITION: UNPARTITIONED
 
-  14:EXCHANGE
+  13:EXCHANGE
 
 PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: ps.ps_suppkey
+  PARTITION: RANDOM
 
   STREAM DATA SINK
-    EXCHANGE ID: 14
+    EXCHANGE ID: 13
     UNPARTITIONED
 
   8:HASH JOIN
@@ -581,62 +581,22 @@ PLAN FRAGMENT 1
   |  hash predicates:
   |    n.n_regionkey = r.r_regionkey
   |
-  |----13:EXCHANGE
+  |----12:EXCHANGE
   |
   7:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    s.s_nationkey = n.n_nationkey
   |
-  |----12:EXCHANGE
+  |----11:EXCHANGE
   |
   6:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
+  |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
   |    ps.ps_suppkey = s.s_suppkey
   |
-  |----11:EXCHANGE
+  |----10:EXCHANGE
   |
-  10:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  4:SCAN HDFS
-     table=tpch.region #partitions=1/1 size=384B
-     predicates: r.r_name = 'EUROPE'
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpch.nation #partitions=1/1 size=2.15KB
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    HASH_PARTITIONED: s.s_suppkey
-
-  1:SCAN HDFS
-     table=tpch.supplier #partitions=1/1 size=1.33MB
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    HASH_PARTITIONED: ps.ps_suppkey
-
   5:HASH JOIN
   |  join op: INNER JOIN (BROADCAST)
   |  hash predicates:
@@ -647,7 +607,38 @@ PLAN FRAGMENT 5
   2:SCAN HDFS
      table=tpch.partsupp #partitions=1/1 size=112.71MB
 
-PLAN FRAGMENT 6
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 12
+    UNPARTITIONED
+
+  4:SCAN HDFS
+     table=tpch.region #partitions=1/1 size=384B
+     predicates: r.r_name = 'EUROPE'
+
+PLAN FRAGMENT 3
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  3:SCAN HDFS
+     table=tpch.nation #partitions=1/1 size=2.15KB
+
+PLAN FRAGMENT 4
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=tpch.supplier #partitions=1/1 size=1.33MB
+
+PLAN FRAGMENT 5
   PARTITION: RANDOM
 
   STREAM DATA SINK
