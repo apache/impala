@@ -8,7 +8,7 @@ set -u
 # Run compute stats over as many of the tables used in the Planner tests as possible.
 python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=functional\
     --table_names="alltypes,alltypesagg,alltypesaggmultifilesnopart,alltypesaggnonulls,
-    alltypessmall,alltypestiny,jointbl,dimtbl"
+    alltypessmall,alltypestiny,jointbl,dimtbl,emptytable"
 python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_name=functional_hbase\
     --table_names="alltypessmall,stringids"
 python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=tpch \

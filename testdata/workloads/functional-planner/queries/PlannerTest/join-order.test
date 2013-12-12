@@ -1050,3 +1050,44 @@ PLAN FRAGMENT 4
      table=tpch.nation #partitions=1/1 size=2.15KB
      predicates: n_name = 'x'
 ====
+# If any table lacks stats then revert to the FROM-clause order.
+# The table functional_seq.alltypes is the only table lacking stats.
+select count(*)
+from functional.alltypessmall a
+  inner join functional_seq.alltypes b on (a.id = b.id)
+  inner join functional.alltypessmall c on (b.id = c.id)
+  inner join functional_seq.alltypes d on (c.id = d.id)
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  7:AGGREGATE (finalize)
+  |  output: COUNT(*)
+  |
+  6:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    c.id = d.id
+  |
+  |----3:SCAN HDFS
+  |       table=functional_seq.alltypes #partitions=24/24 size=562.59KB compact
+  |
+  5:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    b.id = c.id
+  |
+  |----2:SCAN HDFS
+  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
+  |
+  4:HASH JOIN
+  |  join op: INNER JOIN
+  |  hash predicates:
+  |    a.id = b.id
+  |
+  |----1:SCAN HDFS
+  |       table=functional_seq.alltypes #partitions=24/24 size=562.59KB compact
+  |
+  0:SCAN HDFS
+     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+====
