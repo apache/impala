@@ -261,7 +261,7 @@ class StateStore {
   boost::mutex exit_flag_lock_;
   bool exit_flag_;
 
-  // Controls access to topics_
+  // Controls access to topics_. Cannot take subscribers_lock_ after acquiring this lock.
   boost::mutex topic_lock_;
 
   // The entire set of topics tracked by the state-store
@@ -349,7 +349,8 @@ class StateStore {
     TransientEntryMap transient_entries_;
   };
 
-  // Protects access to subscribers_ and subscriber_uuid_generator_
+  // Protects access to subscribers_ and subscriber_uuid_generator_. Must be taken before
+  // topic_lock_.
   boost::mutex subscribers_lock_;
 
   // Map of subscribers currently connected; upon failure their entry is removed from this
@@ -435,7 +436,7 @@ class StateStore {
 
   // Populates a TUpdateStateRequest with the update state for this subscriber. Iterates
   // over all updates in all subscribed topics, populating the given
-  // TUpdateStateRequest object. Must be called while holding the topic_lock_.
+  // TUpdateStateRequest object. Takes the topic_lock_ and subscribers_lock_.
   void GatherTopicUpdates(const Subscriber& subscriber,
       TUpdateStateRequest* update_state_request);
 
@@ -447,7 +448,7 @@ class StateStore {
   // min version belongs can also be retrieved using the optional subscriber_id output
   // parameter. If multiple subscribers have the same min version, the subscriber_id
   // may be set to any one of the matching subscribers.
-  // Takes the subscribers_ lock.
+  // Must be called holding the subscribers_ lock.
   // TODO: Update the min subscriber version only when a topic is updated, rather than
   // each time a subscriber is updated. One way to do this would be to keep a priority
   // queue in Topic of each subscriber's last processed version of the topic.

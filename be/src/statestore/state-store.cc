@@ -231,7 +231,8 @@ void StateStore::TopicsHandler(const Webserver::ArgumentMap& args,
             << "<th>Size (keys/values/total)</th>"
             << "</tr>";
 
-  lock_guard<mutex> l(topic_lock_);
+  lock_guard<mutex> l(subscribers_lock_);
+  lock_guard<mutex> t(topic_lock_);
   BOOST_FOREACH(const TopicMap::value_type& topic, topics_) {
     SubscriberId oldest_subscriber_id;
     TopicEntry::Version oldest_subscriber_version =
@@ -329,10 +330,7 @@ Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
 Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
   // First thing: make a list of updates to send
   TUpdateStateRequest update_state_request;
-  {
-    lock_guard<mutex> l(topic_lock_);
-    GatherTopicUpdates(*subscriber, &update_state_request);
-  }
+  GatherTopicUpdates(*subscriber, &update_state_request);
 
   // Set the expected registration ID, so that the subscriber can reject this update if
   // they have moved on to a new registration instance.
@@ -407,57 +405,68 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
 
 void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
     TUpdateStateRequest* update_state_request) {
-  BOOST_FOREACH(const Subscriber::Topics::value_type& subscribed_topic,
-      subscriber.subscribed_topics()) {
-    TopicMap::const_iterator topic_it = topics_.find(subscribed_topic.first);
-    DCHECK(topic_it != topics_.end());
+  {
+    lock_guard<mutex> l(topic_lock_);
+    BOOST_FOREACH(const Subscriber::Topics::value_type& subscribed_topic,
+        subscriber.subscribed_topics()) {
+      TopicMap::const_iterator topic_it = topics_.find(subscribed_topic.first);
+      DCHECK(topic_it != topics_.end());
 
-    TTopicDelta& topic_delta = update_state_request->topic_deltas[subscribed_topic.first];
-    topic_delta.topic_name = subscribed_topic.first;
+      TTopicDelta& topic_delta =
+          update_state_request->topic_deltas[subscribed_topic.first];
+      topic_delta.topic_name = subscribed_topic.first;
 
-    // If the subscriber version is > 0, send this update as a delta. Otherwise, this
-    // is a new subscriber so send them a non-delta update that includes all items
-    // in the topic.
-    TopicEntry::Version last_processed_version =
-        subscriber.LastTopicVersionProcessed(topic_it->first);
-    topic_delta.is_delta = last_processed_version > Subscriber::TOPIC_INITIAL_VERSION;
-    topic_delta.__set_from_version(last_processed_version);
-    topic_delta.__set_min_subscriber_topic_version(
-        GetMinSubscriberTopicVersion(topic_it->first));
+      // If the subscriber version is > 0, send this update as a delta. Otherwise, this
+      // is a new subscriber so send them a non-delta update that includes all items
+      // in the topic.
+      TopicEntry::Version last_processed_version =
+          subscriber.LastTopicVersionProcessed(topic_it->first);
+      topic_delta.is_delta = last_processed_version > Subscriber::TOPIC_INITIAL_VERSION;
+      topic_delta.__set_from_version(last_processed_version);
 
-    const Topic& topic = topic_it->second;
-    TopicUpdateLog::const_iterator next_update =
-        topic.topic_update_log().upper_bound(last_processed_version);
+      const Topic& topic = topic_it->second;
+      TopicUpdateLog::const_iterator next_update =
+          topic.topic_update_log().upper_bound(last_processed_version);
 
-    for (; next_update != topic.topic_update_log().end(); ++next_update) {
-      TopicEntryMap::const_iterator itr = topic.entries().find(next_update->second);
-      DCHECK(itr != topic.entries().end());
-      const TopicEntry& topic_entry = itr->second;
-      if (topic_entry.value() == StateStore::TopicEntry::NULL_VALUE) {
-        topic_delta.topic_deletions.push_back(itr->first);
+      for (; next_update != topic.topic_update_log().end(); ++next_update) {
+        TopicEntryMap::const_iterator itr = topic.entries().find(next_update->second);
+        DCHECK(itr != topic.entries().end());
+        const TopicEntry& topic_entry = itr->second;
+        if (topic_entry.value() == StateStore::TopicEntry::NULL_VALUE) {
+          topic_delta.topic_deletions.push_back(itr->first);
+        } else {
+          topic_delta.topic_entries.push_back(TTopicItem());
+          TTopicItem& topic_item = topic_delta.topic_entries.back();
+          topic_item.key = itr->first;
+          // TODO: Does this do a needless copy?
+          topic_item.value = topic_entry.value();
+        }
+      }
+
+      if (topic.topic_update_log().size() > 0) {
+        // The largest version for this topic will be the last item in the version
+        // history map.
+        topic_delta.__set_to_version(topic.topic_update_log().rbegin()->first);
       } else {
-        topic_delta.topic_entries.push_back(TTopicItem());
-        TTopicItem& topic_item = topic_delta.topic_entries.back();
-        topic_item.key = itr->first;
-        // TODO: Does this do a needless copy?
-        topic_item.value = topic_entry.value();
+        // There are no updates in the version history
+        topic_delta.__set_to_version(Subscriber::TOPIC_INITIAL_VERSION);
       }
     }
+  }
 
-    if (topic.topic_update_log().size() > 0) {
-      // The largest version for this topic will be the last item in the version
-      // history map.
-      topic_delta.__set_to_version(topic.topic_update_log().rbegin()->first);
-    } else {
-      // There are no updates in the version history
-      topic_delta.__set_to_version(Subscriber::TOPIC_INITIAL_VERSION);
-    }
+  // Fill in the min subscriber topic version. This must be done after releasing
+  // topic_lock_.
+  lock_guard<mutex> l(subscribers_lock_);
+  typedef map<TopicId, TTopicDelta> TopicDeltaMap;
+  BOOST_FOREACH(TopicDeltaMap::value_type& topic_delta,
+      update_state_request->topic_deltas) {
+    topic_delta.second.__set_min_subscriber_topic_version(
+        GetMinSubscriberTopicVersion(topic_delta.first));
   }
 }
 
 const StateStore::TopicEntry::Version StateStore::GetMinSubscriberTopicVersion(
     const TopicId& topic_id, SubscriberId* subscriber_id) {
-  lock_guard<mutex> l(subscribers_lock_);
   TopicEntry::Version min_topic_version = numeric_limits<int64_t>::max();
   bool found = false;
   // Find the minimum version processed for this topic across all topic subscribers.
