@@ -1135,6 +1135,15 @@ field STRING
 LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_seq_snap/bad_file' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
+-- IMPALA-694: uses data file produced by parquet-mr version 1.2.5-cdh4.5.0
+-- (can't use LOAD DATA LOCAL with Impala so copied in create-load-data.sh)
+functional
+---- BASE_TABLE_NAME
+bad_parquet
+---- COLUMNS
+field STRING
+====
+---- DATASET
 functional
 ---- BASE_TABLE_NAME
 map_table

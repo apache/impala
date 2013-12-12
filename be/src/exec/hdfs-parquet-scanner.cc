@@ -180,6 +180,9 @@ class HdfsParquetScanner::BaseColumnReader {
   // Decoder for dictionary-encoded columns. Set by the subclass.
   DictDecoderBase* dict_decoder_base_;
 
+  // The number of values seen so far. Updated per data page.
+  int64_t num_values_;
+
   BaseColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
     : parent_(parent),
       desc_(desc),
@@ -188,7 +191,8 @@ class HdfsParquetScanner::BaseColumnReader {
       metadata_(NULL),
       stream_(NULL),
       decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())),
-      num_buffered_values_(0) {
+      num_buffered_values_(0),
+      num_values_(0) {
   }
 
   // Read the next data page.  If a dictionary page is encountered, that will
@@ -378,7 +382,7 @@ HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(
 static bool RequiresSkippedDictionaryHeaderCheck(
     const HdfsParquetScanner::FileVersion& v) {
   if (v.application != "impala") return false;
-  return v.version == "1.1" || (v.version == "1.2" && v.is_impala_internal);
+  return v.VersionEq(1,1,0) || (v.VersionEq(1,2,0) && v.is_impala_internal);
 }
 
 Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
@@ -392,14 +396,28 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
   parent_->AttachPool(decompressed_data_pool_.get());
 
   // Read the next data page, skipping page types we don't care about.
-  // We break out of this loop on the non-error case (either eosr or
-  // a data page was found).
+  // We break out of this loop on the non-error case (a data page was found or we read all
+  // the pages).
   while (true) {
     DCHECK_EQ(num_buffered_values_, 0);
+    if (num_values_ >= parent_->file_metadata_.num_rows) {
+      // No more pages to read
+      DCHECK_EQ(num_values_, parent_->file_metadata_.num_rows);
+      break;
+    }
+
     RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &num_bytes));
     if (num_bytes == 0) {
       DCHECK(stream_->eosr());
-      break;
+      stringstream ss;
+      ss << "File metadata states there are " << parent_->file_metadata_.num_rows
+         << " rows, but only read " << num_values_ << " values from column "
+         << (desc_->col_pos() - parent_->scan_node_->num_partition_keys());
+      if (parent_->scan_node_->runtime_state()->abort_on_error()) {
+        return Status(ss.str());
+      } else {
+        parent_->scan_node_->runtime_state()->LogError(ss.str());
+      }
     }
 
     // We don't know the actual header size until the thrift object is deserialized.
@@ -427,7 +445,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
           DeserializeThriftMsg(header_buffer, &header_size, true, &current_page_header_);
 
       if (!status.ok()) {
-        status.AddErrorMsg("ParquetScanner: Could not deserialize page header.");
+        status.AddErrorMsg("ParquetScanner: Could not deserialize page header");
         return status;
       }
       DCHECK_GT(header_size, header_first_part);
@@ -499,6 +517,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
     // Read Data Page
     if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
     num_buffered_values_ = current_page_header_.data_page_header.num_values;
+    num_values_ += num_buffered_values_;
 
     if (decompressor_.get() != NULL) {
       SCOPED_TIMER(parent_->decompress_timer_);
@@ -818,6 +837,12 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
       col_start = col_chunk.meta_data.dictionary_page_offset;
     }
     int64_t col_len = col_chunk.meta_data.total_compressed_size;
+    if (file_version_.application == "parquet-mr" && file_version_.VersionLt(1, 2, 9)) {
+      // The Parquet MR writer had a bug in 1.2.8 and below where it didn't include the
+      // dictionary page header size in total_compressed_size and total_uncompressed_size
+      // (see IMPALA-694). We pad col_len to compensate.
+      col_len += MAX_PAGE_HEADER_SIZE;
+    }
 
     // TODO: this will need to change when we have co-located files and the columns
     // are different files.
@@ -869,17 +894,44 @@ HdfsParquetScanner::FileVersion::FileVersion(const string& created_by) {
 
   vector<string> tokens;
   split(tokens, created_by_lower, is_any_of(" "), token_compress_on);
+  // Boost always creates at least one token
+  DCHECK_GT(tokens.size(), 0);
+  application = tokens[0];
+
   if (tokens.size() >= 3 && tokens[1] == "version") {
-    application = tokens[0];
-    version = tokens[2];
+    string version_string = tokens[2];
+    // Ignore any trailing extra characters
+    int n = version_string.find_first_not_of("0123456789.");
+    string version_string_trimmed = version_string.substr(0, n);
+
+    vector<string> version_tokens;
+    split(version_tokens, version_string_trimmed, is_any_of("."));
+    version.major = version_tokens.size() >= 1 ? atoi(version_tokens[0].c_str()) : 0;
+    version.minor = version_tokens.size() >= 2 ? atoi(version_tokens[1].c_str()) : 0;
+    version.patch = version_tokens.size() >= 3 ? atoi(version_tokens[2].c_str()) : 0;
+
     if (application == "impala") {
-      size_t pos = version.find("-internal");
-      if (pos != string::npos) {
-        is_impala_internal = true;
-        version = version.substr(0, pos);
-      }
+      if (version_string.find("-internal") != string::npos) is_impala_internal = true;
     }
+  } else {
+    version.major = 0;
+    version.minor = 0;
+    version.patch = 0;
   }
+}
+
+bool HdfsParquetScanner::FileVersion::VersionLt(int major, int minor, int patch) const {
+  if (version.major < major) return true;
+  if (version.major > major) return false;
+  DCHECK_EQ(version.major, major);
+  if (version.minor < minor) return true;
+  if (version.minor > minor) return false;
+  DCHECK_EQ(version.minor, minor);
+  return version.patch < patch;
+}
+
+bool HdfsParquetScanner::FileVersion::VersionEq(int major, int minor, int patch) const {
+  return version.major == major && version.minor == minor && version.patch == patch;
 }
 
 Status HdfsParquetScanner::ValidateFileMetadata() {

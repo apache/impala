@@ -33,6 +33,7 @@ table_name:insert_string_partitioned, constraint:restrict_to, table_format:parqu
 table_name:old_rcfile_table, constraint:restrict_to, table_format:rc/none/none
 table_name:bad_text_lzo, constraint:restrict_to, table_format:text/lzo/block
 table_name:bad_seq_snap, constraint:restrict_to, table_format:seq/snap/block
+table_name:bad_parquet, constraint:restrict_to, table_format:parquet/none/none
 
 table_name:map_table, constraint:restrict_to, table_format:text/none/none
 table_name:map_table_hbase, constraint:restrict_to, table_format:hbase/none/none

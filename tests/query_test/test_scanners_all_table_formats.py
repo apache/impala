@@ -120,3 +120,17 @@ class TestWideRow(ImpalaTestSuite):
     # TODO: figure out exact breakdown of memory usage (IMPALA-681)
     new_vector.get_value('exec_option')['mem_limit'] = 80 * 1024 * 1024
     self.run_test_case('QueryTest/wide-row', new_vector)
+
+class TestParquet(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestParquet, cls).add_test_dimensions()
+    cls.TestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_parquet(self, vector):
+    self.run_test_case('QueryTest/parquet', vector)

@@ -24,28 +24,54 @@ using namespace std;
 namespace impala {
 
 void CheckVersionParse(const string& s, const string& expected_application,
-    const string& expected_version, bool expected_is_internal) {
+    int expected_major, int expected_minor, int expected_patch,
+    bool expected_is_internal) {
   HdfsParquetScanner::FileVersion v(s);
   EXPECT_EQ(v.application, expected_application) << "String: " << s;
-  EXPECT_EQ(v.version, expected_version) << "String: " << s;
+  EXPECT_EQ(v.version.major, expected_major) << "String: " << s;
+  EXPECT_EQ(v.version.minor, expected_minor) << "String: " << s;
+  EXPECT_EQ(v.version.patch, expected_patch) << "String: " << s;
   EXPECT_EQ(v.is_impala_internal, expected_is_internal);
 }
 
-TEST(ParquetVersionParseTest, Basic) {
-  CheckVersionParse("impala version 1.0", "impala", "1.0", false);
-  CheckVersionParse("impala VERSION 1.0", "impala", "1.0", false);
-  CheckVersionParse("impala VERSION 1.0 ignored", "impala", "1.0", false);
-  CheckVersionParse("parquet-mr version 2.0", "parquet-mr", "2.0", false);
+TEST(ParquetVersionTest, Parsing) {
+  CheckVersionParse("impala version 1.0", "impala", 1, 0, 0, false);
+  CheckVersionParse("impala VERSION 1.0", "impala", 1, 0, 0, false);
+  CheckVersionParse("impala VERSION 1.0 ignored", "impala", 1, 0, 0, false);
+  CheckVersionParse("parquet-mr version 2.0", "parquet-mr", 2, 0, 0, false);
+
+  CheckVersionParse("impala version 1.2", "impala", 1, 2, 0, false);
+  CheckVersionParse("impala version 1.2.3", "impala", 1, 2, 3, false);
+  CheckVersionParse("impala version 1.2.3-cdh4.5", "impala", 1, 2, 3, false);
+  CheckVersionParse("impala version 1.2.3.cdh4.5", "impala", 1, 2, 3, false);
+  CheckVersionParse("impala version 1.2-cdh4.5", "impala", 1, 2, 0, false);
+  CheckVersionParse("impala version 1.2.cdh4.5", "impala", 1, 2, 0, false);
+  CheckVersionParse("impala version 1.2 (build xyz)", "impala", 1, 2, 0, false);
+  CheckVersionParse("impala version cdh4.5", "impala", 0, 0, 0, false);
 
   // Test internal versions
-  CheckVersionParse("impala version 1.0-internal", "impala", "1.0", true);
-  CheckVersionParse("impala version 1.23-internal", "impala", "1.23", true);
-  CheckVersionParse("impala version 2-inTERnal", "impala", "2", true);
-  CheckVersionParse("mr version 1-internal", "mr", "1-internal", false);
+  CheckVersionParse("impala version 1.0-internal", "impala", 1, 0, 0, true);
+  CheckVersionParse("impala version 1.23-internal", "impala", 1, 23, 0, true);
+  CheckVersionParse("impala version 2-inTERnal", "impala", 2, 0, 0, true);
+  CheckVersionParse("mr version 1-internal", "mr", 1, 0, 0, false);
 
-  // Test some malformed strings. They should leave version/app as empty
-  CheckVersionParse("parquet-mr 2.0", "", "", false);
-  CheckVersionParse("impala ve 2.0", "", "", false);
+  // Test some malformed strings.
+  CheckVersionParse("parquet-mr 2.0", "parquet-mr", 0, 0, 0, false);
+  CheckVersionParse("impala ve 2.0", "impala", 0, 0, 0, false);
+  CheckVersionParse("", "", 0, 0, 0, false);
+}
+
+TEST(ParquetVersionTest, Comparisons) {
+  HdfsParquetScanner::FileVersion v("foo version 1.2.3");
+  EXPECT_TRUE(v.VersionEq(1, 2, 3));
+  EXPECT_FALSE(v.VersionEq(1, 2, 4));
+  EXPECT_TRUE(v.VersionLt(3, 2, 1));
+  EXPECT_TRUE(v.VersionLt(1, 2, 4));
+  EXPECT_TRUE(v.VersionLt(2, 0, 0));
+  EXPECT_FALSE(v.VersionLt(0, 0, 0));
+  EXPECT_FALSE(v.VersionLt(1, 2, 3));
+  EXPECT_FALSE(v.VersionLt(1, 2, 2));
+  EXPECT_FALSE(v.VersionLt(0, 4, 4));
 }
 
 }

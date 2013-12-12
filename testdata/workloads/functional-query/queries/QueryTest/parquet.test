@@ -1,0 +1,11 @@
+====
+---- QUERY
+# IMPALA-694: data file produced by parquet-mr version 1.2.5-cdh4.5.0
+SELECT * from bad_parquet
+---- TYPES
+string
+---- RESULTS
+'parquet'
+'is'
+'fun'
+====
