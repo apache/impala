@@ -82,7 +82,7 @@ class RleDecoder {
       current_value_(0),
       repeat_count_(0),
       literal_count_(0) {
-    DCHECK_GE(bit_width_, 1);
+    DCHECK_GE(bit_width_, 0);
     DCHECK_LE(bit_width_, 64);
   }
 
@@ -113,6 +113,7 @@ class RleEncoder {
   // TODO: consider adding a min_repeated_run_length so the caller can control
   // when values should be encoded as repeated runs.  Currently this is derived
   // based on the bit_width, which can determine a storage optimal choice.
+  // TODO: allow 0 bit_width (and have dict encoder use it)
   RleEncoder(uint8_t* buffer, int buffer_len, int bit_width)
     : bit_width_(bit_width),
       bit_writer_(buffer, buffer_len) {

@@ -117,7 +117,7 @@ void TestBitArrayValues(int bit_width, int num_vals) {
 }
 
 TEST(BitArray, TestValues) {
-  for (int width = 1; width <= MAX_WIDTH; ++width) {
+  for (int width = 0; width <= MAX_WIDTH; ++width) {
     TestBitArrayValues(width, 1);
     TestBitArrayValues(width, 2);
     // Don't write too many values
@@ -262,6 +262,35 @@ TEST(Rle, TestValues) {
     TestRleValues(width, 1024, 0);
     TestRleValues(width, 1024, 1);
   }
+}
+
+TEST(Rle, BitWidthZeroRepeated) {
+  uint8_t buffer[1];
+  const int num_values = 15;
+  buffer[0] = num_values << 1; // repeated indicator byte
+  RleDecoder decoder(buffer, sizeof(buffer), 0);
+  uint8_t val;
+  for (int i = 0; i < num_values; ++i) {
+    bool result = decoder.Get(&val);
+    EXPECT_TRUE(result);
+    EXPECT_EQ(val, 0); // can only encode 0s with bit width 0
+  }
+  EXPECT_FALSE(decoder.Get(&val));
+}
+
+TEST(Rle, BitWidthZeroLiteral) {
+  uint8_t buffer[1];
+  const int num_groups = 4;
+  buffer[0] = num_groups << 1 | 1; // literal indicator byte
+  RleDecoder decoder = RleDecoder(buffer, sizeof(buffer), 0);
+  const int num_values = num_groups * 8;
+  uint8_t val;
+  for (int i = 0; i < num_values; ++i) {
+    bool result = decoder.Get(&val);
+    EXPECT_TRUE(result);
+    EXPECT_EQ(val, 0); // can only encode 0s with bit width 0
+  }
+  EXPECT_FALSE(decoder.Get(&val));
 }
 
 // Test that writes out a repeated group and then a literal

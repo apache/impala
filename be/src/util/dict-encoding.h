@@ -132,7 +132,7 @@ class DictDecoderBase {
   void SetData(uint8_t* buffer, int buffer_len) {
     DCHECK_GT(buffer_len, 0);
     uint8_t bit_width = *buffer;
-    DCHECK_GT(bit_width, 0);
+    DCHECK_GE(bit_width, 0);
     ++buffer;
     --buffer_len;
     data_decoder_.reset(new RleDecoder(buffer, buffer_len, bit_width));
