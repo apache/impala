@@ -941,12 +941,11 @@ public class Planner {
 
       PlanNode plan = entry.second;
       if (plan.getCardinality() == -1) {
-        // revert to the FROM-clause order if any table is lacking stats; this policy is
-        // simple and can be communicated effectively; there is no perfect solution
+        // use 0 for the size to avoid it becoming the leftmost input
         // TODO: Consider raw size of scanned partitions in the absence of stats.
-        LOG.debug("Reverting to FROM-clause order because table '" +
-            ref.getTable().getFullName() + "' has no table stats.");
-        return null;
+        candidates.add(new Pair(ref, new Long(0)));
+        LOG.trace("candidate " + ref.getAlias() + ": 0");
+        continue;
       }
       Preconditions.checkNotNull(ref.getDesc());
       long materializedSize =
