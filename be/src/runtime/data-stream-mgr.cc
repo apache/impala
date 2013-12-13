@@ -43,7 +43,6 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(RuntimeState* state,
   : fragment_instance_id_(fragment_instance_id),
     dest_node_id_(dest_node_id),
     row_desc_(row_desc),
-    add_batch_pending_(true),
     is_cancelled_(false),
     buffer_limit_(buffer_size),
     num_buffered_bytes_(0),
@@ -58,7 +57,6 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(RuntimeState* state,
   buffer_full_total_timer_ = ADD_TIMER(profile, "SendersBlockedTotalTimer(*)");
   data_arrival_timer_ = ADD_TIMER(profile, "DataArrivalWaitTime");
   first_batch_wait_timer_ = ADD_TIMER(profile, "FirstBatchArrivalWaitTime");
-  add_batch_pending_.Set(true);
 }
 
 RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
@@ -92,32 +90,11 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
   return result;
 }
 
-struct ScopedPromiseEvent {
-  ScopedPromiseEvent(Promise<bool>* p) : promise(p) {
-    p->Reset();
-  }
-
-  ~ScopedPromiseEvent() {
-    promise->Set(true);
-  }
-
-  Promise<bool>* promise;
-};
-
 void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) {
   unique_lock<mutex> l(lock_);
   if (is_cancelled_) return;
 
-  // There's a thread in AddBatch, we can't cleanup this fragment until this
-  // thread is done.
-  ScopedPromiseEvent add_batch_pending(&add_batch_pending_);
-
   int batch_size = RowBatch::GetBatchSize(thrift_batch);
-  auto_ptr<RowBatch> batch;
-  {
-    SCOPED_TIMER(deserialize_row_batch_timer_);
-    batch.reset(new RowBatch(row_desc_, thrift_batch, &mem_tracker_));
-  }
   COUNTER_UPDATE(bytes_received_counter_, batch_size);
   DCHECK_GT(num_remaining_senders_, 0);
 
@@ -163,15 +140,21 @@ void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) 
     if (got_timer_lock) data_removal_.notify_one();
   }
 
-  // If we've been cancelled, just return and drop the incoming row batch.  This lets
-  // senders (remote fragments) get unblocked.
-  if (is_cancelled_) return;
-
-  VLOG_ROW << "added #rows=" << batch->num_rows()
-           << " batch_size=" << batch_size << "\n";
-  batch_queue_.push_back(make_pair(batch_size, batch.release()));
-  num_buffered_bytes_ += batch_size;
-  data_arrival_.notify_one();
+  if (!is_cancelled_) {
+    RowBatch* batch = NULL;
+    {
+      SCOPED_TIMER(deserialize_row_batch_timer_);
+      // Note: if this function makes a row batch, the batch *must* be added
+      // to batch_queue_. It is not valid to create the row batch and destroy
+      // it in this thread.
+      batch = new RowBatch(row_desc_, thrift_batch, &mem_tracker_);
+    }
+    VLOG_ROW << "added #rows=" << batch->num_rows()
+             << " batch_size=" << batch_size << "\n";
+    batch_queue_.push_back(make_pair(batch_size, batch));
+    num_buffered_bytes_ += batch_size;
+    data_arrival_.notify_one();
+  }
 }
 
 void DataStreamMgr::StreamControlBlock::DecrementSenders() {
@@ -202,10 +185,6 @@ void DataStreamMgr::StreamControlBlock::CancelStream() {
       it != batch_queue_.end(); ++it) {
     delete it->second;
   }
-}
-
-void DataStreamMgr::StreamControlBlock::WaitUntilSafeToTeardown() {
-  add_batch_pending_.Get();
 }
 
 inline uint32_t DataStreamMgr::GetHashValue(
@@ -342,24 +321,6 @@ void DataStreamMgr::Cancel(const TUniqueId& fragment_instance_id) {
     }
     ++i;
   }
-}
-
-void DataStreamMgr::WaitUntilSafeToTeardown(const TUniqueId& fragment_instance_id) {
-  // Collect the StreamControlBlocks for this fragment. We don't want to
-  // hold the lock while waiting.
-  vector<shared_ptr<StreamControlBlock> > cbs;
-  {
-    lock_guard<mutex> l(lock_);
-    FragmentStreamSet::iterator i =
-        fragment_stream_set_.lower_bound(make_pair(fragment_instance_id, 0));
-    while (i != fragment_stream_set_.end() && i->first == fragment_instance_id) {
-      shared_ptr<StreamControlBlock> cb = FindControlBlock(i->first, i->second, false);
-      if (cb != NULL) cbs.push_back(cb);
-      ++i;
-    }
-  }
-
-  for (int i = 0; i < cbs.size(); ++i) cbs[i]->WaitUntilSafeToTeardown();
 }
 
 }

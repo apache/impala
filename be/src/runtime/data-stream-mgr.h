@@ -84,9 +84,6 @@ class DataStreamMgr {
   // Closes all streams registered for fragment_instance_id immediately.
   void Cancel(const TUniqueId& fragment_instance_id);
 
-  // Blocks until it safe to begin tearing down any state for this plan fragment.
-  void WaitUntilSafeToTeardown(const TUniqueId& fragment_instance_id);
-
  private:
   friend class DataStreamRecvr;
 
@@ -126,11 +123,6 @@ class DataStreamMgr {
     // incoming batches will be dropped.
     void CancelStream();
 
-    // Blocks until it is safe to begin tear down. It is not safe to tear down objects
-    // if there is a thread currently in AddBatch().
-    // This must be called from the same thread that calls GetBatch().
-    void WaitUntilSafeToTeardown();
-
     const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
     PlanNodeId dest_node_id() const { return dest_node_id_; }
 
@@ -138,9 +130,6 @@ class DataStreamMgr {
     TUniqueId fragment_instance_id_;
     PlanNodeId dest_node_id_;
     const RowDescriptor& row_desc_;
-
-    // Synchronization object to track if there is a thread currently in AddBatch()
-    Promise<bool> add_batch_pending_;
 
     // protects all subsequent data in this block
     boost::mutex lock_;

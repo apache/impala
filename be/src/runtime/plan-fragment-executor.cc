@@ -447,8 +447,6 @@ void PlanFragmentExecutor::Close() {
     if (plan_ != NULL) plan_->Close(runtime_state_.get());
     if (sink_.get() != NULL) sink_->Close(runtime_state());
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
-    runtime_state_->stream_mgr()->WaitUntilSafeToTeardown(
-        runtime_state_->fragment_instance_id());
   }
   if (mem_usage_sampled_counter_ != NULL) {
     PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);
