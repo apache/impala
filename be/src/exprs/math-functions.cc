@@ -19,6 +19,7 @@
 #include <math.h>
 
 #include "exprs/expr.h"
+#include "exprs/expr-inline.h"
 #include "runtime/tuple-row.h"
 #include "util/string-parser.h"
 #include "opcode/functions.h"
