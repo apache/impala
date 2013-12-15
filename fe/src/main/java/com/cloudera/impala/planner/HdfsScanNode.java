@@ -80,7 +80,7 @@ public class HdfsScanNode extends ScanNode {
   private final ArrayList<HdfsPartition> partitions_ = Lists.newArrayList();
 
   // List of scan-range locations. Populated in getScanRangeLocations().
-  private List<TScanRangeLocations> scanRanges;
+  private List<TScanRangeLocations> scanRanges_;
 
   // Total number of bytes from partitions_
   private long totalBytes_ = 0;
@@ -103,18 +103,18 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Populate 'conjuncts' and 'partitions_'.
+   * Populate conjuncts_ and partitions_.
    */
   @Override
   public void init(Analyzer analyzer)
       throws InternalException, AuthorizationException {
-    // loop over all materialized slots and add predicates to 'conjuncts'
-    for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds.get(0)).getSlots()) {
+    // loop over all materialized slots and add predicates to conjuncts_
+    for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds_.get(0)).getSlots()) {
       ArrayList<Pair<Expr, Boolean>> bindingPredicates =
           analyzer.getBoundPredicates(slotDesc.getId(), this);
       for (Pair<Expr, Boolean> p: bindingPredicates) {
         if (p.second) analyzer.markConjunctAssigned(p.first);
-        conjuncts.add(p.first);
+        conjuncts_.add(p.first);
       }
     }
     // also add remaining unassigned conjuncts
@@ -125,7 +125,7 @@ public class HdfsScanNode extends ScanNode {
     prunePartitions(analyzer);
 
     // mark all slots referenced by the remaining conjuncts as materialized
-    markSlotsMaterialized(analyzer, conjuncts);
+    markSlotsMaterialized(analyzer, conjuncts_);
     computeMemLayout(analyzer);
 
     // do this at the end so it can take all conjuncts into account
@@ -137,15 +137,15 @@ public class HdfsScanNode extends ScanNode {
 
   /**
    * Populate partitions_ based on all applicable conjuncts and remove
-   * conjuncts used for filtering from PlanNode.conjuncts.
+   * conjuncts used for filtering from conjuncts_.
    */
   private void prunePartitions(Analyzer analyzer)
       throws InternalException, AuthorizationException {
-    // loop through all partitions_ and prune based on applicable conjuncts;
+    // loop through all partitions and prune based on applicable conjuncts;
     // start with creating a collection of partition filters for the applicable conjuncts
     List<SlotId> partitionSlots = Lists.newArrayList();
     for (SlotDescriptor slotDesc:
-        analyzer.getDescTbl().getTupleDesc(tupleIds.get(0)).getSlots()) {
+        analyzer.getDescTbl().getTupleDesc(tupleIds_.get(0)).getSlots()) {
       Preconditions.checkState(slotDesc.getColumn() != null);
       if (slotDesc.getColumn().getPosition() < tbl_.getNumClusteringCols()) {
         partitionSlots.add(slotDesc.getId());
@@ -153,17 +153,17 @@ public class HdfsScanNode extends ScanNode {
     }
     List<HdfsPartitionFilter> partitionFilters = Lists.newArrayList();
     Set<Expr> filterConjuncts = Sets.newHashSet();
-    for (Expr conjunct: conjuncts) {
+    for (Expr conjunct: conjuncts_) {
       if (conjunct.isBoundBySlotIds(partitionSlots)) {
         partitionFilters.add(new HdfsPartitionFilter(conjunct, tbl_, analyzer));
         filterConjuncts.add(conjunct);
       }
     }
     // filterConjuncts are applied implicitly via partition pruning
-    conjuncts.removeAll(filterConjuncts);
+    conjuncts_.removeAll(filterConjuncts);
 
     for (HdfsPartition p: tbl_.getPartitions()) {
-      // ignore partitions_ without data
+      // ignore partitions without data
       if (p.getFileDescriptors().size() == 0) continue;
 
       Preconditions.checkState(
@@ -189,41 +189,41 @@ public class HdfsScanNode extends ScanNode {
 
     LOG.debug("collecting partitions for table " + tbl_.getName());
     if (tbl_.getPartitions().isEmpty()) {
-      cardinality = tbl_.getNumRows();
+      cardinality_ = tbl_.getNumRows();
     } else {
-      cardinality = 0;
+      cardinality_ = 0;
       boolean hasValidPartitionCardinality = false;
       for (HdfsPartition p: partitions_) {
-        // ignore partitions_ with missing stats in the hope they don't matter
+        // ignore partitions with missing stats in the hope they don't matter
         // enough to change the planning outcome
         if (p.getNumRows() > 0) {
-          cardinality += p.getNumRows();
+          cardinality_ += p.getNumRows();
           hasValidPartitionCardinality = true;
         }
         totalBytes_ += p.getSize();
       }
-      // if none of the partitions_ knew its number of rows, we fall back on
+      // if none of the partitions knew its number of rows, we fall back on
       // the table stats
-      if (!hasValidPartitionCardinality) cardinality = tbl_.getNumRows();
+      if (!hasValidPartitionCardinality) cardinality_ = tbl_.getNumRows();
     }
 
-    Preconditions.checkState(cardinality >= 0 || cardinality == -1);
-    if (cardinality > 0) {
-      LOG.debug("cardinality=" + Long.toString(cardinality) +
+    Preconditions.checkState(cardinality_ >= 0 || cardinality_ == -1);
+    if (cardinality_ > 0) {
+      LOG.debug("cardinality_=" + Long.toString(cardinality_) +
                 " sel=" + Double.toString(computeSelectivity()));
-      cardinality = Math.round((double) cardinality * computeSelectivity());
+      cardinality_ = Math.round((double) cardinality_ * computeSelectivity());
     }
-    LOG.debug("computeStats HdfsScan: cardinality=" + Long.toString(cardinality));
+    LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
 
-    // TODO: take actual partitions_ into account
-    numNodes = tbl_.getNumNodes();
-    LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes));
+    // TODO: take actual partitions into account
+    numNodes_ = tbl_.getNumNodes();
+    LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
     // TODO: retire this once the migration to the new plan is complete
-    msg.hdfs_scan_node = new THdfsScanNode(desc.getId().asInt());
+    msg.hdfs_scan_node = new THdfsScanNode(desc_.getId().asInt());
     msg.node_type = TPlanNodeType.HDFS_SCAN_NODE;
   }
 
@@ -233,7 +233,7 @@ public class HdfsScanNode extends ScanNode {
    */
   @Override
   public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
-    scanRanges = Lists.newArrayList();
+    scanRanges_ = Lists.newArrayList();
     for (HdfsPartition partition: partitions_) {
       Preconditions.checkState(partition.getId() >= 0);
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
@@ -271,32 +271,32 @@ public class HdfsScanNode extends ScanNode {
             TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
             scanRangeLocations.scan_range = scanRange;
             scanRangeLocations.locations = locations;
-            scanRanges.add(scanRangeLocations);
+            scanRanges_.add(scanRangeLocations);
             remainingLength -= currentLength;
             currentOffset += currentLength;
           }
         }
       }
     }
-    return scanRanges;
+    return scanRanges_;
   }
 
   @Override
   protected String getNodeExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    HdfsTable table = (HdfsTable) desc.getTable();
+    HdfsTable table = (HdfsTable) desc_.getTable();
     output.append(prefix + "table=" + table.getFullName());
     // Exclude the dummy default partition from the total partition count.
     output.append(String.format(" #partitions=%s/%s", partitions_.size(),
         table.getPartitions().size() - 1));
     output.append(" size=" + PrintUtils.printBytes(totalBytes_));
-    if (compactData) {
+    if (compactData_) {
       output.append(" compact\n");
     } else {
       output.append("\n");
     }
-    if (!conjuncts.isEmpty()) {
-      output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
+    if (!conjuncts_.isEmpty()) {
+      output.append(prefix + "predicates: " + getExplainString(conjuncts_) + "\n");
     }
     // Add table and column stats in verbose mode.
     if (detailLevel == TExplainLevel.VERBOSE) {
@@ -307,7 +307,7 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Raises NotImplementedException if any of the partitions_ uses an unsupported file
+   * Raises NotImplementedException if any of the partitions uses an unsupported file
    * format.  This is useful for experimental formats, which we currently don't have.
    * Can only be called after finalize().
    */
@@ -316,39 +316,39 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public void computeCosts(TQueryOptions queryOptions) {
-    Preconditions.checkNotNull(scanRanges, "Cost estimation requires scan ranges.");
-    if (scanRanges.isEmpty()) {
-      perHostMemCost = 0;
+    Preconditions.checkNotNull(scanRanges_, "Cost estimation requires scan ranges.");
+    if (scanRanges_.isEmpty()) {
+      perHostMemCost_ = 0;
       return;
     }
 
     // Number of nodes for the purpose of resource estimation adjusted
     // for the special cases listed below.
-    long adjNumNodes = numNodes;
-    if (numNodes <= 0) {
+    long adjNumNodes = numNodes_;
+    if (numNodes_ <= 0) {
       adjNumNodes = 1;
-    } else if (scanRanges.size() < numNodes) {
+    } else if (scanRanges_.size() < numNodes_) {
       // TODO: Empirically evaluate whether there is more Hdfs block skew for relatively
       // small files, i.e., whether this estimate is too optimistic.
-      adjNumNodes = scanRanges.size();
+      adjNumNodes = scanRanges_.size();
     }
 
-    Preconditions.checkNotNull(desc);
-    Preconditions.checkNotNull(desc.getTable() instanceof HdfsTable);
-    HdfsTable table = (HdfsTable) desc.getTable();
+    Preconditions.checkNotNull(desc_);
+    Preconditions.checkNotNull(desc_.getTable() instanceof HdfsTable);
+    HdfsTable table = (HdfsTable) desc_.getTable();
     int perHostScanRanges;
     if (table.getMajorityFormat() == HdfsFileFormat.PARQUET) {
       // For the purpose of this estimation, the number of per-host scan ranges for
       // Parquet files are equal to the number of non-partition columns scanned.
       perHostScanRanges = 0;
-      for (SlotDescriptor slot: desc.getSlots()) {
+      for (SlotDescriptor slot: desc_.getSlots()) {
         if (slot.getColumn().getPosition() >= table.getNumClusteringCols()) {
           ++perHostScanRanges;
         }
       }
     } else {
       perHostScanRanges = (int) Math.ceil((
-          (double) scanRanges.size() / (double) adjNumNodes) * SCAN_RANGE_SKEW_FACTOR);
+          (double) scanRanges_.size() / (double) adjNumNodes) * SCAN_RANGE_SKEW_FACTOR);
     }
 
     // TODO: The total memory consumption for a particular query depends on the number
@@ -363,21 +363,21 @@ public class HdfsScanNode extends ScanNode {
           Math.min(maxScannerThreads, queryOptions.getNum_scanner_threads());
     }
 
-    long avgScanRangeBytes = (long) Math.ceil(totalBytes_ / (double) scanRanges.size());
+    long avgScanRangeBytes = (long) Math.ceil(totalBytes_ / (double) scanRanges_.size());
     // The +1 accounts for an extra I/O buffer to read past the scan range due to a
     // trailing record spanning Hdfs blocks.
     long perThreadIoBuffers =
         Math.min((long) Math.ceil(avgScanRangeBytes / (double) IO_MGR_BUFFER_SIZE),
             MAX_IO_BUFFERS_PER_THREAD) + 1;
-    perHostMemCost = maxScannerThreads * perThreadIoBuffers * IO_MGR_BUFFER_SIZE;
+    perHostMemCost_ = maxScannerThreads * perThreadIoBuffers * IO_MGR_BUFFER_SIZE;
 
     // Sanity check: the tighter estimation should not exceed the per-host maximum.
     long perHostUpperBound = getPerHostMemUpperBound();
-    if (perHostMemCost > perHostUpperBound) {
+    if (perHostMemCost_ > perHostUpperBound) {
       LOG.warn(String.format("Per-host mem cost %s exceeded per-host upper bound %s.",
-          PrintUtils.printBytes(perHostMemCost),
+          PrintUtils.printBytes(perHostMemCost_),
           PrintUtils.printBytes(perHostUpperBound)));
-      perHostMemCost = perHostUpperBound;
+      perHostMemCost_ = perHostUpperBound;
     }
   }
 

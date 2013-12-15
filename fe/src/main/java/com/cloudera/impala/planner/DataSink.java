@@ -35,10 +35,10 @@ public abstract class DataSink {
 
   // estimated per-host memory requirement for sink;
   // set in computeCosts(); invalid: -1
-  protected long perHostMemCost = -1;
+  protected long perHostMemCost_ = -1;
 
   // Fragment that this DataSink belongs to. Set by the PlanFragment enclosing this sink.
-  protected PlanFragment fragment;
+  protected PlanFragment fragment_;
 
   /**
    * Return an explain string for the DataSink. Each line of the explain will be prefixed
@@ -50,9 +50,9 @@ public abstract class DataSink {
 
   protected abstract TDataSink toThrift();
 
-  public void setFragment(PlanFragment fragment) { this.fragment = fragment; }
-  public PlanFragment getFragment() { return fragment; }
-  public long getPerHostMemCost() { return perHostMemCost; }
+  public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
+  public PlanFragment getFragment() { return fragment_; }
+  public long getPerHostMemCost() { return perHostMemCost_; }
 
   /**
    * Returns an output sink appropriate for writing to the given table.
@@ -78,6 +78,6 @@ public abstract class DataSink {
    * Estimates the cost of executing this DataSink. Currently only sets perHostMemCost.
    */
   public void computeCosts() {
-    perHostMemCost = 0;
+    perHostMemCost_ = 0;
   }
 }

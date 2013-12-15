@@ -50,58 +50,58 @@ public class AggregationNode extends PlanNode {
   // Conservative minimum size of hash table for low-cardinality aggregations.
   private final static long MIN_HASH_TBL_MEM = 10L * 1024L * 1024L;
 
-  private final AggregateInfo aggInfo;
+  private final AggregateInfo aggInfo_;
 
   // Set to true if this aggregation node needs to run the Finalize step. This
   // node is the root node of a distributed aggregation.
-  private boolean needsFinalize;
+  private boolean needsFinalize_;
 
   /**
    * Create an agg node from aggInfo.
    */
   public AggregationNode(PlanNodeId id, PlanNode input, AggregateInfo aggInfo) {
     super(id, aggInfo.getAggTupleId().asList(), "AGGREGATE");
-    this.aggInfo = aggInfo;
-    this.children.add(input);
-    this.needsFinalize = true;
+    aggInfo_ = aggInfo;
+    children.add(input);
+    needsFinalize_ = true;
     updateDisplayName();
   }
 
-  public AggregateInfo getAggInfo() { return aggInfo; }
+  public AggregateInfo getAggInfo() { return aggInfo_; }
 
   // Unsets this node as requiring finalize. Only valid to call this if it is
   // currently marked as needing finalize.
   public void unsetNeedsFinalize() {
-    Preconditions.checkState(needsFinalize);
-    needsFinalize = false;
+    Preconditions.checkState(needsFinalize_);
+    needsFinalize_ = false;
     updateDisplayName();
   }
 
   @Override
-  public void setCompactData(boolean on) { this.compactData = on; }
+  public void setCompactData(boolean on) { this.compactData_ = on; }
 
   @Override
   public boolean isBlockingNode() { return true; }
 
   @Override
   public void init(Analyzer analyzer) {
-    // loop over all materialized slots and add binding predicates to 'conjuncts'
+    // loop over all materialized slots and add binding predicates to conjuncts_
     // TODO: unify this with HdfsScanNode; also, we should be able to apply this
     // logic to predicates over multiple slots
-    for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds.get(0)).getSlots()) {
+    for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds_.get(0)).getSlots()) {
       ArrayList<Pair<Expr, Boolean>> bindingPredicates =
           analyzer.getBoundPredicates(slotDesc.getId(), this);
       for (Pair<Expr, Boolean> p: bindingPredicates) {
         if (!analyzer.isConjunctAssigned(p.first)) {
-          conjuncts.add(p.first);
+          conjuncts_.add(p.first);
           if (p.second) analyzer.markConjunctAssigned(p.first);
         }
       }
     }
 
-    // also add remaining unassigned conjuncts
+    // also add remaining unassigned conjuncts_
     assignConjuncts(analyzer);
-    markSlotsMaterialized(analyzer, conjuncts);
+    markSlotsMaterialized(analyzer, conjuncts_);
     computeMemLayout(analyzer);
     // do this at the end so it can take all conjuncts into account
     computeStats(analyzer);
@@ -110,8 +110,8 @@ public class AggregationNode extends PlanNode {
     // to our input; our conjuncts don't get substituted because they already
     // refer to our output
     Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
-    aggInfo.substitute(combinedChildSmap);
-    baseTblSmap_ = aggInfo.getSMap();
+    aggInfo_.substitute(combinedChildSmap);
+    baseTblSmap_ = aggInfo_.getSMap();
   }
 
   @Override
@@ -127,36 +127,36 @@ public class AggregationNode extends PlanNode {
     // of that table (so that when we're grouping by the primary key col plus
     // some others, the estimate doesn't overshoot dramatically)
     // cardinality: product of # of distinct values produced by grouping exprs
-    cardinality = Expr.getNumDistinctValues(aggInfo.getGroupingExprs());
+    cardinality_ = Expr.getNumDistinctValues(aggInfo_.getGroupingExprs());
     // take HAVING predicate into account
-    LOG.trace("Agg: cardinality=" + Long.toString(cardinality));
-    if (cardinality > 0) {
-      cardinality = Math.round((double) cardinality * computeSelectivity());
+    LOG.trace("Agg: cardinality=" + Long.toString(cardinality_));
+    if (cardinality_ > 0) {
+      cardinality_ = Math.round((double) cardinality_ * computeSelectivity());
       LOG.trace("sel=" + Double.toString(computeSelectivity()));
     }
     // if we ended up with an overflow, the estimate is certain to be wrong
-    if (cardinality < 0) cardinality = -1;
-    // Sanity check the cardinality based on the input cardinality.
+    if (cardinality_ < 0) cardinality_ = -1;
+    // Sanity check the cardinality_ based on the input cardinality_.
     if (getChild(0).getCardinality() != -1) {
-      if (cardinality == -1) {
-        // A worst-case cardinality is better than an unknown cardinality.
-        cardinality = getChild(0).getCardinality();
+      if (cardinality_ == -1) {
+        // A worst-case cardinality_ is better than an unknown cardinality_.
+        cardinality_ = getChild(0).getCardinality();
       } else {
-        // An AggregationNode cannot increase the cardinality.
-        cardinality = Math.min(getChild(0).getCardinality(), cardinality);
+        // An AggregationNode cannot increase the cardinality_.
+        cardinality_ = Math.min(getChild(0).getCardinality(), cardinality_);
       }
     }
-    LOG.trace("stats Agg: cardinality=" + Long.toString(cardinality));
+    LOG.trace("stats Agg: cardinality=" + Long.toString(cardinality_));
   }
 
   private void updateDisplayName() {
     StringBuilder sb = new StringBuilder();
     sb.append("AGGREGATE");
-    if (aggInfo.isMerge() || needsFinalize) {
+    if (aggInfo_.isMerge() || needsFinalize_) {
       sb.append(" (");
-      if (aggInfo.isMerge() && needsFinalize) {
+      if (aggInfo_.isMerge() && needsFinalize_) {
         sb.append("merge finalize");
-      } else if (aggInfo.isMerge()) {
+      } else if (aggInfo_.isMerge()) {
         sb.append("merge");
       } else {
         sb.append("finalize");
@@ -169,7 +169,7 @@ public class AggregationNode extends PlanNode {
   @Override
   protected String debugString() {
     return Objects.toStringHelper(this)
-        .add("aggInfo", aggInfo.debugString())
+        .add("aggInfo_", aggInfo_.debugString())
         .addValue(super.debugString())
         .toString();
   }
@@ -180,14 +180,14 @@ public class AggregationNode extends PlanNode {
 
     List<TAggregateFunctionCall> aggregateFunctions = Lists.newArrayList();
     // only serialize agg exprs that are being materialized
-    for (FunctionCallExpr e: aggInfo.getMaterializedAggregateExprs()) {
+    for (FunctionCallExpr e: aggInfo_.getMaterializedAggregateExprs()) {
       aggregateFunctions.add(e.toTAggregateFunctionCall());
     }
     msg.agg_node = new TAggregationNode(
         aggregateFunctions,
-        aggInfo.getAggTupleId().asInt(), needsFinalize);
-    msg.agg_node.setIs_merge(aggInfo.isMerge());
-    List<Expr> groupingExprs = aggInfo.getGroupingExprs();
+        aggInfo_.getAggTupleId().asInt(), needsFinalize_);
+    msg.agg_node.setIs_merge(aggInfo_.isMerge());
+    List<Expr> groupingExprs = aggInfo_.getGroupingExprs();
     if (groupingExprs != null) {
       msg.agg_node.setGrouping_exprs(Expr.treesToThrift(groupingExprs));
     }
@@ -197,45 +197,45 @@ public class AggregationNode extends PlanNode {
   protected String getNodeExplainString(String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    if (aggInfo.getAggregateExprs() != null && aggInfo.getAggregateExprs().size() > 0) {
+    if (aggInfo_.getAggregateExprs() != null && aggInfo_.getAggregateExprs().size() > 0) {
       output.append(detailPrefix + "output: ")
-        .append(getExplainString(aggInfo.getAggregateExprs()) + "\n");
+        .append(getExplainString(aggInfo_.getAggregateExprs()) + "\n");
    }
     // TODO: is this the best way to display this. It currently would
     // have DISTINCT_PC(DISTINCT_PC(col)) for the merge phase but not
     // very obvious what that means if you don't already know.
 
     // TODO: group by can be very long. Break it into multiple lines
-    if (!aggInfo.getGroupingExprs().isEmpty()) {
+    if (!aggInfo_.getGroupingExprs().isEmpty()) {
       output.append(detailPrefix + "group by: ")
-          .append(getExplainString(aggInfo.getGroupingExprs()) + "\n");
+          .append(getExplainString(aggInfo_.getGroupingExprs()) + "\n");
     }
-    if (!conjuncts.isEmpty()) {
+    if (!conjuncts_.isEmpty()) {
       output.append(detailPrefix + "having: ")
-          .append(getExplainString(conjuncts) + "\n");
+          .append(getExplainString(conjuncts_) + "\n");
     }
     return output.toString();
   }
 
   @Override
   public void computeCosts(TQueryOptions queryOptions) {
-    Preconditions.checkNotNull(fragment,
-        "PlanNode must be placed into a fragment before calling this method.");
-    perHostMemCost = 0;
-    long perHostCardinality = fragment.getNumDistinctValues(aggInfo.getGroupingExprs());
+    Preconditions.checkNotNull(fragment_,
+        "PlanNode must be placed into a fragment_ before calling this method.");
+    perHostMemCost_ = 0;
+    long perHostCardinality = fragment_.getNumDistinctValues(aggInfo_.getGroupingExprs());
     if (perHostCardinality == -1) {
-      perHostMemCost = DEFAULT_PER_HOST_MEM;
+      perHostMemCost_ = DEFAULT_PER_HOST_MEM;
       return;
     }
 
     // Per-host cardinality cannot be greater than the total output cardinality.
-    if (cardinality != -1) {
-      perHostCardinality = Math.min(perHostCardinality, cardinality);
+    if (cardinality_ != -1) {
+      perHostCardinality = Math.min(perHostCardinality, cardinality_);
     }
     // take HAVING predicate into account
     perHostCardinality =
         Math.round((double) perHostCardinality * computeSelectivity());
-    perHostMemCost += Math.max(perHostCardinality * avgRowSize *
+    perHostMemCost_ += Math.max(perHostCardinality * avgRowSize_ *
         Planner.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
   }
 }

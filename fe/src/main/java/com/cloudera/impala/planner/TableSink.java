@@ -22,9 +22,9 @@ import com.cloudera.impala.catalog.Table;
  */
 public abstract class TableSink extends DataSink {
   // Table which is to be populated by this sink.
-  protected final Table targetTable;
+  protected final Table targetTable_;
 
   public TableSink(Table targetTable) {
-    this.targetTable = targetTable;
+    targetTable_ = targetTable;
   }
 }

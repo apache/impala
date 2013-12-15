@@ -29,11 +29,11 @@ import com.google.common.collect.Lists;
  * Representation of the common elements of all scan nodes.
  */
 abstract public class ScanNode extends PlanNode {
-  protected final TupleDescriptor desc;
+  protected final TupleDescriptor desc_;
 
   public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
     super(id, desc.getId().asList(), displayName);
-    this.desc = desc;
+    desc_ = desc;
   }
 
   /**
@@ -47,8 +47,8 @@ abstract public class ScanNode extends PlanNode {
   @Override
   protected String debugString() {
     return Objects.toStringHelper(this)
-        .add("tid", desc.getId().asInt())
-        .add("tblName", desc.getTable().getFullName())
+        .add("tid", desc_.getId().asInt())
+        .add("tblName", desc_.getTable().getFullName())
         .add("keyRanges", "")
         .addValue(super.debugString())
         .toString();
@@ -63,24 +63,24 @@ abstract public class ScanNode extends PlanNode {
   protected String getStatsExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     // Table stats.
-    if (desc.getTable().getNumRows() == -1) {
+    if (desc_.getTable().getNumRows() == -1) {
       output.append(prefix + "table stats: unavailable");
     } else {
-      output.append(prefix + "table stats: " + desc.getTable().getNumRows() +
+      output.append(prefix + "table stats: " + desc_.getTable().getNumRows() +
           " rows total");
     }
     output.append("\n");
 
     // Column stats.
     List<String> columnsMissingStats = Lists.newArrayList();
-    for (SlotDescriptor slot: desc.getSlots()) {
+    for (SlotDescriptor slot: desc_.getSlots()) {
       if (!slot.getStats().hasStats()) {
         columnsMissingStats.add(slot.getColumn().getName());
       }
     }
     if (columnsMissingStats.isEmpty()) {
       output.append(prefix + "column stats: all");
-    } else if (columnsMissingStats.size() == desc.getSlots().size()) {
+    } else if (columnsMissingStats.size() == desc_.getSlots().size()) {
       output.append(prefix + "column stats: unavailable");
     } else {
       output.append(String.format("%scolumns missing stats: %s", prefix,

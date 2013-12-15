@@ -40,25 +40,25 @@ import com.google.common.collect.Lists;
 public class DataPartition {
   private final static Logger LOG = LoggerFactory.getLogger(DataPartition.class);
 
-  private final TPartitionType type;
+  private final TPartitionType type_;
 
   // for hash partition: exprs used to compute hash value
-  private final ImmutableList<Expr> partitionExprs;
+  private final ImmutableList<Expr> partitionExprs_;
 
   public DataPartition(TPartitionType type, List<Expr> exprs) {
     Preconditions.checkNotNull(exprs);
     Preconditions.checkState(!exprs.isEmpty());
     Preconditions.checkState(type == TPartitionType.HASH_PARTITIONED
         || type == TPartitionType.RANGE_PARTITIONED);
-    this.type = type;
-    this.partitionExprs = ImmutableList.copyOf(exprs);
+    type_ = type;
+    partitionExprs_ = ImmutableList.copyOf(exprs);
   }
 
   public DataPartition(TPartitionType type) {
     Preconditions.checkState(type == TPartitionType.UNPARTITIONED
         || type == TPartitionType.RANDOM);
-    this.type = type;
-    this.partitionExprs = ImmutableList.of();
+    type_ = type;
+    partitionExprs_ = ImmutableList.of();
   }
 
   public final static DataPartition UNPARTITIONED =
@@ -67,41 +67,31 @@ public class DataPartition {
   public final static DataPartition RANDOM =
       new DataPartition(TPartitionType.RANDOM);
 
-  public boolean isPartitioned() { return type != TPartitionType.UNPARTITIONED; }
-  public TPartitionType getType() { return type; }
-  public ImmutableList<Expr> getPartitionExprs() { return partitionExprs; }
+  public boolean isPartitioned() { return type_ != TPartitionType.UNPARTITIONED; }
+  public TPartitionType getType() { return type_; }
+  public ImmutableList<Expr> getPartitionExprs() { return partitionExprs_; }
 
   public TDataPartition toThrift() {
-    TDataPartition result = new TDataPartition(type);
-    if (partitionExprs != null) {
-      result.setPartition_exprs(Expr.treesToThrift(partitionExprs));
+    TDataPartition result = new TDataPartition(type_);
+    if (partitionExprs_ != null) {
+      result.setPartition_exprs(Expr.treesToThrift(partitionExprs_));
     }
     return result;
   }
 
   public String debugString() {
     return Objects.toStringHelper(this)
-        .add("type", type)
-        .addValue(Expr.debugString(partitionExprs))
+        .add("type_", type_)
+        .addValue(Expr.debugString(partitionExprs_))
         .toString();
-  }
-
-  /**
-   * Returns true if 'this' is a partition that is compatible with the
-   * requirements of 's'.
-   * TODO: specify more clearly and implement
-   */
-  public boolean isCompatible(DataPartition s) {
-    // TODO: implement
-    return true;
   }
 
   public String getExplainString(TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
-    str.append(type.toString());
-    if (!partitionExprs.isEmpty()) {
+    str.append(type_.toString());
+    if (!partitionExprs_.isEmpty()) {
       List<String> strings = Lists.newArrayList();
-      for (Expr expr: partitionExprs) {
+      for (Expr expr: partitionExprs_) {
         strings.add(expr.toSql());
       }
       str.append(": " + Joiner.on(", ").join(strings));

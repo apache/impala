@@ -34,7 +34,7 @@ public class HBaseTableSink extends TableSink {
   @Override
   public String getExplainString(String prefix, TExplainLevel explainLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "WRITE TO HBASE table=" + targetTable.getFullName() + "\n");
+    output.append(prefix + "WRITE TO HBASE table=" + targetTable_.getFullName() + "\n");
     return output.toString();
   }
 
@@ -42,7 +42,7 @@ public class HBaseTableSink extends TableSink {
   protected TDataSink toThrift() {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
     TTableSink tTableSink =
-        new TTableSink(targetTable.getId().asInt(), TTableSinkType.HBASE);
+        new TTableSink(targetTable_.getId().asInt(), TTableSinkType.HBASE);
     result.table_sink = tTableSink;
     return result;
   }

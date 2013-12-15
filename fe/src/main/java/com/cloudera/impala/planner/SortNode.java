@@ -39,11 +39,11 @@ import com.google.common.collect.Lists;
  */
 public class SortNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(SortNode.class);
-  private final SortInfo info;
-  private final boolean useTopN;
-  private final boolean isDefaultLimit;
+  private final SortInfo info_;
+  private final boolean useTopN_;
+  private final boolean isDefaultLimit_;
 
-  protected long offset; // The offset of the first row to return
+  protected long offset_; // The offset of the first row to return
 
   // set in init() or c'tor
   private List<Expr> baseTblOrderingExprs_;
@@ -51,15 +51,15 @@ public class SortNode extends PlanNode {
   public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN,
       boolean isDefaultLimit, long offset) {
     super(id, "TOP-N");
-    // If this is the default limit, we shouldn't have a non-zero offset set.
+    // If this is the default limit_, we shouldn't have a non-zero offset set.
     Preconditions.checkArgument(!isDefaultLimit || offset == 0);
-    this.info = info;
-    this.useTopN = useTopN;
-    this.isDefaultLimit = isDefaultLimit;
-    this.tupleIds.addAll(input.getTupleIds());
-    this.nullableTupleIds.addAll(input.getNullableTupleIds());
-    this.children.add(input);
-    this.offset = offset;
+    info_ = info;
+    useTopN_ = useTopN;
+    isDefaultLimit_ = isDefaultLimit;
+    tupleIds_.addAll(input.getTupleIds());
+    nullableTupleIds_.addAll(input.getNullableTupleIds());
+    children.add(input);
+    offset_ = offset;
   }
 
   /**
@@ -67,21 +67,21 @@ public class SortNode extends PlanNode {
    */
   public SortNode(PlanNodeId id, SortNode inputSortNode, PlanNode child) {
     super(id, inputSortNode, "TOP-N");
-    this.info = inputSortNode.info;
+    info_ = inputSortNode.info_;
     // set this directly (and don't reassign in init()): inputSortNode's smap
-    // may not be able to remap info.orderingExprs
+    // may not be able to remap info_.orderingExprs
     baseTblOrderingExprs_ = inputSortNode.baseTblOrderingExprs_;
-    this.useTopN = inputSortNode.useTopN;
-    this.isDefaultLimit = inputSortNode.isDefaultLimit;
-    this.children.add(child);
-    this.offset = inputSortNode.offset;
+    useTopN_ = inputSortNode.useTopN_;
+    isDefaultLimit_ = inputSortNode.isDefaultLimit_;
+    children.add(child);
+    offset_ = inputSortNode.offset_;
   }
 
-  public long getOffset() { return offset; }
-  public void setOffset(long offset) { this.offset = offset; }
+  public long getOffset() { return offset_; }
+  public void setOffset(long offset) { offset_ = offset; }
 
   @Override
-  public void setCompactData(boolean on) { this.compactData = on; }
+  public void setCompactData(boolean on) { compactData_ = on; }
 
   @Override
   public boolean isBlockingNode() { return true; }
@@ -94,35 +94,35 @@ public class SortNode extends PlanNode {
     // don't set the ordering exprs if they're already set (they were assigned in the
     // clone c'tor)
     if (baseTblOrderingExprs_ == null) {
-      baseTblOrderingExprs_ = Expr.cloneList(info.getOrderingExprs(), baseTblSmap_);
+      baseTblOrderingExprs_ = Expr.cloneList(info_.getOrderingExprs(), baseTblSmap_);
     }
   }
 
   @Override
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    cardinality = getChild(0).cardinality;
+    cardinality_ = getChild(0).cardinality_;
     if (hasLimit()) {
-      if (cardinality == -1) {
-        cardinality = limit;
+      if (cardinality_ == -1) {
+        cardinality_ = limit_;
       } else {
-        cardinality = Math.min(cardinality, limit);
+        cardinality_ = Math.min(cardinality_, limit_);
       }
     }
-    LOG.debug("stats Sort: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats Sort: cardinality=" + Long.toString(cardinality_));
   }
 
   @Override
   protected String debugString() {
     List<String> strings = Lists.newArrayList();
-    for (Boolean isAsc : info.getIsAscOrder()) {
+    for (Boolean isAsc : info_.getIsAscOrder()) {
       strings.add(isAsc ? "a" : "d");
     }
     return Objects.toStringHelper(this)
-        .add("ordering_exprs", Expr.debugString(info.getOrderingExprs()))
+        .add("ordering_exprs", Expr.debugString(info_.getOrderingExprs()))
         .add("is_asc", "[" + Joiner.on(" ").join(strings) + "]")
-        .add("nulls_first", "[" + Joiner.on(" ").join(info.getNullsFirst()) + "]")
-        .add("offset", offset)
+        .add("nulls_first", "[" + Joiner.on(" ").join(info_.getNullsFirst()) + "]")
+        .add("offset_", offset_)
         .addValue(super.debugString())
         .toString();
   }
@@ -131,10 +131,10 @@ public class SortNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.SORT_NODE;
     msg.sort_node = new TSortNode(
-        Expr.treesToThrift(baseTblOrderingExprs_), info.getIsAscOrder(), useTopN,
-        isDefaultLimit);
-    msg.sort_node.setNulls_first(info.getNullsFirst());
-    msg.sort_node.setOffset(offset);
+        Expr.treesToThrift(baseTblOrderingExprs_), info_.getIsAscOrder(), useTopN_,
+        isDefaultLimit_);
+    msg.sort_node.setNulls_first(info_.getNullsFirst());
+    msg.sort_node.setOffset(offset_);
   }
 
   @Override
@@ -142,14 +142,14 @@ public class SortNode extends PlanNode {
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(detailPrefix + "order by: ");
-    for (int i = 0; i < info.getOrderingExprs().size(); ++i) {
+    for (int i = 0; i < info_.getOrderingExprs().size(); ++i) {
       if (i > 0) {
         output.append(", ");
       }
-      output.append(info.getOrderingExprs().get(i).toSql() + " ");
-      output.append(info.getIsAscOrder().get(i) ? "ASC" : "DESC");
+      output.append(info_.getOrderingExprs().get(i).toSql() + " ");
+      output.append(info_.getIsAscOrder().get(i) ? "ASC" : "DESC");
 
-      Boolean nullsFirstParam = info.getNullsFirstParams().get(i);
+      Boolean nullsFirstParam = info_.getNullsFirstParams().get(i);
       if (nullsFirstParam != null) {
         output.append(nullsFirstParam ? " NULLS FIRST" : " NULLS LAST");
       }
@@ -160,13 +160,13 @@ public class SortNode extends PlanNode {
 
   @Override
   protected String getOffsetExplainString(String prefix) {
-    return offset != 0 ? prefix + "offset: " + Long.toString(offset) + "\n" : "";
+    return offset_ != 0 ? prefix + "offset: " + Long.toString(offset_) + "\n" : "";
   }
 
   @Override
   public void computeCosts(TQueryOptions queryOptions) {
     Preconditions.checkState(hasValidStats());
-    Preconditions.checkState(useTopN);
-    perHostMemCost = (long) Math.ceil((cardinality + offset) * avgRowSize);
+    Preconditions.checkState(useTopN_);
+    perHostMemCost_ = (long) Math.ceil((cardinality_ + offset_) * avgRowSize_);
   }
 }

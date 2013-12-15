@@ -24,25 +24,25 @@ import com.cloudera.impala.thrift.TExplainLevel;
  *
  */
 public class DataStreamSink extends DataSink {
-  private final PlanNodeId exchNodeId;
-  private DataPartition outputPartition;
+  private final PlanNodeId exchNodeId_;
+  private DataPartition outputPartition_;
 
   public DataStreamSink(PlanNodeId exchNodeId) {
-    this.exchNodeId = exchNodeId;
+    exchNodeId_ = exchNodeId;
   }
 
   public void setPartition(DataPartition partition) {
-    outputPartition = partition;
+    outputPartition_ = partition;
   }
 
   @Override
   public String getExplainString(String prefix, TExplainLevel explainLevel) {
     StringBuilder strBuilder = new StringBuilder();
     strBuilder.append(prefix + "STREAM DATA SINK\n");
-    strBuilder.append(prefix + "  EXCHANGE ID: " + exchNodeId + "\n");
-    if (outputPartition != null) {
+    strBuilder.append(prefix + "  EXCHANGE ID: " + exchNodeId_ + "\n");
+    if (outputPartition_ != null) {
       strBuilder.append(prefix + "  "
-          + outputPartition.getExplainString(explainLevel));
+          + outputPartition_.getExplainString(explainLevel));
     }
     return strBuilder.toString();
   }
@@ -51,7 +51,7 @@ public class DataStreamSink extends DataSink {
   protected TDataSink toThrift() {
     TDataSink result = new TDataSink(TDataSinkType.DATA_STREAM_SINK);
     TDataStreamSink tStreamSink =
-        new TDataStreamSink(exchNodeId.asInt(), outputPartition.toThrift());
+        new TDataStreamSink(exchNodeId_.asInt(), outputPartition_.toThrift());
     result.setStream_sink(tStreamSink);
     return result;
   }

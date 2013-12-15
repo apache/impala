@@ -53,29 +53,29 @@ public class PlanFragment {
   private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
 
   // root of plan tree executed by this fragment
-  private PlanNode planRoot;
+  private PlanNode planRoot_;
 
   // fragment that consumes the output of this one
-  private PlanFragment destFragment;
+  private PlanFragment destFragment_;
 
-  // id of ExchangeNode to which this fragment sends its output
-  private PlanNodeId destNodeId;
+  // id_ of ExchangeNode to which this fragment sends its output
+  private PlanNodeId destNodeId_;
 
-  // if null, outputs the entire row produced by planRoot
-  private ArrayList<Expr> outputExprs;
+  // if null, outputs the entire row produced by planRoot_
+  private ArrayList<Expr> outputExprs_;
 
   // created in finalize() or set in setSink()
-  private DataSink sink;
+  private DataSink sink_;
 
   // specification of the partition of the input of this fragment;
   // an UNPARTITIONED fragment is executed on only a single node
   // TODO: improve this comment, "input" is a bit misleading
-  private final DataPartition dataPartition;
+  private final DataPartition dataPartition_;
 
   // specification of how the output of this fragment is partitioned (i.e., how
   // it's sent to its destination);
   // if the output is UNPARTITIONED, it is being broadcast
-  private DataPartition outputPartition;
+  private DataPartition outputPartition_;
 
   // TODO: SubstitutionMap outputSmap;
   // substitution map to remap exprs onto the output of this fragment, to be applied
@@ -85,21 +85,21 @@ public class PlanFragment {
    * C'tor for unpartitioned fragment that produces final output
    */
   public PlanFragment(PlanNode root, ArrayList<Expr> outputExprs) {
-    this.planRoot = root;
-    this.outputExprs = Expr.cloneList(outputExprs, null);
-    this.dataPartition = DataPartition.UNPARTITIONED;
-    this.outputPartition = this.dataPartition;
-    setFragmentInPlanTree(planRoot);
+    planRoot_ = root;
+    outputExprs_ = Expr.cloneList(outputExprs, null);
+    dataPartition_ = DataPartition.UNPARTITIONED;
+    outputPartition_ = this.dataPartition_;
+    setFragmentInPlanTree(planRoot_);
   }
 
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
    */
   public PlanFragment(PlanNode root, DataPartition partition) {
-    this.planRoot = root;
-    this.dataPartition = partition;
-    this.outputPartition = DataPartition.UNPARTITIONED;
-    setFragmentInPlanTree(planRoot);
+    planRoot_ = root;
+    dataPartition_ = partition;
+    outputPartition_ = DataPartition.UNPARTITIONED;
+    setFragmentInPlanTree(planRoot_);
   }
 
   /**
@@ -117,7 +117,7 @@ public class PlanFragment {
   }
 
   public void setOutputExprs(ArrayList<Expr> outputExprs) {
-    this.outputExprs = Expr.cloneList(outputExprs, null);
+    this.outputExprs_ = Expr.cloneList(outputExprs, null);
   }
 
   /**
@@ -125,20 +125,20 @@ public class PlanFragment {
    */
   public void finalize(Analyzer analyzer, boolean validateFileFormats)
       throws InternalException, NotImplementedException {
-    if (planRoot != null) setRowTupleIds(planRoot, null);
-    if (destNodeId != null) {
-      Preconditions.checkState(sink == null);
+    if (planRoot_ != null) setRowTupleIds(planRoot_, null);
+    if (destNodeId_ != null) {
+      Preconditions.checkState(sink_ == null);
       // we're streaming to an exchange node
-      DataStreamSink streamSink = new DataStreamSink(destNodeId);
-      streamSink.setPartition(outputPartition);
+      DataStreamSink streamSink = new DataStreamSink(destNodeId_);
+      streamSink.setPartition(outputPartition_);
       streamSink.setFragment(this);
-      sink = streamSink;
+      sink_ = streamSink;
     }
 
-    if (planRoot != null && validateFileFormats) {
+    if (planRoot_ != null && validateFileFormats) {
       // verify that after partition pruning hdfs partitions only use supported formats
       ArrayList<HdfsScanNode> hdfsScans = Lists.newArrayList();
-      planRoot.collectSubclasses(HdfsScanNode.class, hdfsScans);
+      planRoot_.collectSubclasses(HdfsScanNode.class, hdfsScans);
       for (HdfsScanNode hdfsScanNode: hdfsScans) {
         hdfsScanNode.validateFileFormat();
       }
@@ -150,7 +150,7 @@ public class PlanFragment {
    * invalid: -1
    */
   public int getNumNodes() {
-    return dataPartition == DataPartition.UNPARTITIONED ? 1 : planRoot.getNumNodes();
+    return dataPartition_ == DataPartition.UNPARTITIONED ? 1 : planRoot_.getNumNodes();
   }
 
   /**
@@ -161,10 +161,10 @@ public class PlanFragment {
   private void setRowTupleIds(PlanNode node, ArrayList<TupleId> parentRowTupleIds) {
     if (parentRowTupleIds != null) {
       // we don't output less than we materialize
-      Preconditions.checkState(parentRowTupleIds.containsAll(node.tupleIds));
-      node.rowTupleIds = parentRowTupleIds;
+      Preconditions.checkState(parentRowTupleIds.containsAll(node.tupleIds_));
+      node.rowTupleIds_ = parentRowTupleIds;
     } else {
-      node.rowTupleIds = node.tupleIds;
+      node.rowTupleIds_ = node.tupleIds_;
     }
 
     if (node instanceof ScanNode || node instanceof ExchangeNode) {
@@ -178,16 +178,16 @@ public class PlanFragment {
     } else if (node instanceof SortNode) {
       Preconditions.checkState(node.getChildren().size() == 1);
       // top-n only materializes rows as wide as the input
-      node.rowTupleIds = node.tupleIds;
+      node.rowTupleIds_ = node.tupleIds_;
       setRowTupleIds(node.getChild(0), null);
     } else if (node instanceof SelectNode) {
       // propagate parent's row composition to child
       Preconditions.checkState(node.getChildren().size() == 1);
-      setRowTupleIds(node.getChild(0), node.rowTupleIds);
+      setRowTupleIds(node.getChild(0), node.rowTupleIds_);
     } else if (node instanceof HashJoinNode || node instanceof CrossJoinNode) {
       // propagate parent's row composition only to left child
       Preconditions.checkState(node.getChildren().size() == 2);
-      setRowTupleIds(node.getChild(0), node.rowTupleIds);
+      setRowTupleIds(node.getChild(0), node.rowTupleIds_);
       setRowTupleIds(node.getChild(1), null);
     }
   }
@@ -198,7 +198,7 @@ public class PlanFragment {
    * estimate, e.g., because getNumDistinctValues() failed on one of the exprs.
    */
   public long getNumDistinctValues(List<Expr> exprs) {
-    Preconditions.checkNotNull(dataPartition);
+    Preconditions.checkNotNull(dataPartition_);
     long result = 1;
     int numNodes = getNumNodes();
     Preconditions.checkState(numNodes >= 0);
@@ -210,7 +210,7 @@ public class PlanFragment {
         result = -1;
         break;
       }
-      if (dataPartition.getPartitionExprs().contains(expr)) {
+      if (dataPartition_.getPartitionExprs().contains(expr)) {
         result *= Math.max((double) numDistinct / (double) numNodes, 1L);
       } else {
         result *= numDistinct;
@@ -222,59 +222,59 @@ public class PlanFragment {
   public TPlanFragment toThrift() {
     TPlanFragment result = new TPlanFragment();
     // TODO: remove logging output
-    if (planRoot != null) result.setPlan(planRoot.treeToThrift());
-    if (outputExprs != null) {
-      result.setOutput_exprs(Expr.treesToThrift(outputExprs));
+    if (planRoot_ != null) result.setPlan(planRoot_.treeToThrift());
+    if (outputExprs_ != null) {
+      result.setOutput_exprs(Expr.treesToThrift(outputExprs_));
     }
-    if (sink != null) result.setOutput_sink(sink.toThrift());
-    if (dataPartition.getPartitionExprs() != null) {
+    if (sink_ != null) result.setOutput_sink(sink_.toThrift());
+    if (dataPartition_.getPartitionExprs() != null) {
       List<Expr> c =
-          Expr.cloneList(dataPartition.getPartitionExprs(), planRoot.getBaseTblSmap());
+          Expr.cloneList(dataPartition_.getPartitionExprs(), planRoot_.getBaseTblSmap());
     }
-    result.setPartition(dataPartition.toThrift());
+    result.setPartition(dataPartition_.toThrift());
     return result;
   }
 
   public String getExplainString(TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
-    Preconditions.checkState(dataPartition != null);
-    str.append("  PARTITION: " + dataPartition.getExplainString(explainLevel) + "\n");
-    if (sink != null) str.append(sink.getExplainString("  ", explainLevel) + "\n");
-    if (planRoot != null) str.append(planRoot.getExplainString("  ", "  ", explainLevel));
+    Preconditions.checkState(dataPartition_ != null);
+    str.append("  PARTITION: " + dataPartition_.getExplainString(explainLevel) + "\n");
+    if (sink_ != null) str.append(sink_.getExplainString("  ", explainLevel) + "\n");
+    if (planRoot_ != null) str.append(planRoot_.getExplainString("  ", "  ", explainLevel));
     return str.toString();
   }
 
   /** Returns true if this fragment is partitioned. */
   public boolean isPartitioned() {
-    return (dataPartition.getType() != TPartitionType.UNPARTITIONED);
+    return (dataPartition_.getType() != TPartitionType.UNPARTITIONED);
   }
 
-  public PlanFragment getDestFragment() { return destFragment; }
-  public PlanNodeId getDestNodeId() { return destNodeId; }
-  public DataPartition getDataPartition() { return dataPartition; }
-  public DataPartition getOutputPartition() { return outputPartition; }
+  public PlanFragment getDestFragment() { return destFragment_; }
+  public PlanNodeId getDestNodeId() { return destNodeId_; }
+  public DataPartition getDataPartition() { return dataPartition_; }
+  public DataPartition getOutputPartition() { return outputPartition_; }
   public void setOutputPartition(DataPartition outputPartition) {
-    this.outputPartition = outputPartition;
+    this.outputPartition_ = outputPartition;
   }
-  public PlanNode getPlanRoot() { return planRoot; }
+  public PlanNode getPlanRoot() { return planRoot_; }
   public void setPlanRoot(PlanNode root) {
-    planRoot = root;
-    setFragmentInPlanTree(planRoot);
+    planRoot_ = root;
+    setFragmentInPlanTree(planRoot_);
   }
 
   public void setDestination(PlanFragment fragment, PlanNodeId exchangeId) {
-    destFragment = fragment;
-    destNodeId = exchangeId;
+    destFragment_ = fragment;
+    destNodeId_ = exchangeId;
     // TODO: check that fragment contains node w/ exchangeId
   }
 
-  public boolean hasSink() { return sink != null; }
-  public DataSink getSink() { return sink; }
+  public boolean hasSink() { return sink_ != null; }
+  public DataSink getSink() { return sink_; }
   public void setSink(DataSink sink) {
-    Preconditions.checkState(this.sink == null);
+    Preconditions.checkState(this.sink_ == null);
     Preconditions.checkNotNull(sink);
     sink.setFragment(this);
-    this.sink = sink;
+    this.sink_ = sink;
   }
 
   /**
@@ -283,8 +283,8 @@ public class PlanFragment {
    */
   public void addPlanRoot(PlanNode newRoot) {
     Preconditions.checkState(newRoot.getChildren().size() == 1);
-    newRoot.setChild(0, planRoot);
-    planRoot = newRoot;
-    planRoot.setFragment(this);
+    newRoot.setChild(0, planRoot_);
+    planRoot_ = newRoot;
+    planRoot_.setFragment(this);
   }
 }

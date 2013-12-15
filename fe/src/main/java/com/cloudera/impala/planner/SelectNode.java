@@ -34,8 +34,8 @@ public class SelectNode extends PlanNode {
     super(id, child.getTupleIds(), "SELECT");
     addChild(child);
     this.tblRefIds_ = child.tblRefIds_;
-    this.rowTupleIds = child.rowTupleIds;
-    this.nullableTupleIds = child.nullableTupleIds;
+    this.rowTupleIds_ = child.rowTupleIds_;
+    this.nullableTupleIds_ = child.nullableTupleIds_;
   }
 
   @Override
@@ -46,21 +46,21 @@ public class SelectNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    if (getChild(0).cardinality == -1) {
-      cardinality = -1;
+    if (getChild(0).cardinality_ == -1) {
+      cardinality_ = -1;
     } else {
-      cardinality = Math.round(((double) getChild(0).cardinality) * computeSelectivity());
-      Preconditions.checkState(cardinality >= 0);
+      cardinality_ = Math.round(((double) getChild(0).cardinality_) * computeSelectivity());
+      Preconditions.checkState(cardinality_ >= 0);
     }
-    LOG.debug("stats Select: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats Select: cardinality=" + Long.toString(cardinality_));
   }
 
   @Override
   protected String getNodeExplainString(String prefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    if (!conjuncts.isEmpty()) {
-      output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
+    if (!conjuncts_.isEmpty()) {
+      output.append(prefix + "predicates: " + getExplainString(conjuncts_) + "\n");
     }
     return output.toString();
   }

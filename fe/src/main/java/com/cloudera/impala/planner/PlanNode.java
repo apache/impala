@@ -50,9 +50,9 @@ import com.google.common.collect.Sets;
  * be materialized (ie, can be evaluated by calling GetValue(), rather than being
  * implicitly evaluated as part of a scan key).
  *
- * conjuncts: Each node has a list of conjuncts that can be executed in the context of
+ * conjuncts_: Each node has a list of conjuncts that can be executed in the context of
  * this node, ie, they only reference tuples materialized by this node or one of
- * its children (= are bound by tupleIds).
+ * its children (= are bound by tupleIds_).
  */
 abstract public class PlanNode extends TreeNode<PlanNode> {
   private final static Logger LOG = LoggerFactory.getLogger(PlanNode.class);
@@ -61,38 +61,38 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected final static int DEFAULT_BATCH_SIZE = 1024;
 
   // String used for this node in getExplainString().
-  protected String displayName;
+  protected String displayName_;
 
   // unique w/in plan tree; assigned by planner, and not necessarily in c'tor
-  protected PlanNodeId id;
+  protected PlanNodeId id_;
 
-  protected long limit; // max. # of rows to be returned; 0: no limit
+  protected long limit_; // max. # of rows to be returned; 0: no limit_
 
   // ids materialized by the tree rooted at this node
-  protected ArrayList<TupleId> tupleIds;
+  protected ArrayList<TupleId> tupleIds_;
 
-  // ids of the TblRefs "materialized" by this node; identical with tupleIds
+  // ids of the TblRefs "materialized" by this node; identical with tupleIds_
   // if the tree rooted at this node only materializes BaseTblRefs;
   // useful for during plan generation
   protected ArrayList<TupleId> tblRefIds_;
 
-  // Composition of rows produced by this node. Possibly a superset of tupleIds
+  // Composition of rows produced by this node. Possibly a superset of tupleIds_
   // (the same RowBatch passes through multiple nodes; for instances, join nodes
   // form a left-deep chain and pass RowBatches on to their left children).
-  // rowTupleIds[0] is the first tuple in the row, rowTupleIds[1] the second, etc.
+  // rowTupleIds_[0] is the first tuple in the row, rowTupleIds_[1] the second, etc.
   // Set in PlanFragment.finalize()
-  protected ArrayList<TupleId> rowTupleIds = Lists.newArrayList();
+  protected ArrayList<TupleId> rowTupleIds_ = Lists.newArrayList();
 
-  // A set of nullable TupleId produced by this node. It is a subset of tupleIds.
+  // A set of nullable TupleId produced by this node. It is a subset of tupleIds_.
   // A tuple is nullable within a particular plan tree if it's the "nullable" side of
   // an outer join, which has nothing to do with the schema.
-  protected Set<TupleId> nullableTupleIds = Sets.newHashSet();
+  protected Set<TupleId> nullableTupleIds_ = Sets.newHashSet();
 
-  protected List<Expr> conjuncts = Lists.newArrayList();
+  protected List<Expr> conjuncts_ = Lists.newArrayList();
 
   // Fragment that this PlanNode is executed in. Valid only after this PlanNode has been
   // assigned to a fragment. Set and maintained by enclosing PlanFragment.
-  protected PlanFragment fragment;
+  protected PlanFragment fragment_;
 
   // if set, needs to be applied by parent node to reference this node's output
   protected Expr.SubstitutionMap baseTblSmap_;
@@ -105,86 +105,86 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   // estimate of the output cardinality of this node; set in computeStats();
   // invalid: -1
-  protected long cardinality;
+  protected long cardinality_;
 
   // number of nodes on which the plan tree rooted at this node would execute;
   // set in computeStats(); invalid: -1
-  protected int numNodes;
+  protected int numNodes_;
 
-  // sum of tupleIds' avgSerializedSizes; set in computeStats()
-  protected float avgRowSize;
+  // sum of tupleIds_' avgSerializedSizes; set in computeStats()
+  protected float avgRowSize_;
 
   //  Node should compact data.
-  protected boolean compactData;
+  protected boolean compactData_;
 
   // estimated per-host memory requirement for this node;
   // set in computeCosts(); invalid: -1
-  protected long perHostMemCost = -1;
+  protected long perHostMemCost_ = -1;
 
   protected PlanNode(PlanNodeId id, ArrayList<TupleId> tupleIds, String displayName) {
-    this.id = id;
-    this.limit = -1;
+    id_ = id;
+    limit_ = -1;
     // make a copy, just to be on the safe side
-    this.tupleIds = Lists.newArrayList(tupleIds);
-    this.tblRefIds_ = Lists.newArrayList(tupleIds);
-    this.cardinality = -1;
-    this.numNodes = -1;
-    this.displayName = displayName;
+    tupleIds_ = Lists.newArrayList(tupleIds);
+    tblRefIds_ = Lists.newArrayList(tupleIds);
+    cardinality_ = -1;
+    numNodes_ = -1;
+    displayName_ = displayName;
   }
 
   /**
-   * Deferred id assignment.
+   * Deferred id_ assignment.
    */
   protected PlanNode(String displayName) {
-    this.limit = -1;
-    this.tupleIds = Lists.newArrayList();
-    this.tblRefIds_ = Lists.newArrayList();
-    this.cardinality = -1;
-    this.numNodes = -1;
-    this.displayName = displayName;
+    limit_ = -1;
+    tupleIds_ = Lists.newArrayList();
+    tblRefIds_ = Lists.newArrayList();
+    cardinality_ = -1;
+    numNodes_ = -1;
+    displayName_ = displayName;
   }
 
   protected PlanNode(PlanNodeId id, String displayName) {
-    this.id = id;
-    this.limit = -1;
-    this.tupleIds = Lists.newArrayList();
-    this.tblRefIds_ = Lists.newArrayList();
-    this.cardinality = -1;
-    this.numNodes = -1;
-    this.displayName = displayName;
+    id_ = id;
+    limit_ = -1;
+    tupleIds_ = Lists.newArrayList();
+    tblRefIds_ = Lists.newArrayList();
+    cardinality_ = -1;
+    numNodes_ = -1;
+    displayName_ = displayName;
   }
 
   /**
-   * Copy c'tor. Also passes in new id.
+   * Copy c'tor. Also passes in new id_.
    */
   protected PlanNode(PlanNodeId id, PlanNode node, String displayName) {
-    this.id = id;
-    this.limit = node.limit;
-    this.tupleIds = Lists.newArrayList(node.tupleIds);
-    this.tblRefIds_ = Lists.newArrayList(node.tblRefIds_);
-    this.rowTupleIds = Lists.newArrayList(node.rowTupleIds);
-    this.nullableTupleIds = Sets.newHashSet(node.nullableTupleIds);
-    this.conjuncts = Expr.cloneList(node.conjuncts, null);
-    this.cardinality = -1;
-    this.numNodes = -1;
-    this.compactData = node.compactData;
-    this.displayName = displayName;
+    id_ = id;
+    limit_ = node.limit_;
+    tupleIds_ = Lists.newArrayList(node.tupleIds_);
+    tblRefIds_ = Lists.newArrayList(node.tblRefIds_);
+    rowTupleIds_ = Lists.newArrayList(node.rowTupleIds_);
+    nullableTupleIds_ = Sets.newHashSet(node.nullableTupleIds_);
+    conjuncts_ = Expr.cloneList(node.conjuncts_, null);
+    cardinality_ = -1;
+    numNodes_ = -1;
+    compactData_ = node.compactData_;
+    displayName_ = displayName;
   }
 
-  public PlanNodeId getId() { return id; }
+  public PlanNodeId getId() { return id_; }
   public void setId(PlanNodeId id) {
-    Preconditions.checkState(this.id == null);
-    this.id = id;
+    Preconditions.checkState(id_ == null);
+    id_ = id;
   }
-  public long getLimit() { return limit; }
-  public boolean hasLimit() { return limit > -1; }
-  public long getPerHostMemCost() { return perHostMemCost; }
-  public long getCardinality() { return cardinality; }
-  public int getNumNodes() { return numNodes; }
-  public float getAvgRowSize() { return avgRowSize; }
-  public void setFragment(PlanFragment fragment) { this.fragment = fragment; }
-  public PlanFragment getFragment() { return fragment; }
-  public List<Expr> getConjuncts() { return conjuncts; }
+  public long getLimit() { return limit_; }
+  public boolean hasLimit() { return limit_ > -1; }
+  public long getPerHostMemCost() { return perHostMemCost_; }
+  public long getCardinality() { return cardinality_; }
+  public int getNumNodes() { return numNodes_; }
+  public float getAvgRowSize() { return avgRowSize_; }
+  public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
+  public PlanFragment getFragment() { return fragment_; }
+  public List<Expr> getConjuncts() { return conjuncts_; }
   public Expr.SubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
   public void setBaseTblSmap(Expr.SubstitutionMap sMap) { baseTblSmap_ = sMap; }
   public Set<ExprId> getAssignedConjuncts() { return assignedConjuncts_; }
@@ -192,58 +192,58 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     assignedConjuncts_ = conjuncts;
   }
 
-  /** Set the value of compactData in all children. */
+  /** Set the value of compactData_ in all children. */
   public void setCompactData(boolean on) {
-    this.compactData = on;
+    compactData_ = on;
     for (PlanNode child: this.getChildren()) {
       child.setCompactData(on);
     }
   }
 
   /**
-   * Set the limit to the given limit only if the limit hasn't been set, or the new limit
+   * Set the limit_ to the given limit_ only if the limit_ hasn't been set, or the new limit_
    * is lower.
-   * @param limit
+   * @param limit_
    */
   public void setLimit(long limit) {
-    if (this.limit == -1 || (limit != -1 && this.limit > limit)) this.limit = limit;
+    if (limit_ == -1 || (limit != -1 && limit_ > limit)) limit_ = limit;
   }
 
-  public void unsetLimit() { limit = -1; }
+  public void unsetLimit() { limit_ = -1; }
 
   public ArrayList<TupleId> getTupleIds() {
-    Preconditions.checkState(tupleIds != null);
-    return tupleIds;
+    Preconditions.checkState(tupleIds_ != null);
+    return tupleIds_;
   }
 
   public ArrayList<TupleId> getTblRefIds() { return tblRefIds_; }
   public void setTblRefIds(ArrayList<TupleId> ids) { tblRefIds_ = ids; }
 
   public ArrayList<TupleId> getRowTupleIds() {
-    Preconditions.checkState(rowTupleIds != null);
-    return rowTupleIds;
+    Preconditions.checkState(rowTupleIds_ != null);
+    return rowTupleIds_;
   }
 
   public Set<TupleId> getNullableTupleIds() {
-    Preconditions.checkState(nullableTupleIds != null);
-    return nullableTupleIds;
+    Preconditions.checkState(nullableTupleIds_ != null);
+    return nullableTupleIds_;
   }
 
   public void addConjuncts(List<Expr> conjuncts) {
     if (conjuncts == null)  return;
-    this.conjuncts.addAll(conjuncts);
+    conjuncts_.addAll(conjuncts);
   }
 
   public void transferConjuncts(PlanNode recipient) {
-    recipient.conjuncts.addAll(conjuncts);
-    conjuncts.clear();
+    recipient.conjuncts_.addAll(conjuncts_);
+    conjuncts_.clear();
   }
 
   public String getExplainString() {
     return getExplainString("", "", TExplainLevel.NORMAL);
   }
 
-  protected void setDisplayName(String s) { displayName = s; }
+  protected void setDisplayName(String s) { displayName_ = s; }
 
   /**
    * Generate the explain plan tree. The plan will be in the form of:
@@ -279,22 +279,22 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // Print the current node
     // The plan node header line will be prefixed by rootPrefix and the remaining details
     // will be prefixed by detailPrefix.
-    expBuilder.append(rootPrefix + id.asInt() + ":" + displayName + "\n");
+    expBuilder.append(rootPrefix + id_.asInt() + ":" + displayName_ + "\n");
     expBuilder.append(getNodeExplainString(detailPrefix, detailLevel));
-    if (limit != -1) expBuilder.append(detailPrefix + "limit: " + limit + "\n");
+    if (limit_ != -1) expBuilder.append(detailPrefix + "limit: " + limit_ + "\n");
     expBuilder.append(getOffsetExplainString(detailPrefix));
 
     // Output cardinality, cost estimates and tuple Ids only when explain plan level
     // is set to verbose
     if (detailLevel.equals(TExplainLevel.VERBOSE)) {
       // Print estimated output cardinality and memory cost.
-      expBuilder.append(PrintUtils.printCardinality(detailPrefix, cardinality) + "\n");
-      expBuilder.append(PrintUtils.printMemCost(detailPrefix, perHostMemCost) + "\n");
+      expBuilder.append(PrintUtils.printCardinality(detailPrefix, cardinality_) + "\n");
+      expBuilder.append(PrintUtils.printMemCost(detailPrefix, perHostMemCost_) + "\n");
 
       // Print tuple ids.
      expBuilder.append(detailPrefix + "tuple ids: ");
-      for (TupleId tupleId: tupleIds) {
-        String nullIndicator = nullableTupleIds.contains(tupleId) ? "N" : "";
+      for (TupleId tupleId: tupleIds_) {
+        String nullIndicator = nullableTupleIds_.contains(tupleId) ? "N" : "";
         expBuilder.append(tupleId.asInt() + nullIndicator + " ");
       }
       expBuilder.append("\n");
@@ -327,7 +327,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /**
-   * Return the offset details, if applicable. This is available separately from
+   * Return the offset_ details, if applicable. This is available separately from
    * 'getNodeExplainString' because we want to output 'limit: ...' (which can be printed
    * from PlanNode) before 'offset: ...', which is only printed from SortNodes right
    * now.
@@ -346,16 +346,16 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // Append a flattened version of this plan node, including all children, to 'container'.
   private void treeToThriftHelper(TPlan container) {
     TPlanNode msg = new TPlanNode();
-    msg.node_id = id.asInt();
-    msg.limit = limit;
-    for (TupleId tid: rowTupleIds) {
+    msg.node_id = id_.asInt();
+    msg.limit = limit_;
+    for (TupleId tid: rowTupleIds_) {
       msg.addToRow_tuples(tid.asInt());
-      msg.addToNullable_tuples(nullableTupleIds.contains(tid));
+      msg.addToNullable_tuples(nullableTupleIds_.contains(tid));
     }
-    for (Expr e: conjuncts) {
+    for (Expr e: conjuncts_) {
       msg.addToConjuncts(e.treeToThrift());
     }
-    msg.compact_data = compactData;
+    msg.compact_data = compactData_;
     toThrift(msg);
     container.addToNodes(msg);
     // For the purpose of the BE consider ExchangeNodes to have no children.
@@ -390,7 +390,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   protected void assignConjuncts(Analyzer analyzer) {
     List<Expr> unassigned = analyzer.getUnassignedConjuncts(this);
-    conjuncts.addAll(unassigned);
+    conjuncts_.addAll(unassigned);
     analyzer.markConjunctsAssigned(unassigned);
   }
 
@@ -410,16 +410,16 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   /**
    * Sets baseTblSmap to compose(existing smap, combined child smap). Also
-   * substitutes 'conjuncts' using the combined child smap.
+   * substitutes conjuncts_ using the combined child smap.
    */
   protected void createDefaultSmap() {
     Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
     baseTblSmap_ = Expr.SubstitutionMap.compose(baseTblSmap_, combinedChildSmap);
-    conjuncts = Expr.cloneList(conjuncts, combinedChildSmap);
+    conjuncts_ = Expr.cloneList(conjuncts_, combinedChildSmap);
   }
 
   /**
-   * Computes planner statistics: avgRowSize, numNodes, cardinality.
+   * Computes planner statistics: avgRowSize_, numNodes_, cardinality_.
    * Subclasses need to override this.
    * Assumes that it has already been called on all children.
    * and that DescriptorTable.computePhysMemLayout() has been called.
@@ -428,12 +428,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * partitioning w/o the need to call init() recursively on the whole tree again).
    */
   protected void computeStats(Analyzer analyzer) {
-    avgRowSize = 0.0F;
-    for (TupleId tid: tupleIds) {
+    avgRowSize_ = 0.0F;
+    for (TupleId tid: tupleIds_) {
       TupleDescriptor desc = analyzer.getTupleDesc(tid);
-      avgRowSize += desc.getAvgSerializedSize();
+      avgRowSize_ += desc.getAvgSerializedSize();
     }
-    if (!children.isEmpty()) numNodes = getChild(0).numNodes;
+    if (!children.isEmpty()) numNodes_ = getChild(0).numNodes_;
   }
 
   /**
@@ -451,7 +451,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Call computeMemLayout() for all materialized tuples.
    */
   protected void computeMemLayout(Analyzer analyzer) {
-    for (TupleId id: tupleIds) {
+    for (TupleId id: tupleIds_) {
       analyzer.getDescTbl().getTupleDesc(id).computeMemLayout();
     }
   }
@@ -461,7 +461,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   protected double computeSelectivity() {
     double prod = 1.0;
-    for (Expr e: conjuncts) {
+    for (Expr e: conjuncts_) {
       if (e.getSelectivity() < 0) continue;
       prod *= e.getSelectivity();
     }
@@ -476,8 +476,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // not using Objects.toStrHelper because
     // PlanNode.debugString() is embedded by debug strings of the subclasses
     StringBuilder output = new StringBuilder();
-    output.append("preds=" + Expr.debugString(conjuncts));
-    output.append(" limit=" + Long.toString(limit));
+    output.append("preds=" + Expr.debugString(conjuncts_));
+    output.append(" limit=" + Long.toString(limit_));
     return output.toString();
   }
 
@@ -495,7 +495,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Returns true if stats-related variables are valid.
    */
   protected boolean hasValidStats() {
-    return (numNodes == -1 || numNodes >= 0) && (cardinality == -1 || cardinality >= 0);
+    return (numNodes_ == -1 || numNodes_ >= 0) && (cardinality_ == -1 || cardinality_ >= 0);
   }
 
   /**
@@ -506,12 +506,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public boolean isBlockingNode() { return false; }
 
   /**
-   * Estimates the cost of executing this PlanNode. Currently only sets perHostMemCost.
+   * Estimates the cost of executing this PlanNode. Currently only sets perHostMemCost_.
    * May only be called after this PlanNode has been placed in a PlanFragment because
    * the cost computation is dependent on the enclosing fragment's data partition.
    */
   public void computeCosts(TQueryOptions queryOptions) {
-    perHostMemCost = 0;
+    perHostMemCost_ = 0;
   }
 
 }

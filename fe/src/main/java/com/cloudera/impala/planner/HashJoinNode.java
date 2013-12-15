@@ -52,8 +52,8 @@ public class HashJoinNode extends PlanNode {
   // TODO: Come up with a more useful heuristic (e.g., based on scanned partitions).
   private final static long DEFAULT_PER_HOST_MEM = 2L * 1024L * 1024L * 1024L;
 
-  private final TableRef innerRef;
-  private final JoinOperator joinOp;
+  private final TableRef innerRef_;
+  private final JoinOperator joinOp_;
 
   enum DistributionMode {
     NONE("NONE"),
@@ -70,13 +70,13 @@ public class HashJoinNode extends PlanNode {
     public String toString() { return description; }
   }
 
-  private DistributionMode distrMode;
+  private DistributionMode distrMode_;
 
-  // conjuncts of the form "<lhs> = <rhs>", recorded as Pair(<lhs>, <rhs>)
-  private List<Pair<Expr, Expr> > eqJoinConjuncts;
+  // conjuncts_ of the form "<lhs> = <rhs>", recorded as Pair(<lhs>, <rhs>)
+  private List<Pair<Expr, Expr> > eqJoinConjuncts_;
 
-  // join conjuncts from the JOIN clause that aren't equi-join predicates
-  private List<Expr> otherJoinConjuncts;
+  // join conjuncts_ from the JOIN clause that aren't equi-join predicates
+  private List<Expr> otherJoinConjuncts_;
 
   public HashJoinNode(
       PlanNode outer, PlanNode inner, TableRef innerRef,
@@ -84,60 +84,58 @@ public class HashJoinNode extends PlanNode {
     super("HASH JOIN");
     Preconditions.checkArgument(eqJoinConjuncts != null);
     Preconditions.checkArgument(otherJoinConjuncts != null);
-    tupleIds.addAll(outer.getTupleIds());
-    tupleIds.addAll(inner.getTupleIds());
+    tupleIds_.addAll(outer.getTupleIds());
+    tupleIds_.addAll(inner.getTupleIds());
     tblRefIds_.addAll(outer.getTblRefIds());
     tblRefIds_.addAll(inner.getTblRefIds());
-    this.innerRef = innerRef;
-    this.joinOp = innerRef.getJoinOp();
-    this.distrMode = DistributionMode.NONE;
-    this.eqJoinConjuncts = eqJoinConjuncts;
-    this.otherJoinConjuncts = otherJoinConjuncts;
+    innerRef_ = innerRef;
+    joinOp_ = innerRef.getJoinOp();
+    distrMode_ = DistributionMode.NONE;
+    eqJoinConjuncts_ = eqJoinConjuncts;
+    otherJoinConjuncts_ = otherJoinConjuncts;
     children.add(outer);
     children.add(inner);
 
     // Inherits all the nullable tuple from the children
     // Mark tuples that form the "nullable" side of the outer join as nullable.
-    nullableTupleIds.addAll(inner.getNullableTupleIds());
-    nullableTupleIds.addAll(outer.getNullableTupleIds());
-    if (joinOp.equals(JoinOperator.FULL_OUTER_JOIN)) {
-      nullableTupleIds.addAll(outer.getTupleIds());
-      nullableTupleIds.addAll(inner.getTupleIds());
-    } else if (joinOp.equals(JoinOperator.LEFT_OUTER_JOIN)) {
-      nullableTupleIds.addAll(inner.getTupleIds());
-    } else if (joinOp.equals(JoinOperator.RIGHT_OUTER_JOIN)) {
-      nullableTupleIds.addAll(outer.getTupleIds());
+    nullableTupleIds_.addAll(inner.getNullableTupleIds());
+    nullableTupleIds_.addAll(outer.getNullableTupleIds());
+    if (joinOp_.equals(JoinOperator.FULL_OUTER_JOIN)) {
+      nullableTupleIds_.addAll(outer.getTupleIds());
+      nullableTupleIds_.addAll(inner.getTupleIds());
+    } else if (joinOp_.equals(JoinOperator.LEFT_OUTER_JOIN)) {
+      nullableTupleIds_.addAll(inner.getTupleIds());
+    } else if (joinOp_.equals(JoinOperator.RIGHT_OUTER_JOIN)) {
+      nullableTupleIds_.addAll(outer.getTupleIds());
     }
   }
 
-  public List<Pair<Expr, Expr>> getEqJoinConjuncts() { return eqJoinConjuncts; }
-  public JoinOperator getJoinOp() { return joinOp; }
-  public TableRef getInnerRef() { return innerRef; }
-  public DistributionMode getDistributionMode() { return distrMode; }
-  public void setDistributionMode(DistributionMode distrMode) {
-    this.distrMode = distrMode;
-  }
+  public List<Pair<Expr, Expr>> getEqJoinConjuncts() { return eqJoinConjuncts_; }
+  public JoinOperator getJoinOp() { return joinOp_; }
+  public TableRef getInnerRef() { return innerRef_; }
+  public DistributionMode getDistributionMode() { return distrMode_; }
+  public void setDistributionMode(DistributionMode distrMode) { distrMode_ = distrMode; }
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
 
-    // Set smap to the combined childrens' smaps and apply that to all conjuncts.
+    // Set smap to the combined childrens' smaps and apply that to all conjuncts_.
     createDefaultSmap();
 
     computeStats(analyzer);
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
 
     Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
-    otherJoinConjuncts = Expr.cloneList(otherJoinConjuncts, combinedChildSmap);
+    otherJoinConjuncts_ = Expr.cloneList(otherJoinConjuncts_, combinedChildSmap);
     List<Pair<Expr, Expr>> newEqJoinConjuncts = Lists.newArrayList();
-    for (Pair<Expr, Expr> c: eqJoinConjuncts) {
+    for (Pair<Expr, Expr> c: eqJoinConjuncts_) {
       Pair<Expr, Expr> p =
           new Pair(c.first.clone(combinedChildSmap), c.second.clone(combinedChildSmap));
       newEqJoinConjuncts.add(
           new Pair(c.first.clone(combinedChildSmap), c.second.clone(combinedChildSmap)));
     }
-    eqJoinConjuncts = newEqJoinConjuncts;
+    eqJoinConjuncts_ = newEqJoinConjuncts;
   }
 
   @Override
@@ -167,7 +165,7 @@ public class HashJoinNode extends PlanNode {
     // - the output cardinality of the join would be F.cardinality * 0.2
 
     long maxNumDistinct = 0;
-    for (Pair<Expr, Expr> eqJoinPredicate: eqJoinConjuncts) {
+    for (Pair<Expr, Expr> eqJoinPredicate: eqJoinConjuncts_) {
       if (eqJoinPredicate.first.unwrapSlotRef(false) == null) continue;
       SlotRef rhsSlotRef = eqJoinPredicate.second.unwrapSlotRef(false);
       if (rhsSlotRef == null) continue;
@@ -184,10 +182,10 @@ public class HashJoinNode extends PlanNode {
             + Long.toString(rhsTbl.getNumRows()));
         numDistinct = Math.min(numDistinct, rhsTbl.getNumRows());
       }
-      if (getChild(1).cardinality != -1 && numDistinct != -1) {
-        // The number of distinct values of a slot cannot exceed the cardinality
+      if (getChild(1).cardinality_ != -1 && numDistinct != -1) {
+        // The number of distinct values of a slot cannot exceed the cardinality_
         // of the plan node the slot is coming from.
-        numDistinct = Math.min(numDistinct, getChild(1).cardinality);
+        numDistinct = Math.min(numDistinct, getChild(1).cardinality_);
       }
       maxNumDistinct = Math.max(maxNumDistinct, numDistinct);
       LOG.debug("min slotref=" + rhsSlotRef.toSql() + " #distinct="
@@ -198,57 +196,57 @@ public class HashJoinNode extends PlanNode {
       // if we didn't find any suitable join predicates or don't have stats
       // on the relevant columns, we very optimistically assume we're doing an
       // FK/PK join (which doesn't alter the cardinality of the left-hand side)
-      cardinality = getChild(0).cardinality;
-    } else if (getChild(0).cardinality != -1 && getChild(1).cardinality != -1) {
-      cardinality = Math.round(
-          (double) getChild(0).cardinality
-            * (double) getChild(1).cardinality / (double) maxNumDistinct);
+      cardinality_ = getChild(0).cardinality_;
+    } else if (getChild(0).cardinality_ != -1 && getChild(1).cardinality_ != -1) {
+      cardinality_ = Math.round(
+          (double) getChild(0).cardinality_
+            * (double) getChild(1).cardinality_ / (double) maxNumDistinct);
     }
 
     // Impose lower/upper bounds on the cardinality based on the join type.
-    switch (joinOp) {
+    switch (joinOp_) {
       case LEFT_SEMI_JOIN: {
-        if (getChild(0).cardinality != -1) {
-          cardinality = Math.min(getChild(0).cardinality, cardinality);
+        if (getChild(0).cardinality_ != -1) {
+          cardinality_ = Math.min(getChild(0).cardinality_, cardinality_);
         }
         break;
       }
       case LEFT_OUTER_JOIN: {
-        if (getChild(0).cardinality != -1) {
-          cardinality = Math.max(getChild(0).cardinality, cardinality);
+        if (getChild(0).cardinality_ != -1) {
+          cardinality_ = Math.max(getChild(0).cardinality_, cardinality_);
         }
         break;
       }
       case RIGHT_OUTER_JOIN: {
-        if (getChild(1).cardinality != -1) {
-          cardinality = Math.max(getChild(1).cardinality, cardinality);
+        if (getChild(1).cardinality_ != -1) {
+          cardinality_ = Math.max(getChild(1).cardinality_, cardinality_);
         }
         break;
       }
       case FULL_OUTER_JOIN: {
-        if (getChild(0).cardinality != -1 && getChild(1).cardinality != -1) {
-          cardinality =
-              Math.max(getChild(0).cardinality + getChild(1).cardinality, cardinality);
+        if (getChild(0).cardinality_ != -1 && getChild(1).cardinality_ != -1) {
+          cardinality_ =
+              Math.max(getChild(0).cardinality_ + getChild(1).cardinality_, cardinality_);
         }
         break;
       }
     }
 
     Preconditions.checkState(hasValidStats());
-    LOG.debug("stats HashJoin: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats HashJoin: cardinality=" + Long.toString(cardinality_));
   }
 
   @Override
   protected String debugString() {
     return Objects.toStringHelper(this)
-        .add("eqJoinConjuncts", eqJoinConjunctsDebugString())
+        .add("eqJoinConjuncts_", eqJoinConjunctsDebugString())
         .addValue(super.debugString())
         .toString();
   }
 
   private String eqJoinConjunctsDebugString() {
     Objects.ToStringHelper helper = Objects.toStringHelper(this);
-    for (Pair<Expr, Expr> entry: eqJoinConjuncts) {
+    for (Pair<Expr, Expr> entry: eqJoinConjuncts_) {
       helper.add("lhs" , entry.first).add("rhs", entry.second);
     }
     return helper.toString();
@@ -258,13 +256,13 @@ public class HashJoinNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.HASH_JOIN_NODE;
     msg.hash_join_node = new THashJoinNode();
-    msg.hash_join_node.join_op = joinOp.toThrift();
-    for (Pair<Expr, Expr> entry: eqJoinConjuncts) {
+    msg.hash_join_node.join_op = joinOp_.toThrift();
+    for (Pair<Expr, Expr> entry: eqJoinConjuncts_) {
       TEqJoinCondition eqJoinCondition =
           new TEqJoinCondition(entry.first.treeToThrift(), entry.second.treeToThrift());
       msg.hash_join_node.addToEq_join_conjuncts(eqJoinCondition);
     }
-    for (Expr e: otherJoinConjuncts) {
+    for (Expr e: otherJoinConjuncts_) {
       msg.hash_join_node.addToOther_join_conjuncts(e.treeToThrift());
     }
   }
@@ -272,22 +270,22 @@ public class HashJoinNode extends PlanNode {
   @Override
   protected String getNodeExplainString(String detailPrefix,
       TExplainLevel detailLevel) {
-    String distrModeStr = (distrMode != DistributionMode.NONE) ?
-        (" (" + distrMode.toString() + ")") : "";
+    String distrModeStr = (distrMode_ != DistributionMode.NONE) ?
+        (" (" + distrMode_.toString() + ")") : "";
     StringBuilder output = new StringBuilder()
-      .append(detailPrefix + "join op: " + joinOp.toString() + distrModeStr + "\n")
+      .append(detailPrefix + "join op: " + joinOp_.toString() + distrModeStr + "\n")
       .append(detailPrefix + "hash predicates:\n");
-    for (Pair<Expr, Expr> entry: eqJoinConjuncts) {
+    for (Pair<Expr, Expr> entry: eqJoinConjuncts_) {
       output.append(detailPrefix + "  " +
           entry.first.toSql() + " = " + entry.second.toSql() + "\n");
     }
-    if (!otherJoinConjuncts.isEmpty()) {
+    if (!otherJoinConjuncts_.isEmpty()) {
       output.append(detailPrefix + "other join predicates: ")
-          .append(getExplainString(otherJoinConjuncts) + "\n");
+          .append(getExplainString(otherJoinConjuncts_) + "\n");
     }
-    if (!conjuncts.isEmpty()) {
+    if (!conjuncts_.isEmpty()) {
       output.append(detailPrefix + "other predicates: ")
-          .append(getExplainString(conjuncts) + "\n");
+          .append(getExplainString(conjuncts_) + "\n");
     }
     return output.toString();
   }
@@ -295,12 +293,13 @@ public class HashJoinNode extends PlanNode {
   @Override
   public void computeCosts(TQueryOptions queryOptions) {
     if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
-        || numNodes == 0) {
-      perHostMemCost = DEFAULT_PER_HOST_MEM;
+        || numNodes_ == 0) {
+      perHostMemCost_ = DEFAULT_PER_HOST_MEM;
       return;
     }
-    perHostMemCost = (long) Math.ceil(getChild(1).cardinality * getChild(1).avgRowSize *
-        Planner.HASH_TBL_SPACE_OVERHEAD);
-    if (distrMode == DistributionMode.PARTITIONED) perHostMemCost /= numNodes;
+    perHostMemCost_ =
+        (long) Math.ceil(getChild(1).cardinality_ * getChild(1).avgRowSize_
+          * Planner.HASH_TBL_SPACE_OVERHEAD);
+    if (distrMode_ == DistributionMode.PARTITIONED) perHostMemCost_ /= numNodes_;
   }
 }

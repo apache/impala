@@ -52,21 +52,21 @@ public class HdfsTableSink extends TableSink {
 
   @Override
   public void computeCosts() {
-    HdfsTable table = (HdfsTable) targetTable;
+    HdfsTable table = (HdfsTable) targetTable_;
     // TODO: Estimate the memory requirements more accurately by partition type.
     HdfsFileFormat format = table.getMajorityFormat();
-    PlanNode inputNode = fragment.getPlanRoot();
-    int numNodes = fragment.getNumNodes();
+    PlanNode inputNode = fragment_.getPlanRoot();
+    int numNodes = fragment_.getNumNodes();
     // Compute the per-host number of partitions, taking the number of nodes
     // and the data partition of the fragment executing this sink into account.
-    long numPartitions = fragment.getNumDistinctValues(partitionKeyExprs_);
+    long numPartitions = fragment_.getNumDistinctValues(partitionKeyExprs_);
     if (numPartitions == -1) numPartitions = DEFAULT_NUM_PARTITIONS;
     long perPartitionMemReq = getPerPartitionMemReq(format);
 
-    // The estimate is based purely on the per-partition mem req if the input cardinality
+    // The estimate is based purely on the per-partition mem req if the input cardinality_
     // or the avg row size is unknown.
     if (inputNode.getCardinality() == -1 || inputNode.getAvgRowSize() == -1) {
-      perHostMemCost = numPartitions * perPartitionMemReq;
+      perHostMemCost_ = numPartitions * perPartitionMemReq;
       return;
     }
 
@@ -75,7 +75,7 @@ public class HdfsTableSink extends TableSink {
     long perHostInputCardinality = Math.max(1L, inputNode.getCardinality() / numNodes);
     long perHostInputBytes =
         (long) Math.ceil(perHostInputCardinality * inputNode.getAvgRowSize());
-    perHostMemCost = Math.min(perHostInputBytes, numPartitions * perPartitionMemReq);
+    perHostMemCost_ = Math.min(perHostInputBytes, numPartitions * perPartitionMemReq);
   }
 
   /**
@@ -98,7 +98,7 @@ public class HdfsTableSink extends TableSink {
   @Override
   public String getExplainString(String prefix, TExplainLevel explainLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "WRITE TO HDFS table=" + targetTable.getFullName()
+    output.append(prefix + "WRITE TO HDFS table=" + targetTable_.getFullName()
         + "\n");
     output.append(prefix + "  overwrite=" + (overwrite_ ? "true" : "false") + "\n");
     if (!partitionKeyExprs_.isEmpty()) {
@@ -119,7 +119,7 @@ public class HdfsTableSink extends TableSink {
         output.append("  #partitions: " + totalNumPartitions);
       }
       output.append("\n");
-      output.append(PrintUtils.printMemCost(prefix + "  ", perHostMemCost));
+      output.append(PrintUtils.printMemCost(prefix + "  ", perHostMemCost_));
     }
     output.append("\n");
     return output.toString();
@@ -130,7 +130,7 @@ public class HdfsTableSink extends TableSink {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
     THdfsTableSink hdfsTableSink = new THdfsTableSink(
         Expr.treesToThrift(partitionKeyExprs_), overwrite_);
-    TTableSink tTableSink = new TTableSink(targetTable.getId().asInt(),
+    TTableSink tTableSink = new TTableSink(targetTable_.getId().asInt(),
         TTableSinkType.HDFS);
     tTableSink.hdfs_table_sink = hdfsTableSink;
     result.table_sink = tTableSink;

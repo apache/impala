@@ -37,13 +37,13 @@ public class CrossJoinNode extends PlanNode {
   // Default per-host memory requirement used if no valid stats are available.
   // TODO: Come up with a more useful heuristic (e.g., based on scanned partitions).
   private final static long DEFAULT_PER_HOST_MEM = 2L * 1024L * 1024L * 1024L;
-  private final TableRef innerRef;
+  private final TableRef innerRef_;
 
   public CrossJoinNode(PlanNode outer, PlanNode inner, TableRef innerRef) {
     super("CROSS JOIN");
-    this.innerRef = innerRef;
-    tupleIds.addAll(outer.getTupleIds());
-    tupleIds.addAll(inner.getTupleIds());
+    innerRef_ = innerRef;
+    tupleIds_.addAll(outer.getTupleIds());
+    tupleIds_.addAll(inner.getTupleIds());
     tblRefIds_.addAll(outer.getTblRefIds());
     tblRefIds_.addAll(inner.getTblRefIds());
     children.add(outer);
@@ -51,11 +51,11 @@ public class CrossJoinNode extends PlanNode {
 
     // Inherits all the nullable tuple from the children
     // Mark tuples that form the "nullable" side of the outer join as nullable.
-    nullableTupleIds.addAll(outer.getNullableTupleIds());
-    nullableTupleIds.addAll(inner.getNullableTupleIds());
+    nullableTupleIds_.addAll(outer.getNullableTupleIds());
+    nullableTupleIds_.addAll(inner.getNullableTupleIds());
   }
 
-  public TableRef getInnerRef() { return innerRef; }
+  public TableRef getInnerRef() { return innerRef_; }
 
   @Override
   public void init(Analyzer analyzer) throws InternalException, AuthorizationException {
@@ -66,15 +66,15 @@ public class CrossJoinNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    if (getChild(0).cardinality == -1 || getChild(1).cardinality == -1) {
-      cardinality = -1;
+    if (getChild(0).cardinality_ == -1 || getChild(1).cardinality_ == -1) {
+      cardinality_ = -1;
     } else {
-      cardinality = getChild(0).cardinality * getChild(1).cardinality;
+      cardinality_ = getChild(0).cardinality_ * getChild(1).cardinality_;
       if (computeSelectivity() != -1) {
-        cardinality = Math.round(((double) cardinality) * computeSelectivity());
+        cardinality_ = Math.round(((double) cardinality_) * computeSelectivity());
       }
     }
-    LOG.debug("stats CrossJoin: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats CrossJoin: cardinality=" + Long.toString(cardinality_));
   }
 
   @Override
@@ -95,9 +95,9 @@ public class CrossJoinNode extends PlanNode {
     StringBuilder output = new StringBuilder();
     // Always a BROADCAST, but print it anyway so it's clear to users
     output.append(detailPrefix + "(" + DistributionMode.BROADCAST.toString() + ")\n");
-    if (!conjuncts.isEmpty()) {
+    if (!conjuncts_.isEmpty()) {
       output.append(detailPrefix + "predicates: ")
-          .append(getExplainString(conjuncts) + "\n");
+          .append(getExplainString(conjuncts_) + "\n");
     }
     return output.toString();
   }
@@ -105,10 +105,10 @@ public class CrossJoinNode extends PlanNode {
   @Override
   public void computeCosts(TQueryOptions queryOptions) {
     if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
-        || numNodes == 0) {
-      perHostMemCost = DEFAULT_PER_HOST_MEM;
+        || numNodes_ == 0) {
+      perHostMemCost_ = DEFAULT_PER_HOST_MEM;
       return;
     }
-    perHostMemCost = (long) Math.ceil(getChild(1).cardinality * getChild(1).avgRowSize);
+    perHostMemCost_ = (long) Math.ceil(getChild(1).cardinality_ * getChild(1).avgRowSize_);
   }
 }

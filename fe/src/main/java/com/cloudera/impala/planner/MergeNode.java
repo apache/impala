@@ -44,21 +44,21 @@ public class MergeNode extends PlanNode {
   // Expr lists corresponding to the input query stmts.
   // The ith resultExprList belongs to the ith child.
   // All exprs are resolved to base tables.
-  protected List<List<Expr>> resultExprLists = Lists.newArrayList();
+  protected List<List<Expr>> resultExprLists_ = Lists.newArrayList();
 
   // Expr lists that originate from constant select stmts.
   // We keep them separate from the regular expr lists to avoid null children.
-  protected List<List<Expr>> constExprLists = Lists.newArrayList();
+  protected List<List<Expr>> constExprLists_ = Lists.newArrayList();
 
-  protected final TupleId tupleId;
+  protected final TupleId tupleId_;
 
-  private final boolean isIntermediateMerge;
+  private final boolean isIntermediateMerge_;
 
   protected MergeNode(PlanNodeId id, TupleId tupleId) {
     super(id, Lists.newArrayList(tupleId), "MERGE");
-    this.rowTupleIds.add(tupleId);
-    this.tupleId = tupleId;
-    this.isIntermediateMerge = false;
+    rowTupleIds_.add(tupleId);
+    tupleId_ = tupleId;
+    isIntermediateMerge_ = false;
   }
 
   /**
@@ -68,29 +68,29 @@ public class MergeNode extends PlanNode {
    */
   protected MergeNode(PlanNodeId id, MergeNode node, int childIdx, PlanNode child) {
     super(id, node, "MERGE");
-    this.tupleId = node.tupleId;
-    this.isIntermediateMerge = true;
-    resultExprLists.add(Expr.cloneList(node.getResultExprLists().get(childIdx), null));
+    tupleId_ = node.tupleId_;
+    isIntermediateMerge_ = true;
+    resultExprLists_.add(Expr.cloneList(node.getResultExprLists().get(childIdx), null));
     super.addChild(child);
   }
 
   private MergeNode(PlanNodeId id, MergeNode node) {
     super(id, node, "MERGE");
-    this.tupleId = node.tupleId;
-    this.isIntermediateMerge = true;
+    tupleId_ = node.tupleId_;
+    isIntermediateMerge_ = true;
   }
 
   static public MergeNode createConstIntermediateMerge(PlanNodeId id, MergeNode node) {
     MergeNode result = new MergeNode(id, node);
-    result.constExprLists.addAll(node.getConstExprLists());
+    result.constExprLists_.addAll(node.getConstExprLists());
     return result;
   }
 
-  public List<List<Expr>> getResultExprLists() { return resultExprLists; }
-  public List<List<Expr>> getConstExprLists() { return constExprLists; }
+  public List<List<Expr>> getResultExprLists() { return resultExprLists_; }
+  public List<List<Expr>> getConstExprLists() { return constExprLists_; }
 
   public void addConstExprList(List<Expr> exprs) {
-    constExprLists.add(exprs);
+    constExprLists_.add(exprs);
   }
 
   /**
@@ -98,53 +98,53 @@ public class MergeNode extends PlanNode {
    */
   public void addChild(PlanNode node, List<Expr> baseTblResultExprs) {
     super.addChild(node);
-    resultExprLists.add(baseTblResultExprs);
+    resultExprLists_.add(baseTblResultExprs);
     if (baseTblResultExprs != null) {
       // if we're materializing output, we can only do that into a single
       // output tuple
-      Preconditions.checkState(tupleIds.size() == 1);
+      Preconditions.checkState(tupleIds_.size() == 1);
     }
   }
 
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    cardinality = constExprLists.size();
+    cardinality_ = constExprLists_.size();
     for (PlanNode child: children) {
       // ignore missing child cardinality info in the hope it won't matter enough
       // to change the planning outcome
-      if (child.cardinality > 0) {
-        cardinality += child.cardinality;
+      if (child.cardinality_ > 0) {
+        cardinality_ += child.cardinality_;
       }
     }
-    LOG.debug("stats Merge: cardinality=" + Long.toString(cardinality));
+    LOG.debug("stats Merge: cardinality=" + Long.toString(cardinality_));
   }
 
   /**
    * This must be called *after* addChild()/addConstExprList() because it recomputes
    * both of them.
    * The MergeNode doesn't need an smap: like a ScanNode, it materializes an "original"
-   * tuple id
+   * tuple id_
    */
   @Override
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
     computeMemLayout(analyzer);
     computeStats(analyzer);
-    Preconditions.checkState(resultExprLists.size() == getChildren().size());
+    Preconditions.checkState(resultExprLists_.size() == getChildren().size());
 
-    if (isIntermediateMerge) {
+    if (isIntermediateMerge_) {
       // nothing left to do, but we want to check a few things
-      Preconditions.checkState(resultExprLists.size() == children.size());
-      Preconditions.checkState(resultExprLists.isEmpty() || resultExprLists.size() == 1);
+      Preconditions.checkState(resultExprLists_.size() == children.size());
+      Preconditions.checkState(resultExprLists_.isEmpty() || resultExprLists_.size() == 1);
       int numMaterializedSlots = 0;
-      for (SlotDescriptor slot: analyzer.getDescTbl().getTupleDesc(tupleId).getSlots()) {
+      for (SlotDescriptor slot: analyzer.getDescTbl().getTupleDesc(tupleId_).getSlots()) {
         if (slot.isMaterialized()) ++numMaterializedSlots;
       }
-      if (!resultExprLists.isEmpty()) {
-        Preconditions.checkState(resultExprLists.get(0).size() == numMaterializedSlots);
+      if (!resultExprLists_.isEmpty()) {
+        Preconditions.checkState(resultExprLists_.get(0).size() == numMaterializedSlots);
       }
-      for (List<Expr> l: constExprLists) {
+      for (List<Expr> l: constExprLists_) {
         Preconditions.checkState(l.size() == numMaterializedSlots);
        }
       return;
@@ -152,40 +152,40 @@ public class MergeNode extends PlanNode {
 
     // drop resultExprs/constExprs that aren't getting materialized (= where the
     // corresponding output slot isn't being materialized)
-    List<SlotDescriptor> slots = analyzer.getDescTbl().getTupleDesc(tupleId).getSlots();
+    List<SlotDescriptor> slots = analyzer.getDescTbl().getTupleDesc(tupleId_).getSlots();
     List<List<Expr>> newResultExprLists = Lists.newArrayList();
-    for (List<Expr> exprList: resultExprLists) {
+    for (List<Expr> exprList: resultExprLists_) {
       List<Expr> newExprList = Lists.newArrayList();
       for (int i = 0; i < exprList.size(); ++i) {
         if (slots.get(i).isMaterialized()) newExprList.add(exprList.get(i));
       }
       newResultExprLists.add(newExprList);
     }
-    resultExprLists = newResultExprLists;
-    Preconditions.checkState(resultExprLists.size() == getChildren().size());
+    resultExprLists_ = newResultExprLists;
+    Preconditions.checkState(resultExprLists_.size() == getChildren().size());
 
     List<List<Expr>> newConstExprLists = Lists.newArrayList();
-    for (List<Expr> exprList: constExprLists) {
+    for (List<Expr> exprList: constExprLists_) {
       List<Expr> newExprList = Lists.newArrayList();
       for (int i = 0; i < exprList.size(); ++i) {
         if (slots.get(i).isMaterialized()) newExprList.add(exprList.get(i));
       }
       newConstExprLists.add(newExprList);
     }
-    constExprLists = newConstExprLists;
+    constExprLists_ = newConstExprLists;
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
     List<List<TExpr>> texprLists = Lists.newArrayList();
-    for (List<Expr> exprList : resultExprLists) {
+    for (List<Expr> exprList : resultExprLists_) {
       if (exprList != null) texprLists.add(Expr.treesToThrift(exprList));
     }
     List<List<TExpr>> constTexprLists = Lists.newArrayList();
-    for (List<Expr> constTexprList : constExprLists) {
+    for (List<Expr> constTexprList : constExprLists_) {
       constTexprLists.add(Expr.treesToThrift(constTexprList));
     }
-    msg.merge_node = new TMergeNode(tupleId.asInt(), texprLists, constTexprLists);
+    msg.merge_node = new TMergeNode(tupleId_.asInt(), texprLists, constTexprLists);
     msg.node_type = TPlanNodeType.MERGE_NODE;
   }
 
@@ -195,11 +195,11 @@ public class MergeNode extends PlanNode {
     StringBuilder output = new StringBuilder();
     // A MergeNode may have predicates if a union is used inside an inline view,
     // and the enclosing select stmt has predicates referring to the inline view.
-    if (!conjuncts.isEmpty()) {
-      output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
+    if (!conjuncts_.isEmpty()) {
+      output.append(prefix + "predicates: " + getExplainString(conjuncts_) + "\n");
     }
-    if (constExprLists.size() > 0) {
-      output.append(prefix + "merging " + constExprLists.size() + " SELECT CONSTANT\n");
+    if (constExprLists_.size() > 0) {
+      output.append(prefix + "merging " + constExprLists_.size() + " SELECT CONSTANT\n");
     }
     return output.toString();
   }

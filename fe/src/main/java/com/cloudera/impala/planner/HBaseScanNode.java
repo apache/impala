@@ -37,7 +37,6 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.StringLiteral;
 import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HBaseColumn;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -66,21 +65,21 @@ import com.google.common.collect.Maps;
  */
 public class HBaseScanNode extends ScanNode {
   private final static Logger LOG = LoggerFactory.getLogger(HBaseScanNode.class);
-  private final TupleDescriptor desc;
+  private final TupleDescriptor desc_;
 
   // One range per clustering column. The range bounds are expected to be constants.
   // A null entry means there's no range restriction for that particular key.
   // If keyRanges is non-null it always contains as many entries as there are clustering
   // cols.
-  private List<ValueRange> keyRanges;
+  private List<ValueRange> keyRanges_;
 
-  // derived from keyRanges; empty means unbounded;
-  // initialize start/stopKey to be unbounded.
-  private byte[] startKey = HConstants.EMPTY_START_ROW;
-  private byte[] stopKey = HConstants.EMPTY_END_ROW;
+  // derived from keyRanges_; empty means unbounded;
+  // initialize start/stopKey_ to be unbounded.
+  private byte[] startKey_ = HConstants.EMPTY_START_ROW;
+  private byte[] stopKey_ = HConstants.EMPTY_END_ROW;
 
   // List of HBase Filters for generating thrift message. Filled in finalize().
-  private final List<THBaseFilter> filters = new ArrayList<THBaseFilter>();
+  private final List<THBaseFilter> filters_ = new ArrayList<THBaseFilter>();
 
   // The suggested value for "hbase.client.scan.setCaching", which batches maxCaching
   // rows per fetch request to the HBase region server. If the value is too high,
@@ -91,113 +90,113 @@ public class HBaseScanNode extends ScanNode {
   // won't exceed 500MB.
   private final static int MAX_HBASE_FETCH_BATCH_SIZE = 500 * 1024 * 1024;
   private final static int DEFAULT_SUGGESTED_CACHING = 1024;
-  private int suggestedCaching = DEFAULT_SUGGESTED_CACHING;
+  private int suggestedCaching_ = DEFAULT_SUGGESTED_CACHING;
 
   // HBase config; Common across all object instance.
-  private static Configuration hbaseConf = HBaseConfiguration.create();
+  private static Configuration hbaseConf_ = HBaseConfiguration.create();
 
   public HBaseScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc, "SCAN HBASE");
-    this.desc = desc;
+    desc_ = desc;
   }
 
   public void setKeyRanges(List<ValueRange> keyRanges) {
     Preconditions.checkNotNull(keyRanges);
-    this.keyRanges = keyRanges;
+    keyRanges_ = keyRanges;
   }
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
     computeStats(analyzer);
-    // Convert predicates to HBase filters.
+    // Convert predicates to HBase filters_.
     createHBaseFilters(analyzer);
 
-    // materialize slots in remaining conjuncts
-    analyzer.materializeSlots(conjuncts);
+    // materialize slots in remaining conjuncts_
+    analyzer.materializeSlots(conjuncts_);
     computeMemLayout(analyzer);
   }
 
   /**
-   * Also sets suggestedCaching.
+   * Also sets suggestedCaching_.
    */
   @Override
   public void computeStats(Analyzer analyzer) {
-    Preconditions.checkNotNull(keyRanges);
-    Preconditions.checkState(keyRanges.size() == 1);
+    Preconditions.checkNotNull(keyRanges_);
+    Preconditions.checkState(keyRanges_.size() == 1);
     super.computeStats(analyzer);
-    HBaseTable tbl = (HBaseTable) desc.getTable();
+    HBaseTable tbl = (HBaseTable) desc_.getTable();
 
-    // If ValueRange is not null, transform it into start/stopKey by printing the values.
+    // If ValueRange is not null, transform it into start/stopKey_ by printing the values.
     // At present, we only do that for string-mapped keys because the hbase
     // data is stored as text.
     // ValueRange is null if there is no qualification on the row-key.
-    ValueRange rowRange = keyRanges.get(0);
+    ValueRange rowRange = keyRanges_.get(0);
     if (rowRange != null) {
-      if (rowRange.lowerBound != null) {
-        Preconditions.checkState(rowRange.lowerBound.isConstant());
-        Preconditions.checkState(rowRange.lowerBound instanceof StringLiteral);
-        startKey = convertToBytes(
-            ((StringLiteral) rowRange.lowerBound).getValue(),
-            !rowRange.lowerBoundInclusive);
+      if (rowRange.getLowerBound() != null) {
+        Preconditions.checkState(rowRange.getLowerBound().isConstant());
+        Preconditions.checkState(rowRange.getLowerBound() instanceof StringLiteral);
+        startKey_ = convertToBytes(
+            ((StringLiteral) rowRange.getLowerBound()).getValue(),
+            !rowRange.getLowerBoundInclusive());
       }
-      if (rowRange.upperBound != null) {
-        Preconditions.checkState(rowRange.upperBound.isConstant());
-        Preconditions.checkState(rowRange.upperBound instanceof StringLiteral);
-        stopKey = convertToBytes(
-            ((StringLiteral) rowRange.upperBound).getValue(),
-            rowRange.upperBoundInclusive);
+      if (rowRange.getUpperBound() != null) {
+        Preconditions.checkState(rowRange.getUpperBound().isConstant());
+        Preconditions.checkState(rowRange.getUpperBound() instanceof StringLiteral);
+        stopKey_ = convertToBytes(
+            ((StringLiteral) rowRange.getUpperBound()).getValue(),
+            rowRange.getUpperBoundInclusive());
       }
     }
 
     if (rowRange != null && rowRange.isEqRange()) {
-      cardinality = 1;
+      cardinality_ = 1;
     } else {
      // Set maxCaching so that each fetch from hbase won't return a batch of more than
      // MAX_HBASE_FETCH_BATCH_SIZE bytes.
-      Pair<Long, Long> estimate = tbl.getEstimatedRowStats(startKey, stopKey);
-      cardinality = estimate.first.longValue();
+      Pair<Long, Long> estimate = tbl.getEstimatedRowStats(startKey_, stopKey_);
+      cardinality_ = estimate.first.longValue();
       if (estimate.second.longValue() > 0) {
-        suggestedCaching = (int)
+        suggestedCaching_ = (int)
             Math.max(MAX_HBASE_FETCH_BATCH_SIZE / estimate.second.longValue(), 1);
       }
     }
 
-    cardinality *= computeSelectivity();
-    cardinality = Math.max(0, cardinality);
-    LOG.debug("computeStats HbaseScan: cardinality=" + Long.toString(cardinality));
+    cardinality_ *= computeSelectivity();
+    cardinality_ = Math.max(0, cardinality_);
+    LOG.debug("computeStats HbaseScan: cardinality=" + Long.toString(cardinality_));
 
     // TODO: take actual regions into account
-    numNodes = desc.getTable().getNumNodes();
-    LOG.debug("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes));
+    numNodes_ = desc_.getTable().getNumNodes();
+    LOG.debug("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes_));
   }
 
   @Override
   protected String debugString() {
-    HBaseTable tbl = (HBaseTable) desc.getTable();
+    HBaseTable tbl = (HBaseTable) desc_.getTable();
     return Objects.toStringHelper(this)
-        .add("tid", desc.getId().asInt())
+        .add("tid", desc_.getId().asInt())
         .add("hiveTblName", tbl.getFullName())
         .add("hbaseTblName", tbl.getHBaseTableName())
-        .add("startKey", ByteBuffer.wrap(startKey).toString())
-        .add("stopKey", ByteBuffer.wrap(stopKey).toString())
+        .add("startKey", ByteBuffer.wrap(startKey_).toString())
+        .add("stopKey", ByteBuffer.wrap(stopKey_).toString())
         .addValue(super.debugString())
         .toString();
   }
 
   // We convert predicates of the form <slotref> op <constant> where slotref is of
   // type string to HBase filters.
-  // We remove the corresponding predicate from the conjuncts, but we also explicitly
+  // We remove the corresponding predicate from the conjuncts_, but we also explicitly
   // materialize the referenced slots, otherwise our hbase scans don't return correct data.
   // TODO: expand this to generate nested filter lists for arbitrary conjunctions
   // and disjunctions.
   private void createHBaseFilters(Analyzer analyzer) {
-    for (SlotDescriptor slot: desc.getSlots()) {
+    for (SlotDescriptor slot: desc_.getSlots()) {
       // TODO: Currently we can only push down predicates on string columns.
       if (slot.getType() != PrimitiveType.STRING) continue;
       // List of predicates that cannot be pushed down as an HBase Filter.
       List<Expr> remainingPreds = new ArrayList<Expr>();
-      for (Expr e: conjuncts) {
+      for (Expr e: conjuncts_) {
         if (!(e instanceof BinaryPredicate)) {
           remainingPreds.add(e);
           continue;
@@ -216,26 +215,26 @@ public class HBaseScanNode extends ScanNode {
         }
         StringLiteral literal = (StringLiteral) bindingExpr;
         HBaseColumn col = (HBaseColumn) slot.getColumn();
-        filters.add(new THBaseFilter(
+        filters_.add(new THBaseFilter(
             col.getColumnFamily(), col.getColumnQualifier(),
             (byte) hbaseOp.ordinal(), literal.getValue()));
 
         analyzer.materializeSlots(Lists.newArrayList(e));
       }
-      conjuncts = remainingPreds;
+      conjuncts_ = remainingPreds;
     }
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.HBASE_SCAN_NODE;
-    HBaseTable tbl = (HBaseTable) desc.getTable();
+    HBaseTable tbl = (HBaseTable) desc_.getTable();
     msg.hbase_scan_node =
-      new THBaseScanNode(desc.getId().asInt(), tbl.getHBaseTableName());
-    if (!filters.isEmpty()) {
-      msg.hbase_scan_node.setFilters(filters);
+      new THBaseScanNode(desc_.getId().asInt(), tbl.getHBaseTableName());
+    if (!filters_.isEmpty()) {
+      msg.hbase_scan_node.setFilters(filters_);
     }
-    msg.hbase_scan_node.setSuggested_max_caching(suggestedCaching);
+    msg.hbase_scan_node.setSuggested_max_caching(suggestedCaching_);
   }
 
   /**
@@ -246,12 +245,12 @@ public class HBaseScanNode extends ScanNode {
   @Override
   public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
     // Retrieve relevant HBase regions and their region servers
-    HBaseTable tbl = (HBaseTable) desc.getTable();
+    HBaseTable tbl = (HBaseTable) desc_.getTable();
     HTable hbaseTbl = null;
     List<HRegionLocation> regionsLoc;
     try {
-      hbaseTbl   = new HTable(hbaseConf, tbl.getHBaseTableName());
-      regionsLoc = HBaseTable.getRegionsInRange(hbaseTbl, startKey, stopKey);
+      hbaseTbl   = new HTable(hbaseConf_, tbl.getHBaseTableName());
+      regionsLoc = HBaseTable.getRegionsInRange(hbaseTbl, startKey_, stopKey_);
     } catch (IOException e) {
       throw new RuntimeException(
           "couldn't retrieve HBase table (" + tbl.getHBaseTableName() + ") info:\n"
@@ -309,7 +308,7 @@ public class HBaseScanNode extends ScanNode {
   }
 
   /**
-   * Set the start key of keyRange using the provided key, bounded by startKey
+   * Set the start key of keyRange using the provided key, bounded by startKey_
    * @param keyRange the keyRange to be updated
    * @param rangeStartKey the start key value to be set to
    */
@@ -317,15 +316,15 @@ public class HBaseScanNode extends ScanNode {
     keyRange.unsetStartKey();
     // use the max(startKey, rangeStartKey) for scan start
     if (!Bytes.equals(rangeStartKey, HConstants.EMPTY_START_ROW) ||
-        !Bytes.equals(startKey, HConstants.EMPTY_START_ROW)) {
-      byte[] partStart = (Bytes.compareTo(rangeStartKey, startKey) < 0) ?
-          startKey : rangeStartKey;
+        !Bytes.equals(startKey_, HConstants.EMPTY_START_ROW)) {
+      byte[] partStart = (Bytes.compareTo(rangeStartKey, startKey_) < 0) ?
+          startKey_ : rangeStartKey;
       keyRange.setStartKey(Bytes.toString(partStart));
     }
   }
 
   /**
-   * Set the end key of keyRange using the provided key, bounded by stopKey
+   * Set the end key of keyRange using the provided key, bounded by stopKey_
    * @param keyRange the keyRange to be updated
    * @param rangeEndKey the end key value to be set to
    */
@@ -333,14 +332,14 @@ public class HBaseScanNode extends ScanNode {
     keyRange.unsetStopKey();
     // use the min(stopkey, regionStopKey) for scan stop
     if (!Bytes.equals(rangeEndKey, HConstants.EMPTY_END_ROW) ||
-        !Bytes.equals(stopKey, HConstants.EMPTY_END_ROW)) {
-      if (Bytes.equals(stopKey, HConstants.EMPTY_END_ROW)) {
+        !Bytes.equals(stopKey_, HConstants.EMPTY_END_ROW)) {
+      if (Bytes.equals(stopKey_, HConstants.EMPTY_END_ROW)) {
         keyRange.setStopKey(Bytes.toString(rangeEndKey));
       } else if (Bytes.equals(rangeEndKey, HConstants.EMPTY_END_ROW)) {
-        keyRange.setStopKey(Bytes.toString(stopKey));
+        keyRange.setStopKey(Bytes.toString(stopKey_));
       } else {
-        byte[] partEnd = (Bytes.compareTo(rangeEndKey, stopKey) < 0) ?
-            rangeEndKey : stopKey;
+        byte[] partEnd = (Bytes.compareTo(rangeEndKey, stopKey_) < 0) ?
+            rangeEndKey : stopKey_;
         keyRange.setStopKey(Bytes.toString(partEnd));
       }
     }
@@ -349,25 +348,25 @@ public class HBaseScanNode extends ScanNode {
   @Override
   protected String getNodeExplainString(String prefix,
       TExplainLevel detailLevel) {
-    HBaseTable tbl = (HBaseTable) desc.getTable();
+    HBaseTable tbl = (HBaseTable) desc_.getTable();
     StringBuilder output = new StringBuilder()
         .append(prefix + "table:" + tbl.getName() + "\n");
-    if (!Bytes.equals(startKey, HConstants.EMPTY_START_ROW)) {
-      output.append(prefix + "start key: " + printKey(startKey) + "\n");
+    if (!Bytes.equals(startKey_, HConstants.EMPTY_START_ROW)) {
+      output.append(prefix + "start key: " + printKey(startKey_) + "\n");
     }
-    if (!Bytes.equals(stopKey, HConstants.EMPTY_END_ROW)) {
-      output.append(prefix + "stop key: " + printKey(stopKey) + "\n");
+    if (!Bytes.equals(stopKey_, HConstants.EMPTY_END_ROW)) {
+      output.append(prefix + "stop key: " + printKey(stopKey_) + "\n");
     }
-    if (!filters.isEmpty()) {
+    if (!filters_.isEmpty()) {
       output.append(prefix + "hbase filters:");
-      if (filters.size() == 1) {
-        THBaseFilter filter = filters.get(0);
+      if (filters_.size() == 1) {
+        THBaseFilter filter = filters_.get(0);
         output.append(" " + filter.family + ":" + filter.qualifier + " " +
             CompareFilter.CompareOp.values()[filter.op_ordinal].toString() + " " +
             "'" + filter.filter_constant + "'");
       } else {
-        for (int i = 0; i < filters.size(); ++i) {
-          THBaseFilter filter = filters.get(i);
+        for (int i = 0; i < filters_.size(); ++i) {
+          THBaseFilter filter = filters_.get(i);
           output.append("\n  " + filter.family + ":" + filter.qualifier + " " +
               CompareFilter.CompareOp.values()[filter.op_ordinal].toString() + " " +
               "'" + filter.filter_constant + "'");
@@ -375,8 +374,8 @@ public class HBaseScanNode extends ScanNode {
       }
       output.append('\n');
     }
-    if (!conjuncts.isEmpty()) {
-      output.append(prefix + "predicates: " + getExplainString(conjuncts) + "\n");
+    if (!conjuncts_.isEmpty()) {
+      output.append(prefix + "predicates: " + getExplainString(conjuncts_) + "\n");
     }
     // Add table and column stats in verbose mode.
     if (detailLevel == TExplainLevel.VERBOSE) {
@@ -434,7 +433,7 @@ public class HBaseScanNode extends ScanNode {
   @Override
   public void computeCosts(TQueryOptions queryOptions) {
     // TODO: What's a good estimate of memory consumption?
-    perHostMemCost = 1024L * 1024L * 1024L;
+    perHostMemCost_ = 1024L * 1024L * 1024L;
   }
 
   /**

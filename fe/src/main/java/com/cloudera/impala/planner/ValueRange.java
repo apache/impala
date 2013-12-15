@@ -36,22 +36,31 @@ import com.google.common.base.Preconditions;
 public class ValueRange {
   private final static Logger LOG = LoggerFactory.getLogger(ValueRange.class);
 
-  Expr lowerBound;
-  boolean lowerBoundInclusive;
-  Expr upperBound;
-  boolean upperBoundInclusive;
+  private Expr lowerBound_;
+  private boolean lowerBoundInclusive_;
+  private Expr upperBound_;
+  private boolean upperBoundInclusive_;
+
+  Expr getLowerBound() { return lowerBound_; }
+  void setLowerBound(Expr e) { lowerBound_ = e; }
+  boolean getLowerBoundInclusive() { return lowerBoundInclusive_; }
+  void setLowerBoundInclusive(boolean b) { lowerBoundInclusive_ = b; }
+  Expr getUpperBound() { return upperBound_; }
+  void setUpperBound(Expr e) { upperBound_ = e; }
+  boolean getUpperBoundInclusive() { return upperBoundInclusive_; }
+  void setUpperBoundInclusive(boolean b) { upperBoundInclusive_ = b; }
 
   static public ValueRange createEqRange(Expr valueExpr) {
     ValueRange result = new ValueRange();
-    result.lowerBound = valueExpr;
-    result.lowerBoundInclusive = true;
-    result.upperBound = valueExpr;
-    result.upperBoundInclusive = true;
+    result.lowerBound_ = valueExpr;
+    result.lowerBoundInclusive_ = true;
+    result.upperBound_ = valueExpr;
+    result.upperBoundInclusive_ = true;
     return result;
   }
 
   public boolean isEqRange() {
-    return lowerBound == upperBound && lowerBoundInclusive && upperBoundInclusive;
+    return lowerBound_ == upperBound_ && lowerBoundInclusive_ && upperBoundInclusive_;
   }
 
   /**
@@ -63,26 +72,28 @@ public class ValueRange {
   public boolean isInRange(Analyzer analyzer, Expr valueExpr) throws
       InternalException, AuthorizationException {
     Preconditions.checkState(valueExpr.isConstant());
-    Preconditions.checkState(lowerBound != null || upperBound != null);
+    Preconditions.checkState(lowerBound_ != null || upperBound_ != null);
 
     // construct predicate
     Predicate p = null;
-    if (lowerBound != null && upperBound != null
-        && lowerBoundInclusive && upperBoundInclusive
-        && lowerBound == upperBound) {
+    if (lowerBound_ != null && upperBound_ != null
+        && lowerBoundInclusive_ && upperBoundInclusive_
+        && lowerBound_ == upperBound_) {
       // construct "=" predicate
-      p = new BinaryPredicate(BinaryPredicate.Operator.EQ, valueExpr, lowerBound);
+      p = new BinaryPredicate(BinaryPredicate.Operator.EQ, valueExpr, lowerBound_);
     } else {
       // construct range predicate
-      if (lowerBound != null) {
+      if (lowerBound_ != null) {
         p = new BinaryPredicate(
-            lowerBoundInclusive ? BinaryPredicate.Operator.GE : BinaryPredicate.Operator.GT,
-            valueExpr, lowerBound);
+            lowerBoundInclusive_
+              ? BinaryPredicate.Operator.GE : BinaryPredicate.Operator.GT,
+            valueExpr, lowerBound_);
       }
-      if (upperBound != null) {
+      if (upperBound_ != null) {
         Predicate p2 = new BinaryPredicate(
-            upperBoundInclusive ? BinaryPredicate.Operator.GE : BinaryPredicate.Operator.GT,
-            upperBound, valueExpr);
+            upperBoundInclusive_
+              ? BinaryPredicate.Operator.GE : BinaryPredicate.Operator.GT,
+            upperBound_, valueExpr);
         if (p != null) {
           p = new CompoundPredicate(CompoundPredicate.Operator.AND, p, p2);
         } else {

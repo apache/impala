@@ -81,7 +81,7 @@ public class Planner {
   // used for determining whether a broadcast join is feasible.
   public final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
 
-  private final IdGenerator<PlanNodeId> nodeIdGenerator = new IdGenerator<PlanNodeId>();
+  private final IdGenerator<PlanNodeId> nodeIdGenerator_ = new IdGenerator<PlanNodeId>();
 
   /**
    * Create plan fragments for an analyzed statement, given a set of execution options.
@@ -322,7 +322,7 @@ public class Planner {
     }
 
     Preconditions.checkState(partitionHint == null || partitionHint);
-    ExchangeNode exchNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    ExchangeNode exchNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator_));
     exchNode.addChild(inputFragment.getPlanRoot(), false);
     exchNode.init(analyzer);
     Preconditions.checkState(exchNode.hasValidStats());
@@ -344,7 +344,7 @@ public class Planner {
       PlanFragment inputFragment, Analyzer analyzer)
       throws InternalException, AuthorizationException {
     Preconditions.checkState(inputFragment.isPartitioned());
-    ExchangeNode mergePlan = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    ExchangeNode mergePlan = new ExchangeNode(new PlanNodeId(nodeIdGenerator_));
     mergePlan.addChild(inputFragment.getPlanRoot(), false);
     mergePlan.init(analyzer);
     Preconditions.checkState(mergePlan.hasValidStats());
@@ -536,11 +536,11 @@ public class Planner {
       // left- and rightChildFragments, which now partition their output
       // on their respective join exprs.
       // The new fragment is hash-partitioned on the lhs input join exprs.
-      ExchangeNode lhsExchange = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+      ExchangeNode lhsExchange = new ExchangeNode(new PlanNodeId(nodeIdGenerator_));
       lhsExchange.addChild(leftChildFragment.getPlanRoot(), false);
       lhsExchange.computeStats(null);
       node.setChild(0, lhsExchange);
-      ExchangeNode rhsExchange = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+      ExchangeNode rhsExchange = new ExchangeNode(new PlanNodeId(nodeIdGenerator_));
       rhsExchange.addChild(rightChildFragment.getPlanRoot(), false);
       rhsExchange.computeStats(null);
       node.setChild(1, rhsExchange);
@@ -563,7 +563,7 @@ public class Planner {
    * non-distributed plan.
    * Each of the child fragments receives a MergeNode as a new plan root (with
    * the child fragment's plan tree as its only input), so that each child
-   * fragment's output is mapped onto the MergeNode's result tuple id.
+   * fragment's output is mapped onto the MergeNode's result tuple id_.
    * TODO: if this is implementing a UNION DISTINCT, the parent of the mergeNode
    * is a duplicate-removing AggregationNode, which might make sense to apply
    * to the children as well, in order to reduce the amount of data that needs
@@ -585,20 +585,20 @@ public class Planner {
 
     // create an ExchangeNode to perform the merge operation of mergeNode;
     // the ExchangeNode retains the generic PlanNode parameters of mergeNode
-    ExchangeNode exchNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    ExchangeNode exchNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator_));
     exchNode.addChild(mergeNode, true);
     PlanFragment parentFragment =
         new PlanFragment(exchNode, DataPartition.UNPARTITIONED);
 
     // we don't expect to be parallelizing a MergeNode that was inserted solely
-    // to evaluate conjuncts (ie, that doesn't explicitly materialize its output)
+    // to evaluate conjuncts_ (ie, that doesn't explicitly materialize its output)
     Preconditions.checkState(mergeNode.getTupleIds().size() == 1);
 
     for (int i = 0; i < childFragments.size(); ++i) {
       PlanFragment childFragment = childFragments.get(i);
       MergeNode childMergeNode =
           new MergeNode(
-            new PlanNodeId(nodeIdGenerator), mergeNode, i, childFragment.getPlanRoot());
+            new PlanNodeId(nodeIdGenerator_), mergeNode, i, childFragment.getPlanRoot());
       childMergeNode.init(analyzer);
       childFragment.setPlanRoot(childMergeNode);
       childFragment.setDestination(parentFragment, exchNode.getId());
@@ -608,7 +608,7 @@ public class Planner {
     // Add an unpartitioned child fragment with a MergeNode for the constant exprs.
     if (!mergeNode.getConstExprLists().isEmpty()) {
       MergeNode childMergeNode = MergeNode.createConstIntermediateMerge(
-          new PlanNodeId(nodeIdGenerator), mergeNode);
+          new PlanNodeId(nodeIdGenerator_), mergeNode);
       childMergeNode.init(analyzer);
       // Clear original constant exprs to make sure nobody else picks them up.
       mergeNode.getConstExprLists().clear();
@@ -647,7 +647,7 @@ public class Planner {
   private void connectChildFragment(Analyzer analyzer, PlanNode node, int childIdx,
       PlanFragment parentFragment, PlanFragment childFragment)
       throws InternalException, AuthorizationException {
-    ExchangeNode exchangeNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    ExchangeNode exchangeNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator_));
     exchangeNode.addChild(childFragment.getPlanRoot(), false);
     exchangeNode.init(analyzer);
     node.setChild(childIdx, exchangeNode);
@@ -667,7 +667,7 @@ public class Planner {
   private PlanFragment createParentAggFragment(
       Analyzer analyzer, PlanFragment childFragment, DataPartition parentPartition)
       throws InternalException, AuthorizationException {
-    ExchangeNode exchangeNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator));
+    ExchangeNode exchangeNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator_));
     exchangeNode.addChild(childFragment.getPlanRoot(), false);
     exchangeNode.init(analyzer);
     PlanFragment parentFragment = new PlanFragment(exchangeNode, parentPartition);
@@ -740,14 +740,14 @@ public class Planner {
           createParentAggFragment(analyzer, childFragment, parentPartition);
       AggregationNode mergeAggNode =
           new AggregationNode(
-            new PlanNodeId(nodeIdGenerator), mergeFragment.getPlanRoot(),
+            new PlanNodeId(nodeIdGenerator_), mergeFragment.getPlanRoot(),
             node.getAggInfo().getMergeAggInfo());
       mergeAggNode.init(analyzer);
       mergeAggNode.setLimit(limit);
 
       // HAVING predicates can only be evaluated after the merge agg step
       node.transferConjuncts(mergeAggNode);
-      // Recompute stats after transferring the conjuncts (order is important).
+      // Recompute stats after transferring the conjuncts_ (order is important).
       node.computeStats(analyzer);
       mergeFragment.getPlanRoot().computeStats(analyzer);
       mergeAggNode.computeStats(analyzer);
@@ -798,7 +798,7 @@ public class Planner {
         ((AggregationNode)(node.getChild(0))).getAggInfo().getMergeAggInfo();
     AggregationNode mergeAggNode =
         new AggregationNode(
-          new PlanNodeId(nodeIdGenerator), node.getChild(0), mergeAggInfo);
+          new PlanNodeId(nodeIdGenerator_), node.getChild(0), mergeAggInfo);
     mergeAggNode.init(analyzer);
     mergeAggNode.unsetNeedsFinalize();
     mergeFragment.addPlanRoot(mergeAggNode);
@@ -818,7 +818,7 @@ public class Planner {
       mergeAggInfo = node.getAggInfo().getMergeAggInfo();
       mergeAggNode =
           new AggregationNode(
-            new PlanNodeId(nodeIdGenerator), node.getChild(0), mergeAggInfo);
+            new PlanNodeId(nodeIdGenerator_), node.getChild(0), mergeAggInfo);
       mergeAggNode.init(analyzer);
       mergeFragment.addPlanRoot(mergeAggNode);
     }
@@ -849,17 +849,17 @@ public class Planner {
     // insert sort node that repeats the child's sort
     SortNode childSortNode = (SortNode) childFragment.getPlanRoot();
     LOG.debug("childsortnode limit: " + Long.toString(childSortNode.getLimit()) +
-        " offset: " + Long.toString(childSortNode.getOffset()));
+        " offset_: " + Long.toString(childSortNode.getOffset()));
     Preconditions.checkState(childSortNode.hasLimit());
     PlanNode exchNode = mergeFragment.getPlanRoot();
     // the merging exchange node must not apply the limit (that's done by the
     // merging top-n)
     exchNode.unsetLimit();
     PlanNode mergeNode =
-        new SortNode(new PlanNodeId(nodeIdGenerator), childSortNode, exchNode);
+        new SortNode(new PlanNodeId(nodeIdGenerator_), childSortNode, exchNode);
 
-    // If there is an offset, it must be applied at the top-n. Child nodes do not apply
-    // the offset, and instead must keep at least (limit+offset) rows so that the top-n
+    // If there is an offset_, it must be applied at the top-n. Child nodes do not apply
+    // the offset_, and instead must keep at least (limit+offset_) rows so that the top-n
     // node does not miss any rows that should be in the top-n.
     long offset = childSortNode.getOffset();
     if (offset != 0) {
@@ -890,8 +890,8 @@ public class Planner {
   }
 
   /**
-   * If there are unassigned conjuncts that are bound by tupleIds, returns a SelectNode
-   * on top of root that evaluate those conjuncts; otherwise returns root unchanged.
+   * If there are unassigned conjuncts_ that are bound by tupleIds_, returns a SelectNode
+   * on top of root that evaluate those conjuncts_; otherwise returns root unchanged.
    */
   private PlanNode addUnassignedConjuncts(
       Analyzer analyzer, List<TupleId> tupleIds, PlanNode root)
@@ -899,11 +899,11 @@ public class Planner {
     Preconditions.checkNotNull(root);
     // TODO: standardize on logical tuple ids?
     List<Expr> conjuncts = analyzer.getUnassignedConjuncts(root);
-    //List<Expr> conjuncts = analyzer.getUnassignedConjuncts(tupleIds);
+    //List<Expr> conjuncts_ = analyzer.getUnassignedConjuncts(tupleIds_);
     if (conjuncts.isEmpty()) return root;
-    // evaluate conjuncts in SelectNode
-    SelectNode selectNode = new SelectNode(new PlanNodeId(nodeIdGenerator), root);
-    // init() picks up the unassigned conjuncts
+    // evaluate conjuncts_ in SelectNode
+    SelectNode selectNode = new SelectNode(new PlanNodeId(nodeIdGenerator_), root);
+    // init() picks up the unassigned conjuncts_
     selectNode.init(analyzer);
     Preconditions.checkState(selectNode.hasValidStats());
     return selectNode;
@@ -999,7 +999,7 @@ public class Planner {
     long numOps = 0;
     int i = 0;
     while (!remainingRefs.isEmpty()) {
-      // we minimize the resulting cardinality at each step in the join chain,
+      // we minimize the resulting cardinality_ at each step in the join chain,
       // which minimizes the total number of hash table lookups
       PlanNode newRoot = null;
       Pair<TableRef, PlanNode> minEntry = null;
@@ -1028,7 +1028,7 @@ public class Planner {
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
         PlanNode candidate = createJoinNode(analyzer, root, rhsPlan, ref, false);
         if (candidate == null) continue;
-        LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
+        LOG.trace("cardinality_=" + Long.toString(candidate.getCardinality()));
         if (newRoot == null || candidate.getCardinality() < newRoot.getCardinality()) {
           newRoot = candidate;
           minEntry = entry;
@@ -1048,9 +1048,9 @@ public class Planner {
       remainingRefs.remove(minEntry);
       joinedRefs.add(minEntry.first);
       root = newRoot;
-      // assign id after running through the possible choices in order to end up
+      // assign id_ after running through the possible choices in order to end up
       // with a dense sequence of node ids
-      root.setId(new PlanNodeId(nodeIdGenerator));
+      root.setId(new PlanNodeId(nodeIdGenerator_));
       analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
       // build side copies data to a compact representation in the tuple buffer.
       root.getChildren().get(1).setCompactData(true);
@@ -1074,7 +1074,7 @@ public class Planner {
       TableRef innerRef = refPlans.get(i).first;
       PlanNode innerPlan = refPlans.get(i).second;
       root = createJoinNode(analyzer, root, innerPlan, innerRef, true);
-      root.setId(new PlanNodeId(nodeIdGenerator));
+      root.setId(new PlanNodeId(nodeIdGenerator_));
       // build side copies data to a compact representation in the tuple buffer.
       root.getChildren().get(1).setCompactData(true);
     }
@@ -1150,16 +1150,16 @@ public class Planner {
     }
 
     if (root != null) {
-      // add unassigned conjuncts before aggregation
+      // add unassigned conjuncts_ before aggregation
       // (scenario: agg input comes from an inline view which wasn't able to
-      // evaluate all Where clause conjuncts from this scope)
+      // evaluate all Where clause conjuncts_ from this scope)
       root = addUnassignedConjuncts(analyzer, root.getTupleIds(), root);
     }
 
     // add aggregation, if required
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
-      root = new AggregationNode(new PlanNodeId(nodeIdGenerator), root, aggInfo);
+      root = new AggregationNode(new PlanNodeId(nodeIdGenerator_), root, aggInfo);
       root.init(analyzer);
       Preconditions.checkState(root.hasValidStats());
       // if we're computing DISTINCT agg fns, the analyzer already created the
@@ -1167,7 +1167,7 @@ public class Planner {
       if (aggInfo.isDistinctAgg()) {
         ((AggregationNode)root).unsetNeedsFinalize();
         root = new AggregationNode(
-            new PlanNodeId(nodeIdGenerator), root,
+            new PlanNodeId(nodeIdGenerator_), root,
             aggInfo.getSecondPhaseDistinctAggInfo());
         root.init(analyzer);
         Preconditions.checkState(root.hasValidStats());
@@ -1180,7 +1180,7 @@ public class Planner {
         analyzer, root, selectStmt.getSortInfo(), selectStmt.getLimit(),
         defaultOrderByLimit, selectStmt.getOffset());
 
-    // All the conjuncts should be assigned at this point.
+    // All the conjuncts_ should be assigned at this point.
     //Preconditions.checkState(!analyzer.hasUnassignedConjuncts());
 
     return root;
@@ -1196,7 +1196,7 @@ public class Planner {
     if (sortInfo != null) {
       Preconditions.checkState(limit != -1 || defaultOrderByLimit != -1);
       boolean isDefaultLimit = (limit == -1);
-      root = new SortNode(new PlanNodeId(nodeIdGenerator), root, sortInfo, true,
+      root = new SortNode(new PlanNodeId(nodeIdGenerator_), root, sortInfo, true,
           isDefaultLimit, offset);
       root.init(analyzer);
       Preconditions.checkState(root.hasValidStats());
@@ -1220,7 +1220,7 @@ public class Planner {
     TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor();
     tupleDesc.setIsMaterialized(true);
     MergeNode mergeNode =
-        new MergeNode(new PlanNodeId(nodeIdGenerator), tupleDesc.getId());
+        new MergeNode(new PlanNodeId(nodeIdGenerator_), tupleDesc.getId());
     // Analysis guarantees that selects without a FROM clause only have constant exprs.
     mergeNode.addConstExprList(Lists.newArrayList(resultExprs));
 
@@ -1243,7 +1243,7 @@ public class Planner {
   /**
    * Transform '=', '<[=]' and '>[=]' comparisons for given slot into
    * ValueRange. Also removes those predicates which were used for the construction
-   * of ValueRange from 'conjuncts'. Only looks at comparisons w/ constants
+   * of ValueRange from 'conjuncts_'. Only looks at comparisons w/ constants
    * (ie, the bounds of the result can be evaluated with Expr::GetValue(NULL)).
    * If there are multiple competing comparison predicates that could be used
    * to construct a ValueRange, only the first one from each category is chosen.
@@ -1269,15 +1269,15 @@ public class Planner {
       // TODO: do we need copies here?
       if (comp.getOp() == BinaryPredicate.Operator.GT
           || comp.getOp() == BinaryPredicate.Operator.GE) {
-        if (result.lowerBound == null) {
-          result.lowerBound = slotBinding;
-          result.lowerBoundInclusive = (comp.getOp() == BinaryPredicate.Operator.GE);
+        if (result.getLowerBound() == null) {
+          result.setLowerBound(slotBinding);
+          result.setLowerBoundInclusive(comp.getOp() == BinaryPredicate.Operator.GE);
           i.remove();
         }
       } else {
-        if (result.upperBound == null) {
-          result.upperBound = slotBinding;
-          result.upperBoundInclusive = (comp.getOp() == BinaryPredicate.Operator.LE);
+        if (result.getUpperBound() == null) {
+          result.setUpperBound(slotBinding);
+          result.setUpperBoundInclusive(comp.getOp() == BinaryPredicate.Operator.LE);
           i.remove();
         }
       }
@@ -1321,13 +1321,13 @@ public class Planner {
       // limit clauses on the way)
       List<Expr> viewPredicates = Expr.cloneList(preds, inlineViewRef.getSmap());
 
-      // "migrate" conjuncts by marking them as assigned and re-registering them with
+      // "migrate" conjuncts_ by marking them as assigned and re-registering them with
       // new ids
       analyzer.markConjunctsAssigned(viewPredicates);
       analyzer.registerConjuncts(viewPredicates);
     }
 
-    // mark (fully resolve) slots referenced by remaining unassigned conjuncts as
+    // mark (fully resolve) slots referenced by remaining unassigned conjuncts_ as
     // materialized
     analyzer.materializeSlots(Expr.cloneList(unassigned, inlineViewRef.getBaseTblSmap()));
 
@@ -1338,11 +1338,11 @@ public class Planner {
     if (viewStmt instanceof SelectStmt) {
       SelectStmt selectStmt = (SelectStmt) viewStmt;
       if (selectStmt.getTableRefs().isEmpty()) {
-        // Analysis should have generated a tuple id into which to materialize the exprs.
+        // Analysis should have generated a tuple id_ into which to materialize the exprs.
         Preconditions.checkState(inlineViewRef.getMaterializedTupleIds().size() == 1);
         // we need to materialize all slots of our inline view tuple
         analyzer.getTupleDesc(inlineViewRef.getId()).materializeSlots();
-        MergeNode mergeNode = new MergeNode(new PlanNodeId(nodeIdGenerator),
+        MergeNode mergeNode = new MergeNode(new PlanNodeId(nodeIdGenerator_),
             inlineViewRef.getMaterializedTupleIds().get(0));
         mergeNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
         mergeNode.getConstExprLists().add(selectStmt.getBaseTblResultExprs());
@@ -1359,7 +1359,7 @@ public class Planner {
     rootNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
     // set smap *before* creating a SelectNode in order to allow proper resolution
     rootNode.setBaseTblSmap(inlineViewRef.getBaseTblSmap());
-    // if the view has a limit clause we may have conjuncts from the enclosing scope
+    // if the view has a limit clause we may have conjuncts_ from the enclosing scope
     // left
     rootNode = addUnassignedConjuncts(
         analyzer, inlineViewRef.getDesc().getId().asList(), rootNode);
@@ -1376,19 +1376,19 @@ public class Planner {
       throws InternalException, AuthorizationException {
     ScanNode scanNode = null;
     if (tblRef.getTable() instanceof HdfsTable) {
-      scanNode = new HdfsScanNode(new PlanNodeId(nodeIdGenerator), tblRef.getDesc(),
+      scanNode = new HdfsScanNode(new PlanNodeId(nodeIdGenerator_), tblRef.getDesc(),
           (HdfsTable)tblRef.getTable());
       scanNode.init(analyzer);
       return scanNode;
     } else {
       // HBase table
-      scanNode = new HBaseScanNode(new PlanNodeId(nodeIdGenerator), tblRef.getDesc());
+      scanNode = new HBaseScanNode(new PlanNodeId(nodeIdGenerator_), tblRef.getDesc());
     }
     // TODO: move this to HBaseScanNode.init();
     Preconditions.checkState(scanNode instanceof HBaseScanNode);
 
     List<Expr> conjuncts = analyzer.getUnassignedConjuncts(scanNode);
-    // mark conjuncts assigned here; they will either end up inside a
+    // mark conjuncts_ assigned here; they will either end up inside a
     // ValueRange or will be evaluated directly by the node
     analyzer.markConjunctsAssigned(conjuncts);
     List<ValueRange> keyRanges = Lists.newArrayList();
@@ -1402,7 +1402,7 @@ public class Planner {
         // and non-string comparisons won't work)
         keyRanges.add(null);
       } else {
-        // create ValueRange from conjuncts for slot; also removes conjuncts that were
+        // create ValueRange from conjuncts_ for slot; also removes conjuncts_ that were
         // used as input for filter
         keyRanges.add(createScanRange(slotDesc, conjuncts));
       }
@@ -1416,14 +1416,14 @@ public class Planner {
   }
 
   /**
-   * Return join conjuncts that can be used for hash table lookups.
+   * Return join conjuncts_ that can be used for hash table lookups.
    * - for inner joins, those are equi-join predicates in which one side is fully bound
-   *   by lhsIds and the other by rhs' id;
-   * - for outer joins: same type of conjuncts as inner joins, but only from the JOIN
+   *   by lhsIds and the other by rhs' id_;
+   * - for outer joins: same type of conjuncts_ as inner joins, but only from the JOIN
    *   clause
-   * Returns the conjuncts in 'joinConjuncts' (in which "<lhs> = <rhs>" is returned
+   * Returns the conjuncts_ in 'joinConjuncts' (in which "<lhs> = <rhs>" is returned
    * as Pair(<lhs>, <rhs>)) and also in their original form in 'joinPredicates'.
-   * If no conjuncts are found, constructs them based on equivalence classes, where
+   * If no conjuncts_ are found, constructs them based on equivalence classes, where
    * possible. In that case, they are still returned through joinConjuncts, but
    * joinPredicates would be empty.
    */
@@ -1554,7 +1554,7 @@ public class Planner {
 
     List<Expr> ojConjuncts = Lists.newArrayList();
     if (innerRef.getJoinOp().isOuterJoin()) {
-      // Also assign conjuncts from On clause. All remaining unassigned conjuncts
+      // Also assign conjuncts_ from On clause. All remaining unassigned conjuncts_
       // that can be evaluated by this join are assigned in createSelectPlan().
       ojConjuncts = analyzer.getUnassignedOjConjuncts(innerRef);
       analyzer.markConjunctsAssigned(ojConjuncts);
@@ -1592,7 +1592,7 @@ public class Planner {
       Analyzer analyzer, UnionStmt unionStmt, List<UnionOperand> unionOperands)
       throws ImpalaException {
     MergeNode mergeNode =
-        new MergeNode(new PlanNodeId(nodeIdGenerator), unionStmt.getTupleId());
+        new MergeNode(new PlanNodeId(nodeIdGenerator_), unionStmt.getTupleId());
     for (UnionOperand op: unionOperands) {
       QueryStmt queryStmt = op.getQueryStmt();
       if (queryStmt instanceof SelectStmt) {
@@ -1641,7 +1641,7 @@ public class Planner {
    */
   private PlanNode createUnionPlan(Analyzer analyzer, UnionStmt unionStmt)
       throws ImpalaException {
-    // Turn unassigned predicates for unionStmt's tupleId into predicates for
+    // Turn unassigned predicates for unionStmt's tupleId_ into predicates for
     // the individual operands.
     // Do this prior to creating the operands' plan trees so they get a chance to
     // pick up propagated predicates.
@@ -1653,7 +1653,7 @@ public class Planner {
     for (UnionOperand op: unionStmt.getOperands()) {
       if (isConstantSelect(op.getQueryStmt())) {
         // if we have constant selects, the MergeNode needs to evaluate
-        // all conjuncts as well
+        // all conjuncts_ as well
         // TODO: evaluate predicates directly against constant selects and drop
         // non-matching rows right away
         markAssigned = false;
@@ -1663,9 +1663,9 @@ public class Planner {
 
       // eliminate constant predicates: they would (incorrectly) get picked up by
       // the first call to Analyzer.getUnassignedConjuncts()
-      // TODO: drop the operand if one of its conjuncts is always false
+      // TODO: drop the operand if one of its conjuncts_ is always false
       if (removeConstantExprs(opConjuncts)) {
-        // in this case, we still need to evaluate the conjuncts in the MergeNode
+        // in this case, we still need to evaluate the conjuncts_ in the MergeNode
         // itself
         markAssigned = false;
       }
@@ -1681,7 +1681,7 @@ public class Planner {
     if (unionStmt.hasDistinctOps()) {
       result = createUnionMergePlan(analyzer, unionStmt, unionStmt.getDistinctOperands());
       result = new AggregationNode(
-          new PlanNodeId(nodeIdGenerator), result, unionStmt.getDistinctAggInfo());
+          new PlanNodeId(nodeIdGenerator_), result, unionStmt.getDistinctAggInfo());
       result.init(analyzer);
     }
     // create ALL tree
@@ -1764,7 +1764,7 @@ public class Planner {
         uniqueFragments.add(fragment);
         if (node.getPerHostMemCost() < 0) {
           LOG.warn(String.format("Invalid per-host memory requirement %s of node %s.\n" +
-              "PlanNode stats are: numNodes=%s ", node.getPerHostMemCost(),
+              "PlanNode stats are: numNodes_=%s ", node.getPerHostMemCost(),
               node.getClass().getSimpleName(), node.getNumNodes()));
         }
         if (node instanceof HBaseScanNode) {

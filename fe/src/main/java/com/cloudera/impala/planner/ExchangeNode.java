@@ -49,19 +49,19 @@ public class ExchangeNode extends PlanNode {
     // This ExchangeNode 'inherits' several parameters from its children.
     // Ensure that all children agree on them.
     if (!children.isEmpty()) {
-      Preconditions.checkState(limit == node.limit);
-      Preconditions.checkState(tupleIds.equals(node.tupleIds));
-      Preconditions.checkState(rowTupleIds.equals(node.rowTupleIds));
-      Preconditions.checkState(nullableTupleIds.equals(node.nullableTupleIds));
-      Preconditions.checkState(compactData == node.compactData);
+      Preconditions.checkState(limit_ == node.limit_);
+      Preconditions.checkState(tupleIds_.equals(node.tupleIds_));
+      Preconditions.checkState(rowTupleIds_.equals(node.rowTupleIds_));
+      Preconditions.checkState(nullableTupleIds_.equals(node.nullableTupleIds_));
+      Preconditions.checkState(compactData_ == node.compactData_);
     } else {
-      limit = node.limit;
-      tupleIds = Lists.newArrayList(node.tupleIds);
-      rowTupleIds = Lists.newArrayList(node.rowTupleIds);
-      nullableTupleIds = Sets.newHashSet(node.nullableTupleIds);
-      compactData = node.compactData;
+      limit_ = node.limit_;
+      tupleIds_ = Lists.newArrayList(node.tupleIds_);
+      rowTupleIds_ = Lists.newArrayList(node.rowTupleIds_);
+      nullableTupleIds_ = Sets.newHashSet(node.nullableTupleIds_);
+      compactData_ = node.compactData_;
     }
-    if (copyConjuncts) conjuncts.addAll(Expr.cloneList(node.conjuncts, null));
+    if (copyConjuncts) conjuncts_.addAll(Expr.cloneList(node.conjuncts_, null));
     children.add(node);
   }
 
@@ -69,35 +69,35 @@ public class ExchangeNode extends PlanNode {
   public void addChild(PlanNode node) { addChild(node, false); }
 
   @Override
-  public void setCompactData(boolean on) { this.compactData = on; }
+  public void setCompactData(boolean on) { this.compactData_ = on; }
 
   @Override
   public void computeStats(Analyzer analyzer) {
     Preconditions.checkState(!children.isEmpty(),
         "ExchangeNode must have at least one child");
-    cardinality = 0;
+    cardinality_ = 0;
     for (PlanNode child: children) {
       if (child.getCardinality() == -1) {
-        cardinality = -1;
+        cardinality_ = -1;
         break;
       }
-      cardinality += child.getCardinality();
+      cardinality_ += child.getCardinality();
     }
 
     if (hasLimit()) {
-      if (cardinality == -1) {
-        cardinality = limit;
+      if (cardinality_ == -1) {
+        cardinality_ = limit_;
       } else {
-        cardinality = Math.min(limit, cardinality);
+        cardinality_ = Math.min(limit_, cardinality_);
       }
     }
 
-    // Pick the max numNodes and avgRowSize of all children.
-    numNodes = Integer.MIN_VALUE;
-    avgRowSize = Integer.MIN_VALUE;
+    // Pick the max numNodes_ and avgRowSize_ of all children.
+    numNodes_ = Integer.MIN_VALUE;
+    avgRowSize_ = Integer.MIN_VALUE;
     for (PlanNode child: children) {
-      numNodes = Math.max(child.numNodes, numNodes);
-      avgRowSize =  Math.max(child.numNodes, numNodes);
+      numNodes_ = Math.max(child.numNodes_, numNodes_);
+      avgRowSize_ =  Math.max(child.numNodes_, numNodes_);
     }
   }
 
@@ -107,7 +107,7 @@ public class ExchangeNode extends PlanNode {
         "ExchangeNode must have at least one child");
     msg.node_type = TPlanNodeType.EXCHANGE_NODE;
     msg.exchange_node = new TExchangeNode();
-    for (TupleId tid: tupleIds) {
+    for (TupleId tid: tupleIds_) {
       msg.exchange_node.addToInput_row_tuples(tid.asInt());
     }
   }

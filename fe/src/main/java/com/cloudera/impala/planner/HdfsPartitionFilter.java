@@ -43,17 +43,17 @@ import com.google.common.collect.Maps;
 public class HdfsPartitionFilter {
   private final static Logger LOG = LoggerFactory.getLogger(HdfsPartitionFilter.class);
 
-  private final Expr predicate;
+  private final Expr predicate_;
 
   // lhs exprs of smap used in isMatch()
-  private final ArrayList<SlotRef> lhsSlotRefs = Lists.newArrayList();
+  private final ArrayList<SlotRef> lhsSlotRefs_ = Lists.newArrayList();
   // indices into Table.getColumns()
-  private final ArrayList<Integer> refdKeys = Lists.newArrayList();
+  private final ArrayList<Integer> refdKeys_ = Lists.newArrayList();
 
   public HdfsPartitionFilter(Expr predicate, HdfsTable tbl, Analyzer analyzer) {
-    this.predicate = predicate;
+    predicate_ = predicate;
 
-    // populate lhsSlotRefs and refdKeys
+    // populate lhsSlotRefs_ and refdKeys_
     ArrayList<SlotId> refdSlots = Lists.newArrayList();
     predicate.getIds(null, refdSlots);
     HashMap<Column, SlotDescriptor> slotDescsByCol = Maps.newHashMap();
@@ -66,11 +66,11 @@ public class HdfsPartitionFilter {
       Column col = tbl.getColumns().get(i);
       SlotDescriptor slotDesc = slotDescsByCol.get(col);
       if (slotDesc != null) {
-        lhsSlotRefs.add(new SlotRef(slotDesc));
-        refdKeys.add(i);
+        lhsSlotRefs_.add(new SlotRef(slotDesc));
+        refdKeys_.add(i);
       }
     }
-    Preconditions.checkState(lhsSlotRefs.size() == refdKeys.size());
+    Preconditions.checkState(lhsSlotRefs_.size() == refdKeys_.size());
   }
 
   /**
@@ -83,12 +83,12 @@ public class HdfsPartitionFilter {
       throws InternalException, AuthorizationException {
     // construct smap
     Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
-    for (int i = 0; i < refdKeys.size(); ++i) {
+    for (int i = 0; i < refdKeys_.size(); ++i) {
       sMap.addMapping(
-          lhsSlotRefs.get(i), partition.getPartitionValues().get(refdKeys.get(i)));
+          lhsSlotRefs_.get(i), partition.getPartitionValues().get(refdKeys_.get(i)));
     }
 
-    Expr literalPredicate = predicate.clone(sMap);
+    Expr literalPredicate = predicate_.clone(sMap);
     LOG.trace(
         "isMatch: " + literalPredicate.toSql() + " " + literalPredicate.debugString());
     Preconditions.checkState(literalPredicate.isConstant());
