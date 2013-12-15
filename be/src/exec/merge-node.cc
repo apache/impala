@@ -55,7 +55,6 @@ Status MergeNode::Init(const TPlanNode& tnode) {
 }
 
 Status MergeNode::Prepare(RuntimeState* state) {
-  LOG(INFO) << "MergeNode::prepare";
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
@@ -69,14 +68,12 @@ Status MergeNode::Prepare(RuntimeState* state) {
   // Prepare const expr lists.
   for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(const_result_expr_lists_[i], state, row_desc()));
-    LOG(INFO) << "const: " << Expr::DebugString(const_result_expr_lists_[i]);
     DCHECK_EQ(const_result_expr_lists_[i].size(), materialized_slots_.size());
   }
 
   // Prepare result expr lists.
   for (int i = 0; i < result_expr_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(result_expr_lists_[i], state, child(i)->row_desc()));
-    LOG(INFO) << "non-const: " << Expr::DebugString(result_expr_lists_[i]);
     DCHECK_EQ(result_expr_lists_[i].size(), materialized_slots_.size());
   }
   return Status::OK;

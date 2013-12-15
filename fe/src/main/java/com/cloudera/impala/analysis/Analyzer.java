@@ -314,7 +314,7 @@ public class Analyzer {
     for (TupleId tid: tids) {
       globalState.outerJoinedTupleIds.put(tid, rhsRef);
     }
-    LOG.info("registerOuterJoinedTids: " + globalState.outerJoinedTupleIds.toString());
+    LOG.trace("registerOuterJoinedTids: " + globalState.outerJoinedTupleIds.toString());
   }
 
   /**
@@ -508,7 +508,8 @@ public class Analyzer {
       globalState.slotConjuncts.get(id).add(e.getId());
     }
 
-    LOG.info("register tuple/slotConjunct: " + Integer.toString(e.getId().asInt()) + " " + e.toSql() + " " + e.debugString());
+    LOG.trace("register tuple/slotConjunct: " + Integer.toString(e.getId().asInt())
+        + " " + e.toSql() + " " + e.debugString());
 
     if (!(e instanceof BinaryPredicate)) return;
     BinaryPredicate binaryPred = (BinaryPredicate) e;
@@ -533,7 +534,7 @@ public class Analyzer {
           globalState.eqJoinConjuncts.get(tupleIds.get(0)).add(e.getId());
         }
         binaryPred.setIsEqJoinConjunct(true);
-        LOG.info("register eqJoinConjunct: " + Integer.toString(e.getId().asInt()));
+        LOG.trace("register eqJoinConjunct: " + Integer.toString(e.getId().asInt()));
       }
     }
   }
@@ -547,18 +548,15 @@ public class Analyzer {
     // create an eq predicate between lhs and rhs
     BinaryPredicate p = new BinaryPredicate(BinaryPredicate.Operator.EQ, lhs, rhs);
     p.setIsAuxExpr();
-    LOG.info("register equiv predicate: " + p.toSql() + " " + p.debugString());
-    registerConjunct(p);
+    LOG.trace("register equiv predicate: " + p.toSql() + " " + p.debugString());
     try {
       // create casts if needed
       p.analyze(this);
-    } catch (AnalysisException e) {
-      throw new IllegalStateException(
-          "constructed predicate failed analysis: " + p.toSql());
-    } catch (AuthorizationException e) {
-      throw new IllegalStateException(
-          "constructed predicate fails authorization: " + p.toSql());
+    } catch (ImpalaException e) {
+      // not an executable predicate; ignore
+      return;
     }
+    registerConjunct(p);
   }
 
   /**
@@ -568,7 +566,7 @@ public class Analyzer {
    */
   public List<Expr> getUnassignedConjuncts(
       List<TupleId> tupleIds, boolean inclOjConjuncts) {
-    LOG.info("getUnassignedConjuncts for " + Id.printIds(tupleIds));
+    LOG.trace("getUnassignedConjuncts for " + Id.printIds(tupleIds));
     List<Expr> result = Lists.newArrayList();
     for (Expr e: globalState.conjuncts.values()) {
       if (e.isBoundByTupleIds(tupleIds)
@@ -577,7 +575,7 @@ public class Analyzer {
           && (inclOjConjuncts
               || !globalState.ojClauseByConjunct.containsKey(e.getId()))) {
         result.add(e);
-        LOG.info("getUnassignedConjunct: " + e.toSql());
+        LOG.trace("getUnassignedConjunct: " + e.toSql());
       }
     }
     return result;
@@ -594,12 +592,12 @@ public class Analyzer {
    */
   public List<Expr> getUnassignedConjuncts(PlanNode node) {
     List<TupleId> tupleIds = node.getTblRefIds();
-    LOG.info("getUnassignedConjuncts for node with " + Id.printIds(tupleIds));
+    LOG.trace("getUnassignedConjuncts for node with " + Id.printIds(tupleIds));
     List<Expr> result = Lists.newArrayList();
     for (Expr e: getUnassignedConjuncts(tupleIds, true)) {
       if (canEvalPredicate(node, e)) {
         result.add(e);
-        LOG.info("getUnassignedConjunct: " + e.toSql());
+        LOG.trace("getUnassignedConjunct: " + e.toSql());
       }
     }
     return result;
@@ -619,7 +617,7 @@ public class Analyzer {
         Expr e = globalState.conjuncts.get(conjunctId);
         Preconditions.checkState(e != null);
         result.add(e);
-        LOG.info("getUnassignedOjConjunct: " + e.toSql());
+        LOG.trace("getUnassignedOjConjunct: " + e.toSql());
       }
     }
     return result;
@@ -696,7 +694,8 @@ public class Analyzer {
    *   Outer Join clause
    */
   public boolean canEvalPredicate(List<TupleId> tupleIds, Expr e) {
-    LOG.info("canEval: " + e.toSql() + " " + e.debugString() + " " + Id.printIds(tupleIds));
+    LOG.trace("canEval: " + e.toSql() + " " + e.debugString() + " "
+        + Id.printIds(tupleIds));
     if (!e.isBoundByTupleIds(tupleIds)) return false;
     ArrayList<TupleId> tids = Lists.newArrayList();
     e.getIds(tids, null);
@@ -732,13 +731,13 @@ public class Analyzer {
     }
 
     for (TupleId tid: tids) {
-      LOG.info("canEval: checking tid " + tid.toString());
+      LOG.trace("canEval: checking tid " + tid.toString());
       TableRef rhsRef = getLastOjClause(tid);
       // this is not outer-joined; ignore
       if (rhsRef == null) continue;
       // check whether the last join to outer-join 'tid' is materialized by tupleIds
       boolean contains = tupleIds.containsAll(rhsRef.getAllTupleIds());
-      LOG.info("canEval: contains=" + (contains ? "true " : "false ")
+      LOG.trace("canEval: contains=" + (contains ? "true " : "false ")
           + Id.printIds(tupleIds) + " " + Id.printIds(rhsRef.getAllTupleIds()));
       if (!tupleIds.containsAll(rhsRef.getAllTupleIds())) return false;
     }
@@ -763,7 +762,7 @@ public class Analyzer {
    * have very different semantics
    */
   public ArrayList<Pair<Expr, Boolean>> getBoundPredicates(SlotId slotId, PlanNode node) {
-    LOG.info("getBoundPredicates(" + slotId.toString() + ")");
+    LOG.trace("getBoundPredicates(" + slotId.toString() + ")");
     TupleId tid = getTupleId(slotId);
     ArrayList<Pair<Expr, Boolean>> result = Lists.newArrayList();
     int maxSlotId = globalState.descTbl.getMaxSlotId().asInt();
@@ -775,7 +774,7 @@ public class Analyzer {
 
       for (ExprId id: globalState.slotConjuncts.get(equivSlotId)) {
         Expr e = globalState.conjuncts.get(id);
-        LOG.info("getBoundPredicates: considering " + e.toSql() + " " + e.debugString());
+        LOG.trace("getBoundPredicates: considering " + e.toSql() + " " + e.debugString());
         if (!e.isBound(equivSlotId)) continue;
 
         // if this predicate is directly against slotId, check whether 'node' can
@@ -816,7 +815,7 @@ public class Analyzer {
           p = e.clone(smap);
           // we need to re-analyze in order to create casts, if necessary
           p.unsetIsAnalyzed();
-          LOG.info("new pred: " + p.toSql() + " " + p.debugString());
+          LOG.trace("new pred: " + p.toSql() + " " + p.debugString());
 
           try {
             // create casts if needed
@@ -852,7 +851,7 @@ public class Analyzer {
               && (!globalState.ojClauseByConjunct.containsKey(e.getId())
                   || globalState.ojClauseByConjunct.get(e.getId())
                     != globalState.outerJoinedTupleIds.get(origTupleId));
-        LOG.info("getBoundPredicates: adding " + p.toSql() + " " + p.debugString());
+        LOG.trace("getBoundPredicates: adding " + p.toSql() + " " + p.debugString());
         result.add(new Pair<Expr, Boolean>(p, reverseValueTransfer && ! evalByJoin));
       }
     }
@@ -891,7 +890,7 @@ public class Analyzer {
 
     // transform equality predicates into a transfer graph
     for (ExprId id: globalState.conjuncts.keySet()) {
-      LOG.info("check id " + Integer.toString(id.asInt()));
+      LOG.trace("check id " + Integer.toString(id.asInt()));
       if (!analyzedIds.add(id)) continue;
 
       Expr e = globalState.conjuncts.get(id);
@@ -899,7 +898,7 @@ public class Analyzer {
       if (!(e instanceof BinaryPredicate)) continue;
       BinaryPredicate p = (BinaryPredicate) e;
       if (p.getOp() != BinaryPredicate.Operator.EQ) continue;
-      LOG.info("check " + p.toSql() + " " + p.debugString());
+      LOG.trace("check " + p.toSql() + " " + p.debugString());
       Pair<SlotId, SlotId> slotIds = p.getEqSlots();
       if (slotIds == null) continue;
       TableRef tblRef = globalState.ojClauseByConjunct.get(id);
@@ -911,7 +910,7 @@ public class Analyzer {
         // scope of the source slot and the receiving slot's block has a limit
         Analyzer firstBlock = globalState.blockBySlot.get(slotIds.first);
         Analyzer secondBlock = globalState.blockBySlot.get(slotIds.second);
-        LOG.info("value transfer: from " + slotIds.first.toString());
+        LOG.trace("value transfer: from " + slotIds.first.toString());
         if (!(secondBlock.hasLimit && secondBlock.ancestors.contains(firstBlock))) {
           globalState.valueTransfer[slotIds.first.asInt()][slotIds.second.asInt()] =
               true;
@@ -982,7 +981,7 @@ public class Analyzer {
         if (i != j && globalState.valueTransfer[i][j]) strings.add(Integer.toString(j));
       }
       if (!strings.isEmpty()) {
-        LOG.info("transfer from " + Integer.toString(i) + " to: "
+        LOG.trace("transfer from " + Integer.toString(i) + " to: "
             + Joiner.on(" ").join(strings));
       }
     }
@@ -1052,7 +1051,7 @@ public class Analyzer {
       for (SlotId slotId: members) {
         strings.add(slotId.toString());
       }
-      LOG.info("equiv class: id=" + id.toString() + " members=("
+      LOG.trace("equiv class: id=" + id.toString() + " members=("
           + Joiner.on(" ").join(strings) + ")");
     }
   }
@@ -1129,7 +1128,7 @@ public class Analyzer {
     if (conjuncts == null) return;
     for (Expr p: conjuncts) {
       globalState.assignedConjuncts.add(p.getId());
-      LOG.info("markAssigned " + p.toSql() + " " + p.debugString());
+      LOG.trace("markAssigned " + p.toSql() + " " + p.debugString());
     }
   }
 
@@ -1137,7 +1136,7 @@ public class Analyzer {
    * Mark predicate as assigned.
    */
   public void markConjunctAssigned(Expr conjunct) {
-    LOG.info("markAssigned " + conjunct.toSql() + " " + conjunct.debugString());
+    LOG.trace("markAssigned " + conjunct.toSql() + " " + conjunct.debugString());
     globalState.assignedConjuncts.add(conjunct.getId());
   }
 
@@ -1161,7 +1160,7 @@ public class Analyzer {
       if (globalState.assignedConjuncts.contains(id)) continue;
       Expr e = globalState.conjuncts.get(id);
       if (e.isAuxExpr()) continue;
-      LOG.info("unassigned: " + e.toSql() + " " + e.debugString());
+      LOG.trace("unassigned: " + e.toSql() + " " + e.debugString());
       return true;
     }
     return false;

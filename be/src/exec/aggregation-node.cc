@@ -71,7 +71,6 @@ Status AggregationNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &probe_exprs_));
   for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i) {
-    LOG(INFO) << "AggNode[" << id_ << "]: agg_function:\n" << apache::thrift::ThriftDebugString(tnode.agg_node.aggregate_functions[i]);
     AggFnEvaluator* evaluator;
     RETURN_IF_ERROR(AggFnEvaluator::Create(
         pool_, tnode.agg_node.aggregate_functions[i], &evaluator));
@@ -117,8 +116,6 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     SlotDescriptor* desc = agg_tuple_desc_->slots()[j];
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Prepare(state, child(0)->row_desc(),
         tuple_pool_.get(), desc));
-    LOG(INFO) << "AggNode: input_exprs="
-        << Expr::DebugString(aggregate_evaluators_[i]->input_exprs());
   }
 
   // TODO: how many buckets?
@@ -384,7 +381,6 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
 
   // Src slot is not null, update dst_slot
   builder.SetInsertPoint(src_not_null_block);
-  LOG(INFO) << "CodegenUpdateSlot: slot_desc=" << slot_desc->DebugString();
   Value* dst_ptr = builder.CreateStructGEP(args[0], field_idx, "dst_slot_ptr");
   Value* result = NULL;
 

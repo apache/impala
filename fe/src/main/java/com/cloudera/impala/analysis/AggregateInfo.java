@@ -284,9 +284,9 @@ public class AggregateInfo {
    */
   public void substitute(Expr.SubstitutionMap smap) {
     Expr.substituteList(groupingExprs, smap);
-    LOG.info("AggInfo: grouping_exprs=" + Expr.debugString(groupingExprs));
+    LOG.trace("AggInfo: grouping_exprs=" + Expr.debugString(groupingExprs));
     Expr.substituteList(aggregateExprs, smap);
-    LOG.info("AggInfo: agg_exprs=" + Expr.debugString(aggregateExprs));
+    LOG.trace("AggInfo: agg_exprs=" + Expr.debugString(aggregateExprs));
     aggTupleSMap.substituteLhs(smap);
     if (secondPhaseDistinctAggInfo != null) {
       secondPhaseDistinctAggInfo.substitute(smap);
@@ -520,7 +520,7 @@ public class AggregateInfo {
    */
   public TupleDescriptor createAggTupleDesc(Analyzer analyzer)
       throws AuthorizationException {
-    LOG.info("createAggTupleDesc()");
+    LOG.trace("createAggTupleDesc()");
     TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor();
     List<Expr> exprs = Lists.newLinkedList();
     exprs.addAll(groupingExprs);
@@ -534,7 +534,7 @@ public class AggregateInfo {
       Preconditions.checkState(expr.getType().isValid());
       outputSlotDesc.setType(expr.getType());
       outputSlotDesc.setStats(ColumnStats.fromExpr(expr));
-      LOG.info(outputSlotDesc.debugString());
+      LOG.trace(outputSlotDesc.debugString());
       // count(*) is non-nullable.
       if (i < aggregateExprStartIndex) {
         // register equivalence between grouping slot and grouping expr;
@@ -554,8 +554,8 @@ public class AggregateInfo {
       }
       aggTupleSMap.addMapping(expr.clone(null), new SlotRef(outputSlotDesc));
     }
-    LOG.info("aggtuple=" + result.debugString());
-    LOG.info("aggtuplesmap=" + aggTupleSMap.debugString());
+    LOG.trace("aggtuple=" + result.debugString());
+    LOG.trace("aggtuplesmap=" + aggTupleSMap.debugString());
     return result;
   }
 

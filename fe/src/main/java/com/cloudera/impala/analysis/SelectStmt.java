@@ -255,9 +255,9 @@ public class SelectStmt extends QueryStmt {
       }
     }
     baseTblResultExprs_ = Expr.cloneList(resultExprs_, baseTblSmap_);
-    LOG.info("baseTblSmap_: " + baseTblSmap_.debugString());
-    LOG.info("resultExprs: " + Expr.debugString(resultExprs_));
-    LOG.info("baseTblResultExprs: " + Expr.debugString(baseTblResultExprs_));
+    LOG.trace("baseTblSmap_: " + baseTblSmap_.debugString());
+    LOG.trace("resultExprs: " + Expr.debugString(resultExprs_));
+    LOG.trace("baseTblResultExprs: " + Expr.debugString(baseTblResultExprs_));
   }
 
   public List<TupleId> getTableRefIds() {
