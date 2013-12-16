@@ -147,7 +147,6 @@ DataStreamRecvr* RuntimeState::CreateRecvr(
     int buffer_size, RuntimeProfile* profile) {
   DataStreamRecvr* recvr = exec_env_->stream_mgr()->CreateRecvr(this, row_desc,
       fragment_instance_id_, dest_node_id, num_senders, buffer_size, profile);
-  lock_guard<mutex> l(data_stream_recvrs_lock_);
   data_stream_recvrs_pool_->Add(recvr);
   return recvr;
 }

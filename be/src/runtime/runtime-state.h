@@ -222,9 +222,6 @@ class RuntimeState {
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
-  // Protects data_stream_recvrs_pool_
-  boost::mutex data_stream_recvrs_lock_;
-
   // Data stream receivers created by a plan fragment are gathered here to make sure
   // they are destroyed before obj_pool_ (class members are destroyed in reverse order).
   // Receivers depend on the descriptor table and we need to guarantee that their control
