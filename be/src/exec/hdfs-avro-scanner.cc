@@ -662,7 +662,9 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
   int error = avro_schema_from_json_length(
       table_schema_str.c_str(), table_schema_str.size(), &table_schema.schema);
   if (error != 0) {
-    LOG(WARNING) << "Failed to parse table schema: " << avro_strerror();
+    stringstream ss;
+    ss << "Failed to parse table schema: " << avro_strerror();
+    node->runtime_state()->LogError(ss.str());
     return NULL;
   }
   int num_fields = avro_schema_record_size(table_schema.schema);

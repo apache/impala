@@ -124,10 +124,12 @@ Status RuntimeState::InitMemTrackers(const TUniqueId& query_id) {
       runtime_profile()->name(), query_mem_tracker_.get()));
   if (has_query_mem_limit) {
     if (bytes_limit > MemInfo::physical_mem()) {
-      LOG(WARNING) << "Memory limit "
-                   << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
-                   << " exceeds physical memory of "
-                   << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
+      stringstream ss;
+      ss << "Memory limit "
+         << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
+         << " exceeds physical memory of "
+         << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
+      LogError(ss.str());
     }
     VLOG_QUERY << "Using query memory limit: "
                << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);

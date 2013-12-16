@@ -398,8 +398,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     if ((*scan_range_params_)[i].volume_id == -1) {
       if (!unknown_disk_id_warned_) {
         AddRuntimeExecOption("Missing Volume Id");
-        LOG(WARNING) << "Unknown disk id.  This will negatively affect performance. "
-                     << " Check your hdfs settings to enable block location metadata.";
+        runtime_state()->LogError(
+          "Unknown disk id.  This will negatively affect performance. "
+          "Check your hdfs settings to enable block location metadata.");
         unknown_disk_id_warned_ = true;
       }
       ++num_ranges_missing_volume_id;

@@ -55,8 +55,10 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       if (split->offset() != 0) {
         // We are expecting each file to be one hdfs block (so all the scan range offsets
         // should be 0).  This is not incorrect but we will issue a warning.
-        LOG(WARNING) << "Parquet file should not be split into multiple hdfs-blocks."
-                     << " file=" << files[i]->filename;
+        stringstream ss;
+        ss << "Parquet file should not be split into multiple hdfs-blocks."
+           << " file=" << files[i]->filename;
+        scan_node->runtime_state()->LogError(ss.str());
         // We assign the entire file to one scan range, so mark all but one split
         // (i.e. the first split) as complete
         scan_node->RangeComplete(THdfsFileFormat::PARQUET, THdfsCompression::NONE);

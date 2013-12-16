@@ -612,7 +612,6 @@ Status HdfsParquetTableWriter::Init() {
   VLOG_FILE << "Using compression codec: " << codec;
 
   // Initialize each column structure.
-  LOG(INFO) << "::Init(): output_exprs=" << Expr::DebugString(output_exprs_);
   for (int i = 0; i < columns_.size(); ++i) {
     BaseColumnWriter* writer = NULL;
     switch (output_exprs_[i]->type()) {

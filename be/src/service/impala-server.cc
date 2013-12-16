@@ -1315,7 +1315,7 @@ void ImpalaServer::CancelSessionQueries(SessionState* session_state) {
   }
 
   // Unregister all open queries from this session.
-  Status status("Session closed");
+  Status status("Session closed", true);
   BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
     UnregisterQuery(query_id, &status);
   }

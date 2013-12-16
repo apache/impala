@@ -185,9 +185,9 @@ void PlanFragmentExecutor::OptimizeLlvmModule() {
   if (runtime_state_->codegen() == NULL) return;
   Status status = runtime_state_->codegen()->OptimizeModule();
   if (!status.ok()) {
-    LOG(ERROR) << "Error with codegen for this query: " << status.GetErrorMsg();
-    // TODO: propagate this to the coordinator and user?  Not really actionable
-    // for them but we'd like them to let us know.
+    stringstream ss;
+    ss << "Error with codegen for this query: " << status.GetErrorMsg();
+    runtime_state_->LogError(ss.str());
   }
 }
 
