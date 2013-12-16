@@ -24,6 +24,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -65,8 +66,6 @@ class TClientRequest;
 class TExecRequest;
 class TSessionState;
 class TQueryOptions;
-
-class ThriftServer;
 
 // An ImpalaServer contains both frontend and backend functionality;
 // it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)

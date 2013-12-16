@@ -21,7 +21,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_set.hpp>
-#include <thrift/protocol/TDebugProtocol.h>
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
@@ -34,30 +33,19 @@
 
 #include "catalog/catalog-server.h"
 #include "catalog/catalog-util.h"
-#include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/version.h"
-#include "exec/exec-node.h"
-#include "exec/hdfs-table-sink.h"
-#include "exec/scan-node.h"
-#include "exprs/expr.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
-#include "rpc/thrift-server.h"
 #include "rpc/thrift-thread.h"
-#include "runtime/data-stream-mgr.h"
 #include "runtime/client-cache.h"
-#include "runtime/descriptors.h"
-#include "runtime/data-stream-sender.h"
-#include "runtime/row-batch.h"
-#include "runtime/plan-fragment-executor.h"
-#include "runtime/hdfs-fs-cache.h"
+#include "runtime/data-stream-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/lib-cache.h"
 #include "runtime/timestamp-value.h"
+#include "service/fragment-exec-state.h"
 #include "service/query-exec-state.h"
 #include "statestore/simple-scheduler.h"
-#include "util/bit-util.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
@@ -71,11 +59,8 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/DataSinks_types.h"
-#include "gen-cpp/Types_types.h"
-#include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
-#include "gen-cpp/Frontend_types.h"
 
 using namespace std;
 using namespace boost;
@@ -161,183 +146,6 @@ const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
 
 const string BEESWAX_SERVER_NAME = "beeswax-frontend";
 const string HS2_SERVER_NAME = "hiveserver2-frontend";
-
-// Execution state of a single plan fragment.
-class ImpalaServer::FragmentExecState {
- public:
-  FragmentExecState(const TUniqueId& query_id, int backend_num,
-                    const TUniqueId& fragment_instance_id, ExecEnv* exec_env,
-                    const TNetworkAddress& coord_hostport)
-    : query_id_(query_id),
-      backend_num_(backend_num),
-      fragment_instance_id_(fragment_instance_id),
-      executor_(exec_env,
-          bind<void>(mem_fn(&ImpalaServer::FragmentExecState::ReportStatusCb),
-                     this, _1, _2, _3)),
-      client_cache_(exec_env->client_cache()),
-      coord_hostport_(coord_hostport) {
-  }
-
-  // Calling the d'tor releases all memory and closes all data streams
-  // held by executor_.
-  ~FragmentExecState() {
-  }
-
-  // Returns current execution status, if there was an error. Otherwise cancels
-  // the fragment and returns OK.
-  Status Cancel();
-
-  // Call Prepare() and create and initialize data sink.
-  Status Prepare(const TExecPlanFragmentParams& exec_params);
-
-  // Main loop of plan fragment execution. Blocks until execution finishes.
-  void Exec();
-
-  const TUniqueId& query_id() const { return query_id_; }
-  const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
-
-  void set_exec_thread(Thread* exec_thread) { exec_thread_.reset(exec_thread); }
-
- private:
-  TUniqueId query_id_;
-  int backend_num_;
-  TUniqueId fragment_instance_id_;
-  PlanFragmentExecutor executor_;
-  ImpalaInternalServiceClientCache* client_cache_;
-  TExecPlanFragmentParams exec_params_;
-
-  // initiating coordinator to which we occasionally need to report back
-  // (it's exported ImpalaInternalService)
-  const TNetworkAddress coord_hostport_;
-
-  // the thread executing this plan fragment
-  scoped_ptr<Thread> exec_thread_;
-
-  // protects exec_status_
-  mutex status_lock_;
-
-  // set in ReportStatusCb();
-  // if set to anything other than OK, execution has terminated w/ an error
-  Status exec_status_;
-
-  // Callback for executor; updates exec_status_ if 'status' indicates an error
-  // or if there was a thrift error.
-  void ReportStatusCb(const Status& status, RuntimeProfile* profile, bool done);
-
-  // Update exec_status_ w/ status, if the former isn't already an error.
-  // Returns current exec_status_.
-  Status UpdateStatus(const Status& status);
-};
-
-Status ImpalaServer::FragmentExecState::UpdateStatus(const Status& status) {
-  lock_guard<mutex> l(status_lock_);
-  if (!status.ok() && exec_status_.ok()) exec_status_ = status;
-  return exec_status_;
-}
-
-Status ImpalaServer::FragmentExecState::Cancel() {
-  lock_guard<mutex> l(status_lock_);
-  RETURN_IF_ERROR(exec_status_);
-  executor_.Cancel();
-  return Status::OK;
-}
-
-Status ImpalaServer::FragmentExecState::Prepare(
-    const TExecPlanFragmentParams& exec_params) {
-  exec_params_ = exec_params;
-  RETURN_IF_ERROR(executor_.Prepare(exec_params));
-  executor_.OptimizeLlvmModule();
-  return Status::OK;
-}
-
-void ImpalaServer::FragmentExecState::Exec() {
-  // Open() does the full execution, because all plan fragments have sinks
-  executor_.Open();
-  executor_.Close();
-}
-
-// There can only be one of these callbacks in-flight at any moment, because
-// it is only invoked from the executor's reporting thread.
-// Also, the reported status will always reflect the most recent execution status,
-// including the final status when execution finishes.
-void ImpalaServer::FragmentExecState::ReportStatusCb(
-    const Status& status, RuntimeProfile* profile, bool done) {
-  DCHECK(status.ok() || done);  // if !status.ok() => done
-  Status exec_status = UpdateStatus(status);
-
-  Status coord_status;
-  ImpalaInternalServiceConnection coord(client_cache_, coord_hostport_, &coord_status);
-  if (!coord_status.ok()) {
-    stringstream s;
-    s << "couldn't get a client for " << coord_hostport_;
-    UpdateStatus(Status(TStatusCode::INTERNAL_ERROR, s.str()));
-    return;
-  }
-
-  TReportExecStatusParams params;
-  params.protocol_version = ImpalaInternalServiceVersion::V1;
-  params.__set_query_id(query_id_);
-  params.__set_backend_num(backend_num_);
-  params.__set_fragment_instance_id(fragment_instance_id_);
-  exec_status.SetTStatus(&params);
-  params.__set_done(done);
-  profile->ToThrift(&params.profile);
-  params.__isset.profile = true;
-
-  RuntimeState* runtime_state = executor_.runtime_state();
-  DCHECK(runtime_state != NULL);
-  // Only send updates to insert status if fragment is finished, the coordinator
-  // waits until query execution is done to use them anyhow.
-  if (done) {
-    TInsertExecStatus insert_status;
-
-    if (runtime_state->hdfs_files_to_move()->size() > 0) {
-      insert_status.__set_files_to_move(*runtime_state->hdfs_files_to_move());
-    }
-    if (runtime_state->num_appended_rows()->size() > 0) {
-      insert_status.__set_num_appended_rows(*runtime_state->num_appended_rows());
-    }
-    if (runtime_state->insert_stats()->size() > 0) {
-      insert_status.__set_insert_stats(*runtime_state->insert_stats());
-    }
-
-    params.__set_insert_exec_status(insert_status);
-  }
-
-  // Send new errors to coordinator
-  runtime_state->GetUnreportedErrors(&(params.error_log));
-  params.__isset.error_log = (params.error_log.size() > 0);
-
-  TReportExecStatusResult res;
-  Status rpc_status;
-  try {
-    try {
-      coord->ReportExecStatus(res, params);
-    } catch (TTransportException& e) {
-      VLOG_RPC << "Retrying ReportExecStatus: " << e.what();
-      rpc_status = coord.Reopen();
-      if (!rpc_status.ok()) {
-        // we need to cancel the execution of this fragment
-        UpdateStatus(rpc_status);
-        executor_.Cancel();
-        return;
-      }
-      coord->ReportExecStatus(res, params);
-    }
-    rpc_status = Status(res.status);
-  } catch (TException& e) {
-    stringstream msg;
-    msg << "ReportExecStatus() to " << coord_hostport_ << " failed:\n" << e.what();
-    VLOG_QUERY << msg.str();
-    rpc_status = Status(TStatusCode::INTERNAL_ERROR, msg.str());
-  }
-
-  if (!rpc_status.ok()) {
-    // we need to cancel the execution of this fragment
-    UpdateStatus(rpc_status);
-    executor_.Cancel();
-  }
-}
 
 const char* ImpalaServer::SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION = "42000";
 const char* ImpalaServer::SQLSTATE_GENERAL_ERROR = "HY000";

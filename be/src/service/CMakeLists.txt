@@ -21,6 +21,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 add_library(Service
   frontend.cc
   fe-support.cc
+  fragment-exec-state.cc
   impala-server.cc
   impala-hs2-server.cc
   impala-beeswax-server.cc
