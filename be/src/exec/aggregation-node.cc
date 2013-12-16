@@ -49,8 +49,6 @@ namespace impala {
 const char* AggregationNode::LLVM_CLASS_NAME = "class.impala::AggregationNode";
 
 // TODO: pass in maximum size; enforce by setting limit in mempool
-// TODO: have a Status ExecNode::Init(const TPlanNode&) member function
-// that does initialization outside of c'tor, so we can indicate errors
 AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
                                  const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),

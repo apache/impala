@@ -459,7 +459,6 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
 
 void DataStreamSender::Close(RuntimeState* state) {
   if (closed_) return;
-  // TODO: only close channels that didn't have any errors
   for (int i = 0; i < channels_.size(); ++i) {
     channels_[i]->Close(state);
   }

@@ -17,6 +17,8 @@
 #include <sstream>
 #include <unistd.h>  // for sleep()
 
+#include <thrift/protocol/TDebugProtocol.h>
+
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -163,13 +165,16 @@ Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan,
     return Status::OK;
   }
   int node_idx = 0;
-  RETURN_IF_ERROR(CreateTreeHelper(pool, plan.nodes, descs, NULL, &node_idx, root));
-  if (node_idx + 1 != plan.nodes.size()) {
-    // TODO: print thrift msg for diagnostic purposes.
-    return Status(
+  Status status = CreateTreeHelper(pool, plan.nodes, descs, NULL, &node_idx, root);
+  if (status.ok() && node_idx + 1 != plan.nodes.size()) {
+    status = Status(
         "Plan tree only partially reconstructed. Not all thrift nodes were used.");
   }
-  return Status::OK;
+  if (!status.ok()) {
+    LOG(ERROR) << "Could not construct plan tree:\n"
+               << apache::thrift::ThriftDebugString(plan);
+  }
+  return status;
 }
 
 Status ExecNode::CreateTreeHelper(
@@ -181,7 +186,6 @@ Status ExecNode::CreateTreeHelper(
     ExecNode** root) {
   // propagate error case
   if (*node_idx >= tnodes.size()) {
-    // TODO: print thrift msg
     return Status("Failed to reconstruct plan tree from thrift.");
   }
   int num_children = tnodes[*node_idx].num_children;
@@ -199,7 +203,6 @@ Status ExecNode::CreateTreeHelper(
     // we are expecting a child, but have used all nodes
     // this means we have been given a bad tree and must fail
     if (*node_idx >= tnodes.size()) {
-      // TODO: print thrift msg
       return Status("Failed to reconstruct plan tree from thrift.");
     }
   }

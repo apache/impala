@@ -30,7 +30,6 @@ HdfsFsCache::~HdfsFsCache() {
     int status = hdfsDisconnect(i->second);
     if (status != 0) {
       string error_msg = GetStrErrMsg();
-      // TODO: add error details
       LOG(ERROR) << "hdfsDisconnect(\"" << i->first.first << "\", " << i->first.second
                  << ") failed: " << error_msg;
     }

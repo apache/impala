@@ -97,7 +97,6 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
 
   eos_ = false;
 
-  // TODO: fix problems with asynchronous cancellation
   // Kick-off the construction of the build-side table in a separate
   // thread, so that the left child can do any initialisation in parallel.
   // Only do this if we can get a thread token.  Otherwise, do this in the

@@ -14,6 +14,8 @@
 
 #include <sstream>
 
+#include <thrift/protocol/TDebugProtocol.h>
+
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -128,13 +130,16 @@ Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_ex
     return Status::OK;
   }
   int node_idx = 0;
-  RETURN_IF_ERROR(CreateTreeFromThrift(pool, texpr.nodes, NULL, &node_idx, root_expr));
-  if (node_idx + 1 != texpr.nodes.size()) {
-    // TODO: print thrift msg for diagnostic purposes.
-    return Status(
+  Status status = CreateTreeFromThrift(pool, texpr.nodes, NULL, &node_idx, root_expr);
+  if (status.ok() && node_idx + 1 != texpr.nodes.size()) {
+    status = Status(
         "Expression tree only partially reconstructed. Not all thrift nodes were used.");
   }
-  return Status::OK;
+  if (!status.ok()) {
+    LOG(ERROR) << "Could not construct expr tree.\n"
+               << apache::thrift::ThriftDebugString(texpr);
+  }
+  return status;
 }
 
 Expr* Expr::CreateLiteral(ObjectPool* pool, const ColumnType& type, void* data) {
@@ -241,7 +246,6 @@ Status Expr::CreateTreeFromThrift(ObjectPool* pool, const vector<TExprNode>& nod
     Expr* parent, int* node_idx, Expr** root_expr) {
   // propagate error case
   if (*node_idx >= nodes.size()) {
-    // TODO: print thrift msg
     return Status("Failed to reconstruct expression tree from thrift.");
   }
   int num_children = nodes[*node_idx].num_children;
@@ -259,7 +263,6 @@ Status Expr::CreateTreeFromThrift(ObjectPool* pool, const vector<TExprNode>& nod
     // we are expecting a child, but have used all nodes
     // this means we have been given a bad tree and must fail
     if (*node_idx >= nodes.size()) {
-      // TODO: print thrift msg
       return Status("Failed to reconstruct expression tree from thrift.");
     }
   }

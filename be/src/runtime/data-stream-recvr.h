@@ -36,7 +36,6 @@ class DataStreamRecvr {
   // Returns NULL if eos (subsequent calls will not return any more batches).
   // Sets 'is_cancelled' to true if receiver fragment got cancelled, otherwise false.
   // The caller owns the batch.
-  // TODO: error handling
   RowBatch* GetBatch(bool* is_cancelled) {
     return cb_->GetBatch(is_cancelled);
   }
