@@ -62,9 +62,6 @@ add_library(Exec STATIC
   topn-node.cc
 )
 
-# TODO: why is this test disabled?
-#ADD_BE_TEST(sequence-file-recovery-test)
-
 ADD_BE_TEST(zigzag-test)
 ADD_BE_TEST(hash-table-test)
 ADD_BE_TEST(delimited-text-parser-test)
