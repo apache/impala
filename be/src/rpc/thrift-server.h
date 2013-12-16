@@ -21,7 +21,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/uuid/uuid_generators.hpp>
-#include <thrift/server/TNonblockingServer.h>
+#include <thrift/server/TServer.h>
 #include <thrift/TProcessor.h>
 
 #include "common/status.h"
@@ -31,10 +31,9 @@
 
 namespace impala {
 
-// Utility class for all Thrift servers. Runs a TNonblockingServer(default) or a
+// Utility class for all Thrift servers. Runs a threaded server by default, or a
 // TThreadPoolServer with, by default, 2 worker threads, that exposes the interface
 // described by a user-supplied TProcessor object.
-// If TNonblockingServer is used, client must use TFramedTransport.
 // If TThreadPoolServer is used, client must use TSocket as transport.
 // TODO: Need a builder to help with the unwieldy constructor
 class ThriftServer {
@@ -64,13 +63,11 @@ class ThriftServer {
 
   static const int DEFAULT_WORKER_THREADS = 2;
 
-  // There are 3 servers supported by Thrift with different threading models.
+  // There are 2 servers supported by Thrift with different threading models.
   // ThreadPool  -- Allocates a fixed number of threads. A thread is used by a
   //                connection until it closes.
   // Threaded    -- Allocates 1 thread per connection, as needed.
-  // Nonblocking -- Threads are allocated to a connection only when the server
-  //                is working on behalf of the connection.
-  enum ServerType { ThreadPool = 0, Threaded, Nonblocking };
+  enum ServerType { ThreadPool = 0, Threaded };
 
   // Creates, but does not start, a new server on the specified port
   // that exports the supplied interface.
@@ -158,13 +155,13 @@ class ThriftServer {
   // (requests are queued if no thread is immediately available)
   int num_worker_threads_;
 
-  // ThreadPool or NonBlocking server
+  // ThreadPool or Threaded server
   ServerType server_type_;
 
   // User-specified identifier that shows up in logs
   const std::string name_;
 
-  // Thread that runs the TNonblockingServer::serve loop
+  // Thread that runs ThriftServerEventProcessor::Supervise() in a separate loop
   boost::scoped_ptr<Thread> server_thread_;
 
   // Thrift housekeeping

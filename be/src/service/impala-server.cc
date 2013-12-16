@@ -151,9 +151,6 @@ DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be i
 
 namespace impala {
 
-ThreadManager* fe_tm;
-ThreadManager* be_tm;
-
 // Prefix of profile and event log filenames. The version number is
 // internal, and does not correspond to an Impala release - it should
 // be changed only when the file format changes.

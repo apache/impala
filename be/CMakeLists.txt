@@ -199,7 +199,6 @@ set (IMPALA_LINK_LIBS
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
   thriftstatic
-  thriftnbstatic
   ${SASL_LIBRARY}
   ${LDAP_LIBRARY}
   ${LBER_LIBRARY}
@@ -210,7 +209,6 @@ set (IMPALA_LINK_LIBS
   gflagsstatic
   gutil
   pprofstatic
-  ${LIBEVENT}
   ${LIBZ}
   ${LIBBZ2}
   ${AVRO_STATIC_LIB}

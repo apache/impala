@@ -119,13 +119,10 @@ message(STATUS "Thrift include dir: ${THRIFT_INCLUDE_DIR}")
 message(STATUS "Thrift contrib dir: ${THRIFT_CONTRIB_DIR}")
 message(STATUS "Thrift library path: ${THRIFT_LIBS}")
 message(STATUS "Thrift static library: ${THRIFT_STATIC_LIB}")
-message(STATUS "Thrift static non-blocking library: ${THRIFT_NB_STATIC_LIB}")
 message(STATUS "Thrift compiler: ${THRIFT_COMPILER}")
 # for static linking with Thrift, THRIFT_STATIC_LIB is set in FindThrift.cmake
 add_library(thriftstatic STATIC IMPORTED)
 set_target_properties(thriftstatic PROPERTIES IMPORTED_LOCATION ${THRIFT_STATIC_LIB})
-add_library(thriftnbstatic STATIC IMPORTED)
-set_target_properties(thriftnbstatic PROPERTIES IMPORTED_LOCATION ${THRIFT_NB_STATIC_LIB})
 
 # find Snappy headers and libs
 find_package(Snappy REQUIRED)

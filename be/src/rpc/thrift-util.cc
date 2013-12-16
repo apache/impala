@@ -23,7 +23,7 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Data_types.h"
 
-// TCompactProtocol requires some #defines to work right.  They also define UNLIKLEY
+// TCompactProtocol requires some #defines to work right.  They also define UNLIKELY
 // so we need to undef this.
 // TODO: is there a better include to use?
 #ifdef UNLIKELY
@@ -39,7 +39,6 @@
 #pragma clang diagnostic ignored "-Wstring-plus-int"
 #include <thrift/Thrift.h>
 #include <thrift/transport/TSocket.h>
-#include <thrift/server/TNonblockingServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/concurrency/ThreadManager.h>
 #include <thrift/concurrency/PosixThreadFactory.h>

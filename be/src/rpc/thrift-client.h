@@ -97,16 +97,14 @@ class ThriftClientImpl {
 template <class InterfaceType>
 class ThriftClient : public ThriftClientImpl {
  public:
-  // Creates, but does not connect,  a new ThriftClient for a remote server.
+  // Creates, but does not connect, a new ThriftClient for a remote server.
   //  - ipaddress: address of remote server
   //  - port: port on which remote service runs
   //  - auth_provider: Authentication scheme to use. If NULL, use the global default
   //    client<->demon authentication scheme.
   //  - ssl: if true, SSL is enabled on this connection
-  //  - server_type - the threading strategy employed by the remote server (used to choose
-  //    a correct transport). TODO: Consider removing.
   ThriftClient(const std::string& ipaddress, int port, AuthProvider* auth_provider = NULL,
-      bool ssl = false, ThriftServer::ServerType server_type = ThriftServer::Threaded);
+      bool ssl = false);
 
   // Returns the object used to actually make RPCs against the remote server
   InterfaceType* iface() { return iface_.get(); }
@@ -119,32 +117,12 @@ class ThriftClient : public ThriftClientImpl {
 
 template <class InterfaceType>
 ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port,
-    AuthProvider* auth_provider, bool ssl, ThriftServer::ServerType server_type)
+    AuthProvider* auth_provider, bool ssl)
     : ThriftClientImpl(ipaddress, port, ssl),
       iface_(new InterfaceType(protocol_)),
       auth_provider_(auth_provider) {
 
-  switch (server_type) {
-    case ThriftServer::Nonblocking:
-      // The Nonblocking server is disabled at this time.  There are
-      // issues with the framed protocol throwing negative frame size errors.
-      LOG(WARNING) << "Nonblocking server usage is experimental";
-      if (!FLAGS_principal.empty()) {
-        LOG(ERROR) << "Nonblocking servers cannot be used with Kerberos";
-      }
-      transport_.reset(new apache::thrift::transport::TFramedTransport(socket_));
-      break;
-    case ThriftServer::ThreadPool:
-    case ThriftServer::Threaded:
-      transport_.reset(new apache::thrift::transport::TBufferedTransport(socket_));
-      break;
-    default:
-      std::stringstream error_msg;
-      error_msg << "Unsupported server type: " << server_type;
-      LOG(ERROR) << error_msg.str();
-      DCHECK(false);
-      break;
-  }
+  transport_.reset(new apache::thrift::transport::TBufferedTransport(socket_));
 
   if (auth_provider_ == NULL) {
     auth_provider_ = AuthManager::GetInstance()->GetServerFacingAuthProvider();

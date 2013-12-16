@@ -21,7 +21,6 @@
 #include <thrift/concurrency/Thread.h>
 #include <thrift/concurrency/ThreadManager.h>
 #include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/server/TNonblockingServer.h>
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
 #include <thrift/transport/TSocket.h>
@@ -66,9 +65,9 @@ class ThriftServer::ThriftServerEventProcessor : public TServerEventHandler {
       : thrift_server_(thrift_server),
         signal_fired_(false) { }
 
-  // Called by TNonBlockingServer when server has acquired its resources and is ready to
-  // serve, and signals to StartAndWaitForServer that start-up is finished.
-  // From TServerEventHandler.
+  // Called by the Thrift server implementation when it has acquired its resources and is
+  // ready to serve, and signals to StartAndWaitForServer that start-up is finished. From
+  // TServerEventHandler.
   virtual void preServe();
 
   // Called when a client connects; we create per-client state and call any
@@ -106,7 +105,7 @@ class ThriftServer::ThriftServerEventProcessor : public TServerEventHandler {
   // The time, in milliseconds, to wait for a server to come up
   static const int TIMEOUT_MS = 2500;
 
-  // Called in a separate thread; wraps TNonBlockingServer::serve in an exception handler
+  // Called in a separate thread
   void Supervise();
 };
 
@@ -207,19 +206,8 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
   shared_ptr<ConnectionContext> connection_ptr =
       shared_ptr<ConnectionContext>(new ConnectionContext);
   if (!thrift_server_->auth_provider_->is_sasl()) {
-    switch (thrift_server_->server_type_) {
-      case Nonblocking:
-        socket = static_cast<TSocket*>(
-            static_cast<TFramedTransport*>(transport)->getUnderlyingTransport().get());
-        break;
-      case ThreadPool:
-      case Threaded:
-        socket = static_cast<TSocket*>(
-            static_cast<TBufferedTransport*>(transport)->getUnderlyingTransport().get());
-        break;
-      default:
-        DCHECK(false) << "Unexpected thrift server type";
-    }
+    socket = static_cast<TSocket*>(
+        static_cast<TBufferedTransport*>(transport)->getUnderlyingTransport().get());
   } else {
     TSaslServerTransport* sasl_transport = static_cast<TSaslServerTransport*>(transport);
     // Get the username from the transport.
@@ -360,16 +348,8 @@ Status ThriftServer::EnableSsl(const string& certificate, const string& private_
 Status ThriftServer::Start() {
   DCHECK(!started_);
   shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
-  shared_ptr<ThreadManager> thread_mgr;
   shared_ptr<ThreadFactory> thread_factory(
       new ThriftThreadFactory("thrift-server", name_));
-
-  // TODO: The thrift non-blocking server needs to be fixed.
-  if (server_type_ == Nonblocking && !FLAGS_principal.empty()) {
-    string mesg("Nonblocking servers cannot be used with Kerberos");
-    LOG(ERROR) << mesg;
-    return (Status(mesg));
-  }
 
   // Note - if you change the transport types here, you must check that the
   // logic in createContext is still accurate.
@@ -377,22 +357,16 @@ Status ThriftServer::Start() {
   shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
   RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&transport_factory));
-
-  if (server_type_ != Threaded) {
-    thread_mgr = ThreadManager::newSimpleThreadManager(num_worker_threads_);
-    thread_mgr->threadFactory(thread_factory);
-    thread_mgr->start();
-  }
-
   switch (server_type_) {
-    case Nonblocking:
-      server_.reset(new TNonblockingServer(processor_,
-          transport_factory, transport_factory,
-          protocol_factory, protocol_factory, port_, thread_mgr));
-      break;
     case ThreadPool:
-      server_.reset(new TThreadPoolServer(processor_, server_socket,
-          transport_factory, protocol_factory, thread_mgr));
+      {
+        shared_ptr<ThreadManager> thread_mgr(
+            ThreadManager::newSimpleThreadManager(num_worker_threads_));
+        thread_mgr->threadFactory(thread_factory);
+        thread_mgr->start();
+        server_.reset(new TThreadPoolServer(processor_, server_socket,
+                transport_factory, protocol_factory, thread_mgr));
+      }
       break;
     case Threaded:
       server_.reset(new TThreadedServer(processor_, server_socket,
