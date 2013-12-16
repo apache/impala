@@ -102,15 +102,22 @@ void Webserver::RootHandler(const Webserver::ArgumentMap& args, stringstream* ou
   // path_handler_lock_ already held by SqueaselCallback
   (*output) << "<h2>Version</h2>";
   (*output) << "<pre>" << GetVersionString() << "</pre>" << endl;
+
   (*output) << "<h2>Hardware Info</h2>";
   (*output) << "<pre>";
   (*output) << CpuInfo::DebugString();
   (*output) << MemInfo::DebugString();
   (*output) << DiskInfo::DebugString();
   (*output) << "</pre>";
+
   (*output) << "<h2>OS Info</h2>";
   (*output) << "<pre>";
   (*output) << OsInfo::DebugString();
+  (*output) << "</pre>";
+
+  (*output) << "<h2>Process Info</h2>";
+  (*output) << "<pre>";
+  (*output) << "Process ID: " << getpid();
   (*output) << "</pre>";
 
   (*output) << "<h2>Status Pages</h2>";

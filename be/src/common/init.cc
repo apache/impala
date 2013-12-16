@@ -79,6 +79,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   LOG(INFO) << DiskInfo::DebugString();
   LOG(INFO) << MemInfo::DebugString();
   LOG(INFO) << OsInfo::DebugString();
+  LOG(INFO) << "Process ID: " << getpid();
 
   if (init_jvm) {
     EXIT_IF_ERROR(JniUtil::Init());
