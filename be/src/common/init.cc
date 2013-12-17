@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #include "common/init.h"
+
+#include <google/heap-profiler.h>
+
 #include "common/logging.h"
 #include "common/status.h"
 #include "util/cpu-info.h"
@@ -30,6 +33,8 @@
 DECLARE_string(hostname);
 DECLARE_int32(logbufsecs);
 DECLARE_bool(abort_on_config_error);
+DECLARE_string(heap_profile_dir);
+DECLARE_bool(enable_process_lifetime_heap_profiling);
 
 using namespace boost;
 
@@ -87,4 +92,11 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
     EXIT_IF_ERROR(JniUtil::Init());
     InitJvmLoggingSupport();
   }
+
+#ifndef ADDRESS_SANITIZER
+  // tcmalloc and address sanitizer can not be used together
+  if (FLAGS_enable_process_lifetime_heap_profiling) {
+    HeapProfilerStart(FLAGS_heap_profile_dir.c_str());
+  }
+#endif
 }

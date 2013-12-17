@@ -23,6 +23,7 @@ add_library(Service
   fe-support.cc
   fragment-exec-state.cc
   impala-server.cc
+  impala-server-callbacks.cc
   impala-hs2-server.cc
   impala-beeswax-server.cc
   query-exec-state.cc

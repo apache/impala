@@ -412,6 +412,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // in the fetch call.
   void InitializeConfigVariables();
 
+  // Registers all the per-Impalad webserver callbacks
+  void RegisterWebserverCallbacks(Webserver* webserver);
+
   // Checks settings for profile logging, including whether the output
   // directory exists and is writeable, and initialises the first log file.
   // Returns OK unless there is some problem preventing profile log files
