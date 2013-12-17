@@ -139,7 +139,12 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
       child_row_idx_ = 0;
     }
 
-    // Close current child and move on to next one.
+    // Close current child and move on to next one. It is OK to close the child as
+    // long as all RowBatches have already been consumed so that we are sure to have
+    // transfered all resources. It is not OK to close the child above in the case when
+    // ReachedLimit() is true as we may end up releasing resources that are referenced
+    // by the output row_batch.
+    child(child_idx_)->Close(state);
     ++child_idx_;
     child_row_batch_.reset();
   }
@@ -150,6 +155,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 }
 
 void MergeNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
   child_row_batch_.reset();
   ExecNode::Close(state);
 }

@@ -103,6 +103,7 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
 }
 
 void SelectNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
   child_row_batch_.reset();
   ExecNode::Close(state);
 }

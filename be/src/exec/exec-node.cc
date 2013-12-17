@@ -103,7 +103,8 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     limit_(tnode.limit),
     num_rows_returned_(0),
     rows_returned_counter_(NULL),
-    rows_returned_rate_(NULL) {
+    rows_returned_rate_(NULL),
+    is_closed_(false) {
   InitRuntimeProfile(PrintPlanNodeType(tnode.node_type));
 }
 
@@ -136,6 +137,9 @@ ExecNode::~ExecNode() {
 }
 
 void ExecNode::Close(RuntimeState* state) {
+  if (is_closed_) return;
+  is_closed_ = true;
+
   if (rows_returned_counter_ != NULL) {
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   }

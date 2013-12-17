@@ -63,7 +63,6 @@ class ExecNode {
   virtual Status Prepare(RuntimeState* state);
 
   // Performs any preparatory work prior to calling GetNext().
-  // Can be called repeatedly (after calls to Close()).
   // Caller must not be holding any io buffers. This will cause deadlock.
   virtual Status Open(RuntimeState* state) = 0;
 
@@ -88,10 +87,11 @@ class ExecNode {
   // Close() releases all resources that were allocated in Open()/GetNext(), even if the
   // latter ended with an error. Close() can be called if the node has been prepared or
   // the node is closed.
-  // After calling Close(), the caller calls Open() again prior to subsequent calls to
-  // GetNext(). The default implementation updates runtime profile counters and calls
-  // Close() on the children. To ensure that Close() is called on the entire plan tree,
-  // each implementation should start out by calling the default implementation.
+  // The default implementation updates runtime profile counters and calls
+  // Close() on the children. Subclasses should check if the node has already been
+  // closed (is_closed()), then close themselves, then call the base Close().
+  // Nodes that are using tuples returned by a child may call Close() on their children
+  // before their own Close() if the child node has returned eos.
   virtual void Close(RuntimeState* state);
 
   // Creates exec node tree from list of nodes contained in plan via depth-first
@@ -227,6 +227,7 @@ class ExecNode {
   std::string runtime_exec_options_;
 
   ExecNode* child(int i) { return children_[i]; }
+  bool is_closed() { return is_closed_; }
 
   // Create a single exec node derived from thrift node; place exec node in 'pool'.
   static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode,
@@ -247,6 +248,11 @@ class ExecNode {
 
   // Appends option to 'runtime_exec_options_'
   void AddRuntimeExecOption(const std::string& option);
+
+ private:
+  // Set in ExecNode::Close(). Used to make Close() idempotent. This is not protected
+  // by a lock, it assumes all calls to Close() are made by the same thread.
+  bool is_closed_;
 };
 
 }

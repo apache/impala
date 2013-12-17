@@ -272,6 +272,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
 }
 
 void HBaseScanNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
   PeriodicCounterUpdater::StopTimeSeriesCounter(bytes_read_timeseries_counter_);

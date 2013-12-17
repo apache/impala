@@ -546,6 +546,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 }
 
 void HdfsScanNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
   SetDone();
 
   state->resource_pool()->SetThreadAvailableCb(NULL);

@@ -184,6 +184,9 @@ Status AggregationNode::Open(RuntimeState* state) {
     if (eos) break;
   }
 
+  // We have consumed all of the input from the child and transfered ownership of the
+  // resources we need, so the child can be closed safely to release its resources.
+  child(0)->Close(state);
   if (singleton_output_tuple_ != NULL) {
     hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&singleton_output_tuple_));
     ++num_agg_rows;
@@ -228,6 +231,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 }
 
 void AggregationNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
   ExecNode::Close(state);

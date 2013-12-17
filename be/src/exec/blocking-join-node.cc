@@ -71,6 +71,7 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
 }
 
 void BlockingJoinNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
   if (build_pool_.get() != NULL) build_pool_->FreeAll();
   left_batch_.reset();
   ExecNode::Close(state);
@@ -118,6 +119,10 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   // Blocks until ConstructBuildSide has returned, after which the build side structures
   // are fully constructed.
   RETURN_IF_ERROR(build_side_status.Get());
+  // We can close the right child to release its resources because its input has been
+  // fully consumed.
+  child(1)->Close(state);
+
   RETURN_IF_ERROR(open_status);
   // Seed left child in preparation for GetNext().
   while (true) {

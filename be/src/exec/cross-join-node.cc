@@ -43,6 +43,7 @@ Status CrossJoinNode::Prepare(RuntimeState* state) {
 }
 
 void CrossJoinNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
   build_batches_.Reset();
   build_batch_pool_.reset();
   BlockingJoinNode::Close(state);

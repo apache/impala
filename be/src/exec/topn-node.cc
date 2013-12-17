@@ -104,6 +104,7 @@ Status TopNNode::Open(RuntimeState* state) {
   }
   DCHECK_LE(priority_queue_->size(), limit_ + offset_);
   PrepareForOutput();
+  child(0)->Close(state);
   return Status::OK;
 }
 
@@ -132,6 +133,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 }
 
 void TopNNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
   ExecNode::Close(state);
 }

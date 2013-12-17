@@ -60,9 +60,15 @@ Status ExchangeNode::Open(RuntimeState* state) {
 }
 
 void ExchangeNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
   input_batch_.reset();
   if (stream_recvr_ != NULL) stream_recvr_->Close();
   ExecNode::Close(state);
+}
+
+void ExchangeNode::TransferInputBatchOwnership(RowBatch* output_batch) {
+  if (input_batch_.get() == NULL) return;
+  input_batch_->TransferResourceOwnership(output_batch);
 }
 
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
@@ -71,8 +77,11 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
   RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit()) {
+    TransferInputBatchOwnership(output_batch);
     *eos = true;
     return Status::OK;
+  } else {
+    *eos = false;
   }
 
   while (true) {
@@ -97,6 +106,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
       if (ReachedLimit()) {
+        TransferInputBatchOwnership(output_batch);
         *eos = true;
         return Status::OK;
       }
@@ -104,7 +114,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     }
 
     // we need more rows
-    if (input_batch_.get() != NULL) input_batch_->TransferResourceOwnership(output_batch);
+    TransferInputBatchOwnership(output_batch);
     bool is_cancelled;
     {
       SCOPED_TIMER(state->total_network_wait_timer());

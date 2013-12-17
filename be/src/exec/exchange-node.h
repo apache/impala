@@ -44,6 +44,9 @@ class ExchangeNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
+  // Transfer ownership of input_batch_ to output_batch if it is not null.
+  void TransferInputBatchOwnership(RowBatch* output_batch);
+
   int num_senders_;  // needed for stream_recvr_ construction
 
   // created in Prepare() and owned by the RuntimeState
