@@ -125,6 +125,10 @@ class ThreadPool {
         work_function_(thread_id, workitem);
       }
       if (work_queue_.GetSize() == 0) {
+        // Take lock to ensure that DrainAndShutdown() cannot be between checking
+        // GetSize() and wait()'ing when the condition variable is notified.
+        // (It will hang if we notify right before calling wait().)
+        boost::unique_lock<boost::mutex> l(lock_);
         empty_cv_.notify_all();
       }
     }
