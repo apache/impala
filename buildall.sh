@@ -23,10 +23,10 @@ export IMPALA_HOME=$ROOT
 . "$ROOT"/bin/impala-config.sh
 
 CLEAN_ACTION=1
-TESTDATA_ACTION=1
+TESTDATA_ACTION=0
 TESTS_ACTION=1
-FORMAT_CLUSTER=1
-FORMAT_METASTORE=1
+FORMAT_CLUSTER=0
+FORMAT_METASTORE=0
 TARGET_BUILD_TYPE=Debug
 EXPLORATION_STRATEGY=core
 SNAPSHOT_FILE=
@@ -50,23 +50,23 @@ do
     -noclean)
       CLEAN_ACTION=0
       ;;
-    -notestdata)
-      TESTDATA_ACTION=0
-      FORMAT_CLUSTER=0
-      FORMAT_METASTORE=0
+    -testdata)
+      TESTDATA_ACTION=1
+      FORMAT_CLUSTER=1
+      FORMAT_METASTORE=1
       ;;
     -skiptests)
       TESTS_ACTION=0
       ;;
-    -noformat)
-      FORMAT_CLUSTER=0
-      FORMAT_METASTORE=0
+    -format)
+      FORMAT_CLUSTER=1
+      FORMAT_METASTORE=1
       ;;
-    -noformat_cluster)
-      FORMAT_CLUSTER=0
+    -format_cluster)
+      FORMAT_CLUSTER=1
       ;;
-    -noformat_metastore)
-      FORMAT_METASTORE=0
+    -format_metastore)
+      FORMAT_METASTORE=1
       ;;
     -codecoverage_debug)
       TARGET_BUILD_TYPE=CODE_COVERAGE_DEBUG
@@ -87,22 +87,22 @@ do
       SNAPSHOT_FILE="UNDEFINED"
       ;;
     -help|*)
-      echo "buildall.sh [-noclean] [-notestdata] [-noformat] [-codecoverage]"\
-           "[-skiptests] [-testexhaustive]"
-      echo "[-noclean] : omits cleaning all packages before building"
-      echo "[-notestdata] : omits recreating the metastore and loading test data"
-      echo "[-noformat] : prevents formatting the minicluster and metastore db"
-      echo "[-noformat_cluster] : prevents formatting the minicluster"
-      echo "[-noformat_metastore] : prevents formatting the metastore db"
-      echo "[-codecoverage] : build with 'gcov' code coverage instrumentation at the"\
-           "cost of performance"
-      echo "[-asan] : build with address sanitizer"
-      echo "[-skiptests] : skips execution of all tests"
-      echo "[-testpairwise] : run tests in 'pairwise' mode (increases"\
+      echo "buildall.sh - Builds Impala and runs all tests."
+      echo "[-noclean] : Omits cleaning all packages before building"
+      echo "[-format] : Format the minicluster and metastore db [Default: False]"
+      echo "[-format_cluster] : Format the minicluster [Default: False]"
+      echo "[-format_metastore] : Format the metastore db [Default: False]"
+      echo "[-codecoverage_release] : Release code coverage build"
+      echo "[-codecoverage_debug] : Debug code coverage build"
+      echo "[-asan] : Build with address sanitizer"
+      echo "[-skiptests] : Skips execution of all tests"
+      echo "[-testpairwise] : Sun tests in 'pairwise' mode (increases"\
            "test execution time)"
-      echo "[-testexhaustive] : run tests in 'exhaustive' mode (significantly increases"\
+      echo "[-testexhaustive] : Run tests in 'exhaustive' mode (significantly increases"\
            "test execution time)"
-      echo "[-snapshot_file <file name>] : load test data from a snapshot file"
+      echo "[-testdata] : Loads test data. Implied as true if -snapshot_file is "\
+           "specified. If -snapshot_file is not specified, data will be regenerated."
+      echo "[-snapshot_file <file name>] : Load test data from a snapshot file"
       exit 1
       ;;
   esac
