@@ -68,11 +68,11 @@ typedef std::map<std::string, std::string> FileMoveMap;
 class RuntimeState {
  public:
   RuntimeState(const TUniqueId& query_id, const TUniqueId& fragment_instance_id,
-      const TQueryOptions& query_options, const std::string& now,
-      const std::string& user, ExecEnv* exec_env);
+      const TQueryOptions& query_options, const TQueryGlobals& query_globals,
+      ExecEnv* exec_env);
 
   // RuntimeState for executing expr in fe-support.
-  RuntimeState(const std::string& now, const std::string& user);
+  RuntimeState(const TQueryGlobals& query_globals);
 
   // Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
@@ -97,6 +97,7 @@ class RuntimeState {
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
   const std::string& user() const { return user_; }
+  const int32_t pid() const { return pid_; }
   const std::vector<std::string>& error_log() const { return error_log_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
@@ -214,8 +215,7 @@ class RuntimeState {
  private:
   // Set per-fragment state.
   Status Init(const TUniqueId& fragment_instance_id,
-      const TQueryOptions& query_options, const std::string& now,
-      const std::string& user, ExecEnv* exec_env);
+      const TQueryOptions& query_options, ExecEnv* exec_env);
 
   static const int DEFAULT_BATCH_SIZE = 1024;
 
@@ -250,6 +250,9 @@ class RuntimeState {
   // Query-global timestamp, e.g., for implementing now().
   // Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.
   boost::scoped_ptr<TimestampValue> now_;
+
+  // ID of the impalad process to which the user is connected.
+  int32_t pid_;
 
   TUniqueId query_id_;
   TUniqueId fragment_instance_id_;

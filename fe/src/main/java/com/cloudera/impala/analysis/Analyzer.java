@@ -48,6 +48,7 @@ import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TQueryGlobals;
+import com.cloudera.impala.util.ProcessUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -165,7 +166,7 @@ public class Analyzer {
     private final List<Pair<SlotId, SlotId>> registeredValueTransfers =
         Lists.newArrayList();
 
-    public GlobalState(ImpaladCatalog catalog, String defaultDb, User user) {
+    public GlobalState(ImpaladCatalog catalog, String defaultDb, User user, Integer pid) {
       this.catalog = catalog;
       this.defaultDb = defaultDb;
 
@@ -173,6 +174,7 @@ public class Analyzer {
       SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
       queryGlobals.setNow_string(formatter.format(Calendar.getInstance().getTime()));
       queryGlobals.setUser(user.getName());
+      if (pid != null) queryGlobals.setPid(pid);
     }
   };
 
@@ -195,7 +197,8 @@ public class Analyzer {
 
   public Analyzer(ImpaladCatalog catalog, String defaultDb, User user) {
     this.ancestors_ = Lists.newArrayList();
-    this.globalState_ = new GlobalState(catalog, defaultDb, user);
+    this.globalState_ = new GlobalState(catalog, defaultDb, user,
+        ProcessUtil.getCurrentProcessId());
     this.user_ = user;
   }
 

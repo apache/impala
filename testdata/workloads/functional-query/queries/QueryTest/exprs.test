@@ -952,6 +952,18 @@ bigint
 9900
 ====
 ---- QUERY
+# Test pid() function, this should only return one pid. If pid() were not implemented
+# correctly via the global state variable, this could return multiple pids.
+select pid() p from functional.alltypes
+union distinct select pid() p from functional.alltypes
+group by p
+---- TYPES
+int
+---- RESULTS
+# Matches a single pid
+row_regex: \d+
+====
+---- QUERY
 # Test NOW() function.
 select now()
 ---- TYPES

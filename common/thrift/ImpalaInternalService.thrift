@@ -117,6 +117,9 @@ struct TQueryGlobals {
 
   // Name of the user executing this query.
   2: optional string user
+
+  // The process ID of the impalad to which the user is connected.
+  3: optional i32 pid
 }
 
 

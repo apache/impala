@@ -71,7 +71,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
   DeserializeThriftMsg(env, thrift_predicate_bytes, &thrift_predicate);
   TQueryGlobals query_globals;
   DeserializeThriftMsg(env, thrift_query_globals_bytes, &query_globals);
-  RuntimeState state(query_globals.now_string, query_globals.user);
+  RuntimeState state(query_globals);
   jbyteArray result_bytes = NULL;
   JniLocalFrame jni_frame;
   Expr* e;

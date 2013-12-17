@@ -62,6 +62,15 @@ void* UtilityFunctions::Version(Expr* e, TupleRow* row) {
   return &e->result_.string_val;
 }
 
+void* UtilityFunctions::Pid(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 0);
+  // Set in FunctionCall::Prepare(), will be -1 if the PID could not be determined
+  if (e->result_.int_val == -1) return NULL;
+  // Otherwise the PID should be greater than 0
+  DCHECK(e->result_.int_val > 0);
+  return &e->result_.int_val;
+}
+
 void* UtilityFunctions::Sleep(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
   int* milliseconds = reinterpret_cast<int*>(e->children()[0]->GetValue(row));

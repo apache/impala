@@ -37,6 +37,10 @@ class UtilityFunctions {
   // Implementation of the version() function. Returns the version string.
   static void* Version(Expr* e, TupleRow* row);
 
+  // Implementation of the pid() function. Returns the pid of the impalad that initiated
+  // this query.
+  static void* Pid(Expr* e, TupleRow* row);
+
   // Testing function that sleeps for the specified number of milliseconds. Returns true.
   static void* Sleep(Expr* e, TupleRow* row);
 };

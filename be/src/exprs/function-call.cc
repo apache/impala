@@ -52,6 +52,12 @@ Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc)
       }
       break;
     }
+    case TExprOpcode::UTILITY_PID: {
+      // Set pid from runtime state.
+      DCHECK(state != NULL);
+      result_.int_val = state->pid();
+      break;
+    }
     case TExprOpcode::UTILITY_USER: {
       // Set username from runtime state.
       DCHECK(state != NULL);
