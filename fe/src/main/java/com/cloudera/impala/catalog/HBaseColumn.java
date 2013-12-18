@@ -21,31 +21,31 @@ import com.cloudera.impala.thrift.TColumn;
 // This class adds the HBase columnFamily and columnQualifier,
 // so we can read the column from HBase directly.
 public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
-  private final String columnFamily;
-  private final String columnQualifier;
-  private final boolean binaryEncoded;
+  private final String columnFamily_;
+  private final String columnQualifier_;
+  private final boolean binaryEncoded_;
 
   public HBaseColumn(String name, String columnFamily, String columnQualifier,
       boolean binaryEncoded, PrimitiveType type, String comment, int position) {
     super(name, type, comment, position);
-    this.columnFamily = columnFamily;
-    this.columnQualifier = columnQualifier;
-    this.binaryEncoded = binaryEncoded;
+    columnFamily_ = columnFamily;
+    columnQualifier_ = columnQualifier;
+    binaryEncoded_ = binaryEncoded;
   }
 
-  public String getColumnFamily() { return columnFamily; }
-  public String getColumnQualifier() { return columnQualifier; }
-  public boolean isBinaryEncoded() { return binaryEncoded; }
+  public String getColumnFamily() { return columnFamily_; }
+  public String getColumnQualifier() { return columnQualifier_; }
+  public boolean isBinaryEncoded() { return binaryEncoded_; }
 
   @Override
   // We order the HBase columns in the matadata based on columnFamily,columnQualifier,
   // to more easily map slots from HBase's Result.raw() to target slots in the backend.
   public int compareTo(HBaseColumn o) {
-    int familyCmp = columnFamily.compareTo(o.columnFamily);
+    int familyCmp = columnFamily_.compareTo(o.columnFamily_);
     if (familyCmp != 0) {
       return familyCmp;
     }
-    int qualifierCmp = columnQualifier.compareTo(o.columnQualifier);
+    int qualifierCmp = columnQualifier_.compareTo(o.columnQualifier_);
     return qualifierCmp;
   }
 
@@ -56,9 +56,9 @@ public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
     colDesc.setCol_stats(getStats().toThrift());
     colDesc.setPosition(position_);
     colDesc.setIs_hbase_column(true);
-    colDesc.setColumn_family(columnFamily);
-    colDesc.setColumn_qualifier(columnQualifier);
-    colDesc.setIs_binary(binaryEncoded);
+    colDesc.setColumn_family(columnFamily_);
+    colDesc.setColumn_qualifier(columnQualifier_);
+    colDesc.setIs_binary(binaryEncoded_);
     return colDesc;
   }
 }

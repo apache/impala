@@ -189,7 +189,7 @@ public class HdfsTable extends Table {
    */
   private void loadBlockMd(List<FileDescriptor> fileDescriptors)
       throws RuntimeException {
-    LOG.debug("load block md for " + name);
+    LOG.debug("load block md for " + name_);
     // Block locations for all the files
     List<BlockLocation> blockLocations = Lists.newArrayList();
 
@@ -292,7 +292,7 @@ public class HdfsTable extends Table {
   // table) or if Impala has write permissions on all partition directories (for
   // a partitioned table).
   public boolean hasWriteAccess() {
-    return TAccessLevelUtil.impliesWriteAccess(accessLevel);
+    return TAccessLevelUtil.impliesWriteAccess(accessLevel_);
   }
 
   /**
@@ -304,7 +304,7 @@ public class HdfsTable extends Table {
     if (getMetaStoreTable() == null) return null;
 
     if (getMetaStoreTable().getPartitionKeysSize() == 0) {
-      if (!TAccessLevelUtil.impliesWriteAccess(accessLevel)) {
+      if (!TAccessLevelUtil.impliesWriteAccess(accessLevel_)) {
         return hdfsBaseDir_;
       }
     } else {
@@ -403,7 +403,7 @@ public class HdfsTable extends Table {
     for (FieldSchema s: fieldSchemas) {
       PrimitiveType type = getPrimitiveType(s);
       // Check if we support partitioning on columns of such a type.
-      if (pos < numClusteringCols && !type.supportsTablePartitioning()) {
+      if (pos < numClusteringCols_ && !type.supportsTablePartitioning()) {
         throw new TableLoadingException(
             String.format("Failed to load metadata for table '%s' because of " +
                 "unsupported partition-column type '%s' in partition column '%s'",
@@ -411,8 +411,8 @@ public class HdfsTable extends Table {
       }
 
       Column col = new Column(s.getName(), type, s.getComment(), pos);
-      colsByPos.add(col);
-      colsByName.put(s.getName(), col);
+      colsByPos_.add(col);
+      colsByName_.put(s.getName(), col);
       ++pos;
 
       // Load and set column stats in col.
@@ -451,13 +451,13 @@ public class HdfsTable extends Table {
           new ArrayList<LiteralExpr>(), oldFileDescMap, newFileDescs);
       Path location = new Path(hdfsBaseDir_);
       if (DFS.exists(location)) {
-        accessLevel = getAvailableAccessLevel(location);
+        accessLevel_ = getAvailableAccessLevel(location);
       }
     } else {
       // keep track of distinct partition key values and how many nulls there are
-      Set<String>[] uniquePartitionKeys = new HashSet[numClusteringCols];
-      long[] numNullKeys = new long[numClusteringCols];
-      for (int i = 0; i < numClusteringCols; ++i) {
+      Set<String>[] uniquePartitionKeys = new HashSet[numClusteringCols_];
+      long[] numNullKeys = new long[numClusteringCols_];
+      for (int i = 0; i < numClusteringCols_; ++i) {
         uniquePartitionKeys[i] = new HashSet<String>();
         numNullKeys[i] = 0;
       }
@@ -473,7 +473,7 @@ public class HdfsTable extends Table {
             keyValues.add(new NullLiteral());
             ++numNullKeys[i];
           } else {
-            PrimitiveType type = colsByPos.get(keyValues.size()).getType();
+            PrimitiveType type = colsByPos_.get(keyValues.size()).getType();
             try {
               Expr expr = LiteralExpr.create(partitionKey, type);
               // Force the literal to be of type declared in the metadata.
@@ -502,13 +502,13 @@ public class HdfsTable extends Table {
           // table's access level to the "lowest" effective level across all
           // partitions. That is, if one partition has READ_ONLY and another has
           // WRITE_ONLY the table's access level should be NONE.
-          accessLevel = TAccessLevel.READ_ONLY;
+          accessLevel_ = TAccessLevel.READ_ONLY;
         }
       }
 
       // update col stats for partition key cols
-      for (int i = 0; i < numClusteringCols; ++i) {
-        ColumnStats stats = colsByPos.get(i).getStats();
+      for (int i = 0; i < numClusteringCols_; ++i) {
+        ColumnStats stats = colsByPos_.get(i).getStats();
         stats.setNumNulls(numNullKeys[i]);
         stats.setNumDistinctValues(uniquePartitionKeys[i].size());
         LOG.debug("#col=" + Integer.toString(i) + " stats=" + stats.toString());
@@ -580,7 +580,7 @@ public class HdfsTable extends Table {
       List<FileDescriptor> newFileDescs)
       throws IOException, InvalidStorageDescriptorException {
     HdfsStorageDescriptor fileFormatDescriptor =
-        HdfsStorageDescriptor.fromStorageDescriptor(this.name, storageDescriptor);
+        HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
     Path partDirPath = new Path(storageDescriptor.getLocation());
     List<FileDescriptor> fileDescriptors = Lists.newArrayList();
     if (DFS.exists(partDirPath)) {
@@ -633,7 +633,7 @@ public class HdfsTable extends Table {
     // Default partition has no files and is not referred to by scan nodes. Data sinks
     // refer to this to understand how to create new partitions
     HdfsStorageDescriptor hdfsStorageDescriptor =
-        HdfsStorageDescriptor.fromStorageDescriptor(this.name, storageDescriptor);
+        HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
     HdfsPartition partition = HdfsPartition.defaultPartition(this, hdfsStorageDescriptor);
     partitions_.add(partition);
   }
@@ -658,7 +658,7 @@ public class HdfsTable extends Table {
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     numHdfsFiles_ = 0;
     totalHdfsBytes_ = 0;
-    LOG.debug("load table: " + db.getName() + "." + name);
+    LOG.debug("load table: " + db_.getName() + "." + name_);
     // turn all exceptions into TableLoadingException
     try {
       // set nullPartitionKeyValue from the hive conf.
@@ -675,7 +675,7 @@ public class HdfsTable extends Table {
       List<FieldSchema> tblFields = Lists.newArrayList();
       String inputFormat = msTbl.getSd().getInputFormat();
       if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
-        tblFields.addAll(client.getFields(db.getName(), name));
+        tblFields.addAll(client.getFields(db_.getName(), name_));
       } else {
         tblFields.addAll(msTbl.getSd().getCols());
       }
@@ -684,7 +684,7 @@ public class HdfsTable extends Table {
       fieldSchemas.addAll(partKeys);
       fieldSchemas.addAll(tblFields);
       // The number of clustering columns is the number of partition keys.
-      numClusteringCols = partKeys.size();
+      numClusteringCols_ = partKeys.size();
       loadColumns(fieldSchemas, client);
 
       // Collect the list of partitions to use for the table. Partitions may be reused
@@ -694,8 +694,8 @@ public class HdfsTable extends Table {
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
           Lists.newArrayList();
       if (cachedEntry == null || !(cachedEntry instanceof HdfsTable) ||
-          cachedEntry.lastDdlTime != lastDdlTime) {
-        msPartitions.addAll(client.listPartitions(db.getName(), name, Short.MAX_VALUE));
+          cachedEntry.lastDdlTime_ != lastDdlTime_) {
+        msPartitions.addAll(client.listPartitions(db_.getName(), name_, Short.MAX_VALUE));
       } else {
         // The table was already in the metadata cache and it has not been modified.
         Preconditions.checkArgument(cachedEntry instanceof HdfsTable);
@@ -712,7 +712,7 @@ public class HdfsTable extends Table {
           // First get a list of all the partition names for this table from the
           // metastore, this is much faster than listing all the Partition objects.
           modifiedPartitionNames.addAll(
-              client.listPartitionNames(db.getName(), name, Short.MAX_VALUE));
+              client.listPartitionNames(db_.getName(), name_, Short.MAX_VALUE));
         }
 
         int totalPartitions = modifiedPartitionNames.size();
@@ -741,7 +741,7 @@ public class HdfsTable extends Table {
         // No need to make the metastore call if no partitions are to be updated.
         if (modifiedPartitionNames.size() > 0) {
           // Now reload the the remaining partitions.
-          msPartitions.addAll(client.getPartitionsByNames(db.getName(), name,
+          msPartitions.addAll(client.getPartitionsByNames(db_.getName(), name_,
               Lists.newArrayList(modifiedPartitionNames)));
         }
       }
@@ -752,17 +752,17 @@ public class HdfsTable extends Table {
       loadPartitions(msPartitions, msTbl, oldFileDescMap);
 
       // load table stats
-      numRows = getRowCount(msTbl.getParameters());
-      LOG.debug("table #rows=" + Long.toString(numRows));
+      numRows_ = getRowCount(msTbl.getParameters());
+      LOG.debug("table #rows=" + Long.toString(numRows_));
 
       // For unpartitioned tables set the numRows in its partitions
       // to the table's numRows.
-      if (numClusteringCols == 0 && !partitions_.isEmpty()) {
+      if (numClusteringCols_ == 0 && !partitions_.isEmpty()) {
         // Unpartitioned tables have a 'dummy' partition and a default partition.
         // Temp tables used in CTAS statements have one partition.
         Preconditions.checkState(partitions_.size() == 2 || partitions_.size() == 1);
         for (HdfsPartition p: partitions_) {
-          p.setNumRows(numRows);
+          p.setNumRows(numRows_);
         }
       }
 
@@ -779,7 +779,7 @@ public class HdfsTable extends Table {
     } catch (TableLoadingException e) {
       throw e;
     } catch (Exception e) {
-      throw new TableLoadingException("Failed to load metadata for table: " + name, e);
+      throw new TableLoadingException("Failed to load metadata for table: " + name_, e);
     }
   }
 
@@ -870,10 +870,8 @@ public class HdfsTable extends Table {
 
   @Override
   public TTableDescriptor toThriftDescriptor() {
-    TTableDescriptor tableDesc =
-        new TTableDescriptor(
-            id.asInt(), TTableType.HDFS_TABLE, colsByPos.size(), numClusteringCols, name,
-            db.getName());
+    TTableDescriptor tableDesc = new TTableDescriptor(id_.asInt(), TTableType.HDFS_TABLE,
+        colsByPos_.size(), numClusteringCols_, name_, db_.getName());
     tableDesc.setHdfsTable(getHdfsTable());
     return tableDesc;
   }
@@ -893,8 +891,8 @@ public class HdfsTable extends Table {
     }
 
     List<String> colNames = new ArrayList<String>();
-    for (int i = 0; i < colsByPos.size(); ++i) {
-      colNames.add(colsByPos.get(i).getName());
+    for (int i = 0; i < colsByPos_.size(); ++i) {
+      colNames.add(colsByPos_.get(i).getName());
     }
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, colNames,
         nullPartitionKeyValue_, nullColumnValue_, idToPartition);
@@ -946,9 +944,9 @@ public class HdfsTable extends Table {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
     result.setSchema(resultSchema);
-    for (int i = 0; i < numClusteringCols; ++i) {
+    for (int i = 0; i < numClusteringCols_; ++i) {
       // Add the partition-key values as strings for simplicity.
-      Column partCol = colsByPos.get(i);
+      Column partCol = colsByPos_.get(i);
       TColumn colDesc = new TColumn(partCol.getName(), partCol.getType().toThrift());
       resultSchema.addToColumns(colDesc);
     }
@@ -979,16 +977,16 @@ public class HdfsTable extends Table {
     }
 
     // For partitioned tables add a summary row at the bottom.
-    if (numClusteringCols > 0) {
+    if (numClusteringCols_ > 0) {
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
-      int numEmptyCells = numClusteringCols - 1;
+      int numEmptyCells = numClusteringCols_ - 1;
       rowBuilder.add("Total");
       for (int i = 0; i < numEmptyCells; ++i) {
         rowBuilder.add("");
       }
 
       // Total num rows, files, and bytes (leave format empty).
-      rowBuilder.add(numRows).add(numHdfsFiles_).addBytes(totalHdfsBytes_).add("");
+      rowBuilder.add(numRows_).add(numHdfsFiles_).addBytes(totalHdfsBytes_).add("");
       result.addToRows(rowBuilder.get());
     }
     return result;

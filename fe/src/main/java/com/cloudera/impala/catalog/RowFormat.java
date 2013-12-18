@@ -38,13 +38,13 @@ public class RowFormat {
   private RowFormat(String fieldDelimiter, String lineDelimiter, String escapeChar,
       boolean unescape) {
     if (unescape) {
-      this.fieldDelimiter_ = getUnescapedValueOrNull(fieldDelimiter);
-      this.lineDelimiter_ = getUnescapedValueOrNull(lineDelimiter);
-      this.escapeChar_ = getUnescapedValueOrNull(escapeChar);
+      fieldDelimiter_ = getUnescapedValueOrNull(fieldDelimiter);
+      lineDelimiter_ = getUnescapedValueOrNull(lineDelimiter);
+      escapeChar_ = getUnescapedValueOrNull(escapeChar);
     } else {
-      this.fieldDelimiter_ = fieldDelimiter;
-      this.lineDelimiter_ = lineDelimiter;
-      this.escapeChar_ = escapeChar;
+      fieldDelimiter_ = fieldDelimiter;
+      lineDelimiter_ = lineDelimiter;
+      escapeChar_ = escapeChar;
     }
   }
 

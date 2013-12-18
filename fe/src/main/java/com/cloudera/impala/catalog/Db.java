@@ -58,10 +58,10 @@ public class Db implements CatalogObject {
   // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
   // and the values are all the overloaded variants (e.g. myUdf(double), myUdf(string))
   // This includes both UDFs and UDAs
-  private final HashMap<String, List<Function>> functions;
+  private final HashMap<String, List<Function>> functions_;
 
   // Table metadata cache.
-  private final CatalogObjectCache<Table> tableCache = new CatalogObjectCache<Table>(
+  private final CatalogObjectCache<Table> tableCache_ = new CatalogObjectCache<Table>(
       new CacheLoader<String, Table>() {
         @Override
         public Table load(String tableName) throws TableNotFoundException,
@@ -107,7 +107,7 @@ public class Db implements CatalogObject {
     LOG.info("Force loading all tables for database: " + this.getName());
     for (String tableName: getAllTableNames()) {
       try {
-        tableCache.get(tableName);
+        tableCache_.get(tableName);
       } catch (Exception ex) {
         LOG.warn("Ignoring table: " + tableName + " due to error when loading", ex);
       }
@@ -117,8 +117,8 @@ public class Db implements CatalogObject {
   private Db(String name, Catalog catalog, HiveMetaStoreClient hiveClient)
       throws MetaException {
     this(name, catalog);
-    tableCache.add(hiveClient.getAllTables(name));
-    LOG.info("Added " + tableCache.getAllNames().size() + " " +
+    tableCache_.add(hiveClient.getAllTables(name));
+    LOG.info("Added " + tableCache_.getAllNames().size() + " " +
              "tables to Db cache: " + this.getName());
   }
 
@@ -126,7 +126,7 @@ public class Db implements CatalogObject {
   private Db(String name, Catalog catalog) {
     thriftDb_ = new TDatabase(name);
     this.parentCatalog_ = catalog;
-    functions = new HashMap<String, List<Function>>();
+    functions_ = new HashMap<String, List<Function>>();
   }
 
   /**
@@ -173,11 +173,11 @@ public class Db implements CatalogObject {
   }
 
   public List<String> getAllTableNames() {
-    return Lists.newArrayList(tableCache.getAllNames());
+    return Lists.newArrayList(tableCache_.getAllNames());
   }
 
   public boolean containsTable(String tableName) {
-    return tableCache.contains(tableName);
+    return tableCache_.contains(tableName);
   }
 
   /**
@@ -186,7 +186,7 @@ public class Db implements CatalogObject {
    */
   public Table getTable(String tbl) throws TableLoadingException {
     try {
-      return tableCache.get(tbl);
+      return tableCache_.get(tbl);
     } catch (TableNotFoundException e) {
       return null;
     } catch (TableLoadingException e) {
@@ -200,14 +200,14 @@ public class Db implements CatalogObject {
    * Returns the Table with the given name if present in the table cache, null otherwise.
    */
   public Table getTableIfPresent(String tblName) {
-    return tableCache.getIfPresent(tblName);
+    return tableCache_.getIfPresent(tblName);
   }
 
   /**
    * Adds a table to the table list. Table cache will be populated on the next
    * getTable().
    */
-  public long addTable(String tableName) { return tableCache.add(tableName); }
+  public long addTable(String tableName) { return tableCache_.add(tableName); }
 
   /**
    * Creates a new Table object from the given thrift representation and adds
@@ -227,7 +227,7 @@ public class Db implements CatalogObject {
           thriftTable.getMetastore_table());
       table.loadFromThrift(thriftTable);
       table.setCatalogVersion(catalogVersion);
-      tableCache.add(table);
+      tableCache_.add(table);
     } else {
       // This table's metadata is incomplete. The error message in the load status
       // should provide details on why. By convention, the final error message should
@@ -256,7 +256,7 @@ public class Db implements CatalogObject {
       IncompleteTable table = new IncompleteTable(new TableId(),
           this, thriftTable.getTbl_name(), loadingException);
       table.setCatalogVersion(catalogVersion);
-      tableCache.add(table);
+      tableCache_.add(table);
     }
   }
 
@@ -264,7 +264,7 @@ public class Db implements CatalogObject {
    * Removes the table name and any cached metadata from the Table cache.
    */
   public long removeTable(String tableName) {
-    return tableCache.remove(tableName);
+    return tableCache_.remove(tableName);
   }
 
   /**
@@ -274,7 +274,7 @@ public class Db implements CatalogObject {
    * existing metadata will be invalidated.
    */
   public long refreshTable(String tableName) {
-    return tableCache.refresh(tableName);
+    return tableCache_.refresh(tableName);
   }
 
   /**
@@ -283,8 +283,8 @@ public class Db implements CatalogObject {
    */
   public List<String> getAllFunctionSignatures(TFunctionType type) {
     List<String> names = Lists.newArrayList();
-    synchronized (functions) {
-      for (List<Function> fns: functions.values()) {
+    synchronized (functions_) {
+      for (List<Function> fns: functions_.values()) {
         for (Function f: fns) {
           if (type == null || (type == TFunctionType.SCALAR && f instanceof Udf) ||
                type == TFunctionType.AGGREGATE && f instanceof Uda) {
@@ -300,8 +300,8 @@ public class Db implements CatalogObject {
    * Returns the number of functions in this database.
    */
   public int numFunctions() {
-    synchronized (functions) {
-      return functions.size();
+    synchronized (functions_) {
+      return functions_.size();
     }
   }
 
@@ -309,8 +309,8 @@ public class Db implements CatalogObject {
    * See comment in Catalog.
    */
   public boolean functionExists(FunctionName name) {
-    synchronized (functions) {
-      return functions.get(name.getFunction()) != null;
+    synchronized (functions_) {
+      return functions_.get(name.getFunction()) != null;
     }
   }
 
@@ -318,8 +318,8 @@ public class Db implements CatalogObject {
    * See comment in Catalog.
    */
   public Function getFunction(Function desc, Function.CompareMode mode) {
-    synchronized (functions) {
-      List<Function> fns = functions.get(desc.functionName());
+    synchronized (functions_) {
+      List<Function> fns = functions_.get(desc.functionName());
       if (fns == null) return null;
 
       // First check for identical
@@ -343,8 +343,8 @@ public class Db implements CatalogObject {
   }
 
   public Function getFunction(String signatureString) {
-    synchronized (functions) {
-      for (List<Function> fns: functions.values()) {
+    synchronized (functions_) {
+      for (List<Function> fns: functions_.values()) {
         for (Function f: fns) {
           if (f.signatureString().equals(signatureString)) return f;
         }
@@ -358,14 +358,14 @@ public class Db implements CatalogObject {
    */
   public boolean addFunction(Function fn) {
     // TODO: add this to persistent store
-    synchronized (functions) {
+    synchronized (functions_) {
       if (getFunction(fn, Function.CompareMode.IS_INDISTINGUISHABLE) != null) {
         return false;
       }
-      List<Function> fns = functions.get(fn.functionName());
+      List<Function> fns = functions_.get(fn.functionName());
       if (fns == null) {
         fns = Lists.newArrayList();
-        functions.put(fn.functionName(), fns);
+        functions_.put(fn.functionName(), fns);
       }
       fn.setCatalogVersion(Catalog.incrementAndGetCatalogVersion());
       fns.add(fn);
@@ -378,13 +378,13 @@ public class Db implements CatalogObject {
    */
   public Function removeFunction(Function desc) {
     // TODO: remove this from persistent store.
-    synchronized (functions) {
+    synchronized (functions_) {
       Function fn = getFunction(desc, Function.CompareMode.IS_INDISTINGUISHABLE);
       if (fn == null) return null;
-      List<Function> fns = functions.get(desc.functionName());
+      List<Function> fns = functions_.get(desc.functionName());
       Preconditions.checkNotNull(fns);
       fns.remove(fn);
-      if (fns.isEmpty()) functions.remove(desc.functionName());
+      if (fns.isEmpty()) functions_.remove(desc.functionName());
       return fn;
     }
   }
@@ -395,7 +395,7 @@ public class Db implements CatalogObject {
    * TODO: Move away from using signature strings and instead use Function IDs.
    */
   public Function removeFunction(String signatureStr) {
-    synchronized (functions) {
+    synchronized (functions_) {
       Function targetFn = getFunction(signatureStr);
       if (targetFn != null) return removeFunction(targetFn);
     }
@@ -406,14 +406,14 @@ public class Db implements CatalogObject {
    * Returns a map of functionNames to list of (overloaded) functions with that name.
    */
   public HashMap<String, List<Function>> getAllFunctions() {
-    return functions;
+    return functions_;
   }
 
   /**
    * Marks the table as invalid so the next access will trigger a metadata load.
    */
   public long invalidateTable(String tableName) {
-    return tableCache.invalidate(tableName);
+    return tableCache_.invalidate(tableName);
   }
 
 

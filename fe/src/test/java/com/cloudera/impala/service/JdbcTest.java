@@ -31,27 +31,27 @@ import com.cloudera.impala.testutil.ImpalaJdbcClient;
  *
  */
 public class JdbcTest {
-  private static Connection con;
+  private static Connection con_;
 
   @BeforeClass
   public static void setUp() throws Exception {
     ImpalaJdbcClient client = ImpalaJdbcClient.createClientUsingHiveJdbcDriver();
     client.connect();
-    con = client.getConnection();
-    assertNotNull("Connection is null", con);
-    assertFalse("Connection should not be closed", con.isClosed());
-    Statement stmt = con.createStatement();
+    con_ = client.getConnection();
+    assertNotNull("Connection is null", con_);
+    assertFalse("Connection should not be closed", con_.isClosed());
+    Statement stmt = con_.createStatement();
     assertNotNull("Statement is null", stmt);
   }
 
   @AfterClass
   public static void cleanUp() throws Exception {
-    con.close();
-    assertTrue("Connection should be closed", con.isClosed());
+    con_.close();
+    assertTrue("Connection should be closed", con_.isClosed());
 
     Exception expectedException = null;
     try {
-      con.createStatement();
+      con_.createStatement();
     } catch (Exception e) {
       expectedException = e;
     }
@@ -68,7 +68,8 @@ public class JdbcTest {
     tests.put("%all_ypes", "alltypes");
 
     for (String tblNamePattern: tests.keySet()) {
-      ResultSet rs = con.getMetaData().getTables("", "functional", tblNamePattern, null);
+      ResultSet rs = con_.getMetaData().getTables("", "functional",
+          tblNamePattern, null);
       assertTrue(rs.next());
       // TABLE_NAME is the 3rd column.
       String resultTableName = rs.getString("TABLE_NAME");
@@ -85,7 +86,7 @@ public class JdbcTest {
   @Test
   public void testMetaDataGetCatalogs() throws SQLException {
     // Hive/Impala does not have catalogs.
-    ResultSet rs = con.getMetaData().getCatalogs();
+    ResultSet rs = con_.getMetaData().getCatalogs();
     ResultSetMetaData resMeta = rs.getMetaData();
     assertEquals(1, resMeta.getColumnCount());
     assertEquals("TABLE_CAT", resMeta.getColumnName(1));
@@ -95,7 +96,7 @@ public class JdbcTest {
   @Test
   public void testMetaDataGetSchemas() throws SQLException {
     // There is only one schema: "default".
-    ResultSet rs = con.getMetaData().getSchemas("", "d_f%");
+    ResultSet rs = con_.getMetaData().getSchemas("", "d_f%");
     ResultSetMetaData resMeta = rs.getMetaData();
     assertEquals(2, resMeta.getColumnCount());
     assertEquals("TABLE_SCHEM", resMeta.getColumnName(1));
@@ -109,7 +110,7 @@ public class JdbcTest {
   @Test
   public void testMetaDataGetTableTypes() throws SQLException {
     // There is only one table type: "table".
-    ResultSet rs = con.getMetaData().getTableTypes();
+    ResultSet rs = con_.getMetaData().getTableTypes();
     assertTrue(rs.next());
     assertEquals(rs.getString(1).toLowerCase(), "table");
     assertFalse(rs.next());
@@ -119,7 +120,8 @@ public class JdbcTest {
   @Test
   public void testMetaDataGetColumns() throws SQLException {
     // It should return alltypessmall.string_col.
-    ResultSet rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "s%rin%");
+    ResultSet rs = con_.getMetaData().getColumns(null,
+        "functional", "alltypessmall", "s%rin%");
 
     // validate the metadata for the getColumns result set
     ResultSetMetaData rsmd = rs.getMetaData();
@@ -134,56 +136,61 @@ public class JdbcTest {
     rs.close();
 
     // validate bool_col
-    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "bool_col");
+    rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall", "bool_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.BOOLEAN, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate tinyint_col
-    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "tinyint_col");
+    rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
+        "tinyint_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.TINYINT, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate smallint_col
-    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "smallint_col");
+    rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
+        "smallint_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.SMALLINT, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate int_col
-    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "int_col");
+    rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall", "int_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.INTEGER, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate bigint_col
-    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "bigint_col");
+    rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
+        "bigint_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.BIGINT, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate float_col
-    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "float_col");
+    rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall", "float_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.FLOAT, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate double_col
-    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "double_col");
+    rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
+        "double_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.DOUBLE, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate timestamp_col
-    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "timestamp_col");
+    rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
+        "timestamp_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.TIMESTAMP, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
@@ -195,7 +202,7 @@ public class JdbcTest {
    */
   @Test
   public void testMetaDataGetColumnsMetaData() throws SQLException {
-    ResultSet rs = con.getMetaData().getColumns(null, "functional", "alltypes", null);
+    ResultSet rs = con_.getMetaData().getColumns(null, "functional", "alltypes", null);
 
     ResultSetMetaData rsmd = rs.getMetaData();
     assertEquals("TABLE_CAT", rsmd.getColumnName(1));
@@ -209,7 +216,7 @@ public class JdbcTest {
   @Test
   public void testMetaDataGetFunctions() throws SQLException {
     // It should return one function "parse_url".
-    ResultSet rs = con.getMetaData().getFunctions(null, null, "parse_url");
+    ResultSet rs = con_.getMetaData().getFunctions(null, null, "parse_url");
     assertTrue(rs.next());
     String funcName = rs.getString("FUNCTION_NAME");
     assertEquals("Incorrect function name", "parse_url", funcName.toLowerCase());
@@ -219,7 +226,7 @@ public class JdbcTest {
 
   @Test
   public void testUtilityFunctions() throws SQLException {
-    ResultSet rs = con.createStatement().executeQuery("select user()");
+    ResultSet rs = con_.createStatement().executeQuery("select user()");
     try {
       // We expect exactly one result row with a NULL inside the first column.
       // The user() function returns NULL because we currently cannot set the user

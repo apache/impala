@@ -48,19 +48,19 @@ public enum PrimitiveType {
   // Fixed length char array.
   CHAR("CHAR", -1, TPrimitiveType.CHAR);
 
-  private final String description;
-  private final int slotSize;  // size of tuple slot for this type
-  private final TPrimitiveType thriftType;
+  private final String description_;
+  private final int slotSize_;  // size of tuple slot for this type
+  private final TPrimitiveType thriftType_;
 
   private PrimitiveType(String description, int slotSize, TPrimitiveType thriftType) {
-    this.description = description;
-    this.slotSize = slotSize;
-    this.thriftType = thriftType;
+    description_ = description;
+    slotSize_ = slotSize;
+    thriftType_ = thriftType;
   }
 
   @Override
   public String toString() {
-    return description;
+    return description_;
   }
 
   public static PrimitiveType fromThrift(TPrimitiveType t) {
@@ -82,7 +82,7 @@ public enum PrimitiveType {
   }
 
   public TPrimitiveType toThrift() {
-    return thriftType;
+    return thriftType_;
   }
 
   public static List<TPrimitiveType> toThrift(PrimitiveType[] types) {
@@ -91,14 +91,6 @@ public enum PrimitiveType {
       result.add(t.toThrift());
     }
     return result;
-  }
-
-  public int getSlotSize() {
-    return slotSize;
-  }
-
-  public static int getMaxSlotSize() {
-    return STRING.slotSize;
   }
 
   public boolean isFixedPointType() {
@@ -468,5 +460,7 @@ public enum PrimitiveType {
         return 0;
     }
   }
-}
 
+  public int getSlotSize() { return slotSize_; }
+  public static int getMaxSlotSize() { return STRING.slotSize_; }
+}

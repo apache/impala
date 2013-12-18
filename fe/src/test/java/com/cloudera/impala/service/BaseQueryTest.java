@@ -54,9 +54,6 @@ public abstract class BaseQueryTest {
   private static final String DROP_PARTITIONS_CMD = "DROP PARTITIONS";
   private static final String RELOAD_CATALOG_CMD = "RELOAD";
 
-  private static Catalog catalog;
-  private static ImpaladClientExecutor impaladClientExecutor;
-
   //Test dimension values
   protected static final List<Integer> DEFAULT_BATCH_SIZE_ONLY = ImmutableList.of(0);
   protected static final List<Integer> ALL_BATCH_SIZES = ImmutableList.of(0, 16, 1);
@@ -101,7 +98,10 @@ public abstract class BaseQueryTest {
       System.getProperty("testExecutionMode", "reduced").toUpperCase());
 
   // A relative path from the 'workloads' directory to the base test directory.
-  private final String testDirName;
+  private final String testDirName_;
+
+  private static Catalog catalog_;
+  private static ImpaladClientExecutor impaladClientExecutor_;
 
   /**
    * The different test execution modes that are supported. These modes control which
@@ -177,24 +177,24 @@ public abstract class BaseQueryTest {
   }
 
   protected BaseQueryTest(String testDirName) {
-    this.testDirName = testDirName;
+    this.testDirName_ = testDirName;
   }
 
   @BeforeClass
   public static void setUp() throws Exception {
-    impaladClientExecutor = TestUtils.createImpaladClientExecutor();
+    impaladClientExecutor_ = TestUtils.createImpaladClientExecutor();
     LOG.info(String.format("Executing tests in mode: %s", EXECUTION_MODE));
   }
 
   @AfterClass
   public static void cleanUp() {
-    if (catalog != null) {
-      catalog.close();
+    if (catalog_ != null) {
+      catalog_.close();
     }
 
-    if (impaladClientExecutor != null) {
+    if (impaladClientExecutor_ != null) {
       try {
-        impaladClientExecutor.close();
+        impaladClientExecutor_.close();
       } catch (TTransportException e) {
         e.printStackTrace();
         fail("Problem closing transport: " + e.getMessage());
@@ -373,7 +373,7 @@ public abstract class BaseQueryTest {
 
   protected void runQueryWithTestConfigs(List<TestConfiguration> testConfigs,
       String testFile, boolean abortOnError, int maxErrors) {
-    String fileName = new File(testDirName, testFile + ".test").getPath();
+    String fileName = new File(testDirName_, testFile + ".test").getPath();
     TestFileParser queryFileParser = new TestFileParser(fileName);
 
     LOG.debug("Running the following configurations over file " + fileName + " : ");
@@ -445,7 +445,7 @@ public abstract class BaseQueryTest {
 
         // Always reset the catalog if the test file has a setup section
         if (queryFileParser.hasSetupSection()) {
-          impaladClientExecutor.resetCatalog();
+          impaladClientExecutor_.resetCatalog();
         }
       } catch (Exception e) {
         fail(e.getMessage());
@@ -454,7 +454,7 @@ public abstract class BaseQueryTest {
       String queryString = testCase.getSectionAsString(
           Section.QUERY, false, " ", config.getDbSuffix());
 
-      QueryExecTestResult result = TestUtils.runQuery(impaladClientExecutor,
+      QueryExecTestResult result = TestUtils.runQuery(impaladClientExecutor_,
           queryString, config.getTestExecContext(), testCase.getStartingLineNum(),
           expectedResult, errorLog);
 

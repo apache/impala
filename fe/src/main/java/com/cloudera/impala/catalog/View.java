@@ -42,13 +42,13 @@ import com.cloudera.impala.thrift.TTableType;
 public class View extends Table {
 
   // The original SQL-string given as view definition.
-  private String originalViewDef;
+  private String originalViewDef_;
 
   // The extended SQL-string used for view substitution.
-  private String inlineViewDef;
+  private String inlineViewDef_;
 
   // View definition created by parsing expandedViewDef into a QueryStmt.
-  private ViewRef viewDef;
+  private ViewRef viewDef_;
 
   public View(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
@@ -60,7 +60,7 @@ public class View extends Table {
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     try {
       // Load columns.
-      List<FieldSchema> fieldSchemas = client.getFields(db.getName(), name);
+      List<FieldSchema> fieldSchemas = client.getFields(db_.getName(), name_);
       for (int i = 0; i < fieldSchemas.size(); ++i) {
         FieldSchema s = fieldSchemas.get(i);
         // catch currently unsupported hive schema elements
@@ -71,17 +71,17 @@ public class View extends Table {
         }
         PrimitiveType type = getPrimitiveType(s.getType());
         Column col = new Column(s.getName(), type, s.getComment(), i);
-        colsByPos.add(col);
-        colsByName.put(s.getName(), col);
+        colsByPos_.add(col);
+        colsByName_.put(s.getName(), col);
       }
       // These fields are irrelevant for views.
-      numClusteringCols = 0;
-      numRows = -1;
+      numClusteringCols_ = 0;
+      numRows_ = -1;
       initViewDef();
     } catch (TableLoadingException e) {
       throw e;
     } catch (Exception e) {
-      throw new TableLoadingException("Failed to load metadata for view: " + name, e);
+      throw new TableLoadingException("Failed to load metadata for view: " + name_, e);
     }
   }
 
@@ -99,11 +99,11 @@ public class View extends Table {
    */
   private void initViewDef() throws TableLoadingException {
     // Set view-definition SQL strings.
-    originalViewDef = getMetaStoreTable().getViewOriginalText();
-    inlineViewDef = getMetaStoreTable().getViewExpandedText();
+    originalViewDef_ = getMetaStoreTable().getViewOriginalText();
+    inlineViewDef_ = getMetaStoreTable().getViewExpandedText();
     // Parse the expanded view definition SQL-string into a QueryStmt and
     // populate a ViewRef to provide as view definition.
-    SqlScanner input = new SqlScanner(new StringReader(inlineViewDef));
+    SqlScanner input = new SqlScanner(new StringReader(inlineViewDef_));
     SqlParser parser = new SqlParser(input);
     ParseNode node = null;
     try {
@@ -113,21 +113,21 @@ public class View extends Table {
       // of tables that the user triggering this load may not have privileges on.
       throw new TableLoadingException(
           String.format("Failed to parse view-definition statement of view: " +
-              "%s.%s", db.getName(), name));
+              "%s.%s", db_.getName(), name_));
     }
     // Make sure the view definition parses to a query statement.
     if (!(node instanceof QueryStmt)) {
       throw new TableLoadingException(String.format("View definition of %s.%s " +
-          "is not a query statement", db.getName(), name));
+          "is not a query statement", db_.getName(), name_));
     }
-    viewDef = new ViewRef(name, (QueryStmt) node, this);
+    viewDef_ = new ViewRef(name_, (QueryStmt) node, this);
   }
 
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.VIEW; }
-  public ViewRef getViewDef() { return viewDef; }
-  public String getOriginalViewDef() { return originalViewDef; }
-  public String getInlineViewDef() { return inlineViewDef; }
+  public ViewRef getViewDef() { return viewDef_; }
+  public String getOriginalViewDef() { return originalViewDef_; }
+  public String getInlineViewDef() { return inlineViewDef_; }
 
   @Override
   public int getNumNodes() {

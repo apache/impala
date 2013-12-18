@@ -52,7 +52,7 @@ import com.google.common.base.Preconditions;
  */
 public class JniCatalog {
   private final static Logger LOG = LoggerFactory.getLogger(JniCatalog.class);
-  private final static TBinaryProtocol.Factory protocolFactory =
+  private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
   private final CatalogServiceCatalog catalog_;
   private final DdlExecutor ddlExecutor_;
@@ -82,7 +82,7 @@ public class JniCatalog {
   public byte[] getCatalogObjects(long from_version) throws ImpalaException, TException {
     TGetAllCatalogObjectsResponse resp =
         catalog_.getCatalogObjects(from_version);
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(resp);
   }
 
@@ -91,8 +91,8 @@ public class JniCatalog {
    */
   public byte[] execDdl(byte[] thriftDdlExecReq) throws ImpalaException {
     TDdlExecRequest params = new TDdlExecRequest();
-    JniUtil.deserializeThrift(protocolFactory, params, thriftDdlExecReq);
-    TSerializer serializer = new TSerializer(protocolFactory);
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftDdlExecReq);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(ddlExecutor_.execDdlRequest(params));
     } catch (TException e) {
@@ -106,7 +106,7 @@ public class JniCatalog {
   public byte[] resetMetadata(byte[] thriftResetMetadataReq)
       throws ImpalaException, TException {
     TResetMetadataRequest req = new TResetMetadataRequest();
-    JniUtil.deserializeThrift(protocolFactory, req, thriftResetMetadataReq);
+    JniUtil.deserializeThrift(protocolFactory_, req, thriftResetMetadataReq);
     TResetMetadataResponse resp = new TResetMetadataResponse();
     resp.setResult(new TCatalogUpdateResult());
     resp.getResult().setCatalog_service_id(getServiceId());
@@ -124,7 +124,7 @@ public class JniCatalog {
     resp.getResult().setStatus(
         new TStatus(TStatusCode.OK, new ArrayList<String>()));
 
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(resp);
   }
 
@@ -136,10 +136,10 @@ public class JniCatalog {
   public byte[] getDbNames(byte[] thriftGetTablesParams) throws ImpalaException,
       TException {
     TGetDbsParams params = new TGetDbsParams();
-    JniUtil.deserializeThrift(protocolFactory, params, thriftGetTablesParams);
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     TGetDbsResult result = new TGetDbsResult();
     result.setDbs(catalog_.getDbNames(null));
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(result);
   }
 
@@ -151,11 +151,11 @@ public class JniCatalog {
   public byte[] getTableNames(byte[] thriftGetTablesParams) throws ImpalaException,
       TException {
     TGetTablesParams params = new TGetTablesParams();
-    JniUtil.deserializeThrift(protocolFactory, params, thriftGetTablesParams);
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     List<String> tables = catalog_.getTableNames(params.db, params.pattern);
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(result);
   }
 
@@ -165,8 +165,8 @@ public class JniCatalog {
   public byte[] getCatalogObject(byte[] thriftParams) throws ImpalaException,
       TException {
     TCatalogObject objectDescription = new TCatalogObject();
-    JniUtil.deserializeThrift(protocolFactory, objectDescription, thriftParams);
-    TSerializer serializer = new TSerializer(protocolFactory);
+    JniUtil.deserializeThrift(protocolFactory_, objectDescription, thriftParams);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(catalog_.getTCatalogObject(objectDescription));
   }
 
@@ -177,8 +177,8 @@ public class JniCatalog {
   public byte[] updateCatalog(byte[] thriftUpdateCatalog) throws ImpalaException,
       TException  {
     TUpdateCatalogRequest request = new TUpdateCatalogRequest();
-    JniUtil.deserializeThrift(protocolFactory, request, thriftUpdateCatalog);
-    TSerializer serializer = new TSerializer(protocolFactory);
+    JniUtil.deserializeThrift(protocolFactory_, request, thriftUpdateCatalog);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(ddlExecutor_.updateCatalog(request));
   }
 }

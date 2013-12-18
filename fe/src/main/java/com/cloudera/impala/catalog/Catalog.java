@@ -56,6 +56,7 @@ public abstract class Catalog {
   // Initial catalog version.
   public final static long INITIAL_CATALOG_VERSION = 0L;
   public static final String DEFAULT_DB = "default";
+  private static final int META_STORE_CLIENT_POOL_SIZE = 5;
 
   private static final Logger LOG = Logger.getLogger(Catalog.class);
 
@@ -67,7 +68,6 @@ public abstract class Catalog {
   // the catalogLock_.
   private final static AtomicLong catalogVersion_ =
       new AtomicLong(INITIAL_CATALOG_VERSION);
-  private static final int META_STORE_CLIENT_POOL_SIZE = 5;
   private final MetaStoreClientPool metaStoreClientPool_ = new MetaStoreClientPool(0);
   private final CatalogInitStrategy initStrategy_;
   private final AtomicInteger nextTableId_ = new AtomicInteger(0);

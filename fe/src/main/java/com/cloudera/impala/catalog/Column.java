@@ -42,11 +42,11 @@ public class Column {
   }
 
   public Column(String name, PrimitiveType type, String comment, int position) {
-    this.name_ = name;
-    this.type_ = type;
-    this.comment_ = comment;
-    this.position_ = position;
-    this.stats_ = new ColumnStats(type);
+    name_ = name;
+    type_ = type;
+    comment_ = comment;
+    position_ = position;
+    stats_ = new ColumnStats(type);
   }
 
   public String getComment() { return comment_; }
@@ -69,9 +69,11 @@ public class Column {
   @Override
   public String toString() {
     return Objects.toStringHelper(this.getClass())
-                  .add("name", name_)
-                  .add("type", type_)
-                  .add("position", position_).toString();
+                  .add("name_", name_)
+                  .add("type_", type_)
+                  .add("comment_", comment_)
+                  .add("stats", stats_)
+                  .add("position_", position_).toString();
   }
 
   public static Column fromThrift(TColumn columnDesc) {

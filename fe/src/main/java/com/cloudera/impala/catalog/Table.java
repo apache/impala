@@ -56,45 +56,44 @@ public abstract class Table implements CatalogObject {
   private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
   private final org.apache.hadoop.hive.metastore.api.Table msTable_;
 
-  protected final TableId id;
-  protected final Db db;
-  protected final String name;
-  protected final String owner;
-  protected TTableDescriptor tableDesc;
-  protected List<FieldSchema> fields;
-  protected TAccessLevel accessLevel = TAccessLevel.READ_WRITE;
+  protected final TableId id_;
+  protected final Db db_;
+  protected final String name_;
+  protected final String owner_;
+  protected TTableDescriptor tableDesc_;
+  protected List<FieldSchema> fields_;
+  protected TAccessLevel accessLevel_ = TAccessLevel.READ_WRITE;
 
   // Number of clustering columns.
-  protected int numClusteringCols;
+  protected int numClusteringCols_;
 
   // estimated number of rows in table; -1: unknown.
-  protected long numRows = -1;
+  protected long numRows_ = -1;
 
   // colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
   // the clustering columns.
-  protected final ArrayList<Column> colsByPos;
+  protected final ArrayList<Column> colsByPos_;
 
   // map from lowercase column name to Column object.
-  protected final Map<String, Column> colsByName;
+  protected final Map<String, Column> colsByName_;
 
   // The lastDdlTime for this table; -1 if not set
-  protected long lastDdlTime;
+  protected long lastDdlTime_;
 
   // Set of supported table types.
-  protected static EnumSet<TableType> SUPPORTED_TABLE_TYPES =
-      EnumSet.of(TableType.EXTERNAL_TABLE, TableType.MANAGED_TABLE,
-      TableType.VIRTUAL_VIEW);
+  protected static EnumSet<TableType> SUPPORTED_TABLE_TYPES = EnumSet.of(
+      TableType.EXTERNAL_TABLE, TableType.MANAGED_TABLE, TableType.VIRTUAL_VIEW);
 
-  protected Table(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable_, Db db,
+  protected Table(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
-    this.id = id;
-    this.msTable_ = msTable_;
-    this.db = db;
-    this.name = name;
-    this.owner = owner;
-    this.colsByPos = Lists.newArrayList();
-    this.colsByName = Maps.newHashMap();
-    this.lastDdlTime = (msTable_ != null) ? Catalog.getLastDdlTime(msTable_) : -1;
+    id_ = id;
+    msTable_ = msTable;
+    db_ = db;
+    name_ = name;
+    owner_ = owner;
+    colsByPos_ = Lists.newArrayList();
+    colsByName_ = Maps.newHashMap();
+    lastDdlTime_ = (msTable_ != null) ? Catalog.getLastDdlTime(msTable_) : -1;
   }
 
   //number of nodes that contain data for this table; -1: unknown
@@ -109,17 +108,6 @@ public abstract class Table implements CatalogObject {
   public abstract void load(Table oldValue, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException;
 
-  public TableId getId() { return id; }
-  public long getNumRows() { return numRows; }
-
-  @Override
-  public long getCatalogVersion() { return catalogVersion_; }
-
-  @Override
-  public void setCatalogVersion(long catalogVersion) {
-    catalogVersion_ = catalogVersion;
-  }
-
   /**
    * Updates the lastDdlTime for this Table, if the new value is greater
    * than the existing value. Does nothing if the new value is less than
@@ -127,15 +115,7 @@ public abstract class Table implements CatalogObject {
    */
   public void updateLastDdlTime(long ddlTime) {
     // Ensure the lastDdlTime never goes backwards.
-    if (ddlTime > lastDdlTime) lastDdlTime = ddlTime;
-  }
-
-  /**
-   * Returns the metastore.api.Table object this Table was created from. Returns null
-   * if the derived Table object was not created from a metastore Table (ex. InlineViews).
-   */
-  public org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable() {
-    return msTable_;
+    if (ddlTime > lastDdlTime_) lastDdlTime_ = ddlTime;
   }
 
   /**
@@ -193,7 +173,7 @@ public abstract class Table implements CatalogObject {
   protected void loadColumnStats(Column col, HiveMetaStoreClient client) {
     ColumnStatistics colStats = null;
     try {
-      colStats = client.getTableColumnStatistics(db.getName(), name, col.getName());
+      colStats = client.getTableColumnStatistics(db_.getName(), name_, col.getName());
     } catch (Exception e) {
       // don't try to load stats for this column
       return;
@@ -205,7 +185,7 @@ public abstract class Table implements CatalogObject {
     if (!ColumnStats.isSupportedColType(col.getType())) {
       LOG.warn(String.format("Column stats are available for table %s / " +
           "column '%s', but Impala does not currently support column stats for this " +
-          "type of column (%s)",  name, col.getName(), col.getType().toString()));
+          "type of column (%s)",  name_, col.getName(), col.getType().toString()));
       return;
     }
 
@@ -215,7 +195,7 @@ public abstract class Table implements CatalogObject {
           "column '%s' did not succeed because column type (%s) was not compatible " +
           "with the column stats data. Performance may suffer until column stats are" +
           " regenerated for this column.",
-          name, col.getName(), col.getType().toString()));
+          name_, col.getName(), col.getType().toString()));
     }
   }
 
@@ -272,40 +252,40 @@ public abstract class Table implements CatalogObject {
     columns.addAll(thriftTable.getClustering_columns());
     columns.addAll(thriftTable.getColumns());
 
-    fields = new ArrayList<FieldSchema>();
-    colsByPos.clear();
-    colsByPos.ensureCapacity(columns.size());
+    fields_ = new ArrayList<FieldSchema>();
+    colsByPos_.clear();
+    colsByPos_.ensureCapacity(columns.size());
     for (int i = 0; i < columns.size(); ++i) {
       Column col = Column.fromThrift(columns.get(i));
-      colsByPos.add(col.getPosition(), col);
-      colsByName.put(col.getName().toLowerCase(), col);
-      fields.add(new FieldSchema(col.getName(),
+      colsByPos_.add(col.getPosition(), col);
+      colsByName_.put(col.getName().toLowerCase(), col);
+      fields_.add(new FieldSchema(col.getName(),
         col.getType().toString().toLowerCase(), col.getComment()));
     }
 
-    numClusteringCols = thriftTable.getClustering_columns().size();
+    numClusteringCols_ = thriftTable.getClustering_columns().size();
 
     // Estimated number of rows
-    numRows = thriftTable.isSetTable_stats() ?
+    numRows_ = thriftTable.isSetTable_stats() ?
         thriftTable.getTable_stats().getNum_rows() : -1;
 
     // Default to READ_WRITE access if the field is not set.
-    accessLevel = thriftTable.isSetAccess_level() ? thriftTable.getAccess_level() :
+    accessLevel_ = thriftTable.isSetAccess_level() ? thriftTable.getAccess_level() :
         TAccessLevel.READ_WRITE;
   }
 
   public TTable toThrift() {
-    TTable table = new TTable(db.getName(), name);
-    table.setId(id.asInt());
-    table.setAccess_level(accessLevel);
+    TTable table = new TTable(db_.getName(), name_);
+    table.setId(id_.asInt());
+    table.setAccess_level(accessLevel_);
 
     // Populate both regular columns and clustering columns (if there are any).
     table.setColumns(new ArrayList<TColumn>());
     table.setClustering_columns(new ArrayList<TColumn>());
-    for (int i = 0; i < colsByPos.size(); ++i) {
-      TColumn colDesc = colsByPos.get(i).toThrift();
+    for (int i = 0; i < colsByPos_.size(); ++i) {
+      TColumn colDesc = colsByPos_.get(i).toThrift();
       // Clustering columns come first.
-      if (i < numClusteringCols) {
+      if (i < numClusteringCols_) {
         table.addToClustering_columns(colDesc);
       } else {
         table.addToColumns(colDesc);
@@ -313,9 +293,9 @@ public abstract class Table implements CatalogObject {
     }
 
     table.setMetastore_table(getMetaStoreTable());
-    if (numRows != -1) {
+    if (numRows_ != -1) {
       table.setTable_stats(new TTableStats());
-      table.getTable_stats().setNum_rows(numRows);
+      table.getTable_stats().setNum_rows(numRows_);
     }
     return table;
   }
@@ -358,11 +338,11 @@ public abstract class Table implements CatalogObject {
    * toThrift() should not work on virtual tables.
    */
   public boolean isVirtualTable() { return false; }
-  public Db getDb() { return db; }
-  public String getName() { return name; }
-  public String getFullName() { return (db != null ? db.getName() + "." : "") + name; }
-  public String getOwner() { return owner; }
-  public ArrayList<Column> getColumns() { return colsByPos; }
+  public Db getDb() { return db_; }
+  public String getName() { return name_; }
+  public String getFullName() { return (db_ != null ? db_.getName() + "." : "") + name_; }
+  public String getOwner() { return owner_; }
+  public ArrayList<Column> getColumns() { return colsByPos_; }
 
   /**
    * Subclasses should override this if they provide a storage handler class. Currently
@@ -377,11 +357,11 @@ public abstract class Table implements CatalogObject {
    */
   public ArrayList<Column> getColumnsInHiveOrder() {
     ArrayList<Column> columns = Lists.newArrayList();
-    for (Column column: colsByPos.subList(numClusteringCols, colsByPos.size())) {
+    for (Column column: colsByPos_.subList(numClusteringCols_, colsByPos_.size())) {
       columns.add(column);
     }
 
-    for (Column column: colsByPos.subList(0, numClusteringCols)) {
+    for (Column column: colsByPos_.subList(0, numClusteringCols_)) {
       columns.add(column);
     }
 
@@ -391,6 +371,25 @@ public abstract class Table implements CatalogObject {
   /**
    * Case-insensitive lookup.
    */
-  public Column getColumn(String name) { return colsByName.get(name.toLowerCase()); }
-  public int getNumClusteringCols() { return numClusteringCols; }
+  public Column getColumn(String name) { return colsByName_.get(name.toLowerCase()); }
+
+  /**
+   * Returns the metastore.api.Table object this Table was created from. Returns null
+   * if the derived Table object was not created from a metastore Table (ex. InlineViews).
+   */
+  public org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable() {
+    return msTable_;
+  }
+
+  public int getNumClusteringCols() { return numClusteringCols_; }
+  public TableId getId() { return id_; }
+  public long getNumRows() { return numRows_; }
+
+  @Override
+  public long getCatalogVersion() { return catalogVersion_; }
+
+  @Override
+  public void setCatalogVersion(long catalogVersion) {
+    catalogVersion_ = catalogVersion;
+  }
 }

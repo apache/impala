@@ -80,9 +80,9 @@ import com.google.common.base.Preconditions;
  */
 public class JniFrontend {
   private final static Logger LOG = LoggerFactory.getLogger(JniFrontend.class);
-  private final static TBinaryProtocol.Factory protocolFactory =
+  private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
-  private final Frontend frontend;
+  private final Frontend frontend_;
 
   /**
    * Create a new instance of the Jni Frontend.
@@ -98,7 +98,7 @@ public class JniFrontend {
     AuthorizationConfig authorizationConfig = new AuthorizationConfig(serverName,
         authorizationPolicyFile, policyProviderClassName);
     authorizationConfig.validateConfig();
-    frontend = new Frontend(authorizationConfig);
+    frontend_ = new Frontend(authorizationConfig);
   }
 
   /**
@@ -108,14 +108,14 @@ public class JniFrontend {
   public byte[] createExecRequest(byte[] thriftClientRequest)
       throws ImpalaException {
     TClientRequest request = new TClientRequest();
-    JniUtil.deserializeThrift(protocolFactory, request, thriftClientRequest);
+    JniUtil.deserializeThrift(protocolFactory_, request, thriftClientRequest);
 
     StringBuilder explainString = new StringBuilder();
-    TExecRequest result = frontend.createExecRequest(request, explainString);
+    TExecRequest result = frontend_.createExecRequest(request, explainString);
     LOG.debug(explainString.toString());
 
     // TODO: avoid creating serializer for each query?
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);
     } catch (TException e) {
@@ -125,10 +125,10 @@ public class JniFrontend {
 
   public byte[] updateCatalogCache(byte[] thriftCatalogUpdate) throws ImpalaException {
     TUpdateCatalogCacheRequest req = new TUpdateCatalogCacheRequest();
-    JniUtil.deserializeThrift(protocolFactory, req, thriftCatalogUpdate);
-    TSerializer serializer = new TSerializer(protocolFactory);
+    JniUtil.deserializeThrift(protocolFactory_, req, thriftCatalogUpdate);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
-      return serializer.serialize(frontend.updateCatalogCache(req));
+      return serializer.serialize(frontend_.updateCatalogCache(req));
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
@@ -143,9 +143,9 @@ public class JniFrontend {
   public byte[] loadTableData(byte[] thriftLoadTableDataParams)
       throws ImpalaException, IOException {
     TLoadDataReq request = new TLoadDataReq();
-    JniUtil.deserializeThrift(protocolFactory, request, thriftLoadTableDataParams);
-    TLoadDataResp response = frontend.loadTableData(request);
-    TSerializer serializer = new TSerializer(protocolFactory);
+    JniUtil.deserializeThrift(protocolFactory_, request, thriftLoadTableDataParams);
+    TLoadDataResp response = frontend_.loadTableData(request);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(response);
     } catch (TException e) {
@@ -159,8 +159,8 @@ public class JniFrontend {
    */
   public String getExplainPlan(byte[] thriftQueryRequest) throws ImpalaException {
     TClientRequest request = new TClientRequest();
-    JniUtil.deserializeThrift(protocolFactory, request, thriftQueryRequest);
-    String plan = frontend.getExplainString(request);
+    JniUtil.deserializeThrift(protocolFactory_, request, thriftQueryRequest);
+    String plan = frontend_.getExplainString(request);
     LOG.debug("Explain plan: " + plan);
     return plan;
   }
@@ -174,18 +174,18 @@ public class JniFrontend {
    */
   public byte[] getTableNames(byte[] thriftGetTablesParams) throws ImpalaException {
     TGetTablesParams params = new TGetTablesParams();
-    JniUtil.deserializeThrift(protocolFactory, params, thriftGetTablesParams);
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     // If the session was not set it indicates this is an internal Impala call.
     User user = params.isSetSession() ?
         new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
 
     Preconditions.checkState(!params.isSetSession() || user != null );
-    List<String> tables = frontend.getTableNames(params.db, params.pattern, user);
+    List<String> tables = frontend_.getTableNames(params.db, params.pattern, user);
 
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
 
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);
     } catch (TException e) {
@@ -201,16 +201,16 @@ public class JniFrontend {
    */
   public byte[] getDbNames(byte[] thriftGetTablesParams) throws ImpalaException {
     TGetDbsParams params = new TGetDbsParams();
-    JniUtil.deserializeThrift(protocolFactory, params, thriftGetTablesParams);
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     // If the session was not set it indicates this is an internal Impala call.
     User user = params.isSetSession() ?
         new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
-    List<String> dbs = frontend.getDbNames(params.pattern, user);
+    List<String> dbs = frontend_.getDbNames(params.pattern, user);
 
     TGetDbsResult result = new TGetDbsResult();
     result.setDbs(dbs);
 
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);
     } catch (TException e) {
@@ -220,17 +220,17 @@ public class JniFrontend {
 
   public byte[] getStats(byte[] thriftShowStatsParams) throws ImpalaException {
     TShowStatsParams params = new TShowStatsParams();
-    JniUtil.deserializeThrift(protocolFactory, params, thriftShowStatsParams);
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftShowStatsParams);
     Preconditions.checkState(params.isSetTable_name());
     TResultSet result;
     if (params.isIs_show_col_stats()) {
-      result = frontend.getColumnStats(params.getTable_name().getDb_name(),
+      result = frontend_.getColumnStats(params.getTable_name().getDb_name(),
           params.getTable_name().getTable_name());
     } else {
-      result = frontend.getTableStats(params.getTable_name().getDb_name(),
+      result = frontend_.getTableStats(params.getTable_name().getDb_name(),
           params.getTable_name().getTable_name());
     }
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);
     } catch (TException e) {
@@ -246,12 +246,12 @@ public class JniFrontend {
    */
   public byte[] getFunctions(byte[] thriftGetFunctionsParams) throws ImpalaException {
     TGetFunctionsParams params = new TGetFunctionsParams();
-    JniUtil.deserializeThrift(protocolFactory, params, thriftGetFunctionsParams);
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftGetFunctionsParams);
 
     TGetFunctionsResult result = new TGetFunctionsResult();
     result.setFn_signatures(
-        frontend.getFunctions(params.type, params.db, params.pattern));
-    TSerializer serializer = new TSerializer(protocolFactory);
+        frontend_.getFunctions(params.type, params.db, params.pattern));
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);
     } catch (TException e) {
@@ -265,10 +265,10 @@ public class JniFrontend {
   public byte[] getCatalogObject(byte[] thriftParams) throws ImpalaException,
       TException {
     TCatalogObject objectDescription = new TCatalogObject();
-    JniUtil.deserializeThrift(protocolFactory, objectDescription, thriftParams);
-    TSerializer serializer = new TSerializer(protocolFactory);
+    JniUtil.deserializeThrift(protocolFactory_, objectDescription, thriftParams);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(
-        frontend.getCatalog().getTCatalogObject(objectDescription));
+        frontend_.getCatalog().getTCatalogObject(objectDescription));
   }
 
   /**
@@ -279,12 +279,12 @@ public class JniFrontend {
    */
   public byte[] describeTable(byte[] thriftDescribeTableParams) throws ImpalaException {
     TDescribeTableParams params = new TDescribeTableParams();
-    JniUtil.deserializeThrift(protocolFactory, params, thriftDescribeTableParams);
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftDescribeTableParams);
 
-    TDescribeTableResult result = frontend.describeTable(
+    TDescribeTableResult result = frontend_.describeTable(
         params.getDb(), params.getTable_name(), params.getOutput_style());
 
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);
     } catch (TException e) {
@@ -298,8 +298,8 @@ public class JniFrontend {
   public String showCreateTable(byte[] thriftTableName)
       throws ImpalaException {
     TTableName params = new TTableName();
-    JniUtil.deserializeThrift(protocolFactory, params, thriftTableName);
-    return ToSqlUtils.getCreateTableSql(frontend.getCatalog().getTable(
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftTableName);
+    return ToSqlUtils.getCreateTableSql(frontend_.getCatalog().getTable(
         params.getDb_name(), params.getTable_name(),
         ImpalaInternalAdminUser.getInstance(), Privilege.ALL));
   }
@@ -310,10 +310,10 @@ public class JniFrontend {
   public byte[] execHiveServer2MetadataOp(byte[] metadataOpsParams)
       throws ImpalaException {
     TMetadataOpRequest params = new TMetadataOpRequest();
-    JniUtil.deserializeThrift(protocolFactory, params, metadataOpsParams);
-    TResultSet result = frontend.execHiveServer2MetadataOp(params);
+    JniUtil.deserializeThrift(protocolFactory_, params, metadataOpsParams);
+    TResultSet result = frontend_.execHiveServer2MetadataOp(params);
 
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);
     } catch (TException e) {

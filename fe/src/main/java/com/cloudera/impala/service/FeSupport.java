@@ -42,7 +42,7 @@ import com.google.common.base.Preconditions;
  */
 public class FeSupport {
   private final static Logger LOG = LoggerFactory.getLogger(FeSupport.class);
-  private static boolean loaded = false;
+  private static boolean loaded_ = false;
 
   // Only called if this library is explicitly loaded. This only happens
   // when running FE tests.
@@ -123,11 +123,11 @@ public class FeSupport {
    * native functions are loaded.
    */
   private static synchronized void loadLibrary() {
-    if (loaded) return;
+    if (loaded_) return;
     LOG.info("Loading libfesupport.so");
     NativeLibUtil.loadLibrary("libfesupport.so");
     LOG.info("Loaded libfesupport.so");
-    loaded = true;
+    loaded_ = true;
     NativeFeTestInit();
   }
 }

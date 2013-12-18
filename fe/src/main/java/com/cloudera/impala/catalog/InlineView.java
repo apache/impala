@@ -42,8 +42,8 @@ public class InlineView extends Table {
    * @param col Column of the inline view
    */
   public void addColumn(Column col) {
-    colsByPos.add(col);
-    colsByName.put(col.getName(), col);
+    colsByPos_.add(col);
+    colsByName_.put(col.getName(), col);
   }
 
   /**

@@ -36,16 +36,16 @@ import com.cloudera.impala.thrift.TUniqueId;
  * Test suite to verify proper conversion of Catalog objects to/from Thrift structs.
  */
 public class CatalogObjectToFromThriftTest {
-  private static Catalog catalog;
+  private static Catalog catalog_;
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new CatalogServiceCatalog(new TUniqueId(0L, 0L),
+    catalog_ = new CatalogServiceCatalog(new TUniqueId(0L, 0L),
         CatalogInitStrategy.LAZY);
   }
 
   @AfterClass
-  public static void cleanUp() { catalog.close(); }
+  public static void cleanUp() { catalog_.close(); }
 
   @Test
   public void TestPartitionedTable() throws DatabaseNotFoundException,
@@ -53,7 +53,7 @@ public class CatalogObjectToFromThriftTest {
     String[] dbNames = {"functional", "functional_avro", "functional_parquet",
                         "functional_seq"};
     for (String dbName: dbNames) {
-      Table table = catalog.getTable(dbName, "alltypes");
+      Table table = catalog_.getTable(dbName, "alltypes");
       TTable thriftTable = table.toThrift();
       Assert.assertEquals(thriftTable.tbl_name, "alltypes");
       Assert.assertEquals(thriftTable.db_name, dbName);
@@ -77,14 +77,14 @@ public class CatalogObjectToFromThriftTest {
       }
 
       // Now try to load the thrift struct.
-      Table newTable = Table.fromMetastoreTable(catalog.getNextTableId(),
-          catalog.getDb(dbName), thriftTable.getMetastore_table());
+      Table newTable = Table.fromMetastoreTable(catalog_.getNextTableId(),
+          catalog_.getDb(dbName), thriftTable.getMetastore_table());
       newTable.loadFromThrift(thriftTable);
       Assert.assertTrue(newTable instanceof HdfsTable);
-      Assert.assertEquals(newTable.name, thriftTable.tbl_name);
-      Assert.assertEquals(newTable.numClusteringCols, 2);
+      Assert.assertEquals(newTable.name_, thriftTable.tbl_name);
+      Assert.assertEquals(newTable.numClusteringCols_, 2);
       // Currently only have table stats on "functional.alltypes"
-      if (dbName.equals("functional")) Assert.assertEquals(7300, newTable.numRows);
+      if (dbName.equals("functional")) Assert.assertEquals(7300, newTable.numRows_);
 
       HdfsTable newHdfsTable = (HdfsTable) newTable;
       Assert.assertEquals(newHdfsTable.getPartitions().size(), 25);
@@ -121,7 +121,7 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestMismatchedAvroAndTableSchemas() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
-    Table table = catalog.getTable("functional_avro_snap", "schema_resolution_test");
+    Table table = catalog_.getTable("functional_avro_snap", "schema_resolution_test");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "schema_resolution_test");
     Assert.assertTrue(thriftTable.isSetTable_type());
@@ -130,8 +130,8 @@ public class CatalogObjectToFromThriftTest {
     Assert.assertEquals(thriftTable.getTable_type(), TTableType.HDFS_TABLE);
 
     // Now try to load the thrift struct.
-    Table newTable = Table.fromMetastoreTable(catalog.getNextTableId(),
-        catalog.getDb("functional_avro_snap"), thriftTable.getMetastore_table());
+    Table newTable = Table.fromMetastoreTable(catalog_.getNextTableId(),
+        catalog_.getDb("functional_avro_snap"), thriftTable.getMetastore_table());
     newTable.loadFromThrift(thriftTable);
     Assert.assertEquals(newTable.getColumns().size(), 8);
 
@@ -143,7 +143,7 @@ public class CatalogObjectToFromThriftTest {
   public void TestHBaseTables() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
     String dbName = "functional_hbase";
-    Table table = catalog.getTable(dbName, "alltypes");
+    Table table = catalog_.getTable(dbName, "alltypes");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "alltypes");
     Assert.assertEquals(thriftTable.db_name, dbName);
@@ -159,8 +159,8 @@ public class CatalogObjectToFromThriftTest {
       Assert.assertTrue(!isBinaryEncoded);
     }
 
-    Table newTable = Table.fromMetastoreTable(catalog.getNextTableId(),
-        catalog.getDb(dbName), thriftTable.getMetastore_table());
+    Table newTable = Table.fromMetastoreTable(catalog_.getNextTableId(),
+        catalog_.getDb(dbName), thriftTable.getMetastore_table());
     newTable.loadFromThrift(thriftTable);
     Assert.assertTrue(newTable instanceof HBaseTable);
     HBaseTable newHBaseTable = (HBaseTable) newTable;
@@ -175,7 +175,7 @@ public class CatalogObjectToFromThriftTest {
       throws DatabaseNotFoundException, TableNotFoundException,
       TableLoadingException {
     String dbName = "functional_hbase";
-    Table table = catalog.getTable(dbName, "alltypessmallbinary");
+    Table table = catalog_.getTable(dbName, "alltypessmallbinary");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "alltypessmallbinary");
     Assert.assertEquals(thriftTable.db_name, dbName);
@@ -196,8 +196,8 @@ public class CatalogObjectToFromThriftTest {
 
     // Verify that creating a table from this thrift struct results in a valid
     // Table.
-    Table newTable = Table.fromMetastoreTable(catalog.getNextTableId(),
-        catalog.getDb(dbName), thriftTable.getMetastore_table());
+    Table newTable = Table.fromMetastoreTable(catalog_.getNextTableId(),
+        catalog_.getDb(dbName), thriftTable.getMetastore_table());
     newTable.loadFromThrift(thriftTable);
     Assert.assertTrue(newTable instanceof HBaseTable);
     HBaseTable newHBaseTable = (HBaseTable) newTable;
@@ -210,7 +210,7 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestTableLoadingErrors() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
-    Table table = catalog.getTable("functional", "hive_index_tbl");
+    Table table = catalog_.getTable("functional", "hive_index_tbl");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "hive_index_tbl");
     Assert.assertEquals(thriftTable.db_name, "functional");
@@ -219,7 +219,7 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestView() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
-    Table table = catalog.getTable("functional", "view_view");
+    Table table = catalog_.getTable("functional", "view_view");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "view_view");
     Assert.assertEquals(thriftTable.db_name, "functional");

@@ -28,35 +28,36 @@ import com.google.common.base.Preconditions;
  */
 public class MetaStoreClientPool {
   private static final Logger LOG = Logger.getLogger(MetaStoreClientPool.class);
-  private final ConcurrentLinkedQueue<MetaStoreClient> clientPool =
+
+  private final ConcurrentLinkedQueue<MetaStoreClient> clientPool_ =
       new ConcurrentLinkedQueue<MetaStoreClient>();
-  private Boolean poolClosed = false;
-  private final HiveConf hiveConf;
+  private Boolean poolClosed_ = false;
+  private final HiveConf hiveConf_;
 
   /**
    * A wrapper around the HiveMetaStoreClient that manages interactions with the
    * connection pool.
    */
   public class MetaStoreClient {
-    private final HiveMetaStoreClient hiveClient;
-    private boolean isInUse;
+    private final HiveMetaStoreClient hiveClient_;
+    private boolean isInUse_;
 
     private MetaStoreClient(HiveConf hiveConf) {
       try {
-        LOG.debug("Creating MetaStoreClient. Pool Size = " + clientPool.size());
-        this.hiveClient = new HiveMetaStoreClient(hiveConf);
+        LOG.debug("Creating MetaStoreClient. Pool Size = " + clientPool_.size());
+        this.hiveClient_ = new HiveMetaStoreClient(hiveConf);
       } catch (Exception e) {
         // Turn in to an unchecked exception
         throw new IllegalStateException(e);
       }
-      this.isInUse = false;
+      this.isInUse_ = false;
     }
 
     /**
      * Returns the internal HiveMetaStoreClient object.
      */
     public HiveMetaStoreClient getHiveClient() {
-      return hiveClient;
+      return hiveClient_;
     }
 
     /**
@@ -64,27 +65,27 @@ public class MetaStoreClientPool {
      * closed, just close the Hive client connection.
      */
     public void release() {
-      Preconditions.checkState(isInUse);
-      isInUse = false;
+      Preconditions.checkState(isInUse_);
+      isInUse_ = false;
       // Ensure the connection isn't returned to the pool if the pool has been closed.
       // This lock is needed to ensure proper behavior when a thread reads poolClosed
       // is false, but a call to pool.close() comes in immediately afterward.
-      synchronized (poolClosed) {
-        if (poolClosed) {
-          hiveClient.close();
+      synchronized (poolClosed_) {
+        if (poolClosed_) {
+          hiveClient_.close();
         } else {
           // TODO: Currently the pool does not work properly because we cannot
           // reuse MetastoreClient connections. No reason to add this client back
           // to the pool. See HIVE-5181.
           // clientPool.add(this);
-          hiveClient.close();
+          hiveClient_.close();
         }
       }
     }
 
     // Marks this client as in use
     private void markInUse() {
-      isInUse = true;
+      isInUse_ = true;
     }
   }
 
@@ -93,7 +94,7 @@ public class MetaStoreClientPool {
   }
 
   public MetaStoreClientPool(int initialSize, HiveConf hiveConf) {
-    this.hiveConf = hiveConf;
+    this.hiveConf_ = hiveConf;
     addClients(initialSize);
   }
 
@@ -102,7 +103,7 @@ public class MetaStoreClientPool {
    */
   public void addClients(int numClients) {
     for (int i = 0; i < numClients; ++i) {
-      clientPool.add(new MetaStoreClient(hiveConf));
+      clientPool_.add(new MetaStoreClient(hiveConf_));
     }
   }
 
@@ -119,15 +120,15 @@ public class MetaStoreClientPool {
       Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
     }
 
-    MetaStoreClient client = clientPool.poll();
+    MetaStoreClient client = clientPool_.poll();
     // The pool was empty so create a new client and return that.
     if (client == null) {
-      client = new MetaStoreClient(hiveConf);
+      client = new MetaStoreClient(hiveConf_);
     } else {
       // TODO: Due to Hive Metastore bugs, there is leftover state from previous client
       // connections so we are unable to reuse the same connection. For now simply
       // reconnect each time. One possible culprit is HIVE-5181.
-      client = new MetaStoreClient(hiveConf);
+      client = new MetaStoreClient(hiveConf_);
     }
     client.markInUse();
     return client;
@@ -139,15 +140,15 @@ public class MetaStoreClientPool {
    */
   public void close() {
     // Ensure no more items get added to the pool once close is called.
-    synchronized (poolClosed) {
-      if (poolClosed) {
+    synchronized (poolClosed_) {
+      if (poolClosed_) {
         return;
       }
-      poolClosed = true;
+      poolClosed_ = true;
     }
 
     MetaStoreClient client = null;
-    while ((client = clientPool.poll()) != null) {
+    while ((client = clientPool_.poll()) != null) {
       client.getHiveClient().close();
     }
   }

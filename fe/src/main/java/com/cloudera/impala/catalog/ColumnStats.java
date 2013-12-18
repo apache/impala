@@ -36,7 +36,6 @@ import com.google.common.base.Preconditions;
  */
 public class ColumnStats {
   private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
-  private TColumnStats colStats;
 
   // Set of the currently supported column stats column types.
   private final static EnumSet<PrimitiveType> SUPPORTED_COL_TYPES = EnumSet.of(
@@ -46,12 +45,12 @@ public class ColumnStats {
       PrimitiveType.TINYINT);
 
   // in bytes: excludes serialization overhead
-  private double avgSize;
+  private double avgSize_;
   // in bytes; includes serialization overhead.
-  private double avgSerializedSize;
-  private long maxSize;  // in bytes
-  private long numDistinctValues;
-  private long numNulls;
+  private double avgSerializedSize_;
+  private long maxSize_;  // in bytes
+  private long numDistinctValues_;
+  private long numNulls_;
 
   public ColumnStats(PrimitiveType colType) {
     initColStats(colType);
@@ -63,15 +62,15 @@ public class ColumnStats {
    * sets avgSerializedSize and maxSize to their slot size.
    */
   private void initColStats(PrimitiveType colType) {
-    avgSize = -1;
-    avgSerializedSize = -1;
-    maxSize = -1;
-    numDistinctValues = -1;
-    numNulls = -1;
+    avgSize_ = -1;
+    avgSerializedSize_ = -1;
+    maxSize_ = -1;
+    numDistinctValues_ = -1;
+    numNulls_ = -1;
     if (colType.isFixedLengthType()) {
-      avgSerializedSize = colType.getSlotSize();
-      avgSize = colType.getSlotSize();
-      maxSize = colType.getSlotSize();
+      avgSerializedSize_ = colType.getSlotSize();
+      avgSize_ = colType.getSlotSize();
+      maxSize_ = colType.getSlotSize();
     }
   }
 
@@ -86,7 +85,7 @@ public class ColumnStats {
     stats.setNumDistinctValues(expr.getNumDistinctValues());
     SlotRef slotRef = expr.unwrapSlotRef(false);
     if (slotRef == null) return stats;
-    stats.numNulls = slotRef.getDesc().getStats().getNumNulls();
+    stats.numNulls_ = slotRef.getDesc().getStats().getNumNulls();
     return stats;
   }
 
@@ -98,35 +97,35 @@ public class ColumnStats {
    * source slots, e.g., those produced by union queries.
    */
   public ColumnStats add(ColumnStats other) {
-    if (numDistinctValues != -1 || other.numDistinctValues == -1) {
-      numDistinctValues = -1;
+    if (numDistinctValues_ != -1 || other.numDistinctValues_ == -1) {
+      numDistinctValues_ = -1;
     } else {
-      numDistinctValues += other.numDistinctValues;
+      numDistinctValues_ += other.numDistinctValues_;
     }
-    if (numNulls != -1 || other.numNulls != -1) {
-      numNulls = -1;
+    if (numNulls_ != -1 || other.numNulls_ != -1) {
+      numNulls_ = -1;
     } else {
-      numNulls += other.numNulls;
+      numNulls_ += other.numNulls_;
     }
     return this;
   }
 
-  public void setAvgSerializedSize(float avgSize) { this.avgSerializedSize = avgSize; }
-  public void setMaxSize(long maxSize) { this.maxSize = maxSize; }
-  public long getNumDistinctValues() { return numDistinctValues; }
+  public void setAvgSerializedSize(float avgSize) { this.avgSerializedSize_ = avgSize; }
+  public void setMaxSize(long maxSize) { this.maxSize_ = maxSize; }
+  public long getNumDistinctValues() { return numDistinctValues_; }
   public void setNumDistinctValues(long numDistinctValues) {
-    this.numDistinctValues = numDistinctValues;
+    this.numDistinctValues_ = numDistinctValues;
   }
-  public void setNumNulls(long numNulls) { this.numNulls = numNulls; }
-  public double getAvgSerializedSize() { return avgSerializedSize; }
-  public double getAvgSize() { return avgSize; }
-  public long getMaxSize() { return maxSize; }
-  public boolean hasNulls() { return numNulls > 0; }
-  public long getNumNulls() { return numNulls; }
-  public boolean hasAvgSerializedSize() { return avgSerializedSize >= 0; }
-  public boolean hasMaxSize() { return maxSize >= 0; }
-  public boolean hasNumDistinctValues() { return numDistinctValues >= 0; }
-  public boolean hasStats() { return numNulls != -1 || numDistinctValues != -1; }
+  public void setNumNulls(long numNulls) { this.numNulls_ = numNulls; }
+  public double getAvgSerializedSize() { return avgSerializedSize_; }
+  public double getAvgSize() { return avgSize_; }
+  public long getMaxSize() { return maxSize_; }
+  public boolean hasNulls() { return numNulls_ > 0; }
+  public long getNumNulls() { return numNulls_; }
+  public boolean hasAvgSerializedSize() { return avgSerializedSize_ >= 0; }
+  public boolean hasMaxSize() { return maxSize_ >= 0; }
+  public boolean hasNumDistinctValues() { return numDistinctValues_ >= 0; }
+  public boolean hasStats() { return numNulls_ != -1 || numDistinctValues_ != -1; }
 
   /**
    * Updates the stats with the given ColumnStatisticsData. If the ColumnStatisticsData
@@ -144,8 +143,8 @@ public class ColumnStats {
         isCompatible = statsData.isSetBooleanStats();
         if (isCompatible) {
           BooleanColumnStatsData boolStats = statsData.getBooleanStats();
-          numNulls = boolStats.getNumNulls();
-          numDistinctValues = (numNulls > 0) ? 3 : 2;
+          numNulls_ = boolStats.getNumNulls();
+          numDistinctValues_ = (numNulls_ > 0) ? 3 : 2;
         }
         break;
       case TINYINT:
@@ -156,8 +155,8 @@ public class ColumnStats {
         isCompatible = statsData.isSetLongStats();
         if (isCompatible) {
           LongColumnStatsData longStats = statsData.getLongStats();
-          numDistinctValues = longStats.getNumDVs();
-          numNulls = longStats.getNumNulls();
+          numDistinctValues_ = longStats.getNumDVs();
+          numNulls_ = longStats.getNumNulls();
         }
         break;
       case FLOAT:
@@ -165,29 +164,29 @@ public class ColumnStats {
         isCompatible = statsData.isSetDoubleStats();
         if (isCompatible) {
           DoubleColumnStatsData doubleStats = statsData.getDoubleStats();
-          numDistinctValues = doubleStats.getNumDVs();
-          numNulls = doubleStats.getNumNulls();
+          numDistinctValues_ = doubleStats.getNumDVs();
+          numNulls_ = doubleStats.getNumNulls();
         }
         break;
       case STRING:
         isCompatible = statsData.isSetStringStats();
         if (isCompatible) {
           StringColumnStatsData stringStats = statsData.getStringStats();
-          numDistinctValues = stringStats.getNumDVs();
-          numNulls = stringStats.getNumNulls();
-          maxSize = stringStats.getMaxColLen();
-          avgSize = Double.valueOf(stringStats.getAvgColLen()).floatValue();
-          avgSerializedSize = avgSize + PrimitiveType.STRING.getSlotSize();
+          numDistinctValues_ = stringStats.getNumDVs();
+          numNulls_ = stringStats.getNumNulls();
+          maxSize_ = stringStats.getMaxColLen();
+          avgSize_ = Double.valueOf(stringStats.getAvgColLen()).floatValue();
+          avgSerializedSize_ = avgSize_ + PrimitiveType.STRING.getSlotSize();
         }
         break;
       case BINARY:
         isCompatible = statsData.isSetStringStats();
         if (isCompatible) {
           BinaryColumnStatsData binaryStats = statsData.getBinaryStats();
-          numNulls = binaryStats.getNumNulls();
-          maxSize = binaryStats.getMaxColLen();
-          avgSize = Double.valueOf(binaryStats.getAvgColLen()).floatValue();
-          avgSerializedSize = avgSize + PrimitiveType.BINARY.getSlotSize();
+          numNulls_ = binaryStats.getNumNulls();
+          maxSize_ = binaryStats.getMaxColLen();
+          avgSize_ = Double.valueOf(binaryStats.getAvgColLen()).floatValue();
+          avgSerializedSize_ = avgSize_ + PrimitiveType.BINARY.getSlotSize();
         }
         break;
       default:
@@ -206,29 +205,29 @@ public class ColumnStats {
   }
 
   public void update(PrimitiveType colType, TColumnStats stats) {
-    avgSize = Double.valueOf(stats.getAvg_size()).floatValue();
-    avgSerializedSize = colType.getSlotSize() + avgSize;
-    maxSize = stats.getMax_size();
-    numDistinctValues = stats.getNum_distinct_values();
-    numNulls = stats.getNum_nulls();
+    avgSize_ = Double.valueOf(stats.getAvg_size()).floatValue();
+    avgSerializedSize_ = colType.getSlotSize() + avgSize_;
+    maxSize_ = stats.getMax_size();
+    numDistinctValues_ = stats.getNum_distinct_values();
+    numNulls_ = stats.getNum_nulls();
   }
 
   public TColumnStats toThrift() {
     TColumnStats colStats = new TColumnStats();
-    colStats.setAvg_size(avgSize);
-    colStats.setMax_size(maxSize);
-    colStats.setNum_distinct_values(numDistinctValues);
-    colStats.setNum_nulls(numNulls);
+    colStats.setAvg_size(avgSize_);
+    colStats.setMax_size(maxSize_);
+    colStats.setNum_distinct_values(numDistinctValues_);
+    colStats.setNum_nulls(numNulls_);
     return colStats;
   }
 
   @Override
   public String toString() {
     return Objects.toStringHelper(this.getClass())
-        .add("avgSerializedSize", avgSerializedSize)
-        .add("maxSize", maxSize)
-        .add("numDistinct", numDistinctValues)
-        .add("numNulls", numNulls)
+        .add("avgSerializedSize_", avgSerializedSize_)
+        .add("maxSize_", maxSize_)
+        .add("numDistinct_", numDistinctValues_)
+        .add("numNulls_", numNulls_)
         .toString();
   }
 }

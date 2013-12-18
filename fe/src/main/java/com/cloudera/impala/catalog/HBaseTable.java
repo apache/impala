@@ -78,10 +78,10 @@ public class HBaseTable extends Table {
 
   // Column referring to HBase row key.
   // Hive (including metastore) currently doesn't support composite HBase keys.
-  protected HBaseColumn rowKey;
+  protected HBaseColumn rowKey_;
   // Name of table in HBase.
   // 'this.name' is the alias of the HBase table in Hive.
-  protected String hbaseTableName;
+  protected String hbaseTableName_;
 
   // Input format class for HBase tables read by Hive.
   private static final String HBASE_INPUT_FORMAT =
@@ -91,9 +91,9 @@ public class HBaseTable extends Table {
       "org.apache.hadoop.hive.hbase.HBaseStorageHandler";
 
   // Keep the conf around
-  private final static Configuration hbaseConf = HBaseConfiguration.create();
+  private final static Configuration hbaseConf_ = HBaseConfiguration.create();
 
-  private HTable hTable = null;
+  private HTable hTable_ = null;
 
   protected HBaseTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
       Db db, String name, String owner) {
@@ -232,8 +232,8 @@ public class HBaseTable extends Table {
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     Preconditions.checkNotNull(getMetaStoreTable());
     try {
-      hbaseTableName = getHBaseTableName(getMetaStoreTable());
-      hTable = new HTable(hbaseConf, hbaseTableName);
+      hbaseTableName_ = getHBaseTableName(getMetaStoreTable());
+      hTable_ = new HTable(hbaseConf_, hbaseTableName_);
       Map<String, String> serdeParams =
           getMetaStoreTable().getSd().getSerdeInfo().getParameters();
       String hbaseColumnsMapping = serdeParams.get(HBaseSerDe.HBASE_COLUMNS_MAPPING);
@@ -285,24 +285,24 @@ public class HBaseTable extends Table {
       // so the final position depends on the other mapped HBase columns.
       // Sort columns and update positions.
       Collections.sort(tmpCols);
-      colsByPos.clear();
-      colsByName.clear();
+      colsByPos_.clear();
+      colsByName_.clear();
       for (int i = 0; i < tmpCols.size(); ++i) {
         HBaseColumn col = tmpCols.get(i);
         col.setPosition(i);
-        colsByPos.add(col);
-        colsByName.put(col.getName(), col);
+        colsByPos_.add(col);
+        colsByName_.put(col.getName(), col);
       }
 
       // Set table stats.
-      numRows = getRowCount(super.getMetaStoreTable().getParameters());
+      numRows_ = getRowCount(super.getMetaStoreTable().getParameters());
 
       // since we don't support composite hbase rowkeys yet, all hbase tables have a
       // single clustering col
-      numClusteringCols = 1;
+      numClusteringCols_ = 1;
     } catch (Exception e) {
-      throw new TableLoadingException("Failed to load metadata for HBase table: " + name,
-          e);
+      throw new TableLoadingException("Failed to load metadata for HBase table: " +
+          name_, e);
     }
   }
 
@@ -310,11 +310,11 @@ public class HBaseTable extends Table {
   public void loadFromThrift(TTable table) throws TableLoadingException {
     super.loadFromThrift(table);
     try {
-      hbaseTableName = getHBaseTableName(getMetaStoreTable());
-      hTable = new HTable(hbaseConf, hbaseTableName);
+      hbaseTableName_ = getHBaseTableName(getMetaStoreTable());
+      hTable_ = new HTable(hbaseConf_, hbaseTableName_);
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for HBase table from " +
-          "thrift table: " + name, e);
+          "thrift table: " + name_, e);
     }
   }
 
@@ -365,13 +365,14 @@ public class HBaseTable extends Table {
       // Check to see if things are compressed.
       // If they are we'll estimate a compression factor.
       HColumnDescriptor[] families =
-          hTable.getTableDescriptor().getColumnFamilies();
+          hTable_.getTableDescriptor().getColumnFamilies();
       for (HColumnDescriptor desc: families) {
         isCompressed |= desc.getCompression() != Compression.Algorithm.NONE;
       }
 
       // For every region in the range.
-      List<HRegionLocation> locations = getRegionsInRange(hTable, startRowKey, endRowKey);
+      List<HRegionLocation> locations =
+          getRegionsInRange(hTable_, startRowKey, endRowKey);
       for(HRegionLocation location: locations) {
         long currentHdfsSize = 0;
         long currentRowSize  = 0;
@@ -391,7 +392,7 @@ public class HBaseTable extends Table {
         s.setCacheBlocks(false);
         // Try and get deletes too so their size can be counted.
         s.setRaw(true);
-        ResultScanner rs = hTable.getScanner(s);
+        ResultScanner rs = hTable_.getScanner(s);
 
         // And get the the ROW_COUNT_ESTIMATE_BATCH_SIZE fetched rows
         // for a representative sample
@@ -444,8 +445,8 @@ public class HBaseTable extends Table {
    */
   public long getHdfsSize(HRegionInfo info) throws IOException {
     Path tableDir = HTableDescriptor.getTableDir(
-        FSUtils.getRootDir(hbaseConf), Bytes.toBytes(hbaseTableName));
-    FileSystem fs = tableDir.getFileSystem(hbaseConf);
+        FSUtils.getRootDir(hbaseConf_), Bytes.toBytes(hbaseTableName_));
+    FileSystem fs = tableDir.getFileSystem(hbaseConf_);
     Path regionDir = tableDir.suffix("/" + info.getEncodedName());
     return fs.getContentSummary(regionDir).getLength();
   }
@@ -454,20 +455,20 @@ public class HBaseTable extends Table {
    * Hive returns the columns in order of their declaration for HBase tables.
    */
   @Override
-  public ArrayList<Column> getColumnsInHiveOrder() { return colsByPos; }
+  public ArrayList<Column> getColumnsInHiveOrder() { return colsByPos_; }
 
   @Override
   public TTableDescriptor toThriftDescriptor() {
     TTableDescriptor tableDescriptor =
-        new TTableDescriptor(id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(),
-            numClusteringCols, hbaseTableName, db.getName());
+        new TTableDescriptor(id_.asInt(), TTableType.HBASE_TABLE, colsByPos_.size(),
+            numClusteringCols_, hbaseTableName_, db_.getName());
     tableDescriptor.setHbaseTable(getTHBaseTable());
     return tableDescriptor;
   }
 
-  public String getHBaseTableName() { return hbaseTableName; }
-  public HTable getHTable() { return hTable; }
-  public static Configuration getHBaseConf() { return hbaseConf; }
+  public String getHBaseTableName() { return hbaseTableName_; }
+  public HTable getHTable() { return hTable_; }
+  public static Configuration getHBaseConf() { return hbaseConf_; }
 
   @Override
   public int getNumNodes() {
@@ -488,8 +489,8 @@ public class HBaseTable extends Table {
 
   private THBaseTable getTHBaseTable() {
     THBaseTable tHbaseTable = new THBaseTable();
-    tHbaseTable.setTableName(hbaseTableName);
-    for (Column c : colsByPos) {
+    tHbaseTable.setTableName(hbaseTableName_);
+    for (Column c : colsByPos_) {
       HBaseColumn hbaseCol = (HBaseColumn) c;
       tHbaseTable.addToFamilies(hbaseCol.getColumnFamily());
       if (hbaseCol.getColumnQualifier() != null) {
@@ -569,7 +570,7 @@ public class HBaseTable extends Table {
     try {
       long totalNumRows = 0;
       long totalHdfsSize = 0;
-      List<HRegionLocation> regions = HBaseTable.getRegionsInRange(hTable,
+      List<HRegionLocation> regions = HBaseTable.getRegionsInRange(hTable_,
           HConstants.EMPTY_END_ROW, HConstants.EMPTY_START_ROW);
       for (HRegionLocation region: regions) {
         TResultRowBuilder rowBuilder = new TResultRowBuilder();

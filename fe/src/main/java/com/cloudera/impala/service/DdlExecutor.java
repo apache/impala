@@ -119,10 +119,10 @@ import com.google.common.util.concurrent.SettableFuture;
  * clause of these methods.
  */
 public class DdlExecutor {
-  private final Catalog catalog;
+  private final Catalog catalog_;
 
   // Lock used to synchronize metastore CREATE/DROP/ALTER TABLE/DATABASE requests.
-  private final Object metastoreDdlLock = new Object();
+  private final Object metastoreDdlLock_ = new Object();
   private static final Logger LOG = Logger.getLogger(DdlExecutor.class);
 
   // Only applies to partition updates after an INSERT for now.
@@ -130,11 +130,11 @@ public class DdlExecutor {
 
   // Used to execute metastore updates in parallel. Currently only used for bulk
   // partition creations.
-  private final ExecutorService executor =
+  private final ExecutorService executor_ =
       Executors.newFixedThreadPool(NUM_CONCURRENT_METASTORE_OPERATIONS);
 
   public DdlExecutor(Catalog catalog) {
-    this.catalog = catalog;
+    catalog_ = catalog;
   }
 
   public TDdlExecResponse execDdlRequest(TDdlExecRequest ddlRequest)
@@ -269,7 +269,7 @@ public class DdlExecutor {
             "Unknown ALTER TABLE operation type: " + params.getAlter_type());
     }
     response.result.setUpdated_catalog_object(
-        catalog.resetTable(params.getTable_name(), true));
+        catalog_.resetTable(params.getTable_name(), true));
     response.result.setVersion(
         response.result.getUpdated_catalog_object().getCatalog_version());
   }
@@ -287,7 +287,7 @@ public class DdlExecutor {
         params.getColumns().size() > 0,
           "Null or empty column list given as argument to DdlExecutor.alterView");
 
-    synchronized (metastoreDdlLock) {
+    synchronized (metastoreDdlLock_) {
       // Operate on a copy of the metastore table to avoid prematurely applying the
       // alteration to our cached table in case the actual alteration fails.
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
@@ -303,7 +303,7 @@ public class DdlExecutor {
       applyAlterTable(msTbl);
     }
     resp.result.setUpdated_catalog_object(
-        catalog.resetTable(tableName.toThrift(), true));
+        catalog_.resetTable(tableName.toThrift(), true));
     resp.result.setVersion(resp.result.getUpdated_catalog_object().getCatalog_version());
   }
 
@@ -320,7 +320,7 @@ public class DdlExecutor {
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
     LOG.info(String.format("Updating table stats for %s", tableName));
 
-    Table table = catalog.getTable(tableName.getDb(), tableName.getTbl());
+    Table table = catalog_.getTable(tableName.getDb(), tableName.getTbl());
     // Deep copy the msTbl to avoid updating our cache before successfully persisting
     // the results to the metastore.
     org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -337,7 +337,7 @@ public class DdlExecutor {
       }
     }
 
-    MetaStoreClient msClient = catalog.getMetaStoreClient();
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     int numUpdatedPartitions;
     int numUpdatedColumns;
     try {
@@ -349,7 +349,7 @@ public class DdlExecutor {
         numUpdatedColumns = colStats.getStatsObjSize();
 
         // Ensure updates are atomic with respect to conflicting DDL operations.
-        synchronized (metastoreDdlLock) {
+        synchronized (metastoreDdlLock_) {
           // Alter all partitions in bulk.
           msClient.getHiveClient().alter_partitions(tableName.getDb(),
               tableName.getTbl(), msPartitions);
@@ -494,7 +494,7 @@ public class DdlExecutor {
     String dbName = params.getDb();
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name passed as argument to Catalog.createDatabase");
-    if (params.if_not_exists && catalog.getDb(dbName) != null) {
+    if (params.if_not_exists && catalog_.getDb(dbName) != null) {
       LOG.debug("Skipping database creation because " + dbName + " already exists and " +
           "IF NOT EXISTS was specified.");
       resp.getResult().setVersion(Catalog.getCatalogVersion());
@@ -510,8 +510,8 @@ public class DdlExecutor {
       db.setLocationUri(params.getLocation());
     }
     LOG.debug("Creating database " + dbName);
-    synchronized (metastoreDdlLock) {
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
+    synchronized (metastoreDdlLock_) {
+      MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().createDatabase(db);
       } catch (AlreadyExistsException e) {
@@ -524,7 +524,7 @@ public class DdlExecutor {
         msClient.release();
       }
     }
-    resp.result.setUpdated_catalog_object(catalog.addDb(dbName));
+    resp.result.setUpdated_catalog_object(catalog_.addDb(dbName));
     resp.result.setVersion(resp.result.getUpdated_catalog_object().getCatalog_version());
   }
 
@@ -533,7 +533,7 @@ public class DdlExecutor {
     Function fn = Function.fromThrift(params.getFn());
     LOG.debug(String.format("Adding %s: %s",
         fn.getClass().getSimpleName(), fn.signatureString()));
-    boolean added = catalog.addFunction(fn);
+    boolean added = catalog_.addFunction(fn);
     if (!added && !params.if_not_exists) {
       throw new AlreadyExistsException("Function " + fn.signatureString() +
           " already exists.");
@@ -559,19 +559,19 @@ public class DdlExecutor {
         "Null or empty database name passed as argument to Catalog.dropDatabase");
 
     LOG.debug("Dropping database " + params.getDb());
-    Db db = catalog.getDb(params.db);
+    Db db = catalog_.getDb(params.db);
     if (db != null && db.numFunctions() > 0) {
       throw new InvalidObjectException("Database " + db.getName() + " is not empty");
     }
-    MetaStoreClient msClient = catalog.getMetaStoreClient();
-    synchronized (metastoreDdlLock) {
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
+    synchronized (metastoreDdlLock_) {
       try {
         msClient.getHiveClient().dropDatabase(params.getDb(), true, params.if_exists);
       } finally {
         msClient.release();
       }
     }
-    resp.result.setVersion(catalog.removeDb(params.getDb()));
+    resp.result.setVersion(catalog_.removeDb(params.getDb()));
     TCatalogObject removedObject = new TCatalogObject();
     removedObject.setType(TCatalogObjectType.DATABASE);
     removedObject.setDb(new TDatabase());
@@ -589,8 +589,8 @@ public class DdlExecutor {
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
     LOG.debug(String.format("Dropping table/view %s", tableName));
-    synchronized (metastoreDdlLock) {
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
+    synchronized (metastoreDdlLock_) {
+      MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().dropTable(
             tableName.getDb(), tableName.getTbl(), true, params.if_exists);
@@ -598,7 +598,7 @@ public class DdlExecutor {
         msClient.release();
       }
     }
-    resp.result.setVersion(catalog.removeTable(params.getTable_name()));
+    resp.result.setVersion(catalog_.removeTable(params.getTable_name()));
     TCatalogObject removedObject = new TCatalogObject();
     removedObject.setType(TCatalogObjectType.TABLE);
     removedObject.setTable(new TTable());
@@ -617,7 +617,7 @@ public class DdlExecutor {
     Function desc = new Function(new FunctionName(params.fn_name),
         argTypes, PrimitiveType.INVALID_TYPE, false);
     LOG.debug(String.format("Dropping Function %s", desc.signatureString()));
-    Function fn = catalog.removeFunction(desc);
+    Function fn = catalog_.removeFunction(desc);
     if (fn == null) {
       if (!params.if_exists) {
         throw new NoSuchObjectException(
@@ -653,7 +653,7 @@ public class DdlExecutor {
         "Null or empty column list given as argument to Catalog.createTable");
 
     if (params.if_not_exists &&
-        catalog.containsTable(tableName.getDb(), tableName.getTbl())) {
+        catalog_.containsTable(tableName.getDb(), tableName.getTbl())) {
       LOG.debug(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tableName));
       response.getResult().setVersion(Catalog.getCatalogVersion());
@@ -679,7 +679,7 @@ public class DdlExecutor {
         params.getColumns().size() > 0,
           "Null or empty column list given as argument to DdlExecutor.createView");
     if (params.if_not_exists &&
-        catalog.containsTable(tableName.getDb(), tableName.getTbl())) {
+        catalog_.containsTable(tableName.getDb(), tableName.getTbl())) {
       LOG.debug(String.format("Skipping view creation because %s already exists and " +
           "ifNotExists is true.", tableName));
     }
@@ -713,13 +713,13 @@ public class DdlExecutor {
     Preconditions.checkState(srcTblName != null && srcTblName.isFullyQualified());
 
     if (params.if_not_exists &&
-        catalog.containsTable(tblName.getDb(), tblName.getTbl())) {
+        catalog_.containsTable(tblName.getDb(), tblName.getTbl())) {
       LOG.debug(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tblName));
       response.getResult().setVersion(Catalog.getCatalogVersion());
       return;
     }
-    Table srcTable = catalog.getTable(srcTblName.getDb(), srcTblName.getTbl());
+    Table srcTable = catalog_.getTable(srcTblName.getDb(), srcTblName.getTbl());
     org.apache.hadoop.hive.metastore.api.Table tbl =
         srcTable.getMetaStoreTable().deepCopy();
     tbl.setDbName(tblName.getDb());
@@ -758,8 +758,8 @@ public class DdlExecutor {
       boolean ifNotExists, TDdlExecResponse response) throws MetaException,
       NoSuchObjectException, AlreadyExistsException, InvalidObjectException,
       org.apache.thrift.TException, TableLoadingException {
-    MetaStoreClient msClient = catalog.getMetaStoreClient();
-    synchronized (metastoreDdlLock) {
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
+    synchronized (metastoreDdlLock_) {
       try {
         msClient.getHiveClient().createTable(newTable);
       } catch (AlreadyExistsException e) {
@@ -775,7 +775,7 @@ public class DdlExecutor {
       }
     }
 
-    response.result.setUpdated_catalog_object(catalog.addTable(newTable.getDbName(),
+    response.result.setUpdated_catalog_object(catalog_.addTable(newTable.getDbName(),
         newTable.getTableName()));
     response.result.setVersion(
         response.result.getUpdated_catalog_object().getCatalog_version());
@@ -836,7 +836,7 @@ public class DdlExecutor {
       TColumn newCol) throws MetaException, InvalidObjectException,
       org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
        TableLoadingException, ColumnNotFoundException {
-    synchronized (metastoreDdlLock) {
+    synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       // Find the matching column name and change it.
       Iterator<FieldSchema> iterator = msTbl.getSd().getColsIterator();
@@ -870,14 +870,14 @@ public class DdlExecutor {
       TableLoadingException {
     org.apache.hadoop.hive.metastore.api.Partition partition =
         new org.apache.hadoop.hive.metastore.api.Partition();
-    if (ifNotExists && catalog.containsHdfsPartition(tableName.getDb(),
+    if (ifNotExists && catalog_.containsHdfsPartition(tableName.getDb(),
         tableName.getTbl(), partitionSpec)) {
       LOG.debug(String.format("Skipping partition creation because (%s) already exists " +
           "and ifNotExists is true.", Joiner.on(", ").join(partitionSpec)));
       return;
     }
 
-    synchronized (metastoreDdlLock) {
+    synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       partition.setDbName(tableName.getDb());
       partition.setTableName(tableName.getTbl());
@@ -895,7 +895,7 @@ public class DdlExecutor {
       StorageDescriptor sd = msTbl.getSd().deepCopy();
       sd.setLocation(location);
       partition.setSd(sd);
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
+      MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().add_partition(partition);
         updateLastDdlTime(msTbl, msClient);
@@ -919,14 +919,14 @@ public class DdlExecutor {
       NoSuchObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
 
-    if (ifExists && !catalog.containsHdfsPartition(tableName.getDb(), tableName.getTbl(),
+    if (ifExists && !catalog_.containsHdfsPartition(tableName.getDb(), tableName.getTbl(),
         partitionSpec)) {
       LOG.debug(String.format("Skipping partition drop because (%s) does not exist " +
           "and ifExists is true.", Joiner.on(", ").join(partitionSpec)));
       return;
     }
 
-    synchronized (metastoreDdlLock) {
+    synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       List<String> values = Lists.newArrayList();
       // Need to add in the values in the same order they are defined in the table.
@@ -937,7 +937,7 @@ public class DdlExecutor {
           }
         }
       }
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
+      MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().dropPartition(tableName.getDb(),
             tableName.getTbl(), values);
@@ -961,7 +961,7 @@ public class DdlExecutor {
       throws MetaException, InvalidObjectException, org.apache.thrift.TException,
       DatabaseNotFoundException, TableNotFoundException, ColumnNotFoundException,
       TableLoadingException {
-    synchronized (metastoreDdlLock) {
+    synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
 
       // Find the matching column name and remove it.
@@ -989,11 +989,11 @@ public class DdlExecutor {
       TDdlExecResponse response)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException,
       DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
-    synchronized (metastoreDdlLock) {
+    synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       msTbl.setDbName(newTableName.getDb());
       msTbl.setTableName(newTableName.getTbl());
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
+      MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().alter_table(
             tableName.getDb(), tableName.getTbl(), msTbl);
@@ -1005,7 +1005,7 @@ public class DdlExecutor {
     // Rename the table in the Catalog and get the resulting catalog object.
     // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
     TCatalogObject newTable =
-        catalog.renameTable(tableName.toThrift(), newTableName.toThrift());
+        catalog_.renameTable(tableName.toThrift(), newTableName.toThrift());
     TCatalogObject removedObject = new TCatalogObject();
     removedObject.setType(TCatalogObjectType.TABLE);
     removedObject.setTable(new TTable());
@@ -1029,14 +1029,14 @@ public class DdlExecutor {
       PartitionNotFoundException, TableNotFoundException, TableLoadingException {
     Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
     if (partitionSpec == null) {
-      synchronized (metastoreDdlLock) {
+      synchronized (metastoreDdlLock_) {
         org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
         setStorageDescriptorFileFormat(msTbl.getSd(), fileFormat);
         applyAlterTable(msTbl);
       }
     } else {
-      synchronized (metastoreDdlLock) {
-        HdfsPartition partition = catalog.getHdfsPartition(
+      synchronized (metastoreDdlLock_) {
+        HdfsPartition partition = catalog_.getHdfsPartition(
             tableName.getDb(), tableName.getTbl(), partitionSpec);
         org.apache.hadoop.hive.metastore.api.Partition msPartition =
             partition.getMetaStorePartition();
@@ -1073,14 +1073,14 @@ public class DdlExecutor {
       PartitionNotFoundException, TableNotFoundException, TableLoadingException {
     Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
     if (partitionSpec == null) {
-      synchronized (metastoreDdlLock) {
+      synchronized (metastoreDdlLock_) {
         org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
         msTbl.getSd().setLocation(location);
         applyAlterTable(msTbl);
       }
     } else {
-      synchronized (metastoreDdlLock) {
-        HdfsPartition partition = catalog.getHdfsPartition(
+      synchronized (metastoreDdlLock_) {
+        HdfsPartition partition = catalog_.getHdfsPartition(
             tableName.getDb(), tableName.getTbl(), partitionSpec);
         org.apache.hadoop.hive.metastore.api.Partition msPartition =
             partition.getMetaStorePartition();
@@ -1103,10 +1103,10 @@ public class DdlExecutor {
       TAlterTableSetTblPropertiesParams params) throws TException, CatalogException {
     Map<String, String> properties = params.getProperties();
     Preconditions.checkNotNull(properties);
-    synchronized (metastoreDdlLock) {
+    synchronized (metastoreDdlLock_) {
       if (params.isSetPartition_spec()) {
         // Alter partition params.
-        HdfsPartition partition = catalog.getHdfsPartition(
+        HdfsPartition partition = catalog_.getHdfsPartition(
             tableName.getDb(), tableName.getTbl(), params.getPartition_spec());
         org.apache.hadoop.hive.metastore.api.Partition msPartition =
             partition.getMetaStorePartition();
@@ -1158,7 +1158,7 @@ public class DdlExecutor {
    */
   private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException {
-    MetaStoreClient msClient = catalog.getMetaStoreClient();
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     long lastDdlTime = -1;
     try {
       lastDdlTime = calculateDdlTime(msTbl);
@@ -1167,7 +1167,7 @@ public class DdlExecutor {
           msTbl.getDbName(), msTbl.getTableName(), msTbl);
     } finally {
       msClient.release();
-      catalog.updateLastDdlTime(
+      catalog_.updateLastDdlTime(
           new TTableName(msTbl.getDbName(), msTbl.getTableName()), lastDdlTime);
     }
   }
@@ -1176,7 +1176,7 @@ public class DdlExecutor {
       org.apache.hadoop.hive.metastore.api.Partition msPartition) throws MetaException,
       InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
-    MetaStoreClient msClient = catalog.getMetaStoreClient();
+    MetaStoreClient msClient = catalog_.getMetaStoreClient();
     try {
       msClient.getHiveClient().alter_partition(
           tableName.getDb(), tableName.getTbl(), msPartition);
@@ -1194,7 +1194,7 @@ public class DdlExecutor {
       TableName tableName) throws DatabaseNotFoundException, TableNotFoundException,
       TableLoadingException {
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    return catalog.getTable(tableName.getDb(), tableName.getTbl())
+    return catalog_.getTable(tableName.getDb(), tableName.getTbl())
         .getMetaStoreTable().deepCopy();
   }
 
@@ -1227,7 +1227,7 @@ public class DdlExecutor {
       msClient.getHiveClient().alter_table(
           msTbl.getDbName(), msTbl.getTableName(), msTbl);
     }
-    catalog.updateLastDdlTime(
+    catalog_.updateLastDdlTime(
         new TTableName(msTbl.getDbName(), msTbl.getTableName()), lastDdlTime);
     return lastDdlTime;
   }
@@ -1325,7 +1325,7 @@ public class DdlExecutor {
     public void run() {
       // If there was an exception in another operation, abort
       if (allFinished_.isDone()) return;
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
+      MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         LOG.debug("Creating partition: " + partName_ + " in table: " + tblName_);
         msClient.getHiveClient().appendPartitionByName(tblName_.getDb(),
@@ -1361,7 +1361,7 @@ public class DdlExecutor {
       throws ImpalaException {
     TUpdateCatalogResponse response = new TUpdateCatalogResponse();
     // Only update metastore for Hdfs tables.
-    Table table = catalog.getTable(update.getDb_name(), update.getTarget_table());
+    Table table = catalog_.getTable(update.getDb_name(), update.getTarget_table());
     if (!(table instanceof HdfsTable)) {
       throw new InternalException("Unexpected table type: " +
           update.getTarget_table());
@@ -1380,7 +1380,7 @@ public class DdlExecutor {
         CreatePartitionRunnable rbl =
             new CreatePartitionRunnable(tblName, partName, addedNewPartition, allFinished,
                 numPartitions);
-        executor.execute(rbl);
+        executor_.execute(rbl);
       }
 
       try {
@@ -1391,7 +1391,7 @@ public class DdlExecutor {
       }
     }
     if (addedNewPartition.get()) {
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
+      MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         // Operate on a copy of msTbl to prevent our cached msTbl becoming inconsistent
         // if the alteration fails in the metastore.
@@ -1410,7 +1410,7 @@ public class DdlExecutor {
     response.getResult().setStatus(
         new TStatus(TStatusCode.OK, new ArrayList<String>()));
     response.getResult().setUpdated_catalog_object(
-        catalog.resetTable(tblName.toThrift(), true));
+        catalog_.resetTable(tblName.toThrift(), true));
     response.getResult().setVersion(
         response.getResult().getUpdated_catalog_object().getCatalog_version());
     return response;

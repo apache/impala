@@ -73,8 +73,8 @@ public class IncompleteTable extends Table {
 
   @Override
   public TTable toThrift() {
-    TTable table = new TTable(db.getName(), name);
-    table.setId(id.asInt());
+    TTable table = new TTable(db_.getName(), name_);
+    table.setId(id_.asInt());
     table.setLoad_status(new TStatus(TStatusCode.INTERNAL_ERROR,
         Lists.newArrayList(JniUtil.throwableToString(cause_),
                            JniUtil.throwableToStackTrace(cause_))));

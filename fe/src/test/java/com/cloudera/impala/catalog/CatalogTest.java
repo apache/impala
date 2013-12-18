@@ -31,16 +31,16 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {
-  private static Catalog catalog;
+  private static Catalog catalog_;
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new CatalogServiceCatalog(new TUniqueId(0L, 0L));
+    catalog_ = new CatalogServiceCatalog(new TUniqueId(0L, 0L));
   }
 
   @AfterClass
   public static void cleanUp() {
-    catalog.close();
+    catalog_.close();
   }
 
   private void checkTableCols(Db db, String tblName, int numClusteringCols,
@@ -82,7 +82,7 @@ public class CatalogTest {
 
   @Test
   public void TestColSchema() throws TableLoadingException {
-    Db functionalDb = catalog.getDb("functional");
+    Db functionalDb = catalog_.getDb("functional");
     assertNotNull(functionalDb);
     assertEquals(functionalDb.getName(), "functional");
     assertNotNull(functionalDb.getTable("alltypes"));
@@ -110,13 +110,13 @@ public class CatalogTest {
     assertNull(functionalDb.getTable("nonexistenttable"));
 
     // functional_seq contains the same tables as functional
-    Db testDb = catalog.getDb("functional_seq");
+    Db testDb = catalog_.getDb("functional_seq");
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "functional_seq");
     assertNotNull(testDb.getTable("alltypes"));
     assertNotNull(testDb.getTable("testtbl"));
 
-    Db hbaseDb = catalog.getDb("functional_hbase");
+    Db hbaseDb = catalog_.getDb("functional_hbase");
     assertNotNull(hbaseDb);
     assertEquals(hbaseDb.getName(), "functional_hbase");
     // Loading succeeds for an HBase table that has binary columns and an implicit key
@@ -277,7 +277,7 @@ public class CatalogTest {
 
   @Test public void TestPartitions() throws TableLoadingException {
     HdfsTable table =
-        (HdfsTable) catalog.getDb("functional").getTable("AllTypes");
+        (HdfsTable) catalog_.getDb("functional").getTable("AllTypes");
     List<HdfsPartition> partitions = table.getPartitions();
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
@@ -312,7 +312,7 @@ public class CatalogTest {
   public void testStats() throws TableLoadingException {
     // make sure the stats for functional.alltypesagg look correct
     HdfsTable table =
-        (HdfsTable) catalog.getDb("functional").getTable("AllTypesAgg");
+        (HdfsTable) catalog_.getDb("functional").getTable("AllTypesAgg");
 
     Column idCol = table.getColumn("id");
     assertEquals(idCol.getStats().getAvgSerializedSize(),
@@ -388,12 +388,12 @@ public class CatalogTest {
   @Test
   public void testColStatsColTypeMismatch() throws Exception {
     // First load a table that has column stats.
-    catalog.getDb("functional").invalidateTable("functional");
-    HdfsTable table = (HdfsTable) catalog.getDb("functional").getTable("alltypesagg");
+    catalog_.getDb("functional").invalidateTable("functional");
+    HdfsTable table = (HdfsTable) catalog_.getDb("functional").getTable("alltypesagg");
 
     // Now attempt to update a column's stats with mismatched stats data and ensure
     // we get the expected results.
-    MetaStoreClient client = catalog.getMetaStoreClient();
+    MetaStoreClient client = catalog_.getMetaStoreClient();
     try {
       // Load some string stats data and use it to update the stats of different
       // typed columns.
@@ -422,7 +422,7 @@ public class CatalogTest {
       assertEquals(1178, table.getColumn("string_col").getStats().getNumDistinctValues());
     } finally {
       // Make sure to invalidate the metadata so the next test isn't using bad col stats
-      catalog.getDb("functional").invalidateTable("functional");
+      catalog_.getDb("functional").invalidateTable("functional");
       client.release();
     }
   }
@@ -441,26 +441,26 @@ public class CatalogTest {
   public void testInternalHBaseTable() throws TableLoadingException {
     // Cast will fail if table not an HBaseTable
    HBaseTable table = (HBaseTable)
-       catalog.getDb("functional_hbase").getTable("internal_hbase_table");
+       catalog_.getDb("functional_hbase").getTable("internal_hbase_table");
     assertNotNull("functional_hbase.internal_hbase_table was not found", table);
   }
 
   public void testMapColumnFails() throws TableLoadingException {
-    Table table = catalog.getDb("functional").getTable("map_table");
+    Table table = catalog_.getDb("functional").getTable("map_table");
     assertTrue(table instanceof IncompleteTable);
     IncompleteTable incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
   }
 
   public void testMapColumnFailsOnHBaseTable() throws TableLoadingException {
-    Table table = catalog.getDb("functional_hbase").getTable("map_table_hbase");
+    Table table = catalog_.getDb("functional_hbase").getTable("map_table_hbase");
     assertTrue(table instanceof IncompleteTable);
     IncompleteTable incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
   }
 
   public void testArrayColumnFails() throws TableLoadingException {
-    Table table = catalog.getDb("functional").getTable("array_table");
+    Table table = catalog_.getDb("functional").getTable("array_table");
     assertTrue(table instanceof IncompleteTable);
     IncompleteTable incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
@@ -468,20 +468,20 @@ public class CatalogTest {
 
   @Test
   public void testDatabaseDoesNotExist() {
-    Db nonExistentDb = catalog.getDb("doesnotexist");
+    Db nonExistentDb = catalog_.getDb("doesnotexist");
     assertNull(nonExistentDb);
   }
 
   @Test
   public void testCreateTableMetadata() throws TableLoadingException {
-    Table table = catalog.getDb("functional").getTable("alltypes");
+    Table table = catalog_.getDb("functional").getTable("alltypes");
     // Tables are created via Impala so the metadata should have been populated properly.
     // alltypes is an external table.
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
     assertEquals(TableType.EXTERNAL_TABLE.toString(),
         table.getMetaStoreTable().getTableType());
     // alltypesinsert is created using CREATE TABLE LIKE and is a MANAGED table
-    table = catalog.getDb("functional").getTable("alltypesinsert");
+    table = catalog_.getDb("functional").getTable("alltypesinsert");
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
     assertEquals(TableType.MANAGED_TABLE.toString(),
         table.getMetaStoreTable().getTableType());
@@ -489,7 +489,7 @@ public class CatalogTest {
 
   @Test
   public void testLoadingUnsupportedTableTypes() throws TableLoadingException {
-    Table table = catalog.getDb("functional").getTable("hive_index_tbl");
+    Table table = catalog_.getDb("functional").getTable("hive_index_tbl");
     assertTrue(table instanceof IncompleteTable);
     IncompleteTable incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
@@ -497,7 +497,7 @@ public class CatalogTest {
         incompleteTable.getCause().getMessage());
 
     // Table with unsupported SerDe library.
-    table = catalog.getDb("functional").getTable("bad_serde");
+    table = catalog_.getDb("functional").getTable("bad_serde");
     assertTrue(table instanceof IncompleteTable);
     incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
@@ -515,7 +515,7 @@ public class CatalogTest {
   // escape char.
   @Test public void TestTableWithBadEscapeChar() throws TableLoadingException {
     HdfsTable table =
-        (HdfsTable) catalog.getDb("functional").getTable("escapechartesttable");
+        (HdfsTable) catalog_.getDb("functional").getTable("escapechartesttable");
     List<HdfsPartition> partitions = table.getPartitions();
     for (HdfsPartition p: partitions) {
       HdfsStorageDescriptor desc = p.getInputFormatDescriptor();
@@ -529,47 +529,47 @@ public class CatalogTest {
     // table and an HBase table.
     String[] tableNames = {"alltypes", "alltypesnopart"};
     for (String tableName: tableNames) {
-      Table table = catalog.getDb("functional").getTable(tableName);
-      table = Table.load(catalog.getNextTableId(),
-          catalog.getMetaStoreClient().getHiveClient(),
-          catalog.getDb("functional"), tableName, table);
+      Table table = catalog_.getDb("functional").getTable(tableName);
+      table = Table.load(catalog_.getNextTableId(),
+          catalog_.getMetaStoreClient().getHiveClient(),
+          catalog_.getDb("functional"), tableName, table);
     }
     // Test HBase table
-    Table table = catalog.getDb("functional_hbase").getTable("alltypessmall");
-    table = Table.load(catalog.getNextTableId(),
-        catalog.getMetaStoreClient().getHiveClient(),
-        catalog.getDb("functional_hbase"), "alltypessmall", table);
+    Table table = catalog_.getDb("functional_hbase").getTable("alltypessmall");
+    table = Table.load(catalog_.getNextTableId(),
+        catalog_.getMetaStoreClient().getHiveClient(),
+        catalog_.getDb("functional_hbase"), "alltypessmall", table);
   }
 
   @Test
   public void TestUdf() throws CatalogException {
     List<String> fnNames =
-        catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", "");
+        catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", "");
     assertEquals(fnNames.size(), 0);
 
     ArrayList<PrimitiveType> args1 = Lists.newArrayList();
     ArrayList<PrimitiveType> args2 = Lists.newArrayList(PrimitiveType.INT);
     ArrayList<PrimitiveType> args3 = Lists.newArrayList(PrimitiveType.TINYINT);
 
-    catalog.removeFunction(
+    catalog_.removeFunction(
         new Function(new FunctionName("default", "Foo"), args1,
             PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
 
     assertEquals(fnNames.size(), 0);
 
     Udf udf1 = new Udf(new FunctionName("default", "Foo"),
         args1, PrimitiveType.INVALID_TYPE, new HdfsUri("/Foo"), "Foo.class");
-    catalog.addFunction(udf1);
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    catalog_.addFunction(udf1);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 1);
     assertTrue(fnNames.contains("foo()"));
 
     // Same function name, overloaded arguments
     Udf udf2 = new Udf(new FunctionName("default", "Foo"),
         args2, PrimitiveType.INVALID_TYPE, new HdfsUri("/Foo"), "Foo.class");
-    catalog.addFunction(udf2);
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    catalog_.addFunction(udf2);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo()"));
     assertTrue(fnNames.contains("foo(INT)"));
@@ -577,56 +577,56 @@ public class CatalogTest {
     // Add a function with a new name
     Udf udf3 = new Udf(new FunctionName("default", "Bar"),
         args2, PrimitiveType.INVALID_TYPE, new HdfsUri("/Foo"), "Foo.class");
-    catalog.addFunction(udf3);
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    catalog_.addFunction(udf3);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 3);
     assertTrue(fnNames.contains("foo()"));
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop Foo()
-    catalog.removeFunction(new Function(
+    catalog_.removeFunction(new Function(
         new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop it again, no-op
-    catalog.removeFunction(new Function(
+    catalog_.removeFunction(new Function(
         new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(), no-op
-    catalog.removeFunction(new Function(
+    catalog_.removeFunction(new Function(
         new FunctionName("default", "Bar"), args1, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(tinyint), no-op
-    catalog.removeFunction(new Function(
+    catalog_.removeFunction(new Function(
         new FunctionName("default", "Bar"), args3, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
     assertTrue(fnNames.contains("bar(INT)"));
 
     // Drop bar(int)
-    catalog.removeFunction(new Function(
+    catalog_.removeFunction(new Function(
         new FunctionName("default", "Bar"), args2, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 1);
     assertTrue(fnNames.contains("foo(INT)"));
 
     // Drop foo(int)
-    catalog.removeFunction(new Function(
+    catalog_.removeFunction(new Function(
         new FunctionName("default", "foo"), args2, PrimitiveType.INVALID_TYPE, false));
-    fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
+    fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 0);
   }
 }

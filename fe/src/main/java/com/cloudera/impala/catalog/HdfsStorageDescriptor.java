@@ -40,27 +40,17 @@ public class HdfsStorageDescriptor {
   // hive by default has no escape char
   public static final char DEFAULT_ESCAPE_CHAR = '\u0000';
 
-  private final HdfsFileFormat fileFormat;
-
-  private final char lineDelim;
-  private final char fieldDelim;
-  private final char collectionDelim;
-  private final char mapKeyDelim;
-  private final char escapeChar;
-  private final char quoteChar;
-  private final int blockSize;
-  private final THdfsCompression compression;
-
   // Serde parameters that are recognized by table writers.
   private static final String BLOCK_SIZE = "blocksize";
   private static final String COMPRESSION = "compression";
 
   // Important: don't change the ordering of these keys - if e.g. FIELD_DELIM is not
   // found, the value of LINE_DELIM is used, so LINE_DELIM must be found first.
-  final static List<String> DELIMITER_KEYS =
-      ImmutableList.of(serdeConstants.LINE_DELIM, serdeConstants.FIELD_DELIM,
-        serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM,
-        serdeConstants.ESCAPE_CHAR, serdeConstants.QUOTE_CHAR);
+  // Package visible for testing.
+  final static List<String> DELIMITER_KEYS = ImmutableList.of(
+      serdeConstants.LINE_DELIM, serdeConstants.FIELD_DELIM,
+      serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM,
+      serdeConstants.ESCAPE_CHAR, serdeConstants.QUOTE_CHAR);
 
   // The Parquet serde shows up multiple times as the location of the implementation
   // has changed between Impala versions.
@@ -71,6 +61,16 @@ public class HdfsStorageDescriptor {
       ParquetHiveSerDe.class.getName()); // (parquet)
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
+
+  private final HdfsFileFormat fileFormat_;
+  private final char lineDelim_;
+  private final char fieldDelim_;
+  private final char collectionDelim_;
+  private final char mapKeyDelim_;
+  private final char escapeChar_;
+  private final char quoteChar_;
+  private final int blockSize_;
+  private final THdfsCompression compression_;
 
   /**
    * Returns a map from delimiter key to a single delimiter character,
@@ -113,53 +113,17 @@ public class HdfsStorageDescriptor {
     return delimMap;
   }
 
-  public char getLineDelim() {
-    return lineDelim;
-  }
-
-  public char getFieldDelim() {
-    return fieldDelim;
-  }
-
-  public char getCollectionDelim() {
-    return collectionDelim;
-  }
-
-  public char getMapKeyDelim() {
-    return mapKeyDelim;
-  }
-
-  public char getEscapeChar() {
-    return escapeChar;
-  }
-
-  public char getQuoteChar() {
-    return quoteChar;
-  }
-
-  public HdfsFileFormat getFileFormat() {
-    return fileFormat;
-  }
-
-  public int getBlockSize(){
-    return blockSize;
-  }
-
-  public THdfsCompression getCompression() {
-    return compression;
-  }
-
   public HdfsStorageDescriptor(String tblName, HdfsFileFormat fileFormat, char lineDelim,
       char fieldDelim, char collectionDelim, char mapKeyDelim, char escapeChar,
       char quoteChar, int blockSize, THdfsCompression compression) {
-    this.fileFormat = fileFormat;
-    this.lineDelim = lineDelim;
-    this.fieldDelim = fieldDelim;
-    this.collectionDelim = collectionDelim;
-    this.mapKeyDelim = mapKeyDelim;
-    this.quoteChar = quoteChar;
-    this.blockSize = blockSize;
-    this.compression = compression;
+    this.fileFormat_ = fileFormat;
+    this.lineDelim_ = lineDelim;
+    this.fieldDelim_ = fieldDelim;
+    this.collectionDelim_ = collectionDelim;
+    this.mapKeyDelim_ = mapKeyDelim;
+    this.quoteChar_ = quoteChar;
+    this.blockSize_ = blockSize;
+    this.compression_ = compression;
 
     // You can set the escape character as a tuple or row delim.  Empirically,
     // this is ignored by hive.
@@ -167,11 +131,11 @@ public class HdfsStorageDescriptor {
         escapeChar == lineDelim ||
         escapeChar == collectionDelim) {
       // TODO: we should output the table name here but it's hard to get to now.
-      this.escapeChar = DEFAULT_ESCAPE_CHAR;
+      this.escapeChar_ = DEFAULT_ESCAPE_CHAR;
       LOG.warn("Escape character for table, " + tblName + " is set to "
           + "the same character as one of the delimiters.  Ignoring escape character.");
     } else {
-      this.escapeChar = escapeChar;
+      this.escapeChar_ = escapeChar;
     }
   }
 
@@ -238,4 +202,14 @@ public class HdfsStorageDescriptor {
       throw new InvalidStorageDescriptorException(ex);
     }
   }
+
+  public char getLineDelim() { return lineDelim_; }
+  public char getFieldDelim() { return fieldDelim_; }
+  public char getCollectionDelim() { return collectionDelim_; }
+  public char getMapKeyDelim() { return mapKeyDelim_; }
+  public char getEscapeChar() { return escapeChar_; }
+  public char getQuoteChar() { return quoteChar_; }
+  public HdfsFileFormat getFileFormat() { return fileFormat_; }
+  public int getBlockSize() { return blockSize_; }
+  public THdfsCompression getCompression() { return compression_; }
 }
