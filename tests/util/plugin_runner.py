@@ -24,7 +24,7 @@ PLUGIN_DIR = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'benchmark', 'plug
 # Setup logging for this module.
 logging.basicConfig(level=logging.INFO, format='%(filename)s: %(message)s')
 LOG = logging.getLogger('plugin_runner')
-LOG.setLevel(level=logging.DEBUG)
+LOG.setLevel(level=logging.INFO)
 
 class PluginRunner(object):
   ''' Loads user specified plugins, if found, and initializes them.
@@ -47,7 +47,7 @@ class PluginRunner(object):
       yield __import__("tests.benchmark.plugins.%s" % mod_name, fromlist=[mod_name])
 
   def __get_plugins_from_modules(self, plugin_infos):
-    '''Look for user speicifed plugins in the availabe modules.'''
+    '''Look for user specified plugins in the available modules.'''
     self.__plugins = []
     plugin_names = []
     for module in self.__available_modules:
@@ -77,19 +77,19 @@ class PluginRunner(object):
 
   def print_plugin_names(self):
     for p in self.__plugins:
-      LOG.info("Plugin: %s, Scope: %s" % (p.__name__, p.scope))
+      LOG.debug("Plugin: %s, Scope: %s" % (p.__name__, p.scope))
 
   def run_plugins_pre(self, context=None, scope=None):
     if len(self.__plugins) == 0: return
     if context: context['scope'] = scope
     for p in self.__plugins:
       if not scope or p.scope == scope.lower():
-        LOG.info('Running pre-hook for %s at scope %s' % (p.__name__, scope))
+        LOG.debug('Running pre-hook for %s at scope %s' % (p.__name__, scope))
         p.run_pre_hook(context=context)
 
   def run_plugins_post(self, context=None, scope=None):
     if len(self.__plugins) == 0: return
     for p in self.__plugins:
       if not scope or p.scope == scope.lower():
-        LOG.info('Running post-hook for %s at scope %s' % (p.__name__, scope))
+        LOG.debug('Running post-hook for %s at scope %s' % (p.__name__, scope))
         p.run_post_hook(context=context)

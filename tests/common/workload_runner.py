@@ -252,8 +252,8 @@ class WorkloadRunner(object):
       exec_result = QueryExecResult()
       if not self.skip_impala:
         self.__summary += " Impala Results: "
-        LOG.debug('Running: \n%s\n' % query.query_str)
-        LOG.info('Query Name: %s' % query.name)
+        LOG.info('Query Name: \n%s\n' % query.name)
+        LOG.debug('Sql: \n%s\n' % query.query_str)
         exec_result = self.run_query(executor_name, query, stop_on_query_error)
         if exec_result:
           self.__summary += "%s\n" % exec_result
@@ -264,7 +264,7 @@ class WorkloadRunner(object):
         hive_exec_result = self.run_query('hive', query, False)
         if hive_exec_result:
           self.__summary += "%s\n" % hive_exec_result
-      LOG.debug("---------------------------------------------------------------------")
+      LOG.info("---------------------------------------------------------------------")
       self.__result_map[query].append((exec_result, hive_exec_result))
 
   def execute_workload(self, queries, exit_on_error):

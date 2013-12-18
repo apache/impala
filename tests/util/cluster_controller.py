@@ -21,9 +21,9 @@ from fabric.api import hide, env as fabric_env
 # Setup logging for this module.
 LOG = logging.getLogger('cluster_controller')
 LOG.setLevel(logging.INFO)
-# Set paramiko's logging level to ERROR, to supress its log spew.
-logging.getLogger("paramiko").setLevel(logging.ERROR)
 
+# Set paramiko's logging level to ERROR, to suppress its log spew.
+logging.getLogger("paramiko").setLevel(logging.ERROR)
 
 class ClusterController(object):
   """Responsible for running remote commands on a cluster.
@@ -50,7 +50,7 @@ class ClusterController(object):
   def __validate(self):
     """Validate that commands can be issued
 
-    TODO: Validate that the connections are successfull.
+    TODO: Validate that the connections are successful.
     """
 
     # We do not need to validate the connection for a local run
@@ -78,7 +78,7 @@ class ClusterController(object):
   def reset_fabric_hosts(self):
     """Reset the fabric hosts to the ClusterController default
 
-    This method can be called after an operation on specifc hosts. It's generally called
+    This method can be called after an operation on specific hosts. It's generally called
     after an operation requiring change_fabric_hosts"""
     fabric_env.hosts = ClusterController.hosts
 
@@ -104,7 +104,7 @@ class ClusterController(object):
     If in local mode, the command is run locally. When not local,
     the command is run with superuser privileges on remote hosts
     in parallel. The user can override running the command in parallel
-    by explicity invoking run_cmd to run serially.
+    by explicitly invoking run_cmd to run serially.
     The method returns a dictionary. key = hostname, value = the results of the
     command.
     TODO: Make this cleaner. Remove superuser restriction and make it an option.
