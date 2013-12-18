@@ -40,6 +40,17 @@ Status JniLocalFrame::push(JNIEnv* env, int max_local_ref) {
   return Status::OK;
 }
 
+bool JniUtil::ClassExists(JNIEnv* env, const char* class_str) {
+  jclass local_cl = env->FindClass(class_str);
+  jthrowable exc = env->ExceptionOccurred();
+  if (exc != NULL) {
+    env->ExceptionClear();
+    return false;
+  }
+  env->DeleteLocalRef(local_cl);
+  return true;
+}
+
 Status JniUtil::GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* class_ref) {
   *class_ref = NULL;
   jclass local_cl = env->FindClass(class_str);

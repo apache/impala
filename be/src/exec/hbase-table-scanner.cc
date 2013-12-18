@@ -145,15 +145,17 @@ Status HBaseTableScanner::Init() {
   // Distinguish HBase versions by checking for the existence of the Cell class.
   // HBase 0.95.2: Use Cell class and corresponding methods.
   // HBase prior to 0.95.2: Use the KeyValue class and Cell-equivalent methods.
-  bool has_cell_class = true;
-  Status status =
-      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/Cell", &cell_cl_);
-  if (!status.ok()) {
+  bool has_cell_class = JniUtil::ClassExists(env, "org/apache/hadoop/hbase/Cell");
+  if (has_cell_class) {
+    LOG(INFO) << "Detected HBase version >= 0.95.2";
+    RETURN_IF_ERROR(
+        JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/Cell", &cell_cl_));
+  } else {
     // Assume a non-CDH5 HBase version because the Cell class wasn't found.
+    LOG(INFO) << "Detected HBase version < 0.95.2";
     RETURN_IF_ERROR(
         JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/KeyValue",
             &cell_cl_));
-    has_cell_class = false;
   }
 
   // Scan method ids.

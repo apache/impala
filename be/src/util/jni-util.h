@@ -182,6 +182,11 @@ class JniUtil {
   // Find JniUtil class, and get JniUtil.throwableToString method id
   static Status Init();
 
+  // Returns true if the given class could be found on the CLASSPATH in env.
+  // Returns false otherwise, or if any other error occurred (e.g. a JNI exception).
+  // This function does not log any errors or exceptions.
+  static bool ClassExists(JNIEnv* env, const char* class_str);
+
   // Returns a global JNI reference to the class specified by class_str into class_ref.
   // The reference is added to global_refs_ for cleanup in Deinit().
   // Returns Status::OK if successful.
