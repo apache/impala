@@ -27,8 +27,9 @@ class TestHBaseQueries(ImpalaTestSuite):
   def test_hbase_filters(self, vector):
     self.run_test_case('QueryTest/hbase-filters', vector)
 
-  def test_hbase_inserts(self, vector):
-    self.run_test_case('QueryTest/hbase-inserts', vector)
-
   def test_hbase_subquery(self, vector):
     self.run_test_case('QueryTest/hbase-subquery', vector)
+
+  @pytest.mark.execute_serially
+  def test_hbase_inserts(self, vector):
+    self.run_test_case('QueryTest/hbase-inserts', vector)
