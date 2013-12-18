@@ -28,51 +28,49 @@ import com.google.common.base.Preconditions;
 
 public class IsNullPredicate extends Predicate {
   private final static Logger LOG = LoggerFactory.getLogger(IsNullPredicate.class);
-  private final boolean isNotNull;
+  private final boolean isNotNull_;
 
   public IsNullPredicate(Expr e, boolean isNotNull) {
     super();
-    this.isNotNull = isNotNull;
+    this.isNotNull_ = isNotNull;
     Preconditions.checkNotNull(e);
-    children.add(e);
+    children_.add(e);
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
-    return ((IsNullPredicate) obj).isNotNull == isNotNull;
+    if (!super.equals(obj)) return false;
+    return ((IsNullPredicate) obj).isNotNull_ == isNotNull_;
   }
 
   @Override
   public String toSqlImpl() {
-    return getChild(0).toSql() + (isNotNull ? " IS NOT NULL" : " IS NULL");
+    return getChild(0).toSql() + (isNotNull_ ? " IS NOT NULL" : " IS NULL");
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
 
     // determine selectivity
     // TODO: increase this to make sure we don't end up favoring broadcast joins
     // due to underestimated cardinalities?
-    selectivity = 0.1;
+    selectivity_ = 0.1;
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     if (isSingleColumnPredicate(slotRefRef, null)) {
       SlotDescriptor slotDesc = slotRefRef.getRef().getDesc();
       Table table = slotDesc.getParent().getTable();
       if (table != null && table.getNumRows() > 0) {
         long numRows = table.getNumRows();
-        if (isNotNull) {
-          selectivity =
+        if (isNotNull_) {
+          selectivity_ =
               (double) (numRows - slotDesc.getStats().getNumNulls()) / (double) numRows;
         } else {
-          selectivity = (double) slotDesc.getStats().getNumNulls() / (double) numRows;
+          selectivity_ = (double) slotDesc.getStats().getNumNulls() / (double) numRows;
         }
-        selectivity = Math.max(0.0, Math.min(1.0, selectivity));
+        selectivity_ = Math.max(0.0, Math.min(1.0, selectivity_));
       }
     }
   }
@@ -80,7 +78,7 @@ public class IsNullPredicate extends Predicate {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.IS_NULL_PRED;
-    msg.is_null_pred = new TIsNullPredicate(isNotNull);
+    msg.is_null_pred = new TIsNullPredicate(isNotNull_);
   }
 
 }

@@ -46,7 +46,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
    */
   public CreateUdaStmt(FunctionName fnSymbol, FunctionArgs args,
       PrimitiveType retType, ColumnType intermediateType,
-      HdfsURI location, boolean ifNotExists,
+      HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
     super(new Uda(fnSymbol, args, retType), location, ifNotExists, optArgs);
     uda_ = (Uda)super.fn_;

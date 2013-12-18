@@ -58,7 +58,7 @@ public class SortNode extends PlanNode {
     isDefaultLimit_ = isDefaultLimit;
     tupleIds_.addAll(input.getTupleIds());
     nullableTupleIds_.addAll(input.getNullableTupleIds());
-    children.add(input);
+    children_.add(input);
     offset_ = offset;
   }
 
@@ -73,7 +73,7 @@ public class SortNode extends PlanNode {
     baseTblOrderingExprs_ = inputSortNode.baseTblOrderingExprs_;
     useTopN_ = inputSortNode.useTopN_;
     isDefaultLimit_ = inputSortNode.isDefaultLimit_;
-    children.add(child);
+    children_.add(child);
     offset_ = inputSortNode.offset_;
   }
 

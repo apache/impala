@@ -29,18 +29,18 @@ import com.google.common.base.Preconditions;
  * a copy of an existing table definition.
  */
 public class CreateTableLikeStmt extends StatementBase {
-  private final TableName tableName;
-  private final TableName srcTableName;
-  private final boolean isExternal;
-  private final String comment;
-  private final THdfsFileFormat fileFormat;
-  private final HdfsURI location;
-  private final boolean ifNotExists;
+  private final TableName tableName_;
+  private final TableName srcTableName_;
+  private final boolean isExternal_;
+  private final String comment_;
+  private final THdfsFileFormat fileFormat_;
+  private final HdfsUri location_;
+  private final boolean ifNotExists_;
 
   // Set during analysis
-  private String dbName;
-  private String srcDbName;
-  private String owner;
+  private String dbName_;
+  private String srcDbName_;
+  private String owner_;
 
   /**
    * Builds a CREATE TABLE LIKE statement
@@ -53,34 +53,34 @@ public class CreateTableLikeStmt extends StatementBase {
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
   public CreateTableLikeStmt(TableName tableName, TableName srcTableName,
-      boolean isExternal, String comment, THdfsFileFormat fileFormat, HdfsURI location,
+      boolean isExternal, String comment, THdfsFileFormat fileFormat, HdfsUri location,
       boolean ifNotExists) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(srcTableName);
-    this.tableName = tableName;
-    this.srcTableName = srcTableName;
-    this.isExternal = isExternal;
-    this.comment = comment;
-    this.fileFormat = fileFormat;
-    this.location = location;
-    this.ifNotExists = ifNotExists;
+    this.tableName_ = tableName;
+    this.srcTableName_ = srcTableName;
+    this.isExternal_ = isExternal;
+    this.comment_ = comment;
+    this.fileFormat_ = fileFormat;
+    this.location_ = location;
+    this.ifNotExists_ = ifNotExists;
   }
 
-  public String getTbl() { return tableName.getTbl(); }
-  public String getSrcTbl() { return srcTableName.getTbl(); }
-  public boolean isExternal() { return isExternal; }
-  public boolean getIfNotExists() { return ifNotExists; }
-  public String getComment() { return comment; }
-  public THdfsFileFormat getFileFormat() { return fileFormat; }
-  public HdfsURI getLocation() { return location; }
+  public String getTbl() { return tableName_.getTbl(); }
+  public String getSrcTbl() { return srcTableName_.getTbl(); }
+  public boolean isExternal() { return isExternal_; }
+  public boolean getIfNotExists() { return ifNotExists_; }
+  public String getComment() { return comment_; }
+  public THdfsFileFormat getFileFormat() { return fileFormat_; }
+  public HdfsUri getLocation() { return location_; }
 
   /**
    * Can only be called after analysis, returns the name of the database the table will
    * be created within.
    */
   public String getDb() {
-    Preconditions.checkNotNull(dbName);
-    return dbName;
+    Preconditions.checkNotNull(dbName_);
+    return dbName_;
   }
 
   /**
@@ -88,28 +88,28 @@ public class CreateTableLikeStmt extends StatementBase {
    * be created within.
    */
   public String getSrcDb() {
-    Preconditions.checkNotNull(srcDbName);
-    return srcDbName;
+    Preconditions.checkNotNull(srcDbName_);
+    return srcDbName_;
   }
 
   public String getOwner() {
-    Preconditions.checkNotNull(owner);
-    return owner;
+    Preconditions.checkNotNull(owner_);
+    return owner_;
   }
 
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("CREATE ");
-    if (isExternal) sb.append("EXTERNAL ");
+    if (isExternal_) sb.append("EXTERNAL ");
     sb.append("TABLE ");
-    if (ifNotExists) sb.append("IF NOT EXISTS ");
-    if (tableName.getDb() != null) sb.append(tableName.getDb() + ".");
-    sb.append(tableName.getTbl() + " LIKE ");
-    if (srcTableName.getDb() != null) sb.append(srcTableName.getDb() + ".");
-    sb.append(srcTableName.getTbl());
-    if (comment != null) sb.append(" COMMENT '" + comment + "'");
-    if (fileFormat != null) sb.append(" STORED AS " + fileFormat);
-    if (location != null) sb.append(" LOCATION '" + location + "'");
+    if (ifNotExists_) sb.append("IF NOT EXISTS ");
+    if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
+    sb.append(tableName_.getTbl() + " LIKE ");
+    if (srcTableName_.getDb() != null) sb.append(srcTableName_.getDb() + ".");
+    sb.append(srcTableName_.getTbl());
+    if (comment_ != null) sb.append(" COMMENT '" + comment_ + "'");
+    if (fileFormat_ != null) sb.append(" STORED AS " + fileFormat_);
+    if (location_ != null) sb.append(" LOCATION '" + location_ + "'");
     return sb.toString();
   }
 
@@ -119,9 +119,9 @@ public class CreateTableLikeStmt extends StatementBase {
     params.setSrc_table_name(new TTableName(getSrcDb(), getSrcTbl()));
     params.setOwner(getOwner());
     params.setIs_external(isExternal());
-    params.setComment(comment);
-    if (fileFormat != null) params.setFile_format(fileFormat);
-    params.setLocation(location == null ? null : location.toString());
+    params.setComment(comment_);
+    if (fileFormat_ != null) params.setFile_format(fileFormat_);
+    params.setLocation(location_ == null ? null : location_.toString());
     params.setIf_not_exists(getIfNotExists());
     return params;
   }
@@ -129,22 +129,22 @@ public class CreateTableLikeStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    Preconditions.checkState(tableName != null && !tableName.isEmpty());
-    Preconditions.checkState(srcTableName != null && !srcTableName.isEmpty());
+    Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
+    Preconditions.checkState(srcTableName_ != null && !srcTableName_.isEmpty());
 
     // Make sure the source table exists and the user has permission to access it.
-    srcDbName = analyzer
-        .getTable(srcTableName, Privilege.VIEW_METADATA)
+    srcDbName_ = analyzer
+        .getTable(srcTableName_, Privilege.VIEW_METADATA)
         .getDb().getName();
-    dbName = analyzer.getTargetDbName(tableName);
+    dbName_ = analyzer.getTargetDbName(tableName_);
 
-    if (analyzer.dbContainsTable(dbName, tableName.getTbl(), Privilege.CREATE) &&
-        !ifNotExists) {
+    if (analyzer.dbContainsTable(dbName_, tableName_.getTbl(), Privilege.CREATE) &&
+        !ifNotExists_) {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
-          String.format("%s.%s", dbName, getTbl()));
+          String.format("%s.%s", dbName_, getTbl()));
     }
-    analyzer.addAccessEvent(new TAccessEvent(dbName + "." + tableName.getTbl(),
+    analyzer.addAccessEvent(new TAccessEvent(dbName_ + "." + tableName_.getTbl(),
         TCatalogObjectType.TABLE, Privilege.CREATE.toString()));
-    owner = analyzer.getUser().getName();
+    owner_ = analyzer.getUser().getName();
   }
 }

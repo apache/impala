@@ -23,25 +23,23 @@ import com.cloudera.impala.thrift.TUseDbParams;
  * Representation of a USE db statement.
  */
 public class UseStmt extends StatementBase {
-  private final String database;
+  private final String database_;
 
   public UseStmt(String db) {
-    database = db;
+    database_ = db;
   }
 
-  public String getDatabase() {
-    return database;
-  }
+  public String getDatabase() { return database_; }
 
   @Override
   public String toSql() {
-    return "USE " + database;
+    return "USE " + database_;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    analyzer.getDb(database, Privilege.ANY);
+    analyzer.getDb(database_, Privilege.ANY);
   }
 
   public TUseDbParams toThrift() {

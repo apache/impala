@@ -52,13 +52,13 @@ public class ValuesStmt extends UnionStmt {
       strBuilder.append(" ");
     }
 
-    Preconditions.checkState(operands.size() > 0);
+    Preconditions.checkState(operands_.size() > 0);
     strBuilder.append("VALUES(");
-    for (int i = 0; i < operands.size(); ++i) {
-      if (operands.size() != 1) strBuilder.append("(");
-      appendSelectList((SelectStmt) operands.get(i).getQueryStmt(), strBuilder);
-      if (operands.size() != 1) strBuilder.append(")");
-      strBuilder.append((i+1 != operands.size()) ? ", " : "");
+    for (int i = 0; i < operands_.size(); ++i) {
+      if (operands_.size() != 1) strBuilder.append("(");
+      appendSelectList((SelectStmt) operands_.get(i).getQueryStmt(), strBuilder);
+      if (operands_.size() != 1) strBuilder.append(")");
+      strBuilder.append((i+1 != operands_.size()) ? ", " : "");
     }
     strBuilder.append(")");
     return strBuilder.toString();
@@ -75,7 +75,7 @@ public class ValuesStmt extends UnionStmt {
   @Override
   public QueryStmt clone() {
     List<UnionOperand> operandClones = Lists.newArrayList();
-    for (UnionOperand operand: operands) {
+    for (UnionOperand operand: operands_) {
       operandClones.add(operand.clone());
     }
     ValuesStmt valuesClone = new ValuesStmt(operandClones, cloneOrderByElements(),

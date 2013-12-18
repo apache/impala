@@ -45,10 +45,10 @@ import com.google.common.base.Preconditions;
 public class ViewRef extends InlineViewRef {
   // Set for views originating from the catalog.
   // NULL for views originating from a WITH clause.
-  private final View table;
+  private final View table_;
 
   // NULL for view definitions registered in the analyzer. Set for view instantiations.
-  private final BaseTableRef origTblRef;
+  private final BaseTableRef origTblRef_;
 
   /**
    * C'tor used for creating a view definition in a WITH clause.
@@ -56,8 +56,8 @@ public class ViewRef extends InlineViewRef {
   public ViewRef(String alias, QueryStmt queryStmt) {
     super(alias, queryStmt);
     Preconditions.checkNotNull(alias);
-    table = null;
-    origTblRef = null;
+    table_ = null;
+    origTblRef_ = null;
   }
 
   /**
@@ -66,8 +66,8 @@ public class ViewRef extends InlineViewRef {
   public ViewRef(String alias, QueryStmt queryStmt, View table) {
     super(alias, queryStmt);
     Preconditions.checkNotNull(alias);
-    this.table = table;
-    origTblRef = null;
+    this.table_ = table;
+    origTblRef_ = null;
   }
 
   /**
@@ -77,15 +77,15 @@ public class ViewRef extends InlineViewRef {
   private ViewRef(BaseTableRef origTblRef, QueryStmt queryStmt, View table) {
     // Use tblRef's explicit alias if it has one, otherwise the table name.
     super(origTblRef.getAlias(), queryStmt);
-    this.table = table;
-    this.origTblRef = origTblRef;
+    this.table_ = table;
+    this.origTblRef_ = origTblRef;
     // Set context-dependent attributes from the original table.
     // Do not use originalTblRef.getJoinOp() because we want to record the fact that the
     // joinOp may be NULL, such that toSql() can work correctly.
-    this.joinOp = origTblRef.joinOp;
-    this.joinHints = origTblRef.getJoinHints();
-    this.onClause = origTblRef.getOnClause();
-    this.usingColNames = origTblRef.getUsingClause();
+    this.joinOp_ = origTblRef.joinOp_;
+    this.joinHints_ = origTblRef.getJoinHints();
+    this.onClause_ = origTblRef.getOnClause();
+    this.usingColNames_ = origTblRef.getUsingClause();
   }
 
   /**
@@ -93,9 +93,9 @@ public class ViewRef extends InlineViewRef {
    */
   protected ViewRef(ViewRef other) {
     super(other);
-    this.origTblRef =
-        (other.origTblRef != null) ? (BaseTableRef) other.origTblRef.clone() : null;
-    this.table = other.table;
+    this.origTblRef_ =
+        (other.origTblRef_ != null) ? (BaseTableRef) other.origTblRef_.clone() : null;
+    this.table_ = other.table_;
   }
 
   /**
@@ -107,15 +107,15 @@ public class ViewRef extends InlineViewRef {
    */
   public ViewRef instantiate(BaseTableRef ref) {
     // We should only instantiate a view definition.
-    Preconditions.checkState(origTblRef == null);
-    return new ViewRef(ref, queryStmt.clone(), table);
+    Preconditions.checkState(origTblRef_ == null);
+    return new ViewRef(ref, queryStmt_.clone(), table_);
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     // View definitions cannot be analyzed, only view instantiations.
-    Preconditions.checkNotNull(origTblRef);
+    Preconditions.checkNotNull(origTblRef_);
 
     if (!isCatalogView()) {
       // Analyze WITH-clause view instantiations the same way as inline views.
@@ -140,8 +140,8 @@ public class ViewRef extends InlineViewRef {
       // analysis of this view's defining queryStmt.
       analyzeAsUser(analyzer, ImpalaInternalAdminUser.getInstance(), true);
     }
-    analyzer.addAccessEvent(new TAccessEvent(table.getFullName(),
-        table.getCatalogObjectType(), Privilege.SELECT.toString()));
+    analyzer.addAccessEvent(new TAccessEvent(table_.getFullName(),
+        table_.getCatalogObjectType(), Privilege.SELECT.toString()));
   }
 
   @Override
@@ -152,17 +152,17 @@ public class ViewRef extends InlineViewRef {
     TupleDescriptor result = descTbl.createTupleDescriptor();
     result.setIsMaterialized(false);
     // This tuple is backed by the original view table from the catalog.
-    result.setTable(table);
+    result.setTable(table_);
     return result;
   }
 
   @Override
   protected String tableRefToSql() {
-    if (origTblRef != null) return origTblRef.tableRefToSql();
+    if (origTblRef_ != null) return origTblRef_.tableRefToSql();
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
     // This is needed for view compatibility between Impala and Hive.
-    String aliasSql = ToSqlUtils.getHiveIdentSql(alias);
-    return "(" + queryStmt.toSql() + ") " + aliasSql;
+    String aliasSql = ToSqlUtils.getHiveIdentSql(alias_);
+    return "(" + queryStmt_.toSql() + ") " + aliasSql;
   }
 
   @Override
@@ -170,16 +170,16 @@ public class ViewRef extends InlineViewRef {
 
   @Override
   public String getAlias() {
-    if (origTblRef == null) return alias;
-    return origTblRef.getAlias().toLowerCase();
+    if (origTblRef_ == null) return alias_;
+    return origTblRef_.getAlias().toLowerCase();
   }
 
   @Override
-  public TableName getAliasAsName() { return new TableName(null, alias); }
+  public TableName getAliasAsName() { return new TableName(null, alias_); }
 
   /**
    * Returns true if this refers to a view registered in the catalog.
    * Returns false for views from a WITH clause.
    */
-  public boolean isCatalogView() { return table != null; }
+  public boolean isCatalogView() { return table_ != null; }
 }

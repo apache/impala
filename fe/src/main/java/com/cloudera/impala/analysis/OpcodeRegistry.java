@@ -49,9 +49,8 @@ import com.google.common.collect.Sets;
  * TODO: The opcode registry should be versioned in the FE/BE.
  */
 public class OpcodeRegistry {
-
   private final static Logger LOG = LoggerFactory.getLogger(OpcodeRegistry.class);
-  private static OpcodeRegistry instance = new OpcodeRegistry();
+  private final static OpcodeRegistry INSTANCE = new OpcodeRegistry();
 
   /**
    * Contains all the information about a builtin function.
@@ -119,9 +118,7 @@ public class OpcodeRegistry {
   private final HashMap<String, FunctionOperator> functionNameMap;
 
   // Singleton interface
-  public static OpcodeRegistry instance() {
-    return instance;
-  }
+  public static OpcodeRegistry instance() { return INSTANCE; }
 
   /**
    * Static utility functions

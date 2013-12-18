@@ -31,24 +31,22 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class StringLiteral extends LiteralExpr {
-  private final String value;
+  private final String value_;
 
   public StringLiteral(String value) {
-    this.value = value;
-    type = PrimitiveType.STRING;
+    this.value_ = value;
+    type_ = PrimitiveType.STRING;
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
-    return ((StringLiteral) obj).value.equals(value);
+    if (!super.equals(obj)) return false;
+    return ((StringLiteral) obj).value_.equals(value_);
   }
 
   @Override
   public String toSqlImpl() {
-    return "'" + value + "'";
+    return "'" + value_ + "'";
   }
 
   @Override
@@ -57,33 +55,31 @@ public class StringLiteral extends LiteralExpr {
     msg.string_literal = new TStringLiteral(getUnescapedValue());
   }
 
-  public String getValue() {
-    return value;
-  }
+  public String getValue() { return value_; }
 
   public String getUnescapedValue() {
     // Unescape string exactly like Hive does. Hive's method assumes
     // quotes so we add them here to reuse Hive's code.
-    return BaseSemanticAnalyzer.unescapeSQLString("'" + value + "'");
+    return BaseSemanticAnalyzer.unescapeSQLString("'" + value_ + "'");
   }
 
   @Override
   public String getStringValue() {
-    return value;
+    return value_;
   }
 
   @Override
   public String debugString() {
     return Objects.toStringHelper(this)
-        .add("value", value)
+        .add("value", value_)
         .toString();
   }
 
   @Override
   protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType() || targetType.isDateType()
-        || targetType == this.type);
-    if (targetType == this.type) {
+        || targetType == this.type_);
+    if (targetType == this.type_) {
       return this;
     } else if (targetType.isNumericType()) {
       return convertToNumber();
@@ -105,7 +101,7 @@ public class StringLiteral extends LiteralExpr {
    */
   public LiteralExpr convertToNumber()
       throws AnalysisException {
-    StringReader reader = new StringReader(value);
+    StringReader reader = new StringReader(value_);
     SqlScanner scanner = new SqlScanner(reader);
     // For distinguishing positive and negative numbers.
     double multiplier = 1;
@@ -124,7 +120,7 @@ public class StringLiteral extends LiteralExpr {
       throw new AnalysisException("Failed to convert string literal to number.", e);
     }
     if (sym.sym == SqlParserSymbols.NUMERIC_OVERFLOW) {
-      throw new AnalysisException("Number too large: " + value);
+      throw new AnalysisException("Number too large: " + value_);
     }
     if (sym.sym == SqlParserSymbols.INTEGER_LITERAL) {
       Long val = (Long) sym.value;
@@ -135,7 +131,7 @@ public class StringLiteral extends LiteralExpr {
     }
     // Symbol is not an integer or floating point literal.
     throw new AnalysisException(
-        "Failed to convert string literal '" + value + "' to number.");
+        "Failed to convert string literal '" + value_ + "' to number.");
   }
 
 
@@ -151,7 +147,7 @@ public class StringLiteral extends LiteralExpr {
   private LiteralExpr convertToDate(PrimitiveType targetType)
       throws AnalysisException {
     LiteralExpr newLiteral = null;
-    newLiteral = new DateLiteral(value, targetType);
+    newLiteral = new DateLiteral(value_, targetType);
     return newLiteral;
   }
 
@@ -159,6 +155,6 @@ public class StringLiteral extends LiteralExpr {
   public int compareTo(LiteralExpr o) {
     if (!(o instanceof StringLiteral)) return -1;
     StringLiteral other = (StringLiteral) o;
-    return value.compareTo(other.getStringValue());
+    return value_.compareTo(other.getStringValue());
   }
 }

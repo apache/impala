@@ -24,21 +24,16 @@ package com.cloudera.impala.common;
  *   <do something with ref.getRef()>;
  */
 public class Reference<RefType> {
-  protected RefType ref;
+  protected RefType ref_;
 
   public Reference(RefType ref) {
-    this.ref = ref;
+    this.ref_ = ref;
   }
 
   public Reference() {
-    this.ref = null;
+    this.ref_ = null;
   }
 
-  public RefType getRef() {
-    return ref;
-  }
-
-  public void setRef(RefType ref) {
-    this.ref = ref;
-  }
+  public RefType getRef() { return ref_; }
+  public void setRef(RefType ref) { this.ref_ = ref; }
 }

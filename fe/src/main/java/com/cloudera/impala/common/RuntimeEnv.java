@@ -22,7 +22,7 @@ package com.cloudera.impala.common;
 public class RuntimeEnv {
   public static RuntimeEnv INSTANCE = new RuntimeEnv();
 
-  private int numCores;
+  private int numCores_;
 
   public RuntimeEnv() {
     reset();
@@ -32,9 +32,9 @@ public class RuntimeEnv {
    * Resets this RuntimeEnv back to its machine-dependent state.
    */
   public void reset() {
-    numCores = Runtime.getRuntime().availableProcessors();
+    numCores_ = Runtime.getRuntime().availableProcessors();
   }
 
-  public int getNumCores() { return numCores; }
-  public void setNumCores(int numCores) { this.numCores = numCores; }
+  public int getNumCores() { return numCores_; }
+  public void setNumCores(int numCores) { this.numCores_ = numCores; }
 }

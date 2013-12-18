@@ -32,95 +32,95 @@ import com.google.common.base.Preconditions;
 public class SlotRef extends Expr {
   private final static Logger LOG = LoggerFactory.getLogger(SlotRef.class);
 
-  private final TableName tblName;
-  private final String col;
-  private final String label;  // printed in toSql()
+  private final TableName tblName_;
+  private final String col_;
+  private final String label_;  // printed in toSql()
 
   // results of analysis
-  private SlotDescriptor desc;
+  private SlotDescriptor desc_;
 
   public SlotDescriptor getDesc() {
-    Preconditions.checkState(isAnalyzed);
-    Preconditions.checkNotNull(desc);
-    return desc;
+    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkNotNull(desc_);
+    return desc_;
   }
 
   public SlotId getSlotId() {
-    Preconditions.checkState(isAnalyzed);
-    Preconditions.checkNotNull(desc);
-    return desc.getId();
+    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkNotNull(desc_);
+    return desc_.getId();
   }
 
   public SlotRef(TableName tblName, String col) {
     super();
-    this.tblName = tblName;
-    this.col = col;
-    this.label = ToSqlUtils.getHiveIdentSql(col);
+    this.tblName_ = tblName;
+    this.col_ = col;
+    this.label_ = ToSqlUtils.getHiveIdentSql(col);
   }
 
   // C'tor for a "pre-analyzed" ref to a slot
   public SlotRef(SlotDescriptor desc) {
     super();
-    this.tblName = null;
+    this.tblName_ = null;
     if (desc.getColumn() != null) {
-      this.col = desc.getColumn().getName();
+      this.col_ = desc.getColumn().getName();
     } else {
-      this.col = null;
+      this.col_ = null;
     }
-    this.isAnalyzed = true;
-    this.desc = desc;
-    this.type = desc.getType();
+    this.isAnalyzed_ = true;
+    this.desc_ = desc;
+    this.type_ = desc.getType();
     String alias = desc.getParent().getAlias();
     //this.label =  desc.getLabel();
     // TODO: should this simply be the SlotDescriptor's label?
-    this.label = (alias != null ? alias + "." : "") + desc.getLabel();
-    this.numDistinctValues = desc.getStats().getNumDistinctValues();
+    this.label_ = (alias != null ? alias + "." : "") + desc.getLabel();
+    this.numDistinctValues_ = desc.getStats().getNumDistinctValues();
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
-    desc = analyzer.registerColumnRef(tblName, col);
-    type = desc.getType();
-    if (!type.isSupported()) {
+    desc_ = analyzer.registerColumnRef(tblName_, col_);
+    type_ = desc_.getType();
+    if (!type_.isSupported()) {
       throw new AnalysisException("Unsupported type '"
-          + type.toString() + "' in '" + toSql() + "'.");
+          + type_.toString() + "' in '" + toSql() + "'.");
     }
-    numDistinctValues = desc.getStats().getNumDistinctValues();
-    if (type == PrimitiveType.BOOLEAN) selectivity = defaultSelectivity;
+    numDistinctValues_ = desc_.getStats().getNumDistinctValues();
+    if (type_ == PrimitiveType.BOOLEAN) selectivity_ = DEFAULT_SELECTIVITY;
   }
 
   @Override
   public String toSqlImpl() {
-    if (tblName != null) {
-      Preconditions.checkNotNull(label);
-      return tblName.toSql() + "." + label;
-    } else if (label == null) {
-      return "<slot " + Integer.toString(desc.getId().asInt()) + ">";
+    if (tblName_ != null) {
+      Preconditions.checkNotNull(label_);
+      return tblName_.toSql() + "." + label_;
+    } else if (label_ == null) {
+      return "<slot " + Integer.toString(desc_.getId().asInt()) + ">";
     } else {
-      return label;
+      return label_;
     }
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.SLOT_REF;
-    msg.slot_ref = new TSlotRef(desc.getId().asInt());
+    msg.slot_ref = new TSlotRef(desc_.getId().asInt());
     // we shouldn't be sending exprs over non-materialized slots
-    Preconditions.checkState(desc.isMaterialized());
+    Preconditions.checkState(desc_.isMaterialized());
     // we also shouldn't have forgotten to compute the mem layout
-    Preconditions.checkState(desc.getByteOffset() != -1);
+    Preconditions.checkState(desc_.getByteOffset() != -1);
   }
 
   @Override
   public String debugString() {
     Objects.ToStringHelper toStrHelper = Objects.toStringHelper(this);
-    String tblNameStr = (tblName == null ? "null" : tblName.toString());
+    String tblNameStr = (tblName_ == null ? "null" : tblName_.toString());
     toStrHelper.add("tblName", tblNameStr);
-    toStrHelper.add("col", col);
-    String idStr = (desc == null ? "null" : Integer.toString(desc.getId().asInt()));
+    toStrHelper.add("col", col_);
+    String idStr = (desc_ == null ? "null" : Integer.toString(desc_.getId().asInt()));
     toStrHelper.add("id", idStr);
     return toStrHelper.toString();
   }
@@ -131,40 +131,40 @@ public class SlotRef extends Expr {
     SlotRef other = (SlotRef) obj;
     // check slot ids first; if they're both set we only need to compare those
     // (regardless of how the ref was constructed)
-    if (desc != null && other.desc != null) {
-      return desc.getId().equals(other.desc.getId());
+    if (desc_ != null && other.desc_ != null) {
+      return desc_.getId().equals(other.desc_.getId());
     }
-    if ((tblName == null) != (other.tblName == null)) return false;
-    if (tblName != null && !tblName.equals(other.tblName)) return false;
-    if ((col == null) != (other.col == null)) return false;
-    if (col != null && !col.toLowerCase().equals(other.col.toLowerCase())) return false;
+    if ((tblName_ == null) != (other.tblName_ == null)) return false;
+    if (tblName_ != null && !tblName_.equals(other.tblName_)) return false;
+    if ((col_ == null) != (other.col_ == null)) return false;
+    if (col_ != null && !col_.toLowerCase().equals(other.col_.toLowerCase())) return false;
     return true;
   }
 
   @Override
   public boolean isBoundByTupleIds(List<TupleId> tids) {
-    Preconditions.checkState(desc != null);
+    Preconditions.checkState(desc_ != null);
     for (TupleId tid: tids) {
-      if (tid.equals(desc.getParent().getId())) return true;
+      if (tid.equals(desc_.getParent().getId())) return true;
     }
     return false;
   }
 
   @Override
   public boolean isBoundBySlotIds(List<SlotId> slotIds) {
-    Preconditions.checkState(isAnalyzed);
-    return slotIds.contains(desc.getId());
+    Preconditions.checkState(isAnalyzed_);
+    return slotIds.contains(desc_.getId());
   }
 
   @Override
   public void getIdsHelper(Set<TupleId> tupleIds, Set<SlotId> slotIds) {
-    Preconditions.checkState(type != PrimitiveType.INVALID_TYPE);
-    Preconditions.checkState(desc != null);
-    if (slotIds != null) slotIds.add(desc.getId());
-    if (tupleIds != null) tupleIds.add(desc.getParent().getId());
+    Preconditions.checkState(type_ != PrimitiveType.INVALID_TYPE);
+    Preconditions.checkState(desc_ != null);
+    if (slotIds != null) slotIds.add(desc_.getId());
+    if (tupleIds != null) tupleIds.add(desc_.getParent().getId());
   }
 
   public String getColumnName() {
-    return col;
+    return col_;
   }
 }

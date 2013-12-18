@@ -32,44 +32,44 @@ import com.google.common.collect.Sets;
  *
  */
 public class DescriptorTable {
-  private final HashMap<TupleId, TupleDescriptor> tupleDescs;
-  private final HashMap<SlotId, SlotDescriptor> slotDescs;
+  private final HashMap<TupleId, TupleDescriptor> tupleDescs_;
+  private final HashMap<SlotId, SlotDescriptor> slotDescs_;
   // List of referenced tables with no associated TupleDescriptor to ship to the BE.
   // For example, the output table of an insert query.
-  private final List<Table> referencedTables;
-  private int nextTupleId;
-  private int nextSlotId;
+  private final List<Table> referencedTables_;
+  private int nextTupleId_;
+  private int nextSlotId_;
 
   public DescriptorTable() {
-    tupleDescs = new HashMap<TupleId, TupleDescriptor>();
-    slotDescs = new HashMap<SlotId, SlotDescriptor>();
-    referencedTables = new ArrayList<Table>();
-    nextTupleId = 0;
-    nextSlotId = 0;
+    tupleDescs_ = new HashMap<TupleId, TupleDescriptor>();
+    slotDescs_ = new HashMap<SlotId, SlotDescriptor>();
+    referencedTables_ = new ArrayList<Table>();
+    nextTupleId_ = 0;
+    nextSlotId_ = 0;
   }
 
   public TupleDescriptor createTupleDescriptor() {
-    TupleDescriptor d = new TupleDescriptor(nextTupleId++);
-    tupleDescs.put(d.getId(), d);
+    TupleDescriptor d = new TupleDescriptor(nextTupleId_++);
+    tupleDescs_.put(d.getId(), d);
     return d;
   }
 
   public SlotDescriptor addSlotDescriptor(TupleDescriptor d) {
-    SlotDescriptor result = new SlotDescriptor(nextSlotId++, d);
+    SlotDescriptor result = new SlotDescriptor(nextSlotId_++, d);
     d.addSlot(result);
-    slotDescs.put(result.getId(), result);
+    slotDescs_.put(result.getId(), result);
     return result;
   }
 
-  public TupleDescriptor getTupleDesc(TupleId id) { return tupleDescs.get(id); }
-  public SlotDescriptor getSlotDesc(SlotId id) { return slotDescs.get(id); }
-  public Collection<TupleDescriptor> getTupleDescs() { return tupleDescs.values(); }
-  public Collection<SlotDescriptor> getSlotDescs() { return slotDescs.values(); }
-  public TupleId getMaxTupleId() { return new TupleId(nextTupleId - 1); }
-  public SlotId getMaxSlotId() { return new SlotId(nextSlotId - 1); }
+  public TupleDescriptor getTupleDesc(TupleId id) { return tupleDescs_.get(id); }
+  public SlotDescriptor getSlotDesc(SlotId id) { return slotDescs_.get(id); }
+  public Collection<TupleDescriptor> getTupleDescs() { return tupleDescs_.values(); }
+  public Collection<SlotDescriptor> getSlotDescs() { return slotDescs_.values(); }
+  public TupleId getMaxTupleId() { return new TupleId(nextTupleId_ - 1); }
+  public SlotId getMaxSlotId() { return new SlotId(nextSlotId_ - 1); }
 
   public void addReferencedTable(Table table) {
-    referencedTables.add(table);
+    referencedTables_.add(table);
   }
 
   /**
@@ -96,7 +96,7 @@ public class DescriptorTable {
   // Call this only after the last descriptor was added.
   // Test-only.
   public void computeMemLayout() {
-    for (TupleDescriptor d: tupleDescs.values()) {
+    for (TupleDescriptor d: tupleDescs_.values()) {
       d.computeMemLayout();
     }
   }
@@ -104,7 +104,7 @@ public class DescriptorTable {
   public TDescriptorTable toThrift() {
     TDescriptorTable result = new TDescriptorTable();
     HashSet<Table> referencedTbls = Sets.newHashSet();
-    for (TupleDescriptor tupleD: tupleDescs.values()) {
+    for (TupleDescriptor tupleD: tupleDescs_.values()) {
       // inline view of a non-constant select has a non-materialized tuple descriptor
       // in the descriptor table just for type checking, which we need to skip
       if (tupleD.getIsMaterialized()) {
@@ -120,7 +120,7 @@ public class DescriptorTable {
         }
       }
     }
-    for (Table table: referencedTables) {
+    for (Table table: referencedTables_) {
       referencedTbls.add(table);
     }
     for (Table tbl: referencedTbls) {
@@ -132,7 +132,7 @@ public class DescriptorTable {
   public String debugString() {
     StringBuilder out = new StringBuilder();
     out.append("tuples:\n");
-    for (TupleDescriptor desc: tupleDescs.values()) {
+    for (TupleDescriptor desc: tupleDescs_.values()) {
       out.append(desc.debugString() + "\n");
     }
     return out.toString();

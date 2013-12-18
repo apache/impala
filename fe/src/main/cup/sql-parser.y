@@ -331,7 +331,7 @@ nonterminal THdfsFileFormat file_format_create_table_val;
 nonterminal Boolean if_exists_val;
 nonterminal Boolean if_not_exists_val;
 nonterminal Boolean replace_existing_cols_val;
-nonterminal HdfsURI location_val;
+nonterminal HdfsUri location_val;
 nonterminal RowFormat row_format_val;
 nonterminal String field_terminator_val;
 nonterminal String line_terminator_val;
@@ -447,7 +447,7 @@ stmt ::=
 load_stmt ::=
   KW_LOAD KW_DATA KW_INPATH STRING_LITERAL:path overwrite_val:overwrite KW_INTO KW_TABLE
   table_name:table partition_spec:partition
-  {: RESULT = new LoadDataStmt(table, new HdfsURI(path), overwrite, partition); :}
+  {: RESULT = new LoadDataStmt(table, new HdfsUri(path), overwrite, partition); :}
   ;
 
 overwrite_val ::=
@@ -541,7 +541,7 @@ alter_tbl_stmt ::=
   {: RESULT = new AlterTableSetFileFormatStmt(table, partition, file_format); :}
   | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET
     KW_LOCATION STRING_LITERAL:location
-  {: RESULT = new AlterTableSetLocationStmt(table, partition, new HdfsURI(location)); :}
+  {: RESULT = new AlterTableSetLocationStmt(table, partition, new HdfsUri(location)); :}
   | KW_ALTER KW_TABLE table_name:table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableOrViewRenameStmt(table, new_table, true); :}
   | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET
@@ -626,7 +626,7 @@ create_udf_stmt ::=
   KW_LOCATION STRING_LITERAL:binary_path
   create_function_args_map:arg_map
   {:
-    RESULT = new CreateUdfStmt(fn_name, fn_args, return_type, new HdfsURI(binary_path),
+    RESULT = new CreateUdfStmt(fn_name, fn_args, return_type, new HdfsUri(binary_path),
         if_not_exists, arg_map);
   :}
   ;
@@ -640,7 +640,7 @@ create_uda_stmt ::=
   create_function_args_map:arg_map
   {:
     RESULT = new CreateUdaStmt(fn_name, fn_args, return_type, intermediate_type,
-        new HdfsURI(binary_path), if_not_exists, arg_map);
+        new HdfsUri(binary_path), if_not_exists, arg_map);
   :}
   ;
 
@@ -653,7 +653,7 @@ comment_val ::=
 
 location_val ::=
   KW_LOCATION STRING_LITERAL:location
-  {: RESULT = new HdfsURI(location); :}
+  {: RESULT = new HdfsUri(location); :}
   | /* empty */
   {: RESULT = null; :}
   ;

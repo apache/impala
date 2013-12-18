@@ -26,30 +26,25 @@ import com.cloudera.impala.thrift.TDropDbParams;
  * Represents a DROP [IF EXISTS] DATABASE statement
  */
 public class DropDbStmt extends StatementBase {
-  private final String dbName;
-  private final boolean ifExists;
+  private final String dbName_;
+  private final boolean ifExists_;
 
   /**
    * Constructor for building the drop statement. If ifExists is true, an error will not
    * be thrown if the database does not exist.
    */
   public DropDbStmt(String dbName, boolean ifExists) {
-    this.dbName = dbName;
-    this.ifExists = ifExists;
+    this.dbName_ = dbName;
+    this.ifExists_ = ifExists;
   }
 
-  public String getDb() {
-    return dbName;
-  }
-
-  public boolean getIfExists() {
-    return ifExists;
-  }
+  public String getDb() { return dbName_; }
+  public boolean getIfExists() { return ifExists_; }
 
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("DROP DATABASE");
-    if (ifExists) {
+    if (ifExists_) {
       sb.append(" IF EXISTS ");
     }
     sb.append(getDb());
@@ -66,18 +61,18 @@ public class DropDbStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    Db db = analyzer.getCatalog().getDb(dbName, analyzer.getUser(), Privilege.DROP);
-    if (db == null && !ifExists) {
-      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    Db db = analyzer.getCatalog().getDb(dbName_, analyzer.getUser(), Privilege.DROP);
+    if (db == null && !ifExists_) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName_);
     }
-    analyzer.addAccessEvent(new TAccessEvent(dbName,
+    analyzer.addAccessEvent(new TAccessEvent(dbName_,
         TCatalogObjectType.DATABASE, Privilege.DROP.toString()));
 
-    if (analyzer.getDefaultDb().toLowerCase().equals(dbName.toLowerCase())) {
-      throw new AnalysisException("Cannot drop current default database: " + dbName);
+    if (analyzer.getDefaultDb().toLowerCase().equals(dbName_.toLowerCase())) {
+      throw new AnalysisException("Cannot drop current default database: " + dbName_);
     }
     if (db != null && db.numFunctions() > 0) {
-      throw new AnalysisException("Cannot drop non-empty database: " + dbName);
+      throw new AnalysisException("Cannot drop non-empty database: " + dbName_);
     }
   }
 }

@@ -30,7 +30,7 @@ import com.cloudera.impala.thrift.TShowDbsParams;
  */
 public class ShowDbsStmt extends StatementBase {
   // Pattern to match tables against. | denotes choice, * matches all strings
-  private final String pattern;
+  private final String pattern_;
 
   /**
    * Default constructor, which creates a show statement which returns all
@@ -45,19 +45,17 @@ public class ShowDbsStmt extends StatementBase {
    * supplied pattern.
    */
   public ShowDbsStmt(String pattern) {
-    this.pattern = pattern;
+    this.pattern_ = pattern;
   }
 
-  public String getPattern() {
-    return pattern;
-  }
+  public String getPattern() { return pattern_; }
 
   @Override
   public String toSql() {
-    if (pattern == null) {
-        return "SHOW DATABASES";
+    if (pattern_ == null) {
+      return "SHOW DATABASES";
     } else {
-        return "SHOW DATABASES LIKE '" + pattern + "'";
+      return "SHOW DATABASES LIKE '" + pattern_ + "'";
     }
   }
 

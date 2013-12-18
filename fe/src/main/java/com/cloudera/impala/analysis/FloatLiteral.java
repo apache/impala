@@ -24,17 +24,18 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class FloatLiteral extends LiteralExpr {
-  private double value;
+  private double value_;
 
   private void init(Double value) {
-    this.value = value.doubleValue();
+    this.value_ = value.doubleValue();
     // Figure out if this will fit in a FLOAT without loosing precision.
     float fvalue;
     fvalue = value.floatValue();
-    if (fvalue == value.doubleValue())
-      type = PrimitiveType.FLOAT;
-    else
-      type = PrimitiveType.DOUBLE;
+    if (fvalue == value.doubleValue()) {
+      type_ = PrimitiveType.FLOAT;
+    } else {
+      type_ = PrimitiveType.DOUBLE;
+    }
   }
 
   public FloatLiteral(Double value) {
@@ -45,8 +46,8 @@ public class FloatLiteral extends LiteralExpr {
    * C'tor forcing type, e.g., due to implicit cast
    */
   public FloatLiteral(Double value, PrimitiveType type) {
-    this.value = value.doubleValue();
-    this.type = type;
+    this.value_ = value.doubleValue();
+    this.type_ = type;
   }
 
   public FloatLiteral(String value) throws AnalysisException {
@@ -62,16 +63,14 @@ public class FloatLiteral extends LiteralExpr {
   @Override
   public String debugString() {
     return Objects.toStringHelper(this)
-        .add("value", value)
+        .add("value", value_)
         .toString();
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
-    return ((FloatLiteral) obj).value == value;
+    if (!super.equals(obj)) return false;
+    return ((FloatLiteral) obj).value_ == value_;
   }
 
   @Override
@@ -81,38 +80,38 @@ public class FloatLiteral extends LiteralExpr {
 
   @Override
   public String getStringValue() {
-    return Double.toString(value);
+    return Double.toString(value_);
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.FLOAT_LITERAL;
-    msg.float_literal = new TFloatLiteral(value);
+    msg.float_literal = new TFloatLiteral(value_);
   }
 
   public double getValue() {
-    return value;
+    return value_;
   }
 
   @Override
   protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isFloatingPointType());
-    type = targetType;
+    type_ = targetType;
     return this;
   }
 
   @Override
   public void swapSign() throws NotImplementedException {
     // swapping sign does not change the type
-    value = -value;
+    value_ = -value_;
   }
 
   @Override
   public int compareTo(LiteralExpr o) {
     if (!(o instanceof FloatLiteral)) return -1;
     FloatLiteral other = (FloatLiteral) o;
-    if (value > other.getValue()) return 1;
-    if (value < other.getValue()) return -1;
+    if (value_ > other.getValue()) return 1;
+    if (value_ < other.getValue()) return -1;
     return 0;
   }
 }

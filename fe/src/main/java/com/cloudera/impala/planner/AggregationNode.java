@@ -62,7 +62,7 @@ public class AggregationNode extends PlanNode {
   public AggregationNode(PlanNodeId id, PlanNode input, AggregateInfo aggInfo) {
     super(id, aggInfo.getAggTupleId().asList(), "AGGREGATE");
     aggInfo_ = aggInfo;
-    children.add(input);
+    children_.add(input);
     needsFinalize_ = true;
     updateDisplayName();
   }
@@ -77,8 +77,7 @@ public class AggregationNode extends PlanNode {
     updateDisplayName();
   }
 
-  @Override
-  public void setCompactData(boolean on) { this.compactData_ = on; }
+  public void setCompactData(boolean on) { compactData_ = on; }
 
   @Override
   public boolean isBlockingNode() { return true; }
@@ -169,7 +168,7 @@ public class AggregationNode extends PlanNode {
   @Override
   protected String debugString() {
     return Objects.toStringHelper(this)
-        .add("aggInfo_", aggInfo_.debugString())
+        .add("aggInfo", aggInfo_.debugString())
         .addValue(super.debugString())
         .toString();
   }
@@ -220,7 +219,7 @@ public class AggregationNode extends PlanNode {
   @Override
   public void computeCosts(TQueryOptions queryOptions) {
     Preconditions.checkNotNull(fragment_,
-        "PlanNode must be placed into a fragment_ before calling this method.");
+        "PlanNode must be placed into a fragment before calling this method.");
     perHostMemCost_ = 0;
     long perHostCardinality = fragment_.getNumDistinctValues(aggInfo_.getGroupingExprs());
     if (perHostCardinality == -1) {

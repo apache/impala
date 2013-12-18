@@ -27,20 +27,18 @@ import com.google.common.base.Preconditions;
  * Base class for all ALTER TABLE statements.
  */
 public abstract class AlterTableStmt extends StatementBase {
-  protected final TableName tableName;
+  protected final TableName tableName_;
 
   // Set during analysis.
-  protected Table table;
+  protected Table table_;
 
   protected AlterTableStmt(TableName tableName) {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
-    this.tableName = tableName;
-    this.table = null;
+    tableName_ = tableName;
+    table_ = null;
   }
 
-  public String getTbl() {
-    return tableName.getTbl();
-  }
+  public String getTbl() { return tableName_.getTbl(); }
 
   /**
    * Can only be called after analysis, returns the parent database name of the target
@@ -55,8 +53,8 @@ public abstract class AlterTableStmt extends StatementBase {
    * ALTER TABLE statement.
    */
   protected Table getTargetTable() {
-    Preconditions.checkNotNull(table);
-    return table;
+    Preconditions.checkNotNull(table_);
+    return table_;
   }
 
   public TAlterTableParams toThrift() {
@@ -68,10 +66,10 @@ public abstract class AlterTableStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    table = analyzer.getTable(tableName, Privilege.ALTER);
-    if (table instanceof View) {
+    table_ = analyzer.getTable(tableName_, Privilege.ALTER);
+    if (table_ instanceof View) {
       throw new AnalysisException(String.format(
-          "ALTER TABLE not allowed on a view: %s", table.getFullName()));
+          "ALTER TABLE not allowed on a view: %s", table_.getFullName()));
     }
   }
 }

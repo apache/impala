@@ -33,8 +33,8 @@ import com.google.common.base.Preconditions;
 public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr> {
 
   public LiteralExpr() {
-    numDistinctValues = 1;
-    isAnalyzed = true;
+    numDistinctValues_ = 1;
+    isAnalyzed_ = true;
   }
 
   public static LiteralExpr create(String value, PrimitiveType type)

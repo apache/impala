@@ -27,28 +27,28 @@ import com.google.common.base.Preconditions;
  */
 public class ResetMetadataStmt extends StatementBase {
   // Updated during analysis. Null if invalidating the entire catalog.
-  private TableName tableName;
+  private TableName tableName_;
 
   // true if it is a REFRESH statement.
-  private final boolean isRefresh;
+  private final boolean isRefresh_;
 
   public ResetMetadataStmt(TableName name, boolean isRefresh) {
     Preconditions.checkArgument(!isRefresh || name != null);
-    this.tableName = name;
-    this.isRefresh = isRefresh;
+    this.tableName_ = name;
+    this.isRefresh_ = isRefresh;
   }
 
-  public TableName getTableName() { return tableName; }
-  public boolean isRefresh() { return isRefresh; }
+  public TableName getTableName() { return tableName_; }
+  public boolean isRefresh() { return isRefresh_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (tableName != null) {
-      String dbName = analyzer.getTargetDbName(tableName);
-      tableName = new TableName(dbName, tableName.getTbl());
-      if (!analyzer.dbContainsTable(dbName, tableName.getTbl(), Privilege.ANY)) {
-        throw new AnalysisException(Analyzer.TBL_DOES_NOT_EXIST_ERROR_MSG + tableName);
+    if (tableName_ != null) {
+      String dbName = analyzer.getTargetDbName(tableName_);
+      tableName_ = new TableName(dbName, tableName_.getTbl());
+      if (!analyzer.dbContainsTable(dbName, tableName_.getTbl(), Privilege.ANY)) {
+        throw new AnalysisException(Analyzer.TBL_DOES_NOT_EXIST_ERROR_MSG + tableName_);
       }
     } else {
       PrivilegeRequest privilegeRequest = new PrivilegeRequest(Privilege.ALL);
@@ -59,21 +59,21 @@ public class ResetMetadataStmt extends StatementBase {
   @Override
   public String toSql() {
     StringBuilder result = new StringBuilder();
-    if (isRefresh) {
+    if (isRefresh_) {
       result.append("INVALIDATE METADATA");
     } else {
       result.append("REFRESH");
     }
 
-    if (tableName != null) result.append(" ").append(tableName);
+    if (tableName_ != null) result.append(" ").append(tableName_);
     return result.toString();
   }
 
   public TResetMetadataRequest toThrift() {
     TResetMetadataRequest  params = new TResetMetadataRequest();
-    params.setIs_refresh(isRefresh);
-    if (tableName != null) {
-      params.setTable_name(new TTableName(tableName.getDb(), tableName.getTbl()));
+    params.setIs_refresh(isRefresh_);
+    if (tableName_ != null) {
+      params.setTable_name(new TTableName(tableName_.getDb(), tableName_.getTbl()));
     }
     return params;
   }

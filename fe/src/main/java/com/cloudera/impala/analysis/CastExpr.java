@@ -26,39 +26,40 @@ import com.google.common.base.Preconditions;
 
 public class CastExpr extends Expr {
 
-  private final PrimitiveType targetType;
-  /** true if this is a "pre-analyzed" implicit cast */
-  private final boolean isImplicit;
+  private final PrimitiveType targetType_;
+
+  // true if this is a "pre-analyzed" implicit cast
+  private final boolean isImplicit_;
 
   // True if this cast does not change the type.
-  private boolean noOp = false;
+  private boolean noOp_ = false;
 
   public CastExpr(PrimitiveType targetType, Expr e, boolean isImplicit) {
     super();
     Preconditions.checkArgument(targetType != PrimitiveType.INVALID_TYPE);
-    this.targetType = targetType;
-    this.isImplicit = isImplicit;
+    this.targetType_ = targetType;
+    this.isImplicit_ = isImplicit;
     Preconditions.checkNotNull(e);
-    children.add(e);
+    children_.add(e);
     if (isImplicit) {
-      type = targetType;
+      type_ = targetType;
       OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
-          FunctionOperator.CAST, true, getChild(0).getType(), type);
+          FunctionOperator.CAST, true, getChild(0).getType(), type_);
       Preconditions.checkState(match != null);
-      Preconditions.checkState(match.getReturnType() == type);
-      this.opcode = match.opcode;
+      Preconditions.checkState(match.getReturnType() == type_);
+      this.opcode_ = match.opcode;
     }
   }
 
   @Override
   public String toSqlImpl() {
-    if (isImplicit) return getChild(0).toSql();
-    return "CAST(" + getChild(0).toSql() + " AS " + targetType.toString() + ")";
+    if (isImplicit_) return getChild(0).toSql();
+    return "CAST(" + getChild(0).toSql() + " AS " + targetType_.toString() + ")";
   }
 
   @Override
   protected void treeToThriftHelper(TExpr container) {
-    if (noOp) {
+    if (noOp_) {
       getChild(0).treeToThriftHelper(container);
       return;
     }
@@ -68,54 +69,54 @@ public class CastExpr extends Expr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.CAST_EXPR;
-    msg.setOpcode(opcode);
+    msg.setOpcode(opcode_);
   }
 
   @Override
   public String debugString() {
     return Objects.toStringHelper(this)
-        .add("isImplicit", isImplicit)
-        .add("target", targetType)
+        .add("isImplicit", isImplicit_)
+        .add("target", targetType_)
         .addValue(super.debugString())
         .toString();
   }
 
-  public boolean isImplicit() { return isImplicit; }
+  public boolean isImplicit() { return isImplicit_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
 
-    if (isImplicit) return;
+    if (isImplicit_) return;
 
     // cast was asked for in the query, check for validity of cast
     PrimitiveType childType = getChild(0).getType();
 
     // this cast may result in loss of precision, but the user requested it
-    this.type = targetType;
+    this.type_ = targetType_;
 
-    if (childType.equals(targetType)) {
-      noOp = true;
+    if (childType.equals(targetType_)) {
+      noOp_ = true;
       return;
     }
 
     OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
-        FunctionOperator.CAST, childType.isNull(), getChild(0).getType(), type);
+        FunctionOperator.CAST, childType.isNull(), getChild(0).getType(), type_);
     if (match == null) {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
-          " from " + childType + " to " + targetType);
+          " from " + childType + " to " + targetType_);
     }
-    Preconditions.checkState(match.getReturnType() == targetType);
-    this.opcode = match.opcode;
+    Preconditions.checkState(match.getReturnType() == targetType_);
+    this.opcode_ = match.opcode;
   }
 
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) return false;
     CastExpr expr = (CastExpr) obj;
-    return this.opcode == expr.opcode;
+    return this.opcode_ == expr.opcode_;
   }
 
   /**
@@ -123,7 +124,7 @@ public class CastExpr extends Expr {
    */
   @Override
   public Expr ignoreImplicitCast() {
-    if (isImplicit) {
+    if (isImplicit_) {
       // we don't expect to see to consecutive implicit casts
       Preconditions.checkState(
           !(getChild(0) instanceof CastExpr) || !((CastExpr) getChild(0)).isImplicit());

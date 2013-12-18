@@ -29,15 +29,15 @@ import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
 
 class DateLiteral extends LiteralExpr {
-  private static final List<SimpleDateFormat> formats =
+  private static final List<SimpleDateFormat> formats_ =
       new ArrayList<SimpleDateFormat>();
   static {
-    formats.add(new SimpleDateFormat("yyyy-MM-dd"));
-    formats.add(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss"));
-    formats.add(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS"));
+    formats_.add(new SimpleDateFormat("yyyy-MM-dd"));
+    formats_.add(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss"));
+    formats_.add(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS"));
   }
-  private SimpleDateFormat acceptedFormat = null;
-  private final Timestamp value;
+  private SimpleDateFormat acceptedFormat_ = null;
+  private final Timestamp value_;
 
   /**
    * C'tor takes string because a DateLiteral
@@ -53,19 +53,19 @@ class DateLiteral extends LiteralExpr {
     Preconditions.checkArgument(type.isDateType());
     Date date = null;
     ParsePosition pos = new ParsePosition(0);
-    for (SimpleDateFormat format : formats) {
+    for (SimpleDateFormat format : formats_) {
       pos.setIndex(0);
       date = format.parse(s, pos);
       if (pos.getIndex() == s.length()) {
-        acceptedFormat = format;
+        acceptedFormat_ = format;
         break;
       }
     }
-    if (acceptedFormat == null) {
+    if (acceptedFormat_ == null) {
       throw new AnalysisException("Unable to parse string '" + s + "' to date.");
     }
-    this.value = new Timestamp(date.getTime());
-    this.type = type;
+    this.value_ = new Timestamp(date.getTime());
+    this.type_ = type;
   }
 
   @Override
@@ -76,7 +76,7 @@ class DateLiteral extends LiteralExpr {
     // dateFormat does not need to be compared
     // because dates originating from strings of different formats
     // are still comparable
-    return ((DateLiteral) obj).value == value;
+    return ((DateLiteral) obj).value_ == value_;
   }
 
   @Override
@@ -86,18 +86,16 @@ class DateLiteral extends LiteralExpr {
 
   @Override
   public String getStringValue() {
-    return acceptedFormat.format(value);
+    return acceptedFormat_.format(value_);
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.DATE_LITERAL;
-    msg.date_literal = new TDateLiteral(value.getTime());
+    msg.date_literal = new TDateLiteral(value_.getTime());
   }
 
-  public Timestamp getValue() {
-    return value;
-  }
+  public Timestamp getValue() { return value_; }
 
   @Override
   protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {

@@ -27,24 +27,23 @@ import com.google.common.base.Preconditions;
  * The given tupleIds must be materialized and nullable at the appropriate PlanNode.
  */
 public class TupleIsNullPredicate extends Predicate {
-
-  private final List<TupleId> tupleIds;
+  private final List<TupleId> tupleIds_;
 
   public TupleIsNullPredicate(List<TupleId> tupleIds) {
     Preconditions.checkState(tupleIds != null && !tupleIds.isEmpty());
-    this.tupleIds = tupleIds;
+    this.tupleIds_ = tupleIds;
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.TUPLE_IS_NULL_PRED;
     msg.tuple_is_null_pred = new TTupleIsNullPredicate();
-    for (TupleId tid: tupleIds) {
+    for (TupleId tid: tupleIds_) {
       msg.tuple_is_null_pred.addToTuple_ids(tid.asInt());
     }
   }
 
   @Override
   protected String toSqlImpl() { return ""; }
-  public List<TupleId> getTupleIds() { return tupleIds; }
+  public List<TupleId> getTupleIds() { return tupleIds_; }
 }

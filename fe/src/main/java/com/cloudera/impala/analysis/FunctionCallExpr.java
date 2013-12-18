@@ -61,7 +61,7 @@ public class FunctionCallExpr extends Expr {
     this.fnName_ = fnName;
     params_ = params;
     agg_op_ = null;
-    if (params.exprs() != null) children.addAll(params.exprs());
+    if (params.exprs() != null) children_.addAll(params.exprs());
   }
 
   public FunctionCallExpr(BuiltinAggregateFunction.Operator op, FunctionParams params) {
@@ -69,26 +69,26 @@ public class FunctionCallExpr extends Expr {
     fnName_ = FunctionName.CreateBuiltinName(op.name());
     agg_op_ = op;
     params_ = params;
-    if (params.exprs() != null) children.addAll(params.exprs());
+    if (params.exprs() != null) children_.addAll(params.exprs());
   }
 
   // Constructs the same agg function with new params.
   public FunctionCallExpr(FunctionCallExpr e, FunctionParams params) {
-    Preconditions.checkState(e.isAnalyzed);
+    Preconditions.checkState(e.isAnalyzed_);
     Preconditions.checkState(e.isAggregateFunction());
     fnName_ = e.fnName_;
     agg_op_ = e.agg_op_;
     params_ = params;
     // Just inherit the function object from 'e'.
     fn_ = e.fn_;
-    if (params.exprs() != null) children.addAll(params.exprs());
+    if (params.exprs() != null) children_.addAll(params.exprs());
   }
 
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) return false;
     FunctionCallExpr o = (FunctionCallExpr)obj;
-    return opcode == o.opcode &&
+    return opcode_ == o.opcode_ &&
            agg_op_ == o.agg_op_ &&
            fnName_.equals(o.fnName_) &&
            params_.isDistinct() == o.params_.isDistinct() &&
@@ -164,7 +164,7 @@ public class FunctionCallExpr extends Expr {
         // TODO: remove. All builtins will go through UDF_CALL.
         msg.node_type = TExprNodeType.COMPUTE_FUNCTION_CALL;
       }
-      msg.setOpcode(opcode);
+      msg.setOpcode(opcode_);
     }
   }
 
@@ -172,7 +172,7 @@ public class FunctionCallExpr extends Expr {
     Preconditions.checkState(isAggregateFunction());
 
     List<TExpr> inputExprs = Lists.newArrayList();
-    for (Expr e: children) {
+    for (Expr e: children_) {
       inputExprs.add(e.treeToThrift());
     }
 
@@ -193,13 +193,13 @@ public class FunctionCallExpr extends Expr {
 
     if (agg_op_ == BuiltinAggregateFunction.Operator.COUNT) {
       // for multiple exprs count must be qualified with distinct
-      if (children.size() > 1 && !params_.isDistinct()) {
+      if (children_.size() > 1 && !params_.isDistinct()) {
         throw new AnalysisException(
             "COUNT must have DISTINCT for multiple arguments: " + this.toSql());
       }
       ArrayList<PrimitiveType> childTypes = Lists.newArrayList();
-      for (int i = 0; i < children.size(); ++i) {
-        childTypes.add(getChild(i).type);
+      for (int i = 0; i < children_.size(); ++i) {
+        childTypes.add(getChild(i).type_);
       }
       fn_ = new BuiltinAggregateFunction(agg_op_, childTypes,
           PrimitiveType.BIGINT, ColumnType.createType(PrimitiveType.BIGINT));
@@ -208,7 +208,7 @@ public class FunctionCallExpr extends Expr {
 
     if (agg_op_ == BuiltinAggregateFunction.Operator.GROUP_CONCAT) {
       ArrayList<PrimitiveType> argTypes = Lists.newArrayList();
-      if (children.size() > 2 || children.isEmpty()) {
+      if (children_.size() > 2 || children_.isEmpty()) {
         throw new AnalysisException(
             agg_op_.toString() + " requires one or two parameters: " + this.toSql());
       }
@@ -218,16 +218,16 @@ public class FunctionCallExpr extends Expr {
       }
 
       Expr arg0 = getChild(0);
-      if (!arg0.type.isStringType() && !arg0.type.isNull()) {
+      if (!arg0.type_.isStringType() && !arg0.type_.isNull()) {
         throw new AnalysisException(
             agg_op_.toString() + " requires first parameter to be of type STRING: "
             + this.toSql());
       }
       argTypes.add(PrimitiveType.STRING);
 
-      if (children.size() == 2) {
+      if (children_.size() == 2) {
         Expr arg1 = getChild(1);
-        if (!arg1.type.isStringType() && !arg1.type.isNull()) {
+        if (!arg1.type_.isStringType() && !arg1.type_.isNull()) {
           throw new AnalysisException(
               agg_op_.toString() + " requires second parameter to be of type STRING: "
               + this.toSql());
@@ -248,7 +248,7 @@ public class FunctionCallExpr extends Expr {
     }
 
     // only COUNT and GROUP_CONCAT can contain multiple exprs
-    if (children.size() != 1) {
+    if (children_.size() != 1) {
       throw new AnalysisException(
           agg_op_.toString() + " requires exactly one parameter: " + this.toSql());
     }
@@ -258,12 +258,12 @@ public class FunctionCallExpr extends Expr {
 
     // SUM and AVG cannot be applied to non-numeric types
     if (agg_op_ == BuiltinAggregateFunction.Operator.SUM &&
-        !arg.type.isNumericType() && !arg.type.isNull()) {
+        !arg.type_.isNumericType() && !arg.type_.isNull()) {
       throw new AnalysisException(
             "SUM requires a numeric parameter: " + this.toSql());
     }
-    if (agg_op_ == BuiltinAggregateFunction.Operator.AVG && !arg.type.isNumericType()
-        && arg.type != PrimitiveType.TIMESTAMP && !arg.type.isNull()) {
+    if (agg_op_ == BuiltinAggregateFunction.Operator.AVG && !arg.type_.isNumericType()
+        && arg.type_ != PrimitiveType.TIMESTAMP && !arg.type_.isNull()) {
       throw new AnalysisException(
           "AVG requires a numeric or timestamp parameter: " + this.toSql());
     }
@@ -272,27 +272,27 @@ public class FunctionCallExpr extends Expr {
     ArrayList<PrimitiveType> argTypes = Lists.newArrayList();
     if (agg_op_ == BuiltinAggregateFunction.Operator.AVG) {
       // division always results in a double value
-      type = PrimitiveType.DOUBLE;
-      intermediateType = ColumnType.createType(type);
+      type_ = PrimitiveType.DOUBLE;
+      intermediateType = ColumnType.createType(type_);
     } else if (agg_op_ == BuiltinAggregateFunction.Operator.SUM) {
       // numeric types need to be accumulated at maximum precision
-      type = arg.type.getMaxResolutionType();
-      argTypes.add(type);
-      intermediateType = ColumnType.createType(type);
+      type_ = arg.type_.getMaxResolutionType();
+      argTypes.add(type_);
+      intermediateType = ColumnType.createType(type_);
     } else if (agg_op_ == BuiltinAggregateFunction.Operator.MIN ||
         agg_op_ == BuiltinAggregateFunction.Operator.MAX) {
-      type = arg.type;
+      type_ = arg.type_;
       params_.setIsDistinct(false);  // DISTINCT is meaningless here
-      argTypes.add(type);
-      intermediateType = ColumnType.createType(type);
+      argTypes.add(type_);
+      intermediateType = ColumnType.createType(type_);
     } else if (agg_op_ == BuiltinAggregateFunction.Operator.DISTINCT_PC ||
           agg_op_ == BuiltinAggregateFunction.Operator.DISTINCT_PCSA ||
           agg_op_ == BuiltinAggregateFunction.Operator.NDV) {
-      type = PrimitiveType.STRING;
+      type_ = PrimitiveType.STRING;
       params_.setIsDistinct(false);
       argTypes.add(arg.getType());
     }
-    fn_ = new BuiltinAggregateFunction(agg_op_, argTypes, type, intermediateType);
+    fn_ = new BuiltinAggregateFunction(agg_op_, argTypes, type_, intermediateType);
   }
 
   // Sets fn_ to the proper function object.
@@ -305,7 +305,7 @@ public class FunctionCallExpr extends Expr {
       OpcodeRegistry.BuiltinFunction match =
           OpcodeRegistry.instance().getFunctionInfo(op, true, argTypes);
       if (match != null) {
-        this.opcode = match.opcode;
+        this.opcode_ = match.opcode;
         fn_ = match;
       }
     } else {
@@ -337,7 +337,7 @@ public class FunctionCallExpr extends Expr {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
 
     if (fn_ != null && isAggregate()) {
@@ -348,8 +348,8 @@ public class FunctionCallExpr extends Expr {
         Preconditions.checkState(fn_ instanceof BuiltinAggregateFunction);
         intermediateType = ((BuiltinAggregateFunction)fn_).getIntermediateType();
       }
-      type = fn_.getReturnType();
-      if (intermediateType == null) intermediateType = ColumnType.createType(type);
+      type_ = fn_.getReturnType();
+      if (intermediateType == null) intermediateType = ColumnType.createType(type_);
       // TODO: this needs to change when the intermediate type != the return type
       Preconditions.checkArgument(intermediateType.getType() == fn_.getReturnType());
 
@@ -362,10 +362,10 @@ public class FunctionCallExpr extends Expr {
       return;
     }
 
-    PrimitiveType[] argTypes = new PrimitiveType[this.children.size()];
-    for (int i = 0; i < this.children.size(); ++i) {
-      this.children.get(i).analyze(analyzer);
-      argTypes[i] = this.children.get(i).getType();
+    PrimitiveType[] argTypes = new PrimitiveType[this.children_.size()];
+    for (int i = 0; i < this.children_.size(); ++i) {
+      this.children_.get(i).analyze(analyzer);
+      argTypes[i] = this.children_.get(i).getType();
     }
 
     if (agg_op_ != null) {
@@ -377,7 +377,7 @@ public class FunctionCallExpr extends Expr {
 
     if (isAggregateFunction()) {
       // subexprs must not contain aggregates
-      if (Expr.containsAggregate(children)) {
+      if (Expr.containsAggregate(children_)) {
         throw new AnalysisException(
             "aggregate function cannot contain aggregate parameters: " + this.toSql());
       }
@@ -399,6 +399,6 @@ public class FunctionCallExpr extends Expr {
         if (argTypes[i] != args[ix]) castChild(args[ix], i);
       }
     }
-    this.type = fn_.getReturnType();
+    this.type_ = fn_.getReturnType();
   }
 }

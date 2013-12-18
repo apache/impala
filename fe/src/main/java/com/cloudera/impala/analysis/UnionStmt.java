@@ -51,79 +51,79 @@ public class UnionStmt extends QueryStmt {
    * of the union operator (null for the first queryStmt).
    */
   public static class UnionOperand {
-    private final QueryStmt queryStmt;
+    private final QueryStmt queryStmt_;
     // Null for the first operand.
-    private Qualifier qualifier;
+    private Qualifier qualifier_;
 
     // Analyzer used for this operand. Set in analyze().
     // We must preserve the conjuncts registered in the analyzer for partition pruning.
-    private Analyzer analyzer;
+    private Analyzer analyzer_;
 
     // map from UnionStmts result slots to our resultExprs; useful during plan generation
     private final Expr.SubstitutionMap smap = new Expr.SubstitutionMap();
 
     public UnionOperand(QueryStmt queryStmt, Qualifier qualifier) {
-      this.queryStmt = queryStmt;
-      this.qualifier = qualifier;
+      this.queryStmt_ = queryStmt;
+      this.qualifier_ = qualifier;
     }
 
     public void analyze(Analyzer parent)
         throws AnalysisException, AuthorizationException {
-      analyzer = new Analyzer(parent, parent.getUser());
-      queryStmt.analyze(analyzer);
+      analyzer_ = new Analyzer(parent, parent.getUser());
+      queryStmt_.analyze(analyzer_);
     }
 
-    public QueryStmt getQueryStmt() { return queryStmt; }
-    public Qualifier getQualifier() { return qualifier; }
+    public QueryStmt getQueryStmt() { return queryStmt_; }
+    public Qualifier getQualifier() { return qualifier_; }
     // Used for propagating DISTINCT.
-    public void setQualifier(Qualifier qualifier) { this.qualifier = qualifier; }
-    public Analyzer getAnalyzer() { return analyzer; }
+    public void setQualifier(Qualifier qualifier) { this.qualifier_ = qualifier; }
+    public Analyzer getAnalyzer() { return analyzer_; }
     public Expr.SubstitutionMap getSmap() { return smap; }
 
     @Override
     public UnionOperand clone() {
-      return new UnionOperand(queryStmt.clone(), qualifier);
+      return new UnionOperand(queryStmt_.clone(), qualifier_);
     }
   }
 
   // before analysis, this contains the list of union operands derived verbatim
   // from the query;
   // after analysis, this contains all of distinctOperands followed by allOperands
-  protected final List<UnionOperand> operands;
+  protected final List<UnionOperand> operands_;
 
   // filled during analyze(); contains all operands that need to go through
   // distinct aggregation
-  protected final List<UnionOperand> distinctOperands = Lists.newArrayList();
+  protected final List<UnionOperand> distinctOperands_ = Lists.newArrayList();
 
   // filled during analyze(); contains all operands that can be aggregated with
   // a simple merge without duplicate elimination (also needs to merge the output
   // of the DISTINCT operands)
-  protected final List<UnionOperand> allOperands = Lists.newArrayList();
+  protected final List<UnionOperand> allOperands_ = Lists.newArrayList();
 
-  protected AggregateInfo distinctAggInfo;  // only set if we have DISTINCT ops
+  protected AggregateInfo distinctAggInfo_;  // only set if we have DISTINCT ops
 
  // Single tuple materialized by the union. Set in analyze().
-  protected TupleId tupleId;
+  protected TupleId tupleId_;
 
   // set prior to unnesting
-  protected String toSqlString = null;
+  protected String toSqlString_ = null;
 
   public UnionStmt(List<UnionOperand> operands,
       ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
     super(orderByElements, limitElement);
-    this.operands = operands;
+    this.operands_ = operands;
   }
 
-  public List<UnionOperand> getOperands() { return operands; }
-  public List<UnionOperand> getDistinctOperands() { return distinctOperands; }
-  public boolean hasDistinctOps() { return !distinctOperands.isEmpty(); }
-  public List<UnionOperand> getAllOperands() { return allOperands; }
-  public boolean hasAllOps() { return !allOperands.isEmpty(); }
-  public AggregateInfo getDistinctAggInfo() { return distinctAggInfo; }
+  public List<UnionOperand> getOperands() { return operands_; }
+  public List<UnionOperand> getDistinctOperands() { return distinctOperands_; }
+  public boolean hasDistinctOps() { return !distinctOperands_.isEmpty(); }
+  public List<UnionOperand> getAllOperands() { return allOperands_; }
+  public boolean hasAllOps() { return !allOperands_.isEmpty(); }
+  public AggregateInfo getDistinctAggInfo() { return distinctAggInfo_; }
 
   public void removeAllOperands() {
-    operands.removeAll(allOperands);
-    allOperands.clear();
+    operands_.removeAll(allOperands_);
+    allOperands_.clear();
   }
 
   /**
@@ -134,18 +134,18 @@ public class UnionStmt extends QueryStmt {
   public void analyze(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
     super.analyze(analyzer);
-    Preconditions.checkState(operands.size() > 0);
+    Preconditions.checkState(operands_.size() > 0);
 
     // Propagates DISTINCT from right to left
     propagateDistinct();
 
     // Make sure all operands return an equal number of exprs.
-    QueryStmt firstQuery = operands.get(0).getQueryStmt();
-    operands.get(0).analyze(analyzer);
+    QueryStmt firstQuery = operands_.get(0).getQueryStmt();
+    operands_.get(0).analyze(analyzer);
     List<Expr> firstQueryExprs = firstQuery.getBaseTblResultExprs();
-    for (int i = 1; i < operands.size(); ++i) {
-      QueryStmt query = operands.get(i).getQueryStmt();
-      operands.get(i).analyze(analyzer);
+    for (int i = 1; i < operands_.size(); ++i) {
+      QueryStmt query = operands_.get(i).getQueryStmt();
+      operands_.get(i).analyze(analyzer);
       List<Expr> exprs = query.getBaseTblResultExprs();
       if (firstQueryExprs.size() != exprs.size()) {
         throw new AnalysisException("Operands have unequal number of columns:\n" +
@@ -162,15 +162,15 @@ public class UnionStmt extends QueryStmt {
       PrimitiveType compatibleType = firstQueryExprs.get(i).getType();
       // Remember last compatible expr for error reporting.
       Expr lastCompatibleExpr = firstQueryExprs.get(i);
-      for (int j = 1; j < operands.size(); ++j) {
-        List<Expr> resultExprs = operands.get(j).getQueryStmt().getBaseTblResultExprs();
+      for (int j = 1; j < operands_.size(); ++j) {
+        List<Expr> resultExprs = operands_.get(j).getQueryStmt().getBaseTblResultExprs();
         compatibleType = analyzer.getCompatibleType(compatibleType,
             lastCompatibleExpr, resultExprs.get(i));
         lastCompatibleExpr = resultExprs.get(i);
       }
       // Now that we've found a compatible type, add implicit casts if necessary.
-      for (int j = 0; j < operands.size(); ++j) {
-        List<Expr> resultExprs = operands.get(j).getQueryStmt().getBaseTblResultExprs();
+      for (int j = 0; j < operands_.size(); ++j) {
+        List<Expr> resultExprs = operands_.get(j).getQueryStmt().getBaseTblResultExprs();
         if (resultExprs.get(i).getType() != compatibleType) {
           Expr castExpr = resultExprs.get(i).castTo(compatibleType);
           resultExprs.set(i, castExpr);
@@ -178,7 +178,7 @@ public class UnionStmt extends QueryStmt {
       }
     }
     // TODO: remove
-    for (UnionOperand op: operands) {
+    for (UnionOperand op: operands_) {
       LOG.info("resultexprs: " + Expr.toSql(op.getQueryStmt().getBaseTblResultExprs()) + " " +
           Expr.debugString(op.getQueryStmt().getBaseTblResultExprs()));
     }
@@ -188,7 +188,7 @@ public class UnionStmt extends QueryStmt {
     createMetadata(analyzer);
     createSortInfo(analyzer);
 
-    toSqlString = toSql();
+    toSqlString_ = toSql();
 
     // fill distinct-/allOperands
     unnestOperands(analyzer);
@@ -201,8 +201,8 @@ public class UnionStmt extends QueryStmt {
    */
   @Override
   public void materializeRequiredSlots(Analyzer analyzer) {
-    TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tupleId);
-    if (!distinctOperands.isEmpty()) {
+    TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tupleId_);
+    if (!distinctOperands_.isEmpty()) {
       // to keep things simple we materialize all grouping exprs = output slots,
       // regardless of what's being referenced externally
       for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
@@ -216,18 +216,18 @@ public class UnionStmt extends QueryStmt {
     for (int i = 0; i < outputSlots.size(); ++i) {
       SlotDescriptor slotDesc = outputSlots.get(i);
       if (!slotDesc.isMaterialized()) continue;
-      for (UnionOperand op: operands) {
+      for (UnionOperand op: operands_) {
         exprs.add(op.getQueryStmt().getBaseTblResultExprs().get(i));
       }
-      if (distinctAggInfo != null) {
+      if (distinctAggInfo_ != null) {
         // also mark the corresponding slot in the distinct agg tuple as being
         // materialized
-        distinctAggInfo.getAggTupleDesc().getSlots().get(i).setIsMaterialized(true);
+        distinctAggInfo_.getAggTupleDesc().getSlots().get(i).setIsMaterialized(true);
       }
     }
     materializeSlots(analyzer, exprs);
 
-    for (UnionOperand op: operands) {
+    for (UnionOperand op: operands_) {
       op.getQueryStmt().materializeRequiredSlots(analyzer);
     }
   }
@@ -238,16 +238,16 @@ public class UnionStmt extends QueryStmt {
    */
   private void unnestOperands(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
-    if (operands.size() == 1) {
+    if (operands_.size() == 1) {
       // ValuesStmt for a single row
-      allOperands.add(operands.get(0));
+      allOperands_.add(operands_.get(0));
       return;
     }
 
     // find index of first ALL operand
-    int firstUnionAllIdx = operands.size();
-    for (int i = 1; i < operands.size(); ++i) {
-      UnionOperand operand = operands.get(i);
+    int firstUnionAllIdx = operands_.size();
+    for (int i = 1; i < operands_.size(); ++i) {
+      UnionOperand operand = operands_.get(i);
       if (operand.getQualifier() == Qualifier.ALL) {
         firstUnionAllIdx = (i == 1 ? 0 : i);
         break;
@@ -258,24 +258,24 @@ public class UnionStmt extends QueryStmt {
     Preconditions.checkState(firstUnionAllIdx != 1);
 
     // unnest DISTINCT operands
-    Preconditions.checkState(distinctOperands.isEmpty());
+    Preconditions.checkState(distinctOperands_.isEmpty());
     for (int i = 0; i < firstUnionAllIdx; ++i) {
-      unnestOperand(distinctOperands, Qualifier.DISTINCT, operands.get(i));
+      unnestOperand(distinctOperands_, Qualifier.DISTINCT, operands_.get(i));
     }
 
     // unnest ALL operands
-    Preconditions.checkState(allOperands.isEmpty());
-    for (int i = firstUnionAllIdx; i < operands.size(); ++i) {
-      unnestOperand(allOperands, Qualifier.ALL, operands.get(i));
+    Preconditions.checkState(allOperands_.isEmpty());
+    for (int i = firstUnionAllIdx; i < operands_.size(); ++i) {
+      unnestOperand(allOperands_, Qualifier.ALL, operands_.get(i));
     }
 
-    operands.clear();
-    operands.addAll(distinctOperands);
-    operands.addAll(allOperands);
+    operands_.clear();
+    operands_.addAll(distinctOperands_);
+    operands_.addAll(allOperands_);
 
-    TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tupleId);
+    TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tupleId_);
     // create unnested operands' smaps
-    for (UnionOperand operand: operands) {
+    for (UnionOperand operand: operands_) {
       // operands' smaps were already set in the operands' analyze()
       operand.getSmap().clear();
       for (int i = 0; i < tupleDesc.getSlots().size(); ++i) {
@@ -288,13 +288,13 @@ public class UnionStmt extends QueryStmt {
     }
 
     // create distinctAggInfo, if necessary
-    if (!distinctOperands.isEmpty()) {
+    if (!distinctOperands_.isEmpty()) {
       // Aggregate produces exactly the same tuple as the original union stmt.
       ArrayList<Expr> groupingExprs = Expr.cloneList(resultExprs_, null);
       try {
-        distinctAggInfo =
+        distinctAggInfo_ =
             AggregateInfo.create(groupingExprs, null,
-              analyzer.getDescTbl().getTupleDesc(tupleId), analyzer);
+              analyzer.getDescTbl().getTupleDesc(tupleId_), analyzer);
       } catch (AnalysisException e) {
         // this should never happen
         throw new AnalysisException("error creating agg info in UnionStmt.analyze()");
@@ -352,8 +352,8 @@ public class UnionStmt extends QueryStmt {
    */
   private void propagateDistinct() {
     int lastDistinctPos = -1;
-    for (int i = operands.size() - 1; i > 0; --i) {
-      UnionOperand operand = operands.get(i);
+    for (int i = operands_.size() - 1; i > 0; --i) {
+      UnionOperand operand = operands_.get(i);
       if (lastDistinctPos != -1) {
         // There is a DISTINCT somewhere to the right.
         operand.setQualifier(Qualifier.DISTINCT);
@@ -373,16 +373,16 @@ public class UnionStmt extends QueryStmt {
     // Create tuple descriptor for materialized tuple created by the union.
     TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor();
     tupleDesc.setIsMaterialized(true);
-    tupleId = tupleDesc.getId();
-    LOG.info("UnionStmt.createMetadata: tupleId=" + tupleId.toString());
+    tupleId_ = tupleDesc.getId();
+    LOG.info("UnionStmt.createMetadata: tupleId=" + tupleId_.toString());
 
     // One slot per expr in the select blocks. Use first select block as representative.
-    List<Expr> firstSelectExprs = operands.get(0).getQueryStmt().getBaseTblResultExprs();
+    List<Expr> firstSelectExprs = operands_.get(0).getQueryStmt().getBaseTblResultExprs();
 
     // Compute column stats for the materialized slots from the source exprs.
     List<ColumnStats> columnStats = Lists.newArrayList();
-    for (int i = 0; i < operands.size(); ++i) {
-      List<Expr> selectExprs = operands.get(i).getQueryStmt().getBaseTblResultExprs();
+    for (int i = 0; i < operands_.size(); ++i) {
+      List<Expr> selectExprs = operands_.get(i).getQueryStmt().getBaseTblResultExprs();
       for (int j = 0; j < selectExprs.size(); ++j) {
         ColumnStats statsToAdd = ColumnStats.fromExpr(selectExprs.get(j));
         if (i == 0) {
@@ -415,7 +415,7 @@ public class UnionStmt extends QueryStmt {
 
       // register single-directional value transfers from output slot
       // to operands' result exprs (if those happen to be slotrefs)
-      for (UnionOperand op: operands) {
+      for (UnionOperand op: operands_) {
         Expr resultExpr = op.getQueryStmt().getBaseTblResultExprs().get(i);
         SlotRef slotRef = resultExpr.unwrapSlotRef(true);
         if (slotRef == null) continue;
@@ -453,39 +453,39 @@ public class UnionStmt extends QueryStmt {
   }
 
   public TupleId getTupleId() {
-    return tupleId;
+    return tupleId_;
   }
 
   @Override
   public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
-    tupleIdList.add(tupleId);
+    tupleIdList.add(tupleId_);
   }
 
   @Override
   public String toSql() {
-    if (toSqlString != null) return toSqlString;
+    if (toSqlString_ != null) return toSqlString_;
     StringBuilder strBuilder = new StringBuilder();
-    Preconditions.checkState(operands.size() > 0);
+    Preconditions.checkState(operands_.size() > 0);
 
     if (withClause_ != null) {
       strBuilder.append(withClause_.toSql());
       strBuilder.append(" ");
     }
 
-    strBuilder.append(operands.get(0).getQueryStmt().toSql());
-    for (int i = 1; i < operands.size() - 1; ++i) {
+    strBuilder.append(operands_.get(0).getQueryStmt().toSql());
+    for (int i = 1; i < operands_.size() - 1; ++i) {
       strBuilder.append(" UNION " +
-          ((operands.get(i).getQualifier() == Qualifier.ALL) ? "ALL " : ""));
-      if (operands.get(i).getQueryStmt() instanceof UnionStmt) {
+          ((operands_.get(i).getQualifier() == Qualifier.ALL) ? "ALL " : ""));
+      if (operands_.get(i).getQueryStmt() instanceof UnionStmt) {
         strBuilder.append("(");
       }
-      strBuilder.append(operands.get(i).getQueryStmt().toSql());
-      if (operands.get(i).getQueryStmt() instanceof UnionStmt) {
+      strBuilder.append(operands_.get(i).getQueryStmt().toSql());
+      if (operands_.get(i).getQueryStmt() instanceof UnionStmt) {
         strBuilder.append(")");
       }
     }
     // Determine whether we need parenthesis around the last union operand.
-    UnionOperand lastOperand = operands.get(operands.size() - 1);
+    UnionOperand lastOperand = operands_.get(operands_.size() - 1);
     QueryStmt lastQueryStmt = lastOperand.getQueryStmt();
     strBuilder.append(" UNION " +
         ((lastOperand.getQualifier() == Qualifier.ALL) ? "ALL " : ""));
@@ -513,14 +513,14 @@ public class UnionStmt extends QueryStmt {
 
   @Override
   public ArrayList<String> getColLabels() {
-    Preconditions.checkState(operands.size() > 0);
-    return operands.get(0).getQueryStmt().getColLabels();
+    Preconditions.checkState(operands_.size() > 0);
+    return operands_.get(0).getQueryStmt().getColLabels();
   }
 
   @Override
   public QueryStmt clone() {
     List<UnionOperand> operandClones = Lists.newArrayList();
-    for (UnionOperand operand: operands) {
+    for (UnionOperand operand: operands_) {
       operandClones.add(operand.clone());
     }
     UnionStmt unionClone = new UnionStmt(operandClones, cloneOrderByElements(),

@@ -22,19 +22,19 @@ import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Objects;
 
 public class BoolLiteral extends LiteralExpr {
-  private final boolean value;
+  private final boolean value_;
 
   public BoolLiteral(boolean value) {
-    this.value = value;
-    type = PrimitiveType.BOOLEAN;
+    this.value_ = value;
+    type_ = PrimitiveType.BOOLEAN;
   }
 
   public BoolLiteral(String value) throws AnalysisException {
-    this.type = PrimitiveType.BOOLEAN;
+    this.type_ = PrimitiveType.BOOLEAN;
     if (value.toLowerCase().equals("true")) {
-      this.value = true;
+      this.value_ = true;
     } else if (value.toLowerCase().equals("false")) {
-      this.value = false;
+      this.value_ = false;
     } else {
       throw new AnalysisException("invalid BOOLEAN literal: " + value);
     }
@@ -43,7 +43,7 @@ public class BoolLiteral extends LiteralExpr {
   @Override
   public String debugString() {
     return Objects.toStringHelper(this)
-        .add("value", value)
+        .add("value", value_)
         .toString();
   }
 
@@ -52,12 +52,10 @@ public class BoolLiteral extends LiteralExpr {
     if (!super.equals(obj)) {
       return false;
     }
-    return ((BoolLiteral) obj).value == value;
+    return ((BoolLiteral) obj).value_ == value_;
   }
 
-  public boolean getValue() {
-    return value;
-  }
+  public boolean getValue() { return value_; }
 
   @Override
   public String toSqlImpl() {
@@ -66,21 +64,21 @@ public class BoolLiteral extends LiteralExpr {
 
   @Override
   public String getStringValue() {
-    return value ? "TRUE" : "FALSE";
+    return value_ ? "TRUE" : "FALSE";
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.BOOL_LITERAL;
-    msg.bool_literal = new TBoolLiteral(value);
+    msg.bool_literal = new TBoolLiteral(value_);
   }
 
   @Override
   public int compareTo(LiteralExpr o) {
     if (!(o instanceof BoolLiteral)) return -1;
     BoolLiteral other = (BoolLiteral) o;
-    if (value && !other.getValue()) return 1;
-    if (!value && other.getValue()) return -1;
+    if (value_ && !other.getValue()) return 1;
+    if (!value_ && other.getValue()) return -1;
     return 0;
   }
 }

@@ -28,10 +28,10 @@ import com.cloudera.impala.thrift.TCreateDbParams;
  * Represents a CREATE DATABASE statement
  */
 public class CreateDbStmt extends StatementBase {
-  private final String dbName;
-  private final HdfsURI location;
-  private final String comment;
-  private final boolean ifNotExists;
+  private final String dbName_;
+  private final HdfsUri location_;
+  private final String comment_;
+  private final boolean ifNotExists_;
 
   /**
    * Creates a database with the given name.
@@ -46,45 +46,26 @@ public class CreateDbStmt extends StatementBase {
    * storage location. Create database will throw an error if the database already exists
    * unless the ifNotExists is true.
    */
-  public CreateDbStmt(String dbName, String comment, HdfsURI location,
+  public CreateDbStmt(String dbName, String comment, HdfsUri location,
       boolean ifNotExists) {
-    this.dbName = dbName;
-    this.comment = comment;
-    this.location = location;
-    this.ifNotExists = ifNotExists;
+    this.dbName_ = dbName;
+    this.comment_ = comment;
+    this.location_ = location;
+    this.ifNotExists_ = ifNotExists;
   }
 
-  public String getComment() {
-    return comment;
-  }
-
-  public String getDb() {
-    return dbName;
-  }
-
-  public boolean getIfNotExists() {
-    return ifNotExists;
-  }
-
-  public HdfsURI getLocation() {
-    return location;
-  }
+  public String getComment() { return comment_; }
+  public String getDb() { return dbName_; }
+  public boolean getIfNotExists() { return ifNotExists_; }
+  public HdfsUri getLocation() { return location_; }
 
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("CREATE DATABASE");
-    if (ifNotExists) {
-      sb.append(" IF NOT EXISTS");
-    }
-    sb.append(dbName);
-
-    if (comment != null) {
-      sb.append(" COMMENT '" + comment + "'");
-    }
-
-    if (location != null) {
-      sb.append(" LOCATION '" + location + "'");
-    }
+    if (ifNotExists_) sb.append(" IF NOT EXISTS");
+    sb.append(dbName_);
+    if (comment_ != null) sb.append(" COMMENT '" + comment_ + "'");
+    if (location_ != null) sb.append(" LOCATION '" + location_ + "'");
     return sb.toString();
   }
 
@@ -92,7 +73,7 @@ public class CreateDbStmt extends StatementBase {
     TCreateDbParams params = new TCreateDbParams();
     params.setDb(getDb());
     params.setComment(getComment());
-    params.setLocation(location == null ? null : location.toString());
+    params.setLocation(location_ == null ? null : location_.toString());
     params.setIf_not_exists(getIfNotExists());
     return params;
   }
@@ -101,8 +82,8 @@ public class CreateDbStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     // Check whether the db name meets the Metastore's requirements.
-    if (!MetaStoreUtils.validateName(dbName)) {
-      throw new AnalysisException("Invalid database name: " + dbName);
+    if (!MetaStoreUtils.validateName(dbName_)) {
+      throw new AnalysisException("Invalid database name: " + dbName_);
     }
 
     // Note: It is possible that a database with the same name was created external to
@@ -110,12 +91,12 @@ public class CreateDbStmt extends StatementBase {
     // AnalysisException when creating the database, they will get a Hive
     // AlreadyExistsException once the request has been sent to the metastore.
     Db db = analyzer.getCatalog().getDb(getDb(), analyzer.getUser(), Privilege.CREATE);
-    if (db != null && !ifNotExists) {
+    if (db != null && !ifNotExists_) {
       throw new AnalysisException(Analyzer.DB_ALREADY_EXISTS_ERROR_MSG + getDb());
     }
     analyzer.addAccessEvent(new TAccessEvent(
         getDb(), TCatalogObjectType.DATABASE, Privilege.CREATE.toString()));
 
-    if (location != null) location.analyze(analyzer, Privilege.ALL);
+    if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
   }
 }

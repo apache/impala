@@ -14,8 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 import com.google.common.collect.Lists;
 
@@ -24,38 +24,35 @@ import com.google.common.collect.Lists;
  *
  */
 public class SelectList {
-  private final ArrayList<SelectListItem> items = Lists.newArrayList();
-  private boolean isDistinct;
-  private boolean isStraightJoin;
+  private final ArrayList<SelectListItem> items_ = Lists.newArrayList();
+  private boolean isDistinct_;
+  private boolean isStraightJoin_;
 
   public SelectList() {
-    this.isDistinct = false;
-    this.isStraightJoin = false;
+    this.isDistinct_ = false;
+    this.isStraightJoin_ = false;
   }
 
   public SelectList(List<SelectListItem> items) {
-    isDistinct = false;
-    isStraightJoin = false;
-    this.items.addAll(items);
+    isDistinct_ = false;
+    isStraightJoin_ = false;
+    this.items_.addAll(items);
   }
 
-  public ArrayList<SelectListItem> getItems() {
-    return items;
-  }
-
-  public boolean isDistinct() { return isDistinct; }
-  public void setIsDistinct(boolean value) { isDistinct = value; }
-  public boolean isStraightJoin() { return isStraightJoin; }
-  public void setIsStraightJoin(boolean value) { isStraightJoin = value; }
+  public ArrayList<SelectListItem> getItems() { return items_; }
+  public boolean isDistinct() { return isDistinct_; }
+  public void setIsDistinct(boolean value) { isDistinct_ = value; }
+  public boolean isStraightJoin() { return isStraightJoin_; }
+  public void setIsStraightJoin(boolean value) { isStraightJoin_ = value; }
 
   @Override
   public SelectList clone() {
     SelectList clone = new SelectList();
-    for (SelectListItem item: items) {
-      clone.items.add(item.clone());
+    for (SelectListItem item: items_) {
+      clone.items_.add(item.clone());
     }
-    clone.setIsDistinct(isDistinct);
-    clone.setIsStraightJoin(isStraightJoin);
+    clone.setIsDistinct(isDistinct_);
+    clone.setIsStraightJoin(isStraightJoin_);
     return clone;
   }
 }

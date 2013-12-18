@@ -19,7 +19,7 @@ import java.util.List;
 import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TFunction;
 
@@ -43,7 +43,7 @@ public class Uda extends Function {
 
   public Uda(FunctionName fnName, List<PrimitiveType> argTypes,
       PrimitiveType retType, ColumnType intermediateType,
-      HdfsURI location, String updateFnSymbol, String initFnSymbol,
+      HdfsUri location, String updateFnSymbol, String initFnSymbol,
       String serializeFnSymbol, String mergeFnSymbol, String finalizeFnSymbol) {
     super(fnName, argTypes, retType, false);
     setLocation(location);

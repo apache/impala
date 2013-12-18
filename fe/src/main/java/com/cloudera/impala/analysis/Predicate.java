@@ -21,29 +21,24 @@ import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
 
 public abstract class Predicate extends Expr {
-  protected boolean isEqJoinConjunct;
+  protected boolean isEqJoinConjunct_;
 
   public Predicate() {
     super();
-    this.isEqJoinConjunct = false;
+    this.isEqJoinConjunct_ = false;
   }
 
-  public boolean isEqJoinConjunct() {
-    return isEqJoinConjunct;
-  }
-
-  public void setIsEqJoinConjunct(boolean v) {
-    isEqJoinConjunct = v;
-  }
+  public boolean isEqJoinConjunct() { return isEqJoinConjunct_; }
+  public void setIsEqJoinConjunct(boolean v) { isEqJoinConjunct_ = v; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
-    type = PrimitiveType.BOOLEAN;
+    type_ = PrimitiveType.BOOLEAN;
     // values: true/false/null
-    numDistinctValues = 3;
+    numDistinctValues_ = 3;
   }
 
   /**
@@ -58,14 +53,14 @@ public abstract class Predicate extends Expr {
     // find slotref
     SlotRef slotRef = null;
     int i = 0;
-    for (; i < children.size(); ++i) {
+    for (; i < children_.size(); ++i) {
       slotRef = getChild(i).unwrapSlotRef(false);
       if (slotRef != null) break;
     }
     if (slotRef == null) return false;
 
     // make sure everything else is constant
-    for (int j = 0; j < children.size(); ++j) {
+    for (int j = 0; j < children_.size(); ++j) {
       if (i == j) continue;
       if (!getChild(j).isConstant()) return false;
     }

@@ -17,20 +17,20 @@ package com.cloudera.impala.analysis;
 import com.google.common.base.Preconditions;
 
 class SelectListItem {
-  private final Expr expr;
-  private String alias;
+  private final Expr expr_;
+  private String alias_;
 
   // for "[name.]*"
-  private final TableName tblName;
-  private final boolean isStar;
+  private final TableName tblName_;
+  private final boolean isStar_;
 
   public SelectListItem(Expr expr, String alias) {
     super();
     Preconditions.checkNotNull(expr);
-    this.expr = expr;
-    this.alias = alias;
-    this.tblName = null;
-    this.isStar = false;
+    this.expr_ = expr;
+    this.alias_ = alias;
+    this.tblName_ = null;
+    this.isStar_ = false;
   }
 
   // select list item corresponding to "[[db.]tbl.]*"
@@ -40,26 +40,26 @@ class SelectListItem {
 
   private SelectListItem(TableName tblName) {
     super();
-    this.expr = null;
-    this.tblName = tblName;
-    this.isStar = true;
+    this.expr_ = null;
+    this.tblName_ = tblName;
+    this.isStar_ = true;
   }
 
-  public boolean isStar() { return isStar; }
-  public TableName getTblName() { return tblName; }
-  public Expr getExpr() { return expr; }
-  public String getAlias() { return alias; }
+  public boolean isStar() { return isStar_; }
+  public TableName getTblName() { return tblName_; }
+  public Expr getExpr() { return expr_; }
+  public String getAlias() { return alias_; }
 
   public String toSql() {
-    if (!isStar) {
-      Preconditions.checkNotNull(expr);
+    if (!isStar_) {
+      Preconditions.checkNotNull(expr_);
       // Enclose aliases in quotes if Hive cannot parse them without quotes.
       // This is needed for view compatibility between Impala and Hive.
       String aliasSql = null;
-      if (alias != null) aliasSql = ToSqlUtils.getHiveIdentSql(alias);
-      return expr.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
-    } else if (tblName != null) {
-      return tblName.toString() + ".*" + ((alias != null) ? " " + alias : "");
+      if (alias_ != null) aliasSql = ToSqlUtils.getHiveIdentSql(alias_);
+      return expr_.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
+    } else if (tblName_ != null) {
+      return tblName_.toString() + ".*" + ((alias_ != null) ? " " + alias_ : "");
     } else {
       return "*";
     }
@@ -78,20 +78,20 @@ class SelectListItem {
    * for view compatibility between Impala and Hive.
    */
   public String toColumnLabel(int selectListPos, boolean useHiveColLabels) {
-    if (alias != null) return alias.toLowerCase();
-    if (expr instanceof SlotRef) {
-      SlotRef slotRef = (SlotRef) expr;
+    if (alias_ != null) return alias_.toLowerCase();
+    if (expr_ instanceof SlotRef) {
+      SlotRef slotRef = (SlotRef) expr_;
       return slotRef.getColumnName().toLowerCase();
     }
     // Optionally return auto-generated column label.
     if (useHiveColLabels) return "_c" + selectListPos;
-    return expr.toSql().toLowerCase();
+    return expr_.toSql().toLowerCase();
   }
 
   @Override
   public SelectListItem clone() {
-    if (isStar) return createStarItem(tblName);
-    return new SelectListItem(expr.clone(null), alias);
+    if (isStar_) return createStarItem(tblName_);
+    return new SelectListItem(expr_.clone(null), alias_);
   }
 
 }

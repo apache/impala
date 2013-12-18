@@ -31,60 +31,60 @@ import com.google.common.collect.Lists;
 
 public class TupleDescriptor {
   private final static Logger LOG = LoggerFactory.getLogger(TupleDescriptor.class);
-  private final TupleId id;
+  private final TupleId id_;
   private String alias_;
-  private final ArrayList<SlotDescriptor> slots;
-  private Table table;  // underlying table, if there is one
+  private final ArrayList<SlotDescriptor> slots_;
+  private Table table_;  // underlying table, if there is one
 
   // if false, this tuple doesn't need to be materialized
-  private boolean isMaterialized = true;
+  private boolean isMaterialized_ = true;
 
-  private int byteSize;  // of all slots plus null indicators
-  private int numNullBytes;
+  private int byteSize_;  // of all slots plus null indicators
+  private int numNullBytes_;
 
   // if true, computeMemLayout() has been called and we can't add any additional
   // slots
-  private boolean hasMemLayout = false;
+  private boolean hasMemLayout_ = false;
 
-  private float avgSerializedSize;  // in bytes; includes serialization overhead
+  private float avgSerializedSize_;  // in bytes; includes serialization overhead
 
   TupleDescriptor(int id) {
-    this.id = new TupleId(id);
-    this.slots = new ArrayList<SlotDescriptor>();
+    this.id_ = new TupleId(id);
+    this.slots_ = new ArrayList<SlotDescriptor>();
   }
 
   public void addSlot(SlotDescriptor desc) {
-    Preconditions.checkState(!hasMemLayout);
-    slots.add(desc);
+    Preconditions.checkState(!hasMemLayout_);
+    slots_.add(desc);
   }
 
-  public TupleId getId() { return id; }
-  public ArrayList<SlotDescriptor> getSlots() { return slots; }
-  public Table getTable() { return table; }
+  public TupleId getId() { return id_; }
+  public ArrayList<SlotDescriptor> getSlots() { return slots_; }
+  public Table getTable() { return table_; }
   public TableName getTableName() {
-    if (table == null) return null;
+    if (table_ == null) return null;
     return new TableName(
-        table.getDb() != null ? table.getDb().getName() : null, table.getName());
+        table_.getDb() != null ? table_.getDb().getName() : null, table_.getName());
   }
-  public void setTable(Table tbl) { table = tbl; }
-  public int getByteSize() { return byteSize; }
-  public float getAvgSerializedSize() { return avgSerializedSize; }
-  public boolean getIsMaterialized() { return isMaterialized; }
-  public void setIsMaterialized(boolean value) { isMaterialized = value; }
+  public void setTable(Table tbl) { table_ = tbl; }
+  public int getByteSize() { return byteSize_; }
+  public float getAvgSerializedSize() { return avgSerializedSize_; }
+  public boolean getIsMaterialized() { return isMaterialized_; }
+  public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
   public String getAlias() { return alias_; }
   public void setAlias(String alias) { alias_ = alias; }
 
   public String debugString() {
-    String tblStr = (table == null ? "null" : table.getFullName());
+    String tblStr = (table_ == null ? "null" : table_.getFullName());
     List<String> slotStrings = Lists.newArrayList();
-    for (SlotDescriptor slot : slots) {
+    for (SlotDescriptor slot : slots_) {
       slotStrings.add(slot.debugString());
     }
     return Objects.toStringHelper(this)
-        .add("id", id.asInt())
+        .add("id", id_.asInt())
         .add("tbl", tblStr)
-        .add("byte_size", byteSize)
-        .add("is_materialized", isMaterialized)
+        .add("byte_size", byteSize_)
+        .add("is_materialized", isMaterialized_)
         .add("slots", "[" + Joiner.on(", ").join(slotStrings) + "]")
         .toString();
   }
@@ -93,24 +93,24 @@ public class TupleDescriptor {
    * Materialize all slots.
    */
   public void materializeSlots() {
-    for (SlotDescriptor slot: slots) {
+    for (SlotDescriptor slot: slots_) {
       slot.setIsMaterialized(true);
     }
   }
 
   public TTupleDescriptor toThrift() {
     TTupleDescriptor ttupleDesc =
-        new TTupleDescriptor(id.asInt(), byteSize, numNullBytes);
+        new TTupleDescriptor(id_.asInt(), byteSize_, numNullBytes_);
     // do not set the table id for virtual tables such as views and inline views
-    if (table != null && !table.isVirtualTable()) {
-      ttupleDesc.setTableId(table.getId().asInt());
+    if (table_ != null && !table_.isVirtualTable()) {
+      ttupleDesc.setTableId(table_.getId().asInt());
     }
     return ttupleDesc;
   }
 
   public void computeMemLayout() {
-    if (hasMemLayout) return;
-    hasMemLayout = true;
+    if (hasMemLayout_) return;
+    hasMemLayout_ = true;
 
     // sort slots by size
     List<List<SlotDescriptor>> slotsBySize =
@@ -121,14 +121,14 @@ public class TupleDescriptor {
 
     // populate slotsBySize; also compute avgSerializedSize
     int numNullableSlots = 0;
-    for (SlotDescriptor d: slots) {
+    for (SlotDescriptor d: slots_) {
       ColumnStats stats = d.getStats();
       // TODO: fix this, we don't need to serialize non-materialized slots
       if (stats.hasAvgSerializedSize()) {
-        avgSerializedSize += d.getStats().getAvgSerializedSize();
+        avgSerializedSize_ += d.getStats().getAvgSerializedSize();
       } else {
         // TODO: for computed slots, try to come up with stats estimates
-        avgSerializedSize += d.getType().getSlotSize();
+        avgSerializedSize_ += d.getType().getSlotSize();
       }
       if (d.isMaterialized()) {
         slotsBySize.get(d.getType().getSlotSize()).add(d);
@@ -139,8 +139,8 @@ public class TupleDescriptor {
     Preconditions.checkState(slotsBySize.get(0).isEmpty());
 
     // assign offsets to slots in order of ascending size
-    numNullBytes = (numNullableSlots + 7) / 8;
-    int offset = numNullBytes;
+    numNullBytes_ = (numNullableSlots + 7) / 8;
+    int offset = numNullBytes_;
     int nullIndicatorByte = 0;
     int nullIndicatorBit = 0;
     // slotIdx is the index into the resulting tuple struct.  The first (smallest) field
@@ -174,7 +174,7 @@ public class TupleDescriptor {
       }
     }
 
-    this.byteSize = offset;
+    this.byteSize_ = offset;
   }
 
   /**
@@ -182,9 +182,9 @@ public class TupleDescriptor {
    * (checks that both have the same number of slots and that slots are of the same type)
    */
   public boolean isCompatible(TupleDescriptor desc) {
-    if (slots.size() != desc.slots.size()) return false;
-    for (int i = 0; i < slots.size(); ++i) {
-      if (slots.get(i).getType() != desc.slots.get(i).getType()) return false;
+    if (slots_.size() != desc.slots_.size()) return false;
+    for (int i = 0; i < slots_.size(); ++i) {
+      if (slots_.get(i).getType() != desc.slots_.get(i).getType()) return false;
     }
     return true;
   }

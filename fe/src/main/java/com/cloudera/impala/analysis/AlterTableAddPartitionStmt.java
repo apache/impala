@@ -26,22 +26,22 @@ import com.google.common.base.Preconditions;
  * Represents an ALTER TABLE ADD PARTITION statement.
  */
 public class AlterTableAddPartitionStmt extends AlterTableStmt {
-  private final HdfsURI location_;
+  private final HdfsUri location_;
   private final boolean ifNotExists_;
   private final PartitionSpec partitionSpec_;
 
   public AlterTableAddPartitionStmt(TableName tableName,
-      PartitionSpec partitionSpec, HdfsURI location, boolean ifNotExists) {
+      PartitionSpec partitionSpec, HdfsUri location, boolean ifNotExists) {
     super(tableName);
     Preconditions.checkState(partitionSpec != null);
-    this.location_ = location;
-    this.ifNotExists_ = ifNotExists;
-    this.partitionSpec_ = partitionSpec;
-    this.partitionSpec_.setTableName(tableName);
+    location_ = location;
+    ifNotExists_ = ifNotExists;
+    partitionSpec_ = partitionSpec;
+    partitionSpec_.setTableName(tableName);
   }
 
   public boolean getIfNotExists() { return ifNotExists_; }
-  public HdfsURI getLocation() { return location_; }
+  public HdfsUri getLocation() { return location_; }
 
   @Override
   public String toSql() {

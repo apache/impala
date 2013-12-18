@@ -37,20 +37,20 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    tableName.analyze();
+    tableName_.analyze();
     // Enforce Hive column labels for view compatibility.
     analyzer.setUseHiveColLabels(true);
-    viewDefStmt.analyze(analyzer);
+    viewDefStmt_.analyze(analyzer);
 
-    Preconditions.checkState(tableName != null && !tableName.isEmpty());
-    dbName = analyzer.getTargetDbName(tableName);
-    owner = analyzer.getUser().getName();
-    if (analyzer.dbContainsTable(dbName, tableName.getTbl(), Privilege.CREATE) &&
-        !ifNotExists) {
+    Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
+    dbName_ = analyzer.getTargetDbName(tableName_);
+    owner_ = analyzer.getUser().getName();
+    if (analyzer.dbContainsTable(dbName_, tableName_.getTbl(), Privilege.CREATE) &&
+        !ifNotExists_) {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
-          String.format("%s.%s", dbName, tableName.getTbl()));
+          String.format("%s.%s", dbName_, tableName_.getTbl()));
     }
-    analyzer.addAccessEvent(new TAccessEvent(dbName + "." + tableName.getTbl(),
+    analyzer.addAccessEvent(new TAccessEvent(dbName_ + "." + tableName_.getTbl(),
         TCatalogObjectType.VIEW, Privilege.CREATE.toString()));
     createColumnAndViewDefs(analyzer);
   }
@@ -59,12 +59,12 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
   public String toSql() {
     StringBuilder sb = new StringBuilder();
     sb.append("CREATE VIEW ");
-    if (ifNotExists) sb.append("IF NOT EXISTS ");
-    if (tableName.getDb() != null) sb.append(tableName.getDb() + ".");
-    sb.append(tableName.getTbl() + " (");
-    sb.append(Joiner.on(", ").join(columnDefs));
+    if (ifNotExists_) sb.append("IF NOT EXISTS ");
+    if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
+    sb.append(tableName_.getTbl() + " (");
+    sb.append(Joiner.on(", ").join(columnDefs_));
     sb.append(") AS ");
-    sb.append(viewDefStmt.toSql());
+    sb.append(viewDefStmt_.toSql());
     return sb.toString();
   }
 }

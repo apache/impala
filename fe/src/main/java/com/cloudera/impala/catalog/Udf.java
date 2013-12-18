@@ -18,7 +18,7 @@ import java.util.List;
 
 import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TScalarFunction;
 
@@ -38,7 +38,7 @@ public class Udf extends Function {
   }
 
   public Udf(FunctionName fnName, List<PrimitiveType> argTypes,
-    PrimitiveType retType, HdfsURI location, String symbolName) {
+    PrimitiveType retType, HdfsUri location, String symbolName) {
     super(fnName, argTypes, retType, false);
     setLocation(location);
     setSymbolName(symbolName);

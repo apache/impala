@@ -112,7 +112,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
       // location that was calculated in the getTablePath() call. Since this will be the
       // target location for the INSERT statement, it is important the two match.
       if (createStmt_.getLocation() == null) {
-        createStmt_.setLocation(new HdfsURI(msTbl.getSd().getLocation()));
+        createStmt_.setLocation(new HdfsUri(msTbl.getSd().getLocation()));
       }
 
       // Create a "temp" table based off the given metastore.api.Table object. Normally,

@@ -34,49 +34,47 @@ import com.google.common.base.Preconditions;
  *
  */
 public class CaseExpr extends Expr {
-  private boolean hasCaseExpr;
-  private boolean hasElseExpr;
+  private boolean hasCaseExpr_;
+  private boolean hasElseExpr_;
 
   public CaseExpr(Expr caseExpr, List<CaseWhenClause> whenClauses, Expr elseExpr) {
     super();
     if (caseExpr != null) {
-      children.add(caseExpr);
-      hasCaseExpr = true;
+      children_.add(caseExpr);
+      hasCaseExpr_ = true;
     }
     for (CaseWhenClause whenClause: whenClauses) {
       Preconditions.checkNotNull(whenClause.getWhenExpr());
-      children.add(whenClause.getWhenExpr());
+      children_.add(whenClause.getWhenExpr());
       Preconditions.checkNotNull(whenClause.getThenExpr());
-      children.add(whenClause.getThenExpr());
+      children_.add(whenClause.getThenExpr());
     }
     if (elseExpr != null) {
-      children.add(elseExpr);
-      hasElseExpr = true;
+      children_.add(elseExpr);
+      hasElseExpr_ = true;
     }
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
+    if (!super.equals(obj)) return false;
     CaseExpr expr = (CaseExpr) obj;
-    return hasCaseExpr == expr.hasCaseExpr && hasElseExpr == expr.hasElseExpr;
+    return hasCaseExpr_ == expr.hasCaseExpr_ && hasElseExpr_ == expr.hasElseExpr_;
   }
 
   @Override
   public String toSqlImpl() {
     StringBuilder output = new StringBuilder("CASE");
     int childIdx = 0;
-    if (hasCaseExpr) {
-      output.append(" " + children.get(childIdx++).toSql());
+    if (hasCaseExpr_) {
+      output.append(" " + children_.get(childIdx++).toSql());
     }
-    while (childIdx + 2 <= children.size()) {
-      output.append(" WHEN " + children.get(childIdx++).toSql());
-      output.append(" THEN " + children.get(childIdx++).toSql());
+    while (childIdx + 2 <= children_.size()) {
+      output.append(" WHEN " + children_.get(childIdx++).toSql());
+      output.append(" THEN " + children_.get(childIdx++).toSql());
     }
-    if (hasElseExpr) {
-      output.append(" ELSE " + children.get(children.size() - 1).toSql());
+    if (hasElseExpr_) {
+      output.append(" ELSE " + children_.get(children_.size() - 1).toSql());
     }
     output.append(" END");
     return output.toString();
@@ -85,14 +83,14 @@ public class CaseExpr extends Expr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.CASE_EXPR;
-    msg.case_expr = new TCaseExpr(hasCaseExpr, hasElseExpr);
-    msg.setOpcode(opcode);
+    msg.case_expr = new TCaseExpr(hasCaseExpr_, hasElseExpr_);
+    msg.setOpcode(opcode_);
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
        AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
 
     // Keep track of maximum compatible type of case expr and all when exprs.
@@ -102,19 +100,19 @@ public class CaseExpr extends Expr {
     // Remember last of these exprs for error reporting.
     Expr lastCompatibleThenExpr = null;
     Expr lastCompatibleWhenExpr = null;
-    int loopEnd = children.size();
-    if (hasElseExpr) {
+    int loopEnd = children_.size();
+    if (hasElseExpr_) {
       --loopEnd;
     }
     int loopStart;
     Expr caseExpr = null;
     // Set loop start, and initialize returnType as type of castExpr.
-    if (hasCaseExpr) {
+    if (hasCaseExpr_) {
       loopStart = 1;
-      caseExpr = children.get(0);
+      caseExpr = children_.get(0);
       caseExpr.analyze(analyzer);
       whenType = caseExpr.getType();
-      lastCompatibleWhenExpr = children.get(0);
+      lastCompatibleWhenExpr = children_.get(0);
     } else {
       whenType = PrimitiveType.BOOLEAN;
       loopStart = 0;
@@ -122,8 +120,8 @@ public class CaseExpr extends Expr {
 
     // Go through when/then exprs and determine compatible types.
     for (int i = loopStart; i < loopEnd; i += 2) {
-      Expr whenExpr = children.get(i);
-      if (hasCaseExpr) {
+      Expr whenExpr = children_.get(i);
+      if (hasCaseExpr_) {
         // Determine maximum compatible type of the case expr,
         // and all when exprs seen so far. We will add casts to them at the very end.
         whenType = analyzer.getCompatibleType(whenType,
@@ -144,40 +142,40 @@ public class CaseExpr extends Expr {
       }
       // Determine maximum compatible type of the then exprs seen so far.
       // We will add casts to them at the very end.
-      Expr thenExpr = children.get(i + 1);
+      Expr thenExpr = children_.get(i + 1);
       returnType = analyzer.getCompatibleType(returnType,
           lastCompatibleThenExpr, thenExpr);
       lastCompatibleThenExpr = thenExpr;
     }
-    if (hasElseExpr) {
-      Expr elseExpr = children.get(children.size() - 1);
+    if (hasElseExpr_) {
+      Expr elseExpr = children_.get(children_.size() - 1);
       returnType = analyzer.getCompatibleType(returnType,
           lastCompatibleThenExpr, elseExpr);
     }
 
     // Add casts to case expr to compatible type.
-    if (hasCaseExpr) {
+    if (hasCaseExpr_) {
       // Cast case expr.
-      if (children.get(0).type != whenType) {
+      if (children_.get(0).type_ != whenType) {
         castChild(whenType, 0);
       }
       // Add casts to when exprs to compatible type.
       for (int i = loopStart; i < loopEnd; i += 2) {
-        if (children.get(i).type != whenType) {
+        if (children_.get(i).type_ != whenType) {
           castChild(whenType, i);
         }
       }
     }
     // Cast then exprs to compatible type.
-    for (int i = loopStart + 1; i < children.size(); i += 2) {
-      if (children.get(i).type != returnType) {
+    for (int i = loopStart + 1; i < children_.size(); i += 2) {
+      if (children_.get(i).type_ != returnType) {
         castChild(returnType, i);
       }
     }
     // Cast else expr to compatible type.
-    if (hasElseExpr) {
-      if (children.get(children.size() - 1).type != returnType) {
-        castChild(returnType, children.size() - 1);
+    if (hasElseExpr_) {
+      if (children_.get(children_.size() - 1).type_ != returnType) {
+        castChild(returnType, children_.size() - 1);
       }
     }
 
@@ -188,8 +186,8 @@ public class CaseExpr extends Expr {
       throw new AnalysisException("Could not find match in function registry " +
           "for CASE and arg type: " + whenType);
     }
-    opcode = match.opcode;
-    type = returnType;
-    isAnalyzed = true;
+    opcode_ = match.opcode;
+    type_ = returnType;
+    isAnalyzed_ = true;
   }
 }

@@ -20,20 +20,15 @@ package com.cloudera.impala.analysis;
  */
 public class PartitionListItem {
   // Name of partitioning column.
-  private final String colName;
+  private final String colName_;
   // Value of partitioning column. Set to null for dynamic inserts.
-  private final LiteralExpr value;
+  private final LiteralExpr value_;
 
   public PartitionListItem(String colName, LiteralExpr value) {
-    this.colName = colName;
-    this.value = value;
+    this.colName_ = colName;
+    this.value_ = value;
   }
 
-  public String getColName() {
-    return colName;
-  }
-
-  public LiteralExpr getValue() {
-    return value;
-  }
+  public String getColName() { return colName_; }
+  public LiteralExpr getValue() { return value_; }
 }

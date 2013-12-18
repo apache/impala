@@ -18,30 +18,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TreeNode<NodeType extends TreeNode<NodeType>> {
-  protected ArrayList<NodeType> children;
+  protected ArrayList<NodeType> children_;
 
   protected TreeNode() {
-    this.children = new ArrayList<NodeType>();
+    this.children_ = new ArrayList<NodeType>();
   }
 
   public NodeType getChild(int i) {
-    return hasChild(i) ? children.get(i) : null;
+    return hasChild(i) ? children_.get(i) : null;
   }
 
   public boolean hasChild(int i) {
-    return children.size() > i;
+    return children_.size() > i;
   }
 
   public void addChild(NodeType n) {
-    children.add(n);
+    children_.add(n);
   }
 
   public void setChild(int index, NodeType n) {
-    children.set(index, n);
+    children_.set(index, n);
   }
 
   public ArrayList<NodeType> getChildren() {
-    return children;
+    return children_;
   }
 
   // Collect all unique subnodes of type C (but not of subclasses of C), including
@@ -54,7 +54,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
       subNodes.add((C) this);
       return;
     }
-    for (NodeType child: children) {
+    for (NodeType child: children_) {
       child.collect(cl, subNodes);
     }
   }
@@ -67,7 +67,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
       subNodes.add((C) this);
       return;
     }
-    for (NodeType child: children) {
+    for (NodeType child: children_) {
       child.collectSubclasses(cl, subNodes);
     }
   }
@@ -76,7 +76,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     if (cl.isAssignableFrom(this.getClass()) && this.getClass().isAssignableFrom(cl)) {
       return true;
     }
-    for (NodeType child: children) {
+    for (NodeType child: children_) {
       if (child.contains(cl)) {
         return true;
       }
@@ -88,7 +88,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     if (cl.isAssignableFrom(this.getClass())) {
       return true;
     }
-    for (NodeType child: children) {
+    for (NodeType child: children_) {
       if (child.containsSubclass(cl)) {
         return true;
       }
@@ -104,7 +104,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     if (this.getClass().equals(cl)) {
       return (C) this;
     }
-    for (NodeType child: children) {
+    for (NodeType child: children_) {
       NodeType result = child.findFirstOf(cl);
       if (result != null) {
         return (C) result;

@@ -25,35 +25,35 @@ import com.google.common.collect.Lists;
  *
  */
 public class Id<IdType extends Id<IdType>> {
-  protected final int id;
+  protected final int id_;
 
   static private int INVALID_ID = -1;
 
   public Id() {
-    this.id = INVALID_ID;
+    this.id_ = INVALID_ID;
   }
 
   public Id(int id) {
-    this.id = id;
+    this.id_ = id;
   }
 
-  public boolean isValid() { return id != INVALID_ID; }
+  public boolean isValid() { return id_ != INVALID_ID; }
 
   @Override
   public boolean equals(Object obj) {
     if (obj == null) return false;
     // only ids of the same subclass are comparable
     if (obj.getClass() != this.getClass()) return false;
-    return ((Id)obj).id == id;
+    return ((Id)obj).id_ == id_;
   }
 
   @Override
   public int hashCode() {
-    return Integer.valueOf(id).hashCode();
+    return Integer.valueOf(id_).hashCode();
   }
 
   public int asInt() {
-    return id;
+    return id_;
   }
 
   public ArrayList<IdType> asList() {
@@ -64,7 +64,7 @@ public class Id<IdType extends Id<IdType>> {
 
   @Override
   public String toString() {
-    return Integer.toString(id);
+    return Integer.toString(id_);
   }
 
   public static <C extends Id> String printIds(List<C> ids) {

@@ -54,56 +54,52 @@ public class CompoundPredicate extends Predicate {
       return thriftOp;
     }
   }
-  private final Operator op;
+  private final Operator op_;
 
   public CompoundPredicate(Operator op, Expr e1, Expr e2) {
     super();
-    this.op = op;
+    this.op_ = op;
     Preconditions.checkNotNull(e1);
-    children.add(e1);
+    children_.add(e1);
     Preconditions.checkArgument(op == Operator.NOT && e2 == null
         || op != Operator.NOT && e2 != null);
     if (e2 != null) {
-      children.add(e2);
+      children_.add(e2);
     }
   }
 
-  public Operator getOp() {
-    return op;
-  }
+  public Operator getOp() { return op_; }
 
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
-    return ((CompoundPredicate) obj).op == op;
+    if (!super.equals(obj)) return false;
+    return ((CompoundPredicate) obj).op_ == op_;
   }
 
   @Override
   public String toSqlImpl() {
-    if (children.size() == 1) {
-      Preconditions.checkState(op == Operator.NOT);
+    if (children_.size() == 1) {
+      Preconditions.checkState(op_ == Operator.NOT);
       return "NOT " + getChild(0).toSql();
     } else {
-      return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
+      return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
     }
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.COMPOUND_PRED;
-    msg.setOpcode(op.toThrift());
+    msg.setOpcode(op_.toThrift());
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
 
     // Check that children are predicates.
-    for (Expr e : children) {
+    for (Expr e : children_) {
       if (e.getType() != PrimitiveType.BOOLEAN && !e.getType().isNull()) {
         throw new AnalysisException(String.format("Operand '%s' part of predicate " +
             "'%s' should return type 'BOOLEAN' but returns type '%s'.",
@@ -111,25 +107,25 @@ public class CompoundPredicate extends Predicate {
       }
     }
 
-    if (getChild(0).selectivity == -1
-        || children.size() == 2 && getChild(1).selectivity == -1) {
+    if (getChild(0).selectivity_ == -1
+        || children_.size() == 2 && getChild(1).selectivity_ == -1) {
       // give up if we're missing an input
-      selectivity = -1;
+      selectivity_ = -1;
       return;
     }
 
-    switch (op) {
+    switch (op_) {
       case AND:
-        selectivity = getChild(0).selectivity * getChild(1).selectivity;
+        selectivity_ = getChild(0).selectivity_ * getChild(1).selectivity_;
         break;
       case OR:
-        selectivity = getChild(0).selectivity + getChild(1).selectivity
-            - getChild(0).selectivity * getChild(1).selectivity;
+        selectivity_ = getChild(0).selectivity_ + getChild(1).selectivity_
+            - getChild(0).selectivity_ * getChild(1).selectivity_;
         break;
       case NOT:
-        selectivity = 1.0 - getChild(0).selectivity;
+        selectivity_ = 1.0 - getChild(0).selectivity_;
         break;
     }
-    selectivity = Math.max(0.0, Math.min(1.0, selectivity));
+    selectivity_ = Math.max(0.0, Math.min(1.0, selectivity_));
   }
 }

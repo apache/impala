@@ -35,17 +35,17 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
       throws AnalysisException, AuthorizationException {
     // Enforce Hive column labels for view compatibility.
     analyzer.setUseHiveColLabels(true);
-    viewDefStmt.analyze(analyzer);
+    viewDefStmt_.analyze(analyzer);
 
-    Preconditions.checkState(tableName != null && !tableName.isEmpty());
-    dbName = analyzer.getTargetDbName(tableName);
-    owner = analyzer.getUser().getName();
+    Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
+    dbName_ = analyzer.getTargetDbName(tableName_);
+    owner_ = analyzer.getUser().getName();
 
-    Table table = analyzer.getTable(tableName, Privilege.ALTER);
+    Table table = analyzer.getTable(tableName_, Privilege.ALTER);
     Preconditions.checkNotNull(table);
     if (!(table instanceof View)) {
       throw new AnalysisException(String.format(
-          "ALTER VIEW not allowed on a table: %s.%s", dbName, getTbl()));
+          "ALTER VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
     }
 
     createColumnAndViewDefs(analyzer);
@@ -55,11 +55,11 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
   public String toSql() {
     StringBuilder sb = new StringBuilder();
     sb.append("ALTER VIEW ");
-    if (tableName.getDb() != null) {
-      sb.append(tableName.getDb() + ".");
+    if (tableName_.getDb() != null) {
+      sb.append(tableName_.getDb() + ".");
     }
-    sb.append(tableName.getTbl());
-    sb.append(" AS " + viewDefStmt.toSql());
+    sb.append(tableName_.getTbl());
+    sb.append(" AS " + viewDefStmt_.toSql());
     return sb.toString();
   }
 }

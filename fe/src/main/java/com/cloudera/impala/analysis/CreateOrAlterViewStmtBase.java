@@ -29,19 +29,19 @@ import com.google.common.collect.Sets;
  * Base class for CREATE VIEW and ALTER VIEW AS SELECT statements.
  */
 public abstract class CreateOrAlterViewStmtBase extends StatementBase {
-  protected final boolean ifNotExists;
-  protected final TableName tableName;
-  protected final ArrayList<ColumnDesc> columnDefs;
-  protected final String comment;
-  protected final QueryStmt viewDefStmt;
+  protected final boolean ifNotExists_;
+  protected final TableName tableName_;
+  protected final ArrayList<ColumnDesc> columnDefs_;
+  protected final String comment_;
+  protected final QueryStmt viewDefStmt_;
 
   // Set during analysis
-  protected String dbName;
-  protected String owner;
+  protected String dbName_;
+  protected String owner_;
 
   // The original SQL-string given as view definition. Set during analysis.
   // Corresponds to Hive's viewOriginalText.
-  protected String originalViewDef;
+  protected String originalViewDef_;
 
   // Query statement (as SQL string) that defines the ViewRef for view substitution.
   // It is a transformation of the original view definition, e.g., to enforce the
@@ -54,21 +54,21 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   //
   // Corresponds to Hive's viewExpandedText, but is not identical to the SQL
   // Hive would produce in view creation.
-  protected String inlineViewDef;
+  protected String inlineViewDef_;
 
   // Columns to use in the select list of the expanded SQL string and when registering
   // this view in the metastore. Set in analysis.
-  protected ArrayList<ColumnDesc> finalColDefs;
+  protected ArrayList<ColumnDesc> finalColDefs_;
 
   public CreateOrAlterViewStmtBase(boolean ifNotExists, TableName tableName,
       ArrayList<ColumnDesc> columnDefs, String comment, QueryStmt viewDefStmt) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(viewDefStmt);
-    this.ifNotExists = ifNotExists;
-    this.tableName = tableName;
-    this.columnDefs = columnDefs;
-    this.comment = comment;
-    this.viewDefStmt = viewDefStmt;
+    this.ifNotExists_ = ifNotExists;
+    this.tableName_ = tableName;
+    this.columnDefs_ = columnDefs;
+    this.comment_ = comment;
+    this.viewDefStmt_ = viewDefStmt;
   }
 
   /**
@@ -77,42 +77,42 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
    * and throws an exception if they do.
    */
   protected void createColumnAndViewDefs(Analyzer analyzer) throws AnalysisException {
-    Preconditions.checkNotNull(dbName);
-    Preconditions.checkNotNull(owner);
+    Preconditions.checkNotNull(dbName_);
+    Preconditions.checkNotNull(owner_);
 
     // Set the finalColDefs to reflect the given column definitions.
-    if (columnDefs != null) {
-      Preconditions.checkState(!columnDefs.isEmpty());
-      if (columnDefs.size() != viewDefStmt.getColLabels().size()) {
+    if (columnDefs_ != null) {
+      Preconditions.checkState(!columnDefs_.isEmpty());
+      if (columnDefs_.size() != viewDefStmt_.getColLabels().size()) {
         String cmp =
-            (columnDefs.size() > viewDefStmt.getColLabels().size()) ? "more" : "fewer";
+            (columnDefs_.size() > viewDefStmt_.getColLabels().size()) ? "more" : "fewer";
         throw new AnalysisException(String.format("Column-definition list has " +
             "%s columns (%s) than the view-definition query statement returns (%s).",
-            cmp, columnDefs.size(), viewDefStmt.getColLabels().size()));
+            cmp, columnDefs_.size(), viewDefStmt_.getColLabels().size()));
       }
 
-      finalColDefs = columnDefs;
+      finalColDefs_ = columnDefs_;
       Preconditions.checkState(
-          columnDefs.size() == viewDefStmt.getBaseTblResultExprs().size());
-      for (int i = 0; i < columnDefs.size(); ++i) {
+          columnDefs_.size() == viewDefStmt_.getBaseTblResultExprs().size());
+      for (int i = 0; i < columnDefs_.size(); ++i) {
         // Set type in the column definition from the view-definition statement.
-        columnDefs.get(i).setColType(viewDefStmt.getBaseTblResultExprs().get(i).getType());
+        columnDefs_.get(i).setColType(viewDefStmt_.getBaseTblResultExprs().get(i).getType());
       }
     } else {
       // Create list of column definitions from the view-definition statement.
-      finalColDefs = Lists.newArrayList();
-      List<Expr> exprs = viewDefStmt.getBaseTblResultExprs();
-      List<String> labels = viewDefStmt.getColLabels();
+      finalColDefs_ = Lists.newArrayList();
+      List<Expr> exprs = viewDefStmt_.getBaseTblResultExprs();
+      List<String> labels = viewDefStmt_.getColLabels();
       Preconditions.checkState(exprs.size() == labels.size());
-      for (int i = 0; i < viewDefStmt.getColLabels().size(); ++i) {
-        finalColDefs.add(new ColumnDesc(labels.get(i), exprs.get(i).getType(), null));
+      for (int i = 0; i < viewDefStmt_.getColLabels().size(); ++i) {
+        finalColDefs_.add(new ColumnDesc(labels.get(i), exprs.get(i).getType(), null));
       }
     }
 
     // Check that the column definitions have valid names, and that there are no
     // duplicate column names.
     Set<String> distinctColNames = Sets.newHashSet();
-    for (ColumnDesc colDesc: finalColDefs) {
+    for (ColumnDesc colDesc: finalColDefs_) {
       colDesc.analyze();
       if (!distinctColNames.add(colDesc.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDesc.getColName());
@@ -120,12 +120,12 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     }
 
     // Set original and expanded view-definition SQL strings.
-    originalViewDef = viewDefStmt.toSql();
+    originalViewDef_ = viewDefStmt_.toSql();
 
     // If no column definitions were given, then the expanded view SQL is the same
     // as the original one.
-    if (columnDefs == null) {
-      inlineViewDef = originalViewDef;
+    if (columnDefs_ == null) {
+      inlineViewDef_ = originalViewDef_;
       return;
     }
 
@@ -133,28 +133,28 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     // given column definitions.
     StringBuilder sb = new StringBuilder();
     sb.append("SELECT ");
-    for (int i = 0; i < finalColDefs.size(); ++i) {
-      String colRef = ToSqlUtils.getHiveIdentSql(viewDefStmt.getColLabels().get(i));
-      String colAlias = ToSqlUtils.getHiveIdentSql(finalColDefs.get(i).getColName());
-      sb.append(String.format("%s.%s AS %s", tableName.getTbl(), colRef, colAlias));
-      sb.append((i+1 != finalColDefs.size()) ? ", " : "");
+    for (int i = 0; i < finalColDefs_.size(); ++i) {
+      String colRef = ToSqlUtils.getHiveIdentSql(viewDefStmt_.getColLabels().get(i));
+      String colAlias = ToSqlUtils.getHiveIdentSql(finalColDefs_.get(i).getColName());
+      sb.append(String.format("%s.%s AS %s", tableName_.getTbl(), colRef, colAlias));
+      sb.append((i+1 != finalColDefs_.size()) ? ", " : "");
     }
     // Do not use 'AS' for table aliases because Hive only accepts them without 'AS'.
-    sb.append(String.format(" FROM (%s) %s", originalViewDef, tableName.getTbl()));
-    inlineViewDef = sb.toString();
+    sb.append(String.format(" FROM (%s) %s", originalViewDef_, tableName_.getTbl()));
+    inlineViewDef_ = sb.toString();
   }
 
   public TCreateOrAlterViewParams toThrift() {
     TCreateOrAlterViewParams params = new TCreateOrAlterViewParams();
     params.setView_name(new TTableName(getDb(), getTbl()));
-    for (ColumnDesc col: finalColDefs) {
+    for (ColumnDesc col: finalColDefs_) {
       params.addToColumns(col.toThrift());
     }
     params.setOwner(getOwner());
     params.setIf_not_exists(getIfNotExists());
-    params.setOriginal_view_def(originalViewDef);
-    params.setExpanded_view_def(inlineViewDef);
-    if (comment != null) params.setComment(comment);
+    params.setOriginal_view_def(originalViewDef_);
+    params.setExpanded_view_def(inlineViewDef_);
+    if (comment_ != null) params.setComment(comment_);
     return params;
   }
 
@@ -163,22 +163,22 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
    * be created within.
    */
   public String getDb() {
-    Preconditions.checkNotNull(dbName);
-    return dbName;
+    Preconditions.checkNotNull(dbName_);
+    return dbName_;
   }
 
   /**
    * Can only be called after analysis, returns the owner of the view to be created.
    */
   public String getOwner() {
-    Preconditions.checkNotNull(owner);
-    return owner;
+    Preconditions.checkNotNull(owner_);
+    return owner_;
   }
 
-  public List<ColumnDesc> getColumnDescs() {return columnDefs; }
-  public String getComment() { return comment; }
-  public boolean getIfNotExists() { return ifNotExists; }
-  public String getOriginalViewDef() { return originalViewDef; }
-  public String getInlineViewDef() { return inlineViewDef; }
-  public String getTbl() { return tableName.getTbl(); }
+  public List<ColumnDesc> getColumnDescs() {return columnDefs_; }
+  public String getComment() { return comment_; }
+  public boolean getIfNotExists() { return ifNotExists_; }
+  public String getOriginalViewDef() { return originalViewDef_; }
+  public String getInlineViewDef() { return inlineViewDef_; }
+  public String getTbl() { return tableName_.getTbl(); }
 }

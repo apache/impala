@@ -31,46 +31,46 @@ import com.google.common.base.Preconditions;
 /*
  * Represents an HDFS URI in a SQL statement.
  */
-public class HdfsURI {
-  private final String location;
+public class HdfsUri {
+  private final String location_;
 
   // Set during analysis
-  private Path uriPath;
+  private Path uriPath_;
 
-  public HdfsURI(String location) {
+  public HdfsUri(String location) {
     Preconditions.checkNotNull(location);
-    this.location = location.trim();
+    this.location_ = location.trim();
   }
 
   public Path getPath() {
-    Preconditions.checkNotNull(uriPath);
-    return uriPath;
+    Preconditions.checkNotNull(uriPath_);
+    return uriPath_;
   }
 
   public void analyze(Analyzer analyzer, Privilege privilege)
       throws AnalysisException, AuthorizationException {
-    if (location.isEmpty()) {
+    if (location_.isEmpty()) {
       throw new AnalysisException("URI path cannot be empty.");
     }
 
-    uriPath = new Path(location);
-    if (!uriPath.isUriPathAbsolute()) {
-      throw new AnalysisException("URI path must be absolute: " + uriPath);
+    uriPath_ = new Path(location_);
+    if (!uriPath_.isUriPathAbsolute()) {
+      throw new AnalysisException("URI path must be absolute: " + uriPath_);
     }
     try {
-      FileSystem fs = uriPath.getFileSystem(FileSystemUtil.getConfiguration());
+      FileSystem fs = uriPath_.getFileSystem(FileSystemUtil.getConfiguration());
       if (!(fs instanceof DistributedFileSystem)) {
         throw new AnalysisException(String.format("URI location '%s' " +
-            "must point to an HDFS file system.", uriPath));
+            "must point to an HDFS file system.", uriPath_));
       }
     } catch (IOException e) {
       throw new AnalysisException(e.getMessage(), e);
     }
 
     // Fully-qualify the path
-    uriPath = FileSystemUtil.createFullyQualifiedPath(uriPath);
+    uriPath_ = FileSystemUtil.createFullyQualifiedPath(uriPath_);
     PrivilegeRequest req = new PrivilegeRequest(
-        new AuthorizeableURI(uriPath.toString()), privilege);
+        new AuthorizeableURI(uriPath_.toString()), privilege);
     analyzer.getCatalog().checkAccess(analyzer.getUser(), req);
   }
 
@@ -78,8 +78,8 @@ public class HdfsURI {
   public String toString() {
     // If uriPath is null (this HdfsURI has not been analyzed yet) just return the raw
     // location string the caller passed in.
-    return uriPath == null ? location : uriPath.toString();
+    return uriPath_ == null ? location_ : uriPath_.toString();
   }
 
-  public String getLocation() { return location; }
+  public String getLocation() { return location_; }
 }

@@ -27,30 +27,30 @@ import com.google.common.base.Preconditions;
  * Represents a DROP TABLE/VIEW [IF EXISTS] statement
  */
 public class DropTableOrViewStmt extends StatementBase {
-  protected final TableName tableName;
-  protected final boolean ifExists;
+  protected final TableName tableName_;
+  protected final boolean ifExists_;
 
   // True if we are dropping a table. False if we are dropping a view.
-  protected final boolean dropTable;
+  protected final boolean dropTable_;
 
   // Set during analysis
-  protected String dbName;
+  protected String dbName_;
 
   /**
    * Constructor for building the DROP TABLE/VIEW statement
    */
   public DropTableOrViewStmt(TableName tableName, boolean ifExists, boolean dropTable) {
-    this.tableName = tableName;
-    this.ifExists = ifExists;
-    this.dropTable = dropTable;
+    this.tableName_ = tableName;
+    this.ifExists_ = ifExists;
+    this.dropTable_ = dropTable;
   }
 
   @Override
   public String toSql() {
-    StringBuilder sb = new StringBuilder("DROP " + ((dropTable) ? "TABLE" : "VIEW"));
-    if (ifExists) sb.append("IF EXISTS ");
-    if (tableName.getDb() != null) sb.append(tableName.getDb() + ".");
-    sb.append(tableName.getTbl());
+    StringBuilder sb = new StringBuilder("DROP " + ((dropTable_) ? "TABLE" : "VIEW"));
+    if (ifExists_) sb.append("IF EXISTS ");
+    if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
+    sb.append(tableName_.getTbl());
     return sb.toString();
   }
 
@@ -71,22 +71,22 @@ public class DropTableOrViewStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    dbName = analyzer.getTargetDbName(tableName);
+    dbName_ = analyzer.getTargetDbName(tableName_);
     try {
-      Table table = analyzer.getTable(tableName, Privilege.DROP);
+      Table table = analyzer.getTable(tableName_, Privilege.DROP);
       Preconditions.checkNotNull(table);
-      if (table instanceof View && dropTable) {
+      if (table instanceof View && dropTable_) {
         throw new AnalysisException(String.format(
-            "DROP TABLE not allowed on a view: %s.%s", dbName, getTbl()));
+            "DROP TABLE not allowed on a view: %s.%s", dbName_, getTbl()));
       }
-      if (!(table instanceof View) && !dropTable) {
+      if (!(table instanceof View) && !dropTable_) {
         throw new AnalysisException(String.format(
-            "DROP VIEW not allowed on a table: %s.%s", dbName, getTbl()));
+            "DROP VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
       }
     } catch (AuthorizationException e) {
       throw e;
     } catch (AnalysisException e) {
-      if (ifExists) return;
+      if (ifExists_) return;
       throw e;
     }
   }
@@ -96,11 +96,11 @@ public class DropTableOrViewStmt extends StatementBase {
    * the target drop table resides in.
    */
   public String getDb() {
-    Preconditions.checkNotNull(dbName);
-    return dbName;
+    Preconditions.checkNotNull(dbName_);
+    return dbName_;
   }
 
-  public String getTbl() { return tableName.getTbl(); }
-  public boolean getIfExists() { return this.ifExists; }
-  public boolean isDropTable() { return dropTable; }
+  public String getTbl() { return tableName_.getTbl(); }
+  public boolean getIfExists() { return this.ifExists_; }
+  public boolean isDropTable() { return dropTable_; }
 }

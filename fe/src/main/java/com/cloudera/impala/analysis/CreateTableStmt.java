@@ -48,7 +48,7 @@ public class CreateTableStmt extends StatementBase {
   private final TableName tableName_;
   private final Map<String, String> tblProperties_;
   private final Map<String, String> serdeProperties_;
-  private HdfsURI location_;
+  private HdfsUri location_;
 
   // Set during analysis
   private String dbName_;
@@ -72,7 +72,7 @@ public class CreateTableStmt extends StatementBase {
    */
   public CreateTableStmt(TableName tableName, List<ColumnDesc> columnDefs,
       List<ColumnDesc> partitionColumnDescs, boolean isExternal, String comment,
-      RowFormat rowFormat, THdfsFileFormat fileFormat, HdfsURI location,
+      RowFormat rowFormat, THdfsFileFormat fileFormat, HdfsUri location,
       boolean ifNotExists, Map<String, String> tblProperties,
       Map<String, String> serdeProperties) {
     Preconditions.checkNotNull(columnDefs);
@@ -103,8 +103,8 @@ public class CreateTableStmt extends StatementBase {
   public String getComment() { return comment_; }
   public boolean isExternal() { return isExternal_; }
   public boolean getIfNotExists() { return ifNotExists_; }
-  public HdfsURI getLocation() { return location_; }
-  public void setLocation(HdfsURI location) { this.location_ = location; }
+  public HdfsUri getLocation() { return location_; }
+  public void setLocation(HdfsUri location) { this.location_ = location; }
   public THdfsFileFormat getFileFormat() { return fileFormat_; }
   public RowFormat getRowFormat() { return rowFormat_; }
   public Map<String, String> getTblProperties() { return tblProperties_; }

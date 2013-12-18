@@ -28,33 +28,33 @@ import com.google.common.base.Preconditions;
  * that are not stored in the Metastore, e.g., for Inline Views or WITH-clause views.
  */
 public class TableName {
-  private final String db;
-  private final String tbl;
+  private final String db_;
+  private final String tbl_;
 
   public TableName(String db, String tbl) {
     super();
     Preconditions.checkArgument(db == null || !db.isEmpty());
-    this.db = db;
+    this.db_ = db;
     Preconditions.checkNotNull(tbl);
-    this.tbl = tbl;
+    this.tbl_ = tbl;
   }
 
-  public String getDb() { return db; }
-  public String getTbl() { return tbl; }
-  public boolean isEmpty() { return tbl.isEmpty(); }
+  public String getDb() { return db_; }
+  public String getTbl() { return tbl_; }
+  public boolean isEmpty() { return tbl_.isEmpty(); }
 
   /**
    * Checks whether the db and table name meet the Metastore's requirements.
    */
   public void analyze() throws AnalysisException {
-    if (db != null) {
-      if (!MetaStoreUtils.validateName(db)) {
-        throw new AnalysisException("Invalid database name: " + db);
+    if (db_ != null) {
+      if (!MetaStoreUtils.validateName(db_)) {
+        throw new AnalysisException("Invalid database name: " + db_);
       }
     }
-    Preconditions.checkNotNull(tbl);
-    if (!MetaStoreUtils.validateName(tbl)) {
-      throw new AnalysisException("Invalid table/view name: " + tbl);
+    Preconditions.checkNotNull(tbl_);
+    if (!MetaStoreUtils.validateName(tbl_)) {
+      throw new AnalysisException("Invalid table/view name: " + tbl_);
     }
   }
 
@@ -63,25 +63,25 @@ public class TableName {
    * table name.
    */
   public boolean isFullyQualified() {
-    return db != null && !db.isEmpty() && !tbl.isEmpty();
+    return db_ != null && !db_.isEmpty() && !tbl_.isEmpty();
   }
 
   public String toSql() {
     // Enclose the database and/or table name in quotes if Hive cannot parse them
     // without quotes. This is needed for view compatibility between Impala and Hive.
-    if (db == null) {
-      return ToSqlUtils.getHiveIdentSql(tbl);
+    if (db_ == null) {
+      return ToSqlUtils.getHiveIdentSql(tbl_);
     } else {
-      return ToSqlUtils.getHiveIdentSql(db) + "." + ToSqlUtils.getHiveIdentSql(tbl);
+      return ToSqlUtils.getHiveIdentSql(db_) + "." + ToSqlUtils.getHiveIdentSql(tbl_);
     }
   }
 
   @Override
   public String toString() {
-    if (db == null) {
-      return tbl;
+    if (db_ == null) {
+      return tbl_;
     } else {
-      return db + "." + tbl;
+      return db_ + "." + tbl_;
     }
   }
 
@@ -89,5 +89,5 @@ public class TableName {
     return new TableName(tableName.getDb_name(), tableName.getTable_name());
   }
 
-  public TTableName toThrift() { return new TTableName(db, tbl); }
+  public TTableName toThrift() { return new TTableName(db_, tbl_); }
 }

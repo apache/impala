@@ -31,18 +31,18 @@ import com.google.common.base.Preconditions;
  * of abstract TableRefs in a SelectStmt and replace them with Views or BaseTableRefs.
  */
 public class BaseTableRef extends TableRef {
-  private final TableName name;
+  private final TableName name_;
 
   // Indicates whether this table should be considered for view replacement
   // from WITH-clause views. Used to distinguish non-fully-qualified references
   // to catalog entries (base table or view) from WITH-clause views.
-  private boolean allowWithViewReplacement = true;
+  private boolean allowWithViewReplacement_ = true;
 
   public BaseTableRef(TableName name, String alias) {
     super(alias);
     Preconditions.checkArgument(!name.toString().isEmpty());
     Preconditions.checkArgument(alias == null || !alias.isEmpty());
-    this.name = name;
+    this.name_ = name;
   }
 
   /**
@@ -50,8 +50,8 @@ public class BaseTableRef extends TableRef {
    */
   public BaseTableRef(BaseTableRef other) {
     super(other);
-    this.name = other.name;
-    this.allowWithViewReplacement = other.allowWithViewReplacement;
+    this.name_ = other.name_;
+    this.allowWithViewReplacement_ = other.allowWithViewReplacement_;
   }
 
   /**
@@ -59,9 +59,7 @@ public class BaseTableRef extends TableRef {
    * may not be fully qualified. If the table name is unqualified, the current
    * default database from the analyzer will be used as the db name.
    */
-  public TableName getName() {
-    return name;
-  }
+  public TableName getName() { return name_; }
 
   /**
    * Register this table ref and then analyze the Join clause.
@@ -70,8 +68,8 @@ public class BaseTableRef extends TableRef {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     Preconditions.checkNotNull(getPrivilegeRequirement());
-    desc = analyzer.registerBaseTableRef(this);
-    isAnalyzed = true;  // true that we have assigned desc
+    desc_ = analyzer.registerBaseTableRef(this);
+    isAnalyzed_ = true;  // true that we have assigned desc
     try {
       analyzeJoin(analyzer);
     } catch (InternalException e) {
@@ -82,9 +80,9 @@ public class BaseTableRef extends TableRef {
   @Override
   public List<TupleId> getMaterializedTupleIds() {
     // This function should only be called after analyze().
-    Preconditions.checkState(isAnalyzed);
-    Preconditions.checkState(desc != null);
-    return desc.getId().asList();
+    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkState(desc_ != null);
+    return desc_.getId().asList();
   }
 
   /**
@@ -92,19 +90,19 @@ public class BaseTableRef extends TableRef {
    */
   @Override
   public String getAlias() {
-    if (alias == null) {
-      return name.toString().toLowerCase();
+    if (alias_ == null) {
+      return name_.toString().toLowerCase();
     } else {
-      return alias;
+      return alias_;
     }
   }
 
   @Override
   public TableName getAliasAsName() {
-    if (alias != null) {
-      return new TableName(null, alias);
+    if (alias_ != null) {
+      return new TableName(null, alias_);
     } else {
-      return name;
+      return name_;
     }
   }
 
@@ -113,8 +111,8 @@ public class BaseTableRef extends TableRef {
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
     // This is needed for view compatibility between Impala and Hive.
     String aliasSql = null;
-    if (alias != null) aliasSql = ToSqlUtils.getHiveIdentSql(alias);
-    return name.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
+    if (alias_ != null) aliasSql = ToSqlUtils.getHiveIdentSql(alias_);
+    return name_.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
   }
 
   public String debugString() {
@@ -130,7 +128,7 @@ public class BaseTableRef extends TableRef {
    * Disable/enable WITH-clause view replacement for this table.
    * See comment on allowWithViewReplacement.
    */
-  public void disableWithViewReplacement() { allowWithViewReplacement = false; }
-  public void enableWithViewReplacement() { allowWithViewReplacement = true; }
-  public boolean isReplaceableByWithView() { return allowWithViewReplacement; }
+  public void disableWithViewReplacement() { allowWithViewReplacement_ = false; }
+  public void enableWithViewReplacement() { allowWithViewReplacement_ = true; }
+  public boolean isReplaceableByWithView() { return allowWithViewReplacement_; }
 }

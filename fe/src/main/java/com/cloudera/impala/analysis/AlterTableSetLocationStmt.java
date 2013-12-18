@@ -26,16 +26,16 @@ import com.google.common.base.Preconditions;
  * Represents an ALTER TABLE [PARTITION partitionSpec] SET LOCATION statement.
  */
 public class AlterTableSetLocationStmt extends AlterTableSetStmt {
-  private final HdfsURI location_;
+  private final HdfsUri location_;
 
   public AlterTableSetLocationStmt(TableName tableName,
-      PartitionSpec partitionSpec, HdfsURI location) {
+      PartitionSpec partitionSpec, HdfsUri location) {
     super(tableName, partitionSpec);
     Preconditions.checkNotNull(location);
     this.location_ = location;
   }
 
-  public HdfsURI getLocation() { return location_; }
+  public HdfsUri getLocation() { return location_; }
 
   @Override
   public TAlterTableParams toThrift() {

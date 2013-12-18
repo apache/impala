@@ -49,31 +49,31 @@ import com.google.common.base.Preconditions;
  * destination are preserved, even if OVERWRITE is true.
  */
 public class LoadDataStmt extends StatementBase {
-  private final TableName tableName;
-  private final HdfsURI sourceDataPath;
-  private final PartitionSpec partitionSpec;
-  private final boolean overwrite;
+  private final TableName tableName_;
+  private final HdfsUri sourceDataPath_;
+  private final PartitionSpec partitionSpec_;
+  private final boolean overwrite_;
 
   // Set during analysis
-  private String dbName;
+  private String dbName_;
 
-  public LoadDataStmt(TableName tableName, HdfsURI sourceDataPath, boolean overwrite,
+  public LoadDataStmt(TableName tableName, HdfsUri sourceDataPath, boolean overwrite,
       PartitionSpec partitionSpec) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(sourceDataPath);
-    this.tableName = tableName;
-    this.sourceDataPath = sourceDataPath;
-    this.overwrite = overwrite;
-    this.partitionSpec = partitionSpec;
+    this.tableName_ = tableName;
+    this.sourceDataPath_ = sourceDataPath;
+    this.overwrite_ = overwrite;
+    this.partitionSpec_ = partitionSpec;
   }
 
   public String getTbl() {
-    return tableName.getTbl();
+    return tableName_.getTbl();
   }
 
   public String getDb() {
-    Preconditions.checkNotNull(dbName);
-    return dbName;
+    Preconditions.checkNotNull(dbName_);
+    return dbName_;
   }
 
   /*
@@ -83,37 +83,33 @@ public class LoadDataStmt extends StatementBase {
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("LOAD DATA INPATH '");
-    sb.append(sourceDataPath + "' ");
-    if (overwrite) {
-      sb.append("OVERWRITE ");
-    }
-    sb.append("INTO TABLE " + tableName.toString());
-    if (partitionSpec != null) {
-      sb.append(" " + partitionSpec.toSql());
-    }
+    sb.append(sourceDataPath_ + "' ");
+    if (overwrite_) sb.append("OVERWRITE ");
+    sb.append("INTO TABLE " + tableName_.toString());
+    if (partitionSpec_ != null) sb.append(" " + partitionSpec_.toSql());
     return sb.toString();
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    dbName = analyzer.getTargetDbName(tableName);
-    Table table = analyzer.getTable(tableName, Privilege.INSERT);
+    dbName_ = analyzer.getTargetDbName(tableName_);
+    Table table = analyzer.getTable(tableName_, Privilege.INSERT);
     if (!(table instanceof HdfsTable)) {
       throw new AnalysisException("LOAD DATA only supported for HDFS tables: " +
-          dbName + "." + getTbl());
+          dbName_ + "." + getTbl());
     }
 
     // Analyze the partition spec, if one was specified.
-    if (partitionSpec != null) {
-      partitionSpec.setTableName(tableName);
-      partitionSpec.setPartitionShouldExist();
-      partitionSpec.setPrivilegeRequirement(Privilege.INSERT);
-      partitionSpec.analyze(analyzer);
+    if (partitionSpec_ != null) {
+      partitionSpec_.setTableName(tableName_);
+      partitionSpec_.setPartitionShouldExist();
+      partitionSpec_.setPrivilegeRequirement(Privilege.INSERT);
+      partitionSpec_.analyze(analyzer);
     } else {
       if (table.getMetaStoreTable().getPartitionKeysSize() > 0) {
         throw new AnalysisException("Table is partitioned but no partition spec was " +
-            "specified: " + dbName + "." + getTbl());
+            "specified: " + dbName_ + "." + getTbl());
       }
     }
     analyzePaths(analyzer, (HdfsTable) table);
@@ -123,25 +119,25 @@ public class LoadDataStmt extends StatementBase {
       throws AnalysisException, AuthorizationException {
     // The user must have permission to access the source location. Since the files will
     // be moved from this location, the user needs to have all permission.
-    sourceDataPath.analyze(analyzer, Privilege.ALL);
+    sourceDataPath_.analyze(analyzer, Privilege.ALL);
 
     try {
-      Path source = sourceDataPath.getPath();
+      Path source = sourceDataPath_.getPath();
       FileSystem fs = source.getFileSystem(FileSystemUtil.getConfiguration());
       DistributedFileSystem dfs = (DistributedFileSystem) fs;
       if (!dfs.exists(source)) {
         throw new AnalysisException(String.format(
-            "INPATH location '%s' does not exist.", sourceDataPath));
+            "INPATH location '%s' does not exist.", sourceDataPath_));
       }
 
       if (dfs.isDirectory(source)) {
         if (FileSystemUtil.getTotalNumVisibleFiles(source) == 0) {
           throw new AnalysisException(String.format(
-              "INPATH location '%s' contains no visible files.", sourceDataPath));
+              "INPATH location '%s' contains no visible files.", sourceDataPath_));
         }
         if (FileSystemUtil.containsSubdirectory(source)) {
           throw new AnalysisException(String.format(
-              "INPATH location '%s' cannot contain subdirectories.", sourceDataPath));
+              "INPATH location '%s' cannot contain subdirectories.", sourceDataPath_));
         }
       } else { // INPATH points to a file.
         if (FileSystemUtil.isHiddenFile(source.getName())) {
@@ -156,8 +152,8 @@ public class LoadDataStmt extends StatementBase {
           "location: ", hdfsTable.getFullName());
 
       HdfsPartition partition;
-      if (partitionSpec != null) {
-        partition = hdfsTable.getPartition(partitionSpec.getPartitionSpecKeyValues());
+      if (partitionSpec_ != null) {
+        partition = hdfsTable.getPartition(partitionSpec_.getPartitionSpecKeyValues());
         if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
           throw new AnalysisException(noWriteAccessErrorMsg + partition.getLocation());
         }
@@ -189,10 +185,10 @@ public class LoadDataStmt extends StatementBase {
   public TLoadDataReq toThrift() {
     TLoadDataReq loadDataReq = new TLoadDataReq();
     loadDataReq.setTable_name(new TTableName(getDb(), getTbl()));
-    loadDataReq.setSource_path(sourceDataPath.toString());
-    loadDataReq.setOverwrite(overwrite);
-    if (partitionSpec != null) {
-      loadDataReq.setPartition_spec(partitionSpec.toThrift());
+    loadDataReq.setSource_path(sourceDataPath_.toString());
+    loadDataReq.setOverwrite(overwrite_);
+    if (partitionSpec_ != null) {
+      loadDataReq.setPartition_spec(partitionSpec_.toThrift());
     }
     return loadDataReq;
   }

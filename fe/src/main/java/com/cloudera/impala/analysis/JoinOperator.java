@@ -24,21 +24,21 @@ public enum JoinOperator {
   FULL_OUTER_JOIN("FULL OUTER JOIN", TJoinOp.FULL_OUTER_JOIN),
   CROSS_JOIN("CROSS JOIN", TJoinOp.CROSS_JOIN);
 
-  private final String description;
-  private final TJoinOp thriftJoinOp;
+  private final String description_;
+  private final TJoinOp thriftJoinOp_;
 
   private JoinOperator(String description, TJoinOp thriftJoinOp) {
-    this.description = description;
-    this.thriftJoinOp = thriftJoinOp;
+    this.description_ = description;
+    this.thriftJoinOp_ = thriftJoinOp;
   }
 
   @Override
   public String toString() {
-    return description;
+    return description_;
   }
 
   public TJoinOp toThrift() {
-    return thriftJoinOp;
+    return thriftJoinOp_;
   }
 
   public boolean isOuterJoin() {

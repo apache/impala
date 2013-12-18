@@ -46,8 +46,8 @@ public class CrossJoinNode extends PlanNode {
     tupleIds_.addAll(inner.getTupleIds());
     tblRefIds_.addAll(outer.getTblRefIds());
     tblRefIds_.addAll(inner.getTblRefIds());
-    children.add(outer);
-    children.add(inner);
+    children_.add(outer);
+    children_.add(inner);
 
     // Inherits all the nullable tuple from the children
     // Mark tuples that form the "nullable" side of the outer join as nullable.

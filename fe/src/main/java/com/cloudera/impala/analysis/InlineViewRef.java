@@ -39,13 +39,13 @@ public class InlineViewRef extends TableRef {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
 
   // The select or union statement of the inline view
-  protected final QueryStmt queryStmt;
+  protected final QueryStmt queryStmt_;
 
   // queryStmt has its own analysis context
-  protected Analyzer inlineViewAnalyzer;
+  protected Analyzer inlineViewAnalyzer_;
 
   // list of tuple ids materialized by queryStmt
-  protected final ArrayList<TupleId> materializedTupleIds = Lists.newArrayList();
+  protected final ArrayList<TupleId> materializedTupleIds_ = Lists.newArrayList();
 
   // Map inline view's output slots to the corresponding resultExpr of queryStmt.
   // Some rhs exprs are wrapped into IF(TupleIsNull(), NULL, expr) by calling
@@ -65,7 +65,7 @@ public class InlineViewRef extends TableRef {
   public InlineViewRef(String alias, QueryStmt queryStmt) {
     super(alias);
     Preconditions.checkNotNull(queryStmt);
-    this.queryStmt = queryStmt;
+    this.queryStmt_ = queryStmt;
   }
 
   /**
@@ -73,8 +73,8 @@ public class InlineViewRef extends TableRef {
    */
   public InlineViewRef(InlineViewRef other) {
     super(other);
-    Preconditions.checkNotNull(other.queryStmt);
-    this.queryStmt = other.queryStmt.clone();
+    Preconditions.checkNotNull(other.queryStmt_);
+    this.queryStmt_ = other.queryStmt_.clone();
   }
 
   /**
@@ -92,20 +92,20 @@ public class InlineViewRef extends TableRef {
   protected void analyzeAsUser(Analyzer analyzer, User user, boolean useHiveColLabels)
       throws AuthorizationException, AnalysisException {
     // Analyze the inline view query statement with its own analyzer
-    inlineViewAnalyzer = new Analyzer(analyzer, user);
-    inlineViewAnalyzer.setUseHiveColLabels(useHiveColLabels);
-    queryStmt.analyze(inlineViewAnalyzer);
-    inlineViewAnalyzer.setHasLimit(queryStmt.hasLimitClause());
-    queryStmt.getMaterializedTupleIds(materializedTupleIds);
-    desc = analyzer.registerInlineViewRef(this);
-    isAnalyzed = true;  // true now that we have assigned desc
+    inlineViewAnalyzer_ = new Analyzer(analyzer, user);
+    inlineViewAnalyzer_.setUseHiveColLabels(useHiveColLabels);
+    queryStmt_.analyze(inlineViewAnalyzer_);
+    inlineViewAnalyzer_.setHasLimit(queryStmt_.hasLimitClause());
+    queryStmt_.getMaterializedTupleIds(materializedTupleIds_);
+    desc_ = analyzer.registerInlineViewRef(this);
+    isAnalyzed_ = true;  // true now that we have assigned desc
 
     // For constant selects we materialize its exprs into a tuple.
-    if (materializedTupleIds.isEmpty()) {
-      Preconditions.checkState(queryStmt instanceof SelectStmt);
-      Preconditions.checkState(((SelectStmt) queryStmt).getTableRefs().isEmpty());
-      desc.setIsMaterialized(true);
-      materializedTupleIds.add(desc.getId());
+    if (materializedTupleIds_.isEmpty()) {
+      Preconditions.checkState(queryStmt_ instanceof SelectStmt);
+      Preconditions.checkState(((SelectStmt) queryStmt_).getTableRefs().isEmpty());
+      desc_.setIsMaterialized(true);
+      materializedTupleIds_.add(desc_.getId());
     }
 
     // create smap_ and baseTblSmap_ and register auxiliary eq predicates between our
@@ -113,14 +113,14 @@ public class InlineViewRef extends TableRef {
     // we create these auxiliary predicates so that the analyzer can compute the value
     // transfer graph through this inline view correctly (ie, predicates can get propagated
     // through the view)
-    for (int i = 0; i < queryStmt.getColLabels().size(); ++i) {
-      String colName = queryStmt.getColLabels().get(i);
-      Expr colExpr = queryStmt.getResultExprs().get(i);
+    for (int i = 0; i < queryStmt_.getColLabels().size(); ++i) {
+      String colName = queryStmt_.getColLabels().get(i);
+      Expr colExpr = queryStmt_.getResultExprs().get(i);
       SlotDescriptor slotDesc = analyzer.registerColumnRef(getAliasAsName(), colName);
       slotDesc.setStats(ColumnStats.fromExpr(colExpr));
       SlotRef slotRef = new SlotRef(slotDesc);
       smap_.addMapping(slotRef, colExpr);
-      baseTblSmap_.addMapping(slotRef, queryStmt.getBaseTblResultExprs().get(i));
+      baseTblSmap_.addMapping(slotRef, queryStmt_.getBaseTblResultExprs().get(i));
 
       analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), colExpr.clone(null));
     }
@@ -142,16 +142,16 @@ public class InlineViewRef extends TableRef {
   public TupleDescriptor createTupleDescriptor(DescriptorTable descTbl)
       throws AnalysisException {
     // Create a fake catalog table for the inline view
-    InlineView inlineView = new InlineView(alias);
-    for (int i = 0; i < queryStmt.getColLabels().size(); ++i) {
+    InlineView inlineView = new InlineView(alias_);
+    for (int i = 0; i < queryStmt_.getColLabels().size(); ++i) {
       // inline view select statement has been analyzed. Col label should be filled.
-      Expr selectItemExpr = queryStmt.getResultExprs().get(i);
-      String colAlias = queryStmt.getColLabels().get(i);
+      Expr selectItemExpr = queryStmt_.getResultExprs().get(i);
+      String colAlias = queryStmt_.getColLabels().get(i);
 
       // inline view col cannot have duplicate name
       if (inlineView.getColumn(colAlias) != null) {
         throw new AnalysisException("duplicated inline view column alias: '" +
-            colAlias + "'" + " in inline view " + "'" + alias + "'");
+            colAlias + "'" + " in inline view " + "'" + alias_ + "'");
       }
 
       // create a column and add it to the inline view
@@ -197,7 +197,7 @@ public class InlineViewRef extends TableRef {
     for (int i = 0; i < smap.getRhs().size(); ++i) {
       List<Expr> params = Lists.newArrayList();
       if (!requiresNullWrapping(analyzer, smap.getRhs().get(i), nullSMap)) continue;
-      params.add(new TupleIsNullPredicate(materializedTupleIds));
+      params.add(new TupleIsNullPredicate(materializedTupleIds_));
       params.add(new NullLiteral());
       params.add(smap.getRhs().get(i));
       Expr ifExpr = new FunctionCallExpr("if", params);
@@ -235,31 +235,31 @@ public class InlineViewRef extends TableRef {
 
   @Override
   public List<TupleId> getMaterializedTupleIds() {
-    Preconditions.checkState(isAnalyzed);
-    Preconditions.checkState(materializedTupleIds.size() > 0);
-    return materializedTupleIds;
+    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkState(materializedTupleIds_.size() > 0);
+    return materializedTupleIds_;
   }
 
   public Analyzer getAnalyzer() {
-    Preconditions.checkState(isAnalyzed);
-    return inlineViewAnalyzer;
+    Preconditions.checkState(isAnalyzed_);
+    return inlineViewAnalyzer_;
   }
 
   public Expr.SubstitutionMap getSmap() {
-    Preconditions.checkState(isAnalyzed);
+    Preconditions.checkState(isAnalyzed_);
     return smap_;
   }
 
   public Expr.SubstitutionMap getBaseTblSmap() {
-    Preconditions.checkState(isAnalyzed);
+    Preconditions.checkState(isAnalyzed_);
     return baseTblSmap_;
   }
 
-  public QueryStmt getViewStmt() { return queryStmt; }
+  public QueryStmt getViewStmt() { return queryStmt_; }
   @Override
-  public String getAlias() { return alias; }
+  public String getAlias() { return alias_; }
   @Override
-  public TableName getAliasAsName() { return new TableName(null, alias); }
+  public TableName getAliasAsName() { return new TableName(null, alias_); }
   @Override
   public TableRef clone() { return new InlineViewRef(this); }
 
@@ -267,7 +267,7 @@ public class InlineViewRef extends TableRef {
   protected String tableRefToSql() {
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
     // This is needed for view compatibility between Impala and Hive.
-    String aliasSql = ToSqlUtils.getHiveIdentSql(alias);
-    return "(" + queryStmt.toSql() + ") " + aliasSql;
+    String aliasSql = ToSqlUtils.getHiveIdentSql(alias_);
+    return "(" + queryStmt_.toSql() + ") " + aliasSql;
   }
 }

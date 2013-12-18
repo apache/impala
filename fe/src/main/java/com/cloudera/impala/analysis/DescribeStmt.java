@@ -32,45 +32,40 @@ import com.cloudera.impala.thrift.TDescribeTableParams;
  * properties, SerDe properties, StorageDescriptor properties, and more.
  */
 public class DescribeStmt extends StatementBase {
-  private final TDescribeTableOutputStyle outputStyle;
-  private TableName table;
+  private final TDescribeTableOutputStyle outputStyle_;
+  private TableName table_;
 
   public DescribeStmt(TableName table, TDescribeTableOutputStyle outputStyle) {
-    this.table = table;
-    this.outputStyle = outputStyle;
+    this.table_ = table;
+    this.outputStyle_ = outputStyle;
   }
 
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("DESCRIBE ");
-    if (outputStyle != TDescribeTableOutputStyle.MINIMAL) {
-      sb.append(outputStyle.toString());
+    if (outputStyle_ != TDescribeTableOutputStyle.MINIMAL) {
+      sb.append(outputStyle_.toString());
     }
-    return sb.toString() + table;
+    return sb.toString() + table_;
   }
 
-  public TableName getTable() {
-    return table;
-  }
-
-  public TDescribeTableOutputStyle getOutputStyle() {
-    return outputStyle;
-  }
+  public TableName getTable() { return table_; }
+  public TDescribeTableOutputStyle getOutputStyle() { return outputStyle_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (!table.isFullyQualified()) {
-      table = new TableName(analyzer.getDefaultDb(), table.getTbl());
+    if (!table_.isFullyQualified()) {
+      table_ = new TableName(analyzer.getDefaultDb(), table_.getTbl());
     }
-    analyzer.getTable(table, Privilege.VIEW_METADATA);
+    analyzer.getTable(table_, Privilege.VIEW_METADATA);
   }
 
   public TDescribeTableParams toThrift() {
     TDescribeTableParams params = new TDescribeTableParams();
     params.setTable_name(getTable().getTbl());
     params.setDb(getTable().getDb());
-    params.setOutput_style(outputStyle);
+    params.setOutput_style(outputStyle_);
     return params;
   }
 }

@@ -29,123 +29,60 @@ import com.google.common.base.Preconditions;
  *
  */
 public class AnalysisContext {
-  private final ImpaladCatalog catalog;
+  private final ImpaladCatalog catalog_;
 
   // The name of the database to use if one is not explicitly specified by a query.
-  private final String defaultDatabase;
+  private final String defaultDatabase_;
 
   // The user who initiated the request.
-  private final User user;
+  private final User user_;
 
   public AnalysisContext(ImpaladCatalog catalog, String defaultDb, User user) {
-    this.catalog = catalog;
-    this.defaultDatabase = defaultDb;
-    this.user = user;
+    this.catalog_ = catalog;
+    this.defaultDatabase_ = defaultDb;
+    this.user_ = user;
   }
 
   static public class AnalysisResult {
-    private StatementBase stmt;
-    private Analyzer analyzer;
+    private StatementBase stmt_;
+    private Analyzer analyzer_;
 
-    public boolean isAlterTableStmt() {
-      return stmt instanceof AlterTableStmt;
-    }
-
-    public boolean isAlterViewStmt() {
-      return stmt instanceof AlterViewStmt;
-    }
-
-    public boolean isComputeStatsStmt() {
-      return stmt instanceof ComputeStatsStmt;
-    }
-
-    public boolean isQueryStmt() {
-      return stmt instanceof QueryStmt;
-    }
-
-    public boolean isInsertStmt() {
-      return stmt instanceof InsertStmt;
-    }
-
-    public boolean isDropDbStmt() {
-      return stmt instanceof DropDbStmt;
-    }
-
+    public boolean isAlterTableStmt() { return stmt_ instanceof AlterTableStmt; }
+    public boolean isAlterViewStmt() { return stmt_ instanceof AlterViewStmt; }
+    public boolean isComputeStatsStmt() { return stmt_ instanceof ComputeStatsStmt; }
+    public boolean isQueryStmt() { return stmt_ instanceof QueryStmt; }
+    public boolean isInsertStmt() { return stmt_ instanceof InsertStmt; }
+    public boolean isDropDbStmt() { return stmt_ instanceof DropDbStmt; }
     public boolean isDropTableOrViewStmt() {
-      return stmt instanceof DropTableOrViewStmt;
+      return stmt_ instanceof DropTableOrViewStmt;
     }
-
-    public boolean isDropFunctionStmt() {
-      return stmt instanceof DropFunctionStmt;
-    }
-
+    public boolean isDropFunctionStmt() { return stmt_ instanceof DropFunctionStmt; }
     public boolean isCreateTableLikeStmt() {
-      return stmt instanceof CreateTableLikeStmt;
+      return stmt_ instanceof CreateTableLikeStmt;
     }
-
-    public boolean isCreateViewStmt() {
-      return stmt instanceof CreateViewStmt;
-    }
-
+    public boolean isCreateViewStmt() { return stmt_ instanceof CreateViewStmt; }
     public boolean isCreateTableAsSelectStmt() {
-      return stmt instanceof CreateTableAsSelectStmt;
+      return stmt_ instanceof CreateTableAsSelectStmt;
     }
-
-    public boolean isCreateTableStmt() {
-      return stmt instanceof CreateTableStmt;
-    }
-
-    public boolean isCreateDbStmt() {
-      return stmt instanceof CreateDbStmt;
-    }
-
-    public boolean isCreateUdfStmt() {
-      return stmt instanceof CreateUdfStmt;
-    }
-
-    public boolean isCreateUdaStmt() {
-      return stmt instanceof CreateUdaStmt;
-    }
-
-    public boolean isLoadDataStmt() {
-      return stmt instanceof LoadDataStmt;
-    }
-
-    public boolean isUseStmt() {
-      return stmt instanceof UseStmt;
-    }
-
-    public boolean isShowTablesStmt() {
-      return stmt instanceof ShowTablesStmt;
-    }
-
-    public boolean isShowDbsStmt() {
-      return stmt instanceof ShowDbsStmt;
-    }
-
-    public boolean isShowStatsStmt() {
-      return stmt instanceof ShowStatsStmt;
-    }
-
-    public boolean isShowFunctionsStmt() {
-      return stmt instanceof ShowFunctionsStmt;
-    }
-
+    public boolean isCreateTableStmt() { return stmt_ instanceof CreateTableStmt; }
+    public boolean isCreateDbStmt() { return stmt_ instanceof CreateDbStmt; }
+    public boolean isCreateUdfStmt() { return stmt_ instanceof CreateUdfStmt; }
+    public boolean isCreateUdaStmt() { return stmt_ instanceof CreateUdaStmt; }
+    public boolean isLoadDataStmt() { return stmt_ instanceof LoadDataStmt; }
+    public boolean isUseStmt() { return stmt_ instanceof UseStmt; }
+    public boolean isShowTablesStmt() { return stmt_ instanceof ShowTablesStmt; }
+    public boolean isShowDbsStmt() { return stmt_ instanceof ShowDbsStmt; }
+    public boolean isShowStatsStmt() { return stmt_ instanceof ShowStatsStmt; }
+    public boolean isShowFunctionsStmt() { return stmt_ instanceof ShowFunctionsStmt; }
     public boolean isShowCreateTableStmt() {
-      return stmt instanceof ShowCreateTableStmt;
+      return stmt_ instanceof ShowCreateTableStmt;
     }
-
-    public boolean isDescribeStmt() {
-      return stmt instanceof DescribeStmt;
-    }
-
-    public boolean isResetMetadataStmt() {
-      return stmt instanceof ResetMetadataStmt;
-    }
+    public boolean isDescribeStmt() { return stmt_ instanceof DescribeStmt; }
+    public boolean isResetMetadataStmt() { return stmt_ instanceof ResetMetadataStmt; }
 
     public boolean isExplainStmt() {
-      if (isQueryStmt()) return ((QueryStmt)stmt).isExplain();
-      if (isInsertStmt()) return ((InsertStmt)stmt).isExplain();
+      if (isQueryStmt()) return ((QueryStmt)stmt_).isExplain();
+      if (isInsertStmt()) return ((InsertStmt)stmt_).isExplain();
       return false;
     }
 
@@ -165,77 +102,77 @@ public class AnalysisContext {
 
     public AlterTableStmt getAlterTableStmt() {
       Preconditions.checkState(isAlterTableStmt());
-      return (AlterTableStmt) stmt;
+      return (AlterTableStmt) stmt_;
     }
 
     public AlterViewStmt getAlterViewStmt() {
       Preconditions.checkState(isAlterViewStmt());
-      return (AlterViewStmt) stmt;
+      return (AlterViewStmt) stmt_;
     }
 
     public ComputeStatsStmt getComputeStatsStmt() {
       Preconditions.checkState(isComputeStatsStmt());
-      return (ComputeStatsStmt) stmt;
+      return (ComputeStatsStmt) stmt_;
     }
 
     public CreateTableLikeStmt getCreateTableLikeStmt() {
       Preconditions.checkState(isCreateTableLikeStmt());
-      return (CreateTableLikeStmt) stmt;
+      return (CreateTableLikeStmt) stmt_;
     }
 
     public CreateViewStmt getCreateViewStmt() {
       Preconditions.checkState(isCreateViewStmt());
-      return (CreateViewStmt) stmt;
+      return (CreateViewStmt) stmt_;
     }
 
     public CreateTableAsSelectStmt getCreateTableAsSelectStmt() {
       Preconditions.checkState(isCreateTableAsSelectStmt());
-      return (CreateTableAsSelectStmt) stmt;
+      return (CreateTableAsSelectStmt) stmt_;
     }
 
     public CreateTableStmt getCreateTableStmt() {
       Preconditions.checkState(isCreateTableStmt());
-      return (CreateTableStmt) stmt;
+      return (CreateTableStmt) stmt_;
     }
 
     public CreateDbStmt getCreateDbStmt() {
       Preconditions.checkState(isCreateDbStmt());
-      return (CreateDbStmt) stmt;
+      return (CreateDbStmt) stmt_;
     }
 
     public CreateUdfStmt getCreateUdfStmt() {
       Preconditions.checkState(isCreateUdfStmt());
-      return (CreateUdfStmt) stmt;
+      return (CreateUdfStmt) stmt_;
     }
 
     public CreateUdaStmt getCreateUdaStmt() {
       Preconditions.checkState(isCreateUdfStmt());
-      return (CreateUdaStmt) stmt;
+      return (CreateUdaStmt) stmt_;
     }
 
     public DropDbStmt getDropDbStmt() {
       Preconditions.checkState(isDropDbStmt());
-      return (DropDbStmt) stmt;
+      return (DropDbStmt) stmt_;
     }
 
     public DropTableOrViewStmt getDropTableOrViewStmt() {
       Preconditions.checkState(isDropTableOrViewStmt());
-      return (DropTableOrViewStmt) stmt;
+      return (DropTableOrViewStmt) stmt_;
     }
 
     public DropFunctionStmt getDropFunctionStmt() {
       Preconditions.checkState(isDropFunctionStmt());
-      return (DropFunctionStmt) stmt;
+      return (DropFunctionStmt) stmt_;
     }
 
     public LoadDataStmt getLoadDataStmt() {
       Preconditions.checkState(isLoadDataStmt());
-      return (LoadDataStmt) stmt;
+      return (LoadDataStmt) stmt_;
     }
 
     public QueryStmt getQueryStmt() {
       Preconditions.checkState(isQueryStmt());
-      return (QueryStmt) stmt;
+      return (QueryStmt) stmt_;
     }
 
     public InsertStmt getInsertStmt() {
@@ -243,55 +180,55 @@ public class AnalysisContext {
         return getCreateTableAsSelectStmt().getInsertStmt();
       } else {
         Preconditions.checkState(isInsertStmt());
-        return (InsertStmt) stmt;
+        return (InsertStmt) stmt_;
       }
     }
 
     public UseStmt getUseStmt() {
       Preconditions.checkState(isUseStmt());
-      return (UseStmt) stmt;
+      return (UseStmt) stmt_;
     }
 
     public ShowTablesStmt getShowTablesStmt() {
       Preconditions.checkState(isShowTablesStmt());
-      return (ShowTablesStmt) stmt;
+      return (ShowTablesStmt) stmt_;
     }
 
     public ShowDbsStmt getShowDbsStmt() {
       Preconditions.checkState(isShowDbsStmt());
-      return (ShowDbsStmt) stmt;
+      return (ShowDbsStmt) stmt_;
     }
 
     public ShowStatsStmt getShowStatsStmt() {
       Preconditions.checkState(isShowStatsStmt());
-      return (ShowStatsStmt) stmt;
+      return (ShowStatsStmt) stmt_;
     }
 
     public ShowFunctionsStmt getShowFunctionsStmt() {
       Preconditions.checkState(isShowFunctionsStmt());
-      return (ShowFunctionsStmt) stmt;
+      return (ShowFunctionsStmt) stmt_;
     }
 
     public DescribeStmt getDescribeStmt() {
       Preconditions.checkState(isDescribeStmt());
-      return (DescribeStmt) stmt;
+      return (DescribeStmt) stmt_;
     }
 
     public ShowCreateTableStmt getShowCreateTableStmt() {
       Preconditions.checkState(isShowCreateTableStmt());
-      return (ShowCreateTableStmt) stmt;
+      return (ShowCreateTableStmt) stmt_;
     }
 
     public StatementBase getStmt() {
-      return stmt;
+      return stmt_;
     }
 
     public Analyzer getAnalyzer() {
-      return analyzer;
+      return analyzer_;
     }
 
     public List<TAccessEvent> getAccessEvents() {
-      return analyzer.getAccessEvents();
+      return analyzer_.getAccessEvents();
     }
   }
 
@@ -310,12 +247,12 @@ public class AnalysisContext {
     SqlParser parser = new SqlParser(input);
     try {
       AnalysisResult result = new AnalysisResult();
-      result.stmt = (StatementBase) parser.parse().value;
-      if (result.stmt == null) {
+      result.stmt_ = (StatementBase) parser.parse().value;
+      if (result.stmt_ == null) {
         return null;
       }
-      result.analyzer = new Analyzer(catalog, defaultDatabase, user);
-      result.stmt.analyze(result.analyzer);
+      result.analyzer_ = new Analyzer(catalog_, defaultDatabase_, user_);
+      result.stmt_.analyze(result.analyzer_);
       return result;
     } catch (AnalysisException e) {
       throw e;

@@ -24,7 +24,7 @@ import com.google.common.base.Preconditions;
 public class NullLiteral extends LiteralExpr {
 
   public NullLiteral() {
-    type = PrimitiveType.NULL_TYPE;
+    type_ = PrimitiveType.NULL_TYPE;
   }
 
   @Override
@@ -53,7 +53,7 @@ public class NullLiteral extends LiteralExpr {
   @Override
   protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isValid());
-    type = targetType;
+    type_ = targetType;
     return this;
   }
 

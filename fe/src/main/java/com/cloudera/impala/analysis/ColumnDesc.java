@@ -29,34 +29,34 @@ import com.cloudera.impala.thrift.TColumn;
  * must be valid according to the Metastore's rules (see @MetaStoreUtils).
  */
 public class ColumnDesc {
-  private final String colName;
-  private final String comment;
+  private final String colName_;
+  private final String comment_;
   // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW stmts.
-  private PrimitiveType colType;
+  private PrimitiveType colType_;
 
   public ColumnDesc(String colName, PrimitiveType colType, String comment) {
-    this.colName = colName;
-    this.colType = colType;
-    this.comment = comment;
+    this.colName_ = colName;
+    this.colType_ = colType;
+    this.comment_ = comment;
   }
 
-  public void setColType(PrimitiveType colType) { this.colType = colType; }
-  public PrimitiveType getColType() { return colType; }
-  public String getColName() { return colName; }
-  public String getComment() { return comment; }
+  public void setColType(PrimitiveType colType) { this.colType_ = colType; }
+  public PrimitiveType getColType() { return colType_; }
+  public String getColName() { return colName_; }
+  public String getComment() { return comment_; }
 
   public void analyze() throws AnalysisException {
     // Check whether the column name meets the Metastore's requirements.
-    if (!MetaStoreUtils.validateName(colName)) {
-      throw new AnalysisException("Invalid column name: " + colName);
+    if (!MetaStoreUtils.validateName(colName_)) {
+      throw new AnalysisException("Invalid column name: " + colName_);
     }
   }
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder(colName);
-    if (colType != null) sb.append(" " + colType.toString());
-    if (comment != null) sb.append(String.format(" COMMENT '%s'", comment));
+    StringBuilder sb = new StringBuilder(colName_);
+    if (colType_ != null) sb.append(" " + colType_.toString());
+    if (comment_ != null) sb.append(String.format(" COMMENT '%s'", comment_));
     return sb.toString();
   }
 

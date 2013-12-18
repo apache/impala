@@ -26,30 +26,26 @@ import com.google.common.base.Preconditions;
  * Represents an ALTER TABLE DROP PARTITION statement.
  */
 public class AlterTableDropPartitionStmt extends AlterTableStmt {
-  private final boolean ifExists;
-  private final PartitionSpec partitionSpec;
+  private final boolean ifExists_;
+  private final PartitionSpec partitionSpec_;
 
   public AlterTableDropPartitionStmt(TableName tableName,
       PartitionSpec partitionSpec, boolean ifExists) {
     super(tableName);
     Preconditions.checkNotNull(partitionSpec);
-    this.partitionSpec = partitionSpec;
-    this.partitionSpec.setTableName(tableName);
-    this.ifExists = ifExists;
+    partitionSpec_ = partitionSpec;
+    partitionSpec_.setTableName(tableName);
+    ifExists_ = ifExists;
   }
 
-  public boolean getIfNotExists() {
-    return ifExists;
-  }
+  public boolean getIfNotExists() { return ifExists_; }
 
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("ALTER TABLE " + getTbl());
     sb.append(" DROP ");
-    if (ifExists) {
-      sb.append("IF EXISTS ");
-    }
-    sb.append(" DROP " + partitionSpec.toSql());
+    if (ifExists_) sb.append("IF EXISTS ");
+    sb.append(" DROP " + partitionSpec_.toSql());
     return sb.toString();
   }
 
@@ -58,8 +54,8 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.DROP_PARTITION);
     TAlterTableDropPartitionParams addPartParams = new TAlterTableDropPartitionParams();
-    addPartParams.setPartition_spec(partitionSpec.toThrift());
-    addPartParams.setIf_exists(ifExists);
+    addPartParams.setPartition_spec(partitionSpec_.toThrift());
+    addPartParams.setIf_exists(ifExists_);
     params.setDrop_partition_params(addPartParams);
     return params;
   }
@@ -68,10 +64,8 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
-    if (!ifExists) {
-      partitionSpec.setPartitionShouldExist();
-    }
-    partitionSpec.setPrivilegeRequirement(Privilege.ALTER);
-    partitionSpec.analyze(analyzer);
+    if (!ifExists_) partitionSpec_.setPartitionShouldExist();
+    partitionSpec_.setPrivilegeRequirement(Privilege.ALTER);
+    partitionSpec_.analyze(analyzer);
   }
 }

@@ -37,22 +37,22 @@ import com.google.common.collect.Lists;
 public class SelectStmt extends QueryStmt {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
 
-  private final SelectList selectList;
-  private final ArrayList<String> colLabels; // lower case column labels
-  private final List<TableRef> tableRefs;
-  private final Expr whereClause;
-  private final ArrayList<Expr> groupingExprs;
-  private final Expr havingClause;  // original having clause
+  private final SelectList selectList_;
+  private final ArrayList<String> colLabels_; // lower case column labels
+  private final List<TableRef> tableRefs_;
+  private final Expr whereClause_;
+  private final ArrayList<Expr> groupingExprs_;
+  private final Expr havingClause_;  // original having clause
 
   // havingClause with aliases and agg output resolved
-  private Expr havingPred;
+  private Expr havingPred_;
 
   // set if we have any kind of aggregation operation, include SELECT DISTINCT
-  private AggregateInfo aggInfo;
+  private AggregateInfo aggInfo_;
 
   // SQL string of this SelectStmt before inline-view expression substitution.
   // Set in analyze().
-  private String sqlString;
+  private String sqlString_;
 
   // substitutes all exprs in this select block to reference base tables
   // directly
@@ -64,39 +64,39 @@ public class SelectStmt extends QueryStmt {
              Expr havingPredicate, ArrayList<OrderByElement> orderByElements,
              LimitElement limitElement) {
     super(orderByElements, limitElement);
-    this.selectList = selectList;
+    this.selectList_ = selectList;
     if (tableRefList == null) {
-      this.tableRefs = Lists.newArrayList();
+      this.tableRefs_ = Lists.newArrayList();
     } else {
-      this.tableRefs = tableRefList;
+      this.tableRefs_ = tableRefList;
     }
-    this.whereClause = wherePredicate;
-    this.groupingExprs = groupingExprs;
-    this.havingClause = havingPredicate;
+    this.whereClause_ = wherePredicate;
+    this.groupingExprs_ = groupingExprs;
+    this.havingClause_ = havingPredicate;
 
-    this.colLabels = Lists.newArrayList();
-    this.havingPred = null;
-    this.aggInfo = null;
+    this.colLabels_ = Lists.newArrayList();
+    this.havingPred_ = null;
+    this.aggInfo_ = null;
     this.sortInfo_ = null;
   }
 
   /**
    * @return the original select list items from the query
    */
-  public SelectList getSelectList() { return selectList; }
+  public SelectList getSelectList() { return selectList_; }
 
   /**
    * @return the HAVING clause post-analysis and with aliases resolved
    */
-  public Expr getHavingPred() { return havingPred; }
+  public Expr getHavingPred() { return havingPred_; }
 
-  public List<TableRef> getTableRefs() { return tableRefs; }
-  public Expr getWhereClause() { return whereClause; }
-  public AggregateInfo getAggInfo() { return aggInfo; }
+  public List<TableRef> getTableRefs() { return tableRefs_; }
+  public Expr getWhereClause() { return whereClause_; }
+  public AggregateInfo getAggInfo() { return aggInfo_; }
   @Override
   public SortInfo getSortInfo() { return sortInfo_; }
   @Override
-  public ArrayList<String> getColLabels() { return colLabels; }
+  public ArrayList<String> getColLabels() { return colLabels_; }
   public Expr.SubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
 
   /**
@@ -108,19 +108,19 @@ public class SelectStmt extends QueryStmt {
     super.analyze(analyzer);
 
     // Replace BaseTableRefs with ViewRefs.
-    substituteViews(analyzer, tableRefs);
+    substituteViews(analyzer, tableRefs_);
 
     // start out with table refs to establish aliases
     TableRef leftTblRef = null;  // the one to the left of tblRef
-    for (TableRef tblRef: tableRefs) {
+    for (TableRef tblRef: tableRefs_) {
       tblRef.setLeftTblRef(leftTblRef);
       tblRef.analyze(analyzer);
       leftTblRef = tblRef;
     }
 
     // populate selectListExprs, aliasSMap, and colNames
-    for (int i = 0; i < selectList.getItems().size(); ++i) {
-      SelectListItem item = selectList.getItems().get(i);
+    for (int i = 0; i < selectList_.getItems().size(); ++i) {
+      SelectListItem item = selectList_.getItems().get(i);
       if (item.isStar()) {
         TableName tblName = item.getTblName();
         if (tblName == null) {
@@ -141,29 +141,29 @@ public class SelectStmt extends QueryStmt {
           ambiguousAliasList_.add(aliasRef);
         }
         aliasSmap_.addMapping(aliasRef, item.getExpr().clone(null));
-        colLabels.add(label);
+        colLabels_.add(label);
       }
     }
 
-    if (whereClause != null) {
-      whereClause.analyze(analyzer);
-      if (whereClause.containsAggregate()) {
+    if (whereClause_ != null) {
+      whereClause_.analyze(analyzer);
+      if (whereClause_.containsAggregate()) {
         throw new AnalysisException(
             "aggregate function not allowed in WHERE clause");
       }
-      whereClause.checkReturnsBool("WHERE clause", false);
-      analyzer.registerConjuncts(whereClause, null, true);
+      whereClause_.checkReturnsBool("WHERE clause", false);
+      analyzer.registerConjuncts(whereClause_, null, true);
     }
 
     createSortInfo(analyzer);
     analyzeAggregation(analyzer);
 
     // Remember the SQL string before inline-view expression substitution.
-    sqlString = toSql();
+    sqlString_ = toSql();
 
     resolveInlineViewRefs(analyzer);
 
-    if (aggInfo != null) LOG.debug("post-analysis " + aggInfo.debugString());
+    if (aggInfo_ != null) LOG.debug("post-analysis " + aggInfo_.debugString());
   }
 
   /**
@@ -198,12 +198,14 @@ public class SelectStmt extends QueryStmt {
         Expr.cloneList(unassignedJoinConjuncts, baseTblSmap_);
     materializeSlots(analyzer, baseTblJoinConjuncts);
 
-    if (aggInfo != null) {
+    if (aggInfo_ != null) {
       // mark all agg exprs needed for HAVING pred as materialized before calling
       // AggregateInfo.materializeRequiredSlots(), otherwise they won't show up in
       // AggregateInfo.getMaterializedAggregateExprs()
-      if (havingPred != null) materializeSlots(analyzer, Lists.newArrayList(havingPred));
-      aggInfo.materializeRequiredSlots(analyzer, baseTblSmap_);
+      if (havingPred_ != null) {
+        materializeSlots(analyzer, Lists.newArrayList(havingPred_));
+      }
+      aggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
 
     if (sortInfo_ != null) {
@@ -247,7 +249,7 @@ public class SelectStmt extends QueryStmt {
     */
   protected void resolveInlineViewRefs(Analyzer analyzer) {
     // Gather the inline view substitution maps from the enclosed inline views
-    for (TableRef tblRef: tableRefs) {
+    for (TableRef tblRef: tableRefs_) {
       if (tblRef instanceof InlineViewRef) {
         InlineViewRef inlineViewRef = (InlineViewRef) tblRef;
         baseTblSmap_ =
@@ -262,7 +264,7 @@ public class SelectStmt extends QueryStmt {
 
   public List<TupleId> getTableRefIds() {
     List<TupleId> result = Lists.newArrayList();
-    for (TableRef ref: tableRefs) {
+    for (TableRef ref: tableRefs_) {
       result.add(ref.getId());
     }
     return result;
@@ -273,11 +275,11 @@ public class SelectStmt extends QueryStmt {
    */
   private void expandStar(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (tableRefs.isEmpty()) {
+    if (tableRefs_.isEmpty()) {
       throw new AnalysisException("'*' expression in select list requires FROM clause.");
     }
     // expand in From clause order
-    for (TableRef tableRef: tableRefs) {
+    for (TableRef tableRef: tableRefs_) {
       expandStar(analyzer, tableRef.getAliasAsName(), tableRef.getDesc());
     }
   }
@@ -304,7 +306,7 @@ public class SelectStmt extends QueryStmt {
       SlotRef slotRef = new SlotRef(tblName, col.getName());
       slotRef.analyze(analyzer);
       resultExprs_.add(slotRef);
-      colLabels.add(col.getName().toLowerCase());
+      colLabels_.add(col.getName().toLowerCase());
     }
   }
 
@@ -319,20 +321,20 @@ public class SelectStmt extends QueryStmt {
    */
   private void analyzeAggregation(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
-    if (groupingExprs == null && !selectList.isDistinct()
+    if (groupingExprs_ == null && !selectList_.isDistinct()
         && !Expr.containsAggregate(resultExprs_)) {
       // we're not computing aggregates
       return;
     }
 
     // If we're computing an aggregate, we must have a FROM clause.
-    if (tableRefs.size() == 0) {
+    if (tableRefs_.size() == 0) {
       throw new AnalysisException(
           "aggregation without a FROM clause is not allowed");
     }
 
-    if ((groupingExprs != null || Expr.containsAggregate(resultExprs_))
-        && selectList.isDistinct()) {
+    if ((groupingExprs_ != null || Expr.containsAggregate(resultExprs_))
+        && selectList_.isDistinct()) {
       throw new AnalysisException(
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     }
@@ -340,8 +342,8 @@ public class SelectStmt extends QueryStmt {
     // disallow '*' and explicit GROUP BY (we can't group by '*', and if you need to
     // name all star-expanded cols in the group by clause you might as well do it
     // in the select list)
-    if (groupingExprs != null) {
-      for (SelectListItem item : selectList.getItems()) {
+    if (groupingExprs_ != null) {
+      for (SelectListItem item : selectList_.getItems()) {
         if (item.isStar()) {
           throw new AnalysisException(
               "cannot combine '*' in select list with GROUP BY: " + item.toSql());
@@ -351,10 +353,10 @@ public class SelectStmt extends QueryStmt {
 
     // analyze grouping exprs
     ArrayList<Expr> groupingExprsCopy = Lists.newArrayList();
-    if (groupingExprs != null) {
+    if (groupingExprs_ != null) {
       // make a deep copy here, we don't want to modify the original
       // exprs during analysis (in case we need to print them later)
-      groupingExprsCopy = Expr.cloneList(groupingExprs, null);
+      groupingExprsCopy = Expr.cloneList(groupingExprs_, null);
       substituteOrdinals(groupingExprsCopy, "GROUP BY");
       Expr ambiguousAlias = getFirstAmbiguousAlias(groupingExprsCopy);
       if (ambiguousAlias != null) {
@@ -368,18 +370,18 @@ public class SelectStmt extends QueryStmt {
           // reference the original expr in the error msg
           throw new AnalysisException(
               "GROUP BY expression must not contain aggregate functions: "
-                  + groupingExprs.get(i).toSql());
+                  + groupingExprs_.get(i).toSql());
         }
       }
     }
 
     // analyze having clause
-    if (havingClause != null) {
+    if (havingClause_ != null) {
       // substitute aliases in place (ordinals not allowed in having clause)
-      havingPred = havingClause.clone(aliasSmap_);
-      havingPred.analyze(analyzer);
-      havingPred.checkReturnsBool("HAVING clause", true);
-      analyzer.registerConjuncts(havingPred, null, false);
+      havingPred_ = havingClause_.clone(aliasSmap_);
+      havingPred_.analyze(analyzer);
+      havingPred_.checkReturnsBool("HAVING clause", true);
+      analyzer.registerConjuncts(havingPred_, null, false);
     }
 
     List<Expr> orderingExprs = null;
@@ -401,9 +403,9 @@ public class SelectStmt extends QueryStmt {
 
     // combine avg smap with the one that produces the final agg output
     AggregateInfo finalAggInfo =
-        aggInfo.getSecondPhaseDistinctAggInfo() != null
-          ? aggInfo.getSecondPhaseDistinctAggInfo()
-          : aggInfo;
+        aggInfo_.getSecondPhaseDistinctAggInfo() != null
+          ? aggInfo_.getSecondPhaseDistinctAggInfo()
+          : aggInfo_;
     Expr.SubstitutionMap combinedSMap =
         Expr.SubstitutionMap.compose(avgSMap, finalAggInfo.getSMap());
     LOG.debug("combined smap: " + combinedSMap.debugString());
@@ -411,20 +413,20 @@ public class SelectStmt extends QueryStmt {
     // change select list, having and ordering exprs to point to agg output
     Expr.substituteList(resultExprs_, combinedSMap);
     LOG.debug("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
-    if (havingPred != null) {
-      havingPred = havingPred.substitute(combinedSMap);
-      LOG.debug("post-agg havingPred: " + havingPred.debugString());
+    if (havingPred_ != null) {
+      havingPred_ = havingPred_.substitute(combinedSMap);
+      LOG.debug("post-agg havingPred: " + havingPred_.debugString());
     }
     Expr.substituteList(orderingExprs, combinedSMap);
     LOG.debug("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
 
     // check that all post-agg exprs point to agg output
-    for (int i = 0; i < selectList.getItems().size(); ++i) {
+    for (int i = 0; i < selectList_.getItems().size(); ++i) {
       if (!resultExprs_.get(i).isBound(finalAggInfo.getAggTupleId())) {
         throw new AnalysisException(
             "select list expression not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
-            + selectList.getItems().get(i).getExpr().toSql());
+            + selectList_.getItems().get(i).getExpr().toSql());
       }
     }
     if (orderByElements_ != null) {
@@ -437,12 +439,12 @@ public class SelectStmt extends QueryStmt {
         }
       }
     }
-    if (havingPred != null) {
-      if (!havingPred.isBound(finalAggInfo.getAggTupleId())) {
+    if (havingPred_ != null) {
+      if (!havingPred_.isBound(finalAggInfo.getAggTupleId())) {
         throw new AnalysisException(
             "HAVING clause not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
-            + havingClause.toSql());
+            + havingClause_.toSql());
       }
     }
   }
@@ -450,8 +452,8 @@ public class SelectStmt extends QueryStmt {
   private ArrayList<FunctionCallExpr> collectAggExprs() {
     ArrayList<FunctionCallExpr> result = Lists.newArrayList();
     Expr.collectAggregateExprs(resultExprs_, result);
-    if (havingPred != null) {
-      havingPred.collectAggregateExprs(result);
+    if (havingPred_ != null) {
+      havingPred_.collectAggregateExprs(result);
     }
     if (sortInfo_ != null) {
       Expr.collectAggregateExprs(sortInfo_.getOrderingExprs(), result);
@@ -473,13 +475,13 @@ public class SelectStmt extends QueryStmt {
       }
       // Transform avg(TIMESTAMP) to cast(avg(cast(TIMESTAMP as DOUBLE)) as TIMESTAMP)
       CastExpr inCastExpr = null;
-      if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
+      if (aggExpr.getChild(0).type_ == PrimitiveType.TIMESTAMP) {
         inCastExpr =
             new CastExpr(PrimitiveType.DOUBLE, aggExpr.getChild(0).clone(null), false);
       }
 
       List<Expr> sumInputExprs =
-          Lists.newArrayList(aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP ?
+          Lists.newArrayList(aggExpr.getChild(0).type_ == PrimitiveType.TIMESTAMP ?
               inCastExpr : aggExpr.getChild(0).clone(null));
       List<Expr> countInputExpr = Lists.newArrayList(aggExpr.getChild(0).clone(null));
 
@@ -492,7 +494,7 @@ public class SelectStmt extends QueryStmt {
       ArithmeticExpr divExpr =
           new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);
 
-      if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
+      if (aggExpr.getChild(0).type_ == PrimitiveType.TIMESTAMP) {
         CastExpr outCastExpr = new CastExpr(PrimitiveType.TIMESTAMP, divExpr, false);
         outCastExpr.analyze(analyzer);
         result.addMapping(aggExpr, outCastExpr);
@@ -511,16 +513,16 @@ public class SelectStmt extends QueryStmt {
   private void createAggInfo(ArrayList<Expr> groupingExprs,
       ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
       throws AnalysisException, InternalException, AuthorizationException {
-    if (selectList.isDistinct()) {
+    if (selectList_.isDistinct()) {
        // Create aggInfo for SELECT DISTINCT ... stmt:
        // - all select list items turn into grouping exprs
        // - there are no aggregate exprs
       Preconditions.checkState(groupingExprs.isEmpty());
       Preconditions.checkState(aggExprs.isEmpty());
-      aggInfo =
+      aggInfo_ =
           AggregateInfo.create(Expr.cloneList(resultExprs_, null), null, null, analyzer);
     } else {
-      aggInfo = AggregateInfo.create(groupingExprs, aggExprs, null, analyzer);
+      aggInfo_ = AggregateInfo.create(groupingExprs, aggExprs, null, analyzer);
     }
   }
 
@@ -546,18 +548,18 @@ public class SelectStmt extends QueryStmt {
         throw new AnalysisException(
             errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
       }
-      if (pos > selectList.getItems().size()) {
+      if (pos > selectList_.getItems().size()) {
         throw new AnalysisException(
             errorPrefix + ": ordinal exceeds number of items in select list: "
             + expr.toSql());
       }
-      if (selectList.getItems().get((int) pos - 1).isStar()) {
+      if (selectList_.getItems().get((int) pos - 1).isStar()) {
         throw new AnalysisException(
             errorPrefix + ": ordinal refers to '*' in select list: "
             + expr.toSql());
       }
       // create copy to protect against accidentally shared state
-      i.set(selectList.getItems().get((int)pos - 1).getExpr().clone(null));
+      i.set(selectList_.getItems().get((int)pos - 1).getExpr().clone(null));
     }
   }
 
@@ -567,7 +569,7 @@ public class SelectStmt extends QueryStmt {
   @Override
   public String toSql() {
     // Return the SQL string before inline-view expression substitution.
-    if (sqlString != null) return sqlString;
+    if (sqlString_ != null) return sqlString_;
 
     StringBuilder strBuilder = new StringBuilder();
     if (withClause_ != null) {
@@ -577,37 +579,37 @@ public class SelectStmt extends QueryStmt {
 
     // Select list
     strBuilder.append("SELECT ");
-    if (selectList.isDistinct()) {
+    if (selectList_.isDistinct()) {
       strBuilder.append("DISTINCT ");
     }
-    for (int i = 0; i < selectList.getItems().size(); ++i) {
-      strBuilder.append(selectList.getItems().get(i).toSql());
-      strBuilder.append((i+1 != selectList.getItems().size()) ? ", " : "");
+    for (int i = 0; i < selectList_.getItems().size(); ++i) {
+      strBuilder.append(selectList_.getItems().get(i).toSql());
+      strBuilder.append((i+1 != selectList_.getItems().size()) ? ", " : "");
     }
     // From clause
-    if (!tableRefs.isEmpty()) {
+    if (!tableRefs_.isEmpty()) {
       strBuilder.append(" FROM ");
-      for (int i = 0; i < tableRefs.size(); ++i) {
-        strBuilder.append(tableRefs.get(i).toSql());
+      for (int i = 0; i < tableRefs_.size(); ++i) {
+        strBuilder.append(tableRefs_.get(i).toSql());
       }
     }
     // Where clause
-    if (whereClause != null) {
+    if (whereClause_ != null) {
       strBuilder.append(" WHERE ");
-      strBuilder.append(whereClause.toSql());
+      strBuilder.append(whereClause_.toSql());
     }
     // Group By clause
-    if (groupingExprs != null) {
+    if (groupingExprs_ != null) {
       strBuilder.append(" GROUP BY ");
-      for (int i = 0; i < groupingExprs.size(); ++i) {
-        strBuilder.append(groupingExprs.get(i).toSql());
-        strBuilder.append((i+1 != groupingExprs.size()) ? ", " : "");
+      for (int i = 0; i < groupingExprs_.size(); ++i) {
+        strBuilder.append(groupingExprs_.get(i).toSql());
+        strBuilder.append((i+1 != groupingExprs_.size()) ? ", " : "");
       }
     }
     // Having clause
-    if (havingClause != null) {
+    if (havingClause_ != null) {
       strBuilder.append(" HAVING ");
-      strBuilder.append(havingClause.toSql());
+      strBuilder.append(havingClause_.toSql());
     }
     // Order By clause
     if (orderByElements_ != null) {
@@ -626,15 +628,15 @@ public class SelectStmt extends QueryStmt {
   public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
     // If select statement has an aggregate, then the aggregate tuple id is materialized.
     // Otherwise, all referenced tables are materialized.
-    if (aggInfo != null) {
+    if (aggInfo_ != null) {
       // Return the tuple id produced in the final aggregation step.
-      if (aggInfo.isDistinctAgg()) {
-        tupleIdList.add(aggInfo.getSecondPhaseDistinctAggInfo().getAggTupleId());
+      if (aggInfo_.isDistinctAgg()) {
+        tupleIdList.add(aggInfo_.getSecondPhaseDistinctAggInfo().getAggTupleId());
       } else {
-        tupleIdList.add(aggInfo.getAggTupleId());
+        tupleIdList.add(aggInfo_.getAggTupleId());
       }
     } else {
-      for (TableRef tblRef: tableRefs) {
+      for (TableRef tblRef: tableRefs_) {
         tupleIdList.addAll(tblRef.getMaterializedTupleIds());
       }
     }
@@ -642,7 +644,7 @@ public class SelectStmt extends QueryStmt {
 
   private ArrayList<TableRef> cloneTableRefs() {
     ArrayList<TableRef> clone = Lists.newArrayList();
-    for (TableRef tblRef : tableRefs) {
+    for (TableRef tblRef : tableRefs_) {
       clone.add(tblRef.clone());
     }
     return clone;
@@ -650,10 +652,10 @@ public class SelectStmt extends QueryStmt {
 
   @Override
   public QueryStmt clone() {
-    SelectStmt selectClone = new SelectStmt(selectList.clone(), cloneTableRefs(),
-        (whereClause != null) ? whereClause.clone(null) : null,
-        (groupingExprs != null) ? Expr.cloneList(groupingExprs, null) : null,
-        (havingClause != null) ? havingClause.clone(null) : null,
+    SelectStmt selectClone = new SelectStmt(selectList_.clone(), cloneTableRefs(),
+        (whereClause_ != null) ? whereClause_.clone(null) : null,
+        (groupingExprs_ != null) ? Expr.cloneList(groupingExprs_, null) : null,
+        (havingClause_ != null) ? havingClause_.clone(null) : null,
         cloneOrderByElements(),
         (limitElement_ != null) ? limitElement_.clone(null) : null);
     selectClone.setWithClause(cloneWithClause());

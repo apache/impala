@@ -48,7 +48,7 @@ public class ExchangeNode extends PlanNode {
   public void addChild(PlanNode node, boolean copyConjuncts) {
     // This ExchangeNode 'inherits' several parameters from its children.
     // Ensure that all children agree on them.
-    if (!children.isEmpty()) {
+    if (!children_.isEmpty()) {
       Preconditions.checkState(limit_ == node.limit_);
       Preconditions.checkState(tupleIds_.equals(node.tupleIds_));
       Preconditions.checkState(rowTupleIds_.equals(node.rowTupleIds_));
@@ -62,7 +62,7 @@ public class ExchangeNode extends PlanNode {
       compactData_ = node.compactData_;
     }
     if (copyConjuncts) conjuncts_.addAll(Expr.cloneList(node.conjuncts_, null));
-    children.add(node);
+    children_.add(node);
   }
 
   @Override
@@ -73,10 +73,10 @@ public class ExchangeNode extends PlanNode {
 
   @Override
   public void computeStats(Analyzer analyzer) {
-    Preconditions.checkState(!children.isEmpty(),
+    Preconditions.checkState(!children_.isEmpty(),
         "ExchangeNode must have at least one child");
     cardinality_ = 0;
-    for (PlanNode child: children) {
+    for (PlanNode child: children_) {
       if (child.getCardinality() == -1) {
         cardinality_ = -1;
         break;
@@ -95,7 +95,7 @@ public class ExchangeNode extends PlanNode {
     // Pick the max numNodes_ and avgRowSize_ of all children.
     numNodes_ = Integer.MIN_VALUE;
     avgRowSize_ = Integer.MIN_VALUE;
-    for (PlanNode child: children) {
+    for (PlanNode child: children_) {
       numNodes_ = Math.max(child.numNodes_, numNodes_);
       avgRowSize_ =  Math.max(child.numNodes_, numNodes_);
     }
@@ -103,7 +103,7 @@ public class ExchangeNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    Preconditions.checkState(!children.isEmpty(),
+    Preconditions.checkState(!children_.isEmpty(),
         "ExchangeNode must have at least one child");
     msg.node_type = TPlanNodeType.EXCHANGE_NODE;
     msg.exchange_node = new TExchangeNode();

@@ -18,7 +18,7 @@ import java.util.List;
 
 import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TFunction;
@@ -66,7 +66,7 @@ public class Function implements CatalogObject {
 
   // Absolute path in HDFS for the binary that contains this function.
   // e.g. /udfs/udfs.jar
-  private HdfsURI location_;
+  private HdfsUri location_;
   private TFunctionBinaryType binaryType_;
   private long catalogVersion_ =  Catalog.INITIAL_CATALOG_VERSION;
 
@@ -99,7 +99,7 @@ public class Function implements CatalogObject {
   public PrimitiveType[] getArgs() { return argTypes_; }
   // Returns the number of arguments to this function.
   public int getNumArgs() { return argTypes_.length; }
-  public HdfsURI getLocation() { return location_; }
+  public HdfsUri getLocation() { return location_; }
   public TFunctionBinaryType getBinaryType() { return binaryType_; }
   public boolean hasVarArgs() { return hasVarArgs_; }
   public PrimitiveType getVarArgsType() {
@@ -109,7 +109,7 @@ public class Function implements CatalogObject {
   }
 
   public void setName(FunctionName name) { name_ = name; }
-  public void setLocation(HdfsURI loc) { location_ = loc; }
+  public void setLocation(HdfsUri loc) { location_ = loc; }
   public void setBinaryType(TFunctionBinaryType type) { binaryType_ = type; }
   public void setHasVarArgs(boolean v) { hasVarArgs_ = v; }
 
@@ -250,14 +250,14 @@ public class Function implements CatalogObject {
     Function function = null;
     if (fn.isSetScalar_fn()) {
       function = new Udf(FunctionName.fromThrift(fn.getName()), argTypes,
-          PrimitiveType.fromThrift(fn.getRet_type()), new HdfsURI(fn.getHdfs_location()),
+          PrimitiveType.fromThrift(fn.getRet_type()), new HdfsUri(fn.getHdfs_location()),
           fn.getScalar_fn().getSymbol());
     } else if (fn.isSetAggregate_fn()) {
       TAggregateFunction aggFn = fn.getAggregate_fn();
       function = new Uda(FunctionName.fromThrift(fn.getName()), argTypes,
           PrimitiveType.fromThrift(fn.getRet_type()),
           ColumnType.fromThrift(aggFn.getIntermediate_type()),
-          new HdfsURI(fn.getHdfs_location()), aggFn.getUpdate_fn_symbol(),
+          new HdfsUri(fn.getHdfs_location()), aggFn.getUpdate_fn_symbol(),
           aggFn.getInit_fn_symbol(), aggFn.getSerialize_fn_symbol(),
           aggFn.getMerge_fn_symbol(), aggFn.getFinalize_fn_symbol());
     } else {

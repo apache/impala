@@ -19,11 +19,11 @@ package com.cloudera.impala.analysis;
  * Combination of expr, ASC/DESC, and nulls ordering.
  */
 class OrderByElement {
-  private final Expr expr;
-  private final boolean isAsc;
+  private final Expr expr_;
+  private final boolean isAsc_;
   // Represents the NULLs ordering specified: true when "NULLS FIRST", false when
   // "NULLS LAST", and null if not specified.
-  private final Boolean nullsFirstParam;
+  private final Boolean nullsFirstParam_;
 
   /**
    * Constructs the OrderByElement.
@@ -33,28 +33,28 @@ class OrderByElement {
    */
   public OrderByElement(Expr expr, boolean isAsc, Boolean nullsFirstParam) {
     super();
-    this.expr = expr;
-    this.isAsc = isAsc;
-    this.nullsFirstParam = nullsFirstParam;
+    this.expr_ = expr;
+    this.isAsc_ = isAsc;
+    this.nullsFirstParam_ = nullsFirstParam;
   }
 
-  public Expr getExpr() { return expr; }
-  public boolean getIsAsc() { return isAsc; }
-  public Boolean getNullsFirstParam() { return nullsFirstParam; }
+  public Expr getExpr() { return expr_; }
+  public boolean getIsAsc() { return isAsc_; }
+  public Boolean getNullsFirstParam() { return nullsFirstParam_; }
 
   public String toSql() {
     StringBuilder strBuilder = new StringBuilder();
-    strBuilder.append(expr.toSql());
-    strBuilder.append(isAsc ? " ASC" : " DESC");
+    strBuilder.append(expr_.toSql());
+    strBuilder.append(isAsc_ ? " ASC" : " DESC");
     // When ASC and NULLS LAST or DESC and NULLS FIRST, we do not print NULLS FIRST/LAST
     // because it is the default behavior and we want to avoid printing NULLS FIRST/LAST
     // whenever possible as it is incompatible with Hive (SQL compatibility with Hive is
     // important for views).
-    if (nullsFirstParam != null) {
-      if (isAsc && nullsFirstParam) {
+    if (nullsFirstParam_ != null) {
+      if (isAsc_ && nullsFirstParam_) {
         // If ascending, nulls are last by default, so only add if nulls first.
         strBuilder.append(" NULLS FIRST");
-      } else if (!isAsc && !nullsFirstParam) {
+      } else if (!isAsc_ && !nullsFirstParam_) {
         // If descending, nulls are first by default, so only add if nulls last.
         strBuilder.append(" NULLS LAST");
       }

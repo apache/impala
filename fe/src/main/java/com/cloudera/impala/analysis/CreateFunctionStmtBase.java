@@ -52,7 +52,7 @@ public class CreateFunctionStmtBase extends StatementBase {
   // Set in analyze()
   protected String sqlString_;
 
-  protected CreateFunctionStmtBase(Function fn, HdfsURI location, boolean ifNotExists,
+  protected CreateFunctionStmtBase(Function fn, HdfsUri location, boolean ifNotExists,
       HashMap<OptArg, String> optArgs) {
     fn_ = fn;
     fn_.setLocation(location);

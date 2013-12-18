@@ -29,36 +29,36 @@ import com.google.common.base.Preconditions;
  * Represents an ALTER TABLE/VIEW RENAME statement.
  */
 public class AlterTableOrViewRenameStmt extends AlterTableStmt {
-  protected final TableName newTableName;
+  protected final TableName newTableName_;
 
   // Set during analysis
-  protected String newDbName;
+  protected String newDbName_;
 
   //  True if we are renaming a table. False if we are renaming a view.
-  protected final boolean renameTable;
+  protected final boolean renameTable_;
 
   public AlterTableOrViewRenameStmt(TableName oldTableName, TableName newTableName,
       boolean renameTable) {
     super(oldTableName);
     Preconditions.checkState(newTableName != null && !newTableName.isEmpty());
-    this.newTableName = newTableName;
-    this.renameTable = renameTable;
+    newTableName_ = newTableName;
+    renameTable_ = renameTable;
   }
 
   public String getNewTbl() {
-    return newTableName.getTbl();
+    return newTableName_.getTbl();
   }
 
   public String getNewDb() {
-    Preconditions.checkNotNull(newDbName);
-    return newDbName;
+    Preconditions.checkNotNull(newDbName_);
+    return newDbName_;
   }
 
   @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(
-        (renameTable) ? TAlterTableType.RENAME_TABLE : TAlterTableType.RENAME_VIEW);
+        (renameTable_) ? TAlterTableType.RENAME_TABLE : TAlterTableType.RENAME_VIEW);
     TAlterTableOrViewRenameParams renameParams =
         new TAlterTableOrViewRenameParams(new TTableName(getNewDb(), getNewTbl()));
     params.setRename_params(renameParams);
@@ -68,22 +68,22 @@ public class AlterTableOrViewRenameStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    newTableName.analyze();
-    table = analyzer.getTable(tableName, Privilege.ALTER);
-    if (table instanceof View && renameTable) {
+    newTableName_.analyze();
+    table_ = analyzer.getTable(tableName_, Privilege.ALTER);
+    if (table_ instanceof View && renameTable_) {
       throw new AnalysisException(String.format(
-          "ALTER TABLE not allowed on a view: %s", table.getFullName()));
+          "ALTER TABLE not allowed on a view: %s", table_.getFullName()));
     }
-    if (!(table instanceof View) && !renameTable) {
+    if (!(table_ instanceof View) && !renameTable_) {
       throw new AnalysisException(String.format(
-          "ALTER VIEW not allowed on a table: %s", table.getFullName()));
+          "ALTER VIEW not allowed on a table: %s", table_.getFullName()));
     }
-    newDbName = analyzer.getTargetDbName(newTableName);
-    if (analyzer.dbContainsTable(newDbName, newTableName.getTbl(), Privilege.CREATE)) {
+    newDbName_ = analyzer.getTargetDbName(newTableName_);
+    if (analyzer.dbContainsTable(newDbName_, newTableName_.getTbl(), Privilege.CREATE)) {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
-          String.format("%s.%s", newDbName, getNewTbl()));
+          String.format("%s.%s", newDbName_, getNewTbl()));
     }
-    analyzer.addAccessEvent(new TAccessEvent(newDbName + "." + newTableName.getTbl(),
-        table.getCatalogObjectType(), Privilege.CREATE.toString()));
+    analyzer.addAccessEvent(new TAccessEvent(newDbName_ + "." + newTableName_.getTbl(),
+        table_.getCatalogObjectType(), Privilege.CREATE.toString()));
   }
 }

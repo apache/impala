@@ -35,24 +35,22 @@ import com.google.common.collect.Sets;
  * Represents an ALTER TABLE ADD|REPLACE COLUMNS (colDef1, colDef2, ...) statement.
  */
 public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
-  private final List<ColumnDesc> columnDefs;
-  private final boolean replaceExistingCols;
+  private final List<ColumnDesc> columnDefs_;
+  private final boolean replaceExistingCols_;
 
   public AlterTableAddReplaceColsStmt(TableName tableName, List<ColumnDesc> columnDefs,
       boolean replaceExistingCols) {
     super(tableName);
     Preconditions.checkState(columnDefs != null && columnDefs.size() > 0);
-    this.columnDefs = Lists.newArrayList(columnDefs);
-    this.replaceExistingCols = replaceExistingCols;
+    columnDefs_ = Lists.newArrayList(columnDefs);
+    replaceExistingCols_ = replaceExistingCols;
   }
 
-  public List<ColumnDesc> getColumnDescs() {
-    return columnDefs;
-  }
+  public List<ColumnDesc> getColumnDescs() { return columnDefs_; }
 
   // Replace columns instead of appending new columns.
   public boolean getReplaceExistingCols() {
-    return replaceExistingCols;
+    return replaceExistingCols_;
   }
 
   @Override
@@ -63,7 +61,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     for (ColumnDesc col: getColumnDescs()) {
       colParams.addToColumns(col.toThrift());
     }
-    colParams.setReplace_existing_cols(replaceExistingCols);
+    colParams.setReplace_existing_cols(replaceExistingCols_);
     params.setAdd_replace_cols_params(colParams);
     return params;
   }
@@ -90,7 +88,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     // are all valid and unique, and that none of the columns conflict with
     // partition columns.
     Set<String> colNames = Sets.newHashSet();
-    for (ColumnDesc c: columnDefs) {
+    for (ColumnDesc c: columnDefs_) {
       c.analyze();
       String colName = c.getColName().toLowerCase();
       if (existingPartitionKeys.contains(colName)) {
@@ -99,7 +97,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
       }
 
       Column col = t.getColumn(colName);
-      if (col != null && !replaceExistingCols) {
+      if (col != null && !replaceExistingCols_) {
         throw new AnalysisException("Column already exists: " + colName);
       } else if (!colNames.add(colName)) {
         throw new AnalysisException("Duplicate column name: " + colName);

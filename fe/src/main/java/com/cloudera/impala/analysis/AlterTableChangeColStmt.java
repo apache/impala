@@ -31,33 +31,28 @@ import com.google.common.base.Preconditions;
  * newColDef statements in the future my making colName optional.
  */
 public class AlterTableChangeColStmt extends AlterTableStmt {
-  private final String colName;
-  private final ColumnDesc newColDef;
+  private final String colName_;
+  private final ColumnDesc newColDef_;
 
   public AlterTableChangeColStmt(TableName tableName, String colName,
       ColumnDesc newColDef) {
     super(tableName);
     Preconditions.checkNotNull(newColDef);
     Preconditions.checkState(colName != null && !colName.isEmpty());
-    this.colName = colName;
-    this.newColDef = newColDef;
+    colName_ = colName;
+    newColDef_ = newColDef;
   }
 
-  public String getColName() {
-    return colName;
-  }
-
-  public ColumnDesc getNewColDef() {
-    return newColDef;
-  }
+  public String getColName() { return colName_; }
+  public ColumnDesc getNewColDef() { return newColDef_; }
 
   @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.CHANGE_COLUMN);
     TAlterTableChangeColParams colParams = new TAlterTableChangeColParams();
-    colParams.setCol_name(colName);
-    colParams.setNew_col_def(newColDef.toThrift());
+    colParams.setCol_name(colName_);
+    colParams.setNew_col_def(newColDef_.toThrift());
     params.setChange_col_params(colParams);
     return params;
   }
@@ -77,29 +72,29 @@ public class AlterTableChangeColStmt extends AlterTableStmt {
 
     // Verify there are no conflicts with partition columns.
     for (FieldSchema fs: t.getMetaStoreTable().getPartitionKeys()) {
-      if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
-        throw new AnalysisException("Cannot modify partition column: " + colName);
+      if (fs.getName().toLowerCase().equals(colName_.toLowerCase())) {
+        throw new AnalysisException("Cannot modify partition column: " + colName_);
       }
-      if (fs.getName().toLowerCase().equals(newColDef.getColName().toLowerCase())) {
+      if (fs.getName().toLowerCase().equals(newColDef_.getColName().toLowerCase())) {
         throw new AnalysisException(
             "Column name conflicts with existing partition column: " +
-            newColDef.getColName());
+            newColDef_.getColName());
       }
     }
 
     // Verify the column being modified exists in the table
-    if (t.getColumn(colName) == null) {
+    if (t.getColumn(colName_) == null) {
       throw new AnalysisException(String.format(
-          "Column '%s' does not exist in table: %s", colName, tableName));
+          "Column '%s' does not exist in table: %s", colName_, tableName));
     }
 
     // Check that the new column def's name is valid.
-    newColDef.analyze();
+    newColDef_.analyze();
     // Verify that if the column name is being changed, the new name doesn't conflict
     // with an existing column.
-    if (!colName.toLowerCase().equals(newColDef.getColName().toLowerCase()) &&
-        t.getColumn(newColDef.getColName()) != null) {
-      throw new AnalysisException("Column already exists: " + newColDef.getColName());
+    if (!colName_.toLowerCase().equals(newColDef_.getColName().toLowerCase()) &&
+        t.getColumn(newColDef_.getColName()) != null) {
+      throw new AnalysisException("Column already exists: " + newColDef_.getColName());
     }
   }
 }

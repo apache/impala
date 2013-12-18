@@ -20,7 +20,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.FunctionName;
-import com.cloudera.impala.analysis.HdfsURI;
+import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
@@ -559,7 +559,7 @@ public class CatalogTest {
     assertEquals(fnNames.size(), 0);
 
     Udf udf1 = new Udf(new FunctionName("default", "Foo"),
-        args1, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
+        args1, PrimitiveType.INVALID_TYPE, new HdfsUri("/Foo"), "Foo.class");
     catalog.addFunction(udf1);
     fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 1);
@@ -567,7 +567,7 @@ public class CatalogTest {
 
     // Same function name, overloaded arguments
     Udf udf2 = new Udf(new FunctionName("default", "Foo"),
-        args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
+        args2, PrimitiveType.INVALID_TYPE, new HdfsUri("/Foo"), "Foo.class");
     catalog.addFunction(udf2);
     fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
@@ -576,7 +576,7 @@ public class CatalogTest {
 
     // Add a function with a new name
     Udf udf3 = new Udf(new FunctionName("default", "Bar"),
-        args2, PrimitiveType.INVALID_TYPE, new HdfsURI("/Foo"), "Foo.class");
+        args2, PrimitiveType.INVALID_TYPE, new HdfsUri("/Foo"), "Foo.class");
     catalog.addFunction(udf3);
     fnNames = catalog.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 3);

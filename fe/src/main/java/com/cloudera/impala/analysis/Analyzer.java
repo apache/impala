@@ -85,15 +85,15 @@ public class Analyzer {
 
   private final static Logger LOG = LoggerFactory.getLogger(Analyzer.class);
 
-  private final User user;
+  private final User user_;
 
   // true if the corresponding select block has a limit clause
-  private boolean hasLimit = false;
+  private boolean hasLimit_ = false;
 
   // Current depth of nested analyze() calls. Used for enforcing a
   // maximum expr-tree depth. Needs to be manually maintained by the user
   // of this Analyzer with incrementCallDepth() and decrementCallDepth().
-  private int callDepth = 0;
+  private int callDepth_ = 0;
 
   // state shared between all objects of an Analyzer tree
   private static class GlobalState {
@@ -176,27 +176,27 @@ public class Analyzer {
     }
   };
 
-  private final GlobalState globalState;
+  private final GlobalState globalState_;
 
   // An analyzer stores analysis state for a single select block. A select block can be
   // a top level select statement, or an inline view select block.
   // ancestors contains the Analyzers of the enclosing select blocks of 'this'
   // (ancestors[0] contains the immediate parent, etc.).
-  private final ArrayList<Analyzer> ancestors;
+  private final ArrayList<Analyzer> ancestors_;
 
   // map from lowercase table alias to a view definition of a WITH clause.
-  private final Map<String, ViewRef> withClauseViews = Maps.newHashMap();
+  private final Map<String, ViewRef> withClauseViews_ = Maps.newHashMap();
 
   // map from lowercase table alias to descriptor.
-  private final Map<String, TupleDescriptor> aliasMap = Maps.newHashMap();
+  private final Map<String, TupleDescriptor> aliasMap_ = Maps.newHashMap();
 
   // map from lowercase qualified column name ("alias.col") to descriptor
-  private final Map<String, SlotDescriptor> slotRefMap = Maps.newHashMap();
+  private final Map<String, SlotDescriptor> slotRefMap_ = Maps.newHashMap();
 
   public Analyzer(ImpaladCatalog catalog, String defaultDb, User user) {
-    this.ancestors = Lists.newArrayList();
-    this.globalState = new GlobalState(catalog, defaultDb, user);
-    this.user = user;
+    this.ancestors_ = Lists.newArrayList();
+    this.globalState_ = new GlobalState(catalog, defaultDb, user);
+    this.user_ = user;
   }
 
   /**
@@ -205,12 +205,12 @@ public class Analyzer {
    * Performs the analysis as the given user that is required to be non null.
    */
   public Analyzer(Analyzer parentAnalyzer, User user) {
-    this.ancestors = Lists.newArrayList(parentAnalyzer);
-    this.ancestors.addAll(parentAnalyzer.ancestors);
-    this.globalState = parentAnalyzer.globalState;
+    this.ancestors_ = Lists.newArrayList(parentAnalyzer);
+    this.ancestors_.addAll(parentAnalyzer.ancestors_);
+    this.globalState_ = parentAnalyzer.globalState_;
 
     Preconditions.checkNotNull(user);
-    this.user = user;
+    this.user_ = user;
   }
 
   /**
@@ -218,9 +218,9 @@ public class Analyzer {
    * map
    */
   public void substitute(Expr.SubstitutionMap sMap) {
-    for (ExprId id: globalState.conjuncts.keySet()) {
-      globalState.conjuncts.put(
-          id, (Predicate) globalState.conjuncts.get(id).substitute(sMap));
+    for (ExprId id: globalState_.conjuncts.keySet()) {
+      globalState_.conjuncts.put(
+          id, (Predicate) globalState_.conjuncts.get(id).substitute(sMap));
     }
   }
 
@@ -243,9 +243,9 @@ public class Analyzer {
       Analyzer analyzer = this;
       do {
         String baseTableName = ref.getName().getTbl().toLowerCase();
-        ViewRef view = analyzer.withClauseViews.get(baseTableName);
+        ViewRef view = analyzer.withClauseViews_.get(baseTableName);
         if (view != null) return view;
-        analyzer = (analyzer.ancestors.isEmpty() ? null : analyzer.ancestors.get(0));
+        analyzer = (analyzer.ancestors_.isEmpty() ? null : analyzer.ancestors_.get(0));
       } while (analyzer != null);
     }
     if (!searchCatalog) return null;
@@ -276,7 +276,7 @@ public class Analyzer {
    * definition with the same alias has already been registered.
    */
   public void registerWithClauseView(ViewRef ref) throws AnalysisException {
-    if (withClauseViews.put(ref.getAlias().toLowerCase(), ref) != null) {
+    if (withClauseViews_.put(ref.getAlias().toLowerCase(), ref) != null) {
       throw new AnalysisException(
           String.format("Duplicate table alias: '%s'", ref.getAlias()));
     }
@@ -292,7 +292,7 @@ public class Analyzer {
   public TupleDescriptor registerBaseTableRef(BaseTableRef ref)
       throws AnalysisException, AuthorizationException {
     String lookupAlias = ref.getAlias().toLowerCase();
-    if (aliasMap.containsKey(lookupAlias)) {
+    if (aliasMap_.containsKey(lookupAlias)) {
       throw new AnalysisException("Duplicate table alias: '" + lookupAlias + "'");
     }
 
@@ -300,10 +300,10 @@ public class Analyzer {
     // Views should have been substituted already.
     Preconditions.checkState(!(tbl instanceof View),
         String.format("View %s has not been properly substituted.", tbl.getFullName()));
-    TupleDescriptor result = globalState.descTbl.createTupleDescriptor();
+    TupleDescriptor result = globalState_.descTbl.createTupleDescriptor();
     result.setTable(tbl);
     result.setAlias(lookupAlias);
-    aliasMap.put(lookupAlias, result);
+    aliasMap_.put(lookupAlias, result);
     return result;
   }
 
@@ -312,9 +312,9 @@ public class Analyzer {
    */
   public void registerOuterJoinedTids(List<TupleId> tids, TableRef rhsRef) {
     for (TupleId tid: tids) {
-      globalState.outerJoinedTupleIds.put(tid, rhsRef);
+      globalState_.outerJoinedTupleIds.put(tid, rhsRef);
     }
-    LOG.trace("registerOuterJoinedTids: " + globalState.outerJoinedTupleIds.toString());
+    LOG.trace("registerOuterJoinedTids: " + globalState_.outerJoinedTupleIds.toString());
   }
 
   /**
@@ -330,13 +330,13 @@ public class Analyzer {
   public TupleDescriptor registerInlineViewRef(InlineViewRef ref)
       throws AnalysisException {
     String lookupAlias = ref.getAlias().toLowerCase();
-    if (aliasMap.containsKey(lookupAlias)) {
+    if (aliasMap_.containsKey(lookupAlias)) {
       throw new AnalysisException("Duplicate table alias: '" + lookupAlias + "'");
     }
     // Delegate creation of the tuple descriptor to the concrete inline view ref.
-    TupleDescriptor tupleDesc = ref.createTupleDescriptor(globalState.descTbl);
+    TupleDescriptor tupleDesc = ref.createTupleDescriptor(globalState_.descTbl);
     tupleDesc.setAlias(lookupAlias);
-    aliasMap.put(lookupAlias, tupleDesc);
+    aliasMap_.put(lookupAlias, tupleDesc);
     return tupleDesc;
   }
 
@@ -344,18 +344,18 @@ public class Analyzer {
    * Return descriptor of registered table/alias.
    */
   public TupleDescriptor getDescriptor(TableName name) {
-    return aliasMap.get(name.toString().toLowerCase());
+    return aliasMap_.get(name.toString().toLowerCase());
   }
 
   public TupleDescriptor getTupleDesc(TupleId id) {
-    return globalState.descTbl.getTupleDesc(id);
+    return globalState_.descTbl.getTupleDesc(id);
   }
 
   /**
    * Given a "table alias"."column alias", return the SlotDescriptor
    */
   public SlotDescriptor getSlotDescriptor(String qualifiedColumnName) {
-    return slotRefMap.get(qualifiedColumnName);
+    return slotRefMap_.get(qualifiedColumnName);
   }
 
   /**
@@ -378,13 +378,13 @@ public class Analyzer {
       alias = tblName.toString().toLowerCase();
     }
 
-    TupleDescriptor tupleDesc = aliasMap.get(alias);
+    TupleDescriptor tupleDesc = aliasMap_.get(alias);
     // Try to resolve column references ("table.col") that do not refer to an explicit
     // alias, and that do not use a fully-qualified table name.
     String tmpAlias = alias;
     if (tupleDesc == null && tblName != null) {
       tmpAlias = resolveColumnRef(colName, tblName.getTbl());
-      tupleDesc = aliasMap.get(tmpAlias);
+      tupleDesc = aliasMap_.get(tmpAlias);
     }
     if (tupleDesc == null) {
       throw new AnalysisException("unknown table alias: '" + alias + "'");
@@ -398,12 +398,12 @@ public class Analyzer {
     }
 
     String key = alias + "." + col.getName();
-    SlotDescriptor result = slotRefMap.get(key);
+    SlotDescriptor result = slotRefMap_.get(key);
     if (result != null) return result;
     result = addSlotDescriptor(tupleDesc);
     result.setColumn(col);
     result.setLabel(col.getName());
-    slotRefMap.put(alias + "." + col.getName(), result);
+    slotRefMap_.put(alias + "." + col.getName(), result);
     return result;
   }
 
@@ -411,9 +411,9 @@ public class Analyzer {
    * Creates a new slot descriptor and related state in globalState.
    */
   public SlotDescriptor addSlotDescriptor(TupleDescriptor tupleDesc) {
-    SlotDescriptor result = globalState.descTbl.addSlotDescriptor(tupleDesc);
-    globalState.blockBySlot.put(result.getId(), this);
-    globalState.slotConjuncts.put(result.getId(), new ArrayList<ExprId>());
+    SlotDescriptor result = globalState_.descTbl.addSlotDescriptor(tupleDesc);
+    globalState_.blockBySlot.put(result.getId(), this);
+    globalState_.slotConjuncts.put(result.getId(), new ArrayList<ExprId>());
     return result;
   }
 
@@ -427,7 +427,7 @@ public class Analyzer {
   private String resolveColumnRef(String colName, String tableName)
       throws AnalysisException {
     String result = null;
-    for (Map.Entry<String, TupleDescriptor> entry: aliasMap.entrySet()) {
+    for (Map.Entry<String, TupleDescriptor> entry: aliasMap_.entrySet()) {
       Table table = entry.getValue().getTable();
       Column col = table.getColumn(colName);
       if (col != null &&
@@ -461,16 +461,16 @@ public class Analyzer {
     List<ExprId> ojConjuncts = null;
     if (rhsRef != null) {
       Preconditions.checkState(rhsRef.getJoinOp().isOuterJoin());
-      ojConjuncts = globalState.conjunctsByOjClause.get(rhsRef);
+      ojConjuncts = globalState_.conjunctsByOjClause.get(rhsRef);
       if (ojConjuncts == null) {
         ojConjuncts = Lists.newArrayList();
-        globalState.conjunctsByOjClause.put(rhsRef, ojConjuncts);
+        globalState_.conjunctsByOjClause.put(rhsRef, ojConjuncts);
       }
     }
     for (Expr conjunct: e.getConjuncts()) {
       registerConjunct(conjunct);
       if (rhsRef != null) {
-        globalState.ojClauseByConjunct.put(conjunct.getId(), rhsRef);
+        globalState_.ojClauseByConjunct.put(conjunct.getId(), rhsRef);
         ojConjuncts.add(conjunct.getId());
       }
       if (fromWhereClause) conjunct.setIsWhereClauseConjunct();
@@ -484,8 +484,8 @@ public class Analyzer {
   public void registerConjunct(Expr e) {
     // always generate a new expr id; this might be a cloned conjunct that already
     // has the id of its origin set
-    e.setId(new ExprId(globalState.conjunctIdGenerator));
-    globalState.conjuncts.put(e.getId(), e);
+    e.setId(new ExprId(globalState_.conjunctIdGenerator));
+    globalState_.conjuncts.put(e.getId(), e);
 
     ArrayList<TupleId> tupleIds = Lists.newArrayList();
     ArrayList<SlotId> slotIds = Lists.newArrayList();
@@ -493,19 +493,19 @@ public class Analyzer {
 
     // update tuplePredicates
     for (TupleId id : tupleIds) {
-      if (!globalState.tupleConjuncts.containsKey(id)) {
+      if (!globalState_.tupleConjuncts.containsKey(id)) {
         List<ExprId> conjunctIds = Lists.newArrayList();
         conjunctIds.add(e.getId());
-        globalState.tupleConjuncts.put(id, conjunctIds);
+        globalState_.tupleConjuncts.put(id, conjunctIds);
       } else {
-        globalState.tupleConjuncts.get(id).add(e.getId());
+        globalState_.tupleConjuncts.get(id).add(e.getId());
       }
     }
 
     // update slotPredicates
     for (SlotId id : slotIds) {
-      Preconditions.checkState(globalState.slotConjuncts.containsKey(id));
-      globalState.slotConjuncts.get(id).add(e.getId());
+      Preconditions.checkState(globalState_.slotConjuncts.containsKey(id));
+      globalState_.slotConjuncts.get(id).add(e.getId());
     }
 
     LOG.trace("register tuple/slotConjunct: " + Integer.toString(e.getId().asInt())
@@ -526,12 +526,12 @@ public class Analyzer {
       tupleIds = Lists.newArrayList();
       binaryPred.getChild(i).getIds(tupleIds, null);
       if (tupleIds.size() == 1) {
-        if (!globalState.eqJoinConjuncts.containsKey(tupleIds.get(0))) {
+        if (!globalState_.eqJoinConjuncts.containsKey(tupleIds.get(0))) {
           List<ExprId> conjunctIds = Lists.newArrayList();
           conjunctIds.add(e.getId());
-          globalState.eqJoinConjuncts.put(tupleIds.get(0), conjunctIds);
+          globalState_.eqJoinConjuncts.put(tupleIds.get(0), conjunctIds);
         } else {
-          globalState.eqJoinConjuncts.get(tupleIds.get(0)).add(e.getId());
+          globalState_.eqJoinConjuncts.get(tupleIds.get(0)).add(e.getId());
         }
         binaryPred.setIsEqJoinConjunct(true);
         LOG.trace("register eqJoinConjunct: " + Integer.toString(e.getId().asInt()));
@@ -568,12 +568,12 @@ public class Analyzer {
       List<TupleId> tupleIds, boolean inclOjConjuncts) {
     LOG.trace("getUnassignedConjuncts for " + Id.printIds(tupleIds));
     List<Expr> result = Lists.newArrayList();
-    for (Expr e: globalState.conjuncts.values()) {
+    for (Expr e: globalState_.conjuncts.values()) {
       if (e.isBoundByTupleIds(tupleIds)
           && !e.isAuxExpr()
-          && !globalState.assignedConjuncts.contains(e.getId())
+          && !globalState_.assignedConjuncts.contains(e.getId())
           && (inclOjConjuncts
-              || !globalState.ojClauseByConjunct.containsKey(e.getId()))) {
+              || !globalState_.ojClauseByConjunct.containsKey(e.getId()))) {
         result.add(e);
         LOG.trace("getUnassignedConjunct: " + e.toSql());
       }
@@ -582,7 +582,7 @@ public class Analyzer {
   }
 
   public boolean isOjConjunct(Expr e) {
-    return globalState.ojClauseByConjunct.containsKey(e.getId());
+    return globalState_.ojClauseByConjunct.containsKey(e.getId());
   }
 
   /**
@@ -610,11 +610,11 @@ public class Analyzer {
   public List<Expr> getUnassignedOjConjuncts(TableRef ref) {
     Preconditions.checkState(ref.getJoinOp().isOuterJoin());
     List<Expr> result = Lists.newArrayList();
-    List<ExprId> candidates = globalState.conjunctsByOjClause.get(ref);
+    List<ExprId> candidates = globalState_.conjunctsByOjClause.get(ref);
     if (candidates == null) return result;
     for (ExprId conjunctId: candidates) {
-      if (!globalState.assignedConjuncts.contains(conjunctId)) {
-        Expr e = globalState.conjuncts.get(conjunctId);
+      if (!globalState_.assignedConjuncts.contains(conjunctId)) {
+        Expr e = globalState_.conjuncts.get(conjunctId);
         Preconditions.checkState(e != null);
         result.add(e);
         LOG.trace("getUnassignedOjConjunct: " + e.toSql());
@@ -627,7 +627,7 @@ public class Analyzer {
    * Return rhs ref of last Join clause that outer-joined id.
    */
   public TableRef getLastOjClause(TupleId id) {
-    return globalState.outerJoinedTupleIds.get(id);
+    return globalState_.outerJoinedTupleIds.get(id);
   }
 
   /**
@@ -642,19 +642,19 @@ public class Analyzer {
   }
 
   public DescriptorTable getDescTbl() {
-    return globalState.descTbl;
+    return globalState_.descTbl;
   }
 
   public ImpaladCatalog getCatalog() throws AnalysisException {
-    if (!globalState.catalog.isReady()) {
+    if (!globalState_.catalog.isReady()) {
       throw new AnalysisException("This Impala daemon is not ready to accept user " +
           "requests. Status: Waiting for catalog update from the StateStore.");
     }
-    return globalState.catalog;
+    return globalState_.catalog;
   }
 
   public Set<String> getAliases() {
-    return aliasMap.keySet();
+    return aliasMap_.keySet();
   }
 
   /**
@@ -663,16 +663,16 @@ public class Analyzer {
    * On clause are returned.
    */
   public List<Expr> getEqJoinConjuncts(TupleId id, TableRef rhsRef) {
-    List<ExprId> conjunctIds = globalState.eqJoinConjuncts.get(id);
+    List<ExprId> conjunctIds = globalState_.eqJoinConjuncts.get(id);
     if (conjunctIds == null) return null;
     List<Expr> result = Lists.newArrayList();
     List<ExprId> ojClauseConjuncts = null;
     if (rhsRef != null) {
       Preconditions.checkState(rhsRef.getJoinOp().isOuterJoin());
-      ojClauseConjuncts = globalState.conjunctsByOjClause.get(rhsRef);
+      ojClauseConjuncts = globalState_.conjunctsByOjClause.get(rhsRef);
     }
     for (ExprId conjunctId: conjunctIds) {
-      Expr e = globalState.conjuncts.get(conjunctId);
+      Expr e = globalState_.conjuncts.get(conjunctId);
       Preconditions.checkState(e != null);
       if (ojClauseConjuncts != null) {
         if (ojClauseConjuncts.contains(conjunctId)) result.add(e);
@@ -705,23 +705,23 @@ public class Analyzer {
       if (tids.size() > 1) {
         // bail if this is from an OJ On clause; the join node will pick
         // it up later via getUnassignedOjConjuncts()
-        return !globalState.ojClauseByConjunct.containsKey(e.getId());
+        return !globalState_.ojClauseByConjunct.containsKey(e.getId());
       }
 
       TupleId tid = tids.get(0);
-      if (globalState.ojClauseByConjunct.containsKey(e.getId())) {
+      if (globalState_.ojClauseByConjunct.containsKey(e.getId())) {
         // OJ On-clause predicate: okay if it's from
         // the same On clause that makes tid nullable
         // (otherwise e needn't be true when that tuple is set)
-        if (!globalState.outerJoinedTupleIds.containsKey(tid)) return false;
-        if (globalState.ojClauseByConjunct.get(e.getId())
-            != globalState.outerJoinedTupleIds.get(tid)) {
+        if (!globalState_.outerJoinedTupleIds.containsKey(tid)) return false;
+        if (globalState_.ojClauseByConjunct.get(e.getId())
+            != globalState_.outerJoinedTupleIds.get(tid)) {
           return false;
         }
       } else {
         // non-OJ On-clause predicate: not okay if tid is nullable and the
         // predicate tests for null
-        if (globalState.outerJoinedTupleIds.containsKey(tid)
+        if (globalState_.outerJoinedTupleIds.containsKey(tid)
             // TODO: also check for IFNULL()
             && e.contains(IsNullPredicate.class)) {
           return false;
@@ -765,15 +765,15 @@ public class Analyzer {
     LOG.trace("getBoundPredicates(" + slotId.toString() + ")");
     TupleId tid = getTupleId(slotId);
     ArrayList<Pair<Expr, Boolean>> result = Lists.newArrayList();
-    int maxSlotId = globalState.descTbl.getMaxSlotId().asInt();
+    int maxSlotId = globalState_.descTbl.getMaxSlotId().asInt();
     for (int i = 0; i <= maxSlotId; ++i) {
       SlotId equivSlotId = new SlotId(i);
 
       // skip this slot if we're not allowed to transfer values to slotId
-      if (!globalState.valueTransfer[equivSlotId.asInt()][slotId.asInt()]) continue;
+      if (!globalState_.valueTransfer[equivSlotId.asInt()][slotId.asInt()]) continue;
 
-      for (ExprId id: globalState.slotConjuncts.get(equivSlotId)) {
-        Expr e = globalState.conjuncts.get(id);
+      for (ExprId id: globalState_.slotConjuncts.get(equivSlotId)) {
+        Expr e = globalState_.conjuncts.get(id);
         LOG.trace("getBoundPredicates: considering " + e.toSql() + " " + e.debugString());
         if (!e.isBound(equivSlotId)) continue;
 
@@ -785,7 +785,7 @@ public class Analyzer {
 
         // we cannot evaluate anything containing '<> is null' from the Where clause if
         // we're being outer-joined: this would alter the outcome of the outer join
-        if (globalState.outerJoinedTupleIds.containsKey(tid)
+        if (globalState_.outerJoinedTupleIds.containsKey(tid)
             && e.isWhereClauseConjunct()
             // TODO: also check for IFNULL()
             && e.contains(IsNullPredicate.class)) {
@@ -795,10 +795,10 @@ public class Analyzer {
         // if e comes out of an OJ's On clause, we need to make sure it's the same
         // as the one that makes slotId's tuple nullable
         // (otherwise e needn't be true when slotId's tuple is set)
-        if (globalState.ojClauseByConjunct.containsKey(e.getId())) {
-          if (!globalState.outerJoinedTupleIds.containsKey(tid)) continue;
-          if (globalState.ojClauseByConjunct.get(e.getId())
-              != globalState.outerJoinedTupleIds.get(tid)) {
+        if (globalState_.ojClauseByConjunct.containsKey(e.getId())) {
+          if (!globalState_.outerJoinedTupleIds.containsKey(tid)) continue;
+          if (globalState_.ojClauseByConjunct.get(e.getId())
+              != globalState_.outerJoinedTupleIds.get(tid)) {
             continue;
           }
         }
@@ -810,8 +810,8 @@ public class Analyzer {
         } else {
           Expr.SubstitutionMap smap = new Expr.SubstitutionMap();
           smap.addMapping(
-              new SlotRef(globalState.descTbl.getSlotDesc(equivSlotId)),
-              new SlotRef(globalState.descTbl.getSlotDesc(slotId)));
+              new SlotRef(globalState_.descTbl.getSlotDesc(equivSlotId)),
+              new SlotRef(globalState_.descTbl.getSlotDesc(slotId)));
           p = e.clone(smap);
           // we need to re-analyze in order to create casts, if necessary
           p.unsetIsAnalyzed();
@@ -844,13 +844,13 @@ public class Analyzer {
         //   ON clause, it needs to be evaluated directly by the join node that
         //   materializes the OJ'd table)
         boolean reverseValueTransfer =
-            globalState.valueTransfer[slotId.asInt()][equivSlotId.asInt()];
+            globalState_.valueTransfer[slotId.asInt()][equivSlotId.asInt()];
         TupleId origTupleId = getTupleId(equivSlotId);
         boolean evalByJoin =
-            globalState.outerJoinedTupleIds.containsKey(origTupleId)
-              && (!globalState.ojClauseByConjunct.containsKey(e.getId())
-                  || globalState.ojClauseByConjunct.get(e.getId())
-                    != globalState.outerJoinedTupleIds.get(origTupleId));
+            globalState_.outerJoinedTupleIds.containsKey(origTupleId)
+              && (!globalState_.ojClauseByConjunct.containsKey(e.getId())
+                  || globalState_.ojClauseByConjunct.get(e.getId())
+                    != globalState_.outerJoinedTupleIds.get(origTupleId));
         LOG.trace("getBoundPredicates: adding " + p.toSql() + " " + p.debugString());
         result.add(new Pair<Expr, Boolean>(p, reverseValueTransfer && ! evalByJoin));
       }
@@ -859,15 +859,15 @@ public class Analyzer {
   }
 
   private TupleId getTupleId(SlotId slotId) {
-    return globalState.descTbl.getSlotDesc(slotId).getParent().getId();
+    return globalState_.descTbl.getSlotDesc(slotId).getParent().getId();
   }
 
   public void registerValueTransfer(SlotId id1, SlotId id2) {
-    globalState.registeredValueTransfers.add(new Pair(id1, id2));
+    globalState_.registeredValueTransfers.add(new Pair(id1, id2));
   }
 
   public boolean isOuterJoined(TupleId tid) {
-    return globalState.outerJoinedTupleIds.containsKey(tid);
+    return globalState_.outerJoinedTupleIds.containsKey(tid);
   }
 
   /**
@@ -875,25 +875,25 @@ public class Analyzer {
    * of the form <slotref> = <slotref>.
    */
   private void computeValueTransferGraph() {
-    int numSlots = globalState.descTbl.getMaxSlotId().asInt() + 1;
-    globalState.valueTransfer = new boolean[numSlots][numSlots];
+    int numSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
+    globalState_.valueTransfer = new boolean[numSlots][numSlots];
     for (int i = 0; i < numSlots; ++i) {
-      Arrays.fill(globalState.valueTransfer[i], false);
-      globalState.valueTransfer[i][i] = true;
+      Arrays.fill(globalState_.valueTransfer[i], false);
+      globalState_.valueTransfer[i][i] = true;
     }
-    for (Pair<SlotId, SlotId> t: globalState.registeredValueTransfers) {
+    for (Pair<SlotId, SlotId> t: globalState_.registeredValueTransfers) {
       Preconditions.checkState(t.first.asInt() < numSlots);
       Preconditions.checkState(t.second.asInt() < numSlots);
-      globalState.valueTransfer[t.first.asInt()][t.second.asInt()] = true;
+      globalState_.valueTransfer[t.first.asInt()][t.second.asInt()] = true;
     }
     Set<ExprId> analyzedIds = Sets.newHashSet();
 
     // transform equality predicates into a transfer graph
-    for (ExprId id: globalState.conjuncts.keySet()) {
+    for (ExprId id: globalState_.conjuncts.keySet()) {
       LOG.trace("check id " + Integer.toString(id.asInt()));
       if (!analyzedIds.add(id)) continue;
 
-      Expr e = globalState.conjuncts.get(id);
+      Expr e = globalState_.conjuncts.get(id);
       Preconditions.checkState(e != null);
       if (!(e instanceof BinaryPredicate)) continue;
       BinaryPredicate p = (BinaryPredicate) e;
@@ -901,22 +901,22 @@ public class Analyzer {
       LOG.trace("check " + p.toSql() + " " + p.debugString());
       Pair<SlotId, SlotId> slotIds = p.getEqSlots();
       if (slotIds == null) continue;
-      TableRef tblRef = globalState.ojClauseByConjunct.get(id);
+      TableRef tblRef = globalState_.ojClauseByConjunct.get(id);
       Preconditions.checkState(tblRef == null || tblRef.getJoinOp().isOuterJoin());
       if (tblRef == null) {
         // this eq predicate doesn't involve any outer join, ie, it is true for
         // each result row;
         // value transfer is not legal if the receiving slot is in an enclosed
         // scope of the source slot and the receiving slot's block has a limit
-        Analyzer firstBlock = globalState.blockBySlot.get(slotIds.first);
-        Analyzer secondBlock = globalState.blockBySlot.get(slotIds.second);
+        Analyzer firstBlock = globalState_.blockBySlot.get(slotIds.first);
+        Analyzer secondBlock = globalState_.blockBySlot.get(slotIds.second);
         LOG.trace("value transfer: from " + slotIds.first.toString());
-        if (!(secondBlock.hasLimit && secondBlock.ancestors.contains(firstBlock))) {
-          globalState.valueTransfer[slotIds.first.asInt()][slotIds.second.asInt()] =
+        if (!(secondBlock.hasLimit_ && secondBlock.ancestors_.contains(firstBlock))) {
+          globalState_.valueTransfer[slotIds.first.asInt()][slotIds.second.asInt()] =
               true;
         }
-        if (!(firstBlock.hasLimit && firstBlock.ancestors.contains(secondBlock))) {
-          globalState.valueTransfer[slotIds.second.asInt()][slotIds.first.asInt()] =
+        if (!(firstBlock.hasLimit_ && firstBlock.ancestors_.contains(secondBlock))) {
+          globalState_.valueTransfer[slotIds.second.asInt()][slotIds.first.asInt()] =
               true;
         }
         continue;
@@ -944,15 +944,15 @@ public class Analyzer {
 
       // value transfer is not legal if the receiving slot is in an enclosed
       // scope of the source slot and the receiving slot's block has a limit
-      Analyzer innerBlock = globalState.blockBySlot.get(innerSlot);
-      Analyzer outerBlock = globalState.blockBySlot.get(outerSlot);
+      Analyzer innerBlock = globalState_.blockBySlot.get(innerSlot);
+      Analyzer outerBlock = globalState_.blockBySlot.get(outerSlot);
       if (tblRef.getJoinOp() == JoinOperator.LEFT_OUTER_JOIN) {
-        if (!(outerBlock.hasLimit && outerBlock.ancestors.contains(innerBlock))) {
-          globalState.valueTransfer[outerSlot.asInt()][innerSlot.asInt()] = true;
+        if (!(outerBlock.hasLimit_ && outerBlock.ancestors_.contains(innerBlock))) {
+          globalState_.valueTransfer[outerSlot.asInt()][innerSlot.asInt()] = true;
         }
       } else if (tblRef.getJoinOp() == JoinOperator.RIGHT_OUTER_JOIN) {
-        if (!(innerBlock.hasLimit && innerBlock.ancestors.contains(outerBlock))) {
-          globalState.valueTransfer[innerSlot.asInt()][outerSlot.asInt()] = true;
+        if (!(innerBlock.hasLimit_ && innerBlock.ancestors_.contains(outerBlock))) {
+          globalState_.valueTransfer[innerSlot.asInt()][outerSlot.asInt()] = true;
         }
       }
     }
@@ -964,9 +964,9 @@ public class Analyzer {
       for (int i = 0; i < numSlots; ++i) {
         for (int j = 0; j < numSlots; ++j) {
           for (int k = 0; k < numSlots; ++k) {
-            if (globalState.valueTransfer[i][j] && globalState.valueTransfer[j][k]
-                && !globalState.valueTransfer[i][k]) {
-              globalState.valueTransfer[i][k] = true;
+            if (globalState_.valueTransfer[i][j] && globalState_.valueTransfer[j][k]
+                && !globalState_.valueTransfer[i][k]) {
+              globalState_.valueTransfer[i][k] = true;
               changed = true;
             }
           }
@@ -978,7 +978,7 @@ public class Analyzer {
     for (int i = 0; i < numSlots; ++i) {
       List<String> strings = Lists.newArrayList();
       for (int j = 0; j < numSlots; ++j) {
-        if (i != j && globalState.valueTransfer[i][j]) strings.add(Integer.toString(j));
+        if (i != j && globalState_.valueTransfer[i][j]) strings.add(Integer.toString(j));
       }
       if (!strings.isEmpty()) {
         LOG.trace("transfer from " + Integer.toString(i) + " to: "
@@ -991,12 +991,12 @@ public class Analyzer {
     computeValueTransferGraph();
 
     // we start out by assigning each slot to its own equiv class
-    int numSlots = globalState.descTbl.getMaxSlotId().asInt() + 1;
+    int numSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
     IdGenerator<EquivalenceClassId> equivClassIdGenerator =
         new IdGenerator<EquivalenceClassId>();
     for (int i = 0; i < numSlots; ++i) {
       EquivalenceClassId id = new EquivalenceClassId(equivClassIdGenerator);
-      globalState.equivClassMembers.put(id, Lists.newArrayList(new SlotId(i)));
+      globalState_.equivClassMembers.put(id, Lists.newArrayList(new SlotId(i)));
     }
 
     // merge two classes if there is a value transfer between all members of the
@@ -1005,9 +1005,9 @@ public class Analyzer {
     do {
       merged = false;
       for (Map.Entry<EquivalenceClassId, ArrayList<SlotId>> e1:
-          globalState.equivClassMembers.entrySet()) {
+          globalState_.equivClassMembers.entrySet()) {
         for (Map.Entry<EquivalenceClassId, ArrayList<SlotId>> e2:
-            globalState.equivClassMembers.entrySet()) {
+            globalState_.equivClassMembers.entrySet()) {
           if (e1.getKey() == e2.getKey()) continue;
           List<SlotId> class1Members = e1.getValue();
           if (class1Members.isEmpty()) continue;
@@ -1018,8 +1018,8 @@ public class Analyzer {
           boolean canMerge = true;
           for (SlotId class1Slot: class1Members) {
             for (SlotId class2Slot: class2Members) {
-              if (!globalState.valueTransfer[class1Slot.asInt()][class2Slot.asInt()]
-                  && !globalState.valueTransfer[class2Slot.asInt()][class1Slot.asInt()]) {
+              if (!globalState_.valueTransfer[class1Slot.asInt()][class2Slot.asInt()]
+                  && !globalState_.valueTransfer[class2Slot.asInt()][class1Slot.asInt()]) {
                 canMerge = false;
                 break;
               }
@@ -1037,15 +1037,15 @@ public class Analyzer {
     } while (merged);
 
     // populate equivClassBySlotId
-    for (EquivalenceClassId id: globalState.equivClassMembers.keySet()) {
-      for (SlotId slotId: globalState.equivClassMembers.get(id)) {
-        globalState.equivClassBySlotId.put(slotId, id);
+    for (EquivalenceClassId id: globalState_.equivClassMembers.keySet()) {
+      for (SlotId slotId: globalState_.equivClassMembers.get(id)) {
+        globalState_.equivClassBySlotId.put(slotId, id);
       }
     }
 
     // TODO: remove
-    for (EquivalenceClassId id: globalState.equivClassMembers.keySet()) {
-      List<SlotId> members = globalState.equivClassMembers.get(id);
+    for (EquivalenceClassId id: globalState_.equivClassMembers.keySet()) {
+      List<SlotId> members = globalState_.equivClassMembers.get(id);
       if (members.isEmpty()) continue;
       List<String> strings = Lists.newArrayList();
       for (SlotId slotId: members) {
@@ -1064,17 +1064,17 @@ public class Analyzer {
       List<SlotId> equivSlotIds) {
     equivSlotIds.clear();
     LOG.trace("getequivslots: slotid=" + Integer.toString(slotId.asInt()));
-    EquivalenceClassId classId = globalState.equivClassBySlotId.get(slotId);
-    for (SlotId memberId: globalState.equivClassMembers.get(classId)) {
+    EquivalenceClassId classId = globalState_.equivClassBySlotId.get(slotId);
+    for (SlotId memberId: globalState_.equivClassMembers.get(classId)) {
       if (tupleIds.contains(
-          globalState.descTbl.getSlotDesc(memberId).getParent().getId())) {
+          globalState_.descTbl.getSlotDesc(memberId).getParent().getId())) {
         equivSlotIds.add(memberId);
       }
     }
   }
 
   public EquivalenceClassId getEquivClassId(SlotId slotId) {
-    return globalState.equivClassBySlotId.get(slotId);
+    return globalState_.equivClassBySlotId.get(slotId);
   }
 
   /**
@@ -1114,11 +1114,11 @@ public class Analyzer {
     SlotRef aSlot = e1.unwrapSlotRef(true);
     SlotRef bSlot = e2.unwrapSlotRef(true);
     if (aSlot == null || bSlot == null) return false;
-    Preconditions.checkNotNull(globalState.equivClassBySlotId.get(aSlot.getSlotId()));
-    Preconditions.checkNotNull(globalState.equivClassBySlotId.get(bSlot.getSlotId()));
+    Preconditions.checkNotNull(globalState_.equivClassBySlotId.get(aSlot.getSlotId()));
+    Preconditions.checkNotNull(globalState_.equivClassBySlotId.get(bSlot.getSlotId()));
     // Check whether aSlot and bSlot are in the same equivalence class.
-    return globalState.equivClassBySlotId.get(aSlot.getSlotId()).equals(
-        globalState.equivClassBySlotId.get(bSlot.getSlotId()));
+    return globalState_.equivClassBySlotId.get(aSlot.getSlotId()).equals(
+        globalState_.equivClassBySlotId.get(bSlot.getSlotId()));
   }
 
   /**
@@ -1127,7 +1127,7 @@ public class Analyzer {
   public void markConjunctsAssigned(List<Expr> conjuncts) {
     if (conjuncts == null) return;
     for (Expr p: conjuncts) {
-      globalState.assignedConjuncts.add(p.getId());
+      globalState_.assignedConjuncts.add(p.getId());
       LOG.trace("markAssigned " + p.toSql() + " " + p.debugString());
     }
   }
@@ -1137,28 +1137,28 @@ public class Analyzer {
    */
   public void markConjunctAssigned(Expr conjunct) {
     LOG.trace("markAssigned " + conjunct.toSql() + " " + conjunct.debugString());
-    globalState.assignedConjuncts.add(conjunct.getId());
+    globalState_.assignedConjuncts.add(conjunct.getId());
   }
 
   public boolean isConjunctAssigned(Expr conjunct) {
-    return globalState.assignedConjuncts.contains(conjunct.getId());
+    return globalState_.assignedConjuncts.contains(conjunct.getId());
   }
 
   public Set<ExprId> getAssignedConjuncts() {
-    return Sets.newHashSet(globalState.assignedConjuncts);
+    return Sets.newHashSet(globalState_.assignedConjuncts);
   }
 
   public void setAssignedConjuncts(Set<ExprId> assigned) {
-    globalState.assignedConjuncts = Sets.newHashSet(assigned);
+    globalState_.assignedConjuncts = Sets.newHashSet(assigned);
   }
 
   /**
    * Return true if there's at least one unassigned non-auxiliary conjunct.
    */
   public boolean hasUnassignedConjuncts() {
-    for (ExprId id: globalState.conjuncts.keySet()) {
-      if (globalState.assignedConjuncts.contains(id)) continue;
-      Expr e = globalState.conjuncts.get(id);
+    for (ExprId id: globalState_.conjuncts.keySet()) {
+      if (globalState_.assignedConjuncts.contains(id)) continue;
+      Expr e = globalState_.conjuncts.get(id);
       if (e.isAuxExpr()) continue;
       LOG.trace("unassigned: " + e.toSql() + " " + e.debugString());
       return true;
@@ -1174,7 +1174,7 @@ public class Analyzer {
     for (Expr e: exprs) {
       e.getIds(null, slotIds);
     }
-    globalState.descTbl.markSlotsMaterialized(slotIds);
+    globalState_.descTbl.markSlotsMaterialized(slotIds);
   }
 
 
@@ -1233,19 +1233,19 @@ public class Analyzer {
   }
 
   public Map<String, ViewRef> getWithClauseViews() {
-    return withClauseViews;
+    return withClauseViews_;
   }
 
   public String getDefaultDb() {
-    return globalState.defaultDb;
+    return globalState_.defaultDb;
   }
 
   public User getUser() {
-    return user;
+    return user_;
   }
 
   public TQueryGlobals getQueryGlobals() {
-    return globalState.queryGlobals;
+    return globalState_.queryGlobals;
   }
 
   /**
@@ -1253,8 +1253,8 @@ public class Analyzer {
    * accesses that failed due to AuthorizationExceptions. In general, if analysis
    * fails for any reason this list may be incomplete.
    */
-  public List<TAccessEvent> getAccessEvents() { return globalState.accessEvents; }
-  public void addAccessEvent(TAccessEvent event) { globalState.accessEvents.add(event); }
+  public List<TAccessEvent> getAccessEvents() { return globalState_.accessEvents; }
+  public void addAccessEvent(TAccessEvent event) { globalState_.accessEvents.add(event); }
 
   /**
    * Returns the Catalog Table object for the TableName at the given Privilege level.
@@ -1281,7 +1281,7 @@ public class Analyzer {
         // Add an audit event for this access
         TCatalogObjectType objectType = TCatalogObjectType.TABLE;
         if (table instanceof View) objectType = TCatalogObjectType.VIEW;
-        globalState.accessEvents.add(new TAccessEvent(
+        globalState_.accessEvents.add(new TAccessEvent(
             tableName.toString(), objectType, privilege.toString()));
       }
     } catch (DatabaseNotFoundException e) {
@@ -1325,7 +1325,7 @@ public class Analyzer {
       throws AnalysisException, AuthorizationException {
     Db db = getCatalog().getDb(dbName, getUser(), privilege);
     if (db == null) throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
-    globalState.accessEvents.add(new TAccessEvent(
+    globalState_.accessEvents.add(new TAccessEvent(
         dbName, TCatalogObjectType.DATABASE, privilege.toString()));
     return db;
   }
@@ -1358,21 +1358,21 @@ public class Analyzer {
     return fnName.isFullyQualified() ? fnName.getDb() : getDefaultDb();
   }
 
-  public void setIsExplain(boolean isExplain) { globalState.isExplain = isExplain; }
-  public boolean isExplain() { return globalState.isExplain; }
+  public void setIsExplain(boolean isExplain) { globalState_.isExplain = isExplain; }
+  public boolean isExplain() { return globalState_.isExplain; }
   public void setUseHiveColLabels(boolean useHiveColLabels) {
-    globalState.useHiveColLabels = useHiveColLabels;
+    globalState_.useHiveColLabels = useHiveColLabels;
   }
-  public boolean useHiveColLabels() { return globalState.useHiveColLabels; }
+  public boolean useHiveColLabels() { return globalState_.useHiveColLabels; }
 
-  public boolean hasLimit() { return hasLimit; }
-  public void setHasLimit(boolean hasLimit) { this.hasLimit = hasLimit; }
+  public boolean hasLimit() { return hasLimit_; }
+  public void setHasLimit(boolean hasLimit) { this.hasLimit_ = hasLimit; }
 
   public List<Expr> getConjuncts() {
-    return new ArrayList(globalState.conjuncts.values());
+    return new ArrayList(globalState_.conjuncts.values());
   }
 
-  public int incrementCallDepth() { return ++callDepth; }
-  public int decrementCallDepth() { return --callDepth; }
-  public int getCallDepth() { return callDepth; }
+  public int incrementCallDepth() { return ++callDepth_; }
+  public int decrementCallDepth() { return --callDepth_; }
+  public int getCallDepth() { return callDepth_; }
 }

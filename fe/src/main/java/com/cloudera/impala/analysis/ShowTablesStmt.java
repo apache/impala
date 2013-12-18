@@ -36,13 +36,13 @@ import com.google.common.base.Preconditions;
  */
 public class ShowTablesStmt extends StatementBase {
   // Pattern to match tables against. | denotes choice, * matches all strings
-  private final String pattern;
+  private final String pattern_;
 
   // DB (if any) as seen by the parser
-  private final String parsedDb;
+  private final String parsedDb_;
 
   // Set during analysis
-  private String postAnalysisDb;
+  private String postAnalysisDb_;
 
   /**
    * Default constructor, which creates a show statement with the default
@@ -68,37 +68,35 @@ public class ShowTablesStmt extends StatementBase {
    * If database is null, the default database is searched.
    */
   public ShowTablesStmt(String database, String pattern) {
-    this.parsedDb = database;
-    this.pattern = pattern;
-    this.postAnalysisDb = null;
+    this.parsedDb_ = database;
+    this.pattern_ = pattern;
+    this.postAnalysisDb_ = null;
   }
 
-  public String getPattern() {
-    return pattern;
-  }
+  public String getPattern() { return pattern_; }
 
   /**
    * Can only be called after analysis, returns the name of the database that
    * this show will search against.
    */
   public String getDb() {
-    Preconditions.checkNotNull(postAnalysisDb);
-    return postAnalysisDb;
+    Preconditions.checkNotNull(postAnalysisDb_);
+    return postAnalysisDb_;
   }
 
   @Override
   public String toSql() {
-    if (pattern == null) {
-      if (parsedDb == null) {
+    if (pattern_ == null) {
+      if (parsedDb_ == null) {
         return "SHOW TABLES";
       } else {
-        return "SHOW TABLES IN " + parsedDb;
+        return "SHOW TABLES IN " + parsedDb_;
       }
     } else {
-      if (parsedDb == null) {
-        return "SHOW TABLES LIKE '" + pattern + "'";
+      if (parsedDb_ == null) {
+        return "SHOW TABLES LIKE '" + pattern_ + "'";
       } else {
-        return "SHOW TABLES IN " + parsedDb + " LIKE '" + pattern + "'";
+        return "SHOW TABLES IN " + parsedDb_ + " LIKE '" + pattern_ + "'";
       }
     }
   }
@@ -106,10 +104,10 @@ public class ShowTablesStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    postAnalysisDb = (parsedDb == null ? analyzer.getDefaultDb() : parsedDb);
+    postAnalysisDb_ = (parsedDb_ == null ? analyzer.getDefaultDb() : parsedDb_);
     if (analyzer.getCatalog().getDb(
-        postAnalysisDb, analyzer.getUser(), Privilege.ANY) == null) {
-      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + postAnalysisDb);
+        postAnalysisDb_, analyzer.getUser(), Privilege.ANY) == null) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + postAnalysisDb_);
     }
   }
 

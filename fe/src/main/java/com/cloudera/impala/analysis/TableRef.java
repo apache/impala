@@ -35,34 +35,34 @@ import com.google.common.collect.Sets;
  */
 public abstract class TableRef implements ParseNode {
   // Table alias
-  protected final String alias;
+  protected final String alias_;
 
-  protected JoinOperator joinOp;
-  protected ArrayList<String> joinHints;
-  protected Expr onClause;
-  protected List<String> usingColNames;
+  protected JoinOperator joinOp_;
+  protected ArrayList<String> joinHints_;
+  protected Expr onClause_;
+  protected List<String> usingColNames_;
 
   // set after analyzeJoinHints(); true if explicitly set via hints
-  private boolean isBroadcastJoin;
-  private boolean isPartitionedJoin;
+  private boolean isBroadcastJoin_;
+  private boolean isPartitionedJoin_;
 
   // the ref to the left of us, if we're part of a JOIN clause
-  protected TableRef leftTblRef;
+  protected TableRef leftTblRef_;
 
   // true if this TableRef has been analyzed; implementing subclass should set it to true
   // at the end of analyze() call.
-  protected boolean isAnalyzed;
+  protected boolean isAnalyzed_;
 
   // all (logical) TupleIds referenced in the On clause
   protected List<TupleId> onClauseTupleIds_ = Lists.newArrayList();
 
   // analysis output
-  protected TupleDescriptor desc;
+  protected TupleDescriptor desc_;
 
   public TableRef(String alias) {
     super();
-    this.alias = alias;
-    isAnalyzed = false;
+    this.alias_ = alias;
+    isAnalyzed_ = false;
   }
 
   /**
@@ -70,54 +70,54 @@ public abstract class TableRef implements ParseNode {
    */
   protected TableRef(TableRef other) {
     super();
-    this.alias = other.alias;
-    this.joinOp = other.joinOp;
-    this.joinHints =
-        (other.joinHints != null) ? Lists.newArrayList(other.joinHints) : null;
-    this.usingColNames =
-        (other.usingColNames != null) ? Lists.newArrayList(other.usingColNames) : null;
-    this.onClause = (other.onClause != null) ? other.onClause.clone(null) : null;
-    isAnalyzed = false;
+    this.alias_ = other.alias_;
+    this.joinOp_ = other.joinOp_;
+    this.joinHints_ =
+        (other.joinHints_ != null) ? Lists.newArrayList(other.joinHints_) : null;
+    this.usingColNames_ =
+        (other.usingColNames_ != null) ? Lists.newArrayList(other.usingColNames_) : null;
+    this.onClause_ = (other.onClause_ != null) ? other.onClause_.clone(null) : null;
+    isAnalyzed_ = false;
   }
 
   public JoinOperator getJoinOp() {
     // if it's not explicitly set, we're doing an inner join
-    return (joinOp == null ? JoinOperator.INNER_JOIN : joinOp);
+    return (joinOp_ == null ? JoinOperator.INNER_JOIN : joinOp_);
   }
 
-  public ArrayList<String> getJoinHints() { return joinHints; }
-  public Expr getOnClause() { return onClause; }
-  public List<String> getUsingClause() { return usingColNames; }
-  public String getExplicitAlias() { return alias; }
+  public ArrayList<String> getJoinHints() { return joinHints_; }
+  public Expr getOnClause() { return onClause_; }
+  public List<String> getUsingClause() { return usingColNames_; }
+  public String getExplicitAlias() { return alias_; }
   public Table getTable() { return getDesc().getTable(); }
-  public void setJoinOp(JoinOperator op) { this.joinOp = op; }
-  public void setOnClause(Expr e) { this.onClause = e; }
-  public void setUsingClause(List<String> colNames) { this.usingColNames = colNames; }
-  public TableRef getLeftTblRef() { return leftTblRef; }
-  public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef = leftTblRef; }
-  public void setJoinHints(ArrayList<String> hints) { this.joinHints = hints; }
-  public boolean isBroadcastJoin() { return isBroadcastJoin; }
-  public boolean isPartitionedJoin() { return isPartitionedJoin; }
+  public void setJoinOp(JoinOperator op) { this.joinOp_ = op; }
+  public void setOnClause(Expr e) { this.onClause_ = e; }
+  public void setUsingClause(List<String> colNames) { this.usingColNames_ = colNames; }
+  public TableRef getLeftTblRef() { return leftTblRef_; }
+  public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef_ = leftTblRef; }
+  public void setJoinHints(ArrayList<String> hints) { this.joinHints_ = hints; }
+  public boolean isBroadcastJoin() { return isBroadcastJoin_; }
+  public boolean isPartitionedJoin() { return isPartitionedJoin_; }
   public List<TupleId> getOnClauseTupleIds() { return onClauseTupleIds_; }
 
   /**
    * This method should only be called after the TableRef has been analyzed.
    */
   public TupleDescriptor getDesc() {
-    Preconditions.checkState(isAnalyzed);
+    Preconditions.checkState(isAnalyzed_);
     // after analyze(), desc should be set.
-    Preconditions.checkState(desc != null);
-    return desc;
+    Preconditions.checkState(desc_ != null);
+    return desc_;
   }
 
   /**
    * This method should only be called after the TableRef has been analyzed.
    */
   public TupleId getId() {
-    Preconditions.checkState(isAnalyzed);
+    Preconditions.checkState(isAnalyzed_);
     // after analyze(), desc should be set.
-    Preconditions.checkState(desc != null);
-    return desc.getId();
+    Preconditions.checkState(desc_ != null);
+    return desc_.getId();
   }
 
   /**
@@ -131,9 +131,9 @@ public abstract class TableRef implements ParseNode {
    * table refs up to this one.
    */
   public List<TupleId> getAllMaterializedTupleIds() {
-    if (leftTblRef != null) {
+    if (leftTblRef_ != null) {
       List<TupleId> result =
-          Lists.newArrayList(leftTblRef.getAllMaterializedTupleIds());
+          Lists.newArrayList(leftTblRef_.getAllMaterializedTupleIds());
       result.addAll(getMaterializedTupleIds());
       return result;
     } else {
@@ -145,13 +145,13 @@ public abstract class TableRef implements ParseNode {
    * Return the list of tuple ids of the full sequence of table refs up to this one.
    */
   public List<TupleId> getAllTupleIds() {
-    Preconditions.checkState(isAnalyzed);
-    if (leftTblRef != null) {
-      List<TupleId> result = leftTblRef.getAllTupleIds();
-      result.add(desc.getId());
+    Preconditions.checkState(isAnalyzed_);
+    if (leftTblRef_ != null) {
+      List<TupleId> result = leftTblRef_.getAllTupleIds();
+      result.add(desc_.getId());
       return result;
     } else {
-      return Lists.newArrayList(desc.getId());
+      return Lists.newArrayList(desc_.getId());
     }
   }
 
@@ -159,25 +159,25 @@ public abstract class TableRef implements ParseNode {
    * Parse hints.
    */
   private void analyzeJoinHints() throws AnalysisException {
-    if (joinHints == null) return;
-    for (String hint: joinHints) {
+    if (joinHints_ == null) return;
+    for (String hint: joinHints_) {
       if (hint.toUpperCase().equals("BROADCAST")) {
-        if (joinOp == JoinOperator.RIGHT_OUTER_JOIN ||
-            joinOp == JoinOperator.FULL_OUTER_JOIN) {
-          throw new AnalysisException(joinOp.toString() + " does not support BROADCAST.");
+        if (joinOp_ == JoinOperator.RIGHT_OUTER_JOIN ||
+            joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
+          throw new AnalysisException(joinOp_.toString() + " does not support BROADCAST.");
         }
-        if (isPartitionedJoin) {
+        if (isPartitionedJoin_) {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
-        isBroadcastJoin = true;
+        isBroadcastJoin_ = true;
       } else if (hint.toUpperCase().equals("SHUFFLE")) {
-        if (joinOp == JoinOperator.CROSS_JOIN) {
+        if (joinOp_ == JoinOperator.CROSS_JOIN) {
           throw new AnalysisException("CROSS JOIN does not support SHUFFLE.");
         }
-        if (isBroadcastJoin) {
+        if (isBroadcastJoin_) {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
-        isPartitionedJoin = true;
+        isPartitionedJoin_ = true;
       } else {
         throw new AnalysisException("JOIN hint not recognized: " + hint);
       }
@@ -191,26 +191,26 @@ public abstract class TableRef implements ParseNode {
    */
   public void analyzeJoin(Analyzer analyzer)
       throws AnalysisException, InternalException, AuthorizationException {
-    Preconditions.checkState(desc != null);
+    Preconditions.checkState(desc_ != null);
     analyzeJoinHints();
-    if (joinOp == JoinOperator.CROSS_JOIN) {
+    if (joinOp_ == JoinOperator.CROSS_JOIN) {
       // A CROSS JOIN is always a broadcast join, regardless of the join hints
-      isBroadcastJoin = true;
+      isBroadcastJoin_ = true;
     }
 
-    if (usingColNames != null) {
-      Preconditions.checkState(joinOp != JoinOperator.CROSS_JOIN);
+    if (usingColNames_ != null) {
+      Preconditions.checkState(joinOp_ != JoinOperator.CROSS_JOIN);
       // Turn USING clause into equivalent ON clause.
-      Preconditions.checkState(onClause == null);
-      for (String colName: usingColNames) {
+      Preconditions.checkState(onClause_ == null);
+      for (String colName: usingColNames_) {
         // check whether colName exists both for our table and the one
         // to the left of us
-        if (leftTblRef.getDesc().getTable().getColumn(colName) == null) {
+        if (leftTblRef_.getDesc().getTable().getColumn(colName) == null) {
           throw new AnalysisException(
               "unknown column " + colName + " for alias "
-              + leftTblRef.getAlias() + " (in \"" + this.toSql() + "\")");
+              + leftTblRef_.getAlias() + " (in \"" + this.toSql() + "\")");
         }
-        if (desc.getTable().getColumn(colName) == null) {
+        if (desc_.getTable().getColumn(colName) == null) {
           throw new AnalysisException(
               "unknown column " + colName + " for alias "
               + getAlias() + " (in \"" + this.toSql() + "\")");
@@ -219,13 +219,13 @@ public abstract class TableRef implements ParseNode {
         // create predicate "<left>.colName = <right>.colName"
         BinaryPredicate eqPred =
             new BinaryPredicate(BinaryPredicate.Operator.EQ,
-              new SlotRef(leftTblRef.getAliasAsName(), colName),
+              new SlotRef(leftTblRef_.getAliasAsName(), colName),
               new SlotRef(getAliasAsName(), colName));
-        if (onClause == null) {
-          onClause = eqPred;
+        if (onClause_ == null) {
+          onClause_ = eqPred;
         } else {
-          onClause =
-              new CompoundPredicate(CompoundPredicate.Operator.AND, onClause, eqPred);
+          onClause_ =
+              new CompoundPredicate(CompoundPredicate.Operator.AND, onClause_, eqPred);
         }
       }
     }
@@ -236,25 +236,25 @@ public abstract class TableRef implements ParseNode {
     // as being outer-joined
     boolean lhsIsNullable = false;
     boolean rhsIsNullable = false;
-    if (joinOp == JoinOperator.LEFT_OUTER_JOIN
-        || joinOp == JoinOperator.FULL_OUTER_JOIN) {
+    if (joinOp_ == JoinOperator.LEFT_OUTER_JOIN
+        || joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
       analyzer.registerOuterJoinedTids(getId().asList(), this);
       analyzer.registerOuterJoinedTids(getMaterializedTupleIds(), this);
       rhsIsNullable = true;
     }
-    if (joinOp == JoinOperator.RIGHT_OUTER_JOIN
-        || joinOp == JoinOperator.FULL_OUTER_JOIN) {
-      analyzer.registerOuterJoinedTids(leftTblRef.getAllTupleIds(), this);
-      analyzer.registerOuterJoinedTids(leftTblRef.getAllMaterializedTupleIds(), this);
+    if (joinOp_ == JoinOperator.RIGHT_OUTER_JOIN
+        || joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
+      analyzer.registerOuterJoinedTids(leftTblRef_.getAllTupleIds(), this);
+      analyzer.registerOuterJoinedTids(leftTblRef_.getAllMaterializedTupleIds(), this);
       lhsIsNullable = true;
     }
 
-    if (onClause != null) {
-      Preconditions.checkState(joinOp != JoinOperator.CROSS_JOIN);
-      onClause.analyze(analyzer);
-      onClause.checkReturnsBool("ON clause", true);
+    if (onClause_ != null) {
+      Preconditions.checkState(joinOp_ != JoinOperator.CROSS_JOIN);
+      onClause_.analyze(analyzer);
+      onClause_.checkReturnsBool("ON clause", true);
       Set<TupleId> onClauseTupleIds = Sets.newHashSet();
-      for (Expr e: onClause.getConjuncts()) {
+      for (Expr e: onClause_.getConjuncts()) {
         // Outer join clause conjuncts are registered for this particular table ref
         // (ie, can only be evaluated by the plan node that implements this join).
         // The exception are conjuncts that only pertain to the nullable side
@@ -262,7 +262,7 @@ public abstract class TableRef implements ParseNode {
         // without violating outer join semantics.
         // TODO: remove this special case
         if (getJoinOp().isOuterJoin()) {
-          if (lhsIsNullable && e.isBound(leftTblRef.getId())
+          if (lhsIsNullable && e.isBound(leftTblRef_.getId())
               || rhsIsNullable && e.isBound(getId())) {
             analyzer.registerConjuncts(e, this, false);
           } else {
@@ -281,8 +281,8 @@ public abstract class TableRef implements ParseNode {
     }
 
     // Make constant expressions from inline view refs nullable in its substitution map.
-    if (lhsIsNullable && leftTblRef instanceof InlineViewRef) {
-      ((InlineViewRef) leftTblRef).makeOutputNullable(analyzer);
+    if (lhsIsNullable && leftTblRef_ instanceof InlineViewRef) {
+      ((InlineViewRef) leftTblRef_).makeOutputNullable(analyzer);
     }
     if (rhsIsNullable && this instanceof InlineViewRef) {
       ((InlineViewRef) this).makeOutputNullable(analyzer);
@@ -290,15 +290,15 @@ public abstract class TableRef implements ParseNode {
   }
 
   private String joinOpToSql() {
-    Preconditions.checkState(joinOp != null);
-    switch (joinOp) {
+    Preconditions.checkState(joinOp_ != null);
+    switch (joinOp_) {
       case INNER_JOIN: return "INNER JOIN";
       case LEFT_OUTER_JOIN: return "LEFT OUTER JOIN";
       case LEFT_SEMI_JOIN: return "LEFT SEMI JOIN";
       case RIGHT_OUTER_JOIN: return "RIGHT OUTER JOIN";
       case FULL_OUTER_JOIN: return "FULL OUTER JOIN";
       case CROSS_JOIN: return "CROSS JOIN";
-      default: return "bad join op: " + joinOp.toString();
+      default: return "bad join op: " + joinOp_.toString();
     }
   }
 
@@ -309,18 +309,18 @@ public abstract class TableRef implements ParseNode {
 
   @Override
   public String toSql() {
-    if (joinOp == null) {
+    if (joinOp_ == null) {
       // prepend "," if we're part of a sequence of table refs w/o an
       // explicit JOIN clause
-      return (leftTblRef != null ? ", " : "") + tableRefToSql();
+      return (leftTblRef_ != null ? ", " : "") + tableRefToSql();
     }
 
     StringBuilder output = new StringBuilder(" " + joinOpToSql() + " ");
     output.append(tableRefToSql()).append(" ");
-    if (usingColNames != null) {
-      output.append("USING (").append(Joiner.on(", ").join(usingColNames)).append(")");
-    } else if (onClause != null) {
-      output.append("ON ").append(onClause.toSql());
+    if (usingColNames_ != null) {
+      output.append("USING (").append(Joiner.on(", ").join(usingColNames_)).append(")");
+    } else if (onClause_ != null) {
+      output.append("ON ").append(onClause_.toSql());
     }
     return output.toString();
   }

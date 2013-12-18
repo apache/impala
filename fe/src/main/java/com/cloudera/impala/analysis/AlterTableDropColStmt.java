@@ -31,23 +31,21 @@ import com.google.common.base.Preconditions;
  * by mysql.
  */
 public class AlterTableDropColStmt extends AlterTableStmt {
-  private final String colName;
+  private final String colName_;
 
   public AlterTableDropColStmt(TableName tableName, String colName) {
     super(tableName);
     Preconditions.checkState(colName != null && !colName.isEmpty());
-    this.colName = colName;
+    colName_ = colName;
   }
 
-  public String getColName() {
-    return colName;
-  }
+  public String getColName() { return colName_; }
 
   @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.DROP_COLUMN);
-    TAlterTableDropColParams dropColParams = new TAlterTableDropColParams(colName);
+    TAlterTableDropColParams dropColParams = new TAlterTableDropColParams(colName_);
     params.setDrop_col_params(dropColParams);
     return params;
   }
@@ -66,7 +64,7 @@ public class AlterTableDropColStmt extends AlterTableStmt {
     String tableName = getDb() + "." + getTbl();
 
     for (FieldSchema fs: t.getMetaStoreTable().getPartitionKeys()) {
-      if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
+      if (fs.getName().toLowerCase().equals(colName_.toLowerCase())) {
         throw new AnalysisException("Cannot drop partition column: " + fs.getName());
       }
     }
@@ -74,12 +72,12 @@ public class AlterTableDropColStmt extends AlterTableStmt {
     if (t.getColumns().size() - t.getMetaStoreTable().getPartitionKeysSize() <= 1) {
       throw new AnalysisException(String.format(
           "Cannot drop column '%s' from %s. Tables must contain at least 1 column.",
-          colName, tableName));
+          colName_, tableName));
     }
 
-    if (t.getColumn(colName) == null) {
+    if (t.getColumn(colName_) == null) {
       throw new AnalysisException(String.format(
-          "Column '%s' does not exist in table: %s", colName, tableName));
+          "Column '%s' does not exist in table: %s", colName_, tableName));
     }
   }
 }

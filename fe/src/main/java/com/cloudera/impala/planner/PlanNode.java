@@ -268,7 +268,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     String filler;
     // Do not traverse into the children of an Exchange node to avoid crossing
     // fragment boundaries.
-    if (children != null && children.size() > 0 && !(this instanceof ExchangeNode)) {
+    if (children_ != null && children_.size() > 0 && !(this instanceof ExchangeNode)) {
       detailPrefix += "|  ";
       filler = prefix + "|";
     } else {
@@ -302,17 +302,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
     // Print the children. Do not traverse into the children of an Exchange node to
     // avoid crossing fragment boundaries.
-    if (children != null && children.size() > 0 && !(this instanceof ExchangeNode)) {
+    if (children_ != null && children_.size() > 0 && !(this instanceof ExchangeNode)) {
       expBuilder.append(filler + "\n");
       String childHeadlinePrefix = prefix + "|----";
       String childDetailPrefix = prefix + "|    ";
-      for (int i = children.size() - 1; i >= 1; --i) {
+      for (int i = children_.size() - 1; i >= 1; --i) {
         expBuilder.append(
-            children.get(i).getExplainString(childHeadlinePrefix, childDetailPrefix,
+            children_.get(i).getExplainString(childHeadlinePrefix, childDetailPrefix,
                 detailLevel));
         expBuilder.append(filler + "\n");
       }
-      expBuilder.append(children.get(0).getExplainString(prefix, prefix, detailLevel));
+      expBuilder.append(children_.get(0).getExplainString(prefix, prefix, detailLevel));
     }
     return expBuilder.toString();
   }
@@ -363,8 +363,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       msg.num_children = 0;
       return;
     } else {
-      msg.num_children = children.size();
-      for (PlanNode child: children) {
+      msg.num_children = children_.size();
+      for (PlanNode child: children_) {
         child.treeToThriftHelper(container);
       }
     }
@@ -433,7 +433,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       TupleDescriptor desc = analyzer.getTupleDesc(tid);
       avgRowSize_ += desc.getAvgSerializedSize();
     }
-    if (!children.isEmpty()) numNodes_ = getChild(0).numNodes_;
+    if (!children_.isEmpty()) numNodes_ = getChild(0).numNodes_;
   }
 
   /**

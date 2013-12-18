@@ -32,35 +32,35 @@ public class LikePredicate extends Predicate {
     RLIKE("RLIKE", TExprOpcode.REGEX),
     REGEXP("REGEXP", TExprOpcode.REGEX);
 
-    private final String description;
-    private final TExprOpcode thriftOp;
+    private final String description_;
+    private final TExprOpcode thriftOp_;
 
     private Operator(String description, TExprOpcode thriftOp) {
-      this.description = description;
-      this.thriftOp = thriftOp;
+      this.description_ = description;
+      this.thriftOp_ = thriftOp;
     }
 
     @Override
     public String toString() {
-      return description;
+      return description_;
     }
 
     public TExprOpcode toThrift() {
-      return thriftOp;
+      return thriftOp_;
     }
   }
 
-  private final Operator op;
+  private final Operator op_;
 
   public LikePredicate(Operator op, Expr e1, Expr e2) {
     super();
-    this.op = op;
+    this.op_ = op;
     Preconditions.checkNotNull(e1);
-    children.add(e1);
+    children_.add(e1);
     Preconditions.checkNotNull(e2);
-    children.add(e2);
+    children_.add(e2);
     // TODO: improve with histograms?
-    selectivity = 0.1;
+    selectivity_ = 0.1;
   }
 
   @Override
@@ -68,39 +68,39 @@ public class LikePredicate extends Predicate {
     if (!super.equals(obj)) {
       return false;
     }
-    return ((LikePredicate) obj).op == op;
+    return ((LikePredicate) obj).op_ == op_;
   }
 
   @Override
   public String toSqlImpl() {
-    return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
+    return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.LIKE_PRED;
-    msg.setOpcode(op.toThrift());
+    msg.setOpcode(op_.toThrift());
     msg.like_pred = new TLikePredicate("\\");
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
     if (getChild(0).getType() != PrimitiveType.STRING
         && !getChild(0).getType().isNull()) {
       throw new AnalysisException(
-          "left operand of " + op.toString() + " must be of type STRING: " + toSql());
+          "left operand of " + op_.toString() + " must be of type STRING: " + toSql());
     }
     if (getChild(1).getType() != PrimitiveType.STRING
         && !getChild(1).getType().isNull()) {
       throw new AnalysisException(
-          "right operand of " + op.toString() + " must be of type STRING: " + toSql());
+          "right operand of " + op_.toString() + " must be of type STRING: " + toSql());
     }
 
     if (!getChild(1).getType().isNull() && getChild(1).isLiteral()
-        && (op == Operator.RLIKE || op == Operator.REGEXP)) {
+        && (op_ == Operator.RLIKE || op_ == Operator.REGEXP)) {
       // let's make sure the pattern works
       // TODO: this checks that it's a Java-supported regex, but the syntax supported
       // by the backend is Posix; add a call to the backend to check the re syntax

@@ -937,7 +937,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   @Test
   public void TestUdfs() {
-    HdfsURI dummyUri = new HdfsURI("");
+    HdfsUri dummyUri = new HdfsUri("");
 
     AnalysisError("select udf()", "default.udf() unknown");
     AnalysisError("select functional.udf()", "functional.udf() unknown");
@@ -1036,7 +1036,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // UDF.
     catalog.addFunction(new Udf(new FunctionName("default", "udf"),
         Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT,
-        new HdfsURI(""), null));
+        new HdfsUri(""), null));
     testFuncExprDepthLimit("udf(", "1", ")");
 
     // Timestamp arithmetic expr.

@@ -42,7 +42,7 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
    *        validated in analyze()
    */
   public CreateUdfStmt(FunctionName fnName, FunctionArgs args,
-      PrimitiveType retType, HdfsURI location, boolean ifNotExists,
+      PrimitiveType retType, HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
     super(new Udf(fnName, args, retType), location, ifNotExists, optArgs);
     udf_ = (Udf)fn_;

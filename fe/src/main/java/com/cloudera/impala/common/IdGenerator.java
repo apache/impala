@@ -24,11 +24,11 @@ package com.cloudera.impala.common;
  *
  */
 public class IdGenerator<IdType extends Id<IdType>> {
-  private int nextId = 0;
+  private int nextId_ = 0;
 
   public IdGenerator() {}
 
   public int getNextId() {
-    return nextId++;
+    return nextId_++;
   }
 }

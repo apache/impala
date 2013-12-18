@@ -61,43 +61,40 @@ public class BinaryPredicate extends Predicate {
     }
   }
 
-  private final Operator op;
+  private final Operator op_;
 
-  public Operator getOp() {
-    return op;
-  }
+  public Operator getOp() { return op_; }
 
   public BinaryPredicate(Operator op, Expr e1, Expr e2) {
     super();
-    this.op = op;
+    this.op_ = op;
     Preconditions.checkNotNull(e1);
-    children.add(e1);
+    children_.add(e1);
     Preconditions.checkNotNull(e2);
-    children.add(e2);
+    children_.add(e2);
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
-    return ((BinaryPredicate) obj).opcode == this.opcode;
+    if (!super.equals(obj)) return false;
+    return ((BinaryPredicate) obj).opcode_ == this.opcode_;
   }
 
   @Override
   public String toSqlImpl() {
-    return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
+    return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.BINARY_PRED;
-    msg.setOpcode(opcode);
+    msg.setOpcode(opcode_);
   }
 
+  @Override
   public String debugString() {
     return Objects.toStringHelper(this)
-        .add("op", op)
+        .add("op", op_)
         .addValue(super.debugString())
         .toString();
   }
@@ -105,7 +102,7 @@ public class BinaryPredicate extends Predicate {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
 
     PrimitiveType t1 = getChild(0).getType();
@@ -121,22 +118,22 @@ public class BinaryPredicate extends Predicate {
     castBinaryOp(compatibleType);
 
     OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
-        op.toFunctionOp(), true, compatibleType, compatibleType);
+        op_.toFunctionOp(), true, compatibleType, compatibleType);
     Preconditions.checkState(match != null);
     Preconditions.checkState(match.getReturnType() == PrimitiveType.BOOLEAN);
-    this.opcode = match.opcode;
+    this.opcode_ = match.opcode;
 
     // determine selectivity
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
-    if (op == Operator.EQ
+    if (op_ == Operator.EQ
         && isSingleColumnPredicate(slotRefRef, null)
         && slotRefRef.getRef().getNumDistinctValues() > 0) {
       Preconditions.checkState(slotRefRef.getRef() != null);
-      selectivity = 1.0 / slotRefRef.getRef().getNumDistinctValues();
-      selectivity = Math.max(0, Math.min(1, selectivity));
+      selectivity_ = 1.0 / slotRefRef.getRef().getNumDistinctValues();
+      selectivity_ = Math.max(0, Math.min(1, selectivity_));
     } else {
       // TODO: improve using histograms, once they show up
-      selectivity = Expr.defaultSelectivity;
+      selectivity_ = Expr.DEFAULT_SELECTIVITY;
     }
   }
 
@@ -161,7 +158,7 @@ public class BinaryPredicate extends Predicate {
    */
   @Override
   public Pair<SlotId, SlotId> getEqSlots() {
-    if (op != Operator.EQ) return null;
+    if (op_ != Operator.EQ) return null;
     SlotRef lhs = getChild(0).unwrapSlotRef(true);
     if (lhs == null) return null;
     SlotRef rhs = getChild(1).unwrapSlotRef(true);

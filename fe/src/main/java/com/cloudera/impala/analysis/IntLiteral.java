@@ -30,10 +30,10 @@ public class IntLiteral extends LiteralExpr {
   // We use a higher-resolution type to address edge cases such as Long.MIN_VALUE,
   // which the lexer/parser cannot properly recognize by itself.
   // We detect overflow and set the type in analysis.
-  private BigInteger value;
+  private BigInteger value_;
 
   public IntLiteral(BigInteger value) {
-    this.value = value;
+    this.value_ = value;
   }
 
   public IntLiteral(String value) throws AnalysisException,
@@ -44,7 +44,7 @@ public class IntLiteral extends LiteralExpr {
     } catch (NumberFormatException e) {
       throw new AnalysisException("invalid integer literal: " + value, e);
     }
-    this.value = BigInteger.valueOf(longValue.longValue());
+    this.value_ = BigInteger.valueOf(longValue.longValue());
     analyze(null);
   }
 
@@ -52,39 +52,37 @@ public class IntLiteral extends LiteralExpr {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
-    if (value.compareTo(BigInteger.valueOf(Byte.MAX_VALUE)) <= 0 &&
-        value.compareTo(BigInteger.valueOf(Byte.MIN_VALUE)) >= 0) {
-      type = PrimitiveType.TINYINT;
-    } else if (value.compareTo(BigInteger.valueOf(Short.MAX_VALUE)) <= 0 &&
-        value.compareTo(BigInteger.valueOf(Short.MIN_VALUE)) >= 0) {
-      type = PrimitiveType.SMALLINT;
-    } else if (value.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) <= 0 &&
-        value.compareTo(BigInteger.valueOf(Integer.MIN_VALUE)) >= 0) {
-      type = PrimitiveType.INT;
+    if (value_.compareTo(BigInteger.valueOf(Byte.MAX_VALUE)) <= 0 &&
+        value_.compareTo(BigInteger.valueOf(Byte.MIN_VALUE)) >= 0) {
+      type_ = PrimitiveType.TINYINT;
+    } else if (value_.compareTo(BigInteger.valueOf(Short.MAX_VALUE)) <= 0 &&
+        value_.compareTo(BigInteger.valueOf(Short.MIN_VALUE)) >= 0) {
+      type_ = PrimitiveType.SMALLINT;
+    } else if (value_.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) <= 0 &&
+        value_.compareTo(BigInteger.valueOf(Integer.MIN_VALUE)) >= 0) {
+      type_ = PrimitiveType.INT;
     } else {
-      if (value.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0 ||
-          value.compareTo(BigInteger.valueOf(Long.MIN_VALUE)) < 0) {
+      if (value_.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0 ||
+          value_.compareTo(BigInteger.valueOf(Long.MIN_VALUE)) < 0) {
         throw new AnalysisException(
             String.format("Literal '%s' exceeds maximum range of integers.", toSql()));
       }
-      type = PrimitiveType.BIGINT;
+      type_ = PrimitiveType.BIGINT;
     }
   }
 
-  public long getValue() {
-    return value.longValue();
-  }
+  public long getValue() { return value_.longValue(); }
 
   @Override
   public String debugString() {
     return Objects.toStringHelper(this)
-        .add("value", value)
+        .add("value", value_)
         .toString();
   }
 
   @Override
   public String getStringValue() {
-    return value.toString();
+    return value_.toString();
   }
 
   @Override
@@ -92,7 +90,7 @@ public class IntLiteral extends LiteralExpr {
     if (!super.equals(obj)) {
       return false;
     }
-    return value.equals(((IntLiteral) obj).value);
+    return value_.equals(((IntLiteral) obj).value_);
   }
 
   @Override
@@ -103,24 +101,24 @@ public class IntLiteral extends LiteralExpr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.INT_LITERAL;
-    msg.int_literal = new TIntLiteral(value.longValue());
+    msg.int_literal = new TIntLiteral(value_.longValue());
   }
 
   @Override
   protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType());
     if (targetType.isFixedPointType()) {
-      this.type = targetType;
+      this.type_ = targetType;
       return this;
     } else if (targetType.isFloatingPointType()) {
-      return new FloatLiteral(new Double(value.longValue()), targetType);
+      return new FloatLiteral(new Double(value_.longValue()), targetType);
     }
     return this;
   }
 
   @Override
   public void swapSign() throws NotImplementedException {
-    value = value.negate();
+    value_ = value_.negate();
   }
 
   @Override

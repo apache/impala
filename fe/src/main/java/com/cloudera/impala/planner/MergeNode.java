@@ -110,7 +110,7 @@ public class MergeNode extends PlanNode {
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     cardinality_ = constExprLists_.size();
-    for (PlanNode child: children) {
+    for (PlanNode child: children_) {
       // ignore missing child cardinality info in the hope it won't matter enough
       // to change the planning outcome
       if (child.cardinality_ > 0) {
@@ -135,7 +135,7 @@ public class MergeNode extends PlanNode {
 
     if (isIntermediateMerge_) {
       // nothing left to do, but we want to check a few things
-      Preconditions.checkState(resultExprLists_.size() == children.size());
+      Preconditions.checkState(resultExprLists_.size() == children_.size());
       Preconditions.checkState(resultExprLists_.isEmpty() || resultExprLists_.size() == 1);
       int numMaterializedSlots = 0;
       for (SlotDescriptor slot: analyzer.getDescTbl().getTupleDesc(tupleId_).getSlots()) {

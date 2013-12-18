@@ -44,20 +44,20 @@ import com.google.common.collect.Lists;
  * Views defined within the same WITH-clause may not use the same alias.
  */
 public class WithClause implements ParseNode {
-  private final ArrayList<ViewRef> views;
+  private final ArrayList<ViewRef> views_;
 
   // Analyzer used for this WithClause. Set during analysis.
-  private Analyzer analyzer;
+  private Analyzer analyzer_;
 
   // List of table references from the WITH-clause views' query statements that do not
   // refer to nested WITH-clause views. Used to detect recursive references by
   // propagating the unresolved references to outer scopes.
-  private final ArrayList<BaseTableRef> unresolvedTableRefs = Lists.newArrayList();
+  private final ArrayList<BaseTableRef> unresolvedTableRefs_ = Lists.newArrayList();
 
   public WithClause(ArrayList<ViewRef> views) {
     Preconditions.checkNotNull(views);
     Preconditions.checkState(!views.isEmpty());
-    this.views = views;
+    this.views_ = views;
   }
 
   /**
@@ -66,22 +66,22 @@ public class WithClause implements ParseNode {
   @Override
   public void analyze(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
-    unresolvedTableRefs.clear();
-    analyzeWithClause(analyzer, this, unresolvedTableRefs);
+    unresolvedTableRefs_.clear();
+    analyzeWithClause(analyzer, this, unresolvedTableRefs_);
 
     // The remaining unresolved tables must refer to base tables in the catalog.
     // We explicitly disable view matching for them to simplify later view substitution.
-    for (BaseTableRef baseTblRef: unresolvedTableRefs) {
+    for (BaseTableRef baseTblRef: unresolvedTableRefs_) {
       baseTblRef.disableWithViewReplacement();
     }
 
     // Register all views in analyzer. After this step we will "blindly" replace
     // BaseTableRefs with view definitions from this WITH clause in
     // Analyser.substituteBaseTablesWithMatchingViews().
-    for (ViewRef view: views) {
+    for (ViewRef view: views_) {
       analyzer.registerWithClauseView(view);
     }
-    this.analyzer = analyzer;
+    this.analyzer_ = analyzer;
   }
 
   /**
@@ -172,7 +172,7 @@ public class WithClause implements ParseNode {
 
     // Create a new child analyzer to register views into.
     Analyzer tmpAnalyzer = new Analyzer(analyzer, analyzer.getUser());
-    for (ViewRef view : withClause.views) {
+    for (ViewRef view : withClause.views_) {
 
       // Gather all unresolved table references from all child scopes
       // of the view's query statement.
@@ -202,21 +202,21 @@ public class WithClause implements ParseNode {
   }
 
   public ArrayList<ViewRef> getViews() {
-    return views;
+    return views_;
   }
 
   public ArrayList<BaseTableRef> getUnresolvedTableRefs() {
-    return unresolvedTableRefs;
+    return unresolvedTableRefs_;
   }
 
   public Analyzer getAnalyzer() {
-    return analyzer;
+    return analyzer_;
   }
 
   @Override
   public WithClause clone() {
     ArrayList<ViewRef> viewClones = Lists.newArrayList();
-    for (ViewRef view: views) {
+    for (ViewRef view: views_) {
       viewClones.add((ViewRef) view.clone());
     }
     return new WithClause(viewClones);
@@ -225,7 +225,7 @@ public class WithClause implements ParseNode {
   @Override
   public String toSql() {
     List<String> viewStrings = Lists.newArrayList();
-    for (InlineViewRef view: views) {
+    for (InlineViewRef view: views_) {
       // Enclose the view alias in quotes if Hive cannot parse it without quotes.
       // This is needed for view compatibility between Impala and Hive.
       String aliasSql = ToSqlUtils.getHiveIdentSql(view.getAlias());

@@ -21,15 +21,15 @@ import java.util.List;
  * parameters. These parameters can be for scalar or aggregate functions.
  */
 class FunctionParams {
-  private final boolean isStar;
-  private boolean isDistinct;
-  private final List<Expr> exprs;
+  private final boolean isStar_;
+  private boolean isDistinct_;
+  private final List<Expr> exprs_;
 
   // c'tor for non-star params
   public FunctionParams(boolean isDistinct, List<Expr> exprs) {
-    isStar = false;
-    this.isDistinct = isDistinct;
-    this.exprs = exprs;
+    isStar_ = false;
+    this.isDistinct_ = isDistinct;
+    this.exprs_ = exprs;
   }
 
   // c'tor for non-star, non-distinct params
@@ -41,16 +41,15 @@ class FunctionParams {
     return new FunctionParams();
   }
 
-  public boolean isStar() { return isStar; }
-  public boolean isDistinct() { return isDistinct; }
-  public List<Expr> exprs() { return exprs; }
-
-  public void setIsDistinct(boolean v) { isDistinct = v; }
+  public boolean isStar() { return isStar_; }
+  public boolean isDistinct() { return isDistinct_; }
+  public List<Expr> exprs() { return exprs_; }
+  public void setIsDistinct(boolean v) { isDistinct_ = v; }
 
   // c'tor for <agg>(*)
   private FunctionParams() {
-    exprs = null;
-    isStar = true;
-    isDistinct = false;
+    exprs_ = null;
+    isStar_ = true;
+    isDistinct_ = false;
   }
 }

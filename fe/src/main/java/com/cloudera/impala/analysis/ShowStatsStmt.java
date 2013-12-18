@@ -26,37 +26,39 @@ import com.cloudera.impala.thrift.TShowStatsParams;
  * column and table statistics for a given table.
  */
 public class ShowStatsStmt extends StatementBase {
-  protected final boolean isShowColStats;
-  protected final TableName tableName;
+  protected final boolean isShowColStats_;
+  protected final TableName tableName_;
 
   // Set during analysis.
-  protected Table table;
+  protected Table table_;
 
   public ShowStatsStmt(TableName tableName, boolean isShowColStats) {
-    this.tableName = tableName;
-    this.isShowColStats = isShowColStats;
+    this.tableName_ = tableName;
+    this.isShowColStats_ = isShowColStats;
   }
 
   @Override
-  public String toSql() { return getSqlPrefix() + " " + tableName.toString(); }
+  public String toSql() {
+    return getSqlPrefix() + " " + tableName_.toString();
+  }
 
   private String getSqlPrefix() {
-    return "SHOW " + ((isShowColStats) ? "COLUMN" : "TABLE") + " STATS";
+    return "SHOW " + ((isShowColStats_) ? "COLUMN" : "TABLE") + " STATS";
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    table = analyzer.getTable(tableName, Privilege.VIEW_METADATA);
-    if (table instanceof View) {
+    table_ = analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
+    if (table_ instanceof View) {
       throw new AnalysisException(String.format(
-          "%s not applicable to a view: %s", getSqlPrefix(), table.getFullName()));
+          "%s not applicable to a view: %s", getSqlPrefix(), table_.getFullName()));
     }
   }
 
   public TShowStatsParams toThrift() {
     // Ensure the DB is set in the table_name field by using table and not tableName.
-    return new TShowStatsParams(isShowColStats,
-        new TableName(table.getDb().getName(), table.getName()).toThrift());
+    return new TShowStatsParams(isShowColStats_,
+        new TableName(table_.getDb().getName(), table_.getName()).toThrift());
   }
 }

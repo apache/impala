@@ -28,51 +28,51 @@ import com.cloudera.impala.thrift.TInPredicate;
 
 public class InPredicate extends Predicate {
   private final static Logger LOG = LoggerFactory.getLogger(InPredicate.class);
-  private final boolean isNotIn;
+  private final boolean isNotIn_;
 
   // First child is the comparison expr for which we
   // should check membership in the inList (the remaining children).
   public InPredicate(Expr compareExpr, List<Expr> inList, boolean isNotIn) {
-    children.add(compareExpr);
-    children.addAll(inList);
-    this.isNotIn = isNotIn;
+    children_.add(compareExpr);
+    children_.addAll(inList);
+    this.isNotIn_ = isNotIn;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (isAnalyzed) return;
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
-    analyzer.castAllToCompatibleType(children);
+    analyzer.castAllToCompatibleType(children_);
 
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     Reference<Integer> idxRef = new Reference<Integer>();
     if (isSingleColumnPredicate(slotRefRef, idxRef)
         && idxRef.getRef() == 0
         && slotRefRef.getRef().getNumDistinctValues() > 0) {
-      selectivity = (double) (getChildren().size() - 1)
+      selectivity_ = (double) (getChildren().size() - 1)
           / (double) slotRefRef.getRef().getNumDistinctValues();
-      selectivity = Math.max(0.0, Math.min(1.0, selectivity));
+      selectivity_ = Math.max(0.0, Math.min(1.0, selectivity_));
     } else {
-      selectivity = Expr.defaultSelectivity;
+      selectivity_ = Expr.DEFAULT_SELECTIVITY;
     }
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
-    msg.in_predicate = new TInPredicate(isNotIn);
+    msg.in_predicate = new TInPredicate(isNotIn_);
     msg.node_type = TExprNodeType.IN_PRED;
-    msg.setOpcode(opcode);
+    msg.setOpcode(opcode_);
   }
 
   @Override
   public String toSqlImpl() {
     StringBuilder strBuilder = new StringBuilder();
-    String notStr = (isNotIn) ? "NOT " : "";
+    String notStr = (isNotIn_) ? "NOT " : "";
     strBuilder.append(getChild(0).toSql() + " " + notStr + "IN (");
-    for (int i = 1; i < children.size(); ++i) {
+    for (int i = 1; i < children_.size(); ++i) {
       strBuilder.append(getChild(i).toSql());
-      strBuilder.append((i+1 != children.size()) ? ", " : "");
+      strBuilder.append((i+1 != children_.size()) ? ", " : "");
     }
     strBuilder.append(")");
     return strBuilder.toString();
