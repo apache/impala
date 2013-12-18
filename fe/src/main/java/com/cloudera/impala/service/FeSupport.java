@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TQueryContext;
@@ -54,6 +55,11 @@ public class FeSupport {
 
   // Returns a serialize TSymbolLookupResult
   public native static byte[] NativeLookupSymbol(byte[] thriftSymbolLookup);
+
+  // Does an RPCs to the Catalog Server to retrieve a catalog object. To keep our
+  // kerberos configuration consolidated, we make make all RPCs in the BE layer
+  // instead of calling the Catalog Server using Java Thrift bindings.
+  public native static byte[] NativeGetCatalogObject(byte[] objectDesc);
 
   public static TColumnValue EvalConstExpr(Expr expr, TQueryContext queryCtxt)
       throws InternalException {
@@ -116,6 +122,34 @@ public class FeSupport {
     TColumnValue val = EvalConstExpr(pred, queryCtxt);
     // Return false if pred evaluated to false or NULL. True otherwise.
     return val.isSetBoolVal() && val.boolVal;
+  }
+
+  private static byte[] GetCatalogObject(byte[] objectDescBytes) {
+    try {
+      return NativeGetCatalogObject(objectDescBytes);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return NativeGetCatalogObject(objectDescBytes);
+  }
+
+  public static TCatalogObject GetCatalogObject(TCatalogObject objectDesc)
+      throws InternalException {
+    Preconditions.checkNotNull(objectDesc);
+
+    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
+    try {
+      byte[] result = GetCatalogObject(serializer.serialize(objectDesc));
+      Preconditions.checkNotNull(result);
+      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+      TCatalogObject catalogObject = new TCatalogObject();
+      deserializer.deserialize(catalogObject, result);
+      return catalogObject;
+    } catch (TException e) {
+      // this should never happen
+      throw new InternalException("couldn't get catalog object from descriptor:"
+            + objectDesc.toString());
+    }
   }
 
   /**

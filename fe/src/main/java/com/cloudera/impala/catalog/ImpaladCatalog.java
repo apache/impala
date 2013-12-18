@@ -51,15 +51,19 @@ import com.google.common.base.Preconditions;
 
 /**
  * Thread safe Catalog for an Impalad. The Impalad Catalog provides an interface to
- * access Catalog objects that this Impalad knows about and authorize access requests
+ * access Catalog objects that this Impalad knows about and authorizes access requests
  * to these objects. It also manages reading and updating the authorization policy file
  * from HDFS.
  * TODO: The CatalogService should also handle updating and disseminating the
  * authorization policy.
  * The Impalad catalog can be updated either via a StateStore heartbeat or by directly
- * applying the result of a catalog operation to the CatalogCache. Updates are always
- * applied using the updateCatalog() function which takes the catalogLock_.writeLock()
- * for the duration of its execution to ensure all updates are applied atomically.
+ * applying the result of a catalog operation to the CatalogCache. Updates applied using
+ * the updateCatalog() function which takes the catalogLock_.writeLock() for the duration
+ * of its execution to ensure all updates are applied atomically.
+ * Table metadata is loaded lazily. The CatalogServer initially broadcasts (via the
+ * statestore) the known table names (as IncompleteTables). These table names are added
+ * to the Impalad catalog cache and when one of the tables is accessed, the impalad will
+ * make an RPC to the CatalogServer to load the complete table metadata.
  * In both cases, we need to ensure that work from one update is not "undone" by another
  * update. To handle this the ImpaladCatalog does the following:
  * - Tracks the overall catalog version last received in a state store heartbeat, this
@@ -79,9 +83,6 @@ import com.google.common.base.Preconditions;
  * privilege checks should go through this class.
  * The CatalogServiceId is also tracked to detect if a different instance of the catalog
  * service has been started, in which case a full topic update is required.
- * TODO: Currently, there is some some inconsistency in whether catalog methods throw
- * or return null of the target object does not exist. We should update all
- * methods to return null if the object doesn't exist.
  */
 public class ImpaladCatalog extends Catalog {
   private static final Logger LOG = Logger.getLogger(ImpaladCatalog.class);
@@ -131,7 +132,20 @@ public class ImpaladCatalog extends Catalog {
           new AuthorizationPolicyReader(authzConfig),
           delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
     }
-    if (loadStrategy != CatalogInitStrategy.EMPTY) isReady_.set(true);
+
+    // This is a special branch used to bootstrap loading of the catalog for an Impalad
+    // during the FE tests. We want to invalidate anything in the cache so it will be
+    // loaded (from the catalog server) on the next access.
+    // TODO: Clean up how we bootstrap the FE tests.
+    if (loadStrategy != CatalogInitStrategy.EMPTY) {
+      isReady_.set(true);
+      for (String dbName: getDbNames(null)) {
+        Db db = getDb(dbName);
+        for (String tblName: db.getAllTableNames()) {
+          db.invalidateTable(tblName);
+        }
+      }
+    }
   }
 
   private class AuthorizationPolicyReader implements Runnable {
@@ -224,7 +238,11 @@ public class ImpaladCatalog extends Catalog {
         if (catalogObject.getType() == TCatalogObjectType.CATALOG) {
           newCatalogVersion = catalogObject.getCatalog_version();
         } else {
-          addCatalogObject(catalogObject);
+          try {
+            addCatalogObject(catalogObject);
+          } catch (Exception e) {
+            LOG.error("Error adding catalog object: " + e.getMessage(), e);
+          }
         }
       }
 
@@ -242,82 +260,6 @@ public class ImpaladCatalog extends Catalog {
       catalogLock_.writeLock().unlock();
     }
     return new TUpdateCatalogCacheResponse(catalogServiceId_);
-  }
-
-  /**
-   *  Adds the given TCatalogObject to the catalog cache. The update may be ignored
-   *  (considered out of date) if:
-   *  1) An item exists in the catalog cache with a version > than the given
-   *     TCatalogObject's version.
-   *  2) The catalogDeltaLog_ contains an entry for this object with a version
-   *     > than the given TCatalogObject's version.
-   */
-  private void addCatalogObject(TCatalogObject catalogObject)
-      throws TableLoadingException, DatabaseNotFoundException {
-    // This item is out of date and should not be applied to the catalog.
-    if (catalogDeltaLog_.wasObjectRemovedAfter(catalogObject)) {
-      LOG.debug(String.format("Skipping update because a matching object was removed " +
-          "in a later catalog version: %s", catalogObject));
-      return;
-    }
-
-    switch(catalogObject.getType()) {
-      case DATABASE:
-        addDb(catalogObject.getDb(), catalogObject.getCatalog_version());
-        break;
-      case TABLE:
-      case VIEW:
-        addTable(catalogObject.getTable(), catalogObject.getCatalog_version());
-        break;
-      case FUNCTION:
-        addFunction(catalogObject.getFn(), catalogObject.getCatalog_version());
-        break;
-      default:
-        throw new IllegalStateException(
-            "Unexpected TCatalogObjectType: " + catalogObject.getType());
-    }
-  }
-
-  /**
-   *  Removes the matching TCatalogObject from the catalog, if one exists and its
-   *  catalog version is < the catalog version of this drop operation.
-   *  Note that drop operations that come from statestore heartbeats always have a
-   *  version of 0. To determine the drop version for statestore updates,
-   *  the catalog version from the current update is used. This is okay because there
-   *  can never be a catalog update from the statestore that contains for a drop
-   *  and an addition of the same object. For more details on how drop
-   *  versioning works, see CatalogServerCatalog.java
-   */
-  private void removeCatalogObject(TCatalogObject catalogObject,
-      long currentCatalogUpdateVersion) {
-    // The TCatalogObject associated with a drop operation from a state store
-    // heartbeat will always have a version of zero. Because no update from
-    // the state store can contain both a drop and an addition of the same object,
-    // we can assume the drop version is the current catalog version of this update.
-    // If the TCatalogObject contains a version that != 0, it indicates the drop
-    // came from a direct update.
-    long dropCatalogVersion = catalogObject.getCatalog_version() == 0 ?
-        currentCatalogUpdateVersion : catalogObject.getCatalog_version();
-
-    switch(catalogObject.getType()) {
-      case DATABASE:
-        removeDb(catalogObject.getDb(), dropCatalogVersion);
-        break;
-      case TABLE:
-      case VIEW:
-        removeTable(catalogObject.getTable(), dropCatalogVersion);
-        break;
-      case FUNCTION:
-        removeFunction(catalogObject.getFn(), dropCatalogVersion);
-        break;
-      default:
-        throw new IllegalStateException(
-            "Unexpected TCatalogObjectType: " + catalogObject.getType());
-    }
-
-    if (catalogObject.getCatalog_version() > lastSyncedCatalogVersion_) {
-      catalogDeltaLog_.addRemovedObject(catalogObject);
-    }
   }
 
   /**
@@ -389,21 +331,26 @@ public class ImpaladCatalog extends Catalog {
   }
 
   /**
-   * Returns the Table object for the given dbName/tableName.
+   * Returns the Table object for the given dbName/tableName. If the table is
+   * found to be uninitialized (does not yet have its metadata loaded) then this
+   * will attempt to load the table's metadata from the catalog server.
    */
   public Table getTable(String dbName, String tableName, User user,
-      Privilege privilege) throws DatabaseNotFoundException, TableNotFoundException,
-      TableLoadingException, AuthorizationException {
+      Privilege privilege) throws AuthorizationException, DatabaseNotFoundException,
+      TableLoadingException {
     checkAccess(user, new PrivilegeRequestBuilder()
         .allOf(privilege).onTable(dbName, tableName).toRequest());
 
     Table table = getTable(dbName, tableName);
-    // If there were problems loading this table's metadata, throw an exception
-    // when it is accessed.
     if (table instanceof IncompleteTable) {
+      // We should never get back an uninitialized IncompleteTable.
+      Preconditions.checkState(!((IncompleteTable) table).isUninitialized());
+
+      // If there were problems loading this table's metadata, throw an exception
+      // when it is accessed.
       ImpalaException cause = ((IncompleteTable) table).getCause();
       if (cause instanceof TableLoadingException) throw (TableLoadingException) cause;
-      throw new TableLoadingException("Missing table metadata: ", cause);
+      throw new TableLoadingException("Missing metadata for table: " + tableName, cause);
     }
     return table;
   }
@@ -490,35 +437,118 @@ public class ImpaladCatalog extends Catalog {
     }
   }
 
+  /**
+   *  Adds the given TCatalogObject to the catalog cache. The update may be ignored
+   *  (considered out of date) if:
+   *  1) An item exists in the catalog cache with a version > than the given
+   *     TCatalogObject's version.
+   *  2) The catalogDeltaLog_ contains an entry for this object with a version
+   *     > than the given TCatalogObject's version.
+   */
+  private void addCatalogObject(TCatalogObject catalogObject)
+      throws TableLoadingException, DatabaseNotFoundException {
+    // This item is out of date and should not be applied to the catalog.
+    if (catalogDeltaLog_.wasObjectRemovedAfter(catalogObject)) {
+      LOG.debug(String.format("Skipping update because a matching object was removed " +
+          "in a later catalog version: %s", catalogObject));
+      return;
+    }
+
+    switch(catalogObject.getType()) {
+      case DATABASE:
+        addDb(catalogObject.getDb(), catalogObject.getCatalog_version());
+        break;
+      case TABLE:
+      case VIEW:
+        addTable(catalogObject.getTable(), catalogObject.getCatalog_version());
+        break;
+      case FUNCTION:
+        addFunction(catalogObject.getFn(), catalogObject.getCatalog_version());
+        break;
+      default:
+        throw new IllegalStateException(
+            "Unexpected TCatalogObjectType: " + catalogObject.getType());
+    }
+  }
+
+  /**
+   *  Removes the matching TCatalogObject from the catalog, if one exists and its
+   *  catalog version is < the catalog version of this drop operation.
+   *  Note that drop operations that come from statestore heartbeats always have a
+   *  version of 0. To determine the drop version for statestore updates,
+   *  the catalog version from the current update is used. This is okay because there
+   *  can never be a catalog update from the statestore that contains a drop
+   *  and an addition of the same object. For more details on how drop
+   *  versioning works, see CatalogServerCatalog.java
+   */
+  private void removeCatalogObject(TCatalogObject catalogObject,
+      long currentCatalogUpdateVersion) {
+    // The TCatalogObject associated with a drop operation from a state store
+    // heartbeat will always have a version of zero. Because no update from
+    // the state store can contain both a drop and an addition of the same object,
+    // we can assume the drop version is the current catalog version of this update.
+    // If the TCatalogObject contains a version that != 0, it indicates the drop
+    // came from a direct update.
+    long dropCatalogVersion = catalogObject.getCatalog_version() == 0 ?
+        currentCatalogUpdateVersion : catalogObject.getCatalog_version();
+
+    switch(catalogObject.getType()) {
+      case DATABASE:
+        removeDb(catalogObject.getDb(), dropCatalogVersion);
+        break;
+      case TABLE:
+      case VIEW:
+        removeTable(catalogObject.getTable(), dropCatalogVersion);
+        break;
+      case FUNCTION:
+        removeFunction(catalogObject.getFn(), dropCatalogVersion);
+        break;
+      default:
+        throw new IllegalStateException(
+            "Unexpected TCatalogObjectType: " + catalogObject.getType());
+    }
+
+    if (catalogObject.getCatalog_version() > lastSyncedCatalogVersion_) {
+      catalogDeltaLog_.addRemovedObject(catalogObject);
+    }
+  }
+
   private void addDb(TDatabase thriftDb, long catalogVersion) {
-    Db existingDb = getDbIfPresent(thriftDb.getDb_name());
+    Db existingDb = getDb(thriftDb.getDb_name());
     if (existingDb == null ||
         existingDb.getCatalogVersion() < catalogVersion) {
       Db newDb = Db.fromTDatabase(thriftDb, this);
       newDb.setCatalogVersion(catalogVersion);
-      dbCache_.add(newDb);
+      addDb(newDb);
     }
   }
 
   private void addTable(TTable thriftTable, long catalogVersion)
       throws TableLoadingException {
-    Db db = getDbIfPresent(thriftTable.db_name);
+    Db db = getDb(thriftTable.db_name);
     if (db == null) {
       LOG.debug("Parent database of table does not exist: " +
           thriftTable.db_name + "." + thriftTable.tbl_name);
       return;
     }
-    Table existingTable = db.getTableIfPresent(thriftTable.getTbl_name());
-    if (existingTable == null ||
-        existingTable.getCatalogVersion() < catalogVersion) {
-      db.addTable(thriftTable, catalogVersion);
+
+    Table newTable = Table.fromThrift(db, thriftTable);
+    newTable.setCatalogVersion(catalogVersion);
+
+    // If this is an uninitialized table, don't just add the table name to
+    // the metadata cache. The next access will trigger a metadata load.
+    if (newTable instanceof IncompleteTable
+        && ((IncompleteTable) newTable).isUninitialized()) {
+      db.addTableName(newTable.getName());
+    } else {
+      db.addTable(newTable);
     }
   }
 
   private void addFunction(TFunction fn, long catalogVersion) {
     Function function = Function.fromThrift(fn);
     function.setCatalogVersion(catalogVersion);
-    Db db = getDbIfPresent(function.getFunctionName().getDb());
+    Db db = getDb(function.getFunctionName().getDb());
     if (db == null) {
       LOG.debug("Parent database of function does not exist: " + function.getName());
       return;
@@ -531,25 +561,25 @@ public class ImpaladCatalog extends Catalog {
   }
 
   private void removeDb(TDatabase thriftDb, long dropCatalogVersion) {
-    Db db = getDbIfPresent(thriftDb.getDb_name());
+    Db db = getDb(thriftDb.getDb_name());
     if (db != null && db.getCatalogVersion() < dropCatalogVersion) {
       removeDb(db.getName());
     }
   }
 
   private void removeTable(TTable thriftTable, long dropCatalogVersion) {
-    Db db = getDbIfPresent(thriftTable.db_name);
+    Db db = getDb(thriftTable.db_name);
     // The parent database doesn't exist, nothing to do.
     if (db == null) return;
 
-    Table table = db.getTableIfPresent(thriftTable.getTbl_name());
+    Table table = db.getTable(thriftTable.getTbl_name());
     if (table != null && table.getCatalogVersion() < dropCatalogVersion) {
       db.removeTable(thriftTable.tbl_name);
     }
   }
 
   private void removeFunction(TFunction thriftFn, long dropCatalogVersion) {
-    Db db = getDbIfPresent(thriftFn.name.getDb_name());
+    Db db = getDb(thriftFn.name.getDb_name());
     // The parent database doesn't exist, nothing to do.
     if (db == null) return;
 

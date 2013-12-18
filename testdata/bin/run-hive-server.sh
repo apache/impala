@@ -10,7 +10,7 @@ set -u
 $IMPALA_HOME/testdata/bin/kill-hive-server.sh
 
 # Starts a Hive Metastore Server on the specified port.
-hive --service metastore -p $HIVE_METASTORE_PORT &
+HADOOP_CLIENT_OPTS=-Xmx2024m hive --service metastore -p $HIVE_METASTORE_PORT &
 
 # Starts a HiveServer2 instance on the port specified by the HIVE_SERVER2_THRIFT_PORT
 # environment variable.

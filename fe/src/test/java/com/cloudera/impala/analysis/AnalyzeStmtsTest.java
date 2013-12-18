@@ -1341,7 +1341,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select * from functional.alltypes",
         "Unable to INSERT into target table (functional_seq.alltypes) because Impala " +
         "does not have WRITE access to at least one HDFS path: " +
-        "hdfs://localhost:20500/test-warehouse/alltypes_seq/year=2009/month=1");
+        "hdfs://localhost:20500/test-warehouse/alltypes_seq/year=2009/month=");
 
     // Test plan hints for partitioned Hdfs tables.
     AnalyzesOk("insert into functional.alltypessmall " +

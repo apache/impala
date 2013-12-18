@@ -145,3 +145,20 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
   }
   params->__isset.column_stats = true;
 }
+
+Status CatalogOpExecutor::GetCatalogObject(const TCatalogObject& object_desc,
+    TCatalogObject* result) {
+  const TNetworkAddress& address =
+      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
+  Status status;
+  CatalogServiceConnection client(client_cache_, address, &status);
+  RETURN_IF_ERROR(status);
+
+  TGetCatalogObjectRequest request;
+  request.__set_object_desc(object_desc);
+
+  TGetCatalogObjectResponse response;
+  client->GetCatalogObject(response, request);
+  *result = response.catalog_object;
+  return Status::OK;
+}

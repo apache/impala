@@ -74,6 +74,8 @@ public enum PrimitiveType {
       case STRING: return STRING;
       case TIMESTAMP: return TIMESTAMP;
       case CHAR: return CHAR;
+      case DECIMAL: return DECIMAL;
+      case BINARY: return BINARY;
     }
     return INVALID_TYPE;
   }

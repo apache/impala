@@ -226,7 +226,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table functional.alltypes change column year year int",
         "Cannot modify partition column: year");
 
-    AnalysisError("alter table functional.alltypes change column int_col Tinyint_col int",
+    AnalysisError(
+        "alter table functional.alltypes change column int_col Tinyint_col int",
         "Column already exists: Tinyint_col");
 
     // Invalid column name.
@@ -377,7 +378,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table functional.alltypes rename to functional.`%^&`",
         "Invalid table/view name: %^&");
 
-    AnalysisError("alter table functional.alltypes rename to db_does_not_exist.new_table",
+    AnalysisError(
+        "alter table functional.alltypes rename to db_does_not_exist.new_table",
         "Database does not exist: db_does_not_exist");
 
     // Cannot ALTER TABLE a view.
@@ -592,7 +594,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create table functional.new_table (i int)");
     AnalyzesOk("create table if not exists functional.alltypes (i int)");
     AnalyzesOk("create table if not exists functional.new_tbl like functional.alltypes");
-    AnalyzesOk("create table if not exists functional.alltypes like functional.alltypes");
+    AnalyzesOk(
+        "create table if not exists functional.alltypes like functional.alltypes");
     AnalysisError("create table functional.alltypes like functional.alltypes",
         "Table already exists: functional.alltypes");
     AnalysisError("create table functional.new_table like functional.tbl_does_not_exist",
@@ -676,7 +679,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
   @Test
   public void TestCreateView() throws AnalysisException {
-    AnalyzesOk("create view foo as select int_col, string_col from functional.alltypes");
+    AnalyzesOk(
+        "create view foo_new as select int_col, string_col from functional.alltypes");
     AnalyzesOk("create view functional.foo as select * from functional.alltypes");
     AnalyzesOk("create view if not exists foo as select * from functional.alltypes");
     AnalyzesOk("create view foo (a, b) as select int_col, string_col " +

@@ -24,19 +24,19 @@ from
 where b.id < 10
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: COUNT(id) = b.id
+|  hash predicates: b.id = COUNT(id)
 |
-|--02:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB compact
-|     predicates: b.id < 10
+|--01:AGGREGATE [FINALIZE]
+|  |  output: COUNT(id)
+|  |  group by: int_col, tinyint_col
+|  |  having: COUNT(id) < 10
+|  |
+|  00:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
 |
-01:AGGREGATE [FINALIZE]
-|  output: COUNT(id)
-|  group by: int_col, tinyint_col
-|  having: COUNT(id) < 10
-|
-00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+02:SCAN HDFS [functional.alltypessmall b]
+   partitions=4/4 size=6.32KB
+   predicates: b.id < 10
 ====
 # single-table test case: partitions are pruned due to predicate inference
 select count(*) from functional.alltypes
@@ -208,11 +208,11 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
 NODE 2:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -271,11 +271,11 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
 NODE 2:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -431,8 +431,8 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -557,10 +557,10 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [PARTITION=UNPARTITIONED]
 |

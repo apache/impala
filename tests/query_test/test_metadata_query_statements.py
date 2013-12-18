@@ -63,7 +63,6 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def test_impala_sees_hive_created_tables_and_databases(self, vector):
     # This scenario is covered as part of the data loading process and doesn't
     # need to be validated with each test run.
-    if self.exploration_strategy() != 'exhaustive': pytest.skip()
     db_name = 'hive_test_db'
     tbl_name = 'testtbl'
     self.client.refresh()

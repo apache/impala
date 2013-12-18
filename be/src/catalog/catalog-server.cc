@@ -94,6 +94,16 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "UpdateCatalog(): response=" << ThriftDebugString(resp);
   }
 
+  // Executes a TUpdateCatalogRequest and returns details on the result of the
+  // operation.
+  virtual void GetCatalogObject(TGetCatalogObjectResponse& resp,
+      const TGetCatalogObjectRequest& req) {
+    VLOG_RPC << "GetCatalogObject(): request=" << ThriftDebugString(req);
+    Status status = catalog_server_->catalog()->GetCatalogObject(req.object_desc,
+        &resp.catalog_object);
+    if (!status.ok()) LOG(ERROR) << status.GetErrorMsg();
+    VLOG_RPC << "GetCatalogObject(): response=" << ThriftDebugString(resp);
+  }
 
  private:
   CatalogServer* catalog_server_;

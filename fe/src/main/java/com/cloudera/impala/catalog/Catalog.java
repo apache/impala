@@ -16,12 +16,9 @@ package com.cloudera.impala.catalog;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,27 +27,21 @@ import org.apache.log4j.Logger;
 
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TCatalogObject;
-import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheLoader;
 import com.google.common.collect.Lists;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
- * This class caches db-, table- and column-related metadata. Each time one of these
- * catalog objects is updated/added/removed, the catalogVersion_ is incremented.
- * Although this class is thread safe, it does not guarantee consistency with the
- * MetaStore. It is important to keep in mind that there may be external (potentially
- * conflicting) concurrent metastore updates occurring at any time.
- * All reads and writes of catalog objects are synchronized using the catalogLock_. To
- * perform atomic bulk operations on the Catalog, the getReadLock()/getWriteLock()
- * functions can be leveraged.
+ * This class caches db-, table- and column-related metadata. Although this class is
+ * thread safe, it does not guarantee consistency with the MetaStore. It is important
+ * to keep in mind that there may be external (potentially conflicting) concurrent
+ * metastore updates occurring at any time.
+ * All reads and writes of catalog objects should be synchronized using the catalogLock_.
  */
 public abstract class Catalog {
   // Initial catalog version.
@@ -60,32 +51,12 @@ public abstract class Catalog {
 
   private static final Logger LOG = Logger.getLogger(Catalog.class);
 
-  // Last assigned catalog version. Starts at INITIAL_CATALOG_VERSION and incremented
-  // with each update to the Catalog. Persisted across the lifetime of the Catalog.
-  // Atomic to ensure versions are always sequentially increasing, even when updated
-  // from different threads.
-  // TODO: This probably doesn't need to be atomic and can be updated while holding
-  // the catalogLock_.
-  private final static AtomicLong catalogVersion_ =
-      new AtomicLong(INITIAL_CATALOG_VERSION);
   private final MetaStoreClientPool metaStoreClientPool_ = new MetaStoreClientPool(0);
   private final CatalogInitStrategy initStrategy_;
   private final AtomicInteger nextTableId_ = new AtomicInteger(0);
 
   // Cache of database metadata.
-  protected final CatalogObjectCache<Db> dbCache_ = new CatalogObjectCache<Db>(
-      new CacheLoader<String, Db>() {
-        @Override
-        public Db load(String dbName) {
-          MetaStoreClient msClient = getMetaStoreClient();
-          try {
-            return Db.loadDb(Catalog.this, msClient.getHiveClient(),
-                dbName.toLowerCase(), true);
-          } finally {
-            msClient.release();
-          }
-        }
-      });
+  protected final HashMap<String, Db> dbCache_ = new HashMap<String, Db>();
 
   // Fair lock used to synchronize catalog accesses and updates.
   protected final ReentrantReadWriteLock catalogLock_ =
@@ -95,8 +66,6 @@ public abstract class Catalog {
   public enum CatalogInitStrategy {
     // Load only db and table names on startup.
     LAZY,
-    // Load all metadata on startup
-    IMMEDIATE,
     // Don't load anything on startup (creates an empty catalog).
     EMPTY,
   }
@@ -117,19 +86,14 @@ public abstract class Catalog {
   public Catalog() { this(CatalogInitStrategy.LAZY); }
 
   /**
-   * Adds a database name to the metadata cache and returns the database's
-   * Thrift representation. Used by CREATE DATABASE statements.
+   * Adds a new database to the catalog, replacing any existing database with the same
+   * name. Returns the previous database with this name, or null if there was no
+   * previous database.
    */
-  public TCatalogObject addDb(String dbName) throws ImpalaException {
-    TCatalogObject db = new TCatalogObject(TCatalogObjectType.DATABASE,
-        Catalog.INITIAL_CATALOG_VERSION);
+  public Db addDb(Db db) {
     catalogLock_.writeLock().lock();
     try {
-      dbCache_.add(dbName);
-      Db newDb = dbCache_.get(dbName);
-      db.setDb(newDb.toThrift());
-      db.setCatalog_version(newDb.getCatalogVersion());
-      return db;
+      return dbCache_.put(db.getName().toLowerCase(), db);
     } finally {
       catalogLock_.writeLock().unlock();
     }
@@ -142,18 +106,26 @@ public abstract class Catalog {
   public Db getDb(String dbName) {
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name given as argument to Catalog.getDb");
+    catalogLock_.readLock().lock();
     try {
-      return dbCache_.get(dbName);
-    } catch (ImpalaException e) {
-      throw new IllegalStateException(e);
+      return dbCache_.get(dbName.toLowerCase());
+    } finally {
+      catalogLock_.readLock().unlock();
     }
   }
 
   /**
-   * Returns the Db with the given name if present in the db cache, null otherwise.
+   * Removes a database from the metadata cache. Returns the value removed or null
+   * if not database was removed as part of this operation. Used by DROP DATABASE
+   * statements.
    */
-  public Db getDbIfPresent(String dbName) {
-    return dbCache_.getIfPresent(dbName);
+  public Db removeDb(String dbName) {
+    catalogLock_.writeLock().lock();
+    try {
+      return dbCache_.remove(dbName.toLowerCase());
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
   }
 
   /**
@@ -165,49 +137,10 @@ public abstract class Catalog {
   public List<String> getDbNames(String dbPattern) {
     catalogLock_.readLock().lock();
     try {
-      return filterStringsByPattern(dbCache_.getAllNames(), dbPattern);
+      return filterStringsByPattern(dbCache_.keySet(), dbPattern);
     } finally {
       catalogLock_.readLock().unlock();
     }
-  }
-
-  /**
-   * Removes a database from the metadata cache. Used by DROP DATABASE statements.
-   */
-  public long removeDb(String dbName) {
-    catalogLock_.writeLock().lock();
-    try {
-      return dbCache_.remove(dbName);
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
-  }
-
-  /**
-   * Adds a new table to the catalog and returns the the table's Thrift representation.
-   * If the operations succeeds, returns a TCatalogObject that include this change. If
-   * the database does not exist a CatalogObject with a version of
-   * INITIAL_CATALOG_VERSION will be returned.
-   */
-  public TCatalogObject addTable(String dbName, String tblName)
-      throws TableLoadingException {
-    TCatalogObject tbl = new TCatalogObject(TCatalogObjectType.TABLE,
-        Catalog.INITIAL_CATALOG_VERSION);
-    catalogLock_.writeLock().lock();
-    try {
-      Db db = getDb(dbName);
-      if (db != null) {
-        db.addTable(tblName);
-        Table newTbl = db.getTable(tblName);
-        Preconditions.checkNotNull(newTbl);
-        tbl.setType(newTbl.getCatalogObjectType());
-        tbl.setCatalog_version(newTbl.getCatalogVersion());
-        tbl.setTable(newTbl.toThrift());
-      }
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
-    return tbl;
   }
 
   /**
@@ -215,21 +148,32 @@ public abstract class Catalog {
    * metadata load if the table metadata is not yet cached.
    */
   public Table getTable(String dbName, String tableName) throws
-      DatabaseNotFoundException, TableNotFoundException, TableLoadingException {
+      DatabaseNotFoundException {
     catalogLock_.readLock().lock();
     try {
       Db db = getDb(dbName);
       if (db == null) {
-        throw new DatabaseNotFoundException("Database not found: " + dbName);
+        throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
       }
-      Table table = db.getTable(tableName);
-      if (table == null) {
-        throw new TableNotFoundException(
-            String.format("Table not found: %s.%s", dbName, tableName));
-      }
-      return table;
+      return db.getTable(tableName);
     } finally {
       catalogLock_.readLock().unlock();
+    }
+  }
+
+  /**
+   * Removes a table from the catalog and returns the table that was removed, or null
+   * if the table/database does not exist.
+   */
+  public Table removeTable(TTableName tableName) {
+    catalogLock_.writeLock().lock();
+    try {
+      // Remove the old table name from the cache and add the new table.
+      Db db = getDb(tableName.getDb_name());
+      if (db == null) return null;
+      return db.removeTable(tableName.getTable_name());
+    } finally {
+      catalogLock_.writeLock().unlock();
     }
   }
 
@@ -262,87 +206,6 @@ public abstract class Catalog {
     try {
       Db db = getDb(dbName);
       return (db == null) ? false : db.containsTable(tableName);
-    } finally {
-      catalogLock_.readLock().unlock();
-    }
-  }
-
-  /**
-   * Renames a table and returns the thrift representation of the new table.
-   * This is equivalent to an atomic drop + add of the table. Returns
-   * a catalog object with a version of INITIAL_CATALOG_VERSION if the target
-   * parent database does not exist in the catalog.
-   */
-  public TCatalogObject renameTable(TTableName oldTableName, TTableName newTableName)
-      throws TableLoadingException {
-    // Ensure the removal of the old table and addition of the new table happen
-    // atomically.
-    catalogLock_.writeLock().lock();
-    try {
-      // Remove the old table name from the cache and add the new table.
-      Db db = getDb(oldTableName.getDb_name());
-      if (db != null) db.removeTable(oldTableName.getTable_name());
-      return addTable(newTableName.getDb_name(), newTableName.getTable_name());
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
-  }
-
-  /**
-   * Removes a table from the catalog and returns the catalog version that
-   * contains the change. Returns INITIAL_CATALOG_VERSION if the parent
-   * database or table does not exist in the catalog.
-   */
-  public long removeTable(TTableName tableName) {
-    catalogLock_.writeLock().lock();
-    try {
-      // Remove the old table name from the cache and add the new table.
-      Db db = getDb(tableName.getDb_name());
-      if (db == null) return Catalog.INITIAL_CATALOG_VERSION;
-      return db.removeTable(tableName.getTable_name());
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
-  }
-
-  /**
-   * If isRefresh is false, invalidates a specific table's metadata, forcing the
-   * metadata to be reloaded on the next access.
-   * If isRefresh is true, performs an immediate incremental refresh.
-   * Returns the catalog version that will contain the updated metadata.
-   */
-  public TCatalogObject resetTable(TTableName tableName, boolean isRefresh)
-      throws TableLoadingException {
-    Db db;
-    catalogLock_.writeLock().lock();
-    try {
-      db = getDb(tableName.getDb_name());
-      if (db == null) return null;
-      if (isRefresh) {
-        // TODO: This is not good because refreshes might take a long time we
-        // shouldn't hold the catalog write lock the entire time. Instead,
-        // we could consider making refresh() happen in the background or something
-        // similar.
-        LOG.debug("Refreshing table metadata: " + db.getName() + "." + tableName);
-        db.refreshTable(tableName.getTable_name());
-      } else {
-        LOG.debug("Invalidating table metadata: " + db.getName() + "." + tableName);
-        db.invalidateTable(tableName.getTable_name());
-      }
-      // Downgrade to a read lock.
-      catalogLock_.readLock().lock();
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
-
-    // Read lock should be acquired when we get here.
-    try {
-      Table table = db.getTable(tableName.getTable_name());
-      TCatalogObject catalogObject = new TCatalogObject();
-      catalogObject.setType(table.getCatalogObjectType());
-      catalogObject.setCatalog_version(table.getCatalogVersion());
-      catalogObject.setTable(table.toThrift());
-      return catalogObject;
     } finally {
       catalogLock_.readLock().unlock();
     }
@@ -394,9 +257,7 @@ public abstract class Catalog {
     try {
       Db db = getDb(desc.dbName());
       if (db == null) return null;
-      Function fn = db.removeFunction(desc);
-      if (fn != null) fn.setCatalogVersion(Catalog.incrementAndGetCatalogVersion());
-      return fn;
+      return db.removeFunction(desc);
     } finally {
       catalogLock_.writeLock().unlock();
     }
@@ -451,22 +312,9 @@ public abstract class Catalog {
   public MetaStoreClient getMetaStoreClient() { return metaStoreClientPool_.getClient(); }
 
   /**
-   * Returns the current Catalog version.
-   */
-  public static long getCatalogVersion() { return catalogVersion_.get(); }
-
-  /**
-   * Increments the current Catalog version and returns the new value.
-   */
-  public static long incrementAndGetCatalogVersion() {
-    return catalogVersion_.incrementAndGet();
-  }
-
-  /**
-   * Resets this catalog instance by clearing all cached metadata and reloading
-   * it from the metastore. How the metadata is loaded is based on the
-   * CatalogInitStrategy that was set in the c'tor. If the CatalogInitStrategy is
-   * IMMEDIATE, the table metadata will be loaded in parallel.
+   * Resets this catalog instance by clearing all cached metadata and potentially
+   * reloading the metadata. How the metadata is loaded is based on the
+   * CatalogInitStrategy that was set in the c'tor.
    */
   public long reset() {
     catalogLock_.writeLock().lock();
@@ -487,42 +335,27 @@ public abstract class Catalog {
       dbCache_.clear();
 
       if (initStrategy_ == CatalogInitStrategy.EMPTY) {
-        return Catalog.getCatalogVersion();
+        return CatalogServiceCatalog.getCatalogVersion();
       }
       MetaStoreClient msClient = metaStoreClientPool_.getClient();
 
       try {
-        dbCache_.add(msClient.getHiveClient().getAllDatabases());
+        for (String dbName: msClient.getHiveClient().getAllDatabases()) {
+          Db db = new Db(dbName, this);
+          db.setCatalogVersion(CatalogServiceCatalog.incrementAndGetCatalogVersion());
+          addDb(db);
+          for (final String tableName: msClient.getHiveClient().getAllTables(dbName)) {
+            Table incompleteTbl =
+                IncompleteTable.createUninitializedTable(getNextTableId(), db, tableName);
+            incompleteTbl.setCatalogVersion(
+                CatalogServiceCatalog.incrementAndGetCatalogVersion());
+            db.addTable(incompleteTbl);
+          }
+        }
       } finally {
         msClient.release();
       }
-
-      if (initStrategy_ == CatalogInitStrategy.IMMEDIATE) {
-        // The number of parallel threads to use to load table metadata. This number
-        // was chosen based on experimentation of what provided good throughput while not
-        // putting too much stress on the metastore.
-        ExecutorService executor = Executors.newFixedThreadPool(16);
-        try {
-          for (String dbName: dbCache_.getAllNames()) {
-            final Db db = dbCache_.get(dbName);
-            for (final String tableName: db.getAllTableNames()) {
-              executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                  try {
-                    db.getTable(tableName);
-                  } catch (ImpalaException e) {
-                    LOG.warn("Error: " + e.getMessage());
-                  }
-                }
-              });
-            }
-          }
-        } finally {
-          executor.shutdown();
-        }
-      }
-      return Catalog.getCatalogVersion();
+      return CatalogServiceCatalog.getCatalogVersion();
     } catch (Exception e) {
       LOG.error(e);
       LOG.error("Error initializing Catalog. Catalog may be empty.");
@@ -669,43 +502,5 @@ public abstract class Catalog {
           "Unexpected TCatalogObject type: " + objectDesc.getType());
     }
     return result;
-  }
-
-  /**
-   * Returns the table parameter 'transient_lastDdlTime', or -1 if it's not set.
-   * TODO: move this to a metastore helper class.
-   */
-  public static long getLastDdlTime(org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    Preconditions.checkNotNull(msTbl);
-    Map<String, String> params = msTbl.getParameters();
-    String lastDdlTimeStr = params.get("transient_lastDdlTime");
-    if (lastDdlTimeStr != null) {
-      try {
-        return Long.parseLong(lastDdlTimeStr);
-      } catch (NumberFormatException e) {}
-    }
-    return -1;
-  }
-
-  /**
-   * Updates the cached lastDdlTime for the given table. The lastDdlTime is used during
-   * the metadata refresh() operations to determine if there have been any external
-   * (outside of Impala) modifications to the table.
-   */
-  public void updateLastDdlTime(TTableName tblName, long ddlTime) {
-    catalogLock_.writeLock().lock();
-    try {
-      Db db = getDb(tblName.getDb_name());
-      if (db == null) return;
-      try {
-        Table tbl = db.getTable(tblName.getTable_name());
-        if (tbl == null) return;
-        tbl.updateLastDdlTime(ddlTime);
-      } catch (Exception e) {
-        // Swallow all exceptions.
-      }
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
   }
 }

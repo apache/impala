@@ -306,7 +306,7 @@ public class HBaseTable extends Table {
   }
 
   @Override
-  public void loadFromThrift(TTable table) throws TableLoadingException {
+  protected void loadFromThrift(TTable table) throws TableLoadingException {
     super.loadFromThrift(table);
     try {
       hbaseTableName_ = getHBaseTableName(getMetaStoreTable());

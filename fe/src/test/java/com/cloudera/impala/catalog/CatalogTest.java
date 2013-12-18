@@ -24,19 +24,20 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
+import com.cloudera.impala.authorization.AuthorizationConfig;
+import com.cloudera.impala.catalog.Catalog.CatalogInitStrategy;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.thrift.TFunctionType;
-import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {
-  private static Catalog catalog_;
+  private static ImpaladCatalog catalog_;
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog_ = new CatalogServiceCatalog(new TUniqueId(0L, 0L));
+    catalog_ = new ImpaladCatalog(CatalogInitStrategy.LAZY,
+        AuthorizationConfig.createAuthDisabledConfig());
   }
 
   @AfterClass
@@ -319,56 +320,66 @@ public class CatalogTest {
         (HdfsTable) catalog_.getDb("functional").getTable("AllTypesAgg");
 
     Column idCol = table.getColumn("id");
-    assertEquals(idCol.getStats().getAvgSerializedSize(),
+    assertEquals(idCol.getStats().getAvgSerializedSize() -
+        PrimitiveType.INT.getSlotSize(),
         PrimitiveType.INT.getSlotSize(), 0.0001);
     assertEquals(idCol.getStats().getMaxSize(), PrimitiveType.INT.getSlotSize());
     assertTrue(!idCol.getStats().hasNulls());
 
     Column boolCol = table.getColumn("bool_col");
-    assertEquals(boolCol.getStats().getAvgSerializedSize(),
+    assertEquals(boolCol.getStats().getAvgSerializedSize() -
+        PrimitiveType.BOOLEAN.getSlotSize(),
         PrimitiveType.BOOLEAN.getSlotSize(), 0.0001);
     assertEquals(boolCol.getStats().getMaxSize(), PrimitiveType.BOOLEAN.getSlotSize());
     assertTrue(!boolCol.getStats().hasNulls());
 
     Column tinyintCol = table.getColumn("tinyint_col");
-    assertEquals(tinyintCol.getStats().getAvgSerializedSize(),
+    assertEquals(tinyintCol.getStats().getAvgSerializedSize() -
+        PrimitiveType.TINYINT.getSlotSize(),
         PrimitiveType.TINYINT.getSlotSize(), 0.0001);
-    assertEquals(tinyintCol.getStats().getMaxSize(), PrimitiveType.TINYINT.getSlotSize());
+    assertEquals(tinyintCol.getStats().getMaxSize(),
+        PrimitiveType.TINYINT.getSlotSize());
     assertTrue(tinyintCol.getStats().hasNulls());
 
     Column smallintCol = table.getColumn("smallint_col");
-    assertEquals(smallintCol.getStats().getAvgSerializedSize(),
+    assertEquals(smallintCol.getStats().getAvgSerializedSize() -
+        PrimitiveType.SMALLINT.getSlotSize(),
         PrimitiveType.SMALLINT.getSlotSize(), 0.0001);
     assertEquals(smallintCol.getStats().getMaxSize(),
         PrimitiveType.SMALLINT.getSlotSize());
     assertTrue(smallintCol.getStats().hasNulls());
 
     Column intCol = table.getColumn("int_col");
-    assertEquals(intCol.getStats().getAvgSerializedSize(),
+    assertEquals(intCol.getStats().getAvgSerializedSize() -
+        PrimitiveType.INT.getSlotSize(),
         PrimitiveType.INT.getSlotSize(), 0.0001);
     assertEquals(intCol.getStats().getMaxSize(), PrimitiveType.INT.getSlotSize());
     assertTrue(intCol.getStats().hasNulls());
 
     Column bigintCol = table.getColumn("bigint_col");
-    assertEquals(bigintCol.getStats().getAvgSerializedSize(),
+    assertEquals(bigintCol.getStats().getAvgSerializedSize() -
+        PrimitiveType.BIGINT.getSlotSize(),
         PrimitiveType.BIGINT.getSlotSize(), 0.0001);
     assertEquals(bigintCol.getStats().getMaxSize(), PrimitiveType.BIGINT.getSlotSize());
     assertTrue(bigintCol.getStats().hasNulls());
 
     Column floatCol = table.getColumn("float_col");
-    assertEquals(floatCol.getStats().getAvgSerializedSize(),
+    assertEquals(floatCol.getStats().getAvgSerializedSize() -
+        PrimitiveType.FLOAT.getSlotSize(),
         PrimitiveType.FLOAT.getSlotSize(), 0.0001);
     assertEquals(floatCol.getStats().getMaxSize(), PrimitiveType.FLOAT.getSlotSize());
     assertTrue(floatCol.getStats().hasNulls());
 
     Column doubleCol = table.getColumn("double_col");
-    assertEquals(doubleCol.getStats().getAvgSerializedSize(),
+    assertEquals(doubleCol.getStats().getAvgSerializedSize() -
+        PrimitiveType.DOUBLE.getSlotSize(),
         PrimitiveType.DOUBLE.getSlotSize(), 0.0001);
     assertEquals(doubleCol.getStats().getMaxSize(), PrimitiveType.DOUBLE.getSlotSize());
     assertTrue(doubleCol.getStats().hasNulls());
 
     Column timestampCol = table.getColumn("timestamp_col");
-    assertEquals(timestampCol.getStats().getAvgSerializedSize(),
+    assertEquals(timestampCol.getStats().getAvgSerializedSize() -
+        PrimitiveType.TIMESTAMP.getSlotSize(),
         PrimitiveType.TIMESTAMP.getSlotSize(), 0.0001);
     assertEquals(timestampCol.getStats().getMaxSize(),
         PrimitiveType.TIMESTAMP.getSlotSize());
@@ -377,8 +388,8 @@ public class CatalogTest {
     //assertTrue(timestampCol.getStats().hasNulls());
 
     Column stringCol = table.getColumn("string_col");
-    assertTrue(
-        stringCol.getStats().getAvgSerializedSize() >= PrimitiveType.STRING.getSlotSize());
+    assertTrue(stringCol.getStats().getAvgSerializedSize() >=
+        PrimitiveType.STRING.getSlotSize());
     assertTrue(stringCol.getStats().getAvgSerializedSize() > 0);
     assertTrue(stringCol.getStats().getMaxSize() > 0);
     assertTrue(!stringCol.getStats().hasNulls());
@@ -395,7 +406,7 @@ public class CatalogTest {
   //@Test
   public void testColStatsColTypeMismatch() throws Exception {
     // First load a table that has column stats.
-    catalog_.getDb("functional").invalidateTable("functional");
+    //catalog_.refreshTable("functional", "alltypesagg", false);
     HdfsTable table = (HdfsTable) catalog_.getDb("functional").getTable("alltypesagg");
 
     // Now attempt to update a column's stats with mismatched stats data and ensure
@@ -429,7 +440,7 @@ public class CatalogTest {
       assertEquals(1178, table.getColumn("string_col").getStats().getNumDistinctValues());
     } finally {
       // Make sure to invalidate the metadata so the next test isn't using bad col stats
-      catalog_.getDb("functional").invalidateTable("functional");
+      //catalog_.refreshTable("functional", "alltypesagg", false);
       client.release();
     }
   }
@@ -508,13 +519,11 @@ public class CatalogTest {
     assertTrue(table instanceof IncompleteTable);
     incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
-    assertEquals("Failed to load metadata for table: bad_serde",
-        incompleteTable.getCause().getMessage());
-    assertTrue(incompleteTable.getCause().getCause()
-        instanceof InvalidStorageDescriptorException);
-    assertEquals("Impala does not support tables of this type. REASON: SerDe" +
+    assertEquals("Failed to load metadata for table: bad_serde\n" +
+        "CAUSED BY: InvalidStorageDescriptorException: " +
+        "Impala does not support tables of this type. REASON: SerDe" +
         " library 'org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe' " +
-        "is not supported.", incompleteTable.getCause().getCause().getMessage());
+        "is not supported.", incompleteTable.getCause().getMessage());
   }
 
   // This table has metadata set so the escape is \n, which is also the tuple delim. This
@@ -537,15 +546,13 @@ public class CatalogTest {
     String[] tableNames = {"alltypes", "alltypesnopart"};
     for (String tableName: tableNames) {
       Table table = catalog_.getDb("functional").getTable(tableName);
-      table = Table.load(catalog_.getNextTableId(),
-          catalog_.getMetaStoreClient().getHiveClient(),
-          catalog_.getDb("functional"), tableName, table);
+      catalog_.getDb("functional").reloadTable(tableName);
+      table = catalog_.getDb("functional").getTable(tableName);
     }
     // Test HBase table
     Table table = catalog_.getDb("functional_hbase").getTable("alltypessmall");
-    table = Table.load(catalog_.getNextTableId(),
-        catalog_.getMetaStoreClient().getHiveClient(),
-        catalog_.getDb("functional_hbase"), "alltypessmall", table);
+    catalog_.getDb("functional_hbase").reloadTable("alltypessmall");
+    table = catalog_.getDb("functional_hbase").getTable("alltypessmall");
   }
 
   @Test

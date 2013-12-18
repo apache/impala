@@ -29,6 +29,7 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -271,7 +272,9 @@ public class MetadataOp {
           List<Column> columns = Lists.newArrayList();
 
           if (columnName != null) {
-            for (Column column: db.getTable(tabName).getColumns()) {
+            Table table = catalog.getTable(dbName, tabName, user, Privilege.ANY);
+            if (table == null) continue;
+            for (Column column: table.getColumns()) {
               String colName = column.getName();
               if (!columnPattern.matcher(colName).matches()) {
                 continue;

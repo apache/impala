@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
@@ -69,7 +70,8 @@ public class JniCatalog {
     return new TUniqueId(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
   }
 
-  public JniCatalog(int impalaLogLevel, int otherLogLevel) throws InternalException {
+  public JniCatalog(int impalaLogLevel, int otherLogLevel)
+      throws InternalException {
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.
     GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
@@ -116,8 +118,10 @@ public class JniCatalog {
     resp.getResult().setCatalog_service_id(getServiceId());
 
     if (req.isSetTable_name()) {
-      resp.result.setUpdated_catalog_object(catalog_.resetTable(req.getTable_name(),
-          req.isIs_refresh()));
+      Table resetTable = catalog_.resetTable(req.getTable_name(),
+          req.isIs_refresh());
+      resp.result.setUpdated_catalog_object(
+          DdlExecutor.TableToTCatalogObject(resetTable));
       resp.getResult().setVersion(
           resp.getResult().getUpdated_catalog_object().getCatalog_version());
     } else {

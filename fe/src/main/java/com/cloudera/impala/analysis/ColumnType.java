@@ -100,6 +100,7 @@ public class ColumnType {
       case TIMESTAMP: return TIMESTAMP;
       case DATE: return DATE;
       case DATETIME: return DATETIME;
+      case DECIMAL: return createDecimalType();
       default:
         Preconditions.checkState(false);
         return NULL;

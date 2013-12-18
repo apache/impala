@@ -37,7 +37,11 @@ enum TCatalogObjectType {
 enum TTableType {
   HDFS_TABLE,
   HBASE_TABLE,
-  VIEW
+  VIEW,
+  // A table that does not contain all needed metadata. This can be either because
+  // of an error loading the metadata or because the table metadata has not yet
+  // been loaded.
+  INCOMPLETE_TABLE
 }
 
 enum THdfsFileFormat {

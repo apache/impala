@@ -87,7 +87,7 @@ public class View extends Table {
   }
 
   @Override
-  public void loadFromThrift(TTable t) throws TableLoadingException {
+  protected void loadFromThrift(TTable t) throws TableLoadingException {
     super.loadFromThrift(t);
     initViewDef();
   }

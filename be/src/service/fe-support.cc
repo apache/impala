@@ -22,6 +22,7 @@
 #include "common/init.h"
 #include "common/logging.h"
 #include "common/status.h"
+#include "exec/catalog-op-executor.h"
 #include "exprs/expr.h"
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
@@ -187,6 +188,31 @@ Java_com_cloudera_impala_service_FeSupport_NativeLookupSymbol(
   return result_bytes;
 }
 
+// Calls in to the catalog server to get the metadata for the target
+// catalog object.
+extern "C"
+JNIEXPORT jbyteArray JNICALL
+Java_com_cloudera_impala_service_FeSupport_NativeGetCatalogObject(
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
+  TCatalogObject object_desc;
+  DeserializeThriftMsg(env, thrift_struct, &object_desc);
+
+  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance()->catalogd_client_cache());
+  TCatalogObject result;
+  Status status = catalog_op_executor.GetCatalogObject(object_desc, &result);
+  if (!status.ok()) {
+    LOG(ERROR) << status.GetErrorMsg();
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    result.__isset.table = true;
+    result.table.__set_load_status(thrift_status);
+  }
+  jbyteArray result_bytes = NULL;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
+                     JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
 namespace impala {
 
 static JNINativeMethod native_methods[] = {
@@ -201,6 +227,10 @@ static JNINativeMethod native_methods[] = {
   {
     (char*)"NativeLookupSymbol", (char*)"([B)[B",
     (void*)::Java_com_cloudera_impala_service_FeSupport_NativeLookupSymbol
+  },
+  {
+    (char*)"NativeGetCatalogObject", (char*)"([B)[B",
+    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeGetCatalogObject
   },
 };
 

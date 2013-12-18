@@ -43,40 +43,40 @@ limit 100
 |     partitions=1/1 size=3.08KB compact
 |
 07:HASH JOIN [INNER JOIN]
+|  hash predicates: customer.c_current_addr_sk = customer_address.ca_address_sk
+|
+|--03:SCAN HDFS [tpcds.customer_address]
+|     partitions=1/1 size=5.25MB compact
+|
+06:HASH JOIN [INNER JOIN]
 |  hash predicates: store_sales.ss_item_sk = item.i_item_sk
 |
 |--01:SCAN HDFS [tpcds.item]
 |     partitions=1/1 size=4.82MB compact
 |     predicates: i_manager_id = 7
 |
-06:HASH JOIN [INNER JOIN]
+05:HASH JOIN [INNER JOIN]
 |  hash predicates: customer.c_customer_sk = store_sales.ss_customer_sk
 |
 |--00:SCAN HDFS [tpcds.store_sales]
 |     partitions=2/120 size=663.52KB compact
 |
-05:HASH JOIN [INNER JOIN]
-|  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
-|
-|--02:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 size=12.60MB compact
-|
-03:SCAN HDFS [tpcds.customer_address]
-   partitions=1/1 size=5.25MB
+02:SCAN HDFS [tpcds.customer]
+   partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-19:TOP-N [LIMIT=100]
+18:TOP-N [LIMIT=100]
 |  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |
-18:EXCHANGE [PARTITION=UNPARTITIONED]
+17:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 10:TOP-N [LIMIT=100]
 |  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |
-17:AGGREGATE [MERGE FINALIZE]
+16:AGGREGATE [MERGE FINALIZE]
 |  output: SUM(SUM(ss_ext_sales_price))
 |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
 |
-16:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
+15:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
 |
 09:AGGREGATE
 |  output: SUM(ss_ext_sales_price)
@@ -86,40 +86,38 @@ limit 100
 |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
 |  other predicates: substr(ca_zip, 1, 5) != substr(s_zip, 1, 5)
 |
-|--15:EXCHANGE [BROADCAST]
+|--14:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.store]
 |     partitions=1/1 size=3.08KB
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: customer.c_current_addr_sk = customer_address.ca_address_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.customer_address]
+|     partitions=1/1 size=5.25MB
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_item_sk = item.i_item_sk
 |
-|--14:EXCHANGE [BROADCAST]
+|--12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.item]
 |     partitions=1/1 size=4.82MB
 |     predicates: i_manager_id = 7
 |
-06:HASH JOIN [INNER JOIN, BROADCAST]
+05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: customer.c_customer_sk = store_sales.ss_customer_sk
 |
-|--13:EXCHANGE [BROADCAST]
+|--11:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=2/120 size=663.52KB
 |
-05:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
-|
-|--12:EXCHANGE [PARTITION=HASH(customer.c_current_addr_sk)]
-|  |
-|  02:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 size=12.60MB
-|
-11:EXCHANGE [PARTITION=HASH(customer_address.ca_address_sk)]
-|
-03:SCAN HDFS [tpcds.customer_address]
-   partitions=1/1 size=5.25MB
+02:SCAN HDFS [tpcds.customer]
+   partitions=1/1 size=12.60MB
 ====
 # TPCDS-Q27
 SELECT
@@ -1247,10 +1245,10 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-33:TOP-N [LIMIT=100]
+31:TOP-N [LIMIT=100]
 |  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
 |
-32:EXCHANGE [PARTITION=UNPARTITIONED]
+30:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 17:TOP-N [LIMIT=100]
 |  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
@@ -1258,12 +1256,12 @@ limit 100
 16:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: s_store_id = s_store_id, d_week_seq = d_week_seq - 52
 |
-|--31:EXCHANGE [PARTITION=HASH(s_store_id,d_week_seq - 52)]
+|--29:EXCHANGE [PARTITION=HASH(s_store_id,d_week_seq - 52)]
 |  |
 |  15:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: d_week_seq = d.d_week_seq
 |  |
-|  |--29:EXCHANGE [BROADCAST]
+|  |--27:EXCHANGE [BROADCAST]
 |  |  |
 |  |  13:SCAN HDFS [tpcds.date_dim d]
 |  |     partitions=1/1 size=9.84MB
@@ -1272,40 +1270,38 @@ limit 100
 |  14:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = store.s_store_sk
 |  |
-|  |--28:EXCHANGE [BROADCAST]
+|  |--26:EXCHANGE [BROADCAST]
 |  |  |
 |  |  12:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 size=3.08KB
 |  |
-|  27:AGGREGATE [MERGE FINALIZE]
+|  25:AGGREGATE [MERGE FINALIZE]
 |  |  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
 |  |  group by: d_week_seq, ss_store_sk
 |  |
-|  26:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
+|  24:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
 |  |
 |  11:AGGREGATE
 |  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  |  group by: d_week_seq, ss_store_sk
 |  |
-|  10:HASH JOIN [INNER JOIN, PARTITIONED]
+|  10:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
 |  |
-|  |--25:EXCHANGE [PARTITION=HASH(date_dim.d_date_sk)]
+|  |--23:EXCHANGE [BROADCAST]
 |  |  |
 |  |  09:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 size=9.84MB
 |  |
-|  24:EXCHANGE [PARTITION=HASH(store_sales.ss_sold_date_sk)]
-|  |
 |  08:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 size=23.42MB
 |
-30:EXCHANGE [PARTITION=HASH(s_store_id,d_week_seq)]
+28:EXCHANGE [PARTITION=HASH(s_store_id,d_week_seq)]
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: d_week_seq = d.d_week_seq
 |
-|--23:EXCHANGE [BROADCAST]
+|--22:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 size=9.84MB
@@ -1314,30 +1310,28 @@ limit 100
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = store.s_store_sk
 |
-|--22:EXCHANGE [BROADCAST]
+|--21:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.store]
 |     partitions=1/1 size=3.08KB
 |
-21:AGGREGATE [MERGE FINALIZE]
+20:AGGREGATE [MERGE FINALIZE]
 |  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
 |  group by: d_week_seq, ss_store_sk
 |
-20:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
+19:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
 |
 03:AGGREGATE
 |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: d_week_seq, ss_store_sk
 |
-02:HASH JOIN [INNER JOIN, PARTITIONED]
+02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
 |
-|--19:EXCHANGE [PARTITION=HASH(date_dim.d_date_sk)]
+|--18:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 size=9.84MB
-|
-18:EXCHANGE [PARTITION=HASH(store_sales.ss_sold_date_sk)]
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 size=23.42MB

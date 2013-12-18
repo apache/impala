@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.List;
+
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 
 import com.cloudera.impala.common.ImpalaException;
@@ -23,24 +25,24 @@ import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
-import com.google.common.base.Preconditions;
+import com.cloudera.impala.thrift.TTableType;
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
 /**
- * Represents a table with incomplete metadata. Currently, the only use of the
- * IncompleteTable is for tables that encountered problems loading their table
- * metadata.
- * TODO: This could be extended to also be used for tables that have not yet had
- * their metadata loaded.
+ * Represents a table with incomplete metadata. The metadata may be incomplete because
+ * it has not yet been loaded or because of errors encountered during the loading
+ * process.
  */
 public class IncompleteTable extends Table {
-  // The cause for the incomplete metadata.
-  ImpalaException cause_;
+  // The cause for the incomplete metadata. If there is no cause given (cause_ = null),
+  // then this is assumed to be an uninitialized table (table that does not have
+  // its metadata loaded).
+  private ImpalaException cause_;
 
-  public IncompleteTable(TableId id, Db db, String name,
+  private IncompleteTable(TableId id, Db db, String name,
       ImpalaException cause) {
     super(id, null, db, name, null);
-    Preconditions.checkNotNull(cause);
     cause_ = cause;
   }
 
@@ -49,6 +51,11 @@ public class IncompleteTable extends Table {
    * incomplete.
    */
   public ImpalaException getCause() { return cause_; }
+
+  /**
+   * See comment on cause_.
+   */
+  public boolean isUninitialized() { return cause_ == null; }
 
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
@@ -75,9 +82,53 @@ public class IncompleteTable extends Table {
   public TTable toThrift() {
     TTable table = new TTable(db_.getName(), name_);
     table.setId(id_.asInt());
-    table.setLoad_status(new TStatus(TStatusCode.INTERNAL_ERROR,
-        Lists.newArrayList(JniUtil.throwableToString(cause_),
-                           JniUtil.throwableToStackTrace(cause_))));
+    table.setTable_type(TTableType.INCOMPLETE_TABLE);
+    if (cause_ != null) {
+      table.setLoad_status(new TStatus(TStatusCode.INTERNAL_ERROR,
+          Lists.newArrayList(JniUtil.throwableToString(cause_),
+                             JniUtil.throwableToStackTrace(cause_))));
+    }
     return table;
+  }
+
+  @Override
+  protected void loadFromThrift(TTable thriftTable) throws TableLoadingException {
+    if (thriftTable.isSetLoad_status()) {
+      // Since the load status is set, it indicates the table is incomplete due to
+      // an error loading the table metadata. The error message in the load status
+      // should provide details on why. By convention, the final error message should
+      // be the remote (Catalog Server) call stack. This shouldn't be displayed to the
+      // user under normal circumstances, but needs to be recorded somewhere so append
+      // it to the call stack of the local TableLoadingException created here.
+      // TODO: Provide a mechanism (query option?) to optionally allow returning more
+      // detailed errors (including the full call stack(s)) to the user.
+      List<String> errorMsgs = thriftTable.getLoad_status().getError_msgs();
+      String callStackStr = "<None available>";
+      if (errorMsgs.size() > 1) callStackStr = errorMsgs.remove(errorMsgs.size() - 1);
+
+      String errorMsg = Joiner.on("\n").join(errorMsgs);
+      // The errorMsg will always be prefixed with "ExceptionClassName: ". Since we treat
+      // all errors as TableLoadingExceptions, the prefix "TableLoadingException" is
+      // redundant and can be stripped out.
+      errorMsg = errorMsg.replaceFirst("^TableLoadingException: ", "");
+      TableLoadingException loadingException = new TableLoadingException(errorMsg);
+      List<StackTraceElement> stackTrace =
+          Lists.newArrayList(loadingException.getStackTrace());
+      stackTrace.add(new StackTraceElement("========",
+          "<Remote stack trace on catalogd>: " + callStackStr, "", -1));
+      loadingException.setStackTrace(
+          stackTrace.toArray(new StackTraceElement[stackTrace.size()]));
+      this.cause_ = loadingException;
+    }
+  }
+
+  public static IncompleteTable createUninitializedTable(TableId id, Db db,
+      String name) {
+    return new IncompleteTable(id, db, name, null);
+  }
+
+  public static IncompleteTable createFailedMetadataLoadTable(TableId id, Db db,
+      String name, ImpalaException e) {
+    return new IncompleteTable(id, db, name, e);
   }
 }

@@ -23,6 +23,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.ColumnType;
+import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.Catalog.CatalogInitStrategy;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
@@ -31,18 +32,17 @@ import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableType;
-import com.cloudera.impala.thrift.TUniqueId;
 
 /**
  * Test suite to verify proper conversion of Catalog objects to/from Thrift structs.
  */
 public class CatalogObjectToFromThriftTest {
-  private static Catalog catalog_;
+  private static ImpaladCatalog catalog_;
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog_ = new CatalogServiceCatalog(new TUniqueId(0L, 0L),
-        CatalogInitStrategy.LAZY);
+    catalog_ = new ImpaladCatalog(CatalogInitStrategy.LAZY,
+        AuthorizationConfig.createAuthDisabledConfig());
   }
 
   @AfterClass
@@ -78,9 +78,7 @@ public class CatalogObjectToFromThriftTest {
       }
 
       // Now try to load the thrift struct.
-      Table newTable = Table.fromMetastoreTable(catalog_.getNextTableId(),
-          catalog_.getDb(dbName), thriftTable.getMetastore_table());
-      newTable.loadFromThrift(thriftTable);
+      Table newTable = Table.fromThrift(catalog_.getDb(dbName), thriftTable);
       Assert.assertTrue(newTable instanceof HdfsTable);
       Assert.assertEquals(newTable.name_, thriftTable.tbl_name);
       Assert.assertEquals(newTable.numClusteringCols_, 2);
@@ -131,9 +129,8 @@ public class CatalogObjectToFromThriftTest {
     Assert.assertEquals(thriftTable.getTable_type(), TTableType.HDFS_TABLE);
 
     // Now try to load the thrift struct.
-    Table newTable = Table.fromMetastoreTable(catalog_.getNextTableId(),
-        catalog_.getDb("functional_avro_snap"), thriftTable.getMetastore_table());
-    newTable.loadFromThrift(thriftTable);
+    Table newTable = Table.fromThrift(catalog_.getDb("functional_avro_snap"),
+        thriftTable);
     Assert.assertEquals(newTable.getColumns().size(), 8);
 
     // The table schema does not match the Avro schema - it has only 2 columns.
@@ -160,9 +157,7 @@ public class CatalogObjectToFromThriftTest {
       Assert.assertTrue(!isBinaryEncoded);
     }
 
-    Table newTable = Table.fromMetastoreTable(catalog_.getNextTableId(),
-        catalog_.getDb(dbName), thriftTable.getMetastore_table());
-    newTable.loadFromThrift(thriftTable);
+    Table newTable = Table.fromThrift(catalog_.getDb(dbName), thriftTable);
     Assert.assertTrue(newTable instanceof HBaseTable);
     HBaseTable newHBaseTable = (HBaseTable) newTable;
     Assert.assertEquals(newHBaseTable.getColumns().size(), 13);
@@ -197,9 +192,7 @@ public class CatalogObjectToFromThriftTest {
 
     // Verify that creating a table from this thrift struct results in a valid
     // Table.
-    Table newTable = Table.fromMetastoreTable(catalog_.getNextTableId(),
-        catalog_.getDb(dbName), thriftTable.getMetastore_table());
-    newTable.loadFromThrift(thriftTable);
+    Table newTable = Table.fromThrift(catalog_.getDb(dbName), thriftTable);
     Assert.assertTrue(newTable instanceof HBaseTable);
     HBaseTable newHBaseTable = (HBaseTable) newTable;
     Assert.assertEquals(newHBaseTable.getColumns().size(), 13);

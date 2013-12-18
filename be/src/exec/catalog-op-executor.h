@@ -37,6 +37,11 @@ class CatalogOpExecutor {
   // Executes the given catalog operation against the catalog server.
   Status Exec(const TCatalogOpRequest& catalog_op);
 
+  // Fetches the metadata for the specific TCatalogObject descriptor from the catalog
+  // server. If the catalog server does not have the object cached, its metadata will
+  // be loaded.
+  Status GetCatalogObject(const TCatalogObject& object_desc, TCatalogObject* result);
+
   // Translates the given compute stats params and its child-query results into
   // a new table alteration request for updating the stats metadata, and executes
   // the alteration via Exec();

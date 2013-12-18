@@ -851,7 +851,7 @@ public class HdfsTable extends Table {
   }
 
   @Override
-  public void loadFromThrift(TTable thriftTable) throws TableLoadingException {
+  protected void loadFromThrift(TTable thriftTable) throws TableLoadingException {
     super.loadFromThrift(thriftTable);
     THdfsTable hdfsTable = thriftTable.getHdfs_table();
     hdfsBaseDir_ = hdfsTable.getHdfsBaseDir();

@@ -23,19 +23,21 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.common.JniUtil;
+
 import com.cloudera.impala.thrift.TAccessLevel;
+import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableStats;
+import com.cloudera.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -94,7 +96,8 @@ public abstract class Table implements CatalogObject {
     owner_ = owner;
     colsByPos_ = Lists.newArrayList();
     colsByName_ = Maps.newHashMap();
-    lastDdlTime_ = (msTable_ != null) ? Catalog.getLastDdlTime(msTable_) : -1;
+    lastDdlTime_ = (msTable_ != null) ?
+        CatalogServiceCatalog.getLastDdlTime(msTable_) : -1;
   }
 
   //number of nodes that contain data for this table; -1: unknown
@@ -117,55 +120,6 @@ public abstract class Table implements CatalogObject {
   public void updateLastDdlTime(long ddlTime) {
     // Ensure the lastDdlTime never goes backwards.
     if (ddlTime > lastDdlTime_) lastDdlTime_ = ddlTime;
-  }
-
-  /**
-   * Creates the Impala representation of Hive/HBase metadata for one table.
-   * Calls load() on the appropriate instance of Table subclass.
-   * oldCacheEntry is the existing cache entry and might still contain valid info to help
-   * speed up metadata loading. oldCacheEntry is null if there is no existing cache entry
-   * (i.e. during fresh load).
-   * @return new instance of HdfsTable or HBaseTable
-   *         null if the table does not exist
-   * @throws TableLoadingException if there was an error loading the table.
-   * @throws TableNotFoundException if the table was not found
-   */
-  public static Table load(TableId id, HiveMetaStoreClient client, Db db,
-      String tblName, Table oldCacheEntry) throws TableLoadingException,
-      TableNotFoundException {
-
-    // turn all exceptions into TableLoadingException
-    try {
-      org.apache.hadoop.hive.metastore.api.Table msTbl = null;
-      // All calls to getTable() need to be serialized due to HIVE-5457.
-      synchronized (metastoreAccessLock_) {
-        msTbl = client.getTable(db.getName(), tblName);
-      }
-      // Check that the Hive TableType is supported
-      TableType tableType = TableType.valueOf(msTbl.getTableType());
-      if (!SUPPORTED_TABLE_TYPES.contains(tableType)) {
-        throw new TableLoadingException(String.format(
-            "Unsupported table type '%s' for: %s.%s", tableType, db.getName(), tblName));
-      }
-
-      // Create a table of appropriate type and have it load itself
-      Table table = fromMetastoreTable(id, db, msTbl);
-      if (table == null) {
-        throw new TableLoadingException(
-            "Unrecognized table type for table: " + msTbl.getTableName());
-      }
-      table.load(oldCacheEntry, client, msTbl);
-      return table;
-    } catch (TableLoadingException e) {
-      return new IncompleteTable(id, db, tblName, e);
-    } catch (NoSuchObjectException e) {
-      throw new TableNotFoundException("Table not found: " + tblName, e);
-    } catch (Exception e) {
-      LOG.error(JniUtil.throwableToString(e) + "\n" +
-                JniUtil.throwableToStackTrace(e));
-      throw new TableLoadingException(
-          "Failed to load metadata for table: " + tblName, e);
-    }
   }
 
   /**
@@ -216,6 +170,21 @@ public abstract class Table implements CatalogObject {
   }
 
   /**
+   * Gets the PrimitiveType from the given FieldSchema. Throws a TableLoadingException
+   * if the FieldSchema does not represent a supported primitive type.
+   */
+  protected ColumnType getPrimitiveType(FieldSchema fs)
+      throws TableLoadingException {
+    // catch currently unsupported hive schema elements
+    if (!serdeConstants.PrimitiveTypes.contains(fs.getType())) {
+      throw new TableLoadingException(String.format(
+          "Failed to load metadata for table '%s' due to unsupported " +
+          "column type '%s' in column '%s'", getName(), fs.getType(), fs.getName()));
+    }
+    return getPrimitiveType(fs.getType());
+  }
+
+  /**
    * Creates a table of the appropriate type based on the given hive.metastore.api.Table
    * object.
    */
@@ -234,21 +203,25 @@ public abstract class Table implements CatalogObject {
   }
 
   /**
-   * Gets the PrimitiveType from the given FieldSchema. Throws a TableLoadingException
-   * if the FieldSchema does not represent a supported primitive type.
+   * Factory method that creates a new Table from its Thrift representation.
+   * Determines the type of table to create based on the Thrift table provided.
    */
-  protected ColumnType getPrimitiveType(FieldSchema fs)
+  public static Table fromThrift(Db parentDb, TTable thriftTable)
       throws TableLoadingException {
-    // catch currently unsupported hive schema elements
-    if (!serdeConstants.PrimitiveTypes.contains(fs.getType())) {
-      throw new TableLoadingException(String.format(
-          "Failed to load metadata for table '%s' due to unsupported " +
-          "column type '%s' in column '%s'", getName(), fs.getType(), fs.getName()));
+    Table newTable;
+    if (thriftTable.getTable_type() != TTableType.INCOMPLETE_TABLE &&
+        thriftTable.isSetMetastore_table())  {
+      newTable = Table.fromMetastoreTable(new TableId(thriftTable.getId()),
+          parentDb, thriftTable.getMetastore_table());
+    } else {
+      newTable = IncompleteTable.createUninitializedTable(
+          TableId.createInvalidId(), parentDb, thriftTable.getTbl_name());
     }
-    return getPrimitiveType(fs.getType());
+    newTable.loadFromThrift(thriftTable);
+    return newTable;
   }
 
-  public void loadFromThrift(TTable thriftTable) throws TableLoadingException {
+  protected void loadFromThrift(TTable thriftTable) throws TableLoadingException {
     List<TColumn> columns = new ArrayList<TColumn>();
     columns.addAll(thriftTable.getClustering_columns());
     columns.addAll(thriftTable.getColumns());
@@ -299,6 +272,14 @@ public abstract class Table implements CatalogObject {
       table.getTable_stats().setNum_rows(numRows_);
     }
     return table;
+  }
+
+  public TCatalogObject toTCatalogObject() {
+    TCatalogObject catalogObject = new TCatalogObject();
+    catalogObject.setType(getCatalogObjectType());
+    catalogObject.setCatalog_version(getCatalogVersion());
+    catalogObject.setTable(toThrift());
+    return catalogObject;
   }
 
   protected static ColumnType getPrimitiveType(String typeName) {
