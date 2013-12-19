@@ -110,21 +110,21 @@ class ClusterController(object):
     TODO: Make this cleaner. Remove superuser restriction and make it an option.
     """
     self.cmd = cmd
-    if self.local:
-      local(self.cmd)
-      return
-    if serial:
-      return execute(self.__run_cmd_serial)
-    else:
-      return execute(self.__run_cmd_parallel)
+    # The 'hide' context manager allows for selective muting of fabric's logging when
+    # running remote commands. Specifically, mute the execution status of the command and
+    # the information about which command is being run. Error messages are still logged.
+    with hide('stdout', 'running'):
+      if self.local:
+        local(self.cmd)
+        return
+      if serial:
+        return execute(self.__run_cmd_serial)
+      else:
+        return execute(self.__run_cmd_parallel)
 
-  # The 'hide' context manager allows for selective muting of fabric's logging when
-  # running remote commands.
   @parallel
   def __run_cmd_parallel(self):
-    with hide('stdout', 'running'):
-      return sudo(self.cmd, combine_stderr=True)
+    return sudo(self.cmd, combine_stderr=True)
 
   def __run_cmd_serial(self):
-    with hide('stdout', 'running'):
-      return sudo(self.cmd, combine_stderr=True)
+    return sudo(self.cmd, combine_stderr=True)
