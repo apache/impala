@@ -35,16 +35,16 @@ public enum Privilege {
   ANY(EnumSet.allOf(org.apache.sentry.core.Action.class), true),
   ;
 
-  private final EnumSet<org.apache.sentry.core.Action> actions;
+  private final EnumSet<org.apache.sentry.core.Action> actions_;
 
   // Determines whether to check if the user has ANY the privileges defined in the
   // actions list or whether to check if the user has ALL of the privileges in the
   // actions list.
-  private final boolean anyOf;
+  private final boolean anyOf_;
 
   private Privilege(EnumSet<org.apache.sentry.core.Action> actions, boolean anyOf) {
-    this.actions = actions;
-    this.anyOf = anyOf;
+    actions_ = actions;
+    anyOf_ = anyOf;
   }
 
   private Privilege(org.apache.sentry.core.Action action, boolean anyOf) {
@@ -54,16 +54,12 @@ public enum Privilege {
   /*
    * Returns the set of Hive Access Actions mapping to this Privilege.
    */
-  public EnumSet<org.apache.sentry.core.Action> getHiveActions() {
-    return actions;
-  }
+  public EnumSet<org.apache.sentry.core.Action> getHiveActions() { return actions_; }
 
   /*
    * Determines whether to check if the user has ANY the privileges defined in the
    * actions list or whether to check if the user has ALL of the privileges in the
    * actions list.
    */
-  public boolean getAnyOf() {
-    return anyOf;
-  }
+  public boolean getAnyOf() { return anyOf_; }
 }

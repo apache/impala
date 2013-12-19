@@ -29,31 +29,32 @@ import com.google.common.collect.Lists;
 
 /*
  * Enables executing queries against the specified Impala Daemon.
+ * TODO: Remove this once the DataErrors tests are moved to Python.
  */
 public class ImpaladClientExecutor {
   private static final Logger LOG = Logger.getLogger(ImpaladClientExecutor.class);
-  private final TTransport transport;
-  private final TProtocol protocol;
-  private final Client client;
+  private final TTransport transport_;
+  private final TProtocol protocol_;
+  private final Client client_;
 
   public ImpaladClientExecutor(String hostname, int port) {
-    transport = new TSocket(hostname, port);
-    protocol = new TBinaryProtocol(transport);
-    client = new Client(protocol);
+    transport_ = new TSocket(hostname, port);
+    protocol_ = new TBinaryProtocol(transport_);
+    client_ = new Client(protocol_);
   }
 
   public void init() throws TTransportException {
-    transport.open();
+    transport_.open();
   }
 
   public void close() throws TTransportException {
-    if (transport.isOpen()) {
-      transport.close();
+    if (transport_.isOpen()) {
+      transport_.close();
     }
   }
 
   public void resetCatalog() throws TException {
-    client.ResetCatalog();
+    client_.ResetCatalog();
   }
 
   /**
@@ -89,12 +90,12 @@ public class ImpaladClientExecutor {
     Query query = new Query();
     query.query = queryString;
     query.configuration = getBeeswaxQueryConfigurations(execContext.getTQueryOptions());
-    QueryHandle queryHandle = client.executeAndWait(query, "1");
+    QueryHandle queryHandle = client_.executeAndWait(query, "1");
 
     // Some queries (USE) do not register themselves with a handle.
     if (queryHandle.id.equals("no_query_handle")) { return 0; }
 
-    ResultsMetadata resultsMetadata = client.get_results_metadata(queryHandle);
+    ResultsMetadata resultsMetadata = client_.get_results_metadata(queryHandle);
     for (FieldSchema fs : resultsMetadata.schema.getFieldSchemas()) {
       colLabels.add(fs.getName());
       colTypes.add(fs.getType());
@@ -102,7 +103,7 @@ public class ImpaladClientExecutor {
 
     if (insertResult != null) {
       // Insert
-      TInsertResult tInsertResult = client.CloseInsert(queryHandle);
+      TInsertResult tInsertResult = client_.CloseInsert(queryHandle);
       insertResult.setRows_appended(tInsertResult.getRows_appended());
       return 0;
     }
@@ -110,7 +111,7 @@ public class ImpaladClientExecutor {
     // Query
     int numRows = 0;
     while (true) {
-      Results result = client.fetch(queryHandle, false, execContext.getFetchSize());
+      Results result = client_.fetch(queryHandle, false, execContext.getFetchSize());
       if (result.data.size() > 0) {
         results.add(result.getData().get(0));
         ++numRows;
@@ -122,12 +123,12 @@ public class ImpaladClientExecutor {
     }
 
     // Use Beeswax.get_log to to retrieve error logs from Impalad
-    String error = client.get_log(queryHandle.id);
+    String error = client_.get_log(queryHandle.id);
     if (!error.isEmpty()) {
       errors.add(error);
     }
 
-    client.close(queryHandle);
+    client_.close(queryHandle);
     return numRows;
   }
 
@@ -141,7 +142,7 @@ public class ImpaladClientExecutor {
   public String explain(String queryString) throws BeeswaxException, TException {
     Query query = new Query();
     query.query = queryString;
-    return client.explain(query).textual;
+    return client_.explain(query).textual;
   }
 
   private List<String> getBeeswaxQueryConfigurations(TQueryOptions queryOptions) {

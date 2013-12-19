@@ -20,7 +20,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 
-import com.cloudera.impala.authorization.AuthorizeableURI;
+import com.cloudera.impala.authorization.AuthorizeableUri;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequest;
 import com.cloudera.impala.catalog.AuthorizationException;
@@ -70,7 +70,7 @@ public class HdfsUri {
     // Fully-qualify the path
     uriPath_ = FileSystemUtil.createFullyQualifiedPath(uriPath_);
     PrivilegeRequest req = new PrivilegeRequest(
-        new AuthorizeableURI(uriPath_.toString()), privilege);
+        new AuthorizeableUri(uriPath_.toString()), privilege);
     analyzer.getCatalog().checkAccess(analyzer.getUser(), req);
   }
 

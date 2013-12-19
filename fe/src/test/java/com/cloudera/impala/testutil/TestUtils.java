@@ -29,11 +29,11 @@ import com.google.common.collect.Lists;
 
 public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
-  private final static String[] expectedFilePrefix = { "hdfs:", "file: " };
-  private final static String[] ignoreContentAfter = { "HOST:", "LOCATIONS:" };
+  private final static String[] expectedFilePrefix_ = { "hdfs:", "file: " };
+  private final static String[] ignoreContentAfter_ = { "HOST:", "LOCATIONS:" };
   // Special prefix that designates an expected value specified as a regex rather
   // than a literal
-  private final static String regexAgainstActual = "regex:";
+  private final static String regexAgainstActual_ = "regex:";
   private final static String DEFAULT_DB = "default";
 
   // Our partition file paths are returned in the format of:
@@ -48,11 +48,11 @@ public class TestUtils {
   private static final String DEFAULT_FE_HOST = "localhost";
 
   // Maps from uppercase type name to PrimitiveType
-  private static Map<String, PrimitiveType> typeNameMap =
+  private static Map<String, PrimitiveType> typeNameMap_ =
       new HashMap<String, PrimitiveType>();
   static {
     for(PrimitiveType type: PrimitiveType.values()) {
-      typeNameMap.put(type.toString(), type);
+      typeNameMap_.put(type.toString(), type);
     }
   }
 
@@ -100,11 +100,11 @@ public class TestUtils {
       String actualStr = actual.get(i);
       // Look for special prefixes in containsPrefixes.
       boolean containsPrefix = false;
-      for (int prefixIdx = 0; prefixIdx < expectedFilePrefix.length; ++prefixIdx) {
-        containsPrefix = expectedStr.contains(expectedFilePrefix[prefixIdx]);
+      for (int prefixIdx = 0; prefixIdx < expectedFilePrefix_.length; ++prefixIdx) {
+        containsPrefix = expectedStr.contains(expectedFilePrefix_[prefixIdx]);
         if (containsPrefix) {
-          expectedStr = expectedStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
-          actualStr = actualStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
+          expectedStr = expectedStr.replaceFirst(expectedFilePrefix_[prefixIdx], "");
+          actualStr = actualStr.replaceFirst(expectedFilePrefix_[prefixIdx], "");
           expectedStr = applyHdfsFilePathFilter(expectedStr);
           actualStr = applyHdfsFilePathFilter(actualStr);
           break;
@@ -112,13 +112,13 @@ public class TestUtils {
       }
 
       boolean ignoreAfter = false;
-      for (int j = 0; j < ignoreContentAfter.length; ++j) {
-        ignoreAfter |= expectedStr.startsWith(ignoreContentAfter[j]);
+      for (int j = 0; j < ignoreContentAfter_.length; ++j) {
+        ignoreAfter |= expectedStr.startsWith(ignoreContentAfter_[j]);
       }
 
-      if (expectedStr.startsWith(regexAgainstActual)) {
+      if (expectedStr.startsWith(regexAgainstActual_)) {
         // Get regex to check against by removing prefix.
-        String regex = expectedStr.replace(regexAgainstActual, "").trim();
+        String regex = expectedStr.replace(regexAgainstActual_, "").trim();
         if (!actualStr.matches(regex)) {
           mismatch = i;
           break;
@@ -390,7 +390,7 @@ public class TestUtils {
         line.append(',');
       }
 
-      PrimitiveType columnType = typeNameMap.get(colTypes.get(i).toUpperCase().trim());
+      PrimitiveType columnType = typeNameMap_.get(colTypes.get(i).toUpperCase().trim());
       line.append(parseColumnValue(resultColumns[i], columnType));
     }
 

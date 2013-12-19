@@ -30,14 +30,14 @@ import com.google.common.base.Preconditions;
  * builder.anyOf(SELECT, INSERT).onTable(...);
  */
 public class PrivilegeRequestBuilder {
-  Authorizeable authorizeable;
-  Privilege privilege;
+  Authorizeable authorizeable_;
+  Privilege privilege_;
 
   /*
    * Sets the authorizeable object to be a table.
    */
   public PrivilegeRequestBuilder onTable(String dbName, String tableName) {
-    authorizeable = new AuthorizeableTable(dbName, tableName);
+    authorizeable_ = new AuthorizeableTable(dbName, tableName);
     return this;
   }
 
@@ -45,7 +45,7 @@ public class PrivilegeRequestBuilder {
    * Sets the authorizeable object to be a database.
    */
   public PrivilegeRequestBuilder onDb(String dbName) {
-    authorizeable = new AuthorizeableDb(dbName);
+    authorizeable_ = new AuthorizeableDb(dbName);
     return this;
   }
 
@@ -53,7 +53,7 @@ public class PrivilegeRequestBuilder {
    * Sets the authorizeable object to be a URI.
    */
   public PrivilegeRequestBuilder onURI(String uriName) {
-    authorizeable = new AuthorizeableURI(uriName);
+    authorizeable_ = new AuthorizeableUri(uriName);
     return this;
   }
 
@@ -68,7 +68,7 @@ public class PrivilegeRequestBuilder {
    * Specifies the privilege the user needs to have.
    */
   public PrivilegeRequestBuilder allOf(Privilege privilege) {
-    this.privilege = privilege;
+    privilege_ = privilege;
     return this;
   }
 
@@ -76,7 +76,7 @@ public class PrivilegeRequestBuilder {
    * Specifies the user needs "ALL" privileges
    */
   public PrivilegeRequestBuilder all() {
-    this.privilege = Privilege.ALL;
+    privilege_ = Privilege.ALL;
     return this;
   }
 
@@ -84,7 +84,7 @@ public class PrivilegeRequestBuilder {
    * Specifies that any privileges are sufficient.
    */
   public PrivilegeRequestBuilder any() {
-    privilege = Privilege.ANY;
+    privilege_ = Privilege.ANY;
     return this;
   }
 
@@ -93,8 +93,8 @@ public class PrivilegeRequestBuilder {
    * and privilege settings.
    */
   public PrivilegeRequest toRequest() {
-    Preconditions.checkNotNull(authorizeable);
-    Preconditions.checkNotNull(privilege);
-    return new PrivilegeRequest(authorizeable, privilege);
+    Preconditions.checkNotNull(authorizeable_);
+    Preconditions.checkNotNull(privilege_);
+    return new PrivilegeRequest(authorizeable_, privilege_);
   }
 }

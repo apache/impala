@@ -22,40 +22,37 @@ import com.google.common.base.Preconditions;
  * For example, SELECT on table Foo in database Bar.
  */
 public class PrivilegeRequest {
-  private final Authorizeable authorizeable;
-  private final Privilege privilege;
+  private final Authorizeable authorizeable_;
+  private final Privilege privilege_;
 
   public PrivilegeRequest(Authorizeable authorizeable, Privilege privilege) {
     Preconditions.checkNotNull(authorizeable);
     Preconditions.checkNotNull(privilege);
-    this.authorizeable = authorizeable;
-    this.privilege = privilege;
+    authorizeable_ = authorizeable;
+    privilege_ = privilege;
   }
 
   public PrivilegeRequest(Privilege privilege) {
     Preconditions.checkNotNull(privilege);
-    this.authorizeable = null;
-    this.privilege = privilege;
-  }
-
-  /*
-   * Returns Authorizeable object. Null if the request is for server-level permission.
-   */
-  public Authorizeable getAuthorizeable() {
-    return authorizeable;
+    authorizeable_ = null;
+    privilege_ = privilege;
   }
 
   /*
    * Name of the Authorizeable. Authorizeable refers to the server if it's null.
    */
   public String getName() {
-    return (authorizeable != null) ? authorizeable.getName() : "server";
+    return (authorizeable_ != null) ? authorizeable_.getName() : "server";
   }
 
   /*
    * Requested privilege on the Authorizeable.
    */
-  public Privilege getPrivilege() {
-    return privilege;
-  }
+  public Privilege getPrivilege() { return privilege_; }
+
+
+  /*
+   * Returns Authorizeable object. Null if the request is for server-level permission.
+   */
+  public Authorizeable getAuthorizeable() { return authorizeable_; }
 }

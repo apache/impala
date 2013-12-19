@@ -48,15 +48,15 @@ public class PlannerTest {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
   private final static boolean GENERATE_OUTPUT_FILE = true;
 
-  private static Frontend frontend;
-  private final String testDir = "functional-planner/queries/PlannerTest";
-  private final String outDir = "/tmp/PlannerTest/";
+  private static Frontend frontend_;
+  private final String testDir_ = "functional-planner/queries/PlannerTest";
+  private final String outDir_ = "/tmp/PlannerTest/";
 
   @BeforeClass
   public static void setUp() throws Exception {
     // Use 8 cores for resource estimation.
     RuntimeEnv.INSTANCE.setNumCores(8);
-    frontend = new Frontend(Catalog.CatalogInitStrategy.LAZY,
+    frontend_ = new Frontend(Catalog.CatalogInitStrategy.LAZY,
         AuthorizationConfig.createAuthDisabledConfig());
   }
 
@@ -188,7 +188,7 @@ public class PlannerTest {
     String locationsStr = null;
     actualOutput.append(Section.PLAN.getHeader() + "\n");
     try {
-      execRequest = frontend.createExecRequest(request, explainBuilder);
+      execRequest = frontend_.createExecRequest(request, explainBuilder);
       Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
           || execRequest.stmt_type == TStmtType.QUERY);
       String explainStr = explainBuilder.toString();
@@ -264,7 +264,7 @@ public class PlannerTest {
    TExecRequest execRequest = null;
    try {
      // distributed plan
-     execRequest = frontend.createExecRequest(request, explainBuilder);
+     execRequest = frontend_.createExecRequest(request, explainBuilder);
      Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
          || execRequest.stmt_type == TStmtType.QUERY);
      String explainStr = explainBuilder.toString();
@@ -304,7 +304,7 @@ public class PlannerTest {
 
   private void runPlannerTestFile(String testFile, TQueryOptions options, String dbName)
       throws CatalogException {
-    String fileName = testDir + "/" + testFile + ".test";
+    String fileName = testDir_ + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     StringBuilder actualOutput = new StringBuilder();
 
@@ -320,9 +320,9 @@ public class PlannerTest {
     // Create the actual output file
     if (GENERATE_OUTPUT_FILE) {
       try {
-        File outDirFile = new File(outDir);
+        File outDirFile = new File(outDir_);
         outDirFile.mkdirs();
-        FileWriter fw = new FileWriter(outDir + testFile + ".test");
+        FileWriter fw = new FileWriter(outDir_ + testFile + ".test");
         fw.write(actualOutput.toString());
         fw.close();
       } catch (IOException e) {

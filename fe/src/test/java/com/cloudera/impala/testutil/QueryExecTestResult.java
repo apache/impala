@@ -13,82 +13,66 @@ import com.google.common.collect.Lists;
  * TODO: Consider pushing the actual comparison logic of results into this class.
  */
 public class QueryExecTestResult {
-  private final ArrayList<String> colLabels;
-  private final ArrayList<String> colTypes;
-  private final ArrayList<String> errors;
-  private final ArrayList<String> fileErrors;
-  private final ArrayList<String> numAppendedRows;
-  private final ArrayList<String> modifiedPartitions;
-  private final ArrayList<String> query;
-  private final ArrayList<String> resultSet;
-  private final ArrayList<String> setup;
+  private final ArrayList<String> colLabels_;
+  private final ArrayList<String> colTypes_;
+  private final ArrayList<String> errors_;
+  private final ArrayList<String> fileErrors_;
+  private final ArrayList<String> numAppendedRows_;
+  private final ArrayList<String> modifiedPartitions_;
+  private final ArrayList<String> query_;
+  private final ArrayList<String> resultSet_;
+  private final ArrayList<String> setup_;
 
   public QueryExecTestResult() {
-    this.colTypes = Lists.newArrayList();
-    this.colLabels = Lists.newArrayList();
-    this.errors = Lists.newArrayList();
-    this.fileErrors = Lists.newArrayList();
-    this.numAppendedRows = Lists.newArrayList();
-    this.modifiedPartitions = Lists.newArrayList();
-    this.query = Lists.newArrayList();
-    this.resultSet = Lists.newArrayList();
-    this.setup = Lists.newArrayList();
+    this.colTypes_ = Lists.newArrayList();
+    this.colLabels_ = Lists.newArrayList();
+    this.errors_ = Lists.newArrayList();
+    this.fileErrors_ = Lists.newArrayList();
+    this.numAppendedRows_ = Lists.newArrayList();
+    this.modifiedPartitions_ = Lists.newArrayList();
+    this.query_ = Lists.newArrayList();
+    this.resultSet_ = Lists.newArrayList();
+    this.setup_ = Lists.newArrayList();
   }
 
   /**
    * The column types from a SELECT
    */
-  public ArrayList<String> getColTypes() {
-    return colTypes;
-  }
+  public ArrayList<String> getColTypes() { return colTypes_; }
 
   /**
    * The column labels from a SELECT
    */
-  public ArrayList<String> getColLabels() {
-    return colLabels;
-  }
+  public ArrayList<String> getColLabels() { return colLabels_; }
 
   /**
    * Expected messages in error log.
    */
-  public ArrayList<String> getErrors() {
-    return errors;
-  }
+  public ArrayList<String> getErrors() { return errors_; }
 
   /**
    * Expected number of errors per data file read from query
    */
-  public ArrayList<String> getFileErrors() {
-    return fileErrors;
-  }
+  public ArrayList<String> getFileErrors() { return fileErrors_; }
 
   /**
    * Number of partitions affected by an insert, including the number of rows written,
    * in the form /k1=v1/k2=v2: <num rows>
    */
-  public ArrayList<String> getModifiedPartitions() {
-    return modifiedPartitions;
-  }
+  public ArrayList<String> getModifiedPartitions() { return modifiedPartitions_; }
 
   /**
    * The query the results are associated with
    */
-  public ArrayList<String> getQuery() {
-    return query;
-  }
+  public ArrayList<String> getQuery() { return query_; }
 
   /**
    * The result set from a SELECT statement
    */
-  public ArrayList<String> getResultSet() {
-    return resultSet;
-  }
+  public ArrayList<String> getResultSet() { return resultSet_; }
 
   /**
    * Setup section
    */
-  public ArrayList<String> getSetup() {
-    return setup;
-  }
+  public ArrayList<String> getSetup() { return setup_; }
 }

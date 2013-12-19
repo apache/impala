@@ -22,23 +22,21 @@ import com.google.common.collect.Lists;
 /*
  * Class used to authorize access to a URI.
  */
-public class AuthorizeableURI implements Authorizeable {
-  private final String uriName;
+public class AuthorizeableUri implements Authorizeable {
+  private final String uriName_;
 
-  public AuthorizeableURI(String uriName) {
+  public AuthorizeableUri(String uriName) {
     Preconditions.checkNotNull(uriName);
-    this.uriName = uriName;
+    uriName_ = uriName;
   }
 
   @Override
   public List<org.apache.sentry.core.Authorizable> getHiveAuthorizeableHierarchy() {
     org.apache.sentry.core.AccessURI accessURI =
-        new org.apache.sentry.core.AccessURI(uriName);
+        new org.apache.sentry.core.AccessURI(uriName_);
     return Lists.newArrayList((org.apache.sentry.core.Authorizable) accessURI);
   }
 
   @Override
-  public String getName() {
-    return uriName;
-  }
+  public String getName() { return uriName_; }
 }

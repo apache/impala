@@ -540,7 +540,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     String op1 = "";
     if (type1 != null) {
       if (op1IsLiteral) {
-        op1 = typeToLiteralValue.get(type1);
+        op1 = typeToLiteralValue_.get(type1);
       } else {
         op1 = TestSchemaUtils.getAllTypesColumn(type1);
       }
@@ -920,7 +920,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // Test IsNull() conditional function.
     for (PrimitiveType t: PrimitiveType.values()) {
-      String literal = typeToLiteralValue.get(t);
+      String literal = typeToLiteralValue_.get(t);
       AnalyzesOk(String.format("select isnull(%s, %s)", literal, literal));
       AnalyzesOk(String.format("select isnull(%s, NULL)", literal));
       AnalyzesOk(String.format("select isnull(NULL, %s)", literal));
@@ -945,23 +945,23 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // Add a udf default.udf(), default.udf(int), default.udf(string...),
     // default.udf(int, string...) and functional.udf(double)
-    catalog.addFunction(new Udf(new FunctionName("default", "udf"),
+    catalog_.addFunction(new Udf(new FunctionName("default", "udf"),
         new ArrayList<PrimitiveType>(), PrimitiveType.INT, dummyUri, null));
-    catalog.addFunction(new Udf(new FunctionName("default", "udf"),
+    catalog_.addFunction(new Udf(new FunctionName("default", "udf"),
         Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT, dummyUri, null));
     Udf varArgsUdf1 = new Udf(new FunctionName("default", "udf"),
         Lists.newArrayList(PrimitiveType.STRING),
         PrimitiveType.INT, dummyUri, null);
     varArgsUdf1.setHasVarArgs(true);
-    catalog.addFunction(varArgsUdf1);
+    catalog_.addFunction(varArgsUdf1);
     Udf varArgsUdf2 = new Udf(new FunctionName("default", "udf"),
         Lists.newArrayList(PrimitiveType.INT, PrimitiveType.STRING),
         PrimitiveType.INT, dummyUri, null);
     varArgsUdf2.setHasVarArgs(true);
-    catalog.addFunction(varArgsUdf2);
+    catalog_.addFunction(varArgsUdf2);
     Udf udf = new Udf(new FunctionName("functional", "udf"),
         Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, dummyUri, null);
-    catalog.addFunction(udf);
+    catalog_.addFunction(udf);
 
     AnalyzesOk("select udf()");
     AnalyzesOk("select default.udf()");
@@ -990,7 +990,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     AnalysisError("select udf(1, 2)",
          "No matching function with signature: default.udf(TINYINT, TINYINT).");
-    catalog.removeFunction(udf);
+    catalog_.removeFunction(udf);
   }
 
   @Test
@@ -1034,7 +1034,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testFuncExprDepthLimit("lower(", "'abc'", ")");
 
     // UDF.
-    catalog.addFunction(new Udf(new FunctionName("default", "udf"),
+    catalog_.addFunction(new Udf(new FunctionName("default", "udf"),
         Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT,
         new HdfsUri(""), null));
     testFuncExprDepthLimit("udf(", "1", ")");

@@ -29,23 +29,23 @@ public class AuthorizeableTable implements Authorizeable {
   // a database.
   public final static String ANY_TABLE_NAME = org.apache.sentry.core.AccessConstants.ALL;
 
-  private final org.apache.sentry.core.Table table;
-  private final org.apache.sentry.core.Database database;
+  private final org.apache.sentry.core.Table table_;
+  private final org.apache.sentry.core.Database database_;
 
   public AuthorizeableTable(String dbName, String tableName) {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
     Preconditions.checkState(dbName != null && !dbName.isEmpty());
-    this.table = new org.apache.sentry.core.Table(tableName);
-    this.database = new org.apache.sentry.core.Database(dbName);
+    table_ = new org.apache.sentry.core.Table(tableName);
+    database_ = new org.apache.sentry.core.Database(dbName);
   }
 
   @Override
   public List<org.apache.sentry.core.Authorizable> getHiveAuthorizeableHierarchy() {
-    return Lists.newArrayList(database, table);
+    return Lists.newArrayList(database_, table_);
   }
 
   @Override
   public String getName() {
-    return database.getName() + "." + table.getName();
+    return database_.getName() + "." + table_.getName();
   }
 }

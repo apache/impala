@@ -53,39 +53,39 @@ public class ImpalaJdbcClient {
   private final static String DEFAULT_CONNECTION_STRING =
       "jdbc:hive2://localhost:21050/;auth=noSasl";
 
-  private final String driverName;
-  private final String connString;
-  private Connection conn;
-  private Statement stmt;
+  private final String driverName_;
+  private final String connString_;
+  private Connection conn_;
+  private Statement stmt_;
 
   private ImpalaJdbcClient(String driverName, String connString) {
-    this.driverName = driverName;
-    this.connString = connString;
+    this.driverName_ = driverName;
+    this.connString_ = connString;
   }
 
   private void validateConnection() throws SQLException {
-    if (conn == null) {
+    if (conn_ == null) {
       throw new RuntimeException("Connection not initialized.");
-    } else if (conn.isClosed()) {
+    } else if (conn_.isClosed()) {
       throw new RuntimeException("Connection not open.");
     }
-    Preconditions.checkNotNull(stmt);
+    Preconditions.checkNotNull(stmt_);
 
     // Re-open if the statement if it has been closed.
-    if (stmt.isClosed()) {
-      stmt = conn.createStatement();
+    if (stmt_.isClosed()) {
+      stmt_ = conn_.createStatement();
     }
   }
 
   public void connect() throws ClassNotFoundException, SQLException {
-    LOG.info("Using JDBC Driver Name: " + driverName);
-    LOG.info("Connecting to: " + connString);
+    LOG.info("Using JDBC Driver Name: " + driverName_);
+    LOG.info("Connecting to: " + connString_);
 
     // Make sure the driver can be found, throws a ClassNotFoundException if
     // it is not available.
-    Class.forName(driverName);
-    conn = DriverManager.getConnection(connString, "", "");
-    stmt = conn.createStatement();
+    Class.forName(driverName_);
+    conn_ = DriverManager.getConnection(connString_, "", "");
+    stmt_ = conn_.createStatement();
   }
 
   /*
@@ -93,12 +93,12 @@ public class ImpalaJdbcClient {
    * this is a no-op.
    */
   public void close() throws SQLException {
-    if (stmt != null) {
-      stmt.close();
+    if (stmt_ != null) {
+      stmt_.close();
     }
 
-    if (conn != null) {
-      conn.close();
+    if (conn_ != null) {
+      conn_.close();
     }
   }
 
@@ -109,21 +109,21 @@ public class ImpalaJdbcClient {
   public ResultSet execQuery(String query) throws SQLException {
     validateConnection();
     LOG.info("Executing: " + query);
-    return stmt.executeQuery(query);
+    return stmt_.executeQuery(query);
   }
 
   public void changeDatabase(String db_name) throws SQLException {
     validateConnection();
     LOG.info("Using: " + db_name);
-    stmt.execute("use " + db_name);
+    stmt_.execute("use " + db_name);
   }
 
   public Connection getConnection() {
-    return conn;
+    return conn_;
   }
 
   public Statement getStatement() {
-    return stmt;
+    return stmt_;
   }
 
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver() {

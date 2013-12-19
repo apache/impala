@@ -28,7 +28,7 @@ public class ToSqlTest extends AnalyzerTest {
 
   private static AnalysisContext.AnalysisResult analyze(String query) {
     try {
-      AnalysisContext analysisCtxt = new AnalysisContext(catalog,
+      AnalysisContext analysisCtxt = new AnalysisContext(catalog_,
           Catalog.DEFAULT_DB, new User(System.getProperty("user.name")));
 
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);

@@ -22,40 +22,40 @@ import com.cloudera.impala.thrift.TResultRow;
  * Utility class for building TResultRows.
  */
 public class TResultRowBuilder {
-  private final TResultRow row = new TResultRow();
+  private final TResultRow row_ = new TResultRow();
 
   public TResultRowBuilder add(long val) {
     TColumnValue colVal = new TColumnValue();
     colVal.setLongVal(val);
-    row.addToColVals(colVal);
+    row_.addToColVals(colVal);
     return this;
   }
 
   public TResultRowBuilder add(double val) {
     TColumnValue colVal = new TColumnValue();
     colVal.setDoubleVal(val);
-    row.addToColVals(colVal);
+    row_.addToColVals(colVal);
     return this;
   }
 
   public TResultRowBuilder add(String val) {
     TColumnValue colVal = new TColumnValue();
     colVal.setStringVal(val);
-    row.addToColVals(colVal);
+    row_.addToColVals(colVal);
     return this;
   }
 
   public TResultRowBuilder addBytes(long val) {
     TColumnValue colVal = new TColumnValue();
     colVal.setStringVal(PrintUtils.printBytes(val));
-    row.addToColVals(colVal);
+    row_.addToColVals(colVal);
     return this;
   }
 
   public TResultRowBuilder reset() {
-    row.clear();
+    row_.clear();
     return this;
   }
 
-  public TResultRow get() { return row; }
+  public TResultRow get() { return row_; }
 }

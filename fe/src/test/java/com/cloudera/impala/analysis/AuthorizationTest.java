@@ -65,17 +65,17 @@ public class AuthorizationTest {
   private final static User USER = new User("test_user");
   // The admin_user has ALL privileges on the server.
   private final static User ADMIN_USER = new User("admin_user");
-  private final AnalysisContext analysisContext;
-  private final AuthorizationConfig authzConfig;
-  private final Frontend fe;
+  private final AnalysisContext analysisContext_;
+  private final AuthorizationConfig authzConfig_;
+  private final Frontend fe_;
 
   public AuthorizationTest() throws IOException {
-    authzConfig = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
+    authzConfig_ = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
         LocalGroupResourceAuthorizationProvider.class.getName());
     ImpaladCatalog catalog = new ImpaladCatalog(
-        Catalog.CatalogInitStrategy.LAZY, authzConfig);
-    analysisContext = new AnalysisContext(catalog, Catalog.DEFAULT_DB, USER);
-    fe = new Frontend(Catalog.CatalogInitStrategy.LAZY, authzConfig);
+        Catalog.CatalogInitStrategy.LAZY, authzConfig_);
+    analysisContext_ = new AnalysisContext(catalog, Catalog.DEFAULT_DB, USER);
+    fe_ = new Frontend(Catalog.CatalogInitStrategy.LAZY, authzConfig_);
   }
 
   @Test
@@ -294,7 +294,7 @@ public class AuthorizationTest {
 
     // The admin user should have privileges invalidate the server metadata.
     AnalysisContext adminAc = new AnalysisContext(new ImpaladCatalog(
-        Catalog.CatalogInitStrategy.LAZY, authzConfig),
+        Catalog.CatalogInitStrategy.LAZY, authzConfig_),
         Catalog.DEFAULT_DB, ADMIN_USER);
     AuthzOk(adminAc, "invalidate metadata");
 
@@ -818,10 +818,10 @@ public class AuthorizationTest {
     List<String> expectedDbs = Lists.newArrayList("functional", "functional_parquet",
         "functional_seq_snap", "tpcds", "tpch");
 
-    List<String> dbs = fe.getDbNames("*", USER);
+    List<String> dbs = fe_.getDbNames("*", USER);
     Assert.assertEquals(expectedDbs, dbs);
 
-    dbs = fe.getDbNames(null, USER);
+    dbs = fe_.getDbNames(null, USER);
     Assert.assertEquals(expectedDbs, dbs);
   }
 
@@ -831,10 +831,10 @@ public class AuthorizationTest {
     List<String> expectedTbls =
         Lists.newArrayList("alltypes", "alltypesagg", "complex_view", "view_view");
 
-    List<String> tables = fe.getTableNames("functional", "*", USER);
+    List<String> tables = fe_.getTableNames("functional", "*", USER);
     Assert.assertEquals(expectedTbls, tables);
 
-    tables = fe.getTableNames("functional", null, USER);
+    tables = fe_.getTableNames("functional", null, USER);
     Assert.assertEquals(expectedTbls, tables);
   }
 
@@ -866,7 +866,7 @@ public class AuthorizationTest {
     req.get_tables_req.setSchemaName("functional");
     // Get all tables
     req.get_tables_req.setTableName("%");
-    TResultSet resp = fe.execHiveServer2MetadataOp(req);
+    TResultSet resp = fe_.execHiveServer2MetadataOp(req);
     assertEquals(4, resp.rows.size());
     assertEquals("alltypes",
         resp.rows.get(0).colVals.get(2).stringVal.toLowerCase());
@@ -886,7 +886,7 @@ public class AuthorizationTest {
     req.get_schemas_req = new TGetSchemasReq();
     // Get all schema (databases).
     req.get_schemas_req.setSchemaName("%");
-    TResultSet resp = fe.execHiveServer2MetadataOp(req);
+    TResultSet resp = fe_.execHiveServer2MetadataOp(req);
     List<String> expectedDbs = Lists.newArrayList("functional",
         "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
     assertEquals(expectedDbs.size(), resp.rows.size());
@@ -906,19 +906,19 @@ public class AuthorizationTest {
     req.get_columns_req.setSchemaName("functional");
     req.get_columns_req.setTableName("alltypes");
     req.get_columns_req.setColumnName("stri%");
-    TResultSet resp = fe.execHiveServer2MetadataOp(req);
+    TResultSet resp = fe_.execHiveServer2MetadataOp(req);
     assertEquals(1, resp.rows.size());
 
     // User does not have permission to access the table, no results should be returned.
     req.get_columns_req.setTableName("alltypesnopart");
-    resp = fe.execHiveServer2MetadataOp(req);
+    resp = fe_.execHiveServer2MetadataOp(req);
     assertEquals(0, resp.rows.size());
 
     // User does not have permission to access db or table, no results should be
     // returned.
     req.get_columns_req.setSchemaName("functional_seq_gzip");
     req.get_columns_req.setTableName("alltypes");
-    resp = fe.execHiveServer2MetadataOp(req);
+    resp = fe_.execHiveServer2MetadataOp(req);
     assertEquals(0, resp.rows.size());
   }
 
@@ -932,7 +932,7 @@ public class AuthorizationTest {
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {
       ImpaladCatalog catalog =
-          new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY, authzConfig);
+          new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY, authzConfig_);
       AnalysisContext context = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
           user);
       // Can select from table that user has privileges on.
@@ -1163,7 +1163,7 @@ public class AuthorizationTest {
 
   private void AuthzOk(String stmt) throws AuthorizationException,
       AnalysisException {
-    AuthzOk(analysisContext, stmt);
+    AuthzOk(analysisContext_, stmt);
   }
 
   private static void AuthzOk(AnalysisContext context, String stmt)
@@ -1177,7 +1177,7 @@ public class AuthorizationTest {
    */
   private void AuthzError(String stmt, String expectedErrorString)
       throws AnalysisException {
-    AuthzError(analysisContext, stmt, expectedErrorString, USER);
+    AuthzError(analysisContext_, stmt, expectedErrorString, USER);
   }
 
   private static void AuthzError(AnalysisContext analysisContext,

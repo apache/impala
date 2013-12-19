@@ -28,20 +28,20 @@ import com.google.common.collect.Lists;
  * Class used to check whether a user has access to a given resource.
  */
 public class AuthorizationChecker {
-  private final ResourceAuthorizationProvider provider;
-  private final AuthorizationConfig config;
+  private final ResourceAuthorizationProvider provider_;
+  private final AuthorizationConfig config_;
 
   /*
    * Creates a new AuthorizationChecker based on the config values.
    */
   public AuthorizationChecker(AuthorizationConfig config) {
     Preconditions.checkNotNull(config);
-    this.config = config;
+    config_ = config;
     if (config.isEnabled()) {
-      this.provider = createAuthorizationProvider(config);
-      Preconditions.checkNotNull(provider);
+      provider_ = createAuthorizationProvider(config);
+      Preconditions.checkNotNull(provider_);
     } else {
-      this.provider = null;
+      provider_ = null;
     }
   }
 
@@ -67,7 +67,7 @@ public class AuthorizationChecker {
    * Returns the configuration used to create this AuthorizationProvider.
    */
   public AuthorizationConfig getConfig() {
-    return config;
+    return config_;
   }
 
   /*
@@ -80,7 +80,7 @@ public class AuthorizationChecker {
 
     // If authorization is not enabled the user will always have access. If this is
     // an internal request, the user will always have permission.
-    if (!config.isEnabled() || user instanceof ImpalaInternalAdminUser) {
+    if (!config_.isEnabled() || user instanceof ImpalaInternalAdminUser) {
       return true;
     }
 
@@ -88,7 +88,7 @@ public class AuthorizationChecker {
         request.getPrivilege().getHiveActions();
 
     List<Authorizable> authorizeables = Lists.newArrayList();
-    authorizeables.add(new org.apache.sentry.core.Server(config.getServerName()));
+    authorizeables.add(new org.apache.sentry.core.Server(config_.getServerName()));
     // If request.getAuthorizeable() is null, the request is for server-level permission.
     if (request.getAuthorizeable() != null) {
       authorizeables.addAll(request.getAuthorizeable().getHiveAuthorizeableHierarchy());
@@ -98,14 +98,14 @@ public class AuthorizationChecker {
     // has any privileges on a given resource.
     if (request.getPrivilege().getAnyOf()) {
       for (org.apache.sentry.core.Action action: actions) {
-        if (provider.hasAccess(new org.apache.sentry.core.Subject(user.getShortName()),
+        if (provider_.hasAccess(new org.apache.sentry.core.Subject(user.getShortName()),
             authorizeables, EnumSet.of(action))) {
           return true;
         }
       }
       return false;
     }
-    return provider.hasAccess(new org.apache.sentry.core.Subject(user.getShortName()),
+    return provider_.hasAccess(new org.apache.sentry.core.Subject(user.getShortName()),
         authorizeables, actions);
   }
 }

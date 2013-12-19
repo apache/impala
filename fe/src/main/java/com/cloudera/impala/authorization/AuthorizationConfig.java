@@ -22,15 +22,15 @@ import com.google.common.base.Preconditions;
  * Class that contains configuration details for Impala authorization.
  */
 public class AuthorizationConfig {
-  private final String serverName;
-  private final String policyFile;
-  private final String policyProviderClassName;
+  private final String serverName_;
+  private final String policyFile_;
+  private final String policyProviderClassName_;
 
   public AuthorizationConfig(String serverName, String policyFile,
       String policyProviderClassName) {
-    this.serverName = serverName;
-    this.policyFile = policyFile;
-    this.policyProviderClassName = policyProviderClassName;
+    serverName_ = serverName;
+    policyFile_ = policyFile;
+    policyProviderClassName_ = policyProviderClassName;
   }
 
   /*
@@ -43,17 +43,17 @@ public class AuthorizationConfig {
       return;
     }
 
-    if (serverName == null || serverName.isEmpty()) {
+    if (serverName_ == null || serverName_.isEmpty()) {
       throw new IllegalArgumentException("Authorization is enabled but the server name" +
           " is null or empty. Set the server name using the impalad --server_name flag."
           );
     }
-    if (policyFile == null || policyFile.isEmpty()) {
+    if (policyFile_ == null || policyFile_.isEmpty()) {
       throw new IllegalArgumentException("Authorization is enabled but the policy file" +
           " path was null or empty. Set the policy file using the " +
           "--authorization_policy_file impalad flag.");
     }
-    if (policyProviderClassName == null || policyProviderClassName.isEmpty()) {
+    if (policyProviderClassName_ == null || policyProviderClassName_.isEmpty()) {
       throw new IllegalArgumentException("Authorization is enabled but the " +
           "authorization policy provider class name is null or empty. Set the class " +
           "name using the --authorization_policy_provider_class impalad flag.");
@@ -61,17 +61,17 @@ public class AuthorizationConfig {
     Class<?> providerClass = null;
     try {
       // Get the Class object without performing any initialization.
-      providerClass = Class.forName(policyProviderClassName, false,
+      providerClass = Class.forName(policyProviderClassName_, false,
           this.getClass().getClassLoader());
     } catch (ClassNotFoundException e) {
       throw new IllegalArgumentException(String.format("The authorization policy " +
-          "provider class '%s' was not found.", policyProviderClassName), e);
+          "provider class '%s' was not found.", policyProviderClassName_), e);
     }
     Preconditions.checkNotNull(providerClass);
     if (!ResourceAuthorizationProvider.class.isAssignableFrom(providerClass)) {
       throw new IllegalArgumentException(String.format("The authorization policy " +
           "provider class '%s' must be a subclass of '%s'.",
-          policyProviderClassName,
+          policyProviderClassName_,
           ResourceAuthorizationProvider.class.getName()));
     }
   }
@@ -82,30 +82,8 @@ public class AuthorizationConfig {
    * is considered enabled.
    */
   public boolean isEnabled() {
-    return (serverName != null && !serverName.isEmpty()) ||
-           (policyFile != null && !policyFile.isEmpty());
-  }
-
-  /*
-   * The server name to secure.
-   */
-  public String getServerName() {
-    return serverName;
-  }
-
-  /*
-   * The policy file path.
-   */
-  public String getPolicyFile() {
-    return policyFile;
-  }
-
-  /*
-   * The full class name of the authorization policy provider. For example:
-   * org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider.
-   */
-  public String getPolicyProviderClassName() {
-    return policyProviderClassName;
+    return (serverName_ != null && !serverName_.isEmpty()) ||
+           (policyFile_ != null && !policyFile_.isEmpty());
   }
 
   /*
@@ -114,4 +92,20 @@ public class AuthorizationConfig {
   public static AuthorizationConfig createAuthDisabledConfig() {
     return new AuthorizationConfig(null, null, null);
   }
+
+  /*
+   * The server name to secure.
+   */
+  public String getServerName() { return serverName_; }
+
+  /*
+   * The policy file path.
+   */
+  public String getPolicyFile() { return policyFile_; }
+
+  /*
+   * The full class name of the authorization policy provider. For example:
+   * org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider.
+   */
+  public String getPolicyProviderClassName() { return policyProviderClassName_; }
 }

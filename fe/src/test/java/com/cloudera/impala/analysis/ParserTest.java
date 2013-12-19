@@ -32,7 +32,7 @@ import com.google.common.collect.Lists;
 public class ParserTest {
 
   // Representative operands for testing.
-  private final String[] operands =
+  private final static String[] operands_ =
       new String[] {"i", "5", "true", "NULL", "'a'", "(1.5 * 8)" };
 
   /**
@@ -768,8 +768,8 @@ public class ParserTest {
 
   @Test
   public void TestArithmeticExprs() {
-    for (String lop: operands) {
-      for (String rop: operands) {
+    for (String lop: operands_) {
+      for (String rop: operands_) {
         for (ArithmeticExpr.Operator op : ArithmeticExpr.Operator.values()) {
           // Test BITNOT separately.
           if (op == ArithmeticExpr.Operator.BITNOT) {
@@ -926,8 +926,8 @@ public class ParserTest {
     operations.add("rlike");
     operations.add("regexp");
 
-    for (String lop: operands) {
-      for (String rop: operands) {
+    for (String lop: operands_) {
+      for (String rop: operands_) {
         for (String op : operations) {
           String expr = String.format("%s %s %s", lop, op.toString(), rop);
           ParsesOk(String.format("select %s from t where %s", expr, expr));

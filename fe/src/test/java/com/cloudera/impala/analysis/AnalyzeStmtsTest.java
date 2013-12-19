@@ -462,7 +462,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   void addTestUda(String name, PrimitiveType retType, PrimitiveType... argTypes) {
     FunctionName fnName = new FunctionName("default", name);
-    catalog.addFunction(new Uda(fnName, new FunctionArgs(Lists.newArrayList(argTypes),
+    catalog_.addFunction(new Uda(fnName, new FunctionArgs(Lists.newArrayList(argTypes),
         false), retType));
   }
 
@@ -555,8 +555,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select group_concat(string_col, '-') from functional.alltypes");
     AnalyzesOk("select group_concat(string_col, string_col) from functional.alltypes");
     // test all types as arguments
-    for (PrimitiveType type: typeToLiteralValue.keySet()) {
-      String literal = typeToLiteralValue.get(type);
+    for (PrimitiveType type: typeToLiteralValue_.keySet()) {
+      String literal = typeToLiteralValue_.get(type);
       String query1 = String.format(
           "select group_concat(%s) from functional.alltypes", literal);
       String query2 = String.format(
@@ -573,13 +573,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     }
 
     // Test distinct estimate
-    for (PrimitiveType type: typeToLiteralValue.keySet()) {
+    for (PrimitiveType type: typeToLiteralValue_.keySet()) {
       AnalyzesOk(String.format(
           "select distinctpc(%s) from functional.alltypes",
-          typeToLiteralValue.get(type)));
+          typeToLiteralValue_.get(type)));
       AnalyzesOk(String.format(
           "select ndv(%s) from functional.alltypes",
-          typeToLiteralValue.get(type)));
+          typeToLiteralValue_.get(type)));
     }
   }
 

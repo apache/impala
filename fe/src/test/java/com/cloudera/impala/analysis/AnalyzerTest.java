@@ -46,33 +46,33 @@ import com.google.common.base.Preconditions;
 
 public class AnalyzerTest {
   protected final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
-  protected static ImpaladCatalog catalog;
+  protected static ImpaladCatalog catalog_;
 
-  protected Analyzer analyzer;
+  protected Analyzer analyzer_;
 
   // maps from type to string that will result in literal of that type
-  protected static Map<PrimitiveType, String> typeToLiteralValue =
+  protected static Map<PrimitiveType, String> typeToLiteralValue_ =
       new HashMap<PrimitiveType, String>();
   static {
-    typeToLiteralValue.put(PrimitiveType.BOOLEAN, "true");
-    typeToLiteralValue.put(PrimitiveType.TINYINT, "1");
-    typeToLiteralValue.put(PrimitiveType.SMALLINT, (Byte.MAX_VALUE + 1) + "");
-    typeToLiteralValue.put(PrimitiveType.INT, (Short.MAX_VALUE + 1) + "");
-    typeToLiteralValue.put(PrimitiveType.BIGINT, ((long) Integer.MAX_VALUE + 1) + "");
-    typeToLiteralValue.put(PrimitiveType.FLOAT, "1.0");
-    typeToLiteralValue.put(PrimitiveType.DOUBLE, (Float.MAX_VALUE + 1) + "");
-    typeToLiteralValue.put(PrimitiveType.TIMESTAMP,
+    typeToLiteralValue_.put(PrimitiveType.BOOLEAN, "true");
+    typeToLiteralValue_.put(PrimitiveType.TINYINT, "1");
+    typeToLiteralValue_.put(PrimitiveType.SMALLINT, (Byte.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(PrimitiveType.INT, (Short.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(PrimitiveType.BIGINT, ((long) Integer.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(PrimitiveType.FLOAT, "1.0");
+    typeToLiteralValue_.put(PrimitiveType.DOUBLE, (Float.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(PrimitiveType.TIMESTAMP,
         "cast('2012-12-21 00:00:00.000' as timestamp)");
-    typeToLiteralValue.put(PrimitiveType.STRING, "'Hello, World!'");
-    typeToLiteralValue.put(PrimitiveType.NULL_TYPE, "NULL");
+    typeToLiteralValue_.put(PrimitiveType.STRING, "'Hello, World!'");
+    typeToLiteralValue_.put(PrimitiveType.NULL_TYPE, "NULL");
   }
 
   protected Analyzer createAnalyzer(String defaultDb) {
-    return new Analyzer(catalog, defaultDb, new User(System.getProperty("user.name")));
+    return new Analyzer(catalog_, defaultDb, new User(System.getProperty("user.name")));
   }
 
   protected Analyzer createAnalyzerUsingHiveColLabels() {
-    Analyzer analyzer = new Analyzer(catalog, Catalog.DEFAULT_DB,
+    Analyzer analyzer = new Analyzer(catalog_, Catalog.DEFAULT_DB,
         new User(System.getProperty("user.name")));
     analyzer.setUseHiveColLabels(true);
     return analyzer;
@@ -80,13 +80,13 @@ public class AnalyzerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY,
+    catalog_ = new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY,
         AuthorizationConfig.createAuthDisabledConfig());
   }
 
   @AfterClass
   public static void cleanUp() {
-    catalog.close();
+    catalog_.close();
   }
 
   // Adds a Udf: default.name(args) to the catalog.
@@ -102,7 +102,7 @@ public class AnalyzerTest {
     Function fn = new Udf(
         new FunctionName(db, fnName), args, PrimitiveType.INT, null, null);
     fn.setHasVarArgs(varArgs);
-    catalog.addFunction(fn);
+    catalog_.addFunction(fn);
     return fn;
   }
 
@@ -176,7 +176,7 @@ public class AnalyzerTest {
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    */
   public ParseNode AnalyzesOk(String stmt, Analyzer analyzer) {
-    this.analyzer = analyzer;
+    this.analyzer_ = analyzer;
     LOG.info("analyzing " + stmt);
     ParseNode node = ParsesOk(stmt);
     assertNotNull(node);
@@ -203,7 +203,7 @@ public class AnalyzerTest {
    */
   public void AnalysisError(String stmt, Analyzer analyzer, String expectedErrorString) {
     Preconditions.checkNotNull(expectedErrorString, "No expected error message given.");
-    this.analyzer = analyzer;
+    this.analyzer_ = analyzer;
     LOG.info("analyzing " + stmt);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
@@ -262,7 +262,7 @@ public class AnalyzerTest {
 
   private void testSelectStar() throws AnalysisException, AuthorizationException {
     AnalyzesOk("select * from functional.AllTypes");
-    DescriptorTable descTbl = analyzer.getDescTbl();
+    DescriptorTable descTbl = analyzer_.getDescTbl();
     for (SlotDescriptor slotD : descTbl.getTupleDesc(new TupleId(0)).getSlots()) {
       slotD.setIsMaterialized(true);
     }
@@ -288,7 +288,7 @@ public class AnalyzerTest {
     // 0 - 7: count(int_col)
     // 8 - 15: count(*)
     AnalyzesOk("select count(int_col), count(*) from functional.AllTypes");
-    DescriptorTable descTbl = analyzer.getDescTbl();
+    DescriptorTable descTbl = analyzer_.getDescTbl();
     com.cloudera.impala.analysis.TupleDescriptor aggDesc =
         descTbl.getTupleDesc(new TupleId(1));
     for (SlotDescriptor slotD: aggDesc.getSlots()) {
@@ -308,7 +308,7 @@ public class AnalyzerTest {
     // 8 - 15: sum(int_col)
     // 16 - 23: count(*)
     AnalyzesOk("select sum(int_col), count(*) from functional.AllTypes");
-    DescriptorTable descTbl = analyzer.getDescTbl();
+    DescriptorTable descTbl = analyzer_.getDescTbl();
     com.cloudera.impala.analysis.TupleDescriptor aggDesc =
         descTbl.getTupleDesc(new TupleId(1));
     for (SlotDescriptor slotD: aggDesc.getSlots()) {
@@ -330,7 +330,7 @@ public class AnalyzerTest {
 
   private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,
       int nullIndicatorByte, int nullIndicatorBit) {
-    SlotDescriptor d = analyzer.getSlotDescriptor(colAlias);
+    SlotDescriptor d = analyzer_.getSlotDescriptor(colAlias);
     checkLayoutParams(d, byteSize, byteOffset, nullIndicatorByte, nullIndicatorBit);
   }
 

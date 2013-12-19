@@ -79,7 +79,5 @@ public class FSPermissionChecker {
   /*
    * Returns an instance of the FSPermissionChecker.
    */
-  public static FSPermissionChecker getInstance() {
-    return instance_;
-  }
+  public static FSPermissionChecker getInstance() { return instance_; }
 }

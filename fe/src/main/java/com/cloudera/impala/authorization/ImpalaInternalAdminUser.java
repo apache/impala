@@ -20,7 +20,7 @@ package com.cloudera.impala.authorization;
  * all privileges on all objects in the server.
  */
 public class ImpalaInternalAdminUser extends User {
-  private final static ImpalaInternalAdminUser instance = new ImpalaInternalAdminUser();
+  private final static ImpalaInternalAdminUser instance_ = new ImpalaInternalAdminUser();
 
   private ImpalaInternalAdminUser() {
     super("Impala Internal Admin User");
@@ -29,7 +29,5 @@ public class ImpalaInternalAdminUser extends User {
   /*
    * Returns an instance of the ImpalaInternalAdminUser.
    */
-  public static ImpalaInternalAdminUser getInstance() {
-    return instance;
-  }
+  public static ImpalaInternalAdminUser getInstance() { return instance_; }
 }

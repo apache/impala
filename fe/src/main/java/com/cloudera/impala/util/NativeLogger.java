@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
  */
 public class NativeLogger {
   private final static Logger LOG = LoggerFactory.getLogger(NativeLogger.class);
-  private static boolean loaded = false;
+  private static boolean loaded_ = false;
 
   // Writes a log message to glog
   private native static void Log(int severity, String msg, String filename, int line);
@@ -41,8 +41,8 @@ public class NativeLogger {
    * Loads the native logging support library.
    */
   private static synchronized void loadLibrary() {
-    if (loaded) return;
+    if (loaded_) return;
     NativeLibUtil.loadLibrary("libloggingsupport.so");
-    loaded = true;
+    loaded_ = true;
   }
 }
