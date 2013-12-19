@@ -103,6 +103,24 @@ do
       echo "[-testdata] : Loads test data. Implied as true if -snapshot_file is "\
            "specified. If -snapshot_file is not specified, data will be regenerated."
       echo "[-snapshot_file <file name>] : Load test data from a snapshot file"
+      echo "-----------------------------------------------------------------------------
+Examples of common tasks:
+
+  # Build and run all tests
+  ./buildall.sh
+
+  # Build and skip tests
+  ./buildall.sh -skiptests
+
+  # Build, load a snapshot file, run tests
+  ./buildall.sh -snapshot_file <file>
+
+  # Build, generate and load test data without formatting the mini-cluster (reuses
+  # existing data in HDFS if it exists). Can be faster than loading from a snapshot.
+  ./buildall.sh -testdata
+
+  # Build, format mini-cluster and metastore, load all test data, run tests
+  ./buildall.sh -testdata -format"
       exit 1
       ;;
   esac
