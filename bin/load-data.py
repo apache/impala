@@ -175,12 +175,6 @@ def exec_hadoop_fs_cmd(args, expect_success=True):
 
 def exec_impala_query_from_file_parallel(query_files):
   if not query_files: return
-  # Refresh Catalog
-  print "Invalidating metadata"
-  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
-  impala_client.connect()
-  impala_client.execute('invalidate metadata')
-  impala_client.close_connection()
   result_queue = Queue()
   threads = []
   for query_file in query_files:
@@ -214,7 +208,6 @@ if __name__ == "__main__":
     workloads = options.workloads.split(",")
     validate_workloads(all_workloads, workloads)
 
-
   print 'Starting data load for the following workloads: ' + ', '.join(workloads)
 
   loading_time_map = collections.defaultdict(float)
@@ -245,6 +238,14 @@ if __name__ == "__main__":
     exec_hive_query_from_file('load-%s-hive-generated.sql' % load_file_substr)
     exec_impala_query_from_file_parallel(impala_load_files)
     loading_time_map[workload] = time.time() - start_time
+
+  print "Invalidating metadata"
+  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
+  impala_client.connect()
+  try:
+    impala_client.execute('invalidate metadata')
+  finally:
+    impala_client.close_connection()
 
   total_time = 0.0
   for workload, load_time in loading_time_map.iteritems():
