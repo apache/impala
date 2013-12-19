@@ -27,12 +27,21 @@ elif [[ $1 ]]; then
   exit 1
 fi
 
+set -u
+
 # Kill and clean data for a clean start.
-$IMPALA_HOME/testdata/bin/kill-all.sh
+echo "Killing running services..."
+$IMPALA_HOME/testdata/bin/kill-all.sh &>${IMPALA_TEST_CLUSTER_LOG_DIR}/kill-all.log
 
 # Start up DFS, then Hbase
 echo "Starting all cluster services..."
-$IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER}
-$IMPALA_HOME/testdata/bin/run-hbase.sh
+echo " --> Starting mini-DFS cluster"
+$IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER}\
+    &>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-mini-dfs.log
 
-$IMPALA_HOME/testdata/bin/run-hive-server.sh
+echo " --> Starting HBase"
+$IMPALA_HOME/testdata/bin/run-hbase.sh &>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-hbase.log
+
+echo " --> Starting Hive Server and Metastore Service"
+$IMPALA_HOME/testdata/bin/run-hive-server.sh\
+    &>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-hive-server.log
