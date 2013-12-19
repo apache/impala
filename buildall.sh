@@ -85,6 +85,7 @@ do
       ;;
     -snapshot_file)
       SNAPSHOT_FILE="UNDEFINED"
+      TESTDATA_ACTION=1
       ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
