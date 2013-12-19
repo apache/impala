@@ -26,5 +26,8 @@ class ClearBufferCache(Plugin):
     Plugin.__init__(self, *args, **kwargs)
 
   def run_pre_hook(self, context=None):
-    cmd = "sysctl -w vm.drop_caches=3 vm.drop_caches=0"
+    # Drop the page cache (drop_caches=1). We'll leave the inodes and dentries
+    # since that is not what we are testing and it causes excessive performance
+    # variability.
+    cmd = "sysctl -w vm.drop_caches=1 vm.drop_caches=0"
     self.cluster_controller.run_cmd(cmd)
