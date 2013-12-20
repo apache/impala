@@ -25,6 +25,12 @@ import com.google.common.base.Preconditions;
 // on producing correct SQL.
 public class ToSqlTest extends AnalyzerTest {
 
+  // Helpers for templated join tests.
+  private final String[] joinConditions_ =
+      new String[] {"USING (id)", "ON (a.id = b.id)"};
+  private final String[] joinTypes_ = new String[] {"INNER JOIN", "LEFT OUTER JOIN",
+      "RIGHT OUTER JOIN", "FULL OUTER JOIN", "LEFT SEMI JOIN"};
+
   private static AnalysisContext.AnalysisResult analyze(String query) {
     try {
       AnalysisContext analysisCtxt =
@@ -48,6 +54,23 @@ public class ToSqlTest extends AnalyzerTest {
     }
     // Try to parse and analyze the resulting SQL to ensure its validity.
     AnalyzesOk(actual);
+  }
+
+  private void runTestTemplate(String sql, String expectedSql, String[]... testDims) {
+    Object[] testVector = new Object[testDims.length];
+    runTestTemplate(sql, expectedSql, 0, testVector, testDims);
+  }
+
+  private void runTestTemplate(String sql, String expectedSql, int dim,
+      Object[] testVector, String[]... testDims) {
+    if (dim >= testDims.length) {
+      testToSql(String.format(sql, testVector), String.format(expectedSql, testVector));
+      return;
+    }
+    for (String s: testDims[dim]) {
+      testVector[dim] = s;
+      runTestTemplate(sql, expectedSql, dim + 1, testVector, testDims);
+    }
   }
 
  @Test
@@ -129,6 +152,19 @@ public class ToSqlTest extends AnalyzerTest {
     testToSql("select id from functional.alltypes " +
         "where 5 not in (smallint_col, int_col)",
         "SELECT id FROM functional.alltypes WHERE 5 NOT IN (smallint_col, int_col)");
+  }
+
+  // Test the toSql() output of joins in a standalone select block.
+  @Test
+  public void joinTest() {
+    testToSql("select * from functional.alltypes a, functional.alltypes b " +
+        "where a.id = b.id",
+        "SELECT * FROM functional.alltypes a, functional.alltypes b WHERE a.id = b.id");
+    testToSql("select * from functional.alltypes a cross join functional.alltypes b",
+        "SELECT * FROM functional.alltypes a CROSS JOIN functional.alltypes b");
+    runTestTemplate("select * from functional.alltypes a %s functional.alltypes b %s",
+        "SELECT * FROM functional.alltypes a %s functional.alltypes b %s",
+        joinTypes_, joinConditions_);
   }
 
   // Test the toSql() output of aggregate and group by expressions.
@@ -286,7 +322,23 @@ public class ToSqlTest extends AnalyzerTest {
    * Tests that toSql() properly handles inline views and their expression substitutions.
    */
   @Test
-  public void subqueryTest() {
+  public void inlineViewTest() {
+    // Test joins in an inline view.
+    testToSql("select t.* from " +
+        "(select a.* from functional.alltypes a, functional.alltypes b " +
+        "where a.id = b.id) t",
+        "SELECT t.* FROM " +
+        "(SELECT a.* FROM functional.alltypes a, functional.alltypes b " +
+        "WHERE a.id = b.id) t");
+    testToSql("select t.* from (select a.* from functional.alltypes a " +
+        "cross join functional.alltypes b) t",
+        "SELECT t.* FROM (SELECT a.* FROM functional.alltypes a " +
+        "CROSS JOIN functional.alltypes b) t");
+    runTestTemplate("select t.* from (select a.* from functional.alltypes a %s " +
+        "functional.alltypes b %s) t",
+        "SELECT t.* FROM (SELECT a.* FROM functional.alltypes a %s " +
+        "functional.alltypes b %s) t", joinTypes_, joinConditions_);
+
     // Test undoing expr substitution in select-list exprs and on clause.
     testToSql("select t1.int_col, t2.int_col from " +
         "(select int_col from functional.alltypes) t1 inner join " +
@@ -328,16 +380,6 @@ public class ToSqlTest extends AnalyzerTest {
     // WITH clause in select stmt.
     testToSql("with t as (select * from functional.alltypes) select * from t",
         "WITH t AS (SELECT * FROM functional.alltypes) SELECT * FROM t");
-    // WITH clause in select stmt with a join and an ON clause.
-    testToSql("with t as (select * from functional.alltypes) " +
-        "select * from t a inner join t b on (a.int_col = b.int_col)",
-        "WITH t AS (SELECT * FROM functional.alltypes) " +
-        "SELECT * FROM t a INNER JOIN t b ON (a.int_col = b.int_col)");
-    // WITH clause in select stmt with a join and a USING clause.
-    testToSql("with t as (select * from functional.alltypes) " +
-        "select * from t a inner join t b using(int_col)",
-        "WITH t AS (SELECT * FROM functional.alltypes) " +
-        "SELECT * FROM t a INNER JOIN t b USING (int_col)");
     // WITH clause in a union stmt.
     testToSql("with t1 as (select * from functional.alltypes)" +
         "select * from t1 union all select * from t1",
@@ -352,6 +394,19 @@ public class ToSqlTest extends AnalyzerTest {
         "WITH t1 AS (SELECT * FROM functional.alltypes) " +
         "INSERT INTO TABLE functional.alltypes PARTITION (year, month) " +
         "SELECT * FROM t1");
+    // Test joins in WITH-clause view.
+    testToSql("with t as (select a.* from functional.alltypes a, " +
+        "functional.alltypes b where a.id = b.id) select * from t",
+        "WITH t AS (SELECT a.* FROM functional.alltypes a, " +
+        "functional.alltypes b WHERE a.id = b.id) SELECT * FROM t");
+    testToSql("with t as (select a.* from functional.alltypes a " +
+        "cross join functional.alltypes b) select * from t",
+        "WITH t AS (SELECT a.* FROM functional.alltypes a " +
+        "CROSS JOIN functional.alltypes b) SELECT * FROM t");
+    runTestTemplate("with t as (select a.* from functional.alltypes a %s " +
+        "functional.alltypes b %s) select * from t",
+        "WITH t AS (SELECT a.* FROM functional.alltypes a %s " +
+        "functional.alltypes b %s) SELECT * FROM t", joinTypes_, joinConditions_);
     // WITH clause in complex query with joins and and order by + limit.
     testToSql("with t as (select int_col x, bigint_col y from functional.alltypestiny " +
         "order by id nulls first limit 2) " +

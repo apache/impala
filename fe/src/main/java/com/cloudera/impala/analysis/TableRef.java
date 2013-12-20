@@ -313,11 +313,11 @@ public abstract class TableRef implements ParseNode {
     }
 
     StringBuilder output = new StringBuilder(" " + joinOpToSql() + " ");
-    output.append(tableRefToSql()).append(" ");
+    output.append(tableRefToSql());
     if (usingColNames_ != null) {
-      output.append("USING (").append(Joiner.on(", ").join(usingColNames_)).append(")");
+      output.append(" USING (").append(Joiner.on(", ").join(usingColNames_)).append(")");
     } else if (onClause_ != null) {
-      output.append("ON ").append(onClause_.toSql());
+      output.append(" ON ").append(onClause_.toSql());
     }
     return output.toString();
   }

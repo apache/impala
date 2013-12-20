@@ -75,11 +75,14 @@ public class SelectStmt extends QueryStmt {
     this.whereClause_ = wherePredicate;
     this.groupingExprs_ = groupingExprs;
     this.havingClause_ = havingPredicate;
-
     this.colLabels_ = Lists.newArrayList();
     this.havingPred_ = null;
     this.aggInfo_ = null;
     this.sortInfo_ = null;
+    // Set left table refs to ensure correct toSql() before analysis.
+    for (int i = 1; i < tableRefs_.size(); ++i) {
+      tableRefs_.get(i).setLeftTblRef(tableRefs_.get(i - 1));
+    }
   }
 
   /**
