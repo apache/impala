@@ -43,8 +43,8 @@ public class SlotDescriptor {
 
   private ColumnStats stats_;  // only set if 'column' isn't set
 
-  SlotDescriptor(int id, TupleDescriptor parent) {
-    this.id_ = new SlotId(id);
+  SlotDescriptor(SlotId id, TupleDescriptor parent) {
+    this.id_ = id;
     this.parent_ = parent;
     this.byteOffset_ = -1;  // invalid
   }

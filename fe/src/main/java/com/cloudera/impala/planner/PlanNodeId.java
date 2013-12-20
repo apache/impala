@@ -18,15 +18,17 @@ import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
 
 public class PlanNodeId extends Id<PlanNodeId> {
-  public PlanNodeId() {
-    super();
-  }
-
-  public PlanNodeId(int id) {
+  // Construction only allowed via an IdGenerator.
+  protected PlanNodeId(int id) {
     super(id);
   }
 
-  public PlanNodeId(IdGenerator<PlanNodeId> idGenerator) {
-    super(idGenerator.getNextId());
+  public static IdGenerator<PlanNodeId> createGenerator() {
+    return new IdGenerator<PlanNodeId>() {
+      @Override
+      public PlanNodeId getNextId() { return new PlanNodeId(nextId_++); }
+      @Override
+      public PlanNodeId getMaxId() { return new PlanNodeId(nextId_ - 1); }
+    };
   }
 }

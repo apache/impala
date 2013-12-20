@@ -18,16 +18,17 @@ import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
 
 public class EquivalenceClassId extends Id<EquivalenceClassId> {
-  public EquivalenceClassId() {
-    super();
-  }
-
-  public EquivalenceClassId(int id) {
+  // Construction only allowed via an IdGenerator.
+  protected EquivalenceClassId(int id) {
     super(id);
   }
 
-  public EquivalenceClassId(IdGenerator<EquivalenceClassId> idGenerator) {
-    super(idGenerator.getNextId());
+  public static IdGenerator<EquivalenceClassId> createGenerator() {
+    return new IdGenerator<EquivalenceClassId>() {
+      @Override
+      public EquivalenceClassId getNextId() { return new EquivalenceClassId(nextId_++); }
+      @Override
+      public EquivalenceClassId getMaxId() { return new EquivalenceClassId(nextId_ - 1); }
+    };
   }
-
 }

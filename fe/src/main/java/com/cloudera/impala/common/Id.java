@@ -22,22 +22,27 @@ import com.google.common.collect.Lists;
 
 /**
  * Integer ids that cannot accidentally be compared with ints.
- *
  */
 public class Id<IdType extends Id<IdType>> {
+  static protected int INVALID_ID = -1;
   protected final int id_;
-
-  static private int INVALID_ID = -1;
-
-  public Id() {
-    this.id_ = INVALID_ID;
-  }
 
   public Id(int id) {
     this.id_ = id;
   }
 
   public boolean isValid() { return id_ != INVALID_ID; }
+  public int asInt() { return id_; }
+
+  @Override
+  public int hashCode() {
+    return Integer.valueOf(id_).hashCode();
+  }
+
+  @Override
+  public String toString() {
+    return Integer.toString(id_);
+  }
 
   @Override
   public boolean equals(Object obj) {
@@ -47,24 +52,10 @@ public class Id<IdType extends Id<IdType>> {
     return ((Id)obj).id_ == id_;
   }
 
-  @Override
-  public int hashCode() {
-    return Integer.valueOf(id_).hashCode();
-  }
-
-  public int asInt() {
-    return id_;
-  }
-
   public ArrayList<IdType> asList() {
     ArrayList<IdType> list = new ArrayList<IdType>();
     list.add((IdType) this);
     return list;
-  }
-
-  @Override
-  public String toString() {
-    return Integer.toString(id_);
   }
 
   public static <C extends Id> String printIds(List<C> ids) {

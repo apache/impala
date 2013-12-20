@@ -15,20 +15,11 @@
 package com.cloudera.impala.common;
 
 /**
- * Generator of consecutively numbered integers to be used as ids
- * by subclasses of Id, like so:
- * IdGenerator<TupleId> tupleIdGenerator = ...;
- * TupleId id = new TupleId(idGenerator);
- * The templatization prevents getting id generators that are used for different
- * Id subclasses mixed up.
- *
+ * Generator of consecutively numbered integers to be used as ids by subclasses of Id.
+ * Subclasses of Id should be able to create a generator for their Id type.
  */
-public class IdGenerator<IdType extends Id<IdType>> {
-  private int nextId_ = 0;
-
-  public IdGenerator() {}
-
-  public int getNextId() {
-    return nextId_++;
-  }
+public abstract class IdGenerator<IdType extends Id<IdType>> {
+  protected int nextId_ = 0;
+  public abstract IdType getNextId();
+  public abstract IdType getMaxId();
 }

@@ -18,16 +18,17 @@ import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
 
 public class TupleId extends Id<TupleId> {
-  public TupleId() {
-    super();
-  }
-
-  public TupleId(int id) {
+  // Construction only allowed via an IdGenerator.
+  protected TupleId(int id) {
     super(id);
   }
 
-  public TupleId(IdGenerator<TupleId> idGenerator) {
-    super(idGenerator.getNextId());
+  public static IdGenerator<TupleId> createGenerator() {
+    return new IdGenerator<TupleId>() {
+      @Override
+      public TupleId getNextId() { return new TupleId(nextId_++); }
+      @Override
+      public TupleId getMaxId() { return new TupleId(nextId_ - 1); }
+    };
   }
-
 }

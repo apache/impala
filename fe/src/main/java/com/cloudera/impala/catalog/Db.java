@@ -253,7 +253,7 @@ public class Db implements CatalogObject {
       // if it is accessed it will throw a TableLoadingException. The TableId for
       // the table doesn't matter because can never be sent to the BE, so just assign
       // it an invalid ID.
-      IncompleteTable table = new IncompleteTable(new TableId(),
+      IncompleteTable table = new IncompleteTable(TableId.createInvalidId(),
           this, thriftTable.getTbl_name(), loadingException);
       table.setCatalogVersion(catalogVersion);
       tableCache_.add(table);

@@ -121,7 +121,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
       // SelectStmt (or the BE will be very confused). To ensure the ID is unique within
       // this query, just assign it the invalid table ID. The CatalogServer will assign
       // this table a proper ID once it is created there as part of the CTAS execution.
-      Table table = Table.fromMetastoreTable(new TableId(), db, msTbl);
+      Table table = Table.fromMetastoreTable(TableId.createInvalidId(), db, msTbl);
       Preconditions.checkState(table != null && table instanceof HdfsTable);
 
       HdfsTable hdfsTable = (HdfsTable) table;

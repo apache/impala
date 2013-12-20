@@ -18,15 +18,17 @@ import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
 
 public class ExprId extends Id<ExprId> {
-  public ExprId() {
-    super();
-  }
-
-  public ExprId(int id) {
+  // Construction only allowed via an IdGenerator.
+  protected ExprId(int id) {
     super(id);
   }
 
-  public ExprId(IdGenerator<ExprId> idGenerator) {
-    super(idGenerator.getNextId());
+  public static IdGenerator<ExprId> createGenerator() {
+    return new IdGenerator<ExprId>() {
+      @Override
+      public ExprId getNextId() { return new ExprId(nextId_++); }
+      @Override
+      public ExprId getMaxId() { return new ExprId(nextId_ - 1); }
+    };
   }
 }

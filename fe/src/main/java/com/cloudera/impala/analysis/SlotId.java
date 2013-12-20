@@ -18,15 +18,17 @@ import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
 
 public class SlotId extends Id<SlotId> {
-  public SlotId() {
-    super();
-  }
-
-  public SlotId(int id) {
+  // Construction only allowed via an IdGenerator.
+  protected SlotId(int id) {
     super(id);
   }
 
-  public SlotId(IdGenerator<SlotId> idGenerator) {
-    super(idGenerator.getNextId());
+  public static IdGenerator<SlotId> createGenerator() {
+    return new IdGenerator<SlotId>() {
+      @Override
+      public SlotId getNextId() { return new SlotId(nextId_++); }
+      @Override
+      public SlotId getMaxId() { return new SlotId(nextId_ - 1); }
+    };
   }
 }

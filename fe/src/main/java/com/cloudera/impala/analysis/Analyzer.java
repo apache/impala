@@ -101,7 +101,7 @@ public class Analyzer {
     public final ImpaladCatalog catalog;
     public final DescriptorTable descTbl = new DescriptorTable();
     public final String defaultDb;
-    public final IdGenerator<ExprId> conjunctIdGenerator = new IdGenerator<ExprId>();
+    public final IdGenerator<ExprId> conjunctIdGenerator = ExprId.createGenerator();
     public final TQueryGlobals queryGlobals = new TQueryGlobals();
 
     // True if we are analyzing an explain request. Should be set before starting
@@ -487,7 +487,7 @@ public class Analyzer {
   public void registerConjunct(Expr e) {
     // always generate a new expr id; this might be a cloned conjunct that already
     // has the id of its origin set
-    e.setId(new ExprId(globalState_.conjunctIdGenerator));
+    e.setId(globalState_.conjunctIdGenerator.getNextId());
     globalState_.conjuncts.put(e.getId(), e);
 
     ArrayList<TupleId> tupleIds = Lists.newArrayList();
@@ -996,9 +996,9 @@ public class Analyzer {
     // we start out by assigning each slot to its own equiv class
     int numSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
     IdGenerator<EquivalenceClassId> equivClassIdGenerator =
-        new IdGenerator<EquivalenceClassId>();
+        EquivalenceClassId.createGenerator();
     for (int i = 0; i < numSlots; ++i) {
-      EquivalenceClassId id = new EquivalenceClassId(equivClassIdGenerator);
+      EquivalenceClassId id = equivClassIdGenerator.getNextId();
       globalState_.equivClassMembers.put(id, Lists.newArrayList(new SlotId(i)));
     }
 

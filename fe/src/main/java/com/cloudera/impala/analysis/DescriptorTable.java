@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.thrift.TDescriptorTable;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -28,34 +29,31 @@ import com.google.common.collect.Sets;
 /**
  * Repository for tuple (and slot) descriptors.
  * Descriptors should only be created through this class, which assigns
- * them unique ids..
- *
+ * them unique ids.
  */
 public class DescriptorTable {
   private final HashMap<TupleId, TupleDescriptor> tupleDescs_;
   private final HashMap<SlotId, SlotDescriptor> slotDescs_;
+  private final IdGenerator<TupleId> tupleIdGenerator_ = TupleId.createGenerator();
+  private final IdGenerator<SlotId> slotIdGenerator_ = SlotId.createGenerator();
   // List of referenced tables with no associated TupleDescriptor to ship to the BE.
   // For example, the output table of an insert query.
   private final List<Table> referencedTables_;
-  private int nextTupleId_;
-  private int nextSlotId_;
 
   public DescriptorTable() {
     tupleDescs_ = new HashMap<TupleId, TupleDescriptor>();
     slotDescs_ = new HashMap<SlotId, SlotDescriptor>();
     referencedTables_ = new ArrayList<Table>();
-    nextTupleId_ = 0;
-    nextSlotId_ = 0;
   }
 
   public TupleDescriptor createTupleDescriptor() {
-    TupleDescriptor d = new TupleDescriptor(nextTupleId_++);
+    TupleDescriptor d = new TupleDescriptor(tupleIdGenerator_.getNextId());
     tupleDescs_.put(d.getId(), d);
     return d;
   }
 
   public SlotDescriptor addSlotDescriptor(TupleDescriptor d) {
-    SlotDescriptor result = new SlotDescriptor(nextSlotId_++, d);
+    SlotDescriptor result = new SlotDescriptor(slotIdGenerator_.getNextId(), d);
     d.addSlot(result);
     slotDescs_.put(result.getId(), result);
     return result;
@@ -65,8 +63,8 @@ public class DescriptorTable {
   public SlotDescriptor getSlotDesc(SlotId id) { return slotDescs_.get(id); }
   public Collection<TupleDescriptor> getTupleDescs() { return tupleDescs_.values(); }
   public Collection<SlotDescriptor> getSlotDescs() { return slotDescs_.values(); }
-  public TupleId getMaxTupleId() { return new TupleId(nextTupleId_ - 1); }
-  public SlotId getMaxSlotId() { return new SlotId(nextSlotId_ - 1); }
+  public TupleId getMaxTupleId() { return tupleIdGenerator_.getMaxId(); }
+  public SlotId getMaxSlotId() { return slotIdGenerator_.getMaxId(); }
 
   public void addReferencedTable(Table table) {
     referencedTables_.add(table);

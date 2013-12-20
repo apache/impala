@@ -48,8 +48,8 @@ public class TupleDescriptor {
 
   private float avgSerializedSize_;  // in bytes; includes serialization overhead
 
-  TupleDescriptor(int id) {
-    this.id_ = new TupleId(id);
+  TupleDescriptor(TupleId id) {
+    this.id_ = id;
     this.slots_ = new ArrayList<SlotDescriptor>();
   }
 
