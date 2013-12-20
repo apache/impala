@@ -117,6 +117,7 @@ class HdfsParquetScanner::BaseColumnReader {
     stream_ = stream;
     metadata_ = metadata;
     dict_decoder_base_ = NULL;
+    num_values_read_ = 0;
     if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
       RETURN_IF_ERROR(Codec::CreateDecompressor(
           NULL, false, PARQUET_TO_IMPALA_CODEC[metadata_->codec], &decompressor_));
@@ -185,7 +186,7 @@ class HdfsParquetScanner::BaseColumnReader {
   DictDecoderBase* dict_decoder_base_;
 
   // The number of values seen so far. Updated per data page.
-  int64_t num_values_;
+  int64_t num_values_read_;
 
   BaseColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
     : parent_(parent),
@@ -196,7 +197,7 @@ class HdfsParquetScanner::BaseColumnReader {
       stream_(NULL),
       decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())),
       num_buffered_values_(0),
-      num_values_(0) {
+      num_values_read_(0) {
   }
 
   // Read the next data page.  If a dictionary page is encountered, that will
@@ -404,9 +405,9 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
   // the pages).
   while (true) {
     DCHECK_EQ(num_buffered_values_, 0);
-    if (num_values_ >= parent_->file_metadata_.num_rows) {
+    if (num_values_read_ >= metadata_->num_values) {
       // No more pages to read
-      DCHECK_EQ(num_values_, parent_->file_metadata_.num_rows);
+      DCHECK_EQ(num_values_read_, metadata_->num_values);
       break;
     }
 
@@ -414,8 +415,8 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
     if (num_bytes == 0) {
       DCHECK(stream_->eosr());
       stringstream ss;
-      ss << "File metadata states there are " << parent_->file_metadata_.num_rows
-         << " rows, but only read " << num_values_ << " values from column "
+      ss << "Column metadata states there are " << metadata_->num_values
+         << " values, but only read " << num_values_read_ << " values from column "
          << (desc_->col_pos() - parent_->scan_node_->num_partition_keys());
       if (parent_->scan_node_->runtime_state()->abort_on_error()) {
         return Status(ss.str());
@@ -519,7 +520,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
     // Read Data Page
     if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
     num_buffered_values_ = current_page_header_.data_page_header.num_values;
-    num_values_ += num_buffered_values_;
+    num_values_read_ += num_buffered_values_;
 
     if (decompressor_.get() != NULL) {
       SCOPED_TIMER(parent_->decompress_timer_);
