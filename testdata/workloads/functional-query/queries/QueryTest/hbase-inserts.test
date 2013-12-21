@@ -149,3 +149,17 @@ where id = 9999999
 ---- TYPES
 INT, STRING, STRING
 ====
+---- QUERY
+#IMPALA-715 handle large string value 
+insert into table insertalltypesagg(id, string_col) values(9999999, rpad('a', 50000, 'b'))
+---- RESULTS
+: 1
+====
+---- QUERY
+select id, length(string_col) from insertalltypesagg
+WHERE id = 9999999
+---- RESULTS
+9999999,50000
+---- TYPES
+INT, INT
+====
