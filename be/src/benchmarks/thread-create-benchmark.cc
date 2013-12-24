@@ -17,6 +17,7 @@
 #include <iostream>
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
+#include "util/pretty-printer.h"
 #include "util/thread.h"
 #include "util/stopwatch.h"
 

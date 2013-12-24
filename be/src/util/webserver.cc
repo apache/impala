@@ -38,6 +38,7 @@
 #include "util/os-info.h"
 #include "util/url-coding.h"
 #include "util/debug-util.h"
+#include "util/pretty-printer.h"
 #include "util/stopwatch.h"
 #include "rpc/thrift-util.h"
 

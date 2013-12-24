@@ -45,13 +45,15 @@ TEST(SessionTest, TestExpiry) {
       new InProcessImpalaServer("localhost", FLAGS_be_port, 0, 0, "", 0);
   EXIT_IF_ERROR(
       impala->StartWithClientServers(FLAGS_beeswax_port, FLAGS_beeswax_port + 1, false));
-  Metrics::IntMetric* expired_metric = impala->metrics()->GetMetric<Metrics::IntMetric>(
-      ImpaladMetricKeys::NUM_SESSIONS_EXPIRED);
-  Metrics::IntMetric* beeswax_session_metric =
-      impala->metrics()->GetMetric<Metrics::IntMetric>(
+  IntCounter* expired_metric =
+      impala->metrics()->FindMetricForTesting<IntCounter>(
+          ImpaladMetricKeys::NUM_SESSIONS_EXPIRED);
+  DCHECK(expired_metric != NULL);
+  IntGauge* beeswax_session_metric =
+      impala->metrics()->FindMetricForTesting<IntGauge>(
           ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS);
-  Metrics::IntMetric* hs2_session_metric =
-      impala->metrics()->GetMetric<Metrics::IntMetric>(
+  IntGauge* hs2_session_metric =
+      impala->metrics()->FindMetricForTesting<IntGauge>(
           ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS);
   EXPECT_EQ(expired_metric->value(), 0L);
   EXPECT_EQ(beeswax_session_metric->value(), 0L);

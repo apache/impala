@@ -197,19 +197,18 @@ void ClientCacheHelper::TestShutdown() {
   }
 }
 
-void ClientCacheHelper::InitMetrics(Metrics* metrics, const string& key_prefix) {
+void ClientCacheHelper::InitMetrics(MetricGroup* metrics, const string& key_prefix) {
   DCHECK(metrics != NULL);
   // Not strictly needed if InitMetrics is called before any cache usage, but ensures that
   // metrics_enabled_ is published.
   lock_guard<mutex> lock(cache_lock_);
   stringstream count_ss;
   count_ss << key_prefix << ".client-cache.clients-in-use";
-  clients_in_use_metric_ =
-      metrics->CreateAndRegisterPrimitiveMetric(count_ss.str(), 0L);
+  clients_in_use_metric_ = metrics->AddGauge(count_ss.str(), 0L);
 
   stringstream max_ss;
   max_ss << key_prefix << ".client-cache.total-clients";
-  total_clients_metric_ = metrics->CreateAndRegisterPrimitiveMetric(max_ss.str(), 0L);
+  total_clients_metric_ = metrics->AddGauge(max_ss.str(), 0L);
   metrics_enabled_ = true;
 }
 

@@ -53,7 +53,7 @@ class ThreadMgr {
  public:
   ThreadMgr() : metrics_enabled_(false) { }
 
-  Status StartInstrumentation(Metrics* metrics, Webserver* webserver);
+  Status StartInstrumentation(MetricGroup* metrics, Webserver* webserver);
 
   // Registers a thread to the supplied category. The key is a boost::thread::id, used
   // instead of the system TID since boost::thread::id is always available, unlike
@@ -105,8 +105,8 @@ class ThreadMgr {
 
   // Metrics to track all-time total number of threads, and the
   // current number of running threads.
-  Metrics::IntMetric* total_threads_metric_;
-  Metrics::IntMetric* current_num_threads_metric_;
+  IntGauge* total_threads_metric_;
+  IntGauge* current_num_threads_metric_;
 
   // Webpage callbacks; print all threads by category
   // Example output:
@@ -150,14 +150,14 @@ class ThreadMgr {
   void ThreadOverviewUrlCallback(const Webserver::ArgumentMap& args, Document* document);
 };
 
-Status ThreadMgr::StartInstrumentation(Metrics* metrics, Webserver* webserver) {
+Status ThreadMgr::StartInstrumentation(MetricGroup* metrics, Webserver* webserver) {
   DCHECK(metrics != NULL);
   DCHECK(webserver != NULL);
   lock_guard<mutex> l(lock_);
   metrics_enabled_ = true;
-  total_threads_metric_ = metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
+  total_threads_metric_ = metrics->AddGauge<int64_t>(
       "thread-manager.total-threads-created", 0L);
-  current_num_threads_metric_ = metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
+  current_num_threads_metric_ = metrics->AddGauge<int64_t>(
       "thread-manager.running-threads", 0L);
 
   Webserver::UrlCallback template_callback =
@@ -261,7 +261,7 @@ void InitThreading() {
   thread_manager.reset(new ThreadMgr());
 }
 
-Status StartThreadInstrumentation(Metrics* metrics, Webserver* webserver) {
+Status StartThreadInstrumentation(MetricGroup* metrics, Webserver* webserver) {
   return thread_manager->StartInstrumentation(metrics, webserver);
 }
 

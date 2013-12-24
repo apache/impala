@@ -84,7 +84,7 @@ Status InProcessImpalaServer::Join() {
 
 InProcessStatestore::InProcessStatestore(int statestore_port, int webserver_port)
     : webserver_(new Webserver(webserver_port)),
-      metrics_(new Metrics()),
+      metrics_(new MetricGroup("statestore")),
       statestore_port_(statestore_port),
       statestore_(new Statestore(metrics_.get())) {
   AddDefaultUrlCallbacks(webserver_.get());

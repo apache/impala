@@ -23,6 +23,7 @@
 #include "statestore/query-resource-mgr.h"
 #include "util/debug-util.h"
 #include "util/mem-info.h"
+#include "util/pretty-printer.h"
 #include "util/uid-util.h"
 
 using namespace boost;
@@ -84,7 +85,7 @@ MemTracker::MemTracker(
   Init();
 }
 
-MemTracker::MemTracker(Metrics::PrimitiveMetric<uint64_t>* consumption_metric,
+MemTracker::MemTracker(UIntGauge* consumption_metric,
     int64_t byte_limit, int64_t rm_reserved_limit, const string& label)
   : limit_(byte_limit),
     rm_reserved_limit_(rm_reserved_limit),
@@ -198,20 +199,16 @@ MemTracker::~MemTracker() {
   pool_to_mem_trackers_.erase(pool_name_);
 }
 
-void MemTracker::RegisterMetrics(Metrics* metrics, const string& prefix) {
-  stringstream num_gcs_key;
-  num_gcs_key << prefix << ".num-gcs";
-  num_gcs_metric_ = metrics->CreateAndRegisterPrimitiveMetric(num_gcs_key.str(), 0L);
+void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
+  num_gcs_metric_ = metrics->AddCounter(
+      Substitute("$0.num-gcs", prefix), 0L, TCounterType::UNIT);
 
-  stringstream bytes_freed_by_last_gc_key;
-  bytes_freed_by_last_gc_key << prefix << ".bytes-freed-by-last-gc";
-  bytes_freed_by_last_gc_metric_ = metrics->RegisterMetric(
-      new Metrics::BytesMetric(bytes_freed_by_last_gc_key.str(), -1));
+  // TODO: Consider a total amount of bytes freed counter
+  bytes_freed_by_last_gc_metric_ = metrics->AddGauge<int64_t>(
+      Substitute("$0.bytes-freed-by-last-gc", prefix), -1, TCounterType::BYTES);
 
-  stringstream bytes_over_limit_key;
-  bytes_over_limit_key << prefix << ".bytes-over-limit";
-  bytes_over_limit_metric_ = metrics->RegisterMetric(
-      new Metrics::BytesMetric(bytes_over_limit_key.str(), -1));
+  bytes_over_limit_metric_ = metrics->AddGauge<int64_t>(
+      Substitute("$0.bytes-over-limit", prefix), -1, TCounterType::BYTES);
 }
 
 // Calling this on the query tracker results in output like:
@@ -279,7 +276,7 @@ bool MemTracker::GcMemory(int64_t max_consumption) {
   }
 
   if (bytes_freed_by_last_gc_metric_ != NULL) {
-    bytes_freed_by_last_gc_metric_->Update(pre_gc_consumption - consumption());
+    bytes_freed_by_last_gc_metric_->set_value(pre_gc_consumption - consumption());
   }
   return consumption() > max_consumption;
 }

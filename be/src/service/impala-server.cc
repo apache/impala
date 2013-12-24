@@ -266,8 +266,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   RegisterWebserverCallbacks(exec_env->webserver());
 
   // Initialize impalad metrics
-  ImpaladMetrics::CreateMetrics(exec_env->metrics());
-  ImpaladMetrics::IMPALA_SERVER_START_TIME->Update(
+  ImpaladMetrics::CreateMetrics(exec_env->metrics()->GetChildGroup("impala-server"));
+  ImpaladMetrics::IMPALA_SERVER_START_TIME->set_value(
       TimestampValue::local_time().DebugString());
 
   // Register the membership callback if required
@@ -757,8 +757,8 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
 Status ImpalaServer::UpdateCatalogMetrics() {
   TGetDbsResult db_names;
   RETURN_IF_ERROR(exec_env_->frontend()->GetDbNames(NULL, NULL, &db_names));
-  ImpaladMetrics::CATALOG_NUM_DBS->Update(db_names.dbs.size());
-  ImpaladMetrics::CATALOG_NUM_TABLES->Update(0L);
+  ImpaladMetrics::CATALOG_NUM_DBS->set_value(db_names.dbs.size());
+  ImpaladMetrics::CATALOG_NUM_TABLES->set_value(0L);
   BOOST_FOREACH(const string& db, db_names.dbs) {
     TGetTablesResult table_names;
     RETURN_IF_ERROR(exec_env_->frontend()->GetTableNames(db, NULL, NULL, &table_names));
@@ -1088,7 +1088,7 @@ void ImpalaServer::CatalogUpdateCallback(
       TTopicDelta& update = subscriber_topic_updates->back();
       update.topic_name = CatalogServer::IMPALA_CATALOG_TOPIC;
       update.__set_from_version(0L);
-      ImpaladMetrics::CATALOG_READY->Update(false);
+      ImpaladMetrics::CATALOG_READY->set_value(false);
       // Dropped all cached lib files (this behaves as if all functions and data
       // sources are dropped).
       LibCache::instance()->DropCache();
@@ -1099,7 +1099,7 @@ void ImpalaServer::CatalogUpdateCallback(
         catalog_update_info_.catalog_topic_version = delta.to_version;
         catalog_update_info_.catalog_service_id = resp.catalog_service_id;
       }
-      ImpaladMetrics::CATALOG_READY->Update(new_catalog_version > 0);
+      ImpaladMetrics::CATALOG_READY->set_value(new_catalog_version > 0);
       UpdateCatalogMetrics();
       // Remove all dropped objects from the library cache.
       // TODO: is this expensive? We'd like to process heartbeats promptly.
@@ -1596,7 +1596,7 @@ shared_ptr<ImpalaServer::QueryExecState> ImpalaServer::GetQueryExecState(
 void ImpalaServer::SetOffline(bool is_offline) {
   lock_guard<mutex> l(is_offline_lock_);
   is_offline_ = is_offline;
-  ImpaladMetrics::IMPALA_SERVER_READY->Update(is_offline);
+  ImpaladMetrics::IMPALA_SERVER_READY->set_value(is_offline);
 }
 
 void ImpalaServer::DetectNmFailures() {

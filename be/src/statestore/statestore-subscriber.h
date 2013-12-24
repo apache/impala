@@ -73,7 +73,7 @@ class StatestoreSubscriber {
   StatestoreSubscriber(const std::string& subscriber_id,
       const TNetworkAddress& heartbeat_address,
       const TNetworkAddress& statestore_address,
-      Metrics* metrics);
+      MetricGroup* metrics);
 
   // A TopicDeltaMap is passed to each callback. See UpdateCallback for more details.
   typedef std::map<Statestore::TopicId, TTopicDelta> TopicDeltaMap;
@@ -162,7 +162,7 @@ class StatestoreSubscriber {
   TUniqueId registration_id_;
 
   struct Callbacks {
-    // Owned by the Metrics instance. Tracks how long callbacks took to process this
+    // Owned by the MetricGroup instance. Tracks how long callbacks took to process this
     // topic.
     StatsMetric<double>* processing_time_metric;
 
@@ -193,17 +193,17 @@ class StatestoreSubscriber {
   // statestore client cache - only one client is ever used.
   boost::scoped_ptr<StatestoreClientCache> client_cache_;
 
-  // Metrics instance that all metrics are registered in. Not owned by this class.
-  Metrics* metrics_;
+  // MetricGroup instance that all metrics are registered in. Not owned by this class.
+  MetricGroup* metrics_;
 
   // Metric to indicate if we are successfully registered with the statestore
-  Metrics::BooleanMetric* connected_to_statestore_metric_;
+  BooleanProperty* connected_to_statestore_metric_;
 
   // Amount of time last spent in recovery mode
-  Metrics::DoubleMetric* last_recovery_duration_metric_;
+  DoubleGauge* last_recovery_duration_metric_;
 
   // When the last recovery happened.
-  Metrics::StringMetric* last_recovery_time_metric_;
+  StringProperty* last_recovery_time_metric_;
 
   // Accumulated statistics on the frequency of topic-update messages
   StatsMetric<double>* topic_update_interval_metric_;
@@ -222,7 +222,7 @@ class StatestoreSubscriber {
   StatsMetric<double>* keepalive_interval_metric_;
 
   // Current registration ID, in string form.
-  Metrics::StringMetric* registration_id_metric_;
+  StringProperty* registration_id_metric_;
 
   // Subscriber thrift implementation, needs to access UpdateState
   friend class StatestoreSubscriberThriftIf;

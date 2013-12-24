@@ -32,10 +32,6 @@ class ImpaladMetricKeys {
   // True if Impala has finished initialisation
   static const char* IMPALA_SERVER_READY;
 
-  // The last last time someone issued 'refresh' or an insert query was run from
-  // this node.
-  static const char* IMPALA_SERVER_LAST_REFRESH_TIME;
-
   // Number of queries executed by this server, including failed and cancelled
   // queries
   static const char* IMPALA_SERVER_NUM_QUERIES;
@@ -126,39 +122,41 @@ class ImpaladMetricKeys {
 // ImpaladServer starts up.
 class ImpaladMetrics {
  public:
-  static Metrics::StringMetric* IMPALA_SERVER_START_TIME;
-  static Metrics::StringMetric* IMPALA_SERVER_VERSION;
-  static Metrics::BooleanMetric* IMPALA_SERVER_READY;
-  static Metrics::StringMetric* IMPALA_SERVER_LAST_REFRESH_TIME;
-  static Metrics::IntMetric* IMPALA_SERVER_NUM_QUERIES;
-  static Metrics::IntMetric* IMPALA_SERVER_NUM_FRAGMENTS;
-  static Metrics::IntMetric* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
-  static Metrics::IntMetric* IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS;
-  static Metrics::IntMetric* NUM_RANGES_PROCESSED;
-  static Metrics::IntMetric* NUM_RANGES_MISSING_VOLUME_ID;
-  static Metrics::BytesMetric* MEM_POOL_TOTAL_BYTES;
-  static Metrics::BytesMetric* HASH_TABLE_TOTAL_BYTES;
-  static Metrics::IntMetric* IO_MGR_NUM_OPEN_FILES;
-  static Metrics::IntMetric* IO_MGR_NUM_BUFFERS;
-  static Metrics::IntMetric* IO_MGR_TOTAL_BYTES;
-  static Metrics::IntMetric* IO_MGR_NUM_UNUSED_BUFFERS;
-  static Metrics::BytesMetric* IO_MGR_BYTES_READ;
-  static Metrics::BytesMetric* IO_MGR_LOCAL_BYTES_READ;
-  static Metrics::BytesMetric* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
-  static Metrics::BytesMetric* IO_MGR_CACHED_BYTES_READ;
-  static Metrics::BytesMetric* IO_MGR_BYTES_WRITTEN;
-  static Metrics::IntMetric* CATALOG_NUM_DBS;
-  static Metrics::IntMetric* CATALOG_NUM_TABLES;
-  static Metrics::BooleanMetric* CATALOG_READY;
-  static Metrics::IntMetric* NUM_FILES_OPEN_FOR_INSERT;
-  static Metrics::IntMetric* NUM_SESSIONS_EXPIRED;
-  static Metrics::IntMetric* NUM_QUERIES_EXPIRED;
-  static Metrics::IntMetric* NUM_QUERIES_SPILLED;
-  static Metrics::IntMetric* RESULTSET_CACHE_TOTAL_NUM_ROWS;
-  static Metrics::BytesMetric* RESULTSET_CACHE_TOTAL_BYTES;
+  // Counters
+  static IntGauge* HASH_TABLE_TOTAL_BYTES;
+  static IntCounter* IMPALA_SERVER_NUM_FRAGMENTS;
+  static IntCounter* IMPALA_SERVER_NUM_QUERIES;
+  static IntCounter* NUM_QUERIES_EXPIRED;
+  static IntCounter* NUM_QUERIES_SPILLED;
+  static IntCounter* NUM_RANGES_MISSING_VOLUME_ID;
+  static IntCounter* NUM_RANGES_PROCESSED;
+  static IntCounter* NUM_SESSIONS_EXPIRED;
+  // Gauges
+  static IntGauge* CATALOG_NUM_DBS;
+  static IntGauge* CATALOG_NUM_TABLES;
+  static IntGauge* IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS;
+  static IntGauge* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
+  static IntGauge* IO_MGR_NUM_BUFFERS;
+  static IntGauge* IO_MGR_NUM_OPEN_FILES;
+  static IntGauge* IO_MGR_NUM_UNUSED_BUFFERS;
+  static IntGauge* IO_MGR_TOTAL_BYTES;
+  static IntGauge* IO_MGR_BYTES_READ;
+  static IntGauge* IO_MGR_LOCAL_BYTES_READ;
+  static IntGauge* IO_MGR_CACHED_BYTES_READ;
+  static IntGauge* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
+  static IntGauge* IO_MGR_BYTES_WRITTEN;
+  static IntGauge* MEM_POOL_TOTAL_BYTES;
+  static IntGauge* NUM_FILES_OPEN_FOR_INSERT;
+  static IntGauge* RESULTSET_CACHE_TOTAL_NUM_ROWS;
+  static IntGauge* RESULTSET_CACHE_TOTAL_BYTES;
+  // Properties
+  static BooleanProperty* CATALOG_READY;
+  static BooleanProperty* IMPALA_SERVER_READY;
+  static StringProperty* IMPALA_SERVER_START_TIME;
+  static StringProperty* IMPALA_SERVER_VERSION;
 
   // Creates and initializes all metrics above in 'm'.
-  static void CreateMetrics(Metrics* m);
+  static void CreateMetrics(MetricGroup* m);
 };
 
 

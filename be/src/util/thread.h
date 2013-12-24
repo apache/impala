@@ -26,7 +26,7 @@
 
 namespace impala {
 
-class Metrics;
+class MetricGroup;
 class Webserver;
 class CgroupsMgr;
 
@@ -202,7 +202,7 @@ void InitThreading();
 
 // Registers /threadsz with the debug webserver, and creates thread-tracking metrics under
 // the "thread-manager." prefix
-Status StartThreadInstrumentation(Metrics* metrics, Webserver* webserver);
+Status StartThreadInstrumentation(MetricGroup* metrics, Webserver* webserver);
 }
 
 #endif

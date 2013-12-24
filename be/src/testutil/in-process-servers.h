@@ -27,7 +27,7 @@ namespace impala {
 class ImpalaServer;
 class ThriftServer;
 class Webserver;
-class Metrics;
+class MetricGroup;
 class Statestore;
 
 // A single impala service, with a backend server, two client servers,
@@ -59,7 +59,7 @@ class InProcessImpalaServer {
 
   ImpalaServer* impala_server() { return impala_server_; }
 
-  Metrics* metrics() { return exec_env_->metrics(); }
+  MetricGroup* metrics() { return exec_env_->metrics(); }
 
   // Sets the catalog on this impalad to be initialized. If we don't
   // start up a catalogd, then there is no one to initialize it otherwise.
@@ -106,8 +106,8 @@ class InProcessStatestore {
   // Websever object to serve debug pages through.
   boost::scoped_ptr<Webserver> webserver_;
 
-  // Metrics object
-  boost::scoped_ptr<Metrics> metrics_;
+  // MetricGroup object
+  boost::scoped_ptr<MetricGroup> metrics_;
 
   // Port to start the statestore on.
   uint32_t statestore_port_;

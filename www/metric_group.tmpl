@@ -1,0 +1,33 @@
+{{!Renders a metric group and all its children, one table each}}
+<a id="{{name}}"><h3>{{name}}</h3></a>
+
+<table class='table table-bordered table-hover'>
+  <tr>
+    <th>Name</th>
+    <th>Value</th>
+    <th>Description</th>
+  </tr>
+    {{#metrics}}
+  <tr>
+    <td><tt>{{name}}</tt></td>
+    {{! Is this a stats metric? }}
+    {{?count}}
+    <td>
+      Last (of {{count}}): <strong>{{last}}</strong>.
+      Min: {{min}}, max: {{max}}, avg: {{mean}}</td>{{/count}}
+    {{^count}}
+    <td>
+      {{human_readable}}
+    </td>
+    {{/count}}
+    <td>
+      {{description}}
+    </td>
+  </tr>
+  {{/metrics}}
+</table>
+
+{{! Recurse into all child groups }}
+{{#child_groups}}
+{{>www/metric_group.tmpl}}
+{{/child_groups}}

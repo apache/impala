@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "util/cpu-info.h"
-#include "util/debug-util.h"
 
 #include <boost/algorithm/string.hpp>
 #include <iostream>
@@ -23,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "util/pretty-printer.h"
 
 using namespace boost;
 using namespace std;
@@ -54,7 +55,7 @@ static struct {
 };
 static const long num_flags = sizeof(flag_mappings) / sizeof(flag_mappings[0]);
 
-// Helper function to parse for hardware flags.  
+// Helper function to parse for hardware flags.
 // values contains a list of space-seperated flags.  check to see if the flags we
 // care about are present.
 // Returns a bitmap of flags.
@@ -72,7 +73,7 @@ void CpuInfo::Init() {
   string line;
   string name;
   string value;
-  
+
   float max_mhz = 0;
   int num_cores = 0;
 
@@ -124,7 +125,7 @@ void CpuInfo::Init() {
   } else {
     num_cores_ = 1;
   }
-  
+
   if (FLAGS_num_cores > 0) num_cores_ = FLAGS_num_cores;
 
   initialized_ = true;

@@ -38,7 +38,7 @@ class Scheduler;
 class StatestoreSubscriber;
 class TestExecEnv;
 class Webserver;
-class Metrics;
+class MetricGroup;
 class MemTracker;
 class ThreadResourceMgr;
 class CgroupsManager;
@@ -82,7 +82,7 @@ class ExecEnv {
   HBaseTableFactory* htable_factory() { return htable_factory_.get(); }
   DiskIoMgr* disk_io_mgr() { return disk_io_mgr_.get(); }
   Webserver* webserver() { return webserver_.get(); }
-  Metrics* metrics() { return metrics_.get(); }
+  MetricGroup* metrics() { return metrics_.get(); }
   MemTracker* process_mem_tracker() { return mem_tracker_.get(); }
   ThreadResourceMgr* thread_mgr() { return thread_mgr_.get(); }
   CgroupsMgr* cgroups_mgr() { return cgroups_mgr_.get(); }
@@ -125,7 +125,7 @@ class ExecEnv {
   boost::scoped_ptr<HBaseTableFactory> htable_factory_;
   boost::scoped_ptr<DiskIoMgr> disk_io_mgr_;
   boost::scoped_ptr<Webserver> webserver_;
-  boost::scoped_ptr<Metrics> metrics_;
+  boost::scoped_ptr<MetricGroup> metrics_;
   boost::scoped_ptr<MemTracker> mem_tracker_;
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
   boost::scoped_ptr<CgroupsMgr> cgroups_mgr_;

@@ -78,7 +78,7 @@ namespace impala {
 //    drain all entries from the CGroup's tasks file)
 class CgroupsMgr {
  public:
-  CgroupsMgr(Metrics* metrics);
+  CgroupsMgr(MetricGroup* metrics);
 
   // Sets the cgroups mgr's corresponding members and creates the staging cgroup
   // under <cgroups_hierarchy_path>/<staging_cgroup>. Returns a non-OK status if
@@ -148,23 +148,23 @@ class CgroupsMgr {
   Status GetCgroupPaths(const std::string& cgroup,
       std::string* cgroup_path, std::string* tasks_path) const;
 
-   // Number of currently active Impala-managed cgroups.
-   Metrics::PrimitiveMetric<int64_t>* active_cgroups_metric_;
+  // Number of currently active Impala-managed cgroups.
+  IntCounter* active_cgroups_metric_;
 
-   // Root of the CPU cgroup hierarchy. Created cgroups are placed directly under it.
-   std::string cgroups_hierarchy_path_;
+  // Root of the CPU cgroup hierarchy. Created cgroups are placed directly under it.
+  std::string cgroups_hierarchy_path_;
 
-   // Cgroup that threads from completed queries are relocated into such that the
-   // query's cgroup can be dropped.
-   std::string staging_cgroup_;
+  // Cgroup that threads from completed queries are relocated into such that the
+  // query's cgroup can be dropped.
+  std::string staging_cgroup_;
 
-   // Protects active_cgroups_.
-   boost::mutex active_cgroups_lock_;
+  // Protects active_cgroups_.
+  boost::mutex active_cgroups_lock_;
 
-   // Process-wide map from cgroup to number of fragments using the cgroup.
-   // A cgroup can be safely dropped once the number of fragments in the cgroup,
-   // according to this map, reaches zero.
-   boost::unordered_map<std::string, int32_t> active_cgroups_;
+  // Process-wide map from cgroup to number of fragments using the cgroup.
+  // A cgroup can be safely dropped once the number of fragments in the cgroup,
+  // according to this map, reaches zero.
+  boost::unordered_map<std::string, int32_t> active_cgroups_;
 };
 
 }

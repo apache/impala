@@ -19,7 +19,7 @@
 
 #include "gen-cpp/ImpalaInternalService.h"
 #include "common/status.h"
-#include "util/non-primitive-metrics.h"
+#include "util/collection-metrics.h"
 
 namespace impala {
 
@@ -34,7 +34,7 @@ class RequestPoolService {
   // Initializes the JNI method stubs if configuration files are specified. If any
   // method can't be found, or if there is any further error, the constructor will
   // terminate the process.
-  RequestPoolService(Metrics* metrics);
+  RequestPoolService(MetricGroup* metrics);
 
   // Resolves the user and user-provided pool name to the pool returned by the placement
   // policy and whether or not the user is authorized. If default_pool_only_ is true,
@@ -50,7 +50,7 @@ class RequestPoolService {
 
  private:
   // Metrics subsystem access
-  Metrics* metrics_;
+  MetricGroup* metrics_;
 
   // Metric measuring the time ResolveRequestPool() takes, in milliseconds.
   StatsMetric<double>* resolve_pool_ms_metric_;

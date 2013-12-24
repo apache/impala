@@ -88,7 +88,7 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
 
 StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
     const TNetworkAddress& heartbeat_address, const TNetworkAddress& statestore_address,
-    Metrics* metrics)
+    MetricGroup* metrics)
     : subscriber_id_(subscriber_id), heartbeat_address_(heartbeat_address),
       statestore_address_(statestore_address),
       thrift_iface_(new StatestoreSubscriberThriftIf(this)),
@@ -98,22 +98,28 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
       is_registered_(false),
       client_cache_(new StatestoreClientCache(FLAGS_statestore_subscriber_cnxn_attempts,
           FLAGS_statestore_subscriber_cnxn_retry_interval_ms)),
-      metrics_(metrics) {
+      metrics_(metrics->GetChildGroup("statestore-subscriber")) {
   connected_to_statestore_metric_ =
-      metrics->CreateAndRegisterPrimitiveMetric("statestore-subscriber.connected", false);
-  last_recovery_duration_metric_ = metrics->CreateAndRegisterPrimitiveMetric(
+      metrics_->AddProperty("statestore-subscriber.connected", false);
+  last_recovery_duration_metric_ = metrics_->AddGauge(
       "statestore-subscriber.last-recovery-duration", 0.0);
-  last_recovery_time_metric_ = metrics->CreateAndRegisterPrimitiveMetric<string>(
+  last_recovery_time_metric_ = metrics_->AddProperty<string>(
       "statestore-subscriber.last-recovery-time", "N/A");
   topic_update_interval_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("statestore-subscriber.topic-update-interval-time"));
+      new StatsMetric<double>("statestore-subscriber.topic-update-interval-time",
+          TCounterType::TIME_S));
   topic_update_duration_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("statestore-subscriber.topic-update-duration"));
+      new StatsMetric<double>("statestore-subscriber.topic-update-duration",
+          TCounterType::TIME_S));
   keepalive_interval_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("statestore-subscriber.keepalive-interval-time"));
+      new StatsMetric<double>("statestore-subscriber.keepalive-interval-time",
+          TCounterType::TIME_S));
 
-  registration_id_metric_ = metrics->CreateAndRegisterPrimitiveMetric<string>(
-      "statestore-susbcriber.registration-id", "N/A");
+  registration_id_metric_ = metrics->AddProperty<string>(
+      "statestore-subscriber.registration-id", "N/A",
+      "The most recent registration ID for this subscriber with the statestore. Set to "
+      "'N/A' if no registration has been completed");
+
   client_cache_->InitMetrics(metrics, "statestore-subscriber.statestore");
 }
 
@@ -125,8 +131,8 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
   cb->callbacks.push_back(callback);
   if (cb->processing_time_metric == NULL) {
     const string& metric_name = Substitute(CALLBACK_METRIC_PATTERN, topic_id);
-    cb->processing_time_metric =
-        metrics_->RegisterMetric(new StatsMetric<double>(metric_name));
+    cb->processing_time_metric = metrics_->RegisterMetric(
+        new StatsMetric<double>(metric_name, TCounterType::TIME_S));
   }
   topic_registrations_[topic_id] = is_transient;
   return Status::OK;
@@ -161,12 +167,12 @@ Status StatestoreSubscriber::Register() {
     }
   }
   Status status = Status(response.status);
-  if (status.ok()) connected_to_statestore_metric_->Update(true);
+  if (status.ok()) connected_to_statestore_metric_->set_value(true);
   if (response.__isset.registration_id) {
     lock_guard<mutex> l(registration_id_lock_);
     registration_id_ = response.registration_id;
     const string& registration_string = PrintId(registration_id_);
-    registration_id_metric_->Update(registration_string);
+    registration_id_metric_->set_value(registration_string);
     VLOG(1) << "Subscriber registration ID: " << registration_string;
   } else {
     VLOG(1) << "No subscriber registration ID received from statestore";
@@ -224,7 +230,7 @@ void StatestoreSubscriber::RecoveryModeChecker() {
       lock_guard<mutex> l(lock_);
       MonotonicStopWatch recovery_timer;
       recovery_timer.Start();
-      connected_to_statestore_metric_->Update(false);
+      connected_to_statestore_metric_->set_value(false);
       LOG(INFO) << subscriber_id_
                 << ": Connection with statestore lost, entering recovery mode";
       uint32_t attempt_count = 1;
@@ -246,7 +252,7 @@ void StatestoreSubscriber::RecoveryModeChecker() {
                        << status.GetErrorMsg();
           SleepForMs(SLEEP_INTERVAL_MS);
         }
-        last_recovery_duration_metric_->Update(
+        last_recovery_duration_metric_->set_value(
             recovery_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
       }
       // When we're successful in re-registering, we don't do anything
@@ -254,9 +260,9 @@ void StatestoreSubscriber::RecoveryModeChecker() {
       // responsibility of individual clients to post missing updates
       // back to the statestore. This saves a lot of complexity where
       // we would otherwise have to cache updates here.
-      last_recovery_duration_metric_->Update(
+      last_recovery_duration_metric_->set_value(
           recovery_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-      last_recovery_time_metric_->Update(TimestampValue::local_time().DebugString());
+      last_recovery_time_metric_->set_value(TimestampValue::local_time().DebugString());
     }
 
     SleepForMs(SLEEP_INTERVAL_MS);

@@ -679,7 +679,7 @@ void DiskIoMgr::GcIoBuffers() {
     ImpaladMetrics::IO_MGR_TOTAL_BYTES->Increment(-bytes_freed);
   }
   if (ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS != NULL) {
-    ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->Update(0);
+    ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->set_value(0);
   }
 }
 

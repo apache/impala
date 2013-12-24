@@ -20,7 +20,7 @@
 #include <boost/uuid/uuid.hpp>
 
 #include "runtime/client-cache.h"
-#include "util/non-primitive-metrics.h"
+#include "util/collection-metrics.h"
 #include "util/promise.h"
 #include "gen-cpp/LlamaAMService.h"
 #include "gen-cpp/LlamaNotificationService.h"
@@ -30,7 +30,7 @@ namespace impala {
 
 class QueryResourceMgr;
 class Status;
-class Metrics;
+class MetricGroup;
 class Scheduler;
 class ResourceBrokerNotificationServiceClient;
 
@@ -44,7 +44,7 @@ class ResourceBrokerNotificationServiceClient;
 class ResourceBroker {
  public:
   ResourceBroker(const std::vector<TNetworkAddress>& llama_addresses,
-      const TNetworkAddress& llama_callback_address, Metrics* metrics);
+      const TNetworkAddress& llama_callback_address, MetricGroup* metrics);
 
   // Register this resource broker with LLama and starts the Llama callback service.
   // Returns a non-OK status if the callback service failed to start (e.g., port in use)
@@ -171,17 +171,17 @@ class ResourceBroker {
   // Llama notifications.
   TNetworkAddress llama_callback_address_;
 
-  Metrics* metrics_;
+  MetricGroup* metrics_;
 
   Scheduler* scheduler_;
 
   // Address of the active Llama. A Llama is considered active once we have successfully
   // registered with it. Set to "none" while registering with the Llama.
-  Metrics::StringMetric* active_llama_metric_;
+  StringProperty* active_llama_metric_;
 
   // Llama handle received from the active Llama upon registration.
   // Set to "none" while not registered with Llama.
-  Metrics::StringMetric* active_llama_handle_metric_;
+  StringProperty* active_llama_handle_metric_;
 
   // Accumulated statistics on the time taken to RPC a reservation request and receive
   // an acknowledgement from Llama.
@@ -194,21 +194,21 @@ class ResourceBroker {
   StatsMetric<double>* reservation_response_time_metric_;
 
   // Total number of reservation requests.
-  Metrics::PrimitiveMetric<int64_t>* reservation_requests_total_metric_;
+  IntCounter* reservation_requests_total_metric_;
 
   // Number of fulfilled reservation requests.
-  Metrics::PrimitiveMetric<int64_t>* reservation_requests_fulfilled_metric_;
+  IntCounter* reservation_requests_fulfilled_metric_;
 
   // Reservation requests that failed due to a malformed request or an internal
   // error in Llama.
-  Metrics::PrimitiveMetric<int64_t>* reservation_requests_failed_metric_;
+  IntCounter* reservation_requests_failed_metric_;
 
   // Number of well-formed reservation requests rejected by the central scheduler.
-  Metrics::PrimitiveMetric<int64_t>* reservation_requests_rejected_metric_;
+  IntCounter* reservation_requests_rejected_metric_;
 
   // Number of well-formed reservation requests that did not get fulfilled within
   // the timeout period.
-  Metrics::PrimitiveMetric<int64_t>* reservation_requests_timedout_metric_;
+  IntCounter* reservation_requests_timedout_metric_;
 
   // Accumulated statistics on the time taken to RPC an expansion request and receive an
   // acknowledgement from Llama.
@@ -221,30 +221,30 @@ class ResourceBroker {
   StatsMetric<double>* expansion_response_time_metric_;
 
   // Total number of expansion requests.
-  Metrics::PrimitiveMetric<int64_t>* expansion_requests_total_metric_;
+  IntCounter* expansion_requests_total_metric_;
 
   // Number of fulfilled expansion requests.
-  Metrics::PrimitiveMetric<int64_t>* expansion_requests_fulfilled_metric_;
+  IntCounter* expansion_requests_fulfilled_metric_;
 
   // Expansion requests that failed due to a malformed request or an internal
   // error in Llama.
-  Metrics::PrimitiveMetric<int64_t>* expansion_requests_failed_metric_;
+  IntCounter* expansion_requests_failed_metric_;
 
   // Number of well-formed expansion requests rejected by the central scheduler.
-  Metrics::PrimitiveMetric<int64_t>* expansion_requests_rejected_metric_;
+  IntCounter* expansion_requests_rejected_metric_;
 
   // Number of well-formed expansion requests that did not get fulfilled within
   // the timeout period.
-  Metrics::PrimitiveMetric<int64_t>* expansion_requests_timedout_metric_;
+  IntCounter* expansion_requests_timedout_metric_;
 
   // Total amount of memory currently allocated by Llama to this node
-  Metrics::BytesMetric* allocated_memory_metric_;
+  UIntGauge* allocated_memory_metric_;
 
   // Total number of vcpu cores currently allocated by Llama to this node
-  Metrics::PrimitiveMetric<int64_t>* allocated_vcpus_metric_;
+  UIntGauge* allocated_vcpus_metric_;
 
   // Total number of fulfilled reservation requests that have been released.
-  Metrics::PrimitiveMetric<int64_t>* requests_released_metric_;
+  IntCounter* requests_released_metric_;
 
   // Client id used to register with Llama. Set in Init(). Used to communicate to Llama
   // whether this Impalad has restarted. Registration with Llama is idempotent if the

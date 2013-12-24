@@ -42,13 +42,13 @@ TEST(StatestoreTest, SmokeTest) {
 
   StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("sub1",
       MakeNetworkAddress("localhost", 12345),
-      MakeNetworkAddress("localhost", FLAGS_state_store_port), new Metrics());
+      MakeNetworkAddress("localhost", FLAGS_state_store_port), new MetricGroup(""));
   ASSERT_TRUE(sub_will_start->Start().ok());
 
   // Confirm that a subscriber trying to use an in-use port will fail to start.
   StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("sub2",
       MakeNetworkAddress("localhost", 12345),
-      MakeNetworkAddress("localhost", FLAGS_state_store_port), new Metrics());
+      MakeNetworkAddress("localhost", FLAGS_state_store_port), new MetricGroup(""));
   ASSERT_FALSE(sub_will_not_start->Start().ok());
 
 }

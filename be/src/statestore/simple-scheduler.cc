@@ -84,9 +84,9 @@ static const string ERROR_USER_NOT_SPECIFIED("User must be specified because "
 
 SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     const string& backend_id, const TNetworkAddress& backend_address,
-    Metrics* metrics, Webserver* webserver, ResourceBroker* resource_broker,
+    MetricGroup* metrics, Webserver* webserver, ResourceBroker* resource_broker,
     RequestPoolService* request_pool_service)
-  : metrics_(metrics),
+  : metrics_(metrics->GetChildGroup("scheduler")),
     webserver_(webserver),
     statestore_subscriber_(subscriber),
     backend_id_(backend_id),
@@ -127,7 +127,7 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
 }
 
 SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
-    Metrics* metrics, Webserver* webserver, ResourceBroker* resource_broker,
+    MetricGroup* metrics, Webserver* webserver, ResourceBroker* resource_broker,
     RequestPoolService* request_pool_service)
   : metrics_(metrics),
     webserver_(webserver),
@@ -200,13 +200,10 @@ Status SimpleScheduler::Init() {
     }
   }
   if (metrics_ != NULL) {
-    total_assignments_ =
-        metrics_->CreateAndRegisterPrimitiveMetric(ASSIGNMENTS_KEY, 0L);
-    total_local_assignments_ =
-        metrics_->CreateAndRegisterPrimitiveMetric(LOCAL_ASSIGNMENTS_KEY, 0L);
-    initialised_ =
-        metrics_->CreateAndRegisterPrimitiveMetric(SCHEDULER_INIT_KEY, true);
-    num_backends_metric_ = metrics_->CreateAndRegisterPrimitiveMetric<int64_t>(
+    total_assignments_ = metrics_->AddCounter(ASSIGNMENTS_KEY, 0L);
+    total_local_assignments_ = metrics_->AddCounter(LOCAL_ASSIGNMENTS_KEY, 0L);
+    initialised_ = metrics_->AddProperty(SCHEDULER_INIT_KEY, true);
+    num_backends_metric_ = metrics_->AddGauge<int64_t>(
         NUM_BACKENDS_KEY, backend_map_.size());
   }
 
@@ -360,7 +357,7 @@ void SimpleScheduler::UpdateMembership(
       update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
       update.topic_deletions.push_back(backend_id_);
     }
-    if (metrics_ != NULL) num_backends_metric_->Update(current_membership_.size());
+    if (metrics_ != NULL) num_backends_metric_->set_value(current_membership_.size());
   }
 }
 

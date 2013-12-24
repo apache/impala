@@ -24,7 +24,7 @@ DECLARE_int32(state_store_subscriber_port);
 // an error if a connection could not be made.
 int main(int argc, char **argv) {
   InitCommonRuntime(argc, argv, false);
-  Metrics metrics;
+  MetricGroup metrics("test");
   StatestoreSubscriber subscriber("subscriber1",
       MakeNetworkAddress("localhost", FLAGS_state_store_subscriber_port),
       MakeNetworkAddress("localhost", FLAGS_state_store_port), &metrics);

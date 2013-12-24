@@ -20,7 +20,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "common/status.h"
-#include "util/non-primitive-metrics.h"
+#include "util/collection-metrics.h"
 
 namespace impala {
 

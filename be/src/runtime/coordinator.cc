@@ -48,12 +48,13 @@
 #include "statestore/scheduler.h"
 #include "exec/data-sink.h"
 #include "exec/scan-node.h"
-#include "util/debug-util.h"
-#include "util/hdfs-util.h"
-#include "util/hdfs-bulk-ops.h"
 #include "util/container-util.h"
-#include "util/network-util.h"
+#include "util/debug-util.h"
+#include "util/hdfs-bulk-ops.h"
+#include "util/hdfs-util.h"
 #include "util/llama-util.h"
+#include "util/network-util.h"
+#include "util/pretty-printer.h"
 #include "util/summary-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -385,7 +386,7 @@ Status Coordinator::Exec(QuerySchedule& schedule,
 
   query_events_->MarkEvent("Ready to start remote fragments");
   int backend_num = 0;
-  StatsMetric<double> latencies("fragment-latencies");
+  StatsMetric<double> latencies("fragment-latencies", TCounterType::TIME_NS);
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
        fragment_idx < request.fragments.size(); ++fragment_idx) {
     const FragmentExecParams& params = (*fragment_exec_params)[fragment_idx];
@@ -428,10 +429,8 @@ Status Coordinator::Exec(QuerySchedule& schedule,
   }
 
   query_events_->MarkEvent("Remote fragments started");
-  stringstream remote_fragments_status;
-  latencies.PrintValue(&remote_fragments_status);
   query_profile_->AddInfoString("Fragment start latencies",
-      remote_fragments_status.str());
+      latencies.ToHumanReadable());
 
   // If we have a coordinator fragment and remote fragments (the common case),
   // release the thread token on the coordinator fragment.  This fragment

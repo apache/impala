@@ -18,7 +18,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include "common/logging.h"
-#include "util/debug-util.h"
+#include "util/pretty-printer.h"
 #include "util/table-printer.h"
 
 using namespace boost;

@@ -62,14 +62,14 @@ int main(int argc, char** argv) {
     LOG(INFO) << "Not starting webserver";
   }
 
-  scoped_ptr<Metrics> metrics(new Metrics());
+  scoped_ptr<MetricGroup> metrics(new MetricGroup("catalog"));
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
   EXIT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true));
   StartThreadInstrumentation(metrics.get(), webserver.get());
-  InitRpcEventTracing(webserver.get());
 
-  metrics->CreateAndRegisterPrimitiveMetric<string>(
-      "catalog.version", GetVersionString(true));
+  InitRpcEventTracing(webserver.get());
+  metrics->AddProperty<string>("catalog.version", GetVersionString(true),
+      "catalogd build version");
 
   CatalogServer catalog_server(metrics.get());
   EXIT_IF_ERROR(catalog_server.Start());

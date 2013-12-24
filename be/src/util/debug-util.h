@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #ifndef IMPALA_UTIL_DEBUG_UTIL_H
 #define IMPALA_UTIL_DEBUG_UTIL_H
 
 #include <ostream>
 #include <string>
-#include <boost/cstdint.hpp>
+#include <sstream>
 
 #include "gen-cpp/JniCatalog_types.h"
 #include "gen-cpp/Descriptors_types.h"
@@ -42,6 +41,8 @@ std::ostream& operator<<(std::ostream& os, const TUniqueId& id);
 std::ostream& operator<<(std::ostream& os, const THdfsFileFormat::type& type);
 std::ostream& operator<<(std::ostream& os, const THdfsCompression::type& type);
 std::ostream& operator<<(std::ostream& os, const TStmtType::type& type);
+std::ostream& operator<<(std::ostream& os, const TCounterType::type& type);
+std::ostream& operator<<(std::ostream& os, const TMetricKind::type& type);
 std::ostream& operator<<(std::ostream& os, const beeswax::QueryState::type& type);
 std::ostream& operator<<(std::ostream& os, const parquet::Encoding::type& type);
 std::ostream& operator<<(std::ostream& os, const parquet::CompressionCodec::type& type);
@@ -60,6 +61,8 @@ std::string PrintTStmtType(const TStmtType::type& type);
 std::string PrintQueryState(const beeswax::QueryState::type& type);
 std::string PrintEncoding(const parquet::Encoding::type& type);
 std::string PrintAsHex(const char* bytes, int64_t len);
+std::string PrintTMetricKind(const TMetricKind::type& type);
+std::string PrintTCounterType(const TCounterType::type& type);
 
 // Parse 's' into a TUniqueId object.  The format of s needs to be the output format
 // from PrintId.  (<hi_part>:<low_part>)
@@ -78,20 +81,6 @@ std::string GetVersionString(bool compact = false);
 // Note: there is a libc bug that causes this not to work on 64 bit machines
 // for recursive calls.
 std::string GetStackTrace();
-
-class PrettyPrinter {
- public:
-  // Prints the 'value' in a human friendly format depending on the data type.
-  // i.e. for bytes: 3145728 -> 3MB
-  // If verbose is true, this also prints the raw value (before unit conversion) for
-  // types where this is applicable.
-  static std::string Print(int64_t value, TCounterType::type type, bool verbose = false);
-
-  // Convenience method
-  static std::string PrintBytes(int64_t value) {
-    return PrettyPrinter::Print(value, TCounterType::BYTES);
-  }
-};
 
 }
 

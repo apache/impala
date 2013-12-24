@@ -57,7 +57,7 @@ class TGetAllCatalogObjectsResponse;
 class CatalogServer {
  public:
   static std::string IMPALA_CATALOG_TOPIC;
-  CatalogServer(Metrics* metrics);
+  CatalogServer(MetricGroup* metrics);
 
   // Starts this CatalogService instance.
   // Returns OK unless some error occurred in which case the status is returned.
@@ -75,7 +75,7 @@ class CatalogServer {
   // Thrift API implementation which proxies requests onto this CatalogService.
   boost::shared_ptr<CatalogServiceIf> thrift_iface_;
   ThriftSerializer thrift_serializer_;
-  Metrics* metrics_;
+  MetricGroup* metrics_;
   boost::scoped_ptr<Catalog> catalog_;
   boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;
 

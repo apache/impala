@@ -15,7 +15,8 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-// Counter data types.
+// Counter data types. 'Counter' is a legacy term - these units are used for all metric
+// types.
 enum TCounterType {
   UNIT,
   UNIT_PER_SECOND,
@@ -23,7 +24,23 @@ enum TCounterType {
   BYTES
   BYTES_PER_SECOND,
   TIME_NS,
-  DOUBLE_VALUE
+  DOUBLE_VALUE,
+  NONE,
+  TIME_MS,
+  TIME_S
+}
+
+// Type of the metric, that is a description of the kind of value that a metric
+// represents.
+// TODO: There's a better word for this than 'type'.
+enum TMetricKind {
+  // May go up or down over time
+  GAUGE,
+  // A strictly increasing value
+  COUNTER,
+  // Fixed; will never change
+  PROPERTY
+  // TODO: Stats metrics etc. should be here when we implement Metric::ToThrift()
 }
 
 // Counter data

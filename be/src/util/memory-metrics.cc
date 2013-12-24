@@ -32,7 +32,7 @@ TcmallocMetric* TcmallocMetric::TOTAL_BYTES_RESERVED = NULL;
 TcmallocMetric* TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = NULL;
 TcmallocMetric::PhysicalBytesMetric* TcmallocMetric::PHYSICAL_BYTES_RESERVED = NULL;
 
-Status impala::RegisterMemoryMetrics(Metrics* metrics, bool register_jvm_metrics) {
+Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_metrics) {
 #ifndef ADDRESS_SANITIZER
   TcmallocMetric::BYTES_IN_USE = metrics->RegisterMetric(new TcmallocMetric(
       "tcmalloc.bytes-in-use", "generic.current_allocated_bytes"));
@@ -50,17 +50,20 @@ Status impala::RegisterMemoryMetrics(Metrics* metrics, bool register_jvm_metrics
       new TcmallocMetric::PhysicalBytesMetric("tcmalloc.physical-bytes-reserved"));
 #endif
 
-  if (register_jvm_metrics) RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics));
+  if (register_jvm_metrics) {
+    RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics->GetChildGroup("jvm")));
+  }
   return Status::OK;
 }
 
 JvmMetric::JvmMetric(const string& key, const string& mempool_name, JvmMetricType type)
-    : Metrics::PrimitiveMetric<uint64_t>(key, 0) {
+    : IntGauge(key, TCounterType::BYTES) {
   mempool_name_ = mempool_name;
   metric_type_ = type;
+
 }
 
-Status JvmMetric::InitMetrics(Metrics* metrics) {
+Status JvmMetric::InitMetrics(MetricGroup* metrics) {
   DCHECK(metrics != NULL);
   TGetJvmMetricsRequest request;
   request.get_all = true;

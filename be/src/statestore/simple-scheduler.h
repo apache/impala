@@ -52,12 +52,12 @@ class SimpleScheduler : public Scheduler {
   //  - backend_id - unique identifier for this Impala backend (usually a host:port)
   //  - backend_address - the address that this backend listens on
   SimpleScheduler(StatestoreSubscriber* subscriber, const std::string& backend_id,
-      const TNetworkAddress& backend_address, Metrics* metrics, Webserver* webserver,
+      const TNetworkAddress& backend_address, MetricGroup* metrics, Webserver* webserver,
       ResourceBroker* resource_broker, RequestPoolService* request_pool_service);
 
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   // backends is fixed and will not be updated.
-  SimpleScheduler(const std::vector<TNetworkAddress>& backends, Metrics* metrics,
+  SimpleScheduler(const std::vector<TNetworkAddress>& backends, MetricGroup* metrics,
       Webserver* webserver, ResourceBroker* resource_broker,
       RequestPoolService* request_pool_service);
 
@@ -116,8 +116,8 @@ class SimpleScheduler : public Scheduler {
   typedef boost::unordered_map<std::string, TBackendDescriptor> BackendIdMap;
   BackendIdMap current_membership_;
 
-  // Metrics subsystem access
-  Metrics* metrics_;
+  // MetricGroup subsystem access
+  MetricGroup* metrics_;
 
   // Webserver for /backends. Not owned by us.
   Webserver* webserver_;
@@ -139,12 +139,13 @@ class SimpleScheduler : public Scheduler {
   ThriftSerializer thrift_serializer_;
 
   // Locality metrics
-  Metrics::IntMetric* total_assignments_;
-  Metrics::IntMetric* total_local_assignments_;
+  IntCounter* total_assignments_;
+  IntCounter* total_local_assignments_;
 
   // Initialisation metric
-  Metrics::BooleanMetric* initialised_;
-  Metrics::IntMetric* num_backends_metric_;
+  BooleanProperty* initialised_;
+  // Current number of backends
+  IntGauge* num_backends_metric_;
 
   // Counts the number of UpdateMembership invocations, to help throttle the logging.
   uint32_t update_count_;

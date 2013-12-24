@@ -80,7 +80,7 @@ class ExecEnv;
 //       combination of the estimate and the actual consumption as a function of time.
 class AdmissionController {
  public:
-  AdmissionController(RequestPoolService* request_pool_service, Metrics* metrics,
+  AdmissionController(RequestPoolService* request_pool_service, MetricGroup* metrics,
       const std::string& backend_id);
   ~AdmissionController();
 
@@ -130,41 +130,41 @@ class AdmissionController {
     // requests that are admitted immediately as well as requests that are admitted
     // after being queued.  Incremented when AdmitQuery() returns and the request is
     // admitted.
-    Metrics::IntMetric* local_admitted;
+    IntCounter* local_admitted;
     // The total number of requests that have been queued locally. Incremented
     // when a request is queued.
-    Metrics::IntMetric* local_queued;
+    IntCounter* local_queued;
     // The total number of requests that have been dequeued locally.
-    Metrics::IntMetric* local_dequeued;
+    IntCounter* local_dequeued;
     // The total number of requests that have been rejected locally.  Incremented when
     // AdmitQuery() returns and the request is rejected because the queue is full.
-    Metrics::IntMetric* local_rejected;
+    IntCounter* local_rejected;
     // The total number of requests that timed out while waiting for admission locally.
-    Metrics::IntMetric* local_timed_out;
+    IntCounter* local_timed_out;
     // The total number of requests that have completed locally. Incremented in
     // ReleaseQuery().
-    Metrics::IntMetric* local_completed;
+    IntCounter* local_completed;
     // The total amount of time (in milliseconds) that locally queued requests have
     // spent waiting to be admitted.
-    Metrics::IntMetric* local_time_in_queue_ms;
+    IntCounter* local_time_in_queue_ms;
 
     // Instantaneous statistics, i.e. gauges:
     // The estimated total number of queries currently running across the cluster.
-    Metrics::IntMetric* cluster_num_running;
+    IntGauge* cluster_num_running;
     // The estimated total number of requests currently queued across the cluster.
-    Metrics::IntMetric* cluster_in_queue;
+    IntGauge* cluster_in_queue;
     // Approximate total amount of memory used by this pool across the cluster.
-    Metrics::BytesMetric* cluster_mem_usage;
+    IntGauge* cluster_mem_usage;
     // The sum of planner memory estimates for requests across the cluster.
-    Metrics::BytesMetric* cluster_mem_estimate;
+    IntGauge* cluster_mem_estimate;
     // The total number of queries currently running that were initiated locally.
-    Metrics::IntMetric* local_num_running;
+    IntGauge* local_num_running;
     // The total number of requests currently queued locally.
-    Metrics::IntMetric* local_in_queue;
+    IntGauge* local_in_queue;
     // The total amount of memory used by this pool locally.
-    Metrics::BytesMetric* local_mem_usage;
+    IntGauge* local_mem_usage;
     // The sum of planner memory estimates for requests that were started locally.
-    Metrics::BytesMetric* local_mem_estimate;
+    IntGauge* local_mem_estimate;
   };
 
   // Used for user-to-pool resolution and looking up pool configurations. Not owned by
@@ -172,7 +172,7 @@ class AdmissionController {
   RequestPoolService* request_pool_service_;
 
   // Metrics subsystem access
-  Metrics* metrics_;
+  MetricGroup* metrics_;
 
   // Thread dequeuing and admitting queries.
   boost::scoped_ptr<Thread> dequeue_thread_;

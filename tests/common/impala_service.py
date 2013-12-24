@@ -54,7 +54,7 @@ class BaseImpalaService(object):
 
   def get_metric_value(self, metric_name, default_value=None):
     """Returns the value of the the given metric name from the Impala debug webpage"""
-    metrics = json.loads(self.read_debug_webpage('jsonmetrics'))
+    metrics = json.loads(self.read_debug_webpage('jsonmetrics?json'))
     return metrics.get(metric_name, default_value)
 
   def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1):

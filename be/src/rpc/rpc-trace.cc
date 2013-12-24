@@ -85,7 +85,7 @@ void RpcEventHandlerManager::JsonCallback(const Webserver::ArgumentMap& args,
   document->AddMember("servers", servers, document->GetAllocator());
 }
 
-RpcEventHandler::RpcEventHandler(const string& server_name, Metrics* metrics) :
+RpcEventHandler::RpcEventHandler(const string& server_name, MetricGroup* metrics) :
     server_name_(server_name), metrics_(metrics) {
   if (handler_manager.get() != NULL) handler_manager->RegisterEventHandler(this);
 }
@@ -99,9 +99,8 @@ void RpcEventHandler::ToJson(Value* server, Document* document) {
     Value method(kObjectType);
     Value method_name(rpc.first.c_str(), document->GetAllocator());
     method.AddMember("name", method_name, document->GetAllocator());
-    stringstream ss;
-    rpc.second->time_stats->PrintValue(&ss);
-    Value summary(ss.str().c_str(), document->GetAllocator());
+    const string& human_readable = rpc.second->time_stats->ToHumanReadable();
+    Value summary(human_readable.c_str(), document->GetAllocator());
     method.AddMember("summary", summary, document->GetAllocator());
     method.AddMember("in_flight", rpc.second->num_in_flight, document->GetAllocator());
     methods.PushBack(method, document->GetAllocator());
@@ -121,8 +120,8 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
       descriptor->name = fn_name;
       const string& time_metric_name =
           Substitute("rpc-method.$0.$1.call_duration", server_name_, descriptor->name);
-      descriptor->time_stats =
-          metrics_->RegisterMetric(new StatsMetric<double>(time_metric_name));
+      descriptor->time_stats = metrics_->RegisterMetric(
+          new StatsMetric<double>(time_metric_name, TCounterType::TIME_MS));
       it = method_map_.insert(make_pair(descriptor->name, descriptor)).first;
     }
   }

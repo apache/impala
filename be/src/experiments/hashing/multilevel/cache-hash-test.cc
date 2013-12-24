@@ -13,6 +13,7 @@
 #include "runtime/mem-pool.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
+#include "util/pretty-printer.h"
 #include "util/hash-util.h"
 #include "util/runtime-profile.h"
 #include "util/stopwatch.h"

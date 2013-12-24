@@ -35,6 +35,7 @@
 #include "util/error-util.h"
 #include "util/jni-util.h"
 #include "util/mem-info.h"
+#include "util/pretty-printer.h"
 
 #include <jni.h>
 #include <iostream>

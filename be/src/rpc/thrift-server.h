@@ -81,7 +81,7 @@ class ThriftServer {
   //  - server_type: the type of IO strategy this server should employ
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
-      AuthProvider* auth_provider = NULL, Metrics* metrics = NULL,
+      AuthProvider* auth_provider = NULL, MetricGroup* metrics = NULL,
       int num_worker_threads = DEFAULT_WORKER_THREADS, ServerType server_type = Threaded);
 
   // Enables secure access over SSL. Must be called before Start(). The arguments are
@@ -184,10 +184,10 @@ class ThriftServer {
   bool metrics_enabled_;
 
   // Number of currently active connections
-  Metrics::IntMetric* num_current_connections_metric_;
+  IntGauge* num_current_connections_metric_;
 
   // Total connections made over the lifetime of this server
-  Metrics::IntMetric* total_connections_metric_;
+  IntCounter* total_connections_metric_;
 
   // Used to generate a unique connection id for every connection
   boost::uuids::random_generator uuid_generator_;

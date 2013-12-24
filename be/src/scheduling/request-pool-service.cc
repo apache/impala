@@ -63,11 +63,11 @@ const string DEFAULT_POOL_NAME = "default-pool";
 
 const string RESOLVE_POOL_METRIC_NAME = "request-pool-service.resolve-pool-duration-ms";
 
-RequestPoolService::RequestPoolService(Metrics* metrics) :
+RequestPoolService::RequestPoolService(MetricGroup* metrics) :
     metrics_(metrics), resolve_pool_ms_metric_(NULL) {
   DCHECK(metrics_ != NULL);
   resolve_pool_ms_metric_ = metrics_->RegisterMetric(
-      new StatsMetric<double>(RESOLVE_POOL_METRIC_NAME));
+      new StatsMetric<double>(RESOLVE_POOL_METRIC_NAME, TCounterType::TIME_MS));
 
   if (FLAGS_fair_scheduler_allocation_path.empty() &&
       FLAGS_llama_site_path.empty()) {

@@ -35,10 +35,9 @@ const std::string IMPALA_CGROUP_SUFFIX = "_impala";
 // See Yarn's CgroupsLCEResourcesHandler.java for more details.
 const int32_t CPU_DEFAULT_WEIGHT = 1024;
 
-CgroupsMgr::CgroupsMgr(Metrics* metrics) {
+CgroupsMgr::CgroupsMgr(MetricGroup* metrics) {
   active_cgroups_metric_ =
-      metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
-          "cgroups-mgr.active-cgroups", 0);
+      metrics->AddCounter<int64_t>("cgroups-mgr.active-cgroups", 0);
 }
 
 Status CgroupsMgr::Init(const string& cgroups_hierarchy_path,

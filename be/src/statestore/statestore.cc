@@ -189,7 +189,7 @@ void Statestore::Subscriber::SetLastTopicVersionProcessed(const TopicId& topic_i
   subscribed_topics_[topic_id].last_version = version;
 }
 
-Statestore::Statestore(Metrics* metrics)
+Statestore::Statestore(MetricGroup* metrics)
   : exit_flag_(false),
     subscriber_topic_update_threadpool_("statestore-update",
         "subscriber-update-worker",
@@ -208,21 +208,18 @@ Statestore::Statestore(Metrics* metrics)
 
   DCHECK(metrics != NULL);
   num_subscribers_metric_ =
-      metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_LIVE_SUBSCRIBERS, 0L);
+      metrics->AddGauge(STATESTORE_LIVE_SUBSCRIBERS, 0L);
   subscriber_set_metric_ =
       metrics->RegisterMetric(new SetMetric<string>(STATESTORE_LIVE_SUBSCRIBERS_LIST,
                                                     set<string>()));
-  key_size_metric_ =
-      metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_TOTAL_KEY_SIZE_BYTES, 0L);
-  value_size_metric_ =
-      metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_TOTAL_VALUE_SIZE_BYTES, 0L);
-  topic_size_metric_ =
-      metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0L);
+  key_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_KEY_SIZE_BYTES, 0L);
+  value_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_VALUE_SIZE_BYTES, 0L);
+  topic_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0L);
 
   topic_update_duration_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>(STATESTORE_UPDATE_DURATION));
+      new StatsMetric<double>(STATESTORE_UPDATE_DURATION, TCounterType::TIME_S));
   keepalive_duration_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>(STATESTORE_KEEPALIVE_DURATION));
+      new StatsMetric<double>(STATESTORE_KEEPALIVE_DURATION, TCounterType::TIME_S));
 
   client_cache_->InitMetrics(metrics, "subscriber");
 }
@@ -359,7 +356,7 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     subscribers_.insert(make_pair(subscriber_id, current_registration));
     failure_detector_->UpdateHeartbeat(
         PrintId(current_registration->registration_id()), true);
-    num_subscribers_metric_->Update(subscribers_.size());
+    num_subscribers_metric_->set_value(subscribers_.size());
     subscriber_set_metric_->Add(subscriber_id);
   }
 

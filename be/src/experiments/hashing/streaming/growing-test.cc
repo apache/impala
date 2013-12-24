@@ -5,6 +5,7 @@
 #include "tuple-types.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
+#include "util/pretty-printer.h"
 #include "util/stopwatch.h"
 
 using namespace impala;

@@ -57,15 +57,14 @@ int main(int argc, char** argv) {
     LOG(INFO) << "Not starting webserver";
   }
 
-  scoped_ptr<Metrics> metrics(new Metrics());
+  scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
   EXIT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false));
   StartThreadInstrumentation(metrics.get(), webserver.get());
   InitRpcEventTracing(webserver.get());
   // TODO: Add a 'common metrics' method to add standard metrics to
   // both statestored and impalad
-  metrics->CreateAndRegisterPrimitiveMetric<string>(
-      "statestore.version", GetVersionString(true));
+  metrics->AddProperty<string>("statestore.version", GetVersionString(true));
 
   Statestore statestore(metrics.get());
   statestore.RegisterWebpages(webserver.get());

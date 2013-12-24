@@ -28,7 +28,7 @@
 #include "gen-cpp/StatestoreSubscriber.h"
 #include "gen-cpp/StatestoreService.h"
 #include "util/metrics.h"
-#include "util/non-primitive-metrics.h"
+#include "util/collection-metrics.h"
 #include "rpc/thrift-client.h"
 #include "util/thread-pool.h"
 #include "util/webserver.h"
@@ -89,7 +89,7 @@ class Statestore {
   typedef std::string TopicEntryKey;
 
   // The only constructor; initialises member variables only.
-  Statestore(Metrics* metrics);
+  Statestore(MetricGroup* metrics);
 
   // Registers a new subscriber with the given unique subscriber ID, running a subscriber
   // service at the given location, with the provided list of topic subscriptions.
@@ -177,8 +177,8 @@ class Statestore {
   // topic. This is to support sending only the delta of changes on every update.
   class Topic {
    public:
-    Topic(const TopicId& topic_id, Metrics::IntMetric* key_size_metric,
-        Metrics::IntMetric* value_size_metric, Metrics::IntMetric* topic_size_metric)
+    Topic(const TopicId& topic_id, IntGauge* key_size_metric,
+        IntGauge* value_size_metric, IntGauge* topic_size_metric)
         : topic_id_(topic_id), last_version_(0L), total_key_size_bytes_(0L),
           total_value_size_bytes_(0L), key_size_metric_(key_size_metric),
           value_size_metric_(value_size_metric), topic_size_metric_(topic_size_metric) { }
@@ -236,9 +236,9 @@ class Statestore {
     int64_t total_value_size_bytes_;
 
     // Metrics shared across all topics to sum the size in bytes of keys, values and both
-    Metrics::IntMetric* key_size_metric_;
-    Metrics::IntMetric* value_size_metric_;
-    Metrics::IntMetric* topic_size_metric_;
+    IntGauge* key_size_metric_;
+    IntGauge* value_size_metric_;
+    IntGauge* topic_size_metric_;
   };
 
   // Note on locking: Subscribers and Topics should be accessed under their own coarse
@@ -407,13 +407,13 @@ class Statestore {
   boost::scoped_ptr<MissedHeartbeatFailureDetector> failure_detector_;
 
   // Metric that track the registered, non-failed subscribers.
-  Metrics::IntMetric* num_subscribers_metric_;
+  IntGauge* num_subscribers_metric_;
   SetMetric<std::string>* subscriber_set_metric_;
 
   // Metrics shared across all topics to sum the size in bytes of keys, values and both
-  Metrics::IntMetric* key_size_metric_;
-  Metrics::IntMetric* value_size_metric_;
-  Metrics::IntMetric* topic_size_metric_;
+  IntGauge* key_size_metric_;
+  IntGauge* value_size_metric_;
+  IntGauge* topic_size_metric_;
 
   // Tracks the distribution of topic-update durations - precisely the time spent in
   // calling the UpdateState() RPC which allows us to measure the network transmission

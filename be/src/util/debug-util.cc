@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "common/logging.h"
-
 #include "util/debug-util.h"
 
 #include <iomanip>
 #include <sstream>
 #include <boost/foreach.hpp>
 
-#include "common/logging.h"
 #include "common/version.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
@@ -34,19 +31,6 @@
 #undef HAVE_ATTRIBUTE_NOINLINE
 #undef _XOPEN_SOURCE
 #include <glog/../utilities.h>
-
-#define PRECISION 2
-#define KILOBYTE (1024)
-#define MEGABYTE (1024 * 1024)
-#define GIGABYTE (1024 * 1024 * 1024)
-
-#define SECOND (1000)
-#define MINUTE (1000 * 60)
-#define HOUR (1000 * 60 * 60)
-
-#define THOUSAND (1000)
-#define MILLION (THOUSAND * 1000)
-#define BILLION (MILLION * 1000)
 
 using namespace std;
 using namespace boost;
@@ -88,6 +72,8 @@ THRIFT_ENUM_OUTPUT_FN(QueryState);
 THRIFT_ENUM_OUTPUT_FN(Encoding);
 THRIFT_ENUM_OUTPUT_FN(CompressionCodec);
 THRIFT_ENUM_OUTPUT_FN(Type);
+THRIFT_ENUM_OUTPUT_FN(TMetricKind);
+THRIFT_ENUM_OUTPUT_FN(TCounterType);
 
 THRIFT_ENUM_PRINT_FN(TCatalogObjectType);
 THRIFT_ENUM_PRINT_FN(TDdlType);
@@ -96,6 +82,9 @@ THRIFT_ENUM_PRINT_FN(TSessionType);
 THRIFT_ENUM_PRINT_FN(TStmtType);
 THRIFT_ENUM_PRINT_FN(QueryState);
 THRIFT_ENUM_PRINT_FN(Encoding);
+THRIFT_ENUM_PRINT_FN(TMetricKind);
+THRIFT_ENUM_PRINT_FN(TCounterType);
+
 
 ostream& operator<<(ostream& os, const TUniqueId& id) {
   os << PrintId(id);
@@ -206,158 +195,6 @@ string PrintRow(TupleRow* row, const RowDescriptor& d) {
   }
   out << "]";
   return out.str();
-}
-
-static double GetByteUnit(int64_t value, string* unit) {
-  if (value == 0) {
-    *unit = "";
-    return value;
-  } else if (value > GIGABYTE) {
-    *unit = "GB";
-    return value /(double) GIGABYTE;
-  } else if (value > MEGABYTE ) {
-    *unit = "MB";
-    return value /(double) MEGABYTE;
-  } else if (value > KILOBYTE)  {
-    *unit = "KB";
-    return value /(double) KILOBYTE;
-  } else {
-    *unit = "B";
-    return value;
-  }
-}
-
-static double GetUnit(int64_t value, string* unit) {
-  if (value >= BILLION) {
-    *unit = "B";
-    return value / (1000*1000*1000.);
-  } else if (value >= MILLION) {
-    *unit = "M";
-    return value / (1000*1000.);
-  } else if (value >= THOUSAND) {
-    *unit = "K";
-    return value / (1000.);
-  } else {
-    *unit = "";
-    return value;
-  }
-}
-
-// Print the value (time in ms) to ss
-static void PrintTimeMS(int64_t value, stringstream* ss) {
-  if (value == 0 ) {
-    *ss << "0";
-  } else {
-    bool hour = false;
-    bool minute = false;
-    bool second = false;
-    if (value >= HOUR) {
-      *ss << value / HOUR << "h";
-      value %= HOUR;
-      hour = true;
-    }
-    if (value >= MINUTE) {
-      *ss << value / MINUTE << "m";
-      value %= MINUTE;
-      minute = true;
-    }
-    if (!hour && value >= SECOND) {
-      *ss << value / SECOND << "s";
-      value %= SECOND;
-      second = true;
-    }
-    if (!hour && !minute) {
-      if (second) *ss << setw(3) << setfill('0');
-      *ss << value << "ms";
-    }
-  }
-}
-
-string PrettyPrinter::Print(int64_t value, TCounterType::type type, bool verbose) {
-  stringstream ss;
-  ss.flags(ios::fixed);
-  switch (type) {
-    case TCounterType::UNIT: {
-      string unit;
-      double output = GetUnit(value, &unit);
-      if (unit.empty()) {
-        ss << value;
-      } else {
-        ss << setprecision(PRECISION) << output << unit;
-        if (verbose) ss << " (" << value << ")";
-      }
-      break;
-    }
-
-    case TCounterType::UNIT_PER_SECOND: {
-      string unit;
-      double output = GetUnit(value, &unit);
-      if (output == 0) {
-        ss << "0";
-      } else {
-        ss << setprecision(PRECISION) << output << " " << unit << "/sec";
-      }
-      break;
-    }
-
-    case TCounterType::CPU_TICKS: {
-      if (value < CpuInfo::cycles_per_ms()) {
-        ss << (value / 1000) << "K clock cycles";
-      } else {
-        value /= CpuInfo::cycles_per_ms();
-        PrintTimeMS(value, &ss);
-      }
-      break;
-    }
-
-    case TCounterType::TIME_NS: {
-      if (value >= BILLION) {
-        // If the time is over a second, print it up to ms.
-        value /= MILLION;
-        PrintTimeMS(value, &ss);
-      } else if (value >= MILLION) {
-        // if the time is over a ms, print it up to microsecond in the unit of ms.
-        value /= 1000;
-        ss << value / 1000 << "." << value % 1000 << "ms";
-      } else if (value > 1000) {
-        // if the time is over a microsecond, print it using unit microsecond
-        ss << value / 1000 << "." << value % 1000 << "us";
-      } else {
-        ss << value << "ns";
-      }
-      break;
-    }
-
-    case TCounterType::BYTES: {
-      string unit;
-      double output = GetByteUnit(value, &unit);
-      if (output == 0) {
-        ss << "0";
-      } else {
-        ss << setprecision(PRECISION) << output << " " << unit;
-        if (verbose) ss << " (" << value << ")";
-      }
-      break;
-    }
-
-    case TCounterType::BYTES_PER_SECOND: {
-      string unit;
-      double output = GetByteUnit(value, &unit);
-      ss << setprecision(PRECISION) << output << " " << unit << "/sec";
-      break;
-    }
-
-    case TCounterType::DOUBLE_VALUE: {
-      double output = *reinterpret_cast<double*>(&value);
-      ss << setprecision(PRECISION) << output << " ";
-      break;
-    }
-
-    default:
-      DCHECK(false);
-      break;
-  }
-  return ss.str();
 }
 
 string PrintBatch(RowBatch* batch) {

@@ -16,11 +16,12 @@
 
 #include <sstream>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/math/special_functions/fpclassify.hpp>
 #include <gutil/strings/substitute.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
 
 #include "common/logging.h"
 #include "util/impalad-metrics.h"
@@ -32,106 +33,152 @@ using namespace boost::algorithm;
 using namespace rapidjson;
 using namespace strings;
 
-Metrics::Metrics()
-  : obj_pool_(new ObjectPool()) { }
+template<>
+void ToJsonValue<std::string>(const std::string& value, const TCounterType::type type,
+    Document* document, Value* out_val) {
+  Value val(value.c_str(), document->GetAllocator());
+  *out_val = val;
+}
 
-Status Metrics::Init(Webserver* webserver) {
+void Metric::AddStandardFields(Document* document, Value* val) {
+  Value name(key_.c_str(), document->GetAllocator());
+  val->AddMember("name", name, document->GetAllocator());
+  Value desc(description_.c_str(), document->GetAllocator());
+  val->AddMember("description", desc, document->GetAllocator());
+  Value metric_value(ToHumanReadable().c_str(), document->GetAllocator());
+  val->AddMember("human_readable", metric_value, document->GetAllocator());
+}
+
+MetricGroup::MetricGroup(const std::string& name)
+    : obj_pool_(new ObjectPool()), name_(name) { }
+
+Status MetricGroup::Init(Webserver* webserver) {
   if (webserver != NULL) {
     Webserver::UrlCallback default_callback =
-        bind<void>(mem_fn(&Metrics::TextCallback), this, _1, _2);
-    webserver->RegisterUrlCallback("/metrics", "common-pre.tmpl", default_callback);
+        bind<void>(mem_fn(&MetricGroup::CMCompatibleCallback), this, _1, _2);
+    webserver->RegisterUrlCallback("/jsonmetrics", "legacy-metrics.tmpl",
+        default_callback, false);
 
     Webserver::UrlCallback json_callback =
-        bind<void>(mem_fn(&Metrics::JsonCallback), this, _1, _2);
-    webserver->RegisterUrlCallback("/jsonmetrics", "common-pre.tmpl", json_callback,
-        false);
+        bind<void>(mem_fn(&MetricGroup::TemplateCallback), this, _1, _2);
+    webserver->RegisterUrlCallback("/metrics", "metrics.tmpl", json_callback);
   }
 
   return Status::OK;
 }
 
-string Metrics::DebugString() {
-  Webserver::ArgumentMap empty_map;
-  Document document;
-  document.SetObject();
-  TextCallback(empty_map, &document);
-  return document["contents"].GetString();
-}
-
-string Metrics::DebugStringJson() {
-  Webserver::ArgumentMap empty_map;
-  Document document;
-  document.SetObject();
-  JsonCallback(empty_map, &document);
-  return document["contents"].GetString();
-}
-
-void Metrics::TextCallback(const Webserver::ArgumentMap& args, Document* document) {
+void MetricGroup::CMCompatibleCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
+  // If the request has a 'metric' argument, search all top-level metrics for that metric
+  // only. Otherwise, return document with list of all metrics at the top level.
   Webserver::ArgumentMap::const_iterator metric_name = args.find("metric");
   lock_guard<mutex> l(lock_);
-  stringstream output;
-  if (metric_name == args.end()) {
-    BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
-      m.second->Print(&output);
-      output << endl;
-    }
-  } else {
-    MetricMap::const_iterator metric = metric_map_.find(metric_name->second);
-    if (metric == metric_map_.end()) {
-      Value error(Substitute("Metric '$0' not found", metric_name->second).c_str(),
-          document->GetAllocator());
-      document->AddMember("error", error, document->GetAllocator());
-      return;
-    }
-    metric->second->Print(&output);
-    output << endl;
-  }
-  Value contents(output.str().c_str(), document->GetAllocator());
-  document->AddMember("contents", contents, document->GetAllocator());
-}
-
-void Metrics::JsonCallback(const Webserver::ArgumentMap& args, Document* document) {
-  Webserver::ArgumentMap::const_iterator metric_name = args.find("metric");
-  lock_guard<mutex> l(lock_);
-  stringstream output;
-  output << "{";
-  if (metric_name == args.end()) {
-    bool first = true;
-    BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
-      if (first) {
-        first = false;
-      } else {
-        output << ",\n";
-      }
-      m.second->PrintJson(&output);
-    }
-  } else {
+  if (metric_name != args.end()) {
     MetricMap::const_iterator metric = metric_map_.find(metric_name->second);
     if (metric != metric_map_.end()) {
-      metric->second->PrintJson(&output);
-      output << endl;
+      metric->second->ToLegacyJson(document);
+    }
+    return;
+  }
+
+  stack<MetricGroup*> groups;
+  groups.push(this);
+  while (!groups.empty()) {
+    // Depth-first traversal of children to flatten all metrics, which is what was
+    // expected by CM before we introduced metric groups.
+    MetricGroup* group = groups.top();
+    groups.pop();
+    BOOST_FOREACH(const ChildGroupMap::value_type& child, group->children_) {
+      groups.push(child.second);
+    }
+    BOOST_FOREACH(const MetricMap::value_type& m, group->metric_map_) {
+      m.second->ToLegacyJson(document);
     }
   }
-  output << "}";
-  Value contents(output.str().c_str(), document->GetAllocator());
-  document->AddMember("contents", contents, document->GetAllocator());
-  document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
 }
 
-namespace impala {
+void MetricGroup::TemplateCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
+  Webserver::ArgumentMap::const_iterator metric_group = args.find("metric_group");
+  lock_guard<mutex> l(lock_);
+  // If no particular metric group is requested, render this metric group (and all its
+  // children).
+  if (metric_group == args.end()) {
+    Value container;
+    ToJson(true, document, &container);
+    document->AddMember("metric_group", container, document->GetAllocator());
+    return;
+  }
 
-template<> void PrintPrimitiveAsJson<string>(const string& v, stringstream* out) {
-  (*out) << "\"" << v << "\"";
-}
-
-template<> void PrintPrimitiveAsJson<double>(const double& v, stringstream* out) {
-  if (isfinite(v)) {
-    (*out) << v;
+  // Search all metric groups to find the one we're looking for. In the future, we'll
+  // change this to support path-based resolution of metric groups.
+  MetricGroup* found_group = NULL;
+  stack<MetricGroup*> groups;
+  groups.push(this);
+  while (!groups.empty() && found_group == NULL) {
+    // Depth-first traversal of children to flatten all metrics, which is what was
+    // expected by CM before we introduced metric groups.
+    MetricGroup* group = groups.top();
+    groups.pop();
+    BOOST_FOREACH(const ChildGroupMap::value_type& child, group->children_) {
+      if (child.first == metric_group->second) {
+        found_group = child.second;
+        break;
+      }
+      groups.push(child.second);
+    }
+  }
+  if (found_group != NULL) {
+    Value container;
+    found_group->ToJson(false, document, &container);
+    document->AddMember("metric_group", container, document->GetAllocator());
   } else {
-    // This does not call the std::string override, but instead writes
-    // the literal null, in keeping with the JSON spec.
-    PrintPrimitiveAsJson("null", out);
+    Value error(Substitute("Metric group $0 not found", metric_group->second).c_str(),
+        document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
   }
 }
 
+void MetricGroup::ToJson(bool include_children, Document* document, Value* out_val) {
+  Value metric_list(kArrayType);
+  BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
+    Value metric_value;
+    m.second->ToJson(document, &metric_value);
+    metric_list.PushBack(metric_value, document->GetAllocator());
+  }
+
+  Value container(kObjectType);
+  container.AddMember("metrics", metric_list, document->GetAllocator());
+  container.AddMember("name", name_.c_str(), document->GetAllocator());
+  if (include_children) {
+    Value child_groups(kArrayType);
+    BOOST_FOREACH(const ChildGroupMap::value_type& child, children_) {
+      Value child_value;
+      child.second->ToJson(true, document, &child_value);
+      child_groups.PushBack(child_value, document->GetAllocator());
+    }
+    container.AddMember("child_groups", child_groups, document->GetAllocator());
+  }
+
+  *out_val = container;
+}
+
+MetricGroup* MetricGroup::GetChildGroup(const std::string& name) {
+  lock_guard<mutex> l(lock_);
+  ChildGroupMap::iterator it = children_.find(name);
+  if (it != children_.end()) return it->second;
+  MetricGroup* group = obj_pool_->Add(new MetricGroup(name));
+  children_[name] = group;
+  return group;
+}
+
+string MetricGroup::DebugString() {
+  Webserver::ArgumentMap empty_map;
+  Document document;
+  document.SetObject();
+  TemplateCallback(empty_map, &document);
+  StringBuffer strbuf;
+  PrettyWriter<StringBuffer> writer(strbuf);
+  document.Accept(writer);
+  return strbuf.GetString();
 }

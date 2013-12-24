@@ -174,7 +174,7 @@ static string DebugPoolStats(const string& pool_name,
 }
 
 AdmissionController::AdmissionController(RequestPoolService* request_pool_service,
-    Metrics* metrics, const string& backend_id)
+    MetricGroup* metrics, const string& backend_id)
     : request_pool_service_(request_pool_service),
       metrics_(metrics),
       backend_id_(backend_id),
@@ -537,10 +537,10 @@ void AdmissionController::UpdateClusterAggregates(const string& pool_name) {
   cluster_pool_stats_[pool_name] = total_stats;
   PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
   if (pool_metrics != NULL) {
-    pool_metrics->cluster_num_running->Update(total_stats.num_running);
-    pool_metrics->cluster_in_queue->Update(total_stats.num_queued);
-    pool_metrics->cluster_mem_usage->Update(total_stats.mem_usage);
-    pool_metrics->cluster_mem_estimate->Update(total_stats.mem_estimate);
+    pool_metrics->cluster_num_running->set_value(total_stats.num_running);
+    pool_metrics->cluster_in_queue->set_value(total_stats.num_queued);
+    pool_metrics->cluster_mem_usage->set_value(total_stats.mem_usage);
+    pool_metrics->cluster_mem_estimate->set_value(total_stats.mem_estimate);
   }
 
   if (cluster_pool_stats_[pool_name] != total_stats) {
@@ -560,7 +560,7 @@ void AdmissionController::UpdateLocalMemUsage(const string& pool_name) {
     pools_for_updates_.insert(pool_name);
     PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
     if (pool_metrics != NULL) {
-      pool_metrics->local_mem_usage->Update(current_usage);
+      pool_metrics->local_mem_usage->set_value(current_usage);
     }
   }
 }
@@ -584,9 +584,9 @@ void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
     }
     PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
     if (pool_metrics != NULL) {
-      pool_metrics->local_num_running->Update(pool_stats.num_running);
-      pool_metrics->local_in_queue->Update(pool_stats.num_queued);
-      pool_metrics->local_mem_usage->Update(pool_stats.mem_usage);
+      pool_metrics->local_num_running->set_value(pool_stats.num_running);
+      pool_metrics->local_in_queue->set_value(pool_stats.num_queued);
+      pool_metrics->local_mem_usage->set_value(pool_stats.mem_usage);
     }
   }
   pools_for_updates_.clear();
@@ -689,36 +689,41 @@ AdmissionController::GetPoolMetrics(const string& pool_name) {
   if (it != pool_metrics_map_.end()) return &it->second;
 
   PoolMetrics* pool_metrics = &pool_metrics_map_[pool_name];
-  pool_metrics->local_admitted = metrics_->CreateAndRegisterPrimitiveMetric(
+  pool_metrics->local_admitted = metrics_->AddCounter(
       Substitute(LOCAL_ADMITTED_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->local_queued = metrics_->CreateAndRegisterPrimitiveMetric(
+  pool_metrics->local_queued = metrics_->AddCounter(
       Substitute(LOCAL_QUEUED_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->local_dequeued = metrics_->CreateAndRegisterPrimitiveMetric(
+  pool_metrics->local_dequeued = metrics_->AddCounter(
       Substitute(LOCAL_DEQUEUED_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->local_rejected = metrics_->CreateAndRegisterPrimitiveMetric(
+  pool_metrics->local_rejected = metrics_->AddCounter(
       Substitute(LOCAL_REJECTED_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->local_timed_out = metrics_->CreateAndRegisterPrimitiveMetric(
+  pool_metrics->local_timed_out = metrics_->AddCounter(
       Substitute(LOCAL_TIMED_OUT_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->local_completed = metrics_->CreateAndRegisterPrimitiveMetric(
+  pool_metrics->local_completed = metrics_->AddCounter(
       Substitute(LOCAL_COMPLETED_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->local_time_in_queue_ms = metrics_->CreateAndRegisterPrimitiveMetric(
+  pool_metrics->local_time_in_queue_ms = metrics_->AddCounter(
       Substitute(LOCAL_TIME_IN_QUEUE_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->cluster_num_running = metrics_->CreateAndRegisterPrimitiveMetric(
+
+  pool_metrics->cluster_num_running = metrics_->AddGauge(
       Substitute(CLUSTER_NUM_RUNNING_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->cluster_in_queue = metrics_->CreateAndRegisterPrimitiveMetric(
+
+  pool_metrics->cluster_in_queue = metrics_->AddGauge(
       Substitute(CLUSTER_IN_QUEUE_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->cluster_mem_usage = metrics_->RegisterMetric(new Metrics::BytesMetric(
-      Substitute(CLUSTER_MEM_USAGE_METRIC_KEY_FORMAT, pool_name), 0L));
-  pool_metrics->cluster_mem_estimate = metrics_->RegisterMetric(new Metrics::BytesMetric(
-      Substitute(CLUSTER_MEM_ESTIMATE_METRIC_KEY_FORMAT, pool_name), 0L));
-  pool_metrics->local_num_running = metrics_->CreateAndRegisterPrimitiveMetric(
+  pool_metrics->cluster_mem_usage = metrics_->AddGauge(
+      Substitute(CLUSTER_MEM_USAGE_METRIC_KEY_FORMAT, pool_name), 0L);
+  pool_metrics->cluster_mem_estimate = metrics_->AddGauge(
+      Substitute(CLUSTER_MEM_ESTIMATE_METRIC_KEY_FORMAT, pool_name), 0L);
+
+  pool_metrics->local_num_running = metrics_->AddGauge(
       Substitute(LOCAL_NUM_RUNNING_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->local_in_queue = metrics_->CreateAndRegisterPrimitiveMetric(
+
+  pool_metrics->local_in_queue = metrics_->AddGauge(
       Substitute(LOCAL_IN_QUEUE_METRIC_KEY_FORMAT, pool_name), 0L);
-  pool_metrics->local_mem_usage = metrics_->RegisterMetric(new Metrics::BytesMetric(
-      Substitute(LOCAL_MEM_USAGE_METRIC_KEY_FORMAT, pool_name), 0L));
-  pool_metrics->local_mem_estimate = metrics_->RegisterMetric(new Metrics::BytesMetric(
-      Substitute(LOCAL_MEM_ESTIMATE_METRIC_KEY_FORMAT, pool_name), 0L));
+
+  pool_metrics->local_mem_usage = metrics_->AddGauge(
+      Substitute(LOCAL_MEM_USAGE_METRIC_KEY_FORMAT, pool_name), 0L);
+  pool_metrics->local_mem_estimate = metrics_->AddGauge(
+      Substitute(LOCAL_MEM_ESTIMATE_METRIC_KEY_FORMAT, pool_name), 0L);
   return pool_metrics;
 }
 }

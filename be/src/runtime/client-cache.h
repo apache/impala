@@ -98,7 +98,7 @@ class ClientCacheHelper {
 
   // Creates two metrics for this cache measuring the number of clients currently used,
   // and the total number in the cache.
-  void InitMetrics(Metrics* metrics, const std::string& key_prefix);
+  void InitMetrics(MetricGroup* metrics, const std::string& key_prefix);
 
  private:
   template <class T> friend class ClientCache;
@@ -172,10 +172,10 @@ class ClientCacheHelper {
   bool metrics_enabled_;
 
   // Number of clients 'checked-out' from the cache
-  Metrics::IntMetric* clients_in_use_metric_;
+  IntGauge* clients_in_use_metric_;
 
   // Total clients in the cache, including those in use
-  Metrics::IntMetric* total_clients_metric_;
+  IntGauge* total_clients_metric_;
 
   // Create a new client for specific address in 'client' and put it in client_map_
   Status CreateClient(const TNetworkAddress& address, ClientFactory factory_method,
@@ -272,7 +272,7 @@ class ClientCache {
   // metrics have keys that are prefixed by the key_prefix argument
   // (which should not end in a period).
   // Must be called before the cache is used, otherwise the metrics might be wrong
-  void InitMetrics(Metrics* metrics, const std::string& key_prefix) {
+  void InitMetrics(MetricGroup* metrics, const std::string& key_prefix) {
     client_cache_helper_.InitMetrics(metrics, key_prefix);
   }
 

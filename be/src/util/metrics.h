@@ -18,181 +18,194 @@
 #include <map>
 #include <string>
 #include <sstream>
-#include <boost/thread/mutex.hpp>
+#include <stack>
+#include <boost/foreach.hpp>
+#include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "common/logging.h"
 #include "common/status.h"
 #include "common/object-pool.h"
 #include "util/debug-util.h"
+#include "util/json-util.h"
+#include "util/pretty-printer.h"
 #include "util/webserver.h"
 
 namespace impala {
 
-// Helper method to print a single primitive value as a Json atom
-template<typename T> void PrintPrimitiveAsJson(const T& v, std::stringstream* out) {
-  (*out) << v;
-}
-
-// Specialisation to print string values inside quotes when writing to Json
-template<> void PrintPrimitiveAsJson<std::string>(const std::string& v,
-                                                  std::stringstream* out);
-
-// Specialisation to intercept NaN and inf and print them as null,
-// because JSON doesn't allow for non-finite floating point values (!)
-template<> void PrintPrimitiveAsJson<double>(const double& v, std::stringstream* out);
-
-// Publishes execution metrics to a webserver page
-// TODO: Reconsider naming here; Metrics is too general.
-class Metrics {
- private:
-  // Superclass for metric types, to allow for a single container to hold all metrics
-  class GenericMetric {
-   public:
-    // Empty virtual destructor
-    virtual ~GenericMetric() {}
-
-    // Print key and value to a string
-    virtual void Print(std::stringstream* out) = 0;
-
-    // Print key and value in Json format
-    virtual void PrintJson(std::stringstream* out) = 0;
-  };
-
+// A metric is a container for some value, identified by a string key. Most metrics are
+// numeric, but this metric base-class is general enough such that metrics may be lists,
+// maps, histograms or other arbitrary structures.
+//
+// Metrics must be able to convert themselves to JSON (for integration with our monitoring
+// tools, and for rendering in webpages). See ToJson(), and also ToLegacyJson() which
+// ensures backwards compatibility with older versions of CM.
+//
+// Metrics should be supplied with a description, which is included in JSON output for
+// display by monitoring systems / Impala's webpages.
+//
+// TODO: Add ToThrift() for conversion to an RPC-friendly format.
+class Metric {
  public:
-  // Structure containing a metric value. Provides for thread-safe update and
-  // test-and-set operations.
-  template<typename T>
-  class Metric : GenericMetric {
-   public:
-    // Sets current metric value to parameter
-    void Update(const T& value) {
-      boost::lock_guard<boost::mutex> l(lock_);
-      value_ = value;
-    }
+  // Empty virtual destructor
+  virtual ~Metric() {}
 
-    // If current value == test_, update with new value. In all cases return
-    // current value so that success can be detected.
-    T TestAndSet(const T& value, const T& test) {
-      boost::lock_guard<boost::mutex> l(lock_);
-      if (value_ == test) {
-        value_ = value;
-        return test;
-      }
-      return value_;
-    }
+  // Builds a new Value into 'val', using (if required) the allocator from
+  // 'document'. Should set the following fields where appropriate:
+  //
+  // name, value, human_readable, description
+  virtual void ToJson(rapidjson::Document* document, rapidjson::Value* val) = 0;
 
-    // Reads the current value under the metric lock
-    T value() {
-      boost::lock_guard<boost::mutex> l(lock_);
-      CalculateValue();
-      return value_;
-    }
+  // Adds a new json value directly to 'document' of the form:
+  // "name" : "human-readable-string"
+  //
+  // This method is kept for backwards-compatibility with CM5.0.
+  virtual void ToLegacyJson(rapidjson::Document* document) = 0;
 
-    virtual void Print(std::stringstream* out) {
-      boost::lock_guard<boost::mutex> l(lock_);
-      CalculateValue();
-      (*out) << key_ << ":";
-      PrintValue(out);
-    }
+  // Writes a human-readable representation of this metric to 'out'. This is the
+  // representation that is often displayed in webpages etc.
+  virtual std::string ToHumanReadable() = 0;
 
-    virtual void PrintJson(std::stringstream* out) {
-      boost::lock_guard<boost::mutex> l(lock_);
-      CalculateValue();
-      (*out) << "\"" << key_ << "\": ";
-      PrintValueJson(out);
-    }
+  const std::string& key() const { return key_; }
+  const std::string& description() const { return description_; }
 
-    Metric(const std::string& key, const T& value)
-        : value_(value), key_(key) { }
+ protected:
+  // Unique key identifying this metric
+  const std::string key_;
 
-    virtual ~Metric() { }
+  // Description of this metric.
+  // TODO: share one copy amongst metrics with the same description.
+  const std::string description_;
 
-   protected:
-    // Subclasses are required to implement this to print a string
-    // representation of the metric to the supplied stringstream.
-    // Both methods are always called with lock_ taken, so implementations must
-    // not try and take lock_ themselves..
-    virtual void PrintValue(std::stringstream* out) = 0;
-    virtual void PrintValueJson(std::stringstream* out) = 0;
+  friend class MetricGroup;
 
-    // Subclasses may implement this to update value_ before it's retrieved. Always called
-    // with lock_ held.
-    virtual void CalculateValue() { };
+  Metric(const std::string& key, const std::string& description) :
+      key_(key), description_(description) { }
 
-    // Guards access to value
-    boost::mutex lock_;
-    T value_;
+  // Convenience method to add standard fields (name, description, human readable string)
+  // to 'val'.
+  void AddStandardFields(rapidjson::Document* document, rapidjson::Value* val);
+};
 
-    // Unique key identifying this metric
-    const std::string key_;
+// A SimpleMetric has a value which is a simple primitive type: e.g. integers, strings and
+// floats. It is parameterised not only by the type of its value, but by both the unit
+// (e.g. bytes/s), drawn from TCounterType and the 'kind' of the metric itself. The kind
+// can be one of: 'gauge', which may increase or decrease over time, a 'counter' which is
+// increasing only over time, or a 'property' which is not numeric.
+//
+// SimpleMetrics return their current value through the value() method. Access to value()
+// is thread-safe.
+//
+// TODO: We can use type traits to select a more efficient lock-free implementation of
+// value() etc. where it is safe to do so.
+template<typename T, TMetricKind::type metric_kind=TMetricKind::GAUGE>
+class SimpleMetric : public Metric {
+ public:
+  SimpleMetric(const std::string& key, const TCounterType::type unit,
+      const T& initial_value, const std::string& description = "")
+      : Metric(key, description), unit_(unit), value_(initial_value)
+  { }
 
-    friend class Metrics;
+  SimpleMetric(const std::string& key, const TCounterType::type unit,
+      const std::string& description = "")
+      : Metric(key, description), unit_(unit) { }
 
-    // Some sub-metrics may not want to initialise a value
-    // (e.g. statistic-gathering metrics). This constructor is
-    // accessible to subclasses, but not to clients.
-    Metric(const std::string& key) : key_(key) { }
-  };
+  virtual ~SimpleMetric() { }
 
-  // PrimitiveMetrics are the most common metric type, whose values natively
-  // support operator<< and optionally operator+.
-  template<typename T>
-  class PrimitiveMetric : public Metric<T> {
-   public:
-    PrimitiveMetric(const std::string& key, const T& value)
-        : Metric<T>(key, value) {
-    }
-
-    // Requires that T supports operator+. Returns value of metric after increment
-    T Increment(const T& delta) {
-      boost::lock_guard<boost::mutex> l(this->lock_);
-      this->value_ += delta;
-      return this->value_;
-    }
-
-   protected:
-    virtual void PrintValue(std::stringstream* out) {
-      (*out) << this->value_;
-    }
-
-    virtual void PrintValueJson(std::stringstream* out) {
-      PrintPrimitiveAsJson(this->value_, out);
-    }
-  };
-
-  // Convenient typedefs for common primitive metric types.
-  typedef class PrimitiveMetric<int64_t> IntMetric;
-  typedef class PrimitiveMetric<double> DoubleMetric;
-  typedef class PrimitiveMetric<std::string> StringMetric;
-  typedef class PrimitiveMetric<bool> BooleanMetric;
-
-  class BytesMetric : public IntMetric {
-   public:
-    BytesMetric(const std::string& key, const int64_t& value) : IntMetric(key, value) { }
-
-   protected:
-    virtual void PrintValue(std::stringstream* out) {
-      (*out) << PrettyPrinter::Print(value_, TCounterType::BYTES);
-    }
-  };
-
-  Metrics();
-
-  // Create a primitive metric object with given key and initial value (owned by
-  // this object) If a metric is already registered to this name it will be
-  // overwritten (in debug builds it is an error)
-  template<typename T>
-  PrimitiveMetric<T>* CreateAndRegisterPrimitiveMetric(const std::string& key,
-      const T& value) {
-    return RegisterMetric(new PrimitiveMetric<T>(key, value));
+  // Returns the current value, updating it if necessary. Thread-safe.
+  T value() {
+    boost::lock_guard<boost::mutex> l(lock_);
+    CalculateValue();
+    return value_;
   }
 
+  // Sets the current value. Thread-safe.
+  void set_value(const T& value) {
+    boost::lock_guard<boost::mutex> l(lock_);
+    value_ = value;
+  }
+
+  // Adds 'delta' to the current value atomically.
+  void Increment(const T& delta) {
+    DCHECK(kind() != TMetricKind::PROPERTY)
+        << "Can't change value of PROPERTY metric: " << key();
+    DCHECK(kind() != TMetricKind::COUNTER || delta >= 0)
+        << "Can't decrement value of COUNTER metric: " << key();
+    boost::lock_guard<boost::mutex> l(lock_);
+    value_ += delta;
+  }
+
+  virtual void ToJson(rapidjson::Document* document, rapidjson::Value* val) {
+    rapidjson::Value container(rapidjson::kObjectType);
+    AddStandardFields(document, &container);
+
+    rapidjson::Value metric_value;
+    ToJsonValue(value(), TCounterType::NONE, document, &metric_value);
+    container.AddMember("value", metric_value, document->GetAllocator());
+
+    rapidjson::Value type_value(PrintTMetricKind(kind()).c_str(),
+        document->GetAllocator());
+    container.AddMember("kind", type_value, document->GetAllocator());
+    rapidjson::Value units(PrintTCounterType(unit()).c_str(), document->GetAllocator());
+    container.AddMember("units", units, document->GetAllocator());
+    *val = container;
+  }
+
+  virtual std::string ToHumanReadable() {
+    return PrettyPrinter::Print(value(), unit());
+  }
+
+  virtual void ToLegacyJson(rapidjson::Document* document) {
+    rapidjson::Value val;
+    ToJsonValue(value(), TCounterType::NONE, document, &val);
+    document->AddMember(key_.c_str(), val, document->GetAllocator());
+  }
+
+  const TCounterType::type unit() const { return unit_; }
+  const TMetricKind::type kind() const { return metric_kind; }
+
+ protected:
+  // Called to compute value_ if necessary during calls to value(). The more natural
+  // approach would be to have virtual T value(), but that's not possible in C++.
+  //
+  // TODO: Should be cheap to have a blank implementation, but if required we can cause
+  // the compiler to avoid calling this entirely through a compile-time constant.
+  virtual void CalculateValue() { }
+
+  // Units of this metric
+  const TCounterType::type unit_;
+
+  // Guards access to value_
+  boost::mutex lock_;
+
+  // The current value of the metric
+  T value_;
+};
+
+// Container for a set of metrics. A MetricGroup owns the memory for every metric
+// contained within it (see Add*() to create commonly used metric
+// types). Metrics are 'registered' with a MetricGroup, once registered they cannot be
+// deleted.
+//
+// MetricGroups may be organised hierarchically as a tree.
+//
+// Typically a metric object is cached by its creator after registration. If a metric must
+// be retrieved without an available pointer, FindMetricForTesting() will search the
+// MetricGroup and all its descendent MetricGroups in turn.
+//
+// TODO: Hierarchical naming: that is, resolve "group1.group2.metric-name" to a path
+// through the metric tree.
+class MetricGroup {
+ public:
+  MetricGroup(const std::string& name);
+
   // Registers a new metric. Ownership of the metric will be transferred to this
-  // Metrics object, so callers should take care not to destroy the Metric they
-  // pass in.
-  // If a metric already exists with the supplied metric's key, it is replaced.
-  // The template parameter M must be a subclass of Metric.
+  // MetricGroup object, so callers should take care not to destroy the Metric they pass
+  // in.
+  //
+  // It is an error to call twice with metrics with the same key. The template parameter
+  // M must be a subclass of Metric.
   template <typename M>
   M* RegisterMetric(M* metric) {
     boost::lock_guard<boost::mutex> l(lock_);
@@ -204,50 +217,109 @@ class Metrics {
     return mt;
   }
 
-  // Returns a metric by key.  Returns NULL if there is no metric with that
-  // key.  This is not a very cheap operation and should not be called in a loop.
-  // If the metric needs to be updated in a loop, the returned metric should be cached.
-  template <typename M>
-  M* GetMetric(const std::string& key) {
-    boost::lock_guard<boost::mutex> l(lock_);
-    MetricMap::iterator it = metric_map_.find(key);
-    if (it == metric_map_.end()) return NULL;
-    return reinterpret_cast<M*>(it->second);
+  // Create a gauge metric object with given key and initial value (owned by this object)
+  template<typename T>
+  SimpleMetric<T>* AddGauge(const std::string& key,
+      const T& value, const TCounterType::type unit = TCounterType::NONE,
+      const std::string& description = "") {
+    return RegisterMetric(new SimpleMetric<T, TMetricKind::GAUGE>
+        (key, unit, value, description));
   }
 
-  // Register page callbacks with the webserver
+  template<typename T>
+  SimpleMetric<T, TMetricKind::PROPERTY>* AddProperty(
+      const std::string& key, const T& value,
+      const std::string& description = "") {
+    return RegisterMetric(new SimpleMetric<T, TMetricKind::PROPERTY> (key,
+        TCounterType::NONE, value, description));
+  }
+
+  template<typename T>
+  SimpleMetric<T, TMetricKind::COUNTER>* AddCounter(const std::string& key,
+      const T& value, const TCounterType::type unit = TCounterType::UNIT,
+      const std::string& description = "") {
+    return RegisterMetric(
+        new SimpleMetric<T, TMetricKind::COUNTER>(key, unit, value, description));
+  }
+
+  // Returns a metric by key. All MetricGroups reachable from this group are searched in
+  // depth-first order, starting with the root group.  Returns NULL if there is no metric
+  // with that key. This is not a very cheap operation; the result should be cached where
+  // possible.
+  //
+  // Used for testing only.
+  template <typename M>
+  M* FindMetricForTesting(const std::string& key) {
+    boost::lock_guard<boost::mutex> l(lock_);
+    std::stack<MetricGroup*> groups;
+    groups.push(this);
+    while (!groups.empty()) {
+      MetricGroup* group = groups.top();
+      groups.pop();
+      MetricMap::const_iterator it = group->metric_map_.find(key);
+      if (it != group->metric_map_.end()) return reinterpret_cast<M*>(it->second);
+      BOOST_FOREACH(const ChildGroupMap::value_type& child, group->children_) {
+        groups.push(child.second);
+      }
+    }
+    return NULL;
+  }
+
+  // Register page callbacks with the webserver. Only the root of any metric group
+  // hierarchy needs to do this.
   Status Init(Webserver* webserver);
 
-  // Useful for debuggers, returns the output of TextCallback
+  // Converts this metric group (and optionally all of its children recursively) to JSON.
+  void ToJson(bool include_children, rapidjson::Document* document,
+      rapidjson::Value* out_val);
+
+  // Creates or returns an already existing child metric group.
+  MetricGroup* GetChildGroup(const std::string& name);
+
+  // Useful for debuggers, returns the output of CMCompatibleCallback().
   std::string DebugString();
 
-  // Same as above, but for Json output
-  std::string DebugStringJson();
+  const std::string& name() const { return name_; }
 
  private:
   // Pool containing all metric objects
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
-  // Contains all Metric objects, indexed by key
-  typedef std::map<std::string, GenericMetric*> MetricMap;
-  MetricMap metric_map_;
+  // Name of this metric group.
+  std::string name_;
 
-  // Guards metric_map_
+  // Guards metric_map_ and children_
   boost::mutex lock_;
 
-  // Webserver callback (on /metrics), renders metrics as single text page
-  void TextCallback(const Webserver::ArgumentMap& args, rapidjson::Document* output);
+  // Contains all Metric objects, indexed by key
+  typedef std::map<std::string, Metric*> MetricMap;
+  MetricMap metric_map_;
 
-  // Webserver callback (on /jsonmetrics), renders metrics as a single json document
-  void JsonCallback(const Webserver::ArgumentMap& args, rapidjson::Document* document);
+  // All child metric groups
+  typedef std::map<std::string, MetricGroup*> ChildGroupMap;
+  ChildGroupMap children_;
+
+  // Webserver callback for /metrics. Produces a tree of JSON values, each representing a
+  // metric group, and each including a list of metrics, and a list of immediate children.
+  // If args contains a paramater 'metric', only the json for that metric is returned.
+  void TemplateCallback(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
+
+  // Legacy webpage callback for CM 5.0 and earlier. Produces a flattened map of (key,
+  // value) pairs for all metrics in this hierarchy.
+  // If args contains a paramater 'metric', only the json for that metric is returned.
+  void CMCompatibleCallback(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
 };
 
-// Specialize int metrics to use atomics and avoid locking
-template<>
-inline int64_t Metrics::PrimitiveMetric<int64_t>::Increment(const int64_t& delta) {
-  return __sync_add_and_fetch(&value_, delta);
-}
+// We write 'Int' as a placeholder for all integer types.
+typedef class SimpleMetric<int64_t, TMetricKind::GAUGE> IntGauge;
+typedef class SimpleMetric<uint64_t, TMetricKind::GAUGE> UIntGauge;
+typedef class SimpleMetric<double, TMetricKind::GAUGE> DoubleGauge;
+typedef class SimpleMetric<int64_t, TMetricKind::COUNTER> IntCounter;
 
+typedef class SimpleMetric<bool, TMetricKind::PROPERTY> BooleanProperty;
+typedef class SimpleMetric<std::string, TMetricKind::PROPERTY> StringProperty;
 
 }
 
