@@ -1242,12 +1242,14 @@ public class Planner {
   /**
    * Transform '=', '<[=]' and '>[=]' comparisons for given slot into
    * ValueRange. Also removes those predicates which were used for the construction
-   * of ValueRange from 'conjuncts_'. Only looks at comparisons w/ constants
+   * of ValueRange from 'conjuncts_'. Only looks at comparisons w/ string constants
    * (ie, the bounds of the result can be evaluated with Expr::GetValue(NULL)).
+   * HBase row key filtering works only if the row key is mapped to a string column and
+   * the expression is a string constant expression.
    * If there are multiple competing comparison predicates that could be used
    * to construct a ValueRange, only the first one from each category is chosen.
    */
-  private ValueRange createScanRange(SlotDescriptor d, List<Expr> conjuncts) {
+  private ValueRange createHBaseValueRange(SlotDescriptor d, List<Expr> conjuncts) {
     ListIterator<Expr> i = conjuncts.listIterator();
     ValueRange result = null;
     while (i.hasNext()) {
@@ -1256,7 +1258,10 @@ public class Planner {
       BinaryPredicate comp = (BinaryPredicate) e;
       if (comp.getOp() == BinaryPredicate.Operator.NE) continue;
       Expr slotBinding = comp.getSlotBinding(d.getId());
-      if (slotBinding == null || !slotBinding.isConstant()) continue;
+      if (slotBinding == null || !slotBinding.isConstant() ||
+          slotBinding.getType() != PrimitiveType.STRING) {
+        continue;
+      }
 
       if (comp.getOp() == BinaryPredicate.Operator.EQ) {
         i.remove();
@@ -1403,7 +1408,7 @@ public class Planner {
       } else {
         // create ValueRange from conjuncts_ for slot; also removes conjuncts_ that were
         // used as input for filter
-        keyRanges.add(createScanRange(slotDesc, conjuncts));
+        keyRanges.add(createHBaseValueRange(slotDesc, conjuncts));
       }
     }
 

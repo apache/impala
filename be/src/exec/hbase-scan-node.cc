@@ -124,6 +124,9 @@ Status HBaseScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   JNIEnv* env = getJNIEnv();
+
+  // No need to initialize hbase_scanner_ if there are no scan ranges.
+  if (scan_range_vector_.size() == 0) return Status::OK;
   return hbase_scanner_->StartScan(env, tuple_desc_, scan_range_vector_, filters_);
 }
 
@@ -154,7 +157,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   // TODO: need to understand how the time is spent inside this function.
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
-  if (ReachedLimit()) {
+
+  if (scan_range_vector_.empty() || ReachedLimit()) {
     *eos = true;
     return Status::OK;
   }

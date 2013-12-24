@@ -769,3 +769,160 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ====
+# IMP-1188 - row key predicate is a constant expr.
+select * from functional_hbase.stringids
+where id = concat('', '5')
+and tinyint_col = 5
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     start key: 5
+     stop key: 5\0
+     predicates: tinyint_col = 5
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     start key: 5
+     stop key: 5\0
+     predicates: tinyint_col = 5
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60202 5:5\0
+====
+# IMP-1188 - row key predicate is a constant expr.
+select * from functional_hbase.stringids
+where string_col = '4' and tinyint_col = 5
+  and id >= concat('', '4') and id <= concat('5', '')
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     start key: 4
+     stop key: 5\0
+     hbase filters: d:string_col EQUAL '4'
+     predicates: tinyint_col = 5
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     start key: 4
+     stop key: 5\0
+     hbase filters: d:string_col EQUAL '4'
+     predicates: tinyint_col = 5
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60202 4:5\0
+====
+# IMP-1188 - row key predicate is null.
+select * from functional_hbase.stringids where id = null
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     empty scan node
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     empty scan node
+====
+# IMP-1188 - row key lower bound is bigger than upper bound.
+select * from functional_hbase.stringids where id > 'b' and id < 'a'
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     empty scan node
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     empty scan node
+====
+# IMP-1188 - casting row key to non-string type disables predicate from being pushed
+# into HBase
+select * from functional_hbase.stringids
+where cast(id as int) < 5
+---- PLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     predicates: CAST(id AS INT) < 5
+---- DISTRIBUTEDPLAN
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  1:EXCHANGE
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  0:SCAN HBASE
+     table:stringids
+     predicates: CAST(id AS INT) < 5
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
+====

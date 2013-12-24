@@ -42,6 +42,8 @@ import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.service.FeSupport;
+import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THBaseFilter;
 import com.cloudera.impala.thrift.THBaseKeyRange;
@@ -78,6 +80,11 @@ public class HBaseScanNode extends ScanNode {
   private byte[] startKey_ = HConstants.EMPTY_START_ROW;
   private byte[] stopKey_ = HConstants.EMPTY_END_ROW;
 
+  // True if this scan node is not going to scan anything. If the row key filter
+  // evaluates to null, or if the lower bound > upper bound, then this scan node won't
+  // scan at all.
+  private boolean isEmpty_ = false;
+
   // List of HBase Filters for generating thrift message. Filled in finalize().
   private final List<THBaseFilter> filters_ = new ArrayList<THBaseFilter>();
 
@@ -108,6 +115,7 @@ public class HBaseScanNode extends ScanNode {
   @Override
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
+    setStartStopKey(analyzer);
     computeStats(analyzer);
     // Convert predicates to HBase filters_.
     createHBaseFilters(analyzer);
@@ -118,38 +126,72 @@ public class HBaseScanNode extends ScanNode {
   }
 
   /**
-   * Also sets suggestedCaching_.
+   * Convert keyRanges_ to startKey_ and stopKey_.
+   * If ValueRange is not null, transform it into start/stopKey_ by evaluating the
+   * expression. Analysis has checked that the expression is string type. If the
+   * expression evaluates to null, then there's nothing to scan because Hbase row key
+   * cannot be null.
+   * At present, we only do row key filtering for string-mapped keys. String-mapped keys
+   * are always encded as ascii.
+   * ValueRange is null if there is no predicate on the row-key.
    */
-  @Override
-  public void computeStats(Analyzer analyzer) {
+  private void setStartStopKey(Analyzer analyzer) throws InternalException {
     Preconditions.checkNotNull(keyRanges_);
     Preconditions.checkState(keyRanges_.size() == 1);
-    super.computeStats(analyzer);
-    HBaseTable tbl = (HBaseTable) desc_.getTable();
 
-    // If ValueRange is not null, transform it into start/stopKey_ by printing the values.
-    // At present, we only do that for string-mapped keys because the hbase
-    // data is stored as text.
-    // ValueRange is null if there is no qualification on the row-key.
     ValueRange rowRange = keyRanges_.get(0);
     if (rowRange != null) {
       if (rowRange.getLowerBound() != null) {
         Preconditions.checkState(rowRange.getLowerBound().isConstant());
-        Preconditions.checkState(rowRange.getLowerBound() instanceof StringLiteral);
-        startKey_ = convertToBytes(
-            ((StringLiteral) rowRange.getLowerBound()).getValue(),
-            !rowRange.getLowerBoundInclusive());
+        Preconditions.checkState(rowRange.getLowerBound().getType() ==
+            PrimitiveType.STRING);
+        TColumnValue val = FeSupport.EvalConstExpr(rowRange.getLowerBound(),
+            analyzer.getQueryGlobals());
+        if (!val.isSetStringVal()) {
+          // lower bound is null.
+          isEmpty_ = true;
+          return;
+        } else {
+          startKey_ = convertToBytes(val.getStringVal(),
+              !rowRange.getLowerBoundInclusive());
+        }
       }
       if (rowRange.getUpperBound() != null) {
         Preconditions.checkState(rowRange.getUpperBound().isConstant());
-        Preconditions.checkState(rowRange.getUpperBound() instanceof StringLiteral);
-        stopKey_ = convertToBytes(
-            ((StringLiteral) rowRange.getUpperBound()).getValue(),
-            rowRange.getUpperBoundInclusive());
+        Preconditions.checkState(rowRange.getUpperBound().getType() ==
+            PrimitiveType.STRING);
+        TColumnValue val = FeSupport.EvalConstExpr(rowRange.getUpperBound(),
+            analyzer.getQueryGlobals());
+        if (!val.isSetStringVal()) {
+          // upper bound is null.
+          isEmpty_ = true;
+          return;
+        } else {
+          stopKey_ = convertToBytes(val.getStringVal(),
+              rowRange.getUpperBoundInclusive());
+        }
       }
     }
 
-    if (rowRange != null && rowRange.isEqRange()) {
+    boolean endKeyIsEndOfTable = Bytes.equals(stopKey_, HConstants.EMPTY_END_ROW);
+    if ((Bytes.compareTo(startKey_, stopKey_) > 0) && !endKeyIsEndOfTable) {
+      // Lower bound is greater than upper bound.
+      isEmpty_ = true;
+    }
+  }
+
+  /**
+   * Also sets suggestedCaching_.
+   */
+  @Override
+  public void computeStats(Analyzer analyzer) {
+    super.computeStats(analyzer);
+    HBaseTable tbl = (HBaseTable) desc_.getTable();
+
+    ValueRange rowRange = keyRanges_.get(0);
+    if (isEmpty_) {
+      cardinality_ = 0;
+    } else if (rowRange != null && rowRange.isEqRange()) {
       cardinality_ = 1;
     } else {
      // Set maxCaching so that each fetch from hbase won't return a batch of more than
@@ -180,6 +222,7 @@ public class HBaseScanNode extends ScanNode {
         .add("hbaseTblName", tbl.getHBaseTableName())
         .add("startKey", ByteBuffer.wrap(startKey_).toString())
         .add("stopKey", ByteBuffer.wrap(stopKey_).toString())
+        .add("isEmpty", isEmpty_)
         .addValue(super.debugString())
         .toString();
   }
@@ -244,6 +287,11 @@ public class HBaseScanNode extends ScanNode {
    */
   @Override
   public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
+    List<TScanRangeLocations> result = Lists.newArrayList();
+
+    // For empty scan node, return an empty list.
+    if (isEmpty_) return result;
+
     // Retrieve relevant HBase regions and their region servers
     HBaseTable tbl = (HBaseTable) desc_.getTable();
     HTable hbaseTbl = null;
@@ -270,7 +318,6 @@ public class HBaseScanNode extends ScanNode {
       }
     }
 
-    List<TScanRangeLocations> result = Lists.newArrayList();
     for (Map.Entry<String, List<HRegionLocation>> locEntry: locationMap.entrySet()) {
       // HBaseTableScanner(backend) initializes a result scanner for each key range.
       // To minimize # of result scanner re-init, create only a single HBaseKeyRange
@@ -351,6 +398,10 @@ public class HBaseScanNode extends ScanNode {
     HBaseTable tbl = (HBaseTable) desc_.getTable();
     StringBuilder output = new StringBuilder()
         .append(prefix + "table:" + tbl.getName() + "\n");
+    if (isEmpty_) {
+      output.append(prefix + "empty scan node\n");
+      return output.toString();
+    }
     if (!Bytes.equals(startKey_, HConstants.EMPTY_START_ROW)) {
       output.append(prefix + "start key: " + printKey(startKey_) + "\n");
     }

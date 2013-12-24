@@ -65,8 +65,8 @@ bigint
 # combinations
 select count(*)
 from functional_hbase.stringids
-where id > '5'
-and id < '6'
+where id > concat('', '5')
+and id < concat('6', '')
 ---- TYPES
 bigint
 ---- RESULTS
@@ -113,4 +113,30 @@ and smallint_col < 5
 bigint
 ---- RESULTS
 180
+====
+---- QUERY
+# IMP-1188 - row key lower bound is bigger than upper bound.
+select count(*) from functional_hbase.stringids where id > 'b' and id < 'a'
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMP-1188 - row key predicate is null.
+select count(*) from functional_hbase.stringids
+where id > cast(cast('sdfs' as int) as string)
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMP-1188 - cast string row key to int
+select count(*) from functional_hbase.stringids
+where cast(id as int) < 5
+---- RESULTS
+5
+---- TYPES
+BIGINT
 ====
