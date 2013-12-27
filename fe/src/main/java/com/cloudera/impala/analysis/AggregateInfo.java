@@ -570,6 +570,7 @@ public class AggregateInfo {
    * - for distinct aggregation, we mark all aggregate output slots in order to keep
    *   things simple
    * Also computes materializedAggregateExprs.
+   * This call must be idempotent because it may be called more than once for Union stmt.
    */
   public void materializeRequiredSlots(Analyzer analyzer, Expr.SubstitutionMap smap) {
     for (int i = 0; i < groupingExprs_.size(); ++i) {
@@ -578,6 +579,7 @@ public class AggregateInfo {
 
     // collect input exprs: grouping exprs plus aggregate exprs that need to be
     // materialized
+    materializedAggregateSlots_.clear();
     List<Expr> exprs = Lists.newArrayList();
     exprs.addAll(groupingExprs_);
     for (int i = 0; i < aggregateExprs_.size(); ++i) {

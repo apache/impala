@@ -19,7 +19,6 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.ImpalaException;
 import com.google.common.collect.Lists;
 
 /**
@@ -157,6 +156,7 @@ public abstract class QueryStmt extends StatementBase {
    * Returns the materialized tuple ids of the output of this stmt.
    * Used in case this stmt is part of an @InlineViewRef,
    * since we need to know the materialized tupls ids of a TableRef.
+   * This call must be idempotent because it may be called more than once for Union stmt.
    */
   public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
 

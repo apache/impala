@@ -784,3 +784,14 @@ tinyint, string, null, float
 1,'a',NULL,10.0
 2,'b',NULL,20.0
 ====
+---- QUERY
+# Test UNION DISTINCT with GROUP BY
+select id, count(*) from alltypes where id = 1 group by id
+union distinct
+select 2, 3
+---- TYPES
+int, bigint
+---- RESULTS
+1,1
+2,3
+====
