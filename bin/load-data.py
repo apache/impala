@@ -194,6 +194,15 @@ def exec_impala_query_from_file_parallel(query_files):
   # finished putting their results in the queue.
   for thread in threads: thread.join()
 
+def invalidate_impala_metadata():
+  print "Invalidating Metadata"
+  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
+  impala_client.connect()
+  try:
+    impala_client.execute('invalidate metadata')
+  finally:
+    impala_client.close_connection()
+
 if __name__ == "__main__":
   all_workloads = available_workloads(WORKLOAD_DIR)
   workloads = []
@@ -229,24 +238,18 @@ if __name__ == "__main__":
     impala_load_files = [f for f in dataset_dir_contents if load_filename in f]
 
     # Execute the data loading scripts.
-    # Creating tables in Impala have no dependencies, so we execute them first.
+    # Creating tables in Impala has no dependencies, so we execute them first.
     # HBase table inserts are done via hive, so the hbase tables need to be created before
     # running the hive script. Finally, some of the Impala inserts depend on hive tables,
     # so they're done at the end.
     exec_impala_query_from_file_parallel(impala_create_files)
     exec_hbase_query_from_file('load-%s-hbase-generated.create' % load_file_substr)
     exec_hive_query_from_file('load-%s-hive-generated.sql' % load_file_substr)
+    if impala_load_files: invalidate_impala_metadata()
     exec_impala_query_from_file_parallel(impala_load_files)
     loading_time_map[workload] = time.time() - start_time
 
-  print "Invalidating metadata"
-  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
-  impala_client.connect()
-  try:
-    impala_client.execute('invalidate metadata')
-  finally:
-    impala_client.close_connection()
-
+  invalidate_impala_metadata()
   total_time = 0.0
   for workload, load_time in loading_time_map.iteritems():
     total_time += load_time
