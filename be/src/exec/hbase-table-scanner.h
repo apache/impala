@@ -157,6 +157,8 @@ class HBaseTableScanner {
   static jclass filter_list_op_cl_;
   static jclass single_column_value_filter_cl_;
   static jclass compare_op_cl_;
+  // Exceptions thrown when a ResultScanner times out
+  static jclass scanner_timeout_ex_cl_;
 
   static jmethodID scan_ctor_;
   static jmethodID scan_set_max_versions_id_;
@@ -241,6 +243,14 @@ class HBaseTableScanner {
   // HBase specific counters
   RuntimeProfile::Counter* scan_setup_timer_;
 
+  // Checks for and handles a ScannerTimeoutException which is thrown if the
+  // ResultScanner times out. If a timeout occurs, the ResultScanner is re-created
+  // (with the scan range adjusted if some results have already been returned) and
+  // the exception is cleared. If any other exception is thrown, the error message
+  // is returned in the status.
+  // 'timeout' is true if a ScannerTimeoutException was thrown, false otherwise.
+  Status HandleResultScannerTimeout(JNIEnv* env, bool* timeout);
+
   // Lexicographically compares s with the string in data having given length.
   // Returns a value > 0 if s is greater, a value < 0 if s is smaller,
   // and 0 if they are equal.
@@ -255,6 +265,9 @@ class HBaseTableScanner {
 
   // Initialize the scan to the given range
   Status InitScanRange(JNIEnv* env, const ScanRange& scan_range);
+  // Initialize the scan range to the scan range specified by the start and end byte
+  // arrays
+  Status InitScanRange(JNIEnv* env, jbyteArray start_bytes, jbyteArray end_bytes);
 
   // Copies the row key of cell into value_pool_ and returns it via *data and *length.
   inline void GetRowKey(JNIEnv* env, jobject cell, void** data, int* length);

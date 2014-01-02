@@ -393,32 +393,35 @@ public class HBaseTable extends Table {
         // Try and get deletes too so their size can be counted.
         s.setRaw(true);
         ResultScanner rs = hTable_.getScanner(s);
-
-        // And get the the ROW_COUNT_ESTIMATE_BATCH_SIZE fetched rows
-        // for a representative sample
-        for (int i = 0; i < ROW_COUNT_ESTIMATE_BATCH_SIZE; i++) {
-          Result r = rs.next();
-          if (r == null) break;
-          currentRowCount += 1;
-          for (KeyValue kv : r.list()) {
-            // some extra row size added to make up for shared overhead
-            currentRowSize += kv.getRowLength() // row key
-                + 4 // row key length field
-                + kv.getFamilyLength() // Column family bytes
-                + 4  // family length field
-                + kv.getQualifierLength() // qualifier bytes
-                + 4 // qualifier length field
-                + kv.getValueLength() // length of the value
-                + 4 // value length field
-                + 10; // extra overhead for hfile index, checksums, metadata, etc
+          try {
+          // And get the the ROW_COUNT_ESTIMATE_BATCH_SIZE fetched rows
+          // for a representative sample
+          for (int i = 0; i < ROW_COUNT_ESTIMATE_BATCH_SIZE; i++) {
+            Result r = rs.next();
+            if (r == null) break;
+            currentRowCount += 1;
+            for (KeyValue kv : r.list()) {
+              // some extra row size added to make up for shared overhead
+              currentRowSize += kv.getRowLength() // row key
+                  + 4 // row key length field
+                  + kv.getFamilyLength() // Column family bytes
+                  + 4  // family length field
+                  + kv.getQualifierLength() // qualifier bytes
+                  + 4 // qualifier length field
+                  + kv.getValueLength() // length of the value
+                  + 4 // value length field
+                  + 10; // extra overhead for hfile index, checksums, metadata, etc
+            }
           }
+          // add these values to the cumulative totals in one shot just
+          // in case there was an error in between getting the hdfs
+          // size and the row/column sizes.
+          hdfsSize += currentHdfsSize;
+          rowCount += currentRowCount;
+          rowSize  += currentRowSize;
+        } finally {
+          rs.close();
         }
-        // add these values to the cumulative totals in one shot just
-        // in case there was an error in between getting the hdfs
-        // size and the row/column sizes.
-        hdfsSize += currentHdfsSize;
-        rowCount += currentRowCount;
-        rowSize  += currentRowSize;
       }
     } catch (IOException ioe) {
       // Print the stack trace, but we'll ignore it

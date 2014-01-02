@@ -212,8 +212,10 @@ class JniUtil {
   static Status Cleanup();
 
   // Returns the error message for 'e'. If no exception, returns Status::OK
-  // Prefix, if non-empty will be prepended to the error message.
-  static Status GetJniExceptionMsg(JNIEnv* env, const std::string& prefx = "");
+  // log_stack determines if the stack trace is written to the log
+  // prefix, if non-empty will be prepended to the error message.
+  static Status GetJniExceptionMsg(JNIEnv* env, bool log_stack = true,
+      const std::string& prefix = "");
 
   // Utility methods to avoid repeating lots of the JNI call boilerplate. It seems these
   // must be defined in the header to compile properly.

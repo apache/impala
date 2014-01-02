@@ -147,7 +147,7 @@ Status JniUtil::Cleanup() {
   return Status::OK;
 }
 
-Status JniUtil::GetJniExceptionMsg(JNIEnv* env, const string& prefix) {
+Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& prefix) {
   jthrowable exc = (env)->ExceptionOccurred();
   if (exc == NULL) return Status::OK;
   env->ExceptionClear();
@@ -158,11 +158,13 @@ Status JniUtil::GetJniExceptionMsg(JNIEnv* env, const string& prefix) {
   string error_msg =
       (reinterpret_cast<const char*>(env->GetStringUTFChars(msg, &is_copy)));
 
-  jstring stack = (jstring) env->CallStaticObjectMethod(jni_util_class(),
-      throwable_to_stack_trace_id(), exc);
-  const char* c_stack =
+  if (log_stack) {
+    jstring stack = (jstring) env->CallStaticObjectMethod(jni_util_class(),
+        throwable_to_stack_trace_id(), exc);
+    const char* c_stack =
       reinterpret_cast<const char*>(env->GetStringUTFChars(stack, &is_copy));
-  VLOG(1) << string(c_stack);
+    VLOG(1) << string(c_stack);
+  }
 
   env->ExceptionClear();
   env->DeleteLocalRef(exc);

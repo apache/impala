@@ -37,6 +37,7 @@ jclass HBaseTableScanner::filter_list_cl_ = NULL;
 jclass HBaseTableScanner::filter_list_op_cl_ = NULL;
 jclass HBaseTableScanner::single_column_value_filter_cl_ = NULL;
 jclass HBaseTableScanner::compare_op_cl_ = NULL;
+jclass HBaseTableScanner::scanner_timeout_ex_cl_ = NULL;
 jmethodID HBaseTableScanner::scan_ctor_ = NULL;
 jmethodID HBaseTableScanner::scan_set_max_versions_id_ = NULL;
 jmethodID HBaseTableScanner::scan_set_caching_id_ = NULL;
@@ -141,6 +142,10 @@ Status HBaseTableScanner::Init() {
       JniUtil::GetGlobalClassRef(env,
           "org/apache/hadoop/hbase/filter/CompareFilter$CompareOp",
           &compare_op_cl_));
+  RETURN_IF_ERROR(
+      JniUtil::GetGlobalClassRef(env,
+          "org/apache/hadoop/hbase/client/ScannerTimeoutException",
+          &scanner_timeout_ex_cl_));
 
   // Distinguish HBase versions by checking for the existence of the Cell class.
   // HBase 0.95.2: Use Cell class and corresponding methods.
@@ -393,6 +398,35 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
   return Status::OK;
 }
 
+Status HBaseTableScanner::HandleResultScannerTimeout(JNIEnv* env, bool* timeout) {
+  *timeout = false;
+  jthrowable exc = env->ExceptionOccurred();
+  if (exc == NULL) return Status::OK;
+
+  // GetJniExceptionMsg gets the error message and clears the exception status (which is
+  // necessary). We return the error if the exception was not a ScannerTimeoutException.
+  Status status = JniUtil::GetJniExceptionMsg(env, false);
+  if (env->IsInstanceOf(exc, scanner_timeout_ex_cl_) != JNI_TRUE) return status;
+
+  *timeout = true;
+  const ScanRange& scan_range = scan_range_vector_->at(current_scan_range_idx_);
+  // If cells_ is NULL, then the ResultScanner timed out before it was ever used
+  // so we can just re-create the ResultScanner with the same scan_range
+  if (cells_ == NULL) return InitScanRange(env, scan_range);
+
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(env));
+  DCHECK_LT(cell_index_, num_cells_);
+  jobject cell = env->GetObjectArrayElement(cells_, cell_index_);
+  // Specifically set the start_bytes to the next row since some of them were already
+  // read
+  jbyteArray start_bytes =
+    (jbyteArray) env->CallObjectMethod(cell, cell_get_row_array_);
+  jbyteArray end_bytes;
+  CreateByteArray(env, scan_range.stop_key(), &end_bytes);
+  return InitScanRange(env, start_bytes, end_bytes);
+}
+
 Status HBaseTableScanner::InitScanRange(JNIEnv* env, const ScanRange& scan_range) {
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(env));
@@ -400,7 +434,11 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, const ScanRange& scan_range
   CreateByteArray(env, scan_range.start_key(), &start_bytes);
   jbyteArray end_bytes;
   CreateByteArray(env, scan_range.stop_key(), &end_bytes);
+  return InitScanRange(env, start_bytes, end_bytes);
+}
 
+Status HBaseTableScanner::InitScanRange(JNIEnv* env, jbyteArray start_bytes,
+    jbyteArray end_bytes) {
   // scan_.setStartRow(start_bytes);
   env->CallObjectMethod(scan_, scan_set_start_row_id_, start_bytes);
   RETURN_ERROR_IF_EXC(env);
@@ -409,12 +447,16 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, const ScanRange& scan_range
   env->CallObjectMethod(scan_, scan_set_stop_row_id_, end_bytes);
   RETURN_ERROR_IF_EXC(env);
 
+  if (resultscanner_ != NULL) {
+    // resultscanner_.close();
+    env->CallObjectMethod(resultscanner_, resultscanner_close_id_);
+    RETURN_ERROR_IF_EXC(env);
+    env->DeleteGlobalRef(resultscanner_);
+    resultscanner_ = NULL;
+  }
   // resultscanner_ = htable_.getScanner(scan_);
-  if (resultscanner_ != NULL) env->DeleteGlobalRef(resultscanner_);
   RETURN_IF_ERROR(htable_->GetResultScanner(scan_, &resultscanner_));
-
   resultscanner_ = env->NewGlobalRef(resultscanner_);
-
   RETURN_ERROR_IF_EXC(env);
   return Status::OK;
 }
@@ -428,7 +470,10 @@ Status HBaseTableScanner::StartScan(JNIEnv* env, const TupleDescriptor* tuple_de
   scan_range_vector_ = &scan_range_vector;
   current_scan_range_idx_ = 0;
 
-  // Now, scan the first range (we should have at least one range.)
+  // Now, scan the first range (we should have at least one range). The
+  // resultscanner_ is NULL and gets created in InitScanRange, so we don't
+  // need to check if it timed out.
+  DCHECK(resultscanner_ == NULL);
   return InitScanRange(env, scan_range_vector_->at(current_scan_range_idx_));
 }
 
@@ -454,8 +499,20 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
   {
     SCOPED_TIMER(scan_node_->read_timer());
     while (true) {
+      DCHECK(resultscanner_ != NULL);
       // result_ = resultscanner_.next();
       result = env->CallObjectMethod(resultscanner_, resultscanner_next_id_);
+      // Normally we would check for a JNI exception via RETURN_ERROR_IF_EXC, but we
+      // need to also check for scanner timeouts and handle them specially, which is
+      // done by HandleResultScannerTimeout(). If a timeout occurred, then it will
+      // re-create the ResultScanner so we can try again.
+      bool timeout;
+      RETURN_IF_ERROR(HandleResultScannerTimeout(env, &timeout));
+      if (timeout) {
+        result = env->CallObjectMethod(resultscanner_, resultscanner_next_id_);
+        // There shouldn't be a timeout now, so we will just return any errors.
+        RETURN_ERROR_IF_EXC(env);
+      }
 
       // jump to the next region when finished with the current region.
       if (result == NULL &&
@@ -653,7 +710,22 @@ void HBaseTableScanner::Close(JNIEnv* env) {
   if (resultscanner_ != NULL) {
     // resultscanner_.close();
     env->CallObjectMethod(resultscanner_, resultscanner_close_id_);
+    // Manually check if the ResultScanner timed out so that we can log a less scary
+    // and more specific message.
+    jthrowable exc = env->ExceptionOccurred();
+    if (exc != NULL) {
+      if (env->IsInstanceOf(exc, scanner_timeout_ex_cl_) == JNI_TRUE) {
+        env->ExceptionClear();
+        LOG(INFO) << "ResultScanner timed out before it was closed "
+                  << "(this does not necessarily indicate a problem)";
+      } else {
+        // GetJniExceptionMsg will clear the exception status and log
+        JniUtil::GetJniExceptionMsg(env, true,
+            "Unknown error occurred while closing ResultScanner: ");
+      }
+    }
     env->DeleteGlobalRef(resultscanner_);
+    resultscanner_ = NULL;
   }
   if (scan_ != NULL) env->DeleteGlobalRef(scan_);
   if (cells_ != NULL) env->DeleteGlobalRef(cells_);
