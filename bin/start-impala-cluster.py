@@ -52,6 +52,8 @@ parser.add_option("--wait_for_cluster", dest="wait_for_cluster", action="store_t
                   "queries before returning.")
 parser.add_option("--log_level", type="int", dest="log_level", default=1,
                    help="Set the impalad backend logging level")
+parser.add_option("--jvm_args", dest="jvm_args", default="",
+                  help="Additional arguments to pass to the JVM(s) during startup.")
 
 options, args = parser.parse_args()
 
@@ -68,6 +70,7 @@ MINI_IMPALA_CLUSTER_PATH = IMPALAD_PATH + " -in-process"
 IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
 IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d "
                  "-state_store_subscriber_port=%d -webserver_port=%d")
+JVM_ARGS = "-jvm_debug_port=%s -jvm_args=%s"
 BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=%s -logbufsecs=5"
 CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 
@@ -103,15 +106,15 @@ def start_statestore():
 def start_catalogd():
   print "Starting Catalog Service logging to %s/catalogd.INFO" % options.log_dir
   stderr_log_file_path = os.path.join(options.log_dir, "catalogd-error.log")
-  args = "%s %s" % (build_impalad_logging_args(0, "catalogd"),
-                    options.catalogd_args)
+  args = "%s %s %s" % (build_impalad_logging_args(0, "catalogd"),
+                       options.catalogd_args, build_jvm_args(options.cluster_size))
   exec_impala_process(CATALOGD_PATH, args, stderr_log_file_path)
 
 def start_mini_impala_cluster(cluster_size):
   print ("Starting in-process Impala Cluster logging "
          "to %s/mini-impala-cluster.INFO" % options.log_dir)
-  args = "-num_backends=%s" % (cluster_size)
-  args += ' ' + build_impalad_logging_args(0, 'mini-impala-cluster')
+  args = "-num_backends=%s %s" %\
+         (cluster_size, build_impalad_logging_args(0, 'mini-impala-cluster'))
   stderr_log_file_path = os.path.join(options.log_dir, 'mini-impala-cluster-error.log')
   exec_impala_process(MINI_IMPALA_CLUSTER_PATH, args, stderr_log_file_path)
 
@@ -124,11 +127,15 @@ def build_impalad_port_args(instance_num):
   return IMPALAD_PORTS % (BASE_BEESWAX_PORT + instance_num, BASE_HS2_PORT + instance_num,
                           BASE_BE_PORT + instance_num,
                           BASE_STATE_STORE_SUBSCRIBER_PORT + instance_num,
-                          BASE_WEBSERVER_PORT +instance_num)
+                          BASE_WEBSERVER_PORT + instance_num)
 
 def build_impalad_logging_args(instance_num, service_name):
   log_file_path = os.path.join(options.log_dir, "%s.INFO" % service_name)
   return BE_LOGGING_ARGS % (service_name, options.log_dir, options.log_level)
+
+def build_jvm_args(instance_num):
+  BASE_JVM_DEBUG_PORT = 30000
+  return JVM_ARGS % (BASE_JVM_DEBUG_PORT + instance_num, options.jvm_args)
 
 def start_impalad_instances(cluster_size):
   # Start each impalad instance and optionally redirect the output to a log file.
@@ -138,8 +145,9 @@ def start_impalad_instances(cluster_size):
       service_name = "impalad"
     else:
       service_name = "impalad_node%s" % i
-    args = build_impalad_logging_args(i, service_name)
-    args += ' ' + build_impalad_port_args(i) +  ' ' + options.impalad_args
+    args = "%s %s %s %s" %\
+          (build_impalad_logging_args(i, service_name), build_jvm_args(i),
+           build_impalad_port_args(i), options.impalad_args)
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
 
