@@ -40,6 +40,7 @@
 #include "util/tcmalloc-metric.h"
 #include "util/webserver.h"
 #include "gen-cpp/ImpalaInternalService.h"
+#include "gen-cpp/CatalogService.h"
 
 using namespace std;
 using namespace boost;
@@ -69,7 +70,8 @@ ExecEnv* ExecEnv::exec_env_ = NULL;
 
 ExecEnv::ExecEnv()
   : stream_mgr_(new DataStreamMgr()),
-    client_cache_(new ImpalaInternalServiceClientCache()),
+    impalad_client_cache_(new ImpalaInternalServiceClientCache()),
+    catalogd_client_cache_(new CatalogServiceClientCache()),
     fs_cache_(new HdfsFsCache()),
     lib_cache_(new LibCache()),
     htable_factory_(new HBaseTableFactory()),
@@ -110,7 +112,8 @@ ExecEnv::ExecEnv()
 ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
                  int webserver_port, const string& statestore_host, int statestore_port)
   : stream_mgr_(new DataStreamMgr()),
-    client_cache_(new ImpalaInternalServiceClientCache()),
+    impalad_client_cache_(new ImpalaInternalServiceClientCache()),
+    catalogd_client_cache_(new CatalogServiceClientCache()),
     fs_cache_(new HdfsFsCache()),
     lib_cache_(new LibCache()),
     htable_factory_(new HBaseTableFactory()),
@@ -175,7 +178,8 @@ Status ExecEnv::StartServices() {
   }
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
-  client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
+  impalad_client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
+  catalogd_client_cache_->InitMetrics(metrics_.get(), "catalog.server");
   RegisterTcmallocMetrics(metrics_.get());
 
 #ifndef ADDRESS_SANITIZER

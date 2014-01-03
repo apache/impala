@@ -511,8 +511,8 @@ Status ImpalaServer::ExecuteInternal(
 
   *registered_exec_state = false;
 
-  exec_state->reset(new QueryExecState(
-      exec_env_, frontend_.get(), this, session_state, query_session_state, request.stmt));
+  exec_state->reset(new QueryExecState(exec_env_, frontend_.get(), this, session_state,
+      query_session_state, request.stmt));
 
   (*exec_state)->query_events()->MarkEvent("Start execution");
 
@@ -1456,7 +1456,7 @@ void ImpalaServer::MembershipCallback(
             vector<TNetworkAddress>& failed_hosts = queries_to_cancel[*query_id];
             failed_hosts.push_back(loc_entry->first);
           }
-          exec_env_->client_cache()->CloseConnections(loc_entry->first);
+          exec_env_->impalad_client_cache()->CloseConnections(loc_entry->first);
           // We can remove the location wholesale once we know backend's failed. To do so
           // safely during iteration, we have to be careful not in invalidate the current
           // iterator, so copy the iterator to do the erase(..) and advance the original.

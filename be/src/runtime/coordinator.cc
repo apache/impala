@@ -875,7 +875,7 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
 
   Status status;
   ImpalaInternalServiceConnection backend_client(
-      exec_env_->client_cache(), exec_state->backend_address, &status);
+      exec_env_->impalad_client_cache(), exec_state->backend_address, &status);
   RETURN_IF_ERROR(status);
 
   TExecPlanFragmentResult thrift_result;
@@ -965,7 +965,7 @@ void Coordinator::CancelRemoteFragments() {
     // keep going
     Status status;
     ImpalaInternalServiceConnection backend_client(
-        exec_env_->client_cache(), exec_state->backend_address, &status);
+        exec_env_->impalad_client_cache(), exec_state->backend_address, &status);
     if (!status.ok()) {
       continue;
     }

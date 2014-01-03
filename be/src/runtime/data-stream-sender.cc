@@ -147,7 +147,7 @@ class DataStreamSender::Channel {
 
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
-  client_cache_ = state->client_cache();
+  client_cache_ = state->impalad_client_cache();
   // TODO: figure out how to size batch_
   int capacity = max(1, buffer_size_ / max(row_desc_.GetRowSize(), 1));
   batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker_.get()));

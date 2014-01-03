@@ -37,7 +37,7 @@ class ImpalaServer::FragmentExecState {
       executor_(exec_env, boost::bind<void>(
           boost::mem_fn(&ImpalaServer::FragmentExecState::ReportStatusCb),
               this, _1, _2, _3)),
-      client_cache_(exec_env->client_cache()),
+      client_cache_(exec_env->impalad_client_cache()),
       coord_hostport_(coord_hostport) {
   }
 

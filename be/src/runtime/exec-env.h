@@ -65,7 +65,12 @@ class ExecEnv {
   }
 
   DataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
-  ImpalaInternalServiceClientCache* client_cache() { return client_cache_.get(); }
+  ImpalaInternalServiceClientCache* impalad_client_cache() {
+    return impalad_client_cache_.get();
+  }
+  CatalogServiceClientCache* catalogd_client_cache() {
+    return catalogd_client_cache_.get();
+  }
   HdfsFsCache* fs_cache() { return fs_cache_.get(); }
   LibCache* lib_cache() { return lib_cache_.get(); }
   HBaseTableFactory* htable_factory() { return htable_factory_.get(); }
@@ -95,7 +100,8 @@ class ExecEnv {
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
   boost::scoped_ptr<Scheduler> scheduler_;
   boost::scoped_ptr<StateStoreSubscriber> state_store_subscriber_;
-  boost::scoped_ptr<ImpalaInternalServiceClientCache> client_cache_;
+  boost::scoped_ptr<ImpalaInternalServiceClientCache> impalad_client_cache_;
+  boost::scoped_ptr<CatalogServiceClientCache> catalogd_client_cache_;
   boost::scoped_ptr<HdfsFsCache> fs_cache_;
   boost::scoped_ptr<LibCache> lib_cache_;
   boost::scoped_ptr<HBaseTableFactory> htable_factory_;

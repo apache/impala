@@ -30,27 +30,26 @@ DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
 
 Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
-  ThriftClient<CatalogServiceClient> client(FLAGS_catalog_service_host,
-      FLAGS_catalog_service_port, NULL, ThriftServer::ThreadPool);
+  Status status;
+  const TNetworkAddress& address =
+      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
+  CatalogServiceConnection client(client_cache_, address, &status);
+  RETURN_IF_ERROR(status);
   switch (request.op_type) {
     case TCatalogOpType::DDL: {
       // Compute stats stmts must be executed via ExecComputeStats().
       DCHECK(request.ddl_params.ddl_type != TDdlType::COMPUTE_STATS);
-      RETURN_IF_ERROR(client.Open());
       catalog_update_result_.reset(new TCatalogUpdateResult());
       exec_response_.reset(new TDdlExecResponse());
-      client.iface()->ExecDdl(*exec_response_.get(), request.ddl_params);
+      client->ExecDdl(*exec_response_.get(), request.ddl_params);
       catalog_update_result_.reset(
           new TCatalogUpdateResult(exec_response_.get()->result));
       return Status(exec_response_->result.status);
     }
     case TCatalogOpType::RESET_METADATA: {
-      ThriftClient<CatalogServiceClient> client(FLAGS_catalog_service_host,
-          FLAGS_catalog_service_port, NULL, ThriftServer::ThreadPool);
       TResetMetadataResponse response;
       catalog_update_result_.reset(new TCatalogUpdateResult());
-      RETURN_IF_ERROR(client.Open());
-      client.iface()->ResetMetadata(response, request.reset_metadata_params);
+      client->ResetMetadata(response, request.reset_metadata_params);
       catalog_update_result_.reset(new TCatalogUpdateResult(response.result));
       return Status(response.result.status);
     }

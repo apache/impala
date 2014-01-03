@@ -19,6 +19,7 @@
 #include <boost/scoped_ptr.hpp>
 #include "gen-cpp/cli_service_types.h"
 #include "gen-cpp/Frontend_types.h"
+#include "runtime/client-cache.h"
 
 namespace impala {
 
@@ -30,7 +31,8 @@ class Status;
 // operation.
 class CatalogOpExecutor {
  public:
-  CatalogOpExecutor() {}
+  CatalogOpExecutor(CatalogServiceClientCache* client_cache)
+      : client_cache_(client_cache) {}
 
   // Executes the given catalog operation against the catalog server.
   Status Exec(const TCatalogOpRequest& catalog_op);
@@ -75,6 +77,10 @@ class CatalogOpExecutor {
 
   // Result of executing a DDL request using the CatalogService
   boost::scoped_ptr<TCatalogUpdateResult> catalog_update_result_;
+
+  // Client cache to use when making connections to the catalog service. Not owned by this
+  // class.
+  CatalogServiceClientCache* client_cache_;
 };
 
 }

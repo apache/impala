@@ -109,7 +109,12 @@ class RuntimeState {
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
   LibCache* lib_cache() { return exec_env_->lib_cache(); }
   HBaseTableFactory* htable_factory() { return exec_env_->htable_factory(); }
-  ImpalaInternalServiceClientCache* client_cache() { return exec_env_->client_cache(); }
+  ImpalaInternalServiceClientCache* impalad_client_cache() {
+    return exec_env_->impalad_client_cache();
+  }
+  CatalogServiceClientCache* catalogd_client_cache() {
+    return exec_env_->catalogd_client_cache();
+  }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
   MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }

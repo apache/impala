@@ -273,12 +273,15 @@ class ClientCache {
 
 };
 
-// Impala backend client cache, used by a backend to send requests
-// to any other backend.
+// Common cache / connection types
+
 class ImpalaInternalServiceClient;
 typedef ClientCache<ImpalaInternalServiceClient> ImpalaInternalServiceClientCache;
 typedef ClientConnection<ImpalaInternalServiceClient> ImpalaInternalServiceConnection;
 
+class CatalogServiceClient;
+typedef ClientCache<CatalogServiceClient> CatalogServiceClientCache;
+typedef ClientConnection<CatalogServiceClient> CatalogServiceConnection;
 }
 
 #endif

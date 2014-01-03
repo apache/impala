@@ -127,7 +127,8 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       reset_req.reset_metadata_params.__set_is_refresh(true);
       reset_req.reset_metadata_params.__set_table_name(
           exec_request_.load_data_request.table_name);
-      catalog_op_executor_.reset(new CatalogOpExecutor());
+      catalog_op_executor_.reset(
+          new CatalogOpExecutor(exec_env_->catalogd_client_cache()));
       RETURN_IF_ERROR(catalog_op_executor_->Exec(reset_req));
       RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
           *catalog_op_executor_->update_catalog_result(),
@@ -284,7 +285,7 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
     return Status::OK;
   }
 
-  catalog_op_executor_.reset(new CatalogOpExecutor());
+  catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_->catalogd_client_cache()));
   Status status = catalog_op_executor_->Exec(exec_request_.catalog_op_request);
   {
     lock_guard<mutex> l(lock_);
@@ -519,13 +520,16 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
       catalog_update.target_table = finalize_params.table_name;
       catalog_update.db_name = finalize_params.table_db;
 
-      ThriftClient<CatalogServiceClient> client(FLAGS_catalog_service_host,
-          FLAGS_catalog_service_port, NULL, false);
-      RETURN_IF_ERROR(client.Open());
+      Status cnxn_status;
+      const TNetworkAddress& address =
+          MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
+      CatalogServiceConnection client(
+          exec_env_->catalogd_client_cache(), address, &cnxn_status);
+      RETURN_IF_ERROR(cnxn_status);
 
       VLOG_QUERY << "Executing FinalizeDml() using CatalogService";
       TUpdateCatalogResponse resp;
-      client.iface()->UpdateCatalog(resp, catalog_update);
+      client->UpdateCatalog(resp, catalog_update);
 
       Status status(resp.result.status);
       if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetErrorMsg();
@@ -608,7 +612,7 @@ void ImpalaServer::QueryExecState::MarkActive() {
 
 Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats() {
   DCHECK(child_queries_.size() == 2);
-  catalog_op_executor_.reset(new CatalogOpExecutor());
+  catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_->catalogd_client_cache()));
   Status status = catalog_op_executor_->ExecComputeStats(
       exec_request_.catalog_op_request.ddl_params.compute_stats_params,
       child_queries_[0].result_schema(),
