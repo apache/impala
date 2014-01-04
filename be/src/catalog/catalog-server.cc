@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "catalog/catalog-server.h"
+
+#include <gutil/strings/substitute.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
-#include "catalog/catalog-server.h"
 #include "catalog/catalog-util.h"
 #include "statestore/state-store-subscriber.h"
 #include "util/debug-util.h"
@@ -26,6 +28,7 @@ using namespace impala;
 using namespace std;
 using namespace boost;
 using namespace apache::thrift;
+using namespace strings;
 
 DEFINE_int32(catalog_service_port, 26000, "port where the CatalogService is running");
 DECLARE_string(state_store_host);
@@ -98,16 +101,14 @@ Status CatalogServer::Start() {
   TNetworkAddress server_address = MakeNetworkAddress(FLAGS_hostname,
       FLAGS_catalog_service_port);
 
-  stringstream subscriber_id;
-  subscriber_id << server_address;
-
   // This will trigger a full Catalog metadata load.
   catalog_.reset(new Catalog());
   catalog_update_gathering_thread_.reset(new Thread("catalog-server",
       "catalog-update-gathering-thread",
       &CatalogServer::GatherCatalogUpdatesThread, this));
 
-  state_store_subscriber_.reset(new StateStoreSubscriber(subscriber_id.str(),
+  state_store_subscriber_.reset(new StateStoreSubscriber(
+     Substitute("catalog-server@$0", TNetworkAddressToString(server_address)),
      subscriber_address, statestore_address, metrics_));
 
   StateStoreSubscriber::UpdateCallback cb =

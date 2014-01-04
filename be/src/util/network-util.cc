@@ -100,10 +100,10 @@ bool IsWildcardAddress(const string& ipaddress) {
   return ipaddress == "0.0.0.0";
 }
 
-void TNetworkAddressToString(const TNetworkAddress& address, string* out) {
+string TNetworkAddressToString(const TNetworkAddress& address) {
   stringstream ss;
   ss << address;
-  *out = ss.str();
+  return ss.str();
 }
 
 ostream& operator<<(ostream& out, const TNetworkAddress& hostport) {

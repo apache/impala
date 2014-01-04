@@ -38,7 +38,7 @@ TNetworkAddress MakeNetworkAddress(const std::string& hostname, int port);
 bool IsWildcardAddress(const std::string& ipaddress);
 
 // Utility method to print address as address:port
-void TNetworkAddressToString(const TNetworkAddress& address, std::string* out);
+std::string TNetworkAddressToString(const TNetworkAddress& address);
 
 // Prints a hostport as ipaddress:port
 std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);

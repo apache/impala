@@ -117,6 +117,8 @@ class StateStoreSubscriber {
   // Returns OK unless some error occurred, like a failure to connect.
   Status Start();
 
+  const std::string& id() const { return subscriber_id_; }
+
  private:
   // Unique, but opaque, identifier for this subscriber.
   const std::string subscriber_id_;

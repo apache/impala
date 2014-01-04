@@ -18,6 +18,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <gflags/gflags.h>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "runtime/client-cache.h"
@@ -42,6 +43,7 @@
 
 using namespace std;
 using namespace boost;
+using namespace strings;
 
 DEFINE_bool(use_statestore, true,
     "Use an external state-store process to manage cluster membership");
@@ -90,15 +92,13 @@ ExecEnv::ExecEnv()
         MakeNetworkAddress(FLAGS_state_store_host, FLAGS_state_store_port);
     TNetworkAddress backend_address = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
 
-    stringstream subscriber_id;
-    subscriber_id << backend_address;
-
-    state_store_subscriber_.reset(new StateStoreSubscriber(subscriber_id.str(),
+    state_store_subscriber_.reset(new StateStoreSubscriber(
+        Substitute("impalad@$0", TNetworkAddressToString(backend_address)),
         subscriber_address, statestore_address, metrics_.get()));
 
-    scheduler_.reset(
-        new SimpleScheduler(state_store_subscriber_.get(), subscriber_id.str(),
-                            backend_address, metrics_.get(), webserver_.get()));
+    scheduler_.reset(new SimpleScheduler(state_store_subscriber_.get(),
+        state_store_subscriber_->id(), backend_address, metrics_.get(),
+        webserver_.get()));
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
@@ -131,14 +131,13 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         MakeNetworkAddress(statestore_host, statestore_port);
     TNetworkAddress backend_address = MakeNetworkAddress(hostname, backend_port);
 
-    stringstream ss;
-    ss << backend_address;
+    state_store_subscriber_.reset(new StateStoreSubscriber(
+        Substitute("impalad@$0", TNetworkAddressToString(backend_address)),
+        subscriber_address, statestore_address, metrics_.get()));
 
-    state_store_subscriber_.reset(new StateStoreSubscriber(ss.str(), subscriber_address,
-        statestore_address, metrics_.get()));
-
-    scheduler_.reset(new SimpleScheduler(state_store_subscriber_.get(), ss.str(),
-        backend_address, metrics_.get(), webserver_.get()));
+    scheduler_.reset(new SimpleScheduler(state_store_subscriber_.get(),
+        state_store_subscriber_->id(), backend_address, metrics_.get(),
+        webserver_.get()));
 
   } else {
     vector<TNetworkAddress> addresses;
