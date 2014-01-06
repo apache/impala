@@ -14,7 +14,7 @@
 
 //
 // This file contains the main() function for the state store process,
-// which exports the Thrift service StateStoreService.
+// which exports the Thrift service StatestoreService.
 
 #include <iostream>
 #include <string>
@@ -23,7 +23,7 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "runtime/mem-tracker.h"
-#include "statestore/state-store.h"
+#include "statestore/statestore.h"
 #include "util/debug-util.h"
 #include "util/metrics.h"
 #include "util/memory-metrics.h"
@@ -66,14 +66,14 @@ int main(int argc, char** argv) {
   metrics->CreateAndRegisterPrimitiveMetric<string>(
       "statestore.version", GetVersionString(true));
 
-  StateStore state_store(metrics.get());
-  state_store.RegisterWebpages(webserver.get());
+  Statestore statestore(metrics.get());
+  statestore.RegisterWebpages(webserver.get());
   shared_ptr<TProcessor> processor(
-      new StateStoreServiceProcessor(state_store.thrift_iface()));
+      new StatestoreServiceProcessor(statestore.thrift_iface()));
 
-  ThriftServer* server = new ThriftServer("StateStoreService", processor,
+  ThriftServer* server = new ThriftServer("StatestoreService", processor,
       FLAGS_state_store_port, NULL, metrics.get(), 5);
   EXIT_IF_ERROR(server->Start());
 
-  state_store.MainLoop();
+  statestore.MainLoop();
 }

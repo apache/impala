@@ -16,7 +16,7 @@
 cmake_minimum_required(VERSION 2.6)
 
 # Helper function to generate build rules.  For each input thrift file, this function will
-# generate a rule that maps the input file to the output c++ file.  
+# generate a rule that maps the input file to the output c++ file.
 # Thrift will generate multiple output files for each input (including java files) and
 # ideally, we'd specify all of the outputs for dependency tracking.
 # Unfortunately, it's not easy to figure out all the output files without parsing the
@@ -25,10 +25,10 @@ cmake_minimum_required(VERSION 2.6)
 # capture all the output files.
 #
 # To call this function, pass it the output file list followed by the input thrift files:
-#    i.e. THRIFT_GEN(OUTPUT_FILES, ${THRIFT_FILES}) 
+#    i.e. THRIFT_GEN(OUTPUT_FILES, ${THRIFT_FILES})
 #
 # cmake seems to be case sensitive for some keywords. Changing the first IF check to lower
-# case makes it not work.  TODO: investigate this 
+# case makes it not work.  TODO: investigate this
 function(THRIFT_GEN VAR)
   IF (NOT ARGN)
     MESSAGE(SEND_ERROR "Error: THRIFT_GEN called without any src files")
@@ -43,7 +43,7 @@ function(THRIFT_GEN VAR)
     get_filename_component(FIL_WE ${FIL} NAME_WE)
 
     # All the output files we can determine based on filename.
-    #   - Does not include .skeleton.cpp files 
+    #   - Does not include .skeleton.cpp files
     #   - Does not include java output files
     set(OUTPUT_BE_FILE "${BE_OUTPUT_DIR}/gen-cpp/${FIL_WE}_types.cpp")
     set(OUTPUT_BE_FILE ${OUTPUT_BE_FILE} "${BE_OUTPUT_DIR}/gen-cpp/${FIL_WE}_types.h")
@@ -53,13 +53,13 @@ function(THRIFT_GEN VAR)
 
     # BeeswaxService thrift generation
     # It depends on hive_meta_store, which in turn depends on fb303.
-    # The java dependency is handled by maven. 
+    # The java dependency is handled by maven.
     # We need to generate C++ src file for the parent dependencies using the "-r" option.
     set(CPP_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp -o ${BE_OUTPUT_DIR})
     IF (FIL STREQUAL "beeswax.thrift")
       set(CPP_ARGS -r ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp -o ${BE_OUTPUT_DIR})
     ENDIF(FIL STREQUAL "beeswax.thrift")
-    
+
     IF (FIL STREQUAL "cli_service.thrift")
       # HiveServer2 thrift generation
       # Do not generate Java source because we should use the jar from Hive directly.
@@ -101,7 +101,7 @@ file(MAKE_DIRECTORY ${PYTHON_OUTPUT_DIR})
 set(JAVA_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${FE_OUTPUT_DIR})
 set(PYTHON_ARGS ${THRIFT_INCLUDE_DIR_OPTION} -r --gen py -o ${PYTHON_OUTPUT_DIR})
 
-set (GENERATES_SRC_FILES 
+set (GENERATES_SRC_FILES
   Opcodes.thrift
 )
 
@@ -126,7 +126,7 @@ set (SRC_FILES
   Partitions.thrift
   parquet.thrift
   RuntimeProfile.thrift
-  StateStoreService.thrift
+  StatestoreService.thrift
   Status.thrift
   Types.thrift
   ${GENERATES_SRC_FILES}
@@ -140,4 +140,3 @@ THRIFT_GEN(THRIFT_FILES ${SRC_FILES})
 
 # Add a custom target that generates all the thrift files
 add_custom_target(thrift-cpp ALL DEPENDS ${THRIFT_FILES})
-

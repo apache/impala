@@ -24,28 +24,28 @@
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
 #include "catalog/catalog.h"
-#include "statestore/state-store-subscriber.h"
+#include "statestore/statestore-subscriber.h"
 #include "util/metrics.h"
 
 namespace impala {
 
-class StateStoreSubscriber;
+class StatestoreSubscriber;
 class Catalog;
 class TGetAllCatalogObjectsResponse;
 
 // The Impala CatalogServer manages the caching and persistence of cluster-wide metadata.
 // The CatalogServer aggregates the metadata from the Hive Metastore, the NameNode,
 // and potentially additional sources in the future. The CatalogServer uses the
-// StateStore to broadcast metadata updates across the cluster.
+// Statestore to broadcast metadata updates across the cluster.
 // The CatalogService directly handles executing metadata update requests
 // (DDL requests) from clients via a Thrift interface.
-// The CatalogServer has two main components - a C++ daemon that has the StateStore
+// The CatalogServer has two main components - a C++ daemon that has the Statestore
 // integration code, Thrift service implementiation, and exporting of the debug
 // webpage/metrics.
 // The other main component is written in Java and manages caching and updating of all
-// metadata. For each StateStore heartbeat, the C++ Server queries the Java metadata
+// metadata. For each Statestore heartbeat, the C++ Server queries the Java metadata
 // cache over JNI to get the current state of the catalog. Any updates are broadcast to
-// the rest of the cluster using the StateStore over the IMPALA_CATALOG_TOPIC.
+// the rest of the cluster using the Statestore over the IMPALA_CATALOG_TOPIC.
 // The CatalogServer must be the only writer to the IMPALA_CATALOG_TOPIC, meaning there
 // cannot be multiple CatalogServers running at the same time, as the correctness of delta
 // updates relies upon this assumption.
@@ -74,7 +74,7 @@ class CatalogServer {
   boost::shared_ptr<CatalogServiceIf> thrift_iface_;
   Metrics* metrics_;
   boost::scoped_ptr<Catalog> catalog_;
-  boost::scoped_ptr<StateStoreSubscriber> state_store_subscriber_;
+  boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;
 
   // Thread that polls the catalog for any updates.
   boost::scoped_ptr<Thread> catalog_update_gathering_thread_;
@@ -114,7 +114,7 @@ class CatalogServer {
   // protected by the catalog_lock_.
   int64_t catalog_objects_from_version_;
 
-  // Called during each StateStore heartbeat and is responsible for updating the current
+  // Called during each Statestore heartbeat and is responsible for updating the current
   // set of catalog objects in the IMPALA_CATALOG_TOPIC. Responds to each heartbeat with a
   // delta update containing the set of changes since the last heartbeat. This function
   // enumerates all catalog objects that were returned by the last call to the JniCatalog,
@@ -127,9 +127,9 @@ class CatalogServer {
   // catalog_update_gathering_thread_ to fetch the next set of updates from the
   // JniCatalog.
   // All updates are added to the subscriber_topic_updates list and sent back to the
-  // StateStore.
+  // Statestore.
   void UpdateCatalogTopicCallback(
-      const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+      const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
   // Executed by the catalog_update_gathering_thread_. Calls into JniCatalog

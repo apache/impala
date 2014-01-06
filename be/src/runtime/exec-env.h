@@ -33,7 +33,7 @@ class HBaseTableFactory;
 class HdfsFsCache;
 class LibCache;
 class Scheduler;
-class StateStoreSubscriber;
+class StatestoreSubscriber;
 class TestExecEnv;
 class Webserver;
 class Metrics;
@@ -60,8 +60,8 @@ class ExecEnv {
   // declarations for classes in scoped_ptrs.
   virtual ~ExecEnv();
 
-  StateStoreSubscriber* state_store_subscriber() {
-    return state_store_subscriber_.get();
+  StatestoreSubscriber* statestore_subscriber() {
+    return statestore_subscriber_.get();
   }
 
   DataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
@@ -84,7 +84,7 @@ class ExecEnv {
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
   Scheduler* scheduler() { return scheduler_.get(); }
-  StateStoreSubscriber* subscriber() { return state_store_subscriber_.get(); }
+  StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
 
   // Starts any dependent services in their correct order
   virtual Status StartServices();
@@ -99,7 +99,7 @@ class ExecEnv {
   // Leave protected so that subclasses can override
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
   boost::scoped_ptr<Scheduler> scheduler_;
-  boost::scoped_ptr<StateStoreSubscriber> state_store_subscriber_;
+  boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;
   boost::scoped_ptr<ImpalaInternalServiceClientCache> impalad_client_cache_;
   boost::scoped_ptr<CatalogServiceClientCache> catalogd_client_cache_;
   boost::scoped_ptr<HdfsFsCache> fs_cache_;

@@ -21,7 +21,7 @@
 
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
-#include "gen-cpp/StateStoreService_types.h"
+#include "gen-cpp/StatestoreService_types.h"
 
 namespace impala {
 

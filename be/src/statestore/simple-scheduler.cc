@@ -25,7 +25,7 @@
 #include "runtime/exec-env.h"
 
 #include "statestore/simple-scheduler.h"
-#include "statestore/state-store-subscriber.h"
+#include "statestore/statestore-subscriber.h"
 #include "gen-cpp/Types_types.h"
 
 #include "util/network-util.h"
@@ -42,7 +42,7 @@ static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
 
 const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
-SimpleScheduler::SimpleScheduler(StateStoreSubscriber* subscriber,
+SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     const string& backend_id, const TNetworkAddress& backend_address,
     Metrics* metrics, Webserver* webserver)
   : metrics_(metrics),
@@ -110,7 +110,7 @@ Status SimpleScheduler::Init() {
   }
 
   if (statestore_subscriber_ != NULL) {
-    StateStoreSubscriber::UpdateCallback cb =
+    StatestoreSubscriber::UpdateCallback cb =
         bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1, _2);
     Status status =
         statestore_subscriber_->AddTopic(IMPALA_MEMBERSHIP_TOPIC, true, cb);
@@ -209,12 +209,12 @@ void SimpleScheduler::BackendsPathHandler(const Webserver::ArgumentMap& args,
 }
 
 void SimpleScheduler::UpdateMembership(
-    const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+    const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
   ++update_count_;
   // TODO: Work on a copy if possible, or at least do resolution as a separate step
   // First look to see if the topic(s) we're interested in have an update
-  StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
+  StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(IMPALA_MEMBERSHIP_TOPIC);
 
   if (topic != incoming_topic_deltas.end()) {
@@ -277,9 +277,9 @@ void SimpleScheduler::UpdateMembership(
     }
 
     // If this impalad is not in our view of the membership list, we should add it and
-    // tell the state-store.
+    // tell the statestore.
     if (current_membership_.find(backend_id_) == current_membership_.end()) {
-      VLOG(1) << "Registering local backend with state-store";
+      VLOG(1) << "Registering local backend with statestore";
       subscriber_topic_updates->push_back(TTopicDelta());
       TTopicDelta& update = subscriber_topic_updates->back();
       update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
@@ -289,7 +289,7 @@ void SimpleScheduler::UpdateMembership(
       item.key = backend_id_;
       Status status = thrift_serializer_.Serialize(&backend_descriptor_, &item.value);
       if (!status.ok()) {
-        LOG(WARNING) << "Failed to serialize Impala backend address for state-store topic: "
+        LOG(WARNING) << "Failed to serialize Impala backend address for statestore topic: "
                   << status.GetErrorMsg();
         subscriber_topic_updates->pop_back();
       }

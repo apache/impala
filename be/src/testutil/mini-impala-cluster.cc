@@ -63,9 +63,9 @@ int main(int argc, char** argv) {
   int beeswax_port = 21000;
   int hs2_port = 21050;
 
-  scoped_ptr<InProcessStateStore> state_store(new InProcessStateStore(23000, 25100));
-  if (FLAGS_use_statestore) EXIT_IF_ERROR(state_store->Start());
-  LOG(INFO) << "Started in-process state-store";
+  scoped_ptr<InProcessStatestore> statestore(new InProcessStatestore(23000, 25100));
+  if (FLAGS_use_statestore) EXIT_IF_ERROR(statestore->Start());
+  LOG(INFO) << "Started in-process statestore";
 
   vector<InProcessImpalaServer*> impala_servers;
   for (int i = 0; i < FLAGS_num_backends; ++i) {

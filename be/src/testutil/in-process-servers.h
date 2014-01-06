@@ -28,13 +28,13 @@ class ImpalaServer;
 class ThriftServer;
 class Webserver;
 class Metrics;
-class StateStore;
+class Statestore;
 
 // A single impala service, with a backend server, two client servers,
-// a webserver and optionally a connection to a state-store.
+// a webserver and optionally a connection to a statestore.
 //
 // TODO: Static StartCluster method which runs one or more
-// ImpalaServer(s) and an optional StateStore.
+// ImpalaServer(s) and an optional Statestore.
 // TODO: Fix occasional abort when object is destroyed.
 class InProcessImpalaServer {
  public:
@@ -87,16 +87,16 @@ class InProcessImpalaServer {
 
 };
 
-// An in-process state-store, with webserver and metrics.
-class InProcessStateStore {
+// An in-process statestore, with webserver and metrics.
+class InProcessStatestore {
  public:
-  // Constructs but does not start the state-store.
-  InProcessStateStore(int state_store_port, int webserver_port);
+  // Constructs but does not start the statestore.
+  InProcessStatestore(int statestore_port, int webserver_port);
 
-  // Starts the state-store server, and the processing thread.
+  // Starts the statestore server, and the processing thread.
   Status Start();
 
-  uint32_t port() { return state_store_port_; }
+  uint32_t port() { return statestore_port_; }
 
  private:
   // Websever object to serve debug pages through.
@@ -105,16 +105,16 @@ class InProcessStateStore {
   // Metrics object
   boost::scoped_ptr<Metrics> metrics_;
 
-  // Port to start the state-store on.
-  uint32_t state_store_port_;
+  // Port to start the statestore on.
+  uint32_t statestore_port_;
 
-  // The state-store instance
-  boost::scoped_ptr<StateStore> state_store_;
+  // The statestore instance
+  boost::scoped_ptr<Statestore> statestore_;
 
-  // State-store Thrift server
-  boost::scoped_ptr<ThriftServer> state_store_server_;
+  // Statestore Thrift server
+  boost::scoped_ptr<ThriftServer> statestore_server_;
 
-  boost::scoped_ptr<Thread> state_store_main_loop_;
+  boost::scoped_ptr<Thread> statestore_main_loop_;
 };
 
 }

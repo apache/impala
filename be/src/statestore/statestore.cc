@@ -15,8 +15,8 @@
 #include <boost/foreach.hpp>
 
 #include "common/status.h"
-#include "statestore/state-store.h"
-#include "gen-cpp/StateStoreService_types.h"
+#include "statestore/statestore.h"
+#include "gen-cpp/StatestoreService_types.h"
 #include "statestore/failure-detector.h"
 #include "rpc/thrift-util.h"
 #include "util/debug-util.h"
@@ -32,16 +32,16 @@ using namespace boost;
 
 DEFINE_int32(statestore_max_missed_heartbeats, 5, "Maximum number of consecutive "
     "heartbeats an impalad can miss before being declared failed by the "
-    "state-store.");
+    "statestore.");
 DEFINE_int32(statestore_suspect_heartbeats, 2, "(Advanced) Number of consecutive "
     "heartbeats an impalad can miss before being suspected of failure by the"
-    " state-store");
+    " statestore");
 DEFINE_int32(statestore_num_heartbeat_threads, 10, "(Advanced) Number of threads used to "
     " send heartbeats in parallel to all registered subscribers.");
 DEFINE_int32(statestore_heartbeat_frequency_ms, 500, "(Advanced) Frequency (in ms) with"
-    " which state-store sends heartbeats to subscribers.");
+    " which the statestore sends heartbeats to subscribers.");
 
-DEFINE_int32(state_store_port, 24000, "port where StateStoreService is running");
+DEFINE_int32(state_store_port, 24000, "port where StatestoreService is running");
 
 DECLARE_int32(statestore_subscriber_timeout_seconds);
 
@@ -53,14 +53,14 @@ const string STATESTORE_TOTAL_KEY_SIZE_BYTES = "statestore.total-key-size-bytes"
 const string STATESTORE_TOTAL_VALUE_SIZE_BYTES = "statestore.total-value-size-bytes";
 const string STATESTORE_TOTAL_TOPIC_SIZE_BYTES = "statestore.total-topic-size-bytes";
 
-const StateStore::TopicEntry::Value StateStore::TopicEntry::NULL_VALUE = "";
+const Statestore::TopicEntry::Value Statestore::TopicEntry::NULL_VALUE = "";
 
 // Initial version for each Topic registered by a Subscriber. Generally, the Topic will
 // have a Version that is the MAX() of all entries in the Topic, but this initial
 // value needs to be less than TopicEntry::TOPIC_ENTRY_INITIAL_VERSION to distinguish
 // between the case where a Topic is empty and the case where the Topic only contains
 // an item with the initial version.
-const StateStore::TopicEntry::Version StateStore::Subscriber::TOPIC_INITIAL_VERSION = 0L;
+const Statestore::TopicEntry::Version Statestore::Subscriber::TOPIC_INITIAL_VERSION = 0L;
 
 // Used to control the maximum size of the heartbeat input queue, in which there is at
 // most one entry per subscriber.
@@ -69,36 +69,36 @@ const int32_t STATESTORE_MAX_SUBSCRIBERS = 10000;
 // Heartbeats that miss their deadline by this much are logged.
 const uint32_t HEARTBEAT_WARN_THRESHOLD_MS = 2000;
 
-typedef ClientConnection<StateStoreSubscriberClient> StateStoreSubscriberConnection;
+typedef ClientConnection<StatestoreSubscriberClient> StatestoreSubscriberConnection;
 
-class StateStoreThriftIf : public StateStoreServiceIf {
+class StatestoreThriftIf : public StatestoreServiceIf {
  public:
-  StateStoreThriftIf(StateStore* state_store)
-      : state_store_(state_store) {
-    DCHECK(state_store_ != NULL);
+  StatestoreThriftIf(Statestore* statestore)
+      : statestore_(statestore) {
+    DCHECK(statestore_ != NULL);
   }
 
   virtual void RegisterSubscriber(TRegisterSubscriberResponse& response,
       const TRegisterSubscriberRequest& params) {
     TUniqueId registration_id;
-    Status status = state_store_->RegisterSubscriber(params.subscriber_id,
+    Status status = statestore_->RegisterSubscriber(params.subscriber_id,
         params.subscriber_location, params.topic_registrations, &registration_id);
     status.ToThrift(&response.status);
     response.__set_registration_id(registration_id);
   }
  private:
-  StateStore* state_store_;
+  Statestore* statestore_;
 };
 
-void StateStore::TopicEntry::SetValue(const StateStore::TopicEntry::Value& bytes,
+void Statestore::TopicEntry::SetValue(const Statestore::TopicEntry::Value& bytes,
     TopicEntry::Version version) {
-  DCHECK(bytes == StateStore::TopicEntry::NULL_VALUE || bytes.size() > 0);
+  DCHECK(bytes == Statestore::TopicEntry::NULL_VALUE || bytes.size() > 0);
   value_ = bytes;
   version_ = version;
 }
 
-StateStore::TopicEntry::Version StateStore::Topic::Put(const string& key,
-    const StateStore::TopicEntry::Value& bytes) {
+Statestore::TopicEntry::Version Statestore::Topic::Put(const string& key,
+    const Statestore::TopicEntry::Value& bytes) {
   TopicEntryMap::iterator entry_it = entries_.find(key);
   int64_t key_size_delta = 0L;
   int64_t value_size_delta = 0L;
@@ -128,12 +128,12 @@ StateStore::TopicEntry::Version StateStore::Topic::Put(const string& key,
   return entry_it->second.version();
 }
 
-void StateStore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
-    const StateStore::TopicEntryKey& key) {
+void Statestore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
+    const Statestore::TopicEntryKey& key) {
   TopicEntryMap::iterator entry_it = entries_.find(key);
   if (entry_it != entries_.end() && entry_it->second.version() == version) {
-    // Add a new entry with the the version history for this deletion and remove
-    // the old entry
+    // Add a new entry with the the version history for this deletion and remove the old
+    // entry
     topic_update_log_.erase(version);
     topic_update_log_.insert(make_pair(++last_version_, key));
     total_value_size_bytes_ -= entry_it->second.value().size();
@@ -141,11 +141,11 @@ void StateStore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
 
     value_size_metric_->Increment(entry_it->second.value().size());
     topic_size_metric_->Increment(entry_it->second.value().size());
-    entry_it->second.SetValue(StateStore::TopicEntry::NULL_VALUE, last_version_);
+    entry_it->second.SetValue(Statestore::TopicEntry::NULL_VALUE, last_version_);
   }
 }
 
-StateStore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
+Statestore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
     const TUniqueId& registration_id, const TNetworkAddress& network_address,
     const vector<TTopicRegistration>& subscribed_topics)
     : subscriber_id_(subscriber_id),
@@ -159,7 +159,7 @@ StateStore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
   }
 }
 
-void StateStore::Subscriber::AddTransientUpdate(const TopicId& topic_id,
+void Statestore::Subscriber::AddTransientUpdate(const TopicId& topic_id,
     const TopicEntryKey& topic_key, TopicEntry::Version version) {
   // Only record the update if the topic is transient
   const Topics::const_iterator topic_it = subscribed_topics_.find(topic_id);
@@ -169,27 +169,27 @@ void StateStore::Subscriber::AddTransientUpdate(const TopicId& topic_id,
   }
 }
 
-const StateStore::TopicEntry::Version StateStore::Subscriber::LastTopicVersionProcessed(
+const Statestore::TopicEntry::Version Statestore::Subscriber::LastTopicVersionProcessed(
     const TopicId& topic_id) const {
   Topics::const_iterator itr = subscribed_topics_.find(topic_id);
   return itr == subscribed_topics_.end() ?
       TOPIC_INITIAL_VERSION : itr->second.last_version;
 }
 
-void StateStore::Subscriber::SetLastTopicVersionProcessed(const TopicId& topic_id,
+void Statestore::Subscriber::SetLastTopicVersionProcessed(const TopicId& topic_id,
     TopicEntry::Version version) {
   subscribed_topics_[topic_id].last_version = version;
 }
 
-StateStore::StateStore(Metrics* metrics)
+Statestore::Statestore(Metrics* metrics)
   : exit_flag_(false),
     subscriber_heartbeat_threadpool_("statestore",
         "subscriber-heartbeat-worker",
         FLAGS_statestore_num_heartbeat_threads,
         STATESTORE_MAX_SUBSCRIBERS,
-        bind<void>(mem_fn(&StateStore::UpdateSubscriber), this, _1, _2)),
-    client_cache_(new ClientCache<StateStoreSubscriberClient>()),
-    thrift_iface_(new StateStoreThriftIf(this)),
+        bind<void>(mem_fn(&Statestore::UpdateSubscriber), this, _1, _2)),
+    client_cache_(new ClientCache<StatestoreSubscriberClient>()),
+    thrift_iface_(new StatestoreThriftIf(this)),
     failure_detector_(
         new MissedHeartbeatFailureDetector(FLAGS_statestore_max_missed_heartbeats,
                                            FLAGS_statestore_suspect_heartbeats)) {
@@ -209,17 +209,17 @@ StateStore::StateStore(Metrics* metrics)
   client_cache_->InitMetrics(metrics, "subscriber");
 }
 
-void StateStore::RegisterWebpages(Webserver* webserver) {
+void Statestore::RegisterWebpages(Webserver* webserver) {
   Webserver::PathHandlerCallback topics_callback =
-      bind<void>(mem_fn(&StateStore::TopicsHandler), this, _1, _2);
+      bind<void>(mem_fn(&Statestore::TopicsHandler), this, _1, _2);
   webserver->RegisterPathHandler("/topics", topics_callback);
 
   Webserver::PathHandlerCallback subscribers_callback =
-      bind<void>(mem_fn(&StateStore::SubscribersHandler), this, _1, _2);
+      bind<void>(mem_fn(&Statestore::SubscribersHandler), this, _1, _2);
   webserver->RegisterPathHandler("/subscribers", subscribers_callback);
 }
 
-void StateStore::TopicsHandler(const Webserver::ArgumentMap& args,
+void Statestore::TopicsHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
   (*output) << "<h2>Topics</h2>";
   (*output) << "<table class='table table-striped'>"
@@ -252,7 +252,7 @@ void StateStore::TopicsHandler(const Webserver::ArgumentMap& args,
   (*output) << "</table>";
 }
 
-void StateStore::SubscribersHandler(const Webserver::ArgumentMap& args,
+void Statestore::SubscribersHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
   (*output) << "<h2>Subscribers</h2>";
   (*output) << "<table class ='table table-striped'>"
@@ -271,14 +271,13 @@ void StateStore::SubscribersHandler(const Webserver::ArgumentMap& args,
   (*output) << "</table>";
 }
 
-Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
+Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     const TNetworkAddress& location,
     const vector<TTopicRegistration>& topic_registrations, TUniqueId* registration_id) {
   if (subscriber_id.empty()) return Status("Subscriber ID cannot be empty string");
 
-  // Create any new topics first, so that when the subscriber is first
-  // sent a heartbeat by the worker threads its topics are guaranteed
-  // to exist.
+  // Create any new topics first, so that when the subscriber is first sent a heartbeat by
+  // the worker threads its topics are guaranteed to exist.
   {
     lock_guard<mutex> l(topic_lock_);
     BOOST_FOREACH(const TTopicRegistration& topic, topic_registrations) {
@@ -327,7 +326,7 @@ Status StateStore::RegisterSubscriber(const SubscriberId& subscriber_id,
   return Status::OK;
 }
 
-Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
+Status Statestore::ProcessOneSubscriber(Subscriber* subscriber) {
   // First thing: make a list of updates to send
   TUpdateStateRequest update_state_request;
   GatherTopicUpdates(*subscriber, &update_state_request);
@@ -338,7 +337,7 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
 
   // Second: try and send it
   Status status;
-  StateStoreSubscriberConnection client(client_cache_.get(),
+  StatestoreSubscriberConnection client(client_cache_.get(),
       subscriber->network_address(), &status);
   RETURN_IF_ERROR(status);
 
@@ -358,8 +357,8 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
   }
   RETURN_IF_ERROR(Status(response.status));
 
-  // At this point the updates are assumed to have been successfully processed
-  // by the subscriber. Update the subscriber's max version of each topic.
+  // At this point the updates are assumed to have been successfully processed by the
+  // subscriber. Update the subscriber's max version of each topic.
   map<TopicEntryKey, TTopicDelta>::const_iterator topic_delta =
       update_state_request.topic_deltas.begin();
   for (; topic_delta != update_state_request.topic_deltas.end(); ++topic_delta) {
@@ -377,9 +376,9 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
         continue;
       }
 
-      // The subscriber sent back their from_version which indicates that they
-      // want to reset their max version for this topic to this value. The next update
-      // sent will be from this version.
+      // The subscriber sent back their from_version which indicates that they want to
+      // reset their max version for this topic to this value. The next update sent will
+      // be from this version.
       if (update.__isset.from_version) {
         LOG(INFO) << "Received request for different delta base of topic: "
                   << update.topic_name << " from: " << subscriber->id()
@@ -395,7 +394,7 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
 
       BOOST_FOREACH(const string& key, update.topic_deletions) {
         TopicEntry::Version version =
-            topic->Put(key, StateStore::TopicEntry::NULL_VALUE);
+            topic->Put(key, Statestore::TopicEntry::NULL_VALUE);
         subscriber->AddTransientUpdate(update.topic_name, key, version);
       }
     }
@@ -403,7 +402,7 @@ Status StateStore::ProcessOneSubscriber(Subscriber* subscriber) {
   return Status::OK;
 }
 
-void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
+void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
     TUpdateStateRequest* update_state_request) {
   {
     lock_guard<mutex> l(topic_lock_);
@@ -416,9 +415,9 @@ void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
           update_state_request->topic_deltas[subscribed_topic.first];
       topic_delta.topic_name = subscribed_topic.first;
 
-      // If the subscriber version is > 0, send this update as a delta. Otherwise, this
-      // is a new subscriber so send them a non-delta update that includes all items
-      // in the topic.
+      // If the subscriber version is > 0, send this update as a delta. Otherwise, this is
+      // a new subscriber so send them a non-delta update that includes all items in the
+      // topic.
       TopicEntry::Version last_processed_version =
           subscriber.LastTopicVersionProcessed(topic_it->first);
       topic_delta.is_delta = last_processed_version > Subscriber::TOPIC_INITIAL_VERSION;
@@ -432,7 +431,7 @@ void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
         TopicEntryMap::const_iterator itr = topic.entries().find(next_update->second);
         DCHECK(itr != topic.entries().end());
         const TopicEntry& topic_entry = itr->second;
-        if (topic_entry.value() == StateStore::TopicEntry::NULL_VALUE) {
+        if (topic_entry.value() == Statestore::TopicEntry::NULL_VALUE) {
           topic_delta.topic_deletions.push_back(itr->first);
         } else {
           topic_delta.topic_entries.push_back(TTopicItem());
@@ -444,8 +443,8 @@ void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
       }
 
       if (topic.topic_update_log().size() > 0) {
-        // The largest version for this topic will be the last item in the version
-        // history map.
+        // The largest version for this topic will be the last item in the version history
+        // map.
         topic_delta.__set_to_version(topic.topic_update_log().rbegin()->first);
       } else {
         // There are no updates in the version history
@@ -465,7 +464,7 @@ void StateStore::GatherTopicUpdates(const Subscriber& subscriber,
   }
 }
 
-const StateStore::TopicEntry::Version StateStore::GetMinSubscriberTopicVersion(
+const Statestore::TopicEntry::Version Statestore::GetMinSubscriberTopicVersion(
     const TopicId& topic_id, SubscriberId* subscriber_id) {
   TopicEntry::Version min_topic_version = numeric_limits<int64_t>::max();
   bool found = false;
@@ -485,18 +484,18 @@ const StateStore::TopicEntry::Version StateStore::GetMinSubscriberTopicVersion(
   return found ? min_topic_version : Subscriber::TOPIC_INITIAL_VERSION;
 }
 
-bool StateStore::ShouldExit() {
+bool Statestore::ShouldExit() {
   lock_guard<mutex> l(exit_flag_lock_);
   return exit_flag_;
 }
 
-void StateStore::SetExitFlag() {
+void Statestore::SetExitFlag() {
   lock_guard<mutex> l(exit_flag_lock_);
   exit_flag_ = true;
   subscriber_heartbeat_threadpool_.Shutdown();
 }
 
-void StateStore::UpdateSubscriber(int thread_id,
+void Statestore::UpdateSubscriber(int thread_id,
     const ScheduledSubscriberUpdate& update) {
   int64_t update_deadline = update.first;
   if (update_deadline != 0L) {
@@ -558,7 +557,7 @@ void StateStore::UpdateSubscriber(int thread_id,
   }
 }
 
-void StateStore::UnregisterSubscriber(Subscriber* subscriber) {
+void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
   SubscriberMap::const_iterator it = subscribers_.find(subscriber->id());
   if (it == subscribers_.end() ||
       it->second->registration_id() != subscriber->registration_id()) {
@@ -574,9 +573,9 @@ void StateStore::UnregisterSubscriber(Subscriber* subscriber) {
 
   // Delete all transient entries
   lock_guard<mutex> topic_lock(topic_lock_);
-  BOOST_FOREACH(StateStore::Subscriber::TransientEntryMap::value_type entry,
+  BOOST_FOREACH(Statestore::Subscriber::TransientEntryMap::value_type entry,
       subscriber->transient_entries()) {
-    StateStore::TopicMap::iterator topic_it = topics_.find(entry.first.first);
+    Statestore::TopicMap::iterator topic_it = topics_.find(entry.first.first);
     DCHECK(topic_it != topics_.end());
     topic_it->second.DeleteIfVersionsMatch(entry.second, // version
         entry.first.second); // key
@@ -586,7 +585,7 @@ void StateStore::UnregisterSubscriber(Subscriber* subscriber) {
   subscribers_.erase(subscriber->id());
 }
 
-Status StateStore::MainLoop() {
+Status Statestore::MainLoop() {
   subscriber_heartbeat_threadpool_.Join();
   return Status::OK;
 }

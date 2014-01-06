@@ -27,13 +27,13 @@ DECLARE_int32(state_store_port);
 namespace impala {
 
 TEST(StatestoreTest, SmokeTest) {
-  InProcessStateStore* state_store =
-      new InProcessStateStore(FLAGS_state_store_port, FLAGS_webserver_port);
-  ASSERT_TRUE(state_store->Start().ok());
+  InProcessStatestore* statestore =
+      new InProcessStatestore(FLAGS_state_store_port, FLAGS_webserver_port);
+  ASSERT_TRUE(statestore->Start().ok());
 
-  InProcessStateStore* state_store_wont_start =
-      new InProcessStateStore(FLAGS_state_store_port, FLAGS_webserver_port);
-  ASSERT_FALSE(state_store_wont_start->Start().ok());
+  InProcessStatestore* statestore_wont_start =
+      new InProcessStatestore(FLAGS_state_store_port, FLAGS_webserver_port);
+  ASSERT_FALSE(statestore_wont_start->Start().ok());
 }
 
 }

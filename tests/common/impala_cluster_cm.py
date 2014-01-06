@@ -85,7 +85,7 @@ class ClusterService(object):
     raise NotImplementedError, 'This method is NYI'
 
 
-# Represents an Impala service - a set of ImpalaD processes and a state-store.
+# Represents an Impala service - a set of ImpalaD processes and a statestore.
 class ImpalaService(ClusterService):
   def __init__(self, cluster):
     self.__parent_cluster = cluster
@@ -243,10 +243,10 @@ class Process(object):
     return self.get_pid() > 0
 
 
-# Represents a single Impala state-store process
+# Represents a single Impala statestore process
 class ImpalaStateStoreProcess(Process):
   def __init__(self, parent_service, host, cm_role, metrics_port=9190):
-    Process.__init__(self, host, 'impala-state-store');
+    Process.__init__(self, host, 'impala-statestore');
     self.metrics_port = metrics_port
     self.role = cm_role
 

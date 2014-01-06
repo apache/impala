@@ -14,7 +14,7 @@
 
 #include "testutil/in-process-servers.h"
 
-#include "statestore/state-store.h"
+#include "statestore/statestore.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
 #include "util/network-util.h"
@@ -78,25 +78,25 @@ Status InProcessImpalaServer::Join() {
   return Status::OK;
 }
 
-InProcessStateStore::InProcessStateStore(int state_store_port, int webserver_port)
+InProcessStatestore::InProcessStatestore(int statestore_port, int webserver_port)
     : webserver_(new Webserver(webserver_port)),
       metrics_(new Metrics()),
-      state_store_port_(state_store_port),
-      state_store_(new StateStore(metrics_.get())) {
+      statestore_port_(statestore_port),
+      statestore_(new Statestore(metrics_.get())) {
   AddDefaultPathHandlers(webserver_.get());
-  state_store_->RegisterWebpages(webserver_.get());
+  statestore_->RegisterWebpages(webserver_.get());
 }
 
-Status InProcessStateStore::Start() {
+Status InProcessStatestore::Start() {
   webserver_->Start();
   shared_ptr<TProcessor> processor(
-      new StateStoreServiceProcessor(state_store_->thrift_iface()));
+      new StatestoreServiceProcessor(statestore_->thrift_iface()));
 
-  state_store_server_.reset(new ThriftServer("StateStoreService", processor,
-          state_store_port_, NULL, metrics_.get(), 5));
-  state_store_main_loop_.reset(
-      new Thread("state-store", "main-loop", &StateStore::MainLoop, state_store_.get()));
+  statestore_server_.reset(new ThriftServer("StatestoreService", processor,
+      statestore_port_, NULL, metrics_.get(), 5));
+  statestore_main_loop_.reset(
+      new Thread("statestore", "main-loop", &Statestore::MainLoop, statestore_.get()));
 
-  RETURN_IF_ERROR(state_store_server_->Start());
-  return WaitForServer("localhost", state_store_port_, 10, 100);
+  RETURN_IF_ERROR(statestore_server_->Start());
+  return WaitForServer("localhost", statestore_port_, 10, 100);
 }

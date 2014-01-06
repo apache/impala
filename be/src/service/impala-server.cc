@@ -245,11 +245,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   // Register the membership callback if required
   if (exec_env->subscriber() != NULL) {
-    StateStoreSubscriber::UpdateCallback cb =
+    StatestoreSubscriber::UpdateCallback cb =
         bind<void>(mem_fn(&ImpalaServer::MembershipCallback), this, _1, _2);
     exec_env->subscriber()->AddTopic(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC, true, cb);
 
-    StateStoreSubscriber::UpdateCallback catalog_cb =
+    StatestoreSubscriber::UpdateCallback catalog_cb =
         bind<void>(mem_fn(&ImpalaServer::CatalogUpdateCallback), this, _1, _2);
     exec_env->subscriber()->AddTopic(
         CatalogServer::IMPALA_CATALOG_TOPIC, true, catalog_cb);
@@ -1248,9 +1248,9 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
 }
 
 void ImpalaServer::CatalogUpdateCallback(
-    const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+    const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
-  StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
+  StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(CatalogServer::IMPALA_CATALOG_TOPIC);
   if (topic == incoming_topic_deltas.end()) return;
   const TTopicDelta& delta = topic->second;
@@ -1401,11 +1401,11 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
 }
 
 void ImpalaServer::MembershipCallback(
-    const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+    const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
   // TODO: Consider rate-limiting this. In the short term, best to have
-  // state-store heartbeat less frequently.
-  StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
+  // statestore heartbeat less frequently.
+  StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC);
 
   if (topic != incoming_topic_deltas.end()) {

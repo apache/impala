@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "statestore/state-store-subscriber.h"
+#include "statestore/statestore-subscriber.h"
 #include "common/init.h"
 
 using namespace impala;
@@ -25,7 +25,7 @@ DECLARE_int32(state_store_subscriber_port);
 int main(int argc, char **argv) {
   InitCommonRuntime(argc, argv, false);
   Metrics metrics;
-  StateStoreSubscriber subscriber("subscriber1",
+  StatestoreSubscriber subscriber("subscriber1",
       MakeNetworkAddress("localhost", FLAGS_state_store_subscriber_port),
       MakeNetworkAddress("localhost", FLAGS_state_store_port), &metrics);
   EXIT_IF_ERROR(subscriber.Start());

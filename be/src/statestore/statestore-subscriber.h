@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef STATESTORE_STATE_STORE_SUBSCRIBER_H
-#define STATESTORE_STATE_STORE_SUBSCRIBER_H
+#ifndef STATESTORE_STATESTORE_SUBSCRIBER_H
+#define STATESTORE_STATESTORE_SUBSCRIBER_H
 
 #include <string>
 
@@ -23,14 +23,14 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "statestore/state-store.h"
+#include "statestore/statestore.h"
 #include "util/stopwatch.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-client.h"
 #include "util/thread.h"
 #include "util/metrics.h"
-#include "gen-cpp/StateStoreService.h"
-#include "gen-cpp/StateStoreSubscriber.h"
+#include "gen-cpp/StatestoreService.h"
+#include "gen-cpp/StatestoreSubscriber.h"
 
 namespace impala {
 
@@ -39,57 +39,57 @@ class Status;
 class TNetworkAddress;
 class ThriftServer;
 
-typedef ClientCache<StateStoreServiceClient> StateStoreClientCache;
+typedef ClientCache<StatestoreServiceClient> StatestoreClientCache;
 
-// A StateStoreSubscriber communicates with a state-store periodically
+// A StatestoreSubscriber communicates with a statestore periodically
 // through the exchange of heartbeat messages. These messages contain
-// updates from the state-store to a list of 'topics' that the
+// updates from the statestore to a list of 'topics' that the
 // subscriber is interested in; in response the subscriber sends a
 // list of changes that it wishes to make to a topic.
 //
 // Clients of the subscriber register topics of interest, and a
 // function to call once an update has been received. Each callback
 // may optionally add one or more updates to a list of topic updates
-// to be sent back to the state-store. See AddTopic for the
+// to be sent back to the statestore. See AddTopic for the
 // requirements placed on these callbacks.
 //
 // Topics must be subscribed to before the subscriber is connected to
-// the state-store: there is no way to add a new subscription after
+// the statestore: there is no way to add a new subscription after
 // the subscriber has successfully registered.
 //
-// If the subscriber does not receive heartbeats from the state-store
+// If the subscriber does not receive heartbeats from the statestore
 // within a configurable period of time, the subscriber enters
 // 'recovery mode', where it continually attempts to re-register with
-// the state-store.
-class StateStoreSubscriber {
+// the statestore.
+class StatestoreSubscriber {
  public:
   // Only constructor.
   //   subscriber_id - should be unique across the cluster, identifies this subscriber
   //
   //   heartbeat_address - the local address on which the heartbeat service which
-  //                       communicates with the state-store should be started.
+  //                       communicates with the statestore should be started.
   //
-  //   state_store_address - the address of the state-store to register with
-  StateStoreSubscriber(const std::string& subscriber_id,
+  //   statestore_address - the address of the statestore to register with
+  StatestoreSubscriber(const std::string& subscriber_id,
       const TNetworkAddress& heartbeat_address,
-      const TNetworkAddress& state_store_address,
+      const TNetworkAddress& statestore_address,
       Metrics* metrics);
 
   // A TopicDeltaMap is passed to each callback. See UpdateCallback for more details.
-  typedef std::map<StateStore::TopicId, TTopicDelta> TopicDeltaMap;
+  typedef std::map<Statestore::TopicId, TTopicDelta> TopicDeltaMap;
 
   // Function called to update a service with new state. Called in a
   // separate thread to the one in which it is registered.
   //
   // Every UpdateCallback is invoked every time that an update is
-  // received from the state-store. Therefore the callback should not
+  // received from the statestore. Therefore the callback should not
   // assume that the TopicDeltaMap contains an entry for their
   // particular topic of interest.
   //
   // If a delta for a particular topic does not have the 'is_delta'
   // flag set, clients should assume that the delta contains the
   // entire known state for that topic. This occurs particularly after
-  // state-store failure, and usually clients will need to republish
+  // statestore failure, and usually clients will need to republish
   // any local state that is missing.
   //
   // Callbacks may publish new updates to any topic via the
@@ -107,10 +107,10 @@ class StateStoreSubscriber {
   //
   // Must be called before Start(), in which case it will return
   // Status::OK. Otherwise an error will be returned.
-  Status AddTopic(const StateStore::TopicId& topic_id, bool is_transient,
+  Status AddTopic(const Statestore::TopicId& topic_id, bool is_transient,
       const UpdateCallback& callback);
 
-  // Registers this subscriber with the state-store, and starts the
+  // Registers this subscriber with the statestore, and starts the
   // heartbeat service, as well as a thread to check for failure and
   // initiate recovery mode.
   //
@@ -126,17 +126,17 @@ class StateStoreSubscriber {
   // Address that the heartbeat service should be started on.
   TNetworkAddress heartbeat_address_;
 
-  // Address of the state-store
-  TNetworkAddress state_store_address_;
+  // Address of the statestore
+  TNetworkAddress statestore_address_;
 
   // Implementation of the heartbeat thrift interface, which proxies
   // calls onto this object.
-  boost::shared_ptr<StateStoreSubscriberIf> thrift_iface_;
+  boost::shared_ptr<StatestoreSubscriberIf> thrift_iface_;
 
   // Container for the heartbeat server.
   boost::shared_ptr<ThriftServer> heartbeat_server_;
 
-  // Failure detector that monitors heartbeats from the state-store.
+  // Failure detector that monitors heartbeats from the statestore.
   boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
 
   // Thread in which RecoveryModeChecker runs.
@@ -165,7 +165,7 @@ class StateStoreSubscriber {
   // stores a pointer to an UpdateCallback, memory errors will occur if an UpdateCallback
   // is deleted before being unregistered. The UpdateCallback destructor checks for
   // such problems, so that we will have an assertion failure rather than a memory error.
-  typedef boost::unordered_map<StateStore::TopicId, std::vector<UpdateCallback> >
+  typedef boost::unordered_map<Statestore::TopicId, std::vector<UpdateCallback> >
       UpdateCallbacks;
 
   // Callback for all services that have registered for updates (indexed by the
@@ -176,15 +176,15 @@ class StateStoreSubscriber {
   // this subscriber considers this topic to be 'transient', that is
   // any updates it makes will be deleted upon failure or
   // disconnection.
-  std::map<StateStore::TopicId, bool> topic_registrations_;
+  std::map<Statestore::TopicId, bool> topic_registrations_;
 
   // Mapping of TopicId to the last version of the topic this subscriber successfully
   // processed.
-  typedef boost::unordered_map<StateStore::TopicId, int64_t> TopicVersionMap;
+  typedef boost::unordered_map<Statestore::TopicId, int64_t> TopicVersionMap;
   TopicVersionMap current_topic_versions_;
 
-  // State-store client cache - only one client is ever used.
-  boost::scoped_ptr<StateStoreClientCache> client_cache_;
+  // statestore client cache - only one client is ever used.
+  boost::scoped_ptr<StatestoreClientCache> client_cache_;
 
   // Metric to indicate if we are successfully registered with the statestore
   Metrics::BooleanMetric* connected_to_statestore_metric_;
@@ -202,26 +202,26 @@ class StateStoreSubscriber {
   MonotonicStopWatch heartbeat_interval_timer_;
 
   // Accumulated statistics on the time taken to process each heartbeat from the
-  // state-store (that is, to call all callbacks)
+  // statestore (that is, to call all callbacks)
   StatsMetric<double>* heartbeat_duration_metric_;
 
   // Current registration ID, in string form.
   Metrics::StringMetric* registration_id_metric_;
 
   // Subscriber thrift implementation, needs to access UpdateState
-  friend class StateStoreSubscriberThriftIf;
+  friend class StatestoreSubscriberThriftIf;
 
-  // Called when the state-store sends a heartbeat. Each registered callback is called
-  // in turn with the given map of incoming_topic_deltas from the state-store. Each
-  // TTopicDelta sent from the state-store to the subscriber will contain the topic name,
+  // Called when the statestore sends a heartbeat. Each registered callback is called
+  // in turn with the given map of incoming_topic_deltas from the statestore. Each
+  // TTopicDelta sent from the statestore to the subscriber will contain the topic name,
   // a list of additions to the topic, a list of deletions from the topic, and the
   // version range the update covers. A from_version of 0 indicates a non-delta update.
   // In response, any updates to the topic by the subscriber are aggregated in
-  // subscriber_topic_updates and returned to the state-store. Each update is a
+  // subscriber_topic_updates and returned to the statestore. Each update is a
   // TTopicDelta that contains a list of additions to the topic and a list of deletions
   // from the topic. Additionally, if a subscriber has received an unexpected delta
   // update version range, they can request a new delta update by setting the
-  // "from_version" field of the TTopicDelta response. The next state-store update will
+  // "from_version" field of the TTopicDelta response. The next statestore update will
   // be based off the version the subscriber responds with.
   // If the subscriber is in recovery mode, this method returns immediately.
   // Returns OK if not in recovery mode and the registration ID is current, and an error
@@ -231,7 +231,7 @@ class StateStoreSubscriber {
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
   // Run in a separate thread. In a loop, check failure_detector_ to see if the
-  // state-store is still sending heartbeats. If not, enter 'recovery mode'
+  // statestore is still sending heartbeats. If not, enter 'recovery mode'
   // where a reconnection is repeatedly attempted. Once reconnected, all
   // existing subscriptions and services are reregistered and normal operation
   // resumes.
@@ -239,12 +239,12 @@ class StateStoreSubscriber {
   // During recovery mode, any public methods that are started will block on
   // lock_, which is only released when recovery finishes. In practice, all
   // registrations are made early in the life of an impalad before the
-  // state-store could be detected as failed.
+  // statestore could be detected as failed.
   void RecoveryModeChecker();
 
-  // Creates a client of the remote state-store and sends a list of
+  // Creates a client of the remote statestore and sends a list of
   // topics to register for. Returns OK unless there is some problem
-  // connecting, or the state-store reports an error.
+  // connecting, or the statestore reports an error.
   Status Register();
 };
 

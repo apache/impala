@@ -226,15 +226,15 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // associated with the closed connection.
   virtual void ConnectionEnd(const ThriftServer::ConnectionContext& session_context);
 
-  // Called when a membership update is received from the state-store. Looks for
+  // Called when a membership update is received from the statestore. Looks for
   // active nodes that have failed, and cancels any queries running on them.
-  //  - incoming_topic_deltas: all changes to registered state-store topics
+  //  - incoming_topic_deltas: all changes to registered statestore topics
   //  - subscriber_topic_updates: output parameter to publish any topic updates to.
   //                              Currently unused.
-  void MembershipCallback(const StateStoreSubscriber::TopicDeltaMap&
+  void MembershipCallback(const StatestoreSubscriber::TopicDeltaMap&
       incoming_topic_deltas, std::vector<TTopicDelta>* subscriber_topic_updates);
 
-  void CatalogUpdateCallback(const StateStoreSubscriber::TopicDeltaMap& topic_deltas,
+  void CatalogUpdateCallback(const StatestoreSubscriber::TopicDeltaMap& topic_deltas,
       std::vector<TTopicDelta>* topic_updates);
 
  private:

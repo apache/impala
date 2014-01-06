@@ -18,7 +18,7 @@ namespace java com.cloudera.impala.thrift
 include "Status.thrift"
 include "Types.thrift"
 
-enum StateStoreServiceVersion {
+enum StatestoreServiceVersion {
    V1
 }
 
@@ -96,13 +96,13 @@ struct TTopicRegistration {
 }
 
 struct TRegisterSubscriberRequest {
-  1: required StateStoreServiceVersion protocol_version =
-      StateStoreServiceVersion.V1
+  1: required StatestoreServiceVersion protocol_version =
+      StatestoreServiceVersion.V1
 
   // Unique, human-readable identifier for this subscriber
   2: required string subscriber_id;
 
-  // Location of the StateStoreSubscriberService that this subscriber runs
+  // Location of the StatestoreSubscriberService that this subscriber runs
   3: required Types.TNetworkAddress subscriber_location;
 
   // List of topics to subscribe to
@@ -118,15 +118,15 @@ struct TRegisterSubscriberResponse {
   2: optional Types.TUniqueId registration_id;
 }
 
-service StateStoreService {
+service StatestoreService {
   // Register a single subscriber. Note that after a subscriber is registered, no new
   // topics may be added.
   TRegisterSubscriberResponse RegisterSubscriber(1: TRegisterSubscriberRequest params);
 }
 
 struct TUpdateStateRequest {
-  1: required StateStoreServiceVersion protocol_version =
-      StateStoreServiceVersion.V1
+  1: required StatestoreServiceVersion protocol_version =
+      StatestoreServiceVersion.V1
 
   // Map from topic name to a list of changes for that topic.
   2: required map<string, TTopicDelta> topic_deltas;
@@ -139,20 +139,20 @@ struct TUpdateStateResponse {
   // Whether the call was executed correctly at the application level
   1: required Status.TStatus status;
 
-  // List of updates published by the subscriber to be made centrally by the state-store
+  // List of updates published by the subscriber to be made centrally by the statestore
   2: required list<TTopicDelta> topic_updates;
 }
 
-service StateStoreSubscriber {
-  // Called when the state-store sends a heartbeat. The request contains a map of
-  // topic names to TTopicDelta updates, sent from the state-store to the subscriber. Each
+service StatestoreSubscriber {
+  // Called when the statestore sends a heartbeat. The request contains a map of
+  // topic names to TTopicDelta updates, sent from the statestore to the subscriber. Each
   // of these delta updates will contain a list of additions to the topic and a list of
   // deletions from the topic.
   // In response, the subscriber returns an aggregated list of updates to topic(s) to
-  // the state-store. Each update is a TTopicDelta that contains a list of additions to
+  // the statestore. Each update is a TTopicDelta that contains a list of additions to
   // the topic and a list of deletions from the topic. Additionally, if a subscriber has
   // received an unexpected delta update version range, they can request a new delta
-  // update based off a specific version from the state-store. The next state-store
+  // update based off a specific version from the statestore. The next statestore
   // delta update will be based off of the version the subscriber requested.
   TUpdateStateResponse UpdateState(1: TUpdateStateRequest params);
 }

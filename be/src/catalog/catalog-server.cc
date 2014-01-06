@@ -18,7 +18,7 @@
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "catalog/catalog-util.h"
-#include "statestore/state-store-subscriber.h"
+#include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
 #include "gen-cpp/CatalogInternalService_types.h"
 #include "gen-cpp/CatalogObjects_types.h"
@@ -107,18 +107,18 @@ Status CatalogServer::Start() {
       "catalog-update-gathering-thread",
       &CatalogServer::GatherCatalogUpdatesThread, this));
 
-  state_store_subscriber_.reset(new StateStoreSubscriber(
+  statestore_subscriber_.reset(new StatestoreSubscriber(
      Substitute("catalog-server@$0", TNetworkAddressToString(server_address)),
      subscriber_address, statestore_address, metrics_));
 
-  StateStoreSubscriber::UpdateCallback cb =
+  StatestoreSubscriber::UpdateCallback cb =
       bind<void>(mem_fn(&CatalogServer::UpdateCatalogTopicCallback), this, _1, _2);
-  Status status = state_store_subscriber_->AddTopic(IMPALA_CATALOG_TOPIC, false, cb);
+  Status status = statestore_subscriber_->AddTopic(IMPALA_CATALOG_TOPIC, false, cb);
   if (!status.ok()) {
     status.AddErrorMsg("CatalogService failed to start");
     return status;
   }
-  RETURN_IF_ERROR(state_store_subscriber_->Start());
+  RETURN_IF_ERROR(statestore_subscriber_->Start());
 
   // Notify the thread to start for the first time.
   {
@@ -140,9 +140,9 @@ void CatalogServer::RegisterWebpages(Webserver* webserver) {
 }
 
 void CatalogServer::UpdateCatalogTopicCallback(
-    const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+    const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
-  StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
+  StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(CatalogServer::IMPALA_CATALOG_TOPIC);
   if (topic == incoming_topic_deltas.end()) return;
 

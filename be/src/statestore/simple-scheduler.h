@@ -24,19 +24,19 @@
 
 #include "common/status.h"
 #include "statestore/scheduler.h"
-#include "statestore/state-store-subscriber.h"
-#include "statestore/state-store.h"
+#include "statestore/statestore-subscriber.h"
+#include "statestore/statestore.h"
 #include "util/metrics.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
 
 namespace impala {
 
 // Performs simple scheduling by matching between a list of backends configured
-// either from the state-store, or from a static list of addresses, and a list
+// either from the statestore, or from a static list of addresses, and a list
 // of target data locations.
 //
-// TODO: Notice when there are duplicate state-store registrations (IMPALA-23)
-// TODO: Handle deltas from the state-store
+// TODO: Notice when there are duplicate statestore registrations (IMPALA-23)
+// TODO: Handle deltas from the statestore
 class SimpleScheduler : public Scheduler {
  public:
   static const std::string IMPALA_MEMBERSHIP_TOPIC;
@@ -45,7 +45,7 @@ class SimpleScheduler : public Scheduler {
   // set of available backends.
   //  - backend_id - unique identifier for this Impala backend (usually a host:port)
   //  - backend_address - the address that this backend listens on
-  SimpleScheduler(StateStoreSubscriber* subscriber, const std::string& backend_id,
+  SimpleScheduler(StatestoreSubscriber* subscriber, const std::string& backend_id,
       const TNetworkAddress& backend_address, Metrics* metrics, Webserver* webserver);
 
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
@@ -114,7 +114,7 @@ class SimpleScheduler : public Scheduler {
   // Pointer to a subscription manager (which we do not own) which is used to register
   // for dynamic updates to the set of available backends. May be NULL if the set of
   // backends is fixed.
-  StateStoreSubscriber* statestore_subscriber_;
+  StatestoreSubscriber* statestore_subscriber_;
 
   // Unique - across the cluster - identifier for this impala backend
   const std::string backend_id_;
@@ -136,7 +136,7 @@ class SimpleScheduler : public Scheduler {
   uint32_t update_count_;
 
   // Called asynchronously when an update is received from the subscription manager
-  void UpdateMembership(const StateStoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+  void UpdateMembership(const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
   // Webserver callback that prints a list of known backends
