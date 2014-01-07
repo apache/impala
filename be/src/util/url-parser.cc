@@ -96,13 +96,18 @@ bool UrlParser::ParseUrl(const StringValue* url, UrlPart part, StringValue* resu
         start_pos += at.len;
       }
       StringValue host_start = protocol_end.Substring(start_pos);
+
+      // Find the start of the query
+      int32_t query_start_pos = question_search.Search(&host_start);
+      StringValue url_only = host_start.Substring(0, query_start_pos);
+
+      // Find the first '/' in url_only to determine host<:port>
+      int32_t hostport_end_pos = slash_search.Search(&url_only);
+      StringValue hostport = url_only.Substring(0, hostport_end_pos);
+
       // Find ':' to strip out port.
-      int32_t end_pos = colon_search.Search(&host_start);
-      if (end_pos < 0) {
-        // No port was given. Search for '/' to determine ending position.
-        end_pos = slash_search.Search(&host_start);
-      }
-      *result = host_start.Substring(0, end_pos);
+      int32_t end_pos = colon_search.Search(&hostport);
+      *result = hostport.Substring(0, end_pos);
       break;
     }
 

@@ -1493,6 +1493,21 @@ TEST_F(ExprTest, StringParseUrlFunction) {
   // Exactly what Hive returns as well.
   TestStringValue("parse_url('http://example.com_xyzabc^&*', 'HOST')",
       "example.com_xyzabc^&*");
+  // Colon after host:port/ (with port)
+  TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+      "index.html?name:networking#DOWNLOADING', 'HOST')", "example.com");
+  // Colon after host/ (without port)
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name:networking#DOWNLOADING', 'HOST')", "example.com");
+  // Colon in query without '/' no port
+  TestStringValue("parse_url('http://user:pass@example.com"
+      "?name:networking#DOWNLOADING', 'HOST')", "example.com");
+  // Colon in query without '/' with port
+  TestStringValue("parse_url('http://user:pass@example.com:80"
+      "?name:networking#DOWNLOADING', 'HOST')", "example.com");
+  // '/' in query
+  TestStringValue("parse_url('http://user:pass@example.com:80"
+      "?name:networking/DOWNLOADING', 'HOST')", "example.com");
   // Missing protocol.
   TestIsNull("parse_url('example.com/docs/books/tutorial/"
       "index.html?name=networking#DOWNLOADING', 'HOST')", TYPE_STRING);
