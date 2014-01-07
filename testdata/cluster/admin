@@ -1,0 +1,252 @@
+#!/bin/bash
+
+# Copyright 2014 Cloudera Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This will create/control/destroy a local hdfs+yarn+llama cluster.
+#
+# The original idea was to run each node on a different loopback address but
+# https://jira.cloudera.com/browse/CDH-16602 makes that impossible for now. So all roles
+# run on 127.0.0.1, just like the standard mini cluster included with hadoop. The
+# difference is with this cluster, each role runs in its own process and has its own
+# configs. For each node, the layout of the configs, logs, start/stop scripts, etc, is
+# kept as close as possible to a real cluster. For example, the first node will live in
+# the dir "cdh-<version>/node-1" and its logs would be at "cdh-<version>/node-1/var/log".
+
+set -eu
+
+while getopts v OPT; do
+  case $OPT in
+    v) set -x; shift;;
+    ?) echo "Usage: $0 [-v (verbose)] ACTION (see source...)"; exit 1;;
+  esac
+done
+
+DIR=$(dirname $0)
+NODES_DIR="$DIR/cdh$CDH_MAJOR_VERSION"
+NODE_COUNT=3
+NODE_PREFIX=node-
+COMMON_NODE_TEMPLATE="$DIR/node_templates/common"
+NODE_TEMPLATE="$DIR/node_templates/cdh$CDH_MAJOR_VERSION"
+TEMPLATE_SUFFIX=".tmpl"
+
+# Each process should be marked with this so a "pkill -f" can be done to nuke everything.
+export KILL_CLUSTER_MARKER=IBelongToTheMiniCluster
+
+SUPPORTED_SERVICES=(hdfs yarn)
+if [[ "$CDH_MAJOR_VERSION" -ge 5 ]]; then
+  SUPPORTED_SERVICES+=(llama)
+fi
+
+# All DataNodes and NodeManagers need a unique but fixed address. The IP is fixed at
+# 127.0.0.1, so the only difference is the port. The address must be fixed because it is
+# used as an identifier. If a node were restarted with a different address it would be
+# considered a new node. The values below are arbitrary and may conflict with existing
+# sevices. Fixed ports were preferred to dynamically chosen free ports for consistency.
+DATANODE_FREE_PORT_START=31000
+NODEMANAGER_FREE_PORT_START=31100
+
+# Used to populate config templates later. Any changes made here have no effect on an
+# existing cluster.
+export HDFS_WEBUI_PORT=5070   # changed from 50070 so it is not ephemeral
+export YARN_WEBUI_PORT=8088   # same as default
+export LLAMA_WEBUI_PORT=1501   # same as default
+
+# Empty dirs that should be included in the templates. Since git ignores empty dirs it is
+# easier to maintain them here.
+EMPTY_NODE_DIRS=$(echo data/dfs/{dn,nn} var/{run,lib/hadoop-hdfs,log})
+if [[ "$CDH_MAJOR_VERSION" -ge 5 ]]; then
+  EMPTY_NODE_DIRS+=" /var/log/llama"
+fi
+
+EASY_ACCESS_LOG_DIR="$IMPALA_HOME/cluster_logs"
+
+function cluster_exists {
+  # Just use the first node as an indicator...
+  if [[ ! -e "$NODES_DIR/${NODE_PREFIX}1" ]]; then
+    return 1
+  fi
+}
+
+function create_cluster {
+  mkdir -p "$NODES_DIR"
+
+  # Used to populate config templates later
+  GROUP=$(id -gn)
+  export GROUP
+
+  # Llama needs a mapping of DataNodes to NodeManagers and for that we'll need to know
+  # the hostname hadoop has chosen. It should be the first entry in /etc/hosts for
+  # 127.0.0.1.
+  #
+  # It is possible this hostname must also mactch the impala hostname, which will
+  # never be "localhost".
+  if getent hosts 127.0.0.1 1>/dev/null; then
+    HADOOP_HOSTNAME=$(getent hosts 127.0.0.1 | awk '{print $2}')
+  else
+    # This may be an error case...
+    HADOOP_HOSTNAME=127.0.0.1
+  fi
+
+  # For consistency, the first node will host all the master roles, including llama. Llama
+  # needs to know the ports of the datanodes and nodemanagers. The ports are generated
+  # below as part of setting up each node. The slave nodes are created first so the ports
+  # will be known when it is time to configure llama.
+  for ((NODE_IDX=$NODE_COUNT; NODE_IDX >= 1; NODE_IDX--)); do
+    NODE=${NODE_PREFIX}$NODE_IDX
+    NODE_DIR=$(get_node_dir $NODE)
+
+    echo "Creating $NODE at $NODE_DIR"
+
+    mkdir -p "$NODE_DIR"
+    cp -a "$COMMON_NODE_TEMPLATE"/* "$NODE_DIR"
+    if [[ -e "$NODE_TEMPLATE" ]]; then
+      cp -a "$NODE_TEMPLATE"/* "$NODE_DIR"
+    fi
+    if [[ $NODE_IDX -gt 1 ]]; then
+      # Remove master role scripts from slave nodes
+      rm -f "$NODE_DIR/etc/init.d/"{hdfs-namenode,yarn-resourcemanager,llama-application}
+    fi
+    for EMPTY_NODE_DIR in $EMPTY_NODE_DIRS; do
+      mkdir -p "$NODE_DIR/$EMPTY_NODE_DIR"
+    done
+
+    # Add some easy access links closer to IMPALA_HOME
+    EASY_ACCESS_LOG_LINK="$EASY_ACCESS_LOG_DIR/cdh$CDH_MAJOR_VERSION-$NODE"
+    if [[ ! -e "$EASY_ACCESS_LOG_LINK" ]]; then
+      mkdir -p "$EASY_ACCESS_LOG_DIR"
+      ln -s "$NODE_DIR/var/log" "$EASY_ACCESS_LOG_DIR"
+      mv "$IMPALA_HOME/cluster_logs/log" "$EASY_ACCESS_LOG_LINK"
+    fi
+
+    # Template population
+    DATANODE_PORT=$((DATANODE_FREE_PORT_START++))
+    NODEMANAGER_PORT=$((NODEMANAGER_FREE_PORT_START++))
+    echo "$NODE will use ports DATANODE_PORT=$DATANODE_PORT and" \
+        "NODEMANAGER_PORT=$NODEMANAGER_PORT"
+
+    # Escape the first : to workaround https://jira.cloudera.com/browse/CDH-16840
+    LLAMA_PORT_MAPPINGS+="$HADOOP_HOSTNAME\\:$DATANODE_PORT="
+    LLAMA_PORT_MAPPINGS+="$HADOOP_HOSTNAME:$NODEMANAGER_PORT
+"
+    export NODE NODE_DIR DATANODE_PORT NODEMANAGER_PORT LLAMA_PORT_MAPPINGS
+    for TEMPLATE_PATH in $(find "$NODE_DIR" -name "*$TEMPLATE_SUFFIX"); do
+      ACTUAL_PATH="${TEMPLATE_PATH%$TEMPLATE_SUFFIX}"
+
+      # Search for strings like ${FOO}, if FOO is defined in the environment then replace
+      # "${FOO}" with the environment value.
+      perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+          "$TEMPLATE_PATH" > "$ACTUAL_PATH"
+      if [[ -x "$TEMPLATE_PATH" ]]; then
+        chmod u+x "$ACTUAL_PATH"
+      fi
+      rm "$TEMPLATE_PATH"
+    done
+  done
+}
+
+function start_cluster {
+  if ! cluster_exists; then
+    echo "The cluster must be created first"
+    return 1
+  fi
+
+  for SERVICE in ${SUPPORTED_SERVICES[@]}; do
+    WEBUI_PORT_VAR="${SERVICE^^}_WEBUI_PORT"
+    echo "Starting ${SERVICE^^} (Web UI - http://localhost:${!WEBUI_PORT_VAR})"
+    exec_init_script "$SERVICE*" start
+  done
+
+  # Check if the cluster is still alive...
+  sleep 10
+  check_cluster_status
+}
+
+function exec_init_script {
+  SCRIPT_NAME="$1"
+  shift
+
+  for SCRIPT in \
+      $(find "$NODES_DIR" -path "*/$NODE_PREFIX*/etc/init.d/$SCRIPT_NAME" -executable); do
+    if "$SCRIPT" status &>/dev/null; then
+      RUNNING=true
+    else
+      RUNNING=false
+    fi
+    case $1 in
+      start) if ! $RUNNING; then "$SCRIPT" start; fi;;
+      stop) if $RUNNING; then "$SCRIPT" stop; fi;;
+      *) "$SCRIPT" "$@";;
+    esac &
+  done
+  wait
+}
+
+function check_cluster_status {
+  if ! cluster_exists; then
+    echo "The cluster does not exist"
+    return 1
+  fi
+
+  ROLE_COUNT=0
+  NOT_RUNNING=()
+  for NODE_DIR in "$NODES_DIR/$NODE_PREFIX"*; do
+    for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/*" -executable); do
+      ROLE_COUNT=$((ROLE_COUNT + 1))
+      if ! "$SCRIPT" status &>/dev/null; then
+        NOT_RUNNING+=("\n$(basename $SCRIPT) is not running on $(basename $NODE_DIR)")
+      fi
+    done
+  done
+
+  case ${#NOT_RUNNING[@]} in
+    0) echo "The cluster is running"; return;;
+    $ROLE_COUNT) echo "The cluster is not running"; return 1;;
+    *) echo -e "${NOT_RUNNING[@]}"; return 1;;
+  esac
+}
+
+function stop_cluster {
+  if cluster_exists; then
+    # Stop services in reverse order to give them a chance to shutdown cleanly
+    for ((SERVICE_IDX=${#SUPPORTED_SERVICES[@]} - 1; SERVICE_IDX >= 0; SERVICE_IDX--)); do
+      SERVICE="${SUPPORTED_SERVICES[$SERVICE_IDX]}"
+      echo "Stopping ${SERVICE^^}"
+      exec_init_script "$SERVICE*" stop
+    done
+  fi
+  # Kill everything anyways just in case a git clean -xdf was done
+  pkill -f $KILL_CLUSTER_MARKER || true
+}
+
+function delete_data {
+  rm -rf "$NODES_DIR/$NODE_PREFIX"*/data/dfs/{nn,dn}/*
+}
+
+function delete_cluster {
+  pkill -f $KILL_CLUSTER_MARKER || true
+  rm -rf "$NODES_DIR"
+}
+
+function get_node_dir {
+  readlink -f "$NODES_DIR/$1"
+}
+
+function get_hadoop_client_conf_dir {
+  echo "$NODES_DIR/$NODE_PREFIX"1/etc/hadoop/conf
+}
+
+COMMAND=$1
+shift
+$COMMAND "$@"

@@ -1,0 +1,69 @@
+NODE_DIR="${NODE_DIR}"
+PID_DIR="$NODE_DIR/var/run"
+LOG_DIR="$NODE_DIR/var/log"
+
+export HADOOP_CONF_DIR="$NODE_DIR/etc/hadoop/conf"
+export YARN_CONF_DIR="$HADOOP_CONF_DIR"
+
+# Mark each process so they can be killed if needed. This is a safety mechanism for
+# stopping the processes if the pid file has been removed for whatever reason.
+export HADOOP_OPTS+=" -D${KILL_CLUSTER_MARKER}"
+export YARN_OPTS+=" -D${KILL_CLUSTER_MARKER}"
+
+PID_FILE="$PID_DIR/$(basename $0)"
+
+function do_start {
+  local CMD="$1"
+  shift
+  "$CMD" "$@" &> "$LOG_DIR/$(basename $0).out"  &
+  local PID=$!
+  echo $PID > "$PID_FILE"
+  disown -h $PID
+  # Give the process some time to die... if thing go wrong it usually takes at least a
+  # few seconds for the process to totallly shutdown
+  sleep 5
+  kill -0 $PID
+}
+
+function read_pid {
+  if [[ -e "$PID_FILE" ]]; then
+    cat "$PID_FILE"
+  fi
+}
+
+function pid_exists {
+  kill -0 $1 &> /dev/null
+}
+
+function stop {
+  local PID=$(read_pid)
+  if [[ -z $PID ]]; then
+    echo No PID to stop
+    return
+  fi
+  if pid_exists $PID; then
+    kill $PID
+  fi
+}
+
+function restart {
+  if status &>/dev/null; then
+    stop
+  fi
+  start
+}
+
+function status {
+  local PID=$(read_pid)
+  if [[ -z $PID ]]; then
+    echo Not started
+    return 1
+  fi
+
+  if pid_exists $PID; then
+    echo Running
+  else
+    echo Not Running
+    return 1
+  fi
+}

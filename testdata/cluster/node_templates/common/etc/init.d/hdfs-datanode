@@ -1,0 +1,12 @@
+#/bin/bash
+
+DIR=$(dirname $0)
+
+. "$DIR/common"
+. "$DIR/hdfs-common"
+
+function start {
+  do_start hdfs datanode
+}
+
+$1

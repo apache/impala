@@ -1,0 +1,21 @@
+#/bin/bash
+
+DIR=$(dirname $0)
+
+. "$DIR/common"
+. "$DIR/hdfs-common"
+
+HADOOP_LOG_DIR="$LOG_DIR/llama"
+HADOOP_CLASSPATH="$NODE_DIR/etc/llama/conf:$HADOOP_CLASSPATH"
+for JAR in $(find "$IMPALA_HOME"/thirdparty/llama* -name "*jar"); do
+  HADOOP_CLASSPATH="$JAR:$HADOOP_CLASSPATH"
+done
+export HADOOP_CLASSPATH
+export HADOOP_CLIENT_OPTS="$HADOOP_CLIENT_OPTS \
+    -Dllama.server.conf.dir=$NODE_DIR/etc/llama/conf"
+
+function start {
+  do_start hadoop 'com.cloudera.llama.am.LlamaAMMain'
+}
+
+$1

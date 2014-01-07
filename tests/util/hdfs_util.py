@@ -42,17 +42,13 @@ class HdfsConfig(object):
       self.conf[property.find('name').text] = property.find('value').text
 
   def get(self, key):
-    try:
-      return self.conf[key]
-    except KeyValue:
-      return None
+    return self.conf.get(key)
 
 def get_hdfs_client_from_conf(conf):
   """Returns a new HTTP client for an HDFS cluster using an HdfsConfig object"""
   hostport = conf.get('dfs.namenode.http-address')
   if hostport is None:
     raise Exception("dfs.namenode.http-address not found in config")
-
   host, port = hostport.split(":")
   return get_hdfs_client(host=host, port=port)
 

@@ -1,0 +1,15 @@
+#/bin/bash
+
+DIR=$(dirname $0)
+
+. "$DIR/common"
+. "$DIR/hdfs-common"
+
+function start {
+  if [[ ! -e "$NODE_DIR/data/dfs/nn/current" ]]; then
+    hdfs namenode -format 1</dev/null
+  fi
+  do_start hdfs namenode
+}
+
+$1

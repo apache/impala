@@ -1,9 +1,5 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-# kill DFS
-jps | grep MiniDFSClusterManager | awk '{print $1}' | xargs kill -9;
-sleep 2;
-
-# clear up dfs data to avoid recovery when it starts
-rm -rf /tmp/hadoop-*;
+$IMPALA_HOME/testdata/cluster/admin stop_cluster
+sleep 2

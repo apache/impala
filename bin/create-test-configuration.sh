@@ -42,6 +42,9 @@ fi
 
 set -u
 
+CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
+${CLUSTER_DIR}/admin create_cluster
+
 # Convert Metastore DB name to be lowercase
 export METASTORE_DB=`echo $METASTORE_DB | tr '[A-Z]' '[a-z]'`
 export CURRENT_USER=`whoami`
@@ -53,7 +56,7 @@ echo "Metastore DB: hive_${METASTORE_DB}"
 
 pushd ${CONFIG_DIR}
 # Cleanup any existing files
-rm -f {core,hbase,hive}-site.xml
+rm -f {core,hdfs,hbase,hive}-site.xml
 rm -f authz-provider.ini
 
 # TODO: Throw an error if the template references an undefined environment variable
@@ -69,8 +72,17 @@ if [ $CREATE_METASTORE -eq 1 ]; then
 fi
 
 function generate_config {
+  # Search for strings like ${FOO}, if FOO is defined in the environment then replace
+  # "${FOO}" with the environment value.
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' $1 > $2
 }
+
+echo "Linking core-site.xml from local cluster"
+CLUSTER_HADOOP_CONF_DIR=$(${CLUSTER_DIR}/admin get_hadoop_client_conf_dir)
+ln -s ${CLUSTER_HADOOP_CONF_DIR}/core-site.xml
+
+echo "Linking hdfs-site.xml from local cluster"
+ln -s ${CLUSTER_HADOOP_CONF_DIR}/hdfs-site.xml
 
 echo "Generating hive-site.xml using postgresql for metastore"
 generate_config postgresql-hive-site.xml.template hive-site.xml
@@ -80,10 +92,6 @@ generate_config hive-log4j.properties.template hive-log4j.properties
 
 echo "Generating hbase-site.xml"
 generate_config hbase-site.xml.template hbase-site.xml
-
-echo "Generating core-site.xml"
-# Update dfs.block.local-path-access.user with the current user
-generate_config core-site.xml.template core-site.xml
 
 echo "Generating authorization policy file"
 generate_config authz-policy.ini.template authz-policy.ini

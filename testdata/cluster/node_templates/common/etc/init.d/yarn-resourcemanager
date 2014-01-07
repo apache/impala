@@ -1,0 +1,12 @@
+#/bin/bash
+
+DIR=$(dirname $0)
+
+. "$DIR/common"
+. "$DIR/yarn-common"
+
+function start {
+  do_start yarn resourcemanager
+}
+
+$1

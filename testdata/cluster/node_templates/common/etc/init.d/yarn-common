@@ -1,0 +1,4 @@
+export YARN_LOG_DIR="$LOG_DIR/hadoop-yarn"
+export YARN_ROOT_LOGGER="${YARN_ROOT_LOGGER:-DEBUG,RFA}"
+
+export YARN_LOGFILE=$(basename $0).log
