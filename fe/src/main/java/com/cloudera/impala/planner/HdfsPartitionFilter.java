@@ -102,7 +102,7 @@ public class HdfsPartitionFilter {
     }
 
     // call backend
-    if (!FeSupport.EvalPredicate(literalPredicate, analyzer.getQueryGlobals())) {
+    if (!FeSupport.EvalPredicate(literalPredicate, analyzer.getQueryContext())) {
       return false;
     }
 

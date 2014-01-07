@@ -186,8 +186,7 @@ class Coordinator {
 
   // copied from TQueryExecRequest; constant across all fragments
   TDescriptorTable desc_tbl_;
-  TQueryGlobals query_globals_;
-  TQueryOptions query_options_;
+  TQueryContext query_ctxt_;
 
   // copied from TQueryExecRequest, governs when to call ReportQuerySummary
   TStmtType::type stmt_type_;

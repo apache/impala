@@ -92,7 +92,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // ImpalaService rpcs: Beeswax API (implemented in impala-beeswax-server.cc)
   virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
   virtual void executeAndWait(beeswax::QueryHandle& query_handle,
-      const beeswax::Query& query, const beeswax::LogContextId& client_ctx);
+      const beeswax::Query& query, const beeswax::LogContextId& client_ctxt);
   virtual void explain(beeswax::QueryExplanation& query_explanation,
       const beeswax::Query& query);
   virtual void fetch(beeswax::Results& query_results,
@@ -199,6 +199,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       TCancelPlanFragmentResult& return_val, const TCancelPlanFragmentParams& params);
   virtual void TransmitData(
       TTransmitDataResult& return_val, const TTransmitDataParams& params);
+
+  // Prepares the given query context by populating fields required for evaluating
+  // certain expressions, such as now(), pid(), etc. Should be called before handing
+  // the query context to the frontend for query compilation.
+  static void PrepareQueryContext(TQueryContext* query_ctxt);
 
   // Returns the ImpalaQueryOptions enum for the given "key". Input is case in-sensitive.
   // Return -1 if the input is an invalid option.
@@ -322,15 +327,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // session_state is a ptr to the session running this query.
   // query_session_state is a snapshot of session state that changes when the
   // query was run. (e.g. default database).
-  Status Execute(const TClientRequest& request,
+  Status Execute(TQueryContext* query_ctxt,
                  boost::shared_ptr<SessionState> session_state,
-                 const TSessionState& query_session_state,
                  boost::shared_ptr<QueryExecState>* exec_state);
 
   // Implements Execute() logic, but doesn't unregister query on error.
-  Status ExecuteInternal(const TClientRequest& request,
+  Status ExecuteInternal(const TQueryContext& query_ctxt,
                          boost::shared_ptr<SessionState> session_state,
-                         const TSessionState& query_session_state,
                          bool* registered_exec_state,
                          boost::shared_ptr<QueryExecState>* exec_state);
 
@@ -517,7 +520,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Beeswax private methods
 
   // Helper functions to translate between Beeswax and Impala structs
-  Status QueryToTClientRequest(const beeswax::Query& query, TClientRequest* request);
+  Status QueryToTQueryContext(const beeswax::Query& query, TQueryContext* query_ctxt);
   void TUniqueIdToQueryHandle(const TUniqueId& query_id, beeswax::QueryHandle* handle);
   void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
 
@@ -560,9 +563,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   static void TUniqueIdToTHandleIdentifier(
       const TUniqueId& unique_id, const TUniqueId& secret,
       apache::hive::service::cli::thrift::THandleIdentifier* handle);
-  Status TExecuteStatementReqToTClientRequest(
+  Status TExecuteStatementReqToTQueryContext(
       const apache::hive::service::cli::thrift::TExecuteStatementReq execute_request,
-      TClientRequest* client_request);
+      TQueryContext* query_ctxt);
   static void TColumnValueToHiveServer2TColumnValue(const TColumnValue& value,
       const TPrimitiveType::type& type,
       apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);

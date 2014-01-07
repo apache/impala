@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Function;
@@ -41,7 +40,9 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TExpr;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.google.common.base.Preconditions;
 
 public class AnalyzerTest {
@@ -68,12 +69,13 @@ public class AnalyzerTest {
   }
 
   protected Analyzer createAnalyzer(String defaultDb) {
-    return new Analyzer(catalog_, defaultDb, new User(System.getProperty("user.name")));
+    TQueryContext queryCtxt =
+        TestUtils.createQueryContext(defaultDb, System.getProperty("user.name"));
+    return new Analyzer(catalog_, queryCtxt);
   }
 
   protected Analyzer createAnalyzerUsingHiveColLabels() {
-    Analyzer analyzer = new Analyzer(catalog_, Catalog.DEFAULT_DB,
-        new User(System.getProperty("user.name")));
+    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
     analyzer.setUseHiveColLabels(true);
     return analyzer;
   }

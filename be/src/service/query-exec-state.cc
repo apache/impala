@@ -38,16 +38,13 @@ DECLARE_string(catalog_service_host);
 namespace impala {
 
 ImpalaServer::QueryExecState::QueryExecState(
-    ExecEnv* exec_env, Frontend* frontend,
-    ImpalaServer* server,
-    shared_ptr<SessionState> session,
-    const TSessionState& query_session_state, const string& sql_stmt)
-  : sql_stmt_(sql_stmt),
+    const TQueryContext& query_ctxt, ExecEnv* exec_env, Frontend* frontend,
+    ImpalaServer* server, shared_ptr<SessionState> session)
+  : query_ctxt_(query_ctxt),
     last_active_time_(numeric_limits<int64_t>::max()),
     ref_count_(0L),
     exec_env_(exec_env),
     parent_session_(session),
-    query_session_state_(query_session_state),
     coord_(NULL),
     profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
     server_profile_(&profile_pool_, "ImpalaServer"),
@@ -87,7 +84,7 @@ ImpalaServer::QueryExecState::QueryExecState(
   summary_profile_.AddInfoString("Network Address",
       lexical_cast<string>(parent_session_->network_address));
   summary_profile_.AddInfoString("Default Db", default_db());
-  summary_profile_.AddInfoString("Sql Statement", sql_stmt);
+  summary_profile_.AddInfoString("Sql Statement", query_ctxt_.request.stmt);
 }
 
 Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
@@ -159,7 +156,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
           params->__isset.show_pattern ? &(params->show_pattern) : NULL;
       TGetTablesResult table_names;
       RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name,
-          &query_session_state_, &table_names));
+          &query_ctxt_.session, &table_names));
       SetResultSet(table_names.tables);
       return Status::OK;
     }
@@ -169,7 +166,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       const string* db_pattern =
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(
-          frontend_->GetDbNames(db_pattern, &query_session_state_, &db_names));
+          frontend_->GetDbNames(db_pattern, &query_ctxt_.session, &db_names));
       SetResultSet(db_names.dbs);
       return Status::OK;
     }
@@ -188,7 +185,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       const string* fn_pattern =
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(frontend_->GetFunctions(
-          params->type, params->db, fn_pattern, &query_session_state_, &functions));
+          params->type, params->db, fn_pattern, &query_ctxt_.session, &functions));
       SetResultSet(functions.fn_signatures);
       return Status::OK;
     }

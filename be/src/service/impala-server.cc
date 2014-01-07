@@ -487,14 +487,14 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
 
 ImpalaServer::~ImpalaServer() {}
 
-Status ImpalaServer::Execute(const TClientRequest& request,
+Status ImpalaServer::Execute(TQueryContext* query_ctxt,
     shared_ptr<SessionState> session_state,
-    const TSessionState& query_session_state,
     shared_ptr<QueryExecState>* exec_state) {
+  PrepareQueryContext(query_ctxt);
   bool registered_exec_state;
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
-  Status status = ExecuteInternal(request, session_state, query_session_state,
-      &registered_exec_state, exec_state);
+  Status status = ExecuteInternal(*query_ctxt, session_state, &registered_exec_state,
+      exec_state);
   if (!status.ok() && registered_exec_state) {
     UnregisterQuery((*exec_state)->query_id(), &status);
   }
@@ -502,17 +502,16 @@ Status ImpalaServer::Execute(const TClientRequest& request,
 }
 
 Status ImpalaServer::ExecuteInternal(
-    const TClientRequest& request,
+    const TQueryContext& query_ctxt,
     shared_ptr<SessionState> session_state,
-    const TSessionState& query_session_state,
     bool* registered_exec_state,
     shared_ptr<QueryExecState>* exec_state) {
   DCHECK(session_state != NULL);
 
   *registered_exec_state = false;
 
-  exec_state->reset(new QueryExecState(exec_env_, frontend_.get(), this, session_state,
-      query_session_state, request.stmt));
+  exec_state->reset(new QueryExecState(query_ctxt, exec_env_, frontend_.get(),
+      this, session_state));
 
   (*exec_state)->query_events()->MarkEvent("Start execution");
 
@@ -538,7 +537,7 @@ Status ImpalaServer::ExecuteInternal(
     *registered_exec_state = true;
 
     RETURN_IF_ERROR((*exec_state)->UpdateQueryStatus(
-        frontend_->GetExecRequest(request, &result)));
+        frontend_->GetExecRequest(query_ctxt, &result)));
     (*exec_state)->query_events()->MarkEvent("Planning finished");
     if (result.__isset.result_set_metadata) {
       (*exec_state)->set_result_metadata(result.result_set_metadata);
@@ -568,6 +567,11 @@ Status ImpalaServer::ExecuteInternal(
     }
   }
   return Status::OK;
+}
+
+void ImpalaServer::PrepareQueryContext(TQueryContext* query_ctxt) {
+  query_ctxt->__set_pid(getpid());
+  query_ctxt->__set_now_string(TimestampValue::local_time_micros().DebugString());
 }
 
 Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,

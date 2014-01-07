@@ -26,6 +26,7 @@
 #include "rpc/thrift-server.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "service/impala-server.h"
 
 using namespace apache::thrift;
 using namespace boost;
@@ -53,16 +54,17 @@ class Planner {
   }
 
   Status GeneratePlan(const string& stmt, TExecRequest* result) {
-    TClientRequest request;
-    request.stmt = stmt;
-    request.sessionState = session_state_;
-    request.queryOptions = query_options_;
+    TQueryContext query_ctx;
+    query_ctx.request.stmt = stmt;
+    query_ctx.request.query_options = query_options_;
+    query_ctx.__set_session(session_state_);
+    ImpalaServer::PrepareQueryContext(&query_ctx);
 
     JNIEnv* jni_env = getJNIEnv();
     JniLocalFrame jni_frame;
     RETURN_IF_ERROR(jni_frame.push(jni_env));
     jbyteArray request_bytes;
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_ctx, &request_bytes));
     jbyteArray result_bytes = static_cast<jbyteArray>(
         jni_env->CallObjectMethod(fe_, create_exec_request_id_, request_bytes));
     RETURN_ERROR_IF_EXC(jni_env);

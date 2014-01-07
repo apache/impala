@@ -297,8 +297,7 @@ Status Coordinator::Exec(
   query_id_ = query_id;
   VLOG_QUERY << "Exec() query_id=" << query_id_;
   desc_tbl_ = request.desc_tbl;
-  query_globals_ = request.query_globals;
-  query_options_ = query_options;
+  query_ctxt_ = request.query_ctxt;
 
   query_profile_.reset(
       new RuntimeProfile(obj_pool(), "Execution Profile " + PrintId(query_id_)));
@@ -1575,8 +1574,7 @@ void Coordinator::SetExecPlanFragmentParams(
   rpc_params->__isset.params = true;
   rpc_params->__set_coord(coord);
   rpc_params->__set_backend_num(backend_num);
-  rpc_params->__set_query_globals(query_globals_);
-  rpc_params->__set_query_options(query_options_);
+  rpc_params->__set_query_ctxt(query_ctxt_);
 }
 
 }

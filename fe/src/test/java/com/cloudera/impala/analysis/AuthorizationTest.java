@@ -42,9 +42,11 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.Frontend;
+import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpcode;
 import com.cloudera.impala.thrift.TNetworkAddress;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TSessionState;
 import com.google.common.base.Preconditions;
@@ -74,7 +76,9 @@ public class AuthorizationTest {
         LocalGroupResourceAuthorizationProvider.class.getName());
     ImpaladCatalog catalog = new ImpaladCatalog(
         Catalog.CatalogInitStrategy.LAZY, authzConfig_);
-    analysisContext_ = new AnalysisContext(catalog, Catalog.DEFAULT_DB, USER);
+    TQueryContext queryCtxt =
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, USER.getName());
+    analysisContext_ = new AnalysisContext(catalog, queryCtxt);
     fe_ = new Frontend(Catalog.CatalogInitStrategy.LAZY, authzConfig_);
   }
 
@@ -295,7 +299,7 @@ public class AuthorizationTest {
     // The admin user should have privileges invalidate the server metadata.
     AnalysisContext adminAc = new AnalysisContext(new ImpaladCatalog(
         Catalog.CatalogInitStrategy.LAZY, authzConfig_),
-        Catalog.DEFAULT_DB, ADMIN_USER);
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, ADMIN_USER.getName()));
     AuthzOk(adminAc, "invalidate metadata");
 
     AuthzError("invalidate metadata",
@@ -933,8 +937,8 @@ public class AuthorizationTest {
     for (User user: users) {
       ImpaladCatalog catalog =
           new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY, authzConfig_);
-      AnalysisContext context = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
-          user);
+      AnalysisContext context = new AnalysisContext(catalog,
+          TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
       // Can select from table that user has privileges on.
       AuthzOk(context, "select * from functional.alltypesagg");
 
@@ -960,8 +964,8 @@ public class AuthorizationTest {
         HadoopGroupResourceAuthorizationProvider.class.getName());
     ImpaladCatalog catalog = new  ImpaladCatalog(
         Catalog.CatalogInitStrategy.LAZY, config);
-    AnalysisContext context = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
-        currentUser);
+    AnalysisContext context = new AnalysisContext(catalog,
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, currentUser.getName()));
 
     // Can select from table that user has privileges on.
     AuthzOk(context, "select * from functional.alltypesagg");
@@ -981,8 +985,8 @@ public class AuthorizationTest {
 
     // First try with the less privileged user.
     User currentUser = new User("test_user");
-    AnalysisContext context = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
-        currentUser);
+    AnalysisContext context = new AnalysisContext(catalog,
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, currentUser.getName()));
     AuthzError(context, "show functions",
         "User '%s' does not have privileges to access: default", currentUser);
     AuthzOk(context, "show functions in tpch");
@@ -1006,8 +1010,8 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to CREATE/DROP functions.", currentUser);
 
     // Admin should be able to do everything
-    AnalysisContext adminContext = new AnalysisContext(catalog, Catalog.DEFAULT_DB,
-        ADMIN_USER);
+    AnalysisContext adminContext = new AnalysisContext(catalog,
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, ADMIN_USER.getName()));
     AuthzOk(adminContext, "show functions");
     AuthzOk(adminContext, "show functions in tpch");
 
@@ -1147,7 +1151,7 @@ public class AuthorizationTest {
       throws AnalysisException {
     AnalysisContext ac = new AnalysisContext(new ImpaladCatalog(
         Catalog.CatalogInitStrategy.LAZY, authzConfig),
-        Catalog.DEFAULT_DB, user);
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
     AuthzError(ac, "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypesagg", user);

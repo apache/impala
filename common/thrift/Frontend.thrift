@@ -30,30 +30,6 @@ include "CatalogService.thrift"
 // These are supporting structs for JniFrontend.java, which serves as the glue
 // between our C++ execution environment and the Java frontend.
 
-// Impala currently has two types of sessions: Beeswax and HiveServer2
-enum TSessionType {
-  BEESWAX,
-  HIVESERVER2
-}
-
-// Per-client session state
-struct TSessionState {
-  // A unique identifier for this session
-  3: required Types.TUniqueId session_id
-
-  // Session Type (Beeswax or HiveServer2)
-  5: required TSessionType session_type
-
-  // The default database for the session
-  1: required string database
-
-  // The user to whom this session belongs
-  2: required string user
-
-  // Client network address
-  4: required Types.TNetworkAddress network_address
-}
-
 // Struct for HiveUdf expr to create the proper execution object in the FE
 // java side. See exprs/hive-udf-call.h for how hive Udfs are executed in general.
 // TODO: this could be the UdfID, collapsing the first 3 arguments but synchronizing
@@ -97,7 +73,7 @@ struct TGetTablesParams {
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the tables this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
-  3: optional TSessionState session
+  3: optional ImpalaInternalService.TSessionState session
 }
 
 // getTableNames returns a list of unqualified table names
@@ -114,7 +90,7 @@ struct TGetDbsParams {
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the databases this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
-  2: optional TSessionState session
+  2: optional ImpalaInternalService.TSessionState session
 }
 
 // getDbNames returns a list of database names
@@ -149,17 +125,6 @@ struct TDescribeTableParams {
 struct TDescribeTableResult {
   // Output from a DESCRIBE TABLE command.
   1: required list<Data.TResultRow> results
-}
-
-struct TClientRequest {
-  // select stmt to be executed
-  1: required string stmt
-
-  // query options
-  2: required ImpalaInternalService.TQueryOptions queryOptions
-
-  // session state
-  3: required TSessionState sessionState
 }
 
 // Parameters for SHOW DATABASES commands
@@ -210,7 +175,7 @@ struct TGetFunctionsParams {
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the functions this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
-  4: optional TSessionState session
+  4: optional ImpalaInternalService.TSessionState session
 }
 
 // getFunctions() returns a list of function signatures
@@ -302,7 +267,7 @@ struct TQueryExecRequest {
   // Set if the query needs finalization after it executes
   6: optional TFinalizeParams finalize_params
 
-  7: required ImpalaInternalService.TQueryGlobals query_globals
+  7: required ImpalaInternalService.TQueryContext query_ctxt
 
   // The same as the output of 'explain <query>'
   8: optional string query_plan
@@ -397,7 +362,7 @@ struct TMetadataOpRequest {
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the server objects this user has access to will be returned.
   // If not set, access checks will be skipped (used for internal Impala requests)
-  10: optional TSessionState session
+  10: optional ImpalaInternalService.TSessionState session
 }
 
 // Tracks accesses to Catalog objects for use during auditing. This information, paired

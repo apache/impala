@@ -112,7 +112,7 @@ FunctionContext::ImpalaVersion FunctionContext::version() const {
 
 const char* FunctionContext::user() const {
   if (impl_->state_ == NULL) return NULL;
-  return  impl_->state_->user().c_str();
+  return impl_->state_->user().c_str();
 }
 
 FunctionContext::UniqueId FunctionContext::query_id() const {

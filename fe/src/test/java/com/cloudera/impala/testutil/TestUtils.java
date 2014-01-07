@@ -3,8 +3,10 @@
 package com.cloudera.impala.testutil;
 import static org.junit.Assert.fail;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -21,9 +23,16 @@ import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TInsertResult;
+import com.cloudera.impala.thrift.TNetworkAddress;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TQueryOptions;
+import com.cloudera.impala.thrift.TSessionState;
+import com.cloudera.impala.thrift.TSessionType;
+import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -568,4 +577,24 @@ public class TestUtils {
     return client;
   }
 
+  /**
+   * Create a TQueryContext for executing FE tests.
+   */
+  public static TQueryContext createQueryContext() {
+    return createQueryContext(Catalog.DEFAULT_DB, System.getProperty("user.name"));
+  }
+
+  /**
+   * Create a TQueryContext for executing FE tests using the given default DB and user.
+   */
+  public static TQueryContext createQueryContext(String defaultDb, String user) {
+    TQueryContext queryCtxt = new TQueryContext();
+    queryCtxt.setRequest(new TClientRequest("FeTests", new TQueryOptions()));
+    queryCtxt.setSession(new TSessionState(new TUniqueId(), TSessionType.BEESWAX,
+        defaultDb, user, new TNetworkAddress("localhost", 0)));
+    SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
+    queryCtxt.setNow_string(formatter.format(Calendar.getInstance().getTime()));
+    queryCtxt.setPid(1000);
+    return queryCtxt;
+  }
 }

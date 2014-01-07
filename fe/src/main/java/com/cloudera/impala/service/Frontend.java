@@ -60,7 +60,6 @@ import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.TCatalogOpRequest;
 import com.cloudera.impala.thrift.TCatalogOpType;
-import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TDdlExecRequest;
@@ -77,6 +76,7 @@ import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPrimitiveType;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TResultRow;
@@ -342,9 +342,9 @@ public class Frontend {
    * Parses and plans a query in order to generate its explain string. This method does
    * not increase the query id counter.
    */
-  public String getExplainString(TClientRequest request) throws ImpalaException {
+  public String getExplainString(TQueryContext queryCtxt) throws ImpalaException {
     StringBuilder stringBuilder = new StringBuilder();
-    createExecRequest(request, stringBuilder);
+    createExecRequest(queryCtxt, stringBuilder);
     return stringBuilder.toString();
   }
 
@@ -431,22 +431,20 @@ public class Frontend {
   }
 
   /**
-   * Create a populated TExecRequest corresponding to the supplied TClientRequest.
+   * Create a populated TExecRequest corresponding to the supplied TQueryContext.
    */
   public TExecRequest createExecRequest(
-      TClientRequest request, StringBuilder explainString)
+      TQueryContext queryCtxt, StringBuilder explainString)
       throws ImpalaException {
-    AnalysisContext analysisCtxt = new AnalysisContext(impaladCatalog_,
-        request.sessionState.database,
-        new User(request.sessionState.user));
+    AnalysisContext analysisCtxt = new AnalysisContext(impaladCatalog_, queryCtxt);
     AnalysisContext.AnalysisResult analysisResult = null;
-    LOG.debug("analyze query " + request.stmt);
-    analysisResult = analysisCtxt.analyze(request.stmt);
+    LOG.debug("analyze query " + queryCtxt.request.stmt);
+    analysisResult = analysisCtxt.analyze(queryCtxt.request.stmt);
 
     Preconditions.checkNotNull(analysisResult.getStmt());
 
     TExecRequest result = new TExecRequest();
-    result.setQuery_options(request.getQueryOptions());
+    result.setQuery_options(queryCtxt.request.getQuery_options());
     result.setAccess_events(analysisResult.getAccessEvents());
 
     if (analysisResult.isCatalogOp()) {
@@ -472,7 +470,7 @@ public class Frontend {
     LOG.debug("create plan");
     Planner planner = new Planner();
     ArrayList<PlanFragment> fragments =
-        planner.createPlanFragments(analysisResult, request.queryOptions);
+        planner.createPlanFragments(analysisResult, queryCtxt.request.query_options);
     List<ScanNode> scanNodes = Lists.newArrayList();
     // map from fragment to its index in queryExecRequest.fragments; needed for
     // queryExecRequest.dest_fragment_idx
@@ -499,17 +497,18 @@ public class Frontend {
       queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
           scanNode.getScanRangeLocations(
-            request.queryOptions.getMax_scan_range_length()));
+              queryCtxt.request.query_options.getMax_scan_range_length()));
     }
 
     // Compute resource requirements after scan range locations because the cost
     // estimates of scan nodes rely on them.
-    planner.computeResourceReqs(fragments, true, request.queryOptions, queryExecRequest);
+    planner.computeResourceReqs(fragments, true, queryCtxt.request.query_options,
+        queryExecRequest);
 
     // Use VERBOSE by default for all non-explain statements.
     TExplainLevel explainLevel = TExplainLevel.VERBOSE;
-    if (request.queryOptions.isSetExplain_level()) {
-      explainLevel = request.queryOptions.getExplain_level();
+    if (queryCtxt.request.query_options.isSetExplain_level()) {
+      explainLevel = queryCtxt.request.query_options.getExplain_level();
     } else if (analysisResult.isExplainStmt()) {
       // Use the NORMAL by default for explain statements.
       explainLevel = TExplainLevel.NORMAL;
@@ -529,7 +528,7 @@ public class Frontend {
     result.setQuery_exec_request(queryExecRequest);
 
     // Global query parameters to be set in each TPlanExecRequest.
-    queryExecRequest.query_globals = analysisResult.getAnalyzer().getQueryGlobals();
+    queryExecRequest.setQuery_ctxt(queryCtxt);
 
     if (analysisResult.isQueryStmt()) {
       // fill in the metadata
@@ -563,7 +562,7 @@ public class Frontend {
         finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
         finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
         String db = insertStmt.getTargetTableName().getDb();
-        finalizeParams.setTable_db(db == null ? request.sessionState.database : db);
+        finalizeParams.setTable_db(db == null ? queryCtxt.session.database : db);
         HdfsTable hdfsTable = (HdfsTable) insertStmt.getTargetTable();
         finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
         finalizeParams.setStaging_dir(

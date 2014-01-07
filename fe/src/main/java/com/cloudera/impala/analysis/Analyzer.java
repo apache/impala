@@ -14,10 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -47,8 +45,7 @@ import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TQueryGlobals;
-import com.cloudera.impala.util.ProcessUtil;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -99,10 +96,9 @@ public class Analyzer {
   // state shared between all objects of an Analyzer tree
   private static class GlobalState {
     public final ImpaladCatalog catalog;
+    public final TQueryContext queryCtxt;
     public final DescriptorTable descTbl = new DescriptorTable();
-    public final String defaultDb;
     public final IdGenerator<ExprId> conjunctIdGenerator = ExprId.createGenerator();
-    public final TQueryGlobals queryGlobals = new TQueryGlobals();
 
     // True if we are analyzing an explain request. Should be set before starting
     // analysis.
@@ -166,15 +162,9 @@ public class Analyzer {
     private final List<Pair<SlotId, SlotId>> registeredValueTransfers =
         Lists.newArrayList();
 
-    public GlobalState(ImpaladCatalog catalog, String defaultDb, User user, Integer pid) {
+    public GlobalState(ImpaladCatalog catalog, TQueryContext queryCtxt) {
       this.catalog = catalog;
-      this.defaultDb = defaultDb;
-
-      // Create query global parameters to be set in each TPlanExecRequest.
-      SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
-      queryGlobals.setNow_string(formatter.format(Calendar.getInstance().getTime()));
-      queryGlobals.setUser(user.getName());
-      if (pid != null) queryGlobals.setPid(pid);
+      this.queryCtxt = queryCtxt;
     }
   };
 
@@ -195,11 +185,10 @@ public class Analyzer {
   // map from lowercase qualified column name ("alias.col") to descriptor
   private final Map<String, SlotDescriptor> slotRefMap_ = Maps.newHashMap();
 
-  public Analyzer(ImpaladCatalog catalog, String defaultDb, User user) {
+  public Analyzer(ImpaladCatalog catalog, TQueryContext queryCxt) {
     this.ancestors_ = Lists.newArrayList();
-    this.globalState_ = new GlobalState(catalog, defaultDb, user,
-        ProcessUtil.getCurrentProcessId());
-    this.user_ = user;
+    this.globalState_ = new GlobalState(catalog, queryCxt);
+    user_ = new User(queryCxt.session.user);
   }
 
   /**
@@ -1235,21 +1224,10 @@ public class Analyzer {
     return compatibleType;
   }
 
-  public Map<String, ViewRef> getWithClauseViews() {
-    return withClauseViews_;
-  }
-
-  public String getDefaultDb() {
-    return globalState_.defaultDb;
-  }
-
-  public User getUser() {
-    return user_;
-  }
-
-  public TQueryGlobals getQueryGlobals() {
-    return globalState_.queryGlobals;
-  }
+  public Map<String, ViewRef> getWithClauseViews() { return withClauseViews_; }
+  public String getDefaultDb() { return globalState_.queryCtxt.session.database; }
+  public User getUser() { return user_; }
+  public TQueryContext getQueryContext() { return globalState_.queryCtxt; }
 
   /**
    * Returns a list of the successful catalog object access events. Does not include

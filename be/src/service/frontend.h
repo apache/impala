@@ -42,10 +42,10 @@ class Frontend {
       TUpdateCatalogCacheResponse *resp);
 
   // Call FE to get explain plan
-  Status GetExplainPlan(const TClientRequest& query_request, std::string* explain_string);
+  Status GetExplainPlan(const TQueryContext& query_ctxt, std::string* explain_string);
 
-  // Call FE to get TClientRequestResult.
-  Status GetExecRequest(const TClientRequest& request, TExecRequest* result);
+  // Call FE to get TExecRequest.
+  Status GetExecRequest(const TQueryContext& query_ctxt, TExecRequest* result);
 
   // Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
   // table name returned is unqualified.

@@ -17,30 +17,23 @@ package com.cloudera.impala.analysis;
 import java.io.StringReader;
 import java.util.List;
 
-import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.google.common.base.Preconditions;
 
 /**
  * Wrapper class for parser and analyzer.
- *
  */
 public class AnalysisContext {
   private final ImpaladCatalog catalog_;
+  private final TQueryContext queryCtxt_;
 
-  // The name of the database to use if one is not explicitly specified by a query.
-  private final String defaultDatabase_;
-
-  // The user who initiated the request.
-  private final User user_;
-
-  public AnalysisContext(ImpaladCatalog catalog, String defaultDb, User user) {
-    this.catalog_ = catalog;
-    this.defaultDatabase_ = defaultDb;
-    this.user_ = user;
+  public AnalysisContext(ImpaladCatalog catalog, TQueryContext queryCtxt) {
+    catalog_ = catalog;
+    queryCtxt_ = queryCtxt;
   }
 
   static public class AnalysisResult {
@@ -251,7 +244,7 @@ public class AnalysisContext {
       if (result.stmt_ == null) {
         return null;
       }
-      result.analyzer_ = new Analyzer(catalog_, defaultDatabase_, user_);
+      result.analyzer_ = new Analyzer(catalog_, queryCtxt_);
       result.stmt_.analyze(result.analyzer_);
       return result;
     } catch (AnalysisException e) {

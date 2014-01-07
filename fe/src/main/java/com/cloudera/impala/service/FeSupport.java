@@ -26,7 +26,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExpr;
-import com.cloudera.impala.thrift.TQueryGlobals;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TSymbolLookupParams;
 import com.cloudera.impala.thrift.TSymbolLookupResult;
 import com.cloudera.impala.util.NativeLibUtil;
@@ -55,7 +55,7 @@ public class FeSupport {
   // Returns a serialize TSymbolLookupResult
   public native static byte[] NativeLookupSymbol(byte[] thriftSymbolLookup);
 
-  public static TColumnValue EvalConstExpr(Expr expr, TQueryGlobals queryGlobals)
+  public static TColumnValue EvalConstExpr(Expr expr, TQueryContext queryCtxt)
       throws InternalException {
     Preconditions.checkState(expr.isConstant());
     TExpr thriftExpr = expr.treeToThrift();
@@ -63,7 +63,7 @@ public class FeSupport {
     byte[] result;
     try {
       result = EvalConstExpr(serializer.serialize(thriftExpr),
-          serializer.serialize(queryGlobals));
+          serializer.serialize(queryCtxt));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
       TColumnValue val = new TColumnValue();
@@ -100,20 +100,20 @@ public class FeSupport {
     }
   }
 
-  private static byte[] EvalConstExpr(byte[] thriftExpr, byte[] thriftQueryGlobals) {
+  private static byte[] EvalConstExpr(byte[] thriftExpr, byte[] thriftQueryContext) {
     try {
-      return NativeEvalConstExpr(thriftExpr, thriftQueryGlobals);
+      return NativeEvalConstExpr(thriftExpr, thriftQueryContext);
     } catch (UnsatisfiedLinkError e) {
       // We should only get here in FE tests that dont run the BE.
       loadLibrary();
     }
-    return NativeEvalConstExpr(thriftExpr, thriftQueryGlobals);
+    return NativeEvalConstExpr(thriftExpr, thriftQueryContext);
   }
 
-  public static boolean EvalPredicate(Expr pred, TQueryGlobals queryGlobals)
+  public static boolean EvalPredicate(Expr pred, TQueryContext queryCtxt)
       throws InternalException {
     Preconditions.checkState(pred.getType() == PrimitiveType.BOOLEAN);
-    TColumnValue val = EvalConstExpr(pred, queryGlobals);
+    TColumnValue val = EvalConstExpr(pred, queryCtxt);
     // Return false if pred evaluated to false or NULL. True otherwise.
     return val.isSetBoolVal() && val.boolVal;
   }

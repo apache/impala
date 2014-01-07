@@ -22,11 +22,11 @@ import org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.google.common.collect.Lists;
@@ -272,14 +272,13 @@ public class AuditingTest extends AnalyzerTest {
   @Test
   public void TestAccessEventsOnAuthFailure() throws AuthorizationException,
       AnalysisException {
-    User currentUser = new User(System.getProperty("user.name"));
     // The policy file doesn't exist so all operations will result in
     // an AuthorizationError
     AuthorizationConfig config = new AuthorizationConfig("server1", "/does/not/exist",
         HadoopGroupResourceAuthorizationProvider.class.getName());
     ImpaladCatalog catalog = new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY,
         config);
-    Analyzer analyzer = new Analyzer(catalog, Catalog.DEFAULT_DB, currentUser);
+    Analyzer analyzer = new Analyzer(catalog, TestUtils.createQueryContext());
 
     // Authorization of an object is performed immediately before auditing so
     // the access events will not include the item that failed authorization.

@@ -68,11 +68,10 @@ typedef std::map<std::string, std::string> FileMoveMap;
 class RuntimeState {
  public:
   RuntimeState(const TUniqueId& query_id, const TUniqueId& fragment_instance_id,
-      const TQueryOptions& query_options, const TQueryGlobals& query_globals,
-      ExecEnv* exec_env);
+      const TQueryContext& query_ctxt, ExecEnv* exec_env);
 
   // RuntimeState for executing expr in fe-support.
-  RuntimeState(const TQueryGlobals& query_globals);
+  RuntimeState(const TQueryContext& query_ctxt);
 
   // Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
@@ -86,18 +85,22 @@ class RuntimeState {
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
-  const TQueryOptions& query_options() const { return query_options_; }
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
-  int batch_size() const { return query_options_.batch_size; }
-  bool abort_on_error() const { return query_options_.abort_on_error; }
-  bool abort_on_default_limit_exceeded() const {
-    return query_options_.abort_on_default_limit_exceeded;
+  const TQueryOptions& query_options() const {
+    return query_ctxt_.request.query_options;
   }
-  int max_errors() const { return query_options_.max_errors; }
+  int batch_size() const { return query_ctxt_.request.query_options.batch_size; }
+  bool abort_on_error() const {
+    return query_ctxt_.request.query_options.abort_on_error;
+  }
+  bool abort_on_default_limit_exceeded() const {
+    return query_ctxt_.request.query_options.abort_on_default_limit_exceeded;
+  }
+  int max_errors() const { return query_ctxt_.request.query_options.max_errors; }
+  const TQueryContext& query_ctxt() const { return query_ctxt_; }
+  const std::string& user() const { return query_ctxt_.session.user; }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
-  const std::string& user() const { return user_; }
-  const int32_t pid() const { return pid_; }
   const std::vector<std::string>& error_log() const { return error_log_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
@@ -127,7 +130,9 @@ class RuntimeState {
   RuntimeProfile* runtime_profile() { return &profile_; }
 
   // Returns true if codegen is enabled for this query.
-  bool codegen_enabled() const { return !query_options_.disable_codegen; }
+  bool codegen_enabled() const {
+    return !query_ctxt_.request.query_options.disable_codegen;
+  }
 
   // Returns CodeGen object.  Returns NULL if the codegen object has not been
   // created. If codegen is enabled for the query, the codegen object will be
@@ -164,7 +169,7 @@ class RuntimeState {
   // Returns true if the error log has not reached max_errors_.
   bool LogHasSpace() {
     boost::lock_guard<boost::mutex> l(error_log_lock_);
-    return error_log_.size() < query_options_.max_errors;
+    return error_log_.size() < query_ctxt_.request.query_options.max_errors;
   }
 
   // Report that num_errors occurred while parsing file_name.
@@ -219,8 +224,7 @@ class RuntimeState {
 
  private:
   // Set per-fragment state.
-  Status Init(const TUniqueId& fragment_instance_id,
-      const TQueryOptions& query_options, ExecEnv* exec_env);
+  Status Init(const TUniqueId& fragment_instance_id, ExecEnv* exec_env);
 
   static const int DEFAULT_BATCH_SIZE = 1024;
 
@@ -249,19 +253,16 @@ class RuntimeState {
   // Stores the number of parse errors per file.
   std::vector<std::pair<std::string, int> > file_errors_;
 
-  // Username of user that is executing the query to which this RuntimeState belongs.
-  std::string user_;
+  // Query-global parameters used for preparing exprs as now(), user(), etc. that should
+  // return a consistent result regardless which impalad is evaluating the expr.
+  TQueryContext query_ctxt_;
 
-  // Query-global timestamp, e.g., for implementing now().
+  // Query-global timestamp, e.g., for implementing now(). Set from query_globals_.
   // Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.
   boost::scoped_ptr<TimestampValue> now_;
 
-  // ID of the impalad process to which the user is connected.
-  int32_t pid_;
-
   TUniqueId query_id_;
   TUniqueId fragment_instance_id_;
-  TQueryOptions query_options_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 

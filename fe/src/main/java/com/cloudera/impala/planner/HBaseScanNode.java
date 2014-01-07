@@ -146,7 +146,7 @@ public class HBaseScanNode extends ScanNode {
         Preconditions.checkState(rowRange.getLowerBound().getType() ==
             PrimitiveType.STRING);
         TColumnValue val = FeSupport.EvalConstExpr(rowRange.getLowerBound(),
-            analyzer.getQueryGlobals());
+            analyzer.getQueryContext());
         if (!val.isSetStringVal()) {
           // lower bound is null.
           isEmpty_ = true;
@@ -161,7 +161,7 @@ public class HBaseScanNode extends ScanNode {
         Preconditions.checkState(rowRange.getUpperBound().getType() ==
             PrimitiveType.STRING);
         TColumnValue val = FeSupport.EvalConstExpr(rowRange.getUpperBound(),
-            analyzer.getQueryGlobals());
+            analyzer.getQueryContext());
         if (!val.isSetStringVal()) {
           // upper bound is null.
           isEmpty_ = true;

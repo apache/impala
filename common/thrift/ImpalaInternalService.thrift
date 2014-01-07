@@ -66,6 +66,55 @@ struct TQueryOptions {
   19: optional bool sync_ddl = 0
 }
 
+// Impala currently has two types of sessions: Beeswax and HiveServer2
+enum TSessionType {
+  BEESWAX,
+  HIVESERVER2
+}
+
+// Per-client session state
+struct TSessionState {
+  // A unique identifier for this session
+  3: required Types.TUniqueId session_id
+
+  // Session Type (Beeswax or HiveServer2)
+  5: required TSessionType session_type
+
+  // The default database for the session
+  1: required string database
+
+  // The user to whom this session belongs
+  2: required string user
+
+  // Client network address
+  4: required Types.TNetworkAddress network_address
+}
+
+// Client request including stmt to execute and query options.
+struct TClientRequest {
+  // SQL stmt to be executed
+  1: required string stmt
+
+  // query options
+  2: required TQueryOptions query_options
+}
+
+// Context of this query, including the client request, session state and
+// global query parameters needed for consistent expr evaluation (e.g., now()).
+struct TQueryContext {
+  // Client request containing stmt to execute and query options.
+  1: required TClientRequest request
+
+  // Session state including user.
+  2: required TSessionState session
+
+  // String containing a timestamp set as the query submission time.
+  3: required string now_string
+
+  // Process ID of the impalad to which the user is connected.
+  4: required i32 pid
+}
+
 // A scan range plus the parameters needed to execute that scan.
 struct TScanRangeParams {
   1: required PlanNodes.TScanRange scan_range
@@ -110,19 +159,6 @@ struct TPlanFragmentExecParams {
   8: optional PlanNodes.TDebugAction debug_action
 }
 
-// Global query parameters assigned by the coordinator.
-struct TQueryGlobals {
-  // String containing a timestamp set as the current time.
-  1: required string now_string
-
-  // Name of the user executing this query.
-  2: optional string user
-
-  // The process ID of the impalad to which the user is connected.
-  3: optional i32 pid
-}
-
-
 // Service Protocol Details
 
 enum ImpalaInternalServiceVersion {
@@ -153,13 +189,10 @@ struct TExecPlanFragmentParams {
   // required in V1
   6: optional i32 backend_num
 
-  // Global query parameters assigned by coordinator.
+  // Context of this query, including query options, session state and
+  // global query parameters needed for consistent expr evaluation (e.g., now()).
   // required in V1
-  7: optional TQueryGlobals query_globals
-
-  // options for the query
-  // required in V1
-  8: optional TQueryOptions query_options
+  7: optional TQueryContext query_ctxt
 }
 
 struct TExecPlanFragmentResult {

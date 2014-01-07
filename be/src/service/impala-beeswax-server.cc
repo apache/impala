@@ -143,23 +143,14 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   RAISE_IF_ERROR(
       session_handle.WithSession(ThriftServer::GetThreadConnectionId(), &session),
       SQLSTATE_GENERAL_ERROR);
-  TClientRequest query_request;
+  TQueryContext query_ctxt;
   // raise general error for request conversion error;
-  RAISE_IF_ERROR(QueryToTClientRequest(query, &query_request), SQLSTATE_GENERAL_ERROR);
+  RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctxt), SQLSTATE_GENERAL_ERROR);
 
-  shared_ptr<QueryExecState> exec_state;
-  DCHECK(session != NULL);  // The session should exist.
-  {
-    // The session is created when the client connects. Depending on the underlying
-    // transport, the username may be known at that time. If the username hasn't been set
-    // yet, set it now.
-    lock_guard<mutex> l(session->lock);
-    if (session->user.empty()) session->user = query.hadoop_user;
-    query_request.sessionState.user = session->user;
-  }
   // raise Syntax error or access violation; it's likely to be syntax/analysis error
   // TODO: that may not be true; fix this
-  RAISE_IF_ERROR(Execute(query_request, session, query_request.sessionState, &exec_state),
+  shared_ptr<QueryExecState> exec_state;
+  RAISE_IF_ERROR(Execute(&query_ctxt, session, &exec_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
@@ -179,10 +170,9 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   RAISE_IF_ERROR(
       session_handle.WithSession(ThriftServer::GetThreadConnectionId(), &session),
       SQLSTATE_GENERAL_ERROR);
-  TClientRequest query_request;
+  TQueryContext query_ctxt;
   // raise general error for request conversion error;
-  RAISE_IF_ERROR(QueryToTClientRequest(query, &query_request),
-      SQLSTATE_GENERAL_ERROR);
+  RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctxt), SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<QueryExecState> exec_state;
   DCHECK(session != NULL);  // The session should exist.
@@ -196,7 +186,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 
   // raise Syntax error or access violation; it's likely to be syntax/analysis error
   // TODO: that may not be true; fix this
-  RAISE_IF_ERROR(Execute(query_request, session, query_request.sessionState, &exec_state),
+  RAISE_IF_ERROR(Execute(&query_ctxt, session, &exec_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
@@ -223,13 +213,13 @@ void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& que
   RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
       SQLSTATE_GENERAL_ERROR);
 
-  TClientRequest query_request;
-  RAISE_IF_ERROR(QueryToTClientRequest(query, &query_request), SQLSTATE_GENERAL_ERROR);
+  TQueryContext query_ctxt;
+  RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctxt), SQLSTATE_GENERAL_ERROR);
 
-  RAISE_IF_ERROR(frontend_->GetExplainPlan(query_request, &query_explanation.textual),
+  RAISE_IF_ERROR(frontend_->GetExplainPlan(query_ctxt, &query_explanation.textual),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
   query_explanation.__isset.textual = true;
-  VLOG_QUERY << "explain():\nstmt=" << query_request.stmt
+  VLOG_QUERY << "explain():\nstmt=" << query_ctxt.request.stmt
              << "\nplan: " << query_explanation.textual;
 }
 
@@ -452,26 +442,34 @@ void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& req
   Status::DEPRECATED_RPC.ToThrift(&status);
 }
 
-Status ImpalaServer::QueryToTClientRequest(const Query& query,
-    TClientRequest* request) {
-  request->queryOptions = default_query_options_;
-  request->stmt = query.query;
+Status ImpalaServer::QueryToTQueryContext(const Query& query,
+    TQueryContext* query_ctxt) {
+  query_ctxt->request.query_options = default_query_options_;
+  query_ctxt->request.stmt = query.query;
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
     shared_ptr<SessionState> session;
     const TUniqueId& session_id = ThriftServer::GetThreadConnectionId();
     RETURN_IF_ERROR(GetSessionState(session_id, &session));
-    session->ToThrift(session_id, &request->sessionState);
+    DCHECK(session != NULL);
+    session->ToThrift(session_id, &query_ctxt->session);
+    // The session is created when the client connects. Depending on the underlying
+    // transport, the username may be known at that time. If the username hasn't been set
+    // yet, set it now.
+    lock_guard<mutex> l(session->lock);
+    if (session->user.empty()) session->user = query.hadoop_user;
+    query_ctxt->session.user = session->user;
   }
 
   // Override default query options with Query.Configuration
   if (query.__isset.configuration) {
     BOOST_FOREACH(const string& option, query.configuration) {
-      RETURN_IF_ERROR(ParseQueryOptions(option, &request->queryOptions));
+      RETURN_IF_ERROR(ParseQueryOptions(option, &query_ctxt->request.query_options));
     }
     VLOG_QUERY << "TClientRequest.queryOptions: "
-               << ThriftDebugString(request->queryOptions);
+               << ThriftDebugString(query_ctxt->request.query_options);
   }
+
   return Status::OK;
 }
 

@@ -23,7 +23,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.thrift.TQueryGlobals;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.google.common.base.Preconditions;
 
 /**
@@ -83,7 +83,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
    * Evaluates the given constant expr and returns its result as a LiteralExpr.
    * Assumes expr has been analyzed. Returns constExpr if is it already a LiteralExpr.
    */
-  public static LiteralExpr create(Expr constExpr, TQueryGlobals queryGlobals)
+  public static LiteralExpr create(Expr constExpr, TQueryContext queryCtxt)
       throws AnalysisException {
     Preconditions.checkState(constExpr.isConstant());
     Preconditions.checkState(constExpr.getType().isValid());
@@ -91,7 +91,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
 
     TColumnValue val = null;
     try {
-      val = FeSupport.EvalConstExpr(constExpr, queryGlobals);
+      val = FeSupport.EvalConstExpr(constExpr, queryCtxt);
     } catch (InternalException e) {
       throw new AnalysisException(String.format("Failed to evaluate expr '%s'",
           constExpr.toSql()), e);

@@ -18,8 +18,7 @@ import static org.junit.Assert.fail;
 
 import org.junit.Test;
 
-import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.testutil.TestUtils;
 import com.google.common.base.Preconditions;
 
 // TODO: Expand this test, in particular, because view creation relies
@@ -28,9 +27,8 @@ public class ToSqlTest extends AnalyzerTest {
 
   private static AnalysisContext.AnalysisResult analyze(String query) {
     try {
-      AnalysisContext analysisCtxt = new AnalysisContext(catalog_,
-          Catalog.DEFAULT_DB, new User(System.getProperty("user.name")));
-
+      AnalysisContext analysisCtxt =
+          new AnalysisContext(catalog_, TestUtils.createQueryContext());
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Preconditions.checkNotNull(analysisResult.getStmt());
       return analysisResult;

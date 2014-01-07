@@ -159,13 +159,13 @@ Status Frontend::GetCatalogObject(const TCatalogObject& req,
 }
 
 Status Frontend::GetExecRequest(
-    const TClientRequest& request, TExecRequest* result) {
-  return JniUtil::CallJniMethod(fe_, create_exec_request_id_, request, result);
+    const TQueryContext& query_ctxt, TExecRequest* result) {
+  return JniUtil::CallJniMethod(fe_, create_exec_request_id_, query_ctxt, result);
 }
 
 Status Frontend::GetExplainPlan(
-    const TClientRequest& query_request, string* explain_string) {
-  return JniUtil::CallJniMethod(fe_, get_explain_plan_id_, query_request, explain_string);
+    const TQueryContext& query_ctxt, string* explain_string) {
+  return JniUtil::CallJniMethod(fe_, get_explain_plan_id_, query_ctxt, explain_string);
 }
 
 Status Frontend::ValidateSettings() {

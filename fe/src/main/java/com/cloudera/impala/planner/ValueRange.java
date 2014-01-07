@@ -113,7 +113,7 @@ public class ValueRange {
     }
 
     // call backend
-    return FeSupport.EvalPredicate(p, analyzer.getQueryGlobals());
+    return FeSupport.EvalPredicate(p, analyzer.getQueryContext());
   }
 
 }

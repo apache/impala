@@ -65,13 +65,13 @@ extern "C"
 JNIEXPORT jbyteArray JNICALL
 Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_predicate_bytes,
-    jbyteArray thrift_query_globals_bytes) {
+    jbyteArray thrift_query_ctx_bytes) {
   ObjectPool obj_pool;
   TExpr thrift_predicate;
   DeserializeThriftMsg(env, thrift_predicate_bytes, &thrift_predicate);
-  TQueryGlobals query_globals;
-  DeserializeThriftMsg(env, thrift_query_globals_bytes, &query_globals);
-  RuntimeState state(query_globals);
+  TQueryContext query_ctx;
+  DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx);
+  RuntimeState state(query_ctx);
   jbyteArray result_bytes = NULL;
   JniLocalFrame jni_frame;
   Expr* e;

@@ -53,7 +53,6 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TCatalogObject;
-import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
@@ -63,11 +62,11 @@ import com.cloudera.impala.thrift.TGetFunctionsParams;
 import com.cloudera.impala.thrift.TGetFunctionsResult;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
-import com.cloudera.impala.thrift.TJvmMemoryPool;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TShowStatsParams;
 import com.cloudera.impala.thrift.TTableName;
@@ -103,16 +102,16 @@ public class JniFrontend {
   }
 
   /**
-   * Jni wrapper for Frontend.createQueryExecRequest2(). Accepts a serialized
-   * TClientRequest; returns a serialized TQueryExecRequest2.
+   * Jni wrapper for Frontend.createExecRequest(). Accepts a serialized
+   * TQueryContext; returns a serialized TQueryExecRequest.
    */
-  public byte[] createExecRequest(byte[] thriftClientRequest)
+  public byte[] createExecRequest(byte[] thriftQueryContext)
       throws ImpalaException {
-    TClientRequest request = new TClientRequest();
-    JniUtil.deserializeThrift(protocolFactory_, request, thriftClientRequest);
+    TQueryContext queryCxt = new TQueryContext();
+    JniUtil.deserializeThrift(protocolFactory_, queryCxt, thriftQueryContext);
 
     StringBuilder explainString = new StringBuilder();
-    TExecRequest result = frontend_.createExecRequest(request, explainString);
+    TExecRequest result = frontend_.createExecRequest(queryCxt, explainString);
     LOG.debug(explainString.toString());
 
     // TODO: avoid creating serializer for each query?
@@ -155,13 +154,13 @@ public class JniFrontend {
   }
 
   /**
-   * Return an explain plan based on thriftQueryRequest, a serialized TQueryRequest.
+   * Return an explain plan based on thriftQueryContext, a serialized TQueryContext.
    * This call is thread-safe.
    */
-  public String getExplainPlan(byte[] thriftQueryRequest) throws ImpalaException {
-    TClientRequest request = new TClientRequest();
-    JniUtil.deserializeThrift(protocolFactory_, request, thriftQueryRequest);
-    String plan = frontend_.getExplainString(request);
+  public String getExplainPlan(byte[] thriftQueryContext) throws ImpalaException {
+    TQueryContext queryCtxt = new TQueryContext();
+    JniUtil.deserializeThrift(protocolFactory_, queryCtxt, thriftQueryContext);
+    String plan = frontend_.getExplainString(queryCtxt);
     LOG.debug("Explain plan: " + plan);
     return plan;
   }

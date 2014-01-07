@@ -52,11 +52,9 @@ class QueryExecStateCleaner;
 // will likely become obsolete. Remove all child-query related code from this class.
 class ImpalaServer::QueryExecState {
  public:
-  QueryExecState(ExecEnv* exec_env, Frontend* frontend,
+  QueryExecState(const TQueryContext& query_ctxt, ExecEnv* exec_env, Frontend* frontend,
                  ImpalaServer* server,
-                 boost::shared_ptr<ImpalaServer::SessionState> session,
-                 const TSessionState& query_session_state,
-                 const std::string& sql_stmt);
+                 boost::shared_ptr<ImpalaServer::SessionState> session);
 
   ~QueryExecState() {
   }
@@ -109,9 +107,9 @@ class ImpalaServer::QueryExecState {
   ImpalaServer::SessionState* parent_session() const { return parent_session_.get(); }
   const std::string& user() const { return parent_session_->user; }
   const std::string& do_as_user() const { return parent_session_->do_as_user; }
-  TSessionType::type session_type() const { return query_session_state_.session_type; }
-  const TUniqueId& session_id() const { return query_session_state_.session_id; }
-  const std::string& default_db() const { return query_session_state_.database; }
+  TSessionType::type session_type() const { return query_ctxt_.session.session_type; }
+  const TUniqueId& session_id() const { return query_ctxt_.session.session_id; }
+  const std::string& default_db() const { return query_ctxt_.session.database; }
   bool eos() const { return eos_; }
   Coordinator* coord() const { return coord_.get(); }
   int num_rows_fetched() const { return num_rows_fetched_; }
@@ -135,7 +133,7 @@ class ImpalaServer::QueryExecState {
   const RuntimeProfile& profile() const { return profile_; }
   const TimestampValue& start_time() const { return start_time_; }
   const TimestampValue& end_time() const { return end_time_; }
-  const std::string& sql_stmt() const { return sql_stmt_; }
+  const std::string& sql_stmt() const { return query_ctxt_.request.stmt; }
 
   inline int64_t last_active() const {
     boost::lock_guard<boost::mutex> l(expiration_data_lock_);
@@ -152,7 +150,7 @@ class ImpalaServer::QueryExecState {
 
  private:
   TUniqueId query_id_;
-  const std::string sql_stmt_;
+  const TQueryContext query_ctxt_;
 
   // Ensures single-threaded execution of FetchRows(). Callers of FetchRows() are
   // responsible for acquiring this lock. To avoid deadlocks, callers must not hold lock_
@@ -176,10 +174,6 @@ class ImpalaServer::QueryExecState {
 
   // Session that this query is from
   boost::shared_ptr<SessionState> parent_session_;
-
-  // Snapshot of state in session_ that is not constant (and can change from
-  // QueryExecState to QueryExecState).
-  const TSessionState query_session_state_;
 
   // not set for ddl queries, or queries with "limit 0"
   boost::scoped_ptr<Coordinator> coord_;

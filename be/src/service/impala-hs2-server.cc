@@ -143,9 +143,9 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
     return;
   }
-  TSessionState session_state;
-  session->ToThrift(session_id, &session_state);
-  request->__set_session(session_state);
+  TQueryContext query_ctxt;
+  session->ToThrift(session_id, &query_ctxt.session);
+  request->__set_session(query_ctxt.session);
 
   shared_ptr<QueryExecState> exec_state;
   // There is no user-supplied query text available because this metadata operation comes
@@ -154,8 +154,9 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
       _TMetadataOpcode_VALUES_TO_NAMES.find(request->opcode);
   const string& query_text = query_text_it == _TMetadataOpcode_VALUES_TO_NAMES.end() ?
       "N/A" : query_text_it->second;
-  exec_state.reset(new QueryExecState(exec_env_,
-      frontend_.get(), this, session, session_state, query_text));
+  query_ctxt.request.stmt = query_text;
+  exec_state.reset(new QueryExecState(query_ctxt, exec_env_,
+      frontend_.get(), this, session));
   Status register_status = RegisterQuery(session, exec_state);
   if (!register_status.ok()) {
     status->__set_statusCode(
@@ -166,6 +167,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   }
 
   // start execution of metadata first;
+  PrepareQueryContext(&query_ctxt);
   Status exec_status = exec_state->Exec(*request);
   if (!exec_status.ok()) {
     status->__set_statusCode(
@@ -217,9 +219,9 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
   return Status::OK;
 }
 
-Status ImpalaServer::TExecuteStatementReqToTClientRequest(
-    const TExecuteStatementReq execute_request, TClientRequest* client_request) {
-  client_request->stmt = execute_request.statement;
+Status ImpalaServer::TExecuteStatementReqToTQueryContext(
+    const TExecuteStatementReq execute_request, TQueryContext* query_ctxt) {
+  query_ctxt->request.stmt = execute_request.statement;
   VLOG_QUERY << "TExecuteStatementReq: " << ThriftDebugString(execute_request);
   {
     shared_ptr<SessionState> session_state;
@@ -229,19 +231,19 @@ Status ImpalaServer::TExecuteStatementReqToTClientRequest(
         &session_id, &secret));
 
     RETURN_IF_ERROR(GetSessionState(session_id, &session_state));
-    session_state->ToThrift(session_id, &client_request->sessionState);
+    session_state->ToThrift(session_id, &query_ctxt->session);
     lock_guard<mutex> l(session_state->lock);
-    client_request->queryOptions = session_state->default_query_options;
+    query_ctxt->request.query_options = session_state->default_query_options;
   }
 
   if (execute_request.__isset.confOverlay) {
     map<string, string>::const_iterator conf_itr = execute_request.confOverlay.begin();
     for (; conf_itr != execute_request.confOverlay.end(); ++conf_itr) {
       RETURN_IF_ERROR(SetQueryOptions(conf_itr->first, conf_itr->second,
-          &client_request->queryOptions));
+          &query_ctxt->request.query_options));
     }
     VLOG_QUERY << "TClientRequest.queryOptions: "
-               << ThriftDebugString(client_request->queryOptions);
+               << ThriftDebugString(query_ctxt->request.query_options);
   }
   return Status::OK;
 }
@@ -374,8 +376,8 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
     const TExecuteStatementReq& request) {
   VLOG_QUERY << "ExecuteStatement(): request=" << ThriftDebugString(request);
 
-  TClientRequest query_request;
-  Status status = TExecuteStatementReqToTClientRequest(request, &query_request);
+  TQueryContext query_ctxt;
+  Status status = TExecuteStatementReqToTQueryContext(request, &query_ctxt);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
   TUniqueId session_id;
@@ -392,7 +394,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
   }
 
   shared_ptr<QueryExecState> exec_state;
-  status = Execute(query_request, session, query_request.sessionState, &exec_state);
+  status = Execute(&query_ctxt, session, &exec_state);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
   return_val.__isset.operationHandle = true;

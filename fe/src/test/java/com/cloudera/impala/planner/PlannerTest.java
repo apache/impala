@@ -31,15 +31,13 @@ import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
-import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THdfsFileSplit;
+import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TQueryExecRequest;
-import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRangeLocations;
-import com.cloudera.impala.thrift.TSessionState;
 import com.cloudera.impala.thrift.TStmtType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -153,19 +151,19 @@ public class PlannerTest {
    * locations to actualScanRangeLocations; compares both to the appropriate sections
    * of 'testCase'.
    */
-  private void RunTestCase(TestCase testCase, TQueryOptions options,
-      StringBuilder errorLog, StringBuilder actualOutput, String dbName)
+  private void RunTestCase(TestCase testCase, StringBuilder errorLog,
+      StringBuilder actualOutput, String dbName)
       throws CatalogException {
     String query = testCase.getQuery();
     LOG.info("running query " + query);
-    TSessionState sessionState = new TSessionState(null, null, dbName,
-        System.getProperty("user.name"), null);
-    TClientRequest request = new TClientRequest(query, options, sessionState);
-    request.queryOptions.setExplain_level(TExplainLevel.NORMAL);
+    TQueryContext queryCtxt = TestUtils.createQueryContext(
+        dbName, System.getProperty("user.name"));
+    queryCtxt.request.query_options.setExplain_level(TExplainLevel.NORMAL);
+    queryCtxt.request.query_options.allow_unsupported_formats = true;
     // single-node plan and scan range locations
-    testSingleNodePlan(testCase, request, errorLog, actualOutput);
+    testSingleNodePlan(testCase, queryCtxt, errorLog, actualOutput);
     // distributed plan
-    testDistributedPlan(testCase, request, errorLog, actualOutput);
+    testDistributedPlan(testCase, queryCtxt, errorLog, actualOutput);
   }
 
   /**
@@ -173,14 +171,15 @@ public class PlannerTest {
    * as well as the scan range locations.
    * If testCase contains no expected single-node plan then this function is a no-op.
    */
-  private void testSingleNodePlan(TestCase testCase, TClientRequest request,
+  private void testSingleNodePlan(TestCase testCase, TQueryContext queryCtxt,
       StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
     ArrayList<String> expectedPlan = testCase.getSectionContents(Section.PLAN);
     // Test case has no expected single-node plan. Do not test it.
     if (expectedPlan == null || expectedPlan.isEmpty()) return;
-    request.getQueryOptions().setNum_nodes(1);
     String query = testCase.getQuery();
     String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
+    queryCtxt.request.getQuery_options().setNum_nodes(1);
+    queryCtxt.request.setStmt(query);
     boolean isImplemented = expectedErrorMsg == null;
     StringBuilder explainBuilder = new StringBuilder();
 
@@ -188,7 +187,7 @@ public class PlannerTest {
     String locationsStr = null;
     actualOutput.append(Section.PLAN.getHeader() + "\n");
     try {
-      execRequest = frontend_.createExecRequest(request, explainBuilder);
+      execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
       Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
           || execRequest.stmt_type == TStmtType.QUERY);
       String explainStr = explainBuilder.toString();
@@ -249,22 +248,24 @@ public class PlannerTest {
   * Produces distributed plan for testCase and compares actual plan with expected plan.
   * If testCase contains no expected distributed plan then this function is a no-op.
   */
- private void testDistributedPlan(TestCase testCase, TClientRequest request,
+ private void testDistributedPlan(TestCase testCase, TQueryContext queryCtxt,
      StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
    ArrayList<String> expectedPlan =
        testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
    // Test case has no expected distributed plan. Do not test it.
    if (expectedPlan == null || expectedPlan.isEmpty()) return;
-   request.getQueryOptions().setNum_nodes(ImpalaInternalServiceConstants.NUM_NODES_ALL);
    String query = testCase.getQuery();
    String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
+   queryCtxt.request.getQuery_options().setNum_nodes(
+       ImpalaInternalServiceConstants.NUM_NODES_ALL);
+   queryCtxt.request.setStmt(query);
    boolean isImplemented = expectedErrorMsg == null;
    StringBuilder explainBuilder = new StringBuilder();
    actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
    TExecRequest execRequest = null;
    try {
      // distributed plan
-     execRequest = frontend_.createExecRequest(request, explainBuilder);
+     execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
      Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
          || execRequest.stmt_type == TStmtType.QUERY);
      String explainStr = explainBuilder.toString();
@@ -302,8 +303,7 @@ public class PlannerTest {
    }
   }
 
-  private void runPlannerTestFile(String testFile, TQueryOptions options, String dbName)
-      throws CatalogException {
+  private void runPlannerTestFile(String testFile, String dbName) {
     String fileName = testDir_ + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     StringBuilder actualOutput = new StringBuilder();
@@ -313,7 +313,12 @@ public class PlannerTest {
     for (TestCase testCase : queryFileParser.getTestCases()) {
       actualOutput.append(testCase.getSectionAsString(Section.QUERY, true, "\n"));
       actualOutput.append("\n");
-      RunTestCase(testCase, options, errorLog, actualOutput, dbName);
+      try {
+        RunTestCase(testCase, errorLog, actualOutput, dbName);
+      } catch (CatalogException e) {
+        errorLog.append(String.format("Failed to plan query\n%s\n%s",
+            testCase.getQuery(), e.getMessage()));
+      }
       actualOutput.append("====\n");
     }
 
@@ -332,16 +337,6 @@ public class PlannerTest {
 
     if (errorLog.length() != 0) {
       fail(errorLog.toString());
-    }
-  }
-
-  private void runPlannerTestFile(String testFile, String dbName) {
-    TQueryOptions options = new TQueryOptions();
-    options.allow_unsupported_formats = true;
-    try {
-      runPlannerTestFile(testFile, options, dbName);
-    } catch (Exception e) {
-      fail("Error: " + e.getMessage());
     }
   }
 

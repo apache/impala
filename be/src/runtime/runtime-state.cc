@@ -46,32 +46,32 @@ using namespace boost::algorithm;
 namespace impala {
 
 RuntimeState::RuntimeState(const TUniqueId& query_id,
-    const TUniqueId& fragment_instance_id, const TQueryOptions& query_options,
-    const TQueryGlobals& globals, ExecEnv* exec_env)
+    const TUniqueId& fragment_instance_id, const TQueryContext& query_ctxt,
+    ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
-    user_(globals.__isset.user ? globals.user : ""),
-    now_(new TimestampValue(globals.now_string.c_str(), globals.now_string.size())),
-    pid_(globals.__isset.pid ? globals.pid : -1),
+    query_ctxt_(query_ctxt),
+    now_(new TimestampValue(query_ctxt.now_string.c_str(),
+        query_ctxt.now_string.size())),
     query_id_(query_id),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
     is_cancelled_(false) {
-  Status status = Init(fragment_instance_id, query_options, exec_env);
+  Status status = Init(fragment_instance_id, exec_env);
   DCHECK(status.ok()) << status.GetErrorMsg();
 }
 
-RuntimeState::RuntimeState(const TQueryGlobals& globals)
+RuntimeState::RuntimeState(const TQueryContext& query_ctxt)
   : obj_pool_(new ObjectPool()),
     data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
-    user_(globals.__isset.user ? globals.user : ""),
-    now_(new TimestampValue(globals.now_string.c_str(), globals.now_string.size())),
-    pid_(globals.__isset.pid ? globals.pid : -1),
+    query_ctxt_(query_ctxt),
+    now_(new TimestampValue(query_ctxt.now_string.c_str(),
+        query_ctxt.now_string.size())),
     exec_env_(ExecEnv::GetInstance()),
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false) {
-  query_options_.batch_size = DEFAULT_BATCH_SIZE;
+  query_ctxt_.request.query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
 }
 
 RuntimeState::~RuntimeState() {
@@ -82,24 +82,22 @@ RuntimeState::~RuntimeState() {
   query_mem_tracker_.reset();
 }
 
-Status RuntimeState::Init(
-    const TUniqueId& fragment_instance_id, const TQueryOptions& query_options,
-    ExecEnv* exec_env) {
+Status RuntimeState::Init(const TUniqueId& fragment_instance_id, ExecEnv* exec_env) {
   fragment_instance_id_ = fragment_instance_id;
-  query_options_ = query_options;
   exec_env_ = exec_env;
+  TQueryOptions& query_options = query_ctxt_.request.query_options;
   if (!query_options.disable_codegen) {
     RETURN_IF_ERROR(CreateCodegen());
   } else {
     codegen_.reset(NULL);
   }
-  if (query_options_.max_errors <= 0) {
+  if (query_options.max_errors <= 0) {
     // TODO: fix linker error and uncomment this
     //query_options_.max_errors = FLAGS_max_errors;
-    query_options_.max_errors = 100;
+    query_options.max_errors = 100;
   }
-  if (query_options_.batch_size <= 0) {
-    query_options_.batch_size = DEFAULT_BATCH_SIZE;
+  if (query_options.batch_size <= 0) {
+    query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
   }
 
   // Register with the thread mgr
@@ -191,7 +189,7 @@ void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors
 
 bool RuntimeState::LogError(const string& error) {
   lock_guard<mutex> l(error_log_lock_);
-  if (error_log_.size() < query_options_.max_errors) {
+  if (error_log_.size() < query_ctxt_.request.query_options.max_errors) {
     error_log_.push_back(error);
     return true;
   }
