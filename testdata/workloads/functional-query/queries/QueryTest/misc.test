@@ -30,7 +30,7 @@ bigint, bigint, bigint, bigint, bigint, bigint
 1,1,1,0,0,0
 ====
 ---- QUERY
-# Test to select from table with additional columns at the end that are not in the 
+# Test to select from table with additional columns at the end that are not in the
 # schema and with missing columns
 select * from tblwithraggedcolumns
 ---- TYPES
@@ -87,9 +87,9 @@ string
 ====
 ---- QUERY
 # Quoting test
-SELECT `table_alias`.`int_col` AS `default_int_col` 
-FROM `functional`.`alltypes` `table_alias` 
-GROUP BY `default_int_col` 
+SELECT `table_alias`.`int_col` AS `default_int_col`
+FROM `functional`.`alltypes` `table_alias`
+GROUP BY `default_int_col`
 LIMIT 10
 ---- TYPES
 int
@@ -155,18 +155,18 @@ string, string
 ---- RESULTS
 'quote "','quote ''
 ====
----- QUERY
+#---- QUERY
 #  Select from table that contains unsupported primitive types
-SELECT int_col, str_col, bigint_col from functional.unsupported_types
----- TYPES
-int, string, bigint
----- RESULTS
-0,'aaaa',0
-1,'bbbb',10
-2,'cccc',20
-NULL,'NULL',NULL
-4,'eeee',40
-====
+#SELECT int_col, str_col, bigint_col from functional.unsupported_types
+#---- TYPES
+#int, string, bigint
+#---- RESULTS
+#0,'aaaa',0
+#1,'bbbb',10
+#2,'cccc',20
+#NULL,'NULL',NULL
+#4,'eeee',40
+#====
 ---- QUERY
 # where clause is a SlotRef
 SELECT count(*) from functional.alltypes where bool_col

@@ -18,8 +18,11 @@ import java.util.EnumSet;
 import java.util.List;
 
 import org.apache.commons.lang.reflect.ConstructorUtils;
-import org.apache.sentry.core.Authorizable;
+import org.apache.sentry.core.common.Authorizable;
+import org.apache.sentry.core.model.db.DBModelAction;
+import org.apache.sentry.policy.db.SimpleDBPolicyEngine;
 import org.apache.sentry.provider.file.ResourceAuthorizationProvider;
+import org.apache.sentry.provider.file.SimpleFileProviderBackend;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -51,11 +54,17 @@ public class AuthorizationChecker {
   private static ResourceAuthorizationProvider
       createAuthorizationProvider(AuthorizationConfig config) {
     try {
+      SimpleFileProviderBackend providerBackend =
+          new SimpleFileProviderBackend(config.getPolicyFile());
+      SimpleDBPolicyEngine engine =
+          new SimpleDBPolicyEngine(config.getServerName(), providerBackend);
+
       // Try to create an instance of the specified policy provider class.
       // Re-throw any exceptions that are encountered.
       return (ResourceAuthorizationProvider) ConstructorUtils.invokeConstructor(
           Class.forName(config.getPolicyProviderClassName()),
-          new Object[] {config.getPolicyFile(), config.getServerName()});
+          new Object[] {config.getPolicyFile(), engine});
+
     } catch (Exception e) {
       // Re-throw as unchecked exception.
       throw new IllegalStateException(
@@ -84,11 +93,10 @@ public class AuthorizationChecker {
       return true;
     }
 
-    EnumSet<org.apache.sentry.core.Action> actions =
-        request.getPrivilege().getHiveActions();
+    EnumSet<DBModelAction> actions = request.getPrivilege().getHiveActions();
 
     List<Authorizable> authorizeables = Lists.newArrayList();
-    authorizeables.add(new org.apache.sentry.core.Server(config_.getServerName()));
+    authorizeables.add(new org.apache.sentry.core.model.db.Server(config_.getServerName()));
     // If request.getAuthorizeable() is null, the request is for server-level permission.
     if (request.getAuthorizeable() != null) {
       authorizeables.addAll(request.getAuthorizeable().getHiveAuthorizeableHierarchy());
@@ -97,15 +105,15 @@ public class AuthorizationChecker {
     // The Hive Access API does not currently provide a way to check if the user
     // has any privileges on a given resource.
     if (request.getPrivilege().getAnyOf()) {
-      for (org.apache.sentry.core.Action action: actions) {
-        if (provider_.hasAccess(new org.apache.sentry.core.Subject(user.getShortName()),
+      for (DBModelAction action: actions) {
+        if (provider_.hasAccess(new org.apache.sentry.core.common.Subject(user.getShortName()),
             authorizeables, EnumSet.of(action))) {
           return true;
         }
       }
       return false;
     }
-    return provider_.hasAccess(new org.apache.sentry.core.Subject(user.getShortName()),
+    return provider_.hasAccess(new org.apache.sentry.core.common.Subject(user.getShortName()),
         authorizeables, actions);
   }
 }

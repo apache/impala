@@ -1,8 +1,8 @@
 ====
 ---- QUERY
-select udf_test.lower('HelloWorld')
+select udf_test.trim('HelloWorld')
 ---- RESULTS
-'helloworld'
+'HelloWorld'
 ---- TYPES
 STRING
 ====
@@ -14,35 +14,6 @@ select udf_test.hive_pi()
 DOUBLE
 ====
 ---- QUERY
-# Mix our builtins and operators with hive udfs.
-select udf_test.hive_pi() + 2 * udf_test.hive_floor(pi())
----- RESULTS
-9.141592653589793
----- TYPES
-DOUBLE
-====
----- QUERY
-select udf_test.hive_floor(1.93)
----- RESULTS
-1
----- TYPES
-BIGINT
-====
----- QUERY
-select udf_test.hive_round(1.8)
----- RESULTS
-2
----- TYPES
-DOUBLE
-====
----- QUERY
-select udf_test.hive_mod(100, 13)
----- RESULTS
-9
----- TYPES
-INT
-====
----- QUERY
 select udf_test.hive_bin(100)
 ---- RESULTS
 '1100100'
@@ -50,18 +21,11 @@ select udf_test.hive_bin(100)
 STRING
 ====
 ---- QUERY
-select udf_test.hive_lower(NULL)
+select udf_test.hive_trim(NULL)
 ---- RESULTS
 'NULL'
 ---- TYPES
 STRING
----- QUERY
-select udf_test.hive_pi(), udf_test.hive_mod(100, 5) + udf_test.round(3.1),
-udf_test.hive_lower('ABCD'), udf_test.hive_lower('zY')
----- RESULTS
-3.141592653589793,3,'abcd','zy'
----- TYPES
-DOUBLE, BIGINT, STRING, STRING
 ====
 ---- QUERY
 select min(udf_test.hive_pi()) from functional.alltypesagg
@@ -69,17 +33,6 @@ select min(udf_test.hive_pi()) from functional.alltypesagg
 3.141592653589793
 ---- TYPES
 DOUBLE
-====
----- QUERY
-select udf_test.hive_lower(n_name) from tpch.nation order by 1 limit 5
----- RESULTS
-'algeria'
-'argentina'
-'brazil'
-'canada'
-'china'
----- TYPES
-STRING
 ====
 # Test identity functions
 ---- QUERY

@@ -72,10 +72,26 @@
 
     <dependency>
       <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-core</artifactId>
+      <artifactId>sentry-core-common</artifactId>
       <version>${sentry.version}</version>
       <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}-SNAPSHOT/lib/sentry-core-${sentry.version}.jar</systemPath>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-core-common-${sentry.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.sentry</groupId>
+      <artifactId>sentry-core-model-db</artifactId>
+      <version>${sentry.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-core-model-db-${sentry.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.sentry</groupId>
+      <artifactId>sentry-provider-common</artifactId>
+      <version>${sentry.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-provider-common-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
@@ -83,7 +99,23 @@
       <artifactId>sentry-provider-file</artifactId>
       <version>${sentry.version}</version>
       <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}-SNAPSHOT/lib/sentry-provider-file-${sentry.version}.jar</systemPath>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-provider-file-${sentry.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.sentry</groupId>
+      <artifactId>sentry-policy-common</artifactId>
+      <version>${sentry.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-policy-common-${sentry.version}.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.sentry</groupId>
+      <artifactId>sentry-policy-db</artifactId>
+      <version>${sentry.version}</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-policy-db-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
@@ -91,15 +123,15 @@
       <artifactId>sentry-binding-hive</artifactId>
       <version>${sentry.version}</version>
       <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}-SNAPSHOT/lib/sentry-binding-hive-${sentry.version}.jar</systemPath>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-binding-hive-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>parquet</groupId>
-      <artifactId>parquet-hive</artifactId>
-      <version>1.1.1</version>
+      <artifactId>parquet-hadoop-bundle</artifactId>
+      <version>1.2.5</version>
       <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/parquet-hive-1.1.1.jar</systemPath>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hive-${hive.version}/lib/parquet-hadoop-bundle-1.2.5-cdh5.0.0-SNAPSHOT.jar</systemPath>
     </dependency>
 
     <dependency>

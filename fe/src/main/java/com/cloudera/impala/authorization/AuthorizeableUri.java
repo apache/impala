@@ -31,10 +31,10 @@ public class AuthorizeableUri implements Authorizeable {
   }
 
   @Override
-  public List<org.apache.sentry.core.Authorizable> getHiveAuthorizeableHierarchy() {
-    org.apache.sentry.core.AccessURI accessURI =
-        new org.apache.sentry.core.AccessURI(uriName_);
-    return Lists.newArrayList((org.apache.sentry.core.Authorizable) accessURI);
+  public List<org.apache.sentry.core.model.db.DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
+    org.apache.sentry.core.model.db.AccessURI accessURI =
+        new org.apache.sentry.core.model.db.AccessURI(uriName_);
+    return Lists.newArrayList((org.apache.sentry.core.model.db.DBModelAuthorizable) accessURI);
   }
 
   @Override

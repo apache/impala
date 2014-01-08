@@ -53,6 +53,14 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::concurrency;
 using namespace boost;
 
+// Thrift defines operator< but does not implement it. This is a stub
+// implementation so we can link.
+bool Apache::Hadoop::Hive::Partition::operator<(
+    const Apache::Hadoop::Hive::Partition& x) const {
+  DCHECK(false) << "This should not get called.";
+  return false;
+}
+
 namespace impala {
 
 ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size) :

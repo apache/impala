@@ -467,7 +467,6 @@ public class Frontend {
         || analysisResult.isCreateTableAsSelectStmt());
 
     TQueryExecRequest queryExecRequest = new TQueryExecRequest();
-    queryExecRequest.setUser(request.sessionState.user);
     // create plan
     LOG.debug("create plan");
     Planner planner = new Planner();

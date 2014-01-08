@@ -22,20 +22,17 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 
-import org.apache.hadoop.hive.ql.udf.UDFAbs;
 import org.apache.hadoop.hive.ql.udf.UDFAcos;
 import org.apache.hadoop.hive.ql.udf.UDFAscii;
 import org.apache.hadoop.hive.ql.udf.UDFAsin;
 import org.apache.hadoop.hive.ql.udf.UDFAtan;
 import org.apache.hadoop.hive.ql.udf.UDFBin;
-import org.apache.hadoop.hive.ql.udf.UDFCeil;
 import org.apache.hadoop.hive.ql.udf.UDFConv;
 import org.apache.hadoop.hive.ql.udf.UDFCos;
 import org.apache.hadoop.hive.ql.udf.UDFDegrees;
 import org.apache.hadoop.hive.ql.udf.UDFE;
 import org.apache.hadoop.hive.ql.udf.UDFExp;
 import org.apache.hadoop.hive.ql.udf.UDFFindInSet;
-import org.apache.hadoop.hive.ql.udf.UDFFloor;
 import org.apache.hadoop.hive.ql.udf.UDFHex;
 import org.apache.hadoop.hive.ql.udf.UDFLTrim;
 import org.apache.hadoop.hive.ql.udf.UDFLength;
@@ -43,17 +40,13 @@ import org.apache.hadoop.hive.ql.udf.UDFLn;
 import org.apache.hadoop.hive.ql.udf.UDFLog;
 import org.apache.hadoop.hive.ql.udf.UDFLog10;
 import org.apache.hadoop.hive.ql.udf.UDFLog2;
-import org.apache.hadoop.hive.ql.udf.UDFLower;
 import org.apache.hadoop.hive.ql.udf.UDFLpad;
 import org.apache.hadoop.hive.ql.udf.UDFPI;
-import org.apache.hadoop.hive.ql.udf.UDFPosMod;
-import org.apache.hadoop.hive.ql.udf.UDFPower;
 import org.apache.hadoop.hive.ql.udf.UDFRTrim;
 import org.apache.hadoop.hive.ql.udf.UDFRadians;
 import org.apache.hadoop.hive.ql.udf.UDFRand;
 import org.apache.hadoop.hive.ql.udf.UDFRepeat;
 import org.apache.hadoop.hive.ql.udf.UDFReverse;
-import org.apache.hadoop.hive.ql.udf.UDFRound;
 import org.apache.hadoop.hive.ql.udf.UDFRpad;
 import org.apache.hadoop.hive.ql.udf.UDFSign;
 import org.apache.hadoop.hive.ql.udf.UDFSin;
@@ -63,7 +56,6 @@ import org.apache.hadoop.hive.ql.udf.UDFSubstr;
 import org.apache.hadoop.hive.ql.udf.UDFTan;
 import org.apache.hadoop.hive.ql.udf.UDFTrim;
 import org.apache.hadoop.hive.ql.udf.UDFUnhex;
-import org.apache.hadoop.hive.ql.udf.UDFUpper;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -300,12 +292,8 @@ public class UdfExecutorTest {
   // here is that we can drive all the UDFs.
   public void HiveMathTest()
       throws ImpalaRuntimeException, MalformedURLException {
-    TestHiveUdf(UDFRound.class, createDouble(1), createDouble(1.23));
-    TestHiveUdf(UDFRound.class, createDouble(1.23), createDouble(1.234), createInt(2));
     TestHiveUdfNoValidate(UDFRand.class, createDouble(0));
     TestHiveUdfNoValidate(UDFRand.class, createDouble(0), createBigInt(10));
-    TestHiveUdf(UDFFloor.class, createBigInt(1), createDouble(1.5));
-    TestHiveUdf(UDFCeil.class, createBigInt(2), createDouble(1.5));
     TestHiveUdf(UDFExp.class, createDouble(Math.exp(10)), createDouble(10));
     TestHiveUdf(UDFLn.class, createDouble(Math.log(10)), createDouble(10));
     TestHiveUdf(UDFLog10.class, createDouble(Math.log10(10)), createDouble(10));
@@ -313,12 +301,7 @@ public class UdfExecutorTest {
         createDouble(10));
     TestHiveUdf(UDFLog.class, createDouble(Math.log(3) / Math.log(10)),
         createDouble(10), createDouble(3));
-    TestHiveUdf(UDFPower.class, createDouble(Math.pow(3, 4)),
-        createDouble(3), createDouble(4));
     TestHiveUdf(UDFSqrt.class, createDouble(Math.sqrt(3)), createDouble(3));
-    TestHiveUdf(UDFAbs.class, createDouble(1.23), createDouble(-1.23));
-    TestHiveUdf(UDFPosMod.class, createDouble(12 % 2), createDouble(12), createDouble(2));
-    TestHiveUdf(UDFPosMod.class, createInt(12 % 2), createInt(12), createInt(2));
     TestHiveUdf(UDFSin.class, createDouble(Math.sin(1)), createDouble(1));
     TestHiveUdf(UDFAsin.class, createDouble(Math.asin(1)), createDouble(1));
     TestHiveUdf(UDFCos.class, createDouble(Math.cos(1)), createDouble(1));
@@ -341,7 +324,6 @@ public class UdfExecutorTest {
     TestHiveUdf(UDFUnhex.class, createText("aAzZ"), "61417A5A");
     TestHiveUdf(UDFConv.class, createText("1111011"),
         "123", createInt(10), createInt(2));
-    TestHiveUdf(UDFRound.class, createDouble(1), createDouble(1.23));
     freeAllocations();
   }
 
@@ -352,7 +334,6 @@ public class UdfExecutorTest {
     TestHiveUdf(UDFAscii.class, createInt('1'), "123");
     TestHiveUdf(UDFFindInSet.class, createInt(2), "31", "12,31,23");
     TestHiveUdf(UDFLength.class, createInt(5), createText("Hello"));
-    TestHiveUdf(UDFLower.class, createText("foobar"), "FOOBAR");
     TestHiveUdf(UDFLpad.class, createText("foobar"), "bar", createInt(6), "foo");
     TestHiveUdf(UDFLTrim.class, createText("foobar  "), createText("  foobar  "));
     TestHiveUdf(UDFRepeat.class, createText("abcabc"), "abc", createInt(2));
@@ -363,7 +344,6 @@ public class UdfExecutorTest {
     TestHiveUdf(UDFSubstr.class, createText("World"),
         "HelloWorld", createInt(6), createInt(5));
     TestHiveUdf(UDFTrim.class, createText("foobar"), "  foobar  ");
-    TestHiveUdf(UDFUpper.class, createText("FOOBAR"), "foobar");
     freeAllocations();
   }
 

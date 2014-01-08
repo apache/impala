@@ -27,20 +27,20 @@ import com.google.common.collect.Lists;
 public class AuthorizeableTable implements Authorizeable {
   // Constant to represent privileges in the policy for "ANY" table in a
   // a database.
-  public final static String ANY_TABLE_NAME = org.apache.sentry.core.AccessConstants.ALL;
+  public final static String ANY_TABLE_NAME = org.apache.sentry.core.model.db.AccessConstants.ALL;
 
-  private final org.apache.sentry.core.Table table_;
-  private final org.apache.sentry.core.Database database_;
+  private final org.apache.sentry.core.model.db.Table table_;
+  private final org.apache.sentry.core.model.db.Database database_;
 
   public AuthorizeableTable(String dbName, String tableName) {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
     Preconditions.checkState(dbName != null && !dbName.isEmpty());
-    table_ = new org.apache.sentry.core.Table(tableName);
-    database_ = new org.apache.sentry.core.Database(dbName);
+    table_ = new org.apache.sentry.core.model.db.Table(tableName);
+    database_ = new org.apache.sentry.core.model.db.Database(dbName);
   }
 
   @Override
-  public List<org.apache.sentry.core.Authorizable> getHiveAuthorizeableHierarchy() {
+  public List<org.apache.sentry.core.model.db.DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
     return Lists.newArrayList(database_, table_);
   }
 

@@ -16,45 +16,47 @@ package com.cloudera.impala.authorization;
 
 import java.util.EnumSet;
 
+import org.apache.sentry.core.model.db.DBModelAction;
+
 /*
  * Maps an Impala Privilege to one or more Hive Access "Actions".
  */
 public enum Privilege {
-  ALL(org.apache.sentry.core.Action.ALL, false),
-  ALTER(org.apache.sentry.core.Action.ALL, false),
-  DROP(org.apache.sentry.core.Action.ALL, false),
-  CREATE(org.apache.sentry.core.Action.ALL, false),
-  INSERT(org.apache.sentry.core.Action.INSERT, false),
-  SELECT(org.apache.sentry.core.Action.SELECT, false),
+  ALL(DBModelAction.ALL, false),
+  ALTER(DBModelAction.ALL, false),
+  DROP(DBModelAction.ALL, false),
+  CREATE(DBModelAction.ALL, false),
+  INSERT(DBModelAction.INSERT, false),
+  SELECT(DBModelAction.SELECT, false),
   // Privileges required to view metadata on a server object.
-  VIEW_METADATA(EnumSet.of(
-      org.apache.sentry.core.Action.INSERT,
-      org.apache.sentry.core.Action.SELECT), true),
+  VIEW_METADATA(EnumSet.of(DBModelAction.INSERT, DBModelAction.SELECT), true),
   // Special privilege that is used to determine if the user has any valid privileges
   // on a target object.
-  ANY(EnumSet.allOf(org.apache.sentry.core.Action.class), true),
+  ANY(EnumSet.allOf(DBModelAction.class), true),
   ;
 
-  private final EnumSet<org.apache.sentry.core.Action> actions_;
+  private final EnumSet<DBModelAction> actions;
 
   // Determines whether to check if the user has ANY the privileges defined in the
   // actions list or whether to check if the user has ALL of the privileges in the
   // actions list.
   private final boolean anyOf_;
 
-  private Privilege(EnumSet<org.apache.sentry.core.Action> actions, boolean anyOf) {
-    actions_ = actions;
-    anyOf_ = anyOf;
+  private Privilege(EnumSet<DBModelAction> actions, boolean anyOf) {
+    this.actions = actions;
+    this.anyOf_ = anyOf;
   }
 
-  private Privilege(org.apache.sentry.core.Action action, boolean anyOf) {
+  private Privilege(DBModelAction action, boolean anyOf) {
     this(EnumSet.of(action), anyOf);
   }
 
   /*
    * Returns the set of Hive Access Actions mapping to this Privilege.
    */
-  public EnumSet<org.apache.sentry.core.Action> getHiveActions() { return actions_; }
+  public EnumSet<DBModelAction> getHiveActions() {
+    return actions;
+  }
 
   /*
    * Determines whether to check if the user has ANY the privileges defined in the

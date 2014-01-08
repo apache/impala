@@ -43,6 +43,10 @@ create function udf_test.hive_lower(string) returns string
 location '/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFLower';
 
+create function udf_test.hive_trim(string) returns string
+location '/test-warehouse/hive-exec.jar'
+symbol='org.apache.hadoop.hive.ql.udf.UDFTrim';
+
 create function udf_test.identity(boolean) returns boolean
 location '/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
