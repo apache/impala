@@ -234,8 +234,9 @@ class HdfsScanner {
   Status CommitRows(int num_rows);
 
   // Attach all remaining resources from context_ to batch_ and send batch_ to the scan
-  // node. This must be called after all rows have been committed and before closing
-  // context_ (likely in Close()).
+  // node. This must be called after all rows have been committed and no further resources
+  // are needed from context_ (in practice this will in each scanner subclass's Close()
+  // implementation).
   void AddFinalRowBatch();
 
   // Release all memory in 'pool' to batch_.

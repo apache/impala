@@ -1,14 +1,20 @@
 ====
 ---- QUERY
 # IMPALA-694: data file produced by parquet-mr version 1.2.5-cdh4.5.0
-SELECT * from bad_parquet
+# IMPALA-720: data file with multiple row groups
+SELECT * from bad_parquet where field = "parquet"
 ---- TYPES
 string
 ---- RESULTS
 'parquet'
-'is'
-'fun'
 'parquet'
 'parquet'
 'parquet'
+====
+---- QUERY
+SELECT count(distinct field) from bad_parquet
+---- TYPES
+bigint
+---- RESULTS
+1003
 ====

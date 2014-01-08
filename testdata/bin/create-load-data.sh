@@ -123,6 +123,10 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/bad_parquet_data.parquet \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/repeated_values.parquet \
                   /test-warehouse/bad_parquet_parquet
 
+# IMPALA-720: data file produced by parquet-mr with multiple row groups
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/multiple_rowgroups.parquet \
+                  /test-warehouse/bad_parquet_parquet
+
 # Remove an index file so we test an un-indexed LZO file
 hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/000013_0.lzo.index
 

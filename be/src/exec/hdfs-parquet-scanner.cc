@@ -334,7 +334,6 @@ void HdfsParquetScanner::Close() {
   }
   AttachPool(dictionary_pool_.get());
   AddFinalRowBatch();
-  context_->Close();
 
   // If this was a metadata only read (i.e. count(*)), there are no columns.
   if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
@@ -639,10 +638,12 @@ Status HdfsParquetScanner::ProcessSplit() {
   // per row group.  Row groups are independent, so this this could be parallelized.
   // However, having multiple row groups per file should be seen as an edge case and
   // we can do better parallelizing across files instead.
+  // TODO: not really an edge case since MR writes multiple row groups
   for (int i = 0; i < file_metadata_.row_groups.size(); ++i) {
-    // Close the streams before starting a new row group. These streams could either be
-    // just the footer stream or streams for the previous row group.
-    context_->CloseStreams();
+    // Attach any resources and clear the streams before starting a new row group. These
+    // streams could either be just the footer stream or streams for the previous row
+    // group.
+    context_->AttachCompletedResources(batch_, /* done */ true);
 
     RETURN_IF_ERROR(InitColumns(i));
     RETURN_IF_ERROR(AssembleRows());

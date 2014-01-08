@@ -1,0 +1,20 @@
+bad_parquet_data.parquet:
+Generated with parquet-mr 1.2.5
+Contains 3 single-column rows:
+"parquet"
+"is"
+"fun"
+
+repeated_values.parquet:
+Generated with parquet-mr 1.2.5
+Contains 3 single-column rows:
+"parquet"
+"parquet"
+"parquet"
+
+multiple_rowgroups.parquet:
+Generated with parquet-mr 1.2.5
+Populated with:
+hive> set parquet.block.size=500;
+hive> INSERT INTO TABLE tbl
+      SELECT l_comment FROM tpch.lineitem LIMIT 1000;

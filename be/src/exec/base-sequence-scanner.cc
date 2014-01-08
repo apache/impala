@@ -84,7 +84,6 @@ void BaseSequenceScanner::Close() {
   if (decompressor_.get() != NULL) decompressor_->Close();
   AttachPool(data_buffer_pool_.get());
   AddFinalRowBatch();
-  context_->Close();
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
   }

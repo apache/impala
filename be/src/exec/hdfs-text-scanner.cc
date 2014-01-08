@@ -83,9 +83,6 @@ Status HdfsTextScanner::ProcessSplit() {
 void HdfsTextScanner::Close() {
   AttachPool(boundary_mem_pool_.get());
   AddFinalRowBatch();
-  // We must flush any pending batches in the row batch before telling the scan node
-  // the range is complete.
-  context_->Close();
   scan_node_->RangeComplete(THdfsFileFormat::TEXT, THdfsCompression::NONE);
 
   scan_node_->ReleaseCodegenFn(THdfsFileFormat::TEXT, codegen_fn_);

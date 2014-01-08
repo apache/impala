@@ -32,17 +32,7 @@ ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
   : state_(state),
     scan_node_(scan_node),
     partition_desc_(partition_desc) {
-  Stream* stream = AddStream(scan_range);
-  stream->compact_data_ = scan_node_->compact_data();
-}
-
-void ScannerContext::CloseStreams() {
-  // Return all resources for the current streams
-  for (int i = 0; i < streams_.size(); ++i) {
-    streams_[i]->ReturnAllBuffers();
-    streams_[i]->boundary_pool_->FreeAll();
-  }
-  streams_.clear();
+  AddStream(scan_range);
 }
 
 void ScannerContext::AttachCompletedResources(RowBatch* batch, bool done) {
@@ -50,6 +40,7 @@ void ScannerContext::AttachCompletedResources(RowBatch* batch, bool done) {
   for (int i = 0; i < streams_.size(); ++i) {
     streams_[i]->AttachCompletedResources(batch, done);
   }
+  if (done) streams_.clear();
 }
 
 ScannerContext::Stream::Stream(ScannerContext* parent)
@@ -69,23 +60,9 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   stream->boundary_buffer_bytes_left_ = 0;
   stream->output_buffer_pos_ = NULL;
   stream->output_buffer_bytes_left_ = &stream->io_buffer_bytes_left_;
+  stream->compact_data_ = scan_node_->compact_data();
   streams_.push_back(stream);
   return stream;
-}
-
-void ScannerContext::Stream::ReturnAllBuffers() {
-  if (io_buffer_ != NULL) completed_io_buffers_.push_back(io_buffer_);
-  for (list<DiskIoMgr::BufferDescriptor*>::iterator it = completed_io_buffers_.begin();
-      it != completed_io_buffers_.end(); ++it) {
-    (*it)->Return();
-    --parent_->scan_node_->num_owned_io_buffers_;
-  }
-  io_buffer_ = NULL;
-  io_buffer_pos_ = NULL;
-  io_buffer_bytes_left_ = 0;
-
-  // Cancel the underlying scan range to clean up any queued buffers there
-  if (scan_range_ != NULL) scan_range_->Cancel(Status::CANCELLED);
 }
 
 void ScannerContext::Stream::AttachCompletedResources(RowBatch* batch, bool done) {
@@ -93,7 +70,10 @@ void ScannerContext::Stream::AttachCompletedResources(RowBatch* batch, bool done
   if (done) {
     // Mark any pending resources as completed
     if (io_buffer_ != NULL) completed_io_buffers_.push_back(io_buffer_);
+    // Set variables to NULL to make sure streams are not used again
     io_buffer_ = NULL;
+    io_buffer_pos_ = NULL;
+    io_buffer_bytes_left_ = 0;
     // Cancel the underlying scan range to clean up any queued buffers there
     scan_range_->Cancel(Status::CANCELLED);
   }
@@ -267,18 +247,6 @@ Status ScannerContext::Stream::GetBytesInternal(
   }
 
   return Status::OK;
-}
-
-void ScannerContext::Close() {
-  // Set variables to NULL to make sure this object is not being used after Close()
-  for (int i = 0; i < streams_.size(); ++i) {
-    DCHECK(streams_[i]->io_buffer_ == NULL);
-    streams_[i]->io_buffer_pos_ = NULL;
-  }
-
-  for (int i = 0; i < streams_.size(); ++i) {
-    DCHECK(streams_[i]->completed_io_buffers_.empty());
-  }
 }
 
 bool ScannerContext::cancelled() const {

@@ -228,9 +228,6 @@ class ScannerContext {
     // Attach all completed io buffers and the boundary mem pool to batch.
     void AttachCompletedResources(RowBatch* batch, bool done);
 
-    // Returns all buffers queued on this stream to the io mgr.
-    void ReturnAllBuffers();
-
     // Error-reporting function used by ReadBytes and SkipBytes.
     Status ReportIncompleteRead(int length, int bytes_read);
   };
@@ -245,22 +242,20 @@ class ScannerContext {
   // Attaching only completed resources ensures that buffers (and their cleanup) trail the
   // rows that reference them (row batches are consumed and cleaned up in order by the
   // rest of the query).
-  // If 'done' is true, this is the final call and any pending resources in the stream are
-  // also passed to the row batch.
+  //
+  // If 'done' is true, this is the final call for the current streams and any pending
+  // resources in each stream are also passed to the row batch, and the streams are
+  // cleared from this context.
+  //
+  // This must be called with 'done' set when the scanner is complete and no longer needs
+  // any resources (e.g. tuple memory, io buffers) returned from the current
+  // streams. After calling with 'done' set, this should be called again if new streams
+  // are created via AddStream().
   void AttachCompletedResources(RowBatch* batch, bool done);
-
-  // Closes any existing streams, returning all their resources.
-  void CloseStreams();
 
   // Add a stream to this ScannerContext for 'range'. Returns the added stream.
   // The stream is created in the runtime state's object pool
   Stream* AddStream(DiskIoMgr::ScanRange* range);
-
-  // This function must be called when the scanner is complete and no longer needs
-  // any resources (e.g. tuple memory, io buffers, etc) returned from the scan range
-  // context.  This should be called from the scanner thread.
-  // This must be called even in the error path to clean up any pending resources.
-  void Close();
 
   // If true, the ScanNode has been cancelled and the scanner thread should finish up
   bool cancelled() const;
