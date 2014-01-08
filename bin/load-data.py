@@ -99,7 +99,7 @@ def exec_hbase_query_from_file(file_name):
   print 'Executing HBase Command: %s' % hbase_cmd
   exec_cmd(hbase_cmd, 'Error executing hbase create commands')
 
-def exec_impala_query_from_file(file_name, result_queue):
+def exec_impala_query_from_file(file_name):
   """Execute each query in an Impala query file individually"""
   is_success = True
   impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
@@ -116,7 +116,7 @@ def exec_impala_query_from_file(file_name, result_queue):
     is_success = False
   finally:
     impala_client.close_connection()
-  result_queue.put(is_success)
+  return is_success
 
 def exec_bash_script(file_name):
   bash_cmd = "bash %s" % file_name
@@ -171,11 +171,20 @@ def exec_hadoop_fs_cmd(args, expect_success=True):
       expect_success=expect_success)
 
 def exec_impala_query_from_file_parallel(query_files):
+  # Get the name of the query file that loads the base tables, if it exists.
+  # TODO: Find a better way to detect the file that loads the base tables.
+  create_base_table_file = next((q for q in query_files if 'text' in q), None)
+  if create_base_table_file:
+    is_success = exec_impala_query_from_file(create_base_table_file)
+    query_files.remove(create_base_table_file)
+    # If loading the base tables failed, exit with a non zero error code.
+    if not is_success: sys.exit(1)
   if not query_files: return
-  result_queue = Queue()
   threads = []
+  result_queue = Queue()
   for query_file in query_files:
-    thread = Thread(target=exec_impala_query_from_file, args=[query_file, result_queue])
+    thread = Thread(target=lambda x: result_queue.put(exec_impala_query_from_file(x)),
+        args=[query_file])
     thread.daemon = True
     threads.append(thread)
     thread.start()
