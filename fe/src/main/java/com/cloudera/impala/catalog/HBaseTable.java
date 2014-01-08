@@ -393,7 +393,7 @@ public class HBaseTable extends Table {
         // Try and get deletes too so their size can be counted.
         s.setRaw(true);
         ResultScanner rs = hTable_.getScanner(s);
-          try {
+        try {
           // And get the the ROW_COUNT_ESTIMATE_BATCH_SIZE fetched rows
           // for a representative sample
           for (int i = 0; i < ROW_COUNT_ESTIMATE_BATCH_SIZE; i++) {

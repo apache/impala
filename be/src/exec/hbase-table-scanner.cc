@@ -409,7 +409,7 @@ Status HBaseTableScanner::HandleResultScannerTimeout(JNIEnv* env, bool* timeout)
   if (env->IsInstanceOf(exc, scanner_timeout_ex_cl_) != JNI_TRUE) return status;
 
   *timeout = true;
-  const ScanRange& scan_range = scan_range_vector_->at(current_scan_range_idx_);
+  const ScanRange& scan_range = (*scan_range_vector_)[current_scan_range_idx_];
   // If cells_ is NULL, then the ResultScanner timed out before it was ever used
   // so we can just re-create the ResultScanner with the same scan_range
   if (cells_ == NULL) return InitScanRange(env, scan_range);
@@ -450,8 +450,8 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, jbyteArray start_bytes,
   if (resultscanner_ != NULL) {
     // resultscanner_.close();
     env->CallObjectMethod(resultscanner_, resultscanner_close_id_);
-    RETURN_ERROR_IF_EXC(env);
     env->DeleteGlobalRef(resultscanner_);
+    RETURN_ERROR_IF_EXC(env);
     resultscanner_ = NULL;
   }
   // resultscanner_ = htable_.getScanner(scan_);
@@ -463,6 +463,7 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, jbyteArray start_bytes,
 
 Status HBaseTableScanner::StartScan(JNIEnv* env, const TupleDescriptor* tuple_desc,
     const ScanRangeVector& scan_range_vector, const vector<THBaseFilter>& filters) {
+  DCHECK(scan_range_vector.size() > 0);
   // Setup the scan without ranges first
   RETURN_IF_ERROR(ScanSetup(env, tuple_desc, filters));
 
@@ -474,7 +475,7 @@ Status HBaseTableScanner::StartScan(JNIEnv* env, const TupleDescriptor* tuple_de
   // resultscanner_ is NULL and gets created in InitScanRange, so we don't
   // need to check if it timed out.
   DCHECK(resultscanner_ == NULL);
-  return InitScanRange(env, scan_range_vector_->at(current_scan_range_idx_));
+  return InitScanRange(env, (*scan_range_vector_)[current_scan_range_idx_]);
 }
 
 Status HBaseTableScanner::CreateByteArray(JNIEnv* env, const string& s,
@@ -519,7 +520,7 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
           current_scan_range_idx_ + 1 < scan_range_vector_->size()) {
         ++current_scan_range_idx_;
         RETURN_IF_ERROR(InitScanRange(env,
-            scan_range_vector_->at(current_scan_range_idx_)));
+            (*scan_range_vector_)[current_scan_range_idx_]));
         continue;
       }
       break;

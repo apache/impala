@@ -157,7 +157,7 @@ class HBaseTableScanner {
   static jclass filter_list_op_cl_;
   static jclass single_column_value_filter_cl_;
   static jclass compare_op_cl_;
-  // Exceptions thrown when a ResultScanner times out
+  // Exception thrown when a ResultScanner times out
   static jclass scanner_timeout_ex_cl_;
 
   static jmethodID scan_ctor_;
