@@ -192,6 +192,7 @@ public class HdfsTable extends Table {
     LOG.debug("load block md for " + name_);
     // Block locations for all the files
     List<BlockLocation> blockLocations = Lists.newArrayList();
+    int numCachedBlocks = 0;
 
     // loop over all files and record their block metadata, minus volume ids
     for (FileDescriptor fileDescriptor: fileDescriptors) {
@@ -208,6 +209,7 @@ public class HdfsTable extends Table {
             FileBlock blockMd = new FileBlock(fileDescriptor.getFilePath(),
                 fileDescriptor.getFileLength(), locations[i]);
             fileDescriptor.addFileBlock(blockMd);
+            if (blockMd.isCached()) ++numCachedBlocks;
           }
         }
       } catch (IOException e) {
@@ -216,9 +218,10 @@ public class HdfsTable extends Table {
       }
     }
 
-    if (!SUPPORTS_VOLUME_ID) {
-      return;
-    }
+    LOG.info("Table: " + getFullName() + " contains " + numCachedBlocks +
+        "/" + blockLocations.size() + " cached blocks.");
+
+    if (!SUPPORTS_VOLUME_ID) return;
 
     // BlockStorageLocations for all the blocks
     // block described by blockMetadataList[i] is located at locations[i]

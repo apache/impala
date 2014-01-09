@@ -34,9 +34,9 @@ struct TPlanFragment {
   // exprs that produce values for slots of output tuple (one expr per slot);
   // if not set, plan fragment materializes full rows of plan_tree
   4: optional list<Exprs.TExpr> output_exprs
-  
+
   // Specifies the destination of this plan fragment's output rows.
-  // For example, the destination could be a stream sink which forwards 
+  // For example, the destination could be a stream sink which forwards
   // the data to a remote plan fragment, or a sink which writes to a table (for
   // insert stmts).
   5: optional DataSinks.TDataSink output_sink
@@ -61,6 +61,9 @@ struct TScanRangeLocation {
   // -1 indicates an unknown volume id;
   // only set for TScanRange.hdfs_file_split
   2: optional i32 volume_id = -1
+
+  // If true, this block is cached on this server.
+  3: optional bool is_cached = false
 }
 
 // A single scan range plus the hosts that serve it

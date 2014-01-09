@@ -25,6 +25,19 @@
     <value>134217728</value>
   </property>
 
+  <!-- Set the max cached memory to ~64KB. This must be less than ulimit -l -->
+  <property>
+    <name>dfs.datanode.max.locked.memory</name>
+    <value>64000</value>
+  </property>
+
+  <!-- Increase the frequency the NN talks to the DNs to update the caching policy.
+    This is useful for testing. -->
+  <property>
+    <name>dfs.namenode.path.based.cache.refresh.interval.ms</name>
+    <value>3000</value>
+  </property>
+
   <property>
     <name>dfs.webhdfs.enabled</name>
     <value>true</value>

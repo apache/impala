@@ -254,6 +254,7 @@ public class HdfsScanNode extends ScanNode {
             TScanRangeLocation location = new TScanRangeLocation();
             location.setServer(blockNetworkAddresses.get(i));
             location.setVolume_id(block.getDiskId(i));
+            location.setIs_cached(block.isCached(i));
             locations.add(location);
           }
 

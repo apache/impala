@@ -17,6 +17,7 @@ package com.cloudera.impala.catalog;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang.ArrayUtils;
@@ -40,6 +41,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Query-relevant information for one table partition. Partitions are comparable
@@ -108,9 +110,14 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    */
   public static class FileBlock {
     private final THdfsFileBlock fileBlock_;
+    private boolean isCached_; // Set to true if there is at least one cached replica.
 
     private FileBlock(THdfsFileBlock fileBlock) {
       this.fileBlock_ = fileBlock;
+      isCached_ = false;
+      for (boolean isCached: fileBlock.is_cached) {
+        isCached_ |= isCached;
+      }
     }
 
     /**
@@ -127,8 +134,12 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
       // result of BlockLocation.getNames(): list of (IP:port) hosting this block
       String[] blockHostPorts;
+      String[] hosts = null;
       try {
         blockHostPorts = blockLocation.getNames();
+        hosts = blockLocation.getHosts();
+        Preconditions.checkNotNull(hosts);
+        Preconditions.checkState(hosts.length == blockHostPorts.length);
       } catch (IOException e) {
         // this shouldn't happen, getNames() doesn't throw anything
         String errorMsg = "BlockLocation.getNames() failed:\n" + e.getMessage();
@@ -136,14 +147,28 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         throw new IllegalStateException(errorMsg);
       }
 
+      // Get the list of hosts this block is cached on.
+      Set<String> cachedHosts = Sets.newHashSet();
+      String[] hdfsCachedHosts = blockLocation.getCachedHosts();
+      if (hdfsCachedHosts != null) {
+        for (String host: hdfsCachedHosts) {
+          cachedHosts.add(host);
+        }
+      }
+      Preconditions.checkState(cachedHosts.size() <= blockHostPorts.length);
+
       // network_addresses[i] stores this block on diskId[i]; the BE uses this information
       // to schedule scan ranges.
       fileBlock_.network_addresses = Lists.newArrayList();
+      fileBlock_.is_cached = Lists.newArrayList();
       for (int i = 0; i < blockHostPorts.length; ++i) {
         String[] ip_port = blockHostPorts[i].split(":");
         Preconditions.checkState(ip_port.length == 2);
         fileBlock_.network_addresses.add(new TNetworkAddress(ip_port[0],
             Integer.parseInt(ip_port[1])));
+        boolean isCached = cachedHosts.contains(hosts[i]);
+        fileBlock_.is_cached.add(isCached);
+        isCached_ |= isCached;
       }
     }
 
@@ -151,6 +176,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     public long getFileSize() { return fileBlock_.getFile_size(); }
     public long getOffset() { return fileBlock_.getOffset(); }
     public long getLength() { return fileBlock_.getLength(); }
+    public boolean isCached() { return isCached_; }
     public List<TNetworkAddress> getNetworkAddresses() {
       return fileBlock_.getNetwork_addresses();
     }
@@ -175,6 +201,12 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       Preconditions.checkArgument(hostIndex >= 0);
       Preconditions.checkArgument(hostIndex < fileBlock_.getDisk_idsSize());
       return fileBlock_.getDisk_ids().get(hostIndex);
+    }
+
+    public boolean isCached(int hostIndex) {
+      Preconditions.checkArgument(hostIndex >= 0);
+      Preconditions.checkArgument(hostIndex < fileBlock_.getIs_cachedSize());
+      return fileBlock_.getIs_cached().get(hostIndex);
     }
 
     public THdfsFileBlock toThrift() { return fileBlock_; }

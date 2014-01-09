@@ -151,4 +151,7 @@ popd
 # Copy the test UDF/UDA libraries into HDFS
 ${IMPALA_HOME}/testdata/bin/copy-udfs-udas.sh
 
+# Setup for HDFS caching
+${IMPALA_HOME}/testdata/bin/setup-hdfs-caching.sh
+
 ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only

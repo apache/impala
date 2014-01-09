@@ -158,6 +158,9 @@ struct THdfsFileBlock {
 
   // The list of disk ids for the file block. May not be set if disk ids are not supported
   6: optional list<i32> disk_ids
+
+  // For each replica, specifies if the block is cached in memory.
+  7: optional list<bool> is_cached
 }
 
 // Represents an HDFS file
