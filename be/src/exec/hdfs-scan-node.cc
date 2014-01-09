@@ -897,6 +897,8 @@ void HdfsScanNode::StopAndFinalizeCounters() {
         bytes_read_local_->value());
     ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ->Increment(
         bytes_read_short_circuit_->value());
+    ImpaladMetrics::IO_MGR_CACHED_BYTES_READ->Increment(
+        bytes_read_dn_cache_->value());
   }
 }
 

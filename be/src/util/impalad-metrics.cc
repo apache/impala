@@ -56,6 +56,8 @@ const char* ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ =
     "impala-server.io-mgr.local-bytes-read";
 const char* ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ =
     "impala-server.io-mgr.short-circuit-bytes-read";
+const char* ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ =
+    "impala-server.io-mgr.cached-bytes-read";
 const char* ImpaladMetricKeys::CATALOG_NUM_DBS =
     "catalog.num-databases";
 const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
@@ -97,6 +99,7 @@ Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS = NULL;
 Metrics::BytesMetric* ImpaladMetrics::IO_MGR_BYTES_READ = NULL;
 Metrics::BytesMetric* ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ = NULL;
 Metrics::BytesMetric* ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ = NULL;
+Metrics::BytesMetric* ImpaladMetrics::IO_MGR_CACHED_BYTES_READ = NULL;
 Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_DBS = NULL;
 Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_TABLES = NULL;
 Metrics::BooleanMetric* ImpaladMetrics::CATALOG_READY = NULL;
@@ -164,6 +167,8 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       new Metrics::BytesMetric(ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ, 0L));
   IO_MGR_SHORT_CIRCUIT_BYTES_READ = m->RegisterMetric(
       new Metrics::BytesMetric(ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0L));
+  IO_MGR_CACHED_BYTES_READ = m->RegisterMetric(
+      new Metrics::BytesMetric(ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0L));
 
   // Initialize catalog metrics
   CATALOG_NUM_DBS = m->CreateAndRegisterPrimitiveMetric(
