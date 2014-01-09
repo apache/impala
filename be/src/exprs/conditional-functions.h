@@ -26,6 +26,7 @@ class TupleRow;
 class ConditionalFunctions {
  public:
   static void* IsNull(Expr* e, TupleRow* row);
+  template <typename T> static void* NullIf(Expr* e, TupleRow* row);
   template <typename T> static void* IfFn(Expr* e, TupleRow* row);
   template <typename T> static void* Coalesce(Expr* e, TupleRow* row);
 

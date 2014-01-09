@@ -29,6 +29,22 @@ void* ConditionalFunctions::IsNull(Expr* e, TupleRow* row) {
   return e->children()[1]->GetValue(row);
 }
 
+template <typename T> void* ConditionalFunctions::NullIf(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 2);
+  T* lhs_val = reinterpret_cast<T*>(e->children()[0]->GetValue(row));
+
+  // Short-circuit in case lhs_val is NULL. Can never be equal to RHS.
+  if (lhs_val == NULL) return NULL;
+
+  // Get rhs and return NULL if lhs == rhs, lhs otherwise
+  T* rhs_val = reinterpret_cast<T*>(e->children()[1]->GetValue(row));
+  if ((rhs_val != NULL) && (*lhs_val == *rhs_val)) {
+    return NULL;
+  } else {
+    return lhs_val;
+  }
+}
+
 template <typename T> void* ConditionalFunctions::IfFn(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 3);
   bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
@@ -77,6 +93,15 @@ void* ConditionalFunctions::NoCaseComputeFn(Expr* e, TupleRow* row) {
   return NULL;
 }
 
+template void* ConditionalFunctions::NullIf<bool>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIf<int8_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIf<int16_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIf<int32_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIf<int64_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIf<float>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIf<double>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIf<TimestampValue>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIf<StringValue>(Expr* e, TupleRow* row);
 template void* ConditionalFunctions::IfFn<bool>(Expr* e, TupleRow* row);
 template void* ConditionalFunctions::IfFn<int8_t>(Expr* e, TupleRow* row);
 template void* ConditionalFunctions::IfFn<int16_t>(Expr* e, TupleRow* row);

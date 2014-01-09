@@ -2607,6 +2607,34 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestTimestampValue("if(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", else_val);
 
+  // Test nullif(). Return NULL if lhs equals rhs, lhs otherwise.
+  TestIsNull("nullif(NULL, NULL)", TYPE_BOOLEAN);
+  TestIsNull("nullif(TRUE, TRUE)", TYPE_BOOLEAN);
+  TestValue("nullif(TRUE, FALSE)", TYPE_BOOLEAN, true);
+  TestIsNull("nullif(NULL, TRUE)", TYPE_BOOLEAN);
+  TestValue("nullif(TRUE, NULL)", TYPE_BOOLEAN, true);
+  TestIsNull("nullif(NULL, 10)", TYPE_TINYINT);
+  TestValue("nullif(10, NULL)", TYPE_TINYINT, 10);
+  TestIsNull("nullif(10, 10)", TYPE_TINYINT);
+  TestValue("nullif(10, 20)", TYPE_TINYINT, 10);
+  TestIsNull("nullif(10.10, 10.10)", TYPE_DOUBLE);
+  TestValue("nullif(10.10, 20.20)", TYPE_DOUBLE, 10.10);
+  TestIsNull("nullif(NULL, 10.10)", TYPE_DOUBLE);
+  TestValue("nullif(10.10, NULL)", TYPE_DOUBLE, 10.10);
+  TestIsNull("nullif('abc', 'abc')", TYPE_STRING);
+  TestStringValue("nullif('abc', 'def')", "abc");
+  TestIsNull("nullif(NULL, 'abc')", TYPE_STRING);
+  TestStringValue("nullif('abc', NULL)", "abc");
+  TestIsNull("nullif(cast('2011-01-01 09:01:01' as timestamp), "
+      "cast('2011-01-01 09:01:01' as timestamp))", TYPE_TIMESTAMP);
+  TimestampValue testlhs(1293872461);
+  TestTimestampValue("nullif(cast('2011-01-01 09:01:01' as timestamp), "
+      "cast('1999-06-14 19:07:25' as timestamp))", testlhs);
+  TestIsNull("nullif(NULL, "
+      "cast('2011-01-01 09:01:01' as timestamp))", TYPE_TIMESTAMP);
+  TestTimestampValue("nullif(cast('2011-01-01 09:01:01' as timestamp), "
+      "NULL)", testlhs);
+
   // Test IsNull() function and its aliases on all applicable types and NULL.
   string isnull_aliases[] = {"IsNull", "IfNull", "Nvl"};
   for (int i = 0; i < 3; ++i) {
