@@ -117,6 +117,24 @@ class MemTracker;
 // cases, the IoMgr will recycle the buffers more promptly but regardless, the caller
 // must always call Return()
 //
+// Caching support:
+// Scan ranges contain metadata on whether or not it is cached on the DN. In that
+// case, we use the HDFS APIs to read the cached data without doing any copies. For these
+// ranges, the reads happen on the caller thread (as opposed to the disk threads).
+// It is possible for the cached read APIs to fail, in which case the ranges are then
+// queued on the disk threads and behave identically to the case where the range
+// is not cached.
+// Resources for these ranges are also not accounted against the reader because none
+// are consumed.
+// While a cached block is being processed, the block is mlocked. We want to minimize
+// the time the mlock is held.
+//   - HDFS will time us out if we hold onto the mlock for too long
+//   - Holding the lock prevents uncaching this file due to a caching policy change.
+// Therefore, we only issue the cached read when the caller is ready to process the
+// range (GetNextRange()) instead of when the ranges are issued. This guarantees that
+// there will be a CPU available to process the buffer and any throttling we do with
+// the number of scanner threads properly controls the amount of files we mlock.
+//
 // TODO: IoMgr should be able to request additional scan ranges from the coordinator
 // to help deal with stragglers.
 // TODO: look into using a lock free queue
@@ -177,7 +195,7 @@ class DiskIoMgr {
     // buffer with the read contents
     char* buffer_;
 
-    // length of buffer_
+    // length of buffer_. For buffers from cached reads, the length is 0.
     int64_t buffer_len_;
 
     // length of read contents
@@ -202,7 +220,7 @@ class DiskIoMgr {
 
     // Resets this scan range object with the scan range description.
     void Reset(const char* file, int64_t len,
-        int64_t offset, int disk_id, void* metadata = NULL);
+        int64_t offset, int disk_id, bool try_cache, void* metadata = NULL);
 
     const char* file() const { return file_; }
     int64_t len() const { return len_; }
@@ -248,19 +266,20 @@ class DiskIoMgr {
     bool Validate();
 
     // Opens the file for this range. This function only modifies state in this range.
-    // if hdfs_connection is NULL, 'range' must be for a local file
-    Status OpenScanRange(hdfsFS hdfs_connection);
+    Status OpenScanRange();
 
-    // Closes the file for this range. This function only modifies state in this
-    // range.
-    // if hdfs_connection is NULL, 'range' must be for a local file
-    void CloseScanRange(hdfsFS hdfs_connection, ReaderContext* reader);
+    // Closes the file for this range. This function only modifies state in this range.
+    void CloseScanRange();
 
     // Reads from this range into 'buffer'. Buffer is preallocated. Returns the number
     // of bytes read. Updates range to keep track of where in the file we are.
-    // if hdfs_connection is NULL, 'range' must be for a local file
-    Status ReadFromScanRange(hdfsFS hdfs_connection, char* buffer,
-        int64_t* bytes_read, bool* eosr);
+    Status ReadFromScanRange(char* buffer, int64_t* bytes_read, bool* eosr);
+
+    // Reads from the DN cache. On success, sets cached_buffer_ to the DN buffer
+    // and *read_succeeded to true.
+    // If the data is not cached, returns ok() and *read_succeeded is set to false.
+    // Returns a non-ok status if it ran into a non-continuable error.
+    Status ReadFromCache(bool* read_succeeded);
 
     // Path to file
     const char* file_;
@@ -278,6 +297,11 @@ class DiskIoMgr {
     // id of the disk the data is on. This is 0-indexed
     int disk_id_;
 
+    // If true, this scan range is expected to be cached. Note that this might be wrong
+    // since the block could have been uncached. In that case, the cached path
+    // will fail and we'll just put the scan range on the normal read path.
+    bool try_cache_;
+
     DiskIoMgr* io_mgr_;
 
     // Reader/owner of the scan range
@@ -288,6 +312,10 @@ class DiskIoMgr {
       FILE* local_file_;
       hdfsFile hdfs_file_;
     };
+
+    // If non-null, this is DN cached buffer. This means the cached read succeeded
+    // and all the bytes for the range are in this buffer.
+    struct hadoopRzBuffer* cached_buffer_;
 
     // Lock protecting fields below. This lock is taken during the calls to
     // Open/Read/Close ScanRange. This is okay since only one disk thread can
@@ -411,6 +439,7 @@ class DiskIoMgr {
   int64_t queue_size(ReaderContext* reader) const;
   int64_t bytes_read_local(ReaderContext* reader) const;
   int64_t bytes_read_short_circuit(ReaderContext* reader) const;
+  int64_t bytes_read_dn_cache(ReaderContext* reader) const;
 
   // Returns the read throughput across all readers.
   // TODO: should this be a sliding window?  This should report metrics for the
@@ -466,6 +495,9 @@ class DiskIoMgr {
   // Thread group containing all the worker threads.
   ThreadGroup disk_thread_group_;
 
+  // Options object for cached hdfs reads. Set on startup and never modified.
+  struct hadoopRzOptions* cached_read_options_;
+
   // True if the IoMgr should be torn down. Worker threads watch for this to
   // know to terminate. This variable is read/written to by different threads.
   volatile bool shut_down_;
@@ -516,8 +548,8 @@ class DiskIoMgr {
 
   // Gets a buffer description object, initialized for this reader, allocating one as
   // necessary. buffer_size / min_buffer_size_ should be a power of 2, and buffer_size
-  // should be <= max_buffer_size_. These constraints will be met if buffer was acquired via
-  // GetFreeBuffer() (which it should have been).
+  // should be <= max_buffer_size_. These constraints will be met if buffer was acquired
+  // via GetFreeBuffer() (which it should have been).
   BufferDescriptor* GetBufferDesc(
       ReaderContext* reader, ScanRange* range, char* buffer, int64_t buffer_size);
 

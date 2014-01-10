@@ -65,7 +65,7 @@ struct DiskIoMgr::DiskQueue {
 
 // Internal per reader state. This object maintains a lot of state that is carefully
 // synchronized.  The reader maintains state across all disks as well as per disk state.
-// A scan range for the reader is on one of four states:
+// A scan range for the reader is on one of five states:
 // 1) PerDiskState's unstarted_ranges: This range has only been queued
 //    and nothing has been read from it.
 // 2) ReaderContext's ready_to_start_ranges_: This range is about to be started.
@@ -77,11 +77,18 @@ struct DiskIoMgr::DiskQueue {
 //    anymore. We need the caller to pull a buffer off which will put this in
 //    the in_flight_ranges queue. These ranges are in the ReaderContext's
 //    blocked_ranges_ queue.
+// 5) ScanRange is cached and in the cached_ranges_ queue.
 //
 // If the scan range is read and does not get blocked on the outgoing queue, the
 // transitions are: 1 -> 2 -> 3.
 // If the scan range does get blocked, the transitions are
 // 1 -> 2 -> 3 -> (4 -> 3)*
+//
+// In the case of a cached scan range, the range is immediately put in cache_ranges_.
+// When the caller asks for the next range to process, we first pull ranges from
+// the cache_ranges_ queue. If the range was cached, the range is removed and
+// done (ranges are either entirely cached or not at all). If the cached read attempt
+// fails, we put the range in state 1.
 class DiskIoMgr::ReaderContext {
  public:
   enum State {
@@ -136,6 +143,9 @@ class DiskIoMgr::ReaderContext {
   // Cancels the reader with status code 'status'.
   void Cancel(const Status& status);
 
+  // Adds range to disk queue for this reader.
+  void AddScanRange(DiskIoMgr::ScanRange* range, bool schedule_immediately);
+
   // Returns the default queue capacity for scan ranges. This is updated
   // as the reader processes ranges.
   int initial_scan_range_queue_capacity();
@@ -177,6 +187,9 @@ class DiskIoMgr::ReaderContext {
 
   // Total number of bytes read via short circuit read, updated at end of each range scan
   AtomicInt<int64_t> bytes_read_short_circuit_;
+
+  // Total number of bytes read from date node cache, updated at end of each range scan
+  AtomicInt<int64_t> bytes_read_dn_cache_;
 
   // The number of buffers that have been returned to the reader (via GetNext) that the
   // reader has not returned. Only included for debugging and diagnostics.
@@ -220,6 +233,11 @@ class DiskIoMgr::ReaderContext {
   // The number of disks with scan ranges remaining (always equal to the sum of
   // disks with ranges).
   int num_disks_with_ranges_;
+
+  // This is the list of ranges that are expected to be cached on the DN.
+  // When the reader asks for a new range (GetNextScanRange()), we first
+  // return ranges from this list.
+  InternalQueue<ScanRange> cached_ranges_;
 
   // A list of ranges that should be returned in subsequent calls to
   // GetNextRange.

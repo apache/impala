@@ -102,9 +102,9 @@ class DiskIoMgrTest : public testing::Test {
   }
 
   DiskIoMgr::ScanRange* InitRange(int num_buffers, const char* file_path, int offset,
-      int len, int disk_id, void* meta_data = NULL) {
+      int len, int disk_id, void* meta_data = NULL, bool is_cached = false) {
     DiskIoMgr::ScanRange* range = pool_->Add(new DiskIoMgr::ScanRange(num_buffers));
-    range->Reset(file_path, len, offset, disk_id, meta_data);
+    range->Reset(file_path, len, offset, disk_id, is_cached, meta_data);
     return range;
   }
 
@@ -436,6 +436,73 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     io_mgr.UnregisterReader(reader);
     EXPECT_EQ(reader_mem_tracker.consumption(), 0);
   }
+}
+
+// Test when some scan ranges are marked as being cached.
+// Since these files are not in HDFS, the cached path always fails so this
+// only tests the fallback mechanism.
+// TODO: we can fake the cached read path without HDFS
+TEST_F(DiskIoMgrTest, CachedReads) {
+  MemTracker mem_tracker(LARGE_MEM_LIMIT);
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "abcdefghijklm";
+  int len = strlen(data);
+  CreateTempFile(tmp_file, data);
+
+  const int num_disks = 2;
+  const int num_buffers = 3;
+
+  int64_t iters = 0;
+  {
+    pool_.reset(new ObjectPool);
+    if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
+    DiskIoMgr io_mgr(num_disks, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+
+    Status status = io_mgr.Init(&mem_tracker);
+    ASSERT_TRUE(status.ok());
+    MemTracker reader_mem_tracker;
+    DiskIoMgr::ReaderContext* reader;
+    status = io_mgr.RegisterReader(NULL, &reader, &reader_mem_tracker);
+    ASSERT_TRUE(status.ok());
+
+    DiskIoMgr::ScanRange* complete_range =
+        InitRange(1, tmp_file, 0, strlen(data), 0, NULL, true);
+
+    // Issue some reads before the async ones are issued
+    ValidateSyncRead(&io_mgr, reader, complete_range, data);
+    ValidateSyncRead(&io_mgr, reader, complete_range, data);
+
+    vector<DiskIoMgr::ScanRange*> ranges;
+    for (int i = 0; i < len; ++i) {
+      int disk_id = i % num_disks;
+      ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id, NULL, true));
+    }
+    status = io_mgr.AddScanRanges(reader, ranges);
+    ASSERT_TRUE(status.ok());
+
+    AtomicInt<int> num_ranges_processed;
+    thread_group threads;
+    for (int i = 0; i < 5; ++i) {
+      threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
+          Status::OK, 0, &num_ranges_processed));
+    }
+
+    // Issue some more sync ranges
+    for (int i = 0; i < 5; ++i) {
+      sched_yield();
+      ValidateSyncRead(&io_mgr, reader, complete_range, data);
+    }
+
+    threads.join_all();
+
+    ValidateSyncRead(&io_mgr, reader, complete_range, data);
+    ValidateSyncRead(&io_mgr, reader, complete_range, data);
+
+    EXPECT_EQ(num_ranges_processed, ranges.size());
+    io_mgr.UnregisterReader(reader);
+    EXPECT_EQ(reader_mem_tracker.consumption(), 0);
+  }
+  EXPECT_EQ(mem_tracker.consumption(), 0);
 }
 
 // This test will test multiple concurrent reads each reading a different file.

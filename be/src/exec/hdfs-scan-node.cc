@@ -171,7 +171,7 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
       runtime_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id));
   DiskIoMgr::ScanRange* range =
       runtime_state_->obj_pool()->Add(new DiskIoMgr::ScanRange());
-  range->Reset(file, len, offset, disk_id, metadata);
+  range->Reset(file, len, offset, disk_id, false, metadata);
 
   return range;
 }
