@@ -28,172 +28,98 @@ order by
   i_manufact
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  10:TOP-N
-  |  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
-  |  limit: 100
-  |
-  9:AGGREGATE (finalize)
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |  other predicates: substr(ca_zip, 1, 5) != substr(s_zip, 1, 5)
-  |
-  |----4:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |       predicates: i_manager_id = 7
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    customer.c_customer_sk = store_sales.ss_customer_sk
-  |
-  |----0:SCAN HDFS
-  |       table=tpcds.store_sales #partitions=2/120 size=663.52KB compact
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    customer_address.ca_address_sk = customer.c_current_addr_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.customer #partitions=1/1 size=12.60MB compact
-  |
-  3:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
+10:TOP-N [LIMIT=100]
+|  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
+|
+09:AGGREGATE [FINALIZE]
+|  output: SUM(ss_ext_sales_price)
+|  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  other predicates: substr(ca_zip, 1, 5) != substr(s_zip, 1, 5)
+|
+|--04:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB compact
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB compact
+|     predicates: i_manager_id = 7
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: customer.c_customer_sk = store_sales.ss_customer_sk
+|
+|--00:SCAN HDFS [tpcds.store_sales]
+|     partitions=2/120 size=663.52KB compact
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
+|
+|--02:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 size=12.60MB compact
+|
+03:SCAN HDFS [tpcds.customer_address]
+   partitions=1/1 size=5.25MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  19:TOP-N
-  |  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
-  |  limit: 100
-  |
-  18:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: i_brand, i_brand_id, i_manufact_id, i_manufact
-
-  STREAM DATA SINK
-    EXCHANGE ID: 18
-    UNPARTITIONED
-
-  10:TOP-N
-  |  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
-  |  limit: 100
-  |
-  17:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_ext_sales_price))
-  |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
-  |
-  16:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: customer_address.ca_address_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    HASH_PARTITIONED: i_brand, i_brand_id, i_manufact_id, i_manufact
-
-  9:AGGREGATE
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |  other predicates: substr(ca_zip, 1, 5) != substr(s_zip, 1, 5)
-  |
-  |----15:EXCHANGE
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----14:EXCHANGE
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    customer.c_customer_sk = store_sales.ss_customer_sk
-  |
-  |----13:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    customer_address.ca_address_sk = customer.c_current_addr_sk
-  |
-  |----12:EXCHANGE
-  |
-  11:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 15
-    UNPARTITIONED
-
-  4:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: i_manager_id = 7
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=2/120 size=663.52KB
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    HASH_PARTITIONED: customer.c_current_addr_sk
-
-  2:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
-
-PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    HASH_PARTITIONED: customer_address.ca_address_sk
-
-  3:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
+19:TOP-N [LIMIT=100]
+|  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
+|
+18:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+10:TOP-N [LIMIT=100]
+|  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
+|
+17:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_ext_sales_price))
+|  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
+|
+16:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
+|
+09:AGGREGATE
+|  output: SUM(ss_ext_sales_price)
+|  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  other predicates: substr(ca_zip, 1, 5) != substr(s_zip, 1, 5)
+|
+|--15:EXCHANGE [BROADCAST]
+|  |
+|  04:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB
+|     predicates: i_manager_id = 7
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: customer.c_customer_sk = store_sales.ss_customer_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [tpcds.store_sales]
+|     partitions=2/120 size=663.52KB
+|
+05:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
+|
+|--12:EXCHANGE [PARTITION=HASH(customer.c_current_addr_sk)]
+|  |
+|  02:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 size=12.60MB
+|
+11:EXCHANGE [PARTITION=HASH(customer_address.ca_address_sk)]
+|
+03:SCAN HDFS [tpcds.customer_address]
+   partitions=1/1 size=5.25MB
 ====
 # TPCDS-Q27
 SELECT
@@ -226,165 +152,98 @@ ORDER BY
   s_state
 LIMIT 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  10:TOP-N
-  |  order by: i_item_id ASC, s_state ASC
-  |  limit: 100
-  |
-  9:AGGREGATE (finalize)
-  |  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
-  |  group by: i_item_id, s_state
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----4:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |       predicates: s_state IN ('TN', 'SD')
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_cdemo_sk = cd.cd_demo_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.customer_demographics #partitions=1/1 size=76.92MB compact
-  |       predicates: cd_gender = 'M', cd_marital_status = 'S', cd_education_status = 'College'
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_item_sk = i.i_item_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |       predicates: d_year = 2002
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+10:TOP-N [LIMIT=100]
+|  order by: i_item_id ASC, s_state ASC
+|
+09:AGGREGATE [FINALIZE]
+|  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
+|  group by: i_item_id, s_state
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--04:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB compact
+|     predicates: s_state IN ('TN', 'SD')
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_cdemo_sk = cd.cd_demo_sk
+|
+|--03:SCAN HDFS [tpcds.customer_demographics cd]
+|     partitions=1/1 size=76.92MB compact
+|     predicates: cd_gender = 'M', cd_marital_status = 'S', cd_education_status = 'College'
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_item_sk = i.i_item_sk
+|
+|--02:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 size=4.82MB compact
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB compact
+|     predicates: d_year = 2002
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  18:TOP-N
-  |  order by: i_item_id ASC, s_state ASC
-  |  limit: 100
-  |
-  17:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: i_item_id, s_state
-
-  STREAM DATA SINK
-    EXCHANGE ID: 17
-    UNPARTITIONED
-
-  10:TOP-N
-  |  order by: i_item_id ASC, s_state ASC
-  |  limit: 100
-  |
-  16:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_quantity)), SUM(COUNT(ss_quantity)), SUM(SUM(ss_list_price)), SUM(COUNT(ss_list_price)), SUM(SUM(ss_coupon_amt)), SUM(COUNT(ss_coupon_amt)), SUM(SUM(ss_sales_price)), SUM(COUNT(ss_sales_price))
-  |  group by: i_item_id, s_state
-  |
-  15:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 15
-    HASH_PARTITIONED: i_item_id, s_state
-
-  9:AGGREGATE
-  |  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
-  |  group by: i_item_id, s_state
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----14:EXCHANGE
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_cdemo_sk = cd.cd_demo_sk
-  |
-  |----13:EXCHANGE
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_item_sk = i.i_item_sk
-  |
-  |----12:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----11:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    UNPARTITIONED
-
-  4:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-     predicates: s_state IN ('TN', 'SD')
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.customer_demographics #partitions=1/1 size=76.92MB
-     predicates: cd_gender = 'M', cd_marital_status = 'S', cd_education_status = 'College'
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d_year = 2002
+18:TOP-N [LIMIT=100]
+|  order by: i_item_id ASC, s_state ASC
+|
+17:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+10:TOP-N [LIMIT=100]
+|  order by: i_item_id ASC, s_state ASC
+|
+16:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_quantity)), SUM(COUNT(ss_quantity)), SUM(SUM(ss_list_price)), SUM(COUNT(ss_list_price)), SUM(SUM(ss_coupon_amt)), SUM(COUNT(ss_coupon_amt)), SUM(SUM(ss_sales_price)), SUM(COUNT(ss_sales_price))
+|  group by: i_item_id, s_state
+|
+15:EXCHANGE [PARTITION=HASH(i_item_id,s_state)]
+|
+09:AGGREGATE
+|  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
+|  group by: i_item_id, s_state
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  04:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB
+|     predicates: s_state IN ('TN', 'SD')
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_cdemo_sk = cd.cd_demo_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.customer_demographics cd]
+|     partitions=1/1 size=76.92MB
+|     predicates: cd_gender = 'M', cd_marital_status = 'S', cd_education_status = 'College'
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_item_sk = i.i_item_sk
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 size=4.82MB
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB
+|     predicates: d_year = 2002
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ====
 # TPCDS-Q34
 select
@@ -427,167 +286,100 @@ order by
   c_preferred_cust_flag desc
 limit 1000
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  10:TOP-N
-  |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
-  |  limit: 1000
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    customer.c_customer_sk = ss_customer_sk
-  |
-  |----7:AGGREGATE (finalize)
-  |    |  output: COUNT(*)
-  |    |  group by: ss_ticket_number, ss_customer_sk
-  |    |  having: COUNT(*) >= 15, COUNT(*) <= 20
-  |    |
-  |    6:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |    |
-  |    |----3:SCAN HDFS
-  |    |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |    |       predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom BETWEEN 1 AND 3 OR date_dim.d_dom BETWEEN 25 AND 28)
-  |    |
-  |    5:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    store_sales.ss_store_sk = store.s_store_sk
-  |    |
-  |    |----2:SCAN HDFS
-  |    |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |    |       predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
-  |    |
-  |    4:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-  |    |
-  |    |----1:SCAN HDFS
-  |    |       table=tpcds.household_demographics #partitions=1/1 size=148.10KB compact
-  |    |       predicates: (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown'), household_demographics.hd_vehicle_count > 0, (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
-  |    |
-  |    0:SCAN HDFS
-  |       table=tpcds.store_sales #partitions=120/120 size=23.42MB
-  |
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
+10:TOP-N [LIMIT=1000]
+|  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: customer.c_customer_sk = ss_customer_sk
+|
+|--07:AGGREGATE [FINALIZE]
+|  |  output: COUNT(*)
+|  |  group by: ss_ticket_number, ss_customer_sk
+|  |  having: COUNT(*) >= 15, COUNT(*) <= 20
+|  |
+|  06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  |
+|  |--03:SCAN HDFS [tpcds.date_dim]
+|  |     partitions=1/1 size=9.84MB compact
+|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom BETWEEN 1 AND 3 OR date_dim.d_dom BETWEEN 25 AND 28)
+|  |
+|  05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  |
+|  |--02:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 size=3.08KB compact
+|  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
+|  |
+|  04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--01:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 size=148.10KB compact
+|  |     predicates: (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown'), household_demographics.hd_vehicle_count > 0, (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
+|  |
+|  00:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 size=23.42MB
+|
+08:SCAN HDFS [tpcds.customer]
+   partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  18:TOP-N
-  |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
-  |  limit: 1000
-  |
-  17:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 17
-    UNPARTITIONED
-
-  10:TOP-N
-  |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
-  |  limit: 1000
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    customer.c_customer_sk = ss_customer_sk
-  |
-  |----16:EXCHANGE
-  |
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    UNPARTITIONED
-
-  15:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: ss_ticket_number, ss_customer_sk
-  |  having: COUNT(*) >= 15, COUNT(*) <= 20
-  |
-  14:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    HASH_PARTITIONED: ss_ticket_number, ss_customer_sk
-
-  7:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: ss_ticket_number, ss_customer_sk
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----13:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----12:EXCHANGE
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-  |
-  |----11:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom BETWEEN 1 AND 3 OR date_dim.d_dom BETWEEN 25 AND 28)
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.household_demographics #partitions=1/1 size=148.10KB
-     predicates: (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown'), household_demographics.hd_vehicle_count > 0, (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
+18:TOP-N [LIMIT=1000]
+|  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
+|
+17:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+10:TOP-N [LIMIT=1000]
+|  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: customer.c_customer_sk = ss_customer_sk
+|
+|--16:EXCHANGE [BROADCAST]
+|  |
+|  15:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(COUNT(*))
+|  |  group by: ss_ticket_number, ss_customer_sk
+|  |  having: COUNT(*) >= 15, COUNT(*) <= 20
+|  |
+|  14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk)]
+|  |
+|  07:AGGREGATE
+|  |  output: COUNT(*)
+|  |  group by: ss_ticket_number, ss_customer_sk
+|  |
+|  06:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  |
+|  |--13:EXCHANGE [BROADCAST]
+|  |  |
+|  |  03:SCAN HDFS [tpcds.date_dim]
+|  |     partitions=1/1 size=9.84MB
+|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom BETWEEN 1 AND 3 OR date_dim.d_dom BETWEEN 25 AND 28)
+|  |
+|  05:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  |
+|  |--12:EXCHANGE [BROADCAST]
+|  |  |
+|  |  02:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 size=3.08KB
+|  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
+|  |
+|  04:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--11:EXCHANGE [BROADCAST]
+|  |  |
+|  |  01:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 size=148.10KB
+|  |     predicates: (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown'), household_demographics.hd_vehicle_count > 0, (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
+|  |
+|  00:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 size=23.42MB
+|
+08:SCAN HDFS [tpcds.customer]
+   partitions=1/1 size=12.60MB
 ====
 # TPCDS-Q3
 select
@@ -615,86 +407,52 @@ order by
   brand_id
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:TOP-N
-  |  order by: year(ss_date) ASC, SUM(ss_ext_sales_price) DESC, item.i_brand_id ASC
-  |  limit: 100
-  |
-  3:AGGREGATE (finalize)
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: year(ss_date), item.i_brand, item.i_brand_id
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |       predicates: item.i_manufact_id = 436
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=10/120 size=3.88MB
+04:TOP-N [LIMIT=100]
+|  order by: year(ss_date) ASC, SUM(ss_ext_sales_price) DESC, item.i_brand_id ASC
+|
+03:AGGREGATE [FINALIZE]
+|  output: SUM(ss_ext_sales_price)
+|  group by: year(ss_date), item.i_brand, item.i_brand_id
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB compact
+|     predicates: item.i_manufact_id = 436
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=10/120 size=3.88MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  9:TOP-N
-  |  order by: year(ss_date) ASC, SUM(ss_ext_sales_price) DESC, item.i_brand_id ASC
-  |  limit: 100
-  |
-  8:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: year(ss_date), item.i_brand, item.i_brand_id
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  4:TOP-N
-  |  order by: year(ss_date) ASC, SUM(ss_ext_sales_price) DESC, item.i_brand_id ASC
-  |  limit: 100
-  |
-  7:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_ext_sales_price))
-  |  group by: year(ss_date), item.i_brand, item.i_brand_id
-  |
-  6:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: year(ss_date), item.i_brand, item.i_brand_id
-
-  3:AGGREGATE
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: year(ss_date), item.i_brand, item.i_brand_id
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----5:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=10/120 size=3.88MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: item.i_manufact_id = 436
+09:TOP-N [LIMIT=100]
+|  order by: year(ss_date) ASC, SUM(ss_ext_sales_price) DESC, item.i_brand_id ASC
+|
+08:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:TOP-N [LIMIT=100]
+|  order by: year(ss_date) ASC, SUM(ss_ext_sales_price) DESC, item.i_brand_id ASC
+|
+07:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_ext_sales_price))
+|  group by: year(ss_date), item.i_brand, item.i_brand_id
+|
+06:EXCHANGE [PARTITION=HASH(year(ss_date),item.i_brand,item.i_brand_id)]
+|
+03:AGGREGATE
+|  output: SUM(ss_ext_sales_price)
+|  group by: year(ss_date), item.i_brand, item.i_brand_id
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB
+|     predicates: item.i_manufact_id = 436
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=10/120 size=3.88MB
 ====
 # TPCDS-Q42
 SELECT
@@ -722,113 +480,68 @@ ORDER BY
   i_category
 LIMIT 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:TOP-N
-  |  order by: SUM(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
-  |  limit: 100
-  |
-  5:AGGREGATE (finalize)
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: d.d_year, i.i_category_id, i.i_category
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_item_sk = i.i_item_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |       predicates: i.i_manager_id = 1
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |       predicates: d.d_year = 1998, d.d_moy = 12
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+06:TOP-N [LIMIT=100]
+|  order by: SUM(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
+|
+05:AGGREGATE [FINALIZE]
+|  output: SUM(ss_ext_sales_price)
+|  group by: d.d_year, i.i_category_id, i.i_category
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_item_sk = i.i_item_sk
+|
+|--02:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 size=4.82MB compact
+|     predicates: i.i_manager_id = 1
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB compact
+|     predicates: d.d_year = 1998, d.d_moy = 12
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  12:TOP-N
-  |  order by: SUM(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
-  |  limit: 100
-  |
-  11:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: d.d_year, i.i_category_id, i.i_category
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  6:TOP-N
-  |  order by: SUM(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
-  |  limit: 100
-  |
-  10:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_ext_sales_price))
-  |  group by: d.d_year, i.i_category_id, i.i_category
-  |
-  9:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    HASH_PARTITIONED: d.d_year, i.i_category_id, i.i_category
-
-  5:AGGREGATE
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: d.d_year, i.i_category_id, i.i_category
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_item_sk = i.i_item_sk
-  |
-  |----8:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----7:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: i.i_manager_id = 1
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d.d_year = 1998, d.d_moy = 12
+12:TOP-N [LIMIT=100]
+|  order by: SUM(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
+|
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+06:TOP-N [LIMIT=100]
+|  order by: SUM(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
+|
+10:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_ext_sales_price))
+|  group by: d.d_year, i.i_category_id, i.i_category
+|
+09:EXCHANGE [PARTITION=HASH(d.d_year,i.i_category_id,i.i_category)]
+|
+05:AGGREGATE
+|  output: SUM(ss_ext_sales_price)
+|  group by: d.d_year, i.i_category_id, i.i_category
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_item_sk = i.i_item_sk
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 size=4.82MB
+|     predicates: i.i_manager_id = 1
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB
+|     predicates: d.d_year = 1998, d.d_moy = 12
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ====
 # TPCDS-Q43
 SELECT
@@ -864,113 +577,68 @@ ORDER BY
   sat_sales
 LIMIT 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:TOP-N
-  |  order by: s_store_name ASC, s_store_id ASC, SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
-  |  limit: 100
-  |
-  5:AGGREGATE (finalize)
-  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
-  |  group by: s_store_name, s_store_id
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |       predicates: s_gmt_offset = -5.0
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |       predicates: d_year = 1998
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+06:TOP-N [LIMIT=100]
+|  order by: s_store_name ASC, s_store_id ASC, SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
+|
+05:AGGREGATE [FINALIZE]
+|  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  group by: s_store_name, s_store_id
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--02:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB compact
+|     predicates: s_gmt_offset = -5.0
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB compact
+|     predicates: d_year = 1998
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  12:TOP-N
-  |  order by: s_store_name ASC, s_store_id ASC, SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
-  |  limit: 100
-  |
-  11:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: s_store_name, s_store_id
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  6:TOP-N
-  |  order by: s_store_name ASC, s_store_id ASC, SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
-  |  limit: 100
-  |
-  10:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
-  |  group by: s_store_name, s_store_id
-  |
-  9:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    HASH_PARTITIONED: s_store_name, s_store_id
-
-  5:AGGREGATE
-  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
-  |  group by: s_store_name, s_store_id
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----8:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----7:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-     predicates: s_gmt_offset = -5.0
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d_year = 1998
+12:TOP-N [LIMIT=100]
+|  order by: s_store_name ASC, s_store_id ASC, SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
+|
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+06:TOP-N [LIMIT=100]
+|  order by: s_store_name ASC, s_store_id ASC, SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
+|
+10:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
+|  group by: s_store_name, s_store_id
+|
+09:EXCHANGE [PARTITION=HASH(s_store_name,s_store_id)]
+|
+05:AGGREGATE
+|  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  group by: s_store_name, s_store_id
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB
+|     predicates: s_gmt_offset = -5.0
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB
+|     predicates: d_year = 1998
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ====
 # TPCDS-Q46
 SELECT
@@ -1023,226 +691,130 @@ ORDER BY
   ss_ticket_number
 LIMIT 400
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  14:TOP-N
-  |  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
-  |  limit: 400
-  |
-  13:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    c.c_current_addr_sk = current_addr.ca_address_sk
-  |  other predicates: current_addr.ca_city != ca_city
-  |
-  |----11:SCAN HDFS
-  |       table=tpcds.customer_address #partitions=1/1 size=5.25MB compact
-  |
-  12:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss_customer_sk = c.c_customer_sk
-  |
-  |----10:SCAN HDFS
-  |       table=tpcds.customer #partitions=1/1 size=12.60MB compact
-  |
-  9:AGGREGATE (finalize)
-  |  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
-  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----4:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |       predicates: s.s_city IN ('Oak Grove', 'Fairview', 'Midway', 'Five Points', 'Fairview')
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_addr_sk = ca.ca_address_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.customer_address #partitions=1/1 size=5.25MB compact
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_hdemo_sk = hd.hd_demo_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.household_demographics #partitions=1/1 size=148.10KB compact
-  |       predicates: (hd.hd_dep_count = 9 OR hd.hd_vehicle_count = 0)
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |       predicates: d.d_dow IN (6, 0), d.d_year IN (1999, 1999 + 1, 1999 + 2)
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+14:TOP-N [LIMIT=400]
+|  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
+|
+13:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_current_addr_sk = current_addr.ca_address_sk
+|  other predicates: current_addr.ca_city != ca_city
+|
+|--11:SCAN HDFS [tpcds.customer_address current_addr]
+|     partitions=1/1 size=5.25MB compact
+|
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_customer_sk = c.c_customer_sk
+|
+|--10:SCAN HDFS [tpcds.customer c]
+|     partitions=1/1 size=12.60MB compact
+|
+09:AGGREGATE [FINALIZE]
+|  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--04:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB compact
+|     predicates: s.s_city IN ('Oak Grove', 'Fairview', 'Midway', 'Five Points', 'Fairview')
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_addr_sk = ca.ca_address_sk
+|
+|--03:SCAN HDFS [tpcds.customer_address ca]
+|     partitions=1/1 size=5.25MB compact
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_hdemo_sk = hd.hd_demo_sk
+|
+|--02:SCAN HDFS [tpcds.household_demographics hd]
+|     partitions=1/1 size=148.10KB compact
+|     predicates: (hd.hd_dep_count = 9 OR hd.hd_vehicle_count = 0)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB compact
+|     predicates: d.d_dow IN (6, 0), d.d_year IN (1999, 1999 + 1, 1999 + 2)
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  25:TOP-N
-  |  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
-  |  limit: 400
-  |
-  24:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: ss_customer_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 24
-    UNPARTITIONED
-
-  14:TOP-N
-  |  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
-  |  limit: 400
-  |
-  13:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    c.c_current_addr_sk = current_addr.ca_address_sk
-  |  other predicates: current_addr.ca_city != ca_city
-  |
-  |----23:EXCHANGE
-  |
-  12:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    ss_customer_sk = c.c_customer_sk
-  |
-  |----22:EXCHANGE
-  |
-  21:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 23
-    UNPARTITIONED
-
-  11:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 22
-    HASH_PARTITIONED: c.c_customer_sk
-
-  10:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
-
-PLAN FRAGMENT 4
-  PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-
-  STREAM DATA SINK
-    EXCHANGE ID: 21
-    HASH_PARTITIONED: ss_customer_sk
-
-  20:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_coupon_amt)), SUM(SUM(ss_net_profit))
-  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-  |
-  19:EXCHANGE
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 19
-    HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-
-  9:AGGREGATE
-  |  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
-  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----18:EXCHANGE
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_addr_sk = ca.ca_address_sk
-  |
-  |----17:EXCHANGE
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_hdemo_sk = hd.hd_demo_sk
-  |
-  |----16:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----15:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 18
-    UNPARTITIONED
-
-  4:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-     predicates: s.s_city IN ('Oak Grove', 'Fairview', 'Midway', 'Five Points', 'Fairview')
-
-PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 17
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
-
-PLAN FRAGMENT 8
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.household_demographics #partitions=1/1 size=148.10KB
-     predicates: (hd.hd_dep_count = 9 OR hd.hd_vehicle_count = 0)
-
-PLAN FRAGMENT 9
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 15
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d.d_dow IN (6, 0), d.d_year IN (1999, 1999 + 1, 1999 + 2)
+25:TOP-N [LIMIT=400]
+|  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
+|
+24:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+14:TOP-N [LIMIT=400]
+|  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
+|
+13:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c.c_current_addr_sk = current_addr.ca_address_sk
+|  other predicates: current_addr.ca_city != ca_city
+|
+|--23:EXCHANGE [BROADCAST]
+|  |
+|  11:SCAN HDFS [tpcds.customer_address current_addr]
+|     partitions=1/1 size=5.25MB
+|
+12:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c.c_customer_sk
+|
+|--22:EXCHANGE [PARTITION=HASH(c.c_customer_sk)]
+|  |
+|  10:SCAN HDFS [tpcds.customer c]
+|     partitions=1/1 size=12.60MB
+|
+21:EXCHANGE [PARTITION=HASH(ss_customer_sk)]
+|
+20:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_coupon_amt)), SUM(SUM(ss_net_profit))
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
+|
+19:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)]
+|
+09:AGGREGATE
+|  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--18:EXCHANGE [BROADCAST]
+|  |
+|  04:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB
+|     predicates: s.s_city IN ('Oak Grove', 'Fairview', 'Midway', 'Five Points', 'Fairview')
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_addr_sk = ca.ca_address_sk
+|
+|--17:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.customer_address ca]
+|     partitions=1/1 size=5.25MB
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_hdemo_sk = hd.hd_demo_sk
+|
+|--16:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.household_demographics hd]
+|     partitions=1/1 size=148.10KB
+|     predicates: (hd.hd_dep_count = 9 OR hd.hd_vehicle_count = 0)
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--15:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB
+|     predicates: d.d_dow IN (6, 0), d.d_year IN (1999, 1999 + 1, 1999 + 2)
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ====
 # TPCDS-Q52
 SELECT
@@ -1269,113 +841,68 @@ ORDER BY
   brand_id
 LIMIT 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:TOP-N
-  |  order by: d.d_year ASC, SUM(ss_ext_sales_price) DESC, i.i_brand_id ASC
-  |  limit: 100
-  |
-  5:AGGREGATE (finalize)
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: d.d_year, i.i_brand, i.i_brand_id
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_item_sk = i.i_item_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |       predicates: i.i_manager_id = 1
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |       predicates: d.d_year = 1998, d.d_moy = 12
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+06:TOP-N [LIMIT=100]
+|  order by: d.d_year ASC, SUM(ss_ext_sales_price) DESC, i.i_brand_id ASC
+|
+05:AGGREGATE [FINALIZE]
+|  output: SUM(ss_ext_sales_price)
+|  group by: d.d_year, i.i_brand, i.i_brand_id
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_item_sk = i.i_item_sk
+|
+|--02:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 size=4.82MB compact
+|     predicates: i.i_manager_id = 1
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB compact
+|     predicates: d.d_year = 1998, d.d_moy = 12
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  12:TOP-N
-  |  order by: d.d_year ASC, SUM(ss_ext_sales_price) DESC, i.i_brand_id ASC
-  |  limit: 100
-  |
-  11:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: d.d_year, i.i_brand, i.i_brand_id
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  6:TOP-N
-  |  order by: d.d_year ASC, SUM(ss_ext_sales_price) DESC, i.i_brand_id ASC
-  |  limit: 100
-  |
-  10:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_ext_sales_price))
-  |  group by: d.d_year, i.i_brand, i.i_brand_id
-  |
-  9:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    HASH_PARTITIONED: d.d_year, i.i_brand, i.i_brand_id
-
-  5:AGGREGATE
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: d.d_year, i.i_brand, i.i_brand_id
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_item_sk = i.i_item_sk
-  |
-  |----8:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----7:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: i.i_manager_id = 1
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d.d_year = 1998, d.d_moy = 12
+12:TOP-N [LIMIT=100]
+|  order by: d.d_year ASC, SUM(ss_ext_sales_price) DESC, i.i_brand_id ASC
+|
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+06:TOP-N [LIMIT=100]
+|  order by: d.d_year ASC, SUM(ss_ext_sales_price) DESC, i.i_brand_id ASC
+|
+10:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_ext_sales_price))
+|  group by: d.d_year, i.i_brand, i.i_brand_id
+|
+09:EXCHANGE [PARTITION=HASH(d.d_year,i.i_brand,i.i_brand_id)]
+|
+05:AGGREGATE
+|  output: SUM(ss_ext_sales_price)
+|  group by: d.d_year, i.i_brand, i.i_brand_id
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_item_sk = i.i_item_sk
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 size=4.82MB
+|     predicates: i.i_manager_id = 1
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB
+|     predicates: d.d_year = 1998, d.d_moy = 12
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ====
 # TPCDS-Q53
 select
@@ -1411,136 +938,80 @@ order by
   i_manufact_id
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  8:TOP-N
-  |  order by: sum_sales ASC, i_manufact_id ASC
-  |  limit: 100
-  |
-  7:AGGREGATE (finalize)
-  |  output: SUM(ss_sales_price)
-  |  group by: i_manufact_id, d_qoy
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |       predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=24/120 size=4.74MB
+08:TOP-N [LIMIT=100]
+|  order by: sum_sales ASC, i_manufact_id ASC
+|
+07:AGGREGATE [FINALIZE]
+|  output: SUM(ss_sales_price)
+|  group by: i_manufact_id, d_qoy
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|
+|--03:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 size=9.84MB compact
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|
+|--02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB compact
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB compact
+|     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=24/120 size=4.74MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  15:TOP-N
-  |  order by: sum_sales ASC, i_manufact_id ASC
-  |  limit: 100
-  |
-  14:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: i_manufact_id, d_qoy
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    UNPARTITIONED
-
-  8:TOP-N
-  |  order by: sum_sales ASC, i_manufact_id ASC
-  |  limit: 100
-  |
-  13:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_sales_price))
-  |  group by: i_manufact_id, d_qoy
-  |
-  12:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    HASH_PARTITIONED: i_manufact_id, d_qoy
-
-  7:AGGREGATE
-  |  output: SUM(ss_sales_price)
-  |  group by: i_manufact_id, d_qoy
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----11:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----10:EXCHANGE
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----9:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=24/120 size=4.74MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
+15:TOP-N [LIMIT=100]
+|  order by: sum_sales ASC, i_manufact_id ASC
+|
+14:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+08:TOP-N [LIMIT=100]
+|  order by: sum_sales ASC, i_manufact_id ASC
+|
+13:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_sales_price))
+|  group by: i_manufact_id, d_qoy
+|
+12:EXCHANGE [PARTITION=HASH(i_manufact_id,d_qoy)]
+|
+07:AGGREGATE
+|  output: SUM(ss_sales_price)
+|  group by: i_manufact_id, d_qoy
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 size=9.84MB
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB
+|     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=24/120 size=4.74MB
 ====
 # TPCDS-Q55
 SELECT
@@ -1564,113 +1035,68 @@ ORDER BY
   i_brand_id
 LIMIT 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:TOP-N
-  |  order by: SUM(ss_ext_sales_price) DESC, i_brand_id ASC
-  |  limit: 100
-  |
-  5:AGGREGATE (finalize)
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: i_brand, i_brand_id
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_item_sk = i.i_item_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |       predicates: i_manager_id = 36
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |       predicates: d_moy = 12, d_year = 2001
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+06:TOP-N [LIMIT=100]
+|  order by: SUM(ss_ext_sales_price) DESC, i_brand_id ASC
+|
+05:AGGREGATE [FINALIZE]
+|  output: SUM(ss_ext_sales_price)
+|  group by: i_brand, i_brand_id
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_item_sk = i.i_item_sk
+|
+|--02:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 size=4.82MB compact
+|     predicates: i_manager_id = 36
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB compact
+|     predicates: d_moy = 12, d_year = 2001
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  12:TOP-N
-  |  order by: SUM(ss_ext_sales_price) DESC, i_brand_id ASC
-  |  limit: 100
-  |
-  11:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: i_brand, i_brand_id
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  6:TOP-N
-  |  order by: SUM(ss_ext_sales_price) DESC, i_brand_id ASC
-  |  limit: 100
-  |
-  10:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_ext_sales_price))
-  |  group by: i_brand, i_brand_id
-  |
-  9:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    HASH_PARTITIONED: i_brand, i_brand_id
-
-  5:AGGREGATE
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: i_brand, i_brand_id
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_item_sk = i.i_item_sk
-  |
-  |----8:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----7:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: i_manager_id = 36
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d_moy = 12, d_year = 2001
+12:TOP-N [LIMIT=100]
+|  order by: SUM(ss_ext_sales_price) DESC, i_brand_id ASC
+|
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+06:TOP-N [LIMIT=100]
+|  order by: SUM(ss_ext_sales_price) DESC, i_brand_id ASC
+|
+10:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_ext_sales_price))
+|  group by: i_brand, i_brand_id
+|
+09:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id)]
+|
+05:AGGREGATE
+|  output: SUM(ss_ext_sales_price)
+|  group by: i_brand, i_brand_id
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_item_sk = i.i_item_sk
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 size=4.82MB
+|     predicates: i_manager_id = 36
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB
+|     predicates: d_moy = 12, d_year = 2001
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ====
 # TPCDS-Q59
 select
@@ -1763,288 +1189,158 @@ order by
   d_week_seq1
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  17:TOP-N
-  |  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
-  |  limit: 100
-  |
-  16:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    s_store_id = s_store_id
-  |    d_week_seq = d_week_seq - 52
-  |
-  |----15:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    d_week_seq = d.d_week_seq
-  |    |
-  |    |----13:SCAN HDFS
-  |    |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |    |       predicates: d_month_seq >= 1185 + 12, d_month_seq <= 1185 + 23
-  |    |
-  |    14:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    ss_store_sk = store.s_store_sk
-  |    |
-  |    |----12:SCAN HDFS
-  |    |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |    |
-  |    11:AGGREGATE (finalize)
-  |    |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
-  |    |  group by: d_week_seq, ss_store_sk
-  |    |
-  |    10:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |    |
-  |    |----9:SCAN HDFS
-  |    |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |    |
-  |    8:SCAN HDFS
-  |       table=tpcds.store_sales #partitions=120/120 size=23.42MB
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    d_week_seq = d.d_week_seq
-  |
-  |----5:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |       predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss_store_sk = store.s_store_sk
-  |
-  |----4:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |
-  3:AGGREGATE (finalize)
-  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
-  |  group by: d_week_seq, ss_store_sk
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+17:TOP-N [LIMIT=100]
+|  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
+|
+16:HASH JOIN [INNER JOIN]
+|  hash predicates: s_store_id = s_store_id, d_week_seq = d_week_seq - 52
+|
+|--15:HASH JOIN [INNER JOIN]
+|  |  hash predicates: d_week_seq = d.d_week_seq
+|  |
+|  |--13:SCAN HDFS [tpcds.date_dim d]
+|  |     partitions=1/1 size=9.84MB compact
+|  |     predicates: d_month_seq >= 1185 + 12, d_month_seq <= 1185 + 23
+|  |
+|  14:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = store.s_store_sk
+|  |
+|  |--12:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 size=3.08KB compact
+|  |
+|  11:AGGREGATE [FINALIZE]
+|  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  |  group by: d_week_seq, ss_store_sk
+|  |
+|  10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  |
+|  |--09:SCAN HDFS [tpcds.date_dim]
+|  |     partitions=1/1 size=9.84MB compact
+|  |
+|  08:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 size=23.42MB
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: d_week_seq = d.d_week_seq
+|
+|--05:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB compact
+|     predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = store.s_store_sk
+|
+|--04:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB compact
+|
+03:AGGREGATE [FINALIZE]
+|  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  group by: d_week_seq, ss_store_sk
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|
+|--01:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 size=9.84MB compact
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  33:TOP-N
-  |  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
-  |  limit: 100
-  |
-  32:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: s_store_id, d_week_seq
-
-  STREAM DATA SINK
-    EXCHANGE ID: 32
-    UNPARTITIONED
-
-  17:TOP-N
-  |  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
-  |  limit: 100
-  |
-  16:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    s_store_id = s_store_id
-  |    d_week_seq = d_week_seq - 52
-  |
-  |----31:EXCHANGE
-  |
-  30:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: d_week_seq, ss_store_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 31
-    HASH_PARTITIONED: s_store_id, d_week_seq - 52
-
-  15:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    d_week_seq = d.d_week_seq
-  |
-  |----29:EXCHANGE
-  |
-  14:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss_store_sk = store.s_store_sk
-  |
-  |----28:EXCHANGE
-  |
-  27:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
-  |  group by: d_week_seq, ss_store_sk
-  |
-  26:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 29
-    UNPARTITIONED
-
-  13:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d_month_seq >= 1185 + 12, d_month_seq <= 1185 + 23
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 28
-    UNPARTITIONED
-
-  12:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-
-PLAN FRAGMENT 5
-  PARTITION: HASH_PARTITIONED: store_sales.ss_sold_date_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 26
-    HASH_PARTITIONED: d_week_seq, ss_store_sk
-
-  11:AGGREGATE
-  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
-  |  group by: d_week_seq, ss_store_sk
-  |
-  10:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----25:EXCHANGE
-  |
-  24:EXCHANGE
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 25
-    HASH_PARTITIONED: date_dim.d_date_sk
-
-  9:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-
-PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 24
-    HASH_PARTITIONED: store_sales.ss_sold_date_sk
-
-  8:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 8
-  PARTITION: HASH_PARTITIONED: d_week_seq, ss_store_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 30
-    HASH_PARTITIONED: s_store_id, d_week_seq
-
-  7:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    d_week_seq = d.d_week_seq
-  |
-  |----23:EXCHANGE
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss_store_sk = store.s_store_sk
-  |
-  |----22:EXCHANGE
-  |
-  21:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
-  |  group by: d_week_seq, ss_store_sk
-  |
-  20:EXCHANGE
-
-PLAN FRAGMENT 9
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 23
-    UNPARTITIONED
-
-  5:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
-
-PLAN FRAGMENT 10
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 22
-    UNPARTITIONED
-
-  4:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-
-PLAN FRAGMENT 11
-  PARTITION: HASH_PARTITIONED: store_sales.ss_sold_date_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 20
-    HASH_PARTITIONED: d_week_seq, ss_store_sk
-
-  3:AGGREGATE
-  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
-  |  group by: d_week_seq, ss_store_sk
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----19:EXCHANGE
-  |
-  18:EXCHANGE
-
-PLAN FRAGMENT 12
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 19
-    HASH_PARTITIONED: date_dim.d_date_sk
-
-  1:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-
-PLAN FRAGMENT 13
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 18
-    HASH_PARTITIONED: store_sales.ss_sold_date_sk
-
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+33:TOP-N [LIMIT=100]
+|  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
+|
+32:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+17:TOP-N [LIMIT=100]
+|  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
+|
+16:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: s_store_id = s_store_id, d_week_seq = d_week_seq - 52
+|
+|--31:EXCHANGE [PARTITION=HASH(s_store_id,d_week_seq - 52)]
+|  |
+|  15:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: d_week_seq = d.d_week_seq
+|  |
+|  |--29:EXCHANGE [BROADCAST]
+|  |  |
+|  |  13:SCAN HDFS [tpcds.date_dim d]
+|  |     partitions=1/1 size=9.84MB
+|  |     predicates: d_month_seq >= 1185 + 12, d_month_seq <= 1185 + 23
+|  |
+|  14:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_store_sk = store.s_store_sk
+|  |
+|  |--28:EXCHANGE [BROADCAST]
+|  |  |
+|  |  12:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 size=3.08KB
+|  |
+|  27:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
+|  |  group by: d_week_seq, ss_store_sk
+|  |
+|  26:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
+|  |
+|  11:AGGREGATE
+|  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  |  group by: d_week_seq, ss_store_sk
+|  |
+|  10:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  |
+|  |--25:EXCHANGE [PARTITION=HASH(date_dim.d_date_sk)]
+|  |  |
+|  |  09:SCAN HDFS [tpcds.date_dim]
+|  |     partitions=1/1 size=9.84MB
+|  |
+|  24:EXCHANGE [PARTITION=HASH(store_sales.ss_sold_date_sk)]
+|  |
+|  08:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 size=23.42MB
+|
+30:EXCHANGE [PARTITION=HASH(s_store_id,d_week_seq)]
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: d_week_seq = d.d_week_seq
+|
+|--23:EXCHANGE [BROADCAST]
+|  |
+|  05:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB
+|     predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = store.s_store_sk
+|
+|--22:EXCHANGE [BROADCAST]
+|  |
+|  04:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB
+|
+21:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
+|  group by: d_week_seq, ss_store_sk
+|
+20:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
+|
+03:AGGREGATE
+|  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  group by: d_week_seq, ss_store_sk
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|
+|--19:EXCHANGE [PARTITION=HASH(date_dim.d_date_sk)]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 size=9.84MB
+|
+18:EXCHANGE [PARTITION=HASH(store_sales.ss_sold_date_sk)]
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=120/120 size=23.42MB
 ====
 # TPCDS-Q63
 select
@@ -2080,136 +1376,80 @@ order by
   sum_sales
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  8:TOP-N
-  |  order by: i_manager_id ASC, sum_sales ASC
-  |  limit: 100
-  |
-  7:AGGREGATE (finalize)
-  |  output: SUM(ss_sales_price)
-  |  group by: i_manager_id, d_moy
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |       predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=24/120 size=4.74MB
+08:TOP-N [LIMIT=100]
+|  order by: i_manager_id ASC, sum_sales ASC
+|
+07:AGGREGATE [FINALIZE]
+|  output: SUM(ss_sales_price)
+|  group by: i_manager_id, d_moy
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|
+|--03:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 size=9.84MB compact
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|
+|--02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB compact
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB compact
+|     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=24/120 size=4.74MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  15:TOP-N
-  |  order by: i_manager_id ASC, sum_sales ASC
-  |  limit: 100
-  |
-  14:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: i_manager_id, d_moy
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    UNPARTITIONED
-
-  8:TOP-N
-  |  order by: i_manager_id ASC, sum_sales ASC
-  |  limit: 100
-  |
-  13:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_sales_price))
-  |  group by: i_manager_id, d_moy
-  |
-  12:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    HASH_PARTITIONED: i_manager_id, d_moy
-
-  7:AGGREGATE
-  |  output: SUM(ss_sales_price)
-  |  group by: i_manager_id, d_moy
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----11:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----10:EXCHANGE
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----9:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=24/120 size=4.74MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
+15:TOP-N [LIMIT=100]
+|  order by: i_manager_id ASC, sum_sales ASC
+|
+14:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+08:TOP-N [LIMIT=100]
+|  order by: i_manager_id ASC, sum_sales ASC
+|
+13:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_sales_price))
+|  group by: i_manager_id, d_moy
+|
+12:EXCHANGE [PARTITION=HASH(i_manager_id,d_moy)]
+|
+07:AGGREGATE
+|  output: SUM(ss_sales_price)
+|  group by: i_manager_id, d_moy
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 size=9.84MB
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB
+|     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=24/120 size=4.74MB
 ====
 # TPCDS-Q65
 select
@@ -2261,178 +1501,108 @@ order by
   i_item_desc 
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  10:TOP-N
-  |  order by: s_store_name ASC, i_item_desc ASC
-  |  limit: 100
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss_store_sk = ss_store_sk
-  |  other predicates: SUM(ss_sales_price) <= 0.1 * SUM(revenue) / COUNT(revenue)
-  |
-  |----6:AGGREGATE (finalize)
-  |    |  output: SUM(SUM(ss_sales_price)), COUNT(SUM(ss_sales_price))
-  |    |  group by: ss_store_sk
-  |    |
-  |    5:AGGREGATE (finalize)
-  |    |  output: SUM(ss_sales_price)
-  |    |  group by: ss_store_sk, ss_item_sk
-  |    |
-  |    4:SCAN HDFS
-  |       table=tpcds.store_sales #partitions=24/120 size=4.74MB
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss_store_sk = store.s_store_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    item.i_item_sk = ss_item_sk
-  |
-  |----1:AGGREGATE (finalize)
-  |    |  output: SUM(ss_sales_price)
-  |    |  group by: ss_store_sk, ss_item_sk
-  |    |
-  |    0:SCAN HDFS
-  |       table=tpcds.store_sales #partitions=24/120 size=4.74MB
-  |
-  2:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
+10:TOP-N [LIMIT=100]
+|  order by: s_store_name ASC, i_item_desc ASC
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = ss_store_sk
+|  other predicates: SUM(ss_sales_price) <= 0.1 * SUM(revenue) / COUNT(revenue)
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  output: SUM(SUM(ss_sales_price)), COUNT(SUM(ss_sales_price))
+|  |  group by: ss_store_sk
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: SUM(ss_sales_price)
+|  |  group by: ss_store_sk, ss_item_sk
+|  |
+|  04:SCAN HDFS [tpcds.store_sales]
+|     partitions=24/120 size=4.74MB
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = store.s_store_sk
+|
+|--03:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB compact
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: item.i_item_sk = ss_item_sk
+|
+|--01:AGGREGATE [FINALIZE]
+|  |  output: SUM(ss_sales_price)
+|  |  group by: ss_store_sk, ss_item_sk
+|  |
+|  00:SCAN HDFS [tpcds.store_sales]
+|     partitions=24/120 size=4.74MB
+|
+02:SCAN HDFS [tpcds.item]
+   partitions=1/1 size=4.82MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  21:TOP-N
-  |  order by: s_store_name ASC, i_item_desc ASC
-  |  limit: 100
-  |
-  20:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 20
-    UNPARTITIONED
-
-  10:TOP-N
-  |  order by: s_store_name ASC, i_item_desc ASC
-  |  limit: 100
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss_store_sk = ss_store_sk
-  |  other predicates: SUM(ss_sales_price) <= 0.1 * SUM(revenue) / COUNT(revenue)
-  |
-  |----19:EXCHANGE
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss_store_sk = store.s_store_sk
-  |
-  |----14:EXCHANGE
-  |
-  7:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    item.i_item_sk = ss_item_sk
-  |
-  |----13:EXCHANGE
-  |
-  2:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: ss_store_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 19
-    UNPARTITIONED
-
-  18:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(revenue)), SUM(COUNT(revenue))
-  |  group by: ss_store_sk
-  |
-  17:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: HASH_PARTITIONED: ss_store_sk, ss_item_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 17
-    HASH_PARTITIONED: ss_store_sk
-
-  6:AGGREGATE
-  |  output: SUM(SUM(ss_sales_price)), COUNT(SUM(ss_sales_price))
-  |  group by: ss_store_sk
-  |
-  16:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_sales_price))
-  |  group by: ss_store_sk, ss_item_sk
-  |
-  15:EXCHANGE
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 15
-    HASH_PARTITIONED: ss_store_sk, ss_item_sk
-
-  5:AGGREGATE
-  |  output: SUM(ss_sales_price)
-  |  group by: ss_store_sk, ss_item_sk
-  |
-  4:SCAN HDFS
-     table=tpcds.store_sales #partitions=24/120 size=4.74MB
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-
-PLAN FRAGMENT 6
-  PARTITION: HASH_PARTITIONED: ss_store_sk, ss_item_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  12:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_sales_price))
-  |  group by: ss_store_sk, ss_item_sk
-  |
-  11:EXCHANGE
-
-PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    HASH_PARTITIONED: ss_store_sk, ss_item_sk
-
-  1:AGGREGATE
-  |  output: SUM(ss_sales_price)
-  |  group by: ss_store_sk, ss_item_sk
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=24/120 size=4.74MB
+21:TOP-N [LIMIT=100]
+|  order by: s_store_name ASC, i_item_desc ASC
+|
+20:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+10:TOP-N [LIMIT=100]
+|  order by: s_store_name ASC, i_item_desc ASC
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = ss_store_sk
+|  other predicates: SUM(ss_sales_price) <= 0.1 * SUM(revenue) / COUNT(revenue)
+|
+|--19:EXCHANGE [BROADCAST]
+|  |
+|  18:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(SUM(revenue)), SUM(COUNT(revenue))
+|  |  group by: ss_store_sk
+|  |
+|  17:EXCHANGE [PARTITION=HASH(ss_store_sk)]
+|  |
+|  06:AGGREGATE
+|  |  output: SUM(SUM(ss_sales_price)), COUNT(SUM(ss_sales_price))
+|  |  group by: ss_store_sk
+|  |
+|  16:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(SUM(ss_sales_price))
+|  |  group by: ss_store_sk, ss_item_sk
+|  |
+|  15:EXCHANGE [PARTITION=HASH(ss_store_sk,ss_item_sk)]
+|  |
+|  05:AGGREGATE
+|  |  output: SUM(ss_sales_price)
+|  |  group by: ss_store_sk, ss_item_sk
+|  |
+|  04:SCAN HDFS [tpcds.store_sales]
+|     partitions=24/120 size=4.74MB
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = store.s_store_sk
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: item.i_item_sk = ss_item_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  12:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(SUM(ss_sales_price))
+|  |  group by: ss_store_sk, ss_item_sk
+|  |
+|  11:EXCHANGE [PARTITION=HASH(ss_store_sk,ss_item_sk)]
+|  |
+|  01:AGGREGATE
+|  |  output: SUM(ss_sales_price)
+|  |  group by: ss_store_sk, ss_item_sk
+|  |
+|  00:SCAN HDFS [tpcds.store_sales]
+|     partitions=24/120 size=4.74MB
+|
+02:SCAN HDFS [tpcds.item]
+   partitions=1/1 size=4.82MB
 ====
 # TPCDS-Q68
 select
@@ -2478,190 +1648,112 @@ order by
   ss_ticket_number 
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  12:TOP-N
-  |  order by: c_last_name ASC, ss_ticket_number ASC
-  |  limit: 100
-  |
-  11:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    customer.c_customer_sk = ss_customer_sk
-  |  other predicates: current_addr.ca_city != ca_city
-  |
-  |----7:AGGREGATE (finalize)
-  |    |  output: SUM(ss_ext_sales_price), SUM(ss_ext_list_price), SUM(ss_ext_tax)
-  |    |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-  |    |
-  |    6:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    store_sales.ss_addr_sk = customer_address.ca_address_sk
-  |    |
-  |    |----3:SCAN HDFS
-  |    |       table=tpcds.customer_address #partitions=1/1 size=5.25MB compact
-  |    |
-  |    5:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-  |    |
-  |    |----2:SCAN HDFS
-  |    |       table=tpcds.household_demographics #partitions=1/1 size=148.10KB compact
-  |    |       predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
-  |    |
-  |    4:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    store_sales.ss_store_sk = store.s_store_sk
-  |    |
-  |    |----1:SCAN HDFS
-  |    |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |    |       predicates: store.s_city IN ('Midway', 'Fairview')
-  |    |
-  |    0:SCAN HDFS
-  |       table=tpcds.store_sales #partitions=36/120 size=6.91MB
-  |
-  10:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    customer.c_current_addr_sk = current_addr.ca_address_sk
-  |
-  |----9:SCAN HDFS
-  |       table=tpcds.customer_address #partitions=1/1 size=5.25MB compact
-  |
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
+12:TOP-N [LIMIT=100]
+|  order by: c_last_name ASC, ss_ticket_number ASC
+|
+11:HASH JOIN [INNER JOIN]
+|  hash predicates: customer.c_customer_sk = ss_customer_sk
+|  other predicates: current_addr.ca_city != ca_city
+|
+|--07:AGGREGATE [FINALIZE]
+|  |  output: SUM(ss_ext_sales_price), SUM(ss_ext_list_price), SUM(ss_ext_tax)
+|  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
+|  |
+|  06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: store_sales.ss_addr_sk = customer_address.ca_address_sk
+|  |
+|  |--03:SCAN HDFS [tpcds.customer_address]
+|  |     partitions=1/1 size=5.25MB compact
+|  |
+|  05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--02:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 size=148.10KB compact
+|  |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
+|  |
+|  04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  |
+|  |--01:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 size=3.08KB compact
+|  |     predicates: store.s_city IN ('Midway', 'Fairview')
+|  |
+|  00:SCAN HDFS [tpcds.store_sales]
+|     partitions=36/120 size=6.91MB
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: customer.c_current_addr_sk = current_addr.ca_address_sk
+|
+|--09:SCAN HDFS [tpcds.customer_address current_addr]
+|     partitions=1/1 size=5.25MB compact
+|
+08:SCAN HDFS [tpcds.customer]
+   partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  21:TOP-N
-  |  order by: c_last_name ASC, ss_ticket_number ASC
-  |  limit: 100
-  |
-  20:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 20
-    UNPARTITIONED
-
-  12:TOP-N
-  |  order by: c_last_name ASC, ss_ticket_number ASC
-  |  limit: 100
-  |
-  11:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    customer.c_customer_sk = ss_customer_sk
-  |  other predicates: current_addr.ca_city != ca_city
-  |
-  |----19:EXCHANGE
-  |
-  10:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    customer.c_current_addr_sk = current_addr.ca_address_sk
-  |
-  |----13:EXCHANGE
-  |
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-
-  STREAM DATA SINK
-    EXCHANGE ID: 19
-    UNPARTITIONED
-
-  18:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_ext_sales_price)), SUM(SUM(ss_ext_list_price)), SUM(SUM(ss_ext_tax))
-  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-  |
-  17:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 17
-    HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-
-  7:AGGREGATE
-  |  output: SUM(ss_ext_sales_price), SUM(ss_ext_list_price), SUM(ss_ext_tax)
-  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_addr_sk = customer_address.ca_address_sk
-  |
-  |----16:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-  |
-  |----15:EXCHANGE
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----14:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=36/120 size=6.91MB
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 15
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.household_demographics #partitions=1/1 size=148.10KB
-     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-     predicates: store.s_city IN ('Midway', 'Fairview')
-
-PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  9:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
+21:TOP-N [LIMIT=100]
+|  order by: c_last_name ASC, ss_ticket_number ASC
+|
+20:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+12:TOP-N [LIMIT=100]
+|  order by: c_last_name ASC, ss_ticket_number ASC
+|
+11:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: customer.c_customer_sk = ss_customer_sk
+|  other predicates: current_addr.ca_city != ca_city
+|
+|--19:EXCHANGE [BROADCAST]
+|  |
+|  18:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(SUM(ss_ext_sales_price)), SUM(SUM(ss_ext_list_price)), SUM(SUM(ss_ext_tax))
+|  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
+|  |
+|  17:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)]
+|  |
+|  07:AGGREGATE
+|  |  output: SUM(ss_ext_sales_price), SUM(ss_ext_list_price), SUM(ss_ext_tax)
+|  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
+|  |
+|  06:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: store_sales.ss_addr_sk = customer_address.ca_address_sk
+|  |
+|  |--16:EXCHANGE [BROADCAST]
+|  |  |
+|  |  03:SCAN HDFS [tpcds.customer_address]
+|  |     partitions=1/1 size=5.25MB
+|  |
+|  05:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--15:EXCHANGE [BROADCAST]
+|  |  |
+|  |  02:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 size=148.10KB
+|  |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
+|  |
+|  04:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  |
+|  |--14:EXCHANGE [BROADCAST]
+|  |  |
+|  |  01:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 size=3.08KB
+|  |     predicates: store.s_city IN ('Midway', 'Fairview')
+|  |
+|  00:SCAN HDFS [tpcds.store_sales]
+|     partitions=36/120 size=6.91MB
+|
+10:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: customer.c_current_addr_sk = current_addr.ca_address_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  09:SCAN HDFS [tpcds.customer_address current_addr]
+|     partitions=1/1 size=5.25MB
+|
+08:SCAN HDFS [tpcds.customer]
+   partitions=1/1 size=12.60MB
 ====
 # TPCDS-Q73
 SELECT
@@ -2703,167 +1795,100 @@ ORDER BY
   cnt DESC
 LIMIT 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  10:TOP-N
-  |  order by: cnt DESC
-  |  limit: 100
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    c.c_customer_sk = ss_customer_sk
-  |
-  |----7:AGGREGATE (finalize)
-  |    |  output: COUNT(*)
-  |    |  group by: ss_ticket_number, ss_customer_sk
-  |    |  having: COUNT(*) <= 5, COUNT(*) >= 1
-  |    |
-  |    6:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    ss.ss_store_sk = s.s_store_sk
-  |    |
-  |    |----3:SCAN HDFS
-  |    |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |    |       predicates: s.s_county IN ('Williamson County', 'Ziebach County', 'Ziebach County', 'Ziebach County')
-  |    |
-  |    5:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    ss.ss_hdemo_sk = hd.hd_demo_sk
-  |    |
-  |    |----2:SCAN HDFS
-  |    |       table=tpcds.household_demographics #partitions=1/1 size=148.10KB compact
-  |    |       predicates: (hd.hd_buy_potential = '>10000' OR hd.hd_buy_potential = 'unknown'), hd.hd_vehicle_count > 0, CASE WHEN hd.hd_vehicle_count > 0 THEN hd.hd_dep_count / hd.hd_vehicle_count ELSE NULL END > 1.0
-  |    |
-  |    4:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    ss.ss_sold_date_sk = d.d_date_sk
-  |    |
-  |    |----1:SCAN HDFS
-  |    |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |    |       predicates: d.d_dom >= 1, d.d_dom <= 2, d.d_year IN (1999, 1999 + 1, 1999 + 2)
-  |    |
-  |    0:SCAN HDFS
-  |       table=tpcds.store_sales #partitions=120/120 size=23.42MB
-  |
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
+10:TOP-N [LIMIT=100]
+|  order by: cnt DESC
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_customer_sk = ss_customer_sk
+|
+|--07:AGGREGATE [FINALIZE]
+|  |  output: COUNT(*)
+|  |  group by: ss_ticket_number, ss_customer_sk
+|  |  having: COUNT(*) <= 5, COUNT(*) >= 1
+|  |
+|  06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss.ss_store_sk = s.s_store_sk
+|  |
+|  |--03:SCAN HDFS [tpcds.store s]
+|  |     partitions=1/1 size=3.08KB compact
+|  |     predicates: s.s_county IN ('Williamson County', 'Ziebach County', 'Ziebach County', 'Ziebach County')
+|  |
+|  05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss.ss_hdemo_sk = hd.hd_demo_sk
+|  |
+|  |--02:SCAN HDFS [tpcds.household_demographics hd]
+|  |     partitions=1/1 size=148.10KB compact
+|  |     predicates: (hd.hd_buy_potential = '>10000' OR hd.hd_buy_potential = 'unknown'), hd.hd_vehicle_count > 0, CASE WHEN hd.hd_vehicle_count > 0 THEN hd.hd_dep_count / hd.hd_vehicle_count ELSE NULL END > 1.0
+|  |
+|  04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|  |
+|  |--01:SCAN HDFS [tpcds.date_dim d]
+|  |     partitions=1/1 size=9.84MB compact
+|  |     predicates: d.d_dom >= 1, d.d_dom <= 2, d.d_year IN (1999, 1999 + 1, 1999 + 2)
+|  |
+|  00:SCAN HDFS [tpcds.store_sales ss]
+|     partitions=120/120 size=23.42MB
+|
+08:SCAN HDFS [tpcds.customer c]
+   partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  18:TOP-N
-  |  order by: cnt DESC
-  |  limit: 100
-  |
-  17:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 17
-    UNPARTITIONED
-
-  10:TOP-N
-  |  order by: cnt DESC
-  |  limit: 100
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    c.c_customer_sk = ss_customer_sk
-  |
-  |----16:EXCHANGE
-  |
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    UNPARTITIONED
-
-  15:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: ss_ticket_number, ss_customer_sk
-  |  having: COUNT(*) <= 5, COUNT(*) >= 1
-  |
-  14:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    HASH_PARTITIONED: ss_ticket_number, ss_customer_sk
-
-  7:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: ss_ticket_number, ss_customer_sk
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----13:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_hdemo_sk = hd.hd_demo_sk
-  |
-  |----12:EXCHANGE
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----11:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-     predicates: s.s_county IN ('Williamson County', 'Ziebach County', 'Ziebach County', 'Ziebach County')
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.household_demographics #partitions=1/1 size=148.10KB
-     predicates: (hd.hd_buy_potential = '>10000' OR hd.hd_buy_potential = 'unknown'), hd.hd_vehicle_count > 0, CASE WHEN hd.hd_vehicle_count > 0 THEN hd.hd_dep_count / hd.hd_vehicle_count ELSE NULL END > 1.0
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d.d_dom >= 1, d.d_dom <= 2, d.d_year IN (1999, 1999 + 1, 1999 + 2)
+18:TOP-N [LIMIT=100]
+|  order by: cnt DESC
+|
+17:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+10:TOP-N [LIMIT=100]
+|  order by: cnt DESC
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c.c_customer_sk = ss_customer_sk
+|
+|--16:EXCHANGE [BROADCAST]
+|  |
+|  15:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(COUNT(*))
+|  |  group by: ss_ticket_number, ss_customer_sk
+|  |  having: COUNT(*) <= 5, COUNT(*) >= 1
+|  |
+|  14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk)]
+|  |
+|  07:AGGREGATE
+|  |  output: COUNT(*)
+|  |  group by: ss_ticket_number, ss_customer_sk
+|  |
+|  06:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss.ss_store_sk = s.s_store_sk
+|  |
+|  |--13:EXCHANGE [BROADCAST]
+|  |  |
+|  |  03:SCAN HDFS [tpcds.store s]
+|  |     partitions=1/1 size=3.08KB
+|  |     predicates: s.s_county IN ('Williamson County', 'Ziebach County', 'Ziebach County', 'Ziebach County')
+|  |
+|  05:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss.ss_hdemo_sk = hd.hd_demo_sk
+|  |
+|  |--12:EXCHANGE [BROADCAST]
+|  |  |
+|  |  02:SCAN HDFS [tpcds.household_demographics hd]
+|  |     partitions=1/1 size=148.10KB
+|  |     predicates: (hd.hd_buy_potential = '>10000' OR hd.hd_buy_potential = 'unknown'), hd.hd_vehicle_count > 0, CASE WHEN hd.hd_vehicle_count > 0 THEN hd.hd_dep_count / hd.hd_vehicle_count ELSE NULL END > 1.0
+|  |
+|  04:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|  |
+|  |--11:EXCHANGE [BROADCAST]
+|  |  |
+|  |  01:SCAN HDFS [tpcds.date_dim d]
+|  |     partitions=1/1 size=9.84MB
+|  |     predicates: d.d_dom >= 1, d.d_dom <= 2, d.d_year IN (1999, 1999 + 1, 1999 + 2)
+|  |
+|  00:SCAN HDFS [tpcds.store_sales ss]
+|     partitions=120/120 size=23.42MB
+|
+08:SCAN HDFS [tpcds.customer c]
+   partitions=1/1 size=12.60MB
 ====
 # TPCDS-Q79
 SELECT
@@ -2908,174 +1933,100 @@ ORDER BY
   profit
 LIMIT 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  10:TOP-N
-  |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
-  |  limit: 100
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss_customer_sk = c.c_customer_sk
-  |
-  |----8:SCAN HDFS
-  |       table=tpcds.customer #partitions=1/1 size=12.60MB compact
-  |
-  7:AGGREGATE (finalize)
-  |  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
-  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |       predicates: s.s_number_employees >= 200, s.s_number_employees <= 295
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_hdemo_sk = hd.hd_demo_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.household_demographics #partitions=1/1 size=148.10KB compact
-  |       predicates: (hd.hd_dep_count = 8 OR hd.hd_vehicle_count > 0)
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |       predicates: d.d_dow = 1, d.d_year IN (1998, 1998 + 1, 1998 + 2)
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+10:TOP-N [LIMIT=100]
+|  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_customer_sk = c.c_customer_sk
+|
+|--08:SCAN HDFS [tpcds.customer c]
+|     partitions=1/1 size=12.60MB compact
+|
+07:AGGREGATE [FINALIZE]
+|  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--03:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB compact
+|     predicates: s.s_number_employees >= 200, s.s_number_employees <= 295
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_hdemo_sk = hd.hd_demo_sk
+|
+|--02:SCAN HDFS [tpcds.household_demographics hd]
+|     partitions=1/1 size=148.10KB compact
+|     predicates: (hd.hd_dep_count = 8 OR hd.hd_vehicle_count > 0)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB compact
+|     predicates: d.d_dow = 1, d.d_year IN (1998, 1998 + 1, 1998 + 2)
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  19:TOP-N
-  |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
-  |  limit: 100
-  |
-  18:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: ss_customer_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 18
-    UNPARTITIONED
-
-  10:TOP-N
-  |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
-  |  limit: 100
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    ss_customer_sk = c.c_customer_sk
-  |
-  |----17:EXCHANGE
-  |
-  16:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 17
-    HASH_PARTITIONED: c.c_customer_sk
-
-  8:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
-
-PLAN FRAGMENT 3
-  PARTITION: HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    HASH_PARTITIONED: ss_customer_sk
-
-  15:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_coupon_amt)), SUM(SUM(ss_net_profit))
-  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
-  |
-  14:EXCHANGE
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    HASH_PARTITIONED: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
-
-  7:AGGREGATE
-  |  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
-  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----13:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_hdemo_sk = hd.hd_demo_sk
-  |
-  |----12:EXCHANGE
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_sold_date_sk = d.d_date_sk
-  |
-  |----11:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-     predicates: s.s_number_employees >= 200, s.s_number_employees <= 295
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.household_demographics #partitions=1/1 size=148.10KB
-     predicates: (hd.hd_dep_count = 8 OR hd.hd_vehicle_count > 0)
-
-PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d.d_dow = 1, d.d_year IN (1998, 1998 + 1, 1998 + 2)
+19:TOP-N [LIMIT=100]
+|  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
+|
+18:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+10:TOP-N [LIMIT=100]
+|  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
+|
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c.c_customer_sk
+|
+|--17:EXCHANGE [PARTITION=HASH(c.c_customer_sk)]
+|  |
+|  08:SCAN HDFS [tpcds.customer c]
+|     partitions=1/1 size=12.60MB
+|
+16:EXCHANGE [PARTITION=HASH(ss_customer_sk)]
+|
+15:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_coupon_amt)), SUM(SUM(ss_net_profit))
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
+|
+14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,s_city)]
+|
+07:AGGREGATE
+|  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB
+|     predicates: s.s_number_employees >= 200, s.s_number_employees <= 295
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_hdemo_sk = hd.hd_demo_sk
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.household_demographics hd]
+|     partitions=1/1 size=148.10KB
+|     predicates: (hd.hd_dep_count = 8 OR hd.hd_vehicle_count > 0)
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d]
+|     partitions=1/1 size=9.84MB
+|     predicates: d.d_dow = 1, d.d_year IN (1998, 1998 + 1, 1998 + 2)
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ====
 # TPCDS-Q7
 select
@@ -3102,147 +2053,84 @@ order by
   i_item_id 
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  8:TOP-N
-  |  order by: i_item_id ASC
-  |  limit: 100
-  |
-  7:AGGREGATE (finalize)
-  |  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
-  |  group by: i_item_id
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_promo_sk = promotion.p_promo_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.promotion #partitions=1/1 size=36.36KB compact
-  |       predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_cdemo_sk = customer_demographics.cd_demo_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.customer_demographics #partitions=1/1 size=76.92MB compact
-  |       predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=23/120 size=4.32MB
+08:TOP-N [LIMIT=100]
+|  order by: i_item_id ASC
+|
+07:AGGREGATE [FINALIZE]
+|  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
+|  group by: i_item_id
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_promo_sk = promotion.p_promo_sk
+|
+|--03:SCAN HDFS [tpcds.promotion]
+|     partitions=1/1 size=36.36KB compact
+|     predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--02:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB compact
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_cdemo_sk = customer_demographics.cd_demo_sk
+|
+|--01:SCAN HDFS [tpcds.customer_demographics]
+|     partitions=1/1 size=76.92MB compact
+|     predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=23/120 size=4.32MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  16:TOP-N
-  |  order by: i_item_id ASC
-  |  limit: 100
-  |
-  15:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: i_item_id
-
-  STREAM DATA SINK
-    EXCHANGE ID: 15
-    UNPARTITIONED
-
-  8:TOP-N
-  |  order by: i_item_id ASC
-  |  limit: 100
-  |
-  14:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_quantity)), SUM(COUNT(ss_quantity)), SUM(SUM(ss_list_price)), SUM(COUNT(ss_list_price)), SUM(SUM(ss_coupon_amt)), SUM(COUNT(ss_coupon_amt)), SUM(SUM(ss_sales_price)), SUM(COUNT(ss_sales_price))
-  |  group by: i_item_id
-  |
-  13:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: store_sales.ss_cdemo_sk
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    HASH_PARTITIONED: i_item_id
-
-  7:AGGREGATE
-  |  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
-  |  group by: i_item_id
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_promo_sk = promotion.p_promo_sk
-  |
-  |----12:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----11:EXCHANGE
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    store_sales.ss_cdemo_sk = customer_demographics.cd_demo_sk
-  |
-  |----10:EXCHANGE
-  |
-  9:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.promotion #partitions=1/1 size=36.36KB
-     predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    HASH_PARTITIONED: customer_demographics.cd_demo_sk
-
-  1:SCAN HDFS
-     table=tpcds.customer_demographics #partitions=1/1 size=76.92MB
-     predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    HASH_PARTITIONED: store_sales.ss_cdemo_sk
-
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=23/120 size=4.32MB
+16:TOP-N [LIMIT=100]
+|  order by: i_item_id ASC
+|
+15:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+08:TOP-N [LIMIT=100]
+|  order by: i_item_id ASC
+|
+14:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_quantity)), SUM(COUNT(ss_quantity)), SUM(SUM(ss_list_price)), SUM(COUNT(ss_list_price)), SUM(SUM(ss_coupon_amt)), SUM(COUNT(ss_coupon_amt)), SUM(SUM(ss_sales_price)), SUM(COUNT(ss_sales_price))
+|  group by: i_item_id
+|
+13:EXCHANGE [PARTITION=HASH(i_item_id)]
+|
+07:AGGREGATE
+|  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
+|  group by: i_item_id
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_promo_sk = promotion.p_promo_sk
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.promotion]
+|     partitions=1/1 size=36.36KB
+|     predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: store_sales.ss_cdemo_sk = customer_demographics.cd_demo_sk
+|
+|--10:EXCHANGE [PARTITION=HASH(customer_demographics.cd_demo_sk)]
+|  |
+|  01:SCAN HDFS [tpcds.customer_demographics]
+|     partitions=1/1 size=76.92MB
+|     predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
+|
+09:EXCHANGE [PARTITION=HASH(store_sales.ss_cdemo_sk)]
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=23/120 size=4.32MB
 ====
 # TPCDS-Q89
 select
@@ -3283,138 +2171,82 @@ order by
   i_category
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  8:TOP-N
-  |  order by: sum_sales ASC, s_store_name ASC, i_category ASC
-  |  limit: 100
-  |
-  7:AGGREGATE (finalize)
-  |  output: SUM(ss_sales_price)
-  |  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.date_dim #partitions=1/1 size=9.84MB compact
-  |       predicates: d_year IN (2000)
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.item #partitions=1/1 size=4.82MB compact
-  |       predicates: ((i_category IN ('Home', 'Books', 'Electronics') AND i_class IN ('wallpaper', 'parenting', 'musical')) OR (i_category IN ('Shoes', 'Jewelry', 'Men') AND i_class IN ('womens', 'birdal', 'pants')))
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=24/120 size=4.57MB
+08:TOP-N [LIMIT=100]
+|  order by: sum_sales ASC, s_store_name ASC, i_category ASC
+|
+07:AGGREGATE [FINALIZE]
+|  output: SUM(ss_sales_price)
+|  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|
+|--03:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 size=9.84MB compact
+|     predicates: d_year IN (2000)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|
+|--02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB compact
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB compact
+|     predicates: ((i_category IN ('Home', 'Books', 'Electronics') AND i_class IN ('wallpaper', 'parenting', 'musical')) OR (i_category IN ('Shoes', 'Jewelry', 'Men') AND i_class IN ('womens', 'birdal', 'pants')))
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=24/120 size=4.57MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  15:TOP-N
-  |  order by: sum_sales ASC, s_store_name ASC, i_category ASC
-  |  limit: 100
-  |
-  14:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    UNPARTITIONED
-
-  8:TOP-N
-  |  order by: sum_sales ASC, s_store_name ASC, i_category ASC
-  |  limit: 100
-  |
-  13:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_sales_price))
-  |  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
-  |
-  12:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    HASH_PARTITIONED: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
-
-  7:AGGREGATE
-  |  output: SUM(ss_sales_price)
-  |  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_sold_date_sk = date_dim.d_date_sk
-  |
-  |----11:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----10:EXCHANGE
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_item_sk = item.i_item_sk
-  |
-  |----9:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=24/120 size=4.57MB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.date_dim #partitions=1/1 size=9.84MB
-     predicates: d_year IN (2000)
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: ((i_category IN ('Home', 'Books', 'Electronics') AND i_class IN ('wallpaper', 'parenting', 'musical')) OR (i_category IN ('Shoes', 'Jewelry', 'Men') AND i_class IN ('womens', 'birdal', 'pants')))
+15:TOP-N [LIMIT=100]
+|  order by: sum_sales ASC, s_store_name ASC, i_category ASC
+|
+14:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+08:TOP-N [LIMIT=100]
+|  order by: sum_sales ASC, s_store_name ASC, i_category ASC
+|
+13:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_sales_price))
+|  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
+|
+12:EXCHANGE [PARTITION=HASH(i_category,i_class,i_brand,s_store_name,s_company_name,d_moy)]
+|
+07:AGGREGATE
+|  output: SUM(ss_sales_price)
+|  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 size=9.84MB
+|     predicates: d_year IN (2000)
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_item_sk = item.i_item_sk
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 size=4.82MB
+|     predicates: ((i_category IN ('Home', 'Books', 'Electronics') AND i_class IN ('wallpaper', 'parenting', 'musical')) OR (i_category IN ('Shoes', 'Jewelry', 'Men') AND i_class IN ('womens', 'birdal', 'pants')))
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=24/120 size=4.57MB
 ====
 # TPCDS-Q8
 select
@@ -3486,186 +2318,112 @@ order by
   s_store_name 
 limit 100
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  11:TOP-N
-  |  order by: s_store_name ASC
-  |  limit: 100
-  |
-  10:AGGREGATE (finalize)
-  |  output: SUM(ss_net_profit)
-  |  group by: s_store_name
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    substr(store.s_zip, 1, 2) = substr(substr(ca_zip, 1, 5), 1, 2)
-  |
-  |----7:HASH JOIN
-  |    |  join op: LEFT SEMI JOIN
-  |    |  hash predicates:
-  |    |    substr(ca_zip, 1, 5) = substr(ca_zip, 1, 5)
-  |    |
-  |    |----6:SCAN HDFS
-  |    |       table=tpcds.customer_address #partitions=1/1 size=5.25MB compact
-  |    |       predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
-  |    |
-  |    5:AGGREGATE (finalize)
-  |    |  output: COUNT(*)
-  |    |  group by: substr(ca_zip, 1, 5)
-  |    |  having: COUNT(*) > 10
-  |    |
-  |    4:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    customer_address.ca_address_sk = customer.c_current_addr_sk
-  |    |
-  |    |----3:SCAN HDFS
-  |    |       table=tpcds.customer #partitions=1/1 size=12.60MB compact
-  |    |       predicates: c_preferred_cust_flag = 'Y'
-  |    |
-  |    2:SCAN HDFS
-  |       table=tpcds.customer_address #partitions=1/1 size=5.25MB
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=7/120 size=1.12MB
+11:TOP-N [LIMIT=100]
+|  order by: s_store_name ASC
+|
+10:AGGREGATE [FINALIZE]
+|  output: SUM(ss_net_profit)
+|  group by: s_store_name
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: substr(store.s_zip, 1, 2) = substr(substr(ca_zip, 1, 5), 1, 2)
+|
+|--07:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: substr(ca_zip, 1, 5) = substr(ca_zip, 1, 5)
+|  |
+|  |--06:SCAN HDFS [tpcds.customer_address]
+|  |     partitions=1/1 size=10.49MB compact
+|  |     predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: COUNT(*)
+|  |  group by: substr(ca_zip, 1, 5)
+|  |  having: COUNT(*) > 10
+|  |
+|  04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
+|  |
+|  |--03:SCAN HDFS [tpcds.customer]
+|  |     partitions=1/1 size=12.60MB compact
+|  |     predicates: c_preferred_cust_flag = 'Y'
+|  |
+|  02:SCAN HDFS [tpcds.customer_address]
+|     partitions=1/1 size=5.25MB
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|
+|--01:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB compact
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=7/120 size=1.12MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  21:TOP-N
-  |  order by: s_store_name ASC
-  |  limit: 100
-  |
-  20:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: s_store_name
-
-  STREAM DATA SINK
-    EXCHANGE ID: 20
-    UNPARTITIONED
-
-  11:TOP-N
-  |  order by: s_store_name ASC
-  |  limit: 100
-  |
-  19:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_net_profit))
-  |  group by: s_store_name
-  |
-  18:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 18
-    HASH_PARTITIONED: s_store_name
-
-  10:AGGREGATE
-  |  output: SUM(ss_net_profit)
-  |  group by: s_store_name
-  |
-  9:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    substr(store.s_zip, 1, 2) = substr(substr(ca_zip, 1, 5), 1, 2)
-  |
-  |----17:EXCHANGE
-  |
-  8:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    store_sales.ss_store_sk = store.s_store_sk
-  |
-  |----12:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=7/120 size=1.12MB
-
-PLAN FRAGMENT 3
-  PARTITION: HASH_PARTITIONED: substr(ca_zip, 1, 5)
-
-  STREAM DATA SINK
-    EXCHANGE ID: 17
-    UNPARTITIONED
-
-  7:HASH JOIN
-  |  join op: LEFT SEMI JOIN (PARTITIONED)
-  |  hash predicates:
-  |    substr(ca_zip, 1, 5) = substr(ca_zip, 1, 5)
-  |
-  |----16:EXCHANGE
-  |
-  15:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: substr(ca_zip, 1, 5)
-  |  having: COUNT(*) > 10
-  |
-  14:EXCHANGE
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 16
-    HASH_PARTITIONED: substr(ca_zip, 1, 5)
-
-  6:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
-     predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 14
-    HASH_PARTITIONED: substr(ca_zip, 1, 5)
-
-  5:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: substr(ca_zip, 1, 5)
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    customer_address.ca_address_sk = customer.c_current_addr_sk
-  |
-  |----13:EXCHANGE
-  |
-  2:SCAN HDFS
-     table=tpcds.customer_address #partitions=1/1 size=5.25MB
-
-PLAN FRAGMENT 6
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.customer #partitions=1/1 size=12.60MB
-     predicates: c_preferred_cust_flag = 'Y'
-
-PLAN FRAGMENT 7
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 12
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
+21:TOP-N [LIMIT=100]
+|  order by: s_store_name ASC
+|
+20:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+11:TOP-N [LIMIT=100]
+|  order by: s_store_name ASC
+|
+19:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_net_profit))
+|  group by: s_store_name
+|
+18:EXCHANGE [PARTITION=HASH(s_store_name)]
+|
+10:AGGREGATE
+|  output: SUM(ss_net_profit)
+|  group by: s_store_name
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: substr(store.s_zip, 1, 2) = substr(substr(ca_zip, 1, 5), 1, 2)
+|
+|--17:EXCHANGE [BROADCAST]
+|  |
+|  07:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
+|  |  hash predicates: substr(ca_zip, 1, 5) = substr(ca_zip, 1, 5)
+|  |
+|  |--16:EXCHANGE [PARTITION=HASH(substr(ca_zip, 1, 5))]
+|  |  |
+|  |  06:SCAN HDFS [tpcds.customer_address]
+|  |     partitions=1/1 size=10.49MB
+|  |     predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
+|  |
+|  15:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(COUNT(*))
+|  |  group by: substr(ca_zip, 1, 5)
+|  |  having: COUNT(*) > 10
+|  |
+|  14:EXCHANGE [PARTITION=HASH(substr(ca_zip, 1, 5))]
+|  |
+|  05:AGGREGATE
+|  |  output: COUNT(*)
+|  |  group by: substr(ca_zip, 1, 5)
+|  |
+|  04:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
+|  |
+|  |--13:EXCHANGE [BROADCAST]
+|  |  |
+|  |  03:SCAN HDFS [tpcds.customer]
+|  |     partitions=1/1 size=12.60MB
+|  |     predicates: c_preferred_cust_flag = 'Y'
+|  |
+|  02:SCAN HDFS [tpcds.customer_address]
+|     partitions=1/1 size=5.25MB
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.store]
+|     partitions=1/1 size=3.08KB
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=7/120 size=1.12MB
 ====
 # TPCDS-Q96
 SELECT
@@ -3683,116 +2441,70 @@ WHERE
   AND hd.hd_dep_count = 5
   AND s.s_store_name = 'ese'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  7:AGGREGATE (finalize)
-  |  output: COUNT(*)
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----3:SCAN HDFS
-  |       table=tpcds.store #partitions=1/1 size=3.08KB compact
-  |       predicates: s.s_store_name = 'ese'
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_hdemo_sk = hd.hd_demo_sk
-  |
-  |----2:SCAN HDFS
-  |       table=tpcds.household_demographics #partitions=1/1 size=148.10KB compact
-  |       predicates: hd.hd_dep_count = 5
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    ss.ss_sold_time_sk = td.t_time_sk
-  |
-  |----1:SCAN HDFS
-  |       table=tpcds.time_dim #partitions=1/1 size=4.87MB compact
-  |       predicates: td.t_hour = 8, td.t_minute >= 30
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
+07:AGGREGATE [FINALIZE]
+|  output: COUNT(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--03:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB compact
+|     predicates: s.s_store_name = 'ese'
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_hdemo_sk = hd.hd_demo_sk
+|
+|--02:SCAN HDFS [tpcds.household_demographics hd]
+|     partitions=1/1 size=148.10KB compact
+|     predicates: hd.hd_dep_count = 5
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss.ss_sold_time_sk = td.t_time_sk
+|
+|--01:SCAN HDFS [tpcds.time_dim td]
+|     partitions=1/1 size=4.87MB compact
+|     predicates: td.t_hour = 8, td.t_minute >= 30
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  12:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |
-  11:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  7:AGGREGATE
-  |  output: COUNT(*)
-  |
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_store_sk = s.s_store_sk
-  |
-  |----10:EXCHANGE
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_hdemo_sk = hd.hd_demo_sk
-  |
-  |----9:EXCHANGE
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    ss.ss_sold_time_sk = td.t_time_sk
-  |
-  |----8:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=120/120 size=23.42MB
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    UNPARTITIONED
-
-  3:SCAN HDFS
-     table=tpcds.store #partitions=1/1 size=3.08KB
-     predicates: s.s_store_name = 'ese'
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=tpcds.household_demographics #partitions=1/1 size=148.10KB
-     predicates: hd.hd_dep_count = 5
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=tpcds.time_dim #partitions=1/1 size=4.87MB
-     predicates: td.t_hour = 8, td.t_minute >= 30
+12:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(COUNT(*))
+|
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+07:AGGREGATE
+|  output: COUNT(*)
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_store_sk = s.s_store_sk
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.store s]
+|     partitions=1/1 size=3.08KB
+|     predicates: s.s_store_name = 'ese'
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_hdemo_sk = hd.hd_demo_sk
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.household_demographics hd]
+|     partitions=1/1 size=148.10KB
+|     predicates: hd.hd_dep_count = 5
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss.ss_sold_time_sk = td.t_time_sk
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.time_dim td]
+|     partitions=1/1 size=4.87MB
+|     predicates: td.t_hour = 8, td.t_minute >= 30
+|
+00:SCAN HDFS [tpcds.store_sales ss]
+   partitions=120/120 size=23.42MB
 ====
 # TPCDS-Q98
 select
@@ -3818,84 +2530,50 @@ order by
   i_item_desc
 limit 1000
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:TOP-N
-  |  order by: i_category ASC, i_class ASC, i_item_desc ASC
-  |  limit: 1000
-  |
-  3:AGGREGATE (finalize)
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: i_item_desc, i_category, i_class, i_current_price
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    item.i_item_sk = store_sales.ss_item_sk
-  |
-  |----0:SCAN HDFS
-  |       table=tpcds.store_sales #partitions=2/120 size=235.08KB compact
-  |
-  1:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: i_category IN ('Jewelry', 'Sports', 'Books')
+04:TOP-N [LIMIT=1000]
+|  order by: i_category ASC, i_class ASC, i_item_desc ASC
+|
+03:AGGREGATE [FINALIZE]
+|  output: SUM(ss_ext_sales_price)
+|  group by: i_item_desc, i_category, i_class, i_current_price
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: item.i_item_sk = store_sales.ss_item_sk
+|
+|--00:SCAN HDFS [tpcds.store_sales]
+|     partitions=2/120 size=235.08KB compact
+|
+01:SCAN HDFS [tpcds.item]
+   partitions=1/1 size=4.82MB
+   predicates: i_category IN ('Jewelry', 'Sports', 'Books')
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  9:TOP-N
-  |  order by: i_category ASC, i_class ASC, i_item_desc ASC
-  |  limit: 1000
-  |
-  8:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: i_item_desc, i_category, i_class, i_current_price
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  4:TOP-N
-  |  order by: i_category ASC, i_class ASC, i_item_desc ASC
-  |  limit: 1000
-  |
-  7:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(ss_ext_sales_price))
-  |  group by: i_item_desc, i_category, i_class, i_current_price
-  |
-  6:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: i_item_desc, i_category, i_class, i_current_price
-
-  3:AGGREGATE
-  |  output: SUM(ss_ext_sales_price)
-  |  group by: i_item_desc, i_category, i_class, i_current_price
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    item.i_item_sk = store_sales.ss_item_sk
-  |
-  |----5:EXCHANGE
-  |
-  1:SCAN HDFS
-     table=tpcds.item #partitions=1/1 size=4.82MB
-     predicates: i_category IN ('Jewelry', 'Sports', 'Books')
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  0:SCAN HDFS
-     table=tpcds.store_sales #partitions=2/120 size=235.08KB
+09:TOP-N [LIMIT=1000]
+|  order by: i_category ASC, i_class ASC, i_item_desc ASC
+|
+08:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:TOP-N [LIMIT=1000]
+|  order by: i_category ASC, i_class ASC, i_item_desc ASC
+|
+07:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(ss_ext_sales_price))
+|  group by: i_item_desc, i_category, i_class, i_current_price
+|
+06:EXCHANGE [PARTITION=HASH(i_item_desc,i_category,i_class,i_current_price)]
+|
+03:AGGREGATE
+|  output: SUM(ss_ext_sales_price)
+|  group by: i_item_desc, i_category, i_class, i_current_price
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: item.i_item_sk = store_sales.ss_item_sk
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [tpcds.store_sales]
+|     partitions=2/120 size=235.08KB
+|
+01:SCAN HDFS [tpcds.item]
+   partitions=1/1 size=4.82MB
+   predicates: i_category IN ('Jewelry', 'Sports', 'Books')
 ====

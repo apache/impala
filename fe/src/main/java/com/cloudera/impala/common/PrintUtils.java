@@ -30,21 +30,25 @@ public class PrintUtils {
     final long PB = TB * 1024;
 
     double result = bytes;
-    if (bytes > PB) return String.format("%.2f", result / PB) + "PB";
-    if (bytes > TB) return String.format("%.2f", result / TB) + "TB";
-    if (bytes > GB) return String.format("%.2f", result / GB) + "GB";
-    if (bytes > MB) return String.format("%.2f", result / MB) + "MB";
-    if (bytes > KB) return String.format("%.2f", result / KB) + "KB";
+    if (bytes >= PB) return String.format("%.2f", result / PB) + "PB";
+    if (bytes >= TB) return String.format("%.2f", result / TB) + "TB";
+    if (bytes >= GB) return String.format("%.2f", result / GB) + "GB";
+    if (bytes >= MB) return String.format("%.2f", result / MB) + "MB";
+    if (bytes >= KB) return String.format("%.2f", result / KB) + "KB";
     return bytes + "B";
   }
 
   public static String printCardinality(String prefix, long cardinality) {
-    return prefix + "cardinality: " +
+    return prefix + "cardinality=" +
         ((cardinality != -1) ? String.valueOf(cardinality) : "unavailable");
   }
 
+  public static String printHosts(String prefix, long numHosts) {
+    return prefix + "hosts=" + ((numHosts != -1) ? numHosts : "unavailable");
+  }
+
   public static String printMemCost(String prefix, long perHostMemCost) {
-    return prefix + "per-host memory: " +
+    return prefix + "per-host-mem=" +
         ((perHostMemCost != -1) ? printBytes(perHostMemCost) : "unavailable");
   }
 }

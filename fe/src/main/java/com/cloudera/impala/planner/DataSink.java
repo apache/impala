@@ -42,11 +42,10 @@ public abstract class DataSink {
 
   /**
    * Return an explain string for the DataSink. Each line of the explain will be prefixed
-   * by "prefix"
-   * @param prefix each explain line will be started with the given prefix
-   * @return
+   * by "prefix".
    */
-  public abstract String getExplainString(String prefix, TExplainLevel explainLevel);
+  public abstract String getExplainString(String prefix, String detailPrefix,
+      TExplainLevel explainLevel);
 
   protected abstract TDataSink toThrift();
 

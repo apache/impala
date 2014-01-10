@@ -510,8 +510,8 @@ public class Frontend {
     if (queryCtxt.request.query_options.isSetExplain_level()) {
       explainLevel = queryCtxt.request.query_options.getExplain_level();
     } else if (analysisResult.isExplainStmt()) {
-      // Use the NORMAL by default for explain statements.
-      explainLevel = TExplainLevel.NORMAL;
+      // Use the STANDARD by default for explain statements.
+      explainLevel = TExplainLevel.STANDARD;
     }
 
     explainString.append(planner.getExplainString(fragments, queryExecRequest,

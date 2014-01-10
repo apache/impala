@@ -16,6 +16,7 @@
 package com.cloudera.impala.planner;
 
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.thrift.TDataSink;
 import com.cloudera.impala.thrift.TDataSinkType;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -32,9 +33,15 @@ public class HBaseTableSink extends TableSink {
   }
 
   @Override
-  public String getExplainString(String prefix, TExplainLevel explainLevel) {
+  public String getExplainString(String prefix, String detailPrefix,
+      TExplainLevel explainLevel) {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "WRITE TO HBASE table=" + targetTable_.getFullName() + "\n");
+    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      output.append(PrintUtils.printHosts(detailPrefix, fragment_.getNumNodes()));
+      output.append(PrintUtils.printMemCost(" ", perHostMemCost_));
+      output.append("\n");
+    }
     return output.toString();
   }
 

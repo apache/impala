@@ -1,63 +1,37 @@
 # predicate pushdown
 select * from (select * from functional.alltypessmall) a where id < 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     predicates: functional.alltypessmall.id < 5
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=18.96KB
+   predicates: functional.alltypessmall.id < 5
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     predicates: functional.alltypessmall.id < 5
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=18.96KB
+   predicates: functional.alltypessmall.id < 5
 ====
 # predicate pushdown is prevented in presence of limit clause
 select * from (select * from functional.alltypessmall limit 10) a where id < 5 limit 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:SELECT
-  |  predicates: functional.alltypessmall.id < 5
-  |  limit: 5
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     limit: 10
+01:SELECT
+|  predicates: functional.alltypessmall.id < 5
+|  limit: 5
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=12.64KB
+   limit: 10
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:SELECT
-  |  predicates: functional.alltypessmall.id < 5
-  |  limit: 5
-  |
-  2:EXCHANGE
-     limit: 10
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     limit: 10
+01:SELECT
+|  predicates: functional.alltypessmall.id < 5
+|  limit: 5
+|
+02:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=12.64KB
+   limit: 10
 ====
 # predicate pushdown is prevented in presence of order by/limit clause;
 # top-n is distributed
@@ -65,46 +39,30 @@ select *
 from (select * from functional.alltypessmall order by id limit 10) a
 where id < 5 limit 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:SELECT
-  |  predicates: functional.alltypessmall.id < 5
-  |  limit: 5
-  |
-  1:TOP-N
-  |  order by: id ASC
-  |  limit: 10
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+02:SELECT
+|  predicates: functional.alltypessmall.id < 5
+|  limit: 5
+|
+01:TOP-N [LIMIT=10]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:SELECT
-  |  predicates: functional.alltypessmall.id < 5
-  |  limit: 5
-  |
-  4:TOP-N
-  |  order by: id ASC
-  |  limit: 10
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
-
-  1:TOP-N
-  |  order by: id ASC
-  |  limit: 10
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+02:SELECT
+|  predicates: functional.alltypessmall.id < 5
+|  limit: 5
+|
+04:TOP-N [LIMIT=10]
+|  order by: id ASC
+|
+03:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+01:TOP-N [LIMIT=10]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ====
 # top-n is not distributed because it depends on the output of the aggregation
 select *
@@ -115,88 +73,58 @@ from functional.alltypes
     group by 1 order by 2 limit 5) a using (id)
 where a.id < 5 limit 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    id = functional.alltypes.id
-  |  limit: 5
-  |
-  |----0:SCAN HDFS
-  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
-  |       predicates: functional.alltypes.id < 5
-  |
-  3:TOP-N
-  |  order by: COUNT(*) ASC
-  |  limit: 5
-  |
-  2:AGGREGATE (finalize)
-  |  output: COUNT(*)
-  |  group by: id
-  |
-  1:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypes.id = id
+|  limit: 5
+|
+|--03:TOP-N [LIMIT=5]
+|  |  order by: COUNT(*) ASC
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  output: COUNT(*)
+|  |  group by: id
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    id = functional.alltypes.id
-  |  limit: 5
-  |
-  |----9:EXCHANGE
-  |
-  8:TOP-N
-  |  order by: COUNT(*) ASC
-  |  limit: 5
-  |
-  7:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: functional.alltypes.id < 5
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: id
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  3:TOP-N
-  |  order by: COUNT(*) ASC
-  |  limit: 5
-  |
-  6:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: id
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: id
-
-  2:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: id
-  |
-  1:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+10:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 5
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: functional.alltypes.id = id
+|  limit: 5
+|
+|--09:EXCHANGE [BROADCAST]
+|  |  limit: 5
+|  |
+|  08:TOP-N [LIMIT=5]
+|  |  order by: COUNT(*) ASC
+|  |
+|  07:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |
+|  03:TOP-N [LIMIT=5]
+|  |  order by: COUNT(*) ASC
+|  |
+|  06:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(COUNT(*))
+|  |  group by: id
+|  |
+|  05:EXCHANGE [PARTITION=HASH(id)]
+|  |
+|  02:AGGREGATE
+|  |  output: COUNT(*)
+|  |  group by: id
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: functional.alltypes.id < 5
 ====
 # predicate pushdown is prevented in presence of limit clause; variant w/ join
 select *
@@ -206,62 +134,38 @@ from (
   limit 10) a
 where id < 5 limit 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:SELECT
-  |  predicates: a.id < 5
-  |  limit: 5
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    a.id = functional.alltypessmall.id
-  |  limit: 10
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+03:SELECT
+|  predicates: a.id < 5
+|  limit: 5
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = functional.alltypessmall.id
+|  limit: 10
+|
+|--01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB compact
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:SELECT
-  |  predicates: a.id < 5
-  |  limit: 5
-  |
-  5:EXCHANGE
-     limit: 10
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    a.id = functional.alltypessmall.id
-  |  limit: 10
-  |
-  |----4:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+03:SELECT
+|  predicates: a.id < 5
+|  limit: 5
+|
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = functional.alltypessmall.id
+|  limit: 10
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   partitions=4/4 size=6.32KB
 ====
 # predicate pushdown is prevented in presence of order by/limit clause
 select *
@@ -270,43 +174,28 @@ where id < 5
 order by id
 limit 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:TOP-N
-  |  order by: id ASC
-  |  limit: 5
-  |
-  1:SELECT
-  |  predicates: functional.alltypessmall.id < 5
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     limit: 10
+02:TOP-N [LIMIT=5]
+|  order by: id ASC
+|
+01:SELECT
+|  predicates: functional.alltypessmall.id < 5
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=12.64KB
+   limit: 10
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:TOP-N
-  |  order by: id ASC
-  |  limit: 5
-  |
-  1:SELECT
-  |  predicates: functional.alltypessmall.id < 5
-  |
-  3:EXCHANGE
-     limit: 10
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     limit: 10
+02:TOP-N [LIMIT=5]
+|  order by: id ASC
+|
+01:SELECT
+|  predicates: functional.alltypessmall.id < 5
+|
+03:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=12.64KB
+   limit: 10
 ====
 # predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
 select *
@@ -319,132 +208,75 @@ where id < 5
 order by id
 limit 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:TOP-N
-  |  order by: id ASC
-  |  limit: 5
-  |
-  3:SELECT
-  |  predicates: a.id < 5
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    a.id = functional.alltypessmall.id
-  |  limit: 10
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+04:TOP-N [LIMIT=5]
+|  order by: id ASC
+|
+03:SELECT
+|  predicates: a.id < 5
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = functional.alltypessmall.id
+|  limit: 10
+|
+|--01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB compact
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:TOP-N
-  |  order by: id ASC
-  |  limit: 5
-  |
-  3:SELECT
-  |  predicates: a.id < 5
-  |
-  6:EXCHANGE
-     limit: 10
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    a.id = functional.alltypessmall.id
-  |  limit: 10
-  |
-  |----5:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+04:TOP-N [LIMIT=5]
+|  order by: id ASC
+|
+03:SELECT
+|  predicates: a.id < 5
+|
+06:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = functional.alltypessmall.id
+|  limit: 10
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   partitions=4/4 size=6.32KB
 ====
 # join against subquery with limit creates a merge fragment that applies the limit
 select *
 from functional.alltypes
   join (select id from functional.alltypessmall limit 10) a using (id)
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    functional.alltypes.id = id
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |       limit: 10
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypes.id = id
+|
+|--01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=12.64KB compact
+|     limit: 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    functional.alltypes.id = id
-  |
-  |----4:EXCHANGE
-  |       limit: 10
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  3:EXCHANGE
-     limit: 10
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-     limit: 10
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: functional.alltypes.id = id
+|
+|--04:EXCHANGE [BROADCAST]
+|  |  limit: 10
+|  |
+|  03:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |  limit: 10
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=12.64KB compact
+|     limit: 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ====
 # join against subquery with limit creates a merge fragment that applies the limit;
 # topn is distributed
@@ -452,73 +284,39 @@ select *
 from functional.alltypes
   join (select id from functional.alltypessmall order by id limit 10) a using (id)
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    functional.alltypes.id = id
-  |
-  |----2:TOP-N
-  |    |  order by: id ASC
-  |    |  limit: 10
-  |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypes.id = id
+|
+|--02:TOP-N [LIMIT=10]
+|  |  order by: id ASC
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  7:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    functional.alltypes.id = id
-  |
-  |----6:EXCHANGE
-  |       limit: 10
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  5:TOP-N
-  |  order by: id ASC
-  |  limit: 10
-  |
-  4:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  2:TOP-N
-  |  order by: id ASC
-  |  limit: 10
-  |
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+07:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: functional.alltypes.id = id
+|
+|--06:EXCHANGE [BROADCAST]
+|  |  limit: 10
+|  |
+|  05:TOP-N [LIMIT=10]
+|  |  order by: id ASC
+|  |
+|  04:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |
+|  02:TOP-N [LIMIT=10]
+|  |  order by: id ASC
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ====
 # join against subquery with limit;
 # predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
@@ -532,103 +330,58 @@ where a.id < 5
 order by a.id
 limit 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:TOP-N
-  |  order by: a.id ASC
-  |  limit: 5
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    functional.alltypes.id = a.id
-  |
-  |----3:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    a.id = functional.alltypestiny.id
-  |    |  limit: 10
-  |    |
-  |    |----2:SCAN HDFS
-  |    |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: functional.alltypes.id < 5
+05:TOP-N [LIMIT=5]
+|  order by: a.id ASC
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypes.id = a.id
+|
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = functional.alltypestiny.id
+|  |  limit: 10
+|  |
+|  |--02:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=4/4 size=460B compact
+|  |
+|  01:SCAN HDFS [functional.alltypessmall a]
+|     partitions=4/4 size=6.32KB compact
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  10:TOP-N
-  |  order by: a.id ASC
-  |  limit: 5
-  |
-  9:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  5:TOP-N
-  |  order by: a.id ASC
-  |  limit: 5
-  |
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    functional.alltypes.id = a.id
-  |
-  |----8:EXCHANGE
-  |       limit: 10
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: functional.alltypes.id < 5
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  7:EXCHANGE
-     limit: 10
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    a.id = functional.alltypestiny.id
-  |  limit: 10
-  |
-  |----6:EXCHANGE
-  |
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+10:TOP-N [LIMIT=5]
+|  order by: a.id ASC
+|
+09:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+05:TOP-N [LIMIT=5]
+|  order by: a.id ASC
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: functional.alltypes.id = a.id
+|
+|--08:EXCHANGE [BROADCAST]
+|  |  limit: 10
+|  |
+|  07:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |  limit: 10
+|  |
+|  03:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: a.id = functional.alltypestiny.id
+|  |  limit: 10
+|  |
+|  |--06:EXCHANGE [BROADCAST]
+|  |  |
+|  |  02:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=4/4 size=460B
+|  |
+|  01:SCAN HDFS [functional.alltypessmall a]
+|     partitions=4/4 size=6.32KB compact
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: functional.alltypes.id < 5
 ====
 # join against subquery with order by/limit;
 # predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
@@ -643,112 +396,64 @@ where a.id < 5
 order by a.id
 limit 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:TOP-N
-  |  order by: a.id ASC
-  |  limit: 5
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    functional.alltypes.id = a.id
-  |
-  |----4:TOP-N
-  |    |  order by: a.int_col ASC
-  |    |  limit: 10
-  |    |
-  |    3:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    a.id = functional.alltypestiny.id
-  |    |
-  |    |----2:SCAN HDFS
-  |    |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: functional.alltypes.id < 5
+06:TOP-N [LIMIT=5]
+|  order by: a.id ASC
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypes.id = a.id
+|
+|--04:TOP-N [LIMIT=10]
+|  |  order by: a.int_col ASC
+|  |
+|  03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = functional.alltypestiny.id
+|  |
+|  |--02:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=4/4 size=460B compact
+|  |
+|  01:SCAN HDFS [functional.alltypessmall a]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  12:TOP-N
-  |  order by: a.id ASC
-  |  limit: 5
-  |
-  11:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    UNPARTITIONED
-
-  6:TOP-N
-  |  order by: a.id ASC
-  |  limit: 5
-  |
-  5:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    functional.alltypes.id = a.id
-  |
-  |----10:EXCHANGE
-  |       limit: 10
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: functional.alltypes.id < 5
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 10
-    UNPARTITIONED
-
-  9:TOP-N
-  |  order by: a.int_col ASC
-  |  limit: 10
-  |
-  8:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  4:TOP-N
-  |  order by: a.int_col ASC
-  |  limit: 10
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    a.id = functional.alltypestiny.id
-  |
-  |----7:EXCHANGE
-  |
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+12:TOP-N [LIMIT=5]
+|  order by: a.id ASC
+|
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+06:TOP-N [LIMIT=5]
+|  order by: a.id ASC
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: functional.alltypes.id = a.id
+|
+|--10:EXCHANGE [BROADCAST]
+|  |  limit: 10
+|  |
+|  09:TOP-N [LIMIT=10]
+|  |  order by: a.int_col ASC
+|  |
+|  08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |
+|  04:TOP-N [LIMIT=10]
+|  |  order by: a.int_col ASC
+|  |
+|  03:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: a.id = functional.alltypestiny.id
+|  |
+|  |--07:EXCHANGE [BROADCAST]
+|  |  |
+|  |  02:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=4/4 size=460B
+|  |
+|  01:SCAN HDFS [functional.alltypessmall a]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: functional.alltypes.id < 5
 ====
 # Subquery containing limit and offset
 select x.id from (
@@ -756,48 +461,26 @@ select x.id from (
 order by x.id
 limit 100 offset 4
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:TOP-N
-  |  order by: x.id ASC
-  |  limit: 100
-  |  offset: 4
-  |
-  1:TOP-N
-  |  order by: id ASC
-  |  limit: 5
-  |  offset: 5
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+02:TOP-N [LIMIT=100]
+|  order by: x.id ASC
+|
+01:TOP-N [LIMIT=5]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:TOP-N
-  |  order by: x.id ASC
-  |  limit: 100
-  |  offset: 4
-  |
-  4:TOP-N
-  |  order by: id ASC
-  |  limit: 5
-  |  offset: 5
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
-
-  1:TOP-N
-  |  order by: id ASC
-  |  limit: 10
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+02:TOP-N [LIMIT=100]
+|  order by: x.id ASC
+|
+04:TOP-N [LIMIT=5]
+|  order by: id ASC
+|
+03:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+01:TOP-N [LIMIT=10]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ====

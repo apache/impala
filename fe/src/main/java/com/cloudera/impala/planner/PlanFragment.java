@@ -52,14 +52,13 @@ import com.google.common.collect.Lists;
 public class PlanFragment {
   private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
 
+  private final PlanFragmentId fragmentId_;
+
   // root of plan tree executed by this fragment
   private PlanNode planRoot_;
 
-  // fragment that consumes the output of this one
-  private PlanFragment destFragment_;
-
-  // id_ of ExchangeNode to which this fragment sends its output
-  private PlanNodeId destNodeId_;
+  // exchange node to which this fragment sends its output
+  private ExchangeNode destNode_;
 
   // if null, outputs the entire row produced by planRoot_
   private ArrayList<Expr> outputExprs_;
@@ -77,25 +76,11 @@ public class PlanFragment {
   // if the output is UNPARTITIONED, it is being broadcast
   private DataPartition outputPartition_;
 
-  // TODO: SubstitutionMap outputSmap;
-  // substitution map to remap exprs onto the output of this fragment, to be applied
-  // at destination fragment
-
-  /**
-   * C'tor for unpartitioned fragment that produces final output
-   */
-  public PlanFragment(PlanNode root, ArrayList<Expr> outputExprs) {
-    planRoot_ = root;
-    outputExprs_ = Expr.cloneList(outputExprs, null);
-    dataPartition_ = DataPartition.UNPARTITIONED;
-    outputPartition_ = this.dataPartition_;
-    setFragmentInPlanTree(planRoot_);
-  }
-
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
    */
-  public PlanFragment(PlanNode root, DataPartition partition) {
+  public PlanFragment(PlanFragmentId id, PlanNode root, DataPartition partition) {
+    fragmentId_ = id;
     planRoot_ = root;
     dataPartition_ = partition;
     outputPartition_ = DataPartition.UNPARTITIONED;
@@ -126,11 +111,10 @@ public class PlanFragment {
   public void finalize(Analyzer analyzer, boolean validateFileFormats)
       throws InternalException, NotImplementedException {
     if (planRoot_ != null) setRowTupleIds(planRoot_, null);
-    if (destNodeId_ != null) {
+    if (destNode_ != null) {
       Preconditions.checkState(sink_ == null);
       // we're streaming to an exchange node
-      DataStreamSink streamSink = new DataStreamSink(destNodeId_);
-      streamSink.setPartition(outputPartition_);
+      DataStreamSink streamSink = new DataStreamSink(destNode_, outputPartition_);
       streamSink.setFragment(this);
       sink_ = streamSink;
     }
@@ -221,16 +205,11 @@ public class PlanFragment {
 
   public TPlanFragment toThrift() {
     TPlanFragment result = new TPlanFragment();
-    // TODO: remove logging output
     if (planRoot_ != null) result.setPlan(planRoot_.treeToThrift());
     if (outputExprs_ != null) {
       result.setOutput_exprs(Expr.treesToThrift(outputExprs_));
     }
     if (sink_ != null) result.setOutput_sink(sink_.toThrift());
-    if (dataPartition_.getPartitionExprs() != null) {
-      List<Expr> c =
-          Expr.cloneList(dataPartition_.getPartitionExprs(), planRoot_.getBaseTblSmap());
-    }
     result.setPartition(dataPartition_.toThrift());
     return result;
   }
@@ -238,9 +217,29 @@ public class PlanFragment {
   public String getExplainString(TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
     Preconditions.checkState(dataPartition_ != null);
-    str.append("  PARTITION: " + dataPartition_.getExplainString(explainLevel) + "\n");
-    if (sink_ != null) str.append(sink_.getExplainString("  ", explainLevel) + "\n");
-    if (planRoot_ != null) str.append(planRoot_.getExplainString("  ", "  ", explainLevel));
+    String rootPrefix = "";
+    String prefix = "";
+    String detailPrefix = "|  ";
+    if (explainLevel == TExplainLevel.VERBOSE) {
+      prefix = "  ";
+      rootPrefix = "  ";
+      detailPrefix = prefix + "|  ";
+      str.append(String.format("%s:PLAN FRAGMENT [%s]\n", fragmentId_.toString(),
+          dataPartition_.getExplainString()));
+      if (sink_ != null && sink_ instanceof DataStreamSink) {
+        str.append(sink_.getExplainString(prefix, detailPrefix, explainLevel) + "\n");
+      }
+    }
+    // Always print table sinks.
+    if (sink_ != null && sink_ instanceof TableSink) {
+      str.append(sink_.getExplainString(prefix, detailPrefix, explainLevel));
+      if (explainLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+        str.append(prefix + "|\n");
+      }
+    }
+    if (planRoot_ != null) {
+      str.append(planRoot_.getExplainString(rootPrefix, prefix, explainLevel));
+    }
     return str.toString();
   }
 
@@ -249,8 +248,9 @@ public class PlanFragment {
     return (dataPartition_.getType() != TPartitionType.UNPARTITIONED);
   }
 
-  public PlanFragment getDestFragment() { return destFragment_; }
-  public PlanNodeId getDestNodeId() { return destNodeId_; }
+  public PlanFragmentId getId() { return fragmentId_; }
+  public PlanFragment getDestFragment() { return destNode_.getFragment(); }
+  public ExchangeNode getDestNode() { return destNode_; }
   public DataPartition getDataPartition() { return dataPartition_; }
   public DataPartition getOutputPartition() { return outputPartition_; }
   public void setOutputPartition(DataPartition outputPartition) {
@@ -262,12 +262,7 @@ public class PlanFragment {
     setFragmentInPlanTree(planRoot_);
   }
 
-  public void setDestination(PlanFragment fragment, PlanNodeId exchangeId) {
-    destFragment_ = fragment;
-    destNodeId_ = exchangeId;
-    // TODO: check that fragment contains node w/ exchangeId
-  }
-
+  public void setDestination(ExchangeNode destNode) { destNode_ = destNode; }
   public boolean hasSink() { return sink_ != null; }
   public DataSink getSink() { return sink_; }
   public void setSink(DataSink sink) {

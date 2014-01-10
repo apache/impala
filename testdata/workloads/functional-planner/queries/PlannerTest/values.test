@@ -1,72 +1,44 @@
 values(1+1, 2, 5.0, 'a')
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
+00:MERGE
+   constant-selects=1
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
+00:MERGE
+   constant-selects=1
 ====
 values(1+1, 2, 5.0, 'a') order by 1 limit 10
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:TOP-N
-  |  order by: 1 + 1 ASC
-  |  limit: 10
-  |
-  0:MERGE
-     merging 1 SELECT CONSTANT
+01:TOP-N [LIMIT=10]
+|  order by: 1 + 1 ASC
+|
+00:MERGE
+   constant-selects=1
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:TOP-N
-  |  order by: 1 + 1 ASC
-  |  limit: 10
-  |
-  0:MERGE
-     merging 1 SELECT CONSTANT
+01:TOP-N [LIMIT=10]
+|  order by: 1 + 1 ASC
+|
+00:MERGE
+   constant-selects=1
 ====
 values((1+1, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c'))
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     merging 3 SELECT CONSTANT
+00:MERGE
+   constant-selects=3
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     merging 3 SELECT CONSTANT
+00:MERGE
+   constant-selects=3
 ====
 values((1+1, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c')) order by 1 limit 10
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:TOP-N
-  |  order by: 1 + 1 ASC
-  |  limit: 10
-  |
-  0:MERGE
-     merging 3 SELECT CONSTANT
+01:TOP-N [LIMIT=10]
+|  order by: 1 + 1 ASC
+|
+00:MERGE
+   constant-selects=3
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:TOP-N
-  |  order by: 1 + 1 ASC
-  |  limit: 10
-  |
-  0:MERGE
-     merging 3 SELECT CONSTANT
+01:TOP-N [LIMIT=10]
+|  order by: 1 + 1 ASC
+|
+00:MERGE
+   constant-selects=3
 ====

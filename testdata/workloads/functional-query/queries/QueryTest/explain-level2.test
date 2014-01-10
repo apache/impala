@@ -1,0 +1,259 @@
+====
+---- QUERY
+# Tests explaining a query (TPCDS-Q19)
+explain
+select
+  i_brand_id,
+  i_brand,
+  i_manufact_id,
+  i_manufact,
+  sum(ss_ext_sales_price) ext_price
+from
+  tpcds.store_sales
+  join tpcds.item on (store_sales.ss_item_sk = item.i_item_sk)
+  join tpcds.customer on (store_sales.ss_customer_sk = customer.c_customer_sk)
+  join tpcds.customer_address on (customer.c_current_addr_sk = customer_address.ca_address_sk)
+  join tpcds.store on (store_sales.ss_store_sk = store.s_store_sk)
+where
+  ss_date between '1999-11-01' and '1999-11-30'
+  and i_manager_id = 7
+  and substr(ca_zip, 1, 5) <> substr(s_zip, 1, 5)
+group by
+  i_brand,
+  i_brand_id,
+  i_manufact_id,
+  i_manufact
+order by
+  ext_price desc,
+  i_brand,
+  i_brand_id,
+  i_manufact_id,
+  i_manufact
+limit 100
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=130.33MB VCores=5'
+''
+'18:TOP-N [LIMIT=100]'
+'|  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC'
+'|  hosts=3 per-host-mem=unavailable'
+'|  tuple-ids=5 row-size=48B cardinality=100'
+'|'
+'17:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|  hosts=3 per-host-mem=unavailable'
+'|  tuple-ids=5 row-size=48B cardinality=100'
+'|'
+'10:TOP-N [LIMIT=100]'
+'|  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC'
+'|  hosts=3 per-host-mem=4.69KB'
+'|  tuple-ids=5 row-size=48B cardinality=100'
+'|'
+'16:AGGREGATE [MERGE FINALIZE]'
+'|  output: SUM(SUM(ss_ext_sales_price))'
+'|  group by: i_brand, i_brand_id, i_manufact_id, i_manufact'
+'|  hosts=3 per-host-mem=10.00MB'
+'|  tuple-ids=5 row-size=48B cardinality=100000'
+'|'
+'15:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]'
+'|  hosts=3 per-host-mem=0B'
+'|  tuple-ids=5 row-size=48B cardinality=100000'
+'|'
+'09:AGGREGATE'
+'|  output: SUM(ss_ext_sales_price)'
+'|  group by: i_brand, i_brand_id, i_manufact_id, i_manufact'
+'|  hosts=3 per-host-mem=10.00MB'
+'|  tuple-ids=5 row-size=48B cardinality=100000'
+'|'
+'08:HASH JOIN [INNER JOIN, BROADCAST]'
+'|  hash predicates: store_sales.ss_store_sk = store.s_store_sk'
+'|  other predicates: substr(ca_zip, 1, 5) != substr(s_zip, 1, 5)'
+'|  hosts=3 per-host-mem=489B'
+'|  tuple-ids=2,0,1,3,4 row-size=268B cardinality=100000'
+'|'
+'|--14:EXCHANGE [BROADCAST]'
+'|  |  hosts=3 per-host-mem=0B'
+'|  |  tuple-ids=4 row-size=37B cardinality=12'
+'|  |'
+'|  04:SCAN HDFS [tpcds.store, PARTITION=RANDOM]'
+'|     partitions=1/1 size=3.08KB'
+'|     table stats: 12 rows total'
+'|     column stats: all'
+'|     hosts=3 per-host-mem=32.00MB'
+'|     tuple-ids=4 row-size=37B cardinality=12'
+'|'
+'07:HASH JOIN [INNER JOIN, BROADCAST]'
+'|  hash predicates: customer.c_current_addr_sk = customer_address.ca_address_sk'
+'|  hosts=3 per-host-mem=1.93MB'
+'|  tuple-ids=2,0,1,3 row-size=231B cardinality=100000'
+'|'
+'|--13:EXCHANGE [BROADCAST]'
+'|  |  hosts=3 per-host-mem=0B'
+'|  |  tuple-ids=3 row-size=37B cardinality=50000'
+'|  |'
+'|  03:SCAN HDFS [tpcds.customer_address, PARTITION=RANDOM]'
+'|     partitions=1/1 size=5.25MB'
+'|     table stats: 50000 rows total'
+'|     column stats: all'
+'|     hosts=3 per-host-mem=32.00MB'
+'|     tuple-ids=3 row-size=37B cardinality=50000'
+'|'
+'06:HASH JOIN [INNER JOIN, BROADCAST]'
+'|  hash predicates: store_sales.ss_item_sk = item.i_item_sk'
+'|  hosts=3 per-host-mem=18.27KB'
+'|  tuple-ids=2,0,1 row-size=194B cardinality=100000'
+'|'
+'|--12:EXCHANGE [BROADCAST]'
+'|  |  hosts=3 per-host-mem=0B'
+'|  |  tuple-ids=1 row-size=99B cardinality=171'
+'|  |'
+'|  01:SCAN HDFS [tpcds.item, PARTITION=RANDOM]'
+'|     partitions=1/1 size=4.82MB'
+'|     predicates: i_manager_id = 7'
+'|     table stats: 18000 rows total'
+'|     column stats: all'
+'|     hosts=3 per-host-mem=32.00MB'
+'|     tuple-ids=1 row-size=99B cardinality=171'
+'|'
+'05:HASH JOIN [INNER JOIN, BROADCAST]'
+'|  hash predicates: customer.c_customer_sk = store_sales.ss_customer_sk'
+'|  hosts=3 per-host-mem=387.60KB'
+'|  tuple-ids=2,0 row-size=95B cardinality=100000'
+'|'
+'|--11:EXCHANGE [BROADCAST]'
+'|  |  hosts=3 per-host-mem=0B'
+'|  |  tuple-ids=0 row-size=71B cardinality=5082'
+'|  |'
+'|  00:SCAN HDFS [tpcds.store_sales, PARTITION=RANDOM]'
+'|     partitions=2/120 size=663.52KB'
+'|     table stats: 183592 rows total'
+'|     column stats: all'
+'|     hosts=3 per-host-mem=32.00MB'
+'|     tuple-ids=0 row-size=71B cardinality=5082'
+'|'
+'02:SCAN HDFS [tpcds.customer, PARTITION=RANDOM]'
+'   partitions=1/1 size=12.60MB'
+'   table stats: 100000 rows total'
+'   column stats: all'
+'   hosts=3 per-host-mem=48.00MB'
+'   tuple-ids=2 row-size=24B cardinality=100000'
+====
+---- QUERY
+# Tests explaining an insert query
+explain insert overwrite functional.alltypessmall (id, string_col)
+partition (year, month)
+select a.id, a.string_col, a.year, a.month from functional.alltypes a
+  left semi join functional.alltypesagg b on (a.id = b.id)
+where a.year > 2009 and a.month = 4
+union distinct
+select id, string_col, year, month from functional.alltypes
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=192.03MB VCores=3'
+''
+'WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(year,month)]'
+'|  partitions=96'
+'|  hosts=1 per-host-mem=unavailable'
+'|'
+'05:AGGREGATE [FINALIZE]'
+'|  group by: id, string_col, year, month'
+'|  hosts=3 per-host-mem=unavailable'
+'|  tuple-ids=3 row-size=28B cardinality=7600'
+'|'
+'08:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|  hosts=3 per-host-mem=unavailable'
+'|  tuple-ids=3 row-size=28B cardinality=7600'
+'|'
+'|--10:MERGE'
+'|  |  hosts=3 per-host-mem=0B'
+'|  |  tuple-ids=3 row-size=28B cardinality=7300'
+'|  |'
+'|  04:SCAN HDFS [functional.alltypes, PARTITION=RANDOM]'
+'|     partitions=24/24 size=956.90KB'
+'|     table stats: 7300 rows total'
+'|     column stats: all'
+'|     hosts=3 per-host-mem=160.00MB'
+'|     tuple-ids=2 row-size=41B cardinality=7300'
+'|'
+'09:MERGE'
+'|  hosts=3 per-host-mem=0B'
+'|  tuple-ids=3 row-size=28B cardinality=300'
+'|'
+'03:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
+'|  hash predicates: a.id = b.id'
+'|  hosts=3 per-host-mem=28.65KB'
+'|  tuple-ids=0,1 row-size=49B cardinality=300'
+'|'
+'|--07:EXCHANGE [PARTITION=HASH(b.id)]'
+'|  |  hosts=3 per-host-mem=0B'
+'|  |  tuple-ids=1 row-size=8B cardinality=10000'
+'|  |'
+'|  02:SCAN HDFS [functional.alltypesagg b, PARTITION=RANDOM]'
+'|     partitions=10/10 size=743.67KB'
+'|     table stats: 10000 rows total'
+'|     column stats: all'
+'|     hosts=3 per-host-mem=64.00MB'
+'|     tuple-ids=1 row-size=8B cardinality=10000'
+'|'
+'06:EXCHANGE [PARTITION=HASH(a.id)]'
+'|  hosts=3 per-host-mem=0B'
+'|  tuple-ids=0 row-size=41B cardinality=300'
+'|'
+'01:SCAN HDFS [functional.alltypes a, PARTITION=RANDOM]'
+'   partitions=1/24 size=19.71KB'
+'   table stats: 7300 rows total'
+'   column stats: all'
+'   hosts=3 per-host-mem=32.00MB'
+'   tuple-ids=0 row-size=41B cardinality=300'
+====
+---- QUERY
+# Tests explaining an insert query to/from an HBase table
+explain insert into functional_hbase.alltypes
+select a.* from functional_hbase.alltypessmall a
+  cross join functional.alltypessmall b
+where a.year > 2009 and a.month = 4
+union all
+select * from functional_hbase.alltypessmall
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=1.03GB VCores=3'
+''
+'WRITE TO HBASE table=functional_hbase.alltypes'
+'|  hosts=1 per-host-mem=unavailable'
+'|'
+'06:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|  hosts=100 per-host-mem=unavailable'
+'|  tuple-ids=3 row-size=88B cardinality=700'
+'|'
+'|--08:MERGE'
+'|  |  hosts=100 per-host-mem=0B'
+'|  |  tuple-ids=3 row-size=88B cardinality=200'
+'|  |'
+'|  04:SCAN HBASE [functional_hbase.alltypessmall]'
+'|     table stats: 100 rows total'
+'|     column stats: all'
+'|     hosts=100 per-host-mem=1.00GB'
+'|     tuple-ids=2 row-size=153B cardinality=200'
+'|'
+'07:MERGE'
+'|  hosts=100 per-host-mem=0B'
+'|  tuple-ids=3 row-size=88B cardinality=500'
+'|'
+'03:CROSS JOIN [BROADCAST]'
+'|  hosts=100 per-host-mem=0B'
+'|  tuple-ids=0,1 row-size=153B cardinality=500'
+'|'
+'|--05:EXCHANGE [BROADCAST]'
+'|  |  hosts=3 per-host-mem=0B'
+'|  |  tuple-ids=1 row-size=0B cardinality=100'
+'|  |'
+'|  02:SCAN HDFS [functional.alltypessmall b, PARTITION=RANDOM]'
+'|     partitions=4/4 size=6.32KB'
+'|     table stats: 100 rows total'
+'|     column stats: all'
+'|     hosts=3 per-host-mem=32.00MB'
+'|     tuple-ids=1 row-size=0B cardinality=100'
+'|'
+'01:SCAN HBASE [functional_hbase.alltypessmall a]'
+'   predicates: a.year > 2009, a.month = 4'
+'   table stats: 100 rows total'
+'   column stats: all'
+'   hosts=100 per-host-mem=1.00GB'
+'   tuple-ids=0 row-size=153B cardinality=5'
+====

@@ -3,23 +3,18 @@ select count(*)
 from functional.alltypes a join functional.alltypes b on (a.double_col = b.bigint_col)
 where b.bigint_col div 2 = 0
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:AGGREGATE (finalize)
-  |  output: COUNT(*)
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    a.double_col = b.bigint_col
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
-  |       predicates: b.bigint_col DIV 2 = 0
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+03:AGGREGATE [FINALIZE]
+|  output: COUNT(*)
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.double_col = b.bigint_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 size=478.45KB compact
+|     predicates: b.bigint_col DIV 2 = 0
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
 ====
 # Where clause predicate is turned into Having clause
 select a.cnt, b.int_col
@@ -28,39 +23,31 @@ from
   inner join functional.alltypessmall b on (a.cnt = b.id)
 where b.id < 10
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    COUNT(id) = b.id
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |       predicates: b.id < 10
-  |
-  1:AGGREGATE (finalize)
-  |  output: COUNT(id)
-  |  group by: int_col, tinyint_col
-  |  having: COUNT(id) < 10
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: COUNT(id) = b.id
+|
+|--02:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 size=6.32KB compact
+|     predicates: b.id < 10
+|
+01:AGGREGATE [FINALIZE]
+|  output: COUNT(id)
+|  group by: int_col, tinyint_col
+|  having: COUNT(id) < 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ====
 # single-table test case: partitions are pruned due to predicate inference
 select count(*) from functional.alltypes
 where month = id and id = int_col and tinyint_col = int_col and int_col < 2
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:AGGREGATE (finalize)
-  |  output: COUNT(*)
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.32KB
-     predicates: functional.alltypes.id < 2, int_col < 2, functional.alltypes.tinyint_col < 2, month = id, id = int_col, tinyint_col = int_col
+01:AGGREGATE [FINALIZE]
+|  output: COUNT(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=40.32KB
+   predicates: functional.alltypes.id < 2, int_col < 2, functional.alltypes.tinyint_col < 2, month = id, id = int_col, tinyint_col = int_col
 ====
 # all subquery results get materialized correctly;
 # a.string_col = 'a' needs to be evaluated by the join itself, not the scan
@@ -70,21 +57,16 @@ from
   left outer join (select id, string_col from functional.alltypes) b
   on (a.id = b.id and a.string_col = 'a' and b.string_col = 'b')
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: LEFT OUTER JOIN
-  |  hash predicates:
-  |    id = id
-  |  other join predicates: string_col = 'a'
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
-  |       predicates: functional.alltypes.string_col = 'b'
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: id = id
+|  other join predicates: string_col = 'a'
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=956.90KB compact
+|     predicates: functional.alltypes.string_col = 'b'
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
 ====
 # variation with Where clause; "b.string_col = 'b'" still needs to be applied
 # by the join node but it's safe to have the 'b' scan apply it as well
@@ -95,22 +77,17 @@ from
   on (a.id = b.id)
 where a.string_col = 'a' and b.string_col = 'b'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: LEFT OUTER JOIN
-  |  hash predicates:
-  |    id = id
-  |  other predicates: string_col = 'b'
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
-  |       predicates: functional.alltypes.string_col = 'b'
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: string_col = 'a'
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: id = id
+|  other predicates: string_col = 'b'
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=956.90KB compact
+|     predicates: functional.alltypes.string_col = 'b'
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
+   predicates: string_col = 'a'
 ====
 # Predicates are pushed through cross join to the inline views
 select a.int_col
@@ -119,51 +96,29 @@ from
   cross join (select id, string_col from functional.alltypes) b
 where a.string_col = 'a' and b.string_col = 'b'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:CROSS JOIN
-  |  (BROADCAST)
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypes #partitions=24/24 size=478.45KB compact
-  |       predicates: string_col = 'b'
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: string_col = 'a'
+02:CROSS JOIN [BROADCAST]
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=956.90KB compact
+|     predicates: string_col = 'b'
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
+   predicates: string_col = 'a'
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  2:CROSS JOIN
-  |  (BROADCAST)
-  |
-  |----3:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: string_col = 'a'
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-     predicates: string_col = 'b'
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:CROSS JOIN [BROADCAST]
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=956.90KB
+|     predicates: string_col = 'b'
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
+   predicates: string_col = 'a'
 ====
 # c1 > 0 does not get propagated into inl view due to limit clauses
 select c1, c2, c3
@@ -177,26 +132,21 @@ where c1 > 0
 order by 2, 1 desc
 limit 3
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:TOP-N
-  |  order by: c2 ASC, c1 DESC
-  |  limit: 3
-  |
-  3:SELECT
-  |  predicates: int_col > 0
-  |
-  2:TOP-N
-  |  order by: int_col ASC, tinyint_col ASC
-  |  limit: 5
-  |
-  1:AGGREGATE (finalize)
-  |  output: MAX(id)
-  |  group by: int_col, tinyint_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+04:TOP-N [LIMIT=3]
+|  order by: c2 ASC, c1 DESC
+|
+03:SELECT
+|  predicates: int_col > 0
+|
+02:TOP-N [LIMIT=5]
+|  order by: int_col ASC, tinyint_col ASC
+|
+01:AGGREGATE [FINALIZE]
+|  output: MAX(id)
+|  group by: int_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ====
 # same for with clause variant
 with t as (select int_col c1, tinyint_col c2, max(id) c3
@@ -210,26 +160,21 @@ where c1 > 0
 order by 2, 1 desc
 limit 3
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:TOP-N
-  |  order by: c2 ASC, c1 DESC
-  |  limit: 3
-  |
-  3:SELECT
-  |  predicates: int_col > 0
-  |
-  2:TOP-N
-  |  order by: int_col ASC, tinyint_col ASC
-  |  limit: 5
-  |
-  1:AGGREGATE (finalize)
-  |  output: MAX(id)
-  |  group by: int_col, tinyint_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+04:TOP-N [LIMIT=3]
+|  order by: c2 ASC, c1 DESC
+|
+03:SELECT
+|  predicates: int_col > 0
+|
+02:TOP-N [LIMIT=5]
+|  order by: int_col ASC, tinyint_col ASC
+|
+01:AGGREGATE [FINALIZE]
+|  output: MAX(id)
+|  group by: int_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ====
 # basic propagation between equivalence classes, with partition pruning
 select a.year, a.month, b.year, b.month
@@ -241,94 +186,23 @@ from functional.alltypes a
 where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
   and cast(sin(c.int_col) as boolean) = true
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    b.smallint_col = c.int_col
-  |    b.id = c.id
-  |    b.year = c.year
-  |    b.month = c.month
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=2/4 size=230B compact
-  |       predicates: CAST(sin(c.int_col) AS BOOLEAN) = TRUE, c.id = 17
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    a.tinyint_col = b.smallint_col
-  |    a.id = b.id
-  |    a.year = b.year
-  |    a.month = b.month
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=2/4 size=3.16KB compact
-  |       predicates: CAST(sin(b.smallint_col) AS BOOLEAN) = TRUE, b.id = 17
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: CAST(sin(a.tinyint_col) AS BOOLEAN) = TRUE, a.id = 17
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  7:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    b.smallint_col = c.int_col
-  |    b.id = c.id
-  |    b.year = c.year
-  |    b.month = c.month
-  |
-  |----6:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    a.tinyint_col = b.smallint_col
-  |    a.id = b.id
-  |    a.year = b.year
-  |    a.month = b.month
-  |
-  |----5:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: CAST(sin(a.tinyint_col) AS BOOLEAN) = TRUE, a.id = 17
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=2/4 size=230B
-     predicates: CAST(sin(c.int_col) AS BOOLEAN) = TRUE, c.id = 17
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=2/4 size=3.16KB
-     predicates: CAST(sin(b.smallint_col) AS BOOLEAN) = TRUE, b.id = 17
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: b.smallint_col = c.int_col, b.id = c.id, b.year = c.year, b.month = c.month
+|
+|--02:SCAN HDFS [functional.alltypestiny c]
+|     partitions=2/4 size=230B compact
+|     predicates: CAST(sin(c.int_col) AS BOOLEAN) = TRUE, c.id = 17
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.tinyint_col = b.smallint_col, a.id = b.id, a.year = b.year, a.month = b.month
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=2/4 size=3.16KB compact
+|     predicates: CAST(sin(b.smallint_col) AS BOOLEAN) = TRUE, b.id = 17
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: CAST(sin(a.tinyint_col) AS BOOLEAN) = TRUE, a.id = 17
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -339,6 +213,30 @@ NODE 1:
 NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+---- DISTRIBUTEDPLAN
+07:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: b.smallint_col = c.int_col, b.id = c.id, b.year = c.year, b.month = c.month
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny c]
+|     partitions=2/4 size=230B
+|     predicates: CAST(sin(c.int_col) AS BOOLEAN) = TRUE, c.id = 17
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.tinyint_col = b.smallint_col, a.id = b.id, a.year = b.year, a.month = b.month
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=2/4 size=3.16KB
+|     predicates: CAST(sin(b.smallint_col) AS BOOLEAN) = TRUE, b.id = 17
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: CAST(sin(a.tinyint_col) AS BOOLEAN) = TRUE, a.id = 17
 ====
 # basic propagation between equivalence classes, with partition pruning;
 # variation with inline views
@@ -351,94 +249,23 @@ from (select * from functional.alltypes) a
 where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
   and cast(sin(c.int_col) as boolean) = true
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    functional.alltypessmall.smallint_col = functional.alltypestiny.int_col
-  |    functional.alltypessmall.id = functional.alltypestiny.id
-  |    functional.alltypessmall.year = functional.alltypestiny.year
-  |    functional.alltypessmall.month = functional.alltypestiny.month
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=2/4 size=230B compact
-  |       predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col
-  |    functional.alltypes.id = functional.alltypessmall.id
-  |    functional.alltypes.year = functional.alltypessmall.year
-  |    functional.alltypes.month = functional.alltypessmall.month
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=2/4 size=3.16KB compact
-  |       predicates: functional.alltypessmall.id = 17, CAST(sin(functional.alltypessmall.smallint_col) AS BOOLEAN) = TRUE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: functional.alltypes.id = 17, CAST(sin(functional.alltypes.tinyint_col) AS BOOLEAN) = TRUE
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  7:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    functional.alltypessmall.smallint_col = functional.alltypestiny.int_col
-  |    functional.alltypessmall.id = functional.alltypestiny.id
-  |    functional.alltypessmall.year = functional.alltypestiny.year
-  |    functional.alltypessmall.month = functional.alltypestiny.month
-  |
-  |----6:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col
-  |    functional.alltypes.id = functional.alltypessmall.id
-  |    functional.alltypes.year = functional.alltypessmall.year
-  |    functional.alltypes.month = functional.alltypessmall.month
-  |
-  |----5:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: functional.alltypes.id = 17, CAST(sin(functional.alltypes.tinyint_col) AS BOOLEAN) = TRUE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=2/4 size=230B
-     predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=2/4 size=3.16KB
-     predicates: functional.alltypessmall.id = 17, CAST(sin(functional.alltypessmall.smallint_col) AS BOOLEAN) = TRUE
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypessmall.smallint_col = functional.alltypestiny.int_col, functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=2/4 size=460B compact
+|     predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col, functional.alltypes.id = functional.alltypessmall.id, functional.alltypes.year = functional.alltypessmall.year, functional.alltypes.month = functional.alltypessmall.month
+|
+|--01:SCAN HDFS [functional.alltypessmall]
+|     partitions=2/4 size=6.31KB compact
+|     predicates: functional.alltypessmall.id = 17, CAST(sin(functional.alltypessmall.smallint_col) AS BOOLEAN) = TRUE
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=76.15KB
+   predicates: functional.alltypes.id = 17, CAST(sin(functional.alltypes.tinyint_col) AS BOOLEAN) = TRUE
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -449,6 +276,30 @@ NODE 1:
 NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+---- DISTRIBUTEDPLAN
+07:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: functional.alltypessmall.smallint_col = functional.alltypestiny.int_col, functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     partitions=2/4 size=460B
+|     predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col, functional.alltypes.id = functional.alltypessmall.id, functional.alltypes.year = functional.alltypessmall.year, functional.alltypes.month = functional.alltypessmall.month
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=2/4 size=6.31KB
+|     predicates: functional.alltypessmall.id = 17, CAST(sin(functional.alltypessmall.smallint_col) AS BOOLEAN) = TRUE
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=76.15KB
+   predicates: functional.alltypes.id = 17, CAST(sin(functional.alltypes.tinyint_col) AS BOOLEAN) = TRUE
 ====
 # propagation between outer-joined tables only goes in one direction:
 # - predicate on a.tinyint_col is propagated to b
@@ -461,63 +312,17 @@ from functional.alltypes a
    and a.month = b.month and b.month + 1 = 2)
 where a.year = 2009 and a.tinyint_col = 7 and b.id = 17 and b.int_col is null
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: LEFT OUTER JOIN
-  |  hash predicates:
-  |    a.tinyint_col = b.tinyint_col
-  |    a.id = b.id
-  |    a.year = b.year
-  |    a.month = b.month
-  |  other predicates: b.id = 17, b.int_col IS NULL
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=1/4 size=1.57KB compact
-  |       predicates: b.tinyint_col = 7, b.id = 17
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=12/24 size=238.68KB
-     predicates: a.tinyint_col = 7
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: LEFT OUTER JOIN (BROADCAST)
-  |  hash predicates:
-  |    a.tinyint_col = b.tinyint_col
-  |    a.id = b.id
-  |    a.year = b.year
-  |    a.month = b.month
-  |  other predicates: b.id = 17, b.int_col IS NULL
-  |
-  |----3:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=12/24 size=238.68KB
-     predicates: a.tinyint_col = 7
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=1/4 size=1.57KB
-     predicates: b.tinyint_col = 7, b.id = 17
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
+|  other predicates: b.id = 17, b.int_col IS NULL
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=1/4 size=1.57KB compact
+|     predicates: b.tinyint_col = 7, b.id = 17
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=12/24 size=238.68KB
+   predicates: a.tinyint_col = 7
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -534,6 +339,22 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+---- DISTRIBUTEDPLAN
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
+|  other predicates: b.id = 17, b.int_col IS NULL
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=1/4 size=1.57KB
+|     predicates: b.tinyint_col = 7, b.id = 17
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=12/24 size=238.68KB
+   predicates: a.tinyint_col = 7
 ====
 # propagation between outer-joined tables only goes in one direction
 # - predicate on b.id is propagated to a
@@ -546,72 +367,35 @@ from functional.alltypes a
    and a.month = b.month and a.month + 1 = 2)
 where a.tinyint_col = 7 and b.year = 2009 and b.id = 17
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: RIGHT OUTER JOIN
-  |  hash predicates:
-  |    a.tinyint_col = b.tinyint_col
-  |    a.id = b.id
-  |    a.year = b.year
-  |    a.month = b.month
-  |  other predicates: a.tinyint_col = 7
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |       predicates: b.id = 17
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=19.95KB
-     predicates: a.tinyint_col = 7, a.id = 17
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
+|  other predicates: a.tinyint_col = 7
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 size=6.32KB compact
+|     predicates: b.id = 17
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=1/24 size=19.95KB
+   predicates: a.tinyint_col = 7, a.id = 17
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: a.tinyint_col, a.id, a.year, a.month
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:HASH JOIN
-  |  join op: RIGHT OUTER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    a.tinyint_col = b.tinyint_col
-  |    a.id = b.id
-  |    a.year = b.year
-  |    a.month = b.month
-  |  other predicates: a.tinyint_col = 7
-  |
-  |----4:EXCHANGE
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: b.tinyint_col, b.id, b.year, b.month
-
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     predicates: b.id = 17
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: a.tinyint_col, a.id, a.year, a.month
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=19.95KB
-     predicates: a.tinyint_col = 7, a.id = 17
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
+|  other predicates: a.tinyint_col = 7
+|
+|--04:EXCHANGE [PARTITION=HASH(b.tinyint_col,b.id,b.year,b.month)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 size=6.32KB
+|     predicates: b.id = 17
+|
+03:EXCHANGE [PARTITION=HASH(a.tinyint_col,a.id,a.year,a.month)]
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=1/24 size=19.95KB
+   predicates: a.tinyint_col = 7, a.id = 17
 ====
 # propagation into inline view with aggregation:
 # - predicates from enclosing scope applied to grouping exprs; with partition pruning
@@ -627,84 +411,21 @@ from functional.alltypes a
   on (a.id = b.id and a.tinyint_col = b.int_col and a.year = b.year and a.month = b.month)
 where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col != 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    a.id = id
-  |    a.tinyint_col = int_col
-  |    a.year = year
-  |    a.month = month
-  |
-  |----2:AGGREGATE (finalize)
-  |    |  output: COUNT(*)
-  |    |  group by: year, month, id, int_col
-  |    |  having: COUNT(*) + 1 = 17
-  |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=2/4 size=3.16KB
-  |       predicates: id > 11, functional.alltypessmall.int_col != 5
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: a.id > 11, a.tinyint_col != 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  7:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    a.id = id
-  |    a.tinyint_col = int_col
-  |    a.year = year
-  |    a.month = month
-  |
-  |----6:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: a.id > 11, a.tinyint_col != 5
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: year, month, id, int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  5:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: year, month, id, int_col
-  |  having: COUNT(*) + 1 = 17
-  |
-  4:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: year, month, id, int_col
-
-  2:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: year, month, id, int_col
-  |
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=2/4 size=3.16KB
-     predicates: id > 11, functional.alltypessmall.int_col != 5
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: COUNT(*)
+|  |  group by: year, month, id, int_col
+|  |  having: COUNT(*) + 1 = 17
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=2/4 size=3.16KB
+|     predicates: id > 11, functional.alltypessmall.int_col != 5
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: a.id > 11, a.tinyint_col != 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -712,6 +433,32 @@ NODE 0:
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+---- DISTRIBUTEDPLAN
+07:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(COUNT(*))
+|  |  group by: year, month, id, int_col
+|  |  having: COUNT(*) + 1 = 17
+|  |
+|  04:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
+|  |
+|  02:AGGREGATE
+|  |  output: COUNT(*)
+|  |  group by: year, month, id, int_col
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=2/4 size=3.16KB
+|     predicates: id > 11, functional.alltypessmall.int_col != 5
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: a.id > 11, a.tinyint_col != 5
 ====
 # Same as above but with cross join
 select a.id, b.id
@@ -730,76 +477,47 @@ where a.id = b.id and
       b.count_col + 1 = 17 and
       a.tinyint_col != 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:CROSS JOIN
-  |  (BROADCAST)
-  |  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-  |
-  |----2:AGGREGATE (finalize)
-  |    |  output: COUNT(*)
-  |    |  group by: year, month, id, int_col
-  |    |  having: COUNT(*) + 1 = 17
-  |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=2/4 size=3.16KB
-  |       predicates: id > 11, functional.alltypessmall.int_col != 5
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: a.id > 11, a.tinyint_col != 5
+03:CROSS JOIN [BROADCAST]
+|  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: COUNT(*)
+|  |  group by: year, month, id, int_col
+|  |  having: COUNT(*) + 1 = 17
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=2/4 size=3.16KB
+|     predicates: id > 11, functional.alltypessmall.int_col != 5
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: a.id > 11, a.tinyint_col != 5
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  7:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  3:CROSS JOIN
-  |  (BROADCAST)
-  |  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
-  |
-  |----6:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: a.id > 11, a.tinyint_col != 5
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: year, month, id, int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  5:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: year, month, id, int_col
-  |  having: COUNT(*) + 1 = 17
-  |
-  4:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: year, month, id, int_col
-
-  2:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: year, month, id, int_col
-  |
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=2/4 size=3.16KB
-     predicates: id > 11, functional.alltypessmall.int_col != 5
+07:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+03:CROSS JOIN [BROADCAST]
+|  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(COUNT(*))
+|  |  group by: year, month, id, int_col
+|  |  having: COUNT(*) + 1 = 17
+|  |
+|  04:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
+|  |
+|  02:AGGREGATE
+|  |  output: COUNT(*)
+|  |  group by: year, month, id, int_col
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=2/4 size=3.16KB
+|     predicates: id > 11, functional.alltypessmall.int_col != 5
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: a.id > 11, a.tinyint_col != 5
 ====
 # no propagation into select block with limit;
 # propagation out of that block is okay;
@@ -816,100 +534,24 @@ from functional.alltypes a
   on (a.id = b.id and a.tinyint_col = b.int_col and a.year = b.year and a.month = b.month)
 where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col != 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    a.id = id
-  |    a.tinyint_col = int_col
-  |    a.year = year
-  |    a.month = month
-  |
-  |----3:SELECT
-  |    |  predicates: COUNT(*) + 1 = 17
-  |    |
-  |    2:AGGREGATE (finalize)
-  |    |  output: COUNT(*)
-  |    |  group by: year, month, id, int_col
-  |    |  limit: 5
-  |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB
-  |       predicates: id > 11
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: a.id > 11, a.tinyint_col != 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  9:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    a.id = id
-  |    a.tinyint_col = int_col
-  |    a.year = year
-  |    a.month = month
-  |
-  |----8:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: a.id > 11, a.tinyint_col != 5
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  3:SELECT
-  |  predicates: COUNT(*) + 1 = 17
-  |
-  7:EXCHANGE
-     limit: 5
-
-PLAN FRAGMENT 3
-  PARTITION: HASH_PARTITIONED: year, month, id, int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  6:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: year, month, id, int_col
-  |  limit: 5
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: year, month, id, int_col
-
-  2:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: year, month, id, int_col
-  |
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     predicates: id > 11
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+|
+|--03:SELECT
+|  |  predicates: COUNT(*) + 1 = 17
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  output: COUNT(*)
+|  |  group by: year, month, id, int_col
+|  |  limit: 5
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: id > 11
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: a.id > 11, a.tinyint_col != 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -919,6 +561,38 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+---- DISTRIBUTEDPLAN
+09:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  03:SELECT
+|  |  predicates: COUNT(*) + 1 = 17
+|  |
+|  07:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |  limit: 5
+|  |
+|  06:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(COUNT(*))
+|  |  group by: year, month, id, int_col
+|  |  limit: 5
+|  |
+|  05:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
+|  |
+|  02:AGGREGATE
+|  |  output: COUNT(*)
+|  |  group by: year, month, id, int_col
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: id > 11
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: a.id > 11, a.tinyint_col != 5
 ====
 # Same as above but with cross join
 select a.id, b.id
@@ -938,92 +612,56 @@ where a.year = 2009 and
       a.year = b.year and
       a.month = b.month
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:CROSS JOIN
-  |  (BROADCAST)
-  |  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
-  |
-  |----3:SELECT
-  |    |  predicates: COUNT(*) + 1 = 17
-  |    |
-  |    2:AGGREGATE (finalize)
-  |    |  output: COUNT(*)
-  |    |  group by: year, month, id, int_col
-  |    |  limit: 5
-  |    |
-  |    1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB
-  |       predicates: id > 11
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: a.id > 11, a.tinyint_col != 5
+04:CROSS JOIN [BROADCAST]
+|  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
+|
+|--03:SELECT
+|  |  predicates: COUNT(*) + 1 = 17
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  output: COUNT(*)
+|  |  group by: year, month, id, int_col
+|  |  limit: 5
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: id > 11
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: a.id > 11, a.tinyint_col != 5
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  9:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  4:CROSS JOIN
-  |  (BROADCAST)
-  |  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
-  |
-  |----8:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=38.07KB
-     predicates: a.id > 11, a.tinyint_col != 5
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  3:SELECT
-  |  predicates: COUNT(*) + 1 = 17
-  |
-  7:EXCHANGE
-     limit: 5
-
-PLAN FRAGMENT 3
-  PARTITION: HASH_PARTITIONED: year, month, id, int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  6:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: year, month, id, int_col
-  |  limit: 5
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: year, month, id, int_col
-
-  2:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: year, month, id, int_col
-  |
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     predicates: id > 11
+09:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:CROSS JOIN [BROADCAST]
+|  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  03:SELECT
+|  |  predicates: COUNT(*) + 1 = 17
+|  |
+|  07:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |  limit: 5
+|  |
+|  06:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(COUNT(*))
+|  |  group by: year, month, id, int_col
+|  |  limit: 5
+|  |
+|  05:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
+|  |
+|  02:AGGREGATE
+|  |  output: COUNT(*)
+|  |  group by: year, month, id, int_col
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: id > 11
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=2/24 size=38.07KB
+   predicates: a.id > 11, a.tinyint_col != 5
 ====
 # propagation of z.month=1 to alltypesagg is prevented
 select x.int_col, z.int_col
@@ -1033,23 +671,18 @@ on (x.id = z.id)
 where x.year = 2009
 and z.month = 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    functional.alltypesagg.id = functional.alltypes.id
-  |
-  |----0:SCAN HDFS
-  |       table=functional.alltypes #partitions=12/24 size=238.68KB compact
-  |
-  2:SELECT
-  |  predicates: functional.alltypesagg.month = 1
-  |
-  1:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     limit: 10
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypes.id = functional.alltypesagg.id
+|
+|--02:SELECT
+|  |  predicates: functional.alltypesagg.month = 1
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     partitions=10/10 size=1.45MB compact
+|     limit: 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=12/24 size=716.05KB
 ====
 # extra join predicate "x.id + x.b_id = 17" results in referenced slots being
 # materialized
@@ -1068,31 +701,23 @@ where x.year = 2009
 and z.month = 1
 and x.id + x.b_id = 17
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    functional.alltypesagg.id = a.id
-  |
-  |----2:HASH JOIN
-  |    |  join op: INNER JOIN
-  |    |  hash predicates:
-  |    |    a.year = b.year
-  |    |    a.int_col = b.int_col
-  |    |  other predicates: a.id + b.id = 17
-  |    |
-  |    |----1:SCAN HDFS
-  |    |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |    |
-  |    0:SCAN HDFS
-  |       table=functional.alltypes #partitions=12/24 size=238.68KB compact
-  |
-  4:SELECT
-  |  predicates: functional.alltypesagg.month = 1
-  |
-  3:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
-     limit: 10
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = functional.alltypesagg.id
+|
+|--04:SELECT
+|  |  predicates: functional.alltypesagg.month = 1
+|  |
+|  03:SCAN HDFS [functional.alltypesagg]
+|     partitions=10/10 size=2.18MB compact
+|     limit: 10
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.year = b.year, a.int_col = b.int_col
+|  other predicates: a.id + b.id = 17
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 size=6.32KB compact
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=12/24 size=238.68KB
 ====

@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +40,7 @@ import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.cloudera.impala.thrift.TStmtType;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -158,7 +160,7 @@ public class PlannerTest {
     LOG.info("running query " + query);
     TQueryContext queryCtxt = TestUtils.createQueryContext(
         dbName, System.getProperty("user.name"));
-    queryCtxt.request.query_options.setExplain_level(TExplainLevel.NORMAL);
+    queryCtxt.request.query_options.setExplain_level(TExplainLevel.STANDARD);
     queryCtxt.request.query_options.allow_unsupported_formats = true;
     // single-node plan and scan range locations
     testSingleNodePlan(testCase, queryCtxt, errorLog, actualOutput);
@@ -190,7 +192,7 @@ public class PlannerTest {
       execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
       Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
           || execRequest.stmt_type == TStmtType.QUERY);
-      String explainStr = explainBuilder.toString();
+      String explainStr = removeResourceEstimates(explainBuilder.toString());
       actualOutput.append(explainStr);
       if (!isImplemented) {
         errorLog.append(
@@ -268,7 +270,7 @@ public class PlannerTest {
      execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
      Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
          || execRequest.stmt_type == TStmtType.QUERY);
-     String explainStr = explainBuilder.toString();
+     String explainStr = removeResourceEstimates(explainBuilder.toString());
      actualOutput.append(explainStr);
      if (!isImplemented) {
        errorLog.append(
@@ -301,6 +303,18 @@ public class PlannerTest {
            "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
      }
    }
+  }
+
+  /**
+   * Strips out the header containing resource estimates from the given explain plan,
+   * because the estimates can change easily with stats/cardinality.
+   */
+  private String removeResourceEstimates(String explain) {
+    if (explain.startsWith("Estimated Per-Host Requirements:")) {
+      String[] lines = explain.split("\n");
+      return Joiner.on("\n").join(Arrays.copyOfRange(lines, 2, lines.length)) + "\n";
+    }
+    return explain;
   }
 
   private void runPlannerTestFile(String testFile, String dbName) {

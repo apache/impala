@@ -5,26 +5,20 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes
 where year=2009 and month=05
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypesnopart
-    overwrite=false
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=20.36KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: RANDOM
-
-  WRITE TO HDFS table=functional.alltypesnopart
-    overwrite=false
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=20.36KB
+WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=40.73KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=40.73KB
 ====
 # insert into a static partition
 insert into table functional.alltypessmall
@@ -34,28 +28,20 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes
 where year=2009 and month=05
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2009,4
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=20.36KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: RANDOM
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2009,4
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=20.36KB
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,4)]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=40.73KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,4)]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=40.73KB
 ====
 # overwrite a static partition
 insert overwrite table functional.alltypessmall
@@ -65,28 +51,20 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes
 where year=2009 and month=05
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=true
-    partition keys: 2009,4
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=20.36KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: RANDOM
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=true
-    partition keys: 2009,4
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=20.36KB
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(2009,4)]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=40.73KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(2009,4)]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=40.73KB
 ====
 # insert into fully dynamic partitions
 insert into table functional.alltypessmall
@@ -96,38 +74,23 @@ float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from functional.alltypes
 where year=2009 and month>10
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: year,month
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.07KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: year, month
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: year,month
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    HASH_PARTITIONED: year, month
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.07KB
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=80.14KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+01:EXCHANGE [PARTITION=HASH(year,month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=80.14KB
 ====
 # insert into fully dynamic partitions. The source table has no stats and the insert
 # statement has a partition clause, so hash partition before the sink.
@@ -138,34 +101,19 @@ float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from functional_seq_snap.alltypes
 where year=2009 and month>10
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: year,month
-
-  0:SCAN HDFS
-     table=functional_seq_snap.alltypes #partitions=2/24 size=11.34KB
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+00:SCAN HDFS [functional_seq_snap.alltypes]
+   partitions=2/24 size=22.68KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: year, month
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: year,month
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    HASH_PARTITIONED: year, month
-
-  0:SCAN HDFS
-     table=functional_seq_snap.alltypes #partitions=2/24 size=11.34KB
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+01:EXCHANGE [PARTITION=HASH(year,month)]
+|
+00:SCAN HDFS [functional_seq_snap.alltypes]
+   partitions=2/24 size=22.68KB
 ====
 # insert into fully dynamic partitions;
 # partitioned output doesn't require repartitioning
@@ -178,50 +126,35 @@ from functional.alltypes
 where year=2009 and month>10
 group by year, month
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: year,month
-
-  1:AGGREGATE (finalize)
-  |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
-  |  group by: year, month
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.07KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: year, month
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: year,month
-
-  3:AGGREGATE (merge finalize)
-  |  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
-  |  group by: year, month
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    HASH_PARTITIONED: year, month
-
-  1:AGGREGATE
-  |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
-  |  group by: year, month
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.07KB
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+01:AGGREGATE [FINALIZE]
+|  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
+|  group by: year, month
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=40.07KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+03:AGGREGATE [MERGE FINALIZE]
+|  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
+|  group by: year, month
+|
+02:EXCHANGE [PARTITION=HASH(year,month)]
+|
+01:AGGREGATE
+|  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
+|  group by: year, month
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=40.07KB
 ====
 # insert into a partially dynamic partition
 insert into table functional.alltypessmall
@@ -231,38 +164,23 @@ float_col, double_col, date_string_col, string_col, timestamp_col, month
 from functional.alltypes
 where year=2009 and month>10
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2009,month
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.07KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: month
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2009,month
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    HASH_PARTITIONED: month
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.07KB
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,month)]
+|  partitions=12
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=80.14KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,month)]
+|  partitions=12
+|
+01:EXCHANGE [PARTITION=HASH(month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=80.14KB
 ====
 # insert into a partially dynamic partition
 # partitioned output doesn't require repartitioning
@@ -275,50 +193,35 @@ from functional.alltypes
 where year=2009 and month>10
 group by month
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2009,month
-
-  1:AGGREGATE (finalize)
-  |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
-  |  group by: month
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.07KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: month
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2009,month
-
-  3:AGGREGATE (merge finalize)
-  |  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
-  |  group by: month
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    HASH_PARTITIONED: month
-
-  1:AGGREGATE
-  |  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
-  |  group by: month
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=2/24 size=40.07KB
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,month)]
+|  partitions=12
+|
+01:AGGREGATE [FINALIZE]
+|  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
+|  group by: month
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=40.07KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,month)]
+|  partitions=12
+|
+03:AGGREGATE [MERGE FINALIZE]
+|  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
+|  group by: month
+|
+02:EXCHANGE [PARTITION=HASH(month)]
+|
+01:AGGREGATE
+|  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
+|  group by: month
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=2/24 size=40.07KB
 ====
 # insert into a partially dynamic partition
 insert into table functional.alltypessmall
@@ -328,28 +231,20 @@ float_col, double_col, date_string_col, string_col, timestamp_col, year
 from functional.alltypes
 where year>2009 and month=4
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: year,4
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=19.71KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: RANDOM
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: year,4
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=19.71KB
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,4)]
+|  partitions=2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=39.41KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,4)]
+|  partitions=2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=39.41KB
 ====
 # insert with limit from partitioned table.
 insert into table functional.alltypesnopart
@@ -357,38 +252,25 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes where year=2009 and month=1 limit 10
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypesnopart
-    overwrite=false
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=19.95KB
-     limit: 10
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypesnopart
-    overwrite=false
-
-  1:EXCHANGE
-     limit: 10
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=1/24 size=19.95KB
-     limit: 10
+WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=39.91KB
+   limit: 10
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
+|  partitions=1
+|
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 size=39.91KB
+   limit: 10
 ====
 # static partition insert from a constant select
 insert into table functional.alltypessmall
@@ -396,25 +278,17 @@ partition (year=2010, month=4)
 select 100, false, 1, 1, 1, 10,
 10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp)
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2010,4
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
+|  partitions=1
+|
+00:MERGE
+   constant-selects=1
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2010,4
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
+|  partitions=1
+|
+00:MERGE
+   constant-selects=1
 ====
 # dynamic partition insert from a constant select
 insert into table functional.alltypessmall
@@ -422,25 +296,17 @@ partition (year, month)
 select 100, false, 1, 1, 1, 10,
 10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp), 2010, 4
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2010,4
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
+|  partitions=1
+|
+00:MERGE
+   constant-selects=1
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2010,4
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
+|  partitions=1
+|
+00:MERGE
+   constant-selects=1
 ====
 # static partition insert from values statement
 insert into table functional.alltypessmall
@@ -449,25 +315,17 @@ partition (year=2010, month=4) values
 (200, true, 2, 2, 2, 20, 20.0, 20.0, "02/02/09", "2", cast("2009-02-02 00:01:00" as timestamp)),
 (300, false, 3, 3, 3, 30, 30.0, 30.0, "02/03/09", "3", cast("2009-02-03 00:01:00" as timestamp))
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2010,4
-
-  0:MERGE
-     merging 3 SELECT CONSTANT
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
+|  partitions=1
+|
+00:MERGE
+   constant-selects=3
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2010,4
-
-  0:MERGE
-     merging 3 SELECT CONSTANT
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
+|  partitions=1
+|
+00:MERGE
+   constant-selects=3
 ====
 # dynamic partition insert from values statement
 insert into table functional.alltypessmall
@@ -476,25 +334,17 @@ partition (year, month) values
 (200, true, 2, 2, 2, 20, 20.0, 20.0, "02/02/09", "2", cast("2009-02-02 00:01:00" as timestamp), 2010, 5),
 (300, false, 3, 3, 3, 30, 30.0, 30.0, "02/03/09", "3", cast("2009-02-03 00:01:00" as timestamp), 2010, 6)
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2010,4
-
-  0:MERGE
-     merging 3 SELECT CONSTANT
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
+|  partitions=9
+|
+00:MERGE
+   constant-selects=3
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypessmall
-    overwrite=false
-    partition keys: 2010,4
-
-  0:MERGE
-     merging 3 SELECT CONSTANT
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
+|  partitions=9
+|
+00:MERGE
+   constant-selects=3
 ====
 # test static partition insert from a query with grouped aggregation
 # we expect the insert fragment to be partitioned by the grouping exprs of the query stmt
@@ -503,46 +353,31 @@ insert into functional.alltypes(bigint_col, string_col) partition (year=2010, mo
 select count(int_col), string_col from functional.alltypes
 group by string_col
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: 2010,10
-
-  1:AGGREGATE (finalize)
-  |  output: COUNT(int_col)
-  |  group by: string_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
+|  partitions=1
+|
+01:AGGREGATE [FINALIZE]
+|  output: COUNT(int_col)
+|  group by: string_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: string_col
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: 2010,10
-
-  3:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(int_col))
-  |  group by: string_col
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    HASH_PARTITIONED: string_col
-
-  1:AGGREGATE
-  |  output: COUNT(int_col)
-  |  group by: string_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
+|  partitions=1
+|
+03:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(COUNT(int_col))
+|  group by: string_col
+|
+02:EXCHANGE [PARTITION=HASH(string_col)]
+|
+01:AGGREGATE
+|  output: COUNT(int_col)
+|  group by: string_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ====
 # test static partition insert from a query with distinct grouped aggregation
 # we expect the insert fragment to be partitioned by the grouping exprs of the query stmt
@@ -551,51 +386,36 @@ insert into functional.alltypes(bigint_col, string_col) partition (year=2010, mo
 select count(distinct int_col), string_col from functional.alltypes
 group by string_col
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: 2010,10
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(int_col)
-  |  group by: string_col
-  |
-  1:AGGREGATE
-  |  group by: string_col, int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
+|  partitions=1
+|
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(int_col)
+|  group by: string_col
+|
+01:AGGREGATE
+|  group by: string_col, int_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: string_col
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: 2010,10
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(int_col)
-  |  group by: string_col
-  |
-  4:AGGREGATE (merge)
-  |  group by: string_col, int_col
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: string_col
-
-  1:AGGREGATE
-  |  group by: string_col, int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
+|  partitions=1
+|
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(int_col)
+|  group by: string_col
+|
+04:AGGREGATE [MERGE]
+|  group by: string_col, int_col
+|
+03:EXCHANGE [PARTITION=HASH(string_col)]
+|
+01:AGGREGATE
+|  group by: string_col, int_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ====
 # test that the planner chooses to repartition before the table sink
 # alltypes has column stats and based on the product of the NDVs of year and month
@@ -603,38 +423,23 @@ PLAN FRAGMENT 1
 insert into table functional.alltypes partition(year, month)
 select * from functional.alltypes
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: functional.alltypes.year, functional.alltypes.month
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: functional.alltypes.year,functional.alltypes.month
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    HASH_PARTITIONED: functional.alltypes.year, functional.alltypes.month
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+01:EXCHANGE [PARTITION=HASH(functional.alltypes.year,functional.alltypes.month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
 ====
 # test noshuffle hint to prevent repartitioning (same query as above with hint)
 insert into table functional.alltypes partition(year, month) [noshuffle]
 select * from functional.alltypes
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: RANDOM
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: functional.alltypes.year,functional.alltypes.month
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
 ====
 # test that the planner does not repartition before the table sink
 # alltypes has column stats and since year only has 2 distinct values the planner
@@ -644,39 +449,23 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year
 from functional.alltypes
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: RANDOM
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: year,1
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,1)]
+|  partitions=2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
 ====
 # test shuffle hint to force repartitioning (same query as above with hint)
 insert into table functional.alltypes partition(year, month=1) [shuffle]
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year
 from functional.alltypes
----- PLAN
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: year
-
-  WRITE TO HDFS table=functional.alltypes
-    overwrite=false
-    partition keys: year,1
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    HASH_PARTITIONED: year
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,1)]
+|  partitions=2
+|
+01:EXCHANGE [PARTITION=HASH(year)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
 ====

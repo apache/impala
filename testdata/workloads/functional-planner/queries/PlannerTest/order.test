@@ -36,146 +36,80 @@ where t1.id = t2.id and t2.int_col is not null
 order by int_col
 limit 2
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:TOP-N
-  |  order by: t1.int_col ASC
-  |  limit: 2
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    t1.id = t2.id
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |       predicates: t2.int_col IS NOT NULL
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+03:TOP-N [LIMIT=2]
+|  order by: t1.int_col ASC
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 size=6.32KB compact
+|     predicates: t2.int_col IS NOT NULL
+|
+00:SCAN HDFS [functional.alltypessmall t1]
+   partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  7:TOP-N
-  |  order by: t1.int_col ASC
-  |  limit: 2
-  |
-  6:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: t1.id
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  3:TOP-N
-  |  order by: t1.int_col ASC
-  |  limit: 2
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    t1.id = t2.id
-  |
-  |----5:EXCHANGE
-  |
-  4:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: t2.id
-
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     predicates: t2.int_col IS NOT NULL
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: t1.id
-
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+07:TOP-N [LIMIT=2]
+|  order by: t1.int_col ASC
+|
+06:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+03:TOP-N [LIMIT=2]
+|  order by: t1.int_col ASC
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: t1.id = t2.id
+|
+|--05:EXCHANGE [PARTITION=HASH(t2.id)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 size=6.32KB
+|     predicates: t2.int_col IS NOT NULL
+|
+04:EXCHANGE [PARTITION=HASH(t1.id)]
+|
+00:SCAN HDFS [functional.alltypessmall t1]
+   partitions=4/4 size=6.32KB
 ====
 # Test that the sort is on int_col and not on the id column
 select int_col as id from functional.alltypessmall order by id limit 2
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:TOP-N
-  |  order by: int_col ASC
-  |  limit: 2
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+01:TOP-N [LIMIT=2]
+|  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:TOP-N
-  |  order by: int_col ASC
-  |  limit: 2
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    UNPARTITIONED
-
-  1:TOP-N
-  |  order by: int_col ASC
-  |  limit: 2
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+03:TOP-N [LIMIT=2]
+|  order by: int_col ASC
+|
+02:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+01:TOP-N [LIMIT=2]
+|  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ====
 # Test that the sort is on id and not on int_col
 select int_col as id from functional.alltypessmall order by functional.alltypessmall.id limit 2
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:TOP-N
-  |  order by: functional.alltypessmall.id ASC
-  |  limit: 2
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+01:TOP-N [LIMIT=2]
+|  order by: functional.alltypessmall.id ASC
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:TOP-N
-  |  order by: functional.alltypessmall.id ASC
-  |  limit: 2
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    UNPARTITIONED
-
-  1:TOP-N
-  |  order by: functional.alltypessmall.id ASC
-  |  limit: 2
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+03:TOP-N [LIMIT=2]
+|  order by: functional.alltypessmall.id ASC
+|
+02:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+01:TOP-N [LIMIT=2]
+|  order by: functional.alltypessmall.id ASC
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ====
 # Test that the limit/offset is propagated correctly to child nodes. The TOP-N node
 # should have the limit/offset specified in the query. Child sort nodes should have a
@@ -185,76 +119,18 @@ where t1.id = t2.id and t2.int_col is not null
 order by int_col
 limit 10 offset 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:TOP-N
-  |  order by: t1.int_col ASC
-  |  limit: 10
-  |  offset: 5
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    t1.id = t2.id
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |       predicates: t2.int_col IS NOT NULL
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  7:TOP-N
-  |  order by: t1.int_col ASC
-  |  limit: 10
-  |  offset: 5
-  |
-  6:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: t1.id
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  3:TOP-N
-  |  order by: t1.int_col ASC
-  |  limit: 15
-  |
-  2:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    t1.id = t2.id
-  |
-  |----5:EXCHANGE
-  |
-  4:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: t2.id
-
-  1:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-     predicates: t2.int_col IS NOT NULL
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    HASH_PARTITIONED: t1.id
-
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+03:TOP-N [LIMIT=10]
+|  order by: t1.int_col ASC
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 size=6.32KB compact
+|     predicates: t2.int_col IS NOT NULL
+|
+00:SCAN HDFS [functional.alltypessmall t1]
+   partitions=4/4 size=6.32KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
@@ -266,4 +142,26 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+---- DISTRIBUTEDPLAN
+07:TOP-N [LIMIT=10]
+|  order by: t1.int_col ASC
+|
+06:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+03:TOP-N [LIMIT=15]
+|  order by: t1.int_col ASC
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: t1.id = t2.id
+|
+|--05:EXCHANGE [PARTITION=HASH(t2.id)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 size=6.32KB
+|     predicates: t2.int_col IS NOT NULL
+|
+04:EXCHANGE [PARTITION=HASH(t1.id)]
+|
+00:SCAN HDFS [functional.alltypessmall t1]
+   partitions=4/4 size=6.32KB
 ====

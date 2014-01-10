@@ -21,7 +21,6 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.thrift.TDataPartition;
-import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -86,17 +85,26 @@ public class DataPartition {
         .toString();
   }
 
-  public String getExplainString(TExplainLevel explainLevel) {
+  public String getExplainString() {
     StringBuilder str = new StringBuilder();
-    str.append(type_.toString());
+    str.append("PARTITION=" + getPartitionShortName(type_));;
     if (!partitionExprs_.isEmpty()) {
       List<String> strings = Lists.newArrayList();
       for (Expr expr: partitionExprs_) {
         strings.add(expr.toSql());
       }
-      str.append(": " + Joiner.on(", ").join(strings));
+      str.append("(" + Joiner.on(",").join(strings) +")");
     }
-    str.append("\n");
     return str.toString();
+  }
+
+  private String getPartitionShortName(TPartitionType partition) {
+    switch (partition) {
+      case RANDOM: return "RANDOM";
+      case HASH_PARTITIONED: return "HASH";
+      case RANGE_PARTITIONED: return "RANGE";
+      case UNPARTITIONED: return "UNPARTITIONED";
+      default: return "";
+    }
   }
 }

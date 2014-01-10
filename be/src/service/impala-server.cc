@@ -909,10 +909,14 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         query_options->__set_parquet_file_size(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::EXPLAIN_LEVEL:
-        if (iequals(value, "verbose") || iequals(value, "1")) {
+        if (iequals(value, "minimal") || iequals(value, "0")) {
+          query_options->__set_explain_level(TExplainLevel::MINIMAL);
+        } else if (iequals(value, "standard") || iequals(value, "1")) {
+          query_options->__set_explain_level(TExplainLevel::STANDARD);
+        } else if (iequals(value, "extended") || iequals(value, "2")) {
+          query_options->__set_explain_level(TExplainLevel::EXTENDED);
+        } else if (iequals(value, "verbose") || iequals(value, "3")) {
           query_options->__set_explain_level(TExplainLevel::VERBOSE);
-        } else if (iequals(value, "normal") || iequals(value, "0")) {
-          query_options->__set_explain_level(TExplainLevel::NORMAL);
         } else {
           stringstream ss;
           ss << "Invalid explain level: " << value;

@@ -96,32 +96,38 @@ public class HdfsTableSink extends TableSink {
   }
 
   @Override
-  public String getExplainString(String prefix, TExplainLevel explainLevel) {
+  public String getExplainString(String prefix, String detailPrefix,
+      TExplainLevel explainLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "WRITE TO HDFS table=" + targetTable_.getFullName()
-        + "\n");
-    output.append(prefix + "  overwrite=" + (overwrite_ ? "true" : "false") + "\n");
+    String overwriteStr = ", OVERWRITE=" + (overwrite_ ? "true" : "false");
+    String partitionKeyStr = "";
     if (!partitionKeyExprs_.isEmpty()) {
-      output.append(prefix + "  partition keys: ");
+      StringBuilder tmpBuilder = new StringBuilder(", PARTITION-KEYS=(");
       for (Expr expr: partitionKeyExprs_) {
-        output.append(expr.toSql() + ",");
+        tmpBuilder.append(expr.toSql() + ",");
       }
+      tmpBuilder.deleteCharAt(tmpBuilder.length() - 1);
+      tmpBuilder.append(")");
+      partitionKeyStr = tmpBuilder.toString();
     }
-    output.deleteCharAt(output.length() - 1);
-
+    output.append(String.format("%sWRITE TO HDFS [%s%s%s]\n", prefix,
+        targetTable_.getFullName(), overwriteStr, partitionKeyStr));
     // Report the total number of partitions, independent of the number of nodes
     // and the data partition of the fragment executing this sink.
-    if (explainLevel == TExplainLevel.VERBOSE) {
+    if (explainLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
       long totalNumPartitions = Expr.getNumDistinctValues(partitionKeyExprs_);
       if (totalNumPartitions == -1) {
-        output.append("  #partitions: unavailable");
+        output.append(detailPrefix + "partitions=unavailable");
       } else {
-        output.append("  #partitions: " + totalNumPartitions);
+        output.append(detailPrefix + "partitions=" + totalNumPartitions);
       }
       output.append("\n");
-      output.append(PrintUtils.printMemCost(prefix + "  ", perHostMemCost_));
+      if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+        output.append(PrintUtils.printHosts(detailPrefix, fragment_.getNumNodes()));
+        output.append(PrintUtils.printMemCost(" ", perHostMemCost_));
+        output.append("\n");
+      }
     }
-    output.append("\n");
     return output.toString();
   }
 

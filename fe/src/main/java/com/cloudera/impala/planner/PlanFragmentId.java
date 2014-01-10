@@ -17,23 +17,23 @@ package com.cloudera.impala.planner;
 import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
 
-public class PlanNodeId extends Id<PlanNodeId> {
+public class PlanFragmentId extends Id<PlanFragmentId> {
   // Construction only allowed via an IdGenerator.
-  protected PlanNodeId(int id) {
+  protected PlanFragmentId(int id) {
     super(id);
   }
 
-  public static IdGenerator<PlanNodeId> createGenerator() {
-    return new IdGenerator<PlanNodeId>() {
+  public static IdGenerator<PlanFragmentId> createGenerator() {
+    return new IdGenerator<PlanFragmentId>() {
       @Override
-      public PlanNodeId getNextId() { return new PlanNodeId(nextId_++); }
+      public PlanFragmentId getNextId() { return new PlanFragmentId(nextId_++); }
       @Override
-      public PlanNodeId getMaxId() { return new PlanNodeId(nextId_ - 1); }
+      public PlanFragmentId getMaxId() { return new PlanFragmentId(nextId_ - 1); }
     };
   }
 
   @Override
   public String toString() {
-    return String.format("%02d", id_);
+    return String.format("F%02d", id_);
   }
 }

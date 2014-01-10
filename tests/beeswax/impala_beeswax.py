@@ -257,9 +257,12 @@ class ImpalaBeeswaxClient(object):
     # to deal with escaped quotes in string literals
     lexer = shlex.shlex(query_string.lstrip(), posix=True)
     lexer.escapedquotes += "'"
+    tokens = list(lexer)
+    # Do not classify explain queries as 'insert'
+    if (tokens[0].lower() == "explain"):
+      return tokens[0].lower()
     # Because the WITH clause may precede INSERT or SELECT queries,
     # just checking the first token is insufficient.
-    tokens = list(lexer)
     if filter(self.INSERT_REGEX.match, tokens):
       return "insert"
     return tokens[0].lower()

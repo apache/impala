@@ -1,128 +1,69 @@
 # Basic test with a single with-clause view.
 with t as (select int_col x, bigint_col y from functional.alltypes) select x, y from t
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=1.40MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=1.40MB
 ====
 # Basic test with a single with-clause view that references a catalog view.
 with t as (select int_col x, bigint_col y from functional.alltypes_view)
 select x, y from t
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=1.87MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=1.87MB
 ====
 # Multiple views in with-clause. Only one view is used.
 with t1 as (select int_col x, bigint_col y from functional.alltypes),
 t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
 select x, y from t2
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
+00:MERGE
+   constant-selects=1
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-     merging 1 SELECT CONSTANT
+00:MERGE
+   constant-selects=1
 ====
 # Multiple views in with-clause. All views are used in a union.
 with t1 as (select int_col x, bigint_col y from functional.alltypes),
 t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
 select * from t1 union all select * from t2 union all select * from t3
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:MERGE
-  |
-  |----3:MERGE
-  |       merging 2 SELECT CONSTANT
-  |
-  |----2:MERGE
-  |       merging 1 SELECT CONSTANT
-  |
-  1:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+00:MERGE
+|
+|--03:MERGE
+|     constant-selects=2
+|
+|--02:MERGE
+|     constant-selects=1
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=1.40MB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  7:MERGE
-  |
-  3:MERGE
-     merging 2 SELECT CONSTANT
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  6:MERGE
-  |
-  2:MERGE
-     merging 1 SELECT CONSTANT
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  5:MERGE
-  |
-  1:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+|--07:MERGE
+|  |
+|  03:MERGE
+|     constant-selects=2
+|
+|--06:MERGE
+|  |
+|  02:MERGE
+|     constant-selects=1
+|
+05:MERGE
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=1.40MB
 ====
 # Multiple views in with-clause. All views are used in a join.
 with t1 as (select int_col x, bigint_col y from functional.alltypes),
@@ -130,76 +71,41 @@ t2 as (select int_col x, bigint_col y from functional.alltypestiny),
 t3 as (select int_col x, bigint_col y from functional.alltypessmall)
 select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypessmall #partitions=4/4 size=6.32KB compact
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=12.64KB compact
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B compact
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  7:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----6:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----5:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypes #partitions=24/24 size=478.45KB
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    UNPARTITIONED
-
-  2:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+07:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=12.64KB
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=956.90KB
 ====
 # Multiple dependent views in with-clause
 with t1 as (
@@ -220,338 +126,187 @@ where c1 > 0
 order by c3, c1 desc
 limit 3
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:TOP-N
-  |  order by: c3 ASC, c1 DESC
-  |  limit: 3
-  |
-  4:SELECT
-  |  predicates: c1 > 0
-  |
-  3:AGGREGATE (finalize)
-  |  output: MAX(tinyint_col)
-  |  group by: int_col, MAX(id)
-  |  limit: 10
-  |
-  2:TOP-N
-  |  order by: int_col ASC, tinyint_col ASC
-  |  limit: 5
-  |
-  1:AGGREGATE (finalize)
-  |  output: MAX(id)
-  |  group by: int_col, tinyint_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+05:TOP-N [LIMIT=3]
+|  order by: c3 ASC, c1 DESC
+|
+04:SELECT
+|  predicates: c1 > 0
+|
+03:AGGREGATE [FINALIZE]
+|  output: MAX(tinyint_col)
+|  group by: int_col, MAX(id)
+|  limit: 10
+|
+02:TOP-N [LIMIT=5]
+|  order by: int_col ASC, tinyint_col ASC
+|
+01:AGGREGATE [FINALIZE]
+|  output: MAX(id)
+|  group by: int_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:TOP-N
-  |  order by: c3 ASC, c1 DESC
-  |  limit: 3
-  |
-  4:SELECT
-  |  predicates: c1 > 0
-  |
-  3:AGGREGATE (finalize)
-  |  output: MAX(tinyint_col)
-  |  group by: int_col, MAX(id)
-  |  limit: 10
-  |
-  9:TOP-N
-  |  order by: int_col ASC, tinyint_col ASC
-  |  limit: 5
-  |
-  8:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: int_col, tinyint_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  2:TOP-N
-  |  order by: int_col ASC, tinyint_col ASC
-  |  limit: 5
-  |
-  7:AGGREGATE (merge finalize)
-  |  output: MAX(MAX(id))
-  |  group by: int_col, tinyint_col
-  |
-  6:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: int_col, tinyint_col
-
-  1:AGGREGATE
-  |  output: MAX(id)
-  |  group by: int_col, tinyint_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypessmall #partitions=4/4 size=6.32KB
+05:TOP-N [LIMIT=3]
+|  order by: c3 ASC, c1 DESC
+|
+04:SELECT
+|  predicates: c1 > 0
+|
+03:AGGREGATE [FINALIZE]
+|  output: MAX(tinyint_col)
+|  group by: int_col, MAX(id)
+|  limit: 10
+|
+09:TOP-N [LIMIT=5]
+|  order by: int_col ASC, tinyint_col ASC
+|
+08:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:TOP-N [LIMIT=5]
+|  order by: int_col ASC, tinyint_col ASC
+|
+07:AGGREGATE [MERGE FINALIZE]
+|  output: MAX(MAX(id))
+|  group by: int_col, tinyint_col
+|
+06:EXCHANGE [PARTITION=HASH(int_col,tinyint_col)]
+|
+01:AGGREGATE
+|  output: MAX(id)
+|  group by: int_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
 ====
 # Self-join of with-clause table to make sure the on clause is properly set
 # in the cloned inline-view instances.
 with t as (select int_col x, bigint_col y from functional.alltypestiny)
 select * from t t1 inner join t t2 on (t1.x = t2.x) inner join t t3 on (t2.x = t3.x)
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B compact
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B compact
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=920B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  8:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----7:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----6:EXCHANGE
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: int_col
-
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: int_col
-
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: int_col
-
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+08:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: int_col = int_col
+|
+|--07:EXCHANGE [PARTITION=HASH(int_col)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: int_col = int_col
+|
+|--06:EXCHANGE [PARTITION=HASH(int_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B
+|
+05:EXCHANGE [PARTITION=HASH(int_col)]
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=920B
 ====
 # Self-join of with-clause table to make sure the using clause is properly set
 # in the cloned inline-view instances.
 with t as (select int_col x, bigint_col y from functional.alltypestiny)
 select * from t t1 inner join t t2 using(x) inner join t t3 using(x)
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B compact
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B compact
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=920B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  8:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----7:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----6:EXCHANGE
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: int_col
-
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: int_col
-
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: int_col
-
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+08:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: int_col = int_col
+|
+|--07:EXCHANGE [PARTITION=HASH(int_col)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: int_col = int_col
+|
+|--06:EXCHANGE [PARTITION=HASH(int_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B
+|
+05:EXCHANGE [PARTITION=HASH(int_col)]
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=920B
 ====
 # Self-join of with-clause table to make sure the join op is properly set
 # in the cloned inline-view instances.
 with t as (select int_col x, bigint_col y from functional.alltypestiny)
 select * from t t1 left outer join t t2 using(x) full outer join t t3 using(x)
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: FULL OUTER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |
-  3:HASH JOIN
-  |  join op: LEFT OUTER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+04:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B compact
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B compact
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=920B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  8:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: FULL OUTER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----7:EXCHANGE
-  |
-  3:HASH JOIN
-  |  join op: LEFT OUTER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----6:EXCHANGE
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: int_col
-
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: int_col
-
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    HASH_PARTITIONED: int_col
-
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+08:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: int_col = int_col
+|
+|--07:EXCHANGE [PARTITION=HASH(int_col)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B
+|
+03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: int_col = int_col
+|
+|--06:EXCHANGE [PARTITION=HASH(int_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B
+|
+05:EXCHANGE [PARTITION=HASH(int_col)]
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=920B
 ====
 # Self-join of with-clause table to make sure join hints are properly set
 # in the cloned inline-view instances.
@@ -560,224 +315,123 @@ PLAN FRAGMENT 4
 with t as (select int_col x, bigint_col y from functional.alltypestiny)
 select * from t t1 inner join [broadcast] t t2 using(x) inner join [shuffle] t t3 using(x)
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |
-  3:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----1:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B compact
-  |
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B compact
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B compact
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=920B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  8:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-    UNPARTITIONED
-
-  4:HASH JOIN
-  |  join op: INNER JOIN (PARTITIONED)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----7:EXCHANGE
-  |
-  6:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: int_col
-
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-    HASH_PARTITIONED: int_col
-
-  3:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    int_col = int_col
-  |
-  |----5:EXCHANGE
-  |
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 4
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+08:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: int_col = int_col
+|
+|--07:EXCHANGE [PARTITION=HASH(int_col)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B
+|
+06:EXCHANGE [PARTITION=HASH(int_col)]
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=920B
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=920B
 ====
 # Multiple with clauses. One for the UnionStmt and one for each union operand.
 with t1 as (values('a', 'b'))
 (with t2 as (values('c', 'd')) select * from t2) union all
 (with t3 as (values('e', 'f')) select * from t3) order by 1 limit 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:TOP-N
-  |  order by: 'c' ASC
-  |  limit: 1
-  |
-  0:MERGE
-  |
-  |----2:MERGE
-  |       merging 1 SELECT CONSTANT
-  |
-  1:MERGE
-     merging 1 SELECT CONSTANT
+03:TOP-N [LIMIT=1]
+|  order by: 'c' ASC
+|
+00:MERGE
+|
+|--02:MERGE
+|     constant-selects=1
+|
+01:MERGE
+   constant-selects=1
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:TOP-N
-  |  order by: 'c' ASC
-  |  limit: 1
-  |
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  6:MERGE
-  |
-  2:MERGE
-     merging 1 SELECT CONSTANT
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  5:MERGE
-  |
-  1:MERGE
-     merging 1 SELECT CONSTANT
+03:TOP-N [LIMIT=1]
+|  order by: 'c' ASC
+|
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+|--06:MERGE
+|  |
+|  02:MERGE
+|     constant-selects=1
+|
+05:MERGE
+|
+01:MERGE
+   constant-selects=1
 ====
 # Multiple with clauses. One for the UnionStmt and one for each union operand.
 with t1 as (values('a', 'b'))
 (with t2 as (values('c', 'd')) select * from t2) union all
 (with t3 as (values('e', 'f')) select * from t3) order by 1 limit 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:TOP-N
-  |  order by: 'c' ASC
-  |  limit: 1
-  |
-  0:MERGE
-  |
-  |----2:MERGE
-  |       merging 1 SELECT CONSTANT
-  |
-  1:MERGE
-     merging 1 SELECT CONSTANT
+03:TOP-N [LIMIT=1]
+|  order by: 'c' ASC
+|
+00:MERGE
+|
+|--02:MERGE
+|     constant-selects=1
+|
+01:MERGE
+   constant-selects=1
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:TOP-N
-  |  order by: 'c' ASC
-  |  limit: 1
-  |
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  6:MERGE
-  |
-  2:MERGE
-     merging 1 SELECT CONSTANT
-
-PLAN FRAGMENT 2
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  5:MERGE
-  |
-  1:MERGE
-     merging 1 SELECT CONSTANT
+03:TOP-N [LIMIT=1]
+|  order by: 'c' ASC
+|
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+|--06:MERGE
+|  |
+|  02:MERGE
+|     constant-selects=1
+|
+05:MERGE
+|
+01:MERGE
+   constant-selects=1
 ====
 # Test with clause in an insert statement.
 with t1 as (select * from functional.alltypestiny)
 insert into functional.alltypesinsert partition(year, month) select * from t1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypesinsert
-    overwrite=false
-    partition keys: functional.alltypestiny.year,functional.alltypestiny.month
-
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(functional.alltypestiny.year,functional.alltypestiny.month)]
+|  partitions=4
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=1.35KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: HASH_PARTITIONED: functional.alltypestiny.year, functional.alltypestiny.month
-
-  WRITE TO HDFS table=functional.alltypesinsert
-    overwrite=false
-    partition keys: functional.alltypestiny.year,functional.alltypestiny.month
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    HASH_PARTITIONED: functional.alltypestiny.year, functional.alltypestiny.month
-
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(functional.alltypestiny.year,functional.alltypestiny.month)]
+|  partitions=4
+|
+01:EXCHANGE [PARTITION=HASH(functional.alltypestiny.year,functional.alltypestiny.month)]
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=1.35KB
 ====
 # Test with clause in an insert statement and in its query statement.
 with t1 as (select * from functional.alltypestiny)
@@ -785,51 +439,29 @@ insert into functional.alltypesinsert partition(year, month)
 with t2 as (select * from functional.alltypestiny)
 select * from t1 union all select * from t2
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypesinsert
-    overwrite=false
-    partition keys: year,month
-
-  0:MERGE
-  |
-  |----2:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B
-  |
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=16
+|
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=1.35KB
+|
+01:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=1.35KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  WRITE TO HDFS table=functional.alltypesinsert
-    overwrite=false
-    partition keys: year,month
-
-  3:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
-
-  5:MERGE
-  |
-  2:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
-
-  4:MERGE
-  |
-  1:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=16
+|
+03:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+|--05:MERGE
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=1.35KB
+|
+04:MERGE
+|
+01:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=1.35KB
 ====

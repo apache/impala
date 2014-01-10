@@ -90,14 +90,17 @@ public class CrossJoinNode extends PlanNode {
   }
 
   @Override
-  protected String getNodeExplainString(String detailPrefix,
+  protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     // Always a BROADCAST, but print it anyway so it's clear to users
-    output.append(detailPrefix + "(" + DistributionMode.BROADCAST.toString() + ")\n");
-    if (!conjuncts_.isEmpty()) {
-      output.append(detailPrefix + "predicates: ")
-          .append(getExplainString(conjuncts_) + "\n");
+    output.append(String.format("%s%s:%s [%s]\n", prefix, id_.toString(),
+        displayName_, DistributionMode.BROADCAST.toString()));
+    if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      if (!conjuncts_.isEmpty()) {
+        output.append(detailPrefix + "predicates: ")
+        .append(getExplainString(conjuncts_) + "\n");
+      }
     }
     return output.toString();
   }

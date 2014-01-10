@@ -1,367 +1,202 @@
 # full scan of string typed row-key
 select * from functional_hbase.stringids
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
+00:SCAN HBASE [functional_hbase.stringids]
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
 ====
 # predicate on row key doesn't get transformed into scan parameter, because
 # it's mapped as an int (but stored in ascii and ordered lexicographically)
 select * from functional_hbase.alltypessmall
 where id < 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: id < 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: id < 5
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: id < 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: id < 5
 ====
 # if the row key is mapped as a string col, range predicates are applied to the scan
 select * from functional_hbase.stringids
 where id = '5'
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 5
-     stop key: 5\0
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 5
-     stop key: 5\0
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 5
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5:5\0
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 5
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ====
 select * from functional_hbase.stringids
 where id > '5'
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 5\0
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 5\0
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 5\0
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5\0:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 5\0
+   predicates: tinyint_col = 5
 ====
 select * from functional_hbase.stringids
 where id >= '5'
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 5
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 5
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 5
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 5
+   predicates: tinyint_col = 5
 ====
 select * from functional_hbase.stringids
 where id < '5'
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     stop key: 5
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     stop key: 5
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   stop key: 5
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:5
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   stop key: 5
+   predicates: tinyint_col = 5
 ====
 select * from functional_hbase.stringids
 where id <= '5'
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     stop key: 5\0
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     stop key: 5\0
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:5\0
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ====
 select * from functional_hbase.stringids
 where id > '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4\0
-     stop key: 5
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4\0
-     stop key: 5
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4\0
+   stop key: 5
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4\0
+   stop key: 5
+   predicates: tinyint_col = 5
 ====
 select * from functional_hbase.stringids
 where id >= '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4
-     stop key: 5
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4
-     stop key: 5
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4
+   stop key: 5
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4
+   stop key: 5
+   predicates: tinyint_col = 5
 ====
 select * from functional_hbase.stringids
 where id > '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4\0
-     stop key: 5\0
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4\0
-     stop key: 5\0
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4\0
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5\0
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4\0
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ====
 select * from functional_hbase.stringids
 where id >= '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4
-     stop key: 5\0
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4
-     stop key: 5\0
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ====
 # with aggregation
 select int_col, count(*)
@@ -369,266 +204,131 @@ from functional_hbase.alltypessmall
 where id < 5
 group by 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:AGGREGATE (finalize)
-  |  output: COUNT(*)
-  |  group by: int_col
-  |
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: id < 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  3:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: int_col
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    HASH_PARTITIONED: int_col
-
-  1:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: int_col
-  |
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: id < 5
+01:AGGREGATE [FINALIZE]
+|  output: COUNT(*)
+|  group by: int_col
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: id < 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+03:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(COUNT(*))
+|  group by: int_col
+|
+02:EXCHANGE [PARTITION=HASH(int_col)]
+|
+01:AGGREGATE
+|  output: COUNT(*)
+|  group by: int_col
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: id < 5
 ====
 # predicates on string columns against a constant string are converted to HBase filters
 select * from functional_hbase.alltypessmall where string_col = '4'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col EQUAL '4'
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col EQUAL '4'
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col EQUAL '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col EQUAL '4'
 ====
 # test all comparison ops
 select * from functional_hbase.alltypessmall where string_col != '4'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col NOT_EQUAL '4'
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col NOT_EQUAL '4'
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col NOT_EQUAL '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col NOT_EQUAL '4'
 ====
 select * from functional_hbase.alltypessmall where string_col < '4'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col LESS '4'
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col LESS '4'
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col LESS '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col LESS '4'
 ====
 select * from functional_hbase.alltypessmall where string_col > '4'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col GREATER '4'
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col GREATER '4'
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col GREATER '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col GREATER '4'
 ====
 select * from functional_hbase.alltypessmall where string_col <= '4'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col LESS_OR_EQUAL '4'
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col LESS_OR_EQUAL '4'
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col LESS_OR_EQUAL '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col LESS_OR_EQUAL '4'
 ====
 select * from functional_hbase.alltypessmall where string_col >= '4'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col GREATER_OR_EQUAL '4'
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col GREATER_OR_EQUAL '4'
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col GREATER_OR_EQUAL '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col GREATER_OR_EQUAL '4'
 ====
 # test multiple filters
 select * from functional_hbase.alltypessmall
 where string_col >= '4' and string_col != '2' and date_string_col = '04/03/09'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: 
-  d:date_string_col EQUAL '04/03/09'
-  d:string_col GREATER_OR_EQUAL '4'
-  d:string_col NOT_EQUAL '2'
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: 
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters:
   d:date_string_col EQUAL '04/03/09'
   d:string_col GREATER_OR_EQUAL '4'
   d:string_col NOT_EQUAL '2'
@@ -637,292 +337,161 @@ NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters:
+  d:date_string_col EQUAL '04/03/09'
+  d:string_col GREATER_OR_EQUAL '4'
+  d:string_col NOT_EQUAL '2'
 ====
 # mix of predicates and functional_hbase. filters
 select * from functional_hbase.alltypessmall where string_col = '4' and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col EQUAL '4'
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     hbase filters: d:string_col EQUAL '4'
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5
 ====
 # mix of predicates, functional_hbase. filters and start/stop keys
 select * from functional_hbase.stringids
 where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4
-     stop key: 5\0
-     hbase filters: d:string_col EQUAL '4'
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4
-     stop key: 5\0
-     hbase filters: d:string_col EQUAL '4'
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4
+   stop key: 5\0
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4
+   stop key: 5\0
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5
 ====
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
 select * from functional_hbase.alltypessmall where cast(string_col as int) >= 4
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: CAST(string_col AS INT) >= 4
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: CAST(string_col AS INT) >= 4
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: CAST(string_col AS INT) >= 4
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: CAST(string_col AS INT) >= 4
 ====
 # non-const comparisons cannot be turned into filters
 select * from functional_hbase.alltypessmall where string_col >= date_string_col
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: string_col >= date_string_col
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: string_col >= date_string_col
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: string_col >= date_string_col
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: string_col >= date_string_col
 ====
 # IMP-1188 - row key predicate is a constant expr.
 select * from functional_hbase.stringids
 where id = concat('', '5')
 and tinyint_col = 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 5
-     stop key: 5\0
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 5
-     stop key: 5\0
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 5
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 5:5\0
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 5
+   stop key: 5\0
+   predicates: tinyint_col = 5
 ====
 # IMP-1188 - row key predicate is a constant expr.
 select * from functional_hbase.stringids
 where string_col = '4' and tinyint_col = 5
   and id >= concat('', '4') and id <= concat('5', '')
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4
-     stop key: 5\0
-     hbase filters: d:string_col EQUAL '4'
-     predicates: tinyint_col = 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     start key: 4
-     stop key: 5\0
-     hbase filters: d:string_col EQUAL '4'
-     predicates: tinyint_col = 5
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4
+   stop key: 5\0
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   start key: 4
+   stop key: 5\0
+   hbase filters: d:string_col EQUAL '4'
+   predicates: tinyint_col = 5
 ====
 # IMP-1188 - row key predicate is null.
 select * from functional_hbase.stringids where id = null
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     empty scan node
+empty scan node
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     empty scan node
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+empty scan node
 ====
 # IMP-1188 - row key lower bound is bigger than upper bound.
 select * from functional_hbase.stringids where id > 'b' and id < 'a'
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     empty scan node
+empty scan node
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     empty scan node
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+empty scan node
 ====
 # IMP-1188 - casting row key to non-string type disables predicate from being pushed
 # into HBase
 select * from functional_hbase.stringids
 where cast(id as int) < 5
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     predicates: CAST(id AS INT) < 5
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-    UNPARTITIONED
-
-  0:SCAN HBASE
-     table:stringids
-     predicates: CAST(id AS INT) < 5
+00:SCAN HBASE [functional_hbase.stringids]
+   predicates: CAST(id AS INT) < 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.stringids]
+   predicates: CAST(id AS INT) < 5
 ====

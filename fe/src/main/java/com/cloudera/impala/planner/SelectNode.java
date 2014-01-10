@@ -18,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -56,11 +55,15 @@ public class SelectNode extends PlanNode {
   }
 
   @Override
-  protected String getNodeExplainString(String prefix,
+  protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    if (!conjuncts_.isEmpty()) {
-      output.append(prefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+    output.append(String.format("%s%s:%s\n", prefix, id_.toString(), displayName_));
+    if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      if (!conjuncts_.isEmpty()) {
+        output.append(detailPrefix + "predicates: " +
+            getExplainString(conjuncts_) + "\n");
+      }
     }
     return output.toString();
   }

@@ -101,14 +101,7 @@ public class SortNode extends PlanNode {
   @Override
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    cardinality_ = getChild(0).cardinality_;
-    if (hasLimit()) {
-      if (cardinality_ == -1) {
-        cardinality_ = limit_;
-      } else {
-        cardinality_ = Math.min(cardinality_, limit_);
-      }
-    }
+    cardinality_ = capAtLimit(getChild(0).cardinality_);
     LOG.debug("stats Sort: cardinality=" + Long.toString(cardinality_));
   }
 
@@ -138,23 +131,25 @@ public class SortNode extends PlanNode {
   }
 
   @Override
-  protected String getNodeExplainString(String detailPrefix,
+  protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(detailPrefix + "order by: ");
-    for (int i = 0; i < info_.getOrderingExprs().size(); ++i) {
-      if (i > 0) {
-        output.append(", ");
-      }
-      output.append(info_.getOrderingExprs().get(i).toSql() + " ");
-      output.append(info_.getIsAscOrder().get(i) ? "ASC" : "DESC");
+    output.append(String.format("%s%s:%s [LIMIT=%s]\n", prefix, id_.toString(),
+        displayName_, limit_));
+    if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      output.append(detailPrefix + "order by: ");
+      for (int i = 0; i < info_.getOrderingExprs().size(); ++i) {
+        if (i > 0) output.append(", ");
+        output.append(info_.getOrderingExprs().get(i).toSql() + " ");
+        output.append(info_.getIsAscOrder().get(i) ? "ASC" : "DESC");
 
-      Boolean nullsFirstParam = info_.getNullsFirstParams().get(i);
-      if (nullsFirstParam != null) {
-        output.append(nullsFirstParam ? " NULLS FIRST" : " NULLS LAST");
+        Boolean nullsFirstParam = info_.getNullsFirstParams().get(i);
+        if (nullsFirstParam != null) {
+          output.append(nullsFirstParam ? " NULLS FIRST" : " NULLS LAST");
+        }
       }
+      output.append("\n");
     }
-    output.append("\n");
     return output.toString();
   }
 

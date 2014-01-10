@@ -123,6 +123,7 @@ public class HBaseScanNode extends ScanNode {
     // materialize slots in remaining conjuncts_
     analyzer.materializeSlots(conjuncts_);
     computeMemLayout(analyzer);
+    computeStats(analyzer);
   }
 
   /**
@@ -206,6 +207,7 @@ public class HBaseScanNode extends ScanNode {
 
     cardinality_ *= computeSelectivity();
     cardinality_ = Math.max(0, cardinality_);
+    cardinality_ = capAtLimit(cardinality_);
     LOG.debug("computeStats HbaseScan: cardinality=" + Long.toString(cardinality_));
 
     // TODO: take actual regions into account
@@ -393,44 +395,52 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  protected String getNodeExplainString(String prefix,
+  protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
-    HBaseTable tbl = (HBaseTable) desc_.getTable();
-    StringBuilder output = new StringBuilder()
-        .append(prefix + "table:" + tbl.getName() + "\n");
+    HBaseTable table = (HBaseTable) desc_.getTable();
+    StringBuilder output = new StringBuilder();
     if (isEmpty_) {
       output.append(prefix + "empty scan node\n");
       return output.toString();
     }
-    if (!Bytes.equals(startKey_, HConstants.EMPTY_START_ROW)) {
-      output.append(prefix + "start key: " + printKey(startKey_) + "\n");
+    String aliasStr = "";
+    if (!table.getFullName().equalsIgnoreCase(desc_.getAlias()) &&
+        !table.getName().equalsIgnoreCase(desc_.getAlias())) {
+      aliasStr = " " + desc_.getAlias();
     }
-    if (!Bytes.equals(stopKey_, HConstants.EMPTY_END_ROW)) {
-      output.append(prefix + "stop key: " + printKey(stopKey_) + "\n");
-    }
-    if (!filters_.isEmpty()) {
-      output.append(prefix + "hbase filters:");
-      if (filters_.size() == 1) {
-        THBaseFilter filter = filters_.get(0);
-        output.append(" " + filter.family + ":" + filter.qualifier + " " +
-            CompareFilter.CompareOp.values()[filter.op_ordinal].toString() + " " +
-            "'" + filter.filter_constant + "'");
-      } else {
-        for (int i = 0; i < filters_.size(); ++i) {
-          THBaseFilter filter = filters_.get(i);
-          output.append("\n  " + filter.family + ":" + filter.qualifier + " " +
+    output.append(String.format("%s%s:%s [%s%s]\n", prefix, id_.toString(),
+        displayName_, table.getFullName(), aliasStr));
+    if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      if (!Bytes.equals(startKey_, HConstants.EMPTY_START_ROW)) {
+        output.append(detailPrefix + "start key: " + printKey(startKey_) + "\n");
+      }
+      if (!Bytes.equals(stopKey_, HConstants.EMPTY_END_ROW)) {
+        output.append(detailPrefix + "stop key: " + printKey(stopKey_) + "\n");
+      }
+      if (!filters_.isEmpty()) {
+        output.append(detailPrefix + "hbase filters:");
+        if (filters_.size() == 1) {
+          THBaseFilter filter = filters_.get(0);
+          output.append(" " + filter.family + ":" + filter.qualifier + " " +
               CompareFilter.CompareOp.values()[filter.op_ordinal].toString() + " " +
               "'" + filter.filter_constant + "'");
+        } else {
+          for (int i = 0; i < filters_.size(); ++i) {
+            THBaseFilter filter = filters_.get(i);
+            output.append("\n  " + filter.family + ":" + filter.qualifier + " " +
+                CompareFilter.CompareOp.values()[filter.op_ordinal].toString() + " " +
+                "'" + filter.filter_constant + "'");
+          }
         }
+        output.append('\n');
       }
-      output.append('\n');
+      if (!conjuncts_.isEmpty()) {
+        output.append(
+            detailPrefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+      }
     }
-    if (!conjuncts_.isEmpty()) {
-      output.append(prefix + "predicates: " + getExplainString(conjuncts_) + "\n");
-    }
-    // Add table and column stats in verbose mode.
-    if (detailLevel == TExplainLevel.VERBOSE) {
-      output.append(getStatsExplainString(prefix, detailLevel));
+    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      output.append(getStatsExplainString(detailPrefix, detailLevel));
       output.append("\n");
     }
     return output.toString();

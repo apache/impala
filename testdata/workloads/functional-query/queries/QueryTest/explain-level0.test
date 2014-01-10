@@ -1,0 +1,100 @@
+====
+---- QUERY
+# Tests explaining a query (TPCDS-Q19)
+explain
+select
+  i_brand_id,
+  i_brand,
+  i_manufact_id,
+  i_manufact,
+  sum(ss_ext_sales_price) ext_price
+from
+  tpcds.store_sales
+  join tpcds.item on (store_sales.ss_item_sk = item.i_item_sk)
+  join tpcds.customer on (store_sales.ss_customer_sk = customer.c_customer_sk)
+  join tpcds.customer_address on (customer.c_current_addr_sk = customer_address.ca_address_sk)
+  join tpcds.store on (store_sales.ss_store_sk = store.s_store_sk)
+where
+  ss_date between '1999-11-01' and '1999-11-30'
+  and i_manager_id = 7
+  and substr(ca_zip, 1, 5) <> substr(s_zip, 1, 5)
+group by
+  i_brand,
+  i_brand_id,
+  i_manufact_id,
+  i_manufact
+order by
+  ext_price desc,
+  i_brand,
+  i_brand_id,
+  i_manufact_id,
+  i_manufact
+limit 100
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=130.33MB VCores=5'
+''
+'18:TOP-N [LIMIT=100]'
+'17:EXCHANGE [PARTITION=UNPARTITIONED]'
+'10:TOP-N [LIMIT=100]'
+'16:AGGREGATE [MERGE FINALIZE]'
+'15:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]'
+'09:AGGREGATE'
+'08:HASH JOIN [INNER JOIN, BROADCAST]'
+'|--14:EXCHANGE [BROADCAST]'
+'|  04:SCAN HDFS [tpcds.store]'
+'07:HASH JOIN [INNER JOIN, BROADCAST]'
+'|--13:EXCHANGE [BROADCAST]'
+'|  03:SCAN HDFS [tpcds.customer_address]'
+'06:HASH JOIN [INNER JOIN, BROADCAST]'
+'|--12:EXCHANGE [BROADCAST]'
+'|  01:SCAN HDFS [tpcds.item]'
+'05:HASH JOIN [INNER JOIN, BROADCAST]'
+'|--11:EXCHANGE [BROADCAST]'
+'|  00:SCAN HDFS [tpcds.store_sales]'
+'02:SCAN HDFS [tpcds.customer]'
+====
+---- QUERY
+# Tests explaining an insert query
+explain insert overwrite functional.alltypessmall (id, string_col)
+partition (year, month)
+select a.id, a.string_col, a.year, a.month from functional.alltypes a
+  left semi join functional.alltypesagg b on (a.id = b.id)
+where a.year > 2009 and a.month = 4
+union distinct
+select id, string_col, year, month from functional.alltypes
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=192.03MB VCores=3'
+''
+'WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(year,month)]'
+'05:AGGREGATE [FINALIZE]'
+'08:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|--10:MERGE'
+'|  04:SCAN HDFS [functional.alltypes]'
+'09:MERGE'
+'03:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
+'|--07:EXCHANGE [PARTITION=HASH(b.id)]'
+'|  02:SCAN HDFS [functional.alltypesagg b]'
+'06:EXCHANGE [PARTITION=HASH(a.id)]'
+'01:SCAN HDFS [functional.alltypes a]'
+====
+---- QUERY
+# Tests explaining an insert query to/from an HBase table
+explain insert into functional_hbase.alltypes
+select a.* from functional_hbase.alltypessmall a
+  cross join functional.alltypessmall b
+where a.year > 2009 and a.month = 4
+union all
+select * from functional_hbase.alltypessmall
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=1.03GB VCores=3'
+''
+'WRITE TO HBASE table=functional_hbase.alltypes'
+'06:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|--08:MERGE'
+'|  04:SCAN HBASE [functional_hbase.alltypessmall]'
+'07:MERGE'
+'03:CROSS JOIN [BROADCAST]'
+'|--05:EXCHANGE [BROADCAST]'
+'|  02:SCAN HDFS [functional.alltypessmall b]'
+'01:SCAN HBASE [functional_hbase.alltypessmall a]'
+====

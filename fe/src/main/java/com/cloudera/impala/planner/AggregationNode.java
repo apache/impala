@@ -64,7 +64,6 @@ public class AggregationNode extends PlanNode {
     aggInfo_ = aggInfo;
     children_.add(input);
     needsFinalize_ = true;
-    updateDisplayName();
   }
 
   public AggregateInfo getAggInfo() { return aggInfo_; }
@@ -74,9 +73,9 @@ public class AggregationNode extends PlanNode {
   public void unsetNeedsFinalize() {
     Preconditions.checkState(needsFinalize_);
     needsFinalize_ = false;
-    updateDisplayName();
   }
 
+  @Override
   public void setCompactData(boolean on) { compactData_ = on; }
 
   @Override
@@ -148,23 +147,6 @@ public class AggregationNode extends PlanNode {
     LOG.trace("stats Agg: cardinality=" + Long.toString(cardinality_));
   }
 
-  private void updateDisplayName() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("AGGREGATE");
-    if (aggInfo_.isMerge() || needsFinalize_) {
-      sb.append(" (");
-      if (aggInfo_.isMerge() && needsFinalize_) {
-        sb.append("merge finalize");
-      } else if (aggInfo_.isMerge()) {
-        sb.append("merge");
-      } else {
-        sb.append("finalize");
-      }
-      sb.append(")");
-    }
-    setDisplayName(sb.toString());
-  }
-
   @Override
   protected String debugString() {
     return Objects.toStringHelper(this)
@@ -192,26 +174,47 @@ public class AggregationNode extends PlanNode {
     }
   }
 
+  private String getDisplayNameDetail() {
+    if (aggInfo_.isMerge() || needsFinalize_) {
+      if (aggInfo_.isMerge() && needsFinalize_) {
+        return "MERGE FINALIZE";
+      } else if (aggInfo_.isMerge()) {
+        return "MERGE";
+      } else {
+        return "FINALIZE";
+      }
+    }
+    return null;
+  }
+
   @Override
-  protected String getNodeExplainString(String detailPrefix,
+  protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    if (aggInfo_.getAggregateExprs() != null && aggInfo_.getAggregateExprs().size() > 0) {
-      output.append(detailPrefix + "output: ")
-        .append(getExplainString(aggInfo_.getAggregateExprs()) + "\n");
-   }
-    // TODO: is this the best way to display this. It currently would
-    // have DISTINCT_PC(DISTINCT_PC(col)) for the merge phase but not
-    // very obvious what that means if you don't already know.
+    String nameDetail = getDisplayNameDetail();
+    output.append(String.format("%s%s:%s", prefix, id_.toString(), displayName_));
+    if (nameDetail != null) output.append(" [" + nameDetail + "]");
+    output.append("\n");
 
-    // TODO: group by can be very long. Break it into multiple lines
-    if (!aggInfo_.getGroupingExprs().isEmpty()) {
-      output.append(detailPrefix + "group by: ")
-          .append(getExplainString(aggInfo_.getGroupingExprs()) + "\n");
-    }
-    if (!conjuncts_.isEmpty()) {
-      output.append(detailPrefix + "having: ")
-          .append(getExplainString(conjuncts_) + "\n");
+    if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      if (aggInfo_.getAggregateExprs() != null &&
+          aggInfo_.getAggregateExprs().size() > 0) {
+        output.append(detailPrefix + "output: ")
+        .append(getExplainString(aggInfo_.getAggregateExprs()) + "\n");
+      }
+      // TODO: is this the best way to display this. It currently would
+      // have DISTINCT_PC(DISTINCT_PC(col)) for the merge phase but not
+      // very obvious what that means if you don't already know.
+
+      // TODO: group by can be very long. Break it into multiple lines
+      if (!aggInfo_.getGroupingExprs().isEmpty()) {
+        output.append(detailPrefix + "group by: ")
+        .append(getExplainString(aggInfo_.getGroupingExprs()) + "\n");
+      }
+      if (!conjuncts_.isEmpty()) {
+        output.append(detailPrefix + "having: ")
+        .append(getExplainString(conjuncts_) + "\n");
+      }
     }
     return output.toString();
   }

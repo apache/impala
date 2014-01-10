@@ -190,16 +190,17 @@ public class MergeNode extends PlanNode {
   }
 
   @Override
-  protected String getNodeExplainString(String prefix,
+  protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
+    output.append(String.format("%s%s:%s\n", prefix, id_.toString(), displayName_));
     // A MergeNode may have predicates if a union is used inside an inline view,
     // and the enclosing select stmt has predicates referring to the inline view.
     if (!conjuncts_.isEmpty()) {
-      output.append(prefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+      output.append(detailPrefix + "predicates: " + getExplainString(conjuncts_) + "\n");
     }
-    if (constExprLists_.size() > 0) {
-      output.append(prefix + "merging " + constExprLists_.size() + " SELECT CONSTANT\n");
+    if (!constExprLists_.isEmpty()) {
+      output.append(detailPrefix + "constant-selects=" + constExprLists_.size() + "\n");
     }
     return output.toString();
   }

@@ -3,35 +3,22 @@ select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tin
 avg(tinyint_col)
 from functional.alltypesagg
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:AGGREGATE (finalize)
-  |  output: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+01:AGGREGATE [FINALIZE]
+|  output: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*)), SUM(COUNT(tinyint_col)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col))
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    UNPARTITIONED
-
-  1:AGGREGATE
-  |  output: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+03:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(COUNT(*)), SUM(COUNT(tinyint_col)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col))
+|
+02:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ====
 # with grouping
 select tinyint_col, bigint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
@@ -39,47 +26,12 @@ avg(tinyint_col)
 from functional.alltypesagg
 group by 2, 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:AGGREGATE (finalize)
-  |  output: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
-  |  group by: bigint_col, tinyint_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
----- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: bigint_col, tinyint_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  3:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col)), SUM(COUNT(tinyint_col))
-  |  group by: bigint_col, tinyint_col
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    HASH_PARTITIONED: bigint_col, tinyint_col
-
-  1:AGGREGATE
-  |  output: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
-  |  group by: bigint_col, tinyint_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+01:AGGREGATE [FINALIZE]
+|  output: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
+|  group by: bigint_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
@@ -92,6 +44,21 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+---- DISTRIBUTEDPLAN
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+03:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(COUNT(*)), MIN(MIN(tinyint_col)), MAX(MAX(tinyint_col)), SUM(SUM(tinyint_col)), SUM(COUNT(tinyint_col))
+|  group by: bigint_col, tinyint_col
+|
+02:EXCHANGE [PARTITION=HASH(bigint_col,tinyint_col)]
+|
+01:AGGREGATE
+|  output: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
+|  group by: bigint_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ====
 # avg substitution
 select avg(id)
@@ -99,43 +66,28 @@ from functional.testtbl
 having count(id) > 0
 order by avg(zip) limit 10
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:TOP-N
-  |  order by: SUM(zip) / COUNT(zip) ASC
-  |  limit: 10
-  |
-  1:AGGREGATE (finalize)
-  |  output: SUM(id), COUNT(id), SUM(zip), COUNT(zip)
-  |  having: COUNT(id) > 0
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+02:TOP-N [LIMIT=10]
+|  order by: SUM(zip) / COUNT(zip) ASC
+|
+01:AGGREGATE [FINALIZE]
+|  output: SUM(id), COUNT(id), SUM(zip), COUNT(zip)
+|  having: COUNT(id) > 0
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:TOP-N
-  |  order by: SUM(zip) / COUNT(zip) ASC
-  |  limit: 10
-  |
-  4:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(id)), SUM(COUNT(id)), SUM(SUM(zip)), SUM(COUNT(zip))
-  |  having: COUNT(id) > 0
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    UNPARTITIONED
-
-  1:AGGREGATE
-  |  output: SUM(id), COUNT(id), SUM(zip), COUNT(zip)
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+02:TOP-N [LIMIT=10]
+|  order by: SUM(zip) / COUNT(zip) ASC
+|
+04:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(id)), SUM(COUNT(id)), SUM(SUM(zip)), SUM(COUNT(zip))
+|  having: COUNT(id) > 0
+|
+03:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: SUM(id), COUNT(id), SUM(zip), COUNT(zip)
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ====

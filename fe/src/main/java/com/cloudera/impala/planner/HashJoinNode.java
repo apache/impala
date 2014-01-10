@@ -268,24 +268,30 @@ public class HashJoinNode extends PlanNode {
   }
 
   @Override
-  protected String getNodeExplainString(String detailPrefix,
+  protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
-    String distrModeStr = (distrMode_ != DistributionMode.NONE) ?
-        (" (" + distrMode_.toString() + ")") : "";
-    StringBuilder output = new StringBuilder()
-      .append(detailPrefix + "join op: " + joinOp_.toString() + distrModeStr + "\n")
-      .append(detailPrefix + "hash predicates:\n");
-    for (Pair<Expr, Expr> entry: eqJoinConjuncts_) {
-      output.append(detailPrefix + "  " +
-          entry.first.toSql() + " = " + entry.second.toSql() + "\n");
-    }
-    if (!otherJoinConjuncts_.isEmpty()) {
-      output.append(detailPrefix + "other join predicates: ")
-          .append(getExplainString(otherJoinConjuncts_) + "\n");
-    }
-    if (!conjuncts_.isEmpty()) {
-      output.append(detailPrefix + "other predicates: ")
-          .append(getExplainString(conjuncts_) + "\n");
+    StringBuilder output = new StringBuilder();
+    output.append(String.format("%s%s:%s [%s", prefix, id_.toString(),
+        displayName_, joinOp_.toString()));
+    if (distrMode_ != DistributionMode.NONE) output.append(", " + distrMode_.toString());
+    output.append("]\n");
+
+    if (detailLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
+      output.append(detailPrefix + "hash predicates: ");
+      for (int i = 0; i < eqJoinConjuncts_.size(); ++i) {
+        Pair<Expr, Expr> eqConjunct = eqJoinConjuncts_.get(i);
+        output.append(eqConjunct.first.toSql() + " = " + eqConjunct.second.toSql());
+        if (i + 1 != eqJoinConjuncts_.size()) output.append(", ");
+      }
+      output.append("\n");
+      if (!otherJoinConjuncts_.isEmpty()) {
+        output.append(detailPrefix + "other join predicates: ")
+        .append(getExplainString(otherJoinConjuncts_) + "\n");
+      }
+      if (!conjuncts_.isEmpty()) {
+        output.append(detailPrefix + "other predicates: ")
+        .append(getExplainString(conjuncts_) + "\n");
+      }
     }
     return output.toString();
   }

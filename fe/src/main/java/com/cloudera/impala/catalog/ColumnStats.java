@@ -97,12 +97,12 @@ public class ColumnStats {
    * source slots, e.g., those produced by union queries.
    */
   public ColumnStats add(ColumnStats other) {
-    if (numDistinctValues_ != -1 || other.numDistinctValues_ == -1) {
+    if (numDistinctValues_ == -1 || other.numDistinctValues_ == -1) {
       numDistinctValues_ = -1;
     } else {
       numDistinctValues_ += other.numDistinctValues_;
     }
-    if (numNulls_ != -1 || other.numNulls_ != -1) {
+    if (numNulls_ == -1 || other.numNulls_ == -1) {
       numNulls_ = -1;
     } else {
       numNulls_ += other.numNulls_;

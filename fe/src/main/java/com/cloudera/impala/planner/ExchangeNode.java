@@ -20,8 +20,8 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExchangeNode;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Preconditions;
@@ -97,7 +97,34 @@ public class ExchangeNode extends PlanNode {
     avgRowSize_ = Integer.MIN_VALUE;
     for (PlanNode child: children_) {
       numNodes_ = Math.max(child.numNodes_, numNodes_);
-      avgRowSize_ =  Math.max(child.numNodes_, numNodes_);
+      avgRowSize_ = Math.max(child.avgRowSize_, avgRowSize_);
+    }
+  }
+
+  @Override
+  protected String getNodeExplainString(String prefix, String detailPrefix,
+      TExplainLevel detailLevel) {
+    StringBuilder output = new StringBuilder();
+    output.append(String.format("%s%s:%s [%s]\n", prefix, id_.toString(), displayName_,
+        getPartitionExplainString()));
+    return output.toString();
+  }
+
+  public String getPartitionExplainString() {
+    // For the non-fragmented explain levels, print the data partition
+    // of the data stream sink that sends to this exchange node.
+    Preconditions.checkState(!children_.isEmpty());
+    DataSink sink = getChild(0).getFragment().getSink();
+    if (sink == null) return "";
+    Preconditions.checkState(sink instanceof DataStreamSink);
+    DataStreamSink streamSink = (DataStreamSink) sink;
+    if (!streamSink.getOutputPartition().isPartitioned() &&
+        fragment_.isPartitioned()) {
+      // If the output of the sink is not partitioned but the target fragment is
+      // partitioned, then the data exchange is broadcast.
+      return "BROADCAST";
+    } else {
+      return streamSink.getOutputPartition().getExplainString();
     }
   }
 

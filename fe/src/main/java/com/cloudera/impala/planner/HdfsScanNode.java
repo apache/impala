@@ -213,6 +213,7 @@ public class HdfsScanNode extends ScanNode {
                 " sel=" + Double.toString(computeSelectivity()));
       cardinality_ = Math.round((double) cardinality_ * computeSelectivity());
     }
+    cardinality_ = capAtLimit(cardinality_);
     LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
 
     // TODO: take actual partitions into account
@@ -282,25 +283,40 @@ public class HdfsScanNode extends ScanNode {
   }
 
   @Override
-  protected String getNodeExplainString(String prefix, TExplainLevel detailLevel) {
+  protected String getNodeExplainString(String prefix, String detailPrefix,
+      TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     HdfsTable table = (HdfsTable) desc_.getTable();
-    output.append(prefix + "table=" + table.getFullName());
-    // Exclude the dummy default partition from the total partition count.
-    output.append(String.format(" #partitions=%s/%s", partitions_.size(),
-        table.getPartitions().size() - 1));
-    output.append(" size=" + PrintUtils.printBytes(totalBytes_));
-    if (compactData_) {
-      output.append(" compact\n");
-    } else {
-      output.append("\n");
+    String aliasStr = "";
+    if (!table.getFullName().equalsIgnoreCase(desc_.getAlias()) &&
+        !table.getName().equalsIgnoreCase(desc_.getAlias())) {
+      aliasStr = " " + desc_.getAlias();
     }
-    if (!conjuncts_.isEmpty()) {
-      output.append(prefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+    output.append(String.format("%s%s:%s [%s%s", prefix, id_.toString(),
+        displayName_, table.getFullName(), aliasStr));
+    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() &&
+        fragment_.isPartitioned()) {
+      output.append(", " + fragment_.getDataPartition().getExplainString());
     }
-    // Add table and column stats in verbose mode.
-    if (detailLevel == TExplainLevel.VERBOSE) {
-      output.append(getStatsExplainString(prefix, detailLevel));
+    output.append("]\n");
+    if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      int numPartitions = partitions_.size();
+      if (tbl_.getNumClusteringCols() == 0) numPartitions = 1;
+      output.append(String.format("%spartitions=%s/%s size=%s", detailPrefix,
+          numPartitions, table.getPartitions().size() - 1,
+          PrintUtils.printBytes(totalBytes_)));
+      if (compactData_) {
+        output.append(" compact\n");
+      } else {
+        output.append("\n");
+      }
+      if (!conjuncts_.isEmpty()) {
+        output.append(
+            detailPrefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+      }
+    }
+    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      output.append(getStatsExplainString(detailPrefix, detailLevel));
       output.append("\n");
     }
     return output.toString();

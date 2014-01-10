@@ -18,41 +18,41 @@ import com.cloudera.impala.thrift.TDataSink;
 import com.cloudera.impala.thrift.TDataSinkType;
 import com.cloudera.impala.thrift.TDataStreamSink;
 import com.cloudera.impala.thrift.TExplainLevel;
+import com.google.common.base.Preconditions;
 
 /**
  * Data sink that forwards data to an exchange node.
- *
  */
 public class DataStreamSink extends DataSink {
-  private final PlanNodeId exchNodeId_;
-  private DataPartition outputPartition_;
+  private final ExchangeNode exchNode_;
+  private final DataPartition outputPartition_;
 
-  public DataStreamSink(PlanNodeId exchNodeId) {
-    exchNodeId_ = exchNodeId;
-  }
-
-  public void setPartition(DataPartition partition) {
+  public DataStreamSink(ExchangeNode exchNode, DataPartition partition) {
+    Preconditions.checkNotNull(exchNode);
+    Preconditions.checkNotNull(partition);
+    exchNode_ = exchNode;
     outputPartition_ = partition;
   }
 
   @Override
-  public String getExplainString(String prefix, TExplainLevel explainLevel) {
-    StringBuilder strBuilder = new StringBuilder();
-    strBuilder.append(prefix + "STREAM DATA SINK\n");
-    strBuilder.append(prefix + "  EXCHANGE ID: " + exchNodeId_ + "\n");
-    if (outputPartition_ != null) {
-      strBuilder.append(prefix + "  "
-          + outputPartition_.getExplainString(explainLevel));
-    }
-    return strBuilder.toString();
+  public String getExplainString(String prefix, String detailPrefix,
+      TExplainLevel detailLevel) {
+    StringBuilder output = new StringBuilder();
+    output.append(
+        String.format("%sDATASTREAM SINK [FRAGMENT=%s, EXCHANGE=%s, %s]",
+        prefix, exchNode_.getFragment().getId().toString(),
+        exchNode_.getId().toString(), exchNode_.getPartitionExplainString()));
+    return output.toString();
   }
 
   @Override
   protected TDataSink toThrift() {
     TDataSink result = new TDataSink(TDataSinkType.DATA_STREAM_SINK);
     TDataStreamSink tStreamSink =
-        new TDataStreamSink(exchNodeId_.asInt(), outputPartition_.toThrift());
+        new TDataStreamSink(exchNode_.getId().asInt(), outputPartition_.toThrift());
     result.setStream_sink(tStreamSink);
     return result;
   }
+
+  public DataPartition getOutputPartition() { return outputPartition_; }
 }

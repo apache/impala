@@ -82,6 +82,8 @@ public class Planner {
   public final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
 
   private final IdGenerator<PlanNodeId> nodeIdGenerator_ = PlanNodeId.createGenerator();
+  private final IdGenerator<PlanFragmentId> fragmentIdGenerator_ =
+      PlanFragmentId.createGenerator();
 
   /**
    * Create plan fragments for an analyzed statement, given a set of execution options.
@@ -125,7 +127,8 @@ public class Planner {
       // single-node execution; we're almost done
       singleNodePlan =
           addUnassignedConjuncts(analyzer, singleNodePlan.getTupleIds(), singleNodePlan);
-      fragments.add(new PlanFragment(singleNodePlan, DataPartition.UNPARTITIONED));
+      fragments.add(new PlanFragment(
+          fragmentIdGenerator_.getNextId(), singleNodePlan, DataPartition.UNPARTITIONED));
     } else {
       // For inserts, unless there is a limit clause, leave the root fragment
       // partitioned, otherwise merge everything into a single coordinator fragment,
@@ -172,21 +175,25 @@ public class Planner {
   public String getExplainString(ArrayList<PlanFragment> fragments,
       TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
-    if (request.isSetPer_host_mem_req() && request.isSetPer_host_vcores()
-        && explainLevel == TExplainLevel.VERBOSE) {
+    if (request.isSetPer_host_mem_req() && request.isSetPer_host_vcores()) {
       str.append(
           String.format("Estimated Per-Host Requirements: Memory=%s VCores=%s\n\n",
           PrintUtils.printBytes(request.getPer_host_mem_req()),
           request.per_host_vcores));
     }
-    for (int i = 0; i < fragments.size(); ++i) {
-      PlanFragment fragment = fragments.get(i);
-      if (i > 0) {
-        // a blank line between plan fragments
-        str.append("\n");
+
+    if (explainLevel.ordinal() < TExplainLevel.VERBOSE.ordinal()) {
+      // Print the non-fragmented parallel plan.
+      str.append(fragments.get(0).getExplainString(explainLevel));
+    } else {
+      // Print the fragmented parallel plan.
+      for (int i = 0; i < fragments.size(); ++i) {
+        PlanFragment fragment = fragments.get(i);
+        str.append(fragment.getExplainString(explainLevel));
+        if (explainLevel == TExplainLevel.VERBOSE && i + 1 != fragments.size()) {
+          str.append("\n");
+        }
       }
-      str.append("PLAN FRAGMENT " + i + "\n");
-      str.append(fragment.getExplainString(explainLevel));
     }
     return str.toString();
   }
@@ -328,8 +335,9 @@ public class Planner {
     Preconditions.checkState(exchNode.hasValidStats());
     DataPartition partition =
         new DataPartition(TPartitionType.HASH_PARTITIONED, nonConstPartitionExprs);
-    PlanFragment fragment = new PlanFragment(exchNode, partition);
-    inputFragment.setDestination(fragment, exchNode.getId());
+    PlanFragment fragment =
+        new PlanFragment(fragmentIdGenerator_.getNextId(), exchNode, partition);
+    inputFragment.setDestination(exchNode);
     inputFragment.setOutputPartition(partition);
     fragments.add(fragment);
     return fragment;
@@ -348,10 +356,9 @@ public class Planner {
     mergePlan.addChild(inputFragment.getPlanRoot(), false);
     mergePlan.init(analyzer);
     Preconditions.checkState(mergePlan.hasValidStats());
-    PlanNodeId exchId = mergePlan.getId();
-    PlanFragment fragment =
-        new PlanFragment(mergePlan, DataPartition.UNPARTITIONED);
-    inputFragment.setDestination(fragment, exchId);
+    PlanFragment fragment = new PlanFragment(fragmentIdGenerator_.getNextId(), mergePlan,
+        DataPartition.UNPARTITIONED);
+    inputFragment.setDestination(mergePlan);
     return fragment;
   }
 
@@ -362,7 +369,8 @@ public class Planner {
    * TODO: hbase scans are range-partitioned on the row key
    */
   private PlanFragment createScanFragment(PlanNode node) {
-    return new PlanFragment(node, DataPartition.RANDOM);
+    return new PlanFragment(
+        fragmentIdGenerator_.getNextId(), node, DataPartition.RANDOM);
   }
 
   /**
@@ -495,7 +503,7 @@ public class Planner {
         // Redirect fragments sending to rightFragment to leftFragment.
         for (PlanFragment fragment: fragments) {
           if (fragment.getDestFragment() == rightChildFragment) {
-            fragment.setDestination(leftChildFragment, fragment.getDestNodeId());
+            fragment.setDestination(fragment.getDestNode());
           }
         }
         // Remove right fragment because its plan tree has been merged into leftFragment.
@@ -547,10 +555,11 @@ public class Planner {
 
       // Connect the child fragments in a new fragment, and set the data partition
       // of the new fragment and its child fragments.
-      PlanFragment joinFragment = new PlanFragment(node, lhsJoinPartition);
-      leftChildFragment.setDestination(joinFragment, lhsExchange.getId());
+      PlanFragment joinFragment =
+          new PlanFragment(fragmentIdGenerator_.getNextId(), node, lhsJoinPartition);
+      leftChildFragment.setDestination(lhsExchange);
       leftChildFragment.setOutputPartition(lhsJoinPartition);
-      rightChildFragment.setDestination(joinFragment, rhsExchange.getId());
+      rightChildFragment.setDestination(rhsExchange);
       rightChildFragment.setOutputPartition(rhsJoinPartition);
 
       return joinFragment;
@@ -580,15 +589,16 @@ public class Planner {
     // If the mergeNode only has constant exprs, return it in an unpartitioned fragment.
     if (mergeNode.getChildren().isEmpty()) {
       Preconditions.checkState(!mergeNode.getConstExprLists().isEmpty());
-      return new PlanFragment(mergeNode, DataPartition.UNPARTITIONED);
+      return new PlanFragment(
+          fragmentIdGenerator_.getNextId(), mergeNode, DataPartition.UNPARTITIONED);
     }
 
     // create an ExchangeNode to perform the merge operation of mergeNode;
     // the ExchangeNode retains the generic PlanNode parameters of mergeNode
     ExchangeNode exchNode = new ExchangeNode(nodeIdGenerator_.getNextId());
-    exchNode.addChild(mergeNode, true);
-    PlanFragment parentFragment =
-        new PlanFragment(exchNode, DataPartition.UNPARTITIONED);
+    PlanFragment parentFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
+        exchNode, DataPartition.UNPARTITIONED);
+    exchNode.setFragment(parentFragment);
 
     // we don't expect to be parallelizing a MergeNode that was inserted solely
     // to evaluate conjuncts_ (ie, that doesn't explicitly materialize its output)
@@ -601,7 +611,7 @@ public class Planner {
               nodeIdGenerator_.getNextId(), mergeNode, i, childFragment.getPlanRoot());
       childMergeNode.init(analyzer);
       childFragment.setPlanRoot(childMergeNode);
-      childFragment.setDestination(parentFragment, exchNode.getId());
+      childFragment.setDestination(exchNode);
       exchNode.addChild(childMergeNode, true);
     }
 
@@ -612,10 +622,10 @@ public class Planner {
       childMergeNode.init(analyzer);
       // Clear original constant exprs to make sure nobody else picks them up.
       mergeNode.getConstExprLists().clear();
-      PlanFragment childFragment =
-          new PlanFragment(childMergeNode, DataPartition.UNPARTITIONED);
+      PlanFragment childFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
+          childMergeNode, DataPartition.UNPARTITIONED);
       childFragment.setPlanRoot(childMergeNode);
-      childFragment.setDestination(parentFragment, exchNode.getId());
+      childFragment.setDestination(exchNode);
       childFragments.add(childFragment);
       fragments.add(childFragment);
       exchNode.addChild(childMergeNode, true);
@@ -651,7 +661,7 @@ public class Planner {
     exchangeNode.addChild(childFragment.getPlanRoot(), false);
     exchangeNode.init(analyzer);
     node.setChild(childIdx, exchangeNode);
-    childFragment.setDestination(parentFragment, exchangeNode.getId());
+    childFragment.setDestination(exchangeNode);
   }
 
   /**
@@ -670,8 +680,9 @@ public class Planner {
     ExchangeNode exchangeNode = new ExchangeNode(nodeIdGenerator_.getNextId());
     exchangeNode.addChild(childFragment.getPlanRoot(), false);
     exchangeNode.init(analyzer);
-    PlanFragment parentFragment = new PlanFragment(exchangeNode, parentPartition);
-    childFragment.setDestination(parentFragment, exchangeNode.getId());
+    PlanFragment parentFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
+        exchangeNode, parentPartition);
+    childFragment.setDestination(exchangeNode);
     childFragment.setOutputPartition(parentPartition);
     return parentFragment;
   }
@@ -1198,11 +1209,12 @@ public class Planner {
       boolean isDefaultLimit = (limit == -1);
       root = new SortNode(nodeIdGenerator_.getNextId(), root, sortInfo, true,
           isDefaultLimit, offset);
-      root.init(analyzer);
       Preconditions.checkState(root.hasValidStats());
       root.setLimit(limit != -1 ? limit : defaultOrderByLimit);
+      root.init(analyzer);
     } else {
       root.setLimit(limit);
+      root.computeStats(analyzer);
     }
     return root;
   }
@@ -1838,12 +1850,15 @@ public class Planner {
     Preconditions.checkNotNull(request);
 
     // Maps from an ExchangeNode's PlanNodeId to the fragments feeding it.
+    // TODO: This mapping is not necessary anymore. Remove it and clean up.
     Map<PlanNodeId, List<PlanFragment>> exchangeSources = Maps.newHashMap();
     for (PlanFragment fragment: fragments) {
-      List<PlanFragment> srcFragments = exchangeSources.get(fragment.getDestNodeId());
+      if (fragment.getDestNode() == null) continue;
+      List<PlanFragment> srcFragments =
+          exchangeSources.get(fragment.getDestNode().getId());
       if (srcFragments == null) {
         srcFragments = Lists.newArrayList();
-        exchangeSources.put(fragment.getDestNodeId(), srcFragments);
+        exchangeSources.put(fragment.getDestNode().getId(), srcFragments);
       }
       srcFragments.add(fragment);
     }

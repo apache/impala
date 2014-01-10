@@ -2,243 +2,143 @@
 select distinct *
 from functional.testtbl
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:AGGREGATE (finalize)
-  |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+01:AGGREGATE [FINALIZE]
+|  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  3:AGGREGATE (merge finalize)
-  |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    HASH_PARTITIONED: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-
-  1:AGGREGATE
-  |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+03:AGGREGATE [MERGE FINALIZE]
+|  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
+|
+02:EXCHANGE [PARTITION=HASH(functional.testtbl.id,functional.testtbl.name,functional.testtbl.zip)]
+|
+01:AGGREGATE
+|  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ====
 # distinct w/ explicit select list
 select distinct id, zip
 from functional.testtbl
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:AGGREGATE (finalize)
-  |  group by: id, zip
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+01:AGGREGATE [FINALIZE]
+|  group by: id, zip
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  4:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: id, zip
-
-  STREAM DATA SINK
-    EXCHANGE ID: 4
-    UNPARTITIONED
-
-  3:AGGREGATE (merge finalize)
-  |  group by: id, zip
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    HASH_PARTITIONED: id, zip
-
-  1:AGGREGATE
-  |  group by: id, zip
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+03:AGGREGATE [MERGE FINALIZE]
+|  group by: id, zip
+|
+02:EXCHANGE [PARTITION=HASH(id,zip)]
+|
+01:AGGREGATE
+|  group by: id, zip
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ====
 # count(distinct)
 select count(distinct id, zip)
 from functional.testtbl
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(if(id IS NULL, NULL, zip))
-  |
-  1:AGGREGATE
-  |  group by: id, zip
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(if(id IS NULL, NULL, zip))
+|
+01:AGGREGATE
+|  group by: id, zip
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(if(id IS NULL, NULL, zip)))
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: id, zip
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:AGGREGATE (merge)
-  |  output: COUNT(if(id IS NULL, NULL, zip))
-  |
-  4:AGGREGATE (merge)
-  |  group by: id, zip
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: id, zip
-
-  1:AGGREGATE
-  |  group by: id, zip
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+06:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(COUNT(if(id IS NULL, NULL, zip)))
+|
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:AGGREGATE [MERGE]
+|  output: COUNT(if(id IS NULL, NULL, zip))
+|
+04:AGGREGATE [MERGE]
+|  group by: id, zip
+|
+03:EXCHANGE [PARTITION=HASH(id,zip)]
+|
+01:AGGREGATE
+|  group by: id, zip
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ====
 # count(distinct) w/ grouping
 select tinyint_col, count(distinct int_col, bigint_col)
 from functional.alltypesagg
 group by 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(if(int_col IS NULL, NULL, bigint_col))
-  |  group by: tinyint_col
-  |
-  1:AGGREGATE
-  |  group by: tinyint_col, int_col, bigint_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(if(int_col IS NULL, NULL, bigint_col))
+|  group by: tinyint_col
+|
+01:AGGREGATE
+|  group by: tinyint_col, int_col, bigint_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: tinyint_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(if(int_col IS NULL, NULL, bigint_col))
-  |  group by: tinyint_col
-  |
-  4:AGGREGATE (merge)
-  |  group by: tinyint_col, int_col, bigint_col
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: tinyint_col
-
-  1:AGGREGATE
-  |  group by: tinyint_col, int_col, bigint_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(if(int_col IS NULL, NULL, bigint_col))
+|  group by: tinyint_col
+|
+04:AGGREGATE [MERGE]
+|  group by: tinyint_col, int_col, bigint_col
+|
+03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+|
+01:AGGREGATE
+|  group by: tinyint_col, int_col, bigint_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ====
 # count(distinct) and sum(distinct) w/ grouping
 select tinyint_col, count(distinct int_col), sum(distinct int_col)
 from functional.alltypesagg
 group by 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(int_col), SUM(int_col)
-  |  group by: tinyint_col
-  |
-  1:AGGREGATE
-  |  group by: tinyint_col, int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(int_col), SUM(int_col)
+|  group by: tinyint_col
+|
+01:AGGREGATE
+|  group by: tinyint_col, int_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: tinyint_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(int_col), SUM(int_col)
-  |  group by: tinyint_col
-  |
-  4:AGGREGATE (merge)
-  |  group by: tinyint_col, int_col
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: tinyint_col
-
-  1:AGGREGATE
-  |  group by: tinyint_col, int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(int_col), SUM(int_col)
+|  group by: tinyint_col
+|
+04:AGGREGATE [MERGE]
+|  group by: tinyint_col, int_col
+|
+03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+|
+01:AGGREGATE
+|  group by: tinyint_col, int_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ====
 # count(distinct) and sum(distinct) w/ grouping; distinct in min() and max()
 # is ignored
@@ -246,110 +146,70 @@ select tinyint_col, count(distinct int_col),
 min(distinct smallint_col), max(distinct string_col)
 from functional.alltypesagg group by 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(int_col), MIN(MIN(smallint_col)), MAX(MAX(string_col))
-  |  group by: tinyint_col
-  |
-  1:AGGREGATE
-  |  output: MIN(smallint_col), MAX(string_col)
-  |  group by: tinyint_col, int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(int_col), MIN(MIN(smallint_col)), MAX(MAX(string_col))
+|  group by: tinyint_col
+|
+01:AGGREGATE
+|  output: MIN(smallint_col), MAX(string_col)
+|  group by: tinyint_col, int_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: tinyint_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(int_col), MIN(MIN(smallint_col)), MAX(MAX(string_col))
-  |  group by: tinyint_col
-  |
-  4:AGGREGATE (merge)
-  |  output: MIN(MIN(smallint_col)), MAX(MAX(string_col))
-  |  group by: tinyint_col, int_col
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: tinyint_col
-
-  1:AGGREGATE
-  |  output: MIN(smallint_col), MAX(string_col)
-  |  group by: tinyint_col, int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(int_col), MIN(MIN(smallint_col)), MAX(MAX(string_col))
+|  group by: tinyint_col
+|
+04:AGGREGATE [MERGE]
+|  output: MIN(MIN(smallint_col)), MAX(MAX(string_col))
+|  group by: tinyint_col, int_col
+|
+03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+|
+01:AGGREGATE
+|  output: MIN(smallint_col), MAX(string_col)
+|  group by: tinyint_col, int_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ====
 # aggregate fns with and without distinct
 select tinyint_col, count(distinct int_col), count(*), sum(distinct int_col),
 sum(int_col), min(smallint_col), max(bigint_col)
 from functional.alltypesagg group by 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(int_col), SUM(int_col), SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
-  |  group by: tinyint_col
-  |
-  1:AGGREGATE
-  |  output: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
-  |  group by: tinyint_col, int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(int_col), SUM(int_col), SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
+|  group by: tinyint_col
+|
+01:AGGREGATE
+|  output: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
+|  group by: tinyint_col, int_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: tinyint_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(int_col), SUM(int_col), SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
-  |  group by: tinyint_col
-  |
-  4:AGGREGATE (merge)
-  |  output: SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
-  |  group by: tinyint_col, int_col
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: tinyint_col
-
-  1:AGGREGATE
-  |  output: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
-  |  group by: tinyint_col, int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypesagg #partitions=10/10 size=743.67KB
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(int_col), SUM(int_col), SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
+|  group by: tinyint_col
+|
+04:AGGREGATE [MERGE]
+|  output: SUM(COUNT(*)), SUM(SUM(int_col)), MIN(MIN(smallint_col)), MAX(MAX(bigint_col))
+|  group by: tinyint_col, int_col
+|
+03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+|
+01:AGGREGATE
+|  output: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
+|  group by: tinyint_col, int_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
 ====
 # test join on inline views containing distinct aggregates to make sure
 # the aggregation info reports the correct tuple ids (from the 2nd phase
@@ -358,112 +218,67 @@ select t1.c, t2.c from
 (select count(distinct int_col) as c from functional.alltypestiny) t1 inner join
 (select count(distinct bigint_col) as c from functional.alltypestiny) t2 on (t1.c = t2.c)
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:HASH JOIN
-  |  join op: INNER JOIN
-  |  hash predicates:
-  |    COUNT(int_col) = COUNT(bigint_col)
-  |
-  |----5:AGGREGATE (merge finalize)
-  |    |  output: COUNT(bigint_col)
-  |    |
-  |    4:AGGREGATE
-  |    |  group by: bigint_col
-  |    |
-  |    3:SCAN HDFS
-  |       table=functional.alltypestiny #partitions=4/4 size=460B
-  |
-  2:AGGREGATE (merge finalize)
-  |  output: COUNT(int_col)
-  |
-  1:AGGREGATE
-  |  group by: int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: COUNT(int_col) = COUNT(bigint_col)
+|
+|--05:AGGREGATE [MERGE FINALIZE]
+|  |  output: COUNT(bigint_col)
+|  |
+|  04:AGGREGATE
+|  |  group by: bigint_col
+|  |
+|  03:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=460B
+|
+02:AGGREGATE [MERGE FINALIZE]
+|  output: COUNT(int_col)
+|
+01:AGGREGATE
+|  group by: int_col
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:HASH JOIN
-  |  join op: INNER JOIN (BROADCAST)
-  |  hash predicates:
-  |    COUNT(int_col) = COUNT(bigint_col)
-  |
-  |----15:EXCHANGE
-  |
-  10:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(int_col))
-  |
-  9:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: UNPARTITIONED
-
-  STREAM DATA SINK
-    EXCHANGE ID: 15
-    UNPARTITIONED
-
-  14:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(bigint_col))
-  |
-  13:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: HASH_PARTITIONED: bigint_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 13
-    UNPARTITIONED
-
-  5:AGGREGATE (merge)
-  |  output: COUNT(bigint_col)
-  |
-  12:AGGREGATE (merge)
-  |  group by: bigint_col
-  |
-  11:EXCHANGE
-
-PLAN FRAGMENT 3
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 11
-    HASH_PARTITIONED: bigint_col
-
-  4:AGGREGATE
-  |  group by: bigint_col
-  |
-  3:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
-
-PLAN FRAGMENT 4
-  PARTITION: HASH_PARTITIONED: int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-    UNPARTITIONED
-
-  2:AGGREGATE (merge)
-  |  output: COUNT(int_col)
-  |
-  8:AGGREGATE (merge)
-  |  group by: int_col
-  |
-  7:EXCHANGE
-
-PLAN FRAGMENT 5
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 7
-    HASH_PARTITIONED: int_col
-
-  1:AGGREGATE
-  |  group by: int_col
-  |
-  0:SCAN HDFS
-     table=functional.alltypestiny #partitions=4/4 size=460B
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: COUNT(int_col) = COUNT(bigint_col)
+|
+|--15:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |
+|  14:AGGREGATE [MERGE FINALIZE]
+|  |  output: SUM(COUNT(bigint_col))
+|  |
+|  13:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |
+|  05:AGGREGATE [MERGE]
+|  |  output: COUNT(bigint_col)
+|  |
+|  12:AGGREGATE [MERGE]
+|  |  group by: bigint_col
+|  |
+|  11:EXCHANGE [PARTITION=HASH(bigint_col)]
+|  |
+|  04:AGGREGATE
+|  |  group by: bigint_col
+|  |
+|  03:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=460B
+|
+10:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(COUNT(int_col))
+|
+09:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:AGGREGATE [MERGE]
+|  output: COUNT(int_col)
+|
+08:AGGREGATE [MERGE]
+|  group by: int_col
+|
+07:EXCHANGE [PARTITION=HASH(int_col)]
+|
+01:AGGREGATE
+|  group by: int_col
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
 ====

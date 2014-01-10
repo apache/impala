@@ -240,7 +240,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public String getExplainString() {
-    return getExplainString("", "", TExplainLevel.NORMAL);
+    return getExplainString("", "", TExplainLevel.VERBOSE);
   }
 
   protected void setDisplayName(String s) { displayName_ = s; }
@@ -266,9 +266,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     StringBuilder expBuilder = new StringBuilder();
     String detailPrefix = prefix;
     String filler;
+    boolean printFiller = (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal());
+
     // Do not traverse into the children of an Exchange node to avoid crossing
     // fragment boundaries.
-    if (children_ != null && children_.size() > 0 && !(this instanceof ExchangeNode)) {
+    boolean traverseChildren = !children_.isEmpty() &&
+        !(this instanceof ExchangeNode && detailLevel == TExplainLevel.VERBOSE);
+
+    if (traverseChildren) {
       detailPrefix += "|  ";
       filler = prefix + "|";
     } else {
@@ -279,38 +284,45 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // Print the current node
     // The plan node header line will be prefixed by rootPrefix and the remaining details
     // will be prefixed by detailPrefix.
-    expBuilder.append(rootPrefix + id_.asInt() + ":" + displayName_ + "\n");
-    expBuilder.append(getNodeExplainString(detailPrefix, detailLevel));
-    if (limit_ != -1) expBuilder.append(detailPrefix + "limit: " + limit_ + "\n");
-    expBuilder.append(getOffsetExplainString(detailPrefix));
+    expBuilder.append(getNodeExplainString(rootPrefix, detailPrefix, detailLevel));
+
+    if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal() &&
+        !(this instanceof SortNode)) {
+      if (limit_ != -1) expBuilder.append(detailPrefix + "limit: " + limit_ + "\n");
+      expBuilder.append(getOffsetExplainString(detailPrefix));
+    }
 
     // Output cardinality, cost estimates and tuple Ids only when explain plan level
-    // is set to verbose
-    if (detailLevel.equals(TExplainLevel.VERBOSE)) {
+    // is extended or above.
+    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       // Print estimated output cardinality and memory cost.
-      expBuilder.append(PrintUtils.printCardinality(detailPrefix, cardinality_) + "\n");
-      expBuilder.append(PrintUtils.printMemCost(detailPrefix, perHostMemCost_) + "\n");
+      expBuilder.append(PrintUtils.printHosts(detailPrefix, numNodes_));
+      expBuilder.append(PrintUtils.printMemCost(" ", perHostMemCost_) + "\n");
 
-      // Print tuple ids.
-     expBuilder.append(detailPrefix + "tuple ids: ");
-      for (TupleId tupleId: tupleIds_) {
+      // Print tuple ids and row size.
+      expBuilder.append(detailPrefix + "tuple-ids=");
+      for (int i = 0; i < tupleIds_.size(); ++i) {
+        TupleId tupleId = tupleIds_.get(i);
         String nullIndicator = nullableTupleIds_.contains(tupleId) ? "N" : "";
-        expBuilder.append(tupleId.asInt() + nullIndicator + " ");
+        expBuilder.append(tupleId.asInt() + nullIndicator);
+        if (i + 1 != tupleIds_.size()) expBuilder.append(",");
       }
+      expBuilder.append(" row-size=" + PrintUtils.printBytes(Math.round(avgRowSize_)));
+      expBuilder.append(PrintUtils.printCardinality(" ", cardinality_));
       expBuilder.append("\n");
     }
 
     // Print the children. Do not traverse into the children of an Exchange node to
     // avoid crossing fragment boundaries.
-    if (children_ != null && children_.size() > 0 && !(this instanceof ExchangeNode)) {
-      expBuilder.append(filler + "\n");
-      String childHeadlinePrefix = prefix + "|----";
-      String childDetailPrefix = prefix + "|    ";
+    if (traverseChildren) {
+      if (printFiller) expBuilder.append(filler + "\n");
+      String childHeadlinePrefix = prefix + "|--";
+      String childDetailPrefix = prefix + "|  ";
       for (int i = children_.size() - 1; i >= 1; --i) {
         expBuilder.append(
             children_.get(i).getExplainString(childHeadlinePrefix, childDetailPrefix,
                 detailLevel));
-        expBuilder.append(filler + "\n");
+        if (printFiller) expBuilder.append(filler + "\n");
       }
       expBuilder.append(children_.get(0).getExplainString(prefix, prefix, detailLevel));
     }
@@ -322,7 +334,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Subclass should override this function.
    * Each line should be prefix by detailPrefix.
    */
-  protected String getNodeExplainString(String prefix, TExplainLevel detailLevel) {
+  protected String getNodeExplainString(String rootPrefix, String detailPrefix,
+      TExplainLevel detailLevel) {
     return "";
   }
 
@@ -434,6 +447,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       avgRowSize_ += desc.getAvgSerializedSize();
     }
     if (!children_.isEmpty()) numNodes_ = getChild(0).numNodes_;
+  }
+
+  protected long capAtLimit(long cardinality) {
+    if (hasLimit()) {
+      if (cardinality == -1) {
+        return limit_;
+      } else {
+        return Math.min(cardinality, limit_);
+      }
+    }
+    return cardinality;
   }
 
   /**

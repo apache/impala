@@ -57,10 +57,11 @@ enum TStmtType {
   LOAD // Statement type for LOAD commands
 }
 
-// level of verboseness for "explain" output
-// TODO: should this go somewhere else?
+// Level of verboseness for "explain" output.
 enum TExplainLevel {
-  NORMAL,
+  MINIMAL,
+  STANDARD,
+  EXTENDED,
   VERBOSE
 }
 

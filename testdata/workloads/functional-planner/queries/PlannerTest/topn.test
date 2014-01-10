@@ -3,38 +3,22 @@ from functional.testtbl
 order by name
 limit 1
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  1:TOP-N
-  |  order by: name ASC
-  |  limit: 1
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+01:TOP-N [LIMIT=1]
+|  order by: name ASC
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  3:TOP-N
-  |  order by: name ASC
-  |  limit: 1
-  |
-  2:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-    UNPARTITIONED
-
-  1:TOP-N
-  |  order by: name ASC
-  |  limit: 1
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
+03:TOP-N [LIMIT=1]
+|  order by: name ASC
+|
+02:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+01:TOP-N [LIMIT=1]
+|  order by: name ASC
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
 ====
 select zip, count(*)
 from functional.testtbl
@@ -43,61 +27,38 @@ group by 1
 order by 2 desc
 limit 10
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:TOP-N
-  |  order by: COUNT(*) DESC
-  |  limit: 10
-  |
-  1:AGGREGATE (finalize)
-  |  output: COUNT(*)
-  |  group by: zip
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
-     predicates: name LIKE 'm%'
+02:TOP-N [LIMIT=10]
+|  order by: COUNT(*) DESC
+|
+01:AGGREGATE [FINALIZE]
+|  output: COUNT(*)
+|  group by: zip
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
+   predicates: name LIKE 'm%'
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:TOP-N
-  |  order by: COUNT(*) DESC
-  |  limit: 10
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: zip
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:TOP-N
-  |  order by: COUNT(*) DESC
-  |  limit: 10
-  |
-  4:AGGREGATE (merge finalize)
-  |  output: SUM(COUNT(*))
-  |  group by: zip
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: zip
-
-  1:AGGREGATE
-  |  output: COUNT(*)
-  |  group by: zip
-  |
-  0:SCAN HDFS
-     table=functional.testtbl #partitions=0/1 size=0B
-     predicates: name LIKE 'm%'
+06:TOP-N [LIMIT=10]
+|  order by: COUNT(*) DESC
+|
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:TOP-N [LIMIT=10]
+|  order by: COUNT(*) DESC
+|
+04:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(COUNT(*))
+|  group by: zip
+|
+03:EXCHANGE [PARTITION=HASH(zip)]
+|
+01:AGGREGATE
+|  output: COUNT(*)
+|  group by: zip
+|
+00:SCAN HDFS [functional.testtbl]
+   partitions=1/1 size=0B
+   predicates: name LIKE 'm%'
 ====
 select int_col, sum(float_col)
 from functional_hbase.alltypessmall
@@ -106,61 +67,36 @@ group by 1
 order by 2
 limit 4
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:TOP-N
-  |  order by: SUM(float_col) ASC
-  |  limit: 4
-  |
-  1:AGGREGATE (finalize)
-  |  output: SUM(float_col)
-  |  group by: int_col
-  |
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: id < 5
+02:TOP-N [LIMIT=4]
+|  order by: SUM(float_col) ASC
+|
+01:AGGREGATE [FINALIZE]
+|  output: SUM(float_col)
+|  group by: int_col
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: id < 5
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:TOP-N
-  |  order by: SUM(float_col) ASC
-  |  limit: 4
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:TOP-N
-  |  order by: SUM(float_col) ASC
-  |  limit: 4
-  |
-  4:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(float_col))
-  |  group by: int_col
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: int_col
-
-  1:AGGREGATE
-  |  output: SUM(float_col)
-  |  group by: int_col
-  |
-  0:SCAN HBASE
-     table:alltypessmall
-     predicates: id < 5
+06:TOP-N [LIMIT=4]
+|  order by: SUM(float_col) ASC
+|
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:TOP-N [LIMIT=4]
+|  order by: SUM(float_col) ASC
+|
+04:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(float_col))
+|  group by: int_col
+|
+03:EXCHANGE [PARTITION=HASH(int_col)]
+|
+01:AGGREGATE
+|  output: SUM(float_col)
+|  group by: int_col
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   predicates: id < 5
 ====
 select int_col, sum(float_col), min(float_col)
 from functional_hbase.alltypessmall
@@ -168,57 +104,32 @@ group by 1
 order by 2,3 desc
 limit 0
 ---- PLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  2:TOP-N
-  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
-  |  limit: 0
-  |
-  1:AGGREGATE (finalize)
-  |  output: SUM(float_col), MIN(float_col)
-  |  group by: int_col
-  |
-  0:SCAN HBASE
-     table:alltypessmall
+02:TOP-N [LIMIT=0]
+|  order by: SUM(float_col) ASC, MIN(float_col) DESC
+|
+01:AGGREGATE [FINALIZE]
+|  output: SUM(float_col), MIN(float_col)
+|  group by: int_col
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
 ---- DISTRIBUTEDPLAN
-PLAN FRAGMENT 0
-  PARTITION: UNPARTITIONED
-
-  6:TOP-N
-  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
-  |  limit: 0
-  |
-  5:EXCHANGE
-
-PLAN FRAGMENT 1
-  PARTITION: HASH_PARTITIONED: int_col
-
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-    UNPARTITIONED
-
-  2:TOP-N
-  |  order by: SUM(float_col) ASC, MIN(float_col) DESC
-  |  limit: 0
-  |
-  4:AGGREGATE (merge finalize)
-  |  output: SUM(SUM(float_col)), MIN(MIN(float_col))
-  |  group by: int_col
-  |
-  3:EXCHANGE
-
-PLAN FRAGMENT 2
-  PARTITION: RANDOM
-
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-    HASH_PARTITIONED: int_col
-
-  1:AGGREGATE
-  |  output: SUM(float_col), MIN(float_col)
-  |  group by: int_col
-  |
-  0:SCAN HBASE
-     table:alltypessmall
+06:TOP-N [LIMIT=0]
+|  order by: SUM(float_col) ASC, MIN(float_col) DESC
+|
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:TOP-N [LIMIT=0]
+|  order by: SUM(float_col) ASC, MIN(float_col) DESC
+|
+04:AGGREGATE [MERGE FINALIZE]
+|  output: SUM(SUM(float_col)), MIN(MIN(float_col))
+|  group by: int_col
+|
+03:EXCHANGE [PARTITION=HASH(int_col)]
+|
+01:AGGREGATE
+|  output: SUM(float_col), MIN(float_col)
+|  group by: int_col
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
 ====
