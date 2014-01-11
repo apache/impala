@@ -16,6 +16,7 @@
 
 #include <sstream>
 #include <boost/thread/mutex.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "catalog/catalog-util.h"
 #include "service/query-exec-state.h"
@@ -30,6 +31,7 @@ using namespace boost;
 using namespace std;
 using namespace impala;
 using namespace beeswax;
+using namespace strings;
 
 DECLARE_int32(query_log_size);
 
@@ -323,6 +325,8 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
 
 void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
+  // TODO: This is an almost exact copy of CatalogServer::CatalogPathHandler(). Merge the
+  // two and deal with the different ways to get tables and databases.
   TGetDbsResult get_dbs_result;
   Status status = frontend_->GetDbNames(NULL, NULL, &get_dbs_result);
   if (!status.ok()) {
@@ -344,7 +348,9 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
     (*output) << "[ " <<  join(links, " | ") << " ] ";
 
     BOOST_FOREACH(const string& db, db_names) {
-      (*output) << "<a id='" << db << "'><h3>" << db << "</h3></a>";
+      (*output) << Substitute(
+          "<a href='catalog_objects?object_type=DATABASE&object_name=$0' id='$0'>"
+          "<h3>$0</h3></a>", db);
       TGetTablesResult get_table_results;
       Status status = frontend_->GetTableNames(db, NULL, NULL, &get_table_results);
       if (!status.ok()) {
@@ -357,7 +363,10 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
 
       (*output) << "<ul>" << endl;
       BOOST_FOREACH(const string& table, table_names) {
-        (*output) << "<li>" << table << "</li>" << endl;
+        const string& link_text = Substitute(
+            "<a href='catalog_objects?object_type=TABLE&object_name=$0.$1'>$1</a>",
+            db, table);
+        (*output) << "<li>" << link_text << "</li>" << endl;
       }
       (*output) << "</ul>" << endl;
     }

@@ -26,15 +26,16 @@ using namespace std;
 namespace impala {
 
 TCatalogObjectType::type TCatalogObjectTypeFromName(const string& name) {
-  if (to_upper_copy(name) == "DATABASE") {
+  const string& upper = to_upper_copy(name);
+  if (upper == "DATABASE") {
     return TCatalogObjectType::DATABASE;
-  } else if (name == "TABLE") {
+  } else if (upper == "TABLE") {
     return TCatalogObjectType::TABLE;
-  } else if (name == "VIEW") {
+  } else if (upper == "VIEW") {
     return TCatalogObjectType::VIEW;
-  } else if (name == "FUNCTION") {
+  } else if (upper == "FUNCTION") {
     return TCatalogObjectType::FUNCTION;
-  } else if (name == "CATALOG") {
+  } else if (upper == "CATALOG") {
     return TCatalogObjectType::CATALOG;
   }
   return TCatalogObjectType::UNKNOWN;

@@ -296,7 +296,9 @@ void CatalogServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
     (*output) << "[ " <<  join(links, " | ") << " ] ";
 
     BOOST_FOREACH(const string& db, db_names) {
-      (*output) << "<a id='" << db << "'><h3>" << db << "</h3></a>";
+      (*output) << Substitute(
+          "<a href='catalog_objects?object_type=DATABASE&object_name=$0' id='$0'>"
+          "<h3>$0</h3></a>", db);
       TGetTablesResult get_table_results;
       Status status = catalog_->GetTableNames(db, NULL, &get_table_results);
       if (!status.ok()) {
@@ -309,7 +311,10 @@ void CatalogServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
 
       (*output) << "<ul>" << endl;
       BOOST_FOREACH(const string& table, table_names) {
-        (*output) << "<li>" << table << "</li>" << endl;
+        const string& link_text = Substitute(
+            "<a href='catalog_objects?object_type=TABLE&object_name=$0.$1'>$1</a>",
+            db, table);
+        (*output) << "<li>" << link_text << "</li>" << endl;
       }
       (*output) << "</ul>" << endl;
     }
