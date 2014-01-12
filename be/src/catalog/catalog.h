@@ -78,18 +78,24 @@ class Catalog {
   Status GetTableNames(const std::string& db, const std::string* pattern,
       TGetTablesResult* table_names);
 
+  // Gets all functions in the catalog matching the parameters in the given
+  // TFunctionsRequest.
+  Status GetFunctions(const TGetFunctionsRequest& request,
+      TGetFunctionsResponse *response);
+
  private:
   // Descriptor of Java Catalog class itself, used to create a new instance.
   jclass catalog_class_;
 
   jobject catalog_;  // instance of com.cloudera.impala.service.JniCatalog
-  jmethodID update_metastore_id_;  // CatalogServiceFrontend.updateMetaastore()
-  jmethodID exec_ddl_id_;  // CatalogServiceFrontend.execDdl()
-  jmethodID reset_metadata_id_;  // CatalogServiceFrontend.resetMetdata()
-  jmethodID get_catalog_object_id_;  // CatalogServiceFrontend.getCatalogObject()
-  jmethodID get_catalog_objects_id_;  // CatalogServiceFrontend.getCatalogObjects()
-  jmethodID get_db_names_id_; // CatalogServiceFrontend.getDbNames()
-  jmethodID get_table_names_id_; // CatalogServiceFrontend.getTableNames()
+  jmethodID update_metastore_id_;  // JniCatalog.updateMetaastore()
+  jmethodID exec_ddl_id_;  // JniCatalog.execDdl()
+  jmethodID reset_metadata_id_;  // JniCatalog.resetMetdata()
+  jmethodID get_catalog_object_id_;  // JniCatalog.getCatalogObject()
+  jmethodID get_catalog_objects_id_;  // JniCatalog.getCatalogObjects()
+  jmethodID get_db_names_id_; // JniCatalog.getDbNames()
+  jmethodID get_table_names_id_; // JniCatalog.getTableNames()
+  jmethodID get_functions_id_; // JniCatalog.getFunctions()
   jmethodID catalog_ctor_;
 
   struct MethodDescriptor;

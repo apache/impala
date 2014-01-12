@@ -81,6 +81,20 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "UpdateCatalog(): response=" << ThriftDebugString(resp);
   }
 
+  // Gets functions in the Catalog based on the parameters of the
+  // TGetFunctionsRequest.
+  virtual void GetFunctions(TGetFunctionsResponse& resp,
+      const TGetFunctionsRequest& req) {
+    VLOG_RPC << "GetFunctions(): request=" << ThriftDebugString(req);
+    Status status = catalog_server_->catalog()->GetFunctions(req, &resp);
+    if (!status.ok()) LOG(ERROR) << status.GetErrorMsg();
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    resp.__set_status(thrift_status);
+    VLOG_RPC << "UpdateCatalog(): response=" << ThriftDebugString(resp);
+  }
+
+
  private:
   CatalogServer* catalog_server_;
 };

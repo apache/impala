@@ -220,5 +220,8 @@ class StateStoreProcess(BaseImpalaProcess):
 class CatalogdProcess(BaseImpalaProcess):
   def __init__(self, cmd):
     super(CatalogdProcess, self).__init__(cmd, socket.gethostname())
-    self.service =\
-        CatalogdService(self.hostname, self._get_webserver_port(default=25020))
+    self.service = CatalogdService(self.hostname,
+        self._get_webserver_port(default=25020), self.__get_port(default=26000))
+
+  def __get_port(self, default=None):
+    return int(self._get_arg_value('catalog_service_port', default))

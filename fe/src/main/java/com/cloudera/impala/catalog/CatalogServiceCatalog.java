@@ -145,6 +145,32 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Returns all user defined functions (aggregate and scalar) in the specified database.
+   * Functions are not returned in a defined order.
+   */
+  public List<Function> getFunctions(String dbName) throws DatabaseNotFoundException {
+    catalogLock_.readLock().lock();
+    try {
+      Db db = getDb(dbName);
+      if (db == null) {
+        throw new DatabaseNotFoundException("Database does not exist: " + dbName);
+      }
+
+      // Contains map of overloaded function names to all functions matching that name.
+      HashMap<String, List<Function>> dbFns = db.getAllFunctions();
+      List<Function> fns = new ArrayList<Function>(dbFns.size());
+      for (List<Function> fnOverloads: dbFns.values()) {
+        for (Function fn: fnOverloads) {
+          fns.add(fn);
+        }
+      }
+      return fns;
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
+  }
+
+  /**
    * Returns the Table object for the given dbName/tableName. This will trigger a
    * metadata load if the table metadata is not yet cached. This method does not
    * throw, if there are any issues loading the table metadata a

@@ -47,6 +47,7 @@ Catalog::Catalog() {
     {"resetMetadata", "([B)[B", &reset_metadata_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
+    {"getFunctions", "([B)[B", &get_functions_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"getCatalogObjects", "(J)[B", &get_catalog_objects_id_}};
 
@@ -118,4 +119,9 @@ Status Catalog::GetTableNames(const string& db, const string* pattern,
   params.__set_db(db);
   if (pattern != NULL) params.__set_pattern(*pattern);
   return JniUtil::CallJniMethod(catalog_, get_table_names_id_, params, table_names);
+}
+
+Status Catalog::GetFunctions(const TGetFunctionsRequest& request,
+    TGetFunctionsResponse *response) {
+  return JniUtil::CallJniMethod(catalog_, get_functions_id_, request, response);
 }

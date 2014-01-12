@@ -177,5 +177,6 @@ class StateStoredService(BaseImpalaService):
 # Allows for interacting with the Catalog service to perform operations such as
 # accessing the debug webpage.
 class CatalogdService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port):
+  def __init__(self, hostname, webserver_port, service_port):
     super(CatalogdService, self).__init__(hostname, webserver_port)
+    self.service_port = service_port
