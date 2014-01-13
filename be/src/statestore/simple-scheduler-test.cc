@@ -165,7 +165,7 @@ TEST_F(SimpleSchedulerTest, InitPoolWhiteList) {
   const SimpleScheduler::UserPoolMap& pool_map = sched->user_pool_map();
   EXPECT_EQ(3, pool_map.size());
   EXPECT_EQ(2, pool_map.find("admin")->second.size());
-  EXPECT_EQ(pool_map.end(), pool_map.find("root"));
+  EXPECT_TRUE(pool_map.end() == pool_map.find("root"));
   EXPECT_EQ(2, pool_map.find("*")->second.size());
   EXPECT_EQ("Staging", pool_map.find("*")->second[0]);
 
