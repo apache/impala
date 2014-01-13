@@ -230,23 +230,26 @@ terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_ANTI, KW_API_VERSION, KW_ARRAY,
   KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CACHED,
   KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS,
-  KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES,
-  KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT,
-  KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
-  KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT,
-  KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GROUP,
-  KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,
-  KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT,
-  KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA,
-  KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE,
-  KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PREPARE_FN,
-  KW_PRODUCED, KW_RCFILE, KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS,
-  KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_STRUCT,
-  KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT,
-  KW_STORED, KW_STRAIGHT_JOIN, KW_STRING, KW_SYMBOL, KW_TABLE, KW_TABLES,
-  KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT,
-  KW_STATS, KW_TO, KW_TRUE,KW_UNCACHED, KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING,
-  KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA, KW_DATABASE,
+  KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE,
+  KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS,
+  KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN,
+  KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
+  KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER,
+  KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE,
+  KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION,
+  KW_MAP, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET,
+  KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE,
+  KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PRECEDING,
+  KW_PREPARE_FN, KW_PRODUCED, KW_RANGE, KW_RCFILE,
+  KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW,
+  KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
+  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING,
+  KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED,
+  KW_TEXTFILE, KW_THEN,
+  KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED,
+  KW_UNION, KW_UPDATE_FN,
+  KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
   DIVIDE, MOD, ADD, SUBTRACT;
@@ -304,16 +307,20 @@ nonterminal FunctionName function_name;
 nonterminal Expr where_clause;
 nonterminal Predicate predicate, between_predicate, comparison_predicate,
   compound_predicate, in_predicate, like_predicate, exists_predicate;
-nonterminal ArrayList<Expr> group_by_clause;
+nonterminal ArrayList<Expr> group_by_clause, opt_partition_by_clause;
 nonterminal Expr having_clause;
-nonterminal ArrayList<OrderByElement> order_by_elements, order_by_clause;
+nonterminal ArrayList<OrderByElement> order_by_elements, opt_order_by_clause;
 nonterminal OrderByElement order_by_element;
 nonterminal Boolean opt_order_param;
 nonterminal Boolean opt_nulls_order_param;
 nonterminal Expr opt_offset_param;
 nonterminal LimitElement opt_limit_offset_clause;
 nonterminal Expr opt_limit_clause, opt_offset_clause;
-nonterminal Expr cast_expr, case_else_clause;
+nonterminal Expr cast_expr, case_else_clause, analytic_expr;
+nonterminal FunctionCallExpr function_call_expr;
+nonterminal AnalyticWindow opt_window_clause;
+nonterminal AnalyticWindow.Type window_type;
+nonterminal AnalyticWindow.Boundary window_boundary;
 nonterminal LiteralExpr literal;
 nonterminal CaseExpr case_expr;
 nonterminal ArrayList<CaseWhenClause> case_when_clause_list;
@@ -436,6 +443,8 @@ precedence left KW_FINALIZE_FN;
 precedence left KW_INIT_FN;
 precedence left KW_MERGE_FN;
 precedence left KW_SERIALIZE_FN;
+
+precedence left KW_OVER;
 
 start with stmt;
 
@@ -1240,7 +1249,7 @@ with_view_def_list ::=
   ;
 
 // We must have a non-empty order by or limit for them to bind to the union.
-// We cannot reuse the existing order_by_clause or
+// We cannot reuse the existing opt_order_by_clause or
 // limit_clause because they would introduce conflicts with EOF,
 // which, unfortunately, cannot be accessed in the parser as a nonterminal
 // making this issue unresolvable.
@@ -1316,13 +1325,13 @@ union_op ::=
 
 values_stmt ::=
   KW_VALUES values_operand_list:operands
-  order_by_clause:orderByClause
+  opt_order_by_clause:orderByClause
   opt_limit_offset_clause:limitOffsetClause
   {:
     RESULT = new ValuesStmt(operands, orderByClause, limitOffsetClause);
   :}
   | KW_VALUES LPAREN values_operand_list:operands RPAREN
-    order_by_clause:orderByClause
+    opt_order_by_clause:orderByClause
     opt_limit_offset_clause:limitOffsetClause
   {:
     RESULT = new ValuesStmt(operands, orderByClause, limitOffsetClause);
@@ -1434,7 +1443,7 @@ select_stmt ::=
     where_clause:wherePredicate
     group_by_clause:groupingExprs
     having_clause:havingPredicate
-    order_by_clause:orderByClause
+    opt_order_by_clause:orderByClause
     opt_limit_offset_clause:limitOffsetClause
   {:
     RESULT = new SelectStmt(selectList, tableRefList, wherePredicate, groupingExprs,
@@ -1679,7 +1688,7 @@ having_clause ::=
   {: RESULT = null; :}
   ;
 
-order_by_clause ::=
+opt_order_by_clause ::=
   KW_ORDER KW_BY order_by_elements:l
   {: RESULT = l; :}
   | /* empty */
@@ -1824,10 +1833,10 @@ non_pred_expr ::=
   {: RESULT = e; :}
   | literal:l
   {: RESULT = l; :}
-  | function_name:fn_name LPAREN RPAREN
-  {: RESULT = new FunctionCallExpr(fn_name, new ArrayList<Expr>()); :}
-  | function_name:fn_name LPAREN function_params:params RPAREN
-  {: RESULT = new FunctionCallExpr(fn_name, params); :}
+  | function_call_expr:e
+  {: RESULT = e; :}
+  | analytic_expr:e
+  {: RESULT = e; :}
   /* Since "IF" is a keyword, need to special case this function */
   | KW_IF LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr("if", exprs); :}
@@ -1848,6 +1857,69 @@ non_pred_expr ::=
   :}
   | subquery:s
   {: RESULT = s; :}
+  ;
+
+function_call_expr ::=
+  function_name:fn_name LPAREN RPAREN
+  {: RESULT = new FunctionCallExpr(fn_name, new ArrayList<Expr>()); :}
+  | function_name:fn_name LPAREN function_params:params RPAREN
+  {: RESULT = new FunctionCallExpr(fn_name, params); :}
+  ;
+
+// TODO: allow an arbitrary expr here instead of agg/fn call, and check during analysis?
+// The parser errors aren't particularly easy to parse.
+analytic_expr ::=
+  function_call_expr:f KW_OVER
+    LPAREN opt_partition_by_clause:p opt_order_by_clause:o opt_window_clause:w RPAREN
+  {:
+    f.setIsAnalyticFnCall(true);
+    RESULT = new AnalyticExpr(f, p, o, w);
+  :}
+  %prec KW_OVER
+  ;
+
+opt_partition_by_clause ::=
+  KW_PARTITION KW_BY expr_list:l
+  {: RESULT = l; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+opt_window_clause ::=
+  window_type:t window_boundary:b
+  {: RESULT = new AnalyticWindow(t, b); :}
+  | window_type:t KW_BETWEEN window_boundary:l KW_AND window_boundary:r
+  {: RESULT = new AnalyticWindow(t, l, r); :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+window_type ::=
+  KW_ROWS
+  {: RESULT = AnalyticWindow.Type.ROWS; :}
+  | KW_RANGE
+  {: RESULT = AnalyticWindow.Type.RANGE; :}
+  ;
+
+window_boundary ::=
+  KW_UNBOUNDED KW_PRECEDING
+  {:
+    RESULT = new AnalyticWindow.Boundary(
+        AnalyticWindow.BoundaryType.UNBOUNDED_PRECEDING, null);
+  :}
+  | KW_UNBOUNDED KW_FOLLOWING
+  {:
+    RESULT = new AnalyticWindow.Boundary(
+        AnalyticWindow.BoundaryType.UNBOUNDED_FOLLOWING, null);
+  :}
+  | KW_CURRENT KW_ROW
+  {:
+    RESULT = new AnalyticWindow.Boundary(AnalyticWindow.BoundaryType.CURRENT_ROW, null);
+  :}
+  | expr:e KW_PRECEDING
+  {: RESULT = new AnalyticWindow.Boundary(AnalyticWindow.BoundaryType.PRECEDING, e); :}
+  | expr:e KW_FOLLOWING
+  {: RESULT = new AnalyticWindow.Boundary(AnalyticWindow.BoundaryType.FOLLOWING, e); :}
   ;
 
 arithmetic_expr ::=

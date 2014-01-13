@@ -531,6 +531,286 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "of exprs 'int_array_col' and 'id'.");
   }
 
+  @Test
+  public void TestAnalyticExprs() throws AnalysisException {
+    AnalyzesOk("select int_col from functional.alltypessmall order by count(*) over () "
+        + "limit 10");
+    AnalyzesOk("select sum(int_col) over () from functional.alltypes");
+    AnalyzesOk("select avg(bigint_col) over (partition by id) from functional.alltypes");
+    AnalyzesOk("select count(smallint_col) over (partition by id order by tinyint_col) "
+        + "from functional.alltypes");
+    AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
+        + "rows between unbounded preceding and current row) from functional.alltypes");
+    AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
+        + "rows between 2 preceding and unbounded following) from functional.alltypes");
+    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+        + "range between 2 preceding and 6 following) from functional.alltypes");
+        // TODO: substitute constants in-line so that 2*3 becomes implicitly castable
+        // to tinyint
+        //+ "range between 2 preceding and 2 * 3 following) from functional.alltypes");
+    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+        + "range between 2 preceding and unbounded following) from functional.alltypes");
+    AnalyzesOk("select lead(int_col, 1, null) over "
+        + "(partition by id order by tinyint_col) from functional.alltypes");
+    AnalyzesOk("select rank() over "
+        + "(partition by id order by tinyint_col) from functional.alltypes");
+    AnalyzesOk(
+        "select id from functional.alltypes order by rank() over (order by tinyint_col)");
+
+    // legal combinations of analytic and agg functions
+    AnalyzesOk("select sum(count(id)) over (partition by min(int_col) "
+        + "order by max(bigint_col)) from functional.alltypes group by id, tinyint_col "
+        + "order by rank() over (order by max(bool_col), tinyint_col)");
+    AnalyzesOk("select lead(count(id)) over (order by tinyint_col) "
+        + "from functional.alltypes group by id, tinyint_col "
+        + "order by rank() over (order by tinyint_col)");
+    AnalyzesOk("select min(count(id)) over (order by tinyint_col) "
+        + "from functional.alltypes group by id, tinyint_col "
+        + "order by rank() over (order by tinyint_col)");
+
+    // legal windows
+    AnalyzesOk(
+        "select max(int_col) over (partition by id order by tinyint_col, int_col "
+          + "rows between 2 following and 4 following) from functional.alltypes");
+    AnalyzesOk(
+        "select max(int_col) over (partition by id order by tinyint_col, int_col "
+          + "range between unbounded preceding and current row) from functional.alltypes");
+    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+        + "rows between 4 preceding and 2 preceding) from functional.alltypes");
+    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+        + "rows between 2 following and 4 following) from functional.alltypes");
+    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+        + "range between 2 following and 2 following) from functional.alltypes");
+    AnalyzesOk( "select "
+        + "2 * min(tinyint_col) over (partition by id order by tinyint_col "
+        + "  rows between unbounded preceding and current row), "
+        + "concat(max(string_col) over (partition by timestamp_col, int_col "
+        + "  order by tinyint_col, smallint_col "
+        + "  rows between unbounded preceding and current row), "
+        + "min(string_col) over (partition by timestamp_col, int_col "
+        + "  order by tinyint_col, smallint_col "
+        + "  rows between unbounded preceding and current row)) "
+        + "from functional.alltypes");
+
+    // missing grouping expr
+    AnalysisError(
+        "select lead(count(bigint_col)) over (order by tinyint_col) "
+          + "from functional.alltypes group by id, tinyint_col "
+          + "order by rank() over (order by smallint_col)",
+        "ORDER BY expression not produced by aggregation output (missing from GROUP "
+          + "BY clause?): rank() OVER (ORDER BY smallint_col ASC)");
+    // missing Over clause
+    AnalysisError("select 1, lag(int_col) from functional.alltypes",
+        "Analytic function requires an OVER clause: lag(int_col)");
+    // no FROM clause
+    AnalysisError("select 1, count(*) over()",
+        "Analytic expressions require FROM clause");
+    // analytic expr in Group By
+    AnalysisError(
+        "select id, count(*) from functional.alltypes "
+          + "group by 1, rank() over(order by int_col)",
+        "GROUP BY expression must not contain analytic expressions: rank() OVER "
+          + "(ORDER BY int_col ASC)");
+    AnalysisError(
+        "select id, rank() over(order by int_col), count(*) "
+          + "from functional.alltypes group by 1, 2",
+        "GROUP BY expression must not contain analytic expressions: rank() OVER "
+          + "(ORDER BY int_col ASC)");
+    // analytic expr in Having
+    AnalysisError(
+        "select id, count(*) from functional.alltypes group by 1 "
+          + "having rank() over(order by int_col) > 1",
+        "HAVING clause must not contain analytic expressions: rank() OVER "
+          + "(ORDER BY int_col ASC)");
+    // analytic expr in Where
+    AnalysisError(
+        "select id, tinyint_col from functional.alltypes "
+          + "where row_number() over(order by id) > 1",
+        "WHERE clause must not contain analytic expressions: row_number() OVER "
+          + "(ORDER BY id ASC)");
+    // analytic expr with Distinct
+    AnalysisError(
+        "select id, tinyint_col, sum(distinct tinyint_col) over(order by id) "
+          + "from functional.alltypes",
+        "DISTINCT not allowed in analytic function");
+    // select list alias needs to be ignored
+    AnalysisError(
+        "select min(id) over (order by tinyint_col) as X from functional.alltypes "
+          + "group by id, tinyint_col order by rank() over (order by X)",
+        "Nesting of analytic expressions is not allowed: rank() OVER (ORDER BY X ASC)");
+
+    // nested analytic exprs
+    AnalysisError(
+        "select max(int_col) over (partition by id, rank() over (order by int_col) "
+          + "order by tinyint_col, int_col "
+          + "rows between 2 following and 4 following) from functional.alltypes",
+        "Nesting of analytic expressions is not allowed");
+    AnalysisError(
+        "select lead(rank() over (order by int_col)) over (partition by id "
+          + "order by tinyint_col, int_col) from functional.alltypes",
+        "Nesting of analytic expressions is not allowed");
+    AnalysisError(
+        "select max(int_col) over (partition by id "
+          + "order by rank() over (order by tinyint_col), int_col) "
+          + "from functional.alltypes",
+        "Nesting of analytic expressions is not allowed");
+
+    // lead/lag variants
+    AnalyzesOk(
+        "select lag(int_col, 10, 5 + 1) over (partition by id, bool_col "
+          + "order by tinyint_col, int_col) from functional.alltypes");
+    AnalyzesOk(
+        "select lead(string_col, 1, 'default') over ("
+          + "order by tinyint_col, int_col) from functional.alltypes");
+    AnalyzesOk(
+        "select lag(bool_col, 3) over ("
+          + "order by id, int_col) from functional.alltypes");
+    AnalyzesOk(
+        "select lead(float_col, 2) over (partition by string_col, timestamp_col "
+          + "order by tinyint_col, int_col) from functional.alltypes");
+    AnalyzesOk(
+        "select lag(double_col) over ("
+          + "order by string_col, int_col) from functional.alltypes");
+    AnalyzesOk(
+        "select lead(timestamp_col) over (partition by id "
+          + "order by tinyint_col, int_col) from functional.alltypes");
+    // missing offset w/ default
+    AnalysisError(
+        "select lag(string_col, 'x') over (partition by id "
+          + "order by tinyint_col, int_col) from functional.alltypes",
+        "No matching function with signature: lag(STRING, STRING)");
+    // mismatched default type
+    AnalysisError(
+        "select lead(int_col, 1, 'x') over ("
+          + "order by tinyint_col, int_col) from functional.alltypes",
+        "No matching function with signature: lead(INT, TINYINT, STRING)");
+    // missing params
+    AnalysisError(
+        "select lag() over (partition by id "
+          + "order by tinyint_col, int_col) from functional.alltypes",
+        "No matching function with signature: lag()");
+    // bad offsets
+    AnalysisError(
+        "select lead(int_col, -1) over ("
+          + "order by tinyint_col, int_col) from functional.alltypes",
+        "The offset parameter of LEAD/LAG must be a constant positive integer");
+    AnalysisError(
+        "select lag(int_col, tinyint_col * 2, 5) over ("
+          + "order by tinyint_col, int_col) from functional.alltypes",
+        "The offset parameter of LEAD/LAG must be a constant positive integer");
+
+    // wrong type of function
+    AnalysisError("select abs(float_col) over (partition by id order by tinyint_col "
+        + "rows between unbounded preceding and current row) from functional.alltypes",
+        "OVER clause requires aggregate or analytic function: abs(float_col)");
+    // Order By missing
+    AnalysisError("select sum(int_col) over (partition by id "
+        + "rows between unbounded preceding and current row) from functional.alltypes",
+        "Windowing clause requires ORDER BY clause");
+    // Order By missing for ranking fn
+    AnalysisError("select dense_rank() over (partition by id) from functional.alltypes",
+        "'dense_rank()' requires an ORDER BY clause");
+    // Order By missing for offset fn
+    AnalysisError("select lag(tinyint_col, 1, null) over (partition by id) "
+        + "from functional.alltypes",
+        "'lag(tinyint_col, 1, NULL)' requires an ORDER BY clause");
+    // Window for ranking fn
+    AnalysisError("select row_number() over (partition by id order by tinyint_col "
+        + "rows between unbounded preceding and current row) from functional.alltypes",
+        "Windowing clause not allowed with 'row_number()'");
+    // Window for offset fn
+    AnalysisError("select lead(tinyint_col, 1, null) over (partition by id "
+        + "order by tinyint_col rows between unbounded preceding and current row) "
+        + "from functional.alltypes",
+        "Windowing clause not allowed with 'lead(tinyint_col, 1, NULL)'");
+
+    // windows
+    AnalysisError("select sum(tinyint_col) over (partition by id "
+        + "order by tinyint_col rows between unbounded following and current row) "
+        + "from functional.alltypes",
+        "UNBOUNDED FOLLOWING is only allowed for upper bound of BETWEEN");
+    AnalysisError("select sum(tinyint_col) over (partition by id "
+        + "order by tinyint_col rows unbounded following) from functional.alltypes",
+        "UNBOUNDED FOLLOWING is only allowed for upper bound of BETWEEN");
+    AnalysisError("select sum(tinyint_col) over (partition by id "
+        + "order by tinyint_col rows between current row and unbounded preceding) "
+        + "from functional.alltypes",
+        "UNBOUNDED PRECEDING is only allowed for lower bound of BETWEEN");
+    AnalysisError("select sum(tinyint_col) over (partition by id "
+        + "order by tinyint_col rows 2 following) from functional.alltypes",
+        "FOLLOWING requires a BETWEEN clause");
+    AnalysisError(
+        "select sum(tinyint_col) over (partition by id "
+          + "order by tinyint_col rows between 2 following and current row) "
+          + "from functional.alltypes",
+        "A lower window bound of FOLLOWING requires that the upper bound also be "
+          + "FOLLOWING");
+    AnalysisError(
+        "select sum(tinyint_col) over (partition by id "
+          + "order by tinyint_col rows between current row and 2 preceding) "
+          + "from functional.alltypes",
+        "An upper window bound of PRECEDING requires that the lower bound also be "
+          + "PRECEDING");
+
+    // offset boundaries
+    AnalysisError(
+        "select min(int_col) over (partition by id order by tinyint_col "
+          + "rows between tinyint_col preceding and current row) "
+          + "from functional.alltypes",
+        "For ROWS window, the value of a PRECEDING/FOLLOWING offset must be a "
+          + "constant positive integer: tinyint_col PRECEDING");
+    AnalysisError(
+        "select min(int_col) over (partition by id order by tinyint_col "
+          + "rows between current row and '2' following) from functional.alltypes",
+        "For ROWS window, the value of a PRECEDING/FOLLOWING offset must be a "
+          + "constant positive integer: '2' FOLLOWING");
+    AnalysisError(
+        "select min(int_col) over (partition by id order by tinyint_col "
+          + "rows between -2 preceding and current row) from functional.alltypes",
+        "For ROWS window, the value of a PRECEDING/FOLLOWING offset must be a "
+          + "constant positive integer: -2 PRECEDING");
+    AnalysisError(
+        "select min(int_col) over (partition by id order by tinyint_col "
+          + "rows between 2 preceding and 3 preceding) from functional.alltypes",
+        "Offset boundaries are in the wrong order: ROWS BETWEEN 2 PRECEDING AND "
+          + "3 PRECEDING");
+    AnalysisError(
+        "select min(int_col) over (partition by id order by tinyint_col "
+          + "rows between count(*) preceding and current row) from functional.alltypes",
+        "For ROWS window, the value of a PRECEDING/FOLLOWING offset must be a "
+          + "constant positive integer: count(*) PRECEDING");
+
+    AnalysisError(
+        "select min(int_col) over (partition by id order by float_col "
+          + "range between -2.1 preceding and current row) from functional.alltypes",
+        "For RANGE window, the value of a PRECEDING/FOLLOWING offset must be a "
+          + "constant positive number: -2.1 PRECEDING");
+    AnalysisError(
+        "select min(int_col) over (partition by id order by int_col "
+          + "range between current row and 2.1 following) from functional.alltypes",
+        "The value expression of a PRECEDING/FOLLOWING clause of a RANGE window must "
+          + "be implicitly convertable to the ORDER BY expression's type: 2.1 cannot "
+          + "be implicitly converted to INT");
+    AnalysisError(
+        "select min(int_col) over (partition by id order by int_col "
+          + "range between 2 * tinyint_col preceding and current row) "
+          + "from functional.alltypes",
+        "For RANGE window, the value of a PRECEDING/FOLLOWING offset must be a "
+          + "constant positive number");
+    AnalysisError(
+        "select min(int_col) over (partition by id order by int_col "
+          + "range between 3.1 following and 2.0 following) "
+          + "from functional.alltypes",
+        "Offset boundaries are in the wrong order");
+    // multiple ordering exprs w/ range offset
+    AnalysisError(
+        "select min(int_col) over (partition by id order by int_col, tinyint_col "
+          + "range between 2 preceding and current row) "
+          + "from functional.alltypes",
+        "Only one ORDER BY expression allowed if used with a RANGE window with "
+          + "PRECEDING/FOLLOWING");
+  }
+
   /**
    * Test of all arithmetic type casts.
    */

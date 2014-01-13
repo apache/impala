@@ -658,7 +658,7 @@ public class Analyzer {
     // register single tid conjuncts
     if (tupleIds.size() == 1) globalState_.singleTidConjuncts.add(e.getId());
 
-    LOG.trace("register tuple/slotConjunct: " + Integer.toString(e.getId().asInt())
+    LOG.info("register tuple/slotConjunct: " + Integer.toString(e.getId().asInt())
         + " " + e.toSql() + " " + e.debugString());
 
     if (!(e instanceof BinaryPredicate)) return;

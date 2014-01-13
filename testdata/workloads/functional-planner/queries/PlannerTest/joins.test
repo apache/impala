@@ -1031,7 +1031,8 @@ where b.id < 5
 ====
 # Test joins with decimals with different precision and scale
 # Regression test for IMPALA-1121
-select count(*) from functional.decimal_tbl a join functional.decimal_tbl b on a.d1 = b.d5
+select straight_join count(*)
+from functional.decimal_tbl a join functional.decimal_tbl b on a.d1 = b.d5
 ---- PLAN
 03:AGGREGATE [FINALIZE]
 |  output: count(*)

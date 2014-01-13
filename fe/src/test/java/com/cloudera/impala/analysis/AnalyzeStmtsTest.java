@@ -282,7 +282,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // union test
     AnalyzesOk("select a.* from " +
-        "(select int_col from functional.alltypes " +
+        "(select rank() over(order by string_col) from functional.alltypes " +
         " union all " +
         " select tinyint_col from functional.alltypessmall) a");
     AnalyzesOk("select a.* from " +
@@ -695,6 +695,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "join functional.alltypes b on a.int_col * b.float_col",
         "ON clause 'a.int_col * b.float_col' requires return type 'BOOLEAN'. " +
         "Actual type is 'DOUBLE'.");
+    // wrong kind of expr
+    AnalysisError(
+        "select a.int_col from functional.alltypes a " +
+        "join functional.alltypes b on (a.bigint_col = sum(b.int_col))",
+        "aggregate function not allowed in ON clause");
+    AnalysisError(
+        "select a.int_col from functional.alltypes a " +
+        "join functional.alltypes b on (a.bigint_col = " +
+        "lag(b.int_col) over(order by a.bigint_col))",
+        "analytic expression not allowed in ON clause");
     // unknown column
     AnalysisError(
         "select a.int_col from functional.alltypes a " +
@@ -931,6 +941,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "count() is not allowed.");
     AnalysisError("select min() from functional.alltypes",
         "No matching function with signature: min().");
+    AnalysisError("select int_col from functional.alltypes order by count(*)",
+        "select list expression not produced by aggregation output (missing from "
+          + "GROUP BY clause?): int_col");
 
     // only count() allows '*'
     AnalysisError("select avg(*) from functional.testtbl",
@@ -952,9 +965,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // nested aggregates
     AnalysisError("select sum(count(*)) from functional.testtbl",
-        "aggregate function cannot contain aggregate parameters");
+        "aggregate function must not contain aggregate parameters");
+    AnalysisError("select sum(rank() over (order by id)) from functional.testtbl",
+        "aggregate function must not contain analytic parameters");
     AnalysisError("select min(aggfn(int_col)) from functional.alltypes",
-        "aggregate function cannot contain aggregate parameters: " +
+        "aggregate function must not contain aggregate parameters: " +
         "min(default.aggfn(int_col))");
 
     // wrong type
@@ -1278,7 +1293,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   @Test
   public void TestUnion() {
     // Selects on different tables.
-    AnalyzesOk("select int_col from functional.alltypes union " +
+    AnalyzesOk("select rank() over (order by int_col) from functional.alltypes union " +
         "select int_col from functional.alltypessmall");
     // Selects on same table without aliases.
     AnalyzesOk("select int_col from functional.alltypes union " +
@@ -1391,9 +1406,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "'SELECT smallint_col, bigint_col FROM functional.alltypes' has 2 column(s)");
     // Incompatible types.
     AnalysisError("select bool_col from functional.alltypes " +
-        "union select string_col from functional.alltypes",
+        "union select lag(string_col) over(order by int_col) from functional.alltypes",
         "Incompatible return types 'BOOLEAN' and 'STRING' " +
-            "of exprs 'bool_col' and 'string_col'.");
+            "of exprs 'bool_col' and 'lag(string_col) OVER (ORDER BY int_col ASC)'.");
     // Incompatible types, longer union chain.
     AnalysisError("select int_col, string_col from functional.alltypes " +
         "union select tinyint_col, bool_col from functional.alltypes " +
@@ -1981,6 +1996,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes",
         "Target table 'functional.alltypessmall' has more columns (13) than the " +
         "SELECT / VALUES clause and PARTITION clause return (12)");
+    // Non-const partition value
+    AnalysisError("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year=rank() over(order by int_col), month)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, month " +
+        "from functional.alltypes",
+        "Non-constant expressions are not supported as static partition-key values " +
+        "in 'year=rank() OVER (ORDER BY int_col ASC)'");
 
     // No corresponding select list items of partially dynamic partitions.
     AnalysisError("insert " + qualifier + " table functional.alltypessmall " +

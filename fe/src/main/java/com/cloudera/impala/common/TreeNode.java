@@ -39,6 +39,10 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     children_.add(n);
   }
 
+  public void addChildren(List<? extends NodeType> l) {
+    children_.addAll(l);
+  }
+
   public void setChild(int index, NodeType n) {
     children_.set(index, n);
   }
@@ -102,16 +106,25 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
   public <C extends TreeNode<NodeType>> boolean contains(
       Predicate<? super C> predicate) {
     if (predicate.apply((C) this)) return true;
-
     for (NodeType child: children_) {
       if (child.contains(predicate)) return true;
     }
-
     return false;
   }
 
   /**
-   * For each expression in 'exprList', return true if any subexpression satisfies
+   * Return true if this node or any of its children is an instance of class 'cl'.
+   */
+  public boolean contains(Class cl) {
+    if (cl.equals(getClass())) return true;
+    for (NodeType child: children_) {
+      if (child.contains(cl)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * For each node in nodeList, return true if any subexpression satisfies
    * contains('predicate').
    */
   public static <C extends TreeNode<C>, D extends C> boolean contains(
@@ -119,7 +132,29 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     for (C node : nodeList) {
       if (node.contains(predicate)) return true;
     }
-
     return false;
+  }
+
+  /**
+   * Return true if any node in nodeList contains children of class cl.
+   */
+  public static <C extends TreeNode<C>> boolean contains(
+      List<C> nodeList, Class cl) {
+    for (C node: nodeList) {
+      if (node.contains(cl)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Returns the first node/child of class cl (depth-first traversal).
+   */
+  public <C extends NodeType> C findFirstOf(Class<C> cl) {
+    if (this.getClass().equals(cl)) return (C) this;
+    for (NodeType child: children_) {
+      NodeType result = child.findFirstOf(cl);
+      if (result != null) return (C) result;
+    }
+    return null;
   }
 }

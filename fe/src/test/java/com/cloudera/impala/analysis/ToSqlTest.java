@@ -314,10 +314,10 @@ public class ToSqlTest extends AnalyzerTest {
 
   @Test
   public void unionTest() {
-    testToSql("select bool_col, int_col from functional.alltypes " +
+    testToSql("select bool_col, rank() over(order by id) from functional.alltypes " +
         "union select bool_col, int_col from functional.alltypessmall " +
         "union select bool_col, bigint_col from functional.alltypes",
-        "SELECT bool_col, int_col FROM functional.alltypes " +
+        "SELECT bool_col, rank() OVER (ORDER BY id ASC) FROM functional.alltypes " +
         "UNION SELECT bool_col, int_col FROM functional.alltypessmall " +
         "UNION SELECT bool_col, bigint_col FROM functional.alltypes");
     testToSql("select bool_col, int_col from functional.alltypes " +
@@ -403,10 +403,12 @@ public class ToSqlTest extends AnalyzerTest {
 
     // Test undoing expr substitution in select-list exprs and on clause.
     testToSql("select t1.int_col, t2.int_col from " +
-        "(select int_col from functional.alltypes) t1 inner join " +
+        "(select int_col, rank() over (order by int_col) from functional.alltypes) " +
+        "t1 inner join " +
         "(select int_col from functional.alltypes) t2 on (t1.int_col = t2.int_col)",
         "SELECT t1.int_col, t2.int_col FROM " +
-        "(SELECT int_col FROM functional.alltypes) t1 INNER JOIN " +
+        "(SELECT int_col, rank() OVER (ORDER BY int_col ASC) " +
+        "FROM functional.alltypes) t1 INNER JOIN " +
         "(SELECT int_col FROM functional.alltypes) t2 ON (t1.int_col = t2.int_col)");
     // Test undoing expr substitution in aggregates and group by and having clause.
     testToSql("select count(t1.string_col), sum(t2.float_col) from " +
@@ -502,6 +504,24 @@ public class ToSqlTest extends AnalyzerTest {
     // WITH clause in select stmt.
     testToSql("with t as (select * from functional.alltypes) select * from t",
         "WITH t AS (SELECT * FROM functional.alltypes) SELECT * FROM t");
+    testToSql("with t as (select sum(int_col) over(partition by tinyint_col, " +
+        "bool_col order by float_col rows between unbounded preceding and " +
+        "current row) as x from functional.alltypes) " +
+        "select t1.x, t2.x from t t1 join t t2 on (t1.x = t2.x)",
+        "WITH t AS (SELECT sum(int_col) OVER (PARTITION BY tinyint_col, bool_col " +
+        "ORDER BY float_col ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) " +
+        "x FROM functional.alltypes) SELECT t1.x, t2.x FROM t t1 INNER JOIN t t2 ON " +
+        "(t1.x = t2.x)");
+    // WITH clause in select stmt with a join and an ON clause.
+    testToSql("with t as (select * from functional.alltypes) " +
+        "select * from t a inner join t b on (a.int_col = b.int_col)",
+        "WITH t AS (SELECT * FROM functional.alltypes) " +
+        "SELECT * FROM t a INNER JOIN t b ON (a.int_col = b.int_col)");
+    // WITH clause in select stmt with a join and a USING clause.
+    testToSql("with t as (select * from functional.alltypes) " +
+        "select * from t a inner join t b using(int_col)",
+        "WITH t AS (SELECT * FROM functional.alltypes) " +
+        "SELECT * FROM t a INNER JOIN t b USING (int_col)");
     // WITH clause in a union stmt.
     testToSql("with t1 as (select * from functional.alltypes)" +
         "select * from t1 union all select * from t1",
@@ -616,6 +636,15 @@ public class ToSqlTest extends AnalyzerTest {
         " partition (year=2009, month) values(1, 12)",
         "INSERT INTO TABLE functional.alltypes(id) " +
         "PARTITION (year=2009, month) VALUES(1, 12)");
+  }
+
+  @Test
+  public void testAnalyticExprs() {
+    testToSql(
+        "select sum(int_col) over (partition by id order by tinyint_col "
+          + "rows between unbounded preceding and current row) from functional.alltypes",
+        "SELECT sum(int_col) OVER (PARTITION BY id ORDER BY tinyint_col ASC ROWS "
+          + "BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM functional.alltypes");
   }
 
   /**

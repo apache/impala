@@ -559,7 +559,7 @@ public class AggregateInfo {
         // register equivalence between grouping slot and grouping expr;
         // do this only when the grouping expr isn't a constant, otherwise
         // it'll simply show up as a gratuitous HAVING predicate
-        // (which would actually be incorrect of the constant happens to be NULL)
+        // (which would actually be incorrect if the constant happens to be NULL)
         if (!expr.isConstant()) {
           analyzer.createAuxEquivPredicate(
               new SlotRef(outputSlotDesc), expr.clone());

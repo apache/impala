@@ -36,6 +36,7 @@ import com.google.common.base.Preconditions;
 public class FunctionCallExpr extends Expr {
   private final FunctionName fnName_;
   private final FunctionParams params_;
+  private boolean isAnalyticFnCall_ = false;
 
   // Indicates whether this is a merge aggregation function. This flag affects
   // resetAnalysisState() which is used during expr substitution.
@@ -85,6 +86,7 @@ public class FunctionCallExpr extends Expr {
   protected FunctionCallExpr(FunctionCallExpr other) {
     super(other);
     fnName_ = other.fnName_;
+    isAnalyticFnCall_ = other.isAnalyticFnCall_;
     isMergeAggFn_ = other.isMergeAggFn_;
     // No need to deep clone the params, its exprs are already in children_.
     params_ = other.params_;
@@ -135,9 +137,12 @@ public class FunctionCallExpr extends Expr {
     return fn_ instanceof ScalarFunction ;
   }
 
+  /**
+   * Returns true if this is a call to a non-analytic aggregate function.
+   */
   public boolean isAggregateFunction() {
     Preconditions.checkState(fn_ != null);
-    return fn_ instanceof AggregateFunction;
+    return fn_ instanceof AggregateFunction && !isAnalyticFnCall_;
   }
 
   public boolean isDistinct() {
@@ -147,6 +152,7 @@ public class FunctionCallExpr extends Expr {
 
   public void setIsMergeAggFn() { isMergeAggFn_ = true; }
   public FunctionName getFnName() { return fnName_; }
+  public void setIsAnalyticFnCall(boolean v) { isAnalyticFnCall_ = v; }
 
   @Override
   protected void toThrift(TExprNode msg) {
@@ -155,6 +161,15 @@ public class FunctionCallExpr extends Expr {
     } else {
       msg.node_type = TExprNodeType.FUNCTION_CALL;
     }
+  }
+
+  /**
+   * Aggregate functions are never constant.
+   */
+  @Override
+  public boolean isConstant() {
+    if (fn_ != null && fn_ instanceof AggregateFunction) return false;
+    return super.isConstant();
   }
 
   // Provide better error message for some aggregate builtins. These can be
@@ -345,7 +360,13 @@ public class FunctionCallExpr extends Expr {
       // subexprs must not contain aggregates
       if (TreeNode.contains(children_, Expr.isAggregatePredicate())) {
         throw new AnalysisException(
-            "aggregate function cannot contain aggregate parameters: " + this.toSql());
+            "aggregate function must not contain aggregate parameters: " + this.toSql());
+      }
+
+      // .. or analytic exprs
+      if (Expr.contains(children_, AnalyticExpr.class)) {
+        throw new AnalysisException(
+            "aggregate function must not contain analytic parameters: " + this.toSql());
       }
 
       // The catalog contains count() with no arguments to handle count(*) but don't
@@ -369,13 +390,20 @@ public class FunctionCallExpr extends Expr {
 
       AggregateFunction aggFn = (AggregateFunction)fn_;
       if (aggFn.ignoresDistinct()) params_.setIsDistinct(false);
-    } else {
+    }
+
+    if (isScalarFunction()) {
       if (params_.isStar()) {
         throw new AnalysisException("Cannot pass '*' to scalar function.");
       }
       if (params_.isDistinct()) {
         throw new AnalysisException("Cannot pass 'DISTINCT' to scalar function.");
       }
+    }
+    if (fn_ instanceof AggregateFunction && ((AggregateFunction) fn_).needsAnalyticExpr()
+        && !isAnalyticFnCall_) {
+      throw new AnalysisException(
+          "Analytic function requires an OVER clause: " + toSql());
     }
 
     castForFunctionCall(false);

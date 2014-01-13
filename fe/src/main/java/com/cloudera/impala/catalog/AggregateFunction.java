@@ -42,8 +42,11 @@ public class AggregateFunction extends Function {
   // If true, this aggregate function should ignore distinct.
   // e.g. min(distinct col) == min(col).
   // TODO: currently it is not possible for user functions to specify this. We should
-  // extend the create aggregate function stmt to allow additional metdata like this.
+  // extend the create aggregate function stmt to allow additional metadata like this.
   private boolean ignoresDistinct_;
+
+  // true if this function can only appear within an analytic expr (fn() OVER(...))
+  private boolean needsAnalyticExpr_;
 
   public AggregateFunction(FunctionName fnName, FunctionArgs args, Type retType) {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
@@ -62,6 +65,7 @@ public class AggregateFunction extends Function {
     mergeFnSymbol_ = mergeFnSymbol;
     finalizeFnSymbol_ = finalizeFnSymbol;
     ignoresDistinct_ = false;
+    needsAnalyticExpr_ = false;
   }
 
   public static AggregateFunction createBuiltin(Db db, String name,
@@ -74,6 +78,17 @@ public class AggregateFunction extends Function {
         serializeFnSymbol, mergeFnSymbol, finalizeFnSymbol);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.ignoresDistinct_ = ignoresDistinct;
+    fn.needsAnalyticExpr_ = false;
+    return fn;
+  }
+
+  public static AggregateFunction createAnalyticBuiltin(Db db, String name,
+      List<Type> argTypes, Type retType, Type intermediateType) {
+    AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
+        argTypes, retType, intermediateType, null, null, null, null, null, null);
+    fn.setBinaryType(TFunctionBinaryType.BUILTIN);
+    fn.ignoresDistinct_ = false;
+    fn.needsAnalyticExpr_ = true;
     return fn;
   }
 
@@ -84,6 +99,7 @@ public class AggregateFunction extends Function {
   public String getFinalizeFnSymbol() { return finalizeFnSymbol_; }
   public Type getIntermediateType() { return intermediateType_; }
   public boolean ignoresDistinct() { return ignoresDistinct_; }
+  public boolean needsAnalyticExpr() { return needsAnalyticExpr_; }
 
   public void setUpdateFnSymbol(String fn) { updateFnSymbol_ = fn; }
   public void setInitFnSymbol(String fn) { initFnSymbol_ = fn; }

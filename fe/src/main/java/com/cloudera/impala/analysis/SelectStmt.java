@@ -135,7 +135,7 @@ public class SelectStmt extends QueryStmt {
       throw new AnalysisException("Found missing tables. Aborting analysis.");
     }
 
-    // populate selectListExprs, aliasSMap, and colNames
+    // populate resultExprs_, aliasSmap_, and colLabels_
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
       SelectListItem item = selectList_.getItems().get(i);
       if (item.isStar()) {
@@ -177,6 +177,10 @@ public class SelectStmt extends QueryStmt {
       }
     }
 
+    if (tableRefs_.isEmpty() && TreeNode.contains(resultExprs_, AnalyticExpr.class)) {
+      throw new AnalysisException("Analytic expressions require FROM clause.");
+    }
+
     if (whereClause_ != null) {
       whereClause_.analyze(analyzer);
       if (whereClause_.contains(Expr.isAggregatePredicate())) {
@@ -184,6 +188,11 @@ public class SelectStmt extends QueryStmt {
             "aggregate function not allowed in WHERE clause");
       }
       whereClause_.checkReturnsBool("WHERE clause", false);
+      Expr e = whereClause_.findFirstOf(AnalyticExpr.class);
+      if (e != null) {
+        throw new AnalysisException(
+            "WHERE clause must not contain analytic expressions: " + e.toSql());
+      }
       analyzer.registerConjuncts(whereClause_, false);
     }
 
@@ -328,7 +337,10 @@ public class SelectStmt extends QueryStmt {
   private void analyzeAggregation(Analyzer analyzer)
       throws AnalysisException {
     if (groupingExprs_ == null && !selectList_.isDistinct()
-        && !TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())) {
+        && !TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())
+        && (sortInfo_ == null
+            || !TreeNode.contains(sortInfo_.getOrderingExprs(),
+                                  Expr.isAggregatePredicate()))) {
       // we're not computing aggregates
       return;
     }
@@ -389,6 +401,12 @@ public class SelectStmt extends QueryStmt {
               "GROUP BY expression must not contain aggregate functions: "
                   + groupingExprs_.get(i).toSql());
         }
+        if (groupingExprsCopy.get(i).contains(AnalyticExpr.class)) {
+          // reference the original expr in the error msg
+          throw new AnalysisException(
+              "GROUP BY expression must not contain analytic expressions: "
+                  + groupingExprsCopy.get(i).toSql());
+        }
       }
     }
 
@@ -400,6 +418,13 @@ public class SelectStmt extends QueryStmt {
       // substitute aliases in place (ordinals not allowed in having clause)
       havingPred_ = havingClause_.substitute(aliasSmap_, analyzer);
       havingPred_.checkReturnsBool("HAVING clause", true);
+      // can't contain analytic exprs
+      Expr analyticExpr = havingPred_.findFirstOf(AnalyticExpr.class);
+      if (analyticExpr != null) {
+        throw new AnalysisException(
+            "HAVING clause must not contain analytic expressions: "
+               + analyticExpr.toSql());
+      }
     }
 
     // Collect the aggregate expressions from the SELECT, HAVING and ORDER BY clauses
@@ -453,13 +478,14 @@ public class SelectStmt extends QueryStmt {
         ExprSubstitutionMap.compose(
             ExprSubstitutionMap.compose(avgSMap, countAllMap, analyzer),
             finalAggInfo.getSMap(), analyzer);
-    LOG.debug("combined smap: " + combinedSMap.debugString());
+    LOG.info("combined smap: " + combinedSMap.debugString());
 
     // change select list, having and ordering exprs to point to agg output. We need
     // to reanalyze the exprs at this point.
     // TODO: substitute really needs to bundle the reanalysis.
     resultExprs_ = Expr.substituteList(resultExprs_, combinedSMap, analyzer);
-    LOG.debug("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
+    LOG.info("desctbl: " + analyzer.getDescTbl().debugString());
+    LOG.info("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
     if (havingPred_ != null) {
       // Make sure the predicate in the HAVING clause does not contain a
       // subquery.

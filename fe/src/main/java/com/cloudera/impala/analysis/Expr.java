@@ -57,7 +57,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // to be used where we can't come up with a better estimate
   protected static double DEFAULT_SELECTIVITY = 0.1;
 
-  // isAggregatePredicate_ is a Predicate that returns true if an Expr is an aggregate.
+  // returns true if an Expr is an aggregate.
   private final static com.google.common.base.Predicate<Expr> isAggregatePredicate_ =
       new com.google.common.base.Predicate<Expr>() {
         public boolean apply(Expr arg) {
@@ -130,8 +130,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public void setIsWhereClauseConjunct() { isWhereClauseConjunct_ = true; }
   public boolean isAuxExpr() { return isAuxExpr_; }
   public void setIsAuxExpr() { isAuxExpr_ = true; }
+  public Function getFn() { return fn_; }
 
-  /** Perform semantic analysis of node and all of its children.
+  /**
+   * Perform semantic analysis of node and all of its children.
    * Throws exception if any errors found.
    * @see com.cloudera.impala.parser.ParseNode#analyze(com.cloudera.impala.parser.Analyzer)
    */
@@ -427,9 +429,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return result;
   }
 
-  /*
-   * Return a predicate to test if an Expr object is an aggregate.
-   */
   public static com.google.common.base.Predicate<Expr> isAggregatePredicate() {
     return isAggregatePredicate_;
   }
@@ -452,7 +451,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     for (Expr expr: exprs) {
       strings.add(expr.debugString());
     }
-    return "(" + Joiner.on(" ").join(strings) + ")";
+    return Joiner.on(" ").join(strings);
   }
 
   public static String toSql(List<? extends Expr> exprs) {
@@ -461,7 +460,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     for (Expr expr: exprs) {
       strings.add(expr.toSql());
     }
-    return "(" + Joiner.on(", ").join(strings) + ")";
+    return Joiner.on(", ").join(strings);
   }
 
   /**

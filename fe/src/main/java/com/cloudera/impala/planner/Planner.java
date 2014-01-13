@@ -123,7 +123,7 @@ public class Planner {
     PlanNode singleNodePlan = createQueryPlan(queryStmt, analyzer,
         queryOptions.isDisable_outermost_topn());
     Preconditions.checkNotNull(singleNodePlan);
-    LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+    LOG.info("desctbl: " + analyzer.getDescTbl().debugString());
 
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
     if (queryOptions.num_nodes == 1) {

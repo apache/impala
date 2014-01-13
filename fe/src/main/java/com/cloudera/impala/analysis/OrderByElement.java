@@ -14,6 +14,9 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.Iterator;
+import java.util.List;
+
 
 /**
  * Combination of expr, ASC/DESC, and nulls ordering.
@@ -61,6 +64,27 @@ class OrderByElement {
     }
     return strBuilder.toString();
   }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == null) return false;
+    if (obj.getClass() != this.getClass()) return false;
+    OrderByElement o = (OrderByElement)obj;
+    boolean nullsFirstEqual =
+      (nullsFirstParam_ == null) == (o.nullsFirstParam_ == null);
+    if (nullsFirstParam_ != null && nullsFirstEqual) {
+      nullsFirstEqual = nullsFirstParam_.equals(o.nullsFirstParam_);
+    }
+    return expr_.equals(o.expr_) && isAsc_ == o.isAsc_ && nullsFirstEqual;
+  }
+
+  public OrderByElement clone() {
+    OrderByElement clone = new OrderByElement(
+        expr_.clone(), isAsc_,
+        nullsFirstParam_ != null ? new Boolean(nullsFirstParam_.booleanValue()) : null);
+    return clone;
+  }
+
 
   /**
    * Compute nullsFirst.

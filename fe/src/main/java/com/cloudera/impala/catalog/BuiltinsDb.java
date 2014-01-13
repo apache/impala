@@ -576,5 +576,35 @@ public class BuiltinsDb extends Db {
         prefix +
             "20StringConcatFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         false));
+
+    // analytic functions
+    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+        db, "rank", new ArrayList<Type>(), Type.BIGINT, Type.BIGINT));
+    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+        db, "dense_rank", new ArrayList<Type>(), Type.BIGINT,
+        Type.BIGINT));
+    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+        db, "row_number", new ArrayList<Type>(), Type.BIGINT,
+        Type.BIGINT));
+
+    for (Type t: Type.getSupportedTypes()) {
+      if (t.isNull()) continue; // NULL is handled through type promotion.
+      db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+            db, "first_value", Lists.newArrayList(t), t, t));
+      db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+            db, "last_value", Lists.newArrayList(t), t, t));
+      db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+            db, "lag", Lists.newArrayList(t), t, t));
+      db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+            db, "lag", Lists.newArrayList(t, Type.BIGINT), t, t));
+      db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+            db, "lag", Lists.newArrayList(t, Type.BIGINT, t), t, t));
+      db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+            db, "lead", Lists.newArrayList(t), t, t));
+      db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+            db, "lead", Lists.newArrayList(t, Type.BIGINT), t, t));
+      db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+            db, "lead", Lists.newArrayList(t, Type.BIGINT, t), t, t));
+    }
   }
 }

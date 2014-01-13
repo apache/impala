@@ -308,6 +308,14 @@ public class TableRef implements ParseNode {
       Preconditions.checkState(joinOp_ != JoinOperator.CROSS_JOIN);
       onClause_.analyze(analyzer);
       onClause_.checkReturnsBool("ON clause", true);
+        if (onClause_.contains(Expr.isAggregatePredicate())) {
+          throw new AnalysisException(
+              "aggregate function not allowed in ON clause: " + toSql());
+      }
+      if (onClause_.contains(AnalyticExpr.class)) {
+        throw new AnalysisException(
+            "analytic expression not allowed in ON clause: " + toSql());
+      }
       Set<TupleId> onClauseTupleIds = Sets.newHashSet();
       for (Expr e: onClause_.getConjuncts()) {
         // Outer join clause conjuncts are registered for this particular table ref

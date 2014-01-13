@@ -139,7 +139,7 @@ Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, ExprContext** 
         "Expression tree only partially reconstructed. Not all thrift nodes were used.");
   }
   if (!status.ok()) {
-    LOG(ERROR) << "Could not construct expr tree.\n"
+    LOG(ERROR) << "Could not construct expr tree.\n" << status.GetErrorMsg() << "\n"
                << apache::thrift::ThriftDebugString(texpr);
   }
   return status;
