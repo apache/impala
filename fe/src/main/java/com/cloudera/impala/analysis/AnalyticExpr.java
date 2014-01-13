@@ -63,15 +63,18 @@ public class AnalyticExpr extends Expr {
     addChild(fnCall);
     numPartitionExprs_ = partitionExprs != null ? partitionExprs.size() : 0;
     if (numPartitionExprs_ > 0) addChildren(partitionExprs);
-    orderByElements_ =
-        orderByElements == null ? new ArrayList<OrderByElement>() : orderByElements;
-    // add ordering exprs to children
-    for (OrderByElement orderByElement: orderByElements_) {
-      // create copies, we don't want to modify the original parse node, in case
-      // we need to print it
-      orderingExprs_.add(orderByElement.getExpr().clone());
+    orderByElements_ = Lists.newArrayList();
+    if (orderByElements != null) {
+      // add ordering exprs to children
+      for (OrderByElement e: orderByElements) {
+        // create copies, we don't want to modify the original parse node, in case
+        // we need to print it
+        OrderByElement orderByElement = e.clone();
+        orderByElements_.add(orderByElement);
+        orderingExprs_.add(orderByElement.getExpr());
+        addChild(orderByElement.getExpr());
+      }
     }
-    addChildren(orderingExprs_);
     window_ = window;
   }
 
@@ -93,6 +96,13 @@ public class AnalyticExpr extends Expr {
     return children_.subList(1, numPartitionExprs_ + 1);
   }
   public List<OrderByElement> getOrderByElements() { return orderByElements_; }
+  public List<Expr> getOrderByExprs() {
+    List<Expr> result = Lists.newArrayList();
+    for (OrderByElement e: orderByElements_) {
+      result.add(e.getExpr());
+    }
+    return result;
+  }
   public AnalyticWindow getWindow() { return window_; }
 
   @Override
@@ -288,6 +298,7 @@ public class AnalyticExpr extends Expr {
     }
   }
 
+  @Override
   protected void resetAnalysisState() {
     super.resetAnalysisState();
     isAnalyzed_ = false;

@@ -17,6 +17,10 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
+import com.cloudera.impala.thrift.TAnalyticWindow;
+import com.cloudera.impala.thrift.TAnalyticWindowBoundary;
+import com.cloudera.impala.thrift.TAnalyticWindowBoundaryType;
+import com.cloudera.impala.thrift.TAnalyticWindowType;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.util.TColumnValueUtil;
 import com.google.common.base.Preconditions;
@@ -25,7 +29,7 @@ import com.google.common.base.Preconditions;
 /**
  * Windowing clause of an analytic expr
  */
-class AnalyticWindow {
+public class AnalyticWindow {
   enum Type {
     ROWS("ROWS"),
     RANGE("RANGE");
@@ -38,6 +42,9 @@ class AnalyticWindow {
 
     @Override
     public String toString() { return description_; }
+    public TAnalyticWindowType toThrift() {
+      return this == ROWS ? TAnalyticWindowType.ROWS : TAnalyticWindowType.RANGE;
+    }
   }
 
   enum BoundaryType {
@@ -55,6 +62,17 @@ class AnalyticWindow {
 
     @Override
     public String toString() { return description_; }
+    public TAnalyticWindowBoundaryType toThrift() {
+      Preconditions.checkState(!isAbsolutePos());
+      if (this == CURRENT_ROW) {
+        return TAnalyticWindowBoundaryType.CURRENT_ROW;
+      } else if (this == PRECEDING) {
+        return TAnalyticWindowBoundaryType.PRECEDING;
+      } else if (this == FOLLOWING) {
+        return TAnalyticWindowBoundaryType.FOLLOWING;
+      }
+      return null;
+    }
 
     public boolean isAbsolutePos() {
       return this == UNBOUNDED_PRECEDING || this == UNBOUNDED_FOLLOWING;
@@ -93,6 +111,14 @@ class AnalyticWindow {
       if (expr_ != null) sb.append(expr_.toSql()).append(" ");
       sb.append(type_.toString());
       return sb.toString();
+    }
+
+    public TAnalyticWindowBoundary toThrift() {
+      TAnalyticWindowBoundary result = new TAnalyticWindowBoundary(type_.toThrift());
+      if (type_.isOffset()) {
+        result.setOffset_expr(expr_.treeToThrift());
+      }
+      return result;
     }
 
     @Override
@@ -148,6 +174,17 @@ class AnalyticWindow {
       sb.append(rightBoundary_.toSql());
     }
     return sb.toString();
+  }
+
+  public TAnalyticWindow toThrift() {
+    TAnalyticWindow result = new TAnalyticWindow(type_.toThrift());
+    if (leftBoundary_.getType() != BoundaryType.UNBOUNDED_PRECEDING) {
+      result.setWindow_start(leftBoundary_.toThrift());
+    }
+    if (leftBoundary_.getType() != BoundaryType.UNBOUNDED_FOLLOWING) {
+      result.setWindow_start(rightBoundary_.toThrift());
+    }
+    return result;
   }
 
   @Override

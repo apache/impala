@@ -23,6 +23,9 @@ import com.google.common.collect.Lists;
 /**
  * Encapsulates all the information needed to compute ORDER BY
  * This doesn't contain aliases or positional exprs.
+ * TODO: reorganize this completely, this doesn't really encapsulate anything; this
+ * should move into planner/ and encapsulate the implementation of the sort of a
+ * particular input row (materialize all row slots)
  */
 public class SortInfo {
   private List<Expr> orderingExprs_;
@@ -45,7 +48,8 @@ public class SortInfo {
     nullsFirstParams_ = nullsFirstParams;
   }
 
-  void setMaterializedTupleInfo(TupleDescriptor tupleDesc, List<Expr> tupleSlotExprs) {
+  public void setMaterializedTupleInfo(
+      TupleDescriptor tupleDesc, List<Expr> tupleSlotExprs) {
     sortTupleDesc_ = tupleDesc;
     sortTupleSlotExprs_ = tupleSlotExprs;
   }

@@ -75,7 +75,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   // ids of the TblRefs "materialized" by this node; identical with tupleIds_
   // if the tree rooted at this node only materializes BaseTblRefs;
-  // useful for during plan generation
+  // useful during plan generation
   protected ArrayList<TupleId> tblRefIds_;
 
   // A set of nullable TupleId produced by this node. It is a subset of tupleIds_.

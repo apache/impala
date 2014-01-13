@@ -490,6 +490,11 @@ public class PlannerTest {
   }
 
   @Test
+  public void testAnalytics() {
+    runPlannerTestFile("analytics");
+  }
+
+  @Test
   public void testHbase() {
     runPlannerTestFile("hbase");
   }

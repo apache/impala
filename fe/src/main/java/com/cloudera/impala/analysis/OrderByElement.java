@@ -21,7 +21,7 @@ import java.util.List;
 /**
  * Combination of expr, ASC/DESC, and nulls ordering.
  */
-class OrderByElement {
+public class OrderByElement {
   private final Expr expr_;
   private final boolean isAsc_;
   // Represents the NULLs ordering specified: true when "NULLS FIRST", false when

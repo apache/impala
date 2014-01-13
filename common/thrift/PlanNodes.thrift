@@ -38,7 +38,8 @@ enum TPlanNodeType {
   UNION_NODE,
   SELECT_NODE,
   CROSS_JOIN_NODE,
-  DATA_SOURCE_NODE
+  DATA_SOURCE_NODE,
+  ANALYTIC_EVAL_NODE
 }
 
 // phases of an execution node
@@ -246,9 +247,10 @@ struct TAnalyticWindow {
   3: optional TAnalyticWindowBoundary window_end
 }
 
-// Defines one or more analytic functions that share the same window, partitioning
-// expressions and order-by expressions.
-struct TAnalyticExprInfo {
+// Defines a group of one or more analytic functions that share the same window,
+// partitioning expressions and order-by expressions and are evaluated by a single
+// ExecNode.
+struct TAnalyticNode {
   // Exprs on which the analytic function input is partitioned. Input is already sorted
   // on partitions and order by clauses, partition_exprs is used to identify partition
   // boundaries. Empty if no partition clause is specified.
@@ -265,10 +267,6 @@ struct TAnalyticExprInfo {
 
   // Window specification
   4: optional TAnalyticWindow window
-}
-
-struct TAnalyticNode {
-  1: required list<TAnalyticExprInfo> analytic_exprs
 }
 
 struct TUnionNode {

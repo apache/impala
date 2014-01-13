@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.AnalysisContext;
+import com.cloudera.impala.analysis.AnalyticInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
@@ -123,7 +124,6 @@ public class Planner {
     PlanNode singleNodePlan = createQueryPlan(queryStmt, analyzer,
         queryOptions.isDisable_outermost_topn());
     Preconditions.checkNotNull(singleNodePlan);
-    LOG.info("desctbl: " + analyzer.getDescTbl().debugString());
 
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
     if (queryOptions.num_nodes == 1) {
@@ -165,8 +165,22 @@ public class Planner {
     if (analysisResult.isInsertStmt()) {
       rootFragment.setOutputExprs(analysisResult.getInsertStmt().getResultExprs());
     } else {
-      rootFragment.setOutputExprs(queryStmt.getBaseTblResultExprs());
+      List<Expr> resultExprs = null;
+      if (queryStmt instanceof SelectStmt
+          && ((SelectStmt) queryStmt).getAnalyticInfo() != null
+          && fragments.size() == 1) {
+        // TODO: fix this hack: always apply the smap of the root of fragment 0
+        resultExprs =
+            Expr.substituteList(
+                queryStmt.getBaseTblResultExprs(),
+                rootFragment.getPlanRoot().getBaseTblSmap(), analyzer);
+      } else {
+        resultExprs = queryStmt.getBaseTblResultExprs();
+      }
+      rootFragment.setOutputExprs(resultExprs);
     }
+    LOG.info("desctbl: " + analyzer.getDescTbl().debugString());
+    LOG.info("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
 
     LOG.debug("finalize plan fragments");
     for (PlanFragment fragment: fragments) {
@@ -922,6 +936,13 @@ public class Planner {
     PlanNode root;
     if (stmt instanceof SelectStmt) {
       root = createSelectPlan((SelectStmt) stmt, analyzer);
+
+      // insert possible AnalyticEvalNode before SortNode
+      if (((SelectStmt) stmt).getAnalyticInfo() != null) {
+        AnalyticInfo analyticInfo = ((SelectStmt) stmt).getAnalyticInfo();
+        AnalyticPlanner analyticPlanner = new AnalyticPlanner(analyzer, nodeIdGenerator_);
+        root = analyticPlanner.createSingleNodePlan(root, analyticInfo);
+      }
     } else {
       Preconditions.checkState(stmt instanceof UnionStmt);
       root = createUnionPlan((UnionStmt) stmt, analyzer);

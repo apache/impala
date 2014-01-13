@@ -74,6 +74,23 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
   }
 
   /**
+   * Add all nodes in the tree that are of class 'cl' to the list 'matches'.
+   * This node is checked first, followed by its children in order. If the node
+   * itself is of class 'cl', the children are skipped.
+   */
+  public <C extends TreeNode<NodeType>, D extends C> void collect(
+      Class cl, Collection<D> matches) {
+    if (cl.equals(getClass())) {
+      matches.add((D) this);
+      return;
+    }
+
+    for (NodeType child: children_) {
+      child.collect(cl, matches);
+    }
+  }
+
+  /**
    * Add all nodes in the tree that satisfy 'predicate' to the list 'matches'
    * This node is checked first, followed by its children in order. All nodes
    * that match in the subtree are added.
@@ -95,8 +112,19 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
    */
   public static <C extends TreeNode<C>, D extends C> void collect(
       Collection<C> nodeList, Predicate<? super C> predicate, Collection<D> matches) {
-    for (C node : nodeList) {
+    for (C node: nodeList) {
       node.collect(predicate, matches);
+    }
+  }
+
+  /**
+   * For each expression in 'nodeList', collect all subexpressions of class 'cl'
+   * into 'matches'
+   */
+  public static <C extends TreeNode<C>, D extends C> void collect(
+      Collection<C> nodeList, Class cl, Collection<D> matches) {
+    for (C node: nodeList) {
+      node.collect(cl, matches);
     }
   }
 
@@ -129,7 +157,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
    */
   public static <C extends TreeNode<C>, D extends C> boolean contains(
       Collection<C> nodeList, Predicate<? super C> predicate) {
-    for (C node : nodeList) {
+    for (C node: nodeList) {
       if (node.contains(predicate)) return true;
     }
     return false;

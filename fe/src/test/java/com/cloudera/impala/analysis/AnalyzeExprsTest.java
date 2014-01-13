@@ -605,6 +605,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // no FROM clause
     AnalysisError("select 1, count(*) over()",
         "Analytic expressions require FROM clause");
+    // can't mix DISTINCT and analytics
+    AnalysisError(
+        "select distinct int_col, sum(double_col) over () from functional.alltypes",
+        "cannot combine SELECT DISTINCT with analytic functions");
     // analytic expr in Group By
     AnalysisError(
         "select id, count(*) from functional.alltypes "

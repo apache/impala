@@ -21,7 +21,9 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.SlotDescriptor;
+import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.BackendConfig;
@@ -84,17 +86,23 @@ public class SortNode extends PlanNode {
     // Compute the memory layout for the generated tuple.
     computeMemLayout(analyzer);
     computeStats(analyzer);
-    createDefaultSmap(analyzer);
+
+    // populate baseTblMaterializedTupleExprs_ and baseTblSmap_
+    ExprSubstitutionMap childSmap = getCombinedChildSmap();
     List<SlotDescriptor> sortTupleSlots = info_.getSortTupleDescriptor().getSlots();
     List<Expr> slotExprs = info_.getSortTupleSlotExprs();
     Preconditions.checkState(sortTupleSlots.size() == slotExprs.size());
     baseTblMaterializedTupleExprs_ = Lists.newArrayList();
+    baseTblSmap_ = new ExprSubstitutionMap();
     for (int i = 0; i < slotExprs.size(); ++i) {
       if (!sortTupleSlots.get(i).isMaterialized()) continue;
       baseTblMaterializedTupleExprs_.add(slotExprs.get(i));
+      baseTblSmap_.put(slotExprs.get(i), new SlotRef(sortTupleSlots.get(i)));
     }
     baseTblMaterializedTupleExprs_ =
-        Expr.substituteList(baseTblMaterializedTupleExprs_, baseTblSmap_, analyzer);
+        Expr.substituteList(baseTblMaterializedTupleExprs_, childSmap, analyzer);
+    LOG.info("sort smap: " + baseTblSmap_.debugString());
+    LOG.info("sort input exprs: " + Expr.debugString(baseTblMaterializedTupleExprs_));
   }
 
   @Override

@@ -54,6 +54,9 @@ public class SelectStmt extends QueryStmt {
   // set if we have any kind of aggregation operation, include SELECT DISTINCT
   private AggregateInfo aggInfo_;
 
+  // set if we have AnalyticExprs in the select list/order by clause
+  private AnalyticInfo analyticInfo_;
+
   // SQL string of this SelectStmt before inline-view expression substitution.
   // Set in analyze().
   private String sqlString_;
@@ -100,6 +103,7 @@ public class SelectStmt extends QueryStmt {
   public List<TableRef> getTableRefs() { return tableRefs_; }
   public Expr getWhereClause() { return whereClause_; }
   public AggregateInfo getAggInfo() { return aggInfo_; }
+  public AnalyticInfo getAnalyticInfo() { return analyticInfo_; }
   @Override
   public ArrayList<String> getColLabels() { return colLabels_; }
   public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
@@ -177,8 +181,17 @@ public class SelectStmt extends QueryStmt {
       }
     }
 
-    if (tableRefs_.isEmpty() && TreeNode.contains(resultExprs_, AnalyticExpr.class)) {
-      throw new AnalysisException("Analytic expressions require FROM clause.");
+    if (TreeNode.contains(resultExprs_, AnalyticExpr.class)) {
+      if (tableRefs_.isEmpty()) {
+        throw new AnalysisException("Analytic expressions require FROM clause.");
+      }
+
+      // do this here, not after analyzeAggregation(), otherwise the AnalyticExprs
+      // will get substituted away
+      if (selectList_.isDistinct()) {
+        throw new AnalysisException(
+            "cannot combine SELECT DISTINCT with analytic functions");
+      }
     }
 
     if (whereClause_ != null) {
@@ -198,6 +211,7 @@ public class SelectStmt extends QueryStmt {
 
     createSortInfo(analyzer);
     analyzeAggregation(analyzer);
+    analyzeAnalytics(analyzer);
     if (evaluateOrderBy_) createSortTupleInfo(analyzer);
 
     // Remember the SQL string before inline-view expression substitution.
@@ -258,6 +272,12 @@ public class SelectStmt extends QueryStmt {
           analyzer.getUnassignedConjuncts(aggInfo_.getOutputTupleId().asList(), false));
       materializeSlots(analyzer, havingConjuncts);
       aggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
+    }
+
+    if (analyticInfo_ != null) {
+      // TODO: take conjuncts into account (analytic exprs might be part of an inline
+      // view)
+      analyticInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
   }
 
@@ -654,6 +674,40 @@ public class SelectStmt extends QueryStmt {
       aggInfo_ = AggregateInfo.create(groupingExprs, aggExprs, null, analyzer);
     }
   }
+
+  /**
+   * If the select list contains AnalyticExprs, create AnalyticInfo and substitute
+   * AnalyticExprs using the AnalyticInfo's smap.
+   */
+  private void analyzeAnalytics(Analyzer analyzer)
+      throws AnalysisException {
+    boolean hasAnalyticExprs = TreeNode.contains(resultExprs_, AnalyticExpr.class);
+    if (sortInfo_ != null) {
+      hasAnalyticExprs |=
+          TreeNode.contains(sortInfo_.getOrderingExprs(), AnalyticExpr.class);
+    }
+    if (!hasAnalyticExprs) return;
+
+    // collect AnalyticExprs from the SELECT and ORDER BY clauses
+    ArrayList<AnalyticExpr> analyticExprs = Lists.newArrayList();
+    TreeNode.collect(resultExprs_, AnalyticExpr.class, analyticExprs);
+    if (sortInfo_ != null) {
+      TreeNode.collect(sortInfo_.getOrderingExprs(), AnalyticExpr.class,
+          analyticExprs);
+    }
+    analyticInfo_ = AnalyticInfo.create(analyticExprs, analyzer);
+
+    // change select list and ordering exprs to point to agg output. We need
+    // to reanalyze the exprs at this point.
+    resultExprs_ = Expr.substituteList(resultExprs_, analyticInfo_.getSmap(), analyzer);
+    LOG.info("post-analytic selectListExprs: " + Expr.debugString(resultExprs_));
+    if (sortInfo_ != null) {
+      sortInfo_.substituteOrderingExprs(analyticInfo_.getSmap(), analyzer);
+      LOG.debug("post-analytic orderingExprs: " +
+          Expr.debugString(sortInfo_.getOrderingExprs()));
+    }
+  }
+
 
   /**
    * Substitute exprs of the form "<number>"  with the corresponding

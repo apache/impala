@@ -71,7 +71,7 @@ public class PlanFragment {
   private ExchangeNode destNode_;
 
   // if null, outputs the entire row produced by planRoot_
-  private ArrayList<Expr> outputExprs_;
+  private List<Expr> outputExprs_;
 
   // created in finalize() or set in setSink()
   private DataSink sink_;
@@ -112,9 +112,10 @@ public class PlanFragment {
     }
   }
 
-  public void setOutputExprs(ArrayList<Expr> outputExprs) {
+  public void setOutputExprs(List<Expr> outputExprs) {
     outputExprs_ = Expr.cloneList(outputExprs);
   }
+  public List<Expr> getOutputExprs() { return outputExprs_; }
 
   /**
    * Finalize plan tree and create stream sink, if needed.
