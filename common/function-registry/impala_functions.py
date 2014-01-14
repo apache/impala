@@ -205,6 +205,8 @@ functions = [
         'StringFunctions::ParseUrl', ['parse_url']],
   ['String_Parse_Url', 'STRING', ['STRING', 'STRING', 'STRING'],
         'StringFunctions::ParseUrlKey', ['parse_url']],
+  ['Utility_Current_Database', 'STRING', [], 'UtilityFunctions::CurrentDatabase',
+      ['current_database']],
   ['Utility_User', 'STRING', [], 'UtilityFunctions::User', ['user']],
   ['Utility_Sleep', 'BOOLEAN', ['INT'], 'UtilityFunctions::Sleep', ['sleep']],
   ['Utility_Pid', 'INT', [], 'UtilityFunctions::Pid', ['pid']],

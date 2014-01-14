@@ -80,4 +80,11 @@ void* UtilityFunctions::Sleep(Expr* e, TupleRow* row) {
   return &e->result_.bool_val;
 }
 
+void* UtilityFunctions::CurrentDatabase(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 0);
+  // An empty string indicates the current database wasn't set.
+  return (e->result_.string_val.len > 0) ? &e->result_.string_val : NULL;
+}
+
+
 }

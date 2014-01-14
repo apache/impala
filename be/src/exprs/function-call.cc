@@ -64,6 +64,12 @@ Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc)
       result_.SetStringVal(state->query_ctxt().session.user);
       break;
     }
+    case TExprOpcode::UTILITY_CURRENT_DATABASE: {
+      // Set current database from the session.
+      DCHECK(state != NULL);
+      result_.SetStringVal(state->query_ctxt().session.database);
+      break;
+    }
     default: break;
   }
   return Status::OK;

@@ -43,6 +43,10 @@ class UtilityFunctions {
 
   // Testing function that sleeps for the specified number of milliseconds. Returns true.
   static void* Sleep(Expr* e, TupleRow* row);
+
+  // Implementation of the current_database() function. Returns the current default
+  // database from the parent session of this query.
+  static void* CurrentDatabase(Expr* e, TupleRow* row);
 };
 
 }
