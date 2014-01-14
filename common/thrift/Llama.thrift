@@ -34,13 +34,14 @@ struct TNetworkAddress {
 
 enum TStatusCode {
   OK,
-  RUNTIME_ERROR,
+  REQUEST_ERROR,
   INTERNAL_ERROR
 }
 
 struct TStatus {
   1: required TStatusCode status_code;
-  2: list<string> error_msgs;
+  2: i16 error_code;
+  3: list<string> error_msgs;
 }
 
 enum TLocationEnforcement {
@@ -78,7 +79,7 @@ struct TNodeCapacity {
 
 struct TLlamaAMRegisterRequest {
   1: required TLlamaServiceVersion version;
-  2: required string               client_id;
+  2: required TUniqueId            client_id;
   3: required TNetworkAddress      notification_callback_service;
 }
 
@@ -96,18 +97,28 @@ struct TLlamaAMUnregisterResponse {
   1: required TStatus status;
 }
 
-
-
-
 struct TLlamaAMReservationRequest {
   1: required TLlamaServiceVersion version;
   2: required TUniqueId            am_handle;
-  3: required string               queue;
-  4: required list<TResource>      resources;
-  5: required bool                 gang;
+  3: required string               user;
+  4: optional string               queue;
+  5: required list<TResource>      resources;
+  6: required bool                 gang;
 }
 
 struct TLlamaAMReservationResponse {
+  1: required TStatus   status;
+  2: optional TUniqueId reservation_id;
+}
+
+struct TLlamaAMReservationExpansionRequest {
+  1: required TLlamaServiceVersion version;
+  2: required TUniqueId            am_handle;
+  3: required TUniqueId            expansion_of;
+  4: required TResource            resource;
+}
+
+struct TLlamaAMReservationExpansionResponse {
   1: required TStatus   status;
   2: optional TUniqueId reservation_id;
 }
@@ -139,10 +150,48 @@ service LlamaAMService {
   TLlamaAMUnregisterResponse Unregister(1: TLlamaAMUnregisterRequest request);
   
   TLlamaAMReservationResponse Reserve(1: TLlamaAMReservationRequest request);
-  
+
+    TLlamaAMReservationExpansionResponse Expand(
+    1: TLlamaAMReservationExpansionRequest request);
+
   TLlamaAMReleaseResponse Release(1: TLlamaAMReleaseRequest request);
 
   TLlamaAMGetNodesResponse GetNodes(1: TLlamaAMGetNodesRequest request);
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Llama AM Admin Service
+
+struct TLlamaAMAdminReleaseRequest {
+  1: required TLlamaServiceVersion version;
+  2: optional bool                 do_not_cache = false;
+  3: optional list<string>         queues;
+  4: optional list<TUniqueId>      handles;
+  5: optional list<TUniqueId>      reservations;
+}
+
+struct TLlamaAMAdminReleaseResponse {
+  1: required TStatus status;
+}
+
+struct TLlamaAMAdminEmptyCacheRequest {
+  1: required TLlamaServiceVersion version;
+  2: optional bool                 allQueues = false;
+  3: optional list<string>         queues;
+}
+
+struct TLlamaAMAdminEmptyCacheResponse {
+  1: required TStatus status;
+}
+
+service LlamaAMAdminService {
+
+  TLlamaAMAdminReleaseResponse Release
+  (1: TLlamaAMAdminReleaseRequest request);
+
+  TLlamaAMAdminEmptyCacheResponse EmptyCache
+  (1: TLlamaAMAdminEmptyCacheRequest request);
 
 }
 
@@ -151,7 +200,7 @@ service LlamaAMService {
 
 struct TLlamaNMRegisterRequest {
   1: required TLlamaServiceVersion version;
-  2: required string               client_id;
+  2: required TUniqueId            client_id;
   3: required TNetworkAddress      notification_callback_service;
 }
 
@@ -184,13 +233,15 @@ struct TLlamaAMNotificationRequest {
   1: required TLlamaServiceVersion     version;
   2: required TUniqueId                am_handle;
   3: required bool                     heartbeat;
-  4: required list<TUniqueId>          allocated_reservation_ids;
-  5: required list<TAllocatedResource> allocated_resources;
-  6: required list<TUniqueId>          rejected_reservation_ids;
-  7: required list<TUniqueId>          rejected_client_resource_ids;
-  8: required list<TUniqueId>          lost_client_resource_ids;
-  9: required list<TUniqueId>          preempted_reservation_ids;
-  10: required list<TUniqueId>          preempted_client_resource_ids;
+  4: optional list<TUniqueId>          allocated_reservation_ids;
+  5: optional list<TAllocatedResource> allocated_resources;
+  6: optional list<TUniqueId>          rejected_reservation_ids;
+  7: optional list<TUniqueId>          rejected_client_resource_ids;
+  8: optional list<TUniqueId>          lost_client_resource_ids;
+  9: optional list<TUniqueId>          preempted_reservation_ids;
+  10: optional list<TUniqueId>         preempted_client_resource_ids;
+  11: optional list<TUniqueId>         admin_released_reservation_ids;
+  12: optional list<TUniqueId>         lost_reservation_ids;
 }
 
 struct TLlamaAMNotificationResponse {

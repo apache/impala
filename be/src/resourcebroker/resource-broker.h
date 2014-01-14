@@ -17,6 +17,7 @@
 
 #include <boost/unordered_map.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/uuid/uuid.hpp>
 
 #include "runtime/client-cache.h"
 #include "util/non-primitive-metrics.h"
@@ -141,7 +142,7 @@ class ResourceBroker {
   Metrics::PrimitiveMetric<int64_t>* requests_released_metric_;
 
   // Client id used to register with Llama. Set in Init().
-  std::string llama_client_id_;
+  boost::uuids::uuid llama_client_id_;
 
   // Thrift API implementation which proxies Llama notifications onto this ResourceBroker.
   boost::shared_ptr<llama::LlamaNotificationServiceIf> llama_callback_thrift_iface_;

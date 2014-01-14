@@ -141,9 +141,8 @@ Status ResourceBroker::Init() {
   RETURN_IF_ERROR(llama_callback_server_->Start());
 
   // Generate client id for registration with Llama, and register with LLama.
-  DCHECK(llama_client_id_.empty());
   random_generator uuid_generator;
-  llama_client_id_= lexical_cast<string>(uuid_generator());
+  llama_client_id_= uuid_generator();
   RETURN_IF_ERROR(RegisterAndRefreshLlama());
   return Status::OK;
 }
@@ -180,7 +179,10 @@ Status ResourceBroker::RegisterWithLlama() {
       // Register this resource broker with Llama.
       llama::TLlamaAMRegisterRequest request;
       request.__set_version(llama::TLlamaServiceVersion::V1);
-      request.__set_client_id(llama_client_id_);
+      llama::TUniqueId llama_uuid;
+      UUIDToTUniqueId(llama_client_id_, &llama_uuid);
+      request.__set_client_id(llama_uuid);
+
       llama::TNetworkAddress callback_address;
       callback_address << llama_callback_address_;
       request.__set_notification_callback_service(callback_address);
@@ -563,4 +565,3 @@ ostream& operator<<(ostream& os, const TResourceBrokerReservationResponse& reser
 }
 
 }
-
