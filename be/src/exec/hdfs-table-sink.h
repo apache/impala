@@ -35,30 +35,34 @@ class RuntimeState;
 class HdfsTableWriter;
 class MemTracker;
 
-// Records the temporary and final Hdfs file name,
-// the opened temporary Hdfs file, and the number of appended rows
-// of an output partition.
+// Records the temporary and final Hdfs file name, the opened temporary Hdfs file, and the
+// number of appended rows of an output partition.
 struct OutputPartition {
-  // Full path to root of the group of files that will be created for this
-  // partition.  Each file will have a sequence number appended.
-  // A table writer may produce multiple files per partition.
-  // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>
-  std::string hdfs_file_name_template;
+  // In the below, <unique_id_str> is the unique ID passed to HdfsTableSink in string
+  // form. It is typically the fragment ID that owns the sink.
 
-  // File name for current output -- with sequence number appended.
-  // This is a temporary file that will get moved to the permanent file location
+  // Full path to root of the group of files that will be created for this partition.
+  // Each file will have a sequence number appended.  A table writer may produce multiple
+  // files per partition. The root is either partition_descriptor->location (if non-empty,
+  // i.e. the partition has a custom location) or table_dir/partition_name/
+  // Path: <root>/<unique_id_str>
+  std::string final_hdfs_file_name_prefix;
+
+  // File name for current output, with sequence number appended.
+  // This is a temporary file that will get moved to a  permanent location
   // when we commit the insert.
   // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>.<sequence number>
   std::string current_file_name;
 
-  // Name of the temporary directory.
-  // Path: <hdfs_base_dir>/<unique_id>_dir/
+  // Name of the temporary directory that files for this partition are staged to before
+  // the coordinator moves them to their permanent location once the query completes.
+  // Path: <base_table_dir/<staging_dir>/<unique_id>_dir/
   std::string tmp_hdfs_dir_name;
 
-  // Base name for temporary files: queryId/hdfs_file_name
-  // The file is moved to hdfs_file_name in Close().
-  // Path: tmp_hdfs_dir_name/<partition_values>/<unique_id_str>
-  std::string tmp_hdfs_file_name_template;
+  // Base prefix for temporary files, to save building it every time a temporary file is
+  // created.
+  // Path: tmp_hdfs_dir_name/partition_name/<unique_id_str>
+  std::string tmp_hdfs_file_name_prefix;
 
   // key1=val1/key2=val2/ etc. Used to identify partitions to the metastore.
   std::string partition_name;
@@ -189,7 +193,8 @@ class HdfsTableSink : public DataSink {
   // The Hdfs directory is created from the target table's base Hdfs dir,
   // the partition_key_names_ and the evaluated partition_key_exprs_.
   // The Hdfs file name is the unique_id_str_.
-  void BuildHdfsFileNames(OutputPartition* output);
+  void BuildHdfsFileNames(const HdfsPartitionDescriptor& partition_descriptor,
+      OutputPartition* output);
 
   // Updates runtime stats of HDFS with rows written, then closes the file associated with
   // the partition by calling ClosePartitionFile()

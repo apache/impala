@@ -58,3 +58,30 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
       except:
         err_msg = "Directory '%s' was unexpectedly deleted by INSERT OVERWRITE"
         pytest.fail(err_msg % (table_dir + dir))
+
+  @pytest.mark.excute_serially
+  def test_insert_alter_partition_location(self):
+    """Test that inserts after changing the location of a partition work correctly"""
+    partition_dir = "tmp/test_insert_alter_partition_location"
+
+    self.client.execute("DROP TABLE IF EXISTS functional.insert_alter_partition_location")
+    self.hdfs_client.delete_file_dir(partition_dir, recursive=True)
+    self.hdfs_client.make_dir(partition_dir)
+
+    self.client.execute(
+"CREATE TABLE functional.insert_alter_partition_location (c int) PARTITIONED BY (p int)")
+    self.client.execute(
+"ALTER TABLE functional.insert_alter_partition_location ADD PARTITION(p=1)")
+    self.client.execute(
+"ALTER TABLE functional.insert_alter_partition_location PARTITION(p=1) SET LOCATION '/%s'"
+      % partition_dir)
+    self.client.execute(
+"INSERT OVERWRITE functional.insert_alter_partition_location PARTITION(p=1) VALUES(1)")
+
+    result = self.client.execute(
+"SELECT COUNT(*) FROM functional.insert_alter_partition_location")
+    assert len(result.get_data()) == 1
+
+    # Should have created exactly one file in the partition dir (not in a subdirectory)
+    ls = self.hdfs_client.list_dir(partition_dir)
+    assert len(ls['FileStatuses']['FileStatus']) == 1
