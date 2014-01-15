@@ -61,6 +61,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.junit.Test;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.util.UnsafeUtil;
@@ -162,35 +163,35 @@ public class UdfExecutorTest {
   }
 
   // Returns the primitive type for w
-  PrimitiveType getType(Object w) {
+  ColumnType getType(Object w) {
     if (w instanceof ImpalaBooleanWritable) {
-      return PrimitiveType.BOOLEAN;
+      return ColumnType.BOOLEAN;
     } else if (w instanceof ImpalaTinyIntWritable) {
-      return PrimitiveType.TINYINT;
+      return ColumnType.TINYINT;
     } else if (w instanceof ImpalaSmallIntWritable) {
-      return PrimitiveType.SMALLINT;
+      return ColumnType.SMALLINT;
     } else if (w instanceof ImpalaIntWritable) {
-      return PrimitiveType.INT;
+      return ColumnType.INT;
     } else if (w instanceof ImpalaBigIntWritable) {
-      return PrimitiveType.BIGINT;
+      return ColumnType.BIGINT;
     } else if (w instanceof ImpalaFloatWritable) {
-      return PrimitiveType.FLOAT;
+      return ColumnType.FLOAT;
     } else if (w instanceof ImpalaDoubleWritable) {
-      return PrimitiveType.DOUBLE;
+      return ColumnType.DOUBLE;
     } else if (w instanceof ImpalaBytesWritable || w instanceof ImpalaTextWritable
         || w instanceof String) {
-      return PrimitiveType.STRING;
+      return ColumnType.STRING;
     }
     Preconditions.checkArgument(false);
-    return PrimitiveType.INVALID_TYPE;
+    return ColumnType.INVALID;
   }
 
   // Runs the hive udf contained in c. Validates that c.evaluate(args) == retValue.
   // Arguments and return value cannot be NULL.
-  void TestUdf(String jar, Class<?> c, Writable expectedValue, PrimitiveType expectedType,
+  void TestUdf(String jar, Class<?> c, Writable expectedValue, ColumnType expectedType,
       boolean validate, Object... args)
       throws MalformedURLException, ImpalaRuntimeException {
-    PrimitiveType[] argTypes = new PrimitiveType[args.length];
+    ColumnType[] argTypes = new ColumnType[args.length];
     for (int i = 0; i < args.length; ++i) {
       Preconditions.checkNotNull(args[i]);
       argTypes[i] = getType(args[i]);
@@ -221,7 +222,7 @@ public class UdfExecutorTest {
     for (int i = 0; i < 10; ++i) {
       long r = e.evaluate(inputArgs);
       if (validate) {
-        switch (expectedType) {
+        switch (expectedType.getPrimitiveType()) {
           case BOOLEAN: {
             boolean v = UnsafeUtil.UNSAFE.getByte(r) != 0;
             assertTrue(v == ((ImpalaBooleanWritable)expectedValue).get());

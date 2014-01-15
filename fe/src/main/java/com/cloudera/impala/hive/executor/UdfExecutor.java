@@ -37,6 +37,7 @@ import org.apache.hadoop.io.Writable;
 import org.apache.log4j.Logger;
 import org.apache.thrift.protocol.TBinaryProtocol;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
@@ -64,8 +65,8 @@ public class UdfExecutor {
 
   private UDF udf_;
   private Method method_;
-  private PrimitiveType[] argTypes_;
-  private PrimitiveType retType_;
+  private ColumnType[] argTypes_;
+  private ColumnType retType_;
 
   // Input buffer from the backend. This is valid for the duration of an evaluate() call.
   // These buffers are allocated in the BE.
@@ -108,10 +109,10 @@ public class UdfExecutor {
 
     String className = request.fn.scalar_fn.symbol;
     String jarFile = request.local_location;
-    PrimitiveType retType = PrimitiveType.fromThrift(request.fn.ret_type);
-    PrimitiveType[] parameterTypes = new PrimitiveType[request.fn.arg_types.size()];
+    ColumnType retType = ColumnType.fromThrift(request.fn.ret_type);
+    ColumnType[] parameterTypes = new ColumnType[request.fn.arg_types.size()];
     for (int i = 0; i < request.fn.arg_types.size(); ++i) {
-      parameterTypes[i] = PrimitiveType.fromThrift(request.fn.arg_types.get(i));
+      parameterTypes[i] = ColumnType.fromThrift(request.fn.arg_types.get(i));
     }
     inputBufferPtr_ = request.input_buffer_ptr;
     inputNullsPtr_ = request.input_nulls_ptr;
@@ -136,7 +137,7 @@ public class UdfExecutor {
    * @param udfPath: fully qualified class path for the UDF
    */
   public UdfExecutor(String jarFile, String udfPath,
-      PrimitiveType retType, PrimitiveType... parameterTypes)
+      ColumnType retType, ColumnType... parameterTypes)
       throws ImpalaRuntimeException {
 
     inputBufferOffsets_ = new int[parameterTypes.length];
@@ -260,7 +261,7 @@ public class UdfExecutor {
 
     UnsafeUtil.UNSAFE.putByte(outputNullPtr_, (byte)0);
 
-    switch (retType_) {
+    switch (retType_.getPrimitiveType()) {
       case BOOLEAN: {
         BooleanWritable val = (BooleanWritable)obj;
         UnsafeUtil.UNSAFE.putByte(outputBufferPtr_, val.get() ? (byte)1 : 0);
@@ -338,7 +339,7 @@ public class UdfExecutor {
 
     for (int i = 0; i < argTypes_.length; ++i) {
       int offset = inputBufferOffsets_[i];
-      switch (argTypes_[i]) {
+      switch (argTypes_[i].getPrimitiveType()) {
         case BOOLEAN:
           inputObjects_[i] = new ImpalaBooleanWritable(inputBufferPtr_ + offset);
           break;
@@ -392,7 +393,7 @@ public class UdfExecutor {
    * This uses reflection to look up the "evaluate" function in the UDF class.
    */
   private void init(String jarPath, String udfPath,
-      PrimitiveType retType, PrimitiveType... parameterTypes) throws
+      ColumnType retType, ColumnType... parameterTypes) throws
       ImpalaRuntimeException {
     ArrayList<String> signatures = Lists.newArrayList();
     try {
@@ -422,7 +423,7 @@ public class UdfExecutor {
 
         boolean incompatible = false;
         for (int i = 0; i < methodTypes.length; ++i) {
-          if (getPrimitiveType(methodTypes[i]) != parameterTypes[i]) {
+          if (getPrimitiveType(methodTypes[i]) != parameterTypes[i].getPrimitiveType()) {
             incompatible = true;
             break;
           }

@@ -65,7 +65,7 @@ Status AggFnEvaluator::Create(ObjectPool* pool, const TAggregateFunctionCall& de
 }
 
 AggFnEvaluator::AggFnEvaluator(const TAggregateFunctionCall& desc)
-  : return_type_(ThriftToType(desc.fn.ret_type)),
+  : return_type_(desc.fn.ret_type),
     intermediate_type_(desc.fn.aggregate_fn.intermediate_type),
     function_type_(desc.fn.binary_type),
     output_slot_desc_(NULL) {

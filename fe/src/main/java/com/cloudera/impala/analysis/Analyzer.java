@@ -32,7 +32,6 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
@@ -1180,17 +1179,17 @@ public class Analyzer {
    * but note that lastCompatibleExpr may not yet have lastCompatibleType,
    * because it was not cast yet.
    */
-  public PrimitiveType getCompatibleType(PrimitiveType lastCompatibleType,
+  public ColumnType getCompatibleType(ColumnType lastCompatibleType,
       Expr lastCompatibleExpr, Expr expr)
       throws AnalysisException {
-    PrimitiveType newCompatibleType;
+    ColumnType newCompatibleType;
     if (lastCompatibleType == null) {
       newCompatibleType = expr.getType();
     } else {
       newCompatibleType =
-          PrimitiveType.getAssignmentCompatibleType(lastCompatibleType, expr.getType());
+        ColumnType.getAssignmentCompatibleType(lastCompatibleType, expr.getType());
     }
-    if (newCompatibleType == PrimitiveType.INVALID_TYPE) {
+    if (!newCompatibleType.isValid()) {
       throw new AnalysisException("Incompatible return types '" + lastCompatibleType +
           "' and '" + expr.getType() + "' of exprs '" +
           lastCompatibleExpr.toSql() + "' and '" + expr.toSql() + "'.");
@@ -1204,11 +1203,11 @@ public class Analyzer {
    * Throw an AnalysisException if the types are incompatible,
    * returns compatible type otherwise.
    */
-  public PrimitiveType castAllToCompatibleType(List<Expr> exprs)
+  public ColumnType castAllToCompatibleType(List<Expr> exprs)
       throws AnalysisException, AuthorizationException {
     // Determine compatible type of exprs.
     Expr lastCompatibleExpr = exprs.get(0);
-    PrimitiveType compatibleType = null;
+    ColumnType compatibleType = null;
     for (int i = 0; i < exprs.size(); ++i) {
       exprs.get(i).analyze(this);
       compatibleType = getCompatibleType(compatibleType, lastCompatibleExpr,
@@ -1216,7 +1215,7 @@ public class Analyzer {
     }
     // Add implicit casts if necessary.
     for (int i = 0; i < exprs.size(); ++i) {
-      if (exprs.get(i).getType() != compatibleType) {
+      if (!exprs.get(i).getType().equals(compatibleType)) {
         Expr castExpr = exprs.get(i).castTo(compatibleType);
         exprs.set(i, castExpr);
       }

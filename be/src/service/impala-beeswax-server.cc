@@ -106,7 +106,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
       // ODBC-187 - ODBC can only take "\t" as the delimiter
       out_stream << (i > 0 ? "\t" : "");
       RawValue::PrintValue(col_values[i],
-          ThriftToType(metadata_.columns[i].columnType), scales[i], &out_stream);
+          ThriftToType(metadata_.columns[i].columnType.type), scales[i], &out_stream);
     }
     result_set_->push_back(out_stream.str());
     return Status::OK;
@@ -273,7 +273,7 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
     results_metadata.schema.__isset.fieldSchemas = true;
     results_metadata.schema.fieldSchemas.resize(result_set_md->columns.size());
     for (int i = 0; i < results_metadata.schema.fieldSchemas.size(); ++i) {
-      TPrimitiveType::type col_type = result_set_md->columns[i].columnType;
+      TPrimitiveType::type col_type = result_set_md->columns[i].columnType.type;
       results_metadata.schema.fieldSchemas[i].__set_type(
           TypeToOdbcString(ThriftToType(col_type)));
 
@@ -517,7 +517,7 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
     // TODO: As of today, the ODBC driver does not support boolean and timestamp data
     // type but it should. This is tracked by ODBC-189. We should verify that our
     // boolean and timestamp type are correctly recognized when ODBC-189 is closed.
-    TPrimitiveType::type col_type = result_metadata->columns[i].columnType;
+    TPrimitiveType::type col_type = result_metadata->columns[i].columnType.type;
     query_results->columns[i] = TypeToOdbcString(ThriftToType(col_type));
   }
   query_results->__isset.columns = true;

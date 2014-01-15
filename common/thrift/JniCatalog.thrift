@@ -361,7 +361,7 @@ struct TDropFunctionParams {
   1: required Types.TFunctionName fn_name
 
   // The types of the arguments to the function
-  2: required list<Types.TPrimitiveType> arg_types;
+  2: required list<Types.TColumnType> arg_types;
 
   // If true, no error is raised if the target fn does not exist
   3: required bool if_exists

@@ -24,7 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.opcode.FunctionRegistry;
@@ -63,17 +62,17 @@ public class OpcodeRegistry {
     public final boolean udfInterface;
 
     // Constructor for searching, specifying the op and arguments
-    public BuiltinFunction(FunctionOperator operator, PrimitiveType[] args) {
+    public BuiltinFunction(FunctionOperator operator, ColumnType[] args) {
       super(new FunctionName(operator.toString()),
-          args, PrimitiveType.INVALID_TYPE, false);
+          args, ColumnType.INVALID, false);
       this.operator = operator;
       this.udfInterface = false;
       this.setBinaryType(TFunctionBinaryType.BUILTIN);
     }
 
     private BuiltinFunction(boolean udfInterface, TExprOpcode opcode,
-        FunctionOperator operator, boolean varArgs, PrimitiveType ret,
-        PrimitiveType[] args) {
+        FunctionOperator operator, boolean varArgs, ColumnType ret,
+        ColumnType[] args) {
       super(new FunctionName(opcode.toString()), args, ret, varArgs);
       this.operator = operator;
       this.opcode = opcode;
@@ -105,7 +104,7 @@ public class OpcodeRegistry {
    * For example, one can have two builtins func(float, int ...) and func(string ...),
    * but not func(float, int ...) and func (int ...).
    */
-  private final Map<Pair<FunctionOperator, PrimitiveType>, List<BuiltinFunction>>
+  private final Map<Pair<FunctionOperator, ColumnType>, List<BuiltinFunction>>
       varArgOperations;
 
   /**
@@ -155,14 +154,14 @@ public class OpcodeRegistry {
    * input identically, implicit type promotion is allowed.
    */
   public BuiltinFunction getFunctionInfo(FunctionOperator op, boolean allowImplicitCasts,
-      PrimitiveType ... argTypes) {
+      ColumnType ... argTypes) {
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, argTypes.length);
-    List<Pair<FunctionOperator, PrimitiveType>> varArgMatchTypes = null;
+    List<Pair<FunctionOperator, ColumnType>> varArgMatchTypes = null;
     if (argTypes.length > 0) {
-      Set<PrimitiveType> maxResolutionTypes = getMaxResolutionTypes(argTypes);
+      Set<ColumnType> maxResolutionTypes = getMaxResolutionTypes(argTypes);
       Preconditions.checkNotNull(maxResolutionTypes);
       varArgMatchTypes = Lists.newArrayList();
-      for (PrimitiveType maxResolutionType : maxResolutionTypes) {
+      for (ColumnType maxResolutionType : maxResolutionTypes) {
         varArgMatchTypes.add(Pair.create(op, maxResolutionType));
       }
     }
@@ -172,7 +171,7 @@ public class OpcodeRegistry {
     } else if(varArgMatchTypes != null) {
       functions = Lists.newArrayList();
       List<BuiltinFunction> matchedFunctions = null;
-      for (Pair<FunctionOperator, PrimitiveType> varArgsMatchType : varArgMatchTypes) {
+      for (Pair<FunctionOperator, ColumnType> varArgsMatchType : varArgMatchTypes) {
         matchedFunctions = varArgOperations.get(varArgsMatchType);
         if (matchedFunctions != null) functions.addAll(matchedFunctions);
       }
@@ -195,14 +194,14 @@ public class OpcodeRegistry {
    * Returns the max resolution type for each argType that is not a NULL_TYPE. If all
    * argument types are NULL_TYPE then a set will be returned containing NULL_TYPE.
    */
-  private Set<PrimitiveType> getMaxResolutionTypes(PrimitiveType[] argTypes) {
-    Set<PrimitiveType> maxResolutionTypes = Sets.newHashSet();
+  private Set<ColumnType> getMaxResolutionTypes(ColumnType[] argTypes) {
+    Set<ColumnType> maxResolutionTypes = Sets.newHashSet();
     for (int i = 0; i < argTypes.length; ++i) {
       if (!argTypes[i].isNull()) {
         maxResolutionTypes.add(argTypes[i].getMaxResolutionType());
       }
     }
-    if (maxResolutionTypes.isEmpty()) maxResolutionTypes.add(PrimitiveType.NULL_TYPE);
+    if (maxResolutionTypes.isEmpty()) maxResolutionTypes.add(ColumnType.NULL);
     return maxResolutionTypes;
   }
 
@@ -210,17 +209,17 @@ public class OpcodeRegistry {
    * Add a function with the specified opcode/signature to the registry.
    */
   public boolean add(boolean udfInterface, FunctionOperator op, TExprOpcode opcode,
-      boolean varArgs, PrimitiveType retType, PrimitiveType ... args) {
+      boolean varArgs, ColumnType retType, ColumnType ... args) {
     List<BuiltinFunction> functions;
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, args.length);
     // Take the last argument's type as the vararg type.
-    Pair<FunctionOperator, PrimitiveType> varArgsLookup = null;
+    Pair<FunctionOperator, ColumnType> varArgsLookup = null;
     // Special signature for vararg functions to handle matching when all args are NULL.
-    Pair<FunctionOperator, PrimitiveType> varArgsNullLookup = null;
+    Pair<FunctionOperator, ColumnType> varArgsNullLookup = null;
     Preconditions.checkArgument((varArgs) ? args.length > 0 : true);
     if (varArgs && args.length > 0) {
       varArgsLookup = Pair.create(op, args[args.length - 1].getMaxResolutionType());
-      varArgsNullLookup = Pair.create(op, PrimitiveType.NULL_TYPE);
+      varArgsNullLookup = Pair.create(op, ColumnType.NULL);
     }
     if (operations.containsKey(lookup)) {
       functions = operations.get(lookup);

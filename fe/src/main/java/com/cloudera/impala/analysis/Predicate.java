@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
@@ -36,7 +35,7 @@ public abstract class Predicate extends Expr {
       AuthorizationException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
-    type_ = PrimitiveType.BOOLEAN;
+    type_ = ColumnType.BOOLEAN;
     // values: true/false/null
     numDistinctValues_ = 3;
   }

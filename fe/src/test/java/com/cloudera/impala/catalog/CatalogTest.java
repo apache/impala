@@ -19,6 +19,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.analysis.IntLiteral;
@@ -44,7 +45,7 @@ public class CatalogTest {
   }
 
   private void checkTableCols(Db db, String tblName, int numClusteringCols,
-      String[] colNames, PrimitiveType[] colTypes) throws TableLoadingException {
+      String[] colNames, ColumnType[] colTypes) throws TableLoadingException {
     Table tbl = db.getTable(tblName);
     assertEquals(tbl.getName(), tblName);
     assertEquals(tbl.getNumClusteringCols(), numClusteringCols);
@@ -56,14 +57,14 @@ public class CatalogTest {
     while (it.hasNext()) {
       Column col = it.next();
       assertEquals(col.getName(), colNames[i]);
-      assertEquals(col.getType(), colTypes[i]);
+      assertTrue(col.getType().equals(colTypes[i]));
       ++i;
     }
   }
 
   private void checkHBaseTableCols(Db db, String hiveTableName, String hbaseTableName,
       String[] hiveColNames, String[] colFamilies, String[] colQualifiers,
-      PrimitiveType[] colTypes) throws TableLoadingException{
+      ColumnType[] colTypes) throws TableLoadingException{
     checkTableCols(db, hiveTableName, 1, hiveColNames, colTypes);
     HBaseTable tbl = (HBaseTable) db.getTable(hiveTableName);
     assertEquals(tbl.getHBaseTableName(), hbaseTableName);
@@ -133,36 +134,36 @@ public class CatalogTest {
           {"year", "month", "id", "bool_col", "tinyint_col", "smallint_col",
            "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
            "string_col", "timestamp_col"},
-        new PrimitiveType[]
-          {PrimitiveType.INT, PrimitiveType.INT, PrimitiveType.INT,
-           PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
-           PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
-           PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING,
-           PrimitiveType.TIMESTAMP});
+        new ColumnType[]
+          {ColumnType.INT, ColumnType.INT, ColumnType.INT,
+           ColumnType.BOOLEAN, ColumnType.TINYINT, ColumnType.SMALLINT,
+           ColumnType.INT, ColumnType.BIGINT, ColumnType.FLOAT,
+           ColumnType.DOUBLE, ColumnType.STRING, ColumnType.STRING,
+           ColumnType.TIMESTAMP});
     checkTableCols(functionalDb, "testtbl", 0,
         new String[] {"id", "name", "zip"},
-        new PrimitiveType[]
-          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
+        new ColumnType[]
+          {ColumnType.BIGINT, ColumnType.STRING, ColumnType.INT});
     checkTableCols(testDb, "testtbl", 0,
         new String[] {"id", "name", "zip"},
-        new PrimitiveType[]
-          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
+        new ColumnType[]
+          {ColumnType.BIGINT, ColumnType.STRING, ColumnType.INT});
     checkTableCols(functionalDb, "liketbl", 0,
         new String[] {
             "str_col", "match_like_col", "no_match_like_col", "match_regex_col",
             "no_match_regex_col"},
-        new PrimitiveType[]
-          {PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.STRING,
-           PrimitiveType.STRING, PrimitiveType.STRING});
+        new ColumnType[]
+          {ColumnType.STRING, ColumnType.STRING, ColumnType.STRING,
+           ColumnType.STRING, ColumnType.STRING});
     checkTableCols(functionalDb, "dimtbl", 0,
         new String[] {"id", "name", "zip"},
-        new PrimitiveType[]
-          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
+        new ColumnType[]
+          {ColumnType.BIGINT, ColumnType.STRING, ColumnType.INT});
     checkTableCols(functionalDb, "jointbl", 0,
         new String[] {"test_id", "test_name", "test_zip", "alltypes_id"},
-        new PrimitiveType[]
-          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT,
-           PrimitiveType.INT});
+        new ColumnType[]
+          {ColumnType.BIGINT, ColumnType.STRING, ColumnType.INT,
+           ColumnType.INT});
 
     checkHBaseTableCols(hbaseDb, "alltypessmall", "functional_hbase.alltypessmall",
         new String[]
@@ -175,12 +176,12 @@ public class CatalogTest {
           {null, "bigint_col", "bool_col", "date_string_col", "double_col", "float_col",
            "int_col", "month", "smallint_col", "string_col", "timestamp_col",
            "tinyint_col", "year"},
-        new PrimitiveType[]
-          {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
-           PrimitiveType.STRING, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
-           PrimitiveType.INT, PrimitiveType.INT, PrimitiveType.SMALLINT,
-           PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
-           PrimitiveType.TINYINT, PrimitiveType.INT});
+        new ColumnType[]
+          {ColumnType.INT, ColumnType.BIGINT, ColumnType.BOOLEAN,
+           ColumnType.STRING, ColumnType.DOUBLE, ColumnType.FLOAT,
+           ColumnType.INT, ColumnType.INT, ColumnType.SMALLINT,
+           ColumnType.STRING, ColumnType.TIMESTAMP,
+           ColumnType.TINYINT, ColumnType.INT});
 
     checkHBaseTableCols(hbaseDb, "hbasealltypeserror",
         "functional_hbase.hbasealltypeserror",
@@ -192,11 +193,11 @@ public class CatalogTest {
         new String[]
           {null, "bigint_col", "bool_col","date_string_col", "double_col", "float_col",
            "int_col", "smallint_col", "string_col","timestamp_col", "tinyint_col"},
-        new PrimitiveType[]
-          {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
-           PrimitiveType.STRING, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
-           PrimitiveType.INT, PrimitiveType.SMALLINT, PrimitiveType.STRING,
-           PrimitiveType.TIMESTAMP, PrimitiveType.TINYINT});
+        new ColumnType[]
+          {ColumnType.INT, ColumnType.BIGINT, ColumnType.BOOLEAN,
+           ColumnType.STRING, ColumnType.DOUBLE, ColumnType.FLOAT,
+           ColumnType.INT, ColumnType.SMALLINT, ColumnType.STRING,
+           ColumnType.TIMESTAMP, ColumnType.TINYINT});
 
     checkHBaseTableCols(hbaseDb, "hbasealltypeserrornonulls",
         "functional_hbase.hbasealltypeserrornonulls",
@@ -208,11 +209,11 @@ public class CatalogTest {
         new String[]
           {null, "bigint_col", "bool_col", "date_string_col", "double_col", "float_col",
            "int_col", "smallint_col", "string_col","timestamp_col", "tinyint_col"},
-        new PrimitiveType[]
-          {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
-           PrimitiveType.STRING, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
-           PrimitiveType.INT, PrimitiveType.SMALLINT, PrimitiveType.STRING,
-           PrimitiveType.TIMESTAMP, PrimitiveType.TINYINT});
+        new ColumnType[]
+          {ColumnType.INT, ColumnType.BIGINT, ColumnType.BOOLEAN,
+           ColumnType.STRING, ColumnType.DOUBLE, ColumnType.FLOAT,
+           ColumnType.INT, ColumnType.SMALLINT, ColumnType.STRING,
+           ColumnType.TIMESTAMP, ColumnType.TINYINT});
 
     checkHBaseTableCols(hbaseDb, "alltypesagg", "functional_hbase.alltypesagg",
         new String[]
@@ -225,12 +226,12 @@ public class CatalogTest {
           {null, "bigint_col", "bool_col", "date_string_col", "day", "double_col",
            "float_col", "int_col", "month", "smallint_col", "string_col",
            "timestamp_col", "tinyint_col", "year"},
-        new PrimitiveType[]
-          {PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
-           PrimitiveType.STRING,PrimitiveType.INT, PrimitiveType.DOUBLE,
-           PrimitiveType.FLOAT, PrimitiveType.INT, PrimitiveType.INT,
-           PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
-           PrimitiveType.TINYINT, PrimitiveType.INT});
+        new ColumnType[]
+          {ColumnType.INT, ColumnType.BIGINT, ColumnType.BOOLEAN,
+           ColumnType.STRING,ColumnType.INT, ColumnType.DOUBLE,
+           ColumnType.FLOAT, ColumnType.INT, ColumnType.INT,
+           ColumnType.SMALLINT, ColumnType.STRING, ColumnType.TIMESTAMP,
+           ColumnType.TINYINT, ColumnType.INT});
 
     checkHBaseTableCols(hbaseDb, "stringids", "functional_hbase.alltypesagg",
         new String[]
@@ -243,33 +244,33 @@ public class CatalogTest {
           {null, "bigint_col", "bool_col", "date_string_col", "day", "double_col",
            "float_col", "int_col", "month", "smallint_col", "string_col",
            "timestamp_col", "tinyint_col", "year"},
-        new PrimitiveType[]
-          {PrimitiveType.STRING, PrimitiveType.BIGINT, PrimitiveType.BOOLEAN,
-           PrimitiveType.STRING,PrimitiveType.INT, PrimitiveType.DOUBLE,
-           PrimitiveType.FLOAT, PrimitiveType.INT, PrimitiveType.INT,
-           PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
-           PrimitiveType.TINYINT, PrimitiveType.INT});
+        new ColumnType[]
+          {ColumnType.STRING, ColumnType.BIGINT, ColumnType.BOOLEAN,
+           ColumnType.STRING,ColumnType.INT, ColumnType.DOUBLE,
+           ColumnType.FLOAT, ColumnType.INT, ColumnType.INT,
+           ColumnType.SMALLINT, ColumnType.STRING, ColumnType.TIMESTAMP,
+           ColumnType.TINYINT, ColumnType.INT});
 
     checkTableCols(functionalDb, "greptiny", 0,
         new String[]
           {"field"},
-        new PrimitiveType[]
-          {PrimitiveType.STRING});
+        new ColumnType[]
+          {ColumnType.STRING});
 
     checkTableCols(functionalDb, "rankingssmall", 0,
         new String[]
           {"pagerank", "pageurl", "avgduration"},
-        new PrimitiveType[]
-          {PrimitiveType.INT, PrimitiveType.STRING, PrimitiveType.INT});
+        new ColumnType[]
+          {ColumnType.INT, ColumnType.STRING, ColumnType.INT});
 
     checkTableCols(functionalDb, "uservisitssmall", 0,
         new String[]
           {"sourceip", "desturl", "visitdate",  "adrevenue", "useragent",
            "ccode", "lcode", "skeyword", "avgtimeonsite"},
-        new PrimitiveType[]
-          {PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.STRING,
-           PrimitiveType.FLOAT, PrimitiveType.STRING, PrimitiveType.STRING,
-           PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.INT});
+        new ColumnType[]
+          {ColumnType.STRING, ColumnType.STRING, ColumnType.STRING,
+           ColumnType.FLOAT, ColumnType.STRING, ColumnType.STRING,
+           ColumnType.STRING, ColumnType.STRING, ColumnType.INT});
 
     // case-insensitive lookup
     assertEquals(functionalDb.getTable("alltypes"), functionalDb.getTable("AllTypes"));
@@ -553,19 +554,19 @@ public class CatalogTest {
         catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", "");
     assertEquals(fnNames.size(), 0);
 
-    ArrayList<PrimitiveType> args1 = Lists.newArrayList();
-    ArrayList<PrimitiveType> args2 = Lists.newArrayList(PrimitiveType.INT);
-    ArrayList<PrimitiveType> args3 = Lists.newArrayList(PrimitiveType.TINYINT);
+    ArrayList<ColumnType> args1 = Lists.newArrayList();
+    ArrayList<ColumnType> args2 = Lists.newArrayList(ColumnType.INT);
+    ArrayList<ColumnType> args3 = Lists.newArrayList(ColumnType.TINYINT);
 
     catalog_.removeFunction(
         new Function(new FunctionName("default", "Foo"), args1,
-            PrimitiveType.INVALID_TYPE, false));
+            ColumnType.INVALID, false));
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
 
     assertEquals(fnNames.size(), 0);
 
     Udf udf1 = new Udf(new FunctionName("default", "Foo"),
-        args1, PrimitiveType.INVALID_TYPE, new HdfsUri("/Foo"), "Foo.class");
+        args1, ColumnType.INVALID, new HdfsUri("/Foo"), "Foo.class");
     catalog_.addFunction(udf1);
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 1);
@@ -573,7 +574,7 @@ public class CatalogTest {
 
     // Same function name, overloaded arguments
     Udf udf2 = new Udf(new FunctionName("default", "Foo"),
-        args2, PrimitiveType.INVALID_TYPE, new HdfsUri("/Foo"), "Foo.class");
+        args2, ColumnType.INVALID, new HdfsUri("/Foo"), "Foo.class");
     catalog_.addFunction(udf2);
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
@@ -582,7 +583,7 @@ public class CatalogTest {
 
     // Add a function with a new name
     Udf udf3 = new Udf(new FunctionName("default", "Bar"),
-        args2, PrimitiveType.INVALID_TYPE, new HdfsUri("/Foo"), "Foo.class");
+        args2, ColumnType.INVALID, new HdfsUri("/Foo"), "Foo.class");
     catalog_.addFunction(udf3);
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 3);
@@ -592,7 +593,7 @@ public class CatalogTest {
 
     // Drop Foo()
     catalog_.removeFunction(new Function(
-        new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
+        new FunctionName("default", "Foo"), args1, ColumnType.INVALID, false));
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
@@ -600,7 +601,7 @@ public class CatalogTest {
 
     // Drop it again, no-op
     catalog_.removeFunction(new Function(
-        new FunctionName("default", "Foo"), args1, PrimitiveType.INVALID_TYPE, false));
+        new FunctionName("default", "Foo"), args1, ColumnType.INVALID, false));
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
@@ -608,7 +609,7 @@ public class CatalogTest {
 
     // Drop bar(), no-op
     catalog_.removeFunction(new Function(
-        new FunctionName("default", "Bar"), args1, PrimitiveType.INVALID_TYPE, false));
+        new FunctionName("default", "Bar"), args1, ColumnType.INVALID, false));
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
@@ -616,7 +617,7 @@ public class CatalogTest {
 
     // Drop bar(tinyint), no-op
     catalog_.removeFunction(new Function(
-        new FunctionName("default", "Bar"), args3, PrimitiveType.INVALID_TYPE, false));
+        new FunctionName("default", "Bar"), args3, ColumnType.INVALID, false));
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
     assertTrue(fnNames.contains("foo(INT)"));
@@ -624,14 +625,14 @@ public class CatalogTest {
 
     // Drop bar(int)
     catalog_.removeFunction(new Function(
-        new FunctionName("default", "Bar"), args2, PrimitiveType.INVALID_TYPE, false));
+        new FunctionName("default", "Bar"), args2, ColumnType.INVALID, false));
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 1);
     assertTrue(fnNames.contains("foo(INT)"));
 
     // Drop foo(int)
     catalog_.removeFunction(new Function(
-        new FunctionName("default", "foo"), args2, PrimitiveType.INVALID_TYPE, false));
+        new FunctionName("default", "foo"), args2, ColumnType.INVALID, false));
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 0);
   }

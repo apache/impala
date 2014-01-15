@@ -37,26 +37,26 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   @Test
   public void TestNumericLiteralMinMaxValues() {
-    testNumericLiteral(Byte.toString(Byte.MIN_VALUE), PrimitiveType.TINYINT);
-    testNumericLiteral(Byte.toString(Byte.MAX_VALUE), PrimitiveType.TINYINT);
-    testNumericLiteral("- " + Byte.toString(Byte.MIN_VALUE), PrimitiveType.SMALLINT);
-    testNumericLiteral("- " + Byte.toString(Byte.MAX_VALUE), PrimitiveType.TINYINT);
+    testNumericLiteral(Byte.toString(Byte.MIN_VALUE), ColumnType.TINYINT);
+    testNumericLiteral(Byte.toString(Byte.MAX_VALUE), ColumnType.TINYINT);
+    testNumericLiteral("- " + Byte.toString(Byte.MIN_VALUE), ColumnType.SMALLINT);
+    testNumericLiteral("- " + Byte.toString(Byte.MAX_VALUE), ColumnType.TINYINT);
 
-    testNumericLiteral(Short.toString(Short.MIN_VALUE), PrimitiveType.SMALLINT);
-    testNumericLiteral(Short.toString(Short.MAX_VALUE), PrimitiveType.SMALLINT);
-    testNumericLiteral("- " + Short.toString(Short.MIN_VALUE), PrimitiveType.INT);
-    testNumericLiteral("- " + Short.toString(Short.MAX_VALUE), PrimitiveType.SMALLINT);
+    testNumericLiteral(Short.toString(Short.MIN_VALUE), ColumnType.SMALLINT);
+    testNumericLiteral(Short.toString(Short.MAX_VALUE), ColumnType.SMALLINT);
+    testNumericLiteral("- " + Short.toString(Short.MIN_VALUE), ColumnType.INT);
+    testNumericLiteral("- " + Short.toString(Short.MAX_VALUE), ColumnType.SMALLINT);
 
-    testNumericLiteral(Integer.toString(Integer.MIN_VALUE), PrimitiveType.INT);
-    testNumericLiteral(Integer.toString(Integer.MAX_VALUE), PrimitiveType.INT);
-    testNumericLiteral("- " + Integer.toString(Integer.MIN_VALUE), PrimitiveType.BIGINT);
-    testNumericLiteral("- " + Integer.toString(Integer.MAX_VALUE), PrimitiveType.INT);
+    testNumericLiteral(Integer.toString(Integer.MIN_VALUE), ColumnType.INT);
+    testNumericLiteral(Integer.toString(Integer.MAX_VALUE), ColumnType.INT);
+    testNumericLiteral("- " + Integer.toString(Integer.MIN_VALUE), ColumnType.BIGINT);
+    testNumericLiteral("- " + Integer.toString(Integer.MAX_VALUE), ColumnType.INT);
 
-    testNumericLiteral(Long.toString(Long.MIN_VALUE), PrimitiveType.BIGINT);
-    testNumericLiteral(Long.toString(Long.MAX_VALUE), PrimitiveType.BIGINT);
+    testNumericLiteral(Long.toString(Long.MIN_VALUE), ColumnType.BIGINT);
+    testNumericLiteral(Long.toString(Long.MAX_VALUE), ColumnType.BIGINT);
     AnalysisError(String.format("select - %s", Long.toString(Long.MIN_VALUE)),
         "Literal '9223372036854775808' exceeds maximum range of integers.");
-    testNumericLiteral("- " + Long.toString(Long.MAX_VALUE), PrimitiveType.BIGINT);
+    testNumericLiteral("- " + Long.toString(Long.MAX_VALUE), ColumnType.BIGINT);
 
     // Test overflow/underflow.
     AnalysisError(String.format("select %s1", Long.toString(Long.MIN_VALUE)),
@@ -76,23 +76,23 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // Test floating-point types.
     // TODO: Fix detecting the min resolution type for floating-point literals.
-    testNumericLiteral(Float.toString(Float.MIN_VALUE), PrimitiveType.DOUBLE);
-    testNumericLiteral(Float.toString(Float.MAX_VALUE), PrimitiveType.DOUBLE);
-    testNumericLiteral("-" + Float.toString(Float.MIN_VALUE), PrimitiveType.DOUBLE);
-    testNumericLiteral("-" + Float.toString(Float.MAX_VALUE), PrimitiveType.DOUBLE);
-    testNumericLiteral(Double.toString(Double.MIN_VALUE), PrimitiveType.DOUBLE);
-    testNumericLiteral(Double.toString(Double.MAX_VALUE), PrimitiveType.DOUBLE);
-    testNumericLiteral("-" + Double.toString(Double.MIN_VALUE), PrimitiveType.DOUBLE);
-    testNumericLiteral("-" + Double.toString(Double.MAX_VALUE), PrimitiveType.DOUBLE);
+    testNumericLiteral(Float.toString(Float.MIN_VALUE), ColumnType.DOUBLE);
+    testNumericLiteral(Float.toString(Float.MAX_VALUE), ColumnType.DOUBLE);
+    testNumericLiteral("-" + Float.toString(Float.MIN_VALUE), ColumnType.DOUBLE);
+    testNumericLiteral("-" + Float.toString(Float.MAX_VALUE), ColumnType.DOUBLE);
+    testNumericLiteral(Double.toString(Double.MIN_VALUE), ColumnType.DOUBLE);
+    testNumericLiteral(Double.toString(Double.MAX_VALUE), ColumnType.DOUBLE);
+    testNumericLiteral("-" + Double.toString(Double.MIN_VALUE), ColumnType.DOUBLE);
+    testNumericLiteral("-" + Double.toString(Double.MAX_VALUE), ColumnType.DOUBLE);
   }
 
   /**
    * Asserts that "select literal" analyzes ok and that the expectedType
    * matches the actual type.
    */
-  private void testNumericLiteral(String literal, PrimitiveType expectedType) {
+  private void testNumericLiteral(String literal, ColumnType expectedType) {
     SelectStmt selectStmt = (SelectStmt) AnalyzesOk("select " + literal);
-    Assert.assertEquals(expectedType, selectStmt.resultExprs_.get(0).getType());
+    Assert.assertTrue(expectedType.equals(selectStmt.resultExprs_.get(0).getType()));
   }
 
   @Test
@@ -236,18 +236,20 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   @Test
   public void TestNullCasts() throws AnalysisException {
    for (PrimitiveType type: PrimitiveType.values()) {
+     if (type == PrimitiveType.DECIMAL || type == PrimitiveType.CHAR) continue;
+     // TODO: implement decimal.
+     ColumnType colType = ColumnType.createType(type);
      // Cannot cast to INVALID_TYPE, NULL_TYPE or unsupported types.
-     if (!type.isValid() || type.isNull() || !type.isSupported() ||
-          type == PrimitiveType.CHAR) {
+     if (!colType.isValid() || colType.isNull() || !colType.isSupported()) {
        continue;
      }
-     checkExprType("select cast(null as " + type + ")", type);
+     checkExprType("select cast(null as " + type + ")", colType);
    }
   }
 
   // Analyzes query and asserts that the first result expr returns the given type.
   // Requires query to parse to a SelectStmt.
-  private void checkExprType(String query, PrimitiveType type) {
+  private void checkExprType(String query, ColumnType type) {
     SelectStmt select = (SelectStmt) AnalyzesOk(query);
     assertEquals(select.getResultExprs().get(0).getType(), type);
   }
@@ -434,15 +436,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   @Test
   public void TestArithmeticTypeCasts() throws AnalysisException {
     // test all numeric types and the null type
-    List<PrimitiveType> numericTypes =
-        new ArrayList<PrimitiveType>(PrimitiveType.getNumericTypes());
-    numericTypes.add(PrimitiveType.NULL_TYPE);
+    List<ColumnType> numericTypes =
+        new ArrayList<ColumnType>(ColumnType.getFixedSizeNumericTypes());
+    numericTypes.add(ColumnType.NULL);
 
-    for (PrimitiveType type1 : numericTypes) {
-      for (PrimitiveType type2 : numericTypes) {
-        PrimitiveType compatibleType =
-            PrimitiveType.getAssignmentCompatibleType(type1, type2);
-        PrimitiveType promotedType = compatibleType;
+    for (ColumnType type1 : numericTypes) {
+      for (ColumnType type2 : numericTypes) {
+        ColumnType compatibleType =
+            ColumnType.getAssignmentCompatibleType(type1, type2);
+        ColumnType promotedType = compatibleType;
         if (!(type1.isNull() || type2.isNull())) {
           promotedType = compatibleType.getNextResolutionType();
         }
@@ -467,9 +469,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
         // /
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.DIVIDE, null,
-            PrimitiveType.DOUBLE);
+            ColumnType.DOUBLE);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.DIVIDE, null,
-            PrimitiveType.DOUBLE);
+            ColumnType.DOUBLE);
 
         // div, &, |, ^ only for fixed-point types
         if ((!type1.isFixedPointType() && !type1.isNull())
@@ -495,10 +497,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       }
     }
 
-    List<PrimitiveType> fixedPointTypes = new ArrayList<PrimitiveType>(
-        PrimitiveType.getFixedPointTypes());
-    fixedPointTypes.add(PrimitiveType.NULL_TYPE);
-    for (PrimitiveType type: fixedPointTypes) {
+    List<ColumnType> fixedPointTypes = new ArrayList<ColumnType>(
+        ColumnType.getFixedPointTypes());
+    fixedPointTypes.add(ColumnType.NULL);
+    for (ColumnType type: fixedPointTypes) {
       typeCastTest(null, type, false, ArithmeticExpr.Operator.BITNOT, null, type);
     }
   }
@@ -509,16 +511,16 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   @Test
   public void TestComparisonTypeCasts() throws AnalysisException {
     // test all numeric types and the null type
-    List<PrimitiveType> types =
-        new ArrayList<PrimitiveType>(PrimitiveType.getNumericTypes());
-    types.add(PrimitiveType.NULL_TYPE);
+    List<ColumnType> types =
+        new ArrayList<ColumnType>(ColumnType.getFixedSizeNumericTypes());
+    types.add(ColumnType.NULL);
 
     // test on all comparison ops
     for (BinaryPredicate.Operator cmpOp : BinaryPredicate.Operator.values()) {
-      for (PrimitiveType type1 : types) {
-        for (PrimitiveType type2 : types) {
-          PrimitiveType compatibleType =
-              PrimitiveType.getAssignmentCompatibleType(type1, type2);
+      for (ColumnType type1 : types) {
+        for (ColumnType type2 : types) {
+          ColumnType compatibleType =
+              ColumnType.getAssignmentCompatibleType(type1, type2);
           typeCastTest(type1, type2, false, null, cmpOp, compatibleType);
           typeCastTest(type1, type2, true, null, cmpOp, compatibleType);
         }
@@ -532,9 +534,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    * ops or bool for comparisons) and that both operands are of type 'opType'.
    * @throws AnalysisException
    */
-  private void typeCastTest(PrimitiveType type1, PrimitiveType type2,
+  private void typeCastTest(ColumnType type1, ColumnType type2,
       boolean op1IsLiteral, ArithmeticExpr.Operator arithmeticOp,
-      BinaryPredicate.Operator cmpOp, PrimitiveType opType) throws AnalysisException {
+      BinaryPredicate.Operator cmpOp, ColumnType opType) throws AnalysisException {
     Preconditions.checkState((arithmeticOp == null) != (cmpOp == null));
     boolean arithmeticMode = arithmeticOp != null;
     String op1 = "";
@@ -563,21 +565,21 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       assertEquals(selectListExprs.size(), 1);
       // check the first expr in select list
       expr = selectListExprs.get(0);
-      assertEquals(opType, expr.getType());
+      assert(opType.equals(expr.getType()));
     } else {
       // check the where clause
       expr = select.getWhereClause();
       if (!expr.getType().isNull()) {
-        assertEquals(PrimitiveType.BOOLEAN, expr.getType());
+        assertEquals(PrimitiveType.BOOLEAN, expr.getType().getPrimitiveType());
       }
     }
 
     checkCasts(expr);
     // The children's types must be NULL or equal to the requested opType.
-    Assert.assertTrue(opType == expr.getChild(0).getType()
+    Assert.assertTrue(opType.equals(expr.getChild(0).getType())
         || opType.isNull() || expr.getChild(0).getType().isNull());
     if (type1 != null) {
-      Assert.assertTrue(opType == expr.getChild(1).getType()
+      Assert.assertTrue(opType.equals(expr.getChild(1).getType())
           || opType.isNull() || expr.getChild(1).getType().isNull());
     }
   }
@@ -946,21 +948,24 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Add a udf default.udf(), default.udf(int), default.udf(string...),
     // default.udf(int, string...) and functional.udf(double)
     catalog_.addFunction(new Udf(new FunctionName("default", "udf"),
-        new ArrayList<PrimitiveType>(), PrimitiveType.INT, dummyUri, null));
+        new ArrayList<ColumnType>(), ColumnType.INT, dummyUri, null));
     catalog_.addFunction(new Udf(new FunctionName("default", "udf"),
-        Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT, dummyUri, null));
+        Lists.newArrayList(ColumnType.INT),
+        ColumnType.INT, dummyUri, null));
     Udf varArgsUdf1 = new Udf(new FunctionName("default", "udf"),
-        Lists.newArrayList(PrimitiveType.STRING),
-        PrimitiveType.INT, dummyUri, null);
+        Lists.newArrayList(ColumnType.STRING),
+        ColumnType.INT, dummyUri, null);
     varArgsUdf1.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf1);
     Udf varArgsUdf2 = new Udf(new FunctionName("default", "udf"),
-        Lists.newArrayList(PrimitiveType.INT, PrimitiveType.STRING),
-        PrimitiveType.INT, dummyUri, null);
+        Lists.newArrayList(
+            ColumnType.INT, ColumnType.STRING),
+        ColumnType.INT, dummyUri, null);
     varArgsUdf2.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf2);
     Udf udf = new Udf(new FunctionName("functional", "udf"),
-        Lists.newArrayList(PrimitiveType.DOUBLE), PrimitiveType.INT, dummyUri, null);
+        Lists.newArrayList(ColumnType.DOUBLE),
+        ColumnType.INT, dummyUri, null);
     catalog_.addFunction(udf);
 
     AnalyzesOk("select udf()");
@@ -1035,8 +1040,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // UDF.
     catalog_.addFunction(new Udf(new FunctionName("default", "udf"),
-        Lists.newArrayList(PrimitiveType.INT), PrimitiveType.INT,
-        new HdfsUri(""), null));
+        Lists.newArrayList(ColumnType.INT),
+        ColumnType.INT, new HdfsUri(""), null));
     testFuncExprDepthLimit("udf(", "1", ")");
 
     // Timestamp arithmetic expr.

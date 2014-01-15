@@ -197,17 +197,17 @@ public class FunctionCallExpr extends Expr {
         throw new AnalysisException(
             "COUNT must have DISTINCT for multiple arguments: " + this.toSql());
       }
-      ArrayList<PrimitiveType> childTypes = Lists.newArrayList();
+      ArrayList<ColumnType> childTypes = Lists.newArrayList();
       for (int i = 0; i < children_.size(); ++i) {
         childTypes.add(getChild(i).type_);
       }
       fn_ = new BuiltinAggregateFunction(agg_op_, childTypes,
-          PrimitiveType.BIGINT, ColumnType.createType(PrimitiveType.BIGINT));
+          ColumnType.BIGINT, ColumnType.BIGINT);
       return;
     }
 
     if (agg_op_ == BuiltinAggregateFunction.Operator.GROUP_CONCAT) {
-      ArrayList<PrimitiveType> argTypes = Lists.newArrayList();
+      ArrayList<ColumnType> argTypes = Lists.newArrayList();
       if (children_.size() > 2 || children_.isEmpty()) {
         throw new AnalysisException(
             agg_op_.toString() + " requires one or two parameters: " + this.toSql());
@@ -223,7 +223,7 @@ public class FunctionCallExpr extends Expr {
             agg_op_.toString() + " requires first parameter to be of type STRING: "
             + this.toSql());
       }
-      argTypes.add(PrimitiveType.STRING);
+      argTypes.add(ColumnType.STRING);
 
       if (children_.size() == 2) {
         Expr arg1 = getChild(1);
@@ -232,18 +232,18 @@ public class FunctionCallExpr extends Expr {
               agg_op_.toString() + " requires second parameter to be of type STRING: "
               + this.toSql());
         }
-        argTypes.add(PrimitiveType.STRING);
+        argTypes.add(ColumnType.STRING);
       } else {
         // Add the default string so the BE always see two arguments.
         Expr arg2 = new NullLiteral();
         arg2.analyze(analyzer);
         addChild(arg2);
-        argTypes.add(PrimitiveType.NULL_TYPE);
+        argTypes.add(ColumnType.NULL);
       }
 
       // TODO: we really want the intermediate type to be CHAR(16)
       fn_ = new BuiltinAggregateFunction(agg_op_, argTypes,
-          PrimitiveType.STRING, agg_op_.intermediateType());
+          ColumnType.STRING, agg_op_.intermediateType());
       return;
     }
 
@@ -262,33 +262,33 @@ public class FunctionCallExpr extends Expr {
       throw new AnalysisException(
             "SUM requires a numeric parameter: " + this.toSql());
     }
-    if (agg_op_ == BuiltinAggregateFunction.Operator.AVG && !arg.type_.isNumericType()
-        && arg.type_ != PrimitiveType.TIMESTAMP && !arg.type_.isNull()) {
+    if (agg_op_ == BuiltinAggregateFunction.Operator.AVG && !arg.type_.isNumericType() &&
+        arg.type_.getPrimitiveType() != PrimitiveType.TIMESTAMP && !arg.type_.isNull()) {
       throw new AnalysisException(
           "AVG requires a numeric or timestamp parameter: " + this.toSql());
     }
 
     ColumnType intermediateType = agg_op_.intermediateType();
-    ArrayList<PrimitiveType> argTypes = Lists.newArrayList();
+    ArrayList<ColumnType> argTypes = Lists.newArrayList();
     if (agg_op_ == BuiltinAggregateFunction.Operator.AVG) {
       // division always results in a double value
-      type_ = PrimitiveType.DOUBLE;
-      intermediateType = ColumnType.createType(type_);
+      type_ = ColumnType.DOUBLE;
+      intermediateType = type_;
     } else if (agg_op_ == BuiltinAggregateFunction.Operator.SUM) {
       // numeric types need to be accumulated at maximum precision
       type_ = arg.type_.getMaxResolutionType();
       argTypes.add(type_);
-      intermediateType = ColumnType.createType(type_);
+      intermediateType = type_;
     } else if (agg_op_ == BuiltinAggregateFunction.Operator.MIN ||
         agg_op_ == BuiltinAggregateFunction.Operator.MAX) {
       type_ = arg.type_;
       params_.setIsDistinct(false);  // DISTINCT is meaningless here
       argTypes.add(type_);
-      intermediateType = ColumnType.createType(type_);
+      intermediateType = type_;
     } else if (agg_op_ == BuiltinAggregateFunction.Operator.DISTINCT_PC ||
           agg_op_ == BuiltinAggregateFunction.Operator.DISTINCT_PCSA ||
           agg_op_ == BuiltinAggregateFunction.Operator.NDV) {
-      type_ = PrimitiveType.STRING;
+      type_ = ColumnType.STRING;
       params_.setIsDistinct(false);
       argTypes.add(arg.getType());
     }
@@ -296,7 +296,7 @@ public class FunctionCallExpr extends Expr {
   }
 
   // Sets fn_ to the proper function object.
-  private void setFunction(Analyzer analyzer, PrimitiveType[] argTypes)
+  private void setFunction(Analyzer analyzer, ColumnType[] argTypes)
       throws AnalysisException, AuthorizationException {
     // First check if this is a builtin
     FunctionOperator op = OpcodeRegistry.instance().getFunctionOperator(
@@ -321,7 +321,7 @@ public class FunctionCallExpr extends Expr {
       }
 
       Function searchDesc =
-          new Function(fnName_, argTypes, PrimitiveType.INVALID_TYPE, false);
+          new Function(fnName_, argTypes, ColumnType.INVALID, false);
 
       fn_ = analyzer.getCatalog().getFunction(
           searchDesc, Function.CompareMode.IS_SUBTYPE);
@@ -349,9 +349,9 @@ public class FunctionCallExpr extends Expr {
         intermediateType = ((BuiltinAggregateFunction)fn_).getIntermediateType();
       }
       type_ = fn_.getReturnType();
-      if (intermediateType == null) intermediateType = ColumnType.createType(type_);
+      if (intermediateType == null) intermediateType = type_;
       // TODO: this needs to change when the intermediate type != the return type
-      Preconditions.checkArgument(intermediateType.getType() == fn_.getReturnType());
+      Preconditions.checkArgument(intermediateType.equals(fn_.getReturnType()));
 
       if (agg_op_ == BuiltinAggregateFunction.Operator.GROUP_CONCAT &&
           getChildren().size() == 1) {
@@ -362,7 +362,7 @@ public class FunctionCallExpr extends Expr {
       return;
     }
 
-    PrimitiveType[] argTypes = new PrimitiveType[this.children_.size()];
+    ColumnType[] argTypes = new ColumnType[this.children_.size()];
     for (int i = 0; i < this.children_.size(); ++i) {
       this.children_.get(i).analyze(analyzer);
       argTypes[i] = this.children_.get(i).getType();
@@ -390,13 +390,13 @@ public class FunctionCallExpr extends Expr {
       }
     }
 
-    PrimitiveType[] args = fn_.getArgs();
+    ColumnType[] args = fn_.getArgs();
     if (args.length > 0) {
       // Implicitly cast all the children to match the function if necessary
       for (int i = 0; i < argTypes.length; ++i) {
         // For varargs, we must compare with the last type in callArgs.argTypes.
         int ix = Math.min(args.length - 1, i);
-        if (argTypes[i] != args[ix]) castChild(args[ix], i);
+        if (!argTypes[i].equals(args[ix])) castChild(args[ix], i);
       }
     }
     this.type_ = fn_.getReturnType();

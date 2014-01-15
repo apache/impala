@@ -460,7 +460,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes group by year(timestamp_col)");
   }
 
-  void addTestUda(String name, PrimitiveType retType, PrimitiveType... argTypes) {
+  void addTestUda(String name, ColumnType retType, ColumnType... argTypes) {
     FunctionName fnName = new FunctionName("default", name);
     catalog_.addFunction(new Uda(fnName, new FunctionArgs(Lists.newArrayList(argTypes),
         false), retType));
@@ -476,11 +476,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // TODO: if we could persist these in the catalog, we'd just use those
     // TODO: add cases where the intermediate type is not the return type when
     // the planner supports that.
-    addTestUda("AggFn", PrimitiveType.BIGINT, PrimitiveType.INT);
-    addTestUda("AggFn", PrimitiveType.BIGINT, PrimitiveType.BIGINT);
-    addTestUda("AggFn", PrimitiveType.BIGINT, PrimitiveType.DOUBLE);
-    addTestUda("AggFn", PrimitiveType.STRING,
-        PrimitiveType.STRING, PrimitiveType.STRING);
+    addTestUda("AggFn", ColumnType.BIGINT, ColumnType.INT);
+    addTestUda("AggFn", ColumnType.BIGINT, ColumnType.BIGINT);
+    addTestUda("AggFn", ColumnType.BIGINT, ColumnType.DOUBLE);
+    addTestUda("AggFn", ColumnType.STRING,
+        ColumnType.STRING, ColumnType.STRING);
 
     AnalyzesOk("select aggfn(int_col) from functional.alltypesagg");
     AnalysisError("select default.AggFn(1)",
@@ -555,13 +555,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select group_concat(string_col, '-') from functional.alltypes");
     AnalyzesOk("select group_concat(string_col, string_col) from functional.alltypes");
     // test all types as arguments
-    for (PrimitiveType type: typeToLiteralValue_.keySet()) {
+    for (ColumnType type: typeToLiteralValue_.keySet()) {
       String literal = typeToLiteralValue_.get(type);
       String query1 = String.format(
           "select group_concat(%s) from functional.alltypes", literal);
       String query2 = String.format(
           "select group_concat(string_col, %s) from functional.alltypes", literal);
-      if (type == PrimitiveType.STRING || type == PrimitiveType.NULL_TYPE) {
+      if (type.getPrimitiveType() == PrimitiveType.STRING || type.isNull()) {
         AnalyzesOk(query1);
         AnalyzesOk(query2);
       } else {
@@ -573,7 +573,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     }
 
     // Test distinct estimate
-    for (PrimitiveType type: typeToLiteralValue_.keySet()) {
+    for (ColumnType type: typeToLiteralValue_.keySet()) {
       AnalyzesOk(String.format(
           "select distinctpc(%s) from functional.alltypes",
           typeToLiteralValue_.get(type)));

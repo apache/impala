@@ -21,9 +21,9 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -56,9 +56,9 @@ public class Function implements CatalogObject {
   // User specified function name e.g. "Add"
   private FunctionName name_;
 
-  private final PrimitiveType retType_;
+  private final ColumnType retType_;
   // Array of parameter types.  empty array if this function does not have parameters.
-  private PrimitiveType[] argTypes_;
+  private ColumnType[] argTypes_;
 
   // If true, this function has variable arguments.
   // TODO: we don't currently support varargs with no fixed types. i.e. fn(...)
@@ -70,40 +70,40 @@ public class Function implements CatalogObject {
   private TFunctionBinaryType binaryType_;
   private long catalogVersion_ =  Catalog.INITIAL_CATALOG_VERSION;
 
-  public Function(FunctionName name, PrimitiveType[] argTypes,
-      PrimitiveType retType, boolean varArgs) {
+  public Function(FunctionName name, ColumnType[] argTypes,
+      ColumnType retType, boolean varArgs) {
     this.name_ = name;
     this.hasVarArgs_ = varArgs;
     if (argTypes == null) {
-      argTypes_ = new PrimitiveType[0];
+      argTypes_ = new ColumnType[0];
     } else {
       this.argTypes_ = argTypes;
     }
     this.retType_ = retType;
   }
 
-  public Function(FunctionName name, List<PrimitiveType> args,
-      PrimitiveType retType, boolean varArgs) {
-    this(name, (PrimitiveType[])null, retType, varArgs);
+  public Function(FunctionName name, List<ColumnType> args,
+      ColumnType retType, boolean varArgs) {
+    this(name, (ColumnType[])null, retType, varArgs);
     if (args.size() > 0) {
-      argTypes_ = args.toArray(new PrimitiveType[args.size()]);
+      argTypes_ = args.toArray(new ColumnType[args.size()]);
     } else {
-      argTypes_ = new PrimitiveType[0];
+      argTypes_ = new ColumnType[0];
     }
   }
 
   public FunctionName getFunctionName() { return name_; }
   public String functionName() { return name_.getFunction(); }
   public String dbName() { return name_.getDb(); }
-  public PrimitiveType getReturnType() { return retType_; }
-  public PrimitiveType[] getArgs() { return argTypes_; }
+  public ColumnType getReturnType() { return retType_; }
+  public ColumnType[] getArgs() { return argTypes_; }
   // Returns the number of arguments to this function.
   public int getNumArgs() { return argTypes_.length; }
   public HdfsUri getLocation() { return location_; }
   public TFunctionBinaryType getBinaryType() { return binaryType_; }
   public boolean hasVarArgs() { return hasVarArgs_; }
-  public PrimitiveType getVarArgsType() {
-    if (!hasVarArgs_) return PrimitiveType.INVALID_TYPE;
+  public ColumnType getVarArgsType() {
+    if (!hasVarArgs_) return ColumnType.INVALID;
     Preconditions.checkState(argTypes_.length > 0);
     return argTypes_[argTypes_.length - 1];
   }
@@ -148,14 +148,14 @@ public class Function implements CatalogObject {
     }
     if (this.hasVarArgs_ && other.argTypes_.length < this.argTypes_.length) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
-      if (!PrimitiveType.isImplicitlyCastable(other.argTypes_[i], this.argTypes_[i])) {
+      if (!ColumnType.isImplicitlyCastable(other.argTypes_[i], this.argTypes_[i])) {
         return false;
       }
     }
     // Check trailing varargs.
     if (this.hasVarArgs_) {
       for (int i = this.argTypes_.length; i < other.argTypes_.length; ++i) {
-        if (!PrimitiveType.isImplicitlyCastable(other.argTypes_[i],
+        if (!ColumnType.isImplicitlyCastable(other.argTypes_[i],
             this.getVarArgsType())) {
           return false;
         }
@@ -168,7 +168,7 @@ public class Function implements CatalogObject {
     if (o.argTypes_.length != this.argTypes_.length) return false;
     if (o.hasVarArgs_ != this.hasVarArgs_) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
-      if (o.argTypes_[i] != this.argTypes_[i]) return false;
+      if (!o.argTypes_[i].equals(this.argTypes_[i])) return false;
     }
     return true;
   }
@@ -177,19 +177,19 @@ public class Function implements CatalogObject {
     int minArgs = Math.min(o.argTypes_.length, this.argTypes_.length);
     // The first fully specified args must be identical.
     for (int i = 0; i < minArgs; ++i) {
-      if (o.argTypes_[i] != this.argTypes_[i]) return false;
+      if (!o.argTypes_[i].equals(this.argTypes_[i])) return false;
     }
     if (o.argTypes_.length == this.argTypes_.length) return true;
 
     if (o.hasVarArgs_ && this.hasVarArgs_) {
-      if (o.getVarArgsType() != this.getVarArgsType()) return false;
+      if (!o.getVarArgsType().equals(this.getVarArgsType())) return false;
       if (this.getNumArgs() > o.getNumArgs()) {
         for (int i = minArgs; i < this.getNumArgs(); ++i) {
-          if (this.argTypes_[i] != o.getVarArgsType()) return false;
+          if (!this.argTypes_[i].equals(o.getVarArgsType())) return false;
         }
       } else {
         for (int i = minArgs; i < o.getNumArgs(); ++i) {
-          if (o.argTypes_[i] != this.getVarArgsType()) return false;
+          if (!o.argTypes_[i].equals(this.getVarArgsType())) return false;
         }
       }
       return true;
@@ -197,14 +197,14 @@ public class Function implements CatalogObject {
       // o has var args so check the remaining arguments from this
       if (o.getNumArgs() > minArgs) return false;
       for (int i = minArgs; i < this.getNumArgs(); ++i) {
-        if (this.argTypes_[i] != o.getVarArgsType()) return false;
+        if (!this.argTypes_[i].equals(o.getVarArgsType())) return false;
       }
       return true;
     } else if (this.hasVarArgs_) {
       // this has var args so check the remaining arguments from s
       if (this.getNumArgs() > minArgs) return false;
       for (int i = minArgs; i < o.getNumArgs(); ++i) {
-        if (o.argTypes_[i] != this.getVarArgsType()) return false;
+        if (!o.argTypes_[i].equals(this.getVarArgsType())) return false;
       }
       return true;
     } else {
@@ -233,7 +233,7 @@ public class Function implements CatalogObject {
     fn.setName(name_.toThrift());
     fn.setBinary_type(binaryType_);
     if (location_ != null) fn.setHdfs_location(location_.toString());
-    fn.setArg_types(PrimitiveType.toThrift(argTypes_));
+    fn.setArg_types(ColumnType.toThrift(argTypes_));
     fn.setRet_type(getReturnType().toThrift());
     fn.setHas_var_args(hasVarArgs_);
     // TODO: Comment field is missing?
@@ -242,20 +242,20 @@ public class Function implements CatalogObject {
   }
 
   public static Function fromThrift(TFunction fn) {
-    List<PrimitiveType> argTypes = Lists.newArrayList();
-    for (TPrimitiveType t: fn.getArg_types()) {
-      argTypes.add(PrimitiveType.fromThrift(t));
+    List<ColumnType> argTypes = Lists.newArrayList();
+    for (TColumnType t: fn.getArg_types()) {
+      argTypes.add(ColumnType.fromThrift(t));
     }
 
     Function function = null;
     if (fn.isSetScalar_fn()) {
       function = new Udf(FunctionName.fromThrift(fn.getName()), argTypes,
-          PrimitiveType.fromThrift(fn.getRet_type()), new HdfsUri(fn.getHdfs_location()),
+          ColumnType.fromThrift(fn.getRet_type()), new HdfsUri(fn.getHdfs_location()),
           fn.getScalar_fn().getSymbol());
     } else if (fn.isSetAggregate_fn()) {
       TAggregateFunction aggFn = fn.getAggregate_fn();
       function = new Uda(FunctionName.fromThrift(fn.getName()), argTypes,
-          PrimitiveType.fromThrift(fn.getRet_type()),
+          ColumnType.fromThrift(fn.getRet_type()),
           ColumnType.fromThrift(aggFn.getIntermediate_type()),
           new HdfsUri(fn.getHdfs_location()), aggFn.getUpdate_fn_symbol(),
           aggFn.getInit_fn_symbol(), aggFn.getSerialize_fn_symbol(),

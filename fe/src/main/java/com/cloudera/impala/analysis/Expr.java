@@ -27,7 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExpr;
@@ -62,7 +61,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // false if Expr originated with a query stmt directly
   private boolean isAuxExpr_ = false;
 
-  protected PrimitiveType type_;  // result of analysis
+  protected ColumnType type_;  // result of analysis
   protected boolean isAnalyzed_;  // true after analyze() has been called
   protected boolean isWhereClauseConjunct_;  // set by Analyzer
   protected TExprOpcode opcode_;  // opcode for this expr
@@ -85,7 +84,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   protected Expr() {
     super();
-    type_ = PrimitiveType.INVALID_TYPE;
+    type_ = ColumnType.INVALID;
     opcode_ = TExprOpcode.INVALID_OPCODE;
     selectivity_ = -1.0;
     numDistinctValues_ = -1;
@@ -93,7 +92,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public ExprId getId() { return id_; }
   protected void setId(ExprId id) { this.id_ = id; }
-  public PrimitiveType getType() { return type_; }
+  public ColumnType getType() { return type_; }
   public TExprOpcode getOpcode() { return opcode_; }
   public double getSelectivity() { return selectivity_; }
   public long getNumDistinctValues() { return numDistinctValues_; }
@@ -102,7 +101,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public void setIsWhereClauseConjunct() { isWhereClauseConjunct_ = true; }
   public boolean isAuxExpr() { return isAuxExpr_; }
   public void setIsAuxExpr() { isAuxExpr_ = true; }
-
 
   /**
    * Recursively set isAnalyzed to false for the entire Expr tree, except SlotRefs.
@@ -213,7 +211,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // Append a flattened version of this expr, including all children, to 'container'.
   protected void treeToThriftHelper(TExpr container) {
     TExprNode msg = new TExprNode();
-    msg.type = ColumnType.createType(type_).toThrift();
+    msg.type = type_.toThrift();
     msg.num_children = children_.size();
     toThrift(msg);
     container.addToNodes(msg);
@@ -736,7 +734,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * The error message only contains this.toSql() if printExpr is true.
    */
   public void checkReturnsBool(String name, boolean printExpr) throws AnalysisException {
-    if (type_ != PrimitiveType.BOOLEAN && !type_.isNull()) {
+    if (!type_.isBoolean() && !type_.isNull()) {
       throw new AnalysisException(
           String.format("%s%s requires return type 'BOOLEAN'. " +
               "Actual type is '%s'.", name, (printExpr) ? " '" + toSql() + "'" : "",
@@ -757,16 +755,15 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *           when an invalid cast is asked for, for example,
    *           failure to convert a string literal to a date literal
    */
-  public final Expr castTo(PrimitiveType targetType) throws AnalysisException {
-    PrimitiveType type =
-        PrimitiveType.getAssignmentCompatibleType(this.type_, targetType);
+  public final Expr castTo(ColumnType targetType) throws AnalysisException {
+    ColumnType type = ColumnType.getAssignmentCompatibleType(this.type_, targetType);
     Preconditions.checkState(type.isValid(), "cast %s to %s", this.type_, targetType);
     // If the targetType is NULL_TYPE then ignore the cast because NULL_TYPE
     // is compatible with all types and no cast is necessary.
     if (targetType.isNull()) return this;
     // requested cast must be to assignment-compatible type
     // (which implies no loss of precision)
-    Preconditions.checkArgument(type == targetType);
+    Preconditions.checkArgument(type.equals(targetType));
     return uncheckedCastTo(targetType);
   }
 
@@ -783,7 +780,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *           when an invalid cast is asked for, for example,
    *           failure to convert a string literal to a date literal
    */
-  protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
     return new CastExpr(targetType, this, true);
   }
 
@@ -796,7 +793,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * @param childIndex
    *          index of child to be cast
    */
-  public void castChild(PrimitiveType targetType,
+  public void castChild(ColumnType targetType,
       int childIndex) throws AnalysisException {
     Expr child = getChild(childIndex);
     Expr newChild = child.castTo(targetType);
@@ -825,29 +822,29 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *         The possibly changed compatibleType
    *         (if a string literal forced casting the other operand)
    */
-  public PrimitiveType castBinaryOp(PrimitiveType compatibleType)
+  public ColumnType castBinaryOp(ColumnType compatibleType)
       throws AnalysisException {
     Preconditions.checkState(
         this instanceof BinaryPredicate || this instanceof ArithmeticExpr);
-    PrimitiveType t1 = getChild(0).getType();
-    PrimitiveType t2 = getChild(1).getType();
+    ColumnType t1 = getChild(0).getType();
+    ColumnType t2 = getChild(1).getType();
     // Convert string literals if the other operand is numeric,
     // then get compatible type again to see if non-string type needs a cast as well.
     if (t1.isStringType() && getChild(0).isLiteral() && t2.isNumericType() ) {
       StringLiteral firstChild = (StringLiteral) getChild(0);
       children_.set(0, firstChild.convertToNumber());
       t1 = getChild(0).getType();
-      compatibleType = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+      compatibleType = ColumnType.getAssignmentCompatibleType(t1, t2);
     } else if (t2.isStringType() && getChild(1).isLiteral() && t1.isNumericType()) {
       StringLiteral secondChild = (StringLiteral) getChild(1);
       children_.set(1, secondChild.convertToNumber());
       t2 = getChild(1).getType();
-      compatibleType = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+      compatibleType = ColumnType.getAssignmentCompatibleType(t1, t2);
     }
     // add operand casts
     Preconditions.checkState(compatibleType.isValid());
-    if (t1 != compatibleType) castChild(compatibleType, 0);
-    if (t2 != compatibleType) castChild(compatibleType, 1);
+    if (!t1.equals(compatibleType)) castChild(compatibleType, 0);
+    if (!t2.equals(compatibleType)) castChild(compatibleType, 1);
     return compatibleType;
   }
 

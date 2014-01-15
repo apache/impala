@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.BlockLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
@@ -465,7 +466,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   }
 
   private static LiteralExpr TExprNodeToLiteralExpr(
-      com.cloudera.impala.thrift.TExprNode exprNode, PrimitiveType primitiveType) {
+      com.cloudera.impala.thrift.TExprNode exprNode, ColumnType primitiveType) {
     try {
       switch (exprNode.node_type) {
         case FLOAT_LITERAL:

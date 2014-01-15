@@ -16,7 +16,6 @@ package com.cloudera.impala.analysis;
 
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumn;
 
@@ -32,16 +31,16 @@ public class ColumnDesc {
   private final String colName_;
   private final String comment_;
   // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW stmts.
-  private PrimitiveType colType_;
+  private ColumnType colType_;
 
-  public ColumnDesc(String colName, PrimitiveType colType, String comment) {
+  public ColumnDesc(String colName, ColumnType colType, String comment) {
     this.colName_ = colName;
     this.colType_ = colType;
     this.comment_ = comment;
   }
 
-  public void setColType(PrimitiveType colType) { this.colType_ = colType; }
-  public PrimitiveType getColType() { return colType_; }
+  public void setColType(ColumnType colType) { this.colType_ = colType; }
+  public ColumnType getColType() { return colType_; }
   public String getColName() { return colName_; }
   public String getComment() { return comment_; }
 

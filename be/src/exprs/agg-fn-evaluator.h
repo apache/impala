@@ -54,7 +54,6 @@ class AggFnEvaluator {
   Status Prepare(RuntimeState* state, const RowDescriptor& desc,
       MemPool* pool, const SlotDescriptor* output_slot_desc);
 
-  //PrimitiveType type() const { return type_.type; }
   TAggregationOp::type agg_op() const { return agg_op_; }
   const std::vector<Expr*>& input_exprs() const { return input_exprs_; }
   bool is_count_star() const {

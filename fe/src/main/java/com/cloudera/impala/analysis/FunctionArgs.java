@@ -16,13 +16,12 @@ package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
 
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 // Wrapper class around argument types and if it has varArgs
 public class FunctionArgs {
-  public final ArrayList<PrimitiveType> argTypes;
+  public final ArrayList<ColumnType> argTypes;
   public boolean hasVarArgs;
 
   public FunctionArgs() {
@@ -30,7 +29,7 @@ public class FunctionArgs {
     hasVarArgs = false;
   }
 
-  public FunctionArgs(ArrayList<PrimitiveType> argTypes, boolean varArgs) {
+  public FunctionArgs(ArrayList<ColumnType> argTypes, boolean varArgs) {
     this.argTypes = argTypes;
     this.hasVarArgs = varArgs;
     if (varArgs) Preconditions.checkState(argTypes.size() > 0);

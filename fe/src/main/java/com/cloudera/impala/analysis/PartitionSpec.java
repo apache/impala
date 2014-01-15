@@ -9,7 +9,6 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
@@ -128,17 +127,17 @@ public class PartitionSpec implements ParseNode {
         continue;
       }
 
-      PrimitiveType colType = c.getType();
-      PrimitiveType literalType = pk.getValue().getType();
-      PrimitiveType compatibleType =
-          PrimitiveType.getAssignmentCompatibleType(colType, literalType);
+      ColumnType colType = c.getType();
+      ColumnType literalType = pk.getValue().getType();
+      ColumnType compatibleType =
+          ColumnType.getAssignmentCompatibleType(colType, literalType);
       if (!compatibleType.isValid()) {
         throw new AnalysisException(String.format("Target table not compatible.\n" +
             "Incompatible types '%s' and '%s' in column '%s'", colType.toString(),
             literalType.toString(), pk.getColName()));
       }
       // Check for loss of precision with the partition value
-      if (compatibleType != colType) {
+      if (!compatibleType.equals(colType)) {
         throw new AnalysisException(
             String.format("Partition key value may result in loss of precision.\n" +
             "Would need to cast '%s' to '%s' for partition column: %s",

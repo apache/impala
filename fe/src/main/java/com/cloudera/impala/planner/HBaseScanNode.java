@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.StringLiteral;
@@ -144,8 +145,8 @@ public class HBaseScanNode extends ScanNode {
     if (rowRange != null) {
       if (rowRange.getLowerBound() != null) {
         Preconditions.checkState(rowRange.getLowerBound().isConstant());
-        Preconditions.checkState(rowRange.getLowerBound().getType() ==
-            PrimitiveType.STRING);
+        Preconditions.checkState(
+            rowRange.getLowerBound().getType().equals(ColumnType.STRING));
         TColumnValue val = FeSupport.EvalConstExpr(rowRange.getLowerBound(),
             analyzer.getQueryContext());
         if (!val.isSetStringVal()) {
@@ -159,8 +160,8 @@ public class HBaseScanNode extends ScanNode {
       }
       if (rowRange.getUpperBound() != null) {
         Preconditions.checkState(rowRange.getUpperBound().isConstant());
-        Preconditions.checkState(rowRange.getUpperBound().getType() ==
-            PrimitiveType.STRING);
+        Preconditions.checkState(
+            rowRange.getUpperBound().getType().equals(ColumnType.STRING));
         TColumnValue val = FeSupport.EvalConstExpr(rowRange.getUpperBound(),
             analyzer.getQueryContext());
         if (!val.isSetStringVal()) {
@@ -238,7 +239,7 @@ public class HBaseScanNode extends ScanNode {
   private void createHBaseFilters(Analyzer analyzer) {
     for (SlotDescriptor slot: desc_.getSlots()) {
       // TODO: Currently we can only push down predicates on string columns.
-      if (slot.getType() != PrimitiveType.STRING) continue;
+      if (slot.getType().getPrimitiveType() != PrimitiveType.STRING) continue;
       // List of predicates that cannot be pushed down as an HBase Filter.
       List<Expr> remainingPreds = new ArrayList<Expr>();
       for (Expr e: conjuncts_) {

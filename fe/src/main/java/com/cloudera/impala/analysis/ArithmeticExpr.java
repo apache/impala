@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
@@ -120,13 +119,13 @@ public class ArithmeticExpr extends Expr {
         throw new AnalysisException("Bitwise operations only allowed on fixed-point " +
             "types: " + toSql());
       }
-      Preconditions.checkState(type_ == match.getReturnType() || type_.isNull());
+      Preconditions.checkState(type_.equals(match.getReturnType()) || type_.isNull());
       opcode_ = match.opcode;
       return;
     }
 
-    PrimitiveType t1 = getChild(0).getType();
-    PrimitiveType t2 = getChild(1).getType();  // only bitnot is unary
+    ColumnType t1 = getChild(0).getType();
+    ColumnType t2 = getChild(1).getType();  // only bitnot is unary
 
     FunctionOperator funcOp = op_.toFunctionOp();
     switch (op_) {
@@ -136,7 +135,7 @@ public class ArithmeticExpr extends Expr {
         // If one of the types is null, use the compatible type without promotion.
         // Otherwise, promote the compatible type to the next higher resolution type,
         // to ensure that that a <op> b won't overflow/underflow.
-        type_ = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+        type_ = ColumnType.getAssignmentCompatibleType(t1, t2);
         if (!(t1.isNull() || t2.isNull())) {
           // Both operands are non-null. Use next higher resolution type.
           type_ = type_.getNextResolutionType();
@@ -144,12 +143,12 @@ public class ArithmeticExpr extends Expr {
         Preconditions.checkState(type_.isValid());
         break;
       case MOD:
-        type_ = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+        type_ = ColumnType.getAssignmentCompatibleType(t1, t2);
         // Use MATH_MOD function operator for floating-point modulo.
         if (type_.isFloatingPointType()) funcOp = FunctionOperator.MATH_FMOD;
         break;
       case DIVIDE:
-        type_ = PrimitiveType.DOUBLE;
+        type_ = ColumnType.DOUBLE;
         break;
       case INT_DIVIDE:
       case BITAND:
@@ -160,7 +159,7 @@ public class ArithmeticExpr extends Expr {
               "Invalid floating point argument to operation " +
               op_.toString() + ": " + this.toSql());
         }
-        type_ = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+        type_ = ColumnType.getAssignmentCompatibleType(t1, t2);
         // the result is always an integer or null
         Preconditions.checkState(type_.isFixedPointType() || type_.isNull());
         break;

@@ -112,7 +112,7 @@ public class FeSupport {
 
   public static boolean EvalPredicate(Expr pred, TQueryContext queryCtxt)
       throws InternalException {
-    Preconditions.checkState(pred.getType() == PrimitiveType.BOOLEAN);
+    Preconditions.checkState(pred.getType().isBoolean());
     TColumnValue val = EvalConstExpr(pred, queryCtxt);
     // Return false if pred evaluated to false or NULL. True otherwise.
     return val.isSetBoolVal() && val.boolVal;

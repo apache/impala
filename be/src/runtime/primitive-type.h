@@ -130,6 +130,17 @@ struct ColumnType {
     }
   }
 
+  TColumnType ToThrift() const {
+    TColumnType thrift_type;
+    thrift_type.type = impala::ToThrift(type);
+    if (type == TYPE_CHAR) {
+      thrift_type.len = len;
+      thrift_type.__isset.len = true;
+    }
+    // TODO: decimal
+    return thrift_type;
+  }
+
   std::string DebugString() const;
 };
 

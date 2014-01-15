@@ -30,6 +30,7 @@ import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.EquivalenceClassId;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
@@ -1271,7 +1272,7 @@ public class Planner {
       if (comp.getOp() == BinaryPredicate.Operator.NE) continue;
       Expr slotBinding = comp.getSlotBinding(d.getId());
       if (slotBinding == null || !slotBinding.isConstant() ||
-          slotBinding.getType() != PrimitiveType.STRING) {
+          !slotBinding.getType().equals(ColumnType.STRING)) {
         continue;
       }
 
@@ -1412,7 +1413,7 @@ public class Planner {
     for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
       SlotDescriptor slotDesc = analyzer.getColumnSlot(
           tblRef.getDesc(), tblRef.getTable().getColumns().get(i));
-      if (slotDesc == null || slotDesc.getType() != PrimitiveType.STRING) {
+      if (slotDesc == null || !slotDesc.getType().isStringType()) {
         // the hbase row key is mapped to a non-string type
         // (since it's stored in ascii it will be lexicographically ordered,
         // and non-string comparisons won't work)

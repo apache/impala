@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
@@ -159,7 +158,7 @@ public class UnionStmt extends QueryStmt {
     for (int i = 0; i < firstQueryExprs.size(); ++i) {
       // Type compatible with the i-th exprs of all selects.
       // Initialize with type of i-th expr in first select.
-      PrimitiveType compatibleType = firstQueryExprs.get(i).getType();
+      ColumnType compatibleType = firstQueryExprs.get(i).getType();
       // Remember last compatible expr for error reporting.
       Expr lastCompatibleExpr = firstQueryExprs.get(i);
       for (int j = 1; j < operands_.size(); ++j) {
@@ -171,16 +170,11 @@ public class UnionStmt extends QueryStmt {
       // Now that we've found a compatible type, add implicit casts if necessary.
       for (int j = 0; j < operands_.size(); ++j) {
         List<Expr> resultExprs = operands_.get(j).getQueryStmt().getBaseTblResultExprs();
-        if (resultExprs.get(i).getType() != compatibleType) {
+        if (!resultExprs.get(i).getType().equals(compatibleType)) {
           Expr castExpr = resultExprs.get(i).castTo(compatibleType);
           resultExprs.set(i, castExpr);
         }
       }
-    }
-    // TODO: remove
-    for (UnionOperand op: operands_) {
-      LOG.info("resultexprs: " + Expr.toSql(op.getQueryStmt().getBaseTblResultExprs()) + " " +
-          Expr.debugString(op.getQueryStmt().getBaseTblResultExprs()));
     }
 
     // Create tuple descriptor materialized by this UnionStmt,

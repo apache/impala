@@ -128,7 +128,7 @@ public class TimestampArithmeticExpr extends Expr {
     }
 
     // The first child must return a timestamp or null.
-    if (getChild(0).getType() != PrimitiveType.TIMESTAMP &&
+    if (getChild(0).getType().getPrimitiveType() != PrimitiveType.TIMESTAMP &&
         !getChild(0).getType().isNull()) {
       throw new AnalysisException("Operand '" + getChild(0).toSql() +
           "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
@@ -143,7 +143,7 @@ public class TimestampArithmeticExpr extends Expr {
           getChild(1).getType() + "'. Expected an integer type.");
     }
 
-    PrimitiveType[] argTypes = new PrimitiveType[this.children_.size()];
+    ColumnType[] argTypes = new ColumnType[this.children_.size()];
     for (int i = 0; i < this.children_.size(); ++i) {
       this.children_.get(i).analyze(analyzer);
       argTypes[i] = this.children_.get(i).getType();
@@ -156,7 +156,8 @@ public class TimestampArithmeticExpr extends Expr {
         OpcodeRegistry.instance().getFunctionInfo(funcOp, true, argTypes);
     // We have already done type checking to ensure the function will resolve.
     Preconditions.checkNotNull(match);
-    Preconditions.checkState(match.getReturnType() == PrimitiveType.TIMESTAMP);
+    Preconditions.checkState(
+        match.getReturnType().getPrimitiveType() == PrimitiveType.TIMESTAMP);
     opcode_ = match.opcode;
     type_ = match.getReturnType();
   }

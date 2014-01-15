@@ -23,7 +23,6 @@ import junit.framework.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
 
@@ -889,9 +888,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("drop function if exists foo(double, int...)");
 
     // Add functions default.TestFn(), default.TestFn(double), default.TestFn(String...),
-    addTestFunction("TestFn", new ArrayList<PrimitiveType>(), false);
-    addTestFunction("TestFn", Lists.newArrayList(PrimitiveType.DOUBLE), false);
-    addTestFunction("TestFn", Lists.newArrayList(PrimitiveType.STRING), true);
+    addTestFunction("TestFn", new ArrayList<ColumnType>(), false);
+    addTestFunction("TestFn", Lists.newArrayList(ColumnType.DOUBLE), false);
+    addTestFunction("TestFn", Lists.newArrayList(ColumnType.STRING), true);
 
     AnalysisError("create function TestFn() RETURNS INT " + udfSuffix,
         "Function already exists: testfn()");
@@ -906,7 +905,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Add default.TestFn(int, int)
     addTestFunction("TestFn",
-        Lists.newArrayList(PrimitiveType.INT, PrimitiveType.INT), false);
+        Lists.newArrayList(ColumnType.INT, ColumnType.INT), false);
     AnalyzesOk("drop function TestFn(int, int)");
     AnalysisError("drop function TestFn(int, int, int)",
         "Function does not exist: testfn(INT, INT, INT)");
@@ -935,7 +934,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError(
         "drop function functional.TestFn()", "Function does not exist: testfn()");
 
-    addTestFunction("udf_test", "TestFn", new ArrayList<PrimitiveType>(), false);
+    addTestFunction("udf_test", "TestFn", new ArrayList<ColumnType>(), false);
     AnalysisError(
         "drop database udf_test", "Cannot drop non-empty database: udf_test");
 

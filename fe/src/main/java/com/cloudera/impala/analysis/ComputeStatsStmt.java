@@ -111,7 +111,7 @@ public class ComputeStatsStmt extends StatementBase {
       // Count the number of NULL values.
       columnStatsSelectList.add("COUNT(IF(" + c.getName() + " IS NULL, 1, NULL))");
       // For STRING columns also compute the max and avg string length.
-      if (c.getType() == PrimitiveType.STRING) {
+      if (c.getType().isStringType()) {
         columnStatsSelectList.add("MAX(length(" + c.getName() + "))");
         columnStatsSelectList.add("AVG(length(" + c.getName() + "))");
       } else {

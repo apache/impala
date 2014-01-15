@@ -16,6 +16,7 @@ package com.cloudera.impala.catalog;
 
 import java.util.List;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
@@ -33,12 +34,12 @@ public class Udf extends Function {
   // UDF. e.g. org.example.MyUdf.class.
   private String symbolName_;
 
-  public Udf(FunctionName fnName, FunctionArgs args, PrimitiveType retType) {
+  public Udf(FunctionName fnName, FunctionArgs args, ColumnType retType) {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
   }
 
-  public Udf(FunctionName fnName, List<PrimitiveType> argTypes,
-    PrimitiveType retType, HdfsUri location, String symbolName) {
+  public Udf(FunctionName fnName, List<ColumnType> argTypes,
+      ColumnType retType, HdfsUri location, String symbolName) {
     super(fnName, argTypes, retType, false);
     setLocation(location);
     setSymbolName(symbolName);

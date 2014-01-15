@@ -18,7 +18,6 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -88,13 +87,11 @@ public class LikePredicate extends Predicate {
       AuthorizationException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
-    if (getChild(0).getType() != PrimitiveType.STRING
-        && !getChild(0).getType().isNull()) {
+    if (!getChild(0).getType().isStringType() && !getChild(0).getType().isNull()) {
       throw new AnalysisException(
           "left operand of " + op_.toString() + " must be of type STRING: " + toSql());
     }
-    if (getChild(1).getType() != PrimitiveType.STRING
-        && !getChild(1).getType().isNull()) {
+    if (!getChild(1).getType().isStringType() && !getChild(1).getType().isNull()) {
       throw new AnalysisException(
           "right operand of " + op_.toString() + " must be of type STRING: " + toSql());
     }

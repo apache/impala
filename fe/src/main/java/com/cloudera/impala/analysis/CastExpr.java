@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExpr;
@@ -26,7 +25,7 @@ import com.google.common.base.Preconditions;
 
 public class CastExpr extends Expr {
 
-  private final PrimitiveType targetType_;
+  private final ColumnType targetType_;
 
   // true if this is a "pre-analyzed" implicit cast
   private final boolean isImplicit_;
@@ -34,9 +33,9 @@ public class CastExpr extends Expr {
   // True if this cast does not change the type.
   private boolean noOp_ = false;
 
-  public CastExpr(PrimitiveType targetType, Expr e, boolean isImplicit) {
+  public CastExpr(ColumnType targetType, Expr e, boolean isImplicit) {
     super();
-    Preconditions.checkArgument(targetType != PrimitiveType.INVALID_TYPE);
+    Preconditions.checkArgument(targetType.isValid());
     this.targetType_ = targetType;
     this.isImplicit_ = isImplicit;
     Preconditions.checkNotNull(e);
@@ -46,7 +45,7 @@ public class CastExpr extends Expr {
       OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
           FunctionOperator.CAST, true, getChild(0).getType(), type_);
       Preconditions.checkState(match != null);
-      Preconditions.checkState(match.getReturnType() == type_);
+      Preconditions.checkState(match.getReturnType().equals(type_));
       this.opcode_ = match.opcode;
     }
   }
@@ -92,9 +91,8 @@ public class CastExpr extends Expr {
     if (isImplicit_) return;
 
     // cast was asked for in the query, check for validity of cast
-    PrimitiveType childType = getChild(0).getType();
-
     // this cast may result in loss of precision, but the user requested it
+    ColumnType childType = getChild(0).getType();
     this.type_ = targetType_;
 
     if (childType.equals(targetType_)) {
@@ -108,7 +106,7 @@ public class CastExpr extends Expr {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
           " from " + childType + " to " + targetType_);
     }
-    Preconditions.checkState(match.getReturnType() == targetType_);
+    Preconditions.checkState(match.getReturnType().equals(targetType_));
     this.opcode_ = match.opcode;
   }
 

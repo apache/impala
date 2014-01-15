@@ -49,6 +49,7 @@ import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
@@ -67,7 +68,6 @@ import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
-import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
@@ -404,7 +404,7 @@ public class HdfsTable extends Table {
       throws TableLoadingException {
     int pos = 0;
     for (FieldSchema s: fieldSchemas) {
-      PrimitiveType type = getPrimitiveType(s);
+      ColumnType type = getPrimitiveType(s);
       // Check if we support partitioning on columns of such a type.
       if (pos < numClusteringCols_ && !type.supportsTablePartitioning()) {
         throw new TableLoadingException(
@@ -476,7 +476,7 @@ public class HdfsTable extends Table {
             keyValues.add(new NullLiteral());
             ++numNullKeys[i];
           } else {
-            PrimitiveType type = colsByPos_.get(keyValues.size()).getType();
+            ColumnType type = colsByPos_.get(keyValues.size()).getType();
             try {
               Expr expr = LiteralExpr.create(partitionKey, type);
               // Force the literal to be of type declared in the metadata.
@@ -953,10 +953,10 @@ public class HdfsTable extends Table {
       TColumn colDesc = new TColumn(partCol.getName(), partCol.getType().toThrift());
       resultSchema.addToColumns(colDesc);
     }
-    resultSchema.addToColumns(new TColumn("#Rows", TPrimitiveType.BIGINT));
-    resultSchema.addToColumns(new TColumn("#Files", TPrimitiveType.BIGINT));
-    resultSchema.addToColumns(new TColumn("Size", TPrimitiveType.STRING));
-    resultSchema.addToColumns(new TColumn("Format", TPrimitiveType.STRING));
+    resultSchema.addToColumns(new TColumn("#Rows", ColumnType.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("#Files", ColumnType.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("Size", ColumnType.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Format", ColumnType.STRING.toThrift()));
 
     // Pretty print partitions and their stats.
     ArrayList<HdfsPartition> orderedPartitions = Lists.newArrayList(partitions_);

@@ -567,14 +567,14 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       const apache::hive::service::cli::thrift::TExecuteStatementReq execute_request,
       TQueryContext* query_ctxt);
   static void TColumnValueToHiveServer2TColumnValue(const TColumnValue& value,
-      const TPrimitiveType::type& type,
+      const TColumnType& type,
       apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);
   static void TQueryOptionsToMap(const TQueryOptions& query_option,
       std::map<std::string, std::string>* configuration);
 
   // Convert an expr value to HiveServer2 TColumnValue
   static void ExprValueToHiveServer2TColumnValue(const void* value,
-      const TPrimitiveType::type& type,
+      const TColumnType& type,
       apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);
 
   // Helper function to translate between Beeswax and HiveServer2 type

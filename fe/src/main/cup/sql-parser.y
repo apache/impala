@@ -202,8 +202,8 @@ terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC, KW_AVG,
   KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST,
   KW_CHANGE, KW_CHAR, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_COUNT, KW_CREATE,
-  KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DELIMITED,
-  KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
+  KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL,
+  KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
   KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
   KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST,
   KW_FLOAT, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS,
@@ -298,7 +298,7 @@ nonterminal ViewRef with_table_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal ArrayList<String> opt_plan_hints;
-nonterminal PrimitiveType primitive_type;
+nonterminal ColumnType column_type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
 nonterminal StatementBase explain_stmt;
@@ -360,7 +360,6 @@ nonterminal CreateUdfStmt create_udf_stmt;
 nonterminal CreateUdaStmt create_uda_stmt;
 nonterminal ShowFunctionsStmt show_functions_stmt;
 nonterminal DropFunctionStmt drop_function_stmt;
-nonterminal ColumnType aggregate_intermediate_type;
 // Accepts space separated key='v' arguments.
 nonterminal HashMap create_function_args_map;
 nonterminal CreateFunctionStmtBase.OptArg create_function_arg_key;
@@ -622,7 +621,7 @@ create_tbl_stmt ::=
 create_udf_stmt ::=
   KW_CREATE KW_FUNCTION if_not_exists_val:if_not_exists
   function_name:fn_name function_def_args:fn_args
-  KW_RETURNS primitive_type:return_type
+  KW_RETURNS column_type:return_type
   KW_LOCATION STRING_LITERAL:binary_path
   create_function_args_map:arg_map
   {:
@@ -634,7 +633,7 @@ create_udf_stmt ::=
 create_uda_stmt ::=
   KW_CREATE KW_AGGREGATE KW_FUNCTION if_not_exists_val:if_not_exists
   function_name:fn_name function_def_args:fn_args
-  KW_RETURNS primitive_type:return_type
+  KW_RETURNS column_type:return_type
   opt_aggregate_fn_intermediate_type:intermediate_type
   KW_LOCATION STRING_LITERAL:binary_path
   create_function_args_map:arg_map
@@ -778,7 +777,7 @@ column_def_list ::=
   ;
 
 column_def ::=
-  IDENT:col_name primitive_type:targetType comment_val:comment
+  IDENT:col_name column_type:targetType comment_val:comment
   {: RESULT = new ColumnDesc(col_name, targetType, comment); :}
   ;
 
@@ -934,13 +933,13 @@ function_def_args ::=
   ;
 
 function_def_arg_list ::=
-  primitive_type:type
+  column_type:type
   {:
     FunctionArgs args = new FunctionArgs();
     args.argTypes.add(type);
     RESULT = args;
   :}
-  | function_def_arg_list:args COMMA primitive_type:type
+  | function_def_arg_list:args COMMA column_type:type
   {:
     args.argTypes.add(type);
     RESULT = args;
@@ -961,16 +960,8 @@ opt_is_varargs ::=
   {: RESULT = false; :}
   ;
 
-// TODO: remove this when the char(n) type is supported everywhere.
-aggregate_intermediate_type ::=
-  primitive_type:type
-  {: RESULT = ColumnType.createType(type); :}
-  | KW_CHAR LPAREN INTEGER_LITERAL:len RPAREN
-  {: RESULT = ColumnType.createCharType(len.intValue()); :}
-  ;
-
 opt_aggregate_fn_intermediate_type ::=
-  KW_INTERMEDIATE aggregate_intermediate_type:type
+  KW_INTERMEDIATE column_type:type
   {: RESULT = type; :}
   |
   {: RESULT = null; :}
@@ -1562,8 +1553,8 @@ opt_limit_clause ::=
   ;
 
 cast_expr ::=
-  KW_CAST LPAREN expr:e KW_AS primitive_type:targetType RPAREN
-  {: RESULT = new CastExpr((PrimitiveType) targetType, e, false); :}
+  KW_CAST LPAREN expr:e KW_AS column_type:targetType RPAREN
+  {: RESULT = new CastExpr(targetType, e, false); :}
   ;
 
 case_expr ::=
@@ -1891,27 +1882,31 @@ column_ref ::=
   {: RESULT = new SlotRef(new TableName(db, tbl), col); :}
   ;
 
-primitive_type ::=
+column_type ::=
   KW_TINYINT
-  {: RESULT = PrimitiveType.TINYINT; :}
+  {: RESULT = ColumnType.TINYINT; :}
   | KW_SMALLINT
-  {: RESULT = PrimitiveType.SMALLINT; :}
+  {: RESULT = ColumnType.SMALLINT; :}
   | KW_INT
-  {: RESULT = PrimitiveType.INT; :}
+  {: RESULT = ColumnType.INT; :}
   | KW_BIGINT
-  {: RESULT = PrimitiveType.BIGINT; :}
+  {: RESULT = ColumnType.BIGINT; :}
   | KW_BOOLEAN
-  {: RESULT = PrimitiveType.BOOLEAN; :}
+  {: RESULT = ColumnType.BOOLEAN; :}
   | KW_FLOAT
-  {: RESULT = PrimitiveType.FLOAT; :}
+  {: RESULT = ColumnType.FLOAT; :}
   | KW_DOUBLE
-  {: RESULT = PrimitiveType.DOUBLE; :}
+  {: RESULT = ColumnType.DOUBLE; :}
   | KW_DATE
-  {: RESULT = PrimitiveType.DATE; :}
+  {: RESULT = ColumnType.DATE; :}
   | KW_DATETIME
-  {: RESULT = PrimitiveType.DATETIME; :}
+  {: RESULT = ColumnType.DATETIME; :}
   | KW_TIMESTAMP
-  {: RESULT = PrimitiveType.TIMESTAMP; :}
+  {: RESULT = ColumnType.TIMESTAMP; :}
   | KW_STRING
-  {: RESULT = PrimitiveType.STRING; :}
+  {: RESULT = ColumnType.STRING; :}
+  | KW_CHAR LPAREN INTEGER_LITERAL:len RPAREN
+  {: RESULT = ColumnType.createCharType(len.intValue()); :}
+  | KW_DECIMAL
+  {: RESULT = ColumnType.createDecimalType(); :}
   ;

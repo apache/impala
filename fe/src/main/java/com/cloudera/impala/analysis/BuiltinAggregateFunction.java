@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 
 import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TAggregationOp;
@@ -33,27 +32,27 @@ public class BuiltinAggregateFunction extends Function {
   // We should move this to something in the catalog instead of having it
   // here like this.
   public enum Operator {
-    COUNT("COUNT", TAggregationOp.COUNT, ColumnType.createType(PrimitiveType.BIGINT)),
+    COUNT("COUNT", TAggregationOp.COUNT, ColumnType.BIGINT),
     MIN("MIN", TAggregationOp.MIN, null),
     MAX("MAX", TAggregationOp.MAX, null),
     DISTINCT_PC("DISTINCT_PC", TAggregationOp.DISTINCT_PC,
         // TODO: this needs to switch to CHAR(64)
-        ColumnType.createType(PrimitiveType.STRING)),
+        ColumnType.STRING),
     DISTINCT_PCSA("DISTINCT_PCSA", TAggregationOp.DISTINCT_PCSA,
         // TODO: this needs to switch to CHAR(64)
-        ColumnType.createType(PrimitiveType.STRING)),
+        ColumnType.STRING),
     SUM("SUM", TAggregationOp.SUM, null),
     AVG("AVG", TAggregationOp.INVALID, null),
     GROUP_CONCAT("GROUP_CONCAT", TAggregationOp.GROUP_CONCAT,
         // TODO: this needs to switch to CHAR(16)
-        ColumnType.createType(PrimitiveType.STRING)),
+        ColumnType.STRING),
 
     // NDV is the external facing name (i.e. queries should always be written with NDV)
     // The current implementation of NDV is hyperloglog (but we could change this without
     // external query changes if we find a better algorithm).
     NDV("NDV", TAggregationOp.HLL,
         // TODO: this needs to switch to CHAR(64)
-        ColumnType.createType(PrimitiveType.STRING));
+        ColumnType.STRING);
 
 
     private final String description;
@@ -80,8 +79,8 @@ public class BuiltinAggregateFunction extends Function {
   // TODO: this is not used yet until the planner understand this.
   private ColumnType intermediateType_;
 
-  public BuiltinAggregateFunction(Operator op, ArrayList<PrimitiveType> argTypes,
-      PrimitiveType retType, ColumnType intermediateType) throws AnalysisException {
+  public BuiltinAggregateFunction(Operator op, ArrayList<ColumnType> argTypes,
+      ColumnType retType, ColumnType intermediateType) throws AnalysisException {
     super(FunctionName.CreateBuiltinName(op.toString()), argTypes, retType, false);
     Preconditions.checkState(intermediateType != null);
     Preconditions.checkState(op != null);

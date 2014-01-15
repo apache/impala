@@ -52,20 +52,20 @@ public class AnalyzerTest {
   protected Analyzer analyzer_;
 
   // maps from type to string that will result in literal of that type
-  protected static Map<PrimitiveType, String> typeToLiteralValue_ =
-      new HashMap<PrimitiveType, String>();
+  protected static Map<ColumnType, String> typeToLiteralValue_ =
+      new HashMap<ColumnType, String>();
   static {
-    typeToLiteralValue_.put(PrimitiveType.BOOLEAN, "true");
-    typeToLiteralValue_.put(PrimitiveType.TINYINT, "1");
-    typeToLiteralValue_.put(PrimitiveType.SMALLINT, (Byte.MAX_VALUE + 1) + "");
-    typeToLiteralValue_.put(PrimitiveType.INT, (Short.MAX_VALUE + 1) + "");
-    typeToLiteralValue_.put(PrimitiveType.BIGINT, ((long) Integer.MAX_VALUE + 1) + "");
-    typeToLiteralValue_.put(PrimitiveType.FLOAT, "1.0");
-    typeToLiteralValue_.put(PrimitiveType.DOUBLE, (Float.MAX_VALUE + 1) + "");
-    typeToLiteralValue_.put(PrimitiveType.TIMESTAMP,
+    typeToLiteralValue_.put(ColumnType.BOOLEAN, "true");
+    typeToLiteralValue_.put(ColumnType.TINYINT, "1");
+    typeToLiteralValue_.put(ColumnType.SMALLINT, (Byte.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(ColumnType.INT, (Short.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(ColumnType.BIGINT, ((long) Integer.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(ColumnType.FLOAT, "1.0");
+    typeToLiteralValue_.put(ColumnType.DOUBLE, (Float.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(ColumnType.TIMESTAMP,
         "cast('2012-12-21 00:00:00.000' as timestamp)");
-    typeToLiteralValue_.put(PrimitiveType.STRING, "'Hello, World!'");
-    typeToLiteralValue_.put(PrimitiveType.NULL_TYPE, "NULL");
+    typeToLiteralValue_.put(ColumnType.STRING, "'Hello, World!'");
+    typeToLiteralValue_.put(ColumnType.NULL, "NULL");
   }
 
   protected Analyzer createAnalyzer(String defaultDb) {
@@ -95,14 +95,14 @@ public class AnalyzerTest {
   // TODO: we could consider having this be the sql to run instead but that requires
   // connecting to the BE.
   protected Function addTestFunction(String name,
-      ArrayList<PrimitiveType> args, boolean varArgs) {
+      ArrayList<ColumnType> args, boolean varArgs) {
     return addTestFunction("default", name, args, varArgs);
   }
 
   protected Function addTestFunction(String db, String fnName,
-      ArrayList<PrimitiveType> args, boolean varArgs) {
+      ArrayList<ColumnType> args, boolean varArgs) {
     Function fn = new Udf(
-        new FunctionName(db, fnName), args, PrimitiveType.INT, null, null);
+        new FunctionName(db, fnName), args, ColumnType.INT, null, null);
     fn.setHasVarArgs(varArgs);
     catalog_.addFunction(fn);
     return fn;
@@ -503,9 +503,9 @@ public class AnalyzerTest {
         "Table does not exist: default.doesnt_exist");
   }
 
-  private Function createFunction(boolean hasVarArgs, PrimitiveType... args) {
+  private Function createFunction(boolean hasVarArgs, ColumnType... args) {
     return new Function(
-        new FunctionName("test"), args, PrimitiveType.INVALID_TYPE, hasVarArgs);
+        new FunctionName("test"), args, ColumnType.INVALID, hasVarArgs);
   }
 
   @Test
@@ -516,47 +516,47 @@ public class AnalyzerTest {
     fns[0] = createFunction(false);
 
     // test(int)
-    fns[1] = createFunction(false, PrimitiveType.INT);
+    fns[1] = createFunction(false, ColumnType.INT);
 
     // test(int...)
-    fns[2] = createFunction(true, PrimitiveType.INT);
+    fns[2] = createFunction(true, ColumnType.INT);
 
     // test(tinyint)
-    fns[3] = createFunction(false, PrimitiveType.TINYINT);
+    fns[3] = createFunction(false, ColumnType.TINYINT);
 
     // test(tinyint...)
-    fns[4] = createFunction(true, PrimitiveType.TINYINT);
+    fns[4] = createFunction(true, ColumnType.TINYINT);
 
     // test(double)
-    fns[5] = createFunction(false, PrimitiveType.DOUBLE);
+    fns[5] = createFunction(false, ColumnType.DOUBLE);
 
     // test(double...)
-    fns[6] = createFunction(true, PrimitiveType.DOUBLE);
+    fns[6] = createFunction(true, ColumnType.DOUBLE);
 
     // test(double, double)
-    fns[7] = createFunction(false, PrimitiveType.DOUBLE, PrimitiveType.DOUBLE);
+    fns[7] = createFunction(false, ColumnType.DOUBLE, ColumnType.DOUBLE);
 
     // test(double, double...)
-    fns[8] = createFunction(true, PrimitiveType.DOUBLE, PrimitiveType.DOUBLE);
+    fns[8] = createFunction(true, ColumnType.DOUBLE, ColumnType.DOUBLE);
 
     // test(smallint, tinyint)
-    fns[9] = createFunction(false, PrimitiveType.SMALLINT, PrimitiveType.TINYINT);
+    fns[9] = createFunction(false, ColumnType.SMALLINT, ColumnType.TINYINT);
 
     // test(int, double, double, double)
-    fns[10] = createFunction(false, PrimitiveType.INT, PrimitiveType.DOUBLE,
-        PrimitiveType.DOUBLE, PrimitiveType.DOUBLE);
+    fns[10] = createFunction(false, ColumnType.INT, ColumnType.DOUBLE,
+        ColumnType.DOUBLE, ColumnType.DOUBLE);
 
     // test(int, string, int...)
     fns[11] = createFunction(
-        true, PrimitiveType.INT, PrimitiveType.STRING, PrimitiveType.INT);
+        true, ColumnType.INT, ColumnType.STRING, ColumnType.INT);
 
     // test(tinying, string, tinyint, int, tinyint)
-    fns[12] = createFunction(false, PrimitiveType.TINYINT, PrimitiveType.STRING,
-        PrimitiveType.TINYINT, PrimitiveType.INT, PrimitiveType.TINYINT);
+    fns[12] = createFunction(false, ColumnType.TINYINT, ColumnType.STRING,
+        ColumnType.TINYINT, ColumnType.INT, ColumnType.TINYINT);
 
     // test(tinying, string, bigint, int, tinyint)
-    fns[13] = createFunction(false, PrimitiveType.TINYINT, PrimitiveType.STRING,
-        PrimitiveType.BIGINT, PrimitiveType.INT, PrimitiveType.TINYINT);
+    fns[13] = createFunction(false, ColumnType.TINYINT, ColumnType.STRING,
+        ColumnType.BIGINT, ColumnType.INT, ColumnType.TINYINT);
 
     Assert.assertFalse(fns[1].compare(fns[0], Function.CompareMode.IS_SUBTYPE));
     Assert.assertTrue(fns[1].compare(fns[2], Function.CompareMode.IS_SUBTYPE));

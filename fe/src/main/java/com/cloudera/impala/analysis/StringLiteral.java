@@ -22,7 +22,6 @@ import java_cup.runtime.Symbol;
 
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -35,7 +34,7 @@ public class StringLiteral extends LiteralExpr {
 
   public StringLiteral(String value) {
     this.value_ = value;
-    type_ = PrimitiveType.STRING;
+    type_ = ColumnType.STRING;
   }
 
   @Override
@@ -76,10 +75,10 @@ public class StringLiteral extends LiteralExpr {
   }
 
   @Override
-  protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType() || targetType.isDateType()
-        || targetType == this.type_);
-    if (targetType == this.type_) {
+        || targetType.equals(this.type_));
+    if (targetType.equals(this.type_)) {
       return this;
     } else if (targetType.isNumericType()) {
       return convertToNumber();
@@ -144,7 +143,7 @@ public class StringLiteral extends LiteralExpr {
    * @throws AnalysisException
    *           when entire given string cannot be transformed into a date
    */
-  private LiteralExpr convertToDate(PrimitiveType targetType)
+  private LiteralExpr convertToDate(ColumnType targetType)
       throws AnalysisException {
     LiteralExpr newLiteral = null;
     newLiteral = new DateLiteral(value_, targetType);

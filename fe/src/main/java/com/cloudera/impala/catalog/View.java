@@ -21,6 +21,7 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.serde.serdeConstants;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.ParseNode;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SqlParser;
@@ -69,7 +70,7 @@ public class View extends Table {
               String.format("Failed to load metadata for table '%s' due to unsupported " +
               "column type '%s' in column '%s'", getName(), s.getType(), s.getName()));
         }
-        PrimitiveType type = getPrimitiveType(s.getType());
+        ColumnType type = getPrimitiveType(s.getType());
         Column col = new Column(s.getName(), type, s.getComment(), i);
         colsByPos_.add(col);
         colsByName_.put(s.getName(), col);

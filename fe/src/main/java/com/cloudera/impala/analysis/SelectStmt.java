@@ -25,7 +25,6 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -475,13 +474,14 @@ public class SelectStmt extends QueryStmt {
       }
       // Transform avg(TIMESTAMP) to cast(avg(cast(TIMESTAMP as DOUBLE)) as TIMESTAMP)
       CastExpr inCastExpr = null;
-      if (aggExpr.getChild(0).type_ == PrimitiveType.TIMESTAMP) {
+      if (aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP) {
         inCastExpr =
-            new CastExpr(PrimitiveType.DOUBLE, aggExpr.getChild(0).clone(null), false);
+            new CastExpr(ColumnType.DOUBLE, aggExpr.getChild(0).clone(null), false);
       }
 
       List<Expr> sumInputExprs =
-          Lists.newArrayList(aggExpr.getChild(0).type_ == PrimitiveType.TIMESTAMP ?
+          Lists.newArrayList(
+              aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP ?
               inCastExpr : aggExpr.getChild(0).clone(null));
       List<Expr> countInputExpr = Lists.newArrayList(aggExpr.getChild(0).clone(null));
 
@@ -494,8 +494,8 @@ public class SelectStmt extends QueryStmt {
       ArithmeticExpr divExpr =
           new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);
 
-      if (aggExpr.getChild(0).type_ == PrimitiveType.TIMESTAMP) {
-        CastExpr outCastExpr = new CastExpr(PrimitiveType.TIMESTAMP, divExpr, false);
+      if (aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP) {
+        CastExpr outCastExpr = new CastExpr(ColumnType.TIMESTAMP, divExpr, false);
         outCastExpr.analyze(analyzer);
         result.addMapping(aggExpr, outCastExpr);
       } else {

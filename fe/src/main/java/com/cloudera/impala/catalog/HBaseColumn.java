@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.catalog;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.thrift.TColumn;
 
 // Describes an HBase column mapped to a Hive column (as described in the metastore).
@@ -26,7 +27,7 @@ public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
   private final boolean binaryEncoded_;
 
   public HBaseColumn(String name, String columnFamily, String columnQualifier,
-      boolean binaryEncoded, PrimitiveType type, String comment, int position) {
+      boolean binaryEncoded, ColumnType type, String comment, int position) {
     super(name, type, comment, position);
     columnFamily_ = columnFamily;
     columnQualifier_ = columnQualifier;

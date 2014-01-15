@@ -168,7 +168,7 @@ java_registry_preamble = '\
 package com.cloudera.impala.opcode;\n\
 \n\
 import com.cloudera.impala.analysis.OpcodeRegistry;\n\
-import com.cloudera.impala.catalog.PrimitiveType;\n\
+import com.cloudera.impala.analysis.ColumnType;\n\
 import com.cloudera.impala.thrift.TExprOpcode;\n\
 import com.google.common.base.Preconditions;\n\
 \n\
@@ -185,7 +185,7 @@ java_registry_epilogue = '\
 
 def initialize_sub(op, return_type, arg_types):
   sub = {}
-  java_args = "PrimitiveType." + return_type
+  java_args = "ColumnType." + return_type
   sub["fn_class"] = "GetValueFunctions"
   sub["fn_signature"] = op
   sub["num_args"] = len(arg_types)
@@ -193,7 +193,7 @@ def initialize_sub(op, return_type, arg_types):
     arg = arg_types[idx]
     sub["fn_signature"] += "_" + native_types[arg]
     sub["native_type" + repr(idx + 1)] = native_types[arg]
-    java_args += ", PrimitiveType." + arg
+    java_args += ", ColumnType." + arg
   sub["thrift_enum"] = sub["fn_signature"].upper()
   sub["java_output"] = "FunctionOperator." + op.upper() + ", TExprOpcode." + sub["thrift_enum"]
   sub["java_output"] += ", " + java_args
@@ -308,9 +308,9 @@ def generate_fe_registry_init(filename):
         java_output += ", true"
       else:
         java_output += ", false"
-      java_output += ", PrimitiveType." + entry["ret_type"]
+      java_output += ", ColumnType." + entry["ret_type"]
       for arg in entry["args"]:
-        java_output += ", PrimitiveType." + arg
+        java_output += ", ColumnType." + arg
       java_registry_file.write("    result &= registry.add(%s);\n" % java_output)
   java_registry_file.write("\n")
 

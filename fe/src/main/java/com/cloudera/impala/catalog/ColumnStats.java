@@ -14,7 +14,7 @@
 
 package com.cloudera.impala.catalog;
 
-import java.util.EnumSet;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
@@ -25,11 +25,13 @@ import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.thrift.TColumnStats;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 
 /**
  * Statistics for a single column.
@@ -38,11 +40,11 @@ public class ColumnStats {
   private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
 
   // Set of the currently supported column stats column types.
-  private final static EnumSet<PrimitiveType> SUPPORTED_COL_TYPES = EnumSet.of(
-      PrimitiveType.BIGINT, PrimitiveType.BINARY, PrimitiveType.BOOLEAN,
-      PrimitiveType.DOUBLE, PrimitiveType.FLOAT, PrimitiveType.INT,
-      PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
-      PrimitiveType.TINYINT);
+  private final static Set<ColumnType> SUPPORTED_COL_TYPES = Sets.newHashSet(
+      ColumnType.BIGINT, ColumnType.BINARY, ColumnType.BOOLEAN,
+      ColumnType.DOUBLE, ColumnType.FLOAT, ColumnType.INT,
+      ColumnType.SMALLINT, ColumnType.STRING, ColumnType.TIMESTAMP,
+      ColumnType.TINYINT);
 
   // in bytes: excludes serialization overhead
   private double avgSize_;
@@ -52,7 +54,7 @@ public class ColumnStats {
   private long numDistinctValues_;
   private long numNulls_;
 
-  public ColumnStats(PrimitiveType colType) {
+  public ColumnStats(ColumnType colType) {
     initColStats(colType);
   }
 
@@ -61,7 +63,7 @@ public class ColumnStats {
    * (those which don't need additional storage besides the slot they occupy),
    * sets avgSerializedSize and maxSize to their slot size.
    */
-  private void initColStats(PrimitiveType colType) {
+  private void initColStats(ColumnType colType) {
     avgSize_ = -1;
     avgSerializedSize_ = -1;
     maxSize_ = -1;
@@ -134,11 +136,11 @@ public class ColumnStats {
    * Returns false if the ColumnStatisticsData data was incompatible with the given
    * column type, otherwise returns true.
    */
-  public boolean update(PrimitiveType colType, ColumnStatisticsData statsData) {
+  public boolean update(ColumnType colType, ColumnStatisticsData statsData) {
     Preconditions.checkState(SUPPORTED_COL_TYPES.contains(colType));
     initColStats(colType);
     boolean isCompatible = false;
-    switch (colType) {
+    switch (colType.getPrimitiveType()) {
       case BOOLEAN:
         isCompatible = statsData.isSetBooleanStats();
         if (isCompatible) {
@@ -200,11 +202,11 @@ public class ColumnStats {
   /**
    * Returns true if the given PrimitiveType supports column stats updates.
    */
-  public static boolean isSupportedColType(PrimitiveType colType) {
+  public static boolean isSupportedColType(ColumnType colType) {
     return SUPPORTED_COL_TYPES.contains(colType);
   }
 
-  public void update(PrimitiveType colType, TColumnStats stats) {
+  public void update(ColumnType colType, TColumnStats stats) {
     avgSize_ = Double.valueOf(stats.getAvg_size()).floatValue();
     avgSerializedSize_ = colType.getSlotSize() + avgSize_;
     maxSize_ = stats.getMax_size();

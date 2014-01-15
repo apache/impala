@@ -89,7 +89,7 @@ public class SlotRef extends Expr {
           + type_.toString() + "' in '" + toSql() + "'.");
     }
     numDistinctValues_ = desc_.getStats().getNumDistinctValues();
-    if (type_ == PrimitiveType.BOOLEAN) selectivity_ = DEFAULT_SELECTIVITY;
+    if (type_.isBoolean()) selectivity_ = DEFAULT_SELECTIVITY;
   }
 
   @Override
@@ -158,7 +158,7 @@ public class SlotRef extends Expr {
 
   @Override
   public void getIdsHelper(Set<TupleId> tupleIds, Set<SlotId> slotIds) {
-    Preconditions.checkState(type_ != PrimitiveType.INVALID_TYPE);
+    Preconditions.checkState(type_.isValid());
     Preconditions.checkState(desc_ != null);
     if (slotIds != null) slotIds.add(desc_.getId());
     if (tupleIds != null) tupleIds.add(desc_.getParent().getId());

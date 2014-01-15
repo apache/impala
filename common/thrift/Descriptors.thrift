@@ -22,7 +22,7 @@ include "Exprs.thrift"
 struct TSlotDescriptor {
   1: required Types.TSlotId id
   2: required Types.TTupleId parent
-  3: required Types.TPrimitiveType slotType
+  3: required Types.TColumnType slotType
   4: required i32 columnPos   // in originating table
   5: required i32 byteOffset  // into tuple
   6: required i32 nullIndicatorByte

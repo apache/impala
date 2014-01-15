@@ -43,11 +43,11 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.log4j.Logger;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.THBaseTable;
-import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
@@ -220,10 +220,10 @@ public class HBaseTable extends Table {
   }
 
   private boolean supportsBinaryEncoding(FieldSchema fs) {
-    PrimitiveType colType = getPrimitiveType(fs.getType());
+    ColumnType colType = getPrimitiveType(fs.getType());
     // Only boolean, integer and floating point types can use binary storage.
-    return colType.equals(PrimitiveType.BOOLEAN) ||
-          colType.isIntegerType() || colType.isFloatingPointType();
+    return colType.isBoolean() || colType.isIntegerType()
+        || colType.isFloatingPointType();
   }
 
   @Override
@@ -571,11 +571,12 @@ public class HBaseTable extends Table {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
     result.setSchema(resultSchema);
-    resultSchema.addToColumns(new TColumn("Region Location", TPrimitiveType.STRING));
+    resultSchema.addToColumns(
+        new TColumn("Region Location", ColumnType.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Start RowKey",
-        TPrimitiveType.STRING));
-    resultSchema.addToColumns(new TColumn("Est. #Rows", TPrimitiveType.BIGINT));
-    resultSchema.addToColumns(new TColumn("Size", TPrimitiveType.STRING));
+        ColumnType.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Est. #Rows", ColumnType.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("Size", ColumnType.STRING.toThrift()));
 
     // TODO: Consider fancier stats maintenance techniques for speeding up this process.
     // Currently, we list all regions and perform a mini-scan of each of them to

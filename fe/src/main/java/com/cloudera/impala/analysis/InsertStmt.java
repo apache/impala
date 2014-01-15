@@ -28,7 +28,6 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
@@ -495,14 +494,13 @@ public class InsertStmt extends StatementBase {
       throws AnalysisException {
     // Check for compatible type, and add casts to the selectListExprs if necessary.
     // We don't allow casting to a lower precision type.
-    PrimitiveType colType = column.getType();
-    PrimitiveType exprType = expr.getType();
+    ColumnType colType = column.getType();
+    ColumnType exprType = expr.getType();
     // Trivially compatible.
-    if (colType == exprType) {
-      return expr;
-    }
-    PrimitiveType compatibleType =
-        PrimitiveType.getAssignmentCompatibleType(colType, exprType);
+    if (colType.equals(exprType)) return expr;
+
+    ColumnType compatibleType =
+        ColumnType.getAssignmentCompatibleType(colType, exprType);
     // Incompatible types.
     if (!compatibleType.isValid()) {
       throw new AnalysisException(
@@ -512,7 +510,7 @@ public class InsertStmt extends StatementBase {
             targetTableName_, expr.toSql(), exprType, column.getName(), colType));
     }
     // Loss of precision when inserting into the table.
-    if (compatibleType != colType && !compatibleType.isNull()) {
+    if (!compatibleType.equals(colType) && !compatibleType.isNull()) {
       throw new AnalysisException(
           String.format("Possible loss of precision for target table '%s'.\n" +
                         "Expression '%s' (type: %s) would need to be cast to %s" +
@@ -521,8 +519,7 @@ public class InsertStmt extends StatementBase {
                         column.getName()));
     }
     // Add a cast to the selectListExpr to the higher type.
-    Expr castExpr = expr.castTo(compatibleType);
-    return castExpr;
+    return expr.castTo(compatibleType);
   }
 
   private void analyzePlanHints() throws AnalysisException {

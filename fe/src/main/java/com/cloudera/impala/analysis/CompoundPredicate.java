@@ -18,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -63,9 +62,7 @@ public class CompoundPredicate extends Predicate {
     children_.add(e1);
     Preconditions.checkArgument(op == Operator.NOT && e2 == null
         || op != Operator.NOT && e2 != null);
-    if (e2 != null) {
-      children_.add(e2);
-    }
+    if (e2 != null) children_.add(e2);
   }
 
   public Operator getOp() { return op_; }
@@ -100,7 +97,7 @@ public class CompoundPredicate extends Predicate {
 
     // Check that children are predicates.
     for (Expr e : children_) {
-      if (e.getType() != PrimitiveType.BOOLEAN && !e.getType().isNull()) {
+      if (!e.getType().isBoolean() && !e.getType().isNull()) {
         throw new AnalysisException(String.format("Operand '%s' part of predicate " +
             "'%s' should return type 'BOOLEAN' but returns type '%s'.",
             e.toSql(), toSql(), e.getType()));

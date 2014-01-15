@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.catalog.Catalog;
@@ -60,7 +61,6 @@ import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.catalog.PartitionNotFoundException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
@@ -83,6 +83,7 @@ import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCatalogUpdateResult;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnStats;
+import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TCreateDbParams;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
@@ -97,7 +98,6 @@ import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
-import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
@@ -368,7 +368,7 @@ public class DdlExecutor {
     // Set the results to be reported to the client.
     TResultSet resultSet = new TResultSet();
     resultSet.setSchema(new TResultSetMetadata(Lists.newArrayList(
-        new TColumn("summary", TPrimitiveType.STRING))));
+        new TColumn("summary", ColumnType.STRING.toThrift()))));
     TColumnValue resultColVal = new TColumnValue();
     resultColVal.setStringVal("Updated " + numUpdatedPartitions + " partition(s) and " +
         numUpdatedColumns + " column(s).");
@@ -444,11 +444,11 @@ public class DdlExecutor {
   }
 
   private static ColumnStatisticsData createHiveColStatsData(TColumnStats colStats,
-      PrimitiveType colType) {
+      ColumnType colType) {
     ColumnStatisticsData colStatsData = new ColumnStatisticsData();
     long ndvs = colStats.getNum_distinct_values();
     long numNulls = colStats.getNum_nulls();
-    switch(colType) {
+    switch(colType.getPrimitiveType()) {
       case BOOLEAN:
         // TODO: Gather and set the numTrues and numFalse stats as well. The planner
         // currently does not rely on them.
@@ -610,12 +610,12 @@ public class DdlExecutor {
 
   private void dropFunction(TDropFunctionParams params, TDdlExecResponse resp)
       throws ImpalaException, MetaException, NoSuchObjectException {
-    ArrayList<PrimitiveType> argTypes = Lists.newArrayList();
-    for (TPrimitiveType t: params.arg_types) {
-      argTypes.add(PrimitiveType.fromThrift(t));
+    ArrayList<ColumnType> argTypes = Lists.newArrayList();
+    for (TColumnType t: params.arg_types) {
+      argTypes.add(ColumnType.fromThrift(t));
     }
     Function desc = new Function(new FunctionName(params.fn_name),
-        argTypes, PrimitiveType.INVALID_TYPE, false);
+        argTypes, ColumnType.INVALID, false);
     LOG.debug(String.format("Dropping Function %s", desc.signatureString()));
     Function fn = catalog_.removeFunction(desc);
     if (fn == null) {
@@ -844,7 +844,8 @@ public class DdlExecutor {
         FieldSchema fs = iterator.next();
         if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
           fs.setName(newCol.getColumnName());
-          fs.setType(newCol.getColumnType().toString().toLowerCase());
+          ColumnType type = ColumnType.fromThrift(newCol.getColumnType());
+          fs.setType(type.toString().toLowerCase());
           // Don't overwrite the existing comment unless a new comment is given
           if (newCol.getComment() != null) {
             fs.setComment(newCol.getComment());
@@ -1202,8 +1203,9 @@ public class DdlExecutor {
     List<FieldSchema> fsList = Lists.newArrayList();
     // Add in all the columns
     for (TColumn col: columns) {
+      ColumnType type = ColumnType.fromThrift(col.getColumnType());
       FieldSchema fs = new FieldSchema(col.getColumnName(),
-          col.getColumnType().toString().toLowerCase(), col.getComment());
+          type.toString().toLowerCase(), col.getComment());
       fsList.add(fs);
     }
     return fsList;

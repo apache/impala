@@ -184,7 +184,7 @@ public class TupleDescriptor {
   public boolean isCompatible(TupleDescriptor desc) {
     if (slots_.size() != desc.slots_.size()) return false;
     for (int i = 0; i < slots_.size(); ++i) {
-      if (slots_.get(i).getType() != desc.slots_.get(i).getType()) return false;
+      if (!slots_.get(i).getType().equals(desc.slots_.get(i).getType())) return false;
     }
     return true;
   }

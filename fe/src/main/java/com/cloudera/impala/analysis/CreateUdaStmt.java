@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.util.HashMap;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Uda;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAggregateFunction;
@@ -45,7 +44,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
    *        validated in analyze()
    */
   public CreateUdaStmt(FunctionName fnSymbol, FunctionArgs args,
-      PrimitiveType retType, ColumnType intermediateType,
+      ColumnType retType, ColumnType intermediateType,
       HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
     super(new Uda(fnSymbol, args, retType), location, ifNotExists, optArgs);
@@ -124,7 +123,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     }
 
     if (intermediateType_ == null) {
-      intermediateType_ = ColumnType.createType(uda_.getReturnType());
+      intermediateType_ = uda_.getReturnType();
     } else {
       intermediateType_.analyze();
     }
@@ -132,7 +131,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
 
     // TODO: this is a temporary restriction. Remove when we can support
     // different intermediate types.
-    if (intermediateType_.getType() != fn_.getReturnType()) {
+    if (!intermediateType_.equals(fn_.getReturnType())) {
       StringBuilder error = new StringBuilder();
       error.append("UDAs with an intermediate type, ")
            .append(intermediateType_.toString())
@@ -148,7 +147,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     // The user must provide the symbol for Update.
     uda_.setUpdateFnSymbol(lookupSymbol(
         checkAndGetOptArg(OptArg.UPDATE_FN), intermediateType_, fn_.hasVarArgs(),
-        ColumnType.toColumnType(fn_.getArgs())));
+        fn_.getArgs()));
 
     // If the ddl did not specify the init/serialize/merge/finalize function
     // Symbols, guess them based on the update fn Symbol.
@@ -194,7 +193,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
 
     // If the intermediate type is not the return type, then finalize is
     // required.
-    if (intermediateType_.getType() != fn_.getReturnType() &&
+    if (!intermediateType_.equals(fn_.getReturnType()) &&
         uda_.getFinalizeFnSymbol() == null) {
       throw new AnalysisException("Finalize() is required for this UDA.");
     }

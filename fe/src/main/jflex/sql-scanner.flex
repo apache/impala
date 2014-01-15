@@ -78,6 +78,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("databases", new Integer(SqlParserSymbols.KW_DATABASES));
     keywordMap.put("date", new Integer(SqlParserSymbols.KW_DATE));
     keywordMap.put("datetime", new Integer(SqlParserSymbols.KW_DATETIME));
+    keywordMap.put("decimal", new Integer(SqlParserSymbols.KW_DECIMAL));
     keywordMap.put("delimited", new Integer(SqlParserSymbols.KW_DELIMITED));
     keywordMap.put("desc", new Integer(SqlParserSymbols.KW_DESC));
     keywordMap.put("describe", new Integer(SqlParserSymbols.KW_DESCRIBE));

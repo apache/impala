@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.log4j.Logger;
 
+import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -236,7 +237,7 @@ public abstract class Table implements CatalogObject {
    * Gets the PrimitiveType from the given FieldSchema. Throws a TableLoadingException
    * if the FieldSchema does not represent a supported primitive type.
    */
-  protected PrimitiveType getPrimitiveType(FieldSchema fs)
+  protected ColumnType getPrimitiveType(FieldSchema fs)
       throws TableLoadingException {
     // catch currently unsupported hive schema elements
     if (!serdeConstants.PrimitiveTypes.contains(fs.getType())) {
@@ -300,35 +301,36 @@ public abstract class Table implements CatalogObject {
     return table;
   }
 
-  protected static PrimitiveType getPrimitiveType(String typeName) {
+  protected static ColumnType getPrimitiveType(String typeName) {
     if (typeName.toLowerCase().equals("tinyint")) {
-      return PrimitiveType.TINYINT;
+      return ColumnType.TINYINT;
     } else if (typeName.toLowerCase().equals("smallint")) {
-      return PrimitiveType.SMALLINT;
+      return ColumnType.SMALLINT;
     } else if (typeName.toLowerCase().equals("int")) {
-      return PrimitiveType.INT;
+      return ColumnType.INT;
     } else if (typeName.toLowerCase().equals("bigint")) {
-      return PrimitiveType.BIGINT;
+      return ColumnType.BIGINT;
     } else if (typeName.toLowerCase().equals("boolean")) {
-      return PrimitiveType.BOOLEAN;
+      return ColumnType.BOOLEAN;
     } else if (typeName.toLowerCase().equals("float")) {
-      return PrimitiveType.FLOAT;
+      return ColumnType.FLOAT;
     } else if (typeName.toLowerCase().equals("double")) {
-      return PrimitiveType.DOUBLE;
+      return ColumnType.DOUBLE;
     } else if (typeName.toLowerCase().equals("date")) {
-      return PrimitiveType.DATE;
+      return ColumnType.DATE;
     } else if (typeName.toLowerCase().equals("datetime")) {
-      return PrimitiveType.DATETIME;
+      return ColumnType.DATETIME;
     } else if (typeName.toLowerCase().equals("timestamp")) {
-      return PrimitiveType.TIMESTAMP;
+      return ColumnType.TIMESTAMP;
     } else if (typeName.toLowerCase().equals("string")) {
-      return PrimitiveType.STRING;
+      return ColumnType.STRING;
     } else if (typeName.toLowerCase().equals("binary")) {
-      return PrimitiveType.BINARY;
+      return ColumnType.BINARY;
     } else if (typeName.toLowerCase().equals("decimal")) {
-      return PrimitiveType.DECIMAL;
+      // TODO: parse out precision and scale.
+      return ColumnType.createDecimalType();
     } else {
-      return PrimitiveType.INVALID_TYPE;
+      return ColumnType.INVALID;
     }
   }
 

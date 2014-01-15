@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExprNode;
@@ -32,9 +31,9 @@ public class FloatLiteral extends LiteralExpr {
     float fvalue;
     fvalue = value.floatValue();
     if (fvalue == value.doubleValue()) {
-      type_ = PrimitiveType.FLOAT;
+      type_ = ColumnType.FLOAT;
     } else {
-      type_ = PrimitiveType.DOUBLE;
+      type_ = ColumnType.DOUBLE;
     }
   }
 
@@ -45,7 +44,7 @@ public class FloatLiteral extends LiteralExpr {
   /**
    * C'tor forcing type, e.g., due to implicit cast
    */
-  public FloatLiteral(Double value, PrimitiveType type) {
+  public FloatLiteral(Double value, ColumnType type) {
     this.value_ = value.doubleValue();
     this.type_ = type;
   }
@@ -94,7 +93,7 @@ public class FloatLiteral extends LiteralExpr {
   }
 
   @Override
-  protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isFloatingPointType());
     type_ = targetType;
     return this;

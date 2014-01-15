@@ -675,9 +675,9 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
         return_val.schema.columns[i].position = i;
         return_val.schema.columns[i].typeDesc.types.resize(1);
         return_val.schema.columns[i].typeDesc.types[0].__isset.primitiveEntry = true;
-        TPrimitiveType::type col_type = result_set_md->columns[i].columnType;
+        ColumnType col_type(result_set_md->columns[i].columnType);
         return_val.schema.columns[i].typeDesc.types[0].primitiveEntry.__set_type(
-            TypeToHiveServer2Type(ThriftToType(col_type)));
+            TypeToHiveServer2Type(col_type.type));
       }
     }
   }
@@ -777,9 +777,9 @@ inline void ImpalaServer::TUniqueIdToTHandleIdentifier(
 }
 
 void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col_val,
-    const TPrimitiveType::type& type,
+    const TColumnType& type,
     apache::hive::service::cli::thrift::TColumnValue* hs2_col_val) {
-  switch (type) {
+  switch (type.type) {
     case TPrimitiveType::BOOLEAN:
       hs2_col_val->__isset.boolVal = true;
       hs2_col_val->boolVal.value = col_val.boolVal;
@@ -821,16 +821,16 @@ void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col
       }
       break;
     default:
-      DCHECK(false) << "bad type: " << TypeToString(ThriftToType(type));
+      DCHECK(false) << "bad type: " << TypeToString(ThriftToType(type.type));
       break;
   }
 }
 
 void ImpalaServer::ExprValueToHiveServer2TColumnValue(const void* value,
-    const TPrimitiveType::type& type,
+    const TColumnType& type,
     apache::hive::service::cli::thrift::TColumnValue* hs2_col_val) {
   bool not_null = (value != NULL);
-  switch (type) {
+  switch (type.type) {
     case TPrimitiveType::NULL_TYPE:
       // Set NULLs in the boolVal.
       hs2_col_val->__isset.boolVal = true;
@@ -891,7 +891,7 @@ void ImpalaServer::ExprValueToHiveServer2TColumnValue(const void* value,
       }
       break;
     default:
-      DCHECK(false) << "bad type: " << TypeToString(ThriftToType(type));
+      DCHECK(false) << "bad type: " << TypeToString(ThriftToType(type.type));
       break;
   }
 }

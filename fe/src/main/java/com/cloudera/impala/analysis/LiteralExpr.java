@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.math.BigInteger;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -37,10 +36,10 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
     isAnalyzed_ = true;
   }
 
-  public static LiteralExpr create(String value, PrimitiveType type)
+  public static LiteralExpr create(String value, ColumnType type)
       throws AnalysisException, AuthorizationException {
-    Preconditions.checkArgument(type != PrimitiveType.INVALID_TYPE);
-    switch (type) {
+    Preconditions.checkArgument(type.isValid());
+    switch (type.getPrimitiveType()) {
       case NULL_TYPE:
         return new NullLiteral();
       case BOOLEAN:
@@ -98,32 +97,32 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
     }
 
     LiteralExpr result = null;
-    switch (constExpr.getType()) {
-    case NULL_TYPE:
-      result = new NullLiteral();
-      break;
-    case BOOLEAN:
-      if (val.isSetBoolVal()) result = new BoolLiteral(val.boolVal);
-      break;
-    case TINYINT:
-    case SMALLINT:
-    case INT:
-    case BIGINT:
-      if (val.isSetIntVal()) result = new IntLiteral(BigInteger.valueOf(val.intVal));
-      if (val.isSetLongVal()) result = new IntLiteral(BigInteger.valueOf(val.longVal));
-      break;
-    case FLOAT:
-    case DOUBLE:
-      if (val.isSetDoubleVal()) result = new FloatLiteral(val.doubleVal);
-      break;
-    case STRING:
-      if (val.isSetStringVal()) result = new StringLiteral(val.stringVal);
-      break;
-    case DATE:
-    case DATETIME:
-    case TIMESTAMP:
-      throw new AnalysisException(
-          "DATE/DATETIME/TIMESTAMP literals not supported: " + constExpr.toSql());
+    switch (constExpr.getType().getPrimitiveType()) {
+      case NULL_TYPE:
+        result = new NullLiteral();
+        break;
+      case BOOLEAN:
+        if (val.isSetBoolVal()) result = new BoolLiteral(val.boolVal);
+        break;
+      case TINYINT:
+      case SMALLINT:
+      case INT:
+      case BIGINT:
+        if (val.isSetIntVal()) result = new IntLiteral(BigInteger.valueOf(val.intVal));
+        if (val.isSetLongVal()) result = new IntLiteral(BigInteger.valueOf(val.longVal));
+        break;
+      case FLOAT:
+      case DOUBLE:
+        if (val.isSetDoubleVal()) result = new FloatLiteral(val.doubleVal);
+        break;
+      case STRING:
+        if (val.isSetStringVal()) result = new StringLiteral(val.stringVal);
+        break;
+      case DATE:
+      case DATETIME:
+      case TIMESTAMP:
+        throw new AnalysisException(
+            "DATE/DATETIME/TIMESTAMP literals not supported: " + constExpr.toSql());
     }
     // None of the fields in the thrift struct were set indicating a NULL.
     if (result == null) result = new NullLiteral();

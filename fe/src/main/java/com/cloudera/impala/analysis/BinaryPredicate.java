@@ -18,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
@@ -105,9 +104,9 @@ public class BinaryPredicate extends Predicate {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
 
-    PrimitiveType t1 = getChild(0).getType();
-    PrimitiveType t2 = getChild(1).getType();
-    PrimitiveType compatibleType = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+    ColumnType t1 = getChild(0).getType();
+    ColumnType t2 = getChild(1).getType();
+    ColumnType compatibleType = ColumnType.getAssignmentCompatibleType(t1, t2);
 
     if (!compatibleType.isValid()) {
       // there is no type to which both are assignment-compatible -> we can't compare them
@@ -120,7 +119,7 @@ public class BinaryPredicate extends Predicate {
     OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
         op_.toFunctionOp(), true, compatibleType, compatibleType);
     Preconditions.checkState(match != null);
-    Preconditions.checkState(match.getReturnType() == PrimitiveType.BOOLEAN);
+    Preconditions.checkState(match.getReturnType().isBoolean());
     this.opcode_ = match.opcode;
 
     // determine selectivity
@@ -163,6 +162,6 @@ public class BinaryPredicate extends Predicate {
     if (lhs == null) return null;
     SlotRef rhs = getChild(1).unwrapSlotRef(true);
     if (rhs == null) return null;
-    return new Pair(lhs.getSlotId(), rhs.getSlotId());
+    return new Pair<SlotId, SlotId>(lhs.getSlotId(), rhs.getSlotId());
   }
 }

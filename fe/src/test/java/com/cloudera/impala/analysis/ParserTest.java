@@ -1385,10 +1385,6 @@ public class ParserTest {
     // Parses okay, will fail in analysis
     ParsesOk(c + "INTERMEDIATE CHAR(0)" + loc);
 
-    // CHAR can't be used anywhere else
-    ParserError("CREATE AGGREGATE FUNCTION foo(CHAR(10)) RETURNS INT" + loc);
-    ParserError("CREATE AGGREGATE FUNCTION foo(int) RETURNS CHAR(10)" + loc);
-
     // Optional args must be at the end
     ParserError("CREATE UNKNOWN FUNCTION " + "Foo() RETURNS INT" + loc);
     ParserError("CREATE AGGREGATE FUNCTION Foo() init_fn='1' RETURNS INT" + loc);

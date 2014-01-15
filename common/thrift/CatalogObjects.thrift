@@ -124,7 +124,7 @@ struct TColumnStats {
 
 struct TColumn {
   1: required string columnName
-  2: required Types.TPrimitiveType columnType
+  2: required Types.TColumnType columnType
   3: optional string comment
   // Stats for this table, if any are available.
   4: optional TColumnStats col_stats

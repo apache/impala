@@ -36,7 +36,6 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Udf;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
@@ -1023,9 +1022,9 @@ public class AuthorizationTest {
 
     // Add default.f(), tpch.f()
     catalog.addFunction(new Udf(new FunctionName("default", "f"),
-        new ArrayList<PrimitiveType>(), PrimitiveType.INT, null, null));
+        new ArrayList<ColumnType>(), ColumnType.INT, null, null));
     catalog.addFunction(new Udf(new FunctionName("tpch", "f"),
-        new ArrayList<PrimitiveType>(), PrimitiveType.INT, null, null));
+        new ArrayList<ColumnType>(), ColumnType.INT, null, null));
 
     AuthzError(context, "select default.f()",
         "User '%s' does not have privileges to access: default.*",

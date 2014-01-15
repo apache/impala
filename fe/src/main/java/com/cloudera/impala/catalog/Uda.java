@@ -37,12 +37,12 @@ public class Uda extends Function {
   private String mergeFnSymbol_;
   private String finalizeFnSymbol_;
 
-  public Uda(FunctionName fnName, FunctionArgs args, PrimitiveType retType) {
+  public Uda(FunctionName fnName, FunctionArgs args, ColumnType retType) {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
   }
 
-  public Uda(FunctionName fnName, List<PrimitiveType> argTypes,
-      PrimitiveType retType, ColumnType intermediateType,
+  public Uda(FunctionName fnName, List<ColumnType> argTypes,
+      ColumnType retType, ColumnType intermediateType,
       HdfsUri location, String updateFnSymbol, String initFnSymbol,
       String serializeFnSymbol, String mergeFnSymbol, String finalizeFnSymbol) {
     super(fnName, argTypes, retType, false);

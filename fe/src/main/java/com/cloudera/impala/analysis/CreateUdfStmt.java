@@ -42,7 +42,7 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
    *        validated in analyze()
    */
   public CreateUdfStmt(FunctionName fnName, FunctionArgs args,
-      PrimitiveType retType, HdfsUri location, boolean ifNotExists,
+      ColumnType retType, HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
     super(new Udf(fnName, args, retType), location, ifNotExists, optArgs);
     udf_ = (Udf)fn_;
@@ -63,12 +63,12 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     super.analyze(analyzer);
 
     if (udf_.getBinaryType() == TFunctionBinaryType.HIVE) {
-      if (udf_.getReturnType() == PrimitiveType.TIMESTAMP) {
+      if (udf_.getReturnType().getPrimitiveType() == PrimitiveType.TIMESTAMP) {
         throw new AnalysisException(
             "Hive UDFs that use timestamp are not yet supported.");
       }
       for (int i = 0; i < udf_.getNumArgs(); ++i) {
-        if (udf_.getArgs()[i] == PrimitiveType.TIMESTAMP) {
+        if (udf_.getArgs()[i].getPrimitiveType() == PrimitiveType.TIMESTAMP) {
           throw new AnalysisException(
               "Hive UDFs that use timestamp are not yet supported.");
         }
@@ -78,7 +78,7 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     // Check the user provided symbol exists
     udf_.setSymbolName(lookupSymbol(
         checkAndGetOptArg(OptArg.SYMBOL), null, fn_.hasVarArgs(),
-        ColumnType.toColumnType(fn_.getArgs())));
+        fn_.getArgs()));
 
     // Udfs should not set any of these
     checkOptArgNotSet(OptArg.UPDATE_FN);

@@ -35,10 +35,11 @@ static TSlotDescriptor MakeSlotDescriptor(int id, int parent_id, PrimitiveType t
     int slot_idx, int byte_offset) {
   int null_byte = slot_idx / 8;
   int null_bit = slot_idx % 8;
+  ColumnType col_type(type);
   TSlotDescriptor slot_desc;
   slot_desc.__set_id(id);
   slot_desc.__set_parent(parent_id);
-  slot_desc.__set_slotType(ToThrift(type));
+  slot_desc.__set_slotType(col_type.ToThrift());
   slot_desc.__set_columnPos(slot_idx);
   slot_desc.__set_byteOffset(byte_offset);
   slot_desc.__set_nullIndicatorByte(null_byte);

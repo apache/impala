@@ -135,10 +135,10 @@ struct TFunction {
   3: required TFunctionBinaryType binary_type
 
   // The types of the arguments to the function
-  4: required list<TPrimitiveType> arg_types
+  4: required list<TColumnType> arg_types
 
   // Return type for the function.
-  5: required TPrimitiveType ret_type
+  5: required TColumnType ret_type
 
   // If true, this function takes var args.
   6: required bool has_var_args
