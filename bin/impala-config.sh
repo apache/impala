@@ -52,6 +52,8 @@ if [ -z $IMPALA_HOME ]; then
     fi
 fi
 
+export CDH_MAJOR_VERSION=4
+
 export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
 export IMPALA_AUX_TEST_HOME=${IMPALA_AUX_TEST_HOME-~/impala-auxiliary-tests}
@@ -91,7 +93,7 @@ export PATH=$IMPALA_HOME/bin:$PATH
 
 export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-${IMPALA_HADOOP_VERSION}/
 export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
-export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/hdfs-data
+export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data
 export PATH=$HADOOP_HOME/bin:$PATH
 
 export LLAMA_HOME=$IMPALA_HOME/thirdparty/llama-${IMPALA_LLAMA_VERSION}/
