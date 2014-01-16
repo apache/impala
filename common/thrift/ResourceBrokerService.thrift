@@ -57,6 +57,9 @@ struct TResourceBrokerReservationRequest {
   // Max time in seconds the resource broker should wait for
   // a resource request to be granted by Llama/Yarn.
   6: optional i64 request_timeout;
+
+  // Used to allow Llama to grant or deny access to the requested queue.
+  7: optional string user;
 }
 
 struct TResourceBrokerReservationResponse {

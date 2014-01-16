@@ -60,11 +60,11 @@ class QuerySchedule {
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
       const TQueryOptions& query_options, bool is_mini_llama);
 
-  // Creates a reservation request for the given pool in reservation_request_.
+  // Creates a reservation request for the given pool and user in reservation_request_.
   // The request contains one resource per entry in unique_hosts_. The per-host resources
   // are based on planner estimates in the exec request or on manual overrides given
   // set in the query options.
-  void CreateReservationRequest(const std::string& pool,
+  void CreateReservationRequest(const std::string& pool, const std::string& user,
       const std::vector<std::string>& llama_nodes);
 
   // Returns OK if reservation_ contains a matching resource for each

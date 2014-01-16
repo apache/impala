@@ -240,6 +240,7 @@ void ResourceBroker::CreateLlamaReservationRequest(
   dest.am_handle = llama_handle_;
   dest.gang = src.gang;
   dest.queue = src.queue;
+  dest.user = src.user;
   dest.resources = src.resources;
 }
 
@@ -536,6 +537,7 @@ Status ResourceBroker::RefreshLlamaNodes() {
 ostream& operator<<(ostream& os, const TResourceBrokerReservationRequest& request) {
   os << "Reservation Request("
      << "queue=" << request.queue << " "
+     << "user=" << request.user << " "
      << "gang=" << request.gang << " "
      << "request_timeout=" << request.request_timeout << " "
      << "resources=[";

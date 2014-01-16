@@ -88,7 +88,7 @@ void QuerySchedule::CreateMiniLlamaMapping(const vector<string>& llama_nodes) {
   }
 }
 
-void QuerySchedule::CreateReservationRequest(const string& pool,
+void QuerySchedule::CreateReservationRequest(const string& pool, const string& user,
     const vector<string>& llama_nodes) {
   yarn_pool_ = pool;
   DCHECK(reservation_request_.get() == NULL);
@@ -97,6 +97,7 @@ void QuerySchedule::CreateReservationRequest(const string& pool,
   reservation_request_->version = TResourceBrokerServiceVersion::V1;
   reservation_request_->queue = pool;
   reservation_request_->gang = true;
+  reservation_request_->user = user;
 
   // Set optional request timeout from query options.
   if (query_options_.__isset.reservation_request_timeout) {

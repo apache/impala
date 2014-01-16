@@ -774,7 +774,8 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   string pool;
   RETURN_IF_ERROR(
       GetYarnPool(schedule->request().user, schedule->query_options(), &pool));
-  schedule->CreateReservationRequest(pool, resource_broker_->llama_nodes());
+  schedule->CreateReservationRequest(pool, schedule->request().user,
+      resource_broker_->llama_nodes());
   const TResourceBrokerReservationRequest* reservation_request =
       schedule->reservation_request();
   if (!reservation_request->resources.empty()) {
