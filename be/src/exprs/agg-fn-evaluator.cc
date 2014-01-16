@@ -105,6 +105,9 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   DCHECK(output_slot_desc_ == NULL);
   output_slot_desc_ = output_slot_desc;
 
+  if (return_type_.type == TYPE_DECIMAL) {
+    return Status("DECIMAL is not yet implemented.");
+  }
   RETURN_IF_ERROR(Expr::Prepare(input_exprs_, state, desc, false));
 
   ObjectPool* obj_pool = state->obj_pool();

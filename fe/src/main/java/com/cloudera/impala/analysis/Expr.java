@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.common.AnalysisException;
@@ -202,7 +203,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       for (int i = 0; i < children_.size(); ++i) {
         // For varargs, we must compare with the last type in fnArgs.argTypes.
         int ix = Math.min(fnArgs.length - 1, i);
-        if (!children_.get(i).type_.equals(fnArgs[ix])) castChild(fnArgs[ix], i);
+        if (!children_.get(i).type_.matchesType(fnArgs[ix])) castChild(fnArgs[ix], i);
       }
     }
   }
@@ -817,9 +818,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     // If the targetType is NULL_TYPE then ignore the cast because NULL_TYPE
     // is compatible with all types and no cast is necessary.
     if (targetType.isNull()) return this;
-    // requested cast must be to assignment-compatible type
-    // (which implies no loss of precision)
-    Preconditions.checkArgument(type.equals(targetType));
+    if (!targetType.isDecimal()) {
+      // requested cast must be to assignment-compatible type
+      // (which implies no loss of precision)
+      Preconditions.checkArgument(targetType.equals(type));
+    }
     return uncheckedCastTo(targetType);
   }
 
@@ -896,8 +899,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
     // add operand casts
     Preconditions.checkState(compatibleType.isValid());
-    if (!t1.equals(compatibleType)) castChild(compatibleType, 0);
-    if (!t2.equals(compatibleType)) castChild(compatibleType, 1);
+    if (!t1.matchesType(compatibleType)) castChild(compatibleType, 0);
+    if (!t2.matchesType(compatibleType)) castChild(compatibleType, 1);
     return compatibleType;
   }
 

@@ -23,6 +23,7 @@ import junit.framework.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.CatalogException;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
 
@@ -607,6 +608,16 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
         "terminated by '|'");
 
+    // TODO: add more tests
+    AnalyzesOk("create table new_table (i int) PARTITIONED BY (d decimal)");
+    AnalyzesOk("create table new_table(d1 decimal, d2 decimal(10), d3 decimal(5, 2))");
+    AnalysisError("create table new_table(d1 decimal(1,10))",
+        "Decimal scale (10) must be <= precision (1).");
+    AnalysisError("create table new_table(d1 decimal(0,0))",
+        "Decimal precision must be greater than 0.");
+    AnalysisError("create table new_table(d1 decimal(49,0))",
+        "Decimal precision must be <= 38.");
+
     // Note: Backslashes need to be escaped twice - once for Java and once for Impala.
     // For example, if this were a real query the value '\' would be stored in the
     // metastore for the ESCAPED BY field.
@@ -796,6 +807,14 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'/test-warehouse/libTestUdfs.SO' " +
         "SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'");
     AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.JAR' SYMBOL='a'");
+
+    AnalyzesOk("create function foo() RETURNS decimal" + udfSuffix);
+    AnalyzesOk("create function foo() RETURNS decimal(38,10)" + udfSuffix);
+    AnalyzesOk("create function foo(Decimal, decimal(10, 2)) RETURNS int" + udfSuffix);
+    AnalysisError("create function foo() RETURNS decimal(100)" + udfSuffix,
+        "Decimal precision must be <= 38.");
+    AnalysisError("create function foo(Decimal(2, 3)) RETURNS int" + udfSuffix,
+        "Decimal scale (3) must be <= precision (2).");
 
     // Varargs
     AnalyzesOk("create function foo(INT...) RETURNS int" + udfSuffix);
@@ -1007,6 +1026,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "INTERMEDIATE char(10)" + loc + "UPDATE_FN='AggUpdate'",
         "UDAs with an intermediate type, CHAR(10), that is different from the " +
         "return type, INT, are currently not supported.");
+    AnalysisError("create aggregate function foo(int) RETURNS int " +
+        "INTERMEDIATE decimal(10)" + loc + "UPDATE_FN='AggUpdate'",
+        "UDAs with an intermediate type, DECIMAL(10,0), that is different from the " +
+        "return type, INT, are currently not supported.");
+    AnalysisError("create aggregate function foo(int) RETURNS int " +
+        "INTERMEDIATE decimal(40)" + loc + "UPDATE_FN='AggUpdate'",
+        "Decimal precision must be <= 38.");
     //AnalyzesOk("create aggregate function foo(int) RETURNS int " +
     //    "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='AggUpdate'");
     //AnalysisError("create aggregate function foo(int) RETURNS int " +
@@ -1024,7 +1050,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Invalid char(0) type.
     AnalysisError("create aggregate function foo(int) RETURNS int " +
         "INTERMEDIATE CHAR(0) LOCATION '/foo.so' UPDATE_FN='b'",
-        "Array size must be > 0. Size was set to: 0.");
+        "Char size must be > 0. Size was set to: 0.");
     AnalysisError("create aggregate function foo() RETURNS int" + loc,
         "UDAs must take at least one argument.");
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +

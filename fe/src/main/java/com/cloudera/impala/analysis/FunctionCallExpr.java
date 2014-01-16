@@ -20,6 +20,7 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -197,7 +198,7 @@ public class FunctionCallExpr extends Expr {
       // TODO: fix how we rewrite count distinct.
       argTypes = new ColumnType[0];
       Function searchDesc = new Function(fnName_, argTypes, ColumnType.INVALID, false);
-      fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUBTYPE);
+      fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUPERTYPE_OF);
       type_ = fn_.getReturnType();
       return;
     }
@@ -214,7 +215,7 @@ public class FunctionCallExpr extends Expr {
     }
 
     Function searchDesc = new Function(fnName_, argTypes, ColumnType.INVALID, false);
-    fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUBTYPE);
+    fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUPERTYPE_OF);
 
     if (fn_ == null || !fn_.userVisible()) {
       throw new AnalysisException(getFunctionNotFoundError(argTypes));
@@ -258,6 +259,14 @@ public class FunctionCallExpr extends Expr {
     }
 
     castForFunctionCall();
-    this.type_ = fn_.getReturnType();
+    type_ = fn_.getReturnType();
+    if (type_.isDecimal() && type_.isWildcardDecimal()) {
+      // TODO: we specify decimal(*,*) for some builtins. It would be nice to expose
+      // this mechanism (where the function can at planning type resolve types).
+      Preconditions.checkState(fn_.getBinaryType() == TFunctionBinaryType.BUILTIN);
+      Preconditions.checkState(children_.size() > 0);
+      type_ = children_.get(0).type_;
+      Preconditions.checkState(type_.isDecimal() && !type_.isWildcardDecimal());
+    }
   }
 }

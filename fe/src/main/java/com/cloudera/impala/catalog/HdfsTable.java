@@ -49,7 +49,6 @@ import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
@@ -412,7 +411,7 @@ public class HdfsTable extends Table {
       throws TableLoadingException {
     int pos = 0;
     for (FieldSchema s: fieldSchemas) {
-      ColumnType type = getPrimitiveType(s);
+      ColumnType type = parseColumnType(s);
       // Check if we support partitioning on columns of such a type.
       if (pos < numClusteringCols_ && !type.supportsTablePartitioning()) {
         throw new TableLoadingException(

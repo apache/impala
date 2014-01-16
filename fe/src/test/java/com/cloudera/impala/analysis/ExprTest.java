@@ -18,6 +18,9 @@ import static org.junit.Assert.fail;
 
 import org.junit.Test;
 
+import com.cloudera.impala.catalog.ColumnType;
+
+
 public class ExprTest {
   // Test creation of LiteralExprs from Strings, e.g., for partitioning keys.
   @Test
@@ -43,11 +46,15 @@ public class ExprTest {
     testLiteralExprNegative("ABC", ColumnType.FLOAT);
     testLiteralExprNegative("ABC", ColumnType.DOUBLE);
     testLiteralExprNegative("ABC", ColumnType.TIMESTAMP);
+    testLiteralExprNegative("ABC", ColumnType.createDecimalType());
 
     // Date types not implemented
     testLiteralExprNegative("2010-01-01", ColumnType.DATE);
     testLiteralExprNegative("2010-01-01", ColumnType.DATETIME);
     testLiteralExprNegative("2010-01-01", ColumnType.TIMESTAMP);
+
+    // No decimal literals.
+    testLiteralExprNegative("1.1", ColumnType.createDecimalType());
   }
 
   private void testLiteralExprPositive(String value, ColumnType type) {

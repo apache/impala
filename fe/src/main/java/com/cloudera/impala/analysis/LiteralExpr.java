@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.math.BigInteger;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -54,11 +55,14 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         return new FloatLiteral(value);
       case STRING:
         return new StringLiteral(value);
+      case DECIMAL:
       case DATE:
       case DATETIME:
       case TIMESTAMP:
+        // TODO: we support DECIMAL and TIMESTAMP but no way to specify it in
+        // SQL.
         throw new AnalysisException(
-            "DATE/DATETIME/TIMESTAMP literals not supported: " + value);
+            "DATE/DATETIME/TIMESTAMP/DECIMAL literals not supported: " + value);
       default:
         Preconditions.checkState(false);
     }

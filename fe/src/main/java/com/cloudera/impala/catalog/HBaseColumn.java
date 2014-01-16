@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.catalog;
 
-import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.thrift.TColumn;
 
 // Describes an HBase column mapped to a Hive column (as described in the metastore).

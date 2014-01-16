@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -114,7 +115,7 @@ public class BinaryPredicate extends Predicate {
     super.analyze(analyzer);
 
     fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
-        CompareMode.IS_SUBTYPE);
+        CompareMode.IS_SUPERTYPE_OF);
     if (fn_ == null) {
       throw new AnalysisException("operands are not comparable: " + toSql());
     }

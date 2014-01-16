@@ -2063,4 +2063,22 @@ public class ParserTest {
     ParserError("explain CREATE TABLE Foo (i int)");
   }
 
+  @Test
+  public void TestDecimal() {
+    ParsesOk("CREATE TABLE foo(d decimal)");
+    ParsesOk("CREATE TABLE foo(d decimal, d2 decimal(1))");
+    ParsesOk("CREATE TABLE foo(d decimal(1, 2))");
+    ParsesOk("CREATE TABLE foo(d decimal(0, 0))");
+
+    ParsesOk("SELECT CAST(1 as DECIMAL)");
+    ParsesOk("SELECT CAST(1 as DECIMAL(0))");
+    ParsesOk("SELECT CAST(1 as DECIMAL(100, 0))");
+
+    ParserError("CREATE TABLE foo(d decimal())");
+    ParserError("CREATE TABLE foo(d decimal(a))");
+    ParserError("CREATE TABLE foo(d decimal(1, a))");
+    ParserError("CREATE TABLE foo(d decimal(1, 2, 3))");
+    ParserError("CREATE TABLE foo(d decimal(-1))");
+  }
+
 }

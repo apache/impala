@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.cloudera.impala.analysis;
+package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.analysis.TypesUtil;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumnType;
-import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -28,22 +27,37 @@ import com.google.common.collect.Lists;
  * Class wrapping a type of a column. For most types, this will just be a wrapper
  * around an enum but for types like CHAR(n) and decimal, this will contain additional
  * information.
+ *
+ * Types have a few ways they can be compared to other types. Types can be:
+ *   1. completely identical,
+ *   2. implicitly castable (convertible without loss of precision)
+ *   3. subtype. For example, in the case of decimal, a type can be decimal(*, *)
+ *   indicating that any decimal type is a subtype of the decimal type.
  */
 public class ColumnType {
+  // If true, this type has been analyzed.
+  private boolean isAnalyzed_;
+
   private final PrimitiveType type_;
 
   // Unused if type_ is always the same length.
   private int len_;
 
-  // Only used if type is DECIMAL
+  // Only used if type is DECIMAL. -1 (for both) is used to represent a
+  // decimal with any precision and scale.
+  // It is invalid to have one by -1 and not the other.
+  // TODO: we could use that to store DECIMAL(8,*), indicating a decimal
+  // with 8 digits of precision and any valid ([0-8]) scale.
   private int precision_;
   private int scale_;
 
-  static final int DEFAULT_PRECISION = 10; // Hive and mysql standard
+  // SQL allows the engine to pick the default precision. We pick the largest
+  // precision that is supported by the smallest decimal type in the BE (4 bytes).
+  static final int DEFAULT_PRECISION = 9;
   static final int DEFAULT_SCALE = 0; // SQL standard
 
   // Hive, mysql, sql server standard.
-  static final int MAX_PRECISION = 38;
+  public static final int MAX_PRECISION = 38;
 
   // Static constant types for simple types that don't require additional information.
   public static final ColumnType INVALID = new ColumnType(PrimitiveType.INVALID_TYPE);
@@ -60,11 +74,13 @@ public class ColumnType {
   public static final ColumnType TIMESTAMP = new ColumnType(PrimitiveType.TIMESTAMP);
   public static final ColumnType DATE = new ColumnType(PrimitiveType.DATE);
   public static final ColumnType DATETIME = new ColumnType(PrimitiveType.DATETIME);
+  public static final ColumnType DEFAULT_DECIMAL =
+      createDecimalType(DEFAULT_PRECISION, DEFAULT_SCALE);
+  public static final ColumnType DECIMAL = createDecimalTypeInternal(-1, -1);
 
   private static ArrayList<ColumnType> fixedSizeNumericTypes;
-  private static ArrayList<ColumnType> fixedPointTypes;
+  private static ArrayList<ColumnType> integerTypes;
   private static ArrayList<ColumnType> numericTypes;
-  private static ArrayList<ColumnType> nativeTypes;
   private static ArrayList<ColumnType> supportedTypes;
 
   static {
@@ -76,11 +92,11 @@ public class ColumnType {
     fixedSizeNumericTypes.add(FLOAT);
     fixedSizeNumericTypes.add(DOUBLE);
 
-    fixedPointTypes = Lists.newArrayList();
-    fixedPointTypes.add(TINYINT);
-    fixedPointTypes.add(SMALLINT);
-    fixedPointTypes.add(INT);
-    fixedPointTypes.add(BIGINT);
+    integerTypes = Lists.newArrayList();
+    integerTypes.add(TINYINT);
+    integerTypes.add(SMALLINT);
+    integerTypes.add(INT);
+    integerTypes.add(BIGINT);
 
     numericTypes = Lists.newArrayList();
     numericTypes.add(TINYINT);
@@ -89,15 +105,7 @@ public class ColumnType {
     numericTypes.add(BIGINT);
     numericTypes.add(FLOAT);
     numericTypes.add(DOUBLE);
-
-    nativeTypes = Lists.newArrayList();
-    nativeTypes.add(BOOLEAN);
-    nativeTypes.add(TINYINT);
-    nativeTypes.add(SMALLINT);
-    nativeTypes.add(INT);
-    nativeTypes.add(BIGINT);
-    nativeTypes.add(FLOAT);
-    nativeTypes.add(DOUBLE);
+    numericTypes.add(DECIMAL);
 
     supportedTypes = Lists.newArrayList();
     supportedTypes.add(NULL);
@@ -110,6 +118,7 @@ public class ColumnType {
     supportedTypes.add(DOUBLE);
     supportedTypes.add(STRING);
     supportedTypes.add(TIMESTAMP);
+    supportedTypes.add(DECIMAL);
   }
 
   private ColumnType(PrimitiveType type) {
@@ -145,32 +154,40 @@ public class ColumnType {
     return type;
   }
 
-  public static ColumnType createDecimalType() {
-    return createDecimalType(DEFAULT_PRECISION, DEFAULT_SCALE);
-  }
+  public static ColumnType createDecimalType() { return DEFAULT_DECIMAL; }
 
   public static ColumnType createDecimalType(int precision) {
     return createDecimalType(precision, DEFAULT_SCALE);
   }
 
   public static ColumnType createDecimalType(int precision, int scale) {
+    Preconditions.checkState(precision >= 0); // Enforced by parser
+    Preconditions.checkState(scale >= 0); // Encforced by parser.
     ColumnType type = new ColumnType(PrimitiveType.DECIMAL);
     type.precision_ = precision;
     type.scale_ = scale;
     return type;
   }
 
+  // Identical to createDecimalType except that higher precisions are truncated
+  // to the max storable precision. The BE will report overflow in these cases
+  // (think of this as adding ints to BIGINT but BIGINT can still overflow).
+  public static ColumnType createDecimalTypeInternal(int precision, int scale) {
+    ColumnType type = new ColumnType(PrimitiveType.DECIMAL);
+    type.precision_ = Math.min(precision, MAX_PRECISION);
+    type.scale_ = Math.min(type.precision_, scale);
+    type.isAnalyzed_ = true;
+    return type;
+  }
+
   public static ArrayList<ColumnType> getFixedSizeNumericTypes() {
     return fixedSizeNumericTypes;
   }
-  public static ArrayList<ColumnType> getFixedPointTypes() {
-    return fixedPointTypes;
+  public static ArrayList<ColumnType> getIntegerTypes() {
+    return integerTypes;
   }
   public static ArrayList<ColumnType> getNumericTypes() {
     return numericTypes;
-  }
-  public static ArrayList<ColumnType> getNativeTypes() {
-    return nativeTypes;
   }
   public static ArrayList<ColumnType> getSupportedTypes() {
     return supportedTypes;
@@ -188,12 +205,54 @@ public class ColumnType {
     return true;
   }
 
+  /**
+   * Returns true if this object is of type t.
+   * Handles wildcard types. That is, if t is the wildcard type variant
+   * of 'this', returns true.
+   */
+  public boolean matchesType(ColumnType t) {
+    if (equals(t)) return true;
+    if (isDecimal() && t.isWildcardDecimal()) {
+      Preconditions.checkState(!isWildcardDecimal());
+      return true;
+    }
+    return false;
+  }
+
   public final PrimitiveType getPrimitiveType() { return type_; }
   public boolean isNull() { return getPrimitiveType() == PrimitiveType.NULL_TYPE; }
   public boolean isValid() { return getPrimitiveType() != PrimitiveType.INVALID_TYPE; }
   public int ordinal() { return type_.ordinal(); }
 
+  public int decimalPrecision() {
+    Preconditions.checkState(type_ == PrimitiveType.DECIMAL);
+    return precision_;
+  }
+
+  public int decimalScale() {
+    Preconditions.checkState(type_ == PrimitiveType.DECIMAL);
+    return scale_;
+  }
+
+  public boolean isInvalid() { return type_ == PrimitiveType.INVALID_TYPE; }
   public boolean isBoolean() { return type_ == PrimitiveType.BOOLEAN; }
+  public boolean isDecimal() { return type_ == PrimitiveType.DECIMAL; }
+  public boolean isDecimalOrNull() { return isDecimal() || isNull(); }
+
+  public boolean isWildcardDecimal() {
+    return type_ == PrimitiveType.DECIMAL && precision_ == -1 && scale_ == -1;
+  }
+
+  /**
+   *  Returns true if this type is a fully specified (not wild card) decimal.
+   */
+  public boolean isFullySpecifiedDecimal() {
+    if (!isDecimal()) return false;
+    if (isWildcardDecimal()) return false;
+    if (precision_ <= 0 || precision_ > MAX_PRECISION) return false;
+    if (scale_ < 0 || scale_ > precision_) return false;
+    return true;
+  }
 
   public boolean isFixedPointType() {
     return type_ == PrimitiveType.TINYINT || type_ == PrimitiveType.SMALLINT ||
@@ -238,6 +297,8 @@ public class ColumnType {
       return ColumnType.DOUBLE;
     } else if (isNull()) {
       return ColumnType.NULL;
+    } else if (isDecimal()) {
+      return createDecimalTypeInternal(MAX_PRECISION, scale_);
     } else {
       return ColumnType.INVALID;
     }
@@ -247,6 +308,8 @@ public class ColumnType {
     Preconditions.checkState(isNumericType() || isNull());
     if (type_ == PrimitiveType.DOUBLE || type_ == PrimitiveType.BIGINT || isNull()) {
       return this;
+    } else if (type_ == PrimitiveType.DECIMAL) {
+      return createDecimalTypeInternal(MAX_PRECISION, scale_);
     }
     return createType(PrimitiveType.values()[type_.ordinal() + 1]);
   }
@@ -258,7 +321,19 @@ public class ColumnType {
    */
   public static ColumnType getAssignmentCompatibleType(ColumnType t1,
       ColumnType t2) {
-    if (!t1.isValid() || !t2.isValid()) return ColumnType.INVALID;
+    if (!t1.isValid() || !t2.isValid()) return INVALID;
+    if (t1.equals(t2)) return t1;
+
+    if (t1.isDecimal() && t2.isDecimal()) {
+      return TypesUtil.getDecimalAssignmentCompatibleType(t1, t2);
+    }
+    if (t1.isDecimal() || t2.isDecimal()) {
+      // TODO: should we allow implicit casts from decimals with no fractional
+      // part to ints and vice versa?
+      if (t1.isNull()) return t2;
+      if (t2.isNull()) return t1;
+      return INVALID;
+    }
 
     PrimitiveType smallerType =
         (t1.type_.ordinal() < t2.type_.ordinal() ? t1.type_ : t2.type_);
@@ -275,15 +350,19 @@ public class ColumnType {
    * t1 to t2 results in no loss of precision).
    */
   public static boolean isImplicitlyCastable(ColumnType t1, ColumnType t2) {
-    return getAssignmentCompatibleType(t1, t2).equals(t2);
+    return getAssignmentCompatibleType(t1, t2).matchesType(t2);
   }
 
+  /**
+   * Returns true if Impala supports this type in the metdata. It does not mean we
+   * can manipulate data of this type. For tables that contain columns with these
+   * types, we can safely skip over them.
+   */
   public boolean isSupported() {
     switch (type_) {
       case DATE:
       case DATETIME:
       case BINARY:
-      case DECIMAL:
         return false;
       default:
         return true;
@@ -294,7 +373,8 @@ public class ColumnType {
    * Indicates whether we support partitioning tables on columns of this type.
    */
   public boolean supportsTablePartitioning() {
-    if (!isSupported() || type_ == PrimitiveType.TIMESTAMP || type_ == PrimitiveType.CHAR) {
+    if (!isSupported() || type_ == PrimitiveType.TIMESTAMP ||
+        type_ == PrimitiveType.CHAR) {
       return false;
     }
     return true;
@@ -302,47 +382,58 @@ public class ColumnType {
 
   public int getSlotSize() {
     switch (type_) {
-    case CHAR:
-      return len_;
-    default:
-      return type_.getSlotSize();
+      case CHAR: return len_;
+      case DECIMAL: return TypesUtil.getDecimalSlotSize(this);
+      default:
+        return type_.getSlotSize();
     }
   }
 
   public void analyze() throws AnalysisException {
+    if (isAnalyzed_) return;
+    isAnalyzed_ = true;
     Preconditions.checkState(type_ != PrimitiveType.INVALID_TYPE);
     if (type_ == PrimitiveType.CHAR) {
       if (len_ <= 0) {
-        throw new AnalysisException("Array size must be > 0. Size was set to: " +
+        throw new AnalysisException("Char size must be > 0. Size was set to: " +
             len_ + ".");
       }
     } else if (type_ == PrimitiveType.DECIMAL) {
-      if (precision_ <= 0) {
-        throw new AnalysisException("Decimal precision must be > 0.");
-      }
       if (precision_ > MAX_PRECISION) {
-        throw new AnalysisException("Decimal precision must be <= " + MAX_PRECISION + ".");
+        throw new AnalysisException(
+            "Decimal precision must be <= " + MAX_PRECISION + ".");
       }
-      if (scale_ <= 0) {
-        throw new AnalysisException("Decimal scale must be > 0.");
+      if (precision_ == 0) {
+        throw new AnalysisException("Decimal precision must be greater than 0.");
       }
-      if (scale_ >= precision_) {
-        throw new AnalysisException("Decimal scale(" + scale_+ ") must be less than " +
-            " precision(" + precision_ + ").");
+      if (scale_ > precision_) {
+        throw new AnalysisException("Decimal scale (" + scale_+ ") must be <= " +
+            "precision (" + precision_ + ").");
       }
     }
   }
 
   @Override
+  // The output of this is stored directly in the hive metastore as the column type.
+  // The string must match exactly.
   public String toString() {
-    if (type_ == PrimitiveType.CHAR) return "CHAR(" + len_ + ")";
+    if (type_ == PrimitiveType.CHAR) {
+      return "CHAR(" + len_ + ")";
+    } else  if (type_ == PrimitiveType.DECIMAL) {
+      return "DECIMAL(" + precision_ + "," + scale_ + ")";
+    }
     return type_.toString();
   }
 
   public TColumnType toThrift() {
     TColumnType thrift = new TColumnType();
     thrift.type = type_.toThrift();
-    if (type_ == PrimitiveType.CHAR) thrift.setLen(len_);
+    if (type_ == PrimitiveType.CHAR) {
+      thrift.setLen(len_);
+    } else  if (type_ == PrimitiveType.DECIMAL) {
+      thrift.setPrecision(precision_);
+      thrift.setScale(scale_);
+    }
     return thrift;
   }
 
@@ -354,14 +445,6 @@ public class ColumnType {
     ArrayList<TColumnType> result = Lists.newArrayList();
     for (ColumnType t: types) {
       result.add(t.toThrift());
-    }
-    return result;
-  }
-
-  public static ArrayList<TPrimitiveType> toTPrimitiveTypes(ColumnType[] types) {
-    ArrayList<TPrimitiveType> result = Lists.newArrayList();
-    for (ColumnType t: types) {
-      result.add(t.getPrimitiveType().toThrift());
     }
     return result;
   }
@@ -379,11 +462,14 @@ public class ColumnType {
     if (type == PrimitiveType.CHAR) {
       Preconditions.checkState(thrift.isSetLen());
       return createCharType(thrift.len);
+    } if (type == PrimitiveType.DECIMAL) {
+      Preconditions.checkState(thrift.isSetPrecision());
+      Preconditions.checkState(thrift.isSetScale());
+      return createDecimalType(thrift.precision, thrift.scale);
     } else {
       return createType(type);
     }
   }
-
 
   /**
    * JDBC data type description

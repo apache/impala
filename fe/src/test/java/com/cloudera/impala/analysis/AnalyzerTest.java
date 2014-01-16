@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -100,7 +101,7 @@ public class AnalyzerTest {
   /**
    * Check whether SelectStmt components can be converted to thrift.
    */
-  protected void CheckSelectToThrift(SelectStmt node) {
+  protected void checkSelectToThrift(SelectStmt node) {
     // convert select list exprs and where clause to thrift
     List<Expr> selectListExprs = node.getResultExprs();
     List<TExpr> thriftExprs = Expr.treesToThrift(selectListExprs);
@@ -330,7 +331,7 @@ public class AnalyzerTest {
    * 1. Complex types, e.g., map
    *    For tables with such types we prevent loading the table metadata.
    * 2. Primitive types
-   *    For tables with unsupported primitive types (e.g., decimal)
+   *    For tables with unsupported primitive types (e.g., binary)
    *    we can run queries as long as the unsupported columns are not referenced.
    *    We fail analysis if a query references an unsupported primitive column.
    * 3. Partition-column types
@@ -347,24 +348,27 @@ public class AnalyzerTest {
      * as long as we were skipping those columns. In hive 12's decimal, this is no
      * longer the case.
      */
-    /*
     // Select supported types from a table with mixed supported/unsupported types.
     AnalyzesOk("select int_col, str_col, bigint_col from functional.unsupported_types");
-    // Unsupported type decimal.
 
-    AnalysisError("select dec_col from functional.unsupported_types",
-        "Unsupported type 'DECIMAL' in 'dec_col'.");
+    // Select supported types from a table with mixed supported/unsupported types.
+    AnalyzesOk("select int_col, str_col, bigint_col from functional.unsupported_types");
+
     // Unsupported type binary.
     AnalysisError("select bin_col from functional.unsupported_types",
         "Unsupported type 'BINARY' in 'bin_col'.");
     // Mixed supported/unsupported types.
-    AnalysisError("select int_col, dec_col, str_col, bin_col " +
+    AnalysisError("select int_col, str_col, bin_col " +
         "from functional.unsupported_types",
-        "Unsupported type 'DECIMAL' in 'dec_col'.");
+        "Unsupported type 'BINARY' in 'bin_col'.");
     // Unsupported partition-column type.
     AnalysisError("select * from functional.unsupported_partition_types",
         "Failed to load metadata for table: functional.unsupported_partition_types");
-    */
+
+    // Try with hbase
+    AnalyzesOk("describe functional_hbase.map_table_hbase");
+    AnalysisError("select * from functional_hbase.map_table_hbase",
+        "Unsupported type in 'functional_hbase.map_table_hbase.map_col'.");
   }
 
   @Test
@@ -548,14 +552,14 @@ public class AnalyzerTest {
     fns[13] = createFunction(false, ColumnType.TINYINT, ColumnType.STRING,
         ColumnType.BIGINT, ColumnType.INT, ColumnType.TINYINT);
 
-    Assert.assertFalse(fns[1].compare(fns[0], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertTrue(fns[1].compare(fns[2], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertTrue(fns[1].compare(fns[3], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertTrue(fns[1].compare(fns[4], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertFalse(fns[1].compare(fns[5], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertFalse(fns[1].compare(fns[6], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertFalse(fns[1].compare(fns[7], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertFalse(fns[1].compare(fns[8], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertFalse(fns[1].compare(fns[0], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(fns[1].compare(fns[2], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(fns[1].compare(fns[3], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(fns[1].compare(fns[4], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertFalse(fns[1].compare(fns[5], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertFalse(fns[1].compare(fns[6], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertFalse(fns[1].compare(fns[7], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertFalse(fns[1].compare(fns[8], Function.CompareMode.IS_SUPERTYPE_OF));
 
     Assert.assertTrue(fns[1].compare(fns[2], Function.CompareMode.IS_INDISTINGUISHABLE));
     Assert.assertTrue(fns[3].compare(fns[4], Function.CompareMode.IS_INDISTINGUISHABLE));
@@ -568,14 +572,14 @@ public class AnalyzerTest {
     Assert.assertFalse(fns[1].compare(fns[3], Function.CompareMode.IS_INDISTINGUISHABLE));
     Assert.assertFalse(fns[1].compare(fns[4], Function.CompareMode.IS_INDISTINGUISHABLE));
 
-    Assert.assertFalse(fns[9].compare(fns[4], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertTrue(fns[2].compare(fns[9], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertFalse(fns[9].compare(fns[4], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(fns[2].compare(fns[9], Function.CompareMode.IS_SUPERTYPE_OF));
 
-    Assert.assertTrue(fns[8].compare(fns[10], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertFalse(fns[10].compare(fns[8], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertTrue(fns[8].compare(fns[10], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertFalse(fns[10].compare(fns[8], Function.CompareMode.IS_SUPERTYPE_OF));
 
-    Assert.assertTrue(fns[11].compare(fns[12], Function.CompareMode.IS_SUBTYPE));
-    Assert.assertFalse(fns[11].compare(fns[13], Function.CompareMode.IS_SUBTYPE));
+    Assert.assertTrue(fns[11].compare(fns[12], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertFalse(fns[11].compare(fns[13], Function.CompareMode.IS_SUPERTYPE_OF));
 
     for (int i = 0; i < fns.length; ++i) {
       for (int j = 0; j < fns.length; ++j) {
@@ -585,15 +589,15 @@ public class AnalyzerTest {
           Assert.assertTrue(
               fns[i].compare(fns[i], Function.CompareMode.IS_INDISTINGUISHABLE));
           Assert.assertTrue(
-              fns[i].compare(fns[i], Function.CompareMode.IS_SUBTYPE));
+              fns[i].compare(fns[i], Function.CompareMode.IS_SUPERTYPE_OF));
         } else {
           Assert.assertFalse(fns[i].compare(fns[j], Function.CompareMode.IS_IDENTICAL));
           if (fns[i].compare(fns[j], Function.CompareMode.IS_INDISTINGUISHABLE)) {
             // If it's a indistinguishable, at least one of them must be a super type
             // of the other
             Assert.assertTrue(
-                fns[i].compare(fns[j], Function.CompareMode.IS_SUBTYPE) ||
-                fns[j].compare(fns[i], Function.CompareMode.IS_SUBTYPE));
+                fns[i].compare(fns[j], Function.CompareMode.IS_SUPERTYPE_OF) ||
+                fns[j].compare(fns[i], Function.CompareMode.IS_SUPERTYPE_OF));
           } else if (fns[i].compare(fns[j], Function.CompareMode.IS_INDISTINGUISHABLE)) {
             // This is reflexive
             Assert.assertTrue(

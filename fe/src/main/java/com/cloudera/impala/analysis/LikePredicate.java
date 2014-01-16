@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -105,7 +106,7 @@ public class LikePredicate extends Predicate {
     }
 
     fn_ = getBuiltinFunction(analyzer, op_.toString(), collectChildReturnTypes(),
-        CompareMode.IS_SUBTYPE);
+        CompareMode.IS_SUPERTYPE_OF);
     Preconditions.checkState(fn_ != null);
     Preconditions.checkState(fn_.getReturnType().isBoolean());
 

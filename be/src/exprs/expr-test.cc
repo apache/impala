@@ -552,7 +552,7 @@ class ExprTest : public testing::Test {
     TestIsNull("NULL + NULL", TYPE_NULL);
     TestIsNull("NULL - NULL", TYPE_NULL);
     TestIsNull("NULL * NULL", TYPE_NULL);
-    TestIsNull("NULL / NULL", TYPE_DOUBLE);
+    TestIsNull("NULL / NULL", TYPE_NULL);
     TestIsNull("NULL & NULL", TYPE_NULL);
     TestIsNull("NULL | NULL", TYPE_NULL);
     TestIsNull("NULL ^ NULL", TYPE_NULL);
@@ -777,15 +777,15 @@ TEST_F(ExprTest, ArithmeticExprs) {
 
   // Test behavior with NULLs.
   TestNullOperandFixedResultTypeOps<float, double>(min_float_values_[TYPE_FLOAT],
-      TYPE_FLOAT);
+      TYPE_DOUBLE);
   TestNullOperandFixedResultTypeOps<double, double>(min_float_values_[TYPE_DOUBLE],
-      TYPE_FLOAT);
+      TYPE_DOUBLE);
   TestNullOperandFixedResultTypeOps<int8_t, int64_t>(min_int_values_[TYPE_TINYINT],
-      TYPE_TINYINT);
-  TestNullOperandFixedResultTypeOps<int16_t, int64_t>(min_int_values_[TYPE_SMALLINT],
       TYPE_SMALLINT);
-  TestNullOperandFixedResultTypeOps<int32_t, int64_t>(min_int_values_[TYPE_INT],
+  TestNullOperandFixedResultTypeOps<int16_t, int64_t>(min_int_values_[TYPE_SMALLINT],
       TYPE_INT);
+  TestNullOperandFixedResultTypeOps<int32_t, int64_t>(min_int_values_[TYPE_INT],
+      TYPE_BIGINT);
   TestNullOperandFixedResultTypeOps<int64_t, int64_t>(min_int_values_[TYPE_BIGINT],
       TYPE_BIGINT);
 

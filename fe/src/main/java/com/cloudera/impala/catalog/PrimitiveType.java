@@ -80,9 +80,7 @@ public enum PrimitiveType {
     return INVALID_TYPE;
   }
 
-  public TPrimitiveType toThrift() {
-    return thriftType_;
-  }
+  public TPrimitiveType toThrift() { return thriftType_; }
 
   public static List<TPrimitiveType> toThrift(PrimitiveType[] types) {
     List<TPrimitiveType> result = Lists.newArrayList();

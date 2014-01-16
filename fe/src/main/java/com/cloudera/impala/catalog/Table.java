@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.catalog;
 
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -24,10 +25,12 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
-import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.analysis.ColumnType;
+import com.cloudera.impala.analysis.CreateTableStmt;
+import com.cloudera.impala.analysis.SqlParser;
+import com.cloudera.impala.analysis.SqlScanner;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -167,21 +170,6 @@ public abstract class Table implements CatalogObject {
   }
 
   /**
-   * Gets the PrimitiveType from the given FieldSchema. Throws a TableLoadingException
-   * if the FieldSchema does not represent a supported primitive type.
-   */
-  protected ColumnType getPrimitiveType(FieldSchema fs)
-      throws TableLoadingException {
-    // catch currently unsupported hive schema elements
-    if (!serdeConstants.PrimitiveTypes.contains(fs.getType())) {
-      throw new TableLoadingException(String.format(
-          "Failed to load metadata for table '%s' due to unsupported " +
-          "column type '%s' in column '%s'", getName(), fs.getType(), fs.getName()));
-    }
-    return getPrimitiveType(fs.getType());
-  }
-
-  /**
    * Creates a table of the appropriate type based on the given hive.metastore.api.Table
    * object.
    */
@@ -278,38 +266,48 @@ public abstract class Table implements CatalogObject {
     return catalogObject;
   }
 
-  protected static ColumnType getPrimitiveType(String typeName) {
-    if (typeName.toLowerCase().equals("tinyint")) {
-      return ColumnType.TINYINT;
-    } else if (typeName.toLowerCase().equals("smallint")) {
-      return ColumnType.SMALLINT;
-    } else if (typeName.toLowerCase().equals("int")) {
-      return ColumnType.INT;
-    } else if (typeName.toLowerCase().equals("bigint")) {
-      return ColumnType.BIGINT;
-    } else if (typeName.toLowerCase().equals("boolean")) {
-      return ColumnType.BOOLEAN;
-    } else if (typeName.toLowerCase().equals("float")) {
-      return ColumnType.FLOAT;
-    } else if (typeName.toLowerCase().equals("double")) {
-      return ColumnType.DOUBLE;
-    } else if (typeName.toLowerCase().equals("date")) {
-      return ColumnType.DATE;
-    } else if (typeName.toLowerCase().equals("datetime")) {
-      return ColumnType.DATETIME;
-    } else if (typeName.toLowerCase().equals("timestamp")) {
-      return ColumnType.TIMESTAMP;
-    } else if (typeName.toLowerCase().equals("string")) {
-      return ColumnType.STRING;
-    } else if (typeName.toLowerCase().equals("binary")) {
-      return ColumnType.BINARY;
-    } else if (typeName.toLowerCase().equals("decimal")) {
-      // TODO: parse out precision and scale.
-      return ColumnType.createDecimalType();
-    } else {
-      return ColumnType.INVALID;
-    }
-  }
+  /*
+   * Gets the ColumnType from the given FieldSchema by using Impala's SqlParser.
+   * Throws a TableLoadingException if the FieldSchema could not be parsed.
+   * The type can either be:
+   *   - Supported by Impala, in which case the type is returned.
+   *   - A type Impala understands but is not yet implemented (e.g. date), the type is
+   *     returned but type.IsSupported() returns false.
+   *   - A type Impala can't understand at all, and a TableLoadingException is thrown.
+   */
+   protected ColumnType parseColumnType(FieldSchema fs) throws TableLoadingException {
+     // Wrap the type string in a CREATE TABLE stmt and use Impala's Parser
+     // to get the ColumnType.
+     // Pick a table name that can't be used.
+     String stmt = String.format("CREATE TABLE $DUMMY ($DUMMY %s)", fs.getType());
+     SqlScanner input = new SqlScanner(new StringReader(stmt));
+     SqlParser parser = new SqlParser(input);
+     CreateTableStmt createTableStmt;
+     try {
+       Object o = parser.parse().value;
+       if (!(o instanceof CreateTableStmt)) {
+         // Should never get here.
+         throw new InternalException("Couldn't parse create table stmt.");
+       }
+       createTableStmt = (CreateTableStmt) o;
+       if (createTableStmt.getColumnDescs().isEmpty()) {
+         // Should never get here.
+         throw new InternalException("Invalid create table stmt.");
+       }
+     } catch (Exception e) {
+       throw new TableLoadingException(String.format(
+           "Unsupported type '%s' in column '%s' of table '%s'",
+           fs.getType(), fs.getName(), getName()));
+     }
+     ColumnType type = createTableStmt.getColumnDescs().get(0).getColType();
+     if (type == null) {
+       throw new TableLoadingException(String.format(
+           "Unsupported type '%s' in column '%s' of table '%s'",
+           fs.getType(), fs.getName(), getName()));
+     }
+     // Return type even if !isSupported() to allow the table loading to succeed.
+     return type;
+   }
 
   /**
    * Returns true if this table is not a base table that stores data (e.g., a view).
@@ -343,7 +341,6 @@ public abstract class Table implements CatalogObject {
     for (Column column: colsByPos_.subList(0, numClusteringCols_)) {
       columns.add(column);
     }
-
     return columns;
   }
 

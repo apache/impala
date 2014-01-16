@@ -220,7 +220,6 @@ public class JdbcTest {
         null, null, "sqrt%");
     assertTrue(rs.next());
     String funcName = rs.getString("FUNCTION_NAME");
-    System.err.println(funcName.toLowerCase());
     assertEquals("Incorrect function name",
         "sqrt(double)", funcName.toLowerCase());
     assertFalse(rs.next());

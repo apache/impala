@@ -14,8 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.RowFormat;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
@@ -200,7 +200,7 @@ parser code {:
 // List of keywords. Please keep them sorted alphabetically.
 terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC,
-  KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST,
+  KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST,
   KW_CHANGE, KW_CHAR, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE,
   KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL,
   KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV,
@@ -1874,8 +1874,14 @@ column_type ::=
   {: RESULT = ColumnType.TIMESTAMP; :}
   | KW_STRING
   {: RESULT = ColumnType.STRING; :}
+  | KW_BINARY
+  {: RESULT = ColumnType.BINARY; :}
   | KW_CHAR LPAREN INTEGER_LITERAL:len RPAREN
   {: RESULT = ColumnType.createCharType(len.intValue()); :}
+  | KW_DECIMAL LPAREN INTEGER_LITERAL:precision RPAREN
+  {: RESULT = ColumnType.createDecimalType(precision.intValue()); :}
+  | KW_DECIMAL LPAREN INTEGER_LITERAL:precision COMMA INTEGER_LITERAL:scale RPAREN
+  {: RESULT = ColumnType.createDecimalType(precision.intValue(), scale.intValue()); :}
   | KW_DECIMAL
   {: RESULT = ColumnType.createDecimalType(); :}
   ;

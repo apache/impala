@@ -21,13 +21,13 @@ import java.lang.reflect.Field;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.AggregateFunction;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 public class AnalyzeStmtsTest extends AnalyzerTest {
-
   @Test
   public void TestFromClause() throws AnalysisException {
     AnalyzesOk("select int_col from functional.alltypes");
@@ -579,6 +579,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "select ndv(%s) from functional.alltypes",
           typeToLiteralValue_.get(type)));
     }
+
+    // Decimal
+    AnalyzesOk("select min(d1), max(d2), count(d3), sum(d4) "
+        + "from functional.decimal_tbl");
+    AnalyzesOk("select ndv(d1), distinctpc(d2), distinctpcsa(d3), count(distinct d4) "
+        + "from functional.decimal_tbl");
+    AnalysisError("select avg(d5) from functional.decimal_tbl",
+        "AVG requires a numeric or timestamp parameter: avg(d5)");
+    AnalysisError("select group_concat(d5) from functional.decimal_tbl",
+        "No matching function with signature: group_concat(DECIMAL(10,5))");
   }
 
   @Test
@@ -692,6 +702,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // ok for constants in select list not to be in group by list
     AnalyzesOk("select true, NULL, 1*2+5 as a, zip, count(*) from functional.testtbl " +
         "group by zip");
+    AnalyzesOk("select d1, d2, count(*) from functional.decimal_tbl " +
+        "group by 1, 2");
 
     // doesn't group by all non-agg select list items
     AnalysisError("select zip, count(*) from functional.testtbl",
@@ -775,6 +787,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select zip, id from functional.testtbl order by zip desc");
     AnalyzesOk("select zip, id from functional.testtbl " +
         "order by true asc, false desc, NULL asc");
+    AnalyzesOk("select d1, d2 from functional.decimal_tbl order by d1");
 
     // resolves ordinals
     AnalyzesOk("select zip, id from functional.testtbl order by 1");

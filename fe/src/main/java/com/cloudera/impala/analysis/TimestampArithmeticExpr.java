@@ -146,7 +146,7 @@ public class TimestampArithmeticExpr extends Expr {
     String funcOpName = String.format("%sS_%s", timeUnit_.toString(),
         (op_ == ArithmeticExpr.Operator.ADD) ? "ADD" : "SUB");
     fn_ = getBuiltinFunction(analyzer, funcOpName.toLowerCase(),
-        collectChildReturnTypes(), CompareMode.IS_SUBTYPE);
+        collectChildReturnTypes(), CompareMode.IS_SUPERTYPE_OF);
     Preconditions.checkNotNull(fn_);
     Preconditions.checkState(
         fn_.getReturnType().getPrimitiveType() == PrimitiveType.TIMESTAMP);

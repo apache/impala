@@ -28,7 +28,6 @@ import com.cloudera.impala.analysis.ArithmeticExpr;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.CaseExpr;
 import com.cloudera.impala.analysis.CastExpr;
-import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.CompoundPredicate;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.LikePredicate;
@@ -419,7 +418,7 @@ public abstract class Catalog {
   }
 
   private static final Map<ColumnType, String> HLL_UPDATE_SYMBOL =
-    ImmutableMap.<ColumnType, String>builder()
+      ImmutableMap.<ColumnType, String>builder()
         .put(ColumnType.BOOLEAN,
             "9HllUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(ColumnType.TINYINT,
@@ -438,10 +437,11 @@ public abstract class Catalog {
             "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
         .put(ColumnType.TIMESTAMP,
             "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(ColumnType.DECIMAL, "")
         .build();
 
   private static final Map<ColumnType, String> PC_UPDATE_SYMBOL =
-    ImmutableMap.<ColumnType, String>builder()
+      ImmutableMap.<ColumnType, String>builder()
         .put(ColumnType.BOOLEAN,
             "8PcUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(ColumnType.TINYINT,
@@ -460,6 +460,7 @@ public abstract class Catalog {
             "8PcUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
         .put(ColumnType.TIMESTAMP,
             "8PcUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+         .put(ColumnType.DECIMAL, "")
         .build();
 
     private static final Map<ColumnType, String> PCSA_UPDATE_SYMBOL =
@@ -482,10 +483,11 @@ public abstract class Catalog {
               "10PcsaUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
           .put(ColumnType.TIMESTAMP,
               "10PcsaUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+          .put(ColumnType.DECIMAL, "")
           .build();
 
   private static final Map<ColumnType, String> MIN_UPDATE_SYMBOL =
-    ImmutableMap.<ColumnType, String>builder()
+      ImmutableMap.<ColumnType, String>builder()
         .put(ColumnType.BOOLEAN,
             "3MinIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(ColumnType.TINYINT,
@@ -504,10 +506,11 @@ public abstract class Catalog {
             "3MinIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(ColumnType.TIMESTAMP,
             "3MinIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(ColumnType.DECIMAL, "")
         .build();
 
   private static final Map<ColumnType, String> MAX_UPDATE_SYMBOL =
-    ImmutableMap.<ColumnType, String>builder()
+      ImmutableMap.<ColumnType, String>builder()
         .put(ColumnType.BOOLEAN,
             "3MaxIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(ColumnType.TINYINT,
@@ -526,6 +529,7 @@ public abstract class Catalog {
             "3MaxIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(ColumnType.TIMESTAMP,
             "3MaxIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(ColumnType.DECIMAL, "")
         .build();
 
   // Populate all the aggregate builtins in the catalog.
@@ -620,8 +624,17 @@ public abstract class Catalog {
         prefix + "3SumIN10impala_udf9DoubleValES3_EEvPNS2_15FunctionContextERKT_PT0_",
         prefix + "3SumIN10impala_udf9DoubleValES3_EEvPNS2_15FunctionContextERKT_PT0_",
         null, null, false));
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "sum",
+        Lists.newArrayList(ColumnType.DECIMAL), ColumnType.DECIMAL, ColumnType.DECIMAL,
+        initNull,
+        prefix + "",
+        prefix + "",
+        null, null, false));
 
     for (ColumnType t: ColumnType.getNumericTypes()) {
+      // TODO: the rewrite does not support decimal since the current rewrite
+      // assumes double as the result.
+      if (t.isDecimal()) continue;
       // Avg
       // TODO: because of avg rewrite, BE doesn't implement it yet.
       db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",

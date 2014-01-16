@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -81,8 +82,12 @@ public class ArithmeticExpr extends Expr {
         Operator.DIVIDE.getName(),
         Lists.newArrayList(ColumnType.DOUBLE, ColumnType.DOUBLE),
         ColumnType.DOUBLE));
+    db.addBuiltin(ScalarFunction.createBuiltinOperator(
+        Operator.DIVIDE.getName(),
+        Lists.newArrayList(ColumnType.DECIMAL, ColumnType.DECIMAL),
+        ColumnType.DECIMAL));
 
-    for (ColumnType t: ColumnType.getFixedPointTypes()) {
+    for (ColumnType t: ColumnType.getIntegerTypes()) {
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.INT_DIVIDE.getName(), Lists.newArrayList(t, t), t));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
@@ -96,6 +101,9 @@ public class ArithmeticExpr extends Expr {
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.BITNOT.getName(), Lists.newArrayList(t), t));
     }
+    db.addBuiltin(ScalarFunction.createBuiltinOperator(
+        Operator.MOD.getName(), Lists.newArrayList(
+            ColumnType.DECIMAL, ColumnType.DECIMAL), ColumnType.DECIMAL));
   }
 
   @Override
@@ -138,7 +146,7 @@ public class ArithmeticExpr extends Expr {
     if (op_ == Operator.BITNOT) {
       type_ = getChild(0).getType();
       fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
-          CompareMode.IS_SUBTYPE);
+          CompareMode.IS_SUPERTYPE_OF);
       if (fn_ == null) {
         throw new AnalysisException("Bitwise operations only allowed on fixed-point " +
             "types: " + toSql());
@@ -147,45 +155,34 @@ public class ArithmeticExpr extends Expr {
       return;
     }
 
+    Preconditions.checkState(children_.size() == 2); // only bitnot is unary
     ColumnType t1 = getChild(0).getType();
-    ColumnType t2 = getChild(1).getType();  // only bitnot is unary
+    ColumnType t2 = getChild(1).getType();
 
     String fnName = op_.getName();
     switch (op_) {
-      case MULTIPLY:
       case ADD:
       case SUBTRACT:
-        // If one of the types is null, use the compatible type without promotion.
-        // Otherwise, promote the compatible type to the next higher resolution type,
-        // to ensure that that a <op> b won't overflow/underflow.
-        type_ = ColumnType.getAssignmentCompatibleType(t1, t2);
-        if (!(t1.isNull() || t2.isNull())) {
-          // Both operands are non-null. Use next higher resolution type.
-          type_ = type_.getNextResolutionType();
-        }
-        Preconditions.checkState(type_.isValid());
-        break;
-      case MOD:
-        type_ = ColumnType.getAssignmentCompatibleType(t1, t2);
-        // Use MATH_MOD function operator for floating-point modulo.
-        if (type_.isFloatingPointType()) fnName = "fmod";
-        break;
       case DIVIDE:
-        type_ = ColumnType.DOUBLE;
+      case MULTIPLY:
+      case MOD:
+        type_ = TypesUtil.getArithmeticResultType(t1, t2, op_);
         break;
+
       case INT_DIVIDE:
       case BITAND:
       case BITOR:
       case BITXOR:
-        if (t1.isFloatingPointType() || t2.isFloatingPointType()) {
-          throw new AnalysisException(
-              "Invalid floating point argument to operation " +
-              op_.toString() + ": " + this.toSql());
+        if ((!t1.isNull() & !t1.isIntegerType()) ||
+            (!t2.isNull() && !t2.isIntegerType())) {
+          throw new AnalysisException("Invalid non-integer argument to operation '" +
+              op_.toString() + "': " + this.toSql());
         }
         type_ = ColumnType.getAssignmentCompatibleType(t1, t2);
         // the result is always an integer or null
-        Preconditions.checkState(type_.isFixedPointType() || type_.isNull());
+        Preconditions.checkState(type_.isIntegerType() || type_.isNull());
         break;
+
       default:
         // the programmer forgot to deal with a case
         Preconditions.checkState(false,
@@ -193,12 +190,26 @@ public class ArithmeticExpr extends Expr {
         break;
     }
 
-    type_ = castBinaryOp(type_);
+    // Use MATH_MOD function operator for floating-point modulo.
+    // TODO remove this when we have operators implemented using the UDF interface
+    // and we can resolve this just using function overloading.
+    if ((t1.isFloatingPointType() || t2.isFloatingPointType()) &&
+        op_ == ArithmeticExpr.Operator.MOD) {
+      fnName = "fmod";
+    }
+
+    if (!t1.isDecimalOrNull() || !t2.isDecimalOrNull()) {
+      // The decimal types, the cast is handled as part of the operator and in
+      // general, the return type does not match the input types. Don't cast
+      // the child types to the return type.
+      type_ = castBinaryOp(type_);
+    }
+
     fn_ = getBuiltinFunction(analyzer, fnName, collectChildReturnTypes(),
-        CompareMode.IS_SUBTYPE);
+        CompareMode.IS_SUPERTYPE_OF);
     if (fn_ == null) {
-      Preconditions.checkState(false, String.format("No match in function registry " +
-          "for '%s' with operand types %s and %s", toSql(), type_, type_));
+      Preconditions.checkState(false, String.format("No match " +
+          "for '%s' with operand types %s and %s", toSql(), t1, t2));
     }
   }
 }

@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.thrift.TSlotDescriptor;
 import com.google.common.base.Objects;
 

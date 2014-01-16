@@ -17,7 +17,6 @@ package com.cloudera.impala.catalog;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
@@ -106,6 +105,9 @@ public class ScalarFunction extends Function {
           break;
         case TIMESTAMP:
           beFn += "_TimestampValue";
+          break;
+        case DECIMAL:
+          beFn += "_Decimal";
           break;
         default:
           Preconditions.checkState(false);

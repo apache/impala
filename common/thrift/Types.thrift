@@ -45,8 +45,12 @@ enum TPrimitiveType {
 struct TColumnType {
   1: required TPrimitiveType type
 
-  // Only set if type == CHAR_ARRAY
+  // Only set if type == CHAR
   2: optional i32 len
+
+  // Only set if type == DECIMAL
+  3: optional i32 precision
+  4: optional i32 scale
 }
 
 enum TStmtType {

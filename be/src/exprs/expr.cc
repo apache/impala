@@ -518,6 +518,7 @@ bool Expr::codegend_fn_thread_safe() const {
 }
 
 Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  if (type() == TYPE_DECIMAL) return Status("DECIMAL is not yet implemented.");
   RETURN_IF_ERROR(PrepareChildren(state, row_desc));
   if (is_udf_call_) return Status::OK;
 

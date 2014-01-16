@@ -19,6 +19,7 @@ import java.util.HashMap;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.common.AnalysisException;
@@ -119,6 +120,12 @@ public class CreateFunctionStmtBase extends StatementBase {
       throw new AnalysisException("Function cannot have the same name as a builtin: " +
           fn_.getFunctionName().getFunction());
     }
+
+    // Validate function arguments
+    for (ColumnType t: fn_.getArgs()) {
+      t.analyze();
+    }
+    fn_.getReturnType().analyze();
 
     if (analyzer.getCatalog().getDb(
         fn_.dbName(), analyzer.getUser(), Privilege.CREATE) == null) {

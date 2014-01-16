@@ -41,7 +41,7 @@ java_registry_preamble = '\
 \n\
 package com.cloudera.impala.builtins;\n\
 \n\
-import com.cloudera.impala.analysis.ColumnType;\n\
+import com.cloudera.impala.catalog.ColumnType;\n\
 import com.cloudera.impala.catalog.Db;\n\
 \n\
 public class ScalarBuiltins { \n\

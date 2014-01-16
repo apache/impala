@@ -43,7 +43,6 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumn;
@@ -220,13 +219,23 @@ public class HBaseTable extends Table {
   }
 
   private boolean supportsBinaryEncoding(FieldSchema fs) {
-    ColumnType colType = getPrimitiveType(fs.getType());
-    // Only boolean, integer and floating point types can use binary storage.
-    return colType.isBoolean() || colType.isIntegerType()
-        || colType.isFloatingPointType();
+    try {
+      ColumnType colType = parseColumnType(fs);
+      // Only boolean, integer and floating point types can use binary storage.
+      return colType.isBoolean() || colType.isIntegerType()
+          || colType.isFloatingPointType();
+    } catch (TableLoadingException e) {
+      return false;
+    }
   }
 
   @Override
+  /**
+   * For hbase tables, we can support tables with columns we don't understand at
+   * all (e.g. map) as long as the user does not select those. This is in contrast
+   * to hdfs tables since we typically need to understand all columns to make sense
+   * of the file at all.
+   */
   public void load(Table oldValue, HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     Preconditions.checkNotNull(getMetaStoreTable());
@@ -272,9 +281,16 @@ public class HBaseTable extends Table {
       List<HBaseColumn> tmpCols = new ArrayList<HBaseColumn>();
       for (int i = 0; i < fieldSchemas.size(); ++i) {
         FieldSchema s = fieldSchemas.get(i);
+        ColumnType t = ColumnType.INVALID;
+        try {
+          t = parseColumnType(s);
+        } catch (TableLoadingException e) {
+          // Ignore hbase types we don't support yet. We can load the metadata
+          // but won't be able to select from it.
+        }
         HBaseColumn col = new HBaseColumn(s.getName(), hbaseColumnFamilies.get(i),
             hbaseColumnQualifiers.get(i), hbaseColumnBinaryEncodings.get(i),
-            getPrimitiveType(s.getType()), s.getComment(), -1);
+            t, s.getComment(), -1);
         tmpCols.add(col);
         // Load column stats from the Hive metastore into col.
         loadColumnStats(col, client);

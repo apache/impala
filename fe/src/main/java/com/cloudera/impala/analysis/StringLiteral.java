@@ -22,6 +22,7 @@ import java_cup.runtime.Symbol;
 
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;

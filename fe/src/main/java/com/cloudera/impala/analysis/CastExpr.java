@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Function.CompareMode;
@@ -70,6 +71,10 @@ public class CastExpr extends Expr {
         // For some reason we don't allow string->bool.
         // TODO: revisit
         if (t1.isStringType() && t2.isBoolean()) continue;
+
+        // Disable casting from decimal to boolean and to timestamp
+        if (t1.isDecimal() && (t2.isBoolean() || t2.isDateType())) continue;
+        if ((t1.isBoolean() || t1.isDateType()) && t2.isDecimal()) continue;
         db.addBuiltin(ScalarFunction.createBuiltinOperator(
             CAST_FN_NAME, Lists.newArrayList(t1, t2), t2));
       }
@@ -116,6 +121,7 @@ public class CastExpr extends Expr {
   }
 
   private void analyze() throws AnalysisException {
+    targetType_.analyze();
     // Our cast fn currently takes two arguments. The first is the value to cast and the
     // second is a dummy of the type to cast to. We need this to be able to resolve the
     // proper function.
@@ -132,18 +138,17 @@ public class CastExpr extends Expr {
 
     FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, CAST_FN_NAME);
     Function searchDesc = new Function(fnName, args, ColumnType.INVALID, false);
-    if (isImplicit_) {
-      fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_SUBTYPE);
+    if (isImplicit_ || args[0].isNull()) {
+      fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_SUPERTYPE_OF);
       Preconditions.checkState(fn_ != null);
     } else {
-      fn_ = Catalog.getBuiltin(searchDesc,
-          args[0].isNull() ? CompareMode.IS_SUBTYPE : CompareMode.IS_IDENTICAL);
-      if (fn_ == null) {
-        throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
-            " from " + args[0] + " to " + args[1]);
-      }
+      fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_IDENTICAL);
     }
-    Preconditions.checkState(fn_.getReturnType().equals(targetType_));
+    if (fn_ == null) {
+      throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
+          " from " + args[0] + " to " + args[1]);
+    }
+    Preconditions.checkState(targetType_.matchesType(fn_.getReturnType()));
     type_ = targetType_;
   }
 

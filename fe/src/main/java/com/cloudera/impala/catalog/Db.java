@@ -19,7 +19,6 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TDatabase;
@@ -176,7 +175,7 @@ public class Db implements CatalogObject {
 
       // Finally check for is_subtype
       for (Function f: fns) {
-        if (f.compare(desc, Function.CompareMode.IS_SUBTYPE)) return f;
+        if (f.compare(desc, Function.CompareMode.IS_SUPERTYPE_OF)) return f;
       }
     }
     return null;

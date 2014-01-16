@@ -5,8 +5,6 @@ package com.cloudera.impala.catalog;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.cloudera.impala.analysis.ColumnType;
-
 public class TestSchemaUtils {
   // maps from PrimitiveType to column name
   // in alltypes table

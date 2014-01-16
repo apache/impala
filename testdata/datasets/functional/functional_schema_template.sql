@@ -1195,3 +1195,13 @@ STORED AS INPUTFORMAT
 OUTPUTFORMAT
   'org.apache.hadoop.hive.ql.io.RCFileOutputFormat';
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+decimal_tbl
+---- COLUMNS
+d1 DECIMAL
+d2 DECIMAL(10, 0)
+d3 DECIMAL(20, 10)
+d4 DECIMAL(38, 38)
+d5 DECIMAL(10, 5)

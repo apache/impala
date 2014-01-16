@@ -61,7 +61,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.junit.Test;
 
-import com.cloudera.impala.analysis.ColumnType;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.util.UnsafeUtil;

@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.List;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -194,7 +195,7 @@ public class CaseExpr extends Expr {
     // Do the function lookup just based on the whenType.
     ColumnType[] args = new ColumnType[1];
     args[0] = whenType;
-    fn_ = getBuiltinFunction(analyzer, "case", args, CompareMode.IS_SUBTYPE);
+    fn_ = getBuiltinFunction(analyzer, "case", args, CompareMode.IS_SUPERTYPE_OF);
     if (fn_ == null) {
       throw new AnalysisException("CASE " + whenType + " is not supported.");
     }

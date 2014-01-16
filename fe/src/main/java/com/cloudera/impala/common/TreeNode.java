@@ -46,8 +46,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
 
   // Collect all unique subnodes of type C (but not of subclasses of C), including
   // possibly 'this' if the subnode does not exist in subNodes.
-  // If a subnode is collected, none of its own subnodes will
-  // be.
+  // If a subnode is collected, none of its own subnodes will be.
   public <C extends NodeType> void collect(Class<C> cl, List<C> subNodes) {
     if (cl.isAssignableFrom(this.getClass()) && this.getClass().isAssignableFrom(cl) &&
         !subNodes.contains((C) this)) {

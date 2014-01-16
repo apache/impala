@@ -441,4 +441,10 @@ udf_functions = [
    '_ZN6impala11UdfBuiltins3AbsEPN10impala_udf15FunctionContextERKNS1_9DoubleValE'],
   [['udf_lower'], 'STRING', ['STRING'],
    '_ZN6impala11UdfBuiltins5LowerEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+
+  # TODO: implement these functions.
+  [['abs'], 'DECIMAL', ['DECIMAL'], ""],
+  [['precision'], 'INT', ['DECIMAL'], ""],
+  [['scale'], 'INT', ['DECIMAL'], ""],
+  [['round'], 'DECIMAL', ['DECIMAL', 'INT'], ""],
 ]

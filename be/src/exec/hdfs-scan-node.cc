@@ -333,6 +333,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); ++i) {
     if (!slots[i]->is_materialized()) continue;
+    if (slots[i]->type() == TYPE_DECIMAL) {
+      return Status("Decimal is not yet implemented.");
+    }
     int col_idx = slots[i]->col_pos();
     DCHECK_LT(col_idx, column_idx_to_materialized_slot_idx_.size());
     DCHECK_EQ(column_idx_to_materialized_slot_idx_[col_idx], SKIP_COLUMN);

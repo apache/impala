@@ -16,7 +16,6 @@ package com.cloudera.impala.catalog;
 
 import java.util.List;
 
-import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.common.AnalysisException;
@@ -39,6 +38,12 @@ import com.google.common.collect.Lists;
  */
 public class Function implements CatalogObject {
   // Enum for how to compare function signatures.
+  // For decimal types, the type in the function can be a wildcard, i.e. decimal(*,*).
+  // The wildcard can *only* exist as function type, the caller will always be a
+  // fully specified decimal.
+  // For the purposes of function type resolution, decimal(*,*) will match exactly
+  // with any fully specified decimal (i.e. fn(decimal(*,*)) matches identically for
+  // the call to fn(decimal(1,0)).
   public enum CompareMode {
     // Two signatures are identical if the number of arguments and their types match
     // exactly and either both signatures are varargs or neither.
@@ -50,12 +55,12 @@ public class Function implements CatalogObject {
     // e.g. fn(int, int, int) and fn(int...)
     IS_INDISTINGUISHABLE,
 
-    // X is a subtype of Y if Y.arg[i] can be implicitly cast to
-    // X.arg[i]. If X has vargs, the remaining arguments of Y must
-    // be implicitly castable to the var arg type.
+    // X is a supertype of Y if Y.arg[i] can be implicitly cast to X.arg[i]. If X has
+    // vargs, the remaining arguments of Y must be implicitly castable to the var arg
+    // type. The key property this provides is that X can be used in place of Y.
     // e.g.
-    // fn(int, double, string...) is a subtype of fn(tinyint, float, string, string)
-    IS_SUBTYPE,
+    // fn(int, double, string...) is a supertype of fn(tinyint, float, string, string)
+    IS_SUPERTYPE_OF,
   }
 
   // User specified function name e.g. "Add"
@@ -149,7 +154,7 @@ public class Function implements CatalogObject {
     switch (mode) {
       case IS_IDENTICAL: return isIdentical(other);
       case IS_INDISTINGUISHABLE: return isIndistinguishable(other);
-      case IS_SUBTYPE: return isSubtype(other);
+      case IS_SUPERTYPE_OF: return isSuperTypeOf(other);
       default:
         Preconditions.checkState(false);
         return false;
@@ -161,7 +166,7 @@ public class Function implements CatalogObject {
    * TODO: look into how we resolve implicitly castable functions. Is there a rule
    * for "most" compatible or maybe return an error if it is ambiguous?
    */
-  private boolean isSubtype(Function other) {
+  private boolean isSuperTypeOf(Function other) {
     if (!other.name_.equals(name_)) return false;
     if (!this.hasVarArgs_ && other.argTypes_.length != this.argTypes_.length) {
       return false;
@@ -175,6 +180,7 @@ public class Function implements CatalogObject {
     // Check trailing varargs.
     if (this.hasVarArgs_) {
       for (int i = this.argTypes_.length; i < other.argTypes_.length; ++i) {
+        if (other.argTypes_[i].matchesType(this.getVarArgsType())) continue;
         if (!ColumnType.isImplicitlyCastable(other.argTypes_[i],
             this.getVarArgsType())) {
           return false;
@@ -189,7 +195,7 @@ public class Function implements CatalogObject {
     if (o.argTypes_.length != this.argTypes_.length) return false;
     if (o.hasVarArgs_ != this.hasVarArgs_) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
-      if (!o.argTypes_[i].equals(this.argTypes_[i])) return false;
+      if (!o.argTypes_[i].matchesType(this.argTypes_[i])) return false;
     }
     return true;
   }
@@ -199,19 +205,19 @@ public class Function implements CatalogObject {
     int minArgs = Math.min(o.argTypes_.length, this.argTypes_.length);
     // The first fully specified args must be identical.
     for (int i = 0; i < minArgs; ++i) {
-      if (!o.argTypes_[i].equals(this.argTypes_[i])) return false;
+      if (!o.argTypes_[i].matchesType(this.argTypes_[i])) return false;
     }
     if (o.argTypes_.length == this.argTypes_.length) return true;
 
     if (o.hasVarArgs_ && this.hasVarArgs_) {
-      if (!o.getVarArgsType().equals(this.getVarArgsType())) return false;
+      if (!o.getVarArgsType().matchesType(this.getVarArgsType())) return false;
       if (this.getNumArgs() > o.getNumArgs()) {
         for (int i = minArgs; i < this.getNumArgs(); ++i) {
-          if (!this.argTypes_[i].equals(o.getVarArgsType())) return false;
+          if (!this.argTypes_[i].matchesType(o.getVarArgsType())) return false;
         }
       } else {
         for (int i = minArgs; i < o.getNumArgs(); ++i) {
-          if (!o.argTypes_[i].equals(this.getVarArgsType())) return false;
+          if (!o.argTypes_[i].matchesType(this.getVarArgsType())) return false;
         }
       }
       return true;
@@ -219,14 +225,14 @@ public class Function implements CatalogObject {
       // o has var args so check the remaining arguments from this
       if (o.getNumArgs() > minArgs) return false;
       for (int i = minArgs; i < this.getNumArgs(); ++i) {
-        if (!this.argTypes_[i].equals(o.getVarArgsType())) return false;
+        if (!this.argTypes_[i].matchesType(o.getVarArgsType())) return false;
       }
       return true;
     } else if (this.hasVarArgs_) {
       // this has var args so check the remaining arguments from s
       if (this.getNumArgs() > minArgs) return false;
       for (int i = minArgs; i < o.getNumArgs(); ++i) {
-        if (!o.argTypes_[i].equals(this.getVarArgsType())) return false;
+        if (!o.argTypes_[i].matchesType(this.getVarArgsType())) return false;
       }
       return true;
     } else {

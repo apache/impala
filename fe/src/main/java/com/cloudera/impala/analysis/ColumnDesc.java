@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumn;
 
@@ -49,6 +50,7 @@ public class ColumnDesc {
     if (!MetaStoreUtils.validateName(colName_)) {
       throw new AnalysisException("Invalid column name: " + colName_);
     }
+    colType_.analyze();
   }
 
   @Override

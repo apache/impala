@@ -59,6 +59,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("avro", new Integer(SqlParserSymbols.KW_AVRO));
     keywordMap.put("between", new Integer(SqlParserSymbols.KW_BETWEEN));
     keywordMap.put("bigint", new Integer(SqlParserSymbols.KW_BIGINT));
+    keywordMap.put("binary", new Integer(SqlParserSymbols.KW_BINARY));
     keywordMap.put("boolean", new Integer(SqlParserSymbols.KW_BOOLEAN));
     keywordMap.put("by", new Integer(SqlParserSymbols.KW_BY));
     keywordMap.put("case", new Integer(SqlParserSymbols.KW_CASE));
@@ -234,7 +235,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     String token = tokenIdMap.get(tokenId);
     return keywordMap.containsKey(token.toLowerCase());
   }
-  
+
   public static boolean isKeyword(String ident) {
     return keywordMap.containsKey(ident.toLowerCase());
   }

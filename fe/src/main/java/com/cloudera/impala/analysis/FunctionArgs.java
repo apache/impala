@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
 
+import com.cloudera.impala.catalog.ColumnType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

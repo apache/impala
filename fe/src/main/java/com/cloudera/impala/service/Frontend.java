@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
-import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.CreateUdaStmt;
 import com.cloudera.impala.analysis.CreateUdfStmt;
 import com.cloudera.impala.analysis.DropFunctionStmt;
@@ -50,6 +49,7 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HBaseTable;

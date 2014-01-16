@@ -18,7 +18,6 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnStats;
 import com.google.common.base.Objects;

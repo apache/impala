@@ -557,4 +557,12 @@ public class ToSqlTest extends AnalyzerTest {
         "SELECT DATE_SUB(timestamp_col, INTERVAL 40 hours), " +
         "(DATE_SUB(timestamp_col, INTERVAL 40 hours)) FROM functional.alltypes");
   }
+
+  /**
+   * Tests decimals are output correctly.
+   */
+  @Test
+  public void testDecimal() {
+    testToSql("select cast(1 as decimal)", "SELECT CAST(1 AS DECIMAL(9,0))");
+  }
 }
