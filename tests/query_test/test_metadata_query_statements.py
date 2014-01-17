@@ -17,7 +17,13 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMetadataQueryStatements, cls).add_test_dimensions()
-    # There is no reason to run these tests using all dimensions.
+    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+        cluster_sizes=ALL_NODES_ONLY,
+        disable_codegen_options=[False],
+        batch_sizes=[0],
+        sync_ddl=[0, 1]))
+
+    # There is no reason to run these tests using all table format dimensions.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
@@ -61,53 +67,94 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_impala_sees_hive_created_tables_and_databases(self, vector):
-    # This scenario is covered as part of the data loading process and doesn't
-    # need to be validated with each test run.
+    self.client.set_configuration(vector.get_value('exec_option'))
     db_name = 'hive_test_db'
     tbl_name = 'testtbl'
-    self.client.refresh()
-    result = self.execute_query("show databases");
+    call(["hive", "-e", "DROP DATABASE IF EXISTS %s CASCADE" % db_name])
+    self.client.execute("invalidate metadata")
+
+    result = self.client.execute("show databases")
     assert db_name not in result.data
+
     call(["hive", "-e", "CREATE DATABASE %s" % db_name])
 
-    result = self.execute_query("show databases");
+    # Run 'invalidate metadata <table name>' when the parent database does not exist.
+    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
+    result = self.client.execute("show databases")
     assert db_name not in result.data
 
-    self.client.refresh()
-    result = self.execute_query("show databases");
-    assert db_name in result.data
-
-    # Make sure no tables show up in the new database
-    result = self.execute_query("show tables in %s" % db_name);
-    assert len(result.data) == 0
-
-    self.client.refresh()
-    result = self.execute_query("show tables in %s" % db_name);
-    assert len(result.data) == 0
-
+    # Create a table external to Impala.
     call(["hive", "-e", "CREATE TABLE %s.%s (i int)" % (db_name, tbl_name)])
 
-    result = self.execute_query("show tables in %s" % db_name)
-    assert tbl_name not in result.data
+    # Impala does not know about this database or table.
+    result = self.client.execute("show databases")
+    assert db_name not in result.data
 
-    self.client.refresh()
-    result = self.execute_query("show tables in %s" % db_name)
+    # Run 'invalidate metadata <table name>'. It should add the database and table
+    # in to Impala's catalog.
+    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
+    result = self.client.execute("show databases")
+    assert db_name in result.data
+
+    result = self.client.execute("show tables in %s" % db_name)
     assert tbl_name in result.data
+    assert len(result.data) == 1
 
     # Make sure we can actually use the table
-    self.execute_query(("insert overwrite table %s.%s "
+    self.client.execute(("insert overwrite table %s.%s "
                         "select 1 from functional.alltypes limit 5"
                          % (db_name, tbl_name)))
     result = self.execute_scalar("select count(*) from %s.%s" % (db_name, tbl_name))
     assert int(result) == 5
 
+    # Should be able to call invalidate metadata multiple times on the same table.
+    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
+    self.client.execute("refresh %s.%s"  % (db_name, tbl_name))
+    result = self.client.execute("show tables in %s" % db_name)
+    assert tbl_name in result.data
+
+    # Can still use the table.
+    result = self.execute_scalar("select count(*) from %s.%s" % (db_name, tbl_name))
+    assert int(result) == 5
+
+    # Run 'invalidate metadata <table name>' when no table exists with that name.
+    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name + '2'))
+    result = self.client.execute("show tables in %s" % db_name);
+    assert len(result.data) == 1
+    assert tbl_name in result.data
+
+    # Create another table
+    call(["hive", "-e", "CREATE TABLE %s.%s (i int)" % (db_name, tbl_name + '2')])
+    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name + '2'))
+    result = self.client.execute("show tables in %s" % db_name)
+    assert tbl_name + '2' in result.data
+    assert tbl_name in result.data
+
+    # Drop the table, and then verify invalidate metadata <table name> removes the
+    # table from the catalog.
     call(["hive", "-e", "DROP TABLE %s.%s " % (db_name, tbl_name)])
-    call(["hive", "-e", "DROP DATABASE %s" % db_name])
+    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
+    result = self.client.execute("show tables in %s" % db_name)
+    assert tbl_name + '2' in result.data
+    assert tbl_name not in result.data
+
+    # Should be able to call invalidate multiple times on the same table when the table
+    # does not exist.
+    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
+    result = self.client.execute("show tables in %s" % db_name)
+    assert tbl_name + '2' in result.data
+    assert tbl_name not in result.data
+
+    # Drop the parent database (this will drop all tables). Then invalidate the table
+    call(["hive", "-e", "DROP DATABASE %s CASCADE" % db_name])
+    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name + '2'))
+    result = self.client.execute("show tables in %s" % db_name);
+    assert len(result.data) == 0
 
     # Requires a refresh to see the dropped database
-    result = self.execute_query("show databases");
+    result = self.client.execute("show databases");
     assert db_name in result.data
 
-    self.client.refresh()
-    result = self.execute_query("show databases");
+    self.client.execute("invalidate metadata")
+    result = self.client.execute("show databases");
     assert db_name not in result.data

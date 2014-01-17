@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequest;
+import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
@@ -47,8 +48,22 @@ public class ResetMetadataStmt extends StatementBase {
     if (tableName_ != null) {
       String dbName = analyzer.getTargetDbName(tableName_);
       tableName_ = new TableName(dbName, tableName_.getTbl());
-      if (!analyzer.dbContainsTable(dbName, tableName_.getTbl(), Privilege.ANY)) {
-        throw new AnalysisException(Analyzer.TBL_DOES_NOT_EXIST_ERROR_MSG + tableName_);
+
+      if (isRefresh_) {
+        // Verify the user has privileges to access this table. Will throw if the parent
+        // database does not exists. Don't call getTable() to avoid loading the table
+        // metadata if it is not yet in this impalad's catalog cache.
+        if (!analyzer.dbContainsTable(dbName, tableName_.getTbl(), Privilege.ANY)) {
+          // Only throw an exception when the table does not exist for refresh statements
+          // since 'invalidate metadata' should add/remove tables created/dropped external
+          // to Impala.
+          throw new AnalysisException(Analyzer.TBL_DOES_NOT_EXIST_ERROR_MSG + tableName_);
+        }
+      } else {
+        // Verify the user has privileges to access this table.
+        analyzer.getCatalog().checkAccess(analyzer.getUser(),
+            new PrivilegeRequestBuilder().onTable(dbName, tableName_.getTbl())
+            .any().toRequest());
       }
     } else {
       PrivilegeRequest privilegeRequest = new PrivilegeRequest(Privilege.ALL);

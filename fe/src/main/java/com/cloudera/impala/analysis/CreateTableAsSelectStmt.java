@@ -25,7 +25,7 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableId;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.service.DdlExecutor;
+import com.cloudera.impala.service.CatalogOpExecutor;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
 
@@ -100,7 +100,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     // match the schema of the table that will be created by running the CREATE
     // statement.
     org.apache.hadoop.hive.metastore.api.Table msTbl =
-        DdlExecutor.createMetaStoreTable(createStmt_.toThrift());
+        CatalogOpExecutor.createMetaStoreTable(createStmt_.toThrift());
 
     MetaStoreClient client = analyzer.getCatalog().getMetaStoreClient();
     try {

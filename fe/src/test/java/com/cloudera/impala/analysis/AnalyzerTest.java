@@ -387,10 +387,11 @@ public class AnalyzerTest {
     AnalyzesOk("refresh functional.alltypes_view");
     AnalyzesOk("refresh functional.bad_serde");
 
-    AnalysisError("invalidate metadata functional.unknown_table",
-        "Table does not exist: functional.unknown_table");
-    AnalysisError("invalidate metadata unknown_db.unknown_table",
-        "Database does not exist: unknown_db");
+    // invalidate metadata <table name> checks the Hive Metastore for table existence
+    // and should not throw an AnalysisError if the table or db does not exist.
+    AnalyzesOk("invalidate metadata functional.unknown_table");
+    AnalyzesOk("invalidate metadata unknown_db.unknown_table");
+
     AnalysisError("refresh functional.unknown_table",
         "Table does not exist: functional.unknown_table");
     AnalysisError("refresh unknown_db.unknown_table",

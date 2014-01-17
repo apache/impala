@@ -582,7 +582,7 @@ public class ImpaladCatalog extends Catalog {
     // The parent database doesn't exist, nothing to do.
     if (db == null) return;
 
-    Table table = db.getTable(thriftTable.getTbl_name());
+    Table table = db.getTableNoLoad(thriftTable.getTbl_name());
     if (table != null && table.getCatalogVersion() < dropCatalogVersion) {
       db.removeTable(thriftTable.tbl_name);
     }

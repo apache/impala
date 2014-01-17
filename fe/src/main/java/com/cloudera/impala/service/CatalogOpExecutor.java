@@ -68,6 +68,7 @@ import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
 import com.cloudera.impala.thrift.TAlterTableChangeColParams;
@@ -99,6 +100,8 @@ import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.cloudera.impala.thrift.TResetMetadataRequest;
+import com.cloudera.impala.thrift.TResetMetadataResponse;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
@@ -115,16 +118,20 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.SettableFuture;
 
 /**
- * Class used to execute DDL operations.
+ * Class used to execute Catalog Operations, including DDL and refresh/invalidate
+ * metadata requests. Acts as a bridge between the Thrift catalog operation requests
+ * and the non-thrift Java Catalog objects.
  * TODO: Look in to ways to avoid the explosion of exception types in the throws
  * clause of these methods.
+ * TODO: Create a Hive Metastore utility class to move code that interacts with the
+ * metastore out of this class.
  */
-public class DdlExecutor {
+public class CatalogOpExecutor {
   private final CatalogServiceCatalog catalog_;
 
   // Lock used to synchronize metastore CREATE/DROP/ALTER TABLE/DATABASE requests.
   private final Object metastoreDdlLock_ = new Object();
-  private static final Logger LOG = Logger.getLogger(DdlExecutor.class);
+  private static final Logger LOG = Logger.getLogger(CatalogOpExecutor.class);
 
   // Only applies to partition updates after an INSERT for now.
   private static final int NUM_CONCURRENT_METASTORE_OPERATIONS = 16;
@@ -134,7 +141,7 @@ public class DdlExecutor {
   private final ExecutorService executor_ =
       Executors.newFixedThreadPool(NUM_CONCURRENT_METASTORE_OPERATIONS);
 
-  public DdlExecutor(CatalogServiceCatalog catalog) {
+  public CatalogOpExecutor(CatalogServiceCatalog catalog) {
     catalog_ = catalog;
   }
 
@@ -270,7 +277,7 @@ public class DdlExecutor {
             "Unknown ALTER TABLE operation type: " + params.getAlter_type());
     }
 
-    Table refreshedTable = catalog_.resetTable(params.getTable_name(), true);
+    Table refreshedTable = catalog_.reloadTable(params.getTable_name());
     response.result.setUpdated_catalog_object(TableToTCatalogObject(refreshedTable));
     response.result.setVersion(
         response.result.getUpdated_catalog_object().getCatalog_version());
@@ -305,7 +312,7 @@ public class DdlExecutor {
       applyAlterTable(msTbl);
     }
 
-    Table refreshedTbl = catalog_.resetTable(tableName.toThrift(), true);
+    Table refreshedTbl = catalog_.reloadTable(tableName.toThrift());
     resp.result.setUpdated_catalog_object(TableToTCatalogObject(refreshedTbl));
     resp.result.setVersion(resp.result.getUpdated_catalog_object().getCatalog_version());
   }
@@ -1237,7 +1244,7 @@ public class DdlExecutor {
     return fsList;
   }
 
-  public static TCatalogObject TableToTCatalogObject(Table table) {
+  private static TCatalogObject TableToTCatalogObject(Table table) {
     if (table != null) return table.toTCatalogObject();
     return new TCatalogObject(TCatalogObjectType.TABLE,
         Catalog.INITIAL_CATALOG_VERSION);
@@ -1388,6 +1395,79 @@ public class DdlExecutor {
   }
 
   /**
+   * Executes a TResetMetadataRequest and returns the result as a
+   * TResetMetadataResponse. Based on the request parameters, this operation
+   * may do one of three things:
+   * 1) invalidate the entire catalog, forcing the metadata for all catalog
+   *    objects to be reloaded.
+   * 2) invalidate a specific table, forcing the metadata to be reloaded
+   *    on the next access.
+   * 3) perform a synchronous incremental refresh of a specific table.
+   *
+   * For details on the specific commands see comments on their respective
+   * methods in CatalogServiceCatalog.java.
+   */
+  public TResetMetadataResponse execResetMetadata(TResetMetadataRequest req)
+      throws CatalogException {
+    TResetMetadataResponse resp = new TResetMetadataResponse();
+    resp.setResult(new TCatalogUpdateResult());
+    resp.getResult().setCatalog_service_id(JniCatalog.getServiceId());
+
+    if (req.isSetTable_name()) {
+      // Tracks any CatalogObjects updated/added/removed as a result of
+      // the invalidate metadata or refresh call. For refresh() it is only expected
+      // that a table be modified, but for invalidateTable() the table's parent database
+      // may have also been added if it did not previously exist in the catalog.
+      Pair<Db, Table> modifiedObjects = new Pair<Db, Table>(null, null);
+
+      boolean wasRemoved = false;
+      if (req.isIs_refresh()) {
+        modifiedObjects.second = catalog_.reloadTable(req.getTable_name());
+      } else {
+        wasRemoved = catalog_.invalidateTable(req.getTable_name(), modifiedObjects);
+      }
+
+      if (modifiedObjects.first == null) {
+        TCatalogObject thriftTable = TableToTCatalogObject(modifiedObjects.second);
+        if (modifiedObjects.second != null) {
+          // Return the TCatalogObject in the result to indicate this request can be
+          // processed as a direct DDL operation.
+          if (wasRemoved) {
+            resp.getResult().setRemoved_catalog_object(thriftTable);
+          } else {
+            resp.getResult().setUpdated_catalog_object(thriftTable);
+          }
+        }
+        resp.getResult().setVersion(thriftTable.getCatalog_version());
+      } else {
+        // If there were two catalog objects modified it indicates there was an
+        // "invalidateTable()" call that added a new table AND database to the catalog.
+        Preconditions.checkState(!req.isIs_refresh());
+        Preconditions.checkNotNull(modifiedObjects.first);
+        Preconditions.checkNotNull(modifiedObjects.second);
+
+        // The database should always have a lower catalog version than the table because
+        // it needs to be created before the table can be added.
+        Preconditions.checkState(modifiedObjects.first.getCatalogVersion() <
+            modifiedObjects.second.getCatalogVersion());
+
+        // Since multiple catalog objects were modified, don't treat this as a direct DDL
+        // operation. Just set the overall catalog version and the impalad will wait for
+        // a statestore heartbeat that contains the update.
+        resp.getResult().setVersion(modifiedObjects.second.getCatalogVersion());
+      }
+    } else {
+      // Invalidate the entire catalog if no table name is provided.
+      Preconditions.checkArgument(!req.isIs_refresh());
+      catalog_.reset();
+      resp.result.setVersion(catalog_.getCatalogVersion());
+    }
+    resp.getResult().setStatus(
+        new TStatus(TStatusCode.OK, new ArrayList<String>()));
+    return resp;
+  }
+
+  /**
    * Create any new partitions required as a result of an INSERT statement.
    * Updates the lastDdlTime of the table if new partitions were created.
    */
@@ -1444,7 +1524,7 @@ public class DdlExecutor {
     response.getResult().setCatalog_service_id(JniCatalog.getServiceId());
     response.getResult().setStatus(
         new TStatus(TStatusCode.OK, new ArrayList<String>()));
-    Table refreshedTbl = catalog_.resetTable(tblName.toThrift(), true);
+    Table refreshedTbl = catalog_.reloadTable(tblName.toThrift());
     response.getResult().setUpdated_catalog_object(TableToTCatalogObject(refreshedTbl));
     response.getResult().setVersion(
         response.getResult().getUpdated_catalog_object().getCatalog_version());

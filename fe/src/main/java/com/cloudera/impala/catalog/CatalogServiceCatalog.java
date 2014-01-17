@@ -22,7 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.log4j.Logger;
+import org.apache.thrift.TException;
 
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
@@ -321,8 +323,7 @@ public class CatalogServiceCatalog extends Catalog {
     return db.getTable(tblName);
   }
 
-  public Table removeTable(String dbName, String tblName)
-      throws DatabaseNotFoundException {
+  public Table removeTable(String dbName, String tblName) {
     Db parentDb = getDb(dbName);
     if (parentDb == null) return null;
 
@@ -414,40 +415,92 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * If isRefresh is false, invalidates a specific table's metadata, forcing the
-   * metadata to be reloaded. As part the invalidation, an IncompleteTable with
-   * the updated catalog version will be added to the metadata cache. This will
-   * indicate to an impalad that it needs to contact the catalog server to load
-   * the complete metadata.
-   *
-   * If isRefresh is true, performs an immediate incremental refresh, loading the table
-   * metadata.
-   * TODO: Make "invalidate metadata <table name>" sync the catalog state with the
-   * metastore so the command can be used to add/remove tables that have been
-   * added/dropped externally.
+   * Reloads a table's metadata, reusing any existing cached metadata to speed up
+   * the operation. Returns the updated Table object or null if no table with
+   * this name exists in the catalog.
    */
-  public Table resetTable(TTableName tableName, boolean isRefresh)
-      throws CatalogException {
-    if (isRefresh) {
-      Table table = getTable(tableName.getDb_name(), tableName.getTable_name());
-      if (table == null) return null;
-      LOG.debug("Refreshing table metadata: " + table.getFullName());
-      return table.getDb().reloadTable(table.getName());
-    } else {
-      Table existingTable = getTable(tableName.getDb_name(),
-          tableName.getTable_name());
-      if (existingTable == null) return null;
-      LOG.debug("Invalidating table metadata: " + existingTable.getFullName());
+  public Table reloadTable(TTableName tableName) throws CatalogException {
+    LOG.debug(String.format("Refreshing table metadata: %s.%s",
+        tableName.getDb_name(), tableName.getTable_name()));
+    Table table = getTable(tableName.getDb_name(), tableName.getTable_name());
+    if (table == null) return null;
+    return table.getDb().reloadTable(table.getName());
+  }
 
-      // The existing table is replaced with an uninitialized IncompleteTable, which
-      // effectively invalidates the existing cached value. The IncompleteTable
-      // will then be sent to all impalads in the cluster, triggering an invalidation on
-      // each node.
-      Table newTable = IncompleteTable.createUninitializedTable(getNextTableId(),
-          existingTable.getDb(), existingTable.getName());
+  /**
+   * Invalidates the table in the catalog cache, potentially adding/removing the table
+   * from the cache based on whether it exists in the Hive Metastore.
+   * The invalidation logic is:
+   * - If the table exists in the metastore, add it to the catalog as an uninitialized
+   *   IncompleteTable (replacing any existing entry). The table metadata will be
+   *   loaded lazily, on the next access. If the parent database for this table does not
+   *   yet exist in Impala's cache it will also be added.
+   * - If the table does not exist in the metastore, remove it from the catalog cache.
+   * - If we are unable to determine whether the table exists in the metastore (there was
+   *   an exception thrown making the RPC), invalidate any existing Table by replacing
+   *   it with an uninitialized IncompleteTable.
+   *
+   * The parameter updatedObjects is a Pair that contains details on what catalog objects
+   * were modified as a result of the invalidateTable() call. The first item in the Pair
+   * is a Db which will only be set if a new database was added as a result of this call,
+   * otherwise it will be null. The second item in the Pair is the Table that was
+   * modified/added/removed.
+   * Returns a flag that indicates whether the items in updatedObjects were removed
+   * (returns true) or added/modified (return false). Only Tables should ever be removed.
+   */
+  public boolean invalidateTable(TTableName tableName, Pair<Db, Table> updatedObjects) {
+    Preconditions.checkNotNull(updatedObjects);
+    updatedObjects.first = null;
+    updatedObjects.second = null;
+    LOG.debug(String.format("Invalidating table metadata: %s.%s",
+        tableName.getDb_name(), tableName.getTable_name()));
+    String dbName = tableName.getDb_name();
+    String tblName = tableName.getTable_name();
+
+    // Stores whether the table exists in the metastore. Can have three states:
+    // 1) true - Table exists in metastore.
+    // 2) false - Table does not exist in metastore.
+    // 3) unknown (null) - There was exception thrown by the metastore client.
+    Boolean tableExistsInMetaStore;
+    MetaStoreClient msClient = getMetaStoreClient();
+    try {
+      tableExistsInMetaStore = msClient.getHiveClient().tableExists(dbName, tblName);
+    } catch (UnknownDBException e) {
+      // The parent database does not exist in the metastore. Treat this the same
+      // as if the table does not exist.
+      tableExistsInMetaStore = false;
+    } catch (TException e) {
+      LOG.error("Error executing tableExists() metastore call: " + tblName, e);
+      tableExistsInMetaStore = null;
+    }
+
+    if (tableExistsInMetaStore != null && !tableExistsInMetaStore) {
+      updatedObjects.second = removeTable(dbName, tblName);
+      return true;
+    } else {
+      Db db = getDb(dbName);
+      if ((db == null || !db.containsTable(tblName)) && tableExistsInMetaStore == null) {
+        // The table does not exist in our cache AND it is unknown whether the table
+        // exists in the metastore. Do nothing.
+        return false;
+      } else if (db == null && tableExistsInMetaStore) {
+        // The table exists in the metastore, but our cache does not contain the parent
+        // database. A new db will be added to the cache along with the new table.
+        db = new Db(dbName, this);
+        db.setCatalogVersion(incrementAndGetCatalogVersion());
+        addDb(db);
+        updatedObjects.first = db;
+      }
+
+      // Add a new uninitialized table to the table cache, effectively invalidating
+      // any existing entry. The metadata for the table will be loaded lazily, on the
+      // on the next access to the table.
+      Table newTable = IncompleteTable.createUninitializedTable(
+          getNextTableId(), db, tblName);
       newTable.setCatalogVersion(incrementAndGetCatalogVersion());
-      existingTable.getDb().addTable(newTable);
-      return newTable;
+      db.addTable(newTable);
+      updatedObjects.second = newTable;
+      return false;
     }
   }
 
