@@ -52,7 +52,7 @@ if [ -z $IMPALA_HOME ]; then
     fi
 fi
 
-export CDH_MAJOR_VERSION=4
+export CDH_MAJOR_VERSION=5
 
 export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
