@@ -384,6 +384,11 @@ class Coordinator {
   // Moves all temporary staging files to their final destinations.
   Status FinalizeSuccessfulInsert();
 
+  // Update fragment profile information from a backend exec state.
+  // This method calls Merge and AddChild, which obtain their own locks
+  // on the backend state.
+  void UpdateFragmentInfo(BackendExecState* backend_exec_state);
+
   // Outputs aggregate query profile summary.  This is assumed to be called at the end of
   // a query -- remote fragments' profiles must not be updated while this is running.
   void ReportQuerySummary();

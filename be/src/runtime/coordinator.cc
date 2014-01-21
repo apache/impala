@@ -1038,6 +1038,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       // TODO: We're losing this profile information. Call ReportQuerySummary only after
       // all backends have completed.
       exec_state->profile->Update(cumulative_profile);
+      UpdateFragmentInfo(exec_state);
     }
     if (!exec_state->profile_created) {
       CollectScanNodeCounters(exec_state->profile, &exec_state->aggregate_counters);
@@ -1154,6 +1155,24 @@ typedef struct {
   }
 } InstanceComparator;
 
+// Update fragment profile information from a backend execution state.
+void Coordinator::UpdateFragmentInfo(BackendExecState* backend_exec_state) {
+  int fragment_idx = backend_exec_state->fragment_idx;
+  DCHECK_GE(fragment_idx, 0);
+  DCHECK_LT(fragment_idx, fragment_profiles_.size());
+  PerFragmentProfileData& data = fragment_profiles_[fragment_idx];
+
+  int64_t completion_time = backend_exec_state->stopwatch.ElapsedTime();
+  data.completion_times(completion_time);
+  data.rates(backend_exec_state->total_split_size / (completion_time / 1000.0
+    / 1000.0 / 1000.0));
+  // Merge obtains locks on the counter map and children while
+  // performing the merge, so concurrent merges into the same 
+  // profile should be protected
+  data.averaged_profile->Merge(backend_exec_state->profile);
+  data.root_profile->AddChild(backend_exec_state->profile);
+}
+
 // This function appends summary information to the query_profile_ before
 // outputting it to VLOG.  It adds:
 //   1. Averaged remote fragment profiles (TODO: add outliers)
@@ -1175,17 +1194,7 @@ void Coordinator::ReportQuerySummary() {
     for (int i = 0; i < backend_exec_states_.size(); ++i) {
       backend_exec_states_[i]->profile->ComputeTimeInProfile();
 
-      int fragment_idx = backend_exec_states_[i]->fragment_idx;
-      DCHECK_GE(fragment_idx, 0);
-      DCHECK_LT(fragment_idx, fragment_profiles_.size());
-      PerFragmentProfileData& data = fragment_profiles_[fragment_idx];
-
-      int64_t completion_time = backend_exec_states_[i]->stopwatch.ElapsedTime();
-      data.completion_times(completion_time);
-      data.rates(backend_exec_states_[i]->total_split_size / (completion_time / 1000.0
-        / 1000.0 / 1000.0));
-      data.averaged_profile->Merge(backend_exec_states_[i]->profile);
-      data.root_profile->AddChild(backend_exec_states_[i]->profile);
+      UpdateFragmentInfo(backend_exec_states_[i]);
     }
 
     InstanceComparator comparator;

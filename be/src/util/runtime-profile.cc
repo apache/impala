@@ -331,6 +331,11 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
 void RuntimeProfile::AddChild(RuntimeProfile* child, bool indent, RuntimeProfile* loc) {
   DCHECK(child != NULL);
   lock_guard<mutex> l(children_lock_);
+  if (child_map_.count(child->name_) > 0) {
+    // This child has already been added, so do nothing.
+    // Otherwise, the map and vector will be out of sync.
+    return;
+  }
   child_map_[child->name_] = child;
   if (loc == NULL) {
     children_.push_back(make_pair(child, indent));

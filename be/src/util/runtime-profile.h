@@ -288,6 +288,8 @@ class RuntimeProfile {
       const TRuntimeProfileTree& profiles);
 
   // Adds a child profile.  This is thread safe.
+  // Checks if 'child' is already added by searching for its name in the 
+  // child map, and only adds it if the name doesn't exist.
   // 'indent' indicates whether the child will be printed w/ extra indentation
   // relative to the parent.
   // If location is non-null, child will be inserted after location.  Location must
