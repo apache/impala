@@ -45,7 +45,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     last_active_time_(numeric_limits<int64_t>::max()),
     ref_count_(0L),
     exec_env_(exec_env),
-    parent_session_(session),
+    session_(session),
     schedule_(NULL),
     coord_(NULL),
     profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
@@ -82,9 +82,9 @@ ImpalaServer::QueryExecState::QueryExecState(
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   summary_profile_.AddInfoString("Query Status", "OK");
   summary_profile_.AddInfoString("Impala Version", GetVersionString(/* compact */ true));
-  summary_profile_.AddInfoString("User", user());
+  summary_profile_.AddInfoString("User", connected_user());
   summary_profile_.AddInfoString("Network Address",
-      lexical_cast<string>(parent_session_->network_address));
+      lexical_cast<string>(session_->network_address));
   summary_profile_.AddInfoString("Default Db", default_db());
   summary_profile_.AddInfoString("Sql Statement", query_ctxt_.request.stmt);
 }
@@ -145,8 +145,8 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
     const TCatalogOpRequest& catalog_op) {
   switch (catalog_op.op_type) {
     case TCatalogOpType::USE: {
-      lock_guard<mutex> l(parent_session_->lock);
-      parent_session_->database = exec_request_.catalog_op_request.use_db_params.db;
+      lock_guard<mutex> l(session_->lock);
+      session_->database = exec_request_.catalog_op_request.use_db_params.db;
       return Status::OK;
     }
     case TCatalogOpType::SHOW_TABLES: {

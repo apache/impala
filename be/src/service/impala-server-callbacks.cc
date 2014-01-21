@@ -309,7 +309,7 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
     (*output) << "<tr>"
               << "<td>" << PrintTSessionType(session.second->session_type) << "</td>"
               << "<td>" << session.second->inflight_queries.size() << "</td>"
-              << "<td>" << session.second->user << "</td>"
+              << "<td>" << session.second->connected_user << "</td>"
               << "<td>" << session.first << "</td>"
               << "<td>" << session.second->network_address << "</td>"
               << "<td>" << session.second->database << "</td>"

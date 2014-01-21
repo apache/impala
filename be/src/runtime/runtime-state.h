@@ -98,7 +98,7 @@ class RuntimeState {
   }
   int max_errors() const { return query_ctxt_.request.query_options.max_errors; }
   const TQueryContext& query_ctxt() const { return query_ctxt_; }
-  const std::string& user() const { return query_ctxt_.session.user; }
+  const std::string& connected_user() const { return query_ctxt_.session.connected_user; }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
   const std::vector<std::string>& error_log() const { return error_log_; }

@@ -87,6 +87,7 @@ import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
 import com.cloudera.impala.util.TResultRowBuilder;
+import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -616,7 +617,8 @@ public class Frontend {
   public TResultSet execHiveServer2MetadataOp(TMetadataOpRequest request)
       throws ImpalaException {
     User user = request.isSetSession() ?
-        new User(request.session.getUser()) : ImpalaInternalAdminUser.getInstance();
+        new User(TSessionStateUtil.getEffectiveUser(request.session)) :
+        ImpalaInternalAdminUser.getInstance();
     switch (request.opcode) {
       case GET_TYPE_INFO: return MetadataOp.getTypeInfo();
       case GET_SCHEMAS:

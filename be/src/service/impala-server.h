@@ -689,8 +689,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Time the session was created
     TimestampValue start_time;
 
-    // User for this session
-    std::string user;
+    // Connected user for this session, i.e. the user which originated this session.
+    std::string connected_user;
 
     // The user to impersonate. Empty for no impersonation.
     std::string do_as_user;

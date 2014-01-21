@@ -58,7 +58,7 @@ class RuntimeState {
     return false;
   }
 
-  const std::string user() const { return ""; }
+  const std::string connected_user() const { return ""; }
 };
 }
 #else
@@ -112,7 +112,7 @@ FunctionContext::ImpalaVersion FunctionContext::version() const {
 
 const char* FunctionContext::user() const {
   if (impl_->state_ == NULL) return NULL;
-  return impl_->state_->user().c_str();
+  return impl_->state_->connected_user().c_str();
 }
 
 FunctionContext::UniqueId FunctionContext::query_id() const {
@@ -228,4 +228,3 @@ bool FunctionContextImpl::CheckLocalAlloctionsEmpty() {
 StringVal::StringVal(FunctionContext* context, int len)
   : len(len), ptr(context->impl()->AllocateLocal(len)) {
 }
-

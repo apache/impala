@@ -280,9 +280,9 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   const ThriftServer::Username& username =
       ThriftServer::GetThreadConnectionContext()->username;
   if (!username.empty()) {
-    state->user = username;
+    state->connected_user = username;
   } else {
-    state->user = request.username;
+    state->connected_user = request.username;
   }
 
   // TODO: request.configuration might specify database.
@@ -298,7 +298,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
       // 'impala.doas.user' Hive Server 2 configuration property.
       if (conf_itr->first == "impala.doas.user") {
         state->do_as_user = conf_itr->second;
-        Status status = AuthorizeProxyUser(state->user, state->do_as_user);
+        Status status = AuthorizeProxyUser(state->connected_user, state->do_as_user);
         HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
         continue;
       }

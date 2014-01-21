@@ -181,7 +181,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     // transport, the username may be known at that time. If the username hasn't been set
     // yet, set it now.
     lock_guard<mutex> l(session->lock);
-    if (session->user.empty()) session->user = query.hadoop_user;
+    if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
   }
 
   // raise Syntax error or access violation; it's likely to be syntax/analysis error
@@ -457,8 +457,8 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
     // transport, the username may be known at that time. If the username hasn't been set
     // yet, set it now.
     lock_guard<mutex> l(session->lock);
-    if (session->user.empty()) session->user = query.hadoop_user;
-    query_ctxt->session.user = session->user;
+    if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
+    query_ctxt->session.connected_user = session->connected_user;
   }
 
   // Override default query options with Query.Configuration

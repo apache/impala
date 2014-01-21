@@ -73,6 +73,7 @@ import com.cloudera.impala.thrift.TShowStatsParams;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.util.GlogAppender;
+import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Preconditions;
 
 /**
@@ -178,7 +179,8 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     // If the session was not set it indicates this is an internal Impala call.
     User user = params.isSetSession() ?
-        new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
+        new User(TSessionStateUtil.getEffectiveUser(params.getSession())) :
+        ImpalaInternalAdminUser.getInstance();
 
     Preconditions.checkState(!params.isSetSession() || user != null );
     List<String> tables = frontend_.getTableNames(params.db, params.pattern, user);
@@ -205,7 +207,8 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     // If the session was not set it indicates this is an internal Impala call.
     User user = params.isSetSession() ?
-        new User(params.getSession().getUser()) : ImpalaInternalAdminUser.getInstance();
+        new User(TSessionStateUtil.getEffectiveUser(params.getSession())) :
+        ImpalaInternalAdminUser.getInstance();
     List<String> dbs = frontend_.getDbNames(params.pattern, user);
 
     TGetDbsResult result = new TGetDbsResult();

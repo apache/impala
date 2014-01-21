@@ -61,7 +61,7 @@ Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc)
     case TExprOpcode::UTILITY_USER: {
       // Set username from runtime state.
       DCHECK(state != NULL);
-      result_.SetStringVal(state->query_ctxt().session.user);
+      result_.SetStringVal(state->connected_user());
       break;
     }
     case TExprOpcode::UTILITY_CURRENT_DATABASE: {

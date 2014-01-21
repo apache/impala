@@ -304,13 +304,13 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   // and "impersonator" field should be Null. Otherwise, the "user" should be set to
   // the current do_as_user() and "impersonator" should be the connected user.
   if (exec_state.do_as_user().empty()) {
-    writer.String(exec_state.user().c_str());
+    writer.String(exec_state.connected_user().c_str());
     writer.String("impersonator");
     writer.Null();
   } else {
     writer.String(exec_state.do_as_user().c_str());
     writer.String("impersonator");
-    writer.String(exec_state.user().c_str());
+    writer.String(exec_state.connected_user().c_str());
   }
   writer.String("statement_type");
   if (request.stmt_type == TStmtType::DDL) {
@@ -325,7 +325,7 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   }
   writer.String("network_address");
   writer.String(
-      lexical_cast<string>(exec_state.parent_session()->network_address).c_str());
+      lexical_cast<string>(exec_state.session()->network_address).c_str());
   writer.String("sql_statement");
   writer.String(replace_all_copy(exec_state.sql_stmt(), "\n", " ").c_str());
   writer.String("catalog_objects");
@@ -638,8 +638,8 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id, const Status* caus
   exec_state->Done();
 
   {
-    lock_guard<mutex> l(exec_state->parent_session()->lock);
-    exec_state->parent_session()->inflight_queries.erase(query_id);
+    lock_guard<mutex> l(exec_state->session()->lock);
+    exec_state->session()->inflight_queries.erase(query_id);
   }
 
   ArchiveQuery(*exec_state);
@@ -1217,9 +1217,10 @@ void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,
   state->session_id = session_id;
   state->session_type = session_type;
   state->database = database;
+  state->connected_user = connected_user;
   // The do_as_user will only be set if impersonation is enabled and the
   // proxy user is authorized to impersonate as this user.
-  state->user = do_as_user.empty() ? user : do_as_user;
+  if (!do_as_user.empty()) state->__set_impersonated_user(do_as_user);
   state->network_address = network_address;
 }
 
@@ -1530,7 +1531,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
 
   stmt = exec_state.sql_stmt();
   stmt_type = request.stmt_type;
-  user = exec_state.user();
+  user = exec_state.connected_user();
   default_db = exec_state.default_db();
   start_time = exec_state.start_time();
   end_time = exec_state.end_time();
@@ -1579,7 +1580,7 @@ void ImpalaServer::ConnectionStart(
     session_state->network_address = connection_context.network_address;
     // If the username was set by a lower-level transport, use it.
     if (!connection_context.username.empty()) {
-      session_state->user = connection_context.username;
+      session_state->connected_user = connection_context.username;
     }
 
     {
@@ -1639,7 +1640,7 @@ void ImpalaServer::ExpireSessions() {
         int64_t last_accessed = session_state.second->last_accessed;
         if (now - last_accessed <= FLAGS_idle_session_timeout) continue;
         LOG(INFO) << "Expiring session: " << session_state.first << ", user:"
-                  << session_state.second->user << ", last active: "
+                  << session_state.second->connected_user << ", last active: "
                   << session_state.second->last_accessed.DebugString();
         session_state.second->expired = true;
         ImpaladMetrics::NUM_SESSIONS_EXPIRED->Increment(1L);

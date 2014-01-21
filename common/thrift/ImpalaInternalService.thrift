@@ -96,7 +96,10 @@ struct TSessionState {
   1: required string database
 
   // The user to whom this session belongs
-  2: required string user
+  2: required string connected_user
+
+  // If set, the user we are impersonating for the current session
+  6: optional string impersonated_user;
 
   // Client network address
   4: required Types.TNetworkAddress network_address

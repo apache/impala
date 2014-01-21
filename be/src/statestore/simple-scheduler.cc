@@ -769,13 +769,11 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);
   if (!FLAGS_enable_rm) return Status::OK;
-
-  DCHECK(schedule->request().__isset.user);
+  // TODO: Should this take impersonation into account?
+  const string& user = schedule->request().query_ctxt.session.connected_user;
   string pool;
-  RETURN_IF_ERROR(
-      GetYarnPool(schedule->request().user, schedule->query_options(), &pool));
-  schedule->CreateReservationRequest(pool, schedule->request().user,
-      resource_broker_->llama_nodes());
+  RETURN_IF_ERROR(GetYarnPool(user, schedule->query_options(), &pool));
+  schedule->CreateReservationRequest(pool, user, resource_broker_->llama_nodes());
   const TResourceBrokerReservationRequest* reservation_request =
       schedule->reservation_request();
   if (!reservation_request->resources.empty()) {

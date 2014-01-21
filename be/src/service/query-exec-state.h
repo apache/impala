@@ -106,9 +106,9 @@ class ImpalaServer::QueryExecState {
   // Takes lock_: callers must not hold lock() before calling.
   void Done();
 
-  ImpalaServer::SessionState* parent_session() const { return parent_session_.get(); }
-  const std::string& user() const { return parent_session_->user; }
-  const std::string& do_as_user() const { return parent_session_->do_as_user; }
+  ImpalaServer::SessionState* session() const { return session_.get(); }
+  const std::string& connected_user() const { return query_ctxt_.session.connected_user; }
+  const std::string& do_as_user() const { return session_->do_as_user; }
   TSessionType::type session_type() const { return query_ctxt_.session.session_type; }
   const TUniqueId& session_id() const { return query_ctxt_.session.session_id; }
   const std::string& default_db() const { return query_ctxt_.session.database; }
@@ -176,7 +176,7 @@ class ImpalaServer::QueryExecState {
   ExecEnv* exec_env_;
 
   // Session that this query is from
-  boost::shared_ptr<SessionState> parent_session_;
+  boost::shared_ptr<SessionState> session_;
 
   // Resource assignment determined by scheduler. Owned by obj_pool_.
   boost::scoped_ptr<QuerySchedule> schedule_;
