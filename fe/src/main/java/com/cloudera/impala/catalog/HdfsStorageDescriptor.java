@@ -23,8 +23,6 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import parquet.hive.serde.ParquetHiveSerDe;
-
 import com.cloudera.impala.thrift.CatalogObjectsConstants;
 import com.cloudera.impala.thrift.THdfsCompression;
 import com.google.common.collect.ImmutableList;
@@ -59,7 +57,10 @@ public class HdfsStorageDescriptor {
       "org.apache.hadoop.hive.serde2.avro.AvroSerDe", // (avro)
       "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe", // (rc)
       "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe", // (rc)
-      ParquetHiveSerDe.class.getName()); // (parquet)
+      "parquet.hive.serde.ParquetHiveSerDe", // (parquet - legacy)
+      // TODO: Verify the following Parquet SerDe works with Impala and add
+      // support for the new input/output format classes. See CDH-17085.
+      "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"); // (parquet)
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 

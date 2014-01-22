@@ -18,10 +18,6 @@ import java.util.HashMap;
 
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 
-import parquet.hive.DeprecatedParquetInputFormat;
-import parquet.hive.DeprecatedParquetOutputFormat;
-import parquet.hive.serde.ParquetHiveSerDe;
-
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
 
@@ -63,9 +59,10 @@ public class HiveStorageDescriptorFactory {
 
   private static StorageDescriptor createParquetFileSd() {
     StorageDescriptor sd = createGenericSd();
-    sd.setInputFormat(DeprecatedParquetInputFormat.class.getName());
-    sd.setOutputFormat(DeprecatedParquetOutputFormat.class.getName());
-    sd.getSerdeInfo().setSerializationLib(ParquetHiveSerDe.class.getName());
+    sd.setInputFormat("parquet.hive.DeprecatedParquetInputFormat");
+    sd.setOutputFormat("parquet.hive.DeprecatedParquetOutputFormat");
+    // TODO: Should we use "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"?
+    sd.getSerdeInfo().setSerializationLib("parquet.hive.serde.ParquetHiveSerDe");
     sd.setCompressed(false);
     return sd;
   }
