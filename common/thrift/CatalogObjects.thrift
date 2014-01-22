@@ -141,34 +141,38 @@ struct TColumn {
 
 // Represents a block in an HDFS file
 struct THdfsFileBlock {
-  // Name of the file
-  1: required string file_name
-
-  // Size of the file
-  2: required i64 file_size
-
   // Offset of this block within the file
-  3: required i64 offset
+  1: required i64 offset
 
   // Total length of the block
-  4: required i64 length
+  2: required i64 length
 
   // List of datanodes network addresses (IP address and port) that contain this block
-  5: required list<Types.TNetworkAddress> network_addresses
+  3: required list<Types.TNetworkAddress> network_addresses
 
   // The list of disk ids for the file block. May not be set if disk ids are not supported
-  6: optional list<i32> disk_ids
+  4: optional list<i32> disk_ids
 
   // For each replica, specifies if the block is cached in memory.
-  7: optional list<bool> is_cached
+  5: optional list<bool> is_cached
 }
 
-// Represents an HDFS file
+// Represents an HDFS file in a partition.
 struct THdfsFileDesc {
-  1: required string path
+  // The name of the file (not the full path). The parent path is assumed to be the
+  // 'location' of the THdfsPartition this file resides within.
+  1: required string file_name
+
+  // The total length of the file, in bytes.
   2: required i64 length
+
+  // The type of compression used for this file.
   3: required THdfsCompression compression
+
+  // The last modified time of the file.
   4: required i64 last_modification_time
+
+  // List of THdfsFileBlocks that make up this file.
   5: required list<THdfsFileBlock> file_blocks
 }
 

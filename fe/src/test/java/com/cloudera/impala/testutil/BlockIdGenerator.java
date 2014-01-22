@@ -18,6 +18,7 @@ import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TUniqueId;
 
 /**
@@ -58,10 +59,14 @@ public class BlockIdGenerator {
           // Write the output as <tablename>: <blockid1> <blockid2> <etc>
           writer.write(tableName + ":");
           for (HdfsPartition partition: hdfsTable.getPartitions()) {
+            // Ignore the default partition.
+            if (partition.getId() ==
+                    ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
+              continue;
+            }
             List<FileDescriptor> fileDescriptors = partition.getFileDescriptors();
             for (FileDescriptor fd : fileDescriptors) {
-              String path = fd.getFilePath();
-              Path p = new Path(path);
+              Path p = new Path(partition.getLocation(), fd.getFileName());
 
               // Use a deprecated API to get block ids
               DistributedFileSystem dfs =

@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -267,9 +268,10 @@ public class HdfsScanNode extends ScanNode {
               currentLength = maxScanRangeLength;
             }
             TScanRange scanRange = new TScanRange();
-            scanRange.setHdfs_file_split(
-                new THdfsFileSplit(block.getFileName(), currentOffset,
-                  currentLength, partition.getId(), block.getFileSize()));
+            scanRange.setHdfs_file_split(new THdfsFileSplit(
+                new Path(partition.getLocation(), fileDesc.getFileName()).toString(),
+                currentOffset, currentLength, partition.getId(),
+                fileDesc.getFileLength()));
             TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
             scanRangeLocations.scan_range = scanRange;
             scanRangeLocations.locations = locations;

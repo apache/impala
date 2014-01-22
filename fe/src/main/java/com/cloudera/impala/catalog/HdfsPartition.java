@@ -56,11 +56,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    * TODO: Do we even need this class? Just get rid of it and use the Thrift version?
    */
   static public class FileDescriptor {
-    // TODO: split filePath into dir and file name and reuse the dir string to save
-    // memory.
     private final THdfsFileDesc fileDescriptor_;
 
-    public String getFilePath() { return fileDescriptor_.getPath(); }
+    public String getFileName() { return fileDescriptor_.getFile_name(); }
     public long getFileLength() { return fileDescriptor_.getLength(); }
     public long getModificationTime() {
       return fileDescriptor_.getLast_modification_time();
@@ -71,21 +69,21 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
     public THdfsFileDesc toThrift() { return fileDescriptor_; }
 
-    public FileDescriptor(String filePath, long fileLength, long modificationTime) {
-      Preconditions.checkNotNull(filePath);
+    public FileDescriptor(String fileName, long fileLength, long modificationTime) {
+      Preconditions.checkNotNull(fileName);
       Preconditions.checkArgument(fileLength >= 0);
       fileDescriptor_ = new THdfsFileDesc();
-      fileDescriptor_.setPath(filePath);
+      fileDescriptor_.setFile_name(fileName);
       fileDescriptor_.setLength(fileLength);
       fileDescriptor_.setLast_modification_time(modificationTime);
       fileDescriptor_.setCompression(
-          HdfsCompression.fromFileName(filePath).toThrift());
+          HdfsCompression.fromFileName(fileName).toThrift());
       List<THdfsFileBlock> emptyFileBlockList = Lists.newArrayList();
       fileDescriptor_.setFile_blocks(emptyFileBlockList);
     }
 
     private FileDescriptor(THdfsFileDesc fileDesc) {
-      this(fileDesc.path, fileDesc.length, fileDesc.last_modification_time);
+      this(fileDesc.getFile_name(), fileDesc.length, fileDesc.last_modification_time);
       for (THdfsFileBlock block: fileDesc.getFile_blocks()) {
         fileDescriptor_.addToFile_blocks(block);
       }
@@ -101,7 +99,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(this).add("Path", getFilePath())
+      return Objects.toStringHelper(this)
+          .add("FileName", getFileName())
           .add("Length", getFileLength()).toString();
     }
   }
@@ -125,11 +124,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
      * Construct a FileBlock from blockLocation and populate the network address
      * locations of this block from BlockLocation.getNames(). Does not fill diskIds.
      */
-    public FileBlock(String fileName, long fileSize, BlockLocation blockLocation) {
+    public FileBlock(BlockLocation blockLocation) {
       Preconditions.checkNotNull(blockLocation);
       fileBlock_ = new THdfsFileBlock();
-      fileBlock_.setFile_name(fileName);
-      fileBlock_.setFile_size(fileSize);
       fileBlock_.setOffset(blockLocation.getOffset());
       fileBlock_.setLength(blockLocation.getLength());
 
@@ -173,8 +170,6 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       }
     }
 
-    public String getFileName() { return fileBlock_.getFile_name(); }
-    public long getFileSize() { return fileBlock_.getFile_size(); }
     public long getOffset() { return fileBlock_.getOffset(); }
     public long getLength() { return fileBlock_.getLength(); }
     public boolean isCached() { return isCached_; }
@@ -335,7 +330,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     // invalid and moving on, so that table loading won't fail and user can query other
     // partitions.
     for (FileDescriptor fileDescriptor: fileDescriptors) {
-      String result = checkFileCompressionTypeSupported(fileDescriptor.getFilePath());
+      String result = checkFileCompressionTypeSupported(fileDescriptor.getFileName());
       if (!result.isEmpty()) {
         throw new RuntimeException(result);
       }
@@ -349,7 +344,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       List<HdfsPartition.FileDescriptor> fileDescriptors, TAccessLevel accessLevel) {
     this(table, msPartition, partitionKeyValues, fileFormatDescriptor, fileDescriptors,
         partitionIdCounter.getAndIncrement(), msPartition != null ?
-            msPartition.getSd().getLocation() : null, accessLevel);
+            msPartition.getSd().getLocation() : table.getLocation(), accessLevel);
   }
 
   public static HdfsPartition defaultPartition(

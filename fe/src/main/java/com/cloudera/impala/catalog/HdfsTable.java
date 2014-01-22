@@ -105,8 +105,8 @@ public class HdfsTable extends Table {
 
   private final List<HdfsPartition> partitions_; // these are only non-empty partitions
 
-  // Map from filename to FileDescriptor
-  private final Map<String, FileDescriptor> fileDescMap_ = Maps.newHashMap();
+  // Contains all files (FileDescriptors) in the table, by their partition directory.
+  private final Map<String, List<FileDescriptor>> fileDescMap_ = Maps.newHashMap();
 
   // Total number of Hdfs files in this table. Set in load().
   private long numHdfsFiles_;
@@ -185,9 +185,11 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Populate file block metadata inside each file descriptors.
+   * Loads the file block metadata for the given collection of FileDescriptors.
+   * The FileDescriptors are passed as a Map of partition location to list of
+   * files that exist under that directory.
    */
-  private void loadBlockMd(List<FileDescriptor> fileDescriptors)
+  private void loadBlockMd(Map<String, List<FileDescriptor>> fileDescriptors)
       throws RuntimeException {
     LOG.debug("load block md for " + name_);
     // Block locations for all the files
@@ -195,26 +197,27 @@ public class HdfsTable extends Table {
     int numCachedBlocks = 0;
 
     // loop over all files and record their block metadata, minus volume ids
-    for (FileDescriptor fileDescriptor: fileDescriptors) {
-      Path p = new Path(fileDescriptor.getFilePath());
-      BlockLocation[] locations = null;
-      try {
-        FileStatus fileStatus = DFS.getFileStatus(p);
-        // fileDescriptors should not contain directories.
-        Preconditions.checkArgument(!fileStatus.isDirectory());
-        locations = DFS.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
-        if (locations != null) {
-          blockLocations.addAll(Arrays.asList(locations));
-          for (int i = 0; i < locations.length; ++i) {
-            FileBlock blockMd = new FileBlock(fileDescriptor.getFilePath(),
-                fileDescriptor.getFileLength(), locations[i]);
-            fileDescriptor.addFileBlock(blockMd);
-            if (blockMd.isCached()) ++numCachedBlocks;
+    for (String parentPath: fileDescriptors.keySet()) {
+      for (FileDescriptor fileDescriptor: fileDescriptors.get(parentPath)) {
+        Path p = new Path(parentPath, fileDescriptor.getFileName());
+        BlockLocation[] locations = null;
+        try {
+          FileStatus fileStatus = DFS.getFileStatus(p);
+          // fileDescriptors should not contain directories.
+          Preconditions.checkArgument(!fileStatus.isDirectory());
+          locations = DFS.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+          if (locations != null) {
+            blockLocations.addAll(Arrays.asList(locations));
+            for (int i = 0; i < locations.length; ++i) {
+              FileBlock blockMd = new FileBlock(locations[i]);
+              fileDescriptor.addFileBlock(blockMd);
+              if (blockMd.isCached()) ++numCachedBlocks;
+            }
           }
+        } catch (IOException e) {
+          throw new RuntimeException("couldn't determine block locations for path '"
+              + p + "':\n" + e.getMessage(), e);
         }
-      } catch (IOException e) {
-        throw new RuntimeException("couldn't determine block locations for path '"
-            + p + "':\n" + e.getMessage(), e);
       }
     }
 
@@ -249,23 +252,26 @@ public class HdfsTable extends Table {
 
     int locationsIdx = 0;
     int unknownDiskIdCount = 0;
-    for (FileDescriptor fileDescriptor: fileDescriptors) {
-      for (THdfsFileBlock blockMd: fileDescriptor.getFileBlocks()) {
-        VolumeId[] volumeIds = locations[locationsIdx++].getVolumeIds();
-        // Convert opaque VolumeId to 0 based ids.
-        // TODO: the diskId should be eventually retrievable from Hdfs when
-        // the community agrees this API is useful.
-        int[] diskIds = new int[volumeIds.length];
-        for (int i = 0; i < volumeIds.length; ++i) {
-          diskIds[i] = getDiskId(volumeIds[i]);
-          if (diskIds[i] < 0) ++unknownDiskIdCount;
+    for (String parentPath: fileDescriptors.keySet()) {
+      for (FileDescriptor fileDescriptor: fileDescriptors.get(parentPath)) {
+        for (THdfsFileBlock blockMd: fileDescriptor.getFileBlocks()) {
+          VolumeId[] volumeIds = locations[locationsIdx++].getVolumeIds();
+          // Convert opaque VolumeId to 0 based ids.
+          // TODO: the diskId should be eventually retrievable from Hdfs when
+          // the community agrees this API is useful.
+          int[] diskIds = new int[volumeIds.length];
+          for (int i = 0; i < volumeIds.length; ++i) {
+            diskIds[i] = getDiskId(volumeIds[i]);
+            if (diskIds[i] < 0) ++unknownDiskIdCount;
+          }
+          FileBlock.setDiskIds(diskIds, blockMd);
         }
-        FileBlock.setDiskIds(diskIds, blockMd);
       }
-    }
-    LOG.debug("loaded disk ids for table " + getFullName() + ". nodes: " + getNumNodes());
-    if (unknownDiskIdCount > 0) {
-      LOG.warn("unknown disk id count " + unknownDiskIdCount);
+      LOG.debug("loaded disk ids for table " + getFullName() +
+          ". nodes: " + getNumNodes());
+      if (unknownDiskIdCount > 0) {
+        LOG.warn("unknown disk id count " + unknownDiskIdCount);
+      }
     }
   }
 
@@ -434,10 +440,16 @@ public class HdfsTable extends Table {
   private void loadPartitions(
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
-      Map<String, FileDescriptor> oldFileDescMap) throws IOException, CatalogException {
+      Map<String, List<FileDescriptor>> oldFileDescMap) throws IOException,
+      CatalogException {
     partitions_.clear();
     hdfsBaseDir_ = msTbl.getSd().getLocation();
-    List<FileDescriptor> newFileDescs = Lists.newArrayList();
+
+    // Map of parent path to a list of new/modified FileDescriptors. FileDescriptors
+    // in this Map will have their block location information (re)loaded. This is used
+    // to speedup the incremental refresh of a table's metadata by skipping unmodified,
+    // previously loaded FileDescriptors.
+    Map<String, List<FileDescriptor>> fileDescsToLoad = Maps.newHashMap();
 
     // INSERT statements need to refer to this if they try to write to new partitions
     // Scans don't refer to this because by definition all partitions they refer to
@@ -451,7 +463,7 @@ public class HdfsTable extends Table {
       // partition, so add a single partition with no keys which will get all the
       // files in the table's root directory.
       addPartition(msTbl.getSd(), null,
-          new ArrayList<LiteralExpr>(), oldFileDescMap, newFileDescs);
+          new ArrayList<LiteralExpr>(), oldFileDescMap, fileDescsToLoad);
       Path location = new Path(hdfsBaseDir_);
       if (DFS.exists(location)) {
         accessLevel_ = getAvailableAccessLevel(location);
@@ -490,7 +502,7 @@ public class HdfsTable extends Table {
           ++i;
         }
         HdfsPartition partition = addPartition(msPartition.getSd(), msPartition,
-            keyValues, oldFileDescMap, newFileDescs);
+            keyValues, oldFileDescMap, fileDescsToLoad);
         // If the partition is null, its HDFS path does not exist, and it was not added to
         // this table's partition list. Skip the partition.
         if (partition == null) continue;
@@ -518,8 +530,8 @@ public class HdfsTable extends Table {
       }
     }
 
-    if (newFileDescs.size() > 0) {
-      loadBlockMd(newFileDescs);
+    if (fileDescsToLoad.size() > 0) {
+      loadBlockMd(fileDescsToLoad);
     }
     uniqueHostPortsCount_ = countUniqueDataNetworkLocations(partitions_);
   }
@@ -566,11 +578,13 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Adds a new HdfsPartition to internal partition list, populating with file format
+   * Adds a new HdfsPartition to the internal partition list, populating with file format
    * information and file locations. If a partition contains no files, it's not added.
    * For unchanged files (indicated by unchanged mtime), reuses the FileDescriptor from
    * the oldFileDescMap. Otherwise, creates a new FileDescriptor for each modified or
-   * new file and adds it to newFileDescs.
+   * new file and adds it to newFileDescsMap. Both old and newFileDescMap are Maps of
+   * parent directory (partition location) to list of files (FileDescriptors) under that
+   * directory.
    * Returns new partition or null, if none was added.
    *
    * @throws InvalidStorageDescriptorException
@@ -579,8 +593,9 @@ public class HdfsTable extends Table {
    */
   private HdfsPartition addPartition(StorageDescriptor storageDescriptor,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
-      List<LiteralExpr> partitionKeyExprs, Map<String, FileDescriptor> oldFileDescMap,
-      List<FileDescriptor> newFileDescs)
+      List<LiteralExpr> partitionKeyExprs,
+      Map<String, List<FileDescriptor>> oldFileDescMap,
+      Map<String, List<FileDescriptor>> newFileDescMap)
       throws IOException, InvalidStorageDescriptorException {
     HdfsStorageDescriptor fileFormatDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
@@ -601,22 +616,46 @@ public class HdfsTable extends Table {
           continue;
         }
 
-        String fullPath = fileStatus.getPath().toString();
-        FileDescriptor fd = (oldFileDescMap != null) ?
-            oldFileDescMap.get(fullPath): null;
-        if (fd != null && fd.getFileLength() == fileStatus.getLen() &&
-            fd.getModificationTime() == fileStatus.getModificationTime()) {
-          // Reuse the old file descriptor along with its block metadata if the file
-          // length and mtime has not been changed.
-        } else {
-          // Create a new file descriptor. The block metadata will be populated by
-          // loadFileDescriptorsBlockMd.
-          fd = new FileDescriptor(
-              fullPath, fileStatus.getLen(), fileStatus.getModificationTime());
-          newFileDescs.add(fd);
+        String partitionDir = fileStatus.getPath().getParent().toString();
+        FileDescriptor fd = null;
+        // Search for a FileDescriptor with the same parition dir and file name. If one is
+        // found, it will be chosen as a candidate to reuse.
+        if (oldFileDescMap != null && oldFileDescMap.get(partitionDir) != null) {
+          for (FileDescriptor oldFileDesc: oldFileDescMap.get(partitionDir)) {
+            if (oldFileDesc.getFileName().equals(fileName)) {
+              fd = oldFileDesc;
+              break;
+            }
+          }
         }
+
+        // Check if this FileDescriptor has been modified since last loading its block
+        // location information. If it has not been changed, the previously loaded
+        // value can be reused.
+        if (fd == null || fd.getFileLength() != fileStatus.getLen()
+            || fd.getModificationTime() != fileStatus.getModificationTime()) {
+          // Create a new file descriptor, the block metadata will be populated by
+          // loadBlockMd.
+          fd = new FileDescriptor(fileName, fileStatus.getLen(),
+              fileStatus.getModificationTime());
+
+          List<FileDescriptor> fds = newFileDescMap.get(partitionDir);
+          if (fds == null) {
+            fds = Lists.newArrayList();
+            newFileDescMap.put(partitionDir, fds);
+          }
+          fds.add(fd);
+        }
+
+        List<FileDescriptor> fds = fileDescMap_.get(partitionDir);
+        if (fds == null) {
+          fds = Lists.newArrayList();
+          fileDescMap_.put(partitionDir, fds);
+        }
+        fds.add(fd);
+
+        // Add to the list of FileDescriptors for this partition.
         fileDescriptors.add(fd);
-        fileDescMap_.put(fullPath, fd);
       }
 
       HdfsPartition partition = new HdfsPartition(this, msPartition, partitionKeyExprs,
@@ -748,7 +787,8 @@ public class HdfsTable extends Table {
               Lists.newArrayList(modifiedPartitionNames)));
         }
       }
-      Map<String, FileDescriptor> oldFileDescMap = null;
+
+      Map<String, List<FileDescriptor>> oldFileDescMap = null;
       if (cachedEntry != null && cachedEntry instanceof HdfsTable) {
         oldFileDescMap = ((HdfsTable) cachedEntry).fileDescMap_;
       }
