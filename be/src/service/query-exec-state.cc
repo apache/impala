@@ -15,6 +15,7 @@
 #include "service/query-exec-state.h"
 
 #include <limits>
+#include <gutil/strings/substitute.h>
 
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
@@ -22,6 +23,7 @@
 #include "service/impala-server.h"
 #include "service/frontend.h"
 #include "util/debug-util.h"
+#include "util/impalad-metrics.h"
 #include "util/time.h"
 
 #include "gen-cpp/CatalogService.h"
@@ -31,10 +33,12 @@ using namespace std;
 using namespace boost;
 using namespace boost::uuids;
 using namespace beeswax;
+using namespace strings;
 
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
 DECLARE_bool(enable_rm);
+DECLARE_int64(max_result_cache_size);
 
 namespace impala {
 
@@ -48,6 +52,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     session_(session),
     schedule_(NULL),
     coord_(NULL),
+    result_cache_max_size_(-1),
     profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
     server_profile_(&profile_pool_, "ImpalaServer"),
     summary_profile_(&profile_pool_, "Summary"),
@@ -87,6 +92,20 @@ ImpalaServer::QueryExecState::QueryExecState(
       lexical_cast<string>(session_->network_address));
   summary_profile_.AddInfoString("Default Db", default_db());
   summary_profile_.AddInfoString("Sql Statement", query_ctxt_.request.stmt);
+}
+
+Status ImpalaServer::QueryExecState::SetResultCache(QueryResultSet* cache,
+    int64_t max_size) {
+  lock_guard<mutex> l(lock_);
+  DCHECK(result_cache_ == NULL);
+  result_cache_.reset(cache);
+  if (max_size > FLAGS_max_result_cache_size) {
+    return Status(
+        Substitute("Requested result-cache size of $0 exceeds Impala's maximum of $1.",
+            max_size, FLAGS_max_result_cache_size));
+  }
+  result_cache_max_size_ = max_size;
+  return Status::OK;
 }
 
 Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
@@ -245,6 +264,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   if (query_exec_request.fragments[0].plan.nodes[0].limit == 0 &&
       query_exec_request.stmt_type == TStmtType::QUERY) {
     eos_ = true;
+    query_state_ = QueryState::FINISHED;
     return Status::OK;
   }
 
@@ -365,6 +385,9 @@ void ImpalaServer::QueryExecState::Done() {
             << " because of error: " << status.GetErrorMsg();
     }
   }
+
+  // Update result set cache metrics, and update mem limit accounting.
+  ClearResultCache();
 }
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
@@ -418,6 +441,25 @@ Status ImpalaServer::QueryExecState::FetchRows(const int32_t max_rows,
   return query_status_;
 }
 
+Status ImpalaServer::QueryExecState::RestartFetch() {
+  // No result caching for this query. Restart is invalid.
+  if (result_cache_max_size_ <= 0) {
+    return Status(TStatusCode::RECOVERABLE_ERROR,
+        "Restarting of fetch requires enabling of query result caching.");
+  }
+  // The cache overflowed on a previous fetch.
+  if (result_cache_.get() == NULL) {
+    stringstream ss;
+    ss << "The query result cache exceeded its limit of " << result_cache_max_size_
+       << " rows. Restarting the fetch is not possible.";
+    return Status(TStatusCode::RECOVERABLE_ERROR, ss.str());
+  }
+  // Reset fetch state to start over.
+  eos_ = false;
+  num_rows_fetched_ = 0;
+  return Status::OK;
+}
+
 void ImpalaServer::QueryExecState::UpdateQueryState(QueryState::type query_state) {
   lock_guard<mutex> l(lock_);
   if (query_state_ < query_state) query_state_ = query_state;
@@ -455,6 +497,16 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     return Status::OK;
   }
 
+  int32_t num_rows_fetched_from_cache = 0;
+  if (result_cache_max_size_ > 0 && result_cache_ != NULL) {
+    // Satisfy the fetch from the result cache if possible.
+    int cache_fetch_size = (max_rows <= 0) ? result_cache_->size() : max_rows;
+    num_rows_fetched_from_cache =
+        fetched_rows->AddRows(result_cache_.get(), num_rows_fetched_, cache_fetch_size);
+    num_rows_fetched_ += num_rows_fetched_from_cache;
+    if (num_rows_fetched_from_cache >= max_rows) return Status::OK;
+  }
+
   // List of expr values to hold evaluated rows from the query
   vector<void*> result_row;
   result_row.resize(output_exprs_.size());
@@ -464,14 +516,12 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
   scales.resize(result_row.size());
 
   if (coord_ == NULL) {
-    // query without FROM clause: we return exactly one row
+    // Query with LIMIT 0.
     query_state_ = QueryState::FINISHED;
     eos_ = true;
-    RETURN_IF_ERROR(GetRowValue(NULL, &result_row, &scales));
-    return fetched_rows->AddOneRow(result_row, scales);
+    return Status::OK;
   }
 
-  // query with a FROM clause
   lock_.unlock();
   Status status = coord_->Wait();
   lock_.lock();
@@ -487,13 +537,19 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
   }
   if (current_batch_ == NULL) return Status::OK;
 
+  // Maximum number of rows to be fetched from the coord.
+  int32_t max_coord_rows = max_rows;
+  if (max_rows > 0) {
+    DCHECK_LE(num_rows_fetched_from_cache, max_rows);
+    max_coord_rows = max_rows - num_rows_fetched_from_cache;
+  }
   {
     SCOPED_TIMER(row_materialization_timer_);
-    // Convert the available rows, limited by max_rows
+    // Convert the available rows, limited by max_coord_rows
     int available = current_batch_->num_rows() - current_batch_row_;
     int fetched_count = available;
-    // max_rows <= 0 means no limit
-    if (max_rows > 0 && max_rows < available) fetched_count = max_rows;
+    // max_coord_rows <= 0 means no limit
+    if (max_coord_rows > 0 && max_coord_rows < available) fetched_count = max_coord_rows;
     for (int i = 0; i < fetched_count; ++i) {
       TupleRow* row = current_batch_->GetRow(current_batch_row_);
       RETURN_IF_ERROR(GetRowValue(row, &result_row, &scales));
@@ -502,6 +558,32 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
       ++current_batch_row_;
     }
   }
+
+  // Update the result cache if necessary.
+  if (result_cache_max_size_ > 0 && result_cache_.get() != NULL) {
+    int rows_fetched_from_coord = fetched_rows->size() - num_rows_fetched_from_cache;
+    if (result_cache_->size() + rows_fetched_from_coord > result_cache_max_size_) {
+      // Set the cache to NULL to indicate that adding the rows fetched from the coord
+      // would exceed the bound of the cache, and therefore, RestartFetch() should fail.
+      ClearResultCache();
+      return Status::OK;
+    }
+    int64_t delta_bytes =
+        fetched_rows->BytesSize(num_rows_fetched_from_cache, fetched_rows->size());
+    MemTracker* query_mem_tracker = coord_->runtime_state()->query_mem_tracker();
+    // Count the cached rows towards the mem limit.
+    if (!query_mem_tracker->TryConsume(delta_bytes)) {
+      return coord_->runtime_state()->SetMemLimitExceeded(
+          query_mem_tracker, delta_bytes);
+    }
+    // Append all rows fetched from the coordinator into the cache.
+    int num_rows_added = result_cache_->AddRows(
+        fetched_rows, num_rows_fetched_from_cache, fetched_rows->size());
+    // Update result set cache metrics.
+    ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS->Increment(num_rows_added);
+    ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES->Increment(delta_bytes);
+  }
+
   return Status::OK;
 }
 
@@ -702,6 +784,18 @@ Status ImpalaServer::QueryExecState::WaitForChildQueries() {
   }
   query_events_->MarkEvent("Child queries finished");
   return Status::OK;
+}
+
+void ImpalaServer::QueryExecState::ClearResultCache() {
+  if (result_cache_ == NULL) return;
+  // Update result set cache metrics and mem limit accounting.
+  ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS->Increment(-result_cache_->size());
+  int64_t total_bytes = result_cache_->BytesSize();
+  ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES->Increment(-total_bytes);
+  if (coord_ != NULL) {
+    coord_->runtime_state()->query_mem_tracker()->Release(total_bytes);
+  }
+  result_cache_.reset(NULL);
 }
 
 }

@@ -66,6 +66,10 @@ const char* ImpaladMetricKeys::NUM_SESSIONS_EXPIRED =
     "impala-server.num-sessions-expired";
 const char* ImpaladMetricKeys::NUM_QUERIES_EXPIRED =
     "impala-server.num-queries-expired";
+const char* ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_NUM_ROWS =
+    "impala-server.resultset-cache.total-num-rows";
+const char* ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_BYTES =
+    "impala-server.resultset-cache.total-bytes";
 
 // These are created by impala-server during startup.
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
@@ -90,6 +94,8 @@ Metrics::BooleanMetric* ImpaladMetrics::CATALOG_READY = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_SESSIONS_EXPIRED = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_QUERIES_EXPIRED = NULL;
+Metrics::IntMetric* ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS = NULL;
+Metrics::BytesMetric* ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES = NULL;
 
 void ImpaladMetrics::CreateMetrics(Metrics* m) {
   // Initialize impalad metrics
@@ -111,6 +117,12 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS, 0L);
   IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS, 0L);
+  NUM_SESSIONS_EXPIRED = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::NUM_SESSIONS_EXPIRED, 0L);
+  RESULTSET_CACHE_TOTAL_NUM_ROWS = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_NUM_ROWS, 0L);
+  RESULTSET_CACHE_TOTAL_BYTES = m->RegisterMetric(
+      new Metrics::BytesMetric(ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_BYTES, 0L));
 
   // Initialize scan node metrics
   NUM_RANGES_PROCESSED = m->CreateAndRegisterPrimitiveMetric(
@@ -145,8 +157,6 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::CATALOG_NUM_TABLES, 0L);
   CATALOG_READY = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::CATALOG_READY, false);
-  NUM_SESSIONS_EXPIRED = m->CreateAndRegisterPrimitiveMetric(
-      ImpaladMetricKeys::NUM_SESSIONS_EXPIRED, 0L);
 }
 
 }

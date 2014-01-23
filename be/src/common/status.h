@@ -116,6 +116,11 @@ class Status {
         && error_detail_->error_code == TStatusCode::MEM_LIMIT_EXCEEDED;
   }
 
+  bool IsRecoverableError() const {
+    return error_detail_ != NULL
+        && error_detail_->error_code == TStatusCode::RECOVERABLE_ERROR;
+  }
+
   // Add an error message and set the code if no code has been set yet.
   // If a code has already been set, 'code' is ignored.
   void AddErrorMsg(TStatusCode::type code, const std::string& msg);

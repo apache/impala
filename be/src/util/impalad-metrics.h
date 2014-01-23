@@ -94,6 +94,12 @@ class ImpaladMetricKeys {
 
   // Number of queries expired due to inactivity
   static const char* NUM_QUERIES_EXPIRED;
+
+  // Total number of rows cached to support HS2 FETCH_FIRST.
+  static const char* RESULTSET_CACHE_TOTAL_NUM_ROWS;
+
+  // Total bytes consumed for rows cached to support HS2 FETCH_FIRST.
+  static const char* RESULTSET_CACHE_TOTAL_BYTES;
 };
 
 // Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -124,6 +130,8 @@ class ImpaladMetrics {
   static Metrics::IntMetric* NUM_FILES_OPEN_FOR_INSERT;
   static Metrics::IntMetric* NUM_SESSIONS_EXPIRED;
   static Metrics::IntMetric* NUM_QUERIES_EXPIRED;
+  static Metrics::IntMetric* RESULTSET_CACHE_TOTAL_NUM_ROWS;
+  static Metrics::BytesMetric* RESULTSET_CACHE_TOTAL_BYTES;
 
   // Creates and initializes all metrics above in 'm'.
   static void CreateMetrics(Metrics* m);

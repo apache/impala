@@ -121,6 +121,7 @@ class RuntimeState {
   }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
   MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
+  MemTracker* query_mem_tracker() { return query_mem_tracker_.get(); }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }

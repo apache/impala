@@ -90,10 +90,16 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
  public:
   // Rows are added into rowset.
   AsciiQueryResultSet(const TResultSetMetadata& metadata, vector<string>* rowset)
-    : metadata_(metadata), result_set_(rowset) {
+    : metadata_(metadata), result_set_(rowset), owned_result_set_(NULL) {
   }
 
-  virtual ~AsciiQueryResultSet() {}
+  // Rows are added into a new rowset that is owned by this result set.
+  AsciiQueryResultSet(const TResultSetMetadata& metadata)
+    : metadata_(metadata), result_set_(new vector<string>()),
+      owned_result_set_(result_set_) {
+  }
+
+  virtual ~AsciiQueryResultSet() { }
 
   // Convert expr values (col_values) to ASCII using "\t" as column delimiter and store
   // it in this result set.
@@ -128,12 +134,37 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
     return Status::OK;
   }
 
+  virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) {
+    const AsciiQueryResultSet* o = static_cast<const AsciiQueryResultSet*>(other);
+    if (start_idx >= o->result_set_->size()) return 0;
+    const int rows_added =
+        min(static_cast<size_t>(num_rows), o->result_set_->size() - start_idx);
+    result_set_->insert(result_set_->end(), o->result_set_->begin() + start_idx,
+        o->result_set_->begin() + start_idx + rows_added);
+    return rows_added;
+  }
+
+  virtual int64_t BytesSize(int start_idx, int num_rows) {
+    int64_t bytes = 0;
+    const int end = min(static_cast<size_t>(num_rows), result_set_->size() - start_idx);
+    for (int i = start_idx; i < start_idx + end; ++i) {
+      bytes += sizeof(result_set_[i]) + result_set_[i].capacity();
+    }
+    return bytes;
+  }
+
+  virtual size_t size() { return result_set_->size(); }
+
  private:
   // Metadata of the result set
   const TResultSetMetadata& metadata_;
 
-  // Points to the result set to be filled. Not owned here.
+  // Points to the result set to be filled. The result set this points to may be owned by
+  // this object, in which case owned_result_set_ is set.
   vector<string>* result_set_;
+
+  // Set to result_set_ if result_set_ is owned.
+  scoped_ptr<vector<string> > owned_result_set_;
 };
 
 void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {

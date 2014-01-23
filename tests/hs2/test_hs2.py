@@ -15,61 +15,11 @@
 #
 # Client tests for Impala's HiveServer2 interface
 
-import os
 import pytest
-import json
-from time import sleep
-from getpass import getuser
+from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session, operation_id_to_query_id
 from cli_service import TCLIService
-from thrift.transport.TSocket import TSocket
-from thrift.transport.TTransport import TBufferedTransport, TTransportException
-from thrift.protocol import TBinaryProtocol
-from thrift.Thrift import TApplicationException
-from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 
-def needs_session(fn):
-  """Decorator that establishes a session and sets self.session_handle. When the test is
-  finished, the session is closed.
-  """
-  def add_session(self):
-    open_session_req = TCLIService.TOpenSessionReq()
-    open_session_req.username = getuser()
-    open_session_req.configuration = dict()
-    resp = self.hs2_client.OpenSession(open_session_req)
-    TestHS2.check_response(resp)
-    self.session_handle = resp.sessionHandle
-    try:
-      fn(self)
-    finally:
-      close_session_req = TCLIService.TCloseSessionReq()
-      close_session_req.sessionHandle = resp.sessionHandle
-      TestHS2.check_response(self.hs2_client.CloseSession(close_session_req))
-      self.session_handle = None
-  return add_session
-
-def operation_id_to_query_id(operation_id):
-  lo, hi = operation_id.guid[:8],  operation_id.guid[8:]
-  lo = ''.join(['%0.2X' % ord(c) for c in lo[::-1]])
-  hi = ''.join(['%0.2X' % ord(c) for c in hi[::-1]])
-  return "%s:%s" % (lo, hi)
-
-class TestHS2(ImpalaTestSuite):
-  def setup(self):
-    host, port = IMPALAD_HS2_HOST_PORT.split(":")
-    self.socket = TSocket(host, port)
-    self.transport = TBufferedTransport(self.socket)
-    self.transport.open()
-    self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
-    self.hs2_client = TCLIService.Client(self.protocol)
-
-  def teardown(self):
-    if self.socket:
-      self.socket.close()
-
-  @staticmethod
-  def check_response(response, expected = TCLIService.TStatusCode.SUCCESS_STATUS):
-    assert response.status.statusCode == expected
-
+class TestHS2(HS2TestSuite):
   def test_open_session(self):
     """Check that a session can be opened"""
     open_session_req = TCLIService.TOpenSessionReq()

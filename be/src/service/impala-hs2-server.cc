@@ -27,6 +27,7 @@
 #include <boost/algorithm/string.hpp>
 #include <google/heap-profiler.h>
 #include <google/malloc_extension.h>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "common/version.h"
@@ -44,6 +45,7 @@ using namespace boost::uuids;
 using namespace apache::thrift;
 using namespace apache::hive::service::cli::thrift;
 using namespace beeswax; // Converting QueryState
+using namespace strings;
 
 // HiveServer2 error returning macro
 #define HS2_RETURN_ERROR(return_val, error_msg, error_state) \
@@ -65,14 +67,34 @@ using namespace beeswax; // Converting QueryState
 
 namespace impala {
 
+const string IMPALA_RESULT_CACHING_OPT = "impala.resultset.cache.size";
+
+// Utility functions for computing the size HS2 Thrift structs in bytes.
+static inline
+int64_t BytesSize(const apache::hive::service::cli::thrift::TColumnValue& val) {
+  return sizeof(val) + val.stringVal.value.capacity();
+}
+
+static int64_t BytesSize(const apache::hive::service::cli::thrift::TRow& row) {
+  int64_t bytes = sizeof(row);
+  BOOST_FOREACH(const apache::hive::service::cli::thrift::TColumnValue& c, row.colVals) {
+    bytes += BytesSize(c);
+  }
+  return bytes;
+}
+
 // TRow result set for HiveServer2
 class ImpalaServer::TRowQueryResultSet : public ImpalaServer::QueryResultSet {
  public:
   // Rows are added into rowset.
   TRowQueryResultSet(const TResultSetMetadata& metadata, TRowSet* rowset)
-    : metadata_(metadata), result_set_(rowset) { }
+    : metadata_(metadata), result_set_(rowset), owned_result_set_(NULL) { }
 
-  virtual ~TRowQueryResultSet() {}
+  // Rows are added into a new rowset which is owned by this result set.
+  TRowQueryResultSet(const TResultSetMetadata& metadata)
+    : metadata_(metadata), result_set_(new TRowSet()), owned_result_set_(result_set_) { }
+
+  virtual ~TRowQueryResultSet() { }
 
   // Convert expr value to HS2 TRow and store it in TRowSet.
   virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales) {
@@ -102,12 +124,39 @@ class ImpalaServer::TRowQueryResultSet : public ImpalaServer::QueryResultSet {
     return Status::OK;
   }
 
+  virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) {
+    const TRowQueryResultSet* o = static_cast<const TRowQueryResultSet*>(other);
+    if (start_idx >= o->result_set_->rows.size()) return 0;
+    const int rows_added =
+        min(static_cast<size_t>(num_rows), o->result_set_->rows.size() - start_idx);
+    for (int i = start_idx; i < start_idx + rows_added; ++i) {
+      result_set_->rows.push_back(o->result_set_->rows[i]);
+    }
+    return rows_added;
+  }
+
+  virtual int64_t BytesSize(int start_idx, int num_rows) {
+    int64_t bytes = 0;
+    const int end =
+        min(static_cast<size_t>(num_rows), result_set_->rows.size() - start_idx);
+    for (int i = start_idx; i < start_idx + end; ++i) {
+      bytes += impala::BytesSize(result_set_->rows[i]);
+    }
+    return bytes;
+  }
+
+  virtual size_t size() { return result_set_->rows.size(); }
+
  private:
   // Metadata of the result set
   const TResultSetMetadata& metadata_;
 
-  // Points to the TRowSet to be filled. Not owned here.
+  // Points to the TRowSet to be filled. The row set this points to may be owned by
+  // this object, in which case owned_result_set_ is set.
   TRowSet* result_set_;
+
+  // Set to result_set_ if result_set_ is owned.
+  scoped_ptr<TRowSet> owned_result_set_;
 };
 
 void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
@@ -189,7 +238,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 }
 
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
-    apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results) {
+    bool fetch_first, TFetchResultsResp* fetch_results) {
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
   if (exec_state == NULL) return Status("Invalid query handle");
 
@@ -210,6 +259,8 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
   if (exec_state->num_rows_fetched() == 0) {
     exec_state->query_events()->MarkEvent("First row fetched");
   }
+
+  if (fetch_first) RETURN_IF_ERROR(exec_state->RestartFetch());
 
   fetch_results->results.__set_startRowOffset(exec_state->num_rows_fetched());
   TRowQueryResultSet result_set(*(exec_state->result_metadata()),
@@ -240,6 +291,7 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
   if (execute_request.__isset.confOverlay) {
     map<string, string>::const_iterator conf_itr = execute_request.confOverlay.begin();
     for (; conf_itr != execute_request.confOverlay.end(); ++conf_itr) {
+      if (conf_itr->first == IMPALA_RESULT_CACHING_OPT) continue;
       RETURN_IF_ERROR(SetQueryOptions(conf_itr->first, conf_itr->second,
           &query_ctxt->request.query_options));
     }
@@ -394,9 +446,34 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
         return_val, Status("Invalid session ID"), SQLSTATE_GENERAL_ERROR);
   }
 
+  // Optionally enable result caching to allow restarting fetches.
+  int64_t cache_num_rows = -1;
+  if (request.__isset.confOverlay) {
+    map<string, string>::const_iterator iter =
+        request.confOverlay.find(IMPALA_RESULT_CACHING_OPT);
+    if (iter != request.confOverlay.end()) {
+      StringParser::ParseResult parse_result;
+      cache_num_rows = StringParser::StringToInt<int64_t>(
+          iter->second.c_str(), iter->second.size(), &parse_result);
+      if (parse_result != StringParser::PARSE_SUCCESS) {
+        HS2_RETURN_IF_ERROR(
+            return_val, Status(Substitute("Invalid value '$0' for '$1' option.",
+                iter->second, IMPALA_RESULT_CACHING_OPT)), SQLSTATE_GENERAL_ERROR);
+      }
+    }
+  }
+
   shared_ptr<QueryExecState> exec_state;
   status = Execute(&query_ctxt, session, &exec_state);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+
+  // Optionally enable result caching on the QueryExecState.
+  if (cache_num_rows > 0) {
+    status = exec_state->SetResultCache(
+        new ImpalaServer::TRowQueryResultSet(*exec_state->result_metadata()),
+            cache_num_rows);
+    HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+  }
 
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
@@ -690,11 +767,12 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
 
 void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
     const TFetchResultsReq& request) {
-  if (request.orientation != TFetchOrientation::FETCH_NEXT) {
-    // We can't do anythng other than FETCH_NEXT
+  if (request.orientation != TFetchOrientation::FETCH_NEXT
+      && request.orientation != TFetchOrientation::FETCH_FIRST) {
     HS2_RETURN_ERROR(return_val, "Unsupported operation",
         SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
   }
+  bool fetch_first = request.orientation == TFetchOrientation::FETCH_FIRST;
 
   // Convert Operation id to TUniqueId and get the query exec state.
   // TODO: check secret
@@ -706,11 +784,17 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
            << " fetch_size=" << request.maxRows;
 
   // FetchInternal takes care of extending the session
-  Status status = FetchInternal(query_id, request.maxRows, &return_val);
+  Status status = FetchInternal(query_id, request.maxRows, fetch_first, &return_val);
   VLOG_ROW << "FetchResults(): #results=" << return_val.results.rows.size()
            << " has_more=" << (return_val.hasMoreRows ? "true" : "false");
   if (!status.ok()) {
-    UnregisterQuery(query_id);
+    // Only unregister the query if the underlying error is unrecoverable.
+    // Clients are expected to understand that a failed FETCH_FIRST is recoverable,
+    // and hence, the query must eventually be closed by the client.
+    // It is important to ensure FETCH_NEXT does not return recoverable errors to
+    // preserve compatibility with clients written against Impala versions < 1.3.
+    if (status.IsRecoverableError()) DCHECK(fetch_first);
+    if (!status.IsRecoverableError()) UnregisterQuery(query_id);
     HS2_RETURN_ERROR(return_val, status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
   }
   return_val.status.__set_statusCode(

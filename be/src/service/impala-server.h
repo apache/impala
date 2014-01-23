@@ -264,6 +264,20 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Add the TResultRow to this result set. When a row comes from a DDL/metadata
     // operation, the row in the form of TResultRow.
     virtual Status AddOneRow(const TResultRow& row) = 0;
+
+    // Copies rows in the range [start_idx, start_idx + num_rows) from the other result
+    // set into this result set. Returns the number of rows added to this result set.
+    // Returns 0 if the given range is out of bounds of the other result set.
+    virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) = 0;
+
+    // Returns the approximate size of this result set in bytes.
+    int64_t BytesSize() { return BytesSize(0, size()); }
+
+    // Returns the approximate size of the given range of rows in bytes.
+    virtual int64_t BytesSize(int start_idx, int num_rows) = 0;
+
+    // Returns the size of this result set in number of rows.
+    virtual size_t size() = 0;
   };
 
   class AsciiQueryResultSet; // extends QueryResultSet
@@ -549,9 +563,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       apache::hive::service::cli::thrift::TOperationHandle* handle,
       apache::hive::service::cli::thrift::TStatus* status);
 
-  // Executes the fetch logic for HiveServer2 FetchResults.
+  // Executes the fetch logic for HiveServer2 FetchResults. If fetch_first is true, then
+  // the query's state should be reset to fetch from the beginning of the result set.
   // Doesn't clean up the exec state if an error occurs.
-  Status FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
+  Status FetchInternal(const TUniqueId& query_id, int32_t fetch_size, bool fetch_first,
       apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results);
 
   // Helper functions to translate between HiveServer2 and Impala structs

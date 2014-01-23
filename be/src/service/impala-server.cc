@@ -94,6 +94,11 @@ DEFINE_int32(query_log_size, 25, "Number of queries to retain in the query log. 
                                  "the query log has unbounded size.");
 DEFINE_bool(log_query_to_file, true, "if true, logs completed query profiles to file.");
 
+DEFINE_int64(max_result_cache_size, 100000L, "Maximum number of query results a client "
+    "may request to be cached on a per-query basis to support restarting fetches. This "
+    "option guards against unreasonably large result caches requested by clients. "
+    "Requests exceeding this maximum will be rejected.");
+
 // TODO: this logging should go into a per query log.
 DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory usage "
     "every log_mem_usage_interval'th fragment completion.");
