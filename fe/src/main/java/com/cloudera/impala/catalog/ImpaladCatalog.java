@@ -53,17 +53,18 @@ import com.google.common.base.Preconditions;
  * Thread safe Catalog for an Impalad. The Impalad Catalog provides an interface to
  * access Catalog objects that this Impalad knows about and authorizes access requests
  * to these objects. It also manages reading and updating the authorization policy file
- * from HDFS.
+ * from HDFS. The Impalad Catalog provides APIs for checking whether a user is authorized
+ * to access a particular catalog object. Any catalog access that requires privilege
+ * checks should go through this class.
  * TODO: The CatalogService should also handle updating and disseminating the
  * authorization policy.
  * The Impalad catalog can be updated either via a StateStore heartbeat or by directly
- * applying the result of a catalog operation to the CatalogCache. Updates applied using
- * the updateCatalog() function which takes the catalogLock_.writeLock() for the duration
- * of its execution to ensure all updates are applied atomically.
+ * applying the result of a catalog operation to the CatalogCache. All updates are
+ * applied using the updateCatalog() function.
  * Table metadata is loaded lazily. The CatalogServer initially broadcasts (via the
  * statestore) the known table names (as IncompleteTables). These table names are added
  * to the Impalad catalog cache and when one of the tables is accessed, the impalad will
- * make an RPC to the CatalogServer to load the complete table metadata.
+ * make an RPC to the CatalogServer to request loading the complete table metadata.
  * In both cases, we need to ensure that work from one update is not "undone" by another
  * update. To handle this the ImpaladCatalog does the following:
  * - Tracks the overall catalog version last received in a state store heartbeat, this
@@ -78,16 +79,22 @@ import com.google.common.base.Preconditions;
  * - Before dropping any catalog object, see if the object already exists in the catalog
  *   cache. If it does, only drop the object if the version of the drop is > that
  *   object's catalog version.
- * Additionally, the Impalad Catalog provides interfaces for checking whether
- * a user is authorized to access a particular object. Any catalog access that requires
- * privilege checks should go through this class.
  * The CatalogServiceId is also tracked to detect if a different instance of the catalog
  * service has been started, in which case a full topic update is required.
  */
 public class ImpaladCatalog extends Catalog {
   private static final Logger LOG = Logger.getLogger(ImpaladCatalog.class);
   private static final TUniqueId INITIAL_CATALOG_SERVICE_ID = new TUniqueId(0L, 0L);
+
+  // The last known Catalog Service ID. If the ID changes, it indicates the CatalogServer
+  // has restarted.
   private TUniqueId catalogServiceId_ = INITIAL_CATALOG_SERVICE_ID;
+
+  // The catalog version received in the last StateStore heartbeat. It is guaranteed
+  // all objects in the catalog have at a minimum, this version. Because updates may
+  // be applied out of band of a StateStore heartbeat, it is possible the catalog
+  // contains some objects > than this version.
+  private long lastSyncedCatalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
 
   //TODO: Make the reload interval configurable.
   private static final int AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS = 5 * 60;
@@ -98,13 +105,9 @@ public class ImpaladCatalog extends Catalog {
   // Lock used to synchronize refreshing the AuthorizationChecker.
   private final ReentrantReadWriteLock authzCheckerLock_ = new ReentrantReadWriteLock();
   private AuthorizationChecker authzChecker_;
+
   // Flag to determine if the Catalog is ready to accept user requests. See isReady().
   private final AtomicBoolean isReady_ = new AtomicBoolean(false);
-  // The catalog version received in the last StateStore heartbeat. It is guaranteed
-  // all objects in the catalog have at a minimum, this version. Because updates may
-  // be applied out of band of a StateStore heartbeat, it is possible the catalog
-  // contains some objects > than this version.
-  private long lastSyncedCatalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
 
   // Tracks modifications to this Impalad's catalog from direct updates to the cache.
   private final CatalogDeltaLog catalogDeltaLog_ = new CatalogDeltaLog();
@@ -138,13 +141,38 @@ public class ImpaladCatalog extends Catalog {
     // loaded (from the catalog server) on the next access.
     // TODO: Clean up how we bootstrap the FE tests.
     if (loadStrategy != CatalogInitStrategy.EMPTY) {
+      try {
+        reset();
+      } catch (CatalogException e) {
+        // Re-throw as an illegal state exception.
+        throw new IllegalStateException(e);
+      }
       isReady_.set(true);
-      for (String dbName: getDbNames(null)) {
-        Db db = getDb(dbName);
-        for (String tblName: db.getAllTableNames()) {
-          db.invalidateTable(tblName);
+    }
+  }
+
+  /**
+   * Used only for testing. Implementation of reset() that allows for bootstrapping the
+   * Impalad catalog without a running statestore daemon.
+   */
+  @Override
+  public void reset() throws CatalogException {
+    MetaStoreClient msClient = metaStoreClientPool_.getClient();
+    try {
+      for (String dbName: msClient.getHiveClient().getAllDatabases()) {
+        Db db = new Db(dbName, this);
+        dbCache_.get().put(db.getName().toLowerCase(), db);
+
+        for (String tableName: msClient.getHiveClient().getAllTables(dbName)) {
+          Table incompleteTbl = IncompleteTable.createUninitializedTable(
+              TableId.createInvalidId(), db, tableName);
+          db.addTable(incompleteTbl);
         }
       }
+    } catch (Exception e) {
+      throw new CatalogException(e.getMessage(), e);
+    } finally {
+      msClient.release();
     }
   }
 
@@ -210,55 +238,50 @@ public class ImpaladCatalog extends Catalog {
    *
    * This method is called once per statestore heartbeat and is guaranteed the same
    * object will not be in both the "updated" list and the "removed" list (it is
-   * a detail handled by the statestore). This method takes the catalogLock_ writeLock
-   * for the duration of the method to ensure all updates are applied atomically. Since
-   * updates are sent from the statestore as deltas, this should generally not block
-   * execution for a significant amount of time.
+   * a detail handled by the statestore).
    * Catalog updates are ordered by the object type with the dependent objects coming
    * first. That is, database "foo" will always come before table "foo.bar".
+   * Synchronized because updateCatalog() can be called by during a statestore update or
+   * during a direct-DDL operation and catalogServiceId_ and lastSyncedCatalogVersion_
+   * must be protected.
    */
-  public TUpdateCatalogCacheResponse updateCatalog(
-      TUpdateCatalogCacheRequest req) throws CatalogException {
-    catalogLock_.writeLock().lock();
-    try {
-      // Check for changes in the catalog service ID.
-      if (!catalogServiceId_.equals(req.getCatalog_service_id())) {
-        boolean firstRun = catalogServiceId_.equals(INITIAL_CATALOG_SERVICE_ID);
-        catalogServiceId_ = req.getCatalog_service_id();
-        if (!firstRun) {
-          // Throw an exception which will trigger a full topic update request.
-          throw new CatalogException("Detected catalog service ID change. Aborting " +
-              "updateCatalog()");
-        }
+  public synchronized TUpdateCatalogCacheResponse updateCatalog(
+    TUpdateCatalogCacheRequest req) throws CatalogException {
+    // Check for changes in the catalog service ID.
+    if (!catalogServiceId_.equals(req.getCatalog_service_id())) {
+      boolean firstRun = catalogServiceId_.equals(INITIAL_CATALOG_SERVICE_ID);
+      catalogServiceId_ = req.getCatalog_service_id();
+      if (!firstRun) {
+        // Throw an exception which will trigger a full topic update request.
+        throw new CatalogException("Detected catalog service ID change. Aborting " +
+            "updateCatalog()");
       }
-
-      // First process all updates
-      long newCatalogVersion = lastSyncedCatalogVersion_;
-      for (TCatalogObject catalogObject: req.getUpdated_objects()) {
-        if (catalogObject.getType() == TCatalogObjectType.CATALOG) {
-          newCatalogVersion = catalogObject.getCatalog_version();
-        } else {
-          try {
-            addCatalogObject(catalogObject);
-          } catch (Exception e) {
-            LOG.error("Error adding catalog object: " + e.getMessage(), e);
-          }
-        }
-      }
-
-      // Now remove all objects from the catalog. Removing a database before removing
-      // its child tables/functions is fine. If that happens, the removal of the child
-      // object will be a no-op.
-      for (TCatalogObject catalogObject: req.getRemoved_objects()) {
-        removeCatalogObject(catalogObject, newCatalogVersion);
-      }
-      lastSyncedCatalogVersion_ = newCatalogVersion;
-      // Cleanup old entries in the log.
-      catalogDeltaLog_.garbageCollect(lastSyncedCatalogVersion_);
-      isReady_.set(true);
-    } finally {
-      catalogLock_.writeLock().unlock();
     }
+
+    // First process all updates
+    long newCatalogVersion = lastSyncedCatalogVersion_;
+    for (TCatalogObject catalogObject: req.getUpdated_objects()) {
+      if (catalogObject.getType() == TCatalogObjectType.CATALOG) {
+        newCatalogVersion = catalogObject.getCatalog_version();
+      } else {
+        try {
+          addCatalogObject(catalogObject);
+        } catch (Exception e) {
+          LOG.error("Error adding catalog object: " + e.getMessage(), e);
+        }
+      }
+    }
+
+    // Now remove all objects from the catalog. Removing a database before removing
+    // its child tables/functions is fine. If that happens, the removal of the child
+    // object will be a no-op.
+    for (TCatalogObject catalogObject: req.getRemoved_objects()) {
+      removeCatalogObject(catalogObject, newCatalogVersion);
+    }
+    lastSyncedCatalogVersion_ = newCatalogVersion;
+    // Cleanup old entries in the log.
+    catalogDeltaLog_.garbageCollect(lastSyncedCatalogVersion_);
+    isReady_.set(true);
     return new TUpdateCatalogCacheResponse(catalogServiceId_);
   }
 
@@ -318,16 +341,11 @@ public class ImpaladCatalog extends Catalog {
     checkAccess(user, new PrivilegeRequestBuilder()
         .allOf(privilege).onTable(dbName, tableName).toRequest());
 
-    catalogLock_.readLock().lock();
-    try {
-      Db db = getDb(dbName);
-      if (db == null) {
-        throw new DatabaseNotFoundException("Database not found: " + dbName);
-      }
-      return db.containsTable(tableName);
-    } finally {
-      catalogLock_.readLock().unlock();
+    Db db = getDb(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database not found: " + dbName);
     }
+    return db.containsTable(tableName);
   }
 
   /**
@@ -343,8 +361,8 @@ public class ImpaladCatalog extends Catalog {
 
     Table table = getTable(dbName, tableName);
     if (table instanceof IncompleteTable) {
-      // We should never get back an uninitialized IncompleteTable.
-      Preconditions.checkState(!((IncompleteTable) table).isUninitialized());
+      // We should never get back an IncompleteTable that is uninitialized.
+      Preconditions.checkState(table.isLoaded());
 
       // If there were problems loading this table's metadata, throw an exception
       // when it is accessed.
@@ -534,15 +552,7 @@ public class ImpaladCatalog extends Catalog {
 
     Table newTable = Table.fromThrift(db, thriftTable);
     newTable.setCatalogVersion(catalogVersion);
-
-    // If this is an uninitialized table, don't just add the table name to
-    // the metadata cache. The next access will trigger a metadata load.
-    if (newTable instanceof IncompleteTable
-        && ((IncompleteTable) newTable).isUninitialized()) {
-      db.addTableName(newTable.getName());
-    } else {
-      db.addTable(newTable);
-    }
+    db.addTable(newTable);
   }
 
   private void addFunction(TFunction fn, long catalogVersion) {

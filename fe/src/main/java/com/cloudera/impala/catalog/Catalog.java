@@ -16,10 +16,9 @@ package com.cloudera.impala.catalog;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,11 +36,16 @@ import com.google.common.collect.Lists;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
- * This class caches db-, table- and column-related metadata. Although this class is
+ * This class provides a storage API for caching CatalogObjects: databases, tables,
+ * and functions and the relevant metadata to go along with them. Although this class is
  * thread safe, it does not guarantee consistency with the MetaStore. It is important
  * to keep in mind that there may be external (potentially conflicting) concurrent
  * metastore updates occurring at any time.
- * All reads and writes of catalog objects should be synchronized using the catalogLock_.
+ * The CatalogObject storage hierarchy is:
+ * Catalog -> Db -> Table
+ *               -> Function
+ * Each level has its own synchronization, so the cache of Dbs is synchronized and each
+ * Db has a cache of tables which is synchronized independently.
  */
 public abstract class Catalog {
   // Initial catalog version.
@@ -51,16 +55,15 @@ public abstract class Catalog {
 
   private static final Logger LOG = Logger.getLogger(Catalog.class);
 
-  private final MetaStoreClientPool metaStoreClientPool_ = new MetaStoreClientPool(0);
-  private final CatalogInitStrategy initStrategy_;
-  private final AtomicInteger nextTableId_ = new AtomicInteger(0);
+  protected final MetaStoreClientPool metaStoreClientPool_ = new MetaStoreClientPool(0);
+  protected final CatalogInitStrategy initStrategy_;
 
-  // Cache of database metadata.
-  protected final HashMap<String, Db> dbCache_ = new HashMap<String, Db>();
-
-  // Fair lock used to synchronize catalog accesses and updates.
-  protected final ReentrantReadWriteLock catalogLock_ =
-      new ReentrantReadWriteLock(true);
+  // Thread safe cache of database metadata. Uses an AtomicReference so reset()
+  // operations can atomically swap dbCache_ references.
+  // TODO: Update this to use a CatalogObjectCache?
+  protected AtomicReference<ConcurrentHashMap<String, Db>> dbCache_ =
+      new AtomicReference<ConcurrentHashMap<String, Db>>(
+          new ConcurrentHashMap<String, Db>());
 
   // Determines how the Catalog should be initialized.
   public enum CatalogInitStrategy {
@@ -80,10 +83,14 @@ public abstract class Catalog {
     if (initStrategy != CatalogInitStrategy.EMPTY) {
       metaStoreClientPool_.addClients(META_STORE_CLIENT_POOL_SIZE);
     }
-    reset();
   }
 
-  public Catalog() { this(CatalogInitStrategy.LAZY); }
+  /**
+   * Resets this catalog instance by clearing all cached metadata and potentially
+   * reloading the metadata. How the metadata is loaded is based on the
+   * CatalogInitStrategy that was set in the c'tor.
+   */
+  public abstract void reset() throws CatalogException;
 
   /**
    * Adds a new database to the catalog, replacing any existing database with the same
@@ -91,12 +98,7 @@ public abstract class Catalog {
    * previous database.
    */
   public Db addDb(Db db) {
-    catalogLock_.writeLock().lock();
-    try {
-      return dbCache_.put(db.getName().toLowerCase(), db);
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
+    return dbCache_.get().put(db.getName().toLowerCase(), db);
   }
 
   /**
@@ -106,12 +108,7 @@ public abstract class Catalog {
   public Db getDb(String dbName) {
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name given as argument to Catalog.getDb");
-    catalogLock_.readLock().lock();
-    try {
-      return dbCache_.get(dbName.toLowerCase());
-    } finally {
-      catalogLock_.readLock().unlock();
-    }
+    return dbCache_.get().get(dbName.toLowerCase());
   }
 
   /**
@@ -120,12 +117,7 @@ public abstract class Catalog {
    * statements.
    */
   public Db removeDb(String dbName) {
-    catalogLock_.writeLock().lock();
-    try {
-      return dbCache_.remove(dbName.toLowerCase());
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
+    return dbCache_.get().remove(dbName.toLowerCase());
   }
 
   /**
@@ -135,12 +127,7 @@ public abstract class Catalog {
    * dbPattern may be null (and thus matches everything).
    */
   public List<String> getDbNames(String dbPattern) {
-    catalogLock_.readLock().lock();
-    try {
-      return filterStringsByPattern(dbCache_.keySet(), dbPattern);
-    } finally {
-      catalogLock_.readLock().unlock();
-    }
+    return filterStringsByPattern(dbCache_.get().keySet(), dbPattern);
   }
 
   /**
@@ -149,16 +136,11 @@ public abstract class Catalog {
    */
   public Table getTable(String dbName, String tableName) throws
       DatabaseNotFoundException {
-    catalogLock_.readLock().lock();
-    try {
-      Db db = getDb(dbName);
-      if (db == null) {
-        throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
-      }
-      return db.getTable(tableName);
-    } finally {
-      catalogLock_.readLock().unlock();
+    Db db = getDb(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
+    return db.getTable(tableName);
   }
 
   /**
@@ -166,15 +148,10 @@ public abstract class Catalog {
    * if the table/database does not exist.
    */
   public Table removeTable(TTableName tableName) {
-    catalogLock_.writeLock().lock();
-    try {
-      // Remove the old table name from the cache and add the new table.
-      Db db = getDb(tableName.getDb_name());
-      if (db == null) return null;
-      return db.removeTable(tableName.getTable_name());
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
+    // Remove the old table name from the cache and add the new table.
+    Db db = getDb(tableName.getDb_name());
+    if (db == null) return null;
+    return db.removeTable(tableName.getTable_name());
   }
 
   /**
@@ -189,26 +166,16 @@ public abstract class Catalog {
   public List<String> getTableNames(String dbName, String tablePattern)
       throws DatabaseNotFoundException {
     Preconditions.checkNotNull(dbName);
-    catalogLock_.readLock().lock();
-    try {
-      Db db = getDb(dbName);
-      if (db == null) {
-        throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
-      }
-      return filterStringsByPattern(db.getAllTableNames(), tablePattern);
-    } finally {
-      catalogLock_.readLock().unlock();
+    Db db = getDb(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
+    return filterStringsByPattern(db.getAllTableNames(), tablePattern);
   }
 
   public boolean containsTable(String dbName, String tableName) {
-    catalogLock_.readLock().lock();
-    try {
-      Db db = getDb(dbName);
-      return (db == null) ? false : db.containsTable(tableName);
-    } finally {
-      catalogLock_.readLock().unlock();
-    }
+    Db db = getDb(dbName);
+    return (db == null) ? false : db.containsTable(tableName);
   }
 
   /**
@@ -221,14 +188,9 @@ public abstract class Catalog {
    * resolve first to db.fn().
    */
   public boolean addFunction(Function fn) {
-    catalogLock_.writeLock().lock();
-    try {
-      Db db = getDb(fn.dbName());
-      if (db == null) return false;
-      return db.addFunction(fn);
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
+    Db db = getDb(fn.dbName());
+    if (db == null) return false;
+    return db.addFunction(fn);
   }
 
   /**
@@ -237,14 +199,9 @@ public abstract class Catalog {
    * in the catalog, it will return the function with the strictest matching mode.
    */
   public Function getFunction(Function desc, Function.CompareMode mode) {
-    catalogLock_.readLock().lock();
-    try {
-      Db db = getDb(desc.dbName());
-      if (db == null) return null;
-      return db.getFunction(desc, mode);
-    } finally {
-      catalogLock_.readLock().unlock();
-    }
+    Db db = getDb(desc.dbName());
+    if (db == null) return null;
+    return db.getFunction(desc, mode);
   }
 
   /**
@@ -253,14 +210,9 @@ public abstract class Catalog {
    * null.
    */
   public Function removeFunction(Function desc) {
-    catalogLock_.writeLock().lock();
-    try {
-      Db db = getDb(desc.dbName());
-      if (db == null) return null;
-      return db.removeFunction(desc);
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
+    Db db = getDb(desc.dbName());
+    if (db == null) return null;
+    return db.removeFunction(desc);
   }
 
   /**
@@ -268,16 +220,11 @@ public abstract class Catalog {
    */
   public List<String> getFunctionSignatures(TFunctionType type, String dbName,
       String pattern) throws DatabaseNotFoundException {
-    catalogLock_.readLock().lock();
-    try {
-      Db db = getDb(dbName);
-      if (db == null) {
-        throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
-      }
-      return filterStringsByPattern(db.getAllFunctionSignatures(type), pattern);
-    } finally {
-      catalogLock_.readLock().unlock();
+    Db db = getDb(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
+    return filterStringsByPattern(db.getAllFunctionSignatures(type), pattern);
   }
 
   /**
@@ -285,14 +232,9 @@ public abstract class Catalog {
    * are ignored.
    */
   public boolean functionExists(FunctionName name) {
-    catalogLock_.readLock().lock();
-    try {
-      Db db = getDb(name.getDb());
-      if (db == null) return false;
-      return db.functionExists(name);
-    } finally {
-      catalogLock_.readLock().unlock();
-    }
+    Db db = getDb(name.getDb());
+    if (db == null) return false;
+    return db.functionExists(name);
   }
 
   /**
@@ -301,67 +243,11 @@ public abstract class Catalog {
    */
   public void close() { metaStoreClientPool_.close(); }
 
-  /**
-   * Gets the next table ID and increments the table ID counter.
-   */
-  public TableId getNextTableId() { return new TableId(nextTableId_.getAndIncrement()); }
 
   /**
    * Returns a managed meta store client from the client connection pool.
    */
   public MetaStoreClient getMetaStoreClient() { return metaStoreClientPool_.getClient(); }
-
-  /**
-   * Resets this catalog instance by clearing all cached metadata and potentially
-   * reloading the metadata. How the metadata is loaded is based on the
-   * CatalogInitStrategy that was set in the c'tor.
-   */
-  public long reset() {
-    catalogLock_.writeLock().lock();
-    try {
-      return resetInternal();
-    } finally {
-      catalogLock_.writeLock().unlock();
-    }
-  }
-
-  /**
-   * Executes the underlying reset logic. catalogLock_.writeLock() must
-   * be taken before calling this.
-   */
-  protected long resetInternal() {
-    try {
-      nextTableId_.set(0);
-      dbCache_.clear();
-
-      if (initStrategy_ == CatalogInitStrategy.EMPTY) {
-        return CatalogServiceCatalog.getCatalogVersion();
-      }
-      MetaStoreClient msClient = metaStoreClientPool_.getClient();
-
-      try {
-        for (String dbName: msClient.getHiveClient().getAllDatabases()) {
-          Db db = new Db(dbName, this);
-          db.setCatalogVersion(CatalogServiceCatalog.incrementAndGetCatalogVersion());
-          addDb(db);
-          for (final String tableName: msClient.getHiveClient().getAllTables(dbName)) {
-            Table incompleteTbl =
-                IncompleteTable.createUninitializedTable(getNextTableId(), db, tableName);
-            incompleteTbl.setCatalogVersion(
-                CatalogServiceCatalog.incrementAndGetCatalogVersion());
-            db.addTable(incompleteTbl);
-          }
-        }
-      } finally {
-        msClient.release();
-      }
-      return CatalogServiceCatalog.getCatalogVersion();
-    } catch (Exception e) {
-      LOG.error(e);
-      LOG.error("Error initializing Catalog. Catalog may be empty.");
-      throw new IllegalStateException(e);
-    }
-  }
 
   /**
    * Implement Hive's pattern-matching semantics for SHOW statements. The only
@@ -416,21 +302,16 @@ public abstract class Catalog {
       PartitionNotFoundException, TableNotFoundException, TableLoadingException {
     String partitionNotFoundMsg =
         "Partition not found: " + Joiner.on(", ").join(partitionSpec);
-    catalogLock_.readLock().lock();
-    try {
-      Table table = getTable(dbName, tableName);
-      // This is not an Hdfs table, throw an error.
-      if (!(table instanceof HdfsTable)) {
-        throw new PartitionNotFoundException(partitionNotFoundMsg);
-      }
-      // Get the HdfsPartition object for the given partition spec.
-      HdfsPartition partition =
-          ((HdfsTable) table).getPartitionFromThriftPartitionSpec(partitionSpec);
-      if (partition == null) throw new PartitionNotFoundException(partitionNotFoundMsg);
-      return partition;
-    } finally {
-      catalogLock_.readLock().unlock();
+    Table table = getTable(dbName, tableName);
+    // This is not an Hdfs table, throw an error.
+    if (!(table instanceof HdfsTable)) {
+      throw new PartitionNotFoundException(partitionNotFoundMsg);
     }
+    // Get the HdfsPartition object for the given partition spec.
+    HdfsPartition partition =
+        ((HdfsTable) table).getPartitionFromThriftPartitionSpec(partitionSpec);
+    if (partition == null) throw new PartitionNotFoundException(partitionNotFoundMsg);
+    return partition;
   }
 
   /**

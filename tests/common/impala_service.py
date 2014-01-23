@@ -163,6 +163,11 @@ class ImpaladService(BaseImpalaService):
     client.connect()
     return client
 
+  def get_catalog_object_dump(self, object_type, object_name):
+    return self.read_debug_webpage('catalog_objects?object_type=%s&object_name=%s' %\
+        (object_type, object_name))
+
+
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.
 class StateStoredService(BaseImpalaService):
@@ -180,3 +185,7 @@ class CatalogdService(BaseImpalaService):
   def __init__(self, hostname, webserver_port, service_port):
     super(CatalogdService, self).__init__(hostname, webserver_port)
     self.service_port = service_port
+
+  def get_catalog_object_dump(self, object_type, object_name):
+    return self.read_debug_webpage('catalog_objects?object_type=%s&object_name=%s' %\
+        (object_type, object_name))

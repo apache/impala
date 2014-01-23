@@ -25,7 +25,6 @@ import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
-import com.cloudera.impala.thrift.TTableType;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
@@ -55,7 +54,8 @@ public class IncompleteTable extends Table {
   /**
    * See comment on cause_.
    */
-  public boolean isUninitialized() { return cause_ == null; }
+  @Override
+  public boolean isLoaded() { return cause_ != null; }
 
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
@@ -82,7 +82,6 @@ public class IncompleteTable extends Table {
   public TTable toThrift() {
     TTable table = new TTable(db_.getName(), name_);
     table.setId(id_.asInt());
-    table.setTable_type(TTableType.INCOMPLETE_TABLE);
     if (cause_ != null) {
       table.setLoad_status(new TStatus(TStatusCode.INTERNAL_ERROR,
           Lists.newArrayList(JniUtil.throwableToString(cause_),

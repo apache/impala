@@ -50,7 +50,8 @@ public class Db implements CatalogObject {
 
   // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
   // and the values are all the overloaded variants (e.g. myUdf(double), myUdf(string))
-  // This includes both UDFs and UDAs
+  // This includes both UDFs and UDAs. Updates are made thread safe by synchronizing
+  // on this map.
   private final HashMap<String, List<Function>> functions_;
 
   public Db(String name, Catalog catalog) {
@@ -73,6 +74,16 @@ public class Db implements CatalogObject {
     return TCatalogObjectType.DATABASE;
   }
 
+  /**
+   * Adds a table to the table cache.
+   */
+  public void addTable(Table table) {
+    tableCache_.add(table);
+  }
+
+  /**
+   * Gets all table names in the table cache.
+   */
   public List<String> getAllTableNames() {
     return tableCache_.getAllNames();
   }
@@ -85,25 +96,17 @@ public class Db implements CatalogObject {
    * Returns the Table with the given name if present in the table cache or loads the
    * table if it does not already exist in the cache. Returns null if the table does not
    * exist in the cache or if there was an error loading the table metadata.
-   * TODO: Should we bubble this exception up?
    */
   public Table getTable(String tblName) {
     return tableCache_.getOrLoad(tblName);
   }
 
   /**
-   * Adds a table to the table cache.
+   * Gets a table from the table cache, but does not perform a metadata load if the
+   * table is uninitialized.
    */
-  public void addTable(Table table) {
-    tableCache_.add(table);
-  }
-
-  /**
-   * Adds a given table name to the table cache. The next call to refreshTable() or
-   * getOrLoadTable() will trigger a metadata load.
-   */
-  public void addTableName(String tableName) {
-    tableCache_.addName(tableName);
+  public Table getTableNoLoad(String tblName) {
+    return tableCache_.get(tblName);
   }
 
   /**
@@ -111,14 +114,6 @@ public class Db implements CatalogObject {
    */
   public Table reloadTable(String tableName) {
     return tableCache_.reload(tableName);
-  }
-
-  /**
-   * Invalidates the table's metadata, forcing a reload on the next access. Does
-   * not remove the table from table cache's name set.
-   */
-  public void invalidateTable(String tableName) {
-    tableCache_.invalidate(tableName);
   }
 
   /**
@@ -263,4 +258,7 @@ public class Db implements CatalogObject {
   @Override
   public void setCatalogVersion(long newVersion) { catalogVersion_ = newVersion; }
   public Catalog getParentCatalog() { return parentCatalog_; }
+
+  @Override
+  public boolean isLoaded() { return true; }
 }

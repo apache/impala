@@ -267,4 +267,7 @@ public class Function implements CatalogObject {
     function.setHasVarArgs(fn.isHas_var_args());
     return function;
   }
+
+  @Override
+  public boolean isLoaded() { return true; }
 }

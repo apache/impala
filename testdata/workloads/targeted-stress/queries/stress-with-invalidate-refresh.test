@@ -1,0 +1,24 @@
+====
+---- QUERY : STRESS-Q1
+select count(*) from (select * from lineitem limit 10) p
+---- RESULTS
+10
+---- TYPES
+bigint
+====
+---- QUERY : STRESS-INVALIDATE_METADATA
+invalidate metadata
+====
+---- QUERY : STRESS-INVALIDATE_TABLE
+invalidate metadata lineitem
+====
+---- QUERY : REFRESH-TABLE
+refresh lineitem
+====
+---- QUERY : STRESS-Q2
+select count(*) from (select * from lineitem limit 10) p
+---- RESULTS
+10
+---- TYPES
+bigint
+====

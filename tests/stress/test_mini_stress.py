@@ -2,7 +2,9 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 import pytest
+import re
 from time import sleep
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.test_vector import TestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.test_file_parser import QueryTestSectionReader
@@ -30,3 +32,39 @@ class TestMiniStress(ImpalaTestSuite):
   def test_mini_stress(self, vector):
     for i in xrange(NUM_ITERATIONS):
       self.run_test_case('stress', vector)
+
+  @pytest.mark.stress
+  def test_run_invalidate_refresh(self, vector):
+    """Verifies that running concurrent invalidate table/catalog and refresh commands
+    don't cause failures with other running workloads and ensures catalog versions
+    are strictly increasing."""
+    target_db = self.execute_scalar('select current_database()', vector=vector)
+    impala_cluster = ImpalaCluster()
+    impalad = impala_cluster.impalads[0].service
+    catalogd = impala_cluster.catalogd.service
+
+    for i in xrange(NUM_ITERATIONS):
+      # Get the catalog versions for the table before running the workload
+      before_versions = dict()
+      before_versions['catalogd'] =\
+          self.get_table_version(catalogd, target_db, 'lineitem')
+      before_versions['impalad'] = self.get_table_version(impalad, target_db, 'lineitem')
+
+      self.run_test_case('stress-with-invalidate-refresh', vector)
+
+      # Get the catalog versions for the table after running the workload
+      after_versions = dict()
+      after_versions['catalogd'] = self.get_table_version(catalogd, target_db, 'lineitem')
+      after_versions['impalad'] = self.get_table_version(impalad, target_db, 'lineitem')
+
+      # Catalog versions should be strictly increasing
+      assert before_versions['impalad'] < after_versions['impalad']
+      assert before_versions['catalogd'] < after_versions['catalogd']
+
+  def get_table_version(self, impala_service, db_name, tbl_name):
+    """Gets the given table's catalog version using the given impalad/catalogd service"""
+    obj_dump = impala_service.get_catalog_object_dump('table', db_name + '.' + tbl_name)
+    result = re.search(r'catalog_version \(i64\) = (\d+)', obj_dump)
+    assert result, 'Unable to find catalog version in object dump: ' + obj_dump
+    catalog_version = result.group(1)
+    return int(catalog_version)

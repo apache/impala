@@ -71,6 +71,8 @@ public class CatalogDeltaLog {
    */
   public synchronized boolean wasObjectRemovedAfter(TCatalogObject catalogObject) {
     Preconditions.checkNotNull(catalogObject);
+    if (removedCatalogObjects_.isEmpty()) return false;
+
     // Get all the items that were removed after the catalog version of this object.
     SortedMap<Long, TCatalogObject> candidateObjects =
         removedCatalogObjects_.tailMap(catalogObject.getCatalog_version());

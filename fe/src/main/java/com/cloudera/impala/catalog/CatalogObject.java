@@ -31,4 +31,7 @@ public interface CatalogObject {
 
   // Sets the version of this catalog object.
   public void setCatalogVersion(long newVersion);
+
+  // Returns true if this CatalogObject has had its metadata loaded, false otherwise.
+  public boolean isLoaded();
 }

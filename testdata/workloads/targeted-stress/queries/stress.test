@@ -1,10 +1,8 @@
 ====
 ---- QUERY : STRESS-Q1
 select count(*) from (select * from lineitem limit 10) p
-# TODO: The second limit should not be needed, but getting wrong results due to product
-# bug IMPALA-20. Once that is fixed the second limit can be removed.
-#---- RESULTS
-#10
+---- RESULTS
+10
 ---- TYPES
 bigint
 ====

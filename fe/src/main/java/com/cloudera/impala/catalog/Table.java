@@ -28,8 +28,6 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.analysis.ColumnType;
-import com.cloudera.impala.common.JniUtil;
-
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -37,7 +35,6 @@ import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableStats;
-import com.cloudera.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -209,8 +206,7 @@ public abstract class Table implements CatalogObject {
   public static Table fromThrift(Db parentDb, TTable thriftTable)
       throws TableLoadingException {
     Table newTable;
-    if (thriftTable.getTable_type() != TTableType.INCOMPLETE_TABLE &&
-        thriftTable.isSetMetastore_table())  {
+    if (!thriftTable.isSetLoad_status() && thriftTable.isSetMetastore_table())  {
       newTable = Table.fromMetastoreTable(new TableId(thriftTable.getId()),
           parentDb, thriftTable.getMetastore_table());
     } else {
@@ -375,4 +371,7 @@ public abstract class Table implements CatalogObject {
   public void setCatalogVersion(long catalogVersion) {
     catalogVersion_ = catalogVersion;
   }
+
+  @Override
+  public boolean isLoaded() { return true; }
 }

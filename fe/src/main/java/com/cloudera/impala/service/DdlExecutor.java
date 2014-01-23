@@ -323,8 +323,7 @@ public class DdlExecutor {
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
     LOG.info(String.format("Updating table stats for %s", tableName));
 
-    Table table = catalog_.getOrReloadTable(tableName.getDb(),
-        tableName.getTbl());
+    Table table = catalog_.getTable(tableName.getDb(), tableName.getTbl());
     // Deep copy the msTbl to avoid updating our cache before successfully persisting
     // the results to the metastore.
     org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -501,7 +500,7 @@ public class DdlExecutor {
     if (params.if_not_exists && catalog_.getDb(dbName) != null) {
       LOG.debug("Skipping database creation because " + dbName + " already exists and " +
           "IF NOT EXISTS was specified.");
-      resp.getResult().setVersion(CatalogServiceCatalog.getCatalogVersion());
+      resp.getResult().setVersion(catalog_.getCatalogVersion());
       return;
     }
     org.apache.hadoop.hive.metastore.api.Database db =
@@ -527,7 +526,13 @@ public class DdlExecutor {
       } finally {
         msClient.release();
       }
-      resp.result.setUpdated_catalog_object(catalog_.addDb(dbName));
+
+      Db newDb = catalog_.addDb(dbName);
+      TCatalogObject thriftDb = new TCatalogObject(TCatalogObjectType.DATABASE,
+          Catalog.INITIAL_CATALOG_VERSION);
+      thriftDb.setDb(newDb.toThrift());
+      thriftDb.setCatalog_version(newDb.getCatalogVersion());
+      resp.result.setUpdated_catalog_object(thriftDb);
     }
     resp.result.setVersion(resp.result.getUpdated_catalog_object().getCatalog_version());
   }
@@ -582,7 +587,7 @@ public class DdlExecutor {
       // If no db was removed as part of this operation just return the current catalog
       // version.
       if (removedDb == null) {
-        removedObject.setCatalog_version(CatalogServiceCatalog.getCatalogVersion());
+        removedObject.setCatalog_version(catalog_.getCatalogVersion());
       } else {
         removedObject.setCatalog_version(removedDb.getCatalogVersion());
       }
@@ -619,7 +624,7 @@ public class DdlExecutor {
       if (table != null) {
         resp.result.setVersion(table.getCatalogVersion());
       } else {
-        resp.result.setVersion(CatalogServiceCatalog.getCatalogVersion());
+        resp.result.setVersion(catalog_.getCatalogVersion());
       }
     }
     removedObject.setType(TCatalogObjectType.TABLE);
@@ -647,7 +652,7 @@ public class DdlExecutor {
       }
       // The user specified IF NOT EXISTS and the function didn't exist, just
       // return the current catalog version.
-      resp.result.setVersion(CatalogServiceCatalog.getCatalogVersion());
+      resp.result.setVersion(catalog_.getCatalogVersion());
     } else {
       TCatalogObject removedObject = new TCatalogObject();
       removedObject.setType(TCatalogObjectType.FUNCTION);
@@ -678,7 +683,7 @@ public class DdlExecutor {
         catalog_.containsTable(tableName.getDb(), tableName.getTbl())) {
       LOG.debug(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tableName));
-      response.getResult().setVersion(CatalogServiceCatalog.getCatalogVersion());
+      response.getResult().setVersion(catalog_.getCatalogVersion());
       return false;
     }
     org.apache.hadoop.hive.metastore.api.Table tbl =
@@ -738,10 +743,10 @@ public class DdlExecutor {
         catalog_.containsTable(tblName.getDb(), tblName.getTbl())) {
       LOG.debug(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tblName));
-      response.getResult().setVersion(CatalogServiceCatalog.getCatalogVersion());
+      response.getResult().setVersion(catalog_.getCatalogVersion());
       return;
     }
-    Table srcTable = catalog_.getOrReloadTable(srcTblName.getDb(), srcTblName.getTbl());
+    Table srcTable = catalog_.getTable(srcTblName.getDb(), srcTblName.getTbl());
     org.apache.hadoop.hive.metastore.api.Table tbl =
         srcTable.getMetaStoreTable().deepCopy();
     tbl.setDbName(tblName.getDb());
@@ -1216,7 +1221,7 @@ public class DdlExecutor {
       TableName tableName) throws DatabaseNotFoundException, TableNotFoundException,
       TableLoadingException {
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    return catalog_.getOrReloadTable(tableName.getDb(), tableName.getTbl())
+    return catalog_.getTable(tableName.getDb(), tableName.getTbl())
         .getMetaStoreTable().deepCopy();
   }
 
@@ -1390,7 +1395,7 @@ public class DdlExecutor {
       throws ImpalaException {
     TUpdateCatalogResponse response = new TUpdateCatalogResponse();
     // Only update metastore for Hdfs tables.
-    Table table = catalog_.getOrReloadTable(update.getDb_name(),
+    Table table = catalog_.getTable(update.getDb_name(),
         update.getTarget_table());
     if (!(table instanceof HdfsTable)) {
       throw new InternalException("Unexpected table type: " +

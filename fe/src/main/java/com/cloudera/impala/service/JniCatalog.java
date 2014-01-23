@@ -24,6 +24,7 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Table;
@@ -77,6 +78,11 @@ public class JniCatalog {
     GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
         TLogLevel.values()[otherLogLevel]);
     catalog_ = new CatalogServiceCatalog(getServiceId());
+    try {
+      catalog_.reset();
+    } catch (CatalogException e) {
+      LOG.error("Error initialializing Catalog. Please run 'invalidate metadata'", e);
+    }
     ddlExecutor_ = new DdlExecutor(catalog_);
   }
 
@@ -127,7 +133,8 @@ public class JniCatalog {
     } else {
       // Invalidate the catalog if no table name is provided.
       Preconditions.checkArgument(!req.isIs_refresh());
-      resp.result.setVersion(catalog_.reset());
+      catalog_.reset();
+      resp.result.setVersion(catalog_.getCatalogVersion());
     }
     resp.getResult().setStatus(
         new TStatus(TStatusCode.OK, new ArrayList<String>()));

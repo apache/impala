@@ -18,18 +18,16 @@ import java.util.EnumSet;
 
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TTable;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheLoader;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * A cache loader that defines how table metadata should be loaded. Impalads
@@ -37,6 +35,8 @@ import com.google.common.util.concurrent.SettableFuture;
  * loads its table metadata by contacting the Hive Metastore / HDFS / etc.
  */
 public abstract class TableLoader extends CacheLoader<String, Table> {
+  private final static Logger LOG = LoggerFactory.getLogger(TableLoader.class);
+
   // Parent database of this table.
   protected final Db db_;
 
@@ -60,41 +60,6 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
   }
 
   /**
-   * Load the given table name.
-   */
-  @Override
-  public Table load(String tblName) throws Exception {
-    return loadTable(tblName, null);
-  }
-
-  /**
-   * Computes a replacement value for the Table based on an already-cached value.
-   *
-   * Returns (as a ListenableFuture) the future new value of the table.
-   * The returned Future should not be null. Using a Future allows for a
-   * synchronous or asynchronous implementation or reload().
-   */
-  @Override
-  public ListenableFuture<Table> reload(String tableName, Table cachedValue)
-      throws ImpalaException {
-    SettableFuture<Table> newValue = SettableFuture.create();
-    Table table = loadTable(tableName, cachedValue);
-    newValue.set(table);
-    return newValue;
-  }
-
-  /**
-   * Implementation for how a table is loaded. Generally this is the
-   * only method that needs to be implemented.
-   * @param tblName - The name of the table.
-   * @param cachedEntry - An existing cached table that can be reused to speed up
-   *                      the loading process for a "reload" operation.
-   */
-  protected abstract Table loadTable(String tableName, Table cachedValue)
-      throws TableNotFoundException;
-
-
-  /**
    * TableLoader that loads table metadata from the Hive Metastore. Used by
    * the CatalogServer and updates the object's catalog version on successful
    * load()/reload().
@@ -116,18 +81,21 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
     /**
      * Creates the Impala representation of Hive/HBase metadata for one table.
      * Calls load() on the appropriate instance of Table subclass.
-     * oldCacheEntry is the existing cache entry and might still contain valid info to
-     * help speed up metadata loading. oldCacheEntry is null if there is no existing
+     * cachedValue is the existing cache entry and might still contain valid info to
+     * help speed up metadata loading. cachedValue is null if there is no existing
      * cache entry (i.e. during fresh load).
-     * @return new instance of HdfsTable or HBaseTable
-     *         null if the table does not exist
-     * @throws TableLoadingException if there was an error loading the table.
-     * @throws TableNotFoundException if the table was not found
+     * The catalogVersion parameter specifies what version will be assigned
+     * to the newly loaded object.
+     * Returns new instance of Table, or null if the table does not exist. If there
+     * were any errors loading the table metadata an IncompleteTable will be returned
+     * that contains details on the error.
      */
     @Override
-    protected Table loadTable(String tblName, Table cacheEntry)
-        throws TableNotFoundException {
-      Catalog catalog = db_.getParentCatalog();
+    public Table load(String tblName, Table cachedValue, long catalogVersion) {
+      String fullTblName = db_.getName() + "." + tblName;
+      LOG.info("Loading metadata for: " + fullTblName);
+      Preconditions.checkState(db_.getParentCatalog() instanceof CatalogServiceCatalog);
+      CatalogServiceCatalog catalog = (CatalogServiceCatalog) db_.getParentCatalog();
       MetaStoreClient msClient = catalog.getMetaStoreClient();
       Table table;
       // turn all exceptions into TableLoadingException
@@ -141,22 +109,26 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
         TableType tableType = TableType.valueOf(msTbl.getTableType());
         if (!SUPPORTED_TABLE_TYPES.contains(tableType)) {
           throw new TableLoadingException(String.format(
-              "Unsupported table type '%s' for: %s.%s",
-              tableType, db_.getName(), tblName));
+              "Unsupported table type '%s' for: %s", tableType, fullTblName));
         }
 
         // Create a table of appropriate type and have it load itself
         table = Table.fromMetastoreTable(catalog.getNextTableId(), db_, msTbl);
         if (table == null) {
           throw new TableLoadingException(
-              "Unrecognized table type for table: " + msTbl.getTableName());
+              "Unrecognized table type for table: " + fullTblName);
         }
-        table.load(cacheEntry, msClient.getHiveClient(), msTbl);
+        table.load(cachedValue, msClient.getHiveClient(), msTbl);
       } catch (TableLoadingException e) {
         table = IncompleteTable.createFailedMetadataLoadTable(
             catalog.getNextTableId(), db_, tblName, e);
       } catch (NoSuchObjectException e) {
-        throw new TableNotFoundException("Table not found: " + tblName, e);
+        TableLoadingException tableDoesNotExist = new TableLoadingException(
+            "Table " + fullTblName + " no longer exists in the Hive MetaStore. " +
+            "Run 'invalidate metadata " + fullTblName + "' to update the Impala " +
+            "catalog.");
+        table = IncompleteTable.createFailedMetadataLoadTable(
+            catalog.getNextTableId(), db_, tblName, tableDoesNotExist);
       } catch (Exception e) {
         table = IncompleteTable.createFailedMetadataLoadTable(
             catalog.getNextTableId(), db_, tblName, new TableLoadingException(
@@ -165,8 +137,14 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
         msClient.release();
       }
       // Set the new catalog version for the table and return it.
-      table.setCatalogVersion(CatalogServiceCatalog.incrementAndGetCatalogVersion());
+      table.setCatalogVersion(catalogVersion);
       return table;
+    }
+
+    @Override
+    public long getNextCatalogVersion() {
+      CatalogServiceCatalog catalog = (CatalogServiceCatalog) db_.getParentCatalog();
+      return catalog.incrementAndGetCatalogVersion();
     }
   }
 
@@ -174,23 +152,16 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
    * A TableLoader that loads metadata from the CatalogServer.
    */
   private static class CatalogServiceTableLoader extends TableLoader {
+    private static final String FAILED_TBL_LOAD_MSG =
+        "Unexpected error loading table metadata. Please run 'invalidate metadata %s'";
+
     public CatalogServiceTableLoader(Db db) {
       super(db);
     }
 
     @Override
-    public ListenableFuture<Table> reload(String tableName, Table cachedValue)
-        throws ImpalaException {
-      // To protect against a concurrency issue between add(CatalogObject) and
-      // reload(), reload() is not supported on a CatalogServiceTableLoader. See comment
-      // in the CatalogObjectCache for more details.
-      throw new IllegalStateException("Calling reload() on a CatalogServiceTableLoader" +
-        " is not supported.");
-    }
-
-    @Override
-    protected Table loadTable(String tblName, Table cacheEntry)
-        throws TableNotFoundException {
+    public Table load(String tblName, Table cachedValue, long catalogVersion) {
+      LOG.info("Loading metadata for: " + db_.getName() + "." + tblName);
       TCatalogObject objectDesc = new TCatalogObject();
       objectDesc.setType(TCatalogObjectType.TABLE);
       objectDesc.setTable(new TTable());
@@ -204,20 +175,36 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
             TableId.createInvalidId(), db_, tblName, e);
       }
 
+      Table newTable;
       if (!catalogObject.isSetTable()) {
-        throw new TableNotFoundException(
-            String.format("Table not found: %s.%s", db_.getName(), tblName));
+        newTable = IncompleteTable.createFailedMetadataLoadTable(
+            TableId.createInvalidId(), db_, tblName,
+            new TableLoadingException(FAILED_TBL_LOAD_MSG));
       }
 
-      Table newTable;
+
       try {
         newTable = Table.fromThrift(db_, catalogObject.getTable());
       } catch (TableLoadingException e) {
         newTable = IncompleteTable.createFailedMetadataLoadTable(
             TableId.createInvalidId(), db_, tblName, e);
       }
+
+      if (newTable == null || !newTable.isLoaded()) {
+        newTable = IncompleteTable.createFailedMetadataLoadTable(
+            TableId.createInvalidId(), db_, tblName,
+            new TableLoadingException(FAILED_TBL_LOAD_MSG));
+      }
+
       newTable.setCatalogVersion(catalogObject.getCatalog_version());
       return newTable;
+    }
+
+    @Override
+    public long getNextCatalogVersion() {
+      // Tables should already have catalog versions assigned catalog
+      // by the CatalogServer. Always return zero here.
+      return 0;
     }
   }
 }
