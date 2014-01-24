@@ -27,6 +27,7 @@
 #include "statestore/statestore-subscriber.h"
 #include "statestore/statestore.h"
 #include "util/metrics.h"
+#include "scheduling/admission-controller.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
 #include "gen-cpp/ResourceBrokerService_types.h"
 
@@ -185,6 +186,9 @@ class SimpleScheduler : public Scheduler {
 
   // Default pools read from the whitelist, accessible to all users.
   std::set<std::string> default_pools_;
+
+  // Used to make admission decisions in 'Schedule()'
+  AdmissionController admission_controller_;
 
   // Adds the granted reservation and resources to the active_reservations_ and
   // active_client_resources_ maps, respectively.

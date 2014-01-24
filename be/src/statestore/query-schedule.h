@@ -23,6 +23,8 @@
 
 #include "common/global-types.h"
 #include "common/status.h"
+#include "util/promise.h"
+#include "util/runtime-profile.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ResourceBrokerService_types.h"
@@ -48,17 +50,19 @@ struct FragmentExecParams {
   std::map<PlanNodeId, int> per_exch_num_senders;
   FragmentScanRangeAssignment scan_range_assignment;
 };
-
 // A QuerySchedule contains all necessary information for a query coordinator to
 // generate fragment execution requests and start query execution. If resource management
 // is enabled, then a schedule also contains the resource reservation request
 // and the granted resource reservation.
 // TODO: Consider moving QuerySchedule and all Schedulers into
 // their own lib (and out of statestore).
+// TODO: Move all global state (e.g. profiles) to QueryExecState (after it is decoupled
+// from ImpalaServer)
 class QuerySchedule {
  public:
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-      const TQueryOptions& query_options, bool is_mini_llama);
+      const TQueryOptions& query_options, bool is_mini_llama,
+      RuntimeProfile* summary_profile, RuntimeProfile::EventSequence* query_events);
 
   // Creates a reservation request for the given pool and user in reservation_request_.
   // The request contains one resource per entry in unique_hosts_. The per-host resources
@@ -102,6 +106,10 @@ class QuerySchedule {
   const TResourceBrokerReservationRequest* reservation_request() {
     return reservation_request_.get();
   }
+  bool is_admitted() const { return is_admitted_; }
+  void set_is_admitted(bool is_admitted) { is_admitted_ = is_admitted; }
+  RuntimeProfile* summary_profile() { return summary_profile_; }
+  RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
  private:
   // Populates the bi-directional hostport mapping for the Mini Llama based on
@@ -116,6 +124,8 @@ class QuerySchedule {
   const TQueryExecRequest& request_;
   const TQueryOptions& query_options_;
   bool is_mini_llama_;
+  RuntimeProfile* summary_profile_;
+  RuntimeProfile::EventSequence* query_events_;
 
   // Impala mini clusters using the Mini Llama require translating the impalad hostports
   // to Hadoop DN hostports registered with the Llama during resource requests
@@ -149,6 +159,9 @@ class QuerySchedule {
 
   // Fulfilled reservation request. Populated by scheduler.
   TResourceBrokerReservationResponse reservation_;
+
+  // Indicates if the query has been admitted for execution.
+  bool is_admitted_;
 };
 
 }

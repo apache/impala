@@ -54,7 +54,7 @@ struct TResourceBrokerReservationRequest {
   // granted/denied resources.
   5: optional bool gang;
 
-  // Max time in seconds the resource broker should wait for
+  // Max time in milliseconds the resource broker should wait for
   // a resource request to be granted by Llama/Yarn.
   6: optional i64 request_timeout;
 

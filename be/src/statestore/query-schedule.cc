@@ -44,13 +44,17 @@ const int64_t DEFAULT_REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 
 QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     const TQueryExecRequest& request, const TQueryOptions& query_options,
-    bool is_mini_llama)
+    bool is_mini_llama, RuntimeProfile* summary_profile,
+    RuntimeProfile::EventSequence* query_events)
   : query_id_(query_id),
     request_(request),
     query_options_(query_options),
     is_mini_llama_(is_mini_llama),
+    summary_profile_(summary_profile),
+    query_events_(query_events),
     num_backends_(0),
-    num_scan_ranges_(0) {
+    num_scan_ranges_(0),
+    is_admitted_(false) {
   fragment_exec_params_.resize(request.fragments.size());
   // map from plan node id to fragment index in exec_request.fragments
   vector<PlanNodeId> per_node_fragment_idx;

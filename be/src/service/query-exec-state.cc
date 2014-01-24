@@ -274,7 +274,8 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     is_mini_llama = exec_env_->resource_broker()->is_mini_llama();
   }
   schedule_.reset(new QuerySchedule(query_id_, query_exec_request,
-      exec_request_.query_options, is_mini_llama));
+      exec_request_.query_options, is_mini_llama, &summary_profile_,
+      query_events_));
   coord_.reset(new Coordinator(exec_env_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
   if (FLAGS_enable_rm) {

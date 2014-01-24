@@ -71,7 +71,8 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     total_local_assignments_(NULL),
     initialised_(NULL),
     update_count_(0),
-    resource_broker_(resource_broker) {
+    resource_broker_(resource_broker),
+    admission_controller_(metrics, backend_id) {
   backend_descriptor_.address = backend_address;
   next_nonlocal_backend_entry_ = backend_map_.begin();
 }
@@ -86,7 +87,8 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
     total_local_assignments_(NULL),
     initialised_(NULL),
     update_count_(0),
-    resource_broker_(resource_broker) {
+    resource_broker_(resource_broker),
+    admission_controller_(metrics, "localhost") {
   DCHECK(backends.size() > 0);
 
   for (int i = 0; i < backends.size(); ++i) {
@@ -131,12 +133,12 @@ Status SimpleScheduler::Init() {
   if (statestore_subscriber_ != NULL) {
     StatestoreSubscriber::UpdateCallback cb =
         bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1, _2);
-    Status status =
-        statestore_subscriber_->AddTopic(IMPALA_MEMBERSHIP_TOPIC, true, cb);
+    Status status = statestore_subscriber_->AddTopic(IMPALA_MEMBERSHIP_TOPIC, true, cb);
     if (!status.ok()) {
-      status.AddErrorMsg("SimpleScheduler failed to start");
+      status.AddErrorMsg("SimpleScheduler failed to register membership topic");
       return status;
     }
+    RETURN_IF_ERROR(admission_controller_.Init(statestore_subscriber_));
   }
   if (metrics_ != NULL) {
     total_assignments_ =
@@ -265,7 +267,7 @@ void SimpleScheduler::UpdateMembership(
         Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
             item.value.data()), &len, false, &be_desc);
         if (!status.ok()) {
-          VLOG(2) << "Error deserializing topic item with key: " << item.key;
+          VLOG(2) << "Error deserializing membership topic item with key: " << item.key;
           continue;
         }
         if (item.key == backend_id_ && be_desc.address != backend_descriptor_.address) {
@@ -765,6 +767,7 @@ Status SimpleScheduler::InitPoolWhitelist(const string& conf_path) {
 }
 
 Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
+  RETURN_IF_ERROR(admission_controller_.AdmitQuery(schedule));
   RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);
@@ -794,6 +797,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
 }
 
 Status SimpleScheduler::Release(QuerySchedule* schedule) {
+  RETURN_IF_ERROR(admission_controller_.ReleaseQuery(schedule));
   if (FLAGS_enable_rm && schedule->NeedsRelease()) {
     DCHECK(resource_broker_ != NULL);
     TResourceBrokerReleaseRequest request;

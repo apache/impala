@@ -118,6 +118,7 @@ if (DOXYGEN_FOUND)
     ${CMAKE_SOURCE_DIR}/be/src/exprs/
     ${CMAKE_SOURCE_DIR}/be/src/resourcebroker/
     ${CMAKE_SOURCE_DIR}/be/src/runtime/
+    ${CMAKE_SOURCE_DIR}/be/src/scheduling/
     ${CMAKE_SOURCE_DIR}/be/src/service/
     ${CMAKE_SOURCE_DIR}/be/src/statestore/
     ${CMAKE_SOURCE_DIR}/be/src/testutil/
@@ -187,6 +188,7 @@ set (IMPALA_LINK_LIBS
   ResourceBroker
   Rpc
   Runtime
+  Scheduling
   Service
   Statestore
   TestUtil
@@ -282,6 +284,7 @@ add_subdirectory(src/exec)
 add_subdirectory(src/resourcebroker)
 add_subdirectory(src/exprs)
 add_subdirectory(src/runtime)
+add_subdirectory(src/scheduling)
 add_subdirectory(src/statestore)
 add_subdirectory(src/service)
 add_subdirectory(src/testutil)

@@ -22,10 +22,10 @@
 namespace impala {
 
 // A stripped-down replacement for boost::promise which, to the best of our knowledge,
-// actually works. A single producer provides a single value by calling Set(..), which one
-// or more consumers retrieve through calling Get(..).
-// Consumers must be consistent in their use of Get(), i.e., for a particular promise all
-// consumers should either have a timeout or not.
+// actually works. A single producer provides a single value by calling Set(..), which
+// one or more consumers retrieve through calling Get(..).  Consumers must be consistent
+// in their use of Get(), i.e., for a particular promise all consumers should either
+// have a timeout or not.
 template <typename T>
 class Promise {
  public:
@@ -83,6 +83,12 @@ class Promise {
     }
     *timed_out = !val_is_set_;
     return val_;
+  }
+
+  // Returns whether the value is set.
+  bool IsSet() {
+    boost::lock_guard<boost::mutex> l(val_lock_);
+    return val_is_set_;
   }
 
  private:

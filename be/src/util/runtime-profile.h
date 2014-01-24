@@ -545,6 +545,28 @@ class RuntimeProfile {
       const ChildCounterMap& child_counter_map, std::ostream* s);
 };
 
+// Utility class to mark an event when the object is destroyed.
+class ScopedEvent {
+ public:
+  ScopedEvent(RuntimeProfile::EventSequence* event_sequence, const std::string& label)
+    : label_(label),
+      event_sequence_(event_sequence) {
+  }
+
+  // Mark the event when the object is destroyed
+  ~ScopedEvent() {
+    event_sequence_->MarkEvent(label_);
+  }
+
+ private:
+  // Disable copy constructor and assignment
+  ScopedEvent(const ScopedEvent& event);
+  ScopedEvent& operator=(const ScopedEvent& event);
+
+  const std::string label_;
+  RuntimeProfile::EventSequence* event_sequence_;
+};
+
 // Utility class to update the counter at object construction and destruction.
 // When the object is constructed, decrement the counter by val.
 // When the object goes out of scope, increment the counter by val.

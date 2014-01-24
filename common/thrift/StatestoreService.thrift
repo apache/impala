@@ -22,6 +22,18 @@ enum StatestoreServiceVersion {
    V1
 }
 
+// Structure serialized for the topic AdmissionController::IMPALA_REQUEST_QUEUE_TOPIC.
+// Statistics for a single pool. If RM is used, this is a YARN 'queue'. The topic key is
+// of the form "<pool_name>!<backend_id>".
+struct TPoolStats {
+  // The current number of admitted requests that are running. This is an instantaneous
+  // value (as opposed to a cumulative sum).
+  1: required i64 num_running;
+
+  // The current number of queued requests. This is an instantaneous value.
+  2: required i64 num_queued;
+}
+
 // Structure serialised in the Impala backend topic. Each Impalad
 // constructs one TBackendDescriptor, and registers it in the backend
 // topic. Impalads subscribe to this topic to learn of the location of
