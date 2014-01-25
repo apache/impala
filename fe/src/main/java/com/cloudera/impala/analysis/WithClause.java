@@ -228,7 +228,7 @@ public class WithClause implements ParseNode {
     for (InlineViewRef view: views_) {
       // Enclose the view alias in quotes if Hive cannot parse it without quotes.
       // This is needed for view compatibility between Impala and Hive.
-      String aliasSql = ToSqlUtils.getHiveIdentSql(view.getAlias());
+      String aliasSql = ToSqlUtils.getIdentSql(view.getAlias());
       viewStrings.add(aliasSql + " AS (" + view.getViewStmt().toSql() + ")");
     }
     return "WITH " + Joiner.on(",").join(viewStrings);

@@ -111,7 +111,7 @@ public class BaseTableRef extends TableRef {
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
     // This is needed for view compatibility between Impala and Hive.
     String aliasSql = null;
-    if (alias_ != null) aliasSql = ToSqlUtils.getHiveIdentSql(alias_);
+    if (alias_ != null) aliasSql = ToSqlUtils.getIdentSql(alias_);
     return name_.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
   }
 

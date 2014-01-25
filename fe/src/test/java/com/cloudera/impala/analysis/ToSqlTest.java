@@ -71,7 +71,8 @@ public class ToSqlTest extends AnalyzerTest {
  }
 
   /**
-   * Tests quoting of identifiers for view compatibility with Hive.
+   * Tests quoting of identifiers for view compatibility with Hive,
+   * and for proper quoting of Impala keywords in view-definition stmts.
    */
   @Test
   public void TestIdentifierQuoting() {
@@ -84,6 +85,12 @@ public class ToSqlTest extends AnalyzerTest {
 
     // Quoted identifiers that require quoting in both Impala and Hive.
     testToSql("select 1 as `???`, 2.0 as '^^^'", "SELECT 1 `???`, 2.0 `^^^`");
+
+    // Test quoting of identifiers that are Impala keywords.
+    testToSql("select `end`.`alter`, `end`.`table` from " +
+        "(select 1 as `alter`, 2 as `table`) `end`",
+        "SELECT `end`.`alter`, `end`.`table` FROM " +
+        "(SELECT 1 `alter`, 2 `table`) `end`");
 
     // Test quoting of inline view aliases.
     testToSql("select a from (select 1 as a) as _t",

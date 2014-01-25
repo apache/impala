@@ -161,7 +161,7 @@ public class ViewRef extends InlineViewRef {
     if (origTblRef_ != null) return origTblRef_.tableRefToSql();
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
     // This is needed for view compatibility between Impala and Hive.
-    String aliasSql = ToSqlUtils.getHiveIdentSql(alias_);
+    String aliasSql = ToSqlUtils.getIdentSql(alias_);
     return "(" + queryStmt_.toSql() + ") " + aliasSql;
   }
 

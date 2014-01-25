@@ -243,6 +243,10 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     String token = tokenIdMap.get(tokenId);
     return keywordMap.containsKey(token.toLowerCase());
   }
+  
+  public static boolean isKeyword(String ident) {
+    return keywordMap.containsKey(ident.toLowerCase());
+  }
 
   private Symbol newToken(int id, Object value) {
     return new Symbol(id, yyline+1, yycolumn+1, value);

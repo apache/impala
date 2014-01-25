@@ -134,8 +134,8 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     StringBuilder sb = new StringBuilder();
     sb.append("SELECT ");
     for (int i = 0; i < finalColDefs_.size(); ++i) {
-      String colRef = ToSqlUtils.getHiveIdentSql(viewDefStmt_.getColLabels().get(i));
-      String colAlias = ToSqlUtils.getHiveIdentSql(finalColDefs_.get(i).getColName());
+      String colRef = ToSqlUtils.getIdentSql(viewDefStmt_.getColLabels().get(i));
+      String colAlias = ToSqlUtils.getIdentSql(finalColDefs_.get(i).getColName());
       sb.append(String.format("%s.%s AS %s", tableName_.getTbl(), colRef, colAlias));
       sb.append((i+1 != finalColDefs_.size()) ? ", " : "");
     }

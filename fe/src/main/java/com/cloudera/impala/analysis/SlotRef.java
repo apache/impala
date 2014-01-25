@@ -55,7 +55,7 @@ public class SlotRef extends Expr {
     super();
     this.tblName_ = tblName;
     this.col_ = col;
-    this.label_ = ToSqlUtils.getHiveIdentSql(col);
+    this.label_ = ToSqlUtils.getIdentSql(col);
   }
 
   // C'tor for a "pre-analyzed" ref to a slot

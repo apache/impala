@@ -23,7 +23,6 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
@@ -80,11 +79,11 @@ public class ComputeStatsStmt extends StatementBase {
     // Only add group by clause for HdfsTables.
     if (table_ instanceof HdfsTable) {
       for (int i = 0; i < table_.getNumClusteringCols(); ++i) {
-        String colName = table_.getColumns().get(i).getName();
-        groupByCols.add(colName);
+        String colRefSql = ToSqlUtils.getIdentSql(table_.getColumns().get(i).getName());
+        groupByCols.add(colRefSql);
         // For the select list, wrap the group by columns in a cast to string because
         // the Metastore stores them as strings.
-        tableStatsSelectList.add("cast(" + colName + " as string)");
+        tableStatsSelectList.add("CAST(" + colRefSql + " AS STRING)");
       }
     }
     tableStatsQueryBuilder.append(Joiner.on(", ").join(tableStatsSelectList));
@@ -105,15 +104,19 @@ public class ComputeStatsStmt extends StatementBase {
     int startColIdx = (table_ instanceof HBaseTable) ? 0 : table_.getNumClusteringCols();
     for (int i = startColIdx; i < table_.getColumns().size(); ++i) {
       Column c = table_.getColumns().get(i);
+      // Ignore columns with an invalid/unsupported type. For example, complex types in
+      // an HBase-backed table will appear as invalid types.
+      if (!c.getType().isValid() || !c.getType().isSupported()) continue;
       // NDV approximation function. Add explicit alias for later identification when
       // updating the Metastore.
-      columnStatsSelectList.add("NDV(" + c.getName() + ") AS " + c.getName());
+      String colRefSql = ToSqlUtils.getIdentSql(c.getName());
+      columnStatsSelectList.add("NDV(" + colRefSql + ") AS " + colRefSql);
       // Count the number of NULL values.
-      columnStatsSelectList.add("COUNT(IF(" + c.getName() + " IS NULL, 1, NULL))");
+      columnStatsSelectList.add("COUNT(IF(" + colRefSql + " IS NULL, 1, NULL))");
       // For STRING columns also compute the max and avg string length.
       if (c.getType().isStringType()) {
-        columnStatsSelectList.add("MAX(length(" + c.getName() + "))");
-        columnStatsSelectList.add("AVG(length(" + c.getName() + "))");
+        columnStatsSelectList.add("MAX(length(" + colRefSql + "))");
+        columnStatsSelectList.add("AVG(length(" + colRefSql + "))");
       } else {
         // For non-STRING columns use -1 as the max/avg length to avoid having to
         // treat STRING columns specially in the BE CatalogOpExecutor.

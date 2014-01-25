@@ -56,7 +56,7 @@ class SelectListItem {
       // Enclose aliases in quotes if Hive cannot parse them without quotes.
       // This is needed for view compatibility between Impala and Hive.
       String aliasSql = null;
-      if (alias_ != null) aliasSql = ToSqlUtils.getHiveIdentSql(alias_);
+      if (alias_ != null) aliasSql = ToSqlUtils.getIdentSql(alias_);
       return expr_.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
     } else if (tblName_ != null) {
       return tblName_.toString() + ".*" + ((alias_ != null) ? " " + alias_ : "");

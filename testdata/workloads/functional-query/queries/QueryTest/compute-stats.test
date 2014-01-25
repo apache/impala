@@ -308,3 +308,35 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
+---- QUERY
+# IMP-1227: Test computing stats on an HBase table that has a
+# complex-typed column that Impala does not yet support.
+create table compute_stats_db.map_table
+like functional_hbase.map_table_hbase;
+====
+---- QUERY
+compute stats compute_stats_db.map_table
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY: VERIFY_IS_EQUAL
+show table stats compute_stats_db.map_table
+---- LABELS
+REGION LOCATION, START ROWKEY, EST. #ROWS, SIZE
+---- RESULTS
+regex:.+,'',regex:.+,regex:.+
+---- TYPES
+STRING, STRING, BIGINT, STRING
+====
+---- QUERY
+show column stats compute_stats_db.map_table
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'key','STRING',0,0,0,0
+'map_col','INVALID_TYPE',-1,-1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====

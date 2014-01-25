@@ -50,29 +50,34 @@ public class ToSqlUtils {
       ImmutableSet.of("EXTERNAL", "comment");
 
   /**
-   * Given an unquoted identifier string, returns an identifier lexable by Hive, possibly
-   * by enclosing the original identifier in "`" quotes.
+   * Given an unquoted identifier string, returns an identifier lexable by
+   * Impala and Hive, possibly by enclosing the original identifier in "`" quotes.
    * For example, Hive cannot parse its own auto-generated column
-   * names "_c0", "_c1" etc. unless they are quoted.
+   * names "_c0", "_c1" etc. unless they are quoted. Impala and Hive keywords
+   * must also be quoted.
    *
    * Impala's lexer recognizes a superset of the unquoted identifiers that Hive can.
-   * This method always returns an identifier that Impala can recognize, although for
-   * some identifiers the quotes may not be strictly necessary for Impala.
+   * At the same time, Impala's and Hive's list of keywords differ.
+   * This method always returns an identifier that Impala and Hive can recognize,
+   * although for some identifiers the quotes may not be strictly necessary for
+   * one or the other system.
    */
-  public static String getHiveIdentSql(String ident) {
+  public static String getIdentSql(String ident) {
+    boolean hiveNeedsQuotes = true;
     HiveLexer hiveLexer = new HiveLexer(new ANTLRStringStream(ident));
     try {
       Token t = hiveLexer.nextToken();
       // Check that the lexer recognizes an identifier and then EOF.
       boolean identFound = t.getType() == HiveLexer.Identifier;
       t = hiveLexer.nextToken();
-      // No enclosing quotes are necessary.
-      if (identFound && t.getType() == HiveLexer.EOF) return ident;
+      // No enclosing quotes are necessary for Hive.
+      hiveNeedsQuotes = !(identFound && t.getType() == HiveLexer.EOF);
     } catch (Exception e) {
       // Ignore exception and just quote the identifier to be safe.
     }
-    // Hive's lexer does not recognize impalaIdent, so enclose it in quotes.
-    return "`" + ident + "`";
+    boolean isImpalaKeyword = SqlScanner.isKeyword(ident.toUpperCase());
+    if (hiveNeedsQuotes || isImpalaKeyword) return "`" + ident + "`";
+    return ident;
   }
 
   /**

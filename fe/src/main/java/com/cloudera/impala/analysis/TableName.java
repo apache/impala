@@ -70,9 +70,9 @@ public class TableName {
     // Enclose the database and/or table name in quotes if Hive cannot parse them
     // without quotes. This is needed for view compatibility between Impala and Hive.
     if (db_ == null) {
-      return ToSqlUtils.getHiveIdentSql(tbl_);
+      return ToSqlUtils.getIdentSql(tbl_);
     } else {
-      return ToSqlUtils.getHiveIdentSql(db_) + "." + ToSqlUtils.getHiveIdentSql(tbl_);
+      return ToSqlUtils.getIdentSql(db_) + "." + ToSqlUtils.getIdentSql(tbl_);
     }
   }
 
