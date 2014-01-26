@@ -6,6 +6,7 @@ drop function if exists udf_test.hive_floor(double);
 drop function if exists udf_test.hive_mod(int, int);
 drop function if exists udf_test.hive_bin(bigint);
 drop function if exists udf_test.hive_lower(string);
+drop function if exists udf_test.hive_trim(string);
 
 drop function if exists udf_test.identity(boolean);
 drop function if exists udf_test.identity(tinyint);

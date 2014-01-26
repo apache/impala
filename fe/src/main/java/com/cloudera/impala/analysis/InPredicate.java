@@ -62,7 +62,6 @@ public class InPredicate extends Predicate {
   protected void toThrift(TExprNode msg) {
     msg.in_predicate = new TInPredicate(isNotIn_);
     msg.node_type = TExprNodeType.IN_PRED;
-    msg.setOpcode(opcode_);
   }
 
   @Override

@@ -1,12 +1,5 @@
 ====
 ---- QUERY
-select udf_test.trim('HelloWorld')
----- RESULTS
-'HelloWorld'
----- TYPES
-STRING
-====
----- QUERY
 select udf_test.hive_pi()
 ---- RESULTS
 3.141592653589793

@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.ColumnType;
-import com.cloudera.impala.analysis.OpcodeRegistry;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.Column;
@@ -496,13 +495,6 @@ public class MetadataOp {
     // Impala's built-in functions do not have a catalog name or schema name.
     if (!isEmptyPattern(catalogName) || !isEmptyPattern(schemaName)) {
       return result;
-    }
-
-    Pattern functionPattern = Pattern.compile(convertPattern(functionName));
-
-    for (String builtinFn: OpcodeRegistry.instance().getFunctionNames()) {
-      if (!functionPattern.matcher(builtinFn).matches()) continue;
-      result.rows.add(createFunctionResultRow(builtinFn));
     }
 
     DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,

@@ -136,24 +136,24 @@ public class ToSqlTest extends AnalyzerTest {
   public void aggregationTest() {
     testToSql("select COUNT(*), count(id), COUNT(id), SUM(id), AVG(id) " +
         "from functional.alltypes group by tinyint_col",
-        "SELECT COUNT(*), COUNT(id), COUNT(id), SUM(id), AVG(id) " +
+        "SELECT count(*), count(id), count(id), sum(id), avg(id) " +
         "FROM functional.alltypes GROUP BY tinyint_col");
     testToSql("select avg(float_col / id) from functional.alltypes group by tinyint_col",
-        "SELECT AVG(float_col / id) " +
+        "SELECT avg(float_col / id) " +
         "FROM functional.alltypes GROUP BY tinyint_col");
     testToSql("select avg(double_col) from functional.alltypes " +
         "group by int_col, tinyint_col, bigint_col",
-        "SELECT AVG(double_col) FROM functional.alltypes " +
+        "SELECT avg(double_col) FROM functional.alltypes " +
         "GROUP BY int_col, tinyint_col, bigint_col");
     // Group by with having clause
     testToSql("select avg(id) from functional.alltypes " +
         "group by tinyint_col having count(tinyint_col) > 10",
-        "SELECT AVG(id) FROM functional.alltypes " +
-        "GROUP BY tinyint_col HAVING COUNT(tinyint_col) > 10");
+        "SELECT avg(id) FROM functional.alltypes " +
+        "GROUP BY tinyint_col HAVING count(tinyint_col) > 10");
     testToSql("select sum(id) from functional.alltypes group by tinyint_col " +
         "having avg(tinyint_col) > 10 AND count(tinyint_col) > 5",
-        "SELECT SUM(id) FROM functional.alltypes GROUP BY tinyint_col " +
-        "HAVING AVG(tinyint_col) > 10 AND COUNT(tinyint_col) > 5");
+        "SELECT sum(id) FROM functional.alltypes GROUP BY tinyint_col " +
+        "HAVING avg(tinyint_col) > 10 AND count(tinyint_col) > 5");
   }
 
   // Test the toSql() output of the order by clause.
@@ -206,11 +206,11 @@ public class ToSqlTest extends AnalyzerTest {
         "group by bigint_col, int_col " +
         "having count(int_col) > 10 OR sum(bigint_col) > 20 " +
         "order by 2 DESC NULLS LAST, 3 ASC",
-        "SELECT bigint_col, AVG(double_col), SUM(tinyint_col) " +
+        "SELECT bigint_col, avg(double_col), sum(tinyint_col) " +
         "FROM functional.alltypes " +
         "WHERE double_col > 2.5 AND string_col != 'abc' " +
         "GROUP BY bigint_col, int_col " +
-        "HAVING COUNT(int_col) > 10 OR SUM(bigint_col) > 20 " +
+        "HAVING count(int_col) > 10 OR sum(bigint_col) > 20 " +
         "ORDER BY 2 DESC NULLS LAST, 3 ASC");
   }
 
@@ -299,10 +299,10 @@ public class ToSqlTest extends AnalyzerTest {
         "(select id, string_col from functional.alltypes) t1 inner join " +
         "(select id, float_col from functional.alltypes) t2 on (t1.id = t2.id) " +
         "group by t1.id, t2.id having count(t2.float_col) > 2",
-        "SELECT COUNT(t1.string_col), SUM(t2.float_col) FROM " +
+        "SELECT count(t1.string_col), sum(t2.float_col) FROM " +
         "(SELECT id, string_col FROM functional.alltypes) t1 INNER JOIN " +
         "(SELECT id, float_col FROM functional.alltypes) t2 ON (t1.id = t2.id) " +
-        "GROUP BY t1.id, t2.id HAVING COUNT(t2.float_col) > 2");
+        "GROUP BY t1.id, t2.id HAVING count(t2.float_col) > 2");
     // Test undoing expr substitution in order by clause.
     testToSql("select t1.id, t2.id from " +
         "(select id, string_col from functional.alltypes) t1 inner join " +
@@ -451,9 +451,9 @@ public class ToSqlTest extends AnalyzerTest {
     testToSql("select count(*), (count(*)), avg(int_col), (avg(int_col)), " +
         "sum(int_col), (sum(int_col)), min(int_col), (min(int_col)), " +
         "max(int_col), (max(int_col)) from functional.alltypes",
-        "SELECT COUNT(*), (COUNT(*)), AVG(int_col), (AVG(int_col)), " +
-        "SUM(int_col), (SUM(int_col)), MIN(int_col), (MIN(int_col)), " +
-        "MAX(int_col), (MAX(int_col)) FROM functional.alltypes");
+        "SELECT count(*), (count(*)), avg(int_col), (avg(int_col)), " +
+        "sum(int_col), (sum(int_col)), min(int_col), (min(int_col)), " +
+        "max(int_col), (max(int_col)) FROM functional.alltypes");
     // ArithmeticExpr.
     testToSql("select 1 * 1, (1 * 1), 2 / 2, (2 / 2), 3 % 3, (3 % 3), " +
         "4 DIV 4, (4 DIV 4), 5 + 5, (5 + 5), 6 - 6, (6 - 6), 7 & 7, (7 & 7), " +

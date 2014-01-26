@@ -74,7 +74,7 @@ struct TDdlExecRequest {
   // Parameters for CREATE FUNCTION
   9: optional JniCatalog.TCreateFunctionParams create_fn_params
 
-  // Paramaters for DROP DATABASE
+  // Parameters for DROP DATABASE
   10: optional JniCatalog.TDropDbParams drop_db_params
 
   // Parameters for DROP TABLE/VIEW

@@ -16,7 +16,6 @@
 #ifndef IMPALA_EXPRS_AGGREGATE_FUNCTIONS_H
 #define IMPALA_EXPRS_AGGREGATE_FUNCTIONS_H
 
-#include "exprs/opcode-registry.h"
 #include "udf/udf.h"
 
 using namespace impala_udf;
@@ -56,6 +55,7 @@ class AggregateFunctions {
   static void Max(FunctionContext*, const T& src, T* dst);
 
   // String concat
+  static void StringConcat(FunctionContext*, const StringVal& src, StringVal* result);
   static void StringConcat(FunctionContext*, const StringVal& src,
       const StringVal& separator, StringVal* result);
 

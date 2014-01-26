@@ -19,7 +19,8 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import com.cloudera.impala.analysis.FunctionName;
+import com.cloudera.impala.analysis.ColumnType;
+import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TFunctionType;
@@ -54,6 +55,10 @@ public class Db implements CatalogObject {
   // on this map.
   private final HashMap<String, List<Function>> functions_;
 
+  // If true, this database is an Impala system database.
+  // (e.g. can't drop it, can't add tables to it, etc).
+  private boolean isSystemDb_ = false;
+
   public Db(String name, Catalog catalog) {
     thriftDb_ = new TDatabase(name);
     parentCatalog_ = catalog;
@@ -68,6 +73,8 @@ public class Db implements CatalogObject {
     functions_ = new HashMap<String, List<Function>>();
   }
 
+  public void setIsSystemDb(boolean b) { isSystemDb_ = b; }
+
   /**
    * Creates a Db object with no tables based on the given TDatabase thrift struct.
    */
@@ -75,6 +82,7 @@ public class Db implements CatalogObject {
     return new Db(db.getDb_name(), parentCatalog);
   }
 
+  public boolean isSystemDb() { return isSystemDb_; }
   public TDatabase toThrift() { return thriftDb_; }
   public String getName() { return thriftDb_.getDb_name(); }
   public TCatalogObjectType getCatalogObjectType() {
@@ -132,15 +140,17 @@ public class Db implements CatalogObject {
 
   /**
    * Returns all the function signatures in this DB that match the specified
-   * fuction type. If the function type is null, all function signatures are returned.
+   * function type. If the function type is null, all function signatures are returned.
    */
   public List<String> getAllFunctionSignatures(TFunctionType type) {
     List<String> names = Lists.newArrayList();
     synchronized (functions_) {
       for (List<Function> fns: functions_.values()) {
         for (Function f: fns) {
-          if (type == null || (type == TFunctionType.SCALAR && f instanceof Udf) ||
-               type == TFunctionType.AGGREGATE && f instanceof Uda) {
+          if (!f.userVisible()) continue;
+          if (type == null ||
+              (type == TFunctionType.SCALAR && f instanceof ScalarFunction) ||
+              (type == TFunctionType.AGGREGATE && f instanceof AggregateFunction)) {
             names.add(f.signatureString());
           }
         }
@@ -161,9 +171,9 @@ public class Db implements CatalogObject {
   /**
    * See comment in Catalog.
    */
-  public boolean functionExists(FunctionName name) {
+  public boolean containsFunction(String name) {
     synchronized (functions_) {
-      return functions_.get(name.getFunction()) != null;
+      return functions_.get(name) != null;
     }
   }
 
@@ -251,6 +261,27 @@ public class Db implements CatalogObject {
       if (targetFn != null) return removeFunction(targetFn);
     }
     return null;
+  }
+
+  /**
+   * Add a builtin with the specified name and signatures to this db.
+   */
+  public void addScalarBuiltin(boolean udfInterface, String fnName, String symbol,
+      boolean varArgs, ColumnType retType, ColumnType ... args) {
+    Preconditions.checkState(isSystemDb());
+    addBuiltin(ScalarFunction.createBuiltin(
+        fnName, Lists.newArrayList(args), varArgs, retType,
+        symbol, udfInterface));
+  }
+
+  /**
+   * Adds a builtin to this database. The function must not already exist.
+   */
+  public void addBuiltin(Function fn) {
+    Preconditions.checkState(isSystemDb());
+    Preconditions.checkState(fn != null);
+    Preconditions.checkState(getFunction(fn, CompareMode.IS_INDISTINGUISHABLE) == null);
+    addFunction(fn);
   }
 
   /**

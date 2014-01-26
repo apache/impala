@@ -205,7 +205,7 @@ where id < 5
 group by 1
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: int_col
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
@@ -219,13 +219,13 @@ NODE 0:
 04:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(*))
+|  output: sum(count(*))
 |  group by: int_col
 |
 02:EXCHANGE [PARTITION=HASH(int_col)]
 |
 01:AGGREGATE
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: int_col
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]

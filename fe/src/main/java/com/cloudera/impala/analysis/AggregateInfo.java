@@ -323,9 +323,8 @@ public class AggregateInfo {
           new SlotRef(inputDesc.getSlots().get(i + getGroupingExprs().size()));
       List<Expr> aggExprParamList = Lists.newArrayList(aggExprParam);
       FunctionCallExpr aggExpr = null;
-      if (inputExpr.getAggOp() == BuiltinAggregateFunction.Operator.COUNT) {
-        aggExpr = new FunctionCallExpr(
-            BuiltinAggregateFunction.Operator.SUM, new FunctionParams(aggExprParamList));
+      if (inputExpr.getFnName().getFunction().equals("count")) {
+        aggExpr = new FunctionCallExpr("sum", new FunctionParams(aggExprParamList));
       } else {
         aggExpr = new FunctionCallExpr(inputExpr, new FunctionParams(aggExprParamList));
       }
@@ -402,7 +401,7 @@ public class AggregateInfo {
     for (FunctionCallExpr inputExpr: distinctAggExprs) {
       Preconditions.checkState(inputExpr.isAggregateFunction());
       FunctionCallExpr aggExpr = null;
-      if (inputExpr.getAggOp() == BuiltinAggregateFunction.Operator.COUNT) {
+      if (inputExpr.getFnName().getFunction().equals("count")) {
         // COUNT(DISTINCT ...) ->
         // COUNT(IF(IsNull(<agg slot 1>), NULL, IF(IsNull(<agg slot 2>), NULL, ...)))
         // We need the nested IF to make sure that we do not count
@@ -418,17 +417,16 @@ public class AggregateInfo {
           throw new InternalException("Failed to analyze 'IF' function " +
               "in second phase count distinct aggregation.", e);
         }
-        aggExpr = new FunctionCallExpr(BuiltinAggregateFunction.Operator.COUNT,
+        aggExpr = new FunctionCallExpr("count",
             new FunctionParams(Lists.newArrayList(ifExpr)));
       } else {
         // SUM(DISTINCT <expr>) -> SUM(<last grouping slot>);
         // (MIN(DISTINCT ...) and MAX(DISTINCT ...) have their DISTINCT turned
         // off during analysis, and AVG() is changed to SUM()/COUNT())
-        Preconditions.checkState(inputExpr.getAggOp() ==
-            BuiltinAggregateFunction.Operator.SUM);
+        Preconditions.checkState(inputExpr.getFnName().getFunction().equals("sum"));
         Expr aggExprParam =
             new SlotRef(inputDesc.getSlots().get(origGroupingExprs.size()));
-        aggExpr = new FunctionCallExpr(BuiltinAggregateFunction.Operator.SUM,
+        aggExpr = new FunctionCallExpr("sum",
             new FunctionParams(Lists.newArrayList(aggExprParam)));
       }
       secondPhaseAggExprs.add(aggExpr);
@@ -443,8 +441,8 @@ public class AggregateInfo {
           new SlotRef(inputDesc.getSlots().get(i + getGroupingExprs().size()));
       List<Expr> aggExprParamList = Lists.newArrayList(aggExprParam);
       FunctionCallExpr aggExpr = null;
-      if (inputExpr.getAggOp() == BuiltinAggregateFunction.Operator.COUNT) {
-        aggExpr = new FunctionCallExpr(BuiltinAggregateFunction.Operator.SUM,
+      if (inputExpr.getFnName().getFunction().equals("count")) {
+        aggExpr = new FunctionCallExpr("sum",
             new FunctionParams(aggExprParamList));
       } else {
         // TODO: remap types here. The inserted agg expr doesn't need to be the same
@@ -550,7 +548,7 @@ public class AggregateInfo {
       } else {
         Preconditions.checkArgument(expr instanceof FunctionCallExpr);
         FunctionCallExpr aggExpr = (FunctionCallExpr)expr;
-        if (aggExpr.getAggOp() == BuiltinAggregateFunction.Operator.COUNT) {
+        if (aggExpr.getFnName().getFunction().equals("count")) {
           outputSlotDesc.setIsNullable(false);
         }
       }

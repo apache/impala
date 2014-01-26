@@ -94,7 +94,6 @@ class MathFunctions {
   // Returns false otherwise, indicating some other error condition.
   static bool HandleParseResult(int8_t dest_base, int64_t* num,
       StringParser::ParseResult parse_res);
-
 };
 
 }

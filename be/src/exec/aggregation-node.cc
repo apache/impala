@@ -271,11 +271,11 @@ Tuple* AggregationNode::ConstructAggTuple() {
       ExprValue default_value;
       void* default_value_ptr = NULL;
       switch (evaluator->agg_op()) {
-        case TAggregationOp::MIN:
+        case AggFnEvaluator::MIN:
           default_value_ptr = default_value.SetToMax((*slot_desc)->type());
           RawValue::Write(default_value_ptr, agg_tuple, *slot_desc, NULL);
           break;
-        case TAggregationOp::MAX:
+        case AggFnEvaluator::MAX:
           default_value_ptr = default_value.SetToMin((*slot_desc)->type());
           RawValue::Write(default_value_ptr, agg_tuple, *slot_desc, NULL);
           break;
@@ -395,23 +395,23 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
   // Update the slot
   Value* dst_value = builder.CreateLoad(dst_ptr, "dst_val");
   switch (evaluator->agg_op()) {
-    case TAggregationOp::COUNT:
+    case AggFnEvaluator::COUNT:
       result = builder.CreateAdd(dst_value,
           codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
       break;
-    case TAggregationOp::MIN: {
+    case AggFnEvaluator::MIN: {
       Function* min_fn = codegen->CodegenMinMax(slot_desc->type(), true);
       Value* min_args[] = { dst_value, src_value };
       result = builder.CreateCall(min_fn, min_args, "min_value");
       break;
     }
-    case TAggregationOp::MAX: {
+    case AggFnEvaluator::MAX: {
       Function* max_fn = codegen->CodegenMinMax(slot_desc->type(), false);
       Value* max_args[] = { dst_value, src_value };
       result = builder.CreateCall(max_fn, max_args, "max_value");
       break;
     }
-    case TAggregationOp::SUM:
+    case AggFnEvaluator::SUM:
       if (slot_desc->type() == TYPE_FLOAT || slot_desc->type() == TYPE_DOUBLE) {
         result = builder.CreateFAdd(dst_value, src_value);
       } else {
@@ -491,12 +491,6 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
 
     // Don't codegen things that aren't builtins (for now)
     if (!evaluator->is_builtin()) return NULL;
-
-    // Don't code gen distinct estimate
-    if (evaluator->agg_op() == TAggregationOp::DISTINCT_PC
-        || evaluator->agg_op() == TAggregationOp::DISTINCT_PCSA) {
-      return NULL;
-    }
   }
 
   if (agg_tuple_desc_->GenerateLlvmStruct(codegen) == NULL) {

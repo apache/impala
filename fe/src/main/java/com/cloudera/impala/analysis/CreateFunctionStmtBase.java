@@ -18,6 +18,8 @@ import java.util.HashMap;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -162,14 +164,17 @@ public class CreateFunctionStmtBase extends StatementBase {
 
     // Validate function name is legal
     fn_.getFunctionName().analyze(analyzer);
-
-    // Validate DB is legal
-    String dbName = analyzer.getTargetDbName(fn_.getFunctionName());
-    fn_.getFunctionName().setDb(dbName);
-    if (analyzer.getCatalog().getDb(
-        dbName, analyzer.getUser(), Privilege.CREATE) == null) {
-      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    Db builtinsDb = analyzer.getCatalog().getDb(Catalog.BUILTINS_DB);
+    if (builtinsDb.containsFunction(fn_.getName())) {
+      throw new AnalysisException("Function cannot have the same name as a builtin: " +
+          fn_.getFunctionName().getFunction());
     }
+
+    if (analyzer.getCatalog().getDb(
+        fn_.dbName(), analyzer.getUser(), Privilege.CREATE) == null) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + fn_.dbName());
+    }
+
     Function existingFn = analyzer.getCatalog().getFunction(
         fn_, Function.CompareMode.IS_INDISTINGUISHABLE);
     if (existingFn != null && !ifNotExists_) {

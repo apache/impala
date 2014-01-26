@@ -205,6 +205,7 @@ ExecEnv::~ExecEnv() {
 
 Status ExecEnv::InitForFeTests() {
   mem_tracker_.reset(new MemTracker(-1, "Process"));
+  RETURN_IF_ERROR(lib_cache_->Init(true));
   is_fe_tests_ = true;
   return Status::OK;
 }
@@ -294,6 +295,8 @@ Status ExecEnv::StartServices() {
       return status;
     }
   }
+
+  RETURN_IF_ERROR(lib_cache_->Init());
 
   return Status::OK;
 }

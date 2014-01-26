@@ -64,6 +64,11 @@ public class Function implements CatalogObject {
   // TODO: we don't currently support varargs with no fixed types. i.e. fn(...)
   private boolean hasVarArgs_;
 
+  // If true (default), this function is called directly by the user. For operators,
+  // this is false. If false, it also means the function is not visible from
+  // 'show functions'.
+  private boolean userVisible_;
+
   // Absolute path in HDFS for the binary that contains this function.
   // e.g. /udfs/udfs.jar
   private HdfsUri location_;
@@ -80,6 +85,7 @@ public class Function implements CatalogObject {
       this.argTypes_ = argTypes;
     }
     this.retType_ = retType;
+    this.userVisible_ = true;
   }
 
   public Function(FunctionName name, List<ColumnType> args,
@@ -102,6 +108,7 @@ public class Function implements CatalogObject {
   public HdfsUri getLocation() { return location_; }
   public TFunctionBinaryType getBinaryType() { return binaryType_; }
   public boolean hasVarArgs() { return hasVarArgs_; }
+  public boolean userVisible() { return userVisible_; }
   public ColumnType getVarArgsType() {
     if (!hasVarArgs_) return ColumnType.INVALID;
     Preconditions.checkState(argTypes_.length > 0);
@@ -112,6 +119,7 @@ public class Function implements CatalogObject {
   public void setLocation(HdfsUri loc) { location_ = loc; }
   public void setBinaryType(TFunctionBinaryType type) { binaryType_ = type; }
   public void setHasVarArgs(boolean v) { hasVarArgs_ = v; }
+  public void setUserVisible(boolean b) { userVisible_ = b; }
 
   // Returns a string with the signature in human readable format:
   // FnName(argtype1, argtyp2).  e.g. Add(int, int)
@@ -123,6 +131,12 @@ public class Function implements CatalogObject {
     if (hasVarArgs_) sb.append("...");
     sb.append(")");
     return sb.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof Function)) return false;
+    return compare((Function)o, CompareMode.IS_IDENTICAL);
   }
 
   // Compares this to 'other' for mode.
@@ -227,8 +241,6 @@ public class Function implements CatalogObject {
 
   public TFunction toThrift() {
     TFunction fn = new TFunction();
-    // TODO: this function should have a unique ID
-    fn.setId(0);
     fn.setSignature(signatureString());
     fn.setName(name_.toThrift());
     fn.setBinary_type(binaryType_);
@@ -249,12 +261,12 @@ public class Function implements CatalogObject {
 
     Function function = null;
     if (fn.isSetScalar_fn()) {
-      function = new Udf(FunctionName.fromThrift(fn.getName()), argTypes,
+      function = new ScalarFunction(FunctionName.fromThrift(fn.getName()), argTypes,
           ColumnType.fromThrift(fn.getRet_type()), new HdfsUri(fn.getHdfs_location()),
           fn.getScalar_fn().getSymbol());
     } else if (fn.isSetAggregate_fn()) {
       TAggregateFunction aggFn = fn.getAggregate_fn();
-      function = new Uda(FunctionName.fromThrift(fn.getName()), argTypes,
+      function = new AggregateFunction(FunctionName.fromThrift(fn.getName()), argTypes,
           ColumnType.fromThrift(fn.getRet_type()),
           ColumnType.fromThrift(aggFn.getIntermediate_type()),
           new HdfsUri(fn.getHdfs_location()), aggFn.getUpdate_fn_symbol(),

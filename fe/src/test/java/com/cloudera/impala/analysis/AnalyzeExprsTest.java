@@ -28,7 +28,7 @@ import org.junit.Test;
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
-import com.cloudera.impala.catalog.Udf;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -947,23 +947,23 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // Add a udf default.udf(), default.udf(int), default.udf(string...),
     // default.udf(int, string...) and functional.udf(double)
-    catalog_.addFunction(new Udf(new FunctionName("default", "udf"),
+    catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
         new ArrayList<ColumnType>(), ColumnType.INT, dummyUri, null));
-    catalog_.addFunction(new Udf(new FunctionName("default", "udf"),
+    catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
         Lists.newArrayList(ColumnType.INT),
         ColumnType.INT, dummyUri, null));
-    Udf varArgsUdf1 = new Udf(new FunctionName("default", "udf"),
+    ScalarFunction varArgsUdf1 = new ScalarFunction(new FunctionName("default", "udf"),
         Lists.newArrayList(ColumnType.STRING),
         ColumnType.INT, dummyUri, null);
     varArgsUdf1.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf1);
-    Udf varArgsUdf2 = new Udf(new FunctionName("default", "udf"),
+    ScalarFunction varArgsUdf2 = new ScalarFunction(new FunctionName("default", "udf"),
         Lists.newArrayList(
             ColumnType.INT, ColumnType.STRING),
         ColumnType.INT, dummyUri, null);
     varArgsUdf2.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf2);
-    Udf udf = new Udf(new FunctionName("functional", "udf"),
+    ScalarFunction udf = new ScalarFunction(new FunctionName("functional", "udf"),
         Lists.newArrayList(ColumnType.DOUBLE),
         ColumnType.INT, dummyUri, null);
     catalog_.addFunction(udf);
@@ -1039,7 +1039,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testFuncExprDepthLimit("lower(", "'abc'", ")");
 
     // UDF.
-    catalog_.addFunction(new Udf(new FunctionName("default", "udf"),
+    catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
         Lists.newArrayList(ColumnType.INT),
         ColumnType.INT, new HdfsUri(""), null));
     testFuncExprDepthLimit("udf(", "1", ")");

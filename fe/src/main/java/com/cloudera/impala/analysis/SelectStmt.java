@@ -480,9 +480,7 @@ public class SelectStmt extends QueryStmt {
       throws AnalysisException, AuthorizationException {
     Expr.SubstitutionMap result = new Expr.SubstitutionMap();
     for (FunctionCallExpr aggExpr : aggExprs) {
-      if (aggExpr.getAggOp() != BuiltinAggregateFunction.Operator.AVG) {
-        continue;
-      }
+      if (!aggExpr.getFnName().getFunction().equals("avg")) continue;
       // Transform avg(TIMESTAMP) to cast(avg(cast(TIMESTAMP as DOUBLE)) as TIMESTAMP)
       CastExpr inCastExpr = null;
       if (aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP) {
@@ -497,10 +495,10 @@ public class SelectStmt extends QueryStmt {
       List<Expr> countInputExpr = Lists.newArrayList(aggExpr.getChild(0).clone(null));
 
       FunctionCallExpr sumExpr =
-          new FunctionCallExpr(BuiltinAggregateFunction.Operator.SUM,
+          new FunctionCallExpr("sum",
               new FunctionParams(aggExpr.isDistinct(), sumInputExprs));
       FunctionCallExpr countExpr =
-          new FunctionCallExpr(BuiltinAggregateFunction.Operator.COUNT,
+          new FunctionCallExpr("count",
               new FunctionParams(aggExpr.isDistinct(), countInputExpr));
       ArithmeticExpr divExpr =
           new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);

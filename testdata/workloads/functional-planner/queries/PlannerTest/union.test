@@ -2062,7 +2062,7 @@ where x.int_col < 5 and x.bool_col = false
 00:MERGE
 |
 |--04:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: int_col, bool_col
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
@@ -2070,7 +2070,7 @@ where x.int_col < 5 and x.bool_col = false
 |     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 |
 02:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: int_col, bool_col
 |
 01:SCAN HDFS [functional.alltypestiny]
@@ -2087,13 +2087,13 @@ NODE 3:
 |--11:MERGE
 |  |
 |  08:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: int_col, bool_col
 |  |
 |  07:EXCHANGE [PARTITION=HASH(int_col,bool_col)]
 |  |
 |  04:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: int_col, bool_col
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
@@ -2103,13 +2103,13 @@ NODE 3:
 10:MERGE
 |
 06:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(*))
+|  output: sum(count(*))
 |  group by: int_col, bool_col
 |
 05:EXCHANGE [PARTITION=HASH(int_col,bool_col)]
 |
 02:AGGREGATE
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: int_col, bool_col
 |
 01:SCAN HDFS [functional.alltypestiny]
@@ -2356,7 +2356,7 @@ select count(*) from (
 ) x
 ---- PLAN
 04:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |
 03:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
@@ -2371,7 +2371,7 @@ select count(*) from (
    partitions=24/24 size=956.90KB
 ---- DISTRIBUTEDPLAN
 04:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |
 03:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month

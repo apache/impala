@@ -26,9 +26,9 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.FunctionCallExpr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.thrift.TAggregateFunctionCall;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TExplainLevel;
+import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TQueryOptions;
@@ -160,10 +160,10 @@ public class AggregationNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.AGGREGATION_NODE;
 
-    List<TAggregateFunctionCall> aggregateFunctions = Lists.newArrayList();
+    List<TExpr> aggregateFunctions = Lists.newArrayList();
     // only serialize agg exprs that are being materialized
     for (FunctionCallExpr e: aggInfo_.getMaterializedAggregateExprs()) {
-      aggregateFunctions.add(e.toTAggregateFunctionCall());
+      aggregateFunctions.add(e.treeToThrift());
     }
     msg.agg_node = new TAggregationNode(
         aggregateFunctions,

@@ -24,6 +24,7 @@
 #include "util/dynamic-util.h"
 #include "util/hash-util.h"
 #include "util/hdfs-util.h"
+#include "util/path-builder.h"
 
 using namespace boost;
 using namespace std;
@@ -32,8 +33,27 @@ using namespace impala;
 DEFINE_string(local_library_dir, "/tmp",
               "Local directory to copy UDF libraries from HDFS into");
 
+LibCache::LibCache() :current_process_handle_(NULL) {
+}
+
 LibCache::~LibCache() {
   DropCache();
+  if (current_process_handle_ != NULL) dlclose(current_process_handle_);
+}
+
+Status LibCache::Init(bool is_fe_tests) {
+  if (is_fe_tests) {
+    // In the FE tests, NULL gives the handle to the java process.
+    // Explicitly load the fe-support shared object.
+    string fe_support_path;
+    PathBuilder::GetFullBuildPath("service/libfesupport.so", &fe_support_path);
+    RETURN_IF_ERROR(DynamicOpen(fe_support_path.c_str(), &current_process_handle_));
+  } else {
+    RETURN_IF_ERROR(DynamicOpen(NULL, &current_process_handle_));
+  }
+  DCHECK(current_process_handle_ != NULL)
+      << "We should always be able to get current process handle.";
+  return Status::OK;
 }
 
 LibCache::LibCacheEntry::~LibCacheEntry() {
@@ -48,6 +68,13 @@ LibCache::LibCacheEntry::~LibCacheEntry() {
 
 Status LibCache::GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
                                 const string& symbol, void** fn_ptr) {
+  if (hdfs_lib_file.empty()) {
+    // Just loading a function ptr in the current process. No need to take any locks.
+    DCHECK(current_process_handle_ != NULL);
+    RETURN_IF_ERROR(DynamicLookup(current_process_handle_, symbol.c_str(), fn_ptr));
+    return Status::OK;
+  }
+
   unique_lock<mutex> lock;
   LibCacheEntry* entry = NULL;
   RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, TYPE_SO, &lock, &entry));
@@ -194,7 +221,8 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
   RETURN_IF_ERROR((*entry)->copy_file_status);
   if (type == TYPE_SO) {
     // dlopen the local library
-    RETURN_IF_ERROR(DynamicOpen((*entry)->local_path, &(*entry)->shared_object_handle));
+    RETURN_IF_ERROR(
+        DynamicOpen((*entry)->local_path.c_str(), &(*entry)->shared_object_handle));
   } else if (type == TYPE_IR) {
     // Load the module and populate all symbols.
     ObjectPool pool;

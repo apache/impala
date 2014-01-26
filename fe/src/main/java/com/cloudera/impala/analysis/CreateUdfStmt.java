@@ -18,7 +18,7 @@ import java.util.HashMap;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.Udf;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
@@ -29,7 +29,7 @@ import com.cloudera.impala.thrift.TScalarFunction;
  */
 public class CreateUdfStmt extends CreateFunctionStmtBase {
   // Same as super.fn_. Typed here for convenience.
-  private final Udf udf_;
+  private final ScalarFunction udf_;
 
   /**
    * Builds a CREATE FUNCTION statement
@@ -44,8 +44,8 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
   public CreateUdfStmt(FunctionName fnName, FunctionArgs args,
       ColumnType retType, HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
-    super(new Udf(fnName, args, retType), location, ifNotExists, optArgs);
-    udf_ = (Udf)fn_;
+    super(new ScalarFunction(fnName, args, retType), location, ifNotExists, optArgs);
+    udf_ = (ScalarFunction)fn_;
   }
 
   @Override

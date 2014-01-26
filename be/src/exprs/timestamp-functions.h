@@ -32,10 +32,11 @@ class TupleRow;
 class TimestampFunctions {
  public:
   // Return the unix time_t, seconds from 1970
-  // With 0 argments, returns the current time.
-  // With 1 arument, converts it to a unix time_t
-  // With 2 aruments, the second argument is the format of the timestamp string.
+  // With 0 arguments, returns the current time.
+  // With 1 argument, converts it to a unix time_t
+  // With 2 arguments, the second argument is the format of the timestamp string.
   static void* Unix(Expr* e, TupleRow* row);
+  static void* UnixFromString(Expr* e, TupleRow* row);
 
   // Return a timestamp string from a unix time_t
   // Optional second argument is the format of the string.

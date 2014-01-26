@@ -29,10 +29,10 @@ order by
 limit 100
 ---- PLAN
 10:TOP-N [LIMIT=100]
-|  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
+|  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |
 09:AGGREGATE [FINALIZE]
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
 |
 08:HASH JOIN [INNER JOIN]
@@ -65,21 +65,21 @@ limit 100
    partitions=1/1 size=5.25MB
 ---- DISTRIBUTEDPLAN
 19:TOP-N [LIMIT=100]
-|  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
+|  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |
 18:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 10:TOP-N [LIMIT=100]
-|  order by: SUM(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
+|  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |
 17:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_ext_sales_price))
+|  output: sum(sum(ss_ext_sales_price))
 |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
 |
 16:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
 |
 09:AGGREGATE
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -125,10 +125,10 @@ limit 100
 SELECT
   i_item_id,
   s_state,
-  AVG(ss_quantity) agg1,
-  AVG(ss_list_price) agg2,
-  AVG(ss_coupon_amt) agg3,
-  AVG(ss_sales_price) agg4
+  avg(ss_quantity) agg1,
+  avg(ss_list_price) agg2,
+  avg(ss_coupon_amt) agg3,
+  avg(ss_sales_price) agg4
 FROM store_sales ss
 JOIN date_dim d
   ON (ss.ss_sold_date_sk = d.d_date_sk)
@@ -156,7 +156,7 @@ LIMIT 100
 |  order by: i_item_id ASC, s_state ASC
 |
 09:AGGREGATE [FINALIZE]
-|  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
+|  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
 |  group by: i_item_id, s_state
 |
 08:HASH JOIN [INNER JOIN]
@@ -198,13 +198,13 @@ LIMIT 100
 |  order by: i_item_id ASC, s_state ASC
 |
 16:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_quantity)), SUM(COUNT(ss_quantity)), SUM(SUM(ss_list_price)), SUM(COUNT(ss_list_price)), SUM(SUM(ss_coupon_amt)), SUM(COUNT(ss_coupon_amt)), SUM(SUM(ss_sales_price)), SUM(COUNT(ss_sales_price))
+|  output: sum(sum(ss_quantity)), sum(count(ss_quantity)), sum(sum(ss_list_price)), sum(count(ss_list_price)), sum(sum(ss_coupon_amt)), sum(count(ss_coupon_amt)), sum(sum(ss_sales_price)), sum(count(ss_sales_price))
 |  group by: i_item_id, s_state
 |
 15:EXCHANGE [PARTITION=HASH(i_item_id,s_state)]
 |
 09:AGGREGATE
-|  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
+|  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
 |  group by: i_item_id, s_state
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -271,7 +271,7 @@ from
       or household_demographics.hd_buy_potential = 'unknown')
     and household_demographics.hd_vehicle_count > 0
     and (case when household_demographics.hd_vehicle_count > 0 then household_demographics.hd_dep_count / household_demographics.hd_vehicle_count else null end) > 1.2
-    and store.s_county in ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County') 
+    and store.s_county in ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
   group by
     ss_ticket_number,
     ss_customer_sk
@@ -293,9 +293,9 @@ limit 1000
 |  hash predicates: customer.c_customer_sk = ss_customer_sk
 |
 |--07:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: COUNT(*) >= 15, COUNT(*) <= 20
+|  |  having: count(*) >= 15, count(*) <= 20
 |  |
 |  06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
@@ -338,14 +338,14 @@ limit 1000
 |--16:EXCHANGE [BROADCAST]
 |  |
 |  15:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: COUNT(*) >= 15, COUNT(*) <= 20
+|  |  having: count(*) >= 15, count(*) <= 20
 |  |
 |  14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk)]
 |  |
 |  07:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
 |  |
 |  06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -408,10 +408,10 @@ order by
 limit 100
 ---- PLAN
 04:TOP-N [LIMIT=100]
-|  order by: year(ss_date) ASC, SUM(ss_ext_sales_price) DESC, item.i_brand_id ASC
+|  order by: year(ss_date) ASC, sum(ss_ext_sales_price) DESC, item.i_brand_id ASC
 |
 03:AGGREGATE [FINALIZE]
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: year(ss_date), item.i_brand, item.i_brand_id
 |
 02:HASH JOIN [INNER JOIN]
@@ -425,21 +425,21 @@ limit 100
    partitions=10/120 size=3.88MB
 ---- DISTRIBUTEDPLAN
 09:TOP-N [LIMIT=100]
-|  order by: year(ss_date) ASC, SUM(ss_ext_sales_price) DESC, item.i_brand_id ASC
+|  order by: year(ss_date) ASC, sum(ss_ext_sales_price) DESC, item.i_brand_id ASC
 |
 08:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 04:TOP-N [LIMIT=100]
-|  order by: year(ss_date) ASC, SUM(ss_ext_sales_price) DESC, item.i_brand_id ASC
+|  order by: year(ss_date) ASC, sum(ss_ext_sales_price) DESC, item.i_brand_id ASC
 |
 07:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_ext_sales_price))
+|  output: sum(sum(ss_ext_sales_price))
 |  group by: year(ss_date), item.i_brand, item.i_brand_id
 |
 06:EXCHANGE [PARTITION=HASH(year(ss_date),item.i_brand,item.i_brand_id)]
 |
 03:AGGREGATE
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: year(ss_date), item.i_brand, item.i_brand_id
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
@@ -459,7 +459,7 @@ SELECT
   d.d_year,
   i.i_category_id,
   i.i_category,
-  SUM(ss_ext_sales_price) total_sales
+  sum(ss_ext_sales_price) total_sales
 FROM store_sales ss
 JOIN date_dim d
   ON (ss.ss_sold_date_sk = d.d_date_sk)
@@ -481,10 +481,10 @@ ORDER BY
 LIMIT 100
 ---- PLAN
 06:TOP-N [LIMIT=100]
-|  order by: SUM(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
+|  order by: sum(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
 |
 05:AGGREGATE [FINALIZE]
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: d.d_year, i.i_category_id, i.i_category
 |
 04:HASH JOIN [INNER JOIN]
@@ -505,21 +505,21 @@ LIMIT 100
    partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
 12:TOP-N [LIMIT=100]
-|  order by: SUM(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
+|  order by: sum(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
 |
 11:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 06:TOP-N [LIMIT=100]
-|  order by: SUM(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
+|  order by: sum(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
 |
 10:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_ext_sales_price))
+|  output: sum(sum(ss_ext_sales_price))
 |  group by: d.d_year, i.i_category_id, i.i_category
 |
 09:EXCHANGE [PARTITION=HASH(d.d_year,i.i_category_id,i.i_category)]
 |
 05:AGGREGATE
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: d.d_year, i.i_category_id, i.i_category
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -547,13 +547,13 @@ LIMIT 100
 SELECT
   s_store_name,
   s_store_id,
-  SUM(CASE WHEN (d_day_name='Sunday') THEN ss_sales_price ELSE NULL END) AS sun_sales,
-  SUM(CASE WHEN (d_day_name='Monday') THEN ss_sales_price ELSE NULL END) AS mon_sales,
-  SUM(CASE WHEN (d_day_name='Tuesday') THEN ss_sales_price ELSE NULL END) AS tue_sales,
-  SUM(CASE WHEN (d_day_name='Wednesday') THEN ss_sales_price ELSE NULL END) AS wed_sales,
-  SUM(CASE WHEN (d_day_name='Thursday') THEN ss_sales_price ELSE NULL END) AS thu_sales,
-  SUM(CASE WHEN (d_day_name='Friday') THEN ss_sales_price ELSE NULL END) AS fri_sales,
-  SUM(CASE WHEN (d_day_name='Saturday') THEN ss_sales_price ELSE NULL END) AS sat_sales
+  sum(CASE WHEN (d_day_name='Sunday') THEN ss_sales_price ELSE NULL END) AS sun_sales,
+  sum(CASE WHEN (d_day_name='Monday') THEN ss_sales_price ELSE NULL END) AS mon_sales,
+  sum(CASE WHEN (d_day_name='Tuesday') THEN ss_sales_price ELSE NULL END) AS tue_sales,
+  sum(CASE WHEN (d_day_name='Wednesday') THEN ss_sales_price ELSE NULL END) AS wed_sales,
+  sum(CASE WHEN (d_day_name='Thursday') THEN ss_sales_price ELSE NULL END) AS thu_sales,
+  sum(CASE WHEN (d_day_name='Friday') THEN ss_sales_price ELSE NULL END) AS fri_sales,
+  sum(CASE WHEN (d_day_name='Saturday') THEN ss_sales_price ELSE NULL END) AS sat_sales
 FROM store_sales ss
 JOIN date_dim d
   ON (ss.ss_sold_date_sk = d.d_date_sk)
@@ -578,10 +578,10 @@ ORDER BY
 LIMIT 100
 ---- PLAN
 06:TOP-N [LIMIT=100]
-|  order by: s_store_name ASC, s_store_id ASC, SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
+|  order by: s_store_name ASC, s_store_id ASC, sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
 |
 05:AGGREGATE [FINALIZE]
-|  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: s_store_name, s_store_id
 |
 04:HASH JOIN [INNER JOIN]
@@ -602,21 +602,21 @@ LIMIT 100
    partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
 12:TOP-N [LIMIT=100]
-|  order by: s_store_name ASC, s_store_id ASC, SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
+|  order by: s_store_name ASC, s_store_id ASC, sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
 |
 11:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 06:TOP-N [LIMIT=100]
-|  order by: s_store_name ASC, s_store_id ASC, SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
+|  order by: s_store_name ASC, s_store_id ASC, sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
 |
 10:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
+|  output: sum(sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
 |  group by: s_store_name, s_store_id
 |
 09:EXCHANGE [PARTITION=HASH(s_store_name,s_store_id)]
 |
 05:AGGREGATE
-|  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: s_store_name, s_store_id
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -654,8 +654,8 @@ FROM
     ss_ticket_number,
     ss_customer_sk,
     ca_city bought_city,
-    SUM(ss_coupon_amt) amt,
-    SUM(ss_net_profit) profit
+    sum(ss_coupon_amt) amt,
+    sum(ss_net_profit) profit
   FROM store_sales ss
   JOIN date_dim d
     ON (ss.ss_sold_date_sk = d.d_date_sk)
@@ -708,7 +708,7 @@ LIMIT 400
 |     partitions=1/1 size=12.60MB compact
 |
 09:AGGREGATE [FINALIZE]
-|  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
+|  output: sum(ss_coupon_amt), sum(ss_net_profit)
 |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
 |
 08:HASH JOIN [INNER JOIN]
@@ -769,13 +769,13 @@ LIMIT 400
 21:EXCHANGE [PARTITION=HASH(ss_customer_sk)]
 |
 20:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_coupon_amt)), SUM(SUM(ss_net_profit))
+|  output: sum(sum(ss_coupon_amt)), sum(sum(ss_net_profit))
 |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
 |
 19:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)]
 |
 09:AGGREGATE
-|  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
+|  output: sum(ss_coupon_amt), sum(ss_net_profit)
 |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -821,7 +821,7 @@ SELECT
   d.d_year,
   i.i_brand_id AS brand_id,
   i.i_brand AS brand,
-  SUM(ss_ext_sales_price) AS ext_price
+  sum(ss_ext_sales_price) AS ext_price
 FROM store_sales ss
 JOIN date_dim d
   ON (ss.ss_sold_date_sk = d.d_date_sk)
@@ -842,10 +842,10 @@ ORDER BY
 LIMIT 100
 ---- PLAN
 06:TOP-N [LIMIT=100]
-|  order by: d.d_year ASC, SUM(ss_ext_sales_price) DESC, i.i_brand_id ASC
+|  order by: d.d_year ASC, sum(ss_ext_sales_price) DESC, i.i_brand_id ASC
 |
 05:AGGREGATE [FINALIZE]
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: d.d_year, i.i_brand, i.i_brand_id
 |
 04:HASH JOIN [INNER JOIN]
@@ -866,21 +866,21 @@ LIMIT 100
    partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
 12:TOP-N [LIMIT=100]
-|  order by: d.d_year ASC, SUM(ss_ext_sales_price) DESC, i.i_brand_id ASC
+|  order by: d.d_year ASC, sum(ss_ext_sales_price) DESC, i.i_brand_id ASC
 |
 11:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 06:TOP-N [LIMIT=100]
-|  order by: d.d_year ASC, SUM(ss_ext_sales_price) DESC, i.i_brand_id ASC
+|  order by: d.d_year ASC, sum(ss_ext_sales_price) DESC, i.i_brand_id ASC
 |
 10:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_ext_sales_price))
+|  output: sum(sum(ss_ext_sales_price))
 |  group by: d.d_year, i.i_brand, i.i_brand_id
 |
 09:EXCHANGE [PARTITION=HASH(d.d_year,i.i_brand,i.i_brand_id)]
 |
 05:AGGREGATE
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: d.d_year, i.i_brand, i.i_brand_id
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -923,12 +923,12 @@ from
             and i_class in('personal', 'portable', 'reference', 'self-help')
             and i_brand in('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')
           )
-          or 
+          or
           (i_category in('Women', 'Music', 'Men')
             and i_class in('accessories', 'classical', 'fragrances', 'pants')
             and i_brand in('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')
           )
-        )  
+        )
   group by
     i_manufact_id,
     d_qoy
@@ -942,7 +942,7 @@ limit 100
 |  order by: sum_sales ASC, i_manufact_id ASC
 |
 07:AGGREGATE [FINALIZE]
-|  output: SUM(ss_sales_price)
+|  output: sum(ss_sales_price)
 |  group by: i_manufact_id, d_qoy
 |
 06:HASH JOIN [INNER JOIN]
@@ -976,13 +976,13 @@ limit 100
 |  order by: sum_sales ASC, i_manufact_id ASC
 |
 13:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_sales_price))
+|  output: sum(sum(ss_sales_price))
 |  group by: i_manufact_id, d_qoy
 |
 12:EXCHANGE [PARTITION=HASH(i_manufact_id,d_qoy)]
 |
 07:AGGREGATE
-|  output: SUM(ss_sales_price)
+|  output: sum(ss_sales_price)
 |  group by: i_manufact_id, d_qoy
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1017,7 +1017,7 @@ limit 100
 SELECT
   i_brand_id,
   i_brand,
-  SUM(ss_ext_sales_price) AS ext_price
+  sum(ss_ext_sales_price) AS ext_price
 FROM store_sales ss
 JOIN date_dim d
   ON (ss.ss_sold_date_sk = d.d_date_sk)
@@ -1036,10 +1036,10 @@ ORDER BY
 LIMIT 100
 ---- PLAN
 06:TOP-N [LIMIT=100]
-|  order by: SUM(ss_ext_sales_price) DESC, i_brand_id ASC
+|  order by: sum(ss_ext_sales_price) DESC, i_brand_id ASC
 |
 05:AGGREGATE [FINALIZE]
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id
 |
 04:HASH JOIN [INNER JOIN]
@@ -1060,21 +1060,21 @@ LIMIT 100
    partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
 12:TOP-N [LIMIT=100]
-|  order by: SUM(ss_ext_sales_price) DESC, i_brand_id ASC
+|  order by: sum(ss_ext_sales_price) DESC, i_brand_id ASC
 |
 11:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 06:TOP-N [LIMIT=100]
-|  order by: SUM(ss_ext_sales_price) DESC, i_brand_id ASC
+|  order by: sum(ss_ext_sales_price) DESC, i_brand_id ASC
 |
 10:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_ext_sales_price))
+|  output: sum(sum(ss_ext_sales_price))
 |  group by: i_brand, i_brand_id
 |
 09:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id)]
 |
 05:AGGREGATE
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1145,7 +1145,7 @@ from
   where
     d_month_seq between 1185 and 1185 + 11
   ) y
-  join  
+  join
   (select
     s_store_name s_store_name2,
     wss.d_week_seq d_week_seq2,
@@ -1209,7 +1209,7 @@ limit 100
 |  |     partitions=1/1 size=3.08KB compact
 |  |
 |  11:AGGREGATE [FINALIZE]
-|  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  |  group by: d_week_seq, ss_store_sk
 |  |
 |  10:HASH JOIN [INNER JOIN]
@@ -1235,7 +1235,7 @@ limit 100
 |     partitions=1/1 size=3.08KB compact
 |
 03:AGGREGATE [FINALIZE]
-|  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: d_week_seq, ss_store_sk
 |
 02:HASH JOIN [INNER JOIN]
@@ -1278,13 +1278,13 @@ limit 100
 |  |     partitions=1/1 size=3.08KB
 |  |
 |  27:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
+|  |  output: sum(sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
 |  |  group by: d_week_seq, ss_store_sk
 |  |
 |  26:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
 |  |
 |  11:AGGREGATE
-|  |  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  |  group by: d_week_seq, ss_store_sk
 |  |
 |  10:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1320,13 +1320,13 @@ limit 100
 |     partitions=1/1 size=3.08KB
 |
 21:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), SUM(SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
+|  output: sum(sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
 |  group by: d_week_seq, ss_store_sk
 |
 20:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
 |
 03:AGGREGATE
-|  output: SUM(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), SUM(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
+|  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: d_week_seq, ss_store_sk
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1361,7 +1361,7 @@ from
             and i_class in('personal', 'portable', 'refernece', 'self-help')
             and i_brand in('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')
           )
-          or 
+          or
           (i_category in('Women', 'Music', 'Men')
             and i_class in('accessories', 'classical', 'fragrances', 'pants')
             and i_brand in('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')
@@ -1380,7 +1380,7 @@ limit 100
 |  order by: i_manager_id ASC, sum_sales ASC
 |
 07:AGGREGATE [FINALIZE]
-|  output: SUM(ss_sales_price)
+|  output: sum(ss_sales_price)
 |  group by: i_manager_id, d_moy
 |
 06:HASH JOIN [INNER JOIN]
@@ -1414,13 +1414,13 @@ limit 100
 |  order by: i_manager_id ASC, sum_sales ASC
 |
 13:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_sales_price))
+|  output: sum(sum(ss_sales_price))
 |  group by: i_manager_id, d_moy
 |
 12:EXCHANGE [PARTITION=HASH(i_manager_id,d_moy)]
 |
 07:AGGREGATE
-|  output: SUM(ss_sales_price)
+|  output: sum(ss_sales_price)
 |  group by: i_manager_id, d_moy
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1474,7 +1474,7 @@ from
   ) sc -- 7,858,212,382 rows
   join item on (sc.ss_item_sk = item.i_item_sk)
   join store on (sc.ss_store_sk = store.s_store_sk)
-  join 
+  join
   (select
     ss_store_sk,
     avg(revenue) as ave
@@ -1498,7 +1498,7 @@ where
   sc.revenue <= 0.1 * sb.ave
 order by
   s_store_name,
-  i_item_desc 
+  i_item_desc
 limit 100
 ---- PLAN
 10:TOP-N [LIMIT=100]
@@ -1506,14 +1506,14 @@ limit 100
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_store_sk = ss_store_sk
-|  other predicates: SUM(ss_sales_price) <= 0.1 * SUM(revenue) / COUNT(revenue)
+|  other predicates: sum(ss_sales_price) <= 0.1 * sum(revenue) / count(revenue)
 |
 |--06:AGGREGATE [FINALIZE]
-|  |  output: SUM(SUM(ss_sales_price)), COUNT(SUM(ss_sales_price))
+|  |  output: sum(sum(ss_sales_price)), count(sum(ss_sales_price))
 |  |  group by: ss_store_sk
 |  |
 |  05:AGGREGATE [FINALIZE]
-|  |  output: SUM(ss_sales_price)
+|  |  output: sum(ss_sales_price)
 |  |  group by: ss_store_sk, ss_item_sk
 |  |
 |  04:SCAN HDFS [tpcds.store_sales]
@@ -1529,7 +1529,7 @@ limit 100
 |  hash predicates: item.i_item_sk = ss_item_sk
 |
 |--01:AGGREGATE [FINALIZE]
-|  |  output: SUM(ss_sales_price)
+|  |  output: sum(ss_sales_price)
 |  |  group by: ss_store_sk, ss_item_sk
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
@@ -1548,28 +1548,28 @@ limit 100
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = ss_store_sk
-|  other predicates: SUM(ss_sales_price) <= 0.1 * SUM(revenue) / COUNT(revenue)
+|  other predicates: sum(ss_sales_price) <= 0.1 * sum(revenue) / count(revenue)
 |
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  18:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(SUM(revenue)), SUM(COUNT(revenue))
+|  |  output: sum(sum(revenue)), sum(count(revenue))
 |  |  group by: ss_store_sk
 |  |
 |  17:EXCHANGE [PARTITION=HASH(ss_store_sk)]
 |  |
 |  06:AGGREGATE
-|  |  output: SUM(SUM(ss_sales_price)), COUNT(SUM(ss_sales_price))
+|  |  output: sum(sum(ss_sales_price)), count(sum(ss_sales_price))
 |  |  group by: ss_store_sk
 |  |
 |  16:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(SUM(ss_sales_price))
+|  |  output: sum(sum(ss_sales_price))
 |  |  group by: ss_store_sk, ss_item_sk
 |  |
 |  15:EXCHANGE [PARTITION=HASH(ss_store_sk,ss_item_sk)]
 |  |
 |  05:AGGREGATE
-|  |  output: SUM(ss_sales_price)
+|  |  output: sum(ss_sales_price)
 |  |  group by: ss_store_sk, ss_item_sk
 |  |
 |  04:SCAN HDFS [tpcds.store_sales]
@@ -1589,13 +1589,13 @@ limit 100
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  12:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(SUM(ss_sales_price))
+|  |  output: sum(sum(ss_sales_price))
 |  |  group by: ss_store_sk, ss_item_sk
 |  |
 |  11:EXCHANGE [PARTITION=HASH(ss_store_sk,ss_item_sk)]
 |  |
 |  01:AGGREGATE
-|  |  output: SUM(ss_sales_price)
+|  |  output: sum(ss_sales_price)
 |  |  group by: ss_store_sk, ss_item_sk
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
@@ -1645,7 +1645,7 @@ where
   current_addr.ca_city <> bought_city
 order by
   c_last_name,
-  ss_ticket_number 
+  ss_ticket_number
 limit 100
 ---- PLAN
 12:TOP-N [LIMIT=100]
@@ -1656,7 +1656,7 @@ limit 100
 |  other predicates: current_addr.ca_city != ca_city
 |
 |--07:AGGREGATE [FINALIZE]
-|  |  output: SUM(ss_ext_sales_price), SUM(ss_ext_list_price), SUM(ss_ext_tax)
+|  |  output: sum(ss_ext_sales_price), sum(ss_ext_list_price), sum(ss_ext_tax)
 |  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
 |  |
 |  06:HASH JOIN [INNER JOIN]
@@ -1706,13 +1706,13 @@ limit 100
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  18:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(SUM(ss_ext_sales_price)), SUM(SUM(ss_ext_list_price)), SUM(SUM(ss_ext_tax))
+|  |  output: sum(sum(ss_ext_sales_price)), sum(sum(ss_ext_list_price)), sum(sum(ss_ext_tax))
 |  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
 |  |
 |  17:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)]
 |  |
 |  07:AGGREGATE
-|  |  output: SUM(ss_ext_sales_price), SUM(ss_ext_list_price), SUM(ss_ext_tax)
+|  |  output: sum(ss_ext_sales_price), sum(ss_ext_list_price), sum(ss_ext_tax)
 |  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
 |  |
 |  06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1767,7 +1767,7 @@ FROM
   (SELECT
     ss_ticket_number,
     ss_customer_sk,
-    COUNT(*) AS cnt
+    count(*) AS cnt
   FROM store_sales ss
   JOIN date_dim d
     ON (ss.ss_sold_date_sk = d.d_date_sk)
@@ -1802,9 +1802,9 @@ LIMIT 100
 |  hash predicates: c.c_customer_sk = ss_customer_sk
 |
 |--07:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: COUNT(*) <= 5, COUNT(*) >= 1
+|  |  having: count(*) <= 5, count(*) >= 1
 |  |
 |  06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss.ss_store_sk = s.s_store_sk
@@ -1847,14 +1847,14 @@ LIMIT 100
 |--16:EXCHANGE [BROADCAST]
 |  |
 |  15:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: COUNT(*) <= 5, COUNT(*) >= 1
+|  |  having: count(*) <= 5, count(*) >= 1
 |  |
 |  14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk)]
 |  |
 |  07:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
 |  |
 |  06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1903,8 +1903,8 @@ FROM
     ss_ticket_number,
     ss_customer_sk,
     s_city,
-    SUM(ss_coupon_amt) AS amt,
-    SUM(ss_net_profit) AS profit
+    sum(ss_coupon_amt) AS amt,
+    sum(ss_net_profit) AS profit
   FROM store_sales ss
   JOIN date_dim d
     ON (ss.ss_sold_date_sk = d.d_date_sk)
@@ -1943,7 +1943,7 @@ LIMIT 100
 |     partitions=1/1 size=12.60MB compact
 |
 07:AGGREGATE [FINALIZE]
-|  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
+|  output: sum(ss_coupon_amt), sum(ss_net_profit)
 |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
 |
 06:HASH JOIN [INNER JOIN]
@@ -1989,13 +1989,13 @@ LIMIT 100
 16:EXCHANGE [PARTITION=HASH(ss_customer_sk)]
 |
 15:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_coupon_amt)), SUM(SUM(ss_net_profit))
+|  output: sum(sum(ss_coupon_amt)), sum(sum(ss_net_profit))
 |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
 |
 14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,s_city)]
 |
 07:AGGREGATE
-|  output: SUM(ss_coupon_amt), SUM(ss_net_profit)
+|  output: sum(ss_coupon_amt), sum(ss_net_profit)
 |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2050,14 +2050,14 @@ where
 group by
   i_item_id
 order by
-  i_item_id 
+  i_item_id
 limit 100
 ---- PLAN
 08:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC
 |
 07:AGGREGATE [FINALIZE]
-|  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
+|  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
 |  group by: i_item_id
 |
 06:HASH JOIN [INNER JOIN]
@@ -2092,13 +2092,13 @@ limit 100
 |  order by: i_item_id ASC
 |
 14:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_quantity)), SUM(COUNT(ss_quantity)), SUM(SUM(ss_list_price)), SUM(COUNT(ss_list_price)), SUM(SUM(ss_coupon_amt)), SUM(COUNT(ss_coupon_amt)), SUM(SUM(ss_sales_price)), SUM(COUNT(ss_sales_price))
+|  output: sum(sum(ss_quantity)), sum(count(ss_quantity)), sum(sum(ss_list_price)), sum(count(ss_list_price)), sum(sum(ss_coupon_amt)), sum(count(ss_coupon_amt)), sum(sum(ss_sales_price)), sum(count(ss_sales_price))
 |  group by: i_item_id
 |
 13:EXCHANGE [PARTITION=HASH(i_item_id)]
 |
 07:AGGREGATE
-|  output: SUM(ss_quantity), COUNT(ss_quantity), SUM(ss_list_price), COUNT(ss_list_price), SUM(ss_coupon_amt), COUNT(ss_coupon_amt), SUM(ss_sales_price), COUNT(ss_sales_price)
+|  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
 |  group by: i_item_id
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2175,7 +2175,7 @@ limit 100
 |  order by: sum_sales ASC, s_store_name ASC, i_category ASC
 |
 07:AGGREGATE [FINALIZE]
-|  output: SUM(ss_sales_price)
+|  output: sum(ss_sales_price)
 |  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
 |
 06:HASH JOIN [INNER JOIN]
@@ -2210,13 +2210,13 @@ limit 100
 |  order by: sum_sales ASC, s_store_name ASC, i_category ASC
 |
 13:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_sales_price))
+|  output: sum(sum(ss_sales_price))
 |  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
 |
 12:EXCHANGE [PARTITION=HASH(i_category,i_class,i_brand,s_store_name,s_company_name,d_moy)]
 |
 07:AGGREGATE
-|  output: SUM(ss_sales_price)
+|  output: sum(ss_sales_price)
 |  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2255,7 +2255,7 @@ select
 from
   store_sales
   join store on (store_sales.ss_store_sk = store.s_store_sk)
-  join 
+  join
   (select
     a.ca_zip
   from
@@ -2271,8 +2271,8 @@ from
       ca_zip
     having
       count( *) > 10
-    ) a 
-    left semi join 
+    ) a
+    left semi join
     (select
       substr(ca_zip, 1, 5) ca_zip
     from
@@ -2315,14 +2315,14 @@ where
 group by
   s_store_name
 order by
-  s_store_name 
+  s_store_name
 limit 100
 ---- PLAN
 11:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC
 |
 10:AGGREGATE [FINALIZE]
-|  output: SUM(ss_net_profit)
+|  output: sum(ss_net_profit)
 |  group by: s_store_name
 |
 09:HASH JOIN [INNER JOIN]
@@ -2336,9 +2336,9 @@ limit 100
 |  |     predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
 |  |
 |  05:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: substr(ca_zip, 1, 5)
-|  |  having: COUNT(*) > 10
+|  |  having: count(*) > 10
 |  |
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
@@ -2368,13 +2368,13 @@ limit 100
 |  order by: s_store_name ASC
 |
 19:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_net_profit))
+|  output: sum(sum(ss_net_profit))
 |  group by: s_store_name
 |
 18:EXCHANGE [PARTITION=HASH(s_store_name)]
 |
 10:AGGREGATE
-|  output: SUM(ss_net_profit)
+|  output: sum(ss_net_profit)
 |  group by: s_store_name
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2392,14 +2392,14 @@ limit 100
 |  |     predicates: substr(ca_zip, 1, 5) IN ('89436', '30868', '65085', '22977', '83927', '77557', '58429', '40697', '80614', '10502', '32779', '91137', '61265', '98294', '17921', '18427', '21203', '59362', '87291', '84093', '21505', '17184', '10866', '67898', '25797', '28055', '18377', '80332', '74535', '21757', '29742', '90885', '29898', '17819', '40811', '25990', '47513', '89531', '91068', '10391', '18846', '99223', '82637', '41368', '83658', '86199', '81625', '26696', '89338', '88425', '32200', '81427', '19053', '77471', '36610', '99823', '43276', '41249', '48584', '83550', '82276', '18842', '78890', '14090', '38123', '40936', '34425', '19850', '43286', '80072', '79188', '54191', '11395', '50497', '84861', '90733', '21068', '57666', '37119', '25004', '57835', '70067', '62878', '95806', '19303', '18840', '19124', '29785', '16737', '16022', '49613', '89977', '68310', '60069', '98360', '48649', '39050', '41793', '25002', '27413', '39736', '47208', '16515', '94808', '57648', '15009', '80015', '42961', '63982', '21744', '71853', '81087', '67468', '34175', '64008', '20261', '11201', '51799', '48043', '45645', '61163', '48375', '36447', '57042', '21218', '41100', '89951', '22745', '35851', '83326', '61125', '78298', '80752', '49858', '52940', '96976', '63792', '11376', '53582', '18717', '90226', '50530', '94203', '99447', '27670', '96577', '57856', '56372', '16165', '23427', '54561', '28806', '44439', '22926', '30123', '61451', '92397', '56979', '92309', '70873', '13355', '21801', '46346', '37562', '56458', '28286', '47306', '99555', '69399', '26234', '47546', '49661', '88601', '35943', '39936', '25632', '24611', '44166', '56648', '30379', '59785', '11110', '14329', '93815', '52226', '71381', '13842', '25612', '63294', '14664', '21077', '82626', '18799', '60915', '81020', '56447', '76619', '11433', '13414', '42548', '92713', '70467', '30884', '47484', '16072', '38936', '13036', '88376', '45539', '35901', '19506', '65690', '73957', '71850', '49231', '14276', '20005', '18384', '76615', '11635', '38177', '55607', '41369', '95447', '58581', '58149', '91946', '33790', '76232', '75692', '95464', '22246', '51061', '56692', '53121', '77209', '15482', '10688', '14868', '45907', '73520', '72666', '25734', '17959', '24677', '66446', '94627', '53535', '15560', '41967', '69297', '11929', '59403', '33283', '52232', '57350', '43933', '40921', '36635', '10827', '71286', '19736', '80619', '25251', '95042', '15526', '36496', '55854', '49124', '81980', '35375', '49157', '63512', '28944', '14946', '36503', '54010', '18767', '23969', '43905', '66979', '33113', '21286', '58471', '59080', '13395', '79144', '70373', '67031', '38360', '26705', '50906', '52406', '26066', '73146', '15884', '31897', '30045', '61068', '45550', '92454', '13376', '14354', '19770', '22928', '97790', '50723', '46081', '30202', '14410', '20223', '88500', '67298', '13261', '14172', '81410', '93578', '83583', '46047', '94167', '82564', '21156', '15799', '86709', '37931', '74703', '83103', '23054', '70470', '72008', '49247', '91911', '69998', '20961', '70070', '63197', '54853', '88191', '91830', '49521', '19454', '81450', '89091', '62378', '25683', '61869', '51744', '36580', '85778', '36871', '48121', '28810', '83712', '45486', '67393', '26935', '42393', '20132', '55349', '86057', '21309', '80218', '10094', '11357', '48819', '39734', '40758', '30432', '21204', '29467', '30214', '61024', '55307', '74621', '11622', '68908', '33032', '52868', '99194', '99900', '84936', '69036', '99149', '45013', '32895', '59004', '32322', '14933', '32936', '33562', '72550', '27385', '58049', '58200', '16808', '21360', '32961', '18586', '79307', '15492')
 |  |
 |  15:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: substr(ca_zip, 1, 5)
-|  |  having: COUNT(*) > 10
+|  |  having: count(*) > 10
 |  |
 |  14:EXCHANGE [PARTITION=HASH(substr(ca_zip, 1, 5))]
 |  |
 |  05:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: substr(ca_zip, 1, 5)
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2427,7 +2427,7 @@ limit 100
 ====
 # TPCDS-Q96
 SELECT
-  COUNT(*) AS total
+  count(*) AS total
 FROM store_sales ss
 JOIN time_dim td
   ON (ss.ss_sold_time_sk = td.t_time_sk)
@@ -2442,7 +2442,7 @@ WHERE
   AND s.s_store_name = 'ese'
 ---- PLAN
 07:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: ss.ss_store_sk = s.s_store_sk
@@ -2469,12 +2469,12 @@ WHERE
    partitions=120/120 size=23.42MB
 ---- DISTRIBUTEDPLAN
 12:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(*))
+|  output: sum(count(*))
 |
 11:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 07:AGGREGATE
-|  output: COUNT(*)
+|  output: count(*)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss.ss_store_sk = s.s_store_sk
@@ -2534,7 +2534,7 @@ limit 1000
 |  order by: i_category ASC, i_class ASC, i_item_desc ASC
 |
 03:AGGREGATE [FINALIZE]
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: i_item_desc, i_category, i_class, i_current_price
 |
 02:HASH JOIN [INNER JOIN]
@@ -2556,13 +2556,13 @@ limit 1000
 |  order by: i_category ASC, i_class ASC, i_item_desc ASC
 |
 07:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(ss_ext_sales_price))
+|  output: sum(sum(ss_ext_sales_price))
 |  group by: i_item_desc, i_category, i_class, i_current_price
 |
 06:EXCHANGE [PARTITION=HASH(i_item_desc,i_category,i_class,i_current_price)]
 |
 03:AGGREGATE
-|  output: SUM(ss_ext_sales_price)
+|  output: sum(ss_ext_sales_price)
 |  group by: i_item_desc, i_category, i_class, i_current_price
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]

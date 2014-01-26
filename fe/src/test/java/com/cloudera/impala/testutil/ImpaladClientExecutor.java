@@ -200,15 +200,21 @@ public class ImpaladClientExecutor {
           break;
         case PARQUET_FILE_SIZE:
           optionValue = String.valueOf(queryOptions.getParquet_file_size());
+          break;
         case YARN_POOL:
           optionValue = String.valueOf(queryOptions.yarn_pool);
+          break;
         case V_CPU_CORES:
           optionValue = String.valueOf(queryOptions.v_cpu_cores);
+          break;
         case RESERVATION_REQUEST_TIMEOUT:
           optionValue = String.valueOf(queryOptions.reservation_request_timeout);
           break;
         case EXPLAIN_LEVEL:
           optionValue = String.valueOf(queryOptions.getExplain_level());
+          break;
+        case SYNC_DDL:
+          optionValue = String.valueOf(queryOptions.isSync_ddl());
           break;
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());

@@ -893,27 +893,19 @@ public class ParserTest {
     ParsesOk("select count(*), count(a), count(distinct a, b) from t");
     ParsesOk("select count(NULL), count(TRUE), count(FALSE), " +
              "count(distinct TRUE, FALSE, NULL) from t");
-    ParserError("select count() from t");
     ParsesOk("select count(all *) from t");
     ParsesOk("select count(all 1) from t");
     ParsesOk("select min(a), min(distinct a) from t");
-    ParserError("select min() from t");
     ParsesOk("select max(a), max(distinct a) from t");
-    ParserError("select max() from t");
     ParsesOk("select sum(a), sum(distinct a) from t");
-    ParserError("select sum() from t");
     ParsesOk("select avg(a), avg(distinct a) from t");
-    ParserError("select avg() from t");
     ParsesOk("select distinct a, b, c from t");
     ParsesOk("select distinctpc(a), distinctpc(distinct a) from t");
-    ParserError("select distinctpc() from t");
     ParsesOk("select distinctpcsa(a), distinctpcsa(distinct a) from t");
     ParsesOk("select ndv(a), ndv(distinct a) from t");
-    ParserError("select distinctpcsa() from t");
     ParsesOk("select group_concat(a) from t");
     ParsesOk("select group_concat(a, ', ') from t");
     ParsesOk("select group_concat(a, ', ', c) from t");
-    ParserError("select group_concat() from t");
   }
 
   @Test
@@ -1951,9 +1943,9 @@ public class ParserTest {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: ALL, AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
-        "DISTINCTPCSA, FALSE, GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, " +
-        "STRAIGHT_JOIN, SUM, TRUE, IDENTIFIER\n");
+        "Expected: ALL, CASE, CAST, DISTINCT, " +
+        "FALSE, IF, INTERVAL, NOT, NULL, " +
+        "STRAIGHT_JOIN, TRUE, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -1978,8 +1970,8 @@ public class ParserTest {
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
-        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, FALSE, " +
-        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "Expected: CASE, CAST, FALSE, " +
+        "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -1987,8 +1979,8 @@ public class ParserTest {
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
-        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, FALSE, " +
-        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "Expected: CASE, CAST, FALSE, " +
+        "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
@@ -2055,8 +2047,8 @@ public class ParserTest {
         "...c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t\n" +
         "                             ^\n" +
         "Encountered: COMMA\n" +
-        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, FALSE, " +
-        "GROUP_CONCAT, IF, INTERVAL, MAX, MIN, NDV, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "Expected: CASE, CAST, FALSE, " +
+        "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
 
   }
 

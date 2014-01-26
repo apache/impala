@@ -21,7 +21,6 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/opcode")
 
 set(SRC_FILES
   functions.cc
-  opcode-registry-init.cc
   )
 
 # keep everything in one library, the object files reference 

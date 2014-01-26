@@ -53,8 +53,13 @@ class LibCache {
     TYPE_JAR,     // Java jar file. We don't care about the contents in the BE.
   };
 
+  LibCache();
+
   // Calls dlclose on all cached handles.
   ~LibCache();
+
+  // Initializes the libcache. Must be called before any other APIs.
+  Status Init(bool is_fe_tests = false);
 
   // Gets the local file system path for the library at 'hdfs_lib_file'. If
   // this file is not already on the local fs, it copies it and caches the
@@ -72,9 +77,10 @@ class LibCache {
   Status CheckSymbolExists(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
       LibType type, const std::string& symbol);
 
-  // Returns a pointer to the function for the given library and symbol. 'hdfs_lib_file'
-  // should be the HDFS path to a shared library (.so) file and 'symbol' should be a
-  // symbol within that library. dlopen handles and symbols are cached.
+  // Returns a pointer to the function for the given library and symbol.
+  // If 'hdfs_lib_file' is empty, the symbol is looked up in the impalad process.
+  // Otherwise, 'hdfs_lib_file' should be the HDFS path to a shared library (.so) file.
+  // dlopen handles and symbols are cached.
   // Only usable if 'hdfs_lib_file' refers to a shared object.
   Status GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
                         const std::string& symbol, void** fn_ptr);
@@ -86,6 +92,9 @@ class LibCache {
   void DropCache();
 
  private:
+  // dlopen() handle for the current process (i.e. impalad).
+  void* current_process_handle_;
+
   // Protects lib_cache_. For lock ordering, this lock must always be taken before
   // the per entry lock.
   boost::mutex lock_;

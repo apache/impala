@@ -69,11 +69,9 @@ public class DropFunctionStmt extends StatementBase {
     analyzer.getCatalog().checkCreateDropFunctionAccess(analyzer.getUser());
 
     desc_.getFunctionName().analyze(analyzer);
-    String dbName = analyzer.getTargetDbName(desc_.getFunctionName());
-    desc_.getFunctionName().setDb(dbName);
-    if (analyzer.getCatalog().getDb(dbName, analyzer.getUser(), Privilege.DROP) == null
-        && !ifExists_) {
-      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    if (analyzer.getCatalog().getDb(
+          desc_.dbName(), analyzer.getUser(), Privilege.DROP) == null && !ifExists_) {
+      throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + desc_.dbName());
     }
 
     if (analyzer.getCatalog().getFunction(

@@ -34,6 +34,7 @@ import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
 import com.cloudera.impala.thrift.TPrioritizeLoadResponse;
+import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TSymbolLookupParams;
@@ -62,7 +63,7 @@ public class FeSupport {
   public native static byte[] NativeEvalConstExpr(byte[] thriftExpr,
       byte[] thriftQueryGlobals);
 
-  // Returns a serialize TSymbolLookupResult
+  // Returns a serialized TSymbolLookupResult
   public native static byte[] NativeLookupSymbol(byte[] thriftSymbolLookup);
 
   // Does an RPCs to the Catalog Server to prioritize the metadata loading of a

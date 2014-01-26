@@ -62,6 +62,7 @@ Frontend::Frontend() {
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
+    {"setCatalogInitialized", "()V", &set_catalog_initialized_id_},
     {"loadTableData", "([B)[B", &load_table_data_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
@@ -199,4 +200,13 @@ Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) 
 
 bool Frontend::IsAuthorizationError(const Status& status) {
   return !status.ok() && status.GetErrorMsg().find("AuthorizationException") == 0;
+}
+
+Status Frontend::SetCatalogInitialized() {
+  JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
+  jni_env->CallObjectMethod(fe_, set_catalog_initialized_id_);
+  RETURN_ERROR_IF_EXC(jni_env);
+  return Status::OK;
 }

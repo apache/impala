@@ -150,33 +150,11 @@ struct THashJoinNode {
   3: optional list<Exprs.TExpr> other_join_conjuncts
 }
 
-enum TAggregationOp {
-  INVALID,
-  COUNT,
-  MAX,
-  DISTINCT_PC,
-  DISTINCT_PCSA,
-  MIN,
-  SUM,
-  GROUP_CONCAT,
-  HLL,
-}
-
-struct TAggregateFunctionCall {
-  // The aggregate function to call.
-  1: required Types.TFunction fn
-
-  // The input exprs to this aggregate function
-  2: required list<Exprs.TExpr> input_exprs
-
-  // If set, this aggregate function udf has varargs and this is the index for the
-  // first variable argument.
-  3: optional i32 vararg_start_idx
-}
-
 struct TAggregationNode {
   1: optional list<Exprs.TExpr> grouping_exprs
-  2: required list<TAggregateFunctionCall> aggregate_functions
+  // aggregate exprs. The root of each expr is the aggregate function. The
+  // other exprs are the inputs to the aggregate function.
+  2: required list<Exprs.TExpr> aggregate_functions
   3: required Types.TTupleId agg_tuple_id
 
   // Set to true if this aggregation node needs to run the finalization step.

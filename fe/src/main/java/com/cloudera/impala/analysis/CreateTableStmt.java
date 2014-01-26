@@ -167,6 +167,7 @@ public class CreateTableStmt extends StatementBase {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +
           String.format("%s.%s", dbName_, getTbl()));
     }
+
     analyzer.addAccessEvent(new TAccessEvent(dbName_ + "." + tableName_.getTbl(),
         TCatalogObjectType.TABLE, Privilege.CREATE.toString()));
 

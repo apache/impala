@@ -24,10 +24,10 @@ order by
 limit 10
 ---- PLAN
 06:TOP-N [LIMIT=10]
-|  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+|  order by: round(sum(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
 |
 05:AGGREGATE [FINALIZE]
-|  output: SUM(l_extendedprice * (1.0 - l_discount))
+|  output: sum(l_extendedprice * (1.0 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
 04:HASH JOIN [INNER JOIN]
@@ -49,21 +49,21 @@ limit 10
    predicates: l_shipdate > '1995-03-15'
 ---- DISTRIBUTEDPLAN
 12:TOP-N [LIMIT=10]
-|  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+|  order by: round(sum(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
 |
 11:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 06:TOP-N [LIMIT=10]
-|  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+|  order by: round(sum(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
 |
 10:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
+|  output: sum(sum(l_extendedprice * (1.0 - l_discount)))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
 09:EXCHANGE [PARTITION=HASH(l_orderkey,o_orderdate,o_shippriority)]
 |
 05:AGGREGATE
-|  output: SUM(l_extendedprice * (1.0 - l_discount))
+|  output: sum(l_extendedprice * (1.0 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -114,10 +114,10 @@ order by
 limit 10
 ---- PLAN
 06:TOP-N [LIMIT=10]
-|  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+|  order by: round(sum(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
 |
 05:AGGREGATE [FINALIZE]
-|  output: SUM(l_extendedprice * (1.0 - l_discount))
+|  output: sum(l_extendedprice * (1.0 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
 04:HASH JOIN [INNER JOIN]
@@ -139,21 +139,21 @@ limit 10
    predicates: c.c_mktsegment = 'BUILDING'
 ---- DISTRIBUTEDPLAN
 14:TOP-N [LIMIT=10]
-|  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+|  order by: round(sum(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
 |
 13:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 06:TOP-N [LIMIT=10]
-|  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
+|  order by: round(sum(l_extendedprice * (1.0 - l_discount)), 5) DESC, o_orderdate ASC
 |
 12:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
+|  output: sum(sum(l_extendedprice * (1.0 - l_discount)))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
 11:EXCHANGE [PARTITION=HASH(l_orderkey,o_orderdate,o_shippriority)]
 |
 05:AGGREGATE
-|  output: SUM(l_extendedprice * (1.0 - l_discount))
+|  output: sum(l_extendedprice * (1.0 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -210,10 +210,10 @@ order by
 limit 100
 ---- PLAN
 12:TOP-N [LIMIT=100]
-|  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
+|  order by: round(sum(l_extendedprice * (1.0 - l_discount)), 5) DESC
 |
 11:AGGREGATE [FINALIZE]
-|  output: SUM(l_extendedprice * (1.0 - l_discount))
+|  output: sum(l_extendedprice * (1.0 - l_discount))
 |  group by: n_name
 |
 10:HASH JOIN [INNER JOIN]
@@ -252,21 +252,21 @@ limit 100
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
 21:TOP-N [LIMIT=100]
-|  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
+|  order by: round(sum(l_extendedprice * (1.0 - l_discount)), 5) DESC
 |
 20:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 12:TOP-N [LIMIT=100]
-|  order by: round(SUM(l_extendedprice * (1.0 - l_discount)), 5) DESC
+|  order by: round(sum(l_extendedprice * (1.0 - l_discount)), 5) DESC
 |
 19:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(SUM(l_extendedprice * (1.0 - l_discount)))
+|  output: sum(sum(l_extendedprice * (1.0 - l_discount)))
 |  group by: n_name
 |
 18:EXCHANGE [PARTITION=HASH(n_name)]
 |
 11:AGGREGATE
-|  output: SUM(l_extendedprice * (1.0 - l_discount))
+|  output: sum(l_extendedprice * (1.0 - l_discount))
 |  group by: n_name
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
@@ -430,7 +430,7 @@ limit 10
 |  order by: o_orderpriority ASC
 |
 03:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: o_orderpriority
 |
 02:HASH JOIN [LEFT SEMI JOIN]
@@ -453,13 +453,13 @@ limit 10
 |  order by: o_orderpriority ASC
 |
 08:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(*))
+|  output: sum(count(*))
 |  group by: o_orderpriority
 |
 07:EXCHANGE [PARTITION=HASH(o_orderpriority)]
 |
 03:AGGREGATE
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: o_orderpriority
 |
 02:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
@@ -489,7 +489,7 @@ order by o_orderpriority limit 10
 |  order by: o_orderpriority ASC
 |
 03:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: o_orderpriority
 |
 02:HASH JOIN [FULL OUTER JOIN]
@@ -510,13 +510,13 @@ order by o_orderpriority limit 10
 |  order by: o_orderpriority ASC
 |
 08:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(*))
+|  output: sum(count(*))
 |  group by: o_orderpriority
 |
 07:EXCHANGE [PARTITION=HASH(o_orderpriority)]
 |
 03:AGGREGATE
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: o_orderpriority
 |
 02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
@@ -544,7 +544,7 @@ order by o_orderpriority limit 10
 |  order by: o_orderpriority ASC
 |
 03:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: o_orderpriority
 |
 02:HASH JOIN [RIGHT OUTER JOIN]
@@ -565,13 +565,13 @@ order by o_orderpriority limit 10
 |  order by: o_orderpriority ASC
 |
 08:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(*))
+|  output: sum(count(*))
 |  group by: o_orderpriority
 |
 07:EXCHANGE [PARTITION=HASH(o_orderpriority)]
 |
 03:AGGREGATE
-|  output: COUNT(*)
+|  output: count(*)
 |  group by: o_orderpriority
 |
 02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
@@ -596,7 +596,7 @@ from tpch.customer
 where n_name = 'x'
 ---- PLAN
 05:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: c_custkey = o_custkey
@@ -615,12 +615,12 @@ where n_name = 'x'
    partitions=1/1 size=23.08MB
 ---- DISTRIBUTEDPLAN
 10:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(*))
+|  output: sum(count(*))
 |
 09:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 05:AGGREGATE
-|  output: COUNT(*)
+|  output: count(*)
 |
 04:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
 |  hash predicates: c_custkey = o_custkey
@@ -653,7 +653,7 @@ from tpch.customer
 where n_name = 'x'
 ---- PLAN
 05:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |
 04:CROSS JOIN [BROADCAST]
 |
@@ -671,12 +671,12 @@ where n_name = 'x'
    partitions=1/1 size=23.08MB
 ---- DISTRIBUTEDPLAN
 09:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(*))
+|  output: sum(count(*))
 |
 08:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 05:AGGREGATE
-|  output: COUNT(*)
+|  output: count(*)
 |
 04:CROSS JOIN [BROADCAST]
 |

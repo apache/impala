@@ -35,7 +35,6 @@ Status CompoundPredicate::Prepare(RuntimeState* state, const RowDescriptor& desc
 void* CompoundPredicate::AndComputeFn(Expr* e, TupleRow* row) {
   CompoundPredicate* p = static_cast<CompoundPredicate*>(e);
   DCHECK_EQ(p->children_.size(), 2);
-  DCHECK_EQ(p->opcode_, TExprOpcode::COMPOUND_AND);
   Expr* op1 = e->children()[0];
   bool* val1 = reinterpret_cast<bool*>(op1->GetValue(row));
   Expr* op2 = e->children()[1];
@@ -56,7 +55,6 @@ void* CompoundPredicate::AndComputeFn(Expr* e, TupleRow* row) {
 void* CompoundPredicate::OrComputeFn(Expr* e, TupleRow* row) {
   CompoundPredicate* p = static_cast<CompoundPredicate*>(e);
   DCHECK_EQ(p->children_.size(), 2);
-  DCHECK_EQ(p->opcode_, TExprOpcode::COMPOUND_OR);
   Expr* op1 = e->children()[0];
   bool* val1 = reinterpret_cast<bool*>(op1->GetValue(row));
   Expr* op2 = e->children()[1];
@@ -77,7 +75,6 @@ void* CompoundPredicate::OrComputeFn(Expr* e, TupleRow* row) {
 void* CompoundPredicate::NotComputeFn(Expr* e, TupleRow* row) {
   CompoundPredicate* p = static_cast<CompoundPredicate*>(e);
   DCHECK_EQ(p->children_.size(), 1);
-  DCHECK_EQ(p->opcode_, TExprOpcode::COMPOUND_NOT);
   Expr* op = e->children()[0];
   bool* val = reinterpret_cast<bool*>(op->GetValue(row));
   if (val == NULL) return NULL;
@@ -97,19 +94,18 @@ string CompoundPredicate::DebugString() const {
 //   %child_result = call i1 @BinaryPredicate(i8** %row, i8* %state_data, i1* %is_null)
 //   %child_null = load i1* %is_null
 //   br i1 %child_null, label %ret, label %child_not_null
-// 
+//
 // child_not_null:                                   ; preds = %entry
 //   %0 = xor i1 %child_result, true
 //   br label %ret
-// 
+//
 // ret:                                              ; preds = %child_not_null, %entry
 //   %tmp_phi = phi i1 [ false, %entry ], [ %0, %child_not_null ]
 //   ret i1 %tmp_phi
 // }
 Function* CompoundPredicate::CodegenNot(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 1);
-  DCHECK_EQ(op(), TExprOpcode::COMPOUND_NOT);
-  
+
   Function* child_function = children()[0]->Codegen(codegen);
   if (child_function == NULL) return NULL;
 
@@ -121,7 +117,7 @@ Function* CompoundPredicate::CodegenNot(LlvmCodeGen* codegen) {
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
   builder.SetInsertPoint(entry_block);
 
-  BasicBlock* child_not_null_block = 
+  BasicBlock* child_not_null_block =
       BasicBlock::Create(context, "child_not_null", function);
   BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
 
@@ -145,8 +141,8 @@ Function* CompoundPredicate::CodegenNot(LlvmCodeGen* codegen) {
   return function;
 }
 
-// IR codegen for compound and/or predicates.  Compound predicate has non trivial 
-// null handling as well as many branches so this is pretty complicated.  The IR 
+// IR codegen for compound and/or predicates.  Compound predicate has non trivial
+// null handling as well as many branches so this is pretty complicated.  The IR
 // for x && y is:
 //
 // define i1 @CompoundPredicate(i8** %row, i8* %state_data, i1* %is_null) {
@@ -159,30 +155,30 @@ Function* CompoundPredicate::CodegenNot(LlvmCodeGen* codegen) {
 //   %rhs_null3 = load i1* %rhs_null
 //   %tmp_and = and i1 %lhs_call, %rhs_call
 //   br i1 %lhs_null2, label %lhs_null1, label %lhs_not_null
-// 
+//
 // lhs_null1:                                        ; preds = %entry
 //   br i1 %rhs_null3, label %null_block, label %lhs_null_rhs_not_null
-// 
+//
 // lhs_not_null:                                     ; preds = %entry
 //   br i1 %rhs_null3, label %lhs_not_null_rhs_null, label %not_null_block
-// 
+//
 // lhs_null_rhs_not_null:                            ; preds = %lhs_null1
 //   br i1 %rhs_call, label %null_block, label %not_null_block
-// 
+//
 // lhs_not_null_rhs_null:                            ; preds = %lhs_not_null
 //   br i1 %lhs_call, label %null_block, label %not_null_block
-// 
-// null_block:                                       
+//
+// null_block:
 //   store i1 true, i1* %is_null
 //   br label %ret
-// 
-// not_null_block:                                   
-//   %0 = phi i1 [ false, %lhs_null_rhs_not_null ], 
-//               [ false, %lhs_not_null_rhs_null ], 
+//
+// not_null_block:
+//   %0 = phi i1 [ false, %lhs_null_rhs_not_null ],
+//               [ false, %lhs_not_null_rhs_null ],
 //               [ %tmp_and, %lhs_not_null ]
 //   store i1 false, i1* %is_null
 //   br label %ret
-// 
+//
 // ret:                                           ; preds = %not_null_block, %null_block
 //   %tmp_phi = phi i1 [ false, %null_block ], [ %0, %not_null_block ]
 //   ret i1 %tmp_phi
@@ -194,7 +190,7 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
   if (lhs_function == NULL) return NULL;
   Function* rhs_function = children()[1]->Codegen(codegen);
   if (rhs_function == NULL) return NULL;
-  
+
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
   Type* return_type = codegen->GetType(type());
@@ -205,18 +201,18 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
 
   LlvmCodeGen::NamedVariable lhs_null_var("lhs_null_ptr", codegen->boolean_type());
   LlvmCodeGen::NamedVariable rhs_null_var("rhs_null_ptr", codegen->boolean_type());
-  
+
   // Create stack variables for lhs is_null result and rhs is_null result
   Value* lhs_is_null = codegen->CreateEntryBlockAlloca(function, lhs_null_var);
   Value* rhs_is_null = codegen->CreateEntryBlockAlloca(function, rhs_null_var);
 
   // Control blocks for aggregating results
   BasicBlock* lhs_null_block = BasicBlock::Create(context, "lhs_null", function);
-  BasicBlock* lhs_not_null_block = 
+  BasicBlock* lhs_not_null_block =
       BasicBlock::Create(context, "lhs_not_null", function);
-  BasicBlock* lhs_null_rhs_not_null_block = 
+  BasicBlock* lhs_null_rhs_not_null_block =
       BasicBlock::Create(context, "lhs_null_rhs_not_null", function);
-  BasicBlock* lhs_not_null_rhs_null_block = 
+  BasicBlock* lhs_not_null_rhs_null_block =
       BasicBlock::Create(context, "lhs_not_null_rhs_null", function);
   BasicBlock* null_block = BasicBlock::Create(context, "null_block", function);
   BasicBlock* not_null_block = BasicBlock::Create(context, "not_null_block", function);
@@ -234,11 +230,13 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
   // Call rhs
   args[2] = rhs_is_null;
   Value* rhs_value = builder.CreateCall(rhs_function, args, "rhs_call");
-  
+
   Value* lhs_is_null_val = builder.CreateLoad(lhs_is_null, "lhs_null");
   Value* rhs_is_null_val = builder.CreateLoad(rhs_is_null, "rhs_null");
   Value* compare = NULL;
-  if (op() == TExprOpcode::COMPOUND_AND) {
+
+  bool is_and = fn_.name.function_name == "and";
+  if (is_and) {
     compare = builder.CreateAnd(lhs_value, rhs_value, "tmp_and");
   } else {
     compare = builder.CreateOr(lhs_value, rhs_value, "tmp_or");
@@ -257,7 +255,7 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
 
   // lhs_not_null rhs_null block
   builder.SetInsertPoint(lhs_not_null_rhs_null_block);
-  if (op() == TExprOpcode::COMPOUND_AND) {
+  if (is_and) {
     // false && null -> false; true && null -> null
     builder.CreateCondBr(lhs_value, null_block, not_null_block);
   } else {
@@ -267,7 +265,7 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
 
   // lhs_null rhs_not_null block
   builder.SetInsertPoint(lhs_null_rhs_not_null_block);
-  if (op() == TExprOpcode::COMPOUND_AND) {
+  if (is_and) {
     // null && false -> false; null && true -> null
     builder.CreateCondBr(rhs_value, null_block, not_null_block);
   } else {
@@ -283,7 +281,7 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
   // not-NULL block
   builder.SetInsertPoint(not_null_block);
   PHINode* not_null_phi = builder.CreatePHI(codegen->boolean_type(), 3);
-  if (op() == TExprOpcode::COMPOUND_AND) {
+  if (is_and) {
     not_null_phi->addIncoming(codegen->false_value(), lhs_null_rhs_not_null_block);
     not_null_phi->addIncoming(codegen->false_value(), lhs_not_null_rhs_null_block);
     not_null_phi->addIncoming(compare, lhs_not_null_block);
@@ -305,19 +303,14 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
   return function;
 }
 
-Function* CompoundPredicate::Codegen(LlvmCodeGen* codegen) {  
+Function* CompoundPredicate::Codegen(LlvmCodeGen* codegen) {
   Function* function = NULL;
-  switch (op()) {
-    case TExprOpcode::COMPOUND_AND:
-    case TExprOpcode::COMPOUND_OR:
-      function = CodegenBinary(codegen);
-      break;
-    case TExprOpcode::COMPOUND_NOT:
-      function = CodegenNot(codegen);
-      break;
-    default:
-      DCHECK(false);
-      break;
+  if (fn_.name.function_name == "and" || fn_.name.function_name == "or") {
+    function = CodegenBinary(codegen);
+  } else if (fn_.name.function_name == "not") {
+    function = CodegenNot(codegen);
+  } else {
+    DCHECK(false) << fn_.name.function_name;
   }
   if (function == NULL) return NULL;
   return codegen->FinalizeFunction(function);

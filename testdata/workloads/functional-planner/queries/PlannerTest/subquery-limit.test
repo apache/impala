@@ -78,10 +78,10 @@ where a.id < 5 limit 5
 |  limit: 5
 |
 |--03:TOP-N [LIMIT=5]
-|  |  order by: COUNT(*) ASC
+|  |  order by: count(*) ASC
 |  |
 |  02:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: id
 |  |
 |  01:SCAN HDFS [functional.alltypes]
@@ -102,21 +102,21 @@ where a.id < 5 limit 5
 |  |  limit: 5
 |  |
 |  08:TOP-N [LIMIT=5]
-|  |  order by: COUNT(*) ASC
+|  |  order by: count(*) ASC
 |  |
 |  07:EXCHANGE [PARTITION=UNPARTITIONED]
 |  |
 |  03:TOP-N [LIMIT=5]
-|  |  order by: COUNT(*) ASC
+|  |  order by: count(*) ASC
 |  |
 |  06:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: id
 |  |
 |  05:EXCHANGE [PARTITION=HASH(id)]
 |  |
 |  02:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: id
 |  |
 |  01:SCAN HDFS [functional.alltypes]

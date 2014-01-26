@@ -20,8 +20,8 @@ import java.lang.reflect.Field;
 
 import org.junit.Test;
 
+import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.Uda;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -462,8 +462,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   void addTestUda(String name, ColumnType retType, ColumnType... argTypes) {
     FunctionName fnName = new FunctionName("default", name);
-    catalog_.addFunction(new Uda(fnName, new FunctionArgs(Lists.newArrayList(argTypes),
-        false), retType));
+    catalog_.addFunction(new AggregateFunction(fnName,
+        new FunctionArgs(Lists.newArrayList(argTypes), false), retType));
   }
 
   @Test
@@ -485,6 +485,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select aggfn(int_col) from functional.alltypesagg");
     AnalysisError("select default.AggFn(1)",
         "aggregation without a FROM clause is not allowed");
+    AnalysisError("select aggfn(distinct int_col) from functional.alltypesagg",
+        "User defined aggregates do not support DISTINCT.");
     AnalyzesOk("select default.aggfn(int_col) from functional.alltypes");
     AnalyzesOk("select count(*) from functional.testtbl");
     AnalyzesOk("select min(id), max(id), sum(id) from functional.testtbl");
@@ -505,6 +507,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select 1 from functional.alltypes where aggfn(1)",
         "aggregate function not allowed in WHERE clause");
 
+    AnalysisError("select count() from functional.alltypes",
+        "count() is not allowed.");
+    AnalysisError("select min() from functional.alltypes",
+        "No matching function with signature: min().");
+
     // only count() allows '*'
     AnalysisError("select avg(*) from functional.testtbl",
         "'*' can only be used in conjunction with COUNT");
@@ -517,32 +524,26 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // multiple args
     AnalysisError("select count(id, zip) from functional.testtbl",
-        "COUNT must have DISTINCT for multiple arguments: COUNT(id, zip)");
+        "COUNT must have DISTINCT for multiple arguments: count(id, zip)");
     AnalysisError("select min(id, zip) from functional.testtbl",
-        "MIN requires exactly one parameter");
-    AnalysisError("select max(id, zip) from functional.testtbl",
-        "MAX requires exactly one parameter");
-    AnalysisError("select sum(id, zip) from functional.testtbl",
-        "SUM requires exactly one parameter");
-    AnalysisError("select avg(id, zip) from functional.testtbl",
-        "AVG requires exactly one parameter");
+        "No matching function with signature: min(BIGINT, INT).");
     AnalysisError("select group_concat(name, '-', ',') from functional.testtbl",
-        "GROUP_CONCAT requires one or two parameters");
+        "No matching function with signature: group_concat(STRING, STRING, STRING)");
 
     // nested aggregates
     AnalysisError("select sum(count(*)) from functional.testtbl",
         "aggregate function cannot contain aggregate parameters");
     AnalysisError("select min(aggfn(int_col)) from functional.alltypes",
         "aggregate function cannot contain aggregate parameters: " +
-        "MIN(default.aggfn(int_col))");
+        "min(default.aggfn(int_col))");
 
     // wrong type
     AnalysisError("select sum(timestamp_col) from functional.alltypes",
-        "SUM requires a numeric parameter: SUM(timestamp_col)");
+        "SUM requires a numeric parameter: sum(timestamp_col)");
     AnalysisError("select sum(string_col) from functional.alltypes",
-        "SUM requires a numeric parameter: SUM(string_col)");
+        "SUM requires a numeric parameter: sum(string_col)");
     AnalysisError("select avg(string_col) from functional.alltypes",
-        "AVG requires a numeric or timestamp parameter: AVG(string_col)");
+        "AVG requires a numeric or timestamp parameter: avg(string_col)");
 
     // aggregate requires table in the FROM clause
     AnalysisError("select count(*)", "aggregation without a FROM clause is not allowed");
@@ -566,17 +567,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         AnalyzesOk(query2);
       } else {
         AnalysisError(query1,
-            "GROUP_CONCAT requires first parameter to be of type STRING");
+            "No matching function with signature: group_concat(");
         AnalysisError(query2,
-            "GROUP_CONCAT requires second parameter to be of type STRING");
+            "No matching function with signature: group_concat(");
       }
     }
 
     // Test distinct estimate
     for (ColumnType type: typeToLiteralValue_.keySet()) {
-      AnalyzesOk(String.format(
-          "select distinctpc(%s) from functional.alltypes",
-          typeToLiteralValue_.get(type)));
       AnalyzesOk(String.format(
           "select ndv(%s) from functional.alltypes",
           typeToLiteralValue_.get(type)));
@@ -586,7 +584,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   @Test
   public void TestDistinct() throws AnalysisException {
     AnalyzesOk("select count(distinct id) as sum_id from functional.testtbl");
-    // DISTINCT
     AnalyzesOk("select count(distinct id) as sum_id from " +
         "functional.testtbl order by sum_id");
     AnalyzesOk("select count(distinct id) as sum_id from " +
@@ -608,6 +605,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         + "from functional.alltypesagg group by 1");
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
         + "sum(distinct int_col) from functional.alltypesagg group by 1");
+    AnalyzesOk("select avg(DISTINCT(tinyint_col)) from functional.alltypesagg");
     AnalysisError("select tinyint_col, count(distinct int_col),"
         + "sum(distinct bigint_col) from functional.alltypesagg group by 1",
         "all DISTINCT aggregate functions need to have the same set of parameters");
@@ -616,7 +614,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         + "min(distinct smallint_col), max(distinct string_col) "
         + "from functional.alltypesagg group by 1");
     AnalysisError("select group_concat(distinct name) from functional.testtbl",
-            "GROUP_CONCAT does not support DISTINCT");
+            "GROUP_CONCAT() does not support DISTINCT");
   }
 
   @Test

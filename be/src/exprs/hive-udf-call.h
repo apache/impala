@@ -68,7 +68,6 @@ class HiveUdfCall : public Expr {
   static void* Evaluate(Expr* e, TupleRow* row);
 
   RuntimeState* state_;
-  const TFunction udf_;
 
   struct JniContext;
   boost::scoped_ptr<JniContext> jni_context_;

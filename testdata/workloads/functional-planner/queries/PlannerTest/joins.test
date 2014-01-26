@@ -351,10 +351,10 @@ order by 2
 limit 5
 ---- PLAN
 10:TOP-N [LIMIT=5]
-|  order by: COUNT(x.day) ASC
+|  order by: count(x.day) ASC
 |
 09:AGGREGATE [FINALIZE]
-|  output: COUNT(a.day)
+|  output: count(a.day)
 |  group by: c.tinyint_col
 |
 08:SELECT
@@ -385,10 +385,10 @@ limit 5
    partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
 10:TOP-N [LIMIT=5]
-|  order by: COUNT(x.day) ASC
+|  order by: count(x.day) ASC
 |
 09:AGGREGATE [FINALIZE]
-|  output: COUNT(a.day)
+|  output: count(a.day)
 |  group by: c.tinyint_col
 |
 08:SELECT
@@ -638,7 +638,7 @@ on (a.int_col = b.int_col and b.bool_col = a.bool_col)
 |  hash predicates: a.int_col = int_col, a.bool_col = bool_col
 |
 |--02:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: int_col, bool_col
 |  |
 |  01:SCAN HDFS [functional.alltypes]
@@ -653,13 +653,13 @@ on (a.int_col = b.int_col and b.bool_col = a.bool_col)
 |  hash predicates: a.int_col = int_col, a.bool_col = bool_col
 |
 |--05:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: int_col, bool_col
 |  |
 |  04:EXCHANGE [PARTITION=HASH(int_col,bool_col)]
 |  |
 |  02:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: int_col, bool_col
 |  |
 |  01:SCAN HDFS [functional.alltypes]
@@ -690,7 +690,7 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 |  hash predicates: a.int_col = int_col, a.bool_col = bool_col
 |
 |--03:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: int_col, bool_col
 |  |
 |  02:SCAN HDFS [functional.alltypes]
@@ -713,13 +713,13 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 |  hash predicates: a.int_col = int_col, a.bool_col = bool_col
 |
 |--07:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: int_col, bool_col
 |  |
 |  06:EXCHANGE [PARTITION=HASH(int_col,bool_col)]
 |  |
 |  03:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: int_col, bool_col
 |  |
 |  02:SCAN HDFS [functional.alltypes]

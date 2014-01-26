@@ -16,7 +16,7 @@
 from string import Template
 import os
 
-# This script will generate the implementation of the simple functions for the BE.
+# This script will generate the implementation of the simple operators for the BE.
 # These include:
 #   - Arithmetic functions
 #   - Binary functions
@@ -25,8 +25,6 @@ import os
 # The script outputs (run: 'impala/common/function-registry/gen_functions.py')
 #   - header and implemention for above functions:
 #     - impala/be/src/generated-sources/opcode/functions.[h/cc]
-#   - python file that contains the metadata for those functions:
-#     - impala/common/function-registry/generated_functions.py
 
 unary_op = Template("\
 void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
@@ -182,21 +180,18 @@ void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   return NULL;\n\
 }\n\n")
 
-python_template = Template("\
-  ['${fn_name}', '${return_type}', [${args}], 'ComputeFunctions::${fn_signature}', []], \n")
-
 # Mapping of function to template
 templates = {
   'Add'         : binary_op,
   'Subtract'    : binary_op,
   'Multiply'    : binary_op,
   'Divide'      : binary_op,
-  'Int_Divide'  : binary_op_check_zero,
+  'Int_divide'  : binary_op_check_zero,
   'Mod'         : binary_op_check_zero,
-  'BitAnd'      : binary_op,
-  'BitXor'      : binary_op,
-  'BitOr'       : binary_op,
-  'BitNot'      : unary_op,
+  'Bitand'      : binary_op,
+  'Bitxor'      : binary_op,
+  'Bitor'       : binary_op,
+  'Bitnot'      : unary_op,
   'Eq'          : binary_op,
   'Ne'          : binary_op,
   'Ge'          : binary_op,
@@ -234,12 +229,12 @@ functions = [
   ['Subtract', ['NUMERIC_TYPES'], [['NUMERIC_TYPES'], ['NUMERIC_TYPES']] ],
   ['Multiply', ['NUMERIC_TYPES'], [['NUMERIC_TYPES'], ['NUMERIC_TYPES']] ],
   ['Divide', ['DOUBLE'], [['DOUBLE'], ['DOUBLE']] ],
-  ['Int_Divide', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
+  ['Int_divide', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
   ['Mod', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
-  ['BitAnd', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
-  ['BitXor', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
-  ['BitOr', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
-  ['BitNot', ['INT_TYPES'], [['INT_TYPES']] ],
+  ['Bitand', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
+  ['Bitxor', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
+  ['Bitor', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
+  ['Bitnot', ['INT_TYPES'], [['INT_TYPES']] ],
 
   # BinaryPredicates
   ['Eq', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ],
@@ -422,29 +417,6 @@ h_epilogue = '\
 \n\
 #endif\n'
 
-python_preamble = '\
-#!/usr/bin/env python\n\
-# Copyright 2012 Cloudera Inc.\n\
-#\n\
-# Licensed under the Apache License, Version 2.0 (the "License");\n\
-# you may not use this file except in compliance with the License.\n\
-# You may obtain a copy of the License at\n\
-#\n\
-# http://www.apache.org/licenses/LICENSE-2.0\n\
-#\n\
-# Unless required by applicable law or agreed to in writing, software\n\
-# distributed under the License is distributed on an "AS IS" BASIS,\n\
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n\
-# See the License for the specific language governing permissions and\n\
-# limitations under the License.\n\
-\n\
-# This is a generated file, DO NOT EDIT IT.\n\
-# To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
-\n\
-functions = [\n'
-
-python_epilogue = ']'
-
 header_template = Template("\
   static void* ${fn_signature}(Expr* e, TupleRow* row);\n")
 
@@ -473,10 +445,8 @@ def initialize_sub(op, return_type, arg_types):
 if __name__ == "__main__":
   h_file = open(BE_PATH + 'functions.h', 'w')
   cc_file = open(BE_PATH + 'functions.cc', 'w')
-  python_file = open('generated_functions.py', 'w')
   h_file.write(h_preamble)
   cc_file.write(cc_preamble)
-  python_file.write(python_preamble)
 
   # Generate functions and headers
   for func_data in functions:
@@ -543,11 +513,8 @@ if __name__ == "__main__":
 
       h_file.write(header_template.substitute(sub))
       cc_file.write(template.substitute(sub))
-      python_file.write(python_template.substitute(sub))
 
   h_file.write(h_epilogue)
   cc_file.write(cc_epilogue)
-  python_file.write(python_epilogue)
   h_file.close()
   cc_file.close()
-  python_file.close()

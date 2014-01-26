@@ -136,8 +136,8 @@ class ExprTest : public testing::Test {
     Status status = executor_->Exec(stmt, &result_types);
     ASSERT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetErrorMsg();
     string result_row;
-    ASSERT_TRUE(executor_->FetchResult(&result_row).ok());
-    EXPECT_EQ(TypeToOdbcString(expr_type), result_types[0].type);
+    ASSERT_TRUE(executor_->FetchResult(&result_row).ok()) << expr;
+    EXPECT_EQ(TypeToOdbcString(expr_type), result_types[0].type) << expr;
     *interpreted_value = ConvertValue(expr_type, result_row);
   }
 
@@ -176,7 +176,7 @@ class ExprTest : public testing::Test {
         expr_value_.timestamp_val = TimestampValue(&value[0], value.size());
         return &expr_value_.timestamp_val;
       default:
-        DCHECK(type);
+        DCHECK(false) << type;
     }
     return NULL;
 
@@ -1783,11 +1783,9 @@ TEST_F(ExprTest, MathTrigonometricFunctions) {
   TestIsNull("atan(NULL)", TYPE_DOUBLE);
   TestIsNull("radians(NULL)", TYPE_DOUBLE);
   TestIsNull("degrees(NULL)", TYPE_DOUBLE);
-
 }
 
 TEST_F(ExprTest, MathConversionFunctions) {
-
   TestStringValue("bin(0)", "0");
   TestStringValue("bin(1)", "1");
   TestStringValue("bin(12)", "1100");
@@ -1817,7 +1815,8 @@ TEST_F(ExprTest, MathConversionFunctions) {
   // Uneven number of chars results in empty string.
   TestStringValue("unhex('30A')", "");
 
-  // Run the test suite twice, once with a bigint parameter, and once with string parameters.
+  // Run the test suite twice, once with a bigint parameter, and once with
+  // string parameters.
   for (int i = 0; i < 2; ++i) {
     // First iteration is with bigint, second with string parameter.
     string q = (i == 0) ? "" : "'";
@@ -2154,7 +2153,7 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("quotient(NULL, 1.0)", TYPE_BIGINT);
   TestIsNull("quotient(1.0, NULL)", TYPE_BIGINT);
   TestIsNull("quotient(NULL, NULL)", TYPE_BIGINT);
-  TestIsNull("least(NULL)", TYPE_STRING);
+  TestIsNull("least(NULL)", TYPE_TINYINT);
   TestIsNull("least(cast(NULL as tinyint))", TYPE_TINYINT);
   TestIsNull("least(cast(NULL as smallint))", TYPE_SMALLINT);
   TestIsNull("least(cast(NULL as int))", TYPE_INT);
@@ -2162,7 +2161,7 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("least(cast(NULL as float))", TYPE_FLOAT);
   TestIsNull("least(cast(NULL as double))", TYPE_DOUBLE);
   TestIsNull("least(cast(NULL as timestamp))", TYPE_TIMESTAMP);
-  TestIsNull("greatest(NULL)", TYPE_STRING);
+  TestIsNull("greatest(NULL)", TYPE_TINYINT);
   TestIsNull("greatest(cast(NULL as tinyint))", TYPE_TINYINT);
   TestIsNull("greatest(cast(NULL as smallint))", TYPE_SMALLINT);
   TestIsNull("greatest(cast(NULL as int))", TYPE_INT);
@@ -2469,8 +2468,10 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue(
       "to_date(cast('2011-12-22 09:10:11.12345678' as timestamp))", "2011-12-22");
 
-  TestValue("datediff('2011-12-22 09:10:11.12345678', '2012-12-22')", TYPE_INT, -366);
-  TestValue("datediff('2012-12-22', '2011-12-22 09:10:11.12345678')", TYPE_INT, 366);
+  TestValue("datediff(cast('2011-12-22 09:10:11.12345678' as timestamp), \
+      cast('2012-12-22' as timestamp))", TYPE_INT, -366);
+  TestValue("datediff(cast('2012-12-22' as timestamp), \
+      cast('2011-12-22 09:10:11.12345678' as timestamp))", TYPE_INT, 366);
 
   TestIsNull("year(cast('09:10:11.000000' as timestamp))", TYPE_INT);
   TestIsNull("month(cast('09:10:11.000000' as timestamp))", TYPE_INT);
@@ -2489,8 +2490,9 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("dayofweek(NULL)", TYPE_INT);
   TestIsNull("dayofyear(NULL)", TYPE_INT);
   TestIsNull("weekofyear(NULL)", TYPE_INT);
-  TestIsNull("datediff(NULL, '2011-12-22 09:10:11.12345678')", TYPE_INT);
-  TestIsNull("datediff('2012-12-22', NULL)", TYPE_INT);
+  TestIsNull("datediff(NULL, cast('2011-12-22 09:10:11.12345678' as timestamp))",
+      TYPE_INT);
+  TestIsNull("datediff(cast('2012-12-22' as timestamp), NULL)", TYPE_INT);
   TestIsNull("datediff(NULL, NULL)", TYPE_INT);
 
   TestStringValue("dayname(cast('2011-12-18 09:10:11.000000' as timestamp))", "Sunday");
@@ -2664,8 +2666,8 @@ TEST_F(ExprTest, ConditionalFunctions) {
     TestIsNull(f + "(NULL, NULL)", TYPE_BOOLEAN);
   }
 
-  TestIsNull("coalesce(NULL)", TYPE_FLOAT);
-  TestIsNull("coalesce(NULL, NULL)", TYPE_FLOAT);
+  TestIsNull("coalesce(NULL)", TYPE_BOOLEAN);
+  TestIsNull("coalesce(NULL, NULL)", TYPE_BOOLEAN);
   TestValue("coalesce(TRUE)", TYPE_BOOLEAN, true);
   TestValue("coalesce(NULL, TRUE, NULL)", TYPE_BOOLEAN, true);
   TestValue("coalesce(FALSE, NULL, TRUE, NULL)", TYPE_BOOLEAN, false);
@@ -2938,6 +2940,7 @@ int main(int argc, char **argv) {
   EXIT_IF_ERROR(
       impala_server->StartWithClientServers(FLAGS_beeswax_port, FLAGS_beeswax_port + 1,
                                             false));
+  impala_server->SetCatalogInitialized();
   executor_ = new ImpaladQueryExecutor();
   EXIT_IF_ERROR(executor_->Setup());
 

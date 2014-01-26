@@ -62,8 +62,6 @@ set(SRC_FILES
   NetworkTest_constants.cpp
   NetworkTest_types.cpp
   NetworkTestService.cpp
-  Opcodes_constants.cpp
-  Opcodes_types.cpp
   PlanNodes_constants.cpp
   PlanNodes_types.cpp
   ResourceBrokerNotificationService.cpp

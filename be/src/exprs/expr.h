@@ -20,7 +20,6 @@
 #include <vector>
 
 #include "common/status.h"
-#include "gen-cpp/Opcodes_types.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/tuple.h"
@@ -90,10 +89,6 @@ struct ExprValue {
     : string_data(str),
       string_val(const_cast<char*>(string_data.data()), string_data.size()) {
   }
-
-  // Update this ExprValue by parsing the string and return a pointer to the result.
-  // NULL will be returned if the string and type are not compatible.
-  void* TryParse(const std::string& string, PrimitiveType type);
 
   // Set string value to copy of str
   void SetStringVal(const StringValue& str) {
@@ -290,8 +285,6 @@ class Expr {
   PrimitiveType type() const { return type_.type; }
   const std::vector<Expr*>& children() const { return children_; }
 
-  TExprOpcode::type op() const { return opcode_; }
-
   // Returns true if expr doesn't contain slotrefs, ie, can be evaluated
   // with GetValue(NULL). The default implementation returns true if all of
   // the children are constant.
@@ -398,9 +391,16 @@ class Expr {
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<Expr*>& exprs);
 
+  // The builtin functions are not called from anywhere in the code and the
+  // symbols are therefore not included in the binary. We call these functions
+  // by using dlsym. The compiler must think this function is callable to
+  // not strip these symbols.
+  static void InitBuiltinsDummy();
+
   static const char* LLVM_CLASS_NAME;
 
  protected:
+  friend class AggFnEvaluator;
   friend class ComputeFunctions;
   friend class MathFunctions;
   friend class StringFunctions;
@@ -424,11 +424,12 @@ class Expr {
   // Return OK if successful, otherwise return error status.
   Status PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc);
 
+  // Function description.
+  TFunction fn_;
+  bool is_udf_call_;
+
   // function to evaluate expr; typically set in Prepare()
   ComputeFn compute_fn_;
-
-  // function opcode
-  TExprOpcode::type opcode_;
 
   // recognize if this node is a slotref in order to speed up GetValue()
   const bool is_slotref_;
@@ -585,7 +586,7 @@ inline void* Expr::GetValue(TupleRow* row) {
   if (is_slotref_) {
     return SlotRef::ComputeFn(this, row);
   } else {
-    DCHECK(compute_fn_ != NULL);
+    DCHECK(compute_fn_ != NULL) << DebugString();
     return compute_fn_(this, row);
   }
 }

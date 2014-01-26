@@ -32,52 +32,44 @@ FunctionCall::FunctionCall(const TExprNode& node)
 
 Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   RETURN_IF_ERROR(Expr::Prepare(state, row_desc));
-  switch (opcode_) {
-    case TExprOpcode::TIMESTAMP_NOW:
-    case TExprOpcode::UNIX_TIMESTAMP: {
-      DCHECK(state != NULL);
-      DCHECK(!state->now()->NotADateTime());
-      result_.timestamp_val = *(state->now());
-      break;
+
+  // TODO: remove when UDF allow for an Init() function.
+  const string& name = fn_.name.function_name;
+  if (name == "now" ||
+      name == "current_timestamp" ||
+      (name == "unix_timestamp" && fn_.arg_types.empty())) {
+    DCHECK(state != NULL);
+    DCHECK(!state->now()->NotADateTime());
+    result_.timestamp_val = *(state->now());
+  } else if (name == "pid") {
+    DCHECK(state != NULL);
+    result_.int_val = state->query_ctxt().pid;
+  } else if (name == "user") {
+    // Set username from runtime state.
+    DCHECK(state != NULL);
+    result_.SetStringVal(state->connected_user());
+  } else if (name == "current_database") {
+    // Set current database from the session.
+    DCHECK(state != NULL);
+    result_.SetStringVal(state->query_ctxt().session.database);
+  } else if (name == "unix_timestamp" || name == "from_unixtime") {
+    if (children_.size() < 2) return Status::OK;
+    if (children_[1]->IsConstant()) {
+      StringValue* fmt = reinterpret_cast<StringValue*>(children_[1]->GetValue(NULL));
+      if (fmt != NULL && fmt->len > 0) SetDateTimeFormatCtx(fmt);
+    } else {
+      SetDateTimeFormatCtx(NULL);
     }
-    case TExprOpcode::UNIX_TIMESTAMP_STRINGVALUE_STRINGVALUE:
-    case TExprOpcode::FROM_UNIXTIME_INT_STRINGVALUE:
-    case TExprOpcode::FROM_UNIXTIME_LONG_STRINGVALUE: {
-      if (children_.size() < 2) return Status::OK;
-      if (children_[1]->IsConstant()) {
-        StringValue* fmt = reinterpret_cast<StringValue*>(children_[1]->GetValue(NULL));
-        if (fmt != NULL && fmt->len > 0) SetDateTimeFormatCtx(fmt);
-      } else {
-        SetDateTimeFormatCtx(NULL);
-      }
-      break;
-    }
-    case TExprOpcode::UTILITY_PID: {
-      // Set pid from runtime state.
-      DCHECK(state != NULL);
-      result_.int_val = state->query_ctxt().pid;
-      break;
-    }
-    case TExprOpcode::UTILITY_USER: {
-      // Set username from runtime state.
-      DCHECK(state != NULL);
-      result_.SetStringVal(state->connected_user());
-      break;
-    }
-    case TExprOpcode::UTILITY_CURRENT_DATABASE: {
-      // Set current database from the session.
-      DCHECK(state != NULL);
-      result_.SetStringVal(state->query_ctxt().session.database);
-      break;
-    }
-    default: break;
   }
   return Status::OK;
 }
 
 string FunctionCall::DebugString() const {
   stringstream out;
-  out << "FunctionCall(" << Expr::DebugString() << ")";
+  out << "FunctionCall("
+      << "name=" << fn_.name.function_name << " "
+      << "symbol=" << fn_.scalar_fn.symbol << " "
+      << Expr::DebugString() << ")";
   return out.str();
 }
 

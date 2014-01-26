@@ -18,6 +18,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "exprs/expr.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -91,6 +92,13 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   if (init_jvm) {
     EXIT_IF_ERROR(JniUtil::Init());
     InitJvmLoggingSupport();
+  }
+
+  if (argc == -1) {
+    // Should not be called. We need BuiltinsInit() so the builtin symbols are
+    // not stripped.
+    DCHECK(false);
+    Expr::InitBuiltinsDummy();
   }
 
 #ifndef ADDRESS_SANITIZER

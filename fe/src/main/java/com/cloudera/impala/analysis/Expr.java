@@ -27,11 +27,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprNode;
-import com.cloudera.impala.thrift.TExprOpcode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -64,7 +66,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   protected ColumnType type_;  // result of analysis
   protected boolean isAnalyzed_;  // true after analyze() has been called
   protected boolean isWhereClauseConjunct_;  // set by Analyzer
-  protected TExprOpcode opcode_;  // opcode for this expr
 
   // Flag to indicate whether to wrap this expr's toSql() in parenthesis. Set by parser.
   // Needed for properly capturing expr precedences in the SQL string.
@@ -82,10 +83,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // set during analysis
   protected long numDistinctValues_;
 
+  // The function to call. This can either be a scalar or aggregate function.
+  // Set in analyze().
+  protected Function fn_;
+
   protected Expr() {
     super();
     type_ = ColumnType.INVALID;
-    opcode_ = TExprOpcode.INVALID_OPCODE;
     selectivity_ = -1.0;
     numDistinctValues_ = -1;
   }
@@ -93,7 +97,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public ExprId getId() { return id_; }
   protected void setId(ExprId id) { this.id_ = id; }
   public ColumnType getType() { return type_; }
-  public TExprOpcode getOpcode() { return opcode_; }
   public double getSelectivity() { return selectivity_; }
   public long getNumDistinctValues() { return numDistinctValues_; }
   public void setPrintSqlInParens(boolean b) { printSqlInParens_ = b; }
@@ -143,7 +146,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       child.analyze(analyzer);
     }
     isAnalyzed_ = true;
+    computeNumDistinctValues();
 
+    if (analyzer != null) analyzer.decrementCallDepth();
+  }
+
+  protected void computeNumDistinctValues() {
     if (isConstant()) {
       numDistinctValues_ = 1;
     } else {
@@ -158,7 +166,45 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         numDistinctValues_ = Math.max(numDistinctValues_, slotRef.numDistinctValues_);
       }
     }
-    if (analyzer != null) analyzer.decrementCallDepth();
+  }
+
+  /**
+   * Collects the returns types of the child nodes in an array.
+   */
+  protected ColumnType[] collectChildReturnTypes() {
+    ColumnType[] childTypes = new ColumnType[children_.size()];
+    for (int i = 0; i < children_.size(); ++i) {
+      childTypes[i] = children_.get(i).type_;
+    }
+    return childTypes;
+  }
+
+  /**
+   * Looks up in the catalog the builtin for 'name' and 'argTypes'.
+   * Returns null if the function is not found.
+   */
+  protected Function getBuiltinFunction(Analyzer analyzer, String name,
+      ColumnType[] argTypes, CompareMode mode) throws AnalysisException {
+    FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, name);
+    Function searchDesc = new Function(fnName, argTypes, ColumnType.INVALID, false);
+    return analyzer.getCatalog().getFunction(searchDesc, mode);
+  }
+
+  /**
+   * Generates the necessary casts for the children of this expr to call fn_.
+   * child(0) is cast to the functions first argument, child(1) to the second etc.
+   * This does not do any validation and the casts are assumed to be same.
+   */
+  protected void castForFunctionCall() throws AnalysisException {
+    Preconditions.checkState(fn_ != null);
+    ColumnType[] fnArgs = fn_.getArgs();
+    if (fnArgs.length > 0) {
+      for (int i = 0; i < children_.size(); ++i) {
+        // For varargs, we must compare with the last type in fnArgs.argTypes.
+        int ix = Math.min(fnArgs.length - 1, i);
+        if (!children_.get(i).type_.equals(fnArgs[ix])) castChild(fnArgs[ix], i);
+      }
+    }
   }
 
   /**
@@ -210,9 +256,15 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   // Append a flattened version of this expr, including all children, to 'container'.
   protected void treeToThriftHelper(TExpr container) {
+    Preconditions.checkState(isAnalyzed_,
+        "Must be analyzed before serializing to thrift.");
     TExprNode msg = new TExprNode();
     msg.type = type_.toThrift();
     msg.num_children = children_.size();
+    if (fn_ != null) {
+      msg.setFn(fn_.toThrift());
+      if (fn_.hasVarArgs()) msg.setVararg_start_idx(fn_.getNumArgs() - 1);
+    }
     toThrift(msg);
     container.addToNodes(msg);
     for (Expr child: children_) {
@@ -308,7 +360,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     for (int i = 0; i < children_.size(); ++i) {
       if (!children_.get(i).equals(expr.children_.get(i))) return false;
     }
-    return true;
+    if (fn_ == null && expr.fn_ == null) return true;
+    if (fn_ == null || expr.fn_ == null) return false; // One null, one not
+    // Both fn_'s are not null
+    return fn_.equals(expr.fn_);
   }
 
   /**
@@ -793,8 +848,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * @param childIndex
    *          index of child to be cast
    */
-  public void castChild(ColumnType targetType,
-      int childIndex) throws AnalysisException {
+  public void castChild(ColumnType targetType, int childIndex) throws AnalysisException {
     Expr child = getChild(childIndex);
     Expr newChild = child.castTo(targetType);
     setChild(childIndex, newChild);
@@ -822,10 +876,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *         The possibly changed compatibleType
    *         (if a string literal forced casting the other operand)
    */
-  public ColumnType castBinaryOp(ColumnType compatibleType)
-      throws AnalysisException {
-    Preconditions.checkState(
-        this instanceof BinaryPredicate || this instanceof ArithmeticExpr);
+  public ColumnType castBinaryOp(ColumnType compatibleType) throws AnalysisException {
+    Preconditions.checkState(this instanceof ArithmeticExpr);
     ColumnType t1 = getChild(0).getType();
     ColumnType t2 = getChild(1).getType();
     // Convert string literals if the other operand is numeric,

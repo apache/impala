@@ -40,6 +40,11 @@ InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend
                           statestore_host, statestore_port)) {
 }
 
+void InProcessImpalaServer::SetCatalogInitialized() {
+  DCHECK(impala_server_ != NULL) << "Call Start*() first.";
+  impala_server_->frontend()->SetCatalogInitialized();
+}
+
 Status InProcessImpalaServer::StartWithClientServers(int beeswax_port, int hs2_port,
     bool use_statestore) {
   RETURN_IF_ERROR(exec_env_->StartServices());

@@ -18,11 +18,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TExprOpcode;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * &&, ||, ! predicates.
@@ -32,28 +35,34 @@ public class CompoundPredicate extends Predicate {
   private final static Logger LOG = LoggerFactory.getLogger(CompoundPredicate.class);
 
   public enum Operator {
-    AND("AND", TExprOpcode.COMPOUND_AND),
-    OR("OR", TExprOpcode.COMPOUND_OR),
-    NOT("NOT", TExprOpcode.COMPOUND_NOT);
+    AND("AND"),
+    OR("OR"),
+    NOT("NOT");
 
     private final String description;
-    private final TExprOpcode thriftOp;
 
-    private Operator(String description, TExprOpcode thriftOp) {
+    private Operator(String description) {
       this.description = description;
-      this.thriftOp = thriftOp;
     }
 
     @Override
     public String toString() {
       return description;
     }
-
-    public TExprOpcode toThrift() {
-      return thriftOp;
-    }
   }
   private final Operator op_;
+
+  public static void initBuiltins(Db db) {
+    db.addBuiltin(ScalarFunction.createBuiltinOperator(
+        Operator.AND.name(), "CompoundPredicate", "AndComputeFn",
+        Lists.newArrayList(ColumnType.BOOLEAN, ColumnType.BOOLEAN), ColumnType.BOOLEAN));
+    db.addBuiltin(ScalarFunction.createBuiltinOperator(
+        Operator.OR.name(), "CompoundPredicate", "OrComputeFn",
+        Lists.newArrayList(ColumnType.BOOLEAN, ColumnType.BOOLEAN), ColumnType.BOOLEAN));
+    db.addBuiltin(ScalarFunction.createBuiltinOperator(
+        Operator.NOT.name(), "CompoundPredicate", "NotComputeFn",
+        Lists.newArrayList(ColumnType.BOOLEAN), ColumnType.BOOLEAN));
+  }
 
   public CompoundPredicate(Operator op, Expr e1, Expr e2) {
     super();
@@ -86,7 +95,6 @@ public class CompoundPredicate extends Predicate {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.COMPOUND_PRED;
-    msg.setOpcode(op_.toThrift());
   }
 
   @Override
@@ -103,6 +111,11 @@ public class CompoundPredicate extends Predicate {
             e.toSql(), toSql(), e.getType()));
       }
     }
+
+    fn_ = getBuiltinFunction(analyzer, op_.toString(), collectChildReturnTypes(),
+        CompareMode.IS_SUBTYPE);
+    Preconditions.checkState(fn_ != null);
+    Preconditions.checkState(fn_.getReturnType().isBoolean());
 
     if (getChild(0).selectivity_ == -1
         || children_.size() == 2 && getChild(1).selectivity_ == -1) {

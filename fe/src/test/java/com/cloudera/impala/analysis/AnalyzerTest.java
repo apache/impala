@@ -35,7 +35,7 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.Udf;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.testutil.TestUtils;
@@ -89,7 +89,7 @@ public class AnalyzerTest {
 
   protected Function addTestFunction(String db, String fnName,
       ArrayList<ColumnType> args, boolean varArgs) {
-    Function fn = new Udf(
+    Function fn = new ScalarFunction(
         new FunctionName(db, fnName), args, ColumnType.INT, null, null);
     fn.setHasVarArgs(varArgs);
     catalog_.addFunction(fn);

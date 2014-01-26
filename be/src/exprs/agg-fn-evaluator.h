@@ -18,17 +18,29 @@
 
 #include <string>
 
-#include "exprs/opcode-registry.h"
+#include <boost/scoped_ptr.hpp>
+#include "common/status.h"
+#include "runtime/primitive-type.h"
 #include "udf/udf.h"
 
 #include "gen-cpp/Exprs_types.h"
+#include "gen-cpp/PlanNodes_types.h"
+#include "gen-cpp/Types_types.h"
 
 namespace impala {
 
 class AggregationNode;
+class Expr;
+class MemPool;
+class ObjectPool;
+class RowDescriptor;
+class RuntimeState;
+class SlotDescriptor;
+class Tuple;
+class TupleRow;
 class TExprNode;
 
-// This class evaluates aggregate functions. Aggregate funtions can either be
+// This class evaluates aggregate functions. Aggregate functions can either be
 // builtins or external UDAs. For both of types types, they can either use codegen
 // or not.
 // This class provides an interface that's 1:1 with the UDA interface and serves
@@ -37,29 +49,39 @@ class TExprNode;
 // slots from TupleRows and aggregating the result to the result tuple.
 class AggFnEvaluator {
  public:
+  // TODO: The aggregation node has custom codegen paths for a few of the builtins.
+  // That logic needs to be removed. For now, add some enums for those builtins.
+  enum AggregationOp {
+    COUNT,
+    MIN,
+    MAX,
+    SUM,
+    OTHER,
+  };
+
   // Creates an AggFnEvaluator object from desc. The object is added to 'pool'
   // and returned in *result. This constructs the input Expr trees for
   // this aggregate function as specified in desc. The result is returned in
   // *result.
-  static Status Create(ObjectPool* pool, const TAggregateFunctionCall& desc,
+  static Status Create(ObjectPool* pool, const TExpr& desc,
       AggFnEvaluator** result);
 
   // Initializes the agg expr. 'desc' must be the row descriptor for the input TupleRow.
   // It is used to get the input values in the Update() and Merge() functions.
-  // 'output_slot_desc' is the slot that this aggregator should write to.
+  // 'output_slot_desc' is the slot that this evaluator should write to.
   // The underlying aggregate function allocates memory from the 'pool'. This is
-  // either string data for intemerdiate results or whatever memory the UDA might
+  // either string data for intermediate results or whatever memory the UDA might
   // need.
   // TODO: should we give them their own pool?
   Status Prepare(RuntimeState* state, const RowDescriptor& desc,
       MemPool* pool, const SlotDescriptor* output_slot_desc);
 
-  TAggregationOp::type agg_op() const { return agg_op_; }
+  AggregationOp agg_op() const { return agg_op_; }
   const std::vector<Expr*>& input_exprs() const { return input_exprs_; }
   bool is_count_star() const {
-    return agg_op_ == TAggregationOp::COUNT && input_exprs_.empty();
+    return agg_op_ == COUNT && input_exprs_.empty();
   }
-  bool is_builtin() const { return function_type_ == TFunctionBinaryType::BUILTIN; }
+  bool is_builtin() const { return fn_.binary_type == TFunctionBinaryType::BUILTIN; }
 
   static std::string DebugString(const std::vector<AggFnEvaluator*>& exprs);
   std::string DebugString() const;
@@ -80,23 +102,14 @@ class AggFnEvaluator {
   // Function* GetIrFinalizeFn();
 
  private:
+  TFunction fn_;
+
   const ColumnType return_type_;
   const ColumnType intermediate_type_;
   std::vector<Expr*> input_exprs_;
 
-  // Native (.so), IR (.ll) or builtin
-  TFunctionBinaryType::type function_type_;
-
-  // If it's a builtin, the opcode.
-  TAggregationOp::type agg_op_;
-
-  // HDFS path and function names for UDAs.
-  std::string hdfs_location_;
-  std::string init_fn_symbol_;
-  std::string update_fn_symbol_;
-  std::string merge_fn_symbol_;
-  std::string serialize_fn_symbol_;
-  std::string finalize_fn_symbol_;
+  // The enum for some of the builtins that still require special cased logic.
+  AggregationOp agg_op_;
 
   // Unowned
   const SlotDescriptor* output_slot_desc_;
@@ -113,14 +126,17 @@ class AggFnEvaluator {
   std::vector<impala_udf::AnyVal*> staging_input_vals_;
   impala_udf::AnyVal* staging_output_val_;
 
-  // Function ptrs to the aggregate function. This is either populated from the
-  // opcode registry for builtins or from the external binary for native UDAs.
-  OpcodeRegistry::AggFnDescriptor fn_ptrs_;
+  // Function ptrs for the different phases of the aggregate function.
+  void* init_fn_;
+  void* update_fn_;
+  void* merge_fn_;
+  void* serialize_fn_;
+  void* finalize_fn_;
 
   // Use Create() instead.
-  AggFnEvaluator(const TAggregateFunctionCall& desc);
+  AggFnEvaluator(const TExprNode& desc);
 
-  // TODO: these funtions below are not extensible and we need to use codegen to
+  // TODO: these functions below are not extensible and we need to use codegen to
   // generate the calls into the UDA functions (like for UDFs).
   // Remove these functions when this is supported.
 

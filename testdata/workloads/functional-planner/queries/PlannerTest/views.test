@@ -16,9 +16,9 @@ select * from functional.complex_view
 |  order by: b.string_col ASC
 |
 03:AGGREGATE [FINALIZE]
-|  output: COUNT(a.bigint_col)
+|  output: count(a.bigint_col)
 |  group by: b.string_col
-|  having: COUNT(a.bigint_col) > 1
+|  having: count(a.bigint_col) > 1
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
@@ -39,14 +39,14 @@ select * from functional.complex_view
 |  order by: b.string_col ASC
 |
 07:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(a.bigint_col))
+|  output: sum(count(a.bigint_col))
 |  group by: b.string_col
-|  having: COUNT(a.bigint_col) > 1
+|  having: count(a.bigint_col) > 1
 |
 06:EXCHANGE [PARTITION=HASH(b.string_col)]
 |
 03:AGGREGATE
-|  output: COUNT(a.bigint_col)
+|  output: count(a.bigint_col)
 |  group by: b.string_col
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
@@ -123,15 +123,15 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |     partitions=24/24 size=1.40MB compact
 |
 07:HASH JOIN [INNER JOIN]
-|  hash predicates: functional.alltypes.id = COUNT(a.bigint_col)
+|  hash predicates: functional.alltypes.id = count(a.bigint_col)
 |
 |--06:TOP-N [LIMIT=100]
 |  |  order by: b.string_col ASC
 |  |
 |  05:AGGREGATE [FINALIZE]
-|  |  output: COUNT(a.bigint_col)
+|  |  output: count(a.bigint_col)
 |  |  group by: b.string_col
-|  |  having: COUNT(a.bigint_col) > 1
+|  |  having: count(a.bigint_col) > 1
 |  |
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = b.id
@@ -157,7 +157,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |     partitions=24/24 size=1.40MB
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: functional.alltypes.id = COUNT(a.bigint_col)
+|  hash predicates: functional.alltypes.id = count(a.bigint_col)
 |
 |--14:EXCHANGE [BROADCAST]
 |  |  limit: 100
@@ -171,14 +171,14 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  |  order by: b.string_col ASC
 |  |
 |  11:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(a.bigint_col))
+|  |  output: sum(count(a.bigint_col))
 |  |  group by: b.string_col
-|  |  having: COUNT(a.bigint_col) > 1
+|  |  having: count(a.bigint_col) > 1
 |  |
 |  10:EXCHANGE [PARTITION=HASH(b.string_col)]
 |  |
 |  05:AGGREGATE
-|  |  output: COUNT(a.bigint_col)
+|  |  output: count(a.bigint_col)
 |  |  group by: b.string_col
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]

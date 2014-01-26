@@ -22,11 +22,12 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TFunction;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
 
 /**
- * Internal representation of a UDA.
+ * Internal representation of an aggregate function.
  */
-public class Uda extends Function {
+public class AggregateFunction extends Function {
   private ColumnType intermediateType_;
 
   // The symbol inside the binary at location_ that contains this particular.
@@ -37,11 +38,19 @@ public class Uda extends Function {
   private String mergeFnSymbol_;
   private String finalizeFnSymbol_;
 
-  public Uda(FunctionName fnName, FunctionArgs args, ColumnType retType) {
+  private static String BE_BUILTINS_CLASS = "AggregateFunctions";
+
+  // If true, this aggregate function should ignore distinct.
+  // e.g. min(distinct col) == min(col).
+  // TODO: currently it is not possible for user functions to specify this. We should
+  // extend the create aggregate function stmt to allow additional metdata like this.
+  private boolean ignoresDistinct_;
+
+  public AggregateFunction(FunctionName fnName, FunctionArgs args, ColumnType retType) {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
   }
 
-  public Uda(FunctionName fnName, List<ColumnType> argTypes,
+  public AggregateFunction(FunctionName fnName, List<ColumnType> argTypes,
       ColumnType retType, ColumnType intermediateType,
       HdfsUri location, String updateFnSymbol, String initFnSymbol,
       String serializeFnSymbol, String mergeFnSymbol, String finalizeFnSymbol) {
@@ -53,6 +62,20 @@ public class Uda extends Function {
     serializeFnSymbol_ = serializeFnSymbol;
     mergeFnSymbol_ = mergeFnSymbol;
     finalizeFnSymbol_ = finalizeFnSymbol;
+    ignoresDistinct_ = false;
+  }
+
+  public static AggregateFunction createBuiltin(Db db, String name,
+      List<ColumnType> argTypes, ColumnType retType, ColumnType intermediateType,
+      String initFnSymbol, String updateFnSymbol, String mergeFnSymbol,
+      String serializeFnSymbol, String finalizeFnSymbol,
+      boolean ignoresDistinct) {
+    AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
+        argTypes, retType, intermediateType, null, updateFnSymbol, initFnSymbol,
+        serializeFnSymbol, mergeFnSymbol, finalizeFnSymbol);
+    fn.setBinaryType(TFunctionBinaryType.BUILTIN);
+    fn.ignoresDistinct_ = ignoresDistinct;
+    return fn;
   }
 
   public String getUpdateFnSymbol() { return updateFnSymbol_; }
@@ -61,6 +84,7 @@ public class Uda extends Function {
   public String getMergeFnSymbol() { return mergeFnSymbol_; }
   public String getFinalizeFnSymbol() { return finalizeFnSymbol_; }
   public ColumnType getIntermediateType() { return intermediateType_; }
+  public boolean ignoresDistinct() { return ignoresDistinct_; }
 
   public void setUpdateFnSymbol(String fn) { updateFnSymbol_ = fn; }
   public void setInitFnSymbol(String fn) { initFnSymbol_ = fn; }
@@ -72,14 +96,15 @@ public class Uda extends Function {
   @Override
   public TFunction toThrift() {
     TFunction fn = super.toThrift();
-    TAggregateFunction uda = new TAggregateFunction();
-    uda.setUpdate_fn_symbol(updateFnSymbol_);
-    uda.setInit_fn_symbol(initFnSymbol_);
-    if (serializeFnSymbol_ == null) uda.setSerialize_fn_symbol(serializeFnSymbol_);
-    uda.setMerge_fn_symbol(mergeFnSymbol_);
-    uda.setFinalize_fn_symbol(finalizeFnSymbol_);
-    uda.setIntermediate_type(intermediateType_.toThrift());
-    fn.setAggregate_fn(uda);
+    TAggregateFunction agg_fn = new TAggregateFunction();
+    agg_fn.setUpdate_fn_symbol(updateFnSymbol_);
+    agg_fn.setInit_fn_symbol(initFnSymbol_);
+    if (serializeFnSymbol_ != null) agg_fn.setSerialize_fn_symbol(serializeFnSymbol_);
+    agg_fn.setMerge_fn_symbol(mergeFnSymbol_);
+    if (finalizeFnSymbol_  != null) agg_fn.setFinalize_fn_symbol(finalizeFnSymbol_);
+    agg_fn.setIntermediate_type(intermediateType_.toThrift());
+    agg_fn.setIgnores_distinct(ignoresDistinct_);
+    fn.setAggregate_fn(agg_fn);
     return fn;
   }
 }

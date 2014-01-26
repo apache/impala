@@ -38,6 +38,7 @@ import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TCatalog;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TGetAllCatalogObjectsResponse;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
@@ -400,6 +401,7 @@ public class CatalogServiceCatalog extends Catalog {
 
         for (List<Function> fns: dbFns.second.values()) {
           for (Function fn: fns) {
+            if (fn.getBinaryType() == TFunctionBinaryType.BUILTIN) continue;
             fn.setCatalogVersion(incrementAndGetCatalogVersion());
             db.addFunction(fn);
           }

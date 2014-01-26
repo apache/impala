@@ -79,6 +79,7 @@ public class BetweenPredicate extends Predicate {
 
     try {
       rewrittenPredicate_.analyze(analyzer);
+      fn_ = rewrittenPredicate_.fn_;
     } catch (AnalysisException e) {
       // We should have already guaranteed that analysis will succeed.
       Preconditions.checkState(false, "Analysis failed in rewritten between predicate");

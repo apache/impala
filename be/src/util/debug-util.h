@@ -24,7 +24,6 @@
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/Frontend_types.h"
-#include "gen-cpp/Opcodes_types.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/RuntimeProfile_types.h"
 #include "gen-cpp/ImpalaService_types.h"
@@ -38,8 +37,6 @@ class Tuple;
 class TupleRow;
 class RowBatch;
 
-std::ostream& operator<<(std::ostream& os, const TExprOpcode::type& op);
-std::ostream& operator<<(std::ostream& os, const TAggregationOp::type& op);
 std::ostream& operator<<(std::ostream& os, const TFunctionBinaryType::type& op);
 std::ostream& operator<<(std::ostream& os, const TUniqueId& id);
 std::ostream& operator<<(std::ostream& os, const THdfsFileFormat::type& type);

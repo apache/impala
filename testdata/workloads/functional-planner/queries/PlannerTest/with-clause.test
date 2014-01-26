@@ -133,15 +133,15 @@ limit 3
 |  predicates: c1 > 0
 |
 03:AGGREGATE [FINALIZE]
-|  output: MAX(tinyint_col)
-|  group by: int_col, MAX(id)
+|  output: max(tinyint_col)
+|  group by: int_col, max(id)
 |  limit: 10
 |
 02:TOP-N [LIMIT=5]
 |  order by: int_col ASC, tinyint_col ASC
 |
 01:AGGREGATE [FINALIZE]
-|  output: MAX(id)
+|  output: max(id)
 |  group by: int_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypessmall]
@@ -154,8 +154,8 @@ limit 3
 |  predicates: c1 > 0
 |
 03:AGGREGATE [FINALIZE]
-|  output: MAX(tinyint_col)
-|  group by: int_col, MAX(id)
+|  output: max(tinyint_col)
+|  group by: int_col, max(id)
 |  limit: 10
 |
 09:TOP-N [LIMIT=5]
@@ -167,13 +167,13 @@ limit 3
 |  order by: int_col ASC, tinyint_col ASC
 |
 07:AGGREGATE [MERGE FINALIZE]
-|  output: MAX(MAX(id))
+|  output: max(max(id))
 |  group by: int_col, tinyint_col
 |
 06:EXCHANGE [PARTITION=HASH(int_col,tinyint_col)]
 |
 01:AGGREGATE
-|  output: MAX(id)
+|  output: max(id)
 |  group by: int_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypessmall]

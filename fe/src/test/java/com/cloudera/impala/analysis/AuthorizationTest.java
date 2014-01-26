@@ -35,7 +35,7 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.catalog.Udf;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -282,6 +282,9 @@ public class AuthorizationTest {
     } catch (AnalysisException e) {
       Assert.assertEquals(e.getMessage(), "Database does not exist: newdb");
     }
+
+    // All users should be able to use the system db.
+    AuthzOk("use _impala_builtins");
   }
 
   @Test
@@ -376,6 +379,9 @@ public class AuthorizationTest {
         "'hdfs://localhost:20500/test-warehouse/alltypes'",
         "User '%s' does not have privileges to access: " +
         "hdfs://localhost:20500/test-warehouse/alltypes");
+
+    AuthzError("create table _impala_builtins.tbl(i int)",
+        "Cannot modify system database.");
   }
 
   @Test
@@ -423,6 +429,10 @@ public class AuthorizationTest {
     AuthzError("create view nodb.alltypes as select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'CREATE' on: " +
         "nodb.alltypes");
+
+    AuthzError("create view _impala_builtins.new_view as "
+        + "select * from functional.alltypesagg",
+        "Cannot modify system database.");
   }
 
   @Test
@@ -446,6 +456,10 @@ public class AuthorizationTest {
     // No existent db (no permissions).
     AuthzError("create database nodb",
         "User '%s' does not have privileges to execute 'CREATE' on: nodb");
+
+    // No existent db (no permissions).
+    AuthzError("create database if not exists _impala_builtins",
+        "Cannot modify system database.");
   }
 
   @Test
@@ -473,6 +487,9 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'DROP' on: nodb");
     AuthzError("drop database if exists nodb",
         "User '%s' does not have privileges to execute 'DROP' on: nodb");
+
+    AuthzError("drop database _impala_builtins",
+        "Cannot modify system database.");
   }
 
   @Test
@@ -502,6 +519,10 @@ public class AuthorizationTest {
     // Using DROP TABLE on a view does not reveal privileged information.
     AuthzError("drop table functional.view_view",
         "User '%s' does not have privileges to execute 'DROP' on: functional.view_view");
+
+    // Using DROP TABLE on a view does not reveal privileged information.
+    AuthzError("drop table if exists _impala_builtins.tbl",
+        "Cannot modify system database.");
   }
 
   @Test
@@ -531,6 +552,10 @@ public class AuthorizationTest {
     // Using DROP VIEW on a table does not reveal privileged information.
     AuthzError("drop view functional.alltypes",
         "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
+
+    // Using DROP VIEW on a table does not reveal privileged information.
+    AuthzError("drop view _impala_builtins.my_view",
+        "Cannot modify system database.");
   }
 
   @Test
@@ -776,6 +801,8 @@ public class AuthorizationTest {
   public void TestShowPermissions() throws AuthorizationException, AnalysisException {
     AuthzOk("show tables in functional");
     AuthzOk("show databases");
+    AuthzOk("show tables in _impala_builtins");
+    AuthzOk("show functions in _impala_builtins");
 
     // Database exists, user does not have access.
     AuthzError("show tables in functional_rc",
@@ -1011,14 +1038,21 @@ public class AuthorizationTest {
         "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
     AuthzOk(adminContext, "drop function if exists f()");
 
+    // Can't add function to system db
+    AuthzError(adminContext, "create function _impala_builtins.f() returns int location " +
+        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+        "Cannot modify system database.", ADMIN_USER);
+    AuthzError(adminContext, "drop function if exists pi()",
+        "Cannot modify system database.", ADMIN_USER);
+
     // Add default.f(), tpch.f()
-    catalog_.addFunction(new Udf(new FunctionName("default", "f"),
+    catalog_.addFunction(new ScalarFunction(new FunctionName("default", "f"),
         new ArrayList<ColumnType>(), ColumnType.INT, null, null));
-    catalog_.addFunction(new Udf(new FunctionName("tpch", "f"),
+    catalog_.addFunction(new ScalarFunction(new FunctionName("tpch", "f"),
         new ArrayList<ColumnType>(), ColumnType.INT, null, null));
 
     AuthzError(context, "select default.f()",
-        "User '%s' does not have privileges to access: default.*",
+        "User '%s' does not have privileges to access: default",
         currentUser);
     // Couldn't create tpch.f() but can run it.
     AuthzOk(context, "select tpch.f()");

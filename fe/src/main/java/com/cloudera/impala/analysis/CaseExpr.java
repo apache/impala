@@ -17,12 +17,15 @@ package com.cloudera.impala.analysis;
 import java.util.List;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TCaseExpr;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * CaseExpr represents the SQL expression
@@ -51,6 +54,19 @@ public class CaseExpr extends Expr {
     if (elseExpr != null) {
       children_.add(elseExpr);
       hasElseExpr_ = true;
+    }
+  }
+
+  public static void initBuiltins(Db db) {
+    for (ColumnType t: ColumnType.getSupportedTypes()) {
+      if (t.isNull()) continue;
+      // TODO: case is special and the signature cannot be represented.
+      // It is alternating varargs
+      // e.g. case(bool, type, bool type, bool type, etc).
+      // Instead we just add a version for each of the when types
+      // e.g. case(BOOLEAN), case(INT), etc
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          "case", Lists.newArrayList(t), t));
     }
   }
 
@@ -83,7 +99,6 @@ public class CaseExpr extends Expr {
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.CASE_EXPR;
     msg.case_expr = new TCaseExpr(hasCaseExpr_, hasElseExpr_);
-    msg.setOpcode(opcode_);
   }
 
   @Override
@@ -176,15 +191,13 @@ public class CaseExpr extends Expr {
       }
     }
 
-    // Set opcode based on whenType.
-    OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
-        FunctionOperator.CASE, true, whenType);
-    if (match == null) {
-      throw new AnalysisException("Could not find match in function registry " +
-          "for CASE and arg type: " + whenType);
+    // Do the function lookup just based on the whenType.
+    ColumnType[] args = new ColumnType[1];
+    args[0] = whenType;
+    fn_ = getBuiltinFunction(analyzer, "case", args, CompareMode.IS_SUBTYPE);
+    if (fn_ == null) {
+      throw new AnalysisException("CASE " + whenType + " is not supported.");
     }
-    opcode_ = match.opcode;
     type_ = returnType;
-    isAnalyzed_ = true;
   }
 }

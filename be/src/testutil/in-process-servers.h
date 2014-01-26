@@ -61,6 +61,10 @@ class InProcessImpalaServer {
 
   Metrics* metrics() { return exec_env_->metrics(); }
 
+  // Sets the catalog on this impalad to be initialized. If we don't
+  // start up a catalogd, then there is no one to initialize it otherwise.
+  void SetCatalogInitialized();
+
  private:
   // Hostname for this server, usually FLAGS_hostname
   const std::string hostname_;

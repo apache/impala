@@ -63,6 +63,9 @@ public class ColumnType {
 
   private static ArrayList<ColumnType> fixedSizeNumericTypes;
   private static ArrayList<ColumnType> fixedPointTypes;
+  private static ArrayList<ColumnType> numericTypes;
+  private static ArrayList<ColumnType> nativeTypes;
+  private static ArrayList<ColumnType> supportedTypes;
 
   static {
     fixedSizeNumericTypes = Lists.newArrayList();
@@ -78,6 +81,35 @@ public class ColumnType {
     fixedPointTypes.add(SMALLINT);
     fixedPointTypes.add(INT);
     fixedPointTypes.add(BIGINT);
+
+    numericTypes = Lists.newArrayList();
+    numericTypes.add(TINYINT);
+    numericTypes.add(SMALLINT);
+    numericTypes.add(INT);
+    numericTypes.add(BIGINT);
+    numericTypes.add(FLOAT);
+    numericTypes.add(DOUBLE);
+
+    nativeTypes = Lists.newArrayList();
+    nativeTypes.add(BOOLEAN);
+    nativeTypes.add(TINYINT);
+    nativeTypes.add(SMALLINT);
+    nativeTypes.add(INT);
+    nativeTypes.add(BIGINT);
+    nativeTypes.add(FLOAT);
+    nativeTypes.add(DOUBLE);
+
+    supportedTypes = Lists.newArrayList();
+    supportedTypes.add(NULL);
+    supportedTypes.add(BOOLEAN);
+    supportedTypes.add(TINYINT);
+    supportedTypes.add(SMALLINT);
+    supportedTypes.add(INT);
+    supportedTypes.add(BIGINT);
+    supportedTypes.add(FLOAT);
+    supportedTypes.add(DOUBLE);
+    supportedTypes.add(STRING);
+    supportedTypes.add(TIMESTAMP);
   }
 
   private ColumnType(PrimitiveType type) {
@@ -133,6 +165,15 @@ public class ColumnType {
   }
   public static ArrayList<ColumnType> getFixedPointTypes() {
     return fixedPointTypes;
+  }
+  public static ArrayList<ColumnType> getNumericTypes() {
+    return numericTypes;
+  }
+  public static ArrayList<ColumnType> getNativeTypes() {
+    return nativeTypes;
+  }
+  public static ArrayList<ColumnType> getSupportedTypes() {
+    return supportedTypes;
   }
 
   @Override
@@ -575,7 +616,8 @@ public class ColumnType {
 
     compatibilityMatrix[TIMESTAMP.ordinal()][TIMESTAMP.ordinal()] =
         PrimitiveType.TIMESTAMP;
-    compatibilityMatrix[TIMESTAMP.ordinal()][STRING.ordinal()] = PrimitiveType.TIMESTAMP;
+    compatibilityMatrix[TIMESTAMP.ordinal()][STRING.ordinal()] =
+        PrimitiveType.TIMESTAMP;
 
     compatibilityMatrix[STRING.ordinal()][STRING.ordinal()] = PrimitiveType.STRING;
   }

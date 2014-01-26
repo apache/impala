@@ -110,7 +110,7 @@ void* LikePredicate::RegexMatch(Expr* e, TupleRow* row, bool is_like_pattern) {
   }
   re2::RE2 re(re_pattern);
   if (re.ok()) {
-    p->result_.bool_val = 
+    p->result_.bool_val =
         RE2::FullMatch(re2::StringPiece(operand_value->ptr, operand_value->len), re);
     return &p->result_.bool_val;
   } else {
@@ -131,25 +131,24 @@ void* LikePredicate::RegexFn(Expr* e, TupleRow* row) {
 Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   RETURN_IF_ERROR(Expr::PrepareChildren(state, row_desc));
   DCHECK_EQ(children_.size(), 2);
-  switch (opcode_) {
-    case TExprOpcode::LIKE:
-      compute_fn_ = LikeFn;
-      break;
-    case TExprOpcode::REGEX:
-      compute_fn_ = RegexFn;
-      break;
-    default:
-      stringstream error;
-      error << "Invalid LIKE operator: " << opcode_;
-      return Status(error.str());
+  bool is_like = fn_.name.function_name == "like";
+  if (is_like) {
+    compute_fn_ = LikeFn;
+  } else if (fn_.name.function_name == "regexp" || fn_.name.function_name == "rlike") {
+    compute_fn_ = RegexFn;
+  } else {
+    stringstream error;
+    error << "Invalid LIKE operator: " << fn_.name.function_name;
+    return Status(error.str());
   }
+
   if (GetChild(1)->IsConstant()) {
     // determine pattern and decide on eval fn
     StringValue* pattern = static_cast<StringValue*>(GetChild(1)->GetValue(NULL));
     if (pattern == NULL) return Status::OK;
     string pattern_str(pattern->ptr, pattern->len);
-    // Generate a regex search to look for simple patterns: 
-    // - "%anything%": This maps to a fast substring search implementation. 
+    // Generate a regex search to look for simple patterns:
+    // - "%anything%": This maps to a fast substring search implementation.
     // - anything%: This maps to a strncmp implementation
     // - %anything: This maps to a strncmp implementation
     // - anything: This maps to a strncmp implementation
@@ -165,7 +164,7 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
     DCHECK(equals_re.ok());
     void* no_arg = NULL;
 
-    if (opcode_ == TExprOpcode::LIKE) {
+    if (is_like) {
       if (RE2::FullMatch(pattern_str, substring_re, no_arg, &search_string_, no_arg)) {
         search_string_sv_ = StringValue(search_string_);
         substring_pattern_ = StringSearch(&search_string_sv_);
@@ -184,9 +183,9 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
         compute_fn_ = ConstantEqualsFn;
         return Status::OK;
       }
-    } 
+    }
     string re_pattern;
-    if (opcode_ == TExprOpcode::LIKE) {
+    if (is_like) {
       ConvertLikePattern(pattern, &re_pattern);
     } else {
       re_pattern = pattern_str;

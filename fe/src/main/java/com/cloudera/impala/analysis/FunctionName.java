@@ -14,8 +14,9 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TFunctionName;
 
 /**
@@ -24,7 +25,8 @@ import com.cloudera.impala.thrift.TFunctionName;
  */
 public class FunctionName {
   private String db_;
-  private String fn_;
+  private final String fn_;
+  boolean isBuiltin_;
 
   public FunctionName(String db, String fn) {
     db_ = db;
@@ -49,14 +51,6 @@ public class FunctionName {
     return fn_.equalsIgnoreCase(o.fn_);
   }
 
-  // Same as FunctionName but for builtins and we'll leave the case
-  // as is since we aren't matching by string.
-  public static FunctionName CreateBuiltinName(String fn) {
-    FunctionName name = new FunctionName(fn);
-    name.fn_ = fn;
-    return name;
-  }
-
   public FunctionName(TFunctionName thriftName) {
     db_ = thriftName.db_name.toLowerCase();
     fn_ = thriftName.function_name.toLowerCase();
@@ -65,14 +59,13 @@ public class FunctionName {
   public String getDb() { return db_; }
   public String getFunction() { return fn_; }
   public boolean isFullyQualified() { return db_ != null; }
+  public boolean isBuiltin() { return isBuiltin_; }
 
   @Override
   public String toString() {
-    if (db_ == null) return fn_;
+    if (db_ == null || isBuiltin_) return fn_;
     return db_ + "." + fn_;
   }
-
-  public void setDb(String db) { db_ = db; }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (fn_.length() == 0) {
@@ -89,11 +82,20 @@ public class FunctionName {
       throw new AnalysisException("Function cannot start with a digit: " + fn_);
     }
 
-    // If the function name is not fully qualified, it must not be the same as a builtin
-    if (!isFullyQualified() && OpcodeRegistry.instance().getFunctionOperator(
-          getFunction()) != FunctionOperator.INVALID_OPERATOR) {
-      throw new AnalysisException(
-          "Function cannot have the same name as a builtin: " + getFunction());
+    // Resolve the database for this function.
+    if (!isFullyQualified()) {
+      Db builtinDb = analyzer.getCatalog().getBuiltinsDb();
+      if (builtinDb.containsFunction(fn_)) {
+        // If it isn't fully qualified and is the same name as a builtin, use
+        // the builtin.
+        db_ = Catalog.BUILTINS_DB;
+        isBuiltin_ = true;
+      } else {
+        db_ = analyzer.getDefaultDb();
+        isBuiltin_ = false;
+      }
+    } else {
+      isBuiltin_ = db_.equals(Catalog.BUILTINS_DB);
     }
   }
 

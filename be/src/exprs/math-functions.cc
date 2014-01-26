@@ -26,7 +26,7 @@
 
 using namespace std;
 
-namespace impala { 
+namespace impala {
 
 const char* MathFunctions::ALPHANUMERIC_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -544,7 +544,7 @@ void* MathFunctions::QuotientDouble(Expr* e, TupleRow* row) {
 }
 
 void* MathFunctions::QuotientBigInt(Expr* e, TupleRow* row) {
-  return ComputeFunctions::Int_Divide_long_long(e, row);
+  return ComputeFunctions::Int_divide_long_long(e, row);
 }
 
 template <typename T, bool ISLEAST>

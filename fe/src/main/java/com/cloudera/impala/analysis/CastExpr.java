@@ -15,13 +15,18 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 public class CastExpr extends Expr {
 
@@ -33,6 +38,8 @@ public class CastExpr extends Expr {
   // True if this cast does not change the type.
   private boolean noOp_ = false;
 
+  private static final String CAST_FN_NAME = "cast";
+
   public CastExpr(ColumnType targetType, Expr e, boolean isImplicit) {
     super();
     Preconditions.checkArgument(targetType.isValid());
@@ -41,12 +48,31 @@ public class CastExpr extends Expr {
     Preconditions.checkNotNull(e);
     children_.add(e);
     if (isImplicit) {
-      type_ = targetType;
-      OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
-          FunctionOperator.CAST, true, getChild(0).getType(), type_);
-      Preconditions.checkState(match != null);
-      Preconditions.checkState(match.getReturnType().equals(type_));
-      this.opcode_ = match.opcode;
+      // Implicit casts don't call analyze()
+      // TODO: this doesn't seem like the cleanest approach but there are places
+      // we generate these (e.g. table loading) where there is no analyzer object.
+      try {
+        analyze();
+        computeNumDistinctValues();
+      } catch (AnalysisException ex) {
+        Preconditions.checkState(false,
+          "Implicit casts should never throw analysis exception.");
+      }
+      isAnalyzed_ = true;
+    }
+  }
+
+  public static void initBuiltins(Db db) {
+    for (ColumnType t1: ColumnType.getSupportedTypes()) {
+      if (t1.isNull()) continue;
+      for (ColumnType t2: ColumnType.getSupportedTypes()) {
+        if (t2.isNull()) continue;
+        // For some reason we don't allow string->bool.
+        // TODO: revisit
+        if (t1.isStringType() && t2.isBoolean()) continue;
+        db.addBuiltin(ScalarFunction.createBuiltinOperator(
+            CAST_FN_NAME, Lists.newArrayList(t1, t2), t2));
+      }
     }
   }
 
@@ -68,7 +94,6 @@ public class CastExpr extends Expr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.CAST_EXPR;
-    msg.setOpcode(opcode_);
   }
 
   @Override
@@ -87,34 +112,39 @@ public class CastExpr extends Expr {
       AuthorizationException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
+    analyze();
+  }
 
-    if (isImplicit_) return;
-
-    // cast was asked for in the query, check for validity of cast
-    // this cast may result in loss of precision, but the user requested it
-    ColumnType childType = getChild(0).getType();
-    this.type_ = targetType_;
-
-    if (childType.equals(targetType_)) {
+  private void analyze() throws AnalysisException {
+    // Our cast fn currently takes two arguments. The first is the value to cast and the
+    // second is a dummy of the type to cast to. We need this to be able to resolve the
+    // proper function.
+    //  e.g. to differentiate between cast(bool, int) and cast(bool, smallint).
+    // TODO: this is not very intuitive. We could also call the functions castToInt(*)
+    ColumnType[] args = new ColumnType[2];
+    args[0] = children_.get(0).type_;
+    args[1] = targetType_;
+    if (args[0].equals(args[1])) {
       noOp_ = true;
+      type_ = targetType_;
       return;
     }
 
-    OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
-        FunctionOperator.CAST, childType.isNull(), getChild(0).getType(), type_);
-    if (match == null) {
-      throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
-          " from " + childType + " to " + targetType_);
+    FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, CAST_FN_NAME);
+    Function searchDesc = new Function(fnName, args, ColumnType.INVALID, false);
+    if (isImplicit_) {
+      fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_SUBTYPE);
+      Preconditions.checkState(fn_ != null);
+    } else {
+      fn_ = Catalog.getBuiltin(searchDesc,
+          args[0].isNull() ? CompareMode.IS_SUBTYPE : CompareMode.IS_IDENTICAL);
+      if (fn_ == null) {
+        throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
+            " from " + args[0] + " to " + args[1]);
+      }
     }
-    Preconditions.checkState(match.getReturnType().equals(targetType_));
-    this.opcode_ = match.opcode;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    CastExpr expr = (CastExpr) obj;
-    return this.opcode_ == expr.opcode_;
+    Preconditions.checkState(fn_.getReturnType().equals(targetType_));
+    type_ = targetType_;
   }
 
   /**

@@ -19,7 +19,6 @@
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include "codegen/llvm-codegen.h"
 #include "exprs/anyval-util.h"
-#include "exprs/opcode-registry.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
@@ -33,15 +32,13 @@ using namespace std;
 
 NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
   : Expr(node),
-    udf_type_(node.fn_call_expr.fn.binary_type),
-    hdfs_location_(node.fn_call_expr.fn.hdfs_location),
-    symbol_name_(node.fn_call_expr.fn.scalar_fn.symbol),
-    vararg_start_idx_(node.fn_call_expr.__isset.vararg_start_idx ?
-        node.fn_call_expr.vararg_start_idx : -1),
+    vararg_start_idx_(node.__isset.vararg_start_idx ?
+        node.vararg_start_idx : -1),
     udf_wrapper_(NULL),
     varargs_input_(NULL) {
+  is_udf_call_ = true;
   DCHECK_EQ(node.node_type, TExprNodeType::FUNCTION_CALL);
-  DCHECK_NE(udf_type_, TFunctionBinaryType::HIVE);
+  DCHECK_NE(fn_.binary_type, TFunctionBinaryType::HIVE);
 }
 
 NativeUdfExpr::~NativeUdfExpr() {
@@ -135,6 +132,16 @@ void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
 
 Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
   RETURN_IF_ERROR(Expr::PrepareChildren(state, desc));
+  if (fn_.scalar_fn.symbol.empty()) {
+    // This path is intended to only be used during development to test FE
+    // code before the BE has implemented the function.
+    // Having the failure in the BE (rather than during analysis) allows for
+    // better FE testing.
+    DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::BUILTIN);
+    stringstream ss;
+    ss << "Function " << fn_.name.function_name << " is not implemented.";
+    return Status(ss.str());
+  }
 
   // TODO: this should come from the ExprContext
   udf_context_.reset(FunctionContextImpl::CreateContext(state, state->udf_pool()));
@@ -271,19 +278,24 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
 Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
-  if (udf_type_ == TFunctionBinaryType::NATIVE ||
-      (udf_type_ == TFunctionBinaryType::BUILTIN && !state->codegen_enabled())) {
+  if (fn_.binary_type == TFunctionBinaryType::NATIVE ||
+      (fn_.binary_type == TFunctionBinaryType::BUILTIN && !state->codegen_enabled())) {
     // In this path, we are code that has been statically compiled to assembly.
     // This can either be a UDF implemented in a .so or a builtin using the UDF
     // interface with the code in impalad.
-    void* udf_ptr;
-    if (udf_type_ == TFunctionBinaryType::NATIVE) {
-      RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-          state->fs_cache(), hdfs_location_, symbol_name_, &udf_ptr));
-    } else {
-      udf_ptr = OpcodeRegistry::Instance()->GetFunctionPtr(opcode_);
+    void* fn_ptr;
+    Status status = state->lib_cache()->GetSoFunctionPtr(
+        state->fs_cache(), fn_.hdfs_location, fn_.scalar_fn.symbol, &fn_ptr);
+    if (!status.ok() && fn_.binary_type == TFunctionBinaryType::BUILTIN) {
+      // Builtins symbols should exist unless there is a version mismatch.
+      stringstream ss;
+      ss << "Builtin '" << fn_.name.function_name << "' with symbol '"
+         << fn_.scalar_fn.symbol << "' does not exist. "
+         << "Verify that all your impalads are the same version.";
+      status.AddErrorMsg(ss.str());
     }
-    DCHECK(udf_ptr != NULL);
+    RETURN_IF_ERROR(status);
+    DCHECK(fn_ptr != NULL);
 
     // Convert UDF function pointer to llvm::Function*
     // First generate the llvm::FunctionType* corresponding to the UDF.
@@ -309,39 +321,42 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     // declaration, not a definition, since we do not create any basic blocks or
     // instructions in it.
     *udf = llvm::Function::Create(
-        udf_type, llvm::GlobalValue::ExternalLinkage, symbol_name_, codegen->module());
+        udf_type, llvm::GlobalValue::ExternalLinkage,
+        fn_.scalar_fn.symbol, codegen->module());
 
     // Associate the dynamically loaded function pointer with the Function* we
     // defined. This tells LLVM where the compiled function definition is located in
     // memory.
-    codegen->execution_engine()->addGlobalMapping(*udf, udf_ptr);
-  } else if (udf_type_ == TFunctionBinaryType::BUILTIN) {
+    codegen->execution_engine()->addGlobalMapping(*udf, fn_ptr);
+  } else if (fn_.binary_type == TFunctionBinaryType::BUILTIN) {
     // In this path, we're running a builtin with the UDF interface. The IR is
     // in the llvm module.
     DCHECK(state->codegen_enabled());
-    const string& symbol = OpcodeRegistry::Instance()->GetFunctionSymbol(opcode_);
-    *udf = codegen->module()->getFunction(symbol);
+    *udf = codegen->module()->getFunction(fn_.scalar_fn.symbol);
     if (*udf == NULL) {
+      // Builtins symbols should exist unless there is a version mismatch.
       stringstream ss;
-      ss << "Could not load builtin " << opcode_ << " with symbol: " << symbol;
+      ss << "Builtin '" << fn_.name.function_name << "' with symbol '"
+         << fn_.scalar_fn.symbol << "' does not exist. "
+         << "Verify that all your impalads are the same version.";
       return Status(ss.str());
     }
   } else {
     // We're running a IR UDF.
-    DCHECK_EQ(udf_type_, TFunctionBinaryType::IR);
+    DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
     string local_path;
     RETURN_IF_ERROR(state->lib_cache()->GetLocalLibPath(
-          state->fs_cache(), hdfs_location_, LibCache::TYPE_IR, &local_path));
+          state->fs_cache(), fn_.hdfs_location, LibCache::TYPE_IR, &local_path));
 
     // Link the UDF module into this query's main module (essentially copy the UDF module
     // into the main module) so the UDF function is available for inlining in the main
     // module.
     RETURN_IF_ERROR(codegen->LinkModule(local_path));
-    *udf = codegen->module()->getFunction(symbol_name_);
+    *udf = codegen->module()->getFunction(fn_.scalar_fn.symbol);
     if (*udf == NULL) {
       stringstream ss;
-      ss << "Unable to locate function " << symbol_name_
-         << " from LLVM module " << hdfs_location_;
+      ss << "Unable to locate function " << fn_.scalar_fn.symbol
+         << " from LLVM module " << fn_.hdfs_location;
       return Status(ss.str());
     }
   }
@@ -350,7 +365,8 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
 
 string NativeUdfExpr::DebugString() const {
   stringstream out;
-  out << "NativeUdfExpr(udf_type=" << udf_type_ << " location=" << hdfs_location_
-      << " symbol_name=" << symbol_name_ << Expr::DebugString() << ")";
+  out << "NativeUdfExpr(udf_type=" << fn_.binary_type
+      << " location=" << fn_.hdfs_location
+      << " symbol_name=" << fn_.scalar_fn.symbol << Expr::DebugString() << ")";
   return out.str();
 }

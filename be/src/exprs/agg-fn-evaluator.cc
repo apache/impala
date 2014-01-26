@@ -26,6 +26,7 @@
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"
 
+#include <thrift/protocol/TDebugProtocol.h>
 using namespace impala;
 using namespace impala_udf;
 using namespace llvm;
@@ -56,37 +57,39 @@ typedef void (*UpdateFn8)(FunctionContext*, const AnyVal&, const AnyVal&,
 typedef StringVal (*SerializeFn)(FunctionContext*, const StringVal&);
 typedef AnyVal (*FinalizeFn)(FunctionContext*, const AnyVal&);
 
-Status AggFnEvaluator::Create(ObjectPool* pool, const TAggregateFunctionCall& desc,
+Status AggFnEvaluator::Create(ObjectPool* pool, const TExpr& desc,
     AggFnEvaluator** result) {
-  *result = pool->Add(new AggFnEvaluator(desc));
-  RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool, desc.input_exprs, &(*result)->input_exprs_));
+  DCHECK_GT(desc.nodes.size(), 0);
+  *result = pool->Add(new AggFnEvaluator(desc.nodes[0]));
+  int node_idx = 0;
+  for (int i = 0; i < desc.nodes[0].num_children; ++i) {
+    ++node_idx;
+    Expr* expr = NULL;
+    RETURN_IF_ERROR(Expr::CreateTreeFromThrift(
+        pool, desc.nodes, NULL, &node_idx, &expr));
+    (*result)->input_exprs_.push_back(expr);
+  }
   return Status::OK;
 }
 
-AggFnEvaluator::AggFnEvaluator(const TAggregateFunctionCall& desc)
-  : return_type_(desc.fn.ret_type),
+AggFnEvaluator::AggFnEvaluator(const TExprNode& desc)
+  : fn_(desc.fn),
+    return_type_(desc.fn.ret_type),
     intermediate_type_(desc.fn.aggregate_fn.intermediate_type),
-    function_type_(desc.fn.binary_type),
     output_slot_desc_(NULL) {
-  if (function_type_ == TFunctionBinaryType::BUILTIN) {
-    agg_op_ = static_cast<TAggregationOp::type>(desc.fn.id);
-    DCHECK_NE(agg_op_, TAggregationOp::INVALID);
+  DCHECK(desc.fn.__isset.aggregate_fn);
+  DCHECK(desc.node_type == TExprNodeType::AGGREGATE_EXPR);
+  // TODO: remove. See comment with AggregationOp
+  if (fn_.name.function_name == "count") {
+    agg_op_ = COUNT;
+  } else if (fn_.name.function_name == "min") {
+    agg_op_ = MIN;
+  } else if (fn_.name.function_name == "max") {
+    agg_op_ = MAX;
+  } else if (fn_.name.function_name == "sum") {
+    agg_op_ = SUM;
   } else {
-    DCHECK_EQ(function_type_, TFunctionBinaryType::NATIVE);
-    DCHECK(desc.fn.__isset.aggregate_fn);
-
-    hdfs_location_ = desc.fn.hdfs_location;
-    init_fn_symbol_ = desc.fn.aggregate_fn.init_fn_symbol;
-    update_fn_symbol_ = desc.fn.aggregate_fn.update_fn_symbol;
-    merge_fn_symbol_ = desc.fn.aggregate_fn.merge_fn_symbol;
-    serialize_fn_symbol_ = desc.fn.aggregate_fn.serialize_fn_symbol;
-    finalize_fn_symbol_ = desc.fn.aggregate_fn.finalize_fn_symbol;
-
-    DCHECK(!hdfs_location_.empty());
-    DCHECK(!init_fn_symbol_.empty());
-    DCHECK(!update_fn_symbol_.empty());
-    DCHECK(!merge_fn_symbol_.empty());
+    agg_op_ = OTHER;
   }
 }
 
@@ -106,40 +109,41 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   }
   staging_output_val_ = CreateAnyVal(obj_pool, output_slot_desc_->type());
 
-  // TODO: this should be made identical for the builtin and UDA case by
-  // putting all this logic in an improved opcode registry.
-  if (function_type_ == TFunctionBinaryType::BUILTIN) {
-    pair<TAggregationOp::type, PrimitiveType> key;
-    if (is_count_star()) {
-      key = make_pair(agg_op_, INVALID_TYPE);
-    } else {
-      DCHECK_GE(input_exprs().size(), 1);
-      key = make_pair(agg_op_, input_exprs()[0]->type());
-    }
-    const OpcodeRegistry::AggFnDescriptor* fn_desc =
-        OpcodeRegistry::Instance()->GetBuiltinAggFnDescriptor(key);
-    DCHECK(fn_desc != NULL);
-    fn_ptrs_ = *fn_desc;
-  } else {
-    DCHECK_EQ(function_type_, TFunctionBinaryType::NATIVE);
-    // Load the function pointers.
-    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-        state->fs_cache(), hdfs_location_, init_fn_symbol_, &fn_ptrs_.init_fn));
-    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-        state->fs_cache(), hdfs_location_, update_fn_symbol_, &fn_ptrs_.update_fn));
-    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-        state->fs_cache(), hdfs_location_, merge_fn_symbol_, &fn_ptrs_.merge_fn));
+  // Load the function pointers.
+  if (fn_.aggregate_fn.init_fn_symbol.empty() ||
+      fn_.aggregate_fn.update_fn_symbol.empty() ||
+      fn_.aggregate_fn.merge_fn_symbol.empty()) {
+    // This path is only for partially implemented builtins.
+    DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::BUILTIN);
+    stringstream ss;
+    ss << "Function " << fn_.name.function_name << " is not implemented.";
+    return Status(ss.str());
+  }
 
-    // Serialize and Finalize are optional
-    if (!serialize_fn_symbol_.empty()) {
-      RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-          state->fs_cache(), hdfs_location_, serialize_fn_symbol_,
-          &fn_ptrs_.serialize_fn));
-    }
-    if (!finalize_fn_symbol_.empty()) {
-      RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-          state->fs_cache(), hdfs_location_, finalize_fn_symbol_, &fn_ptrs_.finalize_fn));
-    }
+  RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+      state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.init_fn_symbol,
+      &init_fn_));
+  RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+      state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.update_fn_symbol,
+      &update_fn_));
+  RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+      state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.merge_fn_symbol,
+      &merge_fn_));
+
+  // Serialize and Finalize are optional
+  if (!fn_.aggregate_fn.serialize_fn_symbol.empty()) {
+    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+        state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.serialize_fn_symbol,
+        &serialize_fn_));
+  } else {
+    serialize_fn_ = NULL;
+  }
+  if (!fn_.aggregate_fn.finalize_fn_symbol.empty()) {
+    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
+        state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.finalize_fn_symbol,
+        &finalize_fn_));
+  } else {
+    finalize_fn_ = NULL;
   }
   return Status::OK;
 }
@@ -236,8 +240,8 @@ inline void AggFnEvaluator::SetOutputSlot(const AnyVal* src, Tuple* dst) {
 
 // This function would be replaced in codegen.
 void AggFnEvaluator::Init(Tuple* dst) {
-  DCHECK(fn_ptrs_.init_fn != NULL);
-  reinterpret_cast<InitFn>(fn_ptrs_.init_fn)(ctx_.get(), staging_output_val_);
+  DCHECK(init_fn_ != NULL);
+  reinterpret_cast<InitFn>(init_fn_)(ctx_.get(), staging_output_val_);
   SetOutputSlot(staging_output_val_, dst);
 }
 
@@ -313,11 +317,11 @@ void AggFnEvaluator::UpdateOrMerge(TupleRow* row, Tuple* dst, void* fn) {
 }
 
 void AggFnEvaluator::Update(TupleRow* row, Tuple* dst) {
-  return UpdateOrMerge(row, dst, fn_ptrs_.update_fn);
+  return UpdateOrMerge(row, dst, update_fn_);
 }
 
 void AggFnEvaluator::Merge(TupleRow* row, Tuple* dst) {
-  return UpdateOrMerge(row, dst, fn_ptrs_.merge_fn);
+  return UpdateOrMerge(row, dst, merge_fn_);
 }
 
 void AggFnEvaluator::SerializeOrFinalize(Tuple* tuple, void* fn) {
@@ -384,11 +388,11 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* tuple, void* fn) {
 }
 
 void AggFnEvaluator::Serialize(Tuple* tuple) {
-  SerializeOrFinalize(tuple, fn_ptrs_.serialize_fn);
+  SerializeOrFinalize(tuple, serialize_fn_);
 }
 
 void AggFnEvaluator::Finalize(Tuple* tuple) {
-  SerializeOrFinalize(tuple, fn_ptrs_.finalize_fn);
+  SerializeOrFinalize(tuple, finalize_fn_);
 }
 
 string AggFnEvaluator::DebugString(const vector<AggFnEvaluator*>& exprs) {

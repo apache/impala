@@ -199,24 +199,24 @@ parser code {:
 
 // List of keywords. Please keep them sorted alphabetically.
 terminal
-  KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC, KW_AVG,
+  KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC,
   KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST,
-  KW_CHANGE, KW_CHAR, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_COUNT, KW_CREATE,
+  KW_CHANGE, KW_CHAR, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE,
   KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL,
-  KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA, KW_DIV,
+  KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV,
   KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
   KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST,
   KW_FLOAT, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS,
-  KW_GROUP, KW_GROUP_CONCAT, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER,
+  KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER,
   KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO,
   KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT,
-  KW_LINES, KW_LOAD, KW_LOCATION, KW_MAX, KW_MERGE_FN, KW_METADATA, KW_MIN, KW_NDV,
+  KW_LINES, KW_LOAD, KW_LOCATION, KW_MERGE_FN, KW_METADATA,
   KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE,
   KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_RCFILE, KW_REFRESH,
   KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA,
   KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
   KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRAIGHT_JOIN,
-  KW_STRING, KW_SUM, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED,
+  KW_STRING, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED,
   KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNION,
   KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
@@ -281,12 +281,11 @@ nonterminal Boolean opt_order_param;
 nonterminal Boolean opt_nulls_order_param;
 nonterminal Expr opt_offset_param;
 nonterminal LimitElement opt_limit_clause;
-nonterminal Expr cast_expr, case_else_clause, aggregate_expr;
+nonterminal Expr cast_expr, case_else_clause;
 nonterminal LiteralExpr literal;
 nonterminal CaseExpr case_expr;
 nonterminal ArrayList<CaseWhenClause> case_when_clause_list;
 nonterminal FunctionParams function_params;
-nonterminal BuiltinAggregateFunction.Operator aggregate_operator;
 nonterminal SlotRef column_ref;
 nonterminal ArrayList<TableRef> from_clause, table_ref_list;
 nonterminal ArrayList<ViewRef> with_table_ref_list;
@@ -1634,8 +1633,6 @@ non_pred_expr ::=
   {: RESULT = c; :}
   | case_expr:c
   {: RESULT = c; :}
-  | aggregate_expr:a
-  {: RESULT = a; :}
   | column_ref:c
   {: RESULT = c; :}
   | timestamp_arithmetic_expr:e
@@ -1741,34 +1738,6 @@ literal ::=
     // and generate a corresponding symbol to be reported
     parser.parseError("literal", SqlParserSymbols.NUMERIC_OVERFLOW);
   :}
-  ;
-
-aggregate_expr ::=
-  aggregate_operator:op LPAREN function_params:params RPAREN
-  {:
-    RESULT = new FunctionCallExpr(op, params);
-  :}
-  ;
-
-aggregate_operator ::=
-  KW_COUNT
-  {: RESULT = BuiltinAggregateFunction.Operator.COUNT; :}
-  | KW_MIN
-  {: RESULT = BuiltinAggregateFunction.Operator.MIN; :}
-  | KW_MAX
-  {: RESULT = BuiltinAggregateFunction.Operator.MAX; :}
-  | KW_DISTINCTPC
-  {: RESULT = BuiltinAggregateFunction.Operator.DISTINCT_PC; :}
-  | KW_DISTINCTPCSA
-  {: RESULT = BuiltinAggregateFunction.Operator.DISTINCT_PCSA; :}
-  | KW_NDV
-  {: RESULT = BuiltinAggregateFunction.Operator.NDV; :}
-  | KW_SUM
-  {: RESULT = BuiltinAggregateFunction.Operator.SUM; :}
-  | KW_AVG
-  {: RESULT = BuiltinAggregateFunction.Operator.AVG; :}
-  | KW_GROUP_CONCAT
-  {: RESULT = BuiltinAggregateFunction.Operator.GROUP_CONCAT; :}
   ;
 
 function_params ::=

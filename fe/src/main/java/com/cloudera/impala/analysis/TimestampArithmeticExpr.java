@@ -19,9 +19,9 @@ import java.util.Map;
 
 import com.cloudera.impala.analysis.ArithmeticExpr.Operator;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
@@ -143,29 +143,19 @@ public class TimestampArithmeticExpr extends Expr {
           getChild(1).getType() + "'. Expected an integer type.");
     }
 
-    ColumnType[] argTypes = new ColumnType[this.children_.size()];
-    for (int i = 0; i < this.children_.size(); ++i) {
-      this.children_.get(i).analyze(analyzer);
-      argTypes[i] = this.children_.get(i).getType();
-    }
     String funcOpName = String.format("%sS_%s", timeUnit_.toString(),
         (op_ == ArithmeticExpr.Operator.ADD) ? "ADD" : "SUB");
-    FunctionOperator funcOp =
-        OpcodeRegistry.instance().getFunctionOperator(funcOpName);
-    OpcodeRegistry.BuiltinFunction match =
-        OpcodeRegistry.instance().getFunctionInfo(funcOp, true, argTypes);
-    // We have already done type checking to ensure the function will resolve.
-    Preconditions.checkNotNull(match);
+    fn_ = getBuiltinFunction(analyzer, funcOpName.toLowerCase(),
+        collectChildReturnTypes(), CompareMode.IS_SUBTYPE);
+    Preconditions.checkNotNull(fn_);
     Preconditions.checkState(
-        match.getReturnType().getPrimitiveType() == PrimitiveType.TIMESTAMP);
-    opcode_ = match.opcode;
-    type_ = match.getReturnType();
+        fn_.getReturnType().getPrimitiveType() == PrimitiveType.TIMESTAMP);
+    type_ = fn_.getReturnType();
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.COMPUTE_FUNCTION_CALL;
-    msg.setOpcode(opcode_);
   }
 
   public String getTimeUnitIdent() { return timeUnitIdent_; }

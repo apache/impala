@@ -42,7 +42,6 @@ add_library(Exprs
   like-predicate.cc
   math-functions.cc
   null-literal.cc  
-  opcode-registry.cc
   slot-ref.cc
   string-literal.cc
   string-functions.cc

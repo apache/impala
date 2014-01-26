@@ -81,7 +81,7 @@ Status HdfsLzoTextScanner::IssueInitialRanges(RuntimeState* state,
 
 Status HdfsLzoTextScanner::LoadLzoLibrary(RuntimeState* state) {
   void* handle;
-  RETURN_IF_ERROR(DynamicOpen(LIB_IMPALA_LZO, &handle));
+  RETURN_IF_ERROR(DynamicOpen(LIB_IMPALA_LZO.c_str(), &handle));
   RETURN_IF_ERROR(DynamicLookup(handle,
       "GetImpalaBuildVersion", reinterpret_cast<void**>(&GetImpalaBuildVersion)));
 

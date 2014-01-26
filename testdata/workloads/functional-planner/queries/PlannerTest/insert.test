@@ -130,7 +130,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |  partitions=24
 |
 01:AGGREGATE [FINALIZE]
-|  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
+|  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: year, month
 |
 00:SCAN HDFS [functional.alltypes]
@@ -144,13 +144,13 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |  partitions=24
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
+|  output: min(min(id)), min(min(bool_col)), min(min(tinyint_col)), min(min(smallint_col)), min(min(int_col)), min(min(bigint_col)), min(min(float_col)), min(min(double_col)), min(min(date_string_col)), min(min(string_col)), min(min(timestamp_col))
 |  group by: year, month
 |
 02:EXCHANGE [PARTITION=HASH(year,month)]
 |
 01:AGGREGATE
-|  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
+|  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: year, month
 |
 00:SCAN HDFS [functional.alltypes]
@@ -197,7 +197,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |  partitions=12
 |
 01:AGGREGATE [FINALIZE]
-|  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
+|  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: month
 |
 00:SCAN HDFS [functional.alltypes]
@@ -211,13 +211,13 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |  partitions=12
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: MIN(MIN(id)), MIN(MIN(bool_col)), MIN(MIN(tinyint_col)), MIN(MIN(smallint_col)), MIN(MIN(int_col)), MIN(MIN(bigint_col)), MIN(MIN(float_col)), MIN(MIN(double_col)), MIN(MIN(date_string_col)), MIN(MIN(string_col)), MIN(MIN(timestamp_col))
+|  output: min(min(id)), min(min(bool_col)), min(min(tinyint_col)), min(min(smallint_col)), min(min(int_col)), min(min(bigint_col)), min(min(float_col)), min(min(double_col)), min(min(date_string_col)), min(min(string_col)), min(min(timestamp_col))
 |  group by: month
 |
 02:EXCHANGE [PARTITION=HASH(month)]
 |
 01:AGGREGATE
-|  output: MIN(id), MIN(bool_col), MIN(tinyint_col), MIN(smallint_col), MIN(int_col), MIN(bigint_col), MIN(float_col), MIN(double_col), MIN(date_string_col), MIN(string_col), MIN(timestamp_col)
+|  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: month
 |
 00:SCAN HDFS [functional.alltypes]
@@ -357,7 +357,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |  partitions=1
 |
 01:AGGREGATE [FINALIZE]
-|  output: COUNT(int_col)
+|  output: count(int_col)
 |  group by: string_col
 |
 00:SCAN HDFS [functional.alltypes]
@@ -367,13 +367,13 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |  partitions=1
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: SUM(COUNT(int_col))
+|  output: sum(count(int_col))
 |  group by: string_col
 |
 02:EXCHANGE [PARTITION=HASH(string_col)]
 |
 01:AGGREGATE
-|  output: COUNT(int_col)
+|  output: count(int_col)
 |  group by: string_col
 |
 00:SCAN HDFS [functional.alltypes]
@@ -390,7 +390,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |  partitions=1
 |
 02:AGGREGATE [MERGE FINALIZE]
-|  output: COUNT(int_col)
+|  output: count(int_col)
 |  group by: string_col
 |
 01:AGGREGATE
@@ -403,7 +403,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |  partitions=1
 |
 02:AGGREGATE [MERGE FINALIZE]
-|  output: COUNT(int_col)
+|  output: count(int_col)
 |  group by: string_col
 |
 04:AGGREGATE [MERGE]

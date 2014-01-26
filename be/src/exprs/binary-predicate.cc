@@ -46,19 +46,19 @@ string BinaryPredicate::DebugString() const {
 //   %child_result = call i8 @IntLiteral(i8** %row, i8* %state_data, i1* %is_null)
 //   %child_null = load i1* %is_null
 //   br i1 %child_null, label %ret_block, label %lhs_not_null
-// 
+//
 // lhs_not_null:                                     ; preds = %entry
 //   %child_result1 = call i8 @IntLiteral1(i8** %row, i8* %state_data, i1* %is_null)
 //   %child_null2 = load i1* %is_null
 //   br i1 %child_null2, label %ret_block, label %rhs_not_null
-// 
+//
 // rhs_not_null:                                     ; preds = %lhs_not_null
 //   %tmp_lt = icmp slt i8 %child_result, %child_result1
 //   br label %ret_block
-// 
-// ret_block:  
-//   %tmp_phi = phi i1 [ false, %entry ], 
-//                     [ false, %lhs_not_null ], 
+//
+// ret_block:
+//   %tmp_phi = phi i1 [ false, %entry ],
+//                     [ false, %lhs_not_null ],
 //                     [ %tmp_lt, %rhs_not_null ]
 //   ret i1 %tmp_phi
 // }
@@ -67,7 +67,7 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
   Function* lhs_function = children()[0]->Codegen(codegen);
   Function* rhs_function = children()[1]->Codegen(codegen);
   if (lhs_function == NULL || rhs_function == NULL) return NULL;
-  
+
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
   Type* return_type = codegen->GetType(type());
@@ -80,121 +80,143 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
 
   builder.SetInsertPoint(entry_block);
   // Call lhs function
-  Value* lhs_value = children()[0]->CodegenGetValue(codegen, entry_block, 
+  Value* lhs_value = children()[0]->CodegenGetValue(codegen, entry_block,
       ret_block, lhs_not_null_block);
 
   // Lhs not null, eval rhs
   builder.SetInsertPoint(lhs_not_null_block);
-  Value* rhs_value = children()[1]->CodegenGetValue(codegen, lhs_not_null_block, 
+  Value* rhs_value = children()[1]->CodegenGetValue(codegen, lhs_not_null_block,
       ret_block, rhs_not_null_block);
 
   // rhs not null, do arithmetic op
   builder.SetInsertPoint(rhs_not_null_block);
 
+  PrimitiveType t = children_[0]->type();
+  DCHECK_EQ(t, children_[1]->type());
+
   Value* result = NULL;
-  switch (op()) {
-    case TExprOpcode::EQ_BOOL_BOOL:
-    case TExprOpcode::EQ_CHAR_CHAR:
-    case TExprOpcode::EQ_SHORT_SHORT:
-    case TExprOpcode::EQ_INT_INT:
-    case TExprOpcode::EQ_LONG_LONG:
-    case TExprOpcode::EQ_FLOAT_FLOAT:
-    case TExprOpcode::EQ_DOUBLE_DOUBLE:
-    case TExprOpcode::EQ_STRINGVALUE_STRINGVALUE: 
-      result = codegen->CodegenEquals(&builder, lhs_value, rhs_value,
-          children()[0]->type());
-      break;
-
-    case TExprOpcode::NE_BOOL_BOOL:
-    case TExprOpcode::NE_CHAR_CHAR:
-    case TExprOpcode::NE_SHORT_SHORT:
-    case TExprOpcode::NE_INT_INT:
-    case TExprOpcode::NE_LONG_LONG:
-      result = builder.CreateICmpNE(lhs_value, rhs_value, "tmp_neq");
-      break;
-    case TExprOpcode::NE_FLOAT_FLOAT:
-    case TExprOpcode::NE_DOUBLE_DOUBLE:
-      result = builder.CreateFCmpUNE(lhs_value, rhs_value, "tmp_neq");
-      break;
-
-    case TExprOpcode::LE_BOOL_BOOL:  // LLVM defines false > true
-    case TExprOpcode::GE_CHAR_CHAR:
-    case TExprOpcode::GE_SHORT_SHORT:
-    case TExprOpcode::GE_INT_INT:
-    case TExprOpcode::GE_LONG_LONG:
-      result = builder.CreateICmpSGE(lhs_value, rhs_value, "tmp_ge");
-      break;
-    case TExprOpcode::GE_FLOAT_FLOAT:
-    case TExprOpcode::GE_DOUBLE_DOUBLE:
-      result = builder.CreateFCmpUGE(lhs_value, rhs_value, "tmp_ge");
-      break;
-
-    case TExprOpcode::LT_BOOL_BOOL:  // LLVM defines false > true
-    case TExprOpcode::GT_CHAR_CHAR:
-    case TExprOpcode::GT_SHORT_SHORT:
-    case TExprOpcode::GT_INT_INT:
-    case TExprOpcode::GT_LONG_LONG:
-      result = builder.CreateICmpSGT(lhs_value, rhs_value, "tmp_gt");
-      break;
-    case TExprOpcode::GT_FLOAT_FLOAT:
-    case TExprOpcode::GT_DOUBLE_DOUBLE:
-      result = builder.CreateFCmpUGT(lhs_value, rhs_value, "tmp_gt");
-      break;
-
-    case TExprOpcode::GE_BOOL_BOOL:  // LLVM defines false > true
-    case TExprOpcode::LE_CHAR_CHAR:
-    case TExprOpcode::LE_SHORT_SHORT:
-    case TExprOpcode::LE_INT_INT:
-    case TExprOpcode::LE_LONG_LONG:
-      result = builder.CreateICmpSLE(lhs_value, rhs_value, "tmp_le");
-      break;
-    case TExprOpcode::LE_FLOAT_FLOAT:
-    case TExprOpcode::LE_DOUBLE_DOUBLE:
-      result = builder.CreateFCmpULE(lhs_value, rhs_value, "tmp_le");
-      break;
- 
-    case TExprOpcode::GT_BOOL_BOOL:  // LLVM defines false > true
-    case TExprOpcode::LT_CHAR_CHAR:
-    case TExprOpcode::LT_SHORT_SHORT:
-    case TExprOpcode::LT_INT_INT:
-    case TExprOpcode::LT_LONG_LONG:
-      result = builder.CreateICmpSLT(lhs_value, rhs_value, "tmp_lt");
-      break;
-    case TExprOpcode::LT_FLOAT_FLOAT:
-    case TExprOpcode::LT_DOUBLE_DOUBLE:
-      result = builder.CreateFCmpULT(lhs_value, rhs_value, "tmp_lt");
-      break;
-
-    // String comparison functions
-    case TExprOpcode::NE_STRINGVALUE_STRINGVALUE: {
-      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_NE);
-      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_ne");
-      break;
+  if (fn_.name.function_name == "eq") {
+    result = codegen->CodegenEquals(&builder, lhs_value, rhs_value,
+        children()[0]->type());
+  } else if (fn_.name.function_name == "ne") {
+    switch (t) {
+      case TYPE_BOOLEAN:
+      case TYPE_TINYINT:
+      case TYPE_SMALLINT:
+      case TYPE_INT:
+      case TYPE_BIGINT:
+        result = builder.CreateICmpNE(lhs_value, rhs_value, "tmp_ne");
+        break;
+      case TYPE_FLOAT:
+      case TYPE_DOUBLE:
+        result = builder.CreateFCmpUNE(lhs_value, rhs_value, "tmp_ne");
+        break;
+      case TYPE_STRING: {
+        Function* call_fn = codegen->GetFunction(IRFunction::STRING_VALUE_NE);
+        result = builder.CreateCall2(call_fn, lhs_value, rhs_value, "tmp_ne");
+        break;
+      }
+      default:
+        DCHECK(false) << "Shouldn't get here.";
     }
-    case TExprOpcode::GE_STRINGVALUE_STRINGVALUE: {
-      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_GE);
-      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_ge");
-      break;
+  } else if (fn_.name.function_name == "ge") {
+    switch (t) {
+      case TYPE_BOOLEAN:
+        // LLVM defines false > true
+        result = builder.CreateICmpSLE(lhs_value, rhs_value, "tmp_ge");
+        break;
+      case TYPE_TINYINT:
+      case TYPE_SMALLINT:
+      case TYPE_INT:
+      case TYPE_BIGINT:
+        result = builder.CreateICmpSGE(lhs_value, rhs_value, "tmp_ge");
+        break;
+      case TYPE_FLOAT:
+      case TYPE_DOUBLE:
+        result = builder.CreateFCmpUGE(lhs_value, rhs_value, "tmp_ge");
+        break;
+      case TYPE_STRING: {
+        Function* call_fn = codegen->GetFunction(IRFunction::STRING_VALUE_GE);
+        result = builder.CreateCall2(call_fn, lhs_value, rhs_value, "tmp_ge");
+        break;
+      }
+      default:
+        DCHECK(false) << "Shouldn't get here.";
     }
-    case TExprOpcode::GT_STRINGVALUE_STRINGVALUE: {
-      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_GT);
-      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_gt");
-      break;
+  } else if (fn_.name.function_name == "gt") {
+    switch (t) {
+      case TYPE_BOOLEAN:
+        // LLVM defines false > true
+        result = builder.CreateICmpSLT(lhs_value, rhs_value, "tmp_gt");
+        break;
+      case TYPE_TINYINT:
+      case TYPE_SMALLINT:
+      case TYPE_INT:
+      case TYPE_BIGINT:
+        result = builder.CreateICmpSGT(lhs_value, rhs_value, "tmp_gt");
+        break;
+      case TYPE_FLOAT:
+      case TYPE_DOUBLE:
+        result = builder.CreateFCmpUGT(lhs_value, rhs_value, "tmp_gt");
+        break;
+      case TYPE_STRING: {
+        Function* call_fn = codegen->GetFunction(IRFunction::STRING_VALUE_GT);
+        result = builder.CreateCall2(call_fn, lhs_value, rhs_value, "tmp_gt");
+        break;
+      }
+      default:
+        DCHECK(false) << "Shouldn't get here.";
     }
-    case TExprOpcode::LE_STRINGVALUE_STRINGVALUE: {
-      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_LE);
-      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_le");
-      break;
+  } else if (fn_.name.function_name == "le") {
+    switch (t) {
+      case TYPE_BOOLEAN:
+        // LLVM defines false > true
+        result = builder.CreateICmpSGE(lhs_value, rhs_value, "tmp_le");
+        break;
+      case TYPE_TINYINT:
+      case TYPE_SMALLINT:
+      case TYPE_INT:
+      case TYPE_BIGINT:
+        result = builder.CreateICmpSLE(lhs_value, rhs_value, "tmp_le");
+        break;
+      case TYPE_FLOAT:
+      case TYPE_DOUBLE:
+        result = builder.CreateFCmpULE(lhs_value, rhs_value, "tmp_le");
+        break;
+      case TYPE_STRING: {
+        Function* call_fn = codegen->GetFunction(IRFunction::STRING_VALUE_LE);
+        result = builder.CreateCall2(call_fn, lhs_value, rhs_value, "tmp_le");
+        break;
+      }
+      default:
+        DCHECK(false) << "Shouldn't get here.";
     }
-    case TExprOpcode::LT_STRINGVALUE_STRINGVALUE: {
-      Function* call_fn = codegen->GetFunction(IRFunction::STRING_VALUE_LT);
-      result = builder.CreateCall2(call_fn, lhs_value, rhs_value, "tmp_lt");
-      break;
+  } else if (fn_.name.function_name == "lt") {
+    switch (t) {
+      case TYPE_BOOLEAN:
+        // LLVM defines false > true
+        result = builder.CreateICmpSGT(lhs_value, rhs_value, "tmp_lt");
+        break;
+      case TYPE_TINYINT:
+      case TYPE_SMALLINT:
+      case TYPE_INT:
+      case TYPE_BIGINT:
+        result = builder.CreateICmpSLT(lhs_value, rhs_value, "tmp_lt");
+        break;
+      case TYPE_FLOAT:
+      case TYPE_DOUBLE:
+        result = builder.CreateFCmpULT(lhs_value, rhs_value, "tmp_lt");
+        break;
+      case TYPE_STRING: {
+        Function* call_fn = codegen->GetFunction(IRFunction::STRING_VALUE_LT);
+        result = builder.CreateCall2(call_fn, lhs_value, rhs_value, "tmp_lt");
+        break;
+      }
+      default:
+        DCHECK(false) << "Shouldn't get here.";
     }
-
-    default:
-      DCHECK(false) << "Unknown op: " << op();
-      return NULL;
+  } else {
+    DCHECK(false) << "Unknown binary predicate function: " << fn_.name.function_name;
   }
   builder.CreateBr(ret_block);
 

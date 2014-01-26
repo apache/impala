@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.List;
+import java.util.Set;
 
 import org.apache.hive.service.cli.thrift.TGetCatalogsReq;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
@@ -28,6 +29,7 @@ import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Unit test for Frontend.execHiveServer2MetadataOp, which executes a HiveServer2
@@ -171,14 +173,19 @@ public class FrontendTest {
     assertEquals(6, resp.schema.columns.size());
     assertEquals(6, resp.rows.get(0).colVals.size());
 
-    assertEquals(3, resp.rows.size());
+    Set<String> fns = Sets.newHashSet();
+    for (TResultRow row: resp.rows) {
+      String fn = row.colVals.get(2).stringVal.toLowerCase();
+      fn = fn.substring(0, fn.indexOf('('));
+      fns.add(fn);
+    }
+    assertEquals(3, fns.size());
 
     List<String> expectedResult = Lists.newArrayList();
     expectedResult.add("subdate");
     expectedResult.add("substr");
     expectedResult.add("substring");
-    for (TResultRow row: resp.rows) {
-      String fn = row.colVals.get(2).stringVal.toLowerCase();
+    for (String fn: fns) {
       assertTrue(fn + " not found", expectedResult.remove(fn));
     }
   }

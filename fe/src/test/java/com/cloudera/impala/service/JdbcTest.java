@@ -212,10 +212,13 @@ public class JdbcTest {
   @Test
   public void testMetaDataGetFunctions() throws SQLException {
     // It should return one function "parse_url".
-    ResultSet rs = con_.getMetaData().getFunctions(null, null, "parse_url");
+    ResultSet rs = con_.getMetaData().getFunctions(
+        null, null, "sqrt%");
     assertTrue(rs.next());
     String funcName = rs.getString("FUNCTION_NAME");
-    assertEquals("Incorrect function name", "parse_url", funcName.toLowerCase());
+    System.err.println(funcName.toLowerCase());
+    assertEquals("Incorrect function name",
+        "sqrt(double)", funcName.toLowerCase());
     assertFalse(rs.next());
     rs.close();
   }

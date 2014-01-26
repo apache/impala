@@ -50,7 +50,7 @@ template <class TIME>
 void* TimestampFunctions::FromUnix(Expr* e, TupleRow* row) {
   DCHECK_LE(e->GetNumChildren(), 2);
   DCHECK_NE(e->GetNumChildren(), 0);
-  
+
   Expr* op = e->children()[0];
   TIME* intp = reinterpret_cast<TIME*>(op->GetValue(row));
   if (intp == NULL) return NULL;
@@ -121,6 +121,19 @@ void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
   if (tv->date().is_special()) return NULL;
   ptime temp;
   tv->ToPtime(&temp);
+  e->result_.int_val = static_cast<int32_t>(to_time_t(temp));
+  return &e->result_.int_val;
+}
+
+void* TimestampFunctions::UnixFromString(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  Expr* op = e->children()[0];
+  StringValue* sv = reinterpret_cast<StringValue*>(op->GetValue(row));
+  if (sv == NULL) return NULL;
+  TimestampValue tv(sv->ptr, sv->len);
+  if (tv.date().is_special()) return NULL;
+  ptime temp;
+  tv.ToPtime(&temp);
   e->result_.int_val = static_cast<int32_t>(to_time_t(temp));
   return &e->result_.int_val;
 }

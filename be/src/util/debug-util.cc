@@ -28,7 +28,6 @@
 #include "runtime/row-batch.h"
 #include "util/cpu-info.h"
 #include "util/string-parser.h"
-#include "gen-cpp/Opcodes_types.h"
 
 // For DumpStackTraceToString
 #include <glog/../utilities.h>
@@ -74,8 +73,6 @@ namespace impala {
     return ss.str();\
   }
 
-THRIFT_ENUM_OUTPUT_FN(TExprOpcode);
-THRIFT_ENUM_OUTPUT_FN(TAggregationOp);
 THRIFT_ENUM_OUTPUT_FN(TFunctionBinaryType);
 THRIFT_ENUM_OUTPUT_FN(TCatalogObjectType);
 THRIFT_ENUM_OUTPUT_FN(TDdlType);

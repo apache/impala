@@ -726,7 +726,7 @@ timestamp, bigint
 # Test NULLs in aggregate functions
 select count(NULL), min(NULL), max(NULL), sum(NULL), avg(NULL) from alltypesagg
 ---- TYPES
-bigint, NULL, NULL, NULL, double
+bigint, boolean, boolean, bigint, double
 ---- RESULTS
 0,NULL,NULL,NULL,NULL
 ====
@@ -734,7 +734,7 @@ bigint, NULL, NULL, NULL, double
 # Test ignored distinct in MIN and MAX with NULLs
 select min(distinct NULL), max(distinct NULL) from alltypesagg
 ---- TYPES
-NULL, NULL
+boolean, boolean
 ---- RESULTS
 NULL,NULL
 ====
@@ -821,7 +821,7 @@ int, string
 ---- QUERY
 # Test group_concat with column delimiter
 # Will cause all columns save first to be duplicated
-select day, group_concat(string_col, string_col)
+select day, group_concat(trim(string_col), trim(string_col))
 from alltypesagg
 where id % 200 = day
 group by day

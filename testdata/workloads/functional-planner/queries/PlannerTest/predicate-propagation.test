@@ -4,7 +4,7 @@ from functional.alltypes a join functional.alltypes b on (a.double_col = b.bigin
 where b.bigint_col div 2 = 0
 ---- PLAN
 03:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.double_col = b.bigint_col
@@ -24,16 +24,16 @@ from
 where b.id < 10
 ---- PLAN
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: COUNT(id) = b.id
+|  hash predicates: count(id) = b.id
 |
 |--02:SCAN HDFS [functional.alltypessmall b]
 |     partitions=4/4 size=6.32KB compact
 |     predicates: b.id < 10
 |
 01:AGGREGATE [FINALIZE]
-|  output: COUNT(id)
+|  output: count(id)
 |  group by: int_col, tinyint_col
-|  having: COUNT(id) < 10
+|  having: count(id) < 10
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -43,7 +43,7 @@ select count(*) from functional.alltypes
 where month = id and id = int_col and tinyint_col = int_col and int_col < 2
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: COUNT(*)
+|  output: count(*)
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 size=40.32KB
@@ -142,7 +142,7 @@ limit 3
 |  order by: int_col ASC, tinyint_col ASC
 |
 01:AGGREGATE [FINALIZE]
-|  output: MAX(id)
+|  output: max(id)
 |  group by: int_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypessmall]
@@ -170,7 +170,7 @@ limit 3
 |  order by: int_col ASC, tinyint_col ASC
 |
 01:AGGREGATE [FINALIZE]
-|  output: MAX(id)
+|  output: max(id)
 |  group by: int_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypessmall]
@@ -415,9 +415,9 @@ where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col 
 |  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
 |
 |--02:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: year, month, id, int_col
-|  |  having: COUNT(*) + 1 = 17
+|  |  having: count(*) + 1 = 17
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 size=3.16KB
@@ -442,14 +442,14 @@ NODE 1:
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  05:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: year, month, id, int_col
-|  |  having: COUNT(*) + 1 = 17
+|  |  having: count(*) + 1 = 17
 |  |
 |  04:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
 |  |
 |  02:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
@@ -481,9 +481,9 @@ where a.id = b.id and
 |  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
 |
 |--02:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: year, month, id, int_col
-|  |  having: COUNT(*) + 1 = 17
+|  |  having: count(*) + 1 = 17
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 size=3.16KB
@@ -501,14 +501,14 @@ where a.id = b.id and
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  05:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: year, month, id, int_col
-|  |  having: COUNT(*) + 1 = 17
+|  |  having: count(*) + 1 = 17
 |  |
 |  04:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
 |  |
 |  02:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
@@ -538,10 +538,10 @@ where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col 
 |  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
 |
 |--03:SELECT
-|  |  predicates: COUNT(*) + 1 = 17
+|  |  predicates: count(*) + 1 = 17
 |  |
 |  02:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |  limit: 5
 |  |
@@ -570,20 +570,20 @@ NODE 1:
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  03:SELECT
-|  |  predicates: COUNT(*) + 1 = 17
+|  |  predicates: count(*) + 1 = 17
 |  |
 |  07:EXCHANGE [PARTITION=UNPARTITIONED]
 |  |  limit: 5
 |  |
 |  06:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: year, month, id, int_col
 |  |  limit: 5
 |  |
 |  05:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
 |  |
 |  02:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
@@ -616,10 +616,10 @@ where a.year = 2009 and
 |  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
 |
 |--03:SELECT
-|  |  predicates: COUNT(*) + 1 = 17
+|  |  predicates: count(*) + 1 = 17
 |  |
 |  02:AGGREGATE [FINALIZE]
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |  limit: 5
 |  |
@@ -639,20 +639,20 @@ where a.year = 2009 and
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  03:SELECT
-|  |  predicates: COUNT(*) + 1 = 17
+|  |  predicates: count(*) + 1 = 17
 |  |
 |  07:EXCHANGE [PARTITION=UNPARTITIONED]
 |  |  limit: 5
 |  |
 |  06:AGGREGATE [MERGE FINALIZE]
-|  |  output: SUM(COUNT(*))
+|  |  output: sum(count(*))
 |  |  group by: year, month, id, int_col
 |  |  limit: 5
 |  |
 |  05:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
 |  |
 |  02:AGGREGATE
-|  |  output: COUNT(*)
+|  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]

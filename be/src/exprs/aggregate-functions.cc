@@ -133,6 +133,11 @@ void AggregateFunctions::Max(FunctionContext*,
 }
 
 void AggregateFunctions::StringConcat(FunctionContext* ctx, const StringVal& src,
+      StringVal* result) {
+  StringConcat(ctx, src, DEFAULT_STRING_CONCAT_DELIM, result);
+}
+
+void AggregateFunctions::StringConcat(FunctionContext* ctx, const StringVal& src,
       const StringVal& separator, StringVal* result) {
   if (src.is_null) return;
   if (result->is_null) {
@@ -423,8 +428,6 @@ StringVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
 // Stamp out the templates for the types we need.
 template void AggregateFunctions::InitZero<BigIntVal>(FunctionContext*, BigIntVal* dst);
 
-template void AggregateFunctions::Sum<BooleanVal, BigIntVal>(
-    FunctionContext*, const BooleanVal& src, BigIntVal* dst);
 template void AggregateFunctions::Sum<TinyIntVal, BigIntVal>(
     FunctionContext*, const TinyIntVal& src, BigIntVal* dst);
 template void AggregateFunctions::Sum<SmallIntVal, BigIntVal>(

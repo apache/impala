@@ -18,14 +18,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
-import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Most predicates with two operands..
@@ -35,28 +38,41 @@ public class BinaryPredicate extends Predicate {
   private final static Logger LOG = LoggerFactory.getLogger(BinaryPredicate.class);
 
   public enum Operator {
-    EQ("=", FunctionOperator.EQ),
-    NE("!=", FunctionOperator.NE),
-    LE("<=", FunctionOperator.LE),
-    GE(">=", FunctionOperator.GE),
-    LT("<", FunctionOperator.LT),
-    GT(">", FunctionOperator.GT);
+    EQ("=", "eq"),
+    NE("!=", "ne"),
+    LE("<=", "le"),
+    GE(">=", "ge"),
+    LT("<", "lt"),
+    GT(">", "gt");
 
     private final String description;
-    private final FunctionOperator functionOp;
+    private final String name;
 
-    private Operator(String description, FunctionOperator functionOp) {
+    private Operator(String description, String name) {
       this.description = description;
-      this.functionOp = functionOp;
+      this.name = name;
     }
 
     @Override
-    public String toString() {
-      return description;
-    }
+    public String toString() { return description; }
+    public String getName() { return name; }
+  }
 
-    public FunctionOperator toFunctionOp() {
-      return functionOp;
+  public static void initBuiltins(Db db) {
+    for (ColumnType t: ColumnType.getSupportedTypes()) {
+      if (t.isNull()) continue; // NULL is handled through type promotion.
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.EQ.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.NE.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.LE.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.GE.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.LT.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.GT.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
     }
   }
 
@@ -74,12 +90,6 @@ public class BinaryPredicate extends Predicate {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    return ((BinaryPredicate) obj).opcode_ == this.opcode_;
-  }
-
-  @Override
   public String toSqlImpl() {
     return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
   }
@@ -87,7 +97,6 @@ public class BinaryPredicate extends Predicate {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.BINARY_PRED;
-    msg.setOpcode(opcode_);
   }
 
   @Override
@@ -104,23 +113,13 @@ public class BinaryPredicate extends Predicate {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
 
-    ColumnType t1 = getChild(0).getType();
-    ColumnType t2 = getChild(1).getType();
-    ColumnType compatibleType = ColumnType.getAssignmentCompatibleType(t1, t2);
-
-    if (!compatibleType.isValid()) {
-      // there is no type to which both are assignment-compatible -> we can't compare them
-      throw new AnalysisException("operands are not comparable: " + this.toSql());
+    fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
+        CompareMode.IS_SUBTYPE);
+    if (fn_ == null) {
+      throw new AnalysisException("operands are not comparable: " + toSql());
     }
-
-    // Ignore return value because type is always bool for predicates.
-    castBinaryOp(compatibleType);
-
-    OpcodeRegistry.BuiltinFunction match = OpcodeRegistry.instance().getFunctionInfo(
-        op_.toFunctionOp(), true, compatibleType, compatibleType);
-    Preconditions.checkState(match != null);
-    Preconditions.checkState(match.getReturnType().isBoolean());
-    this.opcode_ = match.opcode;
+    Preconditions.checkState(fn_.getReturnType().isBoolean());
+    castForFunctionCall();
 
     // determine selectivity
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();

@@ -68,13 +68,6 @@ class NativeUdfExpr: public Expr {
   // TODO: Get this from the to-be-implemented ExprContext instead
   boost::scoped_ptr<impala_udf::FunctionContext> udf_context_;
 
-  // Native (.so), IR (.ll) or builtin
-  TFunctionBinaryType::type udf_type_;
-
-  // HDFS path and name of the compiled UDF binary
-  std::string hdfs_location_;
-  std::string symbol_name_;
-
   // If this function has var args, children()[vararg_start_idx_] is the
   // first vararg argument.
   // If this function does not have varargs, it is set to -1.

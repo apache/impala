@@ -46,16 +46,16 @@ string ArithmeticExpr::DebugString() const {
 //   %child_result = call i64 @IntLiteral(i8** %row, i8* %state_data, i1* %is_null)
 //   %child_null = load i1* %is_null
 //   br i1 %child_null, label %ret, label %compute_rhs
-// 
+//
 // compute_rhs:                                      ; preds = %entry
 //   %child_result1 = call i64 @IntLiteral1(i8** %row, i8* %state_data, i1* %is_null)
 //   %child_null2 = load i1* %is_null
 //   br i1 %child_null2, label %ret, label %arith
-// 
+//
 // arith:                                            ; preds = %compute_rhs
 //   %tmp_add = add i64 %child_result, %child_result1
 //   br label %ret
-// 
+//
 // ret:                                           ; preds = %arith, %compute_rhs, %entry
 //   %tmp_phi = phi i64 [ 0, %entry ], [ 0, %compute_rhs ], [ %tmp_add, %arith ]
 //   ret i64 %tmp_phi
@@ -70,7 +70,7 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
     rhs_function = children()[1]->Codegen(codegen);
     if (rhs_function == NULL) return NULL;
   }
-  
+
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
   Type* return_type = codegen->GetType(type());
@@ -78,7 +78,7 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
 
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
   builder.SetInsertPoint(entry_block);
-  
+
   BasicBlock* compute_rhs_block = NULL;
   BasicBlock* compute_arith_block = NULL;
   Value* lhs_value = NULL;
@@ -97,7 +97,7 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
   // Lhs not null, eval rhs
   if (GetNumChildren() == 2) {
     builder.SetInsertPoint(compute_rhs_block);
-    rhs_value = children()[1]->CodegenGetValue(codegen, compute_rhs_block, 
+    rhs_value = children()[1]->CodegenGetValue(codegen, compute_rhs_block,
         ret_block, compute_arith_block);
   }
 
@@ -105,90 +105,71 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
   builder.SetInsertPoint(compute_arith_block);
 
   Value* result = NULL;
-  switch (op()) {
-    case TExprOpcode::BITNOT_CHAR:
-    case TExprOpcode::BITNOT_SHORT:
-    case TExprOpcode::BITNOT_INT:
-    case TExprOpcode::BITNOT_LONG:
-      result = builder.CreateNot(lhs_value, "tmp_not");
-      break;
-    case TExprOpcode::ADD_CHAR_CHAR:
-    case TExprOpcode::ADD_SHORT_SHORT:
-    case TExprOpcode::ADD_INT_INT:
-    case TExprOpcode::ADD_LONG_LONG:
-      result = builder.CreateAdd(lhs_value, rhs_value, "tmp_add");
-      break;
-    case TExprOpcode::ADD_FLOAT_FLOAT:
-    case TExprOpcode::ADD_DOUBLE_DOUBLE:
-      result = builder.CreateFAdd(lhs_value, rhs_value, "tmp_add");
-      break;
-    case TExprOpcode::SUBTRACT_CHAR_CHAR:
-    case TExprOpcode::SUBTRACT_SHORT_SHORT:
-    case TExprOpcode::SUBTRACT_INT_INT:
-    case TExprOpcode::SUBTRACT_LONG_LONG:
-      result = builder.CreateSub(lhs_value, rhs_value, "tmp_sub");
-      break;
-    case TExprOpcode::SUBTRACT_FLOAT_FLOAT:
-    case TExprOpcode::SUBTRACT_DOUBLE_DOUBLE:
-      result = builder.CreateFSub(lhs_value, rhs_value, "tmp_sub");
-      break;
-    case TExprOpcode::MULTIPLY_CHAR_CHAR:
-    case TExprOpcode::MULTIPLY_SHORT_SHORT:
-    case TExprOpcode::MULTIPLY_INT_INT:
-    case TExprOpcode::MULTIPLY_LONG_LONG:
-      result = builder.CreateMul(lhs_value, rhs_value, "tmp_mul");
-      break;
-    case TExprOpcode::MULTIPLY_FLOAT_FLOAT:
-    case TExprOpcode::MULTIPLY_DOUBLE_DOUBLE:
-      result = builder.CreateFMul(lhs_value, rhs_value, "tmp_mul");
-      break;
-    case TExprOpcode::DIVIDE:
-      result = builder.CreateFDiv(lhs_value, rhs_value, "tmp_div");
-      break;
-
-    case TExprOpcode::INT_DIVIDE_CHAR_CHAR:
-    case TExprOpcode::INT_DIVIDE_SHORT_SHORT:
-    case TExprOpcode::INT_DIVIDE_INT_INT:
-    case TExprOpcode::INT_DIVIDE_LONG_LONG:
+  // TODO: this is a temporary hack until the expr refactoring goes in and
+  // all this code is removed.
+  if (fn_.name.function_name == "bitnot") {
+    result = builder.CreateNot(lhs_value, "tmp_not");
+  } else if (fn_.name.function_name == "bitand") {
+    result = builder.CreateAnd(lhs_value, rhs_value, "tmp_and");
+  } else if (fn_.name.function_name == "bitor") {
+    result = builder.CreateOr(lhs_value, rhs_value, "tmp_or");
+  } else if (fn_.name.function_name == "bitxor") {
+    result = builder.CreateXor(lhs_value, rhs_value, "tmp_xor");
+  } else if (fn_.name.function_name == "add") {
+    switch(type()) {
+      case TYPE_TINYINT:
+      case TYPE_SMALLINT:
+      case TYPE_INT:
+      case TYPE_BIGINT:
+        result = builder.CreateAdd(lhs_value, rhs_value, "tmp_add");
+        break;
+      case TYPE_FLOAT:
+      case TYPE_DOUBLE:
+        result = builder.CreateFAdd(lhs_value, rhs_value, "tmp_add");
+        break;
+      default:
+        DCHECK(false) << "Shouldn't get here.";
+    }
+  } else if (fn_.name.function_name == "subtract") {
+    switch(type()) {
+      case TYPE_TINYINT:
+      case TYPE_SMALLINT:
+      case TYPE_INT:
+      case TYPE_BIGINT:
+        result = builder.CreateSub(lhs_value, rhs_value, "tmp_sub");
+        break;
+      case TYPE_FLOAT:
+      case TYPE_DOUBLE:
+        result = builder.CreateFSub(lhs_value, rhs_value, "tmp_sub");
+        break;
+      default:
+        DCHECK(false) << "Shouldn't get here.";
+    }
+  } else if (fn_.name.function_name == "multiply") {
+    switch(type()) {
+      case TYPE_TINYINT:
+      case TYPE_SMALLINT:
+      case TYPE_INT:
+      case TYPE_BIGINT:
+        result = builder.CreateMul(lhs_value, rhs_value, "tmp_mul");
+        break;
+      case TYPE_FLOAT:
+      case TYPE_DOUBLE:
+        result = builder.CreateFMul(lhs_value, rhs_value, "tmp_div");
+        break;
+      default:
+        DCHECK(false) << "Shouldn't get here.";
+    }
+  } else if (fn_.name.function_name == "divide") {
+    result = builder.CreateFDiv(lhs_value, rhs_value, "tmp_div");
+  } else if (fn_.name.function_name == "int_divide") {
       result = builder.CreateSDiv(lhs_value, rhs_value, "tmp_div");
-      break;
-
-    case TExprOpcode::MOD_CHAR_CHAR:
-    case TExprOpcode::MOD_SHORT_SHORT:
-    case TExprOpcode::MOD_INT_INT:
-    case TExprOpcode::MOD_LONG_LONG:
-      result = builder.CreateSRem(lhs_value, rhs_value, "tmp_mod");
-      break;
-
-    case TExprOpcode::MATH_FMOD_FLOAT_FLOAT:
-    case TExprOpcode::MATH_FMOD_DOUBLE_DOUBLE:
-      result = builder.CreateFRem(lhs_value, rhs_value, "tmp_fmod");
-      break;
-
-    case TExprOpcode::BITAND_CHAR_CHAR:
-    case TExprOpcode::BITAND_SHORT_SHORT:
-    case TExprOpcode::BITAND_INT_INT:
-    case TExprOpcode::BITAND_LONG_LONG:
-      result = builder.CreateAnd(lhs_value, rhs_value, "tmp_and");
-      break;
-
-    case TExprOpcode::BITOR_CHAR_CHAR:
-    case TExprOpcode::BITOR_SHORT_SHORT:
-    case TExprOpcode::BITOR_INT_INT:
-    case TExprOpcode::BITOR_LONG_LONG:
-      result = builder.CreateOr(lhs_value, rhs_value, "tmp_or");
-      break;
-
-    case TExprOpcode::BITXOR_CHAR_CHAR:
-    case TExprOpcode::BITXOR_SHORT_SHORT:
-    case TExprOpcode::BITXOR_INT_INT:
-    case TExprOpcode::BITXOR_LONG_LONG:
-      result = builder.CreateXor(lhs_value, rhs_value, "tmp_xor");
-      break;
-
-    default:
-      DCHECK(false) << "Unknown op: " << op();
-      return NULL;
+  } else if (fn_.name.function_name == "mod") {
+    result = builder.CreateSRem(lhs_value, rhs_value, "tmp_mul");
+  } else if (fn_.name.function_name == "fmod") {
+    result = builder.CreateFRem(lhs_value, rhs_value, "tmp_fmod");
+  } else {
+    DCHECK(false) << "Unknown arithmetic function: " << fn_.name.function_name;
   }
   builder.CreateBr(ret_block);
 

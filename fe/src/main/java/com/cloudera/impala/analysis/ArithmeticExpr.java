@@ -15,42 +15,40 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 public class ArithmeticExpr extends Expr {
   enum Operator {
-    MULTIPLY("*", FunctionOperator.MULTIPLY),
-    DIVIDE("/", FunctionOperator.DIVIDE),
-    MOD("%", FunctionOperator.MOD),
-    INT_DIVIDE("DIV", FunctionOperator.INT_DIVIDE),
-    ADD("+", FunctionOperator.ADD),
-    SUBTRACT("-", FunctionOperator.SUBTRACT),
-    BITAND("&", FunctionOperator.BITAND),
-    BITOR("|", FunctionOperator.BITOR),
-    BITXOR("^", FunctionOperator.BITXOR),
-    BITNOT("~", FunctionOperator.BITNOT);
+    MULTIPLY("*", "multiply"),
+    DIVIDE("/", "divide"),
+    MOD("%", "mod"),
+    INT_DIVIDE("DIV", "int_divide"),
+    ADD("+", "add"),
+    SUBTRACT("-", "subtract"),
+    BITAND("&", "bitand"),
+    BITOR("|", "bitor"),
+    BITXOR("^", "bitxor"),
+    BITNOT("~", "bitnot");
 
-    private final String description;
-    private final FunctionOperator functionOp;
+    private final String description_;
+    private final String name_;
 
-    private Operator(String description, FunctionOperator thriftOp) {
-      this.description = description;
-      this.functionOp = thriftOp;
+    private Operator(String description, String name) {
+      this.description_ = description;
+      this.name_ = name;
     }
 
     @Override
-    public String toString() {
-      return description;
-    }
-
-    public FunctionOperator toFunctionOp() {
-      return functionOp;
-    }
+    public String toString() { return description_; }
+    public String getName() { return name_; }
   }
 
   private final Operator op_;
@@ -65,6 +63,39 @@ public class ArithmeticExpr extends Expr {
     Preconditions.checkArgument(op == Operator.BITNOT && e2 == null
         || op != Operator.BITNOT && e2 != null);
     if (e2 != null) children_.add(e2);
+  }
+
+  public static void initBuiltins(Db db) {
+    for (ColumnType t: ColumnType.getNumericTypes()) {
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.MULTIPLY.getName(), Lists.newArrayList(t, t),
+          t.getMaxResolutionType()));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.ADD.getName(), Lists.newArrayList(t, t),
+          t.getNextResolutionType()));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.SUBTRACT.getName(), Lists.newArrayList(t, t),
+          t.getNextResolutionType()));
+    }
+    db.addBuiltin(ScalarFunction.createBuiltinOperator(
+        Operator.DIVIDE.getName(),
+        Lists.newArrayList(ColumnType.DOUBLE, ColumnType.DOUBLE),
+        ColumnType.DOUBLE));
+
+    for (ColumnType t: ColumnType.getFixedPointTypes()) {
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.INT_DIVIDE.getName(), Lists.newArrayList(t, t), t));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.MOD.getName(), Lists.newArrayList(t, t), t));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.BITAND.getName(), Lists.newArrayList(t, t), t));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.BITOR.getName(), Lists.newArrayList(t, t), t));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.BITXOR.getName(), Lists.newArrayList(t, t), t));
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          Operator.BITNOT.getName(), Lists.newArrayList(t), t));
+    }
   }
 
   @Override
@@ -88,13 +119,6 @@ public class ArithmeticExpr extends Expr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.ARITHMETIC_EXPR;
-    msg.setOpcode(opcode_);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    return ((ArithmeticExpr) obj).opcode_ == opcode_;
   }
 
   @Override
@@ -113,21 +137,20 @@ public class ArithmeticExpr extends Expr {
     // bitnot is the only unary op, deal with it here
     if (op_ == Operator.BITNOT) {
       type_ = getChild(0).getType();
-      OpcodeRegistry.BuiltinFunction match =
-        OpcodeRegistry.instance().getFunctionInfo(op_.functionOp, true, type_);
-      if (match == null) {
+      fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
+          CompareMode.IS_SUBTYPE);
+      if (fn_ == null) {
         throw new AnalysisException("Bitwise operations only allowed on fixed-point " +
             "types: " + toSql());
       }
-      Preconditions.checkState(type_.equals(match.getReturnType()) || type_.isNull());
-      opcode_ = match.opcode;
+      Preconditions.checkState(type_.equals(fn_.getReturnType()) || type_.isNull());
       return;
     }
 
     ColumnType t1 = getChild(0).getType();
     ColumnType t2 = getChild(1).getType();  // only bitnot is unary
 
-    FunctionOperator funcOp = op_.toFunctionOp();
+    String fnName = op_.getName();
     switch (op_) {
       case MULTIPLY:
       case ADD:
@@ -145,7 +168,7 @@ public class ArithmeticExpr extends Expr {
       case MOD:
         type_ = ColumnType.getAssignmentCompatibleType(t1, t2);
         // Use MATH_MOD function operator for floating-point modulo.
-        if (type_.isFloatingPointType()) funcOp = FunctionOperator.MATH_FMOD;
+        if (type_.isFloatingPointType()) fnName = "fmod";
         break;
       case DIVIDE:
         type_ = ColumnType.DOUBLE;
@@ -171,12 +194,11 @@ public class ArithmeticExpr extends Expr {
     }
 
     type_ = castBinaryOp(type_);
-    OpcodeRegistry.BuiltinFunction match =
-        OpcodeRegistry.instance().getFunctionInfo(funcOp, true, type_, type_);
-    if (match == null) {
+    fn_ = getBuiltinFunction(analyzer, fnName, collectChildReturnTypes(),
+        CompareMode.IS_SUBTYPE);
+    if (fn_ == null) {
       Preconditions.checkState(false, String.format("No match in function registry " +
           "for '%s' with operand types %s and %s", toSql(), type_, type_));
     }
-    this.opcode_ = match.opcode;
   }
 }
