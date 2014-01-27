@@ -147,14 +147,15 @@ struct THdfsFileBlock {
   // Total length of the block
   2: required i64 length
 
-  // List of datanodes network addresses (IP address and port) that contain this block
-  3: required list<Types.TNetworkAddress> network_addresses
+  // Hosts that contain replicas of this block. Each value in the list is an index in to
+  // the network_addresses list of THdfsTable.
+  3: required list<i32> replica_host_idxs
 
   // The list of disk ids for the file block. May not be set if disk ids are not supported
   4: optional list<i32> disk_ids
 
   // For each replica, specifies if the block is cached in memory.
-  5: optional list<bool> is_cached
+  5: optional list<bool> is_replica_cached
 }
 
 // Represents an HDFS file in a partition.
@@ -216,6 +217,11 @@ struct THdfsTable {
 
   // map from partition id to partition metadata
   4: required map<i64, THdfsPartition> partitions
+
+  // Each TNetworkAddress is a datanode which contains blocks of a file in the table.
+  // Used so that each THdfsFileBlock can just reference an index in this list rather
+  // than duplicate the list of network address, which helps reduce memory usage.
+  7: optional list<Types.TNetworkAddress> network_addresses
 }
 
 struct THBaseTable {

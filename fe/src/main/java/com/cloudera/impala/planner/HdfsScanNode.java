@@ -235,11 +235,22 @@ public class HdfsScanNode extends ScanNode {
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
         for (THdfsFileBlock thriftBlock: fileDesc.getFileBlocks()) {
           HdfsPartition.FileBlock block = FileBlock.fromThrift(thriftBlock);
-          List<TNetworkAddress> blockNetworkAddresses = block.getNetworkAddresses();
-          if (blockNetworkAddresses.size() == 0) {
+          List<Integer> replicaHostIdxs = block.getReplicaHostIdxs();
+          if (replicaHostIdxs.size() == 0) {
             // we didn't get locations for this block; for now, just ignore the block
             // TODO: do something meaningful with that
             continue;
+          }
+
+          // Look up the network addresses of all hosts (datanodes) that contain
+          // replicas of this block.
+          List<TNetworkAddress> blockNetworkAddresses =
+              new ArrayList<TNetworkAddress>(replicaHostIdxs.size());
+          for (Integer replicaHostId: replicaHostIdxs) {
+            TNetworkAddress blockNetworkAddress =
+                partition.getTable().getNetworkAddressByIdx(replicaHostId);
+            Preconditions.checkNotNull(blockNetworkAddress);
+            blockNetworkAddresses.add(blockNetworkAddress);
           }
 
           // record host/ports and volume ids
