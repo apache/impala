@@ -337,9 +337,6 @@ public class AnalyzerTest {
    */
   @Test
   public void TestUnsupportedTypes() throws AuthorizationException {
-    AnalysisError("select dec_col from functional.unsupported_types",
-        "Unsupported type 'DECIMAL' in 'dec_col'.");
-
     // The table metadata should not have been loaded.
     AnalysisError("select * from functional.map_table",
         "Failed to load metadata for table: functional.map_table");
