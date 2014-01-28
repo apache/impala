@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "service/impala-server.h"
+#include "service/impala-server.inline.h"
 
 #include <algorithm>
 #include <boost/algorithm/string/join.hpp>
@@ -745,35 +746,6 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
     return_val.status.__set_statusCode(
         apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
   }
-}
-
-inline Status ImpalaServer::THandleIdentifierToTUniqueId(
-    const apache::hive::service::cli::thrift::THandleIdentifier& handle,
-    TUniqueId* unique_id, TUniqueId* secret) {
-  if (handle.guid.length() != 16 || handle.secret.length() != 16) {
-    stringstream ss;
-    ss << "Malformed THandleIdentifier (guid size: " << handle.guid.length()
-       << ", expected 16, secret size: " << handle.secret.length() << ", expected 16)";
-    return Status(ss.str());
-  }
-  memcpy(&(unique_id->hi), handle.guid.c_str(), 8);
-  memcpy(&(unique_id->lo), handle.guid.c_str() + 8, 8);
-  memcpy(&(secret->hi), handle.secret.c_str(), 8);
-  memcpy(&(secret->lo), handle.secret.c_str() + 8, 8);
-
-  return Status::OK;
-}
-
-inline void ImpalaServer::TUniqueIdToTHandleIdentifier(
-    const TUniqueId& unique_id, const TUniqueId& secret,
-    apache::hive::service::cli::thrift::THandleIdentifier* handle) {
-  char uuid[16];
-  memcpy((void*)uuid, &unique_id.hi, 8);
-  memcpy((void*)(uuid + 8), &unique_id.lo, 8);
-  handle->guid.assign(uuid, 16);
-  memcpy((void*)uuid, &secret.hi, 8);
-  memcpy((void*)(uuid + 8), &secret.lo, 8);
-  handle->secret.assign(uuid, 16);
 }
 
 void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col_val,

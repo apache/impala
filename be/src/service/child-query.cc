@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "service/child-query.h"
+#include "service/impala-server.inline.h"
 #include "service/query-exec-state.h"
 #include "util/debug-util.h"
 #include "gen-cpp/cli_service_types.h"
