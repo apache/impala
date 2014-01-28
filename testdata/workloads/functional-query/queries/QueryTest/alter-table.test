@@ -177,14 +177,6 @@ alter table jointbl_test set location '/test-warehouse/jointbl_seq'
 ---- RESULTS
 ====
 ---- QUERY
-# since the file format doesn't match, wrong results will be returned
-select test_id from jointbl_test order by test_id limit 3
----- RESULTS
-NULL
----- TYPES
-bigint
-====
----- QUERY
 # change the table fileformat to match the data
 alter table jointbl_test set fileformat sequencefile
 ---- RESULTS

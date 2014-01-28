@@ -182,20 +182,6 @@ select count(*) from alltypes_test
 BIGINT
 ====
 ---- QUERY
-# Show this was actually a different file format (parquet) by trying to
-# change the format to textfile and reading the results.
-alter table alltypes_test partition (year=2009, month=4)
-set fileformat textfile
----- RESULTS
-====
----- QUERY
-select count(*) from alltypes_test
----- RESULTS
-124
----- TYPES
-BIGINT
-====
----- QUERY
 # This should copy the file format from the source table (rc)
 create external table jointbl_like like functional_rc_gzip.jointbl
 location '/test-warehouse/jointbl_rc_gzip'
