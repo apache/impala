@@ -44,6 +44,23 @@ void TestIntValue(const char* s, T exp_val, StringParser::ParseResult exp_result
   }
 }
 
+// Tests conversion of s, given a base, to an integer with and without leading/trailing
+// whitespace
+template<typename T>
+void TestIntValue(
+    const char* s, int base, T exp_val, StringParser::ParseResult exp_result) {
+  for (int i = 0; i < space_len; ++i) {
+    for (int j = 0; j < space_len; ++j) {
+      // All combinations of leading and/or trailing whitespace.
+      string str = space[i] + s + space[j];
+      StringParser::ParseResult result;
+      T val = StringParser::StringToInt<T>(str.data(), str.length(), base, &result);
+      EXPECT_EQ(exp_val, val) << str;
+      EXPECT_EQ(result, exp_result);
+    }
+  }
+}
+
 void TestBoolValue(const char* s, bool exp_val, StringParser::ParseResult exp_result) {
   for (int i = 0; i < space_len; ++i) {
     for (int j = 0; j < space_len; ++j) {
@@ -194,6 +211,107 @@ TEST(StringToInt, Int8_Exhaustive) {
   }
 }
 
+TEST(StringToIntWithBase, Basic) {
+  TestIntValue<int8_t>("123", 10, 123, StringParser::PARSE_SUCCESS);
+  TestIntValue<int16_t>("123", 10, 123, StringParser::PARSE_SUCCESS);
+  TestIntValue<int32_t>("123", 10, 123, StringParser::PARSE_SUCCESS);
+  TestIntValue<int64_t>("123", 10, 123, StringParser::PARSE_SUCCESS);
+
+  TestIntValue<int8_t>("123", 10, 123, StringParser::PARSE_SUCCESS);
+  TestIntValue<int16_t>("12345", 10, 12345, StringParser::PARSE_SUCCESS);
+  TestIntValue<int32_t>("12345678", 10, 12345678, StringParser::PARSE_SUCCESS);
+  TestIntValue<int64_t>("12345678901234", 10, 12345678901234, StringParser::PARSE_SUCCESS);
+
+  TestIntValue<int8_t>("-10", 10, -10, StringParser::PARSE_SUCCESS);
+  TestIntValue<int16_t>("-10", 10, -10, StringParser::PARSE_SUCCESS);
+  TestIntValue<int32_t>("-10", 10, -10, StringParser::PARSE_SUCCESS);
+  TestIntValue<int64_t>("-10", 10, -10, StringParser::PARSE_SUCCESS);
+
+  TestIntValue<int8_t>("+1", 10, 1, StringParser::PARSE_SUCCESS);
+  TestIntValue<int16_t>("+1", 10, 1, StringParser::PARSE_SUCCESS);
+  TestIntValue<int32_t>("+1", 10, 1, StringParser::PARSE_SUCCESS);
+  TestIntValue<int64_t>("+1", 10, 1, StringParser::PARSE_SUCCESS);
+
+  TestIntValue<int8_t>("+0", 10, 0, StringParser::PARSE_SUCCESS);
+  TestIntValue<int16_t>("-0", 10, 0, StringParser::PARSE_SUCCESS);
+  TestIntValue<int32_t>("+0", 10, 0, StringParser::PARSE_SUCCESS);
+  TestIntValue<int64_t>("-0", 10, 0, StringParser::PARSE_SUCCESS);
+
+  TestIntValue<int8_t>("a", 16, 10, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("A", 16, 10, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("b", 20, 11, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("B", 20, 11, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("z", 36, 35, StringParser::PARSE_SUCCESS);
+  TestIntValue<int16_t>("f0a", 16, 3850, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("7", 8, 7, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("10", 2, 2, StringParser::PARSE_SUCCESS);
+}
+
+TEST(StringToIntWithBase, NonNumericCharacters) {
+  // Alphanumeric digits that are not in base are ok
+  TestIntValue<int8_t>("123abc   ", 10, 123, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("-123abc   ", 10, -123, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("   123abc   ", 10, 123, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("a123", 10, 0, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("   a123", 10, 0, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("   -a123", 10, 0, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("   a!123", 10, 0, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("   a!123", 10, 0, StringParser::PARSE_SUCCESS);
+
+  // Trailing white space + digits is not ok
+  TestIntValue<int8_t>("   -12  3xyz ", 10, 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("12 3", 10, 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("-12 3", 10, 0, StringParser::PARSE_FAILURE);
+
+  // Must have at least one leading valid digit.
+  TestIntValue<int8_t>("!123", 0, StringParser::PARSE_FAILURE);
+
+  // Test empty string and string with only whitespaces.
+  TestIntValue<int8_t>("", 0, StringParser::PARSE_FAILURE);
+  TestIntValue<int8_t>("   ", 0, StringParser::PARSE_FAILURE);
+}
+
+TEST(StringToIntWithBase, Limit) {
+  TestIntValue<int8_t>("127", 10, 127, StringParser::PARSE_SUCCESS);
+  TestIntValue<int8_t>("-128", 10, -128, StringParser::PARSE_SUCCESS);
+  TestIntValue<int16_t>("32767", 10, 32767, StringParser::PARSE_SUCCESS);
+  TestIntValue<int16_t>("-32768", 10, -32768, StringParser::PARSE_SUCCESS);
+  TestIntValue<int32_t>("2147483647", 10, 2147483647, StringParser::PARSE_SUCCESS);
+  TestIntValue<int32_t>("-2147483648", 10, -2147483648, StringParser::PARSE_SUCCESS);
+  TestIntValue<int64_t>("9223372036854775807", 10, numeric_limits<int64_t>::max(),
+      StringParser::PARSE_SUCCESS);
+  TestIntValue<int64_t>("-9223372036854775808", 10, numeric_limits<int64_t>::min(),
+      StringParser::PARSE_SUCCESS);
+}
+
+TEST(StringToIntWithBase, Overflow) {
+  TestIntValue<int8_t>("128", 10, 127, StringParser::PARSE_OVERFLOW);
+  TestIntValue<int8_t>("-129", 10, -128, StringParser::PARSE_OVERFLOW);
+  TestIntValue<int16_t>("32768", 10, 32767, StringParser::PARSE_OVERFLOW);
+  TestIntValue<int16_t>("-32769", 10, -32768, StringParser::PARSE_OVERFLOW);
+  TestIntValue<int32_t>("2147483648", 10, 2147483647, StringParser::PARSE_OVERFLOW);
+  TestIntValue<int32_t>("-2147483649", 10, -2147483648, StringParser::PARSE_OVERFLOW);
+  TestIntValue<int64_t>("9223372036854775808", 10, 9223372036854775807LL,
+      StringParser::PARSE_OVERFLOW);
+  TestIntValue<int64_t>("-9223372036854775809", 10, numeric_limits<int64_t>::min(),
+      StringParser::PARSE_OVERFLOW);
+}
+
+TEST(StringToIntWithBase, Int8_Exhaustive) {
+  char buffer[5];
+  for (int i = -256; i <= 256; ++i) {
+    sprintf(buffer, "%d", i);
+    int8_t expected = i;
+    if (i > 127) {
+      expected = 127;
+    } else if (i < -128) {
+      expected = -128;
+    }
+    TestIntValue<int8_t>(buffer, 10, expected,
+        i == expected ? StringParser::PARSE_SUCCESS : StringParser::PARSE_OVERFLOW);
+  }
+}
+
 TEST(StringToFloat, Basic) {
   TestAllFloatVariants("0", StringParser::PARSE_SUCCESS);
   TestAllFloatVariants("123", StringParser::PARSE_SUCCESS);
@@ -239,11 +357,31 @@ TEST(StringToFloat, Basic) {
   TestAllFloatVariants("456x.789e10", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("456.x789e10", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("456.789xe10", StringParser::PARSE_FAILURE);
-  TestAllFloatVariants("456.789x10", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("456.789a10", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("456.789ex10", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("456.789e10x", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("456.789e10   sdfs ", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("1e10   sdfs", StringParser::PARSE_FAILURE);
+}
+
+TEST(StringToFloat, InvalidLeadingTrailing) {
+  // Test that trailing garbage is not allowed.
+  TestFloatValue<double>("123xyz   ", StringParser::PARSE_FAILURE);
+  TestFloatValue<double>("-123xyz   ", StringParser::PARSE_FAILURE);
+  TestFloatValue<double>("   123xyz   ", StringParser::PARSE_FAILURE);
+  TestFloatValue<double>("   -12  3xyz ", StringParser::PARSE_FAILURE);
+  TestFloatValue<double>("12 3", StringParser::PARSE_FAILURE);
+  TestFloatValue<double>("-12 3", StringParser::PARSE_FAILURE);
+
+  // Must have at least one leading valid digit.
+  TestFloatValue<double>("x123", StringParser::PARSE_FAILURE);
+  TestFloatValue<double>("   x123", StringParser::PARSE_FAILURE);
+  TestFloatValue<double>("   -x123", StringParser::PARSE_FAILURE);
+  TestFloatValue<double>("   x-123", StringParser::PARSE_FAILURE);
+
+  // Test empty string and string with only whitespaces.
+  TestFloatValue<double>("", StringParser::PARSE_FAILURE);
+  TestFloatValue<double>("   ", StringParser::PARSE_FAILURE);
 }
 
 TEST(StringToFloat, BruteForce) {

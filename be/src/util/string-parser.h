@@ -221,6 +221,11 @@ class StringParser {
   // TOOD: Investigate using intrinsics to speed up the slow strtod path.
   template <typename T>
   static inline T StringToFloatInternal(const char* s, int len, ParseResult* result) {
+    if (UNLIKELY(len <= 0)) {
+      *result = PARSE_FAILURE;
+      return 0;
+    }
+
     // Use double here to not lose precision while accumulating the result
     double val = 0;
     bool negative = false;
