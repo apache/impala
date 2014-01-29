@@ -351,3 +351,16 @@ tinyint, int, double
 0,0,0
 1,1,4
 ====
+---- QUERY
+select count(*) from functional.alltypessmall where udf_test.No_Args() = 'string'
+---- TYPES
+BIGINT
+---- RESULTS
+100
+====
+---- QUERY
+select count(*) from functional.alltypessmall where udf_test.No_Args() != 'string'
+---- TYPES
+BIGINT
+---- RESULTS
+0

@@ -94,11 +94,13 @@ class ExecEnv {
   // Starts any dependent services in their correct order
   virtual Status StartServices();
 
+  // Initializes the exec env for running FE tests.
+  Status InitForFeTests();
+
   // Returns true if this environment was created from the FE tests. This makes the
   // environment special since the JVM is started first and libraries are loaded
   // differently.
   bool is_fe_tests() { return is_fe_tests_; }
-  void set_is_fe_tests(bool v) { is_fe_tests_ = v; }
 
  protected:
   // Leave protected so that subclasses can override

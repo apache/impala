@@ -58,7 +58,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeFeTestInit(
   InitCommonRuntime(1, &name, false);
   LlvmCodeGen::InitializeLlvm();
   ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
-  exec_env->set_is_fe_tests(true);
+  exec_env->InitForFeTests();
 }
 
 // Requires JniUtil::Init() to have been called.
@@ -76,6 +76,9 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
   jbyteArray result_bytes = NULL;
   JniLocalFrame jni_frame;
   Expr* e;
+
+  THROW_IF_ERROR_RET(state.InitMemTrackers(TUniqueId(), -1), env,
+                     JniUtil::internal_exc_class(), result_bytes);
   THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
                      result_bytes);
   THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, thrift_predicate, &e), env,

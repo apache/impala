@@ -203,6 +203,12 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
 ExecEnv::~ExecEnv() {
 }
 
+Status ExecEnv::InitForFeTests() {
+  mem_tracker_.reset(new MemTracker(-1, "Process"));
+  is_fe_tests_ = true;
+  return Status::OK;
+}
+
 Status ExecEnv::StartServices() {
   LOG(INFO) << "Starting global services";
 
