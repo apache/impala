@@ -534,11 +534,11 @@ public class HdfsTable extends Table {
     if (permisisonChecker.hasAccess(DFS, location, FsAction.READ_WRITE)) {
       return TAccessLevel.READ_WRITE;
     } else if (permisisonChecker.hasAccess(DFS, location, FsAction.READ)) {
-      LOG.debug(String.format("Impala does not have READ access to '%s' in table: %s",
+      LOG.debug(String.format("Impala does not have WRITE access to '%s' in table: %s",
           location, getFullName()));
       return TAccessLevel.READ_ONLY;
     } else if (permisisonChecker.hasAccess(DFS, location, FsAction.WRITE)) {
-      LOG.debug(String.format("Impala does not have WRITE access to '%s' in table: %s",
+      LOG.debug(String.format("Impala does not have READ access to '%s' in table: %s",
           location, getFullName()));
       return TAccessLevel.WRITE_ONLY;
     }
