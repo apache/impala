@@ -191,7 +191,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
         DiskIoMgr::WriteRange** new_range = pool_->Add(new DiskIoMgr::WriteRange*);
         DiskIoMgr::WriteRange::WriteDoneCallback callback =
             bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, num_ranges,
-                 new_range, read_io_mgr.get(), reader, data, Status::OK, _1);
+                new_range, read_io_mgr.get(), reader, data, Status::OK, _1);
         *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, cur_offset,
             num_ranges % num_disks, callback));
         (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));

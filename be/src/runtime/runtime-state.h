@@ -30,7 +30,7 @@
 #include "statestore/query-resource-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
-#include "runtime/disk-io-mgr.h"  // for DiskIoMgr::ReaderContext
+#include "runtime/disk-io-mgr.h"  // for DiskIoMgr::RequestContext
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
@@ -96,9 +96,6 @@ class RuntimeState {
   int batch_size() const { return query_ctxt_.request.query_options.batch_size; }
   bool abort_on_error() const {
     return query_ctxt_.request.query_options.abort_on_error;
-  }
-  bool abort_on_default_limit_exceeded() const {
-    return query_ctxt_.request.query_options.abort_on_default_limit_exceeded;
   }
   int max_errors() const { return query_ctxt_.request.query_options.max_errors; }
   const TQueryContext& query_ctxt() const { return query_ctxt_; }
@@ -187,10 +184,12 @@ class RuntimeState {
   MemPool* udf_pool() { return udf_pool_.get(); };
 
   // Create and return a stream receiver for fragment_instance_id_
-  // from the data stream manager. The receiver is added to data_stream_recvrs_pool_.
-  DataStreamRecvr* CreateRecvr(
+  // from the data stream manager.
+  // Separate row-batch receiver queues are maintained for each sender instance if
+  // is_merging is true.
+  boost::shared_ptr<DataStreamRecvr> CreateRecvr(
       const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
-      int buffer_size, RuntimeProfile* profile);
+      int buffer_size, RuntimeProfile* profile, bool is_merging);
 
   // Appends error to the error_log_ if there is space. Returns true if there was space
   // and the error was logged.
@@ -269,13 +268,6 @@ class RuntimeState {
 
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
-
-  // Data stream receivers created by a plan fragment are gathered here to make sure
-  // they are destroyed before obj_pool_ (class members are destroyed in reverse order).
-  // Receivers depend on the descriptor table and we need to guarantee that their control
-  // blocks are removed from the data stream manager before the objects in the
-  // descriptor table are destroyed.
-  boost::scoped_ptr<ObjectPool> data_stream_recvrs_pool_;
 
   // Lock protecting error_log_ and unreported_error_idx_
   boost::mutex error_log_lock_;

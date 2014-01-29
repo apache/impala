@@ -37,6 +37,7 @@ add_library(Util
   disk-info.cc
   error-util.cc
   fe-test-info.cc
+  filesystem-util.cc
   hdfs-util.cc
   hdfs-bulk-ops.cc
   impalad-metrics.cc

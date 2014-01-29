@@ -75,7 +75,7 @@ do
   # Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
   # functional-query workload because the larger datasets (ex. tpch) are not generated
   # in all table formats.
-  ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
+  ${IMPALA_HOME}/tests/run-tests.py --exploration_strategy=core \
       --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY
 
   # Run JUnit frontend tests

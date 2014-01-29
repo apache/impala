@@ -16,8 +16,11 @@
 
 #include <vector>
 
+#include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
+#include "runtime/raw-value.h"
+#include "runtime/tuple-row.h"
 #include "runtime/string-value.h"
 #include "util/debug-util.h"
 
@@ -69,4 +72,44 @@ void Tuple::DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
   }
 }
 
+template <bool collect_string_vals>
+void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
+    const vector<Expr*>& materialize_exprs, MemPool* pool,
+    vector<StringValue*>* non_null_var_len_values, int* total_var_len) {
+  if (collect_string_vals) {
+    non_null_var_len_values->clear();
+    *total_var_len = 0;
+  }
+  memset(this, 0, desc.num_null_bytes());
+  // Evaluate the output_slot_exprs and place the results in the tuples.
+  int mat_expr_index = 0;
+  for (int i = 0; i < desc.slots().size(); ++i) {
+    SlotDescriptor* slot_desc = desc.slots()[i];
+    if (!slot_desc->is_materialized()) continue;
+    DCHECK_EQ(slot_desc->type(), materialize_exprs[mat_expr_index]->type());
+    void* src = materialize_exprs[mat_expr_index]->GetValue(row);
+    if (src != NULL) {
+      void* dst = GetSlot(slot_desc->tuple_offset());
+      RawValue::Write(src, dst, slot_desc->type(), pool);
+      if (collect_string_vals && slot_desc->type() == TYPE_STRING) {
+        StringValue* string_val = reinterpret_cast<StringValue*>(dst);
+        non_null_var_len_values->push_back(string_val);
+        *total_var_len += string_val->len;
+      }
+    } else {
+      SetNull(slot_desc->null_indicator_offset());
+    }
+    ++mat_expr_index;
+  }
+
+  DCHECK_EQ(mat_expr_index, materialize_exprs.size());
+}
+
+template void Tuple::MaterializeExprs<false>(TupleRow* row, const TupleDescriptor& desc,
+    const vector<Expr*>& materialize_exprs, MemPool* pool,
+    vector<StringValue*>* non_null_var_values, int* total_var_len);
+
+template void Tuple::MaterializeExprs<true>(TupleRow* row, const TupleDescriptor& desc,
+    const vector<Expr*>& materialize_exprs, MemPool* pool,
+    vector<StringValue*>* non_null_var_values, int* total_var_len);
 }

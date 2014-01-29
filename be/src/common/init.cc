@@ -34,6 +34,7 @@
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/timestamp-parse-util.h"
+#include "runtime/tmp-file-mgr.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "util/thread.h"
@@ -124,6 +125,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm, bool is_fe_
   impala::InitGoogleLoggingSafe(argv[0]);
   impala::InitThreading();
   impala::TimestampParser::Init();
+  TmpFileMgr::Init();
   EXIT_IF_ERROR(impala::InitAuth(argv[0]));
 
   // Initialize maintenance_thread after InitGoogleLoggingSafe and InitThreading.

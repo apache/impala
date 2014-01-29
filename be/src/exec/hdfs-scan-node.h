@@ -273,7 +273,7 @@ class HdfsScanNode : public ScanNode {
   // materialized string slots.
   bool requires_compaction_;
 
-  // ReaderContext object to use with the disk-io-mgr
+  // RequestContext object to use with the disk-io-mgr for reads.
   DiskIoMgr::RequestContext* reader_context_;
 
   // Descriptor for tuples this scan node constructs

@@ -133,6 +133,12 @@ public class SlotRef extends Expr {
   }
 
   @Override
+  public int hashCode() {
+    if (desc_ != null) return desc_.getId().hashCode();
+    return Objects.hashCode(tblName_, (col_ == null) ? null : col_.toLowerCase());
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) return false;
     SlotRef other = (SlotRef) obj;

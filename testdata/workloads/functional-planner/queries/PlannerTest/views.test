@@ -30,10 +30,9 @@ select * from functional.complex_view
    partitions=10/10 size=743.67KB
    predicates: a.bigint_col < 50
 ---- DISTRIBUTEDPLAN
-09:TOP-N [LIMIT=100]
+08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: b.string_col ASC
-|
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 04:TOP-N [LIMIT=100]
 |  order by: b.string_col ASC
@@ -148,12 +147,12 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
    partitions=24/24 size=478.45KB
    predicates: functional.alltypes.id > 1
 ---- DISTRIBUTEDPLAN
-16:EXCHANGE [PARTITION=UNPARTITIONED]
+15:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = int_col
 |
-|--15:EXCHANGE [BROADCAST]
+|--14:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 size=478.45KB
@@ -162,13 +161,12 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = count(a.bigint_col)
 |
-|--14:EXCHANGE [BROADCAST]
+|--13:EXCHANGE [BROADCAST]
 |  |  limit: 100
 |  |
-|  13:TOP-N [LIMIT=100]
+|  12:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  |  order by: b.string_col ASC
-|  |
-|  12:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |  limit: 100
 |  |
 |  06:TOP-N [LIMIT=100]
 |  |  order by: b.string_col ASC

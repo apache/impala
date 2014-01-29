@@ -145,7 +145,6 @@ class DataStreamSender::Channel {
   Status CloseInternal();
 };
 
-
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
   client_cache_ = state->impalad_client_cache();
   // TODO: figure out how to size batch_
@@ -193,6 +192,7 @@ void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
     params.__set_dest_node_id(dest_node_id_);
     params.__set_row_batch(*batch);  // yet another copy
     params.__set_eos(false);
+    params.__set_sender_id(parent_->sender_id_);
 
     ImpalaInternalServiceConnection client(client_cache_, address_, &rpc_status_);
     if (!rpc_status_.ok()) return;
@@ -304,6 +304,7 @@ Status DataStreamSender::Channel::CloseInternal() {
     params.protocol_version = ImpalaInternalServiceVersion::V1;
     params.__set_dest_fragment_instance_id(fragment_instance_id_);
     params.__set_dest_node_id(dest_node_id_);
+    params.__set_sender_id(parent_->sender_id_);
     params.__set_eos(true);
     TTransmitDataResult res;
     VLOG_RPC << "calling TransmitData to close channel";
@@ -332,11 +333,12 @@ void DataStreamSender::Channel::Close(RuntimeState* state) {
   batch_.reset();
 }
 
-DataStreamSender::DataStreamSender(ObjectPool* pool,
+DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
     const RowDescriptor& row_desc, const TDataStreamSink& sink,
     const vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size)
-  : pool_(pool),
+  : sender_id_(sender_id),
+    pool_(pool),
     row_desc_(row_desc),
     closed_(false),
     current_thrift_batch_(&thrift_batch1_),

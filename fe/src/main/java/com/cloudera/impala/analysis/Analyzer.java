@@ -95,8 +95,8 @@ public class Analyzer {
 
   private final User user_;
 
-  // true if the corresponding select block has a limit clause
-  private boolean hasLimit_ = false;
+  // true if the corresponding select block has a limit and/or offset clause
+  private boolean hasLimitOffsetClause_ = false;
 
   // Current depth of nested analyze() calls. Used for enforcing a
   // maximum expr-tree depth. Needs to be manually maintained by the user
@@ -360,6 +360,12 @@ public class Analyzer {
   public SlotDescriptor getSlotDescriptor(String qualifiedColumnName) {
     return slotRefMap_.get(qualifiedColumnName);
   }
+
+  /**
+   * Return true if this analyzer has no ancestors. (i.e. false for the analyzer created
+   * for inline views/ union operands, etc.)
+   */
+  public boolean isRootAnalyzer() { return ancestors_.isEmpty(); }
 
   /**
    * Checks that 'col' references an existing column for a registered table alias;
@@ -1480,8 +1486,9 @@ public class Analyzer {
   }
   public boolean useHiveColLabels() { return globalState_.useHiveColLabels; }
 
-  public boolean hasLimit() { return hasLimit_; }
-  public void setHasLimit(boolean hasLimit) { this.hasLimit_ = hasLimit; }
+  public void setHasLimitOffsetClause(boolean hasLimitOffset) {
+    this.hasLimitOffsetClause_ = hasLimitOffset;
+  }
 
   public List<Expr> getConjuncts() {
     return new ArrayList<Expr>(globalState_.conjuncts.values());
@@ -1702,10 +1709,12 @@ public class Analyzer {
           LOG.trace("value transfer: from " + slotIds.first.toString());
           Pair<SlotId, SlotId> firstToSecond = null;
           Pair<SlotId, SlotId> secondToFirst = null;
-          if (!(secondBlock.hasLimit_ && secondBlock.ancestors_.contains(firstBlock))) {
+          if (!(secondBlock.hasLimitOffsetClause_ &&
+              secondBlock.ancestors_.contains(firstBlock))) {
             firstToSecond = new Pair<SlotId, SlotId>(slotIds.first, slotIds.second);
           }
-          if (!(firstBlock.hasLimit_ && firstBlock.ancestors_.contains(secondBlock))) {
+          if (!(firstBlock.hasLimitOffsetClause_ &&
+              firstBlock.ancestors_.contains(secondBlock))) {
             secondToFirst = new Pair<SlotId, SlotId>(slotIds.second, slotIds.first);
           }
           // Add bi-directional value transfers to the completeSubGraphs, or

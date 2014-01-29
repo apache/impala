@@ -45,7 +45,8 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
 
       // TODO: figure out good buffer size based on size of output row
       tmp_sink = new DataStreamSender(pool,
-          row_desc, thrift_sink.stream_sink, params.destinations, 16 * 1024);
+          params.sender_id, row_desc, thrift_sink.stream_sink,
+          params.destinations, 16 * 1024);
       sink->reset(tmp_sink);
       break;
 

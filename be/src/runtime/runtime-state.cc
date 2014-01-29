@@ -25,6 +25,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
+#include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-recvr.h"
 #include "util/bitmap.h"
 #include "util/cpu-info.h"
@@ -50,7 +51,6 @@ RuntimeState::RuntimeState(const TUniqueId& query_id,
     const TUniqueId& fragment_instance_id, const TQueryContext& query_ctxt,
     const string& cgroup, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
-    data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
     query_ctxt_(query_ctxt),
     now_(new TimestampValue(query_ctxt.now_string.c_str(),
@@ -67,7 +67,6 @@ RuntimeState::RuntimeState(const TUniqueId& query_id,
 
 RuntimeState::RuntimeState(const TQueryContext& query_ctxt)
   : obj_pool_(new ObjectPool()),
-    data_stream_recvrs_pool_(new ObjectPool()),
     unreported_error_idx_(0),
     query_ctxt_(query_ctxt),
     now_(new TimestampValue(query_ctxt.now_string.c_str(),
@@ -148,12 +147,12 @@ Status RuntimeState::InitMemTrackers(const TUniqueId& query_id,
   return Status::OK;
 }
 
-DataStreamRecvr* RuntimeState::CreateRecvr(
+shared_ptr<DataStreamRecvr> RuntimeState::CreateRecvr(
     const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
-    int buffer_size, RuntimeProfile* profile) {
-  DataStreamRecvr* recvr = exec_env_->stream_mgr()->CreateRecvr(this, row_desc,
-      fragment_instance_id_, dest_node_id, num_senders, buffer_size, profile);
-  data_stream_recvrs_pool_->Add(recvr);
+    int buffer_size, RuntimeProfile* profile, bool is_merging) {
+  shared_ptr<DataStreamRecvr> recvr = exec_env_->stream_mgr()->CreateRecvr(this,
+      row_desc, fragment_instance_id_, dest_node_id, num_senders, buffer_size, profile,
+      is_merging);
   return recvr;
 }
 

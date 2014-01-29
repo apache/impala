@@ -357,9 +357,11 @@ public class ParserTest {
     ParsesOk("select a from test order by a limit 10 offset 0");
     ParsesOk("select a from test order by a limit 10 offset 0 + 5 / 2");
     ParsesOk("select a from test order by a asc limit 10 offset 5");
+    ParsesOk("select a from test order by a offset 5");
     ParsesOk("select a from test limit 10 offset 5"); // Parses OK, doesn't analyze
-    ParserError("select a from test offset 5");
-    ParserError("select a from test order by a offset 5");
+    ParsesOk("select a from test offset 5"); // Parses OK, doesn't analyze
+    ParsesOk("select a from (select a from test offset 5) A"); // Doesn't analyze
+    ParsesOk("select a from (select a from test order by a offset 5) A");
     ParserError("select a from test order by a limit offset");
     ParserError("select a from test order by a limit offset 5");
   }
@@ -396,25 +398,44 @@ public class ParserTest {
     // Union with limit.
     ParsesOk("(select a from test) union (select a from test) " +
         "union (select a from test) union (select a from test) limit 10");
-    // Union with order by and limit.
+    // Union with order by, offset and limit.
     ParsesOk("(select a from test) union (select a from test) " +
         "union (select a from test) union (select a from test) order by a limit 10");
     ParsesOk("(select a from test) union (select a from test) " +
         "union (select a from test) union (select a from test) order by a " +
         "nulls first limit 10");
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union (select a from test) union (select a from test) order by a " +
+        "nulls first offset 10");
+    ParserError("select a from test union (select a from test) " +
+        "union (select a from test) union (select a from test) offset 10");
     // Union with some select blocks in parenthesis, and others not.
     ParsesOk("(select a from test) union select a from test " +
         "union (select a from test) union select a from test");
     ParsesOk("select a from test union (select a from test) " +
         "union select a from test union (select a from test)");
-    // Union with order by and limit binding to last select.
+    // Union with order by, offset and limit binding to last select.
     ParsesOk("(select a from test) union (select a from test) " +
         "union select a from test union select a from test order by a limit 10");
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union select a from test union select a from test order by a offset 10");
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union select a from test union select a from test order by a");
     // Union with order by and limit.
     // Last select with order by and limit is in parenthesis.
     ParsesOk("select a from test union (select a from test) " +
         "union select a from test union (select a from test order by a limit 10) " +
         "order by a limit 1");
+    ParsesOk("select a from test union (select a from test) " +
+        "union select a from test union (select a from test order by a offset 10) " +
+        "order by a limit 1");
+    ParsesOk("select a from test union (select a from test) " +
+        "union select a from test union (select a from test order by a) " +
+        "order by a limit 1");
+    // Union with order by, offset in first operand.
+    ParsesOk("select a from test order by a union select a from test");
+    ParsesOk("select a from test order by a offset 5 union select a from test");
+    ParsesOk("select a from test offset 5 union select a from test");
     // Union with order by and limit.
     // Last select with order by and limit is not in parenthesis.
     ParsesOk("select a from test union select a from test " +
@@ -470,6 +491,8 @@ public class ParserTest {
     ParsesOk("values(1, 'a') limit 10");
     ParsesOk("values(1, 'a') order by 1");
     ParsesOk("values(1, 'a') order by 1 limit 10");
+    ParsesOk("values(1, 'a') order by 1 offset 10");
+    ParsesOk("values(1, 'a') offset 10");
     ParsesOk("values(1, 'a'), (2, 'b') order by 1 limit 10");
     ParsesOk("values((1, 'a'), (2, 'b')) order by 1 limit 10");
 
@@ -2139,8 +2162,8 @@ public class ParserTest {
         "... b, c,c,c,c,c,c,c,c,c,a a a,c,c,c,c,c,c,c,cd,c,d,d,,c,...\n" +
         "                             ^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, ON, " +
-        "ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
+        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
+        "ON, ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the start
     ParserError("select a a a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",
@@ -2148,8 +2171,8 @@ public class ParserTest {
         "select a a a, b, c,c,c,c,c,c,c,c,c,c,c,...\n" +
         "           ^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, ON, " +
-        "ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
+        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
+        "ON, ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the end
     ParserError("select a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t",

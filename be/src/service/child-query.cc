@@ -115,7 +115,7 @@ void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
     TExecuteStatementReq* exec_stmt_req) {
   // If this DCHECK is hit then handle the missing query option below.
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),
-      TImpalaQueryOptions::DISABLE_CACHED_READS + 1);
+      TImpalaQueryOptions::DISABLE_OUTERMOST_TOPN + 1);
   SET_QUERY_OPTION(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED);
   SET_QUERY_OPTION(abort_on_error, ABORT_ON_ERROR);
   SET_QUERY_OPTION(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS);
@@ -123,6 +123,7 @@ void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
   // Ignore debug actions on child queries because they may cause deadlock.
   SET_QUERY_OPTION(default_order_by_limit, DEFAULT_ORDER_BY_LIMIT);
   SET_QUERY_OPTION(disable_cached_reads, DISABLE_CACHED_READS);
+  SET_QUERY_OPTION(disable_outermost_topn, DISABLE_OUTERMOST_TOPN);
   SET_QUERY_OPTION(disable_codegen, DISABLE_CODEGEN);
   SET_QUERY_OPTION(explain_level, EXPLAIN_LEVEL);
   SET_QUERY_OPTION(hbase_cache_blocks, HBASE_CACHE_BLOCKS);

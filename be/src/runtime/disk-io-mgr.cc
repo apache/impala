@@ -825,17 +825,19 @@ bool DiskIoMgr::GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
 
 void DiskIoMgr::HandleWriteFinished(RequestContext* writer, WriteRange* write_range,
     const Status& write_status) {
+  {
+    unique_lock<mutex> writer_lock(writer->lock_);
+    DCHECK(writer->Validate()) << endl << writer->DebugString();
+    RequestContext::PerDiskState& state = writer->disk_states_[write_range->disk_id_];
+    if (writer->state_ == RequestContext::Cancelled) {
+      state.DecrementRequestThreadAndCheckDone(writer);
+    } else {
+      state.DecrementRequestThread();
+    }
+    --state.num_remaining_ranges();
+  }
   // The status of the write does not affect the status of the writer context.
   write_range->callback_(write_status);
-  unique_lock<mutex> writer_lock(writer->lock_);
-  DCHECK(writer->Validate()) << endl << writer->DebugString();
-  RequestContext::PerDiskState& state = writer->disk_states_[write_range->disk_id_];
-  if (writer->state_ == RequestContext::Cancelled) {
-    state.DecrementRequestThreadAndCheckDone(writer);
-  } else {
-    state.DecrementRequestThread();
-  }
-  --state.num_remaining_ranges();
 }
 
 void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, RequestContext* reader,
@@ -902,7 +904,7 @@ void DiskIoMgr::WorkLoop(DiskQueue* disk_queue) {
     RequestContext* worker_context = NULL;;
     RequestRange* range = NULL;
 
-    if(!GetNextRequestRange(disk_queue, &range, &worker_context)) {
+    if (!GetNextRequestRange(disk_queue, &range, &worker_context)) {
       DCHECK(shut_down_);
       break;
     }
@@ -1020,7 +1022,10 @@ void DiskIoMgr::Write(RequestContext* writer_context, WriteRange* write_range) {
 Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
   // First ensure that disk space is allocated via fallocate().
   int file_desc = fileno(file_handle);
-  int success = posix_fallocate(file_desc, write_range->offset(), write_range->len_);
+  int success = 0;
+  if (write_range->len_ > 0) {
+    success = posix_fallocate(file_desc, write_range->offset(), write_range->len_);
+  }
   if (success != 0) {
     return Status(TStatusCode::RUNTIME_ERROR,
         Substitute("posix_fallocate($0, $1, $2) failed for file $3"

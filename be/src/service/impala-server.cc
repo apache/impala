@@ -952,6 +952,10 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         query_options->__set_disable_cached_reads(
             iequals(value, "true") || iequals(value, "1"));
         break;
+      case TImpalaQueryOptions::DISABLE_OUTERMOST_TOPN:
+        query_options->__set_disable_outermost_topn(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1032,12 +1036,14 @@ void ImpalaServer::TransmitData(
   VLOG_ROW << "TransmitData(): instance_id=" << params.dest_fragment_instance_id
            << " node_id=" << params.dest_node_id
            << " #rows=" << params.row_batch.num_rows
+           << "sender_id=" << params.sender_id
            << " eos=" << (params.eos ? "true" : "false");
   // TODO: fix Thrift so we can simply take ownership of thrift_batch instead
   // of having to copy its data
   if (params.row_batch.num_rows > 0) {
     Status status = exec_env_->stream_mgr()->AddData(
-        params.dest_fragment_instance_id, params.dest_node_id, params.row_batch);
+        params.dest_fragment_instance_id, params.dest_node_id, params.row_batch,
+        params.sender_id);
     status.SetTStatus(&return_val);
     if (!status.ok()) {
       // should we close the channel here as well?
@@ -1047,7 +1053,8 @@ void ImpalaServer::TransmitData(
 
   if (params.eos) {
     exec_env_->stream_mgr()->CloseSender(
-        params.dest_fragment_instance_id, params.dest_node_id).SetTStatus(&return_val);
+        params.dest_fragment_instance_id, params.dest_node_id,
+        params.sender_id).SetTStatus(&return_val);
   }
 }
 
@@ -1224,6 +1231,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::DISABLE_CACHED_READS:
         val << query_option.disable_cached_reads;
+        break;
+      case TImpalaQueryOptions::DISABLE_OUTERMOST_TOPN:
+        val << query_option.disable_outermost_topn;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

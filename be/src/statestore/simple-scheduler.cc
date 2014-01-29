@@ -640,6 +640,7 @@ void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_re
     PlanNodeId exch_id = sink.dest_node_id;
     // we might have multiple fragments sending to this exchange node
     // (distributed MERGE), which is why we need to add up the #senders
+    params.sender_id_base = dest_params.per_exch_num_senders[exch_id];
     dest_params.per_exch_num_senders[exch_id] += params.hosts.size();
 
     // create one TPlanFragmentDestination per destination host

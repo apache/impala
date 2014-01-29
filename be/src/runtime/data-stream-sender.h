@@ -46,12 +46,13 @@ class TPlanFragmentDestination;
 class DataStreamSender : public DataSink {
  public:
   // Construct a sender according to the output specification (sink),
-  // sending to the given destinations.
+  // sending to the given destinations. sender_id identifies this
+  // sender instance, and is unique within a fragment.
   // Per_channel_buffer_size is the buffer size allocated to each channel
   // and is specified in bytes.
   // The RowDescriptor must live until Close() is called.
   // NOTE: supported partition types are UNPARTITIONED (broadcast) and HASH_PARTITIONED
-  DataStreamSender(ObjectPool* pool,
+  DataStreamSender(ObjectPool* pool, int sender_id,
     const RowDescriptor& row_desc, const TDataStreamSink& sink,
     const std::vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size);
@@ -85,6 +86,8 @@ class DataStreamSender : public DataSink {
  private:
   class Channel;
 
+  // Sender instance id, unique within a fragment.
+  int sender_id_;
   RuntimeState* state_;
   ObjectPool* pool_;
   const RowDescriptor& row_desc_;

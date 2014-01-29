@@ -229,9 +229,26 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select * from (select zip, count(*) " +
         "       from (select * from functional.testtbl) x " +
         "       group by 1 order by count(*) + min(zip) limit 5) x");
+    AnalyzesOk("select * from (select zip, count(*) " +
+        "       from (select * from functional.testtbl) x " +
+        "       group by 1 order by count(*) + min(zip)) x");
+    AnalysisError("select * from (select zip, count(*) " +
+        "       from (select * from functional.testtbl) x " +
+        "       group by 1 offset 5) x",
+        "OFFSET requires an ORDER BY clause: OFFSET 5");
+    AnalysisError("select * from (select zip, count(*) " +
+        "       from (select * from functional.testtbl) x " +
+        "       group by 1 order by count(*) + min(zip) offset 5) x",
+        "Order-by with offset without limit not supported in nested queries");
     AnalyzesOk("select c1, c2 from (select zip c1 , count(*) c2 " +
         "                     from (select * from functional.testtbl) x group by 1) x " +
         "        order by 2, 1 limit 5");
+    AnalyzesOk("select c1, c2 from (select zip c1 , count(*) c2 " +
+        "                     from (select * from functional.testtbl) x group by 1) x " +
+        "        order by 2, 1");
+    AnalyzesOk("select c1, c2 from (select zip c1 , count(*) c2 " +
+        "                     from (select * from functional.testtbl) x group by 1) x " +
+        "        order by 2, 1 offset 5");
 
     // test NULLs
     AnalyzesOk("select * from (select NULL) a");
@@ -819,7 +836,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select zip z, id C, id D from functional.testtbl order by z, C, d");
 
     // can introduce additional aggregates in order by clause
-    AnalyzesOk("select zip, count(*) from functional.testtbl group by 1 order by count(*)");
+    AnalyzesOk("select zip, count(*) from functional.testtbl group by 1 " +
+        " order by count(*)");
     AnalyzesOk("select zip, count(*) from functional.testtbl " +
         "group by 1 order by count(*) + min(zip)");
     AnalysisError("select zip, count(*) from functional.testtbl group by 1 order by id",
@@ -901,16 +919,47 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "union select float_col, smallint_col from functional.alltypes " +
         "union select double_col, tinyint_col from functional.alltypes");
 
-    // With order by and limit.
+    // With order by, offset and limit.
     AnalyzesOk("(select int_col from functional.alltypes) " +
         "union (select tinyint_col from functional.alltypessmall) " +
         "order by int_col limit 1");
+    AnalyzesOk("(select int_col from functional.alltypes) " +
+        "union (select tinyint_col from functional.alltypessmall) " +
+        "order by int_col");
+    AnalyzesOk("(select int_col from functional.alltypes) " +
+        "union (select tinyint_col from functional.alltypessmall) " +
+        "order by int_col offset 5");
+    // Order by w/o limit is ignored in the union operand below.
+    AnalyzesOk("select int_col from functional.alltypes order by int_col " +
+        "union (select tinyint_col from functional.alltypessmall) ");
+    AnalysisError("select int_col from functional.alltypes order by int_col offset 5 " +
+        "union (select tinyint_col from functional.alltypessmall) ",
+        "Order-by with offset without limit not supported in nested queries");
+    AnalysisError("select int_col from functional.alltypes offset 5 " +
+        "union (select tinyint_col from functional.alltypessmall) ",
+        "OFFSET requires an ORDER BY clause: OFFSET 5");
+    // Order by w/o limit is ignored in the union operand below.
+    AnalyzesOk("select int_col from functional.alltypes " +
+        "union (select tinyint_col from functional.alltypessmall " +
+        "order by tinyint_col) ");
+    AnalysisError("select int_col from functional.alltypes " +
+        "union (select tinyint_col from functional.alltypessmall " +
+        "order by tinyint_col offset 5) ",
+        "Order-by with offset without limit not supported in nested queries");
+    AnalysisError("select int_col from functional.alltypes " +
+        "union (select tinyint_col from functional.alltypessmall offset 5) ",
+        "OFFSET requires an ORDER BY clause: OFFSET 5");
     // Bigger order by.
     AnalyzesOk("(select tinyint_col, double_col from functional.alltypes) " +
         "union (select smallint_col, float_col from functional.alltypes) " +
         "union (select int_col, bigint_col from functional.alltypes) " +
         "union (select bigint_col, int_col from functional.alltypes) " +
         "order by double_col, tinyint_col");
+    // Multiple union operands with valid order by clauses.
+    AnalyzesOk("select int_col from functional.alltypes order by int_col " +
+        "union select int_col from functional.alltypes order by int_col limit 10 " +
+        "union (select int_col from functional.alltypes " +
+        "order by int_col limit 10 offset 5) order by int_col offset 5");
     // Bigger order by with ordinals.
     AnalyzesOk("(select tinyint_col, double_col from functional.alltypes) " +
         "union (select smallint_col, float_col from functional.alltypes) " +
@@ -1001,10 +1050,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "(3, true, 3, 3, 3, 3, 3.0, 3.0, 'c', 'c', cast(0 as timestamp), 2009, 3))");
     // Test multiple aliases. Values() is like union, the column labels are 'x' and 'y'.
     AnalyzesOk("values((1 as x, 'a' as y), (2 as k, 'b' as j))");
-    // Test order by and limit.
+    // Test order by, offset and limit.
     AnalyzesOk("values(1 as x, 'a') order by 2 limit 10");
     AnalyzesOk("values(1 as x, 'a' as y), (2, 'b') order by y limit 10");
     AnalyzesOk("values((1, 'a'), (2, 'b')) order by 1 limit 10");
+    AnalyzesOk("values((1, 'a'), (2, 'b')) order by 2");
+    AnalyzesOk("values((1, 'a'), (2, 'b')) order by 1 offset 5");
+    AnalysisError("values((1, 'a'), (2, 'b')) offset 5",
+        "OFFSET requires an ORDER BY clause: OFFSET 5");
 
     AnalysisError("values(1, 'a', 1.0, *)",
         "'*' expression in select list requires FROM clause.");
@@ -1863,7 +1916,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   @Test
   public void cloneTest() {
-    testNumberOfMembers(QueryStmt.class, 9);
+    testNumberOfMembers(QueryStmt.class, 10);
     testNumberOfMembers(UnionStmt.class, 7);
     testNumberOfMembers(ValuesStmt.class, 0);
 

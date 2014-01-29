@@ -208,10 +208,12 @@ public class PlannerTest {
       }
     } catch (ImpalaException e) {
       if (e instanceof AnalysisException) {
-        errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
+        errorLog.append(
+            "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
         return;
       } else if (e instanceof InternalException) {
-        errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
+        errorLog.append(
+            "query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
         return;
       } if (e instanceof NotImplementedException) {
         handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
@@ -298,6 +300,9 @@ public class PlannerTest {
        errorLog.append(
            "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
      }
+   } catch (IllegalStateException ie) {
+       errorLog.append(
+           "query:\n" + query + "\nunhandled exception: " + ie.getMessage() + "\n");
    }
   }
 

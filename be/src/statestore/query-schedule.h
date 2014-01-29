@@ -50,6 +50,11 @@ struct FragmentExecParams {
   std::vector<TPlanFragmentDestination> destinations;
   std::map<PlanNodeId, int> per_exch_num_senders;
   FragmentScanRangeAssignment scan_range_assignment;
+  // In its role as a data sender, a fragment instance is assigned a "sender id" to
+  // uniquely identify it to a receiver. The id that a particular fragment instance
+  // is assigned ranges from [sender_id_base, sender_id_base + N - 1], where
+  // N = hosts.size (i.e. N = number of fragment instances)
+  int sender_id_base;
 };
 // A QuerySchedule contains all necessary information for a query coordinator to
 // generate fragment execution requests and start query execution. If resource management

@@ -16,6 +16,7 @@ package com.cloudera.impala.common;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collection;
 
 import com.google.common.base.Predicate;
 
@@ -52,7 +53,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
    * itself matches, the children are skipped.
    */
   public <C extends TreeNode<NodeType>, D extends C> void collect(
-      Predicate<? super C> predicate, List<D> matches) {
+      Predicate<? super C> predicate, Collection<D> matches) {
     // TODO: the semantics of this function are very strange. contains()
     // checks using .equals() on the nodes. In the case of literals, slotrefs
     // and maybe others, two different tree node objects can be equal and
@@ -89,7 +90,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
    * into 'matches'
    */
   public static <C extends TreeNode<C>, D extends C> void collect(
-      List<C> nodeList, Predicate<? super C> predicate, List<D> matches) {
+      Collection<C> nodeList, Predicate<? super C> predicate, Collection<D> matches) {
     for (C node : nodeList) {
       node.collect(predicate, matches);
     }
@@ -114,7 +115,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
    * contains('predicate').
    */
   public static <C extends TreeNode<C>, D extends C> boolean contains(
-      List<C> nodeList, Predicate<? super C> predicate) {
+      Collection<C> nodeList, Predicate<? super C> predicate) {
     for (C node : nodeList) {
       if (node.contains(predicate)) return true;
     }

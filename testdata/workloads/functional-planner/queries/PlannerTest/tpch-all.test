@@ -191,7 +191,7 @@ order by
 limit 100
 ---- PLAN
 03:TOP-N [LIMIT=100]
-|  order by: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
+|  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.p_partkey = t2.p_partkey, t1.ps_supplycost = t2.ps_min_supplycost
@@ -202,13 +202,12 @@ limit 100
 00:SCAN HDFS [tpch.q2_minimum_cost_supplier_tmp1 t1]
    partitions=1/1 size=108.41KB
 ---- DISTRIBUTEDPLAN
-06:TOP-N [LIMIT=100]
-|  order by: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
-|
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
+|  limit: 100
 |
 03:TOP-N [LIMIT=100]
-|  order by: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
+|  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.p_partkey = t2.p_partkey, t1.ps_supplycost = t2.ps_min_supplycost
@@ -270,10 +269,9 @@ limit 10
    partitions=1/1 size=718.94MB
    predicates: l_shipdate > '1995-03-15'
 ---- DISTRIBUTEDPLAN
-12:TOP-N [LIMIT=10]
+11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
-|
-11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
 |
 06:TOP-N [LIMIT=10]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
@@ -351,10 +349,9 @@ limit 10
    partitions=1/1 size=718.94MB
    predicates: l.l_commitdate < l.l_receiptdate
 ---- DISTRIBUTEDPLAN
-10:TOP-N [LIMIT=10]
+09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: o_orderpriority ASC
-|
-09:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
 |
 05:TOP-N [LIMIT=10]
 |  order by: o_orderpriority ASC
@@ -453,10 +450,9 @@ limit 100
 00:SCAN HDFS [tpch.lineitem l]
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-21:TOP-N [LIMIT=100]
+20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC
-|
-20:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 12:TOP-N [LIMIT=100]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC
@@ -633,10 +629,9 @@ limit 100
 00:SCAN HDFS [tpch.lineitem l]
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-27:TOP-N [LIMIT=100]
+26:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: year(o_orderdate) ASC
-|
-26:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 16:TOP-N [LIMIT=100]
 |  order by: year(o_orderdate) ASC
@@ -783,10 +778,9 @@ limit 200
 00:SCAN HDFS [tpch.lineitem l]
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-21:TOP-N [LIMIT=200]
+20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: n.n_name ASC, year(o.o_orderdate) DESC
-|
-20:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 200
 |
 12:TOP-N [LIMIT=200]
 |  order by: n.n_name ASC, year(o.o_orderdate) DESC
@@ -911,10 +905,9 @@ limit 20
    partitions=1/1 size=718.94MB
    predicates: l.l_returnflag = 'R'
 ---- DISTRIBUTEDPLAN
-15:TOP-N [LIMIT=20]
+14:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC
-|
-14:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 20
 |
 08:TOP-N [LIMIT=20]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC
@@ -1101,10 +1094,9 @@ limit 10
 01:SCAN HDFS [tpch.orders o]
    partitions=1/1 size=162.56MB
 ---- DISTRIBUTEDPLAN
-09:TOP-N [LIMIT=10]
+08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: l_shipmode ASC
-|
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
 |
 04:TOP-N [LIMIT=10]
 |  order by: l_shipmode ASC
@@ -1173,10 +1165,9 @@ limit 100
    partitions=1/1 size=162.56MB
    predicates: NOT o.o_comment LIKE '%special%requests%'
 ---- DISTRIBUTEDPLAN
-13:TOP-N [LIMIT=100]
+12:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: count(1) DESC, c_count DESC
-|
-12:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 05:TOP-N [LIMIT=100]
 |  order by: count(1) DESC, c_count DESC
@@ -1357,10 +1348,9 @@ limit 100
 00:SCAN HDFS [tpch.supplier s]
    partitions=1/1 size=1.33MB
 ---- DISTRIBUTEDPLAN
-09:TOP-N [LIMIT=100]
+08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: s_suppkey ASC
-|
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 05:TOP-N [LIMIT=100]
 |  order by: s_suppkey ASC
@@ -1483,10 +1473,9 @@ limit 1000
    partitions=1/1 size=27.10MB
    predicates: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
 ---- DISTRIBUTEDPLAN
-07:TOP-N [LIMIT=1000]
+06:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
-|
-06:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 1000
 |
 03:TOP-N [LIMIT=1000]
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
@@ -1689,10 +1678,9 @@ limit 100
 00:SCAN HDFS [tpch.lineitem l]
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-16:TOP-N [LIMIT=100]
+15:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
-|
-15:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 08:TOP-N [LIMIT=100]
 |  order by: CAST(o_totalprice AS BIGINT) ASC, o_orderdate ASC
@@ -2009,10 +1997,9 @@ limit 100
 00:SCAN HDFS [tpch.supplier s]
    partitions=1/1 size=1.33MB
 ---- DISTRIBUTEDPLAN
-09:TOP-N [LIMIT=100]
+08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: s_name ASC
-|
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 05:TOP-N [LIMIT=100]
 |  order by: s_name ASC
@@ -2116,10 +2103,9 @@ limit 100
 00:SCAN HDFS [tpch.lineitem l1]
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-21:TOP-N [LIMIT=100]
+20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: count(*) DESC, s_name ASC
-|
-20:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 12:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, s_name ASC
@@ -2289,10 +2275,9 @@ limit 100
    partitions=1/1 size=23.08MB
    predicates: (substr(c.c_phone, 1, 2) = '13' OR substr(c.c_phone, 1, 2) = '31' OR substr(c.c_phone, 1, 2) = '23' OR substr(c.c_phone, 1, 2) = '29' OR substr(c.c_phone, 1, 2) = '30' OR substr(c.c_phone, 1, 2) = '18' OR substr(c.c_phone, 1, 2) = '17')
 ---- DISTRIBUTEDPLAN
-13:TOP-N [LIMIT=100]
+12:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: substring(c_phone, 1, 2) ASC
-|
-12:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 06:TOP-N [LIMIT=100]
 |  order by: substring(c_phone, 1, 2) ASC

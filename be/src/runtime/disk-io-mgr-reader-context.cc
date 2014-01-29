@@ -23,7 +23,6 @@ void DiskIoMgr::RequestContext::Cancel(const Status& status) {
 
   // Callbacks are collected in this vector and invoked while no lock is held.
   vector<WriteRange::WriteDoneCallback> write_callbacks;
-
   {
     lock_guard<mutex> lock(lock_);
     DCHECK(Validate()) << endl << DebugString();

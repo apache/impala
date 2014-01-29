@@ -23,7 +23,7 @@
 namespace impala {
 
 // A TupleRow encapsulates a contiguous sequence of Tuple pointers which
-// together make up a row. 
+// together make up a row.
 class TupleRow {
  public:
   Tuple* GetTuple(int tuple_idx) {
@@ -42,8 +42,8 @@ class TupleRow {
     return result;
   }
 
-  // Create a deep copy of this TupleRow into 'dst'.  DeepCopy will allocate from 
-  // the MemPool and copy the tuple pointers, the tuples and the string data in the 
+  // Create a deep copy of this TupleRow into 'dst'.  DeepCopy will allocate from
+  // the MemPool and copy the tuple pointers, the tuples and the string data in the
   // tuples.
   // If reuse_tuple_mem is true, it is assumed the dst TupleRow has already allocated
   // tuple memory and that memory will be reused.  Otherwise, new tuples will be allocated
@@ -64,7 +64,7 @@ class TupleRow {
       }
     }
   }
- 
+
   // TODO: make a macro for doing this
   // For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;

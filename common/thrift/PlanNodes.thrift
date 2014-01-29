@@ -184,18 +184,25 @@ struct TAggregationNode {
   5: optional bool is_merge
 }
 
-struct TSortNode {
+struct TSortInfo {
   1: required list<Exprs.TExpr> ordering_exprs
   2: required list<bool> is_asc_order
-  // Indicates whether the backend service should use topn vs. sorting
-  3: required bool use_top_n;
-  // Indicates whether the imposed limit comes DEFAULT_ORDER_BY_LIMIT.
-  4: required bool is_default_limit
   // Indicates, for each expr, if nulls should be listed first or last. This is
   // independent of is_asc_order.
-  5: optional list<bool> nulls_first
-  // If use_top_n, this is the number of rows to skip before returning results
-  6: optional i64 offset
+  3: required list<bool> nulls_first
+  // Expressions evaluated over the input row that materialize the tuple to be sorted.
+  // Contains one expr per slot in the materialized tuple.
+  4: optional list<Exprs.TExpr> sort_tuple_slot_exprs
+}
+
+struct TSortNode {
+  1: required TSortInfo sort_info
+  // Indicates whether the backend service should use topn vs. sorting
+  2: required bool use_top_n;
+  // This is the number of rows to skip before returning results
+  3: optional i64 offset
+  // Fraction of remaining memory the sort can use.
+  4: optional double use_mem_fraction
 }
 
 struct TMergeNode {
@@ -212,6 +219,10 @@ struct TExchangeNode {
   // The ExchangeNode's input rows form a prefix of the output rows it produces;
   // this describes the composition of that prefix
   1: required list<Types.TTupleId> input_row_tuples
+ // For a merging exchange, the sort information.
+  2: optional TSortInfo sort_info
+  // This is the number of rows to skip before returning results
+  3: optional i64 offset
 }
 
 // This is essentially a union of all messages corresponding to subclasses

@@ -40,7 +40,6 @@ import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
@@ -84,6 +83,9 @@ public class Planner {
   // used for determining whether a broadcast join is feasible.
   public final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
 
+  // The maximum fraction of remaining memory that a sort node can use during execution.
+  public final static double SORT_MEM_MAX_FRACTION = 0.80;
+
   private final IdGenerator<PlanNodeId> nodeIdGenerator_ = PlanNodeId.createGenerator();
   private final IdGenerator<PlanFragmentId> fragmentIdGenerator_ =
       PlanFragmentId.createGenerator();
@@ -120,8 +122,8 @@ public class Planner {
       analyzer.materializeSlots(queryStmt.getBaseTblResultExprs());
     }
 
-    PlanNode singleNodePlan =
-        createQueryPlan(queryStmt, analyzer, queryOptions.getDefault_order_by_limit());
+    PlanNode singleNodePlan = createQueryPlan(queryStmt, analyzer,
+        queryOptions.isDisable_outermost_topn());
     Preconditions.checkNotNull(singleNodePlan);
     LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
 
@@ -133,12 +135,12 @@ public class Planner {
       fragments.add(new PlanFragment(
           fragmentIdGenerator_.getNextId(), singleNodePlan, DataPartition.UNPARTITIONED));
     } else {
-      // For inserts or CTAS, unless there is a limit clause, leave the root fragment
-      // partitioned, otherwise merge everything into a single coordinator fragment,
-      // so we can pass it back to the client.
+      // For inserts or CTAS, unless there is a limit or offset clause, leave the root
+      // fragment partitioned, otherwise merge everything into a single coordinator
+      // fragment, so we can pass it back to the client.
       boolean isPartitioned = false;
       if ((analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())
-          && !queryStmt.hasLimitClause()) {
+          && !queryStmt.hasLimit() && !queryStmt.hasOffset()) {
         isPartitioned = true;
       }
       LOG.debug("create plan fragments");
@@ -269,7 +271,8 @@ public class Planner {
           (AggregationNode) root, childFragments.get(0), fragments, analyzer);
     } else if (root instanceof SortNode) {
       result =
-          createTopnFragment((SortNode) root, childFragments.get(0), fragments, analyzer);
+          createOrderByFragment((SortNode) root, childFragments.get(0), fragments,
+              analyzer);
     } else {
       throw new InternalException(
           "Cannot create plan fragment for this node type: " + root.getExplainString());
@@ -930,15 +933,14 @@ public class Planner {
   }
 
   /**
-   * Returns a fragment that outputs the result of 'node'.
-   * - adds the top-n computation to the child fragment(s)
-   * - if the child fragment is partitioned creates a new unpartitioned fragment that
-   *   merges the output of the child and does another top-n computation
-   * - for a top-n over a union, the child fragment is unpartitioned and only contains an
-   *   ExchangeNoode; adds local top-n nodes to the children of the exchange, and then
-   *   merges the output in childFragment with another top-n
+   * Adds the SortNode 'node' to the child fragment.
+   * If the child fragment is unpartitioned, distribute over union branches if possible.
+   * If the child fragment(s) is partitioned, add a fragment with sort-merging exchange
+   * node as a parent and return the parent.
+   * If a parent was added, the offset and limit are adjusted in the child and parent
+   * nodes to produce the correct result.
    */
-  private PlanFragment createTopnFragment(SortNode node,
+  private PlanFragment createOrderByFragment(SortNode node,
       PlanFragment childFragment, ArrayList<PlanFragment> fragments, Analyzer analyzer)
       throws InternalException, AuthorizationException {
     List<PlanFragment> childFragments = Lists.newArrayList();
@@ -951,55 +953,106 @@ public class Planner {
       return childFragment;
     }
     // Remember original offset and limit.
+    boolean hasLimit = node.hasLimit();
     long limit = node.getLimit();
     long offset = node.getOffset();
     addPlanRoots(childFragments, node, analyzer);
 
-    // we're doing top-n in a single unpartitioned new fragment
-    // that merges the output of childFragment
+    // Create an exchange fragment for the final merge.
     mergeFragment = createParentFragment(analyzer, childFragments,
         DataPartition.UNPARTITIONED, mergeFragment);
-    // insert sort node that repeats the childrens' sort
-    PlanNode exchNode = mergeFragment.getPlanRoot();
-    SortNode mergeNode = (SortNode) node.clone(nodeIdGenerator_.getNextId());
-    mergeNode.addChild(exchNode);
-    // the merging exchange node must not apply the limit (that's done by the
-    // merging top-n)
-    exchNode.unsetLimit();
+    ExchangeNode exchNode = (ExchangeNode) mergeFragment.getPlanRoot();
 
-    // If there is an offset_, it must be applied at the top-n. Child nodes do not apply
-    // the offset_, and instead must keep at least (limit+offset_) rows so that the top-n
-    // node does not miss any rows that should be in the top-n.
+    // Set limit, offset and merge parameters in the exchange node.
+    exchNode.unsetLimit();
+    if (hasLimit) exchNode.setLimit(limit);
+    exchNode.setMergeInfo(node.getSortInfo(), offset);
+
+    // Child nodes should not process the offset. If there is a limit,
+    // the child nodes need only return (offset + limit) rows.
+    List<SortNode> childSortNodes = Lists.newArrayList();
     for (PlanFragment f: childFragments) {
       SortNode childSortNode = (SortNode) f.getPlanRoot();
-      childSortNode.unsetLimit();
-      childSortNode.setLimit(limit + ((offset > 0) ? offset : 0));
+      childSortNodes.add(childSortNode);
+      if (hasLimit) {
+        childSortNode.unsetLimit();
+        childSortNode.setLimit(limit + ((offset > 0) ? offset : 0));
+      }
+
       childSortNode.setOffset(0);
-      childSortNode.init(analyzer);
+      childSortNode.computeStats(analyzer);
     }
-    // Set limit and offset in merge node.
-    mergeNode.setLimit(limit);
-    mergeNode.setOffset(offset);
-    mergeNode.init(analyzer);
-    Preconditions.checkState(mergeNode.hasValidStats());
-    mergeFragment.setPlanRoot(mergeNode);
+
+    // For full sorts, compute the fraction of memory assigned to each sort.
+    // TODO: This is the wrong place to do it and should go away once union-all
+    // operands are evaluated in the same fragment.
+    if (!node.useTopN()) computeMemFraction(childSortNodes);
+
     exchNode.computeStats(analyzer);
 
     return mergeFragment;
   }
 
   /**
-   * Create plan tree for single-node execution.
+   * Compute the fraction of the total memory available for sorts that each sort node
+   * in the 'sortNodes' is allowed to use. The nodes in 'sortNodes' are in concurrently
+   * executing plan fragments. The fraction assigned to each node is proportional to the
+   * cardinality of its input.
    */
-  private PlanNode createQueryPlan(
-      QueryStmt stmt, Analyzer analyzer, long defaultOrderByLimit)
+  private void computeMemFraction(List<SortNode> sortNodes) {
+    double totalSortInput = 0;
+    int numValidChildCard = 0;
+    for (SortNode sortNode: sortNodes) {
+      long childCard = sortNode.getChild(0).getCardinality();
+      if (childCard > 0) {
+        totalSortInput += childCard;
+        ++numValidChildCard;
+      }
+    }
+
+    // For sort inputs with no valid cardinality, assign a cardinality equal to the
+    // average of the remaining inputs.
+    double avgChildCard = 1.0;
+    if (numValidChildCard > 0) avgChildCard = totalSortInput / numValidChildCard;
+
+    totalSortInput += avgChildCard * (sortNodes.size() - numValidChildCard);
+    for (SortNode sortNode: sortNodes) {
+      double childCard = sortNode.getChild(0).getCardinality();
+      if (childCard <= 0) childCard = avgChildCard;
+      sortNode.setUseMemFraction(childCard / totalSortInput);
+    }
+  }
+
+  /**
+   * Create plan tree for single-node execution. Generates PlanNodes for the
+   * Select/Project/Join/Union [All]/Group by/Having/Order by clauses of the query stmt.
+   */
+  private PlanNode createQueryPlan(QueryStmt stmt, Analyzer analyzer, boolean disableTopN)
       throws ImpalaException {
+    PlanNode root;
     if (stmt instanceof SelectStmt) {
-      return createSelectPlan((SelectStmt) stmt, analyzer, defaultOrderByLimit);
+      root = createSelectPlan((SelectStmt) stmt, analyzer);
     } else {
       Preconditions.checkState(stmt instanceof UnionStmt);
-      return createUnionPlan(analyzer, (UnionStmt) stmt);
+      root = createUnionPlan((UnionStmt) stmt, analyzer);
     }
+
+    if (stmt.evaluateOrderBy()) {
+      long limit = stmt.getLimit();
+      // TODO: External sort could be used for very large limits
+      // not just unlimited order-by
+      boolean useTopN = stmt.hasLimit() && !disableTopN;
+      root = new SortNode(nodeIdGenerator_.getNextId(), root, stmt.getSortInfo(),
+          useTopN, stmt.getOffset());
+      Preconditions.checkState(root.hasValidStats());
+      root.setLimit(limit);
+      root.init(analyzer);
+    } else {
+      root.setLimit(stmt.getLimit());
+      root.computeStats(analyzer);
+    }
+
+    return root;
   }
 
   /**
@@ -1193,7 +1246,6 @@ public class Planner {
     return root;
   }
 
-
   /**
    * Return a plan with joins in the order of refPlans (= FROM clause order).
    */
@@ -1217,11 +1269,8 @@ public class Planner {
   /**
    * Create tree of PlanNodes that implements the Select/Project/Join/Group by/Having
    * of the selectStmt query block.
-   * @throws NotImplementedException if selectStmt contains Order By clause w/o Limit
-   *   and the query options don't contain a default limit
    */
-  private PlanNode createSelectPlan(
-      SelectStmt selectStmt, Analyzer analyzer, long defaultOrderByLimit)
+  private PlanNode createSelectPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws ImpalaException {
     // no from clause -> materialize the select's exprs with a MergeNode
     if (selectStmt.getTableRefs().isEmpty()) {
@@ -1273,14 +1322,6 @@ public class Planner {
       Preconditions.checkNotNull(root);
     }
 
-    if (selectStmt.getSortInfo() != null
-        && selectStmt.getLimit() == -1 && defaultOrderByLimit == -1) {
-      // TODO: only use topN if the memory footprint is expected to be low;
-      // how to account for strings?
-      throw new NotImplementedException(
-          "ORDER BY without LIMIT currently not supported");
-    }
-
     if (root != null) {
       // add unassigned conjuncts_ before aggregation
       // (scenario: agg input comes from an inline view which wasn't able to
@@ -1308,36 +1349,9 @@ public class Planner {
       root.assignConjuncts(analyzer);
     }
 
-    root = addOrderByLimit(
-        analyzer, root, selectStmt.getSortInfo(), selectStmt.getLimit(),
-        defaultOrderByLimit, selectStmt.getOffset());
-
     // All the conjuncts_ should be assigned at this point.
     // TODO: Re-enable this check here and/or elswehere.
     //Preconditions.checkState(!analyzer.hasUnassignedConjuncts());
-
-    return root;
-  }
-
-  /**
-   * Returns a SortNode with 'root' as its input if sortInfo != null, otherwise
-   * just sets the limit.
-   */
-  private PlanNode addOrderByLimit(Analyzer analyzer, PlanNode root,
-      SortInfo sortInfo, long limit, long defaultOrderByLimit, long offset)
-      throws InternalException, AuthorizationException {
-    if (sortInfo != null) {
-      Preconditions.checkState(limit != -1 || defaultOrderByLimit != -1);
-      boolean isDefaultLimit = (limit == -1);
-      root = new SortNode(nodeIdGenerator_.getNextId(), root, sortInfo, true,
-          isDefaultLimit, offset);
-      Preconditions.checkState(root.hasValidStats());
-      root.setLimit(limit != -1 ? limit : defaultOrderByLimit);
-      root.init(analyzer);
-    } else {
-      root.setLimit(limit);
-      root.computeStats(analyzer);
-    }
     return root;
   }
 
@@ -1447,7 +1461,8 @@ public class Planner {
     // On-clause of an outer join may be pushed into the inline view as well.
     List<Expr> unassigned =
         analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
-    if (!inlineViewRef.getViewStmt().hasLimitClause()) {
+    if (!inlineViewRef.getViewStmt().hasLimit()
+        && !inlineViewRef.getViewStmt().hasOffset()) {
       // check if we can evaluate them
       List<Expr> preds = Lists.newArrayList();
       for (Expr e: unassigned) {
@@ -1492,7 +1507,7 @@ public class Planner {
     }
 
     PlanNode rootNode =
-        createQueryPlan(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer(), -1);
+        createQueryPlan(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer(), false);
     // TODO: we should compute the "physical layout" of the view's descriptor, so that
     // the avg row size is availble during optimization; however, that means we need to
     // select references to its resultExprs from the enclosing scope(s)
@@ -1741,7 +1756,7 @@ public class Planner {
           continue;
         }
       }
-      PlanNode opPlan = createQueryPlan(queryStmt, analyzer, -1);
+      PlanNode opPlan = createQueryPlan(queryStmt, analyzer, false);
       mergeNode.addChild(opPlan, op.getQueryStmt().getBaseTblResultExprs());
     }
     mergeNode.init(analyzer);
@@ -1755,7 +1770,7 @@ public class Planner {
    * - the output of that plus the allOperands' plan trees are collected in
    *   another MergeNode which materializes the result of unionStmt
    */
-  private PlanNode createUnionPlan(Analyzer analyzer, UnionStmt unionStmt)
+  private PlanNode createUnionPlan(UnionStmt unionStmt, Analyzer analyzer )
       throws ImpalaException {
     // Turn unassigned predicates for unionStmt's tupleId_ into predicates for
     // the individual operands.
@@ -1803,12 +1818,11 @@ public class Planner {
       MergeNode allMerge =
           createUnionMergePlan(analyzer, unionStmt, unionStmt.getAllOperands());
       // for unionStmt, baseTblResultExprs = resultExprs
-      if (result != null) allMerge.addChild(result, unionStmt.getResultExprs());
+      if (result != null) allMerge.addChild(result,
+          unionStmt.getDistinctAggInfo().getGroupingExprs());
       result = allMerge;
     }
 
-    result = addOrderByLimit(analyzer, result, unionStmt.getSortInfo(),
-        unionStmt.getLimit(), -1, unionStmt.getOffset());
     return result;
   }
 
@@ -1870,6 +1884,7 @@ public class Planner {
       long perHostHbaseScanMem = 0L;
       long perHostHdfsScanMem = 0L;
       long perHostNonScanMem = 0L;
+
       for (int i = 0; i < planNodes.size(); ++i) {
         PlanNode node = planNodes.get(i);
         PlanFragment fragment = node.getFragment();
@@ -1889,6 +1904,7 @@ public class Planner {
           perHostNonScanMem += node.getPerHostMemCost();
         }
       }
+
       // The memory required by concurrent scans cannot exceed the upper memory bound
       // for that scan type.
       // TODO: In the future, we may want to restrict scanner concurrency based on a

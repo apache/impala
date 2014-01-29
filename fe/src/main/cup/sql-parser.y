@@ -283,7 +283,8 @@ nonterminal OrderByElement order_by_element;
 nonterminal Boolean opt_order_param;
 nonterminal Boolean opt_nulls_order_param;
 nonterminal Expr opt_offset_param;
-nonterminal LimitElement opt_limit_clause;
+nonterminal LimitElement opt_limit_offset_clause;
+nonterminal Expr opt_limit_clause, opt_offset_clause;
 nonterminal Expr cast_expr, case_else_clause;
 nonterminal LiteralExpr literal;
 nonterminal CaseExpr case_expr;
@@ -1170,11 +1171,12 @@ with_table_ref_list ::=
 union_with_order_by_or_limit ::=
     union_operand_list:operands
     KW_ORDER KW_BY order_by_elements:orderByClause
+    opt_offset_param:offsetExpr
   {:
     if (operands.size() == 1) {
       parser.parseError("order", SqlParserSymbols.KW_ORDER);
     }
-    RESULT = new UnionStmt(operands, orderByClause, null);
+    RESULT = new UnionStmt(operands, orderByClause, new LimitElement(null, offsetExpr));
   :}
   |
     union_operand_list:operands
@@ -1233,15 +1235,15 @@ union_op ::=
 values_stmt ::=
   KW_VALUES values_operand_list:operands
   order_by_clause:orderByClause
-  opt_limit_clause:limitClause
+  opt_limit_offset_clause:limitOffsetClause
   {:
-    RESULT = new ValuesStmt(operands, orderByClause, limitClause);
+    RESULT = new ValuesStmt(operands, orderByClause, limitOffsetClause);
   :}
   | KW_VALUES LPAREN values_operand_list:operands RPAREN
     order_by_clause:orderByClause
-    opt_limit_clause:limitClause
+    opt_limit_offset_clause:limitOffsetClause
   {:
-    RESULT = new ValuesStmt(operands, orderByClause, limitClause);
+    RESULT = new ValuesStmt(operands, orderByClause, limitOffsetClause);
   :}
   ;
 
@@ -1351,10 +1353,10 @@ select_stmt ::=
     group_by_clause:groupingExprs
     having_clause:havingPredicate
     order_by_clause:orderByClause
-    opt_limit_clause:limitClause
+    opt_limit_offset_clause:limitOffsetClause
   {:
     RESULT = new SelectStmt(selectList, tableRefList, wherePredicate, groupingExprs,
-                            havingPredicate, orderByClause, limitClause);
+                            havingPredicate, orderByClause, limitOffsetClause);
   :}
   ;
 
@@ -1645,9 +1647,21 @@ opt_offset_param ::=
   {: RESULT = null; :}
   ;
 
-opt_limit_clause ::=
-  KW_LIMIT expr:limitExpr opt_offset_param:offsetExpr
+opt_limit_offset_clause ::=
+  opt_limit_clause:limitExpr opt_offset_clause:offsetExpr
   {: RESULT = new LimitElement(limitExpr, offsetExpr); :}
+  ;
+
+opt_limit_clause ::=
+  KW_LIMIT expr:limitExpr
+  {: RESULT = limitExpr; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+opt_offset_clause ::=
+  KW_OFFSET expr:offsetExpr
+  {: RESULT = offsetExpr; :}
   | /* empty */
   {: RESULT = null; :}
   ;

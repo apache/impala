@@ -20,10 +20,12 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 
 add_library(Runtime STATIC
+  buffered-block-mgr.cc
   client-cache.cc
   coordinator.cc
   data-stream-mgr.cc
   data-stream-sender.cc
+  data-stream-recvr.cc
   descriptors.cc
   disk-io-mgr.cc
   disk-io-mgr-reader-context.cc
@@ -44,12 +46,15 @@ add_library(Runtime STATIC
   raw-value-test.cc
   row-batch.cc
   runtime-state.cc
+  sorted-run-merger.cc
+  sorter.cc
   string-value.cc
   thread-resource-mgr.cc
   timestamp-parse-util.cc
   timestamp-value.cc
   tuple.cc
   tuple-row.cc
+  tmp-file-mgr.cc
 )
 
 # This test runs forever so should not be part of 'make test'
@@ -62,6 +67,7 @@ ADD_BE_TEST(string-buffer-test)
 ADD_BE_TEST(data-stream-test)
 ADD_BE_TEST(timestamp-test)
 ADD_BE_TEST(disk-io-mgr-test)
+ADD_BE_TEST(buffered-block-mgr-test)
 ADD_BE_TEST(parallel-executor-test)
 ADD_BE_TEST(raw-value-test)
 ADD_BE_TEST(string-value-test)

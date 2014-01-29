@@ -158,10 +158,9 @@ limit 3
 |  group by: int_col, max(id)
 |  limit: 10
 |
-09:TOP-N [LIMIT=5]
+08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: int_col ASC, tinyint_col ASC
-|
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 5
 |
 02:TOP-N [LIMIT=5]
 |  order by: int_col ASC, tinyint_col ASC
@@ -369,10 +368,9 @@ with t1 as (values('a', 'b'))
 01:MERGE
    constant-selects=1
 ---- DISTRIBUTEDPLAN
-09:TOP-N [LIMIT=1]
+08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: 'c' ASC
-|
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 1
 |
 |--07:TOP-N [LIMIT=1]
 |  |  order by: 'c' ASC
@@ -406,10 +404,9 @@ with t1 as (values('a', 'b'))
 01:MERGE
    constant-selects=1
 ---- DISTRIBUTEDPLAN
-09:TOP-N [LIMIT=1]
+08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: 'c' ASC
-|
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 1
 |
 |--07:TOP-N [LIMIT=1]
 |  |  order by: 'c' ASC

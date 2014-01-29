@@ -48,10 +48,9 @@ limit 10
    partitions=1/1 size=718.94MB
    predicates: l_shipdate > '1995-03-15'
 ---- DISTRIBUTEDPLAN
-12:TOP-N [LIMIT=10]
+11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
-|
-11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
 |
 06:TOP-N [LIMIT=10]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
@@ -138,10 +137,9 @@ limit 10
    partitions=1/1 size=23.08MB
    predicates: c.c_mktsegment = 'BUILDING'
 ---- DISTRIBUTEDPLAN
-14:TOP-N [LIMIT=10]
+13:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
-|
-13:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
 |
 06:TOP-N [LIMIT=10]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
@@ -251,10 +249,9 @@ limit 100
 02:SCAN HDFS [tpch.lineitem l]
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-21:TOP-N [LIMIT=100]
+20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC
-|
-20:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 12:TOP-N [LIMIT=100]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC
@@ -444,10 +441,9 @@ limit 10
    partitions=1/1 size=162.56MB
    predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
 ---- DISTRIBUTEDPLAN
-10:TOP-N [LIMIT=10]
+09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: o_orderpriority ASC
-|
-09:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
 |
 04:TOP-N [LIMIT=10]
 |  order by: o_orderpriority ASC
@@ -501,10 +497,9 @@ order by o_orderpriority limit 10
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
 ---- DISTRIBUTEDPLAN
-10:TOP-N [LIMIT=10]
+09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: o_orderpriority ASC
-|
-09:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
 |
 04:TOP-N [LIMIT=10]
 |  order by: o_orderpriority ASC
@@ -556,10 +551,9 @@ order by o_orderpriority limit 10
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
 ---- DISTRIBUTEDPLAN
-10:TOP-N [LIMIT=10]
+09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: o_orderpriority ASC
-|
-09:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
 |
 04:TOP-N [LIMIT=10]
 |  order by: o_orderpriority ASC

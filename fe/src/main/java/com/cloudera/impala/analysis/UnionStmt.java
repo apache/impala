@@ -206,11 +206,11 @@ public class UnionStmt extends QueryStmt {
     // its resultExprs, and its sortInfo if necessary.
     createMetadata(analyzer);
     createSortInfo(analyzer);
-
     toSqlString_ = toSql();
 
     // fill distinct-/allOperands
     unnestOperands(analyzer);
+    if (evaluateOrderBy_) createSortTupleInfo(analyzer);
   }
 
   /**
@@ -227,6 +227,10 @@ public class UnionStmt extends QueryStmt {
       for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
         slotDesc.setIsMaterialized(true);
       }
+    }
+
+    if (evaluateOrderBy_) {
+      sortInfo_.materializeRequiredSlots(analyzer, null);
     }
 
     // collect operands' result exprs
@@ -347,7 +351,7 @@ public class UnionStmt extends QueryStmt {
 
     Preconditions.checkState(queryStmt instanceof UnionStmt);
     UnionStmt unionStmt = (UnionStmt) queryStmt;
-    if (unionStmt.hasLimitClause()) {
+    if (unionStmt.hasLimit() || unionStmt.hasOffset()) {
       // we must preserve the nested Union
       target.add(operand);
     } else if (targetQualifier == Qualifier.DISTINCT || !unionStmt.hasDistinctOps()) {
@@ -486,7 +490,12 @@ public class UnionStmt extends QueryStmt {
 
   @Override
   public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
-    tupleIdList.add(tupleId_);
+    // Return the sort tuple if there is an evaluated order by.
+    if (evaluateOrderBy_) {
+      tupleIdList.add(sortInfo_.getSortTupleDescriptor().getId());
+    } else {
+      tupleIdList.add(tupleId_);
+    }
   }
 
   @Override
@@ -518,7 +527,8 @@ public class UnionStmt extends QueryStmt {
     strBuilder.append(" UNION " +
         ((lastOperand.getQualifier() == Qualifier.ALL) ? "ALL " : ""));
     if (lastQueryStmt instanceof UnionStmt ||
-        ((hasOrderByClause() || hasLimitClause()) && !lastQueryStmt.hasLimitClause() &&
+        ((hasOrderByClause() || hasLimit() || hasOffset()) &&
+            !lastQueryStmt.hasLimit() && !lastQueryStmt.hasOffset() &&
             !lastQueryStmt.hasOrderByClause())) {
       strBuilder.append("(");
       strBuilder.append(lastQueryStmt.toSql());

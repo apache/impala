@@ -41,19 +41,6 @@ class TupleRowComparator {
     DCHECK_EQ(key_exprs_lhs.size(), nulls_first.size());
   }
 
-  // Convenience constructor that sets all of the nulls_first for all exprs to the
-  // same value.
-  TupleRowComparator(const std::vector<Expr*>& key_exprs_lhs,
-      const std::vector<Expr*>& key_exprs_rhs,
-      const std::vector<bool>& is_asc,
-      const bool nulls_first)
-      : key_exprs_lhs_(key_exprs_lhs), key_exprs_rhs_(key_exprs_rhs),
-        is_asc_(is_asc) {
-    DCHECK_EQ(key_exprs_lhs.size(), key_exprs_rhs.size());
-    DCHECK_EQ(key_exprs_lhs.size(), is_asc.size());
-    nulls_first_.assign(key_exprs_lhs.size(), nulls_first);
-  }
-
   // Returns true if x is strictly less than y.
   bool operator() (TupleRow* lhs, TupleRow* rhs) const {
     std::vector<Expr*>::const_iterator lhs_expr_iter = key_exprs_lhs_.begin();

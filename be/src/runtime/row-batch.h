@@ -152,6 +152,16 @@ class RowBatch {
     memcpy(dest, src, num_tuples_per_row_ * sizeof(Tuple*));
   }
 
+  // Copy 'num_rows' rows from 'src' to 'dest' within the batch. Useful for exec
+  // nodes that skip an offset and copied more than necessary.
+  void CopyRows(int dest, int src, int num_rows) {
+    DCHECK_LE(dest, src);
+    DCHECK_LE(src + num_rows, capacity_);
+    memmove(tuple_ptrs_ + num_tuples_per_row_ * dest,
+        tuple_ptrs_ + num_tuples_per_row_ * src,
+        num_rows * num_tuples_per_row_ * sizeof(Tuple*));
+  }
+
   void ClearRow(TupleRow* row) {
     memset(row, 0, num_tuples_per_row_ * sizeof(Tuple*));
   }

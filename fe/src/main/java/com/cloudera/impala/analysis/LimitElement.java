@@ -35,12 +35,9 @@ class LimitElement {
   /**
    * Constructs the LimitElement.
    * @param limitExpr The limit expression. May be null if there is no LIMIT clause.
-   * @param offsetExpr The offset expression. May be null if there is no OFFSET clause,
-   *                   but an OFFSET clause requires a LIMIT clause (this must not be
-   *                   null if limit is null).
+   * @param offsetExpr The offset expression. May be null if there is no OFFSET clause.
    */
   public LimitElement(Expr limitExpr, Expr offsetExpr) {
-    Preconditions.checkArgument(offsetExpr == null || limitExpr != null);
     this.limitExpr_ = limitExpr;
     this.offsetExpr_ = offsetExpr;
     isAnalyzed_ = false;
@@ -75,9 +72,11 @@ class LimitElement {
   }
 
   public String toSql() {
-    if (limitExpr_ == null) return "";
-    StringBuilder sb = new StringBuilder(" LIMIT ");
-    sb.append(limitExpr_.toSql());
+    StringBuilder sb = new StringBuilder();
+    if (limitExpr_ != null) {
+      sb.append(" LIMIT ");
+      sb.append(limitExpr_.toSql());
+    }
     // Don't add the offset if it is the default value. However, we do print it if it
     // hasn't been analyzed yet because we need to output the expression used in errors.
     if (offsetExpr_ != null && (offset_ != 0 || !isAnalyzed_)) {
@@ -90,24 +89,26 @@ class LimitElement {
   public void analyze(Analyzer analyzer) throws AuthorizationException,
       AnalysisException {
     isAnalyzed_ = true;
-    if (limitExpr_ == null) return;
-    if (!limitExpr_.isConstant()) {
-      throw new AnalysisException("LIMIT expression must be a constant expression: " +
-          limitExpr_.toSql());
-    }
-    if (offsetExpr_ != null && !offsetExpr_.isConstant()) {
-      throw new AnalysisException("OFFSET expression must be a constant expression: " +
-          offsetExpr_.toSql());
-    }
+    if (limitExpr_ != null) {
+      if (!limitExpr_.isConstant()) {
+        throw new AnalysisException("LIMIT expression must be a constant expression: " +
+            limitExpr_.toSql());
+      }
 
-    limitExpr_.analyze(analyzer);
-    if (!limitExpr_.getType().isIntegerType()) {
-      throw new AnalysisException("LIMIT expression must be an integer type but is '" +
-          limitExpr_.getType() + "': " + limitExpr_.toSql());
+      limitExpr_.analyze(analyzer);
+      if (!limitExpr_.getType().isIntegerType()) {
+        throw new AnalysisException("LIMIT expression must be an integer type but is '" +
+            limitExpr_.getType() + "': " + limitExpr_.toSql());
+      }
+      limit_ = evalIntegerExpr(analyzer, limitExpr_, "LIMIT");
     }
-    limit_ = evalIntegerExpr(analyzer, limitExpr_, "LIMIT");
 
     if (offsetExpr_ != null) {
+      if (!offsetExpr_.isConstant()) {
+        throw new AnalysisException("OFFSET expression must be a constant expression: " +
+            offsetExpr_.toSql());
+      }
+
       offsetExpr_.analyze(analyzer);
       if (!offsetExpr_.getType().isIntegerType()) {
         throw new AnalysisException("OFFSET expression must be an integer type but " +

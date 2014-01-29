@@ -28,6 +28,7 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/hdfs-util.h"
+#include "util/filesystem-util.h"
 #include "util/impalad-metrics.h"
 
 // This file contains internal structures to the IoMgr. Users of the IoMgr do

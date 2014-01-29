@@ -29,18 +29,17 @@ where month = 1
 03:SCAN HDFS [functional.alltypes t2]
    partitions=2/24 size=40.32KB
 ---- DISTRIBUTEDPLAN
-10:EXCHANGE [PARTITION=UNPARTITIONED]
+09:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t2.int_col = int_col
 |
-|--09:EXCHANGE [BROADCAST]
+|--08:EXCHANGE [BROADCAST]
 |  |  limit: 5
 |  |
-|  08:TOP-N [LIMIT=5]
+|  07:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  |  order by: count(*) DESC
-|  |
-|  07:EXCHANGE [PARTITION=UNPARTITIONED]
+|  |  limit: 5
 |  |
 |  02:TOP-N [LIMIT=5]
 |  |  order by: count(*) DESC
@@ -440,10 +439,9 @@ from
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
 ---- DISTRIBUTEDPLAN
-06:TOP-N [LIMIT=5]
+05:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: c2 ASC, c3 DESC
-|
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 5
 |
 02:TOP-N [LIMIT=5]
 |  order by: c2 ASC, c3 DESC
@@ -501,10 +499,9 @@ limit 0
 |  output: min(tinyint_col)
 |  group by: int_col
 |
-08:TOP-N [LIMIT=1]
+07:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: int_col ASC, tinyint_col ASC
-|
-07:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 1
 |
 02:TOP-N [LIMIT=1]
 |  order by: int_col ASC, tinyint_col ASC

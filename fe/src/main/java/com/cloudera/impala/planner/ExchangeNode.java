@@ -19,11 +19,13 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.thrift.TExchangeNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TSortInfo;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -36,13 +38,24 @@ import com.google.common.collect.Sets;
  * e.g., for distributed union queries an ExchangeNode may have one sender child per
  * union operand.
  *
- * TODO: merging of sorted inputs.
+ * If a (optional) SortInfo field is set, the ExchangeNode will merge its
+ * inputs on the parameters specified in the SortInfo object. It is assumed that the
+ * inputs are also sorted individually on the same SortInfo parameter.
  */
 public class ExchangeNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(ExchangeNode.class);
 
+  // The parameters based on which sorted input streams are merged by this
+  // exchange node. Null if this exchange does not merge sorted streams
+  private SortInfo mergeInfo_;
+
+  // Offset after which the exchange begins returning rows. Currently valid
+  // only if mergeInfo_ is non-null, i.e. this is a merging exchange node.
+  private long offset_;
+
   public ExchangeNode(PlanNodeId id) {
     super(id, "EXCHANGE");
+    offset_ = 0;
   }
 
   public void addChild(PlanNode node, boolean copyConjuncts) {
@@ -64,9 +77,6 @@ public class ExchangeNode extends PlanNode {
     if (copyConjuncts) conjuncts_.addAll(Expr.cloneList(node.conjuncts_, null));
     children_.add(node);
   }
-
-  @Override
-  public void addChild(PlanNode node) { addChild(node, false); }
 
   @Override
   public void setCompactData(boolean on) { this.compactData_ = on; }
@@ -92,6 +102,11 @@ public class ExchangeNode extends PlanNode {
       }
     }
 
+    // Apply the offset correction if there's a valid cardinality
+    if (cardinality_ > -1) {
+      cardinality_ = Math.max(0, cardinality_ - offset_);
+    }
+
     // Pick the max numNodes_ and avgRowSize_ of all children.
     numNodes_ = Integer.MIN_VALUE;
     avgRowSize_ = Integer.MIN_VALUE;
@@ -101,12 +116,41 @@ public class ExchangeNode extends PlanNode {
     }
   }
 
+  /**
+   * Set the parameters used to merge sorted input streams. This can be called
+   * after init().
+   */
+  public void setMergeInfo(SortInfo info, long offset) {
+    mergeInfo_ = info;
+    offset_ = offset;
+    displayName_ = "MERGING-EXCHANGE";
+  }
+
   @Override
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(String.format("%s%s:%s [%s]\n", prefix, id_.toString(), displayName_,
         getPartitionExplainString()));
+
+    if (offset_ > 0) {
+      output.append(detailPrefix + "offset: ").append(offset_).append("\n");
+    }
+
+    if (mergeInfo_ != null) {
+      output.append(detailPrefix + "order by: ");
+      for (int i = 0; i < mergeInfo_.getOrderingExprs().size(); ++i) {
+        if (i > 0) output.append(", ");
+        output.append(mergeInfo_.getOrderingExprs().get(i).toSql() + " ");
+        output.append(mergeInfo_.getIsAscOrder().get(i) ? "ASC" : "DESC");
+
+        Boolean nullsFirstParam = mergeInfo_.getNullsFirstParams().get(i);
+        if (nullsFirstParam != null) {
+          output.append(nullsFirstParam ? " NULLS FIRST" : " NULLS LAST");
+        }
+      }
+      output.append("\n");
+    }
     return output.toString();
   }
 
@@ -136,6 +180,14 @@ public class ExchangeNode extends PlanNode {
     msg.exchange_node = new TExchangeNode();
     for (TupleId tid: tupleIds_) {
       msg.exchange_node.addToInput_row_tuples(tid.asInt());
+    }
+
+    if (mergeInfo_ != null) {
+      TSortInfo sortInfo = new TSortInfo(
+          Expr.treesToThrift(mergeInfo_.getOrderingExprs()), mergeInfo_.getIsAscOrder(),
+          mergeInfo_.getNullsFirst());
+      msg.exchange_node.setSort_info(sortInfo);
+      msg.exchange_node.setOffset(offset_);
     }
   }
 }

@@ -54,10 +54,10 @@ struct TQueryOptions {
 
   8: optional i32 max_io_buffers = 0              // Deprecated in 1.1
   9: optional bool allow_unsupported_formats = 0
-  10: optional i64 default_order_by_limit = -1
+  10: optional i64 default_order_by_limit = -1    // Deprecated in 1.4
   11: optional string debug_action = ""
   12: optional i64 mem_limit = 0
-  13: optional bool abort_on_default_limit_exceeded = 0
+  13: optional bool abort_on_default_limit_exceeded = 0 // Deprecated in 1.4
   14: optional CatalogObjects.THdfsCompression parquet_compression_codec =
       CatalogObjects.THdfsCompression.SNAPPY
   15: optional i32 hbase_caching = 0
@@ -81,6 +81,9 @@ struct TQueryOptions {
   // 1. disable preferring to schedule to cached replicas
   // 2. disable the cached read path.
   23: optional bool disable_cached_reads = 0
+
+  // test hook to disable topn on the outermost select block.
+  24: optional bool disable_outermost_topn = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
@@ -186,6 +189,9 @@ struct TPlanFragmentExecParams {
   // The pool to which this request has been submitted. Used to update pool statistics
   // for admission control.
   9: optional string request_pool;
+
+  // Id of this fragment in its role as a sender.
+  10: optional i32 sender_id
 }
 
 // Service Protocol Details
@@ -340,8 +346,8 @@ struct TTransmitDataParams {
   // required in V1
   2: optional Types.TUniqueId dest_fragment_instance_id
 
-  // for debugging purposes; currently ignored
-  //3: optional Types.TUniqueId src_fragment_instance_id
+  // Id of this fragment in its role as a sender.
+  3: optional i32 sender_id
 
   // required in V1
   4: optional Types.TPlanNodeId dest_node_id

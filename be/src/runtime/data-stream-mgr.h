@@ -57,153 +57,53 @@ class DataStreamMgr {
  public:
   DataStreamMgr() {}
 
-  // Create a receiver for a specific fragment_instance_id/node_id destination; desc_tbl
-  // is the query's descriptor table and is needed to decode incoming TRowBatches.
-  // The caller is responsible for deleting the returned DataStreamRecvr.
-  DataStreamRecvr* CreateRecvr(
+  // Create a receiver for a specific fragment_instance_id/node_id destination;
+  // If is_merging is true, the receiver maintains a separate queue of incoming row
+  // batches for each sender and merges the sorted streams from each sender into a
+  // single stream.
+  // Ownership of the receiver is shared between this DataStream mgr instance and the
+  // caller.
+  boost::shared_ptr<DataStreamRecvr> CreateRecvr(
       RuntimeState* state, const RowDescriptor& row_desc,
       const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
-      int num_senders, int buffer_size, RuntimeProfile* profile);
+      int num_senders, int buffer_size, RuntimeProfile* profile,
+      bool is_merging);
 
-  // Adds a row batch to the stream identified by fragment_instance_id/dest_node_id
-  // if the stream has not been cancelled.
+  // Adds a row batch to the recvr identified by fragment_instance_id/dest_node_id
+  // if the recvr has not been cancelled. sender_id identifies the sender instance
+  // from which the data came.
   // The call blocks if this ends up pushing the stream over its buffering limit;
-  // it unblocks when the stream consumer removed enough data to make space for
+  // it unblocks when the consumer removed enough data to make space for
   // row_batch.
   // TODO: enforce per-sender quotas (something like 200% of buffer_size/#senders),
   // so that a single sender can't flood the buffer and stall everybody else.
   // Returns OK if successful, error status otherwise.
   Status AddData(const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
-                 const TRowBatch& thrift_batch);
+                 const TRowBatch& thrift_batch, int sender_id);
 
-  // Decreases the #remaining_senders count for the stream identified by
-  // fragment_instance_id/dest_node_id.
+  // Notifies the recvr associated with the fragment/node id that the specified
+  // sender has closed.
   // Returns OK if successful, error status otherwise.
-  Status CloseSender(const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id);
+  Status CloseSender(const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
+      int sender_id);
 
-  // Closes all streams registered for fragment_instance_id immediately.
+  // Closes all receivers registered for fragment_instance_id immediately.
   void Cancel(const TUniqueId& fragment_instance_id);
 
  private:
   friend class DataStreamRecvr;
 
-  class StreamControlBlock {
-   public:
-    StreamControlBlock(
-        RuntimeState* state, const RowDescriptor& row_desc,
-        const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
-        int num_senders, int buffer_size, RuntimeProfile* profile);
-
-    // Returns next available batch or NULL if end-of-stream or stream got
-    // cancelled (sets 'is_cancelled' accordingly).
-    // A returned batch that is not filled to capacity does *not* indicate
-    // end-of-stream.
-    // The call blocks until another batch arrives or all senders close
-    // their channels.
-    // The caller owns the batch.
-    RowBatch* GetBatch(bool* is_cancelled);
-
-    // Adds a row batch to this stream's queue if this stream has not been cancelled;
-    // blocks if this will make the stream exceed its buffer limit.
-    //
-    // For example, for an NxN broadcast, there will be N threads on N
-    // clients talking to up-to N threads on N servers. Those server
-    // threads share a buffer per-exchange-node in their
-    // StreamControlBlock (so one per incoming plan fragment), so
-    // typically you'll have N threads contending to write to a single
-    // buffer. If there is no space in the buffer, they will block the
-    // sender until space is available.
-    void AddBatch(const TRowBatch& batch);
-
-    // Decrement the number of remaining senders and signal eos ("new data")
-    // if the count drops to 0.
-    void DecrementSenders();
-
-    // Set cancellation flag and signal cancellation to receiver and sender. Subsequent
-    // incoming batches will be dropped.
-    void CancelStream();
-
-    const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
-    PlanNodeId dest_node_id() const { return dest_node_id_; }
-
-   private:
-    TUniqueId fragment_instance_id_;
-    PlanNodeId dest_node_id_;
-    const RowDescriptor& row_desc_;
-
-    // protects all subsequent data in this block
-    boost::mutex lock_;
-
-    // if true, the receiver fragment for this stream got cancelled
-    bool is_cancelled_;
-
-    // soft upper limit on the amount of buffering allowed for this stream;
-    // we stop acking incoming data once the amount of buffered data
-    // exceeds this value
-    int buffer_limit_;
-
-    // total number of bytes held in batch_queue_
-    int num_buffered_bytes_;
-
-    // number of senders which haven't closed the channel yet
-    // (if it drops to 0, end-of-stream is true)
-    int num_remaining_senders_;
-
-    // signal arrival of new batch or the eos/cancelled condition
-    boost::condition_variable data_arrival_;
-
-    // signal removal of data by stream consumer
-    boost::condition_variable data_removal_;
-
-    // queue of (batch length, batch) pairs.  The StreamControl block owns memory to
-    // these batches.  They are handed off to the caller via GetBatch.
-    typedef std::list<std::pair<int, RowBatch*> > RowBatchQueue;
-    RowBatchQueue batch_queue_;
-
-    // Number of bytes received
-    RuntimeProfile::Counter* bytes_received_counter_;
-
-    // Time series of number of bytes received, samples bytes_received_counter_
-    RuntimeProfile::TimeSeriesCounter* bytes_received_time_series_counter_;
-
-    RuntimeProfile::Counter* deserialize_row_batch_timer_;
-    MemTracker mem_tracker_;
-
-    // Time spent waiting until the first batch arrives
-    RuntimeProfile::Counter* first_batch_wait_timer_;
-
-    // Set to true when the first batch has been received
-    bool received_first_batch_;
-
-    // Total time (summed across all threads) spent waiting for the
-    // recv buffer to be drained so that new batches can be
-    // added. Remote plan fragments are blocked for the same amount of
-    // time.
-    RuntimeProfile::Counter* buffer_full_total_timer_;
-
-    // Protects access to buffer_full_wall_timer_. We only want one
-    // thread to be running the timer at any time, and we use this
-    // try_mutex to enforce this condition. If a thread does not get
-    // the lock, it continues to execute, but without running the
-    // timer.
-    boost::try_mutex buffer_wall_timer_lock_;
-
-    // Wall time senders spend waiting for the recv buffer to have capacity.
-    RuntimeProfile::Counter* buffer_full_wall_timer_;
-
-    // Total time spent waiting for data to arrive in the recv buffer
-    RuntimeProfile::Counter* data_arrival_timer_;
-  };
-
   // protects all fields below
   boost::mutex lock_;
 
-  // map from hash value of fragment instance id/node id pair to control blocks;
-  // we don't want to create a map<pair<TUniqueId, PlanNodeId>, StreamControlBlock*>,
+  // map from hash value of fragment instance id/node id pair to stream receivers;
+  // Ownership of the stream revcr is shared between this instance and the caller of
+  // CreateRecvr().
+  // we don't want to create a map<pair<TUniqueId, PlanNodeId>, DataStreamRecvr*>,
   // because that requires a bunch of copying of ids for lookup
   typedef boost::unordered_multimap<uint32_t,
-      boost::shared_ptr<StreamControlBlock> > StreamMap;
-  StreamMap stream_map_;
+      boost::shared_ptr<DataStreamRecvr> > StreamMap;
+  StreamMap receiver_map_;
 
   // less-than ordering for pair<TUniqueId, PlanNodeId>
   struct ComparisonOp {
@@ -226,14 +126,14 @@ class DataStreamMgr {
   typedef std::set<std::pair<TUniqueId, PlanNodeId>, ComparisonOp > FragmentStreamSet;
   FragmentStreamSet fragment_stream_set_;
 
-  // Return the StreamControlBlock for given fragment_instance_id/node_id,
+  // Return the receiver for given fragment_instance_id/node_id,
   // or NULL if not found. If 'acquire_lock' is false, assumes lock_ is already being
   // held and won't try to acquire it.
-  boost::shared_ptr<StreamControlBlock> FindControlBlock(
+  boost::shared_ptr<DataStreamRecvr> FindRecvr(
       const TUniqueId& fragment_instance_id, PlanNodeId node_id,
       bool acquire_lock = true);
 
-  // Remove control block for fragment_instance_id/node_id.
+  // Remove receiver block for fragment_instance_id/node_id from the map.
   Status DeregisterRecvr(const TUniqueId& fragment_instance_id, PlanNodeId node_id);
 
   inline uint32_t GetHashValue(const TUniqueId& fragment_instance_id, PlanNodeId node_id);

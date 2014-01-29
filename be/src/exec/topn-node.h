@@ -20,6 +20,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/exec-node.h"
+#include "exec/sort-exec-exprs.h"
 #include "runtime/descriptors.h"  // for TupleId
 #include "util/tuple-row-compare.h"
 
@@ -30,9 +31,10 @@ class RuntimeState;
 class Tuple;
 
 // Node for in-memory TopN (ORDER BY ... LIMIT)
-// This handles the case where the result fits in memory.  This node will do a deep
-// copy of the tuples that are necessary for the output.
-// This is implemented by storing rows in a priority queue.
+// This handles the case where the result fits in memory.
+// This node will materialize its input rows into a new tuple using the expressions
+// in sort_tuple_slot_exprs_ in its sort_exec_exprs_ member.
+// TopN is implemented by storing rows in a priority queue.
 class TopNNode : public ExecNode {
  public:
   TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -61,19 +63,13 @@ class TopNNode : public ExecNode {
   int64_t offset_;
   int64_t num_rows_skipped_;
 
-  std::vector<TupleDescriptor*> tuple_descs_;
+  // sort_exec_exprs_ contains the ordering expressions used for tuple comparison and
+  // the materialization exprs for the output tuple.
+  SortExecExprs sort_exec_exprs_;
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
-
-  // True if the limit_ comes from DEFAULT_ORDER_BY_LIMIT and the query option
-  // ABORT_ON_DEFAULT_LIMIT_EXCEEDED is set.
-  bool abort_on_default_limit_exceeded_;
-
-  // Create two copies of the exprs for evaluating over the TupleRows.
-  // The result of the evaluation is stored in the Expr, so it's not efficient to use
-  // one set of Expr to compare TupleRows.
-  std::vector<Expr*> lhs_ordering_exprs_;
-  std::vector<Expr*> rhs_ordering_exprs_;
+  // Cached descriptor for the materialized tuple. Assigned in Prepare().
+  TupleDescriptor* materialized_tuple_desc_;
 
   boost::scoped_ptr<TupleRowComparator> tuple_row_less_than_;
 
@@ -82,18 +78,21 @@ class TopNNode : public ExecNode {
   // the order of the queue is the opposite of what the ORDER BY clause specifies, such
   // that the top of the queue is the last sorted element.
   boost::scoped_ptr<
-      std::priority_queue<TupleRow*, std::vector<TupleRow*>, TupleRowComparator> >
+      std::priority_queue<Tuple*, std::vector<Tuple*>, TupleRowComparator> >
           priority_queue_;
 
   // After computing the TopN in the priority_queue, pop them and put them in this vector
-  std::vector<TupleRow*> sorted_top_n_;
-  std::vector<TupleRow*>::iterator get_next_iter_;
+  std::vector<Tuple*> sorted_top_n_;
+  std::vector<Tuple*>::iterator get_next_iter_;
 
   // Stores everything referenced in priority_queue_
   boost::scoped_ptr<MemPool> tuple_pool_;
+  // Tuple allocated once from tuple_pool_ and reused in InsertTupleRow to
+  // materialize input tuples if necessary. After materialization, tmp_tuple_ may be
+  // copied into the the tuple pool and inserted into the priority queue.
+  Tuple* tmp_tuple_;
 };
 
 };
 
 #endif
-

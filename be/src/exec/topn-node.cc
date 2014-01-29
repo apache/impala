@@ -41,29 +41,12 @@ TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
 
 Status TopNNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(ExecNode::Init(tnode));
-  RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool_, tnode.sort_node.ordering_exprs, &lhs_ordering_exprs_));
-  RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool_, tnode.sort_node.ordering_exprs, &rhs_ordering_exprs_));
-  is_asc_order_.insert(
-      is_asc_order_.begin(), tnode.sort_node.is_asc_order.begin(),
-      tnode.sort_node.is_asc_order.end());
-  if (tnode.sort_node.__isset.nulls_first) {
-    nulls_first_.insert(
-        nulls_first_.begin(), tnode.sort_node.nulls_first.begin(),
-        tnode.sort_node.nulls_first.end());
-  } else {
-    nulls_first_.assign(is_asc_order_.size(), false);
-  }
+  RETURN_IF_ERROR(sort_exec_exprs_.Init(tnode.sort_node.sort_info, pool_));
+  is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
+  nulls_first_ = tnode.sort_node.sort_info.nulls_first;
 
   DCHECK_EQ(conjuncts_.size(), 0) << "TopNNode should never have predicates to evaluate.";
-  abort_on_default_limit_exceeded_ = tnode.sort_node.is_default_limit;
 
-  tuple_row_less_than_.reset(new TupleRowComparator(
-      lhs_ordering_exprs_, rhs_ordering_exprs_, is_asc_order_, nulls_first_));
-  priority_queue_.reset(
-      new priority_queue<TupleRow*, vector<TupleRow*>, TupleRowComparator>(
-          *tuple_row_less_than_));
   return Status::OK;
 }
 
@@ -71,11 +54,16 @@ Status TopNNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_pool_.reset(new MemPool(mem_tracker()));
-  tuple_descs_ = child(0)->row_desc().tuple_descriptors();
-  RETURN_IF_ERROR(Expr::Prepare(lhs_ordering_exprs_, state, child(0)->row_desc()));
-  RETURN_IF_ERROR(Expr::Prepare(rhs_ordering_exprs_, state, child(0)->row_desc()));
-  abort_on_default_limit_exceeded_ = abort_on_default_limit_exceeded_ &&
-      state->abort_on_default_limit_exceeded();
+  RETURN_IF_ERROR(sort_exec_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
+  tuple_row_less_than_.reset(new TupleRowComparator(sort_exec_exprs_.lhs_ordering_exprs(),
+      sort_exec_exprs_.rhs_ordering_exprs(), is_asc_order_, nulls_first_));
+  priority_queue_.reset(
+      new priority_queue<Tuple*, vector<Tuple*>, TupleRowComparator>(
+          *tuple_row_less_than_));
+  materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
+  // Allocate memory for a temporary tuple.
+  tmp_tuple_ = reinterpret_cast<Tuple*>(
+      tuple_pool_->Allocate(materialized_tuple_desc_->byte_size()));
   return Status::OK;
 }
 
@@ -84,8 +72,7 @@ Status TopNNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
-  RETURN_IF_ERROR(Expr::Open(lhs_ordering_exprs_, state));
-  RETURN_IF_ERROR(Expr::Open(rhs_ordering_exprs_, state));
+  RETURN_IF_ERROR(sort_exec_exprs_.Open(state));
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // Limit of 0, no need to fetch anything from children.
@@ -95,10 +82,6 @@ Status TopNNode::Open(RuntimeState* state) {
     do {
       batch.Reset();
       RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
-      if (abort_on_default_limit_exceeded_ && child(0)->rows_returned() > limit_) {
-        DCHECK(offset_ == 0); // Offset should be 0 when the default limit is set.
-        return Status("DEFAULT_ORDER_BY_LIMIT has been exceeded.");
-      }
       for (int i = 0; i < batch.num_rows(); ++i) {
         InsertTupleRow(batch.GetRow(i));
       }
@@ -124,7 +107,8 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     }
     int row_idx = row_batch->AddRow();
     TupleRow* dst_row = row_batch->GetRow(row_idx);
-    TupleRow* src_row = *get_next_iter_;
+    Tuple* src_tuple = *get_next_iter_;
+    TupleRow* src_row = reinterpret_cast<TupleRow*>(&src_tuple);
     row_batch->CopyRow(src_row, dst_row);
     ++get_next_iter_;
     row_batch->CommitLastRow();
@@ -138,32 +122,34 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 void TopNNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
-  Expr::Close(lhs_ordering_exprs_, state);
-  Expr::Close(rhs_ordering_exprs_, state);
+  sort_exec_exprs_.Close(state);
   ExecNode::Close(state);
 }
 
 // Insert if either not at the limit or it's a new TopN tuple_row
 void TopNNode::InsertTupleRow(TupleRow* input_row) {
-  TupleRow* insert_tuple_row = NULL;
+  Tuple* insert_tuple = NULL;
 
   if (priority_queue_->size() < limit_ + offset_) {
-    insert_tuple_row = input_row->DeepCopy(tuple_descs_, tuple_pool_.get());
+    insert_tuple = reinterpret_cast<Tuple*>(
+        tuple_pool_->Allocate(materialized_tuple_desc_->byte_size()));
+    insert_tuple->MaterializeExprs<false>(input_row, *materialized_tuple_desc_,
+        sort_exec_exprs_.sort_tuple_slot_exprs(), tuple_pool_.get());
   } else {
     DCHECK(!priority_queue_->empty());
-    TupleRow* top_tuple_row = priority_queue_->top();
-    if ((*tuple_row_less_than_)(input_row, top_tuple_row)) {
-      // TODO: DeepCopy will allocate new buffers for the string data.  This needs
+    Tuple* top_tuple = priority_queue_->top();
+    tmp_tuple_->MaterializeExprs<false>(input_row, *materialized_tuple_desc_,
+            sort_exec_exprs_.sort_tuple_slot_exprs(), NULL);
+    if ((*tuple_row_less_than_)(tmp_tuple_, top_tuple)) {
+      // TODO: DeepCopy() will allocate new buffers for the string data. This needs
       // to be fixed to use a freelist
-      input_row->DeepCopy(top_tuple_row, tuple_descs_, tuple_pool_.get(), true);
-      insert_tuple_row = top_tuple_row;
+      tmp_tuple_->DeepCopy(top_tuple, *materialized_tuple_desc_, tuple_pool_.get());
+      insert_tuple = top_tuple;
       priority_queue_->pop();
     }
   }
 
-  if (insert_tuple_row != NULL) {
-    priority_queue_->push(insert_tuple_row);
-  }
+  if (insert_tuple != NULL) priority_queue_->push(insert_tuple);
 }
 
 // Reverse the order of the tuples in the priority queue
@@ -172,9 +158,9 @@ void TopNNode::PrepareForOutput() {
   int index = sorted_top_n_.size() - 1;
 
   while (priority_queue_->size() > 0) {
-    TupleRow* tuple_row = priority_queue_->top();
+    Tuple* tuple = priority_queue_->top();
     priority_queue_->pop();
-    sorted_top_n_[index] = tuple_row;
+    sorted_top_n_[index] = tuple;
     --index;
   }
 
@@ -184,12 +170,13 @@ void TopNNode::PrepareForOutput() {
 void TopNNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "TopNNode("
-       << " ordering_exprs=" << Expr::DebugString(lhs_ordering_exprs_)
-       << " sort_order=[";
+      << Expr::DebugString(sort_exec_exprs_.lhs_ordering_exprs());
   for (int i = 0; i < is_asc_order_.size(); ++i) {
-    *out << (i > 0 ? " " : "") << (is_asc_order_[i] ? "asc" : "desc");
-  }
-  *out << "]";
+    *out << (i > 0 ? " " : "")
+         << (is_asc_order_[i] ? "asc" : "desc")
+         << " nulls " << (nulls_first_[i] ? "first" : "last");
+ }
+
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }

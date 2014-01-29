@@ -1464,6 +1464,7 @@ void Coordinator::SetExecPlanFragmentParams(
   rpc_params->__set_coord(coord);
   rpc_params->__set_backend_num(backend_num);
   rpc_params->__set_query_ctxt(query_ctxt_);
+  rpc_params->params.__set_sender_id(params.sender_id_base + instance_idx);
 }
 
 }

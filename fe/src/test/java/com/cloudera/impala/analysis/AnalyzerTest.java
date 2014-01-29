@@ -519,11 +519,13 @@ public class AnalyzerTest {
 
     // Offset is only valid with an order by
     AnalysisError("SELECT a FROM test LIMIT 10 OFFSET 5",
-        "OFFSET requires an ORDER BY clause: SELECT a FROM test LIMIT 10 OFFSET 5");
+        "OFFSET requires an ORDER BY clause: LIMIT 10 OFFSET 5");
     AnalysisError("SELECT x.id FROM (SELECT id FROM alltypesagg LIMIT 5 OFFSET 5) x " +
         "ORDER BY x.id LIMIT 100 OFFSET 4",
-        "OFFSET requires an ORDER BY clause: SELECT id FROM alltypesagg " +
-        "LIMIT 5 OFFSET 5");
+        "OFFSET requires an ORDER BY clause: LIMIT 5 OFFSET 5");
+    AnalysisError("SELECT a FROM test OFFSET 5",
+        "OFFSET requires an ORDER BY clause: OFFSET 5");
+    AnalyzesOk("SELECT id FROM functional.Alltypes ORDER BY bool_col OFFSET 5");
   }
 
   @Test

@@ -64,10 +64,9 @@ limit 100
 03:SCAN HDFS [tpcds.customer_address]
    partitions=1/1 size=5.25MB
 ---- DISTRIBUTEDPLAN
-19:TOP-N [LIMIT=100]
+18:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
-|
-18:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 10:TOP-N [LIMIT=100]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
@@ -189,10 +188,9 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-18:TOP-N [LIMIT=100]
+17:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: i_item_id ASC, s_state ASC
-|
-17:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 10:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC, s_state ASC
@@ -324,10 +322,9 @@ limit 1000
 08:SCAN HDFS [tpcds.customer]
    partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-18:TOP-N [LIMIT=1000]
+17:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
-|
-17:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 1000
 |
 10:TOP-N [LIMIT=1000]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
@@ -424,10 +421,9 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=10/120 size=3.76MB
 ---- DISTRIBUTEDPLAN
-09:TOP-N [LIMIT=100]
+08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: year(ss_date) ASC, sum(ss_ext_sales_price) DESC, item.i_brand_id ASC
-|
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 04:TOP-N [LIMIT=100]
 |  order by: year(ss_date) ASC, sum(ss_ext_sales_price) DESC, item.i_brand_id ASC
@@ -504,10 +500,9 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-12:TOP-N [LIMIT=100]
+11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: sum(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
-|
-11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 06:TOP-N [LIMIT=100]
 |  order by: sum(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
@@ -601,10 +596,9 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-12:TOP-N [LIMIT=100]
+11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: s_store_name ASC, s_store_id ASC, sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
-|
-11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 06:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC, s_store_id ASC, sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
@@ -741,10 +735,9 @@ LIMIT 400
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-24:TOP-N [LIMIT=400]
+23:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
-|
-23:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 400
 |
 14:TOP-N [LIMIT=400]
 |  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
@@ -863,10 +856,9 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-12:TOP-N [LIMIT=100]
+11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: d.d_year ASC, sum(ss_ext_sales_price) DESC, i.i_brand_id ASC
-|
-11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 06:TOP-N [LIMIT=100]
 |  order by: d.d_year ASC, sum(ss_ext_sales_price) DESC, i.i_brand_id ASC
@@ -965,10 +957,9 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=24/120 size=4.60MB
 ---- DISTRIBUTEDPLAN
-15:TOP-N [LIMIT=100]
+14:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: sum_sales ASC, i_manufact_id ASC
-|
-14:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 08:TOP-N [LIMIT=100]
 |  order by: sum_sales ASC, i_manufact_id ASC
@@ -1057,10 +1048,9 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-12:TOP-N [LIMIT=100]
+11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand_id ASC
-|
-11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 06:TOP-N [LIMIT=100]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand_id ASC
@@ -1245,10 +1235,9 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-33:TOP-N [LIMIT=100]
+32:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
-|
-32:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 17:TOP-N [LIMIT=100]
 |  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
@@ -1403,10 +1392,9 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=24/120 size=4.60MB
 ---- DISTRIBUTEDPLAN
-15:TOP-N [LIMIT=100]
+14:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: i_manager_id ASC, sum_sales ASC
-|
-14:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 08:TOP-N [LIMIT=100]
 |  order by: i_manager_id ASC, sum_sales ASC
@@ -1536,10 +1524,9 @@ limit 100
 02:SCAN HDFS [tpcds.item]
    partitions=1/1 size=4.82MB
 ---- DISTRIBUTEDPLAN
-21:TOP-N [LIMIT=100]
+20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: s_store_name ASC, i_item_desc ASC
-|
-20:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 10:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC, i_item_desc ASC
@@ -1689,10 +1676,9 @@ limit 100
 08:SCAN HDFS [tpcds.customer]
    partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-22:TOP-N [LIMIT=100]
+21:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: c_last_name ASC, ss_ticket_number ASC
-|
-21:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 12:TOP-N [LIMIT=100]
 |  order by: c_last_name ASC, ss_ticket_number ASC
@@ -1833,10 +1819,9 @@ LIMIT 100
 08:SCAN HDFS [tpcds.customer c]
    partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-18:TOP-N [LIMIT=100]
+17:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: cnt DESC
-|
-17:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 10:TOP-N [LIMIT=100]
 |  order by: cnt DESC
@@ -1970,10 +1955,9 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-18:TOP-N [LIMIT=100]
+17:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
-|
-17:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 10:TOP-N [LIMIT=100]
 |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
@@ -2081,10 +2065,9 @@ limit 100
    partitions=1/1 size=76.92MB
    predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
 ---- DISTRIBUTEDPLAN
-16:TOP-N [LIMIT=100]
+15:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: i_item_id ASC
-|
-15:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 08:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC
@@ -2199,10 +2182,9 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=24/120 size=4.43MB
 ---- DISTRIBUTEDPLAN
-15:TOP-N [LIMIT=100]
+14:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: sum_sales ASC, s_store_name ASC, i_category ASC
-|
-14:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 08:TOP-N [LIMIT=100]
 |  order by: sum_sales ASC, s_store_name ASC, i_category ASC
@@ -2357,10 +2339,9 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=7/120 size=1.09MB
 ---- DISTRIBUTEDPLAN
-21:TOP-N [LIMIT=100]
+20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: s_store_name ASC
-|
-20:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 100
 |
 11:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC
@@ -2545,10 +2526,9 @@ limit 1000
    partitions=1/1 size=4.82MB
    predicates: i_category IN ('Jewelry', 'Sports', 'Books')
 ---- DISTRIBUTEDPLAN
-09:TOP-N [LIMIT=1000]
+08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
 |  order by: i_category ASC, i_class ASC, i_item_desc ASC
-|
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 1000
 |
 04:TOP-N [LIMIT=1000]
 |  order by: i_category ASC, i_class ASC, i_item_desc ASC

@@ -98,7 +98,8 @@ public class InlineViewRef extends TableRef {
     inlineViewAnalyzer_.setUseHiveColLabels(useHiveColLabels);
     queryStmt_.analyze(inlineViewAnalyzer_);
 
-    inlineViewAnalyzer_.setHasLimit(queryStmt_.hasLimitClause());
+    inlineViewAnalyzer_.setHasLimitOffsetClause(
+        queryStmt_.hasLimit() || queryStmt_.hasOffset());
     queryStmt_.getMaterializedTupleIds(materializedTupleIds_);
     desc_ = analyzer.registerInlineViewRef(this);
     isAnalyzed_ = true;  // true now that we have assigned desc

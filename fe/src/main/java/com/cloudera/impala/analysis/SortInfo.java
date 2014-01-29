@@ -28,20 +28,31 @@ public class SortInfo {
   private final List<Boolean> isAscOrder_;
   // True if "NULLS FIRST", false if "NULLS LAST", null if not specified.
   private final List<Boolean> nullsFirstParams_;
+  // The single tuple that is materialized, sorted and output by a sort operator
+  // (i.e. SortNode or TopNNode)
+  private TupleDescriptor sortTupleDesc_;
+  // Input expressions materialized into sortTupleDesc_. One expr per slot in
+  // sortTupleDesc_.
+  private List<Expr> sortTupleSlotExprs_;
 
-  public SortInfo(List<Expr> orderingExprs,
-      List<Boolean> isAscOrder,
+  public SortInfo(List<Expr> orderingExprs, List<Boolean> isAscOrder,
       List<Boolean> nullsFirstParams) {
     Preconditions.checkArgument(orderingExprs.size() == isAscOrder.size());
     Preconditions.checkArgument(orderingExprs.size() == nullsFirstParams.size());
-    this.orderingExprs_ = orderingExprs;
-    this.isAscOrder_ = isAscOrder;
-    this.nullsFirstParams_ = nullsFirstParams;
+    orderingExprs_ = orderingExprs;
+    isAscOrder_ = isAscOrder;
+    nullsFirstParams_ = nullsFirstParams;
   }
 
+  void setMaterializedTupleInfo(TupleDescriptor tupleDesc, List<Expr> tupleSlotExprs) {
+    sortTupleDesc_ = tupleDesc;
+    sortTupleSlotExprs_ = tupleSlotExprs;
+  }
   public List<Expr> getOrderingExprs() { return orderingExprs_; }
   public List<Boolean> getIsAscOrder() { return isAscOrder_; }
   public List<Boolean> getNullsFirstParams() { return nullsFirstParams_; }
+  public List<Expr> getSortTupleSlotExprs() { return sortTupleSlotExprs_; }
+  public TupleDescriptor getSortTupleDescriptor() { return sortTupleDesc_; }
 
   /**
    * Gets the list of booleans indicating whether nulls come first or last, independent
@@ -57,10 +68,23 @@ public class SortInfo {
   }
 
   /**
-   * Substitute all the ordering expression according to the substitution map.
+   * Materializes the slots in sortTupleDesc_ referenced in the ordering exprs.
+   * Materializes the slots referenced by the corresponding sortTupleSlotExpr after
+   * applying the 'smap'.
    */
-  public void substitute(Expr.SubstitutionMap smap) {
-    Expr.substituteList(orderingExprs_, smap);
+  public void materializeRequiredSlots(Analyzer analyzer, Expr.SubstitutionMap smap) {
+    Preconditions.checkNotNull(sortTupleDesc_);
+    Preconditions.checkNotNull(sortTupleSlotExprs_);
+    Preconditions.checkState(sortTupleDesc_.getIsMaterialized());
+    analyzer.materializeSlots(orderingExprs_);
+    List<SlotDescriptor> sortTupleSlotDescs = sortTupleDesc_.getSlots();
+    List<Expr> materializedExprs = Lists.newArrayList();
+    for (int i = 0; i < sortTupleSlotDescs.size(); ++i) {
+      if (sortTupleSlotDescs.get(i).isMaterialized()) {
+        materializedExprs.add(sortTupleSlotExprs_.get(i));
+      }
+    }
+    analyzer.materializeSlots(Expr.cloneList(materializedExprs, smap));
   }
-}
 
+}

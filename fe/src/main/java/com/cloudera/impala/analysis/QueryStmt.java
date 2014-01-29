@@ -16,10 +16,16 @@ package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.TreeNode;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Abstract base class for any statement that returns results
@@ -64,14 +70,19 @@ public abstract class QueryStmt extends StatementBase {
 
   protected SortInfo sortInfo_;
 
+  // evaluateOrderBy_ is true if there is an order by clause that must be evaluated.
+  // False for nested query stmts with an order-by clause without offset/limit.
+  // sortInfo_ is still generated and used in analysis to ensure that the order-by clause
+  // is well-formed.
+  protected boolean evaluateOrderBy_;
+
   // Analyzer that was used to analyze this query statement.
   protected Analyzer analyzer_;
 
   QueryStmt(ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
-    this.orderByElements_ = orderByElements;
-    this.sortInfo_ = null;
-    this.limitElement_ =
-        limitElement == null ? new LimitElement(null, null) : limitElement;
+    orderByElements_ = orderByElements;
+    sortInfo_ = null;
+    limitElement_ = limitElement == null ? new LimitElement(null, null) : limitElement;
   }
 
   @Override
@@ -86,19 +97,27 @@ public abstract class QueryStmt extends StatementBase {
   private void analyzeLimit(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     if (limitElement_.getOffsetExpr() != null && !hasOrderByClause()) {
-      throw new AnalysisException("OFFSET requires an ORDER BY clause: " + toSql());
+      throw new AnalysisException("OFFSET requires an ORDER BY clause: " +
+          limitElement_.toSql().trim());
     }
     limitElement_.analyze(analyzer);
   }
 
-
   /**
    * Creates sortInfo by resolving aliases and ordinals in the orderingExprs.
+   * If the query stmt is an inline view/union operand, then order-by with no
+   * limit with offset is not allowed, since that requires a sort and merging-exchange,
+   * and subsequent query execution would occur on a single machine.
+   * Sets evaluateOrderBy_ to false for ignored order-by w/o limit/offset in nested
+   * queries.
    */
   protected void createSortInfo(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     // not computing order by
-    if (orderByElements_ == null) return;
+    if (orderByElements_ == null) {
+      evaluateOrderBy_ = false;
+      return;
+    }
 
     ArrayList<Expr> orderingExprs = Lists.newArrayList();
     ArrayList<Boolean> isAscOrder = Lists.newArrayList();
@@ -121,7 +140,67 @@ public abstract class QueryStmt extends StatementBase {
     Expr.substituteList(orderingExprs, aliasSmap_);
     Expr.analyze(orderingExprs, analyzer);
 
+    if (!analyzer.isRootAnalyzer() && hasOffset() && !hasLimit()) {
+      throw new AnalysisException("Order-by with offset without limit not supported" +
+        " in nested queries.");
+    }
+
     sortInfo_ = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
+    // order by w/o limit and offset in inline views and union operands are ignored.
+    if (!analyzer.isRootAnalyzer() && !hasLimit() && !hasOffset()) {
+      evaluateOrderBy_ = false;
+    } else {
+      evaluateOrderBy_ = true;
+    }
+  }
+
+  /**
+   * Create a tuple descriptor for the single tuple that is materialized, sorted and
+   * output by the exec node implementing the sort. Done by materializing slot refs in
+   * the order-by and result expressions. Those SlotRefs in the ordering and result exprs
+   * are substituted with SlotRefs into the new tuple. This simplifies sorting logic for
+   * total (no limit) sorts.
+   * Done after analyzeAggregation() since ordering and result exprs may refer to
+   * the outputs of aggregation. Invoked for UnionStmt as well since
+   * TODO: We could do something more sophisticated than simply copying input
+   * slotrefs - e.g. compute some order-by expressions.
+   */
+  protected void createSortTupleInfo(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
+    Preconditions.checkState(evaluateOrderBy_);
+
+    // sourceSlots contains the slots from the input row to materialize.
+    Set<SlotRef> sourceSlots = Sets.newHashSet();
+    TreeNode.collect(resultExprs_, Predicates.instanceOf(SlotRef.class), sourceSlots);
+    TreeNode.collect(sortInfo_.getOrderingExprs(), Predicates.instanceOf(SlotRef.class),
+        sourceSlots);
+
+    TupleDescriptor sortTupleDesc = analyzer.getDescTbl().createTupleDescriptor();
+    List<Expr> sortTupleExprs = Lists.newArrayList();
+    sortTupleDesc.setIsMaterialized(true);
+    // substOrderBy is the mapping from slot refs in the input row to slot refs in the
+    // materialized sort tuple.
+    Expr.SubstitutionMap substOrderBy = new Expr.SubstitutionMap();
+    for (SlotRef origSlotRef: sourceSlots) {
+      SlotDescriptor origSlotDesc = origSlotRef.getDesc();
+      SlotDescriptor materializedDesc = analyzer.addSlotDescriptor(sortTupleDesc);
+      Column origColumn = origSlotDesc.getColumn();
+      if (origColumn != null) {
+        materializedDesc.setColumn(origColumn);
+      } else {
+        materializedDesc.setType(origSlotDesc.getType());
+      }
+      materializedDesc.setLabel(origSlotDesc.getLabel());
+      SlotRef cloneRef = new SlotRef(materializedDesc);
+      substOrderBy.addMapping(origSlotRef, cloneRef);
+      analyzer.createAuxEquivPredicate(cloneRef, origSlotRef);
+      sortTupleExprs.add(origSlotRef);
+    }
+
+    Expr.substituteList(resultExprs_, substOrderBy);
+    Expr.substituteList(sortInfo_.getOrderingExprs(), substOrderBy);
+
+    sortInfo_.setMaterializedTupleInfo(sortTupleDesc, sortTupleExprs);
   }
 
   /**
@@ -160,13 +239,13 @@ public abstract class QueryStmt extends StatementBase {
   public void setWithClause(WithClause withClause) { this.withClause_ = withClause; }
   public boolean hasWithClause() { return withClause_ != null; }
   public WithClause getWithClause() { return withClause_; }
-  public ArrayList<OrderByElement> getOrderByElements() { return orderByElements_; }
-  public void removeOrderByElements() { orderByElements_ = null; }
   public boolean hasOrderByClause() { return orderByElements_ != null; }
+  public boolean hasLimit() { return limitElement_.getLimitExpr() != null; }
   public long getLimit() { return limitElement_.getLimit(); }
-  public boolean hasLimitClause() { return limitElement_.getLimitExpr() != null; }
+  public boolean hasOffset() { return limitElement_.getOffsetExpr() != null; }
   public long getOffset() { return limitElement_.getOffset(); }
   public SortInfo getSortInfo() { return sortInfo_; }
+  public boolean evaluateOrderBy() { return evaluateOrderBy_; }
   public ArrayList<Expr> getResultExprs() { return resultExprs_; }
   public ArrayList<Expr> getBaseTblResultExprs() { return baseTblResultExprs_; }
 

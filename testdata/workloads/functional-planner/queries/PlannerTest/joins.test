@@ -352,14 +352,14 @@ limit 5
 |  order by: count(x.day) ASC
 |
 09:AGGREGATE [FINALIZE]
-|  output: count(a.day)
-|  group by: c.tinyint_col
+|  output: count(day)
+|  group by: tinyint_col
 |
 08:SELECT
-|  predicates: a.day >= 6
+|  predicates: day >= 6
 |
 07:TOP-N [LIMIT=10]
-|  order by: a.day ASC, c.tinyint_col ASC
+|  order by: day ASC, tinyint_col ASC
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = d.id
@@ -386,19 +386,18 @@ limit 5
 |  order by: count(x.day) ASC
 |
 09:AGGREGATE [FINALIZE]
-|  output: count(a.day)
-|  group by: c.tinyint_col
+|  output: count(day)
+|  group by: tinyint_col
 |
 08:SELECT
-|  predicates: a.day >= 6
+|  predicates: day >= 6
 |
-16:TOP-N [LIMIT=10]
-|  order by: a.day ASC, c.tinyint_col ASC
-|
-15:EXCHANGE [PARTITION=UNPARTITIONED]
+15:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  order by: day ASC, tinyint_col ASC
+|  limit: 10
 |
 07:TOP-N [LIMIT=10]
-|  order by: a.day ASC, c.tinyint_col ASC
+|  order by: day ASC, tinyint_col ASC
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.id = d.id
