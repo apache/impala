@@ -101,7 +101,11 @@ class KerberosAuthProvider : public AuthProvider {
   // True if tickets for this principal should be obtained.
   bool needs_kinit_;
 
-  // Runs kinit periodically to maintain a live ticket for principal_.
+  // Periodically (roughly once every FLAGS_kerberor_reinit_interval minutes) calls kinit
+  // to get a ticket granting ticket from the kerberos server for principal_, which is
+  // kept in the kerberos cache associated with this process. Once the first attempt to
+  // obtain a ticket has completed, first_kinit is Set() with the status of the
+  // operation. Additionally, if the first attempt fails, this method will return.
   void RunKinit(Promise<Status>* first_kinit);
 };
 

@@ -27,7 +27,7 @@
 #include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/url-coding.h"
-#include "util/proc-util.h"
+#include "util/os-util.h"
 
 using namespace boost;
 using namespace std;

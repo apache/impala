@@ -21,6 +21,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int.hpp>
+#include <gutil/strings/substitute.h>
 #include <string>
 #include <vector>
 
@@ -38,10 +39,13 @@
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/network-util.h"
+#include "util/os-util.h"
 #include "util/promise.h"
 #include "util/thread.h"
+#include "util/time.h"
 
 using namespace std;
+using namespace strings;
 using namespace boost;
 using namespace boost::random;
 
@@ -248,8 +252,6 @@ static int SaslGetPath(void* context, const char** path) {
   return SASL_OK;
 }
 
-// Periodically call kinit to get a ticket granting ticket from the kerberos server.
-// This is kept in the kerberos cache associated with this process.
 void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   // Minumum lifetime to request for each ticket renewal.
   static const int MIN_TICKET_LIFETIME_IN_MINS = 1440;
@@ -258,60 +260,52 @@ void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   // whichever is larger. The KDC will automatically fall back to using the maximum
   // allowed allowed value if a longer lifetime is requested, so it is okay to be greedy
   // here.
-  int ticket_lifetime =
+  int ticket_lifetime_mins =
       max(MIN_TICKET_LIFETIME_IN_MINS, FLAGS_kerberos_reinit_interval * 2);
 
   // Pass the path to the key file and the principal. Make the ticket renewable.
   // Calling kinit -R ensures the ticket makes it to the cache, and should be a separate
   // call to kinit.
-  stringstream kinit_cmd_ss;
-  kinit_cmd_ss << "kinit -r " << ticket_lifetime << "m -k -t " << keytab_path_ << " "
-               << principal_ << " 2>&1 " << "&& kinit -R 2>&1";
-  string kinit_cmd = kinit_cmd_ss.str();
+  const string kinit_cmd = Substitute("kinit -r $0m -k -t $1 $2 2>&1",
+      ticket_lifetime_mins, keytab_path_, principal_);
 
-  bool had_one_success = false;
-  int failures = 0;
+  bool first_time = true;
+  int failures_since_renewal = 0;
   while (true) {
-    LOG(INFO) << "Registering " << principal_ << " key_tab file "
-              << keytab_path_;
-    string kreturn;
-    bool succeeded = false;
-    FILE* fp = popen(kinit_cmd.c_str(), "r");
-    if (fp == NULL) {
-      kreturn = "Failed to execute kinit";
-    } else {
-      // Read the first 1024 bytes of any output so we have some idea of what happened on
-      // failure.
-      char buf[1024];
-      size_t len = fread(buf, 1, 1024, fp);
-      kreturn.assign(buf, len);
-      // pclose() returns an encoded form of the sub-process' exit code.
-      int status = pclose(fp);
-      if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-        succeeded = true;
+    LOG(INFO) << "Registering " << principal_ << ", key_tab file " << keytab_path_;
+    string kinit_output;
+    bool success = RunShellProcess(kinit_cmd, &kinit_output);
+
+    if (!success) {
+      const string& err_msg = Substitute(
+          "Failed to obtain Kerberos ticket for principal: $0. $1", principal_,
+          kinit_output);
+      if (first_time) {
+        first_kinit->Set(Status(err_msg));
+        return;
+      } else {
+        LOG(ERROR) << err_msg;
       }
+    } else {
+      first_time = false;
+      first_kinit->Set(Status::OK);
     }
 
-    if (!succeeded) {
-      string error_msg = GetStrErrMsg();
-      if (!had_one_success) {
-        stringstream ss;
-        ss << "Failed to obtain Kerberos ticket for principal: " << principal_
-           << " - error message is '" << error_msg << "' and output from kinit was: "
-           << "'" << kreturn << "'";
-        first_kinit->Set(Status(ss.str()));
-        return;
-      }
-      // We couldn't renew the ticket so just report the error. Existing connections
-      // are ok and we'll try to renew the ticket later.
-      ++failures;
-      LOG(ERROR) << "Failed to extend kerberos ticket: '" << kreturn
-                 << "' " << error_msg << ". Failure count: " << failures;
-    } else {
-      VLOG_CONNECTION << "kinit returned: '" << kreturn << "'";
-      if (had_one_success == false) {
-        had_one_success = true;
-        first_kinit->Set(Status::OK);
+    if (success) {
+      failures_since_renewal = 0;
+      // Workaround for Kerberos 1.8.1 - wait a short time, before requesting a renewal of
+      // the ticket-granting ticket. The sleep time is >1s, to force the system clock to
+      // roll-over o a new second, avoiding a race between grant and renewal.
+      SleepForMs(1500);
+      string krenew_output;
+      if (RunShellProcess("kinit -R", &krenew_output)) {
+        LOG(INFO) << "Successfully renewed Keberos ticket";
+      } else {
+        // We couldn't renew the ticket so just report the error. Existing connections
+        // are ok and we'll try to renew the ticket later.
+        ++failures_since_renewal;
+        LOG(ERROR) << "Failed to extend Kerberos ticket. Error: " << krenew_output
+                   << ". Failure count: " << failures_since_renewal;
       }
     }
     // Sleep for the renewal interval, minus a random time between 0-5 minutes to help
@@ -319,7 +313,7 @@ void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
     // reduce KDC stress due to frequent renewals.
     mt19937 generator;
     uniform_int<> dist(0, 300);
-    sleep(max((60 * FLAGS_kerberos_reinit_interval) - dist(generator), 60));
+    SleepForMs(1000 * max((60 * FLAGS_kerberos_reinit_interval) - dist(generator), 60));
   }
 }
 

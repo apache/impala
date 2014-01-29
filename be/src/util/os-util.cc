@@ -12,20 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util/proc-util.h"
+#include "util/os-util.h"
 
 #include <unistd.h>
 #include <fstream>
 #include <sstream>
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
+#include <gutil/strings/substitute.h>
 
+#include "util/error-util.h"
 #include "util/string-parser.h"
 
 using namespace impala;
 using namespace std;
 using namespace boost::filesystem;
 using namespace boost;
+using namespace strings;
 
 // Ensure that Impala compiles on earlier kernels. If the target kernel does not support
 // _SC_CLK_TCK, sysconf(_SC_CLK_TCK) will return -1.
@@ -81,4 +84,31 @@ Status impala::GetThreadStats(int64_t tid, ThreadStats* stats) {
   }
 
   return Status::OK;
+}
+
+bool impala::RunShellProcess(const string& cmd, string* msg) {
+  DCHECK(msg != NULL);
+  FILE* fp = popen(cmd.c_str(), "r");
+  if (fp == NULL) {
+    *msg = Substitute("Failed to execute shell cmd: '$0', error was: $1", cmd,
+        GetStrErrMsg());
+    return false;
+  }
+  // Read the first 1024 bytes of any output before pclose() so we have some idea of what
+  // happened on failure.
+  char buf[1024];
+  size_t len = fread(buf, 1, 1024, fp);
+  string output;
+  output.assign(buf, len);
+
+  // pclose() returns an encoded form of the sub-process' exit code.
+  int status = pclose(fp);
+  if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+    *msg = output;
+    return true;
+  }
+
+  *msg = Substitute("Shell cmd: '$0' exited with an error: '$1'. Output was: '$2'", cmd,
+      GetStrErrMsg(), output);
+  return false;
 }

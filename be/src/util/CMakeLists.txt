@@ -50,7 +50,7 @@ add_library(Util
   pprof-path-handlers.cc
 # TODO: not supported on RHEL 5
 #  perf-counters.cc
-  proc-util.cc
+  os-util.cc
   thread.cc
   time.cc
   progress-updater.cc
