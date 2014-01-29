@@ -51,7 +51,10 @@ using namespace llvm;
 using namespace std;
 
 DEFINE_bool(dump_ir, false, "if true, output IR after optimization passes");
-DEFINE_string(module_output, "", "if set, saves the generated IR to the output file.");
+DEFINE_string(unopt_module_output, "",
+              "if set, saves the unoptimized generated IR to the output file.");
+DEFINE_string(opt_module_output, "",
+              "if set, saves the optimized generated IR to the output file.");
 DECLARE_string(local_library_dir);
 
 namespace impala {
@@ -258,15 +261,6 @@ Status LlvmCodeGen::Init() {
 }
 
 LlvmCodeGen::~LlvmCodeGen() {
-  if (FLAGS_module_output.size() != 0) {
-    fstream f(FLAGS_module_output.c_str(), fstream::out | fstream::trunc);
-    if (f.fail()) {
-      LOG(ERROR) << "Could not save IR to: " << FLAGS_module_output;
-    } else {
-      f << GetIR(true);
-      f.close();
-    }
-  }
   for (map<Function*, bool>::iterator iter = jitted_functions_.begin();
       iter != jitted_functions_.end(); ++iter) {
     execution_engine_->freeMachineCodeForFunction(iter->first);
@@ -548,6 +542,16 @@ Status LlvmCodeGen::OptimizeModule() {
   DCHECK(!is_compiled_);
   is_compiled_ = true;
 
+  if (FLAGS_unopt_module_output.size() != 0) {
+    fstream f(FLAGS_unopt_module_output.c_str(), fstream::out | fstream::trunc);
+    if (f.fail()) {
+      LOG(ERROR) << "Could not save IR to: " << FLAGS_unopt_module_output;
+    } else {
+      f << GetIR(true);
+      f.close();
+    }
+  }
+
   if (is_corrupt_) return Status("Module is corrupt.");
   SCOPED_TIMER(profile_.total_time_counter());
   SCOPED_TIMER(compile_timer_);
@@ -590,6 +594,16 @@ Status LlvmCodeGen::OptimizeModule() {
   // Now that the module is optimized, it is safe to call jit fn.
   for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
     *fns_to_jit_compile_[i].second = JitFunction(fns_to_jit_compile_[i].first);
+  }
+
+  if (FLAGS_opt_module_output.size() != 0) {
+    fstream f(FLAGS_opt_module_output.c_str(), fstream::out | fstream::trunc);
+    if (f.fail()) {
+      LOG(ERROR) << "Could not save IR to: " << FLAGS_opt_module_output;
+    } else {
+      f << GetIR(true);
+      f.close();
+    }
   }
 
   return Status::OK;
