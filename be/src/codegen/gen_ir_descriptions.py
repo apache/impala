@@ -15,6 +15,16 @@
 
 from string import Template
 import os
+import shutil
+import filecmp
+import tempfile
+from optparse import OptionParser
+
+parser = OptionParser()
+parser.add_option("--noclean", action="store_true", default=False,
+                  help="If specified, does not remove existing files and only replaces "
+                       "them with freshly generated ones if they have changed.")
+options, args = parser.parse_args()
 
 # This script will generate two headers that describe all of the clang cross compiled
 # functions.
@@ -133,16 +143,31 @@ names_epilogue = '\
 \n\
 #endif\n'
 
-BE_PATH = os.environ['IMPALA_HOME'] + "/be/generated-sources/impala-ir/"
+def move_if_different(src_file, dest_file):
+  """Moves src_file to dest_file if dest_file does not exist, or if
+  the contents of src_file and dest_file differ. Assumes that src_file exists."""
+  if not os.path.isfile(dest_file) or not filecmp.cmp(src_file, dest_file):
+    shutil.move(src_file, dest_file)
+  else:
+    print 'Retaining existing file: %s' % (dest_file)
+
+BE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'be/generated-sources/impala-ir/')
+IR_FUNCTIONS_FILE = 'impala-ir-functions.h'
+IR_NAMES_FILE = 'impala-ir-names.h'
+IR_FUNCTIONS_PATH = os.path.join(BE_PATH, IR_FUNCTIONS_FILE)
+IR_NAMES_PATH = os.path.join(BE_PATH, IR_NAMES_FILE)
+TMP_IR_FUNCTIONS_PATH = os.path.join(tempfile.gettempdir(), IR_FUNCTIONS_FILE)
+TMP_IR_NAMES_PATH = os.path.join(tempfile.gettempdir(), IR_NAMES_FILE)
+
 if not os.path.exists(BE_PATH):
   os.makedirs(BE_PATH)
 
 if __name__ == "__main__":
   print "Generating IR description files"
-  enums_file = open(BE_PATH + 'impala-ir-functions.h', 'w')
+  enums_file = open(TMP_IR_FUNCTIONS_PATH, 'w')
   enums_file.write(enums_preamble)
 
-  names_file = open(BE_PATH + 'impala-ir-names.h', 'w')
+  names_file = open(TMP_IR_NAMES_PATH, 'w')
   names_file.write(names_preamble);
 
   idx = 0;
@@ -155,9 +180,16 @@ if __name__ == "__main__":
     idx = idx + 1;
   enums_file.write("    FN_END = " + str(idx) + "\n")
 
-
   enums_file.write(enums_epilogue)
   enums_file.close()
 
   names_file.write(names_epilogue)
   names_file.close()
+
+  # Conditionally move files from tmp to BE.
+  if options.noclean:
+    move_if_different(TMP_IR_FUNCTIONS_PATH, IR_FUNCTIONS_PATH)
+    move_if_different(TMP_IR_NAMES_PATH, IR_NAMES_PATH)
+  else:
+    shutil.move(TMP_IR_FUNCTIONS_PATH, IR_FUNCTIONS_PATH)
+    shutil.move(TMP_IR_NAMES_PATH, IR_NAMES_PATH)

@@ -18,18 +18,34 @@
 
 import os
 import time;
+import filecmp
 from commands import getstatusoutput
 from time import localtime, strftime
+from optparse import OptionParser
+
+parser = OptionParser()
+parser.add_option("--noclean", action="store_true", default=False,
+                  help="If specified, does not remove existing files and only replaces "
+                       "them with freshly generated ones if they have changed.")
+options, args = parser.parse_args()
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
+SAVE_VERSION_SCRIPT = os.path.join(IMPALA_HOME, 'bin/save-version.sh')
 VERSION_FILE_NAME = os.path.join(IMPALA_HOME, 'bin/version.info')
+VERSION_HEADER_FILE_NAME = os.path.join(IMPALA_HOME, 'be/src/common/version.h')
 
-# If a version file already exists use that, otherwise generate a version info file.
+# Remove existing version files only if --noclean was not specified.
+# TODO: Might be useful to make a common utility function remove_if_clean.
+if not options.noclean and os.path.isfile(VERSION_FILE_NAME):
+  print 'Removing existing file: %s' % (VERSION_FILE_NAME)
+  os.remove(VERSION_FILE_NAME)
+if not options.noclean and os.path.isfile(VERSION_HEADER_FILE_NAME):
+  print 'Removing existing file: %s' % (VERSION_HEADER_FILE_NAME)
+  os.remove(VERSION_HEADER_FILE_NAME)
+
+# Generate a new version file only if there is no existing one.
 if not os.path.isfile(VERSION_FILE_NAME):
-  print 'No version.info file found. Generating new version.info'
-  os.system(os.path.join(IMPALA_HOME, 'bin/save-version.sh'))
-else:
-  print 'Using existing version.info file'
+  os.system(SAVE_VERSION_SCRIPT)
 
 # version.info file has the format:
 # VERSION: <version>
@@ -79,8 +95,8 @@ file_contents = """
        'build_time': build_time}
 file_contents = file_contents.strip()
 
-RESULT_PATH = os.environ['IMPALA_HOME'] + '/be/src/common/version.h'
-
-version_file = open(RESULT_PATH, "w")
-version_file.write(file_contents)
-version_file.close()
+# Generate a new version file only if there is no existing one.
+if not os.path.isfile(VERSION_HEADER_FILE_NAME):
+  version_file = open(VERSION_HEADER_FILE_NAME, "w")
+  version_file.write(file_contents)
+  version_file.close()

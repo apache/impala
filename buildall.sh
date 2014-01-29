@@ -31,6 +31,9 @@ TARGET_BUILD_TYPE=Debug
 EXPLORATION_STRATEGY=core
 SNAPSHOT_FILE=
 
+# Arg to pass to python scripts supporting incremental rebuilding, e.g., via --noclean.
+PYTHON_CLEAN_ARG=""
+
 # Exit on reference to uninitialized variable
 set -u
 
@@ -49,6 +52,7 @@ do
   case "$ARG" in
     -noclean)
       CLEAN_ACTION=0
+      PYTHON_CLEAN_ARG="--noclean"
       ;;
     -testdata)
       TESTDATA_ACTION=1
@@ -113,6 +117,9 @@ Examples of common tasks:
   # Build and skip tests
   ./buildall.sh -skiptests
 
+  # Incrementally rebuild and skip tests
+  ./buildall.sh -skiptests -noclean
+
   # Build, load a snapshot file, run tests
   ./buildall.sh -snapshot_file <file>
 
@@ -173,9 +180,6 @@ then
 
   # clean llvm
   rm -f $IMPALA_HOME/llvm-ir/impala*.ll
-
-  # Cleanup the version.info file so it will be regenerated for the next build.
-  rm -f $IMPALA_HOME/bin/version.info
 fi
 
 # Kill any processes that may be accessing postgres metastore
@@ -195,15 +199,15 @@ fi
 # build common and backend
 cd $IMPALA_HOME
 rm -f CMakeCache.txt
-bin/gen_build_version.py
+bin/gen_build_version.py $PYTHON_CLEAN_ARG
 cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
 
 cd $IMPALA_HOME/common/function-registry
-make
+make -j${IMPALA_BUILD_THREADS:-4}
 cd $IMPALA_HOME/common/thrift
-make
+make -j${IMPALA_BUILD_THREADS:-4}
 cd $IMPALA_BE_DIR
-python src/codegen/gen_ir_descriptions.py
+python src/codegen/gen_ir_descriptions.py $PYTHON_CLEAN_ARG
 make -j${IMPALA_BUILD_THREADS:-4}
 
 if [ -e $IMPALA_LZO ]
