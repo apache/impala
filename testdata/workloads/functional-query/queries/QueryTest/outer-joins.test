@@ -597,3 +597,22 @@ bigint
 ---- RESULTS
 10
 ====
+---- QUERY
+# Regression test for IMPALA-735.
+select distinct t1.tinyint_col from alltypesagg t1
+full outer join alltypesagg t2
+on t2.smallint_col = (t1.tinyint_col + 10000)
+---- TYPES
+tinyint
+---- RESULTS
+NULL
+1
+2
+3
+4
+5
+6
+7
+8
+9
+====

@@ -267,10 +267,7 @@ int RowDescriptor::GetRowSize() const {
 }
 
 int RowDescriptor::GetTupleIdx(TupleId id) const {
-  if (id >= tuple_idx_map_.size()) {
-    LOG(INFO) << "RowDescriptor: " << DebugString();
-  }
-  DCHECK_LT(id, tuple_idx_map_.size());
+  DCHECK_LT(id, tuple_idx_map_.size()) << "RowDescriptor: " << DebugString();
   return tuple_idx_map_[id];
 }
 

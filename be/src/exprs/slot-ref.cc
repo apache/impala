@@ -77,7 +77,7 @@ Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
     error << "invalid tuple_idx";
     return Status(error.str());
   }
-  //DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
+  DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
   tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
   slot_offset_ = slot_desc->tuple_offset();
   null_indicator_offset_ = slot_desc->null_indicator_offset();
@@ -93,6 +93,7 @@ string SlotRef::DebugString() const {
   stringstream out;
   out << "SlotRef(slot_id=" << slot_id_
       << " tuple_idx=" << tuple_idx_ << " slot_offset=" << slot_offset_
+      << " tuple_is_nullable=" << tuple_is_nullable_
       << " null_indicator=" << null_indicator_offset_
       << Expr::DebugString() << ")";
   return out.str();
@@ -143,9 +144,15 @@ string SlotRef::DebugString() const {
 // }
 Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   // SlotRefs are based on the slot_id and tuple_idx.  Combine them to make a
-  // query-wide unique id.
+  // query-wide unique id. We also need to combine whether the tuple is nullable. For
+  // example, in an outer join the scan node could have the same tuple id and slot id
+  // as the join node. When the slot is being used in the scan-node, the tuple is
+  // non-nullable. Used in the join node (and above in the plan tree), it is nullable.
   // TODO: can we do something better.
+  const int64_t TUPLE_NULLABLE_MASK = 1L << 63;
   int64_t unique_slot_id = slot_id_ | ((int64_t)tuple_idx_) << 32;
+  DCHECK_EQ(unique_slot_id & TUPLE_NULLABLE_MASK, 0);
+  if (tuple_is_nullable_) unique_slot_id |= TUPLE_NULLABLE_MASK;
   Function* cached_fn = codegen->GetRegisteredExprFn(unique_slot_id);
   if (cached_fn != NULL) {
     codegen_fn_ = cached_fn;

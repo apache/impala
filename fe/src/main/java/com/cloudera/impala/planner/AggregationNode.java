@@ -63,6 +63,7 @@ public class AggregationNode extends PlanNode {
     super(id, aggInfo.getAggTupleId().asList(), "AGGREGATE");
     aggInfo_ = aggInfo;
     children_.add(input);
+    nullableTupleIds_.addAll(input.getNullableTupleIds());
     needsFinalize_ = true;
   }
 

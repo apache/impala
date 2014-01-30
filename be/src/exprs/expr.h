@@ -575,6 +575,7 @@ class SlotRef : public Expr {
 inline void* SlotRef::ComputeFn(Expr* expr, TupleRow* row) {
   SlotRef* ref = static_cast<SlotRef*>(expr);
   Tuple* t = row->GetTuple(ref->tuple_idx_);
+  if (!ref->tuple_is_nullable_) DCHECK(t != NULL);
   if (t == NULL || t->IsNull(ref->null_indicator_offset_)) return NULL;
   return t->GetSlot(ref->slot_offset_);
 }
