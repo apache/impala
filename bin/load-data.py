@@ -76,15 +76,16 @@ def validate_workloads(all_workloads, workloads):
       print 'Available workloads: ' + ', '.join(all_workloads)
       sys.exit(1)
 
-def exec_cmd(cmd, error_msg, expect_success=True):
+def exec_cmd(cmd, error_msg, exit_on_error=True):
   ret_val = -1
   try:
     ret_val = subprocess.call(cmd, shell=True)
   except Exception as e:
     error_msg = "%s: %s" % (error_msg, str(e))
   finally:
-    if expect_success and ret_val != 0:
+    if ret_val != 0:
       print error_msg
+      if exit_on_error: sys.exit(ret_val)
   return ret_val
 
 def exec_hive_query_from_file(file_name):
@@ -164,11 +165,11 @@ def copy_avro_schemas_to_hdfs(schemas_dir):
   exec_hadoop_fs_cmd("-mkdir -p " + options.hive_warehouse_dir)
   exec_hadoop_fs_cmd("-put -f %s %s/" % (schemas_dir, options.hive_warehouse_dir))
 
-def exec_hadoop_fs_cmd(args, expect_success=True):
+def exec_hadoop_fs_cmd(args, exit_on_error=True):
   cmd = "%s fs %s" % (HADOOP_CMD, args)
   print "Executing Hadoop command: " + cmd
   exec_cmd(cmd, "Error executing Hadoop command, exiting",
-      expect_success=expect_success)
+      exit_on_error=exit_on_error)
 
 def exec_impala_query_from_file_parallel(query_files):
   # Get the name of the query file that loads the base tables, if it exists.
