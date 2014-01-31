@@ -52,6 +52,7 @@ table_name:text_comma_backslash_newline, constraint:restrict_to, table_format:te
 table_name:text_dollar_hash_pipe, constraint:restrict_to, table_format:text/none/none
 
 table_name:bad_serde, constraint:restrict_to, table_format:text/none/none
+table_name:rcfile_lazy_binary_serde, constraint:restrict_to, table_format:rc/none/none
 table_name:unsupported_partition_types, constraint:restrict_to, table_format:text/none/none
 table_name:nullformat_custom, constraint:exclude, table_format:parquet/none/none
 

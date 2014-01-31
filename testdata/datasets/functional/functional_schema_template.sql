@@ -1179,3 +1179,17 @@ bad_serde
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (col int)
 ROW FORMAT serde "org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe";
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+rcfile_lazy_binary_serde
+---- CREATE_HIVE
+-- For incompatible SerDe testing
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (int_col int)
+ROW FORMAT SERDE
+  'org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe'
+STORED AS INPUTFORMAT
+  'org.apache.hadoop.hive.ql.io.RCFileInputFormat'
+OUTPUTFORMAT
+  'org.apache.hadoop.hive.ql.io.RCFileOutputFormat';
+====

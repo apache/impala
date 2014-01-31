@@ -524,6 +524,18 @@ public class CatalogTest {
         "Impala does not support tables of this type. REASON: SerDe" +
         " library 'org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe' " +
         "is not supported.", incompleteTable.getCause().getMessage());
+
+    // Impala does not yet support Hive's LazyBinaryColumnarSerDe which can be
+    // used for RCFILE tables.
+    table = catalog_.getDb("functional_rc").getTable("rcfile_lazy_binary_serde");
+    assertTrue(table instanceof IncompleteTable);
+    incompleteTable = (IncompleteTable) table;
+    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
+    assertEquals("Failed to load metadata for table: rcfile_lazy_binary_serde\n" +
+        "CAUSED BY: InvalidStorageDescriptorException: " +
+        "Impala does not support tables of this type. REASON: SerDe" +
+        " library 'org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe' " +
+        "is not supported.", incompleteTable.getCause().getMessage());
   }
 
   // This table has metadata set so the escape is \n, which is also the tuple delim. This

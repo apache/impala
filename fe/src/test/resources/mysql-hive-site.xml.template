@@ -123,4 +123,11 @@
   <name>hive.server2.authentication</name>
   <value>NONE</value>
 </property>
+
+<property>
+  <!--  TODO: Remove this once Hive has changed their default back to ColumnarSerDe -->
+  <name>hive.default.rcfile.serde</name>
+  <value>org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe</value>
+  <description>The default SerDe hive will use for the rcfile format</description>
+</property>
 </configuration>
