@@ -45,8 +45,8 @@ import com.google.common.base.Preconditions;
 
 public class AnalyzerTest {
   protected final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
-  protected static ImpaladCatalog catalog_ = new ImpaladCatalog(
-      Catalog.CatalogInitStrategy.LAZY, AuthorizationConfig.createAuthDisabledConfig());
+  protected static ImpaladCatalog catalog_ = ImpaladCatalog.createForTesting(
+      AuthorizationConfig.createAuthDisabledConfig());
 
   protected Analyzer analyzer_;
 

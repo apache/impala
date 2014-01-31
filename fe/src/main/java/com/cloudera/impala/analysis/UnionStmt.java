@@ -132,7 +132,11 @@ public class UnionStmt extends QueryStmt {
   @Override
   public void analyze(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
-    super.analyze(analyzer);
+    try {
+      super.analyze(analyzer);
+    } catch (AnalysisException e) {
+      if (analyzer.getMissingTbls().isEmpty()) throw e;
+    }
     Preconditions.checkState(operands_.size() > 0);
 
     // Propagates DISTINCT from right to left
@@ -140,18 +144,32 @@ public class UnionStmt extends QueryStmt {
 
     // Make sure all operands return an equal number of exprs.
     QueryStmt firstQuery = operands_.get(0).getQueryStmt();
-    operands_.get(0).analyze(analyzer);
+
+    try {
+      operands_.get(0).analyze(analyzer);
+    } catch (AnalysisException e) {
+      if (analyzer.getMissingTbls().isEmpty()) throw e;
+    }
+
     List<Expr> firstQueryExprs = firstQuery.getBaseTblResultExprs();
     for (int i = 1; i < operands_.size(); ++i) {
       QueryStmt query = operands_.get(i).getQueryStmt();
-      operands_.get(i).analyze(analyzer);
-      List<Expr> exprs = query.getBaseTblResultExprs();
-      if (firstQueryExprs.size() != exprs.size()) {
-        throw new AnalysisException("Operands have unequal number of columns:\n" +
-            "'" + queryStmtToSql(firstQuery) + "' has " +
-            firstQueryExprs.size() + " column(s)\n" +
-            "'" + queryStmtToSql(query) + "' has " + exprs.size() + " column(s)");
+      try {
+        operands_.get(i).analyze(analyzer);
+        List<Expr> exprs = query.getBaseTblResultExprs();
+        if (firstQueryExprs.size() != exprs.size()) {
+          throw new AnalysisException("Operands have unequal number of columns:\n" +
+              "'" + queryStmtToSql(firstQuery) + "' has " +
+              firstQueryExprs.size() + " column(s)\n" +
+              "'" + queryStmtToSql(query) + "' has " + exprs.size() + " column(s)");
+        }
+      } catch (AnalysisException e) {
+        if (analyzer.getMissingTbls().isEmpty()) throw e;
       }
+    }
+
+    if (!analyzer.getMissingTbls().isEmpty()) {
+      throw new AnalysisException("Found missing tables. Aborting analysis.");
     }
 
     // Determine compatible types for exprs, position by position.

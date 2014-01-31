@@ -41,10 +41,12 @@ import com.cloudera.impala.thrift.TGetFunctionsResponse;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TLogLevel;
+import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.thrift.TUpdateCatalogRequest;
 import com.cloudera.impala.util.GlogAppender;
+import com.google.common.base.Preconditions;
 
 /**
  * JNI-callable interface for the CatalogService. The main point is to serialize
@@ -65,13 +67,16 @@ public class JniCatalog {
     return new TUniqueId(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
   }
 
-  public JniCatalog(int impalaLogLevel, int otherLogLevel)
-      throws InternalException {
+  public JniCatalog(boolean loadInBackground, int numMetadataLoadingThreads,
+      int impalaLogLevel, int otherLogLevel) throws InternalException {
+    Preconditions.checkArgument(numMetadataLoadingThreads > 0);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.
     GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
         TLogLevel.values()[otherLogLevel]);
-    catalog_ = new CatalogServiceCatalog(getServiceId());
+
+    catalog_ = new CatalogServiceCatalog(loadInBackground,
+        numMetadataLoadingThreads, getServiceId());
     try {
       catalog_.reset();
     } catch (CatalogException e) {
@@ -181,6 +186,13 @@ public class JniCatalog {
     }
 
     return serializer.serialize(response);
+  }
+
+  public void prioritizeLoad(byte[] thriftLoadReq) throws ImpalaException,
+      TException  {
+    TPrioritizeLoadRequest request = new TPrioritizeLoadRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, thriftLoadReq);
+    catalog_.prioritizeLoad(request.getObject_descs());
   }
 
   /**

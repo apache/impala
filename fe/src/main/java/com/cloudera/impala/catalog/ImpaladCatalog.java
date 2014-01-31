@@ -112,17 +112,15 @@ public class ImpaladCatalog extends Catalog {
   // Tracks modifications to this Impalad's catalog from direct updates to the cache.
   private final CatalogDeltaLog catalogDeltaLog_ = new CatalogDeltaLog();
 
-  public ImpaladCatalog(AuthorizationConfig authzConfig) {
-    this(CatalogInitStrategy.EMPTY, authzConfig);
-  }
+  // Object that is used to synchronize on and signal when a catalog update is received.
+  private final Object catalogUpdateEventNotifier_ = new Object();
 
   /**
    * C'tor used by tests that need to validate the ImpaladCatalog outside of the
    * CatalogServer.
    */
-  public ImpaladCatalog(CatalogInitStrategy loadStrategy,
-      AuthorizationConfig authzConfig) {
-    super(loadStrategy);
+  public ImpaladCatalog(AuthorizationConfig authzConfig) {
+    super(false);
     authzConfig_ = authzConfig;
     authzChecker_ = new AuthorizationChecker(authzConfig);
     // If authorization is enabled, reload the policy on a regular basis.
@@ -135,45 +133,30 @@ public class ImpaladCatalog extends Catalog {
           new AuthorizationPolicyReader(authzConfig),
           delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
     }
+  }
+
+  public static ImpaladCatalog createForTesting(AuthorizationConfig authzConfig) {
+    ImpaladCatalog catalog = new ImpaladCatalog(authzConfig);
 
     // This is a special branch used to bootstrap loading of the catalog for an Impalad
     // during the FE tests. We want to invalidate anything in the cache so it will be
     // loaded (from the catalog server) on the next access.
     // TODO: Clean up how we bootstrap the FE tests.
-    if (loadStrategy != CatalogInitStrategy.EMPTY) {
-      try {
-        reset();
-      } catch (CatalogException e) {
-        // Re-throw as an illegal state exception.
-        throw new IllegalStateException(e);
-      }
-      isReady_.set(true);
-    }
-  }
-
-  /**
-   * Used only for testing. Implementation of reset() that allows for bootstrapping the
-   * Impalad catalog without a running statestore daemon.
-   */
-  @Override
-  public void reset() throws CatalogException {
-    MetaStoreClient msClient = metaStoreClientPool_.getClient();
+    CatalogServiceCatalog catalogServerCatalog =
+        CatalogServiceCatalog.createForTesting(true);
     try {
-      for (String dbName: msClient.getHiveClient().getAllDatabases()) {
-        Db db = new Db(dbName, this);
-        dbCache_.get().put(db.getName().toLowerCase(), db);
-
-        for (String tableName: msClient.getHiveClient().getAllTables(dbName)) {
-          Table incompleteTbl = IncompleteTable.createUninitializedTable(
-              TableId.createInvalidId(), db, tableName);
-          db.addTable(incompleteTbl);
-        }
-      }
-    } catch (Exception e) {
-      throw new CatalogException(e.getMessage(), e);
-    } finally {
-      msClient.release();
+      catalogServerCatalog.reset();
+    } catch (CatalogException e) {
+      // Re-throw as an unchecked exception.
+      throw new IllegalStateException(e.getMessage(), e);
     }
+
+    for (String dbName: catalogServerCatalog.getDbNames(null)) {
+      // Adding DB should include all tables/fns in that database.
+      catalog.addDb(catalogServerCatalog.getDb(dbName));
+    }
+    catalog.isReady_.set(true);
+    return catalog;
   }
 
   private class AuthorizationPolicyReader implements Runnable {
@@ -282,7 +265,29 @@ public class ImpaladCatalog extends Catalog {
     // Cleanup old entries in the log.
     catalogDeltaLog_.garbageCollect(lastSyncedCatalogVersion_);
     isReady_.set(true);
+
+    // Notify all the threads waiting on a catalog update.
+    synchronized (catalogUpdateEventNotifier_) {
+      catalogUpdateEventNotifier_.notifyAll();
+    }
+
     return new TUpdateCatalogCacheResponse(catalogServiceId_);
+  }
+
+  /**
+   * Causes the calling thread to wait until a catalog update notification has been sent
+   * or the given timeout has been reached. A timeout value of 0 indicates an indefinite
+   * wait. Does not protect against spurious wakeups, so this should be called in a loop.
+   *
+   */
+  public void waitForCatalogUpdate(long timeoutMs) {
+    synchronized (catalogUpdateEventNotifier_) {
+      try {
+        catalogUpdateEventNotifier_.wait(timeoutMs);
+      } catch (InterruptedException e) {
+        // Ignore
+      }
+    }
   }
 
   /**
@@ -360,10 +365,9 @@ public class ImpaladCatalog extends Catalog {
         .allOf(privilege).onTable(dbName, tableName).toRequest());
 
     Table table = getTable(dbName, tableName);
-    if (table instanceof IncompleteTable) {
-      // We should never get back an IncompleteTable that is uninitialized.
-      Preconditions.checkState(table.isLoaded());
+    if (table == null) return null;
 
+    if (table.isLoaded() && table instanceof IncompleteTable) {
       // If there were problems loading this table's metadata, throw an exception
       // when it is accessed.
       ImpalaException cause = ((IncompleteTable) table).getCause();

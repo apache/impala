@@ -51,6 +51,12 @@ class CatalogOpExecutor {
       const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& col_stats_data);
 
+  // Makes an RPC to the CatalogServer to prioritize the loading of the catalog objects
+  // specified in the TPrioritizeLoadRequest. Returns OK if the RPC was successful,
+  // otherwise a bad status will be returned.
+  Status PrioritizeLoad(const TPrioritizeLoadRequest& req,
+      TPrioritizeLoadResponse* result);
+
   // Set in Exec(), returns a pointer to the TDdlExecResponse of the DDL execution.
   // If called before Exec(), this will return NULL. Only set if the
   // TCatalogOpType is DDL.

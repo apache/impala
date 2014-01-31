@@ -193,30 +193,32 @@ Java_com_cloudera_impala_service_FeSupport_NativeLookupSymbol(
   return result_bytes;
 }
 
-// Calls in to the catalog server to get the metadata for the target
-// catalog object.
+// Calls in to the catalog server to request prioritizing the loading of metadata for
+// specific catalog objects.
 extern "C"
 JNIEXPORT jbyteArray JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativeGetCatalogObject(
+Java_com_cloudera_impala_service_FeSupport_NativePrioritizeLoad(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
-  TCatalogObject object_desc;
-  DeserializeThriftMsg(env, thrift_struct, &object_desc);
+  TPrioritizeLoadRequest request;
+  DeserializeThriftMsg(env, thrift_struct, &request);
 
   CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), NULL);
-  TCatalogObject result;
-  Status status = catalog_op_executor.GetCatalogObject(object_desc, &result);
+  TPrioritizeLoadResponse result;
+  Status status = catalog_op_executor.PrioritizeLoad(request, &result);
   if (!status.ok()) {
     LOG(ERROR) << status.GetErrorMsg();
-    TStatus thrift_status;
-    status.ToThrift(&thrift_status);
-    result.__isset.table = true;
-    result.table.__set_load_status(thrift_status);
+    // Create a new Status, copy in this error, then update the result.
+    Status catalog_service_status(result.status);
+    catalog_service_status.AddError(status);
+    status.ToThrift(&result.status);
   }
+
   jbyteArray result_bytes = NULL;
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
                      JniUtil::internal_exc_class(), result_bytes);
   return result_bytes;
 }
+
 
 namespace impala {
 
@@ -234,8 +236,8 @@ static JNINativeMethod native_methods[] = {
     (void*)::Java_com_cloudera_impala_service_FeSupport_NativeLookupSymbol
   },
   {
-    (char*)"NativeGetCatalogObject", (char*)"([B)[B",
-    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeGetCatalogObject
+    (char*)"NativePrioritizeLoad", (char*)"([B)[B",
+    (void*)::Java_com_cloudera_impala_service_FeSupport_NativePrioritizeLoad
   },
 };
 

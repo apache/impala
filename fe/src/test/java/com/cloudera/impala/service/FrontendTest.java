@@ -14,11 +14,10 @@ import org.apache.hive.service.cli.thrift.TGetFunctionsReq;
 import org.apache.hive.service.cli.thrift.TGetInfoReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
@@ -39,14 +38,9 @@ import com.google.common.collect.Lists;
  *
  */
 public class FrontendTest {
-  private static Frontend fe_ = new Frontend(Catalog.CatalogInitStrategy.LAZY,
-      AuthorizationConfig.createAuthDisabledConfig());
-
-  @BeforeClass
-  public static void setUp() throws Exception {
-    fe_ = new Frontend(Catalog.CatalogInitStrategy.LAZY,
-        AuthorizationConfig.createAuthDisabledConfig());
-  }
+  private static Frontend fe_ = new Frontend(
+      AuthorizationConfig.createAuthDisabledConfig(),
+      ImpaladCatalog.createForTesting(AuthorizationConfig.createAuthDisabledConfig()));
 
   @Test
   public void TestCatalogNotReady() throws ImpalaException {

@@ -102,8 +102,8 @@ public class SelectStmt extends QueryStmt {
    * Creates resultExprs and baseTblResultExprs.
    */
   @Override
-  public void analyze(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     super.analyze(analyzer);
 
     // Replace BaseTableRefs with ViewRefs.
@@ -113,8 +113,19 @@ public class SelectStmt extends QueryStmt {
     TableRef leftTblRef = null;  // the one to the left of tblRef
     for (TableRef tblRef: tableRefs_) {
       tblRef.setLeftTblRef(leftTblRef);
-      tblRef.analyze(analyzer);
+      try {
+        tblRef.analyze(analyzer);
+      } catch (AnalysisException e) {
+        // Only re-throw the exception if no tables are missing.
+        if (analyzer.getMissingTbls().isEmpty()) throw e;
+      }
       leftTblRef = tblRef;
+    }
+
+    // All tableRefs have been analyzed, but at least one table was found missing.
+    // There is no reason to proceed with analysis past this point.
+    if (!analyzer.getMissingTbls().isEmpty()) {
+      throw new AnalysisException("Found missing tables. Aborting analysis.");
     }
 
     // populate selectListExprs, aliasSMap, and colNames

@@ -19,7 +19,6 @@ import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
-import com.cloudera.impala.thrift.TUniqueId;
 
 /**
  * Utility to generate an output file with all the block ids for each table
@@ -45,7 +44,7 @@ public class BlockIdGenerator {
       writer = new FileWriter(output);
 
       // Load all tables in the catalog
-      Catalog catalog = new CatalogServiceCatalog(new TUniqueId(0, 0));
+      Catalog catalog = CatalogServiceCatalog.createForTesting(true);
       for (String dbName: catalog.getDbNames(null)) {
         Db database = catalog.getDb(dbName);
         for (String tableName: database.getAllTableNames()) {

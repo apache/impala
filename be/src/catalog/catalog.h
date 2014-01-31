@@ -83,6 +83,10 @@ class Catalog {
   Status GetFunctions(const TGetFunctionsRequest& request,
       TGetFunctionsResponse *response);
 
+  // Prioritizes the loading of metadata for the catalog objects specified in the
+  // TPrioritizeLoadRequest.
+  Status PrioritizeLoad(const TPrioritizeLoadRequest& req);
+
  private:
   // Descriptor of Java Catalog class itself, used to create a new instance.
   jclass catalog_class_;
@@ -96,6 +100,7 @@ class Catalog {
   jmethodID get_db_names_id_; // JniCatalog.getDbNames()
   jmethodID get_table_names_id_; // JniCatalog.getTableNames()
   jmethodID get_functions_id_; // JniCatalog.getFunctions()
+  jmethodID prioritize_load_id_; // JniCatalog.prioritizeLoad()
   jmethodID catalog_ctor_;
 
   struct MethodDescriptor;

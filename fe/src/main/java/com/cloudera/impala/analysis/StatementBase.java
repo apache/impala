@@ -17,16 +17,24 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 
-/*
+/**
  * Base class for all Impala SQL statements.
  */
 abstract class StatementBase implements ParseNode {
-  public void analyze(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  /**
+   * Analyzes the statement and throws an AnalysisException if analysis fails. A failure
+   * could be due to a problem with the statement or because one or more tables/views
+   * were missing from the catalog.
+   * It is up to the analysis() implementation to ensure the maximum number of missing
+   * tables/views get collected in the Analyzer before failing analyze().
+   */
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     throw new AnalysisException("not implemented");
   }
 
-  /* Print SQL syntax corresponding to this node.
+  /**
+   * Print SQL syntax corresponding to this node.
    * @see com.cloudera.impala.parser.ParseNode#toSql()
    */
   public String toSql() {

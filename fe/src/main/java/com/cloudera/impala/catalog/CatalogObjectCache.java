@@ -25,7 +25,12 @@ import com.google.common.collect.Lists;
 /**
  * Lazily loads metadata on read (through getOrLoad()) and tracks the set of valid/known
  * object names. This class is thread safe. The CatalogObjectCache is created by passing
- * a custom CacheLoader object which can implement its own load() logic.
+ * a custom CacheLoader object which can implement its own load() logic. If null is passed
+ * as the CacheLoader, the cache will function as a non-loading cache - which will
+ * bypass loading for unloaded values and will throw an error if reload() is called on a
+ * key. TODO: We need two types of caches - a LoadingCatalogObjectCache and a regular
+ * (non-loading) version. Perhaps the loading specific parts should be moved to a
+ * subclass?
  *
  * Items are added to the cache by calling add(T catalogObject). New objects can be
  * added in an initialized or uninitialized state (determined by the isLoaded()
@@ -63,23 +68,20 @@ public class CatalogObjectCache<T extends CatalogObject> {
     private final CacheLoader<String, T> cacheLoader_;
     private T catalogObject_;
 
-    private CacheEntry(T catalogObject, CacheLoader<String, T> cacheLoader) {
+    public CacheEntry(T catalogObject, CacheLoader<String, T> cacheLoader) {
       catalogObject_ = catalogObject;
       cacheLoader_ = cacheLoader;
     }
 
     /**
      * Replaces the CatalogObject in this CacheEntry if it is newer than the
-     * existing value (the catalog version is greater) or if the existing value
-     * has not yet uninitialized (has not been loaded) and the new value is
-     * loaded.
+     * existing value (the catalog version is greater).
      * Returns true if the existing value was replaced or false if the existing
      * value was preserved.
      */
     public synchronized boolean replaceIfNewer(T newCatalogObject) {
       Preconditions.checkNotNull(newCatalogObject);
-      if (catalogObject_.getCatalogVersion() < newCatalogObject.getCatalogVersion()
-          || !catalogObject_.isLoaded() && newCatalogObject.isLoaded()) {
+      if (catalogObject_.getCatalogVersion() < newCatalogObject.getCatalogVersion()) {
         catalogObject_ = newCatalogObject;
         return true;
       }
@@ -99,11 +101,14 @@ public class CatalogObjectCache<T extends CatalogObject> {
       // Get the catalog version to assign the to the loaded object. It's important to
       // do this before locking, because getNextCatalogVersion() may require taking
       // a top-level lock.
-      long targetCatalogVersion = cacheLoader_.getNextCatalogVersion();
+      long targetCatalogVersion = 0;
+      if (cacheLoader_ != null) {
+        targetCatalogVersion = cacheLoader_.getNextCatalogVersion();
+      }
 
       synchronized (this) {
         Preconditions.checkNotNull(catalogObject_);
-        if (catalogObject_.isLoaded()) return catalogObject_;
+        if (catalogObject_.isLoaded() || cacheLoader_ == null) return catalogObject_;
         T loadedObject = cacheLoader_.load(catalogObject_.getName().toLowerCase(), null,
             targetCatalogVersion);
         Preconditions.checkNotNull(loadedObject);
@@ -120,6 +125,10 @@ public class CatalogObjectCache<T extends CatalogObject> {
      * value the value they loaded.
      */
     public T reload() {
+      if (cacheLoader_ == null) {
+        throw new IllegalStateException("Cannot call reload() without a CacheLoader.");
+      }
+
       // Get the catalog version to assign the to the reloaded object. It's important to
       // do this before locking, because getNextCatalogVersion() may require taking
       // a top-level lock.
@@ -139,14 +148,6 @@ public class CatalogObjectCache<T extends CatalogObject> {
         return catalogObject_;
       }
     }
-
-    /**
-     * Creates a new CacheEntry with the given key and CacheLoader.
-     */
-    public static <T extends CatalogObject> CacheEntry<T>
-        create(T catalogObject, CacheLoader<String, T> cacheLoader) {
-      return new CacheEntry<T>(catalogObject, cacheLoader);
-    }
   }
 
   /**
@@ -164,8 +165,7 @@ public class CatalogObjectCache<T extends CatalogObject> {
    */
   public boolean add(T catalogObject) {
     Preconditions.checkNotNull(catalogObject);
-    CacheEntry<T> cacheEntry =
-        CacheEntry.create(catalogObject, cacheLoader_);
+    CacheEntry<T> cacheEntry = new CacheEntry<T>(catalogObject, cacheLoader_);
     CacheEntry<T> existingItem = metadataCache_.putIfAbsent(
         catalogObject.getName().toLowerCase(), cacheEntry);
 
@@ -223,8 +223,8 @@ public class CatalogObjectCache<T extends CatalogObject> {
   /**
    * Returns the catalog object corresponding to the supplied name.
    * Returns null if there is no CacheEntry in the metadataCache_ associated with this
-   * key. May throw an unchecked exception if an error was encountered during
-   * loading.
+   * key. If another load on the same key is in progress, this will block until the load
+   * completes and return the loaded value.
    * It is important getOrLoad() not be synchronized to allow concurrent getOrLoad()
    * requests on different keys.
    */

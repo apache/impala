@@ -90,4 +90,21 @@ public class TableName {
   }
 
   public TTableName toThrift() { return new TTableName(db_, tbl_); }
+
+  /**
+   * Returns true of the table names are considered equals. To check for equality,
+   * a case-insensitive comparison of the database and table name is performed.
+   */
+  @Override
+  public boolean equals(Object anObject) {
+    if (anObject instanceof TableName) {
+      return toString().toLowerCase().equals(anObject.toString().toLowerCase());
+    }
+    return false;
+  }
+
+  @Override
+  public int hashCode() {
+    return toString().toLowerCase().hashCode();
+  }
 }

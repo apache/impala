@@ -33,10 +33,10 @@ import com.cloudera.impala.thrift.TDescribeTableParams;
  */
 public class DescribeStmt extends StatementBase {
   private final TDescribeTableOutputStyle outputStyle_;
-  private TableName table_;
+  private TableName tableName_;
 
-  public DescribeStmt(TableName table, TDescribeTableOutputStyle outputStyle) {
-    this.table_ = table;
+  public DescribeStmt(TableName tableName, TDescribeTableOutputStyle outputStyle) {
+    this.tableName_ = tableName;
     this.outputStyle_ = outputStyle;
   }
 
@@ -46,19 +46,19 @@ public class DescribeStmt extends StatementBase {
     if (outputStyle_ != TDescribeTableOutputStyle.MINIMAL) {
       sb.append(outputStyle_.toString());
     }
-    return sb.toString() + table_;
+    return sb.toString() + tableName_;
   }
 
-  public TableName getTable() { return table_; }
+  public TableName getTable() { return tableName_; }
   public TDescribeTableOutputStyle getOutputStyle() { return outputStyle_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (!table_.isFullyQualified()) {
-      table_ = new TableName(analyzer.getDefaultDb(), table_.getTbl());
+    if (!tableName_.isFullyQualified()) {
+      tableName_ = new TableName(analyzer.getDefaultDb(), tableName_.getTbl());
     }
-    analyzer.getTable(table_, Privilege.VIEW_METADATA);
+    analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
   }
 
   public TDescribeTableParams toThrift() {

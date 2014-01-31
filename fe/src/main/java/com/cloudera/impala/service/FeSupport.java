@@ -14,6 +14,10 @@
 
 package com.cloudera.impala.service;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -22,14 +26,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TCatalogObject;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExpr;
+import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
+import com.cloudera.impala.thrift.TPrioritizeLoadResponse;
 import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TSymbolLookupParams;
 import com.cloudera.impala.thrift.TSymbolLookupResult;
+import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.util.NativeLibUtil;
 import com.google.common.base.Preconditions;
 
@@ -56,10 +65,11 @@ public class FeSupport {
   // Returns a serialize TSymbolLookupResult
   public native static byte[] NativeLookupSymbol(byte[] thriftSymbolLookup);
 
-  // Does an RPCs to the Catalog Server to retrieve a catalog object. To keep our
-  // kerberos configuration consolidated, we make make all RPCs in the BE layer
-  // instead of calling the Catalog Server using Java Thrift bindings.
-  public native static byte[] NativeGetCatalogObject(byte[] objectDesc);
+  // Does an RPCs to the Catalog Server to prioritize the metadata loading of a
+  // one or more catalog objects. To keep our kerberos configuration consolidated,
+  // we make make all RPCs in the BE layer instead of calling the Catalog Server
+  // using Java Thrift bindings.
+  public native static byte[] NativePrioritizeLoad(byte[] thriftReq);
 
   public static TColumnValue EvalConstExpr(Expr expr, TQueryContext queryCtxt)
       throws InternalException {
@@ -124,31 +134,41 @@ public class FeSupport {
     return val.isSetBoolVal() && val.boolVal;
   }
 
-  private static byte[] GetCatalogObject(byte[] objectDescBytes) {
+  private static byte[] PrioritizeLoad(byte[] thriftReq) {
     try {
-      return NativeGetCatalogObject(objectDescBytes);
+      return NativePrioritizeLoad(thriftReq);
     } catch (UnsatisfiedLinkError e) {
       loadLibrary();
     }
-    return NativeGetCatalogObject(objectDescBytes);
+    return NativePrioritizeLoad(thriftReq);
   }
 
-  public static TCatalogObject GetCatalogObject(TCatalogObject objectDesc)
+  public static TStatus PrioritizeLoad(Set<TableName> tableNames)
       throws InternalException {
-    Preconditions.checkNotNull(objectDesc);
+    Preconditions.checkNotNull(tableNames);
+
+    List<TCatalogObject> objectDescs = new ArrayList<TCatalogObject>(tableNames.size());
+    for (TableName tableName: tableNames) {
+      TCatalogObject catalogObject = new TCatalogObject();
+      catalogObject.setType(TCatalogObjectType.TABLE);
+      catalogObject.setTable(new TTable(tableName.getDb(), tableName.getTbl()));
+      objectDescs.add(catalogObject);
+    }
+
+    TPrioritizeLoadRequest request = new TPrioritizeLoadRequest ();
+    request.setObject_descs(objectDescs);
 
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
-      byte[] result = GetCatalogObject(serializer.serialize(objectDesc));
+      byte[] result = PrioritizeLoad(serializer.serialize(request));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
-      TCatalogObject catalogObject = new TCatalogObject();
-      deserializer.deserialize(catalogObject, result);
-      return catalogObject;
+      TPrioritizeLoadResponse response = new TPrioritizeLoadResponse();
+      deserializer.deserialize(response, result);
+      return response.getStatus();
     } catch (TException e) {
       // this should never happen
-      throw new InternalException("couldn't get catalog object from descriptor:"
-            + objectDesc.toString());
+      throw new InternalException("Error processing request: " + e.getMessage(), e);
     }
   }
 

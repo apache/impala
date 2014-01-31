@@ -19,8 +19,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
+import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -47,8 +48,9 @@ import com.google.common.collect.Lists;
 public class PlannerTest {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
   private final static boolean GENERATE_OUTPUT_FILE = true;
-
-  private static Frontend frontend_;
+  private static Frontend frontend_ = new Frontend(
+      AuthorizationConfig.createAuthDisabledConfig(),
+      ImpaladCatalog.createForTesting(AuthorizationConfig.createAuthDisabledConfig()));
   private final String testDir_ = "functional-planner/queries/PlannerTest";
   private final String outDir_ = "/tmp/PlannerTest/";
 
@@ -56,8 +58,6 @@ public class PlannerTest {
   public static void setUp() throws Exception {
     // Use 8 cores for resource estimation.
     RuntimeEnv.INSTANCE.setNumCores(8);
-    frontend_ = new Frontend(Catalog.CatalogInitStrategy.LAZY,
-        AuthorizationConfig.createAuthDisabledConfig());
   }
 
   @AfterClass
@@ -460,6 +460,7 @@ public class PlannerTest {
 
   @Test
   public void testTpcds() {
+    HdfsTable table = (HdfsTable) frontend_.getCatalog().getDb("tpcds").getTable("customer_address");
     // Join order has been optimized for Impala. Uses ss_date as partition key.
     runPlannerTestFile("tpcds-all", "tpcds");
   }

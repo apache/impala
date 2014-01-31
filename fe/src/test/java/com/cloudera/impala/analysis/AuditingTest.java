@@ -276,8 +276,7 @@ public class AuditingTest extends AnalyzerTest {
     // an AuthorizationError
     AuthorizationConfig config = new AuthorizationConfig("server1", "/does/not/exist",
         HadoopGroupResourceAuthorizationProvider.class.getName());
-    ImpaladCatalog catalog = new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY,
-        config);
+    ImpaladCatalog catalog = ImpaladCatalog.createForTesting(config);
     Analyzer analyzer = new Analyzer(catalog, TestUtils.createQueryContext());
 
     // Authorization of an object is performed immediately before auditing so

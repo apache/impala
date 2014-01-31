@@ -25,7 +25,6 @@ import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.Catalog.CatalogInitStrategy;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.thrift.TFunctionType;
 import com.google.common.collect.Lists;
@@ -36,7 +35,7 @@ public class CatalogTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog_ = new ImpaladCatalog(CatalogInitStrategy.LAZY,
+    catalog_ = ImpaladCatalog.createForTesting(
         AuthorizationConfig.createAuthDisabledConfig());
   }
 
@@ -519,11 +518,9 @@ public class CatalogTest {
     assertTrue(table instanceof IncompleteTable);
     incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
-    assertEquals("Failed to load metadata for table: bad_serde\n" +
-        "CAUSED BY: InvalidStorageDescriptorException: " +
-        "Impala does not support tables of this type. REASON: SerDe" +
+    assertEquals("Impala does not support tables of this type. REASON: SerDe" +
         " library 'org.apache.hadoop.hive.serde2.binarysortable.BinarySortableSerDe' " +
-        "is not supported.", incompleteTable.getCause().getMessage());
+        "is not supported.", incompleteTable.getCause().getCause().getMessage());
 
     // Impala does not yet support Hive's LazyBinaryColumnarSerDe which can be
     // used for RCFILE tables.
@@ -531,11 +528,9 @@ public class CatalogTest {
     assertTrue(table instanceof IncompleteTable);
     incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
-    assertEquals("Failed to load metadata for table: rcfile_lazy_binary_serde\n" +
-        "CAUSED BY: InvalidStorageDescriptorException: " +
-        "Impala does not support tables of this type. REASON: SerDe" +
+    assertEquals("Impala does not support tables of this type. REASON: SerDe" +
         " library 'org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe' " +
-        "is not supported.", incompleteTable.getCause().getMessage());
+        "is not supported.", incompleteTable.getCause().getCause().getMessage());
   }
 
   // This table has metadata set so the escape is \n, which is also the tuple delim. This

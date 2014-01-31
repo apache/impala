@@ -78,8 +78,8 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     this.analyzer_ = analyzer;
     analyzeLimit(analyzer);
     if (hasWithClause()) withClause_.analyze(analyzer);

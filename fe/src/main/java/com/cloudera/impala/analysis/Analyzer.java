@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,10 +42,10 @@ import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.PlanNode;
-import com.cloudera.impala.util.TSessionStateUtil;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -184,6 +185,10 @@ public class Analyzer {
   // map from lowercase qualified column name ("alias.col") to descriptor
   private final Map<String, SlotDescriptor> slotRefMap_ = Maps.newHashMap();
 
+  // Tracks the all tables/views found during analysis that were missing metadata.
+  Set<TableName> missingTbls_ = new HashSet<TableName>();
+  public Set<TableName> getMissingTbls() { return missingTbls_; }
+
   public Analyzer(ImpaladCatalog catalog, TQueryContext queryCxt) {
     this.ancestors_ = Lists.newArrayList();
     this.globalState_ = new GlobalState(catalog, queryCxt);
@@ -199,6 +204,7 @@ public class Analyzer {
     this.ancestors_ = Lists.newArrayList(parentAnalyzer);
     this.ancestors_.addAll(parentAnalyzer.ancestors_);
     this.globalState_ = parentAnalyzer.globalState_;
+    this.missingTbls_ = parentAnalyzer.missingTbls_;
 
     Preconditions.checkNotNull(user);
     this.user_ = user;
@@ -1238,6 +1244,9 @@ public class Analyzer {
 
   /**
    * Returns the Catalog Table object for the TableName at the given Privilege level.
+   * If the table has not yet been loaded in the local catalog cache, it will get
+   * added to the set of table names in "missingTbls_" and an AnalysisException will be
+   * thrown.
    *
    * If the user does not have sufficient privileges to access the table an
    * AuthorizationException is thrown. If the table or the db does not exist in the
@@ -1260,6 +1269,12 @@ public class Analyzer {
       if (table == null) {
         throw new AnalysisException(TBL_DOES_NOT_EXIST_ERROR_MSG + tableName.toString());
       }
+      if (!table.isLoaded()) {
+        missingTbls_.add(new TableName(table.getDb().getName(), table.getName()));
+        throw new AnalysisException(
+            "Table/view is missing metadata: " + table.getFullName());
+      }
+
       if (addAccessEvent) {
         // Add an audit event for this access
         TCatalogObjectType objectType = TCatalogObjectType.TABLE;
@@ -1350,7 +1365,7 @@ public class Analyzer {
   public void setHasLimit(boolean hasLimit) { this.hasLimit_ = hasLimit; }
 
   public List<Expr> getConjuncts() {
-    return new ArrayList(globalState_.conjuncts.values());
+    return new ArrayList<Expr>(globalState_.conjuncts.values());
   }
 
   public int incrementCallDepth() { return ++callDepth_; }

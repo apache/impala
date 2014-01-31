@@ -22,11 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.service.FeSupport;
-import com.cloudera.impala.thrift.TCatalogObject;
-import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TTable;
 import com.google.common.base.Preconditions;
 
 /**
@@ -49,14 +44,9 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
    * database's parent catalog.
    */
   public static TableLoader createTableLoader(Db parentDb) {
-    Preconditions.checkNotNull(parentDb);
-    if (parentDb.getParentCatalog() instanceof ImpaladCatalog) {
-      return new CatalogServiceTableLoader(parentDb);
-    } else if (parentDb.getParentCatalog() instanceof CatalogServiceCatalog) {
-      return new MetaStoreTableLoader(parentDb);
-    }
-    throw new IllegalStateException("Unexpected Catalog type: " +
-        parentDb.getParentCatalog().getClass().getName());
+    Preconditions.checkState(
+        parentDb.getParentCatalog() instanceof CatalogServiceCatalog);
+    return new MetaStoreTableLoader(parentDb);
   }
 
   /**
@@ -145,66 +135,6 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
     public long getNextCatalogVersion() {
       CatalogServiceCatalog catalog = (CatalogServiceCatalog) db_.getParentCatalog();
       return catalog.incrementAndGetCatalogVersion();
-    }
-  }
-
-  /**
-   * A TableLoader that loads metadata from the CatalogServer.
-   */
-  private static class CatalogServiceTableLoader extends TableLoader {
-    private static final String FAILED_TBL_LOAD_MSG =
-        "Unexpected error loading table metadata. Please run 'invalidate metadata %s'";
-
-    public CatalogServiceTableLoader(Db db) {
-      super(db);
-    }
-
-    @Override
-    public Table load(String tblName, Table cachedValue, long catalogVersion) {
-      LOG.info("Loading metadata for: " + db_.getName() + "." + tblName);
-      TCatalogObject objectDesc = new TCatalogObject();
-      objectDesc.setType(TCatalogObjectType.TABLE);
-      objectDesc.setTable(new TTable());
-      objectDesc.getTable().setDb_name(db_.getName());
-      objectDesc.getTable().setTbl_name(tblName);
-      TCatalogObject catalogObject;
-      try {
-        catalogObject = FeSupport.GetCatalogObject(objectDesc);
-      } catch (InternalException e) {
-        return IncompleteTable.createFailedMetadataLoadTable(
-            TableId.createInvalidId(), db_, tblName, e);
-      }
-
-      Table newTable;
-      if (!catalogObject.isSetTable()) {
-        newTable = IncompleteTable.createFailedMetadataLoadTable(
-            TableId.createInvalidId(), db_, tblName,
-            new TableLoadingException(FAILED_TBL_LOAD_MSG));
-      }
-
-
-      try {
-        newTable = Table.fromThrift(db_, catalogObject.getTable());
-      } catch (TableLoadingException e) {
-        newTable = IncompleteTable.createFailedMetadataLoadTable(
-            TableId.createInvalidId(), db_, tblName, e);
-      }
-
-      if (newTable == null || !newTable.isLoaded()) {
-        newTable = IncompleteTable.createFailedMetadataLoadTable(
-            TableId.createInvalidId(), db_, tblName,
-            new TableLoadingException(FAILED_TBL_LOAD_MSG));
-      }
-
-      newTable.setCatalogVersion(catalogObject.getCatalog_version());
-      return newTable;
-    }
-
-    @Override
-    public long getNextCatalogVersion() {
-      // Tables should already have catalog versions assigned catalog
-      // by the CatalogServer. Always return zero here.
-      return 0;
     }
   }
 }

@@ -69,14 +69,14 @@ public class AuthorizationTest {
   private final static AuthorizationConfig authzConfig_ = new AuthorizationConfig(
       "server1", AUTHZ_POLICY_FILE,
       LocalGroupResourceAuthorizationProvider.class.getName());
-  private final static ImpaladCatalog catalog_ = new ImpaladCatalog(
-      Catalog.CatalogInitStrategy.LAZY, authzConfig_);
+  private final static ImpaladCatalog catalog_ =
+      ImpaladCatalog.createForTesting(authzConfig_);
   private final static TQueryContext queryCtxt_ =
         TestUtils.createQueryContext(Catalog.DEFAULT_DB, USER.getName());
   private final static AnalysisContext analysisContext_ =
       new AnalysisContext(catalog_, queryCtxt_);
   private final static Frontend fe_ =
-      new Frontend(Catalog.CatalogInitStrategy.LAZY, authzConfig_);
+      new Frontend(authzConfig_, ImpaladCatalog.createForTesting(authzConfig_));
 
   @Test
   public void TestSelect() throws AuthorizationException, AnalysisException {
@@ -293,8 +293,8 @@ public class AuthorizationTest {
     AuthzOk("refresh functional.view_view");
 
     // The admin user should have privileges invalidate the server metadata.
-    AnalysisContext adminAc = new AnalysisContext(new ImpaladCatalog(
-        Catalog.CatalogInitStrategy.LAZY, authzConfig_),
+    AnalysisContext adminAc = new AnalysisContext(
+        ImpaladCatalog.createForTesting(authzConfig_),
         TestUtils.createQueryContext(Catalog.DEFAULT_DB, ADMIN_USER.getName()));
     AuthzOk(adminAc, "invalidate metadata");
 
@@ -931,8 +931,7 @@ public class AuthorizationTest {
         new User(USER.getName() + "/abc.host.com@REAL.COM"),
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {
-      ImpaladCatalog catalog =
-          new ImpaladCatalog(Catalog.CatalogInitStrategy.LAZY, authzConfig_);
+      ImpaladCatalog catalog = ImpaladCatalog.createForTesting(authzConfig_);
       AnalysisContext context = new AnalysisContext(catalog_,
           TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
 
@@ -959,8 +958,7 @@ public class AuthorizationTest {
     User currentUser = new User(System.getProperty("user.name"));
     AuthorizationConfig config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE,
         HadoopGroupResourceAuthorizationProvider.class.getName());
-    ImpaladCatalog catalog = new  ImpaladCatalog(
-        Catalog.CatalogInitStrategy.LAZY, config);
+    ImpaladCatalog catalog = ImpaladCatalog.createForTesting(config);
     AnalysisContext context = new AnalysisContext(catalog,
         TestUtils.createQueryContext(Catalog.DEFAULT_DB, currentUser.getName()));
 
@@ -1141,8 +1139,7 @@ public class AuthorizationTest {
 
   private static void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws AnalysisException {
-    AnalysisContext ac = new AnalysisContext(new ImpaladCatalog(
-        Catalog.CatalogInitStrategy.LAZY, authzConfig),
+    AnalysisContext ac = new AnalysisContext(ImpaladCatalog.createForTesting(authzConfig),
         TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
     AuthzError(ac, "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'SELECT' on: " +

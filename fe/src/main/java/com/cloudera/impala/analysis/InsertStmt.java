@@ -128,21 +128,38 @@ public class InsertStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    if (withClause_ != null) withClause_.analyze(analyzer);
+    try {
+      if (withClause_ != null) withClause_.analyze(analyzer);
+    } catch (AnalysisException e) {
+      // Ignore AnalysisExceptions if tables are missing to ensure the maximum number
+      // of missing tables can be collected before failing analyze().
+      if (analyzer.getMissingTbls().isEmpty()) throw e;
+    }
 
     analyzer.setIsExplain(isExplain_);
     if (queryStmt_ != null) queryStmt_.setIsExplain(isExplain_);
 
-    List<Expr> selectListExprs;
+    List<Expr> selectListExprs = null;
     if (!needsGeneratedQueryStatement_) {
-      queryStmt_.analyze(analyzer);
-      selectListExprs = queryStmt_.getBaseTblResultExprs();
+      try {
+        queryStmt_.analyze(analyzer);
+        selectListExprs = queryStmt_.getBaseTblResultExprs();
+      } catch (AnalysisException e) {
+        if (analyzer.getMissingTbls().isEmpty()) throw e;
+      }
     } else {
       selectListExprs = Lists.newArrayList();
     }
 
     // Set target table and perform table-type specific analysis and auth checking.
+    // Also checks if the target table is missing.
     setTargetTable(analyzer);
+
+    // Abort analysis if there are any missing tables beyond this point.
+    if (!analyzer.getMissingTbls().isEmpty()) {
+      throw new AnalysisException("Found missing tables. Aborting analysis.");
+    }
+
     boolean isHBaseTable = (table_ instanceof HBaseTable);
     int numClusteringCols = isHBaseTable ? 0 : table_.getNumClusteringCols();
 

@@ -57,7 +57,14 @@ public class Db implements CatalogObject {
   public Db(String name, Catalog catalog) {
     thriftDb_ = new TDatabase(name);
     parentCatalog_ = catalog;
-    tableCache_ = new CatalogObjectCache<Table>(TableLoader.createTableLoader(this));
+    if (catalog instanceof ImpaladCatalog) {
+      // Impalads do not use a loading cache, so pass null as the table loader.
+      // This will enforce that no loads happen when a table's metadata is missing.
+      tableCache_ = new CatalogObjectCache<Table>(null);
+    } else {
+      tableCache_ = new CatalogObjectCache<Table>(TableLoader.createTableLoader(this));
+    }
+
     functions_ = new HashMap<String, List<Function>>();
   }
 

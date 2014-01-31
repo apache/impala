@@ -18,8 +18,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -45,16 +47,19 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.PlanFragment;
 import com.cloudera.impala.planner.Planner;
@@ -76,13 +81,14 @@ import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TPlanFragment;
-import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
+import com.cloudera.impala.thrift.TStatus;
+import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
@@ -100,18 +106,25 @@ import com.google.common.collect.Maps;
  */
 public class Frontend {
   private final static Logger LOG = LoggerFactory.getLogger(Frontend.class);
+  // Time to wait for missing tables to be loaded before timing out.
+  private final long MISSING_TBL_LOAD_WAIT_TIMEOUT_MS = 2 * 60 * 1000;
+
+  // Max time to wait for a catalog update notification.
+  private final long MAX_CATALOG_UPDATE_WAIT_TIME_MS = 2 * 1000;
+
   private ImpaladCatalog impaladCatalog_;
   private final AuthorizationConfig authzConfig_;
 
   public Frontend(AuthorizationConfig authorizationConfig) {
-    this(Catalog.CatalogInitStrategy.EMPTY, authorizationConfig);
+    this(authorizationConfig, new ImpaladCatalog(authorizationConfig));
   }
 
-  // C'tor used by some tests.
-  public Frontend(Catalog.CatalogInitStrategy initStrategy,
-      AuthorizationConfig authorizationConfig) {
+  /**
+   * C'tor used by tests to pass in a custom ImpaladCatalog.
+   */
+  public Frontend(AuthorizationConfig authorizationConfig, ImpaladCatalog catalog) {
     authzConfig_ = authorizationConfig;
-    impaladCatalog_ = new ImpaladCatalog(initStrategy, authzConfig_);
+    impaladCatalog_ = catalog;
   }
 
   public ImpaladCatalog getCatalog() { return impaladCatalog_; }
@@ -122,10 +135,8 @@ public class Frontend {
 
     // If this is not a delta, this update should replace the current
     // Catalog contents so create a new catalog and populate it.
-    if (!req.is_delta) {
-      catalog = new ImpaladCatalog(Catalog.CatalogInitStrategy.EMPTY,
-          authzConfig_);
-    }
+    if (!req.is_delta) catalog = new ImpaladCatalog(authzConfig_);
+
     TUpdateCatalogCacheResponse response = catalog.updateCatalog(req);
     if (!req.is_delta) impaladCatalog_ = catalog;
     return response;
@@ -435,16 +446,113 @@ public class Frontend {
   }
 
   /**
+   * Given a set of table names, returns the set of table names that are missing
+   * metadata (are not yet loaded).
+   */
+  private Set<TableName> getMissingTbls(Set<TableName> tableNames) {
+    Set<TableName> missingTbls = new HashSet<TableName>();
+    for (TableName tblName: tableNames) {
+      Db db = getCatalog().getDb(tblName.getDb());
+      if (db == null) continue;
+      Table tbl = db.getTableNoLoad(tblName.getTbl());
+      if (tbl == null) continue;
+      if (!tbl.isLoaded()) missingTbls.add(tblName);
+    }
+    return missingTbls;
+  }
+
+  /**
+   * Requests the catalog server load the given set of tables and waits until
+   * these tables show up in the local catalog, or the given timeout has been reached.
+   * The timeout is specified in milliseconds, with a value <= 0 indicating no timeout.
+   * The exact steps taken are:
+   * 1) Collect the tables that are missing (not yet loaded locally).
+   * 2) Make an RPC to the CatalogServer to prioritize the loading of these tables.
+   * 3) Wait until the local catalog contains all missing tables by (re)checking the
+   *    catalog each time a new catalog update is received.
+   *
+   * Returns true if all missing tables were received before timing out and false if
+   * the timeout was reached before all tables were received.
+   */
+  private boolean requestTblLoadAndWait(Set<TableName> requestedTbls, long timeoutMs)
+      throws InternalException {
+    Set<TableName> missingTbls = getMissingTbls(requestedTbls);
+    // There are no missing tables, return and avoid making an RPC to the CatalogServer.
+    if (missingTbls.isEmpty()) return true;
+
+    // Call into the CatalogServer and request the required tables be loaded.
+    LOG.info(String.format("Requesting prioritized load of table(s): %s",
+        Joiner.on(", ").join(missingTbls)));
+    TStatus status = FeSupport.PrioritizeLoad(missingTbls);
+    if (status.getStatus_code() != TStatusCode.OK) {
+      throw new InternalException("Error requesting prioritized load: " +
+          Joiner.on("\n").join(status.getError_msgs()));
+    }
+
+    long startTimeMs = System.currentTimeMillis();
+    // Wait until all the required tables are loaded in the Impalad's catalog cache.
+    while (!missingTbls.isEmpty()) {
+      // Check if the timeout has been reached.
+      if (timeoutMs > 0 && System.currentTimeMillis() - startTimeMs > timeoutMs) {
+        return false;
+      }
+
+      LOG.trace(String.format("Waiting for table(s) to complete loading: %s",
+          Joiner.on(", ").join(missingTbls)));
+      getCatalog().waitForCatalogUpdate(MAX_CATALOG_UPDATE_WAIT_TIME_MS);
+      missingTbls = getMissingTbls(missingTbls);
+      // TODO: Check for query cancellation here.
+    }
+    return true;
+  }
+
+  /**
+   * Analyzes the SQL statement included in queryCtxt and returns the AnalysisResult.
+   * If a statement fails analysis because table/view metadata was not loaded, an
+   * RPC to the CatalogServer will be executed to request loading the missing metadata
+   * and analysis will be restarted once the required tables have been loaded
+   * in the local Impalad Catalog or the MISSING_TBL_LOAD_WAIT_TIMEOUT_MS timeout
+   * is reached.
+   * The goal of this timeout is not to analysis, but to restart the analysis/missing
+   * table collection process. This helps ensure a statement never waits indefinitely
+   * for a table to be loaded in event the table metadata was invalidated.
+   * TODO: Also consider adding an overall timeout that fails analysis.
+   */
+  private AnalysisContext.AnalysisResult analyzeStmt(TQueryContext queryCtxt)
+      throws AnalysisException, InternalException, AuthorizationException {
+    AnalysisContext analysisCtxt = new AnalysisContext(impaladCatalog_, queryCtxt);
+    LOG.debug("analyze query " + queryCtxt.request.stmt);
+
+    // Run analysis in a loop until it either:
+    // 1) Completes successfully
+    // 2) Fails with an AnalysisException AND there are no missing tables.
+    while (true) {
+      try {
+        analysisCtxt.analyze(queryCtxt.request.stmt);
+        Preconditions.checkState(analysisCtxt.getAnalyzer().getMissingTbls().isEmpty());
+        return analysisCtxt.getAnalysisResult();
+      } catch (AnalysisException e) {
+        Set<TableName> missingTbls = analysisCtxt.getAnalyzer().getMissingTbls();
+        // Only re-throw the AnalysisException if there were no missing tables.
+        if (missingTbls.isEmpty()) throw e;
+
+        // Some tables/views were missing, request and wait for them to load.
+        if (!requestTblLoadAndWait(missingTbls, MISSING_TBL_LOAD_WAIT_TIMEOUT_MS)) {
+          LOG.info(String.format("Missing tables were not received in %dms. Load " +
+              "request will be retried.", MISSING_TBL_LOAD_WAIT_TIMEOUT_MS));
+        }
+      }
+    }
+  }
+
+  /**
    * Create a populated TExecRequest corresponding to the supplied TQueryContext.
    */
   public TExecRequest createExecRequest(
       TQueryContext queryCtxt, StringBuilder explainString)
       throws ImpalaException {
-    AnalysisContext analysisCtxt = new AnalysisContext(impaladCatalog_, queryCtxt);
-    AnalysisContext.AnalysisResult analysisResult = null;
-    LOG.debug("analyze query " + queryCtxt.request.stmt);
-    analysisResult = analysisCtxt.analyze(queryCtxt.request.stmt);
-
+    // Analyze the statement
+    AnalysisContext.AnalysisResult analysisResult = analyzeStmt(queryCtxt);
     Preconditions.checkNotNull(analysisResult.getStmt());
 
     TExecRequest result = new TExecRequest();

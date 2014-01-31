@@ -95,6 +95,7 @@ public class InlineViewRef extends TableRef {
     inlineViewAnalyzer_ = new Analyzer(analyzer, user);
     inlineViewAnalyzer_.setUseHiveColLabels(useHiveColLabels);
     queryStmt_.analyze(inlineViewAnalyzer_);
+
     inlineViewAnalyzer_.setHasLimit(queryStmt_.hasLimitClause());
     queryStmt_.getMaterializedTupleIds(materializedTupleIds_);
     desc_ = analyzer.registerInlineViewRef(this);
@@ -111,8 +112,8 @@ public class InlineViewRef extends TableRef {
     // create smap_ and baseTblSmap_ and register auxiliary eq predicates between our
     // tuple descriptor's slots and our *unresolved* select list exprs;
     // we create these auxiliary predicates so that the analyzer can compute the value
-    // transfer graph through this inline view correctly (ie, predicates can get propagated
-    // through the view)
+    // transfer graph through this inline view correctly (ie, predicates can get
+    // propagated through the view)
     for (int i = 0; i < queryStmt_.getColLabels().size(); ++i) {
       String colName = queryStmt_.getColLabels().get(i);
       Expr colExpr = queryStmt_.getResultExprs().get(i);

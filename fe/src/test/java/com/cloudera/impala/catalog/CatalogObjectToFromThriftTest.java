@@ -24,7 +24,6 @@ import org.junit.Test;
 
 import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.Catalog.CatalogInitStrategy;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.THBaseTable;
@@ -41,7 +40,7 @@ public class CatalogObjectToFromThriftTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog_ = new ImpaladCatalog(CatalogInitStrategy.LAZY,
+    catalog_ = ImpaladCatalog.createForTesting(
         AuthorizationConfig.createAuthDisabledConfig());
   }
 

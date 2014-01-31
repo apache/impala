@@ -56,7 +56,6 @@ public abstract class Catalog {
   private static final Logger LOG = Logger.getLogger(Catalog.class);
 
   protected final MetaStoreClientPool metaStoreClientPool_ = new MetaStoreClientPool(0);
-  protected final CatalogInitStrategy initStrategy_;
 
   // Thread safe cache of database metadata. Uses an AtomicReference so reset()
   // operations can atomically swap dbCache_ references.
@@ -65,32 +64,15 @@ public abstract class Catalog {
       new AtomicReference<ConcurrentHashMap<String, Db>>(
           new ConcurrentHashMap<String, Db>());
 
-  // Determines how the Catalog should be initialized.
-  public enum CatalogInitStrategy {
-    // Load only db and table names on startup.
-    LAZY,
-    // Don't load anything on startup (creates an empty catalog).
-    EMPTY,
-  }
-
   /**
-   * Creates a new instance of the Catalog, initializing it based on
-   * the given CatalogInitStrategy.
+   * Creates a new instance of a Catalog. If initMetastoreClientPool is true, will
+   * also add META_STORE_CLIENT_POOL_SIZE clients to metastoreClientPool_.
    */
-  public Catalog(CatalogInitStrategy initStrategy) {
-    initStrategy_ = initStrategy;
-    // Don't create any metastore clients for empty catalogs.
-    if (initStrategy != CatalogInitStrategy.EMPTY) {
+  public Catalog(boolean initMetastoreClientPool) {
+    if (initMetastoreClientPool) {
       metaStoreClientPool_.addClients(META_STORE_CLIENT_POOL_SIZE);
     }
   }
-
-  /**
-   * Resets this catalog instance by clearing all cached metadata and potentially
-   * reloading the metadata. How the metadata is loaded is based on the
-   * CatalogInitStrategy that was set in the c'tor.
-   */
-  public abstract void reset() throws CatalogException;
 
   /**
    * Adds a new database to the catalog, replacing any existing database with the same

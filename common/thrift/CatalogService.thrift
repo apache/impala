@@ -177,6 +177,23 @@ struct TGetCatalogObjectResponse {
   1: required CatalogObjects.TCatalogObject catalog_object
 }
 
+// Instructs the Catalog Server to prioritizing loading of metadata for the specified
+// catalog objects. Currently only used for controlling the priority of loading
+// tables/views since Db/Function metadata is loaded on startup.
+struct TPrioritizeLoadRequest {
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+
+  // A list of catalog objects descriptors for which to prioritize loading. A catalog
+  // object descriptor is a TCatalogObject with only the object name and type fields set.
+  2: required list<CatalogObjects.TCatalogObject> object_descs
+}
+
+struct TPrioritizeLoadResponse {
+  // The status of the operation, OK if the operation was successful.
+  1: optional Status.TStatus status
+}
+
+
 // The CatalogService API
 service CatalogService {
   // Executes a DDL request and returns details on the result of the operation.
@@ -196,4 +213,8 @@ service CatalogService {
   // Gets all user defined functions (aggregate and scalar) in the catalog matching
   // the parameters of TGetFunctionsRequest.
   TGetFunctionsResponse GetFunctions(1: TGetFunctionsRequest req);
+
+  // Prioritize the loading of metadata for the CatalogObjects specified in the
+  // TPrioritizeLoadRequest.
+  TPrioritizeLoadResponse PrioritizeLoad(1: TPrioritizeLoadRequest req);
 }
