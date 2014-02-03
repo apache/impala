@@ -18,6 +18,7 @@
 
 #include <cstring>
 #include "common/logging.h"
+#include "gutil/macros.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 
@@ -41,11 +42,13 @@ class TupleDescriptor;
 // 7) bigint slots
 // 8) double slots
 // 9) string slots
+//
+// A tuple with 0 materialised slots is represented as NULL.
 class Tuple {
  public:
   // initialize individual tuple with data residing in mem pool
   static Tuple* Create(int size, MemPool* pool) {
-    // assert(size > 0);
+    if (size == 0) return NULL;
     Tuple* result = reinterpret_cast<Tuple*>(pool->Allocate(size));
     result->Init(size);
     return result;
@@ -115,6 +118,9 @@ class Tuple {
 
   // For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(Tuple);
 };
 
 }

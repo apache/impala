@@ -288,7 +288,7 @@ Tuple* AggregationNode::ConstructAggTuple() {
 }
 
 void AggregationNode::UpdateAggTuple(Tuple* tuple, TupleRow* row) {
-  DCHECK(tuple != NULL);
+  DCHECK(tuple != NULL || aggregate_evaluators_.empty());
   for (vector<AggFnEvaluator*>::const_iterator evaluator = aggregate_evaluators_.begin();
       evaluator != aggregate_evaluators_.end(); ++evaluator) {
     if (is_merge_) {
@@ -300,7 +300,7 @@ void AggregationNode::UpdateAggTuple(Tuple* tuple, TupleRow* row) {
 }
 
 void AggregationNode::FinalizeAggTuple(Tuple* tuple) {
-  DCHECK(tuple != NULL);
+  DCHECK(tuple != NULL || aggregate_evaluators_.empty());
   for (vector<AggFnEvaluator*>::const_iterator evaluator = aggregate_evaluators_.begin();
       evaluator != aggregate_evaluators_.end(); ++evaluator) {
     if (needs_finalize_) {
@@ -631,4 +631,3 @@ Function* AggregationNode::CodegenProcessRowBatch(
 }
 
 }
-

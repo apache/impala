@@ -62,10 +62,10 @@ class HashTableTest : public testing::Test {
 
   TupleRow* CreateTupleRow(int32_t val) {
     uint8_t* tuple_row_mem = mem_pool_.Allocate(sizeof(int32_t*));
-    uint8_t* tuple_mem = mem_pool_.Allocate(sizeof(int32_t));
+    Tuple* tuple_mem = Tuple::Create(sizeof(int32_t), &mem_pool_);
     *reinterpret_cast<int32_t*>(tuple_mem) = val;
     TupleRow* row = reinterpret_cast<TupleRow*>(tuple_row_mem);
-    row->SetTuple(0, reinterpret_cast<Tuple*>(tuple_mem));
+    row->SetTuple(0, tuple_mem);
     return row;
   }
 

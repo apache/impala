@@ -126,8 +126,8 @@ void HdfsTextScanner::ResetScanner() {
   partial_tuple_empty_ = true;
   byte_buffer_ptr_ = byte_buffer_end_ = NULL;
 
-  partial_tuple_ = reinterpret_cast<Tuple*>(
-      boundary_mem_pool_->Allocate(scan_node_->tuple_desc()->byte_size()));
+  partial_tuple_ =
+      Tuple::Create(scan_node_->tuple_desc()->byte_size(), boundary_mem_pool_.get());
 
   // Initialize codegen fn
   InitializeWriteTuplesFn(

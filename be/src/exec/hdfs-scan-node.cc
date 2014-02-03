@@ -292,8 +292,7 @@ Tuple* HdfsScanNode::InitEmptyTemplateTuple() {
   Tuple* template_tuple = NULL;
   {
     unique_lock<mutex> l(lock_);
-    template_tuple = reinterpret_cast<Tuple*>(
-        scan_node_pool_->Allocate(tuple_desc_->byte_size()));
+    template_tuple = Tuple::Create(tuple_desc_->byte_size(), scan_node_pool_.get());
   }
   memset(template_tuple, 0, tuple_desc_->byte_size());
   return template_tuple;
@@ -934,4 +933,3 @@ Status HdfsScanNode::CreateConjunctsCopies(THdfsFileFormat::type format) {
 
   return Status::OK;
 }
-

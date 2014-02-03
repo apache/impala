@@ -91,9 +91,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Create new tuple buffer for row_batch.
   int tuple_buffer_size = row_batch->capacity() * tuple_desc_->byte_size();
-  void* tuple_buffer = row_batch->tuple_data_pool()->Allocate(tuple_buffer_size);
-  bzero(tuple_buffer, tuple_buffer_size);
-  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
+  Tuple* tuple = Tuple::Create(tuple_buffer_size, row_batch->tuple_data_pool());
 
   // Evaluate and materialize the const expr lists exactly once.
   while (const_result_expr_idx_ < const_result_expr_lists_.size()) {

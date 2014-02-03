@@ -62,6 +62,7 @@ class RowBatchListTest : public testing::Test {
       TupleRow* row = batch->GetRow(idx);
       *tuple_mem = i;
       row->SetTuple(0, reinterpret_cast<Tuple*>(tuple_mem));
+
       batch->CommitLastRow();
       tuple_mem++;
     }

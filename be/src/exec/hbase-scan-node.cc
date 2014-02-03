@@ -165,9 +165,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
 
   // create new tuple buffer for row_batch
   tuple_buffer_size_ = row_batch->capacity() * tuple_desc_->byte_size();
-  tuple_buffer_ = tuple_pool_->Allocate(tuple_buffer_size_);
-  bzero(tuple_buffer_, tuple_buffer_size_);
-  tuple_ = reinterpret_cast<Tuple*>(tuple_buffer_);
+  tuple_ = Tuple::Create(tuple_buffer_size_, tuple_pool_.get());
 
   // Indicates whether the current row has conversion errors. Used for error reporting.
   bool error_in_row = false;
