@@ -38,62 +38,60 @@ using namespace apache::thrift::protocol;
 
 namespace impala {
 
-Status ClientCacheHelper::GetClient(const TNetworkAddress& hostport,
-    ClientFactory factory_method, void** client_key) {
-  lock_guard<mutex> lock(lock_);
-  VLOG_RPC << "GetClient(" << hostport << ")";
-  ClientCacheMap::iterator cache_entry = client_cache_.find(hostport);
-  if (cache_entry == client_cache_.end()) {
-    cache_entry =
-        client_cache_.insert(make_pair(hostport, list<void*>())).first;
-    DCHECK(cache_entry != client_cache_.end());
+Status ClientCacheHelper::GetClient(const TNetworkAddress& address,
+    ClientFactory factory_method, ClientKey* client_key) {
+  shared_ptr<PerHostCache> host_cache;
+  {
+    lock_guard<mutex> lock(cache_lock_);
+    VLOG_RPC << "GetClient(" << address << ")";
+    shared_ptr<PerHostCache>* ptr = &per_host_caches_[address];
+    if (ptr->get() == NULL) ptr->reset(new PerHostCache());
+    host_cache = *ptr;
   }
 
-  list<void*>& info_list = cache_entry->second;
-  if (!info_list.empty()) {
-    *client_key = info_list.front();
-    VLOG_RPC << "GetClient(): cached client for " << hostport;
-    info_list.pop_front();
-  } else {
-    RETURN_IF_ERROR(CreateClient(hostport, factory_method, client_key));
+  {
+    lock_guard<mutex> lock(host_cache->lock);
+    if (!host_cache->clients.empty()) {
+      *client_key = host_cache->clients.front();
+      VLOG_RPC << "GetClient(): returning cached client for " << address;
+      host_cache->clients.pop_front();
+      if (metrics_enabled_) clients_in_use_metric_->Increment(1);
+      return Status::OK;
+    }
   }
 
-  if (metrics_enabled_) {
-    clients_in_use_metric_->Increment(1);
-  }
-
+  // Only get here if host_cache->clients.empty(). No need for the lock.
+  RETURN_IF_ERROR(CreateClient(address, factory_method, client_key));
+  if (metrics_enabled_) clients_in_use_metric_->Increment(1);
   return Status::OK;
 }
 
-Status ClientCacheHelper::ReopenClient(ClientFactory factory_method, void** client_key) {
-  lock_guard<mutex> lock(lock_);
-  ClientMap::iterator i = client_map_.find(*client_key);
-  DCHECK(i != client_map_.end());
-  ThriftClientImpl* info = i->second;
-  const string ipaddress = info->ipaddress();
-  int port = info->port();
+Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
+    ClientKey* client_key) {
+  // Clients are not ordinarily removed from the cache completely (in the future, they may
+  // be); this is the only method where a client may be deleted and replaced with another.
+  shared_ptr<ThriftClientImpl> client_impl;
+  {
+    lock_guard<mutex> lock(client_map_lock_);
+    ClientMap::iterator client = client_map_.find(*client_key);
+    DCHECK(client != client_map_.end());
+    client_impl = client->second;
+    client_map_.erase(client);
+  }
+  client_impl->Close();
 
-  info->Close();
-
-  // TODO: Thrift TBufferedTransport cannot be re-opened after Close() because it does
-  // not clean up internal buffers it reopens. To work around this issue, create a new
-  // client instead.
-  client_map_.erase(*client_key);
-  delete info;
+  // TODO: Thrift TBufferedTransport cannot be re-opened after Close() because it does not
+  // clean up internal buffers it reopens. To work around this issue, create a new client
+  // instead.
   *client_key = NULL;
-  if (metrics_enabled_) {
-    total_clients_metric_->Increment(-1);
-  }
-  RETURN_IF_ERROR(
-      CreateClient(MakeNetworkAddress(ipaddress, port), factory_method, client_key));
-  return Status::OK;
+  if (metrics_enabled_) total_clients_metric_->Increment(-1);
+  return CreateClient(client_impl->address(), factory_method, client_key);
 }
 
-Status ClientCacheHelper::CreateClient(const TNetworkAddress& hostport,
-    ClientFactory factory_method, void** client_key) {
-  auto_ptr<ThriftClientImpl> client_impl(factory_method(hostport, client_key));
-  VLOG_CONNECTION << "CreateClient(): adding new client for "
-                  << client_impl->ipaddress() << ":" << client_impl->port();
+Status ClientCacheHelper::CreateClient(const TNetworkAddress& address,
+    ClientFactory factory_method, ClientKey* client_key) {
+  shared_ptr<ThriftClientImpl> client_impl(factory_method(address, client_key));
+  VLOG_CONNECTION << "CreateClient(): creating new client for " << client_impl->address();
   Status status = client_impl->OpenWithRetry(num_tries_, wait_ms_);
   if (!status.ok()) {
     *client_key = NULL;
@@ -103,77 +101,93 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& hostport,
   client_impl->setRecvTimeout(recv_timeout_ms_);
   client_impl->setSendTimeout(send_timeout_ms_);
 
-  // Because the client starts life 'checked out', we don't add it to the cache map
-  client_map_[*client_key] = client_impl.get();
-  client_impl.release();
-  if (metrics_enabled_) {
-    total_clients_metric_->Increment(1);
+  // Because the client starts life 'checked out', we don't add it to its host cache.
+  {
+    lock_guard<mutex> lock(client_map_lock_);
+    client_map_[*client_key] = client_impl;
   }
+
+  if (metrics_enabled_) total_clients_metric_->Increment(1);
   return Status::OK;
 }
 
-void ClientCacheHelper::ReleaseClient(void** client_key) {
+void ClientCacheHelper::ReleaseClient(ClientKey* client_key) {
   DCHECK(*client_key != NULL) << "Trying to release NULL client";
-  lock_guard<mutex> lock(lock_);
-  ClientMap::iterator i = client_map_.find(*client_key);
-  DCHECK(i != client_map_.end());
-  ThriftClientImpl* info = i->second;
-  VLOG_RPC << "releasing client for "
-           << info->ipaddress() << ":" << info->port();
-  ClientCacheMap::iterator j =
-      client_cache_.find(MakeNetworkAddress(info->ipaddress(), info->port()));
-  DCHECK(j != client_cache_.end());
-  j->second.push_back(*client_key);
-  if (metrics_enabled_) {
-    clients_in_use_metric_->Increment(-1);
+  shared_ptr<ThriftClientImpl> client_impl;
+  {
+    lock_guard<mutex> lock(client_map_lock_);
+    ClientMap::iterator client = client_map_.find(*client_key);
+    DCHECK(client != client_map_.end());
+    client_impl = client->second;
   }
+  VLOG_RPC << "Releasing client for " << client_impl->address() << " back to cache";
+  {
+    lock_guard<mutex> lock(cache_lock_);
+    PerHostCacheMap::iterator cache = per_host_caches_.find(client_impl->address());
+    DCHECK(cache != per_host_caches_.end());
+    lock_guard<mutex> entry_lock(cache->second->lock);
+    cache->second->clients.push_back(*client_key);
+  }
+  if (metrics_enabled_) clients_in_use_metric_->Increment(-1);
   *client_key = NULL;
 }
 
-void ClientCacheHelper::CloseConnections(const TNetworkAddress& hostport) {
-  lock_guard<mutex> lock(lock_);
-  ClientCacheMap::iterator cache_entry = client_cache_.find(hostport);
-  if (cache_entry == client_cache_.end()) return;
-  VLOG_RPC << "Invalidating all " << cache_entry->second.size() << " clients for: "
-           << hostport;
-  BOOST_FOREACH(void* client_key, cache_entry->second) {
-    ClientMap::iterator client_map_entry = client_map_.find(client_key);
-    DCHECK(client_map_entry != client_map_.end());
-    client_map_entry->second->Close();
+void ClientCacheHelper::CloseConnections(const TNetworkAddress& address) {
+  PerHostCache* cache;
+  {
+    lock_guard<mutex> lock(cache_lock_);
+    PerHostCacheMap::iterator cache_it = per_host_caches_.find(address);
+    if (cache_it == per_host_caches_.end()) return;
+    cache = cache_it->second.get();
+  }
+
+  {
+    VLOG_RPC << "Invalidating all " << cache->clients.size() << " clients for: "
+             << address;
+    lock_guard<mutex> entry_lock(cache->lock);
+    lock_guard<mutex> map_lock(client_map_lock_);
+    BOOST_FOREACH(ClientKey client_key, cache->clients) {
+      ClientMap::iterator client_map_entry = client_map_.find(client_key);
+      DCHECK(client_map_entry != client_map_.end());
+      client_map_entry->second->Close();
+    }
   }
 }
 
 string ClientCacheHelper::DebugString() {
+  lock_guard<mutex> lock(cache_lock_);
   stringstream out;
-  out << "ClientCacheHelper(#hosts=" << client_cache_.size()
+  out << "ClientCacheHelper(#hosts=" << per_host_caches_.size()
       << " [";
-  for (ClientCacheMap::iterator i = client_cache_.begin(); i != client_cache_.end(); ++i) {
-    if (i != client_cache_.begin()) out << " ";
-    out << i->first << ":" << i->second.size();
+  bool first = true;
+  BOOST_FOREACH(const PerHostCacheMap::value_type& cache, per_host_caches_) {
+    lock_guard<mutex> host_cache_lock(cache.second->lock);
+    if (!first) out << " ";
+    out << cache.first << ":" << cache.second->clients.size();
+    first = false;
   }
   out << "])";
   return out.str();
 }
 
 void ClientCacheHelper::TestShutdown() {
-  vector<TNetworkAddress> hostports;
+  vector<TNetworkAddress> addresses;
   {
-    lock_guard<mutex> lock(lock_);
-    BOOST_FOREACH(const ClientCacheMap::value_type& i, client_cache_) {
-      hostports.push_back(i.first);
+    lock_guard<mutex> lock(cache_lock_);
+    BOOST_FOREACH(const PerHostCacheMap::value_type& cache_entry, per_host_caches_) {
+      addresses.push_back(cache_entry.first);
     }
   }
-  for (vector<TNetworkAddress>::iterator it = hostports.begin(); it != hostports.end();
-      ++it) {
-    CloseConnections(*it);
+  BOOST_FOREACH(const TNetworkAddress& address, addresses) {
+    CloseConnections(address);
   }
 }
 
 void ClientCacheHelper::InitMetrics(Metrics* metrics, const string& key_prefix) {
   DCHECK(metrics != NULL);
-  // Not strictly needed if InitMetrics is called before any cache
-  // usage, but ensures that metrics_enabled_ is published.
-  lock_guard<mutex> lock(lock_);
+  // Not strictly needed if InitMetrics is called before any cache usage, but ensures that
+  // metrics_enabled_ is published.
+  lock_guard<mutex> lock(cache_lock_);
   stringstream count_ss;
   count_ss << key_prefix << ".client-cache.clients-in-use";
   clients_in_use_metric_ =
@@ -184,6 +198,5 @@ void ClientCacheHelper::InitMetrics(Metrics* metrics, const string& key_prefix) 
   total_clients_metric_ = metrics->CreateAndRegisterPrimitiveMetric(max_ss.str(), 0L);
   metrics_enabled_ = true;
 }
-
 
 }

@@ -44,8 +44,8 @@ class ThriftClientImpl {
   ~ThriftClientImpl() {
     Close();
   }
-  const std::string& ipaddress() { return ipaddress_; }
-  int port() { return port_; }
+
+  const TNetworkAddress& address() const { return address_; }
 
   // Open the connection to the remote server. May be called repeatedly, is idempotent
   // unless there is a failure to connect.
@@ -66,7 +66,7 @@ class ThriftClientImpl {
 
  protected:
   ThriftClientImpl(const std::string& ipaddress, int port, bool ssl)
-      : ipaddress_(ipaddress), port_(port), ssl_(ssl) {
+      : address_(MakeNetworkAddress(ipaddress, port)), ssl_(ssl) {
     socket_create_status_ = CreateSocket();
   }
 
@@ -74,8 +74,10 @@ class ThriftClientImpl {
   // be created.
   Status CreateSocket();
 
-  std::string ipaddress_;
-  int port_;
+  // Address of the server this client communicates with.
+  TNetworkAddress address_;
+
+  // True if ssl encryption is enabled on this connection.
   bool ssl_;
 
   Status socket_create_status_;
@@ -128,7 +130,7 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
     auth_provider_ = AuthManager::GetInstance()->GetServerFacingAuthProvider();
   }
 
-  auth_provider_->WrapClientTransport(ipaddress_, transport_, &transport_);
+  auth_provider_->WrapClientTransport(address_.hostname, transport_, &transport_);
 
   protocol_.reset(new apache::thrift::protocol::TBinaryProtocol(transport_));
   iface_.reset(new InterfaceType(protocol_));
