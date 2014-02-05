@@ -77,10 +77,12 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
   JniLocalFrame jni_frame;
   Expr* e;
 
-  THROW_IF_ERROR_RET(state.InitMemTrackers(TUniqueId(), -1), env,
-                     JniUtil::internal_exc_class(), result_bytes);
   THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
                      result_bytes);
+  // Exprs can allocate memory so we need to set up the mem trackers before
+  // preparing/running the exprs.
+  THROW_IF_ERROR_RET(state.InitMemTrackers(TUniqueId(), -1), env,
+                     JniUtil::internal_exc_class(), result_bytes);
   THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, thrift_predicate, &e), env,
                      JniUtil::internal_exc_class(), result_bytes);
   THROW_IF_ERROR_RET(Expr::Prepare(e, &state, RowDescriptor()), env,
