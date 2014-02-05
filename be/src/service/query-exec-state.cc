@@ -146,7 +146,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       reset_req.reset_metadata_params.__set_table_name(
           exec_request_.load_data_request.table_name);
       catalog_op_executor_.reset(
-          new CatalogOpExecutor(exec_env_->catalogd_client_cache()));
+          new CatalogOpExecutor(exec_env_, frontend_));
       RETURN_IF_ERROR(catalog_op_executor_->Exec(reset_req));
       RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
           *catalog_op_executor_->update_catalog_result(),
@@ -336,7 +336,7 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
     return Status::OK;
   }
 
-  catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_->catalogd_client_cache()));
+  catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_));
   Status status = catalog_op_executor_->Exec(exec_request_.catalog_op_request);
   {
     lock_guard<mutex> l(lock_);
@@ -734,7 +734,7 @@ void ImpalaServer::QueryExecState::MarkActive() {
 
 Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats() {
   DCHECK(child_queries_.size() == 2);
-  catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_->catalogd_client_cache()));
+  catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_));
   Status status = catalog_op_executor_->ExecComputeStats(
       exec_request_.catalog_op_request.ddl_params.compute_stats_params,
       child_queries_[0].result_schema(),

@@ -202,7 +202,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeGetCatalogObject(
   TCatalogObject object_desc;
   DeserializeThriftMsg(env, thrift_struct, &object_desc);
 
-  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance()->catalogd_client_cache());
+  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), NULL);
   TCatalogObject result;
   Status status = catalog_op_executor.GetCatalogObject(object_desc, &result);
   if (!status.ok()) {

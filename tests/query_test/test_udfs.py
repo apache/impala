@@ -3,6 +3,8 @@
 
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.common.impala_cluster import ImpalaCluster
+from subprocess import call
 
 class TestUdfs(ImpalaTestSuite):
   @classmethod
@@ -12,9 +14,6 @@ class TestUdfs(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestUdfs, cls).add_test_dimensions()
-    # UDFs require codegen
-    cls.TestMatrix.add_constraint(
-      lambda v: v.get_value('exec_option')['disable_codegen'] == False)
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
@@ -46,6 +45,43 @@ class TestUdfs(ImpalaTestSuite):
   def test_libs_with_same_filenames(self, vector):
     self.run_test_case('QueryTest/libs_with_same_filenames', vector)
 
+  @pytest.mark.execute_serially
+  def test_udf_update(self, vector):
+    # Test updating the UDF binary without restarting Impala. Dropping
+    # the function should remove the binary from the local cache.
+    # Run with sync_ddl to guarantee the drop is processed by all impalads.
+    exec_options = vector.get_value('exec_option')
+    exec_options['sync_ddl'] = 1
+    old_udf = os.path.join(os.environ['IMPALA_HOME'],
+        'testdata/udfs/impala-hive-udfs.jar')
+    new_udf = os.path.join(os.environ['IMPALA_HOME'],
+        'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
+    udf_dst = '/test-warehouse/impala-hive-udfs2.jar'
+
+    drop_fn_stmt = 'drop function if exists udf_update_test()'
+    create_fn_stmt = "create function udf_update_test() returns string "\
+        "LOCATION '" + udf_dst + "' SYMBOL='com.cloudera.impala.TestUpdateUdf'"
+    query_stmt = "select udf_update_test()"
+
+    # Put the old UDF binary on HDFS, make the UDF in Impala and run it.
+    call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
+    self.execute_query_expect_success(self.client, drop_fn_stmt, exec_options)
+    self.execute_query_expect_success(self.client, create_fn_stmt, exec_options)
+    self.__run_query_all_impalads(exec_options, query_stmt, ["Old UDF"])
+
+    # Update the binary, drop and create the function again. The new binary should
+    # be running.
+    call(["hadoop", "fs", "-put", "-f", new_udf, udf_dst])
+    self.execute_query_expect_success(self.client, drop_fn_stmt, exec_options)
+    self.execute_query_expect_success(self.client, create_fn_stmt, exec_options)
+    self.__run_query_all_impalads(exec_options, query_stmt, ["New UDF"])
+
+  def __run_query_all_impalads(self, exec_options, query, expected):
+    impala_cluster = ImpalaCluster()
+    for impalad in impala_cluster.impalads:
+      client = impalad.service.create_beeswax_client()
+      result = self.execute_query_expect_success(client, query, exec_options)
+      assert result.data == expected
 
   def __load_functions(self, template, vector, database, location):
     queries = template.format(database=database, location=location)

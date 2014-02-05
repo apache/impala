@@ -56,6 +56,7 @@ public class DropFunctionStmt extends StatementBase {
     params.setFn_name(desc_.getFunctionName().toThrift());
     params.setArg_types(ColumnType.toThrift(desc_.getArgs()));
     params.setIf_exists(getIfExists());
+    params.setSignature(desc_.signatureString());
     return params;
   }
 

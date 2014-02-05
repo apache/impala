@@ -19,10 +19,11 @@
 #include <boost/scoped_ptr.hpp>
 #include "gen-cpp/cli_service_types.h"
 #include "gen-cpp/Frontend_types.h"
-#include "runtime/client-cache.h"
 
 namespace impala {
 
+class ExecEnv;
+class Frontend;
 class Status;
 
 // The CatalogOpExecutor is responsible for executing catalog operations.
@@ -31,8 +32,7 @@ class Status;
 // operation.
 class CatalogOpExecutor {
  public:
-  CatalogOpExecutor(CatalogServiceClientCache* client_cache)
-      : client_cache_(client_cache) {}
+  CatalogOpExecutor(ExecEnv* env, Frontend* fe) : env_(env), fe_(fe) {}
 
   // Executes the given catalog operation against the catalog server.
   Status Exec(const TCatalogOpRequest& catalog_op);
@@ -83,9 +83,12 @@ class CatalogOpExecutor {
   // Result of executing a DDL request using the CatalogService
   boost::scoped_ptr<TCatalogUpdateResult> catalog_update_result_;
 
-  // Client cache to use when making connections to the catalog service. Not owned by this
-  // class.
-  CatalogServiceClientCache* client_cache_;
+  ExecEnv* env_;
+  Frontend* fe_;
+
+  // Handles additional BE work that needs to be done for drop function, in particular,
+  // clearing the local library cache for this function.
+  void HandleDropFunction(const TDropFunctionParams&);
 };
 
 }

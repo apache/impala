@@ -38,7 +38,8 @@ Java_com_cloudera_impala_util_NativeLogger_Log(
   // Unused required argument to GetStringUTFChars
   jboolean dummy;
   const char* filename = env->GetStringUTFChars(file, &dummy);
-  const char* str = env->GetStringUTFChars(msg, &dummy);
+  const char* str = "";
+  if (msg != NULL) str = env->GetStringUTFChars(msg, &dummy);
   int log_level = google::INFO;
   switch (severity) {
     case TLogLevel::VLOG:
@@ -62,7 +63,7 @@ Java_com_cloudera_impala_util_NativeLogger_Log(
       DCHECK(false) << "Unrecognised TLogLevel: " << log_level;
   }
   google::LogMessage(filename, line_number, log_level).stream() << string(str);
-  env->ReleaseStringUTFChars(msg, str);
+  if (msg != NULL) env->ReleaseStringUTFChars(msg, str);
   env->ReleaseStringUTFChars(file, filename);
 }
 
