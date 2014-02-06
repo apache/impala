@@ -72,10 +72,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     return decorate
 
   def setup_method(self, method):
-    cluster_args = ""
+    cluster_args = list()
     for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS]:
       if arg in method.func_dict:
-        cluster_args += "--%s=\"%s\" " % (arg, method.func_dict[arg])
+        cluster_args.append("--%s=\"%s\" " % (arg, method.func_dict[arg]))
     # Start a clean new cluster before each test
     self.__start_impala_cluster(cluster_args)
     self.cluster = ImpalaCluster()
@@ -93,10 +93,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     sleep(2)
 
   @classmethod
-  def __start_impala_cluster(cls, options=None):
+  def __start_impala_cluster(cls, options):
     logdir = os.getenv('LOG_DIR', "/tmp/")
     cmd = [os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'),
            '--cluster_size=%d' % CLUSTER_SIZE,
-           '--log_dir=%s' % logdir,
-           options]
-    call(cmd)
+           '--log_dir=%s' % logdir]
+    call(cmd + options)

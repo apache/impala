@@ -64,6 +64,8 @@ const string LOCAL_ADMITTED_METRIC_KEY_FORMAT =
   "admission-controller.$0.local-admitted";
 const string LOCAL_QUEUED_METRIC_KEY_FORMAT =
   "admission-controller.$0.local-queued";
+const string LOCAL_DEQUEUED_METRIC_KEY_FORMAT =
+  "admission-controller.$0.local-dequeued";
 const string LOCAL_REJECTED_METRIC_KEY_FORMAT =
   "admission-controller.$0.local-rejected";
 const string LOCAL_TIMED_OUT_METRIC_KEY_FORMAT =
@@ -559,6 +561,7 @@ void AdmissionController::DequeueLoop() {
       VLOG_ROW << "Dequeue thread can admit " << num_to_admit << " queries from pool "
                << pool_name << " with " << local_stats->num_queued << " queued queries.";
 
+      PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
       while (num_to_admit > 0 && !queue.empty()) {
         QueueNode* queue_node = queue.Dequeue();
         DCHECK(queue_node != NULL);
@@ -567,6 +570,7 @@ void AdmissionController::DequeueLoop() {
         --total_stats->num_queued;
         ++local_stats->num_running;
         ++total_stats->num_running;
+        if (pool_metrics != NULL) pool_metrics->local_dequeued->Increment(1L);
         VLOG_ROW << "Dequeuing query id=" << queue_node->query_id;
         queue_node->is_admitted.Set(true);
         --num_to_admit;
@@ -587,6 +591,8 @@ AdmissionController::GetPoolMetrics(const string& pool_name) {
       Substitute(LOCAL_ADMITTED_METRIC_KEY_FORMAT, pool_name), 0L);
   pool_metrics->local_queued = metrics_->CreateAndRegisterPrimitiveMetric(
       Substitute(LOCAL_QUEUED_METRIC_KEY_FORMAT, pool_name), 0L);
+  pool_metrics->local_dequeued = metrics_->CreateAndRegisterPrimitiveMetric(
+      Substitute(LOCAL_DEQUEUED_METRIC_KEY_FORMAT, pool_name), 0L);
   pool_metrics->local_rejected = metrics_->CreateAndRegisterPrimitiveMetric(
       Substitute(LOCAL_REJECTED_METRIC_KEY_FORMAT, pool_name), 0L);
   pool_metrics->local_timed_out = metrics_->CreateAndRegisterPrimitiveMetric(

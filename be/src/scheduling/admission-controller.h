@@ -114,6 +114,8 @@ class AdmissionController {
     // The total number of requests that have been queued locally. Incremented
     // when a request is queued.
     Metrics::IntMetric* local_queued;
+    // The total number of requests that have been dequeued locally.
+    Metrics::IntMetric* local_dequeued;
     // The total number of requests that have been rejected locally.  Incremented when
     // AdmitQuery() returns and the request is rejected because the queue is full.
     Metrics::IntMetric* local_rejected;

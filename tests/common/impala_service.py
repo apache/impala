@@ -51,9 +51,10 @@ class BaseImpalaService(object):
       sleep(interval)
     assert 0, 'Debug webpage did not become available in expected time.'
 
-  def get_metric_value(self, metric_name):
+  def get_metric_value(self, metric_name, default_value=None):
     """Returns the value of the the given metric name from the Impala debug webpage"""
-    return json.loads(self.read_debug_webpage('jsonmetrics'))[metric_name]
+    metrics = json.loads(self.read_debug_webpage('jsonmetrics'))
+    return metrics.get(metric_name, default_value)
 
   def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1):
     start_time = time()
