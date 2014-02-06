@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import getpass
 from itertools import product
 from optparse import OptionParser
 from Queue import Queue
@@ -35,6 +36,9 @@ parser.add_option("-f", "--force_reload", dest="force_reload", action="store_tru
                   default=False, help='Skips HDFS exists check and reloads all tables')
 parser.add_option("--impalad", dest="impalad", default="localhost:21000",
                   help="Impala daemon to connect to")
+parser.add_option("--hive_hs2_hostport", dest="hive_hs2_hostport",
+                  default="localhost:11050",
+                  help="HS2 host:Port to issue Hive queries against using beeline")
 parser.add_option("--table_names", dest="table_names", default=None,
                   help="Only load the specified tables - specified as a comma-seperated "\
                   "list of base table names")
@@ -61,8 +65,18 @@ AVRO_SCHEMA_DIR = "avro_schemas"
 
 GENERATE_SCHEMA_CMD = "generate-schema-statements.py --exploration_strategy=%s "\
                       "--workload=%s --scale_factor=%s --verbose"
-HIVE_CMD = os.path.join(os.environ['HIVE_HOME'], 'bin/hive')
-HIVE_ARGS = "-hiveconf hive.root.logger=WARN,console -v"
+# Load data using Hive's beeline because the Hive shell has regressed (CDH-17222).
+# The Hive shell is stateful, meaning that certain series of actions lead to problems.
+# Examples of problems due to the statefullness of the Hive shell:
+# - Creating an HBase table changes the replication factor to 1 for subsequent LOADs.
+# - INSERTs into an HBase table fail if they are the first stmt executed in a session.
+# However, beeline itself also has bugs. For example, inserting a NULL literal into
+# a string-typed column leads to an NPE. We work around these problems by using LOAD from
+# a datafile instead of doing INSERTs.
+# TODO: Adjust connection string for --use_kerberos=true appropriately.
+HIVE_CMD = os.path.join(os.environ['HIVE_HOME'], 'bin/beeline')
+HIVE_ARGS = '-n %s -u "jdbc:hive2://%s/default;" --verbose=true'\
+            % (getpass.getuser(), options.hive_hs2_hostport)
 HADOOP_CMD = os.path.join(os.environ['HADOOP_HOME'], 'bin/hadoop')
 
 def available_workloads(workload_dir):

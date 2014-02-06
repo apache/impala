@@ -89,6 +89,12 @@
   <description></description>
 </property>
 
+<property>
+  <!--  Location of Hive per-query log files of the form: hive_job_log_<hive_query_id>.txt -->
+  <name>hive.querylog.location</name>
+  <value>${IMPALA_TEST_CLUSTER_LOG_DIR}/hive</value>
+</property>
+
 <!--property>
   <name>test.log.dir</name>
   <value>${build.dir}/test/logs</value>

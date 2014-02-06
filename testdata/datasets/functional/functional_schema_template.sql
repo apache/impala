@@ -949,9 +949,10 @@ e double
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select 'a', '', NULL, NULL, NULL from {db_name}.alltypes limit 1;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional.nulltable;
 ---- LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select 'a', '', NULL, NULL, NULL from {db_name}.alltypes limit 1;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/NullTable/data.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -966,9 +967,10 @@ e double
 ---- ROW_FORMAT
 delimited fields terminated by ',' escaped by '\\'
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select 'a', '', NULL, NULL, NULL from {db_name}.alltypes limit 1;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional.nulltable;
 ---- LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select 'a', '', NULL, NULL, NULL from {db_name}.alltypes limit 1;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/NullTable/data.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional

@@ -75,6 +75,9 @@ function generate_config {
 echo "Generating hive-site.xml using postgresql for metastore"
 generate_config postgresql-hive-site.xml.template hive-site.xml
 
+echo "Generating hive-log4j.properties"
+generate_config hive-log4j.properties.template hive-log4j.properties
+
 echo "Generating hbase-site.xml"
 generate_config hbase-site.xml.template hbase-site.xml
 

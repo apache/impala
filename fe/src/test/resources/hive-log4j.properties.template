@@ -1,25 +1,19 @@
 # Define some default values that can be overridden by system properties
-hive.root.logger=ERROR,DRFA
-hive.log.dir=/tmp/${user.name}
+hive.root.logger=INFO,DRFA
+hive.log.dir=${IMPALA_TEST_CLUSTER_LOG_DIR}/hive
 hive.log.file=hive.log
 
 # Define the root logger to the system property "hadoop.root.logger".
-log4j.rootLogger=INFO,console
-#log4j.rootLogger=${hive.root.logger}, EventCounter, console
+log4j.rootLogger=${hive.root.logger}, EventCounter
 
 # Logging Threshold
-log4j.threshhold=INFO
+log4j.threshhold=WARN
 
 #
 # Daily Rolling File Appender
 #
-# Use the PidDailyerRollingFileAppend class instead if you want to use separate log files
-# for different CLI session.
-#
-# log4j.appender.DRFA=org.apache.hadoop.hive.ql.log.PidDailyRollingFileAppender
 
 log4j.appender.DRFA=org.apache.log4j.DailyRollingFileAppender
-
 log4j.appender.DRFA.File=${hive.log.dir}/${hive.log.file}
 
 # Rollver at midnight
@@ -64,3 +58,5 @@ log4j.category.JPOX.MetaData=ERROR,DRFA
 log4j.category.JPOX.Query=ERROR,DRFA
 log4j.category.JPOX.General=ERROR,DRFA
 log4j.category.JPOX.Enhancer=ERROR,DRFA
+log4j.logger.org.apache.hadoop.conf.Configuration=ERROR,DRFA
+

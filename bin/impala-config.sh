@@ -104,17 +104,17 @@ export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 
 ### Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
 ### any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
-export HIVE_AUX_JARS_PATH=$IMPALA_FE_DIR/target
+export HIVE_AUX_JARS_PATH=${IMPALA_FE_DIR}/target
 export AUX_CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar
+
+export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-${IMPALA_HBASE_VERSION}/
+export PATH=$HBASE_HOME/bin:$PATH
 
 # Add the jars so hive can create hbase tables.
 export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-common-${IMPALA_HBASE_VERSION}.jar
 export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-client-${IMPALA_HBASE_VERSION}.jar
 export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-server-${IMPALA_HBASE_VERSION}.jar
 export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-protocol-${IMPALA_HBASE_VERSION}.jar
-
-export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-${IMPALA_HBASE_VERSION}/
-export PATH=$HBASE_HOME/bin:$PATH
 
 GPERFTOOLS_HOME=${IMPALA_HOME}/thirdparty/gperftools-${IMPALA_GPERFTOOLS_VERSION}/
 export PPROF_PATH="${PPROF_PATH:-${GPERFTOOLS_HOME}/src/pprof}"
