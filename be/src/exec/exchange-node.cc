@@ -117,7 +117,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     TransferInputBatchOwnership(output_batch);
     bool is_cancelled;
     {
-      SCOPED_TIMER(state->total_network_wait_timer());
+      SCOPED_TIMER(state->total_network_receive_timer());
       input_batch_.reset(stream_recvr_->GetBatch(&is_cancelled));
     }
     VLOG_FILE << "exch: has batch=" << (input_batch_.get() == NULL ? "false" : "true")

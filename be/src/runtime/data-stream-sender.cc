@@ -228,7 +228,7 @@ void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
 }
 
 void DataStreamSender::Channel::WaitForRpc() {
-  SCOPED_TIMER(parent_->state_->total_network_wait_timer());
+  SCOPED_TIMER(parent_->state_->total_network_send_timer());
   unique_lock<mutex> l(rpc_thread_lock_);
   while (rpc_in_flight_) {
     rpc_done_cv_.wait(l);

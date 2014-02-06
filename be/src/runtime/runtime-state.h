@@ -200,8 +200,11 @@ class RuntimeState {
   RuntimeProfile::Counter* total_storage_wait_timer() {
     return total_storage_wait_timer_;
   }
-  RuntimeProfile::Counter* total_network_wait_timer() {
-    return total_network_wait_timer_;
+  RuntimeProfile::Counter* total_network_send_timer() {
+    return total_network_send_timer_;
+  }
+  RuntimeProfile::Counter* total_network_receive_timer() {
+    return total_network_receive_timer_;
   }
 
   // Sets query_status_ with err_msg if no error has been set yet.
@@ -294,8 +297,11 @@ class RuntimeState {
   // Total time waiting in storage (across all threads)
   RuntimeProfile::Counter* total_storage_wait_timer_;
 
-  // Total time waiting in network (across all threads)
-  RuntimeProfile::Counter* total_network_wait_timer_;
+  // Total time spent sending over the network (across all threads)
+  RuntimeProfile::Counter* total_network_send_timer_;
+
+  // Total time spent receiving over the network (across all threads)
+  RuntimeProfile::Counter* total_network_receive_timer_;
 
   // MemTracker that is shared by all fragment instances running on this host.
   // The query mem tracker must be released after the instance_mem_tracker_.

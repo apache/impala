@@ -436,7 +436,8 @@ void PlanFragmentExecutor::FragmentComplete() {
   fragment_sw_ = MonotonicStopWatch();
   int64_t cpu_time = cpu_and_wait_time
       - runtime_state_->total_storage_wait_timer()->value()
-      - runtime_state_->total_network_wait_timer()->value();
+      - runtime_state_->total_network_send_timer()->value()
+      - runtime_state_->total_network_receive_timer()->value();
   // Timing is not perfect.
   if (cpu_time < 0)
     cpu_time = 0;

@@ -109,7 +109,8 @@ Status RuntimeState::Init(const TUniqueId& fragment_instance_id, ExecEnv* exec_e
 
   total_cpu_timer_ = ADD_TIMER(runtime_profile(), "TotalCpuTime");
   total_storage_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalStorageWaitTime");
-  total_network_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkWaitTime");
+  total_network_send_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkSendTime");
+  total_network_receive_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkReceiveTime");
 
   return Status::OK;
 }
