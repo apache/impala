@@ -178,14 +178,13 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   const string& pool = FLAGS_default_pool_name;
   // Note the queue_node will not exist in the queue when this method returns.
   QueueNode queue_node(schedule->query_id());
-  RequestQueue* queue = &request_queue_map_[pool];
-  PoolMetrics* pool_metrics;
 
   schedule->query_events()->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
   ScopedEvent completedEvent(schedule->query_events(), QUERY_EVENT_COMPLETED_ADMISSION);
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    pool_metrics = GetPoolMetrics(pool);
+    RequestQueue* queue = &request_queue_map_[pool];
+    PoolMetrics* pool_metrics = GetPoolMetrics(pool);
     TPoolStats* total_stats = &cluster_pool_stats_[pool];
     TPoolStats* local_stats = &local_pool_stats_[pool];
     VLOG_ROW << "Schedule for id=" << schedule->query_id() << " in pool=" << pool
@@ -246,6 +245,8 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   // stats.
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
+    RequestQueue* queue = &request_queue_map_[pool];
+    PoolMetrics* pool_metrics = GetPoolMetrics(pool);
     pools_for_updates_.insert(pool);
     if (pool_metrics != NULL) {
       pool_metrics->local_time_in_queue_ms->Increment(wait_time_ms);
@@ -499,6 +500,7 @@ void AdmissionController::DequeueLoop() {
         queue_node->is_admitted.Set(true);
         --num_to_admit;
       }
+      pools_for_updates_.insert(pool_name);
     }
     pools_to_dequeue_.clear();
   }

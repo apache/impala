@@ -233,8 +233,9 @@ class AdmissionController {
   // Dequeues and admits queued queries when notified by dequeue_cv_.
   void DequeueLoop();
 
-  // Gets the metrics for a pool. The metrics are initialized if they don't
-  // already exist. Returns NULL if there is no metrics system available.
+  // Gets the metrics for a pool. The metrics are initialized if they don't already
+  // exist. Returns NULL if there is no metrics system available.  Must hold
+  // admission_ctrl_lock_.
   PoolMetrics* GetPoolMetrics(const std::string& pool_name);
 };
 
