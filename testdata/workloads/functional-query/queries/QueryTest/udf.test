@@ -354,14 +354,14 @@ tinyint, int, double
 # Test UDFs that are evaluated in the planner (doesn't take cols as input)
 # and returns a string.
 ---- QUERY
-select count(*) from functional.alltypessmall where udf_test.No_Args() = 'string'
+select count(*) from functional.alltypessmall where No_Args() = 'string'
 ---- TYPES
 BIGINT
 ---- RESULTS
 100
 ====
 ---- QUERY
-select count(*) from functional.alltypessmall where udf_test.No_Args() != 'string'
+select count(*) from functional.alltypessmall where No_Args() != 'string'
 ---- TYPES
 BIGINT
 ---- RESULTS
