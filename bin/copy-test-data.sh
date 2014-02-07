@@ -14,4 +14,4 @@ DATASRC="a2226.halxg.cloudera.com:/data/1/workspace/impala-data"
 DATADST=$IMPALA_HOME/testdata/impala-data
 mkdir -p $DATADST
 
-scp -i $IMPALA_HOME/ssh_keys/id_rsa_impala -o "StrictHostKeyChecking=no" -r $DATASRC/* $DATADST
+scp -i $HOME/.ssh/id_rsa_jenkins -o "StrictHostKeyChecking=no" -r systest@$DATASRC/* $DATADST
