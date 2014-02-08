@@ -110,3 +110,26 @@ where month = 2
 'WRITE TO HDFS [functional.t, OVERWRITE=false]'
 '00:SCAN HDFS [functional.alltypes]'
 ====
+---- QUERY
+# Tests the warning about missing table stats in the explain header.
+explain select count(t1.int_col), avg(t2.float_col), sum(t3.bigint_col)
+from functional_avro.alltypes t1
+  inner join functional_parquet.alltypessmall t2 on (t1.id = t2.id)
+  left outer join functional_avro.alltypes t3 on (t2.id = t3.id)
+where t1.month = 1 and t2.year = 2009 and t3.bool_col = false
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=4.03GB VCores=3'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'functional_avro.alltypes, functional_parquet.alltypessmall'
+''
+'09:AGGREGATE [MERGE FINALIZE]'
+'08:EXCHANGE [PARTITION=UNPARTITIONED]'
+'05:AGGREGATE'
+'04:HASH JOIN [LEFT OUTER JOIN, BROADCAST]'
+'|--07:EXCHANGE [BROADCAST]'
+'|  02:SCAN HDFS [functional_avro.alltypes t3]'
+'03:HASH JOIN [INNER JOIN, BROADCAST]'
+'|--06:EXCHANGE [BROADCAST]'
+'|  01:SCAN HDFS [functional_parquet.alltypessmall t2]'
+'00:SCAN HDFS [functional_avro.alltypes t1]'
+====

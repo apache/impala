@@ -187,7 +187,7 @@ public class PlannerTest {
     actualOutput.append(Section.PLAN.getHeader() + "\n");
     try {
       execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
-      String explainStr = removeResourceEstimates(explainBuilder.toString());
+      String explainStr = removeExplainHeader(explainBuilder.toString());
       actualOutput.append(explainStr);
       if (!isImplemented) {
         errorLog.append(
@@ -266,7 +266,7 @@ public class PlannerTest {
    try {
      // distributed plan
      execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
-     String explainStr = removeResourceEstimates(explainBuilder.toString());
+     String explainStr = removeExplainHeader(explainBuilder.toString());
      actualOutput.append(explainStr);
      if (!isImplemented) {
        errorLog.append(
@@ -302,13 +302,18 @@ public class PlannerTest {
   }
 
   /**
-   * Strips out the header containing resource estimates from the given explain plan,
-   * because the estimates can change easily with stats/cardinality.
+   * Strips out the header containing resource estimates and the warning about missing
+   * stats from the given explain plan, because the estimates can change easily with
+   * stats/cardinality.
    */
-  private String removeResourceEstimates(String explain) {
-    if (explain.startsWith("Estimated Per-Host Requirements:")) {
-      String[] lines = explain.split("\n");
-      return Joiner.on("\n").join(Arrays.copyOfRange(lines, 2, lines.length)) + "\n";
+  private String removeExplainHeader(String explain) {
+    String[] lines = explain.split("\n");
+    // Find the first empty line - the end of the header.
+    for (int i = 0; i < lines.length - 1; ++i) {
+      if (lines[i].isEmpty()) {
+        return Joiner.on("\n").join(Arrays.copyOfRange(lines, i + 1 , lines.length))
+            + "\n";
+      }
     }
     return explain;
   }

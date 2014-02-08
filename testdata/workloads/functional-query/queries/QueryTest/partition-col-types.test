@@ -82,6 +82,8 @@ WHERE tinyint_col < 7 AND smallint_col < 6 AND int_col < 5 AND bigint_col < 40 A
 string_col in ('1', '2', '3')
 ---- RESULTS
 'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'hdfs_partitioning.all_insert_partition_col_types'
 ''
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
@@ -94,6 +96,8 @@ SELECT * from all_insert_partition_col_types
 WHERE tinyint_col < 7
 ---- RESULTS
 'Estimated Per-Host Requirements: Memory=48.00MB VCores=1'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'hdfs_partitioning.all_insert_partition_col_types'
 ''
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
@@ -106,6 +110,8 @@ SELECT * from all_insert_partition_col_types
 WHERE smallint_col < 6
 ---- RESULTS
 'Estimated Per-Host Requirements: Memory=48.00MB VCores=1'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'hdfs_partitioning.all_insert_partition_col_types'
 ''
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
@@ -118,6 +124,8 @@ SELECT * from all_insert_partition_col_types
 WHERE int_col < 5
 ---- RESULTS
 'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'hdfs_partitioning.all_insert_partition_col_types'
 ''
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
@@ -130,6 +138,8 @@ SELECT * from all_insert_partition_col_types
 WHERE bigint_col < 40
 ---- RESULTS
 'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'hdfs_partitioning.all_insert_partition_col_types'
 ''
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
@@ -142,6 +152,8 @@ SELECT * from all_insert_partition_col_types
 WHERE string_col in ('1', '2', '3')
 ---- RESULTS
 'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'hdfs_partitioning.all_insert_partition_col_types'
 ''
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
@@ -154,6 +166,8 @@ SELECT * from all_insert_partition_col_types
 WHERE double_col = 1.1
 ---- RESULTS
 'Estimated Per-Host Requirements: Memory=64.00MB VCores=1'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'hdfs_partitioning.all_insert_partition_col_types'
 ''
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
@@ -166,6 +180,8 @@ SELECT * from all_insert_partition_col_types
 WHERE float_col = 2
 ---- RESULTS
 'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'hdfs_partitioning.all_insert_partition_col_types'
 ''
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
@@ -223,6 +239,8 @@ SELECT * FROM all_partition_col_types
 WHERE bool_col=false
 ---- RESULTS
 'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'hdfs_partitioning.all_partition_col_types'
 ''
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'

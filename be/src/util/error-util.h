@@ -17,7 +17,9 @@
 #define IMPALA_UTIL_ERROR_UTIL_H
 
 #include <string>
+#include <vector>
 #include <boost/cstdint.hpp>
+#include "gen-cpp/CatalogObjects_types.h"
 
 namespace impala {
 
@@ -26,6 +28,10 @@ namespace impala {
 // Returns empty string if errno is 0.
 std::string GetStrErrMsg();
 
+// Returns an error message warning that the given table names are missing relevant
+// table/and or column statistics.
+std::string GetTablesMissingStatsWarning(
+    const std::vector<TTableName>& tables_missing_stats);
 }
 
 #endif

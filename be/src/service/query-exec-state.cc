@@ -42,6 +42,12 @@ DECLARE_int64(max_result_cache_size);
 
 namespace impala {
 
+// Keys into the info string map of the runtime profile referring to specific
+// items used by CM for monitoring purposes.
+static const string PER_HOST_MEM_KEY = "Estimated Per-Host Mem";
+static const string PER_HOST_VCORES_KEY = "Estimated Per-Host VCores";
+static const string TABLES_MISSING_STATS_KEY = "Tables Missing Stats";
+
 ImpalaServer::QueryExecState::QueryExecState(
     const TQueryContext& query_ctxt, ExecEnv* exec_env, Frontend* frontend,
     ImpalaServer* server, shared_ptr<SessionState> session)
@@ -246,6 +252,27 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
             << query_exec_request.query_plan
             << "----------------";
     summary_profile_.AddInfoString("Plan", plan_ss.str());
+  }
+  // Add info strings consumed by CM: Estimated mem/vcores and tables missing stats.
+  if (query_exec_request.__isset.per_host_mem_req) {
+    stringstream ss;
+    ss << query_exec_request.per_host_mem_req;
+    summary_profile_.AddInfoString(PER_HOST_MEM_KEY, ss.str());
+  }
+  if (query_exec_request.__isset.per_host_vcores) {
+    stringstream ss;
+    ss << query_exec_request.per_host_vcores;
+    summary_profile_.AddInfoString(PER_HOST_VCORES_KEY, ss.str());
+  }
+  if (query_exec_request.query_ctxt.__isset.tables_missing_stats &&
+      !query_exec_request.query_ctxt.tables_missing_stats.empty()) {
+    stringstream ss;
+    const vector<TTableName>& tbls = query_exec_request.query_ctxt.tables_missing_stats;
+    for (int i = 0; i < tbls.size(); ++i) {
+      if (i != 0) ss << ",";
+      ss << tbls[i].db_name << "." << tbls[i].table_name;
+    }
+    summary_profile_.AddInfoString(TABLES_MISSING_STATS_KEY, ss.str());
   }
 
   // If desc_tbl is not set, query has SELECT with no FROM. In that

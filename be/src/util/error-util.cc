@@ -32,4 +32,17 @@ string GetStrErrMsg() {
   return ss.str();
 }
 
+string GetTablesMissingStatsWarning(const vector<TTableName>& tables_missing_stats) {
+  stringstream ss;
+  if (tables_missing_stats.empty()) return string("");
+  ss << "WARNING: The following tables are missing relevant table and/or column "
+     << "statistics.\n";
+  for (int i = 0; i < tables_missing_stats.size(); ++i) {
+    const TTableName& table_name = tables_missing_stats[i];
+    if (i != 0) ss << ",";
+    ss << table_name.db_name << "." << table_name.table_name;
+  }
+  return ss.str();
+}
+
 }

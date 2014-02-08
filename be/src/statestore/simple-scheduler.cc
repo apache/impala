@@ -36,6 +36,7 @@
 #include "util/uid-util.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
+#include "util/error-util.h"
 #include "util/llama-util.h"
 #include "gen-cpp/ResourceBrokerService_types.h"
 
@@ -758,9 +759,10 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
         reservation_request, schedule->reservation());
     if (!status.ok()) {
       // Warn about missing table and/or column stats if necessary.
-      if (schedule->request().__isset.fe_error_msgs &&
-          !schedule->request().fe_error_msgs.empty()) {
-        status.AddErrorMsg(schedule->request().fe_error_msgs[0]);
+      if(schedule->request().query_ctxt.__isset.tables_missing_stats &&
+          !schedule->request().query_ctxt.tables_missing_stats.empty()) {
+        status.AddErrorMsg(GetTablesMissingStatsWarning(
+            schedule->request().query_ctxt.tables_missing_stats));
       }
       return status;
     }

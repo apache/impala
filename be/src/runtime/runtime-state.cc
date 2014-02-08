@@ -29,6 +29,7 @@
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
+#include "util/error-util.h"
 #include "util/jni-util.h"
 #include "util/mem-info.h"
 
@@ -235,12 +236,18 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
        << " without exceeding limit."
        << endl;
   }
+
   if (exec_env_->process_mem_tracker()->LimitExceeded()) {
     ss << exec_env_->process_mem_tracker()->LogUsage();
   } else {
     ss << query_mem_tracker_->LogUsage();
   }
   LogError(ss.str());
+  // Add warning about missing stats.
+  if (query_ctxt_.__isset.tables_missing_stats
+      && !query_ctxt_.tables_missing_stats.empty()) {
+    LogError(GetTablesMissingStatsWarning(query_ctxt_.tables_missing_stats));
+  }
   DCHECK(query_status_.IsMemLimitExceeded());
   return query_status_;
 }

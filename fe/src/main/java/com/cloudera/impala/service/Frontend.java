@@ -90,6 +90,7 @@ import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TStmtType;
+import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
 import com.cloudera.impala.util.TResultRowBuilder;
@@ -98,6 +99,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * Frontend API for the impalad process.
@@ -613,22 +615,19 @@ public class Frontend {
 
     // Set scan ranges/locations for scan nodes.
     // Also assemble list of tables names missing stats for assembling a warning message.
-    List<String> tablesMissingStats = Lists.newArrayList();
     LOG.debug("get scan range locations");
+    Set<TTableName> tablesMissingStats = Sets.newTreeSet();
     for (ScanNode scanNode: scanNodes) {
       queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
           scanNode.getScanRangeLocations(
               queryCtxt.request.query_options.getMax_scan_range_length()));
       if (scanNode.isTableMissingStats()) {
-        tablesMissingStats.add(scanNode.getTupleDesc().getTable().getFullName());
+        tablesMissingStats.add(scanNode.getTupleDesc().getTableName().toThrift());
       }
     }
-    if (!tablesMissingStats.isEmpty()) {
-      String warnMsg = "Warning: The following tables are missing relevant table " +
-          "and/or column statistics leading to inaccurate resource estimates:\n" +
-          Joiner.on(", ").join(tablesMissingStats);
-      queryExecRequest.addToFe_error_msgs(warnMsg);
+    for (TTableName tableName: tablesMissingStats) {
+      queryCtxt.addToTables_missing_stats(tableName);
     }
 
     // Compute resource requirements after scan range locations because the cost
@@ -644,6 +643,8 @@ public class Frontend {
       // Use the STANDARD by default for explain statements.
       explainLevel = TExplainLevel.STANDARD;
     }
+    // Global query parameters to be set in each TPlanExecRequest.
+    queryExecRequest.setQuery_ctxt(queryCtxt);
 
     explainString.append(planner.getExplainString(fragments, queryExecRequest,
         explainLevel));
@@ -657,9 +658,6 @@ public class Frontend {
     }
 
     result.setQuery_exec_request(queryExecRequest);
-
-    // Global query parameters to be set in each TPlanExecRequest.
-    queryExecRequest.setQuery_ctxt(queryCtxt);
 
     if (analysisResult.isQueryStmt()) {
       // fill in the metadata

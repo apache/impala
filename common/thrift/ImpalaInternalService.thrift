@@ -133,6 +133,10 @@ struct TQueryContext {
 
   // Process ID of the impalad to which the user is connected.
   4: required i32 pid
+
+  // List of tables missing relevant table and/or column stats. Used for
+  // populating query-profile fields consumed by CM as well as warning messages.
+  5: optional list<CatalogObjects.TTableName> tables_missing_stats
 }
 
 // A scan range plus the parameters needed to execute that scan.

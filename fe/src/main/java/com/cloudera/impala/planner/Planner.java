@@ -62,6 +62,8 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryOptions;
+import com.cloudera.impala.thrift.TTableName;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -175,12 +177,26 @@ public class Planner {
   public String getExplainString(ArrayList<PlanFragment> fragments,
       TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
+    boolean hasHeader = false;
     if (request.isSetPer_host_mem_req() && request.isSetPer_host_vcores()) {
       str.append(
-          String.format("Estimated Per-Host Requirements: Memory=%s VCores=%s\n\n",
+          String.format("Estimated Per-Host Requirements: Memory=%s VCores=%s\n",
           PrintUtils.printBytes(request.getPer_host_mem_req()),
           request.per_host_vcores));
+      hasHeader = true;
     }
+    // Append warning about tables missing stats.
+    if (request.query_ctxt.isSetTables_missing_stats() &&
+        !request.query_ctxt.getTables_missing_stats().isEmpty()) {
+      List<String> tableNames = Lists.newArrayList();
+      for (TTableName tableName: request.query_ctxt.getTables_missing_stats()) {
+        tableNames.add(tableName.db_name + "." + tableName.table_name);
+      }
+      str.append("WARNING: The following tables are missing relevant table " +
+          "and/or column statistics.\n" + Joiner.on(", ").join(tableNames) + "\n");
+      hasHeader = true;
+    }
+    if (hasHeader) str.append("\n");
 
     if (explainLevel.ordinal() < TExplainLevel.VERBOSE.ordinal()) {
       // Print the non-fragmented parallel plan.
