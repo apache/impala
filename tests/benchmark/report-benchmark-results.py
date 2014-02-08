@@ -66,6 +66,10 @@ parser.add_option("--max_percent_change_threshold",
                   type="float", help="Any performance changes above this threshold"\
                   " will be classified as significant. If the user specifies an" \
                   " empty value, the threshold will be set to the system's maxint")
+parser.add_option("--allowed_latency_diff_secs",
+                  dest="allowed_latency_diff_secs", default=0.0, type="float",
+                  help="If specified, only a timing change that differs by more than\
+                  this value will be considered significant.")
 
 # These parameters are specific to recording results in a database. This is optional
 parser.add_option("--save_to_db", dest="save_to_db", action="store_true",
@@ -272,6 +276,9 @@ def check_perf_change_significance(row, ref_row):
   iters, ref_iters = map(int, [row[NUM_ITERS_IDX], ref_row[NUM_ITERS_IDX]])
   stddevs_are_zero = (ref_stddev == 0.0) and (stddev == 0.0)
   percent_difference = abs(ref_avg - avg) * 100 / ref_avg
+  # If the result is within the allowed_latency_diff_secs, mark it as insignificant.
+  if abs(ref_avg - avg) < options.allowed_latency_diff_secs:
+    return False, False
   # If result is within min_percent_change_threshold of the baseline,
   # mark it as insignificant and ignore the t-test.
   if percent_difference < options.min_percent_change_threshold:
