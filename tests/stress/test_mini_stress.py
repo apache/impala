@@ -33,6 +33,8 @@ class TestMiniStress(ImpalaTestSuite):
     for i in xrange(NUM_ITERATIONS):
       self.run_test_case('stress', vector)
 
+  @pytest.mark.skipif(True,
+      reason="Skip until the race in the catalog server is resolved")
   @pytest.mark.stress
   def test_run_invalidate_refresh(self, vector):
     """Verifies that running concurrent invalidate table/catalog and refresh commands
