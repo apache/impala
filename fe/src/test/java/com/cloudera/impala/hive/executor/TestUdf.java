@@ -74,10 +74,19 @@ public class TestUdf extends UDF {
     if (a == null) return a;
     return new TimestampWritable(a);
   }
+  public String evaluate(String a) {
+    if (a == null) return a;
+    return a;
+  }
 
   public DoubleWritable evaluate(DoubleWritable arg1, DoubleWritable arg2) {
     if (arg1 == null || arg2 == null) return null;
     return new DoubleWritable(arg1.get() + arg2.get());
+  }
+
+  public String evaluate(String a, String b) {
+    if (a == null || b == null) return null;
+    return a + b;
   }
 
 }

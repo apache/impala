@@ -94,6 +94,10 @@ public class UdfExecutor {
   // as these objects are reused across calls to evaluate().
   private Object[] inputObjects_;
   private Object[] inputArgs_; // inputArgs_[i] is either inputObjects_[i] or null
+  // True if inputArgs_[i] is the java String type (and not a writable). We need
+  // to make a String object before calling the UDF.
+  // TODO: is there a unsafe way to make string objects?
+  private boolean[] isArgString_;
 
   // Allocations made from the native heap that need to be cleaned when this object
   // is GC'ed.
@@ -191,7 +195,12 @@ public class UdfExecutor {
     try {
       for (int i = 0; i < argTypes_.length; ++i) {
         if (UnsafeUtil.UNSAFE.getByte(inputNullsPtr_ + i) == 0) {
-          inputArgs_[i] = inputObjects_[i];
+          if (isArgString_[i]) {
+            Preconditions.checkState(inputArgs_[i] instanceof ImpalaBytesWritable);
+            inputArgs_[i] = ((ImpalaBytesWritable)inputArgs_[i]).toString();
+          } else {
+            inputArgs_[i] = inputObjects_[i];
+          }
         } else {
           inputArgs_[i] = null;
         }
@@ -253,7 +262,7 @@ public class UdfExecutor {
   }
 
   // Sets the result object 'obj' into the outputBufferPtr_
-  private void storeUdfResult(Object obj) {
+  private void storeUdfResult(Object obj) throws ImpalaRuntimeException {
     if (obj == null) {
       UnsafeUtil.UNSAFE.putByte(outputNullPtr_, (byte)1);
       return;
@@ -305,12 +314,10 @@ public class UdfExecutor {
           bytes = ((BytesWritable)obj).getBytes();
         } else if (obj instanceof Text) {
           bytes = ((Text)obj).getBytes();
-        }
-
-        if (bytes == null) {
-          // TODO: the returned string type is not one we expect
-          System.err.println("Unexpected return type: " + obj.getClass());
-          Preconditions.checkArgument(false);
+        } else if (obj instanceof String) {
+          bytes = ((String)obj).getBytes();
+        } else {
+          throw new ImpalaRuntimeException("Unexpected return type: " + obj.getClass());
         }
 
         if (bytes.length > outBufferCapacity_) {
@@ -327,15 +334,16 @@ public class UdfExecutor {
       }
       case TIMESTAMP:
       default:
-        Preconditions.checkArgument(false);
+        throw new ImpalaRuntimeException("Unsupported argument type: " + retType_);
     }
   }
 
   // Preallocate the input objects that will be passed to the underlying UDF.
   // These objects are allocated once and reused across calls to evaluate()
-  private void allocateInputObjects() {
+  private void allocateInputObjects() throws ImpalaRuntimeException {
     inputObjects_ = new Writable[argTypes_.length];
     inputArgs_ = new Writable[argTypes_.length];
+    isArgString_ = new boolean[argTypes_.length];
 
     for (int i = 0; i < argTypes_.length; ++i) {
       int offset = inputBufferOffsets_[i];
@@ -368,13 +376,20 @@ public class UdfExecutor {
           } else  if (method_.getParameterTypes()[i] == BytesWritable.class) {
             ImpalaBytesWritable w = new ImpalaBytesWritable(inputBufferPtr_ + offset);
             inputObjects_[i] = w;
+          } else if (method_.getParameterTypes()[i] == String.class) {
+            isArgString_[i] = true;
+            // String can be mapped to any String-like Writable class. We need
+            // to call toString on it before calling the UDF.
+            ImpalaBytesWritable w = new ImpalaBytesWritable(inputBufferPtr_ + offset);
+            inputObjects_[i] = w;
           } else {
-            Preconditions.checkArgument(false);
+            throw new ImpalaRuntimeException(
+                "Unsupported argument type: " + method_.getParameterTypes()[i]);
           }
           break;
         case TIMESTAMP:
         default:
-          Preconditions.checkArgument(false);
+          throw new ImpalaRuntimeException("Unsupported argument type: " + argTypes_[i]);
         }
     }
   }

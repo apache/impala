@@ -76,7 +76,7 @@ public class UdfExecutorTest {
   // Allocations from the native heap. These are freed in bulk.
   ArrayList<Long> allocations_ = Lists.newArrayList();
 
-  // Allocats 'byteSize' from the native heap and returns the ptr. The allocation
+  // Allocates 'byteSize' from the native heap and returns the ptr. The allocation
   // is added to allocations_.
   long allocate(int byteSize) {
     long ptr = UnsafeUtil.UNSAFE.allocateMemory(byteSize);
@@ -188,7 +188,7 @@ public class UdfExecutorTest {
 
   // Runs the hive udf contained in c. Validates that c.evaluate(args) == retValue.
   // Arguments and return value cannot be NULL.
-  void TestUdf(String jar, Class<?> c, Writable expectedValue, ColumnType expectedType,
+  void TestUdfImpl(String jar, Class<?> c, Object expectedValue, ColumnType expectedType,
       boolean validate, Object... args)
       throws MalformedURLException, ImpalaRuntimeException {
     ColumnType[] argTypes = new ColumnType[args.length];
@@ -258,6 +258,8 @@ public class UdfExecutorTest {
               expectedBytes = ((ImpalaBytesWritable)expectedValue).getBytes();
             } else if (expectedValue instanceof ImpalaTextWritable) {
               expectedBytes = ((ImpalaTextWritable)expectedValue).getBytes();
+            } else if (expectedValue instanceof String) {
+              expectedBytes = ((String)expectedValue).getBytes();
             } else {
               Preconditions.checkState(false);
             }
@@ -274,17 +276,22 @@ public class UdfExecutorTest {
 
   void TestUdf(String jar, Class<?> c, Writable expectedValue, Object... args)
       throws MalformedURLException, ImpalaRuntimeException {
-    TestUdf(jar, c, expectedValue, getType(expectedValue), true, args);
+    TestUdfImpl(jar, c, expectedValue, getType(expectedValue), true, args);
+  }
+
+  void TestUdf(String jar, Class<?> c, String expectedValue, Object... args)
+      throws MalformedURLException, ImpalaRuntimeException {
+    TestUdfImpl(jar, c, expectedValue, getType(expectedValue), true, args);
   }
 
   void TestHiveUdf(Class<?> c, Writable expectedValue, Object... args)
       throws MalformedURLException, ImpalaRuntimeException {
-    TestUdf(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), true, args);
+    TestUdfImpl(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), true, args);
   }
 
   void TestHiveUdfNoValidate(Class<?> c, Writable expectedValue, Object... args)
       throws MalformedURLException, ImpalaRuntimeException {
-    TestUdf(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), false, args);
+    TestUdfImpl(HIVE_BUILTIN_JAR, c, expectedValue, getType(expectedValue), false, args);
   }
 
   @Test
@@ -359,8 +366,10 @@ public class UdfExecutorTest {
     TestUdf(null, TestUdf.class, createFloat(1.1f), createFloat(1.1f));
     TestUdf(null, TestUdf.class, createDouble(1.1), createDouble(1.1));
     TestUdf(null, TestUdf.class, createBytes("ABCD"), "ABCD");
+    TestUdf(null, TestUdf.class, "ABCD", "ABCD");
     TestUdf(null, TestUdf.class, createDouble(3),
         createDouble(1), createDouble(2));
+    TestUdf(null, TestUdf.class, "ABCXYZ", "ABC", "XYZ");
     freeAllocations();
   }
 }
