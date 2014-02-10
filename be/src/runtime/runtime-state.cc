@@ -116,10 +116,14 @@ Status RuntimeState::Init(const TUniqueId& fragment_instance_id, ExecEnv* exec_e
 }
 
 Status RuntimeState::InitMemTrackers(const TUniqueId& query_id,
-    int64_t query_bytes_limit) {
+    const string* pool_name, int64_t query_bytes_limit) {
+  MemTracker* query_parent_tracker = exec_env_->process_mem_tracker();
+  if (pool_name != NULL) {
+    query_parent_tracker = MemTracker::GetRequestPoolMemTracker(*pool_name,
+        query_parent_tracker);
+  }
   query_mem_tracker_ =
-      MemTracker::GetQueryMemTracker(
-        query_id, query_bytes_limit, exec_env_->process_mem_tracker());
+      MemTracker::GetQueryMemTracker(query_id, query_bytes_limit, query_parent_tracker);
   instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1,
       runtime_profile()->name(), query_mem_tracker_.get()));
   if (query_bytes_limit != -1) {

@@ -15,18 +15,25 @@
 #include "runtime/mem-tracker.h"
 
 #include <boost/algorithm/string/join.hpp>
+#include <gutil/strings/substitute.h>
 
+#include "runtime/exec-env.h"
 #include "util/debug-util.h"
 #include "util/uid-util.h"
 
 using namespace boost;
 using namespace std;
+using namespace strings;
 
 namespace impala {
 
 const string MemTracker::COUNTER_NAME = "PeakMemoryUsage";
-MemTracker::MemTrackersMap MemTracker::uid_to_mem_trackers_;
-mutex MemTracker::uid_to_mem_trackers_lock_;
+MemTracker::RequestTrackersMap MemTracker::request_to_mem_trackers_;
+MemTracker::PoolTrackersMap MemTracker::pool_to_mem_trackers_;
+mutex MemTracker::static_mem_trackers_lock_;
+
+// Name for request pool MemTrackers. '$0' is replaced with the pool name.
+const string REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT = "RequestPool=$0";
 
 MemTracker::MemTracker(int64_t byte_limit, const string& label, MemTracker* parent)
   : limit_(byte_limit),
@@ -105,11 +112,33 @@ void MemTracker::UnregisterFromParent() {
   child_tracker_it_ = parent_->child_trackers_.end();
 }
 
+MemTracker* MemTracker::GetRequestPoolMemTracker(const string& pool_name,
+    MemTracker* parent) {
+  DCHECK(!pool_name.empty());
+  lock_guard<mutex> l(static_mem_trackers_lock_);
+  PoolTrackersMap::iterator it = pool_to_mem_trackers_.find(pool_name);
+  if (it != pool_to_mem_trackers_.end()) {
+    MemTracker* tracker = it->second;
+    DCHECK(pool_name == tracker->pool_name_);
+    return tracker;
+  } else {
+    if (parent == NULL) return NULL;
+    // First time this pool_name registered, make a new object.
+    MemTracker* tracker = new MemTracker(-1,
+          Substitute(REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT, pool_name),
+          parent);
+    tracker->auto_unregister_ = true;
+    tracker->pool_name_ = pool_name;
+    pool_to_mem_trackers_[pool_name] = tracker;
+    return tracker;
+  }
+}
+
 shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
     const TUniqueId& id, int64_t byte_limit, MemTracker* parent) {
-  lock_guard<mutex> l(uid_to_mem_trackers_lock_);
-  MemTrackersMap::iterator it = uid_to_mem_trackers_.find(id);
-  if (it != uid_to_mem_trackers_.end()) {
+  lock_guard<mutex> l(static_mem_trackers_lock_);
+  RequestTrackersMap::iterator it = request_to_mem_trackers_.find(id);
+  if (it != request_to_mem_trackers_.end()) {
     // Return the existing MemTracker object for this id, converting the weak ptr
     // to a shared ptr.
     shared_ptr<MemTracker> tracker = it->second.lock();
@@ -123,16 +152,19 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
     shared_ptr<MemTracker> tracker(new MemTracker(byte_limit, "Query Limit", parent));
     tracker->auto_unregister_ = true;
     tracker->query_id_ = id;
-    uid_to_mem_trackers_[id] = tracker;
+    request_to_mem_trackers_[id] = tracker;
     return tracker;
   }
 }
 
 MemTracker::~MemTracker() {
-  lock_guard<mutex> l(uid_to_mem_trackers_lock_);
+  lock_guard<mutex> l(static_mem_trackers_lock_);
   if (auto_unregister_) UnregisterFromParent();
   // Erase the weak ptr reference from the map.
-  uid_to_mem_trackers_.erase(query_id_);
+  request_to_mem_trackers_.erase(query_id_);
+  // Per-pool trackers should live the entire lifetime of the impalad process, but
+  // remove the element from the map in case this changes in the future.
+  pool_to_mem_trackers_.erase(pool_name_);
 }
 
 void MemTracker::RegisterMetrics(Metrics* metrics, const string& prefix) {

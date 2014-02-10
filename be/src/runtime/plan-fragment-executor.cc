@@ -122,7 +122,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     VLOG_QUERY << "Using query memory limit from query options: "
         << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
   }
-  RETURN_IF_ERROR(runtime_state_->InitMemTrackers(query_id_, bytes_limit));
+  DCHECK(!params.request_pool.empty());
+  RETURN_IF_ERROR(runtime_state_->InitMemTrackers(query_id_, &params.request_pool,
+      bytes_limit));
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();

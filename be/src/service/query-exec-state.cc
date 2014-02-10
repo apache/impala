@@ -278,8 +278,9 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
       query_events_));
   coord_.reset(new Coordinator(exec_env_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
+  summary_profile_.AddInfoString("Request Pool", schedule_->request_pool());
   if (FLAGS_enable_rm) {
-    // Add the Yarn pool and the reservation request to the query profile.
+    // TODO: Remove 'Yarn Pool' once we have admission control user->pool resolution
     summary_profile_.AddInfoString("Yarn Pool", schedule_->yarn_pool());
     if (status.ok()) {
       DCHECK(schedule_->reservation_request() != NULL);

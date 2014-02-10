@@ -87,7 +87,9 @@ class QuerySchedule {
   const TUniqueId& query_id() const { return query_id_; }
   const TQueryExecRequest& request() const { return request_; }
   const TQueryOptions& query_options() const { return query_options_; }
-  const std::string& yarn_pool() { return yarn_pool_; }
+  const std::string& yarn_pool() const { return yarn_pool_; }
+  const std::string& request_pool() const { return request_pool_; }
+  void set_request_pool(const std::string& pool_name) { request_pool_ = pool_name; }
   bool HasReservation() const { return !reservation_.allocated_resources.empty(); }
 
   // Granted or timed out reservations need to be released. In both such cases,
@@ -152,7 +154,12 @@ class QuerySchedule {
 
   // Yarn pool from which resources were requested for this query schedule.
   // Set in CreateReservationRequest().
+  // TODO: Remove once we can use llama as a library to resolve pools locally; just
+  // use request_pool_.
   std::string yarn_pool_;
+
+  // Request pool to which the request was submitted for admission.
+  std::string request_pool_;
 
   // Reservation request to be submitted to Llama. Set in CreateReservationRequest().
   boost::scoped_ptr<TResourceBrokerReservationRequest> reservation_request_;

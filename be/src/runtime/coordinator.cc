@@ -1301,6 +1301,7 @@ void Coordinator::SetExecPlanFragmentParams(
     rpc_params->__set_reserved_resource(
         schedule.reservation()->allocated_resources[resource_hostport]);
   }
+  rpc_params->params.__set_request_pool(schedule.request_pool());
   rpc_params->params.__set_per_node_scan_ranges(scan_ranges);
   rpc_params->params.__set_per_exch_num_senders(params.per_exch_num_senders);
   rpc_params->params.__set_destinations(params.destinations);

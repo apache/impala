@@ -90,6 +90,16 @@ class MemTracker {
   static boost::shared_ptr<MemTracker> GetQueryMemTracker(
       const TUniqueId& id, int64_t byte_limit, MemTracker* parent);
 
+  // Returns a MemTracker object for request pool 'pool_name'. Calling this with the same
+  // 'pool_name' will return the same MemTracker object. This is used to track the local
+  // memory usage of all requests executing in this pool. The first time this is called
+  // for a pool, a new MemTracker object is created with the parent tracker if it is not
+  // NULL. If the parent is NULL, no new tracker will be created and NULL is returned.
+  // There is no explicit per-pool byte_limit set at any particular impalad, so newly
+  // created trackers will always have a limit of -1.
+  static MemTracker* GetRequestPoolMemTracker(const std::string& pool_name,
+      MemTracker* parent);
+
   // Increases consumption of this tracker and its ancestors by 'bytes'.
   void Consume(int64_t bytes) {
     if (consumption_metric_ != NULL) {
@@ -230,17 +240,26 @@ class MemTracker {
   // Lock to protect GcMemory(). This prevents many GCs from occurring at once.
   SpinLock gc_lock_;
 
-  // All MemTracker objects that are in use and lock protecting it.
-  // For memory management, this map contains only weak ptrs.  MemTrackers that are
-  // handed out via GetQueryMemTracker() are shared ptrs.  When all the shared ptrs are
-  // no longer referenced, the MemTracker d'tor will be called at which point the
-  // weak ptr will be removed from the map.
-  typedef boost::unordered_map<TUniqueId, boost::weak_ptr<MemTracker> > MemTrackersMap;
-  static MemTrackersMap uid_to_mem_trackers_;
-  static boost::mutex uid_to_mem_trackers_lock_;
+  // Protects request_to_mem_trackers_ and pool_to_mem_trackers_
+  static boost::mutex static_mem_trackers_lock_;
 
-  // Only valid for MemTrackers returned from GetMemTracker()
+  // All per-request MemTracker objects that are in use.  For memory management, this map
+  // contains only weak ptrs.  MemTrackers that are handed out via GetQueryMemTracker()
+  // are shared ptrs.  When all the shared ptrs are no longer referenced, the MemTracker
+  // d'tor will be called at which point the weak ptr will be removed from the map.
+  typedef boost::unordered_map<TUniqueId, boost::weak_ptr<MemTracker> > RequestTrackersMap;
+  static RequestTrackersMap request_to_mem_trackers_;
+
+  // All per-request pool MemTracker objects. It is assumed that request pools will live
+  // for the entire duration of the process lifetime.
+  typedef boost::unordered_map<std::string, MemTracker*> PoolTrackersMap;
+  static PoolTrackersMap pool_to_mem_trackers_;
+
+  // Only valid for MemTrackers returned from GetQueryMemTracker()
   TUniqueId query_id_;
+
+  // Only valid for MemTrackers returned from GetRequestPoolMemTracker()
+  std::string pool_name_;
 
   int64_t limit_;  // in bytes; < 0: no limit
   std::string label_;

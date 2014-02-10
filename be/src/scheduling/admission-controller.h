@@ -32,32 +32,35 @@
 namespace impala {
 
 class QuerySchedule;
+class ExecEnv;
 
-// The AdmissionController is used to make local admission decisions based on
-// cluster state disseminated by the statestore. Requests are submitted for
-// execution to a given pool via AdmitQuery(). A request will either be
-// admitted immediately, queued, or rejected. This decision is based on
-// per-pool estimates of the total number of concurrently executing queries
-// across the entire cluster and the total number of queued requests across the
-// entire cluster. When the number of concurrently executing queries goes above
-// a configurable per-pool threshold, requests will be queued. When the total
-// number of queued requests in a particular pool goes above a configurable
-// threshold, incoming requests to that pool will be rejected.
+// The AdmissionController is used to make local admission decisions based on cluster
+// state disseminated by the statestore. Requests are submitted for execution to a given
+// pool via AdmitQuery(). A request will either be admitted immediately, queued, or
+// rejected. This decision is based on per-pool estimates of the total number of
+// concurrently executing queries across the entire cluster, their memory usage, and the
+// total number of queued requests across the entire cluster. When the number of
+// concurrently executing queries goes above a configurable per-pool threshold or the
+// memory usage of those queries goes above a per-pool memory limit, requests
+// will be queued. When the total number of queued requests in a particular pool goes
+// above a configurable threshold, incoming requests to that pool will be rejected.
 // TODO: When we resolve users->pools, explain the model and configuration story.
 //       (There is one hard-coded pool right now, configurable via gflags.)
 //
 // The pool statistics are updated by the statestore using the
-// IMPALA_REQUEST_QUEUE_TOPIC topic. Every <impalad, pool> pair is sent as a
-// topic update when pool statistics change, and the topic updates from other
-// impalads are used to re-compute the total per-pool stats. When there are
-// queued requests and the number of concurrently executing queries drops below
-// the configured maximum, a number of queued requests will be
-// admitted according to the following formula:
+// IMPALA_REQUEST_QUEUE_TOPIC topic. Every <impalad, pool> pair is sent as a topic update
+// when pool statistics change, and the topic updates from other impalads are used to
+// re-compute the total per-pool stats. When there are queued requests, the number of
+// executing queries drops below the configured maximum, and the memory usage of those
+// queries is below the memory limit, a number of queued requests will be admitted
+// according to the following formula:
 //   N = (#local_pool_queued / #global_pool_queued) * (pool_limit - #global_pool_running)
-// However, because the pool statistics are only updated on statestore
+// If there is a memory limit specified but no limit on the number of running queries, we
+// will dequeue and admit all of the queued requests because we don't attempt to estimate
+// request memory usage. Because the pool statistics are only updated on statestore
 // heartbeats and all decisions are made locally, the total pool statistics are
-// estimates.  As a result, more requests may be admitted or queued than the
-// configured thresholds, which are really soft limits.
+// estimates. As a result, more requests may be admitted or queued than the configured
+// thresholds, which are really soft limits.
 class AdmissionController {
  public:
   AdmissionController(Metrics* metrics, const std::string& backend_id);
@@ -128,10 +131,14 @@ class AdmissionController {
     Metrics::IntMetric* cluster_num_running;
     // The estimated total number of requests currently queued across the cluster.
     Metrics::IntMetric* cluster_in_queue;
+    // The estimated total amount of memory used by this pool across the cluster.
+    Metrics::BytesMetric* cluster_mem_usage;
     // The total number of queries currently running that were initiated locally.
     Metrics::IntMetric* local_num_running;
     // The total number of requests currently queued locally.
     Metrics::IntMetric* local_in_queue;
+    // The total amount of memory used by this pool locally.
+    Metrics::BytesMetric* local_mem_usage;
   };
 
   // Metrics subsystem access
@@ -164,10 +171,6 @@ class AdmissionController {
   // The set of local pools that have changed between topic updates that
   // need to be sent to the statestore.
   PoolSet pools_for_updates_;
-
-  // The set of pools for which the total number of running queries has
-  // decreased and thus may be eligible for admitting queued queries.
-  PoolSet pools_to_dequeue_;
 
   // Mimics the statestore topic, i.e. stores a local copy of the logical data structure
   // that the statestore broadcasts. The local stats are not stored in this map because
@@ -213,21 +216,25 @@ class AdmissionController {
 
   // Updates the per_backend_pool_stats_map_ with topic_updates.
   // Called by UpdatePoolStats(). Must hold admission_ctrl_lock_.
-  void HandleTopicUpdates(const std::vector<TTopicItem>& topic_updates,
-      PoolSet* updated_pools);
+  void HandleTopicUpdates(const std::vector<TTopicItem>& topic_updates);
 
   // Removes stats from the per_backend_pool_stats_map_ from topic deletions.
   // Called by UpdatePoolStats(). Must hold admission_ctrl_lock_.
-  void HandleTopicDeletions(const std::vector<std::string>& topic_deletions,
-      PoolSet* updated_pools);
+  void HandleTopicDeletions(const std::vector<std::string>& topic_deletions);
 
-  // Re-computes the cluster_pool_stats_ aggregate stats for the updated pools.
+  // Re-computes the cluster_pool_stats_ aggregate stats for all pools.
   // Called by UpdatePoolStats() after handling updates and deletions.
   // Must hold admission_ctrl_lock_.
-  void UpdateClusterAggregates(const PoolSet& updated_pools);
+  void UpdateClusterAggregates();
+
+  // Updates the memory usage of the local pool stats based on the most recent mem
+  // tracker consumption. Called by UpdatePoolStats() before sending local pool updates.
+  // Must hold admission_ctrl_lock_.
+  void UpdateMemUsage();
 
   // Adds updates for local pools that have changed to the subscriber topic updates.
-  // Called by UpdatePoolStats() before handling updates. Takes admission_ctrl_lock_.
+  // Called by UpdatePoolStats() before handling updates.
+  // Must hold admission_ctrl_lock_.
   void AddPoolUpdates(std::vector<TTopicDelta>* subscriber_topic_updates);
 
   // Dequeues and admits queued queries when notified by dequeue_cv_.

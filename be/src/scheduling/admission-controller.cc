@@ -23,6 +23,9 @@
 #include "common/logging.h"
 #include "statestore/query-schedule.h"
 #include "statestore/simple-scheduler.h"
+#include "runtime/exec-env.h"
+#include "runtime/mem-tracker.h"
+#include "util/debug-util.h"
 #include "util/time.h"
 #include "util/runtime-profile.h"
 
@@ -35,9 +38,12 @@ DEFINE_string(default_pool_name, "default-pool", "Default pool name.");
 DEFINE_int64(default_pool_max_requests, -1, "Maximum number of concurrent outstanding "
     "requests allowed to run before queueing incoming requests. A negative value "
     "indicates no limit.");
+DEFINE_int64(default_pool_max_mem_usage, -1, "Maximum amount of memory usage (in bytes) "
+    "that all outstanding requests in this pool may use before new requests to this pool"
+    " are queued. A negative value indicates no memory limit.");
 DEFINE_int64(default_pool_max_queue_size, 0, "Maximum number of requests allowed to be "
-    "queued before rejecting requests. A negative value or 0 indicates queries "
-    "will always be rejected once the maximum number of concurrent queries are "
+    "queued before rejecting requests. A negative value or 0 indicates requests "
+    "will always be rejected once the maximum number of concurrent requests are "
     "executing.");
 DEFINE_int64(default_queue_wait_timeout_ms, 60 * 1000, "Maximum amount of time (in "
     "milliseconds) that a request will wait to be admitted before timing out.");
@@ -70,11 +76,14 @@ const string CLUSTER_NUM_RUNNING_METRIC_KEY_FORMAT =
   "admission-controller.$0.cluster-num-running";
 const string CLUSTER_IN_QUEUE_METRIC_KEY_FORMAT =
   "admission-controller.$0.cluster-in-queue";
+const string CLUSTER_MEM_USAGE_METRIC_KEY_FORMAT =
+  "admission-controller.$0.cluster-mem-usage";
 const string LOCAL_NUM_RUNNING_METRIC_KEY_FORMAT =
   "admission-controller.$0.local-num-running";
 const string LOCAL_IN_QUEUE_METRIC_KEY_FORMAT =
   "admission-controller.$0.local-in-queue";
-// TODO: update test code that depends on the names
+const string LOCAL_MEM_USAGE_METRIC_KEY_FORMAT =
+  "admission-controller.$0.local-mem-usage";
 
 // Profile query events
 const string QUERY_EVENT_SUBMIT_FOR_ADMISSION = "Submit for admission";
@@ -126,16 +135,60 @@ static string DebugPoolStats(const string& pool_name,
   if (total_stats != NULL) {
     ss << " Total(";
     ss << "num_running=" << total_stats->num_running << ", ";
-    ss << "num_queued=" << total_stats->num_queued;
+    ss << "num_queued=" << total_stats->num_queued << ", ";
+    ss << "mem_usage=" <<
+        PrettyPrinter::Print(total_stats->mem_usage, TCounterType::BYTES);
     ss << ")";
   }
   if (local_stats != NULL) {
     ss << " Local(";
     ss << "num_running=" << local_stats->num_running << ", ";
-    ss << "num_queued=" << local_stats->num_queued;
+    ss << "num_queued=" << local_stats->num_queued << ", ";
+    ss << "mem_usage=" <<
+        PrettyPrinter::Print(local_stats->mem_usage, TCounterType::BYTES);
     ss << ")";
   }
   return ss.str();
+}
+
+// Computes the number of requests that can be admitted based on the total and local
+// pool statistics, pool limits, and whether or not the requests to be admitted are
+// from the queue (versus a new request in AdmitQuery()).
+static int64_t NumToAdmit(TPoolStats* total_stats, TPoolStats* local_stats,
+    int64_t max_requests, int64_t max_mem_usage, bool admit_from_queue) {
+  // Can't admit any requests if:
+  //  (a) Already over the maximum number of requests
+  //  (b) Already over the maximum memory usage
+  //  (c) This is not admitting from the queue and there are already queued requests
+  if ((max_requests > 0 && total_stats->num_running >= max_requests) ||
+      (max_mem_usage > 0 && total_stats->mem_usage >= max_mem_usage) ||
+      (!admit_from_queue && total_stats->num_queued > 0)) {
+    return 0L;
+  }
+
+  // Admit if there is no limit on the number of requests. We don't attempt to estimate
+  // memory usage of a request.
+  if (max_requests < 0) {
+    if (admit_from_queue) {
+      DCHECK_GT(local_stats->num_queued, 0);
+      // TODO: Consider throttling the number to admit, though if these queries were
+      // all submitted at the same time while there is memory available, then they
+      // would all be admitted immediately, so this behavior isn't inconsistent with
+      // the behavior if admit_from_queue is false.
+      return local_stats->num_queued;
+    } else {
+      DCHECK_EQ(local_stats->num_queued, 0);
+      return 1L;
+    }
+  }
+
+  const int64_t total_available = max_requests - total_stats->num_running;
+  DCHECK_GT(total_available, 0);
+  if (!admit_from_queue) return 1L;
+  double queue_size_ratio = static_cast<double>(local_stats->num_queued) /
+    static_cast<double>(total_stats->num_queued);
+  // TODO: Use a simple heuristic rather than always admitting at least 1 query.
+  return max(1L, static_cast<int64_t>(queue_size_ratio * total_available));
 }
 
 AdmissionController::AdmissionController(Metrics* metrics, const string& backend_id)
@@ -173,9 +226,12 @@ Status AdmissionController::Init(StatestoreSubscriber* subscriber) {
 
 Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   // TODO: Get the pool from the schedule and configs from the configuration
-  const int64_t max_queries = FLAGS_default_pool_max_requests;
+  const int64_t max_requests = FLAGS_default_pool_max_requests;
   const int64_t max_queued = FLAGS_default_pool_max_queue_size;
+  const int64_t max_mem_usage = FLAGS_default_pool_max_mem_usage;
   const string& pool = FLAGS_default_pool_name;
+  schedule->set_request_pool(pool);
+
   // Note the queue_node will not exist in the queue when this method returns.
   QueueNode queue_node(schedule->query_id());
 
@@ -188,11 +244,10 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     TPoolStats* total_stats = &cluster_pool_stats_[pool];
     TPoolStats* local_stats = &local_pool_stats_[pool];
     VLOG_ROW << "Schedule for id=" << schedule->query_id() << " in pool=" << pool
-             << " max_queries=" << max_queries << " max_queued=" << max_queued
+             << " max_requests=" << max_requests << " max_queued=" << max_queued
              << " Initial stats: " << DebugPoolStats(pool, total_stats, local_stats);
 
-    if (max_queries < 0 ||
-        (total_stats->num_queued == 0 && total_stats->num_running < max_queries)) {
+    if (NumToAdmit(total_stats, local_stats, max_requests, max_mem_usage, false) > 0) {
       // Execute immediately
       pools_for_updates_.insert(pool);
       // The local and total stats get incremented together when we queue so if
@@ -207,7 +262,8 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
       VLOG_QUERY << "Admitted query id=" << schedule->query_id();
       VLOG_ROW << "Final: " << DebugPoolStats(pool, total_stats, local_stats);
       return Status::OK;
-    } else if (max_queries == 0 || total_stats->num_queued >= max_queued) {
+    } else if (max_requests == 0 || max_mem_usage == 0 ||
+        total_stats->num_queued >= max_queued) {
       // Reject query
       schedule->set_is_admitted(false);
       schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
@@ -220,7 +276,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     // We cannot immediately admit but do not need to reject, so queue the request
     VLOG_QUERY << "Queuing, query id=" << schedule->query_id();
     DCHECK_LT(total_stats->num_queued, max_queued);
-    DCHECK_GT(max_queries, 0);
+    DCHECK(max_requests > 0 || max_mem_usage > 0);
     pools_for_updates_.insert(pool);
     ++local_stats->num_queued;
     ++total_stats->num_queued;
@@ -296,7 +352,6 @@ Status AdmissionController::ReleaseQuery(QuerySchedule* schedule) {
     PoolMetrics* pool_metrics = GetPoolMetrics(pool);
     if (pool_metrics != NULL) pool_metrics->local_completed->Increment(1L);
     pools_for_updates_.insert(pool);
-    pools_to_dequeue_.insert(pool);
     VLOG_ROW << "Released query id=" << schedule->query_id() << " "
              << DebugPoolStats(pool, total_stats, local_stats);
   }
@@ -311,37 +366,31 @@ Status AdmissionController::ReleaseQuery(QuerySchedule* schedule) {
 void AdmissionController::UpdatePoolStats(
     const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
-  AddPoolUpdates(subscriber_topic_updates);
-
-  StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
-      incoming_topic_deltas.find(IMPALA_REQUEST_QUEUE_TOPIC);
-  if (topic == incoming_topic_deltas.end()) return;
-  const TTopicDelta& delta = topic->second;
-  if (delta.topic_entries.empty() && delta.topic_deletions.empty()) return;
-
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    // Delta and non-delta updates are handled the same way, except for a full update
-    // we first clear the per_backend_pool_stats_map_. We then update the global map
-    // and then re-compute the pool stats for any pools that changed.
-    if (!delta.is_delta) {
-      VLOG_ROW << "Full impala-request-queue stats update";
-      per_backend_pool_stats_map_.clear();
-    }
+    UpdateMemUsage();
+    AddPoolUpdates(subscriber_topic_updates);
 
-    // The set of pools for which we receive topic updates/deletions. This is
-    // different from pools_for_updates_ which is the set of pools that have been
-    // updated local.
-    PoolSet updated_pools;
-    HandleTopicUpdates(delta.topic_entries, &updated_pools);
-    HandleTopicDeletions(delta.topic_deletions, &updated_pools);
-    UpdateClusterAggregates(updated_pools);
+    StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
+        incoming_topic_deltas.find(IMPALA_REQUEST_QUEUE_TOPIC);
+    if (topic != incoming_topic_deltas.end()) {
+      const TTopicDelta& delta = topic->second;
+      // Delta and non-delta updates are handled the same way, except for a full update
+      // we first clear the per_backend_pool_stats_map_. We then update the global map
+      // and then re-compute the pool stats for any pools that changed.
+      if (!delta.is_delta) {
+        VLOG_ROW << "Full impala-request-queue stats update";
+        per_backend_pool_stats_map_.clear();
+      }
+      HandleTopicUpdates(delta.topic_entries);
+      HandleTopicDeletions(delta.topic_deletions);
+    }
+    UpdateClusterAggregates();
   }
   dequeue_cv_.notify_one(); // Dequeue and admit queries on the dequeue thread
 }
 
-void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_updates,
-    PoolSet* updated_pools) {
+void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_updates) {
   BOOST_FOREACH(const TTopicItem& item, topic_updates) {
     bool is_valid;
     string pool_name = ExtractPoolName(item.key, &is_valid);
@@ -350,6 +399,7 @@ void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_upd
     // The topic entry from this subscriber is handled specially; the stats coming
     // from the statestore are likely already outdated.
     if (item.key == local_topic_key) continue;
+    local_pool_stats_[pool_name]; // Create an entry in the local map if it doesn't exist
     TPoolStats pool_update;
     uint32_t len = item.value.size();
     Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
@@ -369,7 +419,6 @@ void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_upd
              << DebugPoolStats(pool_name, NULL, &pool_update);
 
     pool_map[item.key] = pool_update;
-    updated_pools->insert(pool_name);
     DCHECK(per_backend_pool_stats_map_[pool_name][item.key].num_running ==
         pool_update.num_running);
     DCHECK(per_backend_pool_stats_map_[pool_name][item.key].num_queued ==
@@ -377,8 +426,7 @@ void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_upd
   }
 }
 
-void AdmissionController::HandleTopicDeletions(const vector<string>& topic_deletions,
-    PoolSet* updated_pools) {
+void AdmissionController::HandleTopicDeletions(const vector<string>& topic_deletions) {
   BOOST_FOREACH(const string& topic_key, topic_deletions) {
     bool is_valid;
     string pool_name = ExtractPoolName(topic_key, &is_valid);
@@ -387,14 +435,15 @@ void AdmissionController::HandleTopicDeletions(const vector<string>& topic_delet
     VLOG_ROW << "Deleting stats for key=" << topic_key << " "
              << DebugPoolStats(pool_name, NULL, &pool_map[topic_key]);
     pool_map.erase(topic_key);
-    updated_pools->insert(pool_name);
     DCHECK(per_backend_pool_stats_map_[pool_name].find(topic_key) ==
            per_backend_pool_stats_map_[pool_name].end());
   }
 }
 
-void AdmissionController::UpdateClusterAggregates(const PoolSet& updated_pools) {
-  BOOST_FOREACH(const string& pool_name, updated_pools) {
+void AdmissionController::UpdateClusterAggregates() {
+  BOOST_FOREACH(PoolStatsMap::value_type& entry, local_pool_stats_) {
+    const string& pool_name = entry.first;
+    TPoolStats& local_stats = entry.second;
     string local_topic_key = MakePoolTopicKey(pool_name, backend_id_);
     PoolStatsMap& pool_map = per_backend_pool_stats_map_[pool_name];
     TPoolStats total_stats;
@@ -404,39 +453,54 @@ void AdmissionController::UpdateClusterAggregates(const PoolSet& updated_pools) 
       if (entry.first == local_topic_key) continue;
       total_stats.num_running += entry.second.num_running;
       total_stats.num_queued += entry.second.num_queued;
+      total_stats.mem_usage += entry.second.mem_usage;
     }
-    TPoolStats& local_stats = local_pool_stats_[pool_name];
     total_stats.num_running += local_stats.num_running;
     total_stats.num_queued += local_stats.num_queued;
+    total_stats.mem_usage += local_stats.mem_usage;
 
-    // Mark the pool as eligible for dequeuing queries if the total number of
-    // running queries is less than the maximum.
-    // TODO: get the per-pool maximum.
-    const int64_t max_queries = FLAGS_default_pool_max_requests;
-    if (total_stats.num_running < max_queries) {
-      pools_to_dequeue_.insert(pool_name);
-    }
-
-    VLOG_ROW << "Recomputing stats, previous: "
-             << DebugPoolStats(pool_name, &cluster_pool_stats_[pool_name], NULL);
-    VLOG_ROW << "Recomputing stats, updated: "
-             << DebugPoolStats(pool_name, &total_stats, NULL);
     DCHECK_GE(total_stats.num_running, 0);
     DCHECK_GE(total_stats.num_queued, 0);
+    DCHECK_GE(total_stats.mem_usage, 0);
     DCHECK_GE(total_stats.num_running, local_stats.num_running);
     DCHECK_GE(total_stats.num_queued, local_stats.num_queued);
+    DCHECK_GE(total_stats.mem_usage, local_stats.mem_usage);
 
     cluster_pool_stats_[pool_name] = total_stats;
     PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
     if (pool_metrics != NULL) {
       pool_metrics->cluster_num_running->Update(total_stats.num_running);
       pool_metrics->cluster_in_queue->Update(total_stats.num_queued);
+      pool_metrics->cluster_mem_usage->Update(total_stats.mem_usage);
+    }
+
+    if (cluster_pool_stats_[pool_name] != total_stats) {
+      VLOG_ROW << "Recomputed stats, previous: "
+               << DebugPoolStats(pool_name, &cluster_pool_stats_[pool_name], NULL);
+      VLOG_ROW << "Recomputed stats, updated: "
+               << DebugPoolStats(pool_name, &total_stats, NULL);
+    }
+  }
+}
+
+void AdmissionController::UpdateMemUsage() {
+  BOOST_FOREACH(PoolStatsMap::value_type& entry, local_pool_stats_) {
+    const string& pool_name = entry.first;
+    TPoolStats* stats = &entry.second;
+    MemTracker* tracker = MemTracker::GetRequestPoolMemTracker(pool_name, NULL);
+    int64_t current_usage = tracker == NULL ? 0L : tracker->consumption();
+    if (current_usage != stats->mem_usage) {
+      stats->mem_usage = current_usage;
+      pools_for_updates_.insert(pool_name);
+      PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
+      if (pool_metrics != NULL) {
+        pool_metrics->cluster_mem_usage->Update(current_usage);
+      }
     }
   }
 }
 
 void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
-  lock_guard<mutex> lock(admission_ctrl_lock_);
   if (pools_for_updates_.empty()) return;
   topic_updates->push_back(TTopicDelta());
   TTopicDelta& topic_delta = topic_updates->back();
@@ -457,6 +521,7 @@ void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
     if (pool_metrics != NULL) {
       pool_metrics->local_num_running->Update(pool_stats.num_running);
       pool_metrics->local_in_queue->Update(pool_stats.num_queued);
+      pool_metrics->local_mem_usage->Update(pool_stats.mem_usage);
     }
   }
   pools_for_updates_.clear();
@@ -465,24 +530,30 @@ void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
 void AdmissionController::DequeueLoop() {
   while (true) {
     unique_lock<mutex> lock(admission_ctrl_lock_);
-    while (!done_ && pools_to_dequeue_.empty()) {
-      dequeue_cv_.wait(lock);
-    }
     if (done_) break;
-    BOOST_FOREACH(const string& pool_name, pools_to_dequeue_) {
-      const int64_t max_queries = FLAGS_default_pool_max_requests;
-      TPoolStats* local_stats = &local_pool_stats_[pool_name];
+    dequeue_cv_.wait(lock);
+    BOOST_FOREACH(PoolStatsMap::value_type& entry, local_pool_stats_) {
+      const string& pool_name = entry.first;
+      TPoolStats* local_stats = &entry.second;
+      const int64_t max_requests = FLAGS_default_pool_max_requests;
+      const int64_t max_mem_usage = FLAGS_default_pool_max_mem_usage;
+      // We should never have queued any requests in pools where either limit is 0 as no
+      // requests should ever be admitted or when both limits are less than 0, i.e.
+      // unlimited requests can be admitted and should never be queued.
+      if (max_requests == 0 || max_mem_usage == 0 ||
+          (max_requests < 0 && max_mem_usage < 0)) {
+        DCHECK_EQ(local_stats->num_queued, 0);
+      }
+
+      if (local_stats->num_queued == 0) continue; // Nothing to dequeue
+      DCHECK(max_requests > 0 || max_mem_usage > 0);
       TPoolStats* total_stats = &cluster_pool_stats_[pool_name];
-      const int64_t total_available = max_queries - total_stats->num_running;
-      if (local_stats->num_queued == 0 || total_available <= 0) continue;
 
       DCHECK_GT(local_stats->num_queued, 0);
       DCHECK_GE(total_stats->num_queued, local_stats->num_queued);
-      double queue_size_ratio = static_cast<double>(local_stats->num_queued) /
-        static_cast<double>(total_stats->num_queued);
-      // TODO: Use a simple heuristic rather than always admitting at least 1 query.
-      int64_t num_to_admit =
-        max(1L, static_cast<int64_t>(queue_size_ratio * total_available));
+      int64_t num_to_admit = NumToAdmit(total_stats, local_stats, max_requests,
+          max_mem_usage, true);
+      if (num_to_admit <= 0) continue;
 
       RequestQueue& queue = request_queue_map_[pool_name];
       VLOG_ROW << "Dequeue thread can admit " << num_to_admit << " queries from pool "
@@ -502,7 +573,6 @@ void AdmissionController::DequeueLoop() {
       }
       pools_for_updates_.insert(pool_name);
     }
-    pools_to_dequeue_.clear();
   }
 }
 
@@ -529,10 +599,14 @@ AdmissionController::GetPoolMetrics(const string& pool_name) {
       Substitute(CLUSTER_NUM_RUNNING_METRIC_KEY_FORMAT, pool_name), 0L);
   pool_metrics->cluster_in_queue = metrics_->CreateAndRegisterPrimitiveMetric(
       Substitute(CLUSTER_IN_QUEUE_METRIC_KEY_FORMAT, pool_name), 0L);
+  pool_metrics->cluster_mem_usage = metrics_->RegisterMetric(new Metrics::BytesMetric(
+      Substitute(CLUSTER_MEM_USAGE_METRIC_KEY_FORMAT, pool_name), 0L));
   pool_metrics->local_num_running = metrics_->CreateAndRegisterPrimitiveMetric(
       Substitute(LOCAL_NUM_RUNNING_METRIC_KEY_FORMAT, pool_name), 0L);
   pool_metrics->local_in_queue = metrics_->CreateAndRegisterPrimitiveMetric(
       Substitute(LOCAL_IN_QUEUE_METRIC_KEY_FORMAT, pool_name), 0L);
+  pool_metrics->local_mem_usage = metrics_->RegisterMetric(new Metrics::BytesMetric(
+      Substitute(LOCAL_MEM_USAGE_METRIC_KEY_FORMAT, pool_name), 0L));
   return pool_metrics;
 }
 }

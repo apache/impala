@@ -173,6 +173,10 @@ struct TPlanFragmentExecParams {
   6: optional Types.TPlanNodeId debug_node_id
   7: optional PlanNodes.TExecNodePhase debug_phase
   8: optional PlanNodes.TDebugAction debug_action
+
+  // The pool to which this request has been submitted. Used to update pool statistics
+  // for admission control.
+  9: optional string request_pool;
 }
 
 // Service Protocol Details
