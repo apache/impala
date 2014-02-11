@@ -26,6 +26,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <google/malloc_extension.h>
+#include <gutil/strings/substitute.h>
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -74,6 +75,7 @@ using namespace apache::thrift::concurrency;
 using namespace apache::hive::service::cli::thrift;
 using namespace beeswax;
 using namespace boost::posix_time;
+using namespace strings;
 
 DECLARE_int32(be_port);
 DECLARE_string(nn);
@@ -974,12 +976,18 @@ void ImpalaServer::ReportExecStatus(
   // every report (assign each query a local int32_t id and use that to index into a
   // vector of QueryExecStates, w/o lookup or locking?)
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(params.query_id, false);
+  // TODO: This is expected occasionally (since a report RPC might be in flight while
+  // cancellation is happening), but repeated instances for the same query are a bug
+  // (which we have occasionally seen). Consider keeping query exec states around for a
+  // little longer (until all reports have been received).
   if (exec_state.get() == NULL) {
     return_val.status.__set_status_code(TStatusCode::INTERNAL_ERROR);
-    stringstream str;
-    str << "unknown query id: " << params.query_id;
-    return_val.status.error_msgs.push_back(str.str());
-    LOG(ERROR) << str.str();
+    const string& err = Substitute("ReportExecStatus(): Received report for unknown "
+        "query ID (probably closed or cancelled). (query_id: $0, backend: $1, instance:"
+        " $2 done: $3)", PrintId(params.query_id), params.backend_num,
+        PrintId(params.fragment_instance_id), params.done);
+    return_val.status.error_msgs.push_back(err);
+    LOG(INFO) << err;
     return;
   }
   exec_state->coord()->UpdateFragmentExecStatus(params).SetTStatus(&return_val);
