@@ -28,6 +28,7 @@
 
 namespace impala {
 
+class QueryResourceMgr;
 class Status;
 class Metrics;
 class Scheduler;
@@ -55,6 +56,11 @@ class ResourceBroker {
   Status Reserve(const TResourceBrokerReservationRequest& request,
       TResourceBrokerReservationResponse* response);
 
+  // Requests more resources from Llama for an existing reservation. Blocks until the
+  // request has been granted or denied.
+  Status Expand(const TResourceBrokerExpansionRequest& request,
+      TResourceBrokerExpansionResponse* response);
+
   // Releases resources from Llama.
   Status Release(const TResourceBrokerReleaseRequest& request,
       TResourceBrokerReleaseResponse* response);
@@ -78,6 +84,18 @@ class ResourceBroker {
   Status RefreshLlamaNodes();
 
   void set_scheduler(Scheduler* scheduler) { scheduler_ = scheduler; };
+
+  // Retrieves or creates a new QueryResourceMgr for the given query ID. Returns true if
+  // this is the first 'checkout' of this QueryResourceMgr, false otherwise. The other
+  // parameters are passed to the QueryResourceMgr constructor.
+  bool GetQueryResourceMgr(const TUniqueId& query_id,
+      const TUniqueId& reservation_id, const TNetworkAddress& local_resource_address,
+      QueryResourceMgr** res_mgr);
+
+  // Decrements the reference count for a particular QueryResourceMgr. If this is the last
+  // reference (i.e. the ref count goes to 0), the QueryResourceMgr is deleted. It's an
+  // error to call this with a query_id that does not have a registered QueryResourceMgr.
+  void UnregisterQueryResourceMgr(const TUniqueId& query_id);
 
  private:
   // Registers this resource broker with the Llama and refreshes the Llama nodes
@@ -113,30 +131,58 @@ class ResourceBroker {
 
   // Accumulated statistics on the time taken to RPC a reservation request and receive
   // an acknowledgement from Llama.
-  StatsMetric<double>* request_rpc_time_metric_;
+  StatsMetric<double>* reservation_rpc_time_metric_;
 
   // Accumulated statistics on the time taken to complete a reservation request
   // (granted or denied). The time includes the request RPC to Llama and the time
   // the requesting thread waits on the pending_requests_'s promise.
   // The metric does not include requests that timed out.
-  StatsMetric<double>* request_response_time_metric_;
+  StatsMetric<double>* reservation_response_time_metric_;
 
   // Total number of reservation requests.
-  Metrics::PrimitiveMetric<int64_t>* requests_total_metric_;
+  Metrics::PrimitiveMetric<int64_t>* reservation_requests_total_metric_;
 
   // Number of fulfilled reservation requests.
-  Metrics::PrimitiveMetric<int64_t>* requests_fulfilled_metric_;
+  Metrics::PrimitiveMetric<int64_t>* reservation_requests_fulfilled_metric_;
 
   // Reservation requests that failed due to a malformed request or an internal
   // error in Llama.
-  Metrics::PrimitiveMetric<int64_t>* requests_failed_metric_;
+  Metrics::PrimitiveMetric<int64_t>* reservation_requests_failed_metric_;
 
   // Number of well-formed reservation requests rejected by the central scheduler.
-  Metrics::PrimitiveMetric<int64_t>* requests_rejected_metric_;
+  Metrics::PrimitiveMetric<int64_t>* reservation_requests_rejected_metric_;
 
   // Number of well-formed reservation requests that did not get fulfilled within
   // the timeout period.
-  Metrics::PrimitiveMetric<int64_t>* requests_timedout_metric_;
+  Metrics::PrimitiveMetric<int64_t>* reservation_requests_timedout_metric_;
+
+  // Accumulated statistics on the time taken to RPC an expansion request and receive an
+  // acknowledgement from Llama.
+  StatsMetric<double>* expansion_rpc_time_metric_;
+
+  // Accumulated statistics on the time taken to complete an expansion request
+  // (granted or denied). The time includes the request RPC to Llama and the time
+  // the requesting thread waits on the pending_requests_'s promise.
+  // The metric does not include requests that timed out.
+  StatsMetric<double>* expansion_response_time_metric_;
+
+  // Total number of expansion requests.
+  Metrics::PrimitiveMetric<int64_t>* expansion_requests_total_metric_;
+
+  // Number of fulfilled expansion requests.
+  Metrics::PrimitiveMetric<int64_t>* expansion_requests_fulfilled_metric_;
+
+  // Expansion requests that failed due to a malformed request or an internal
+  // error in Llama.
+  Metrics::PrimitiveMetric<int64_t>* expansion_requests_failed_metric_;
+
+  // Number of well-formed expansion requests rejected by the central scheduler.
+  Metrics::PrimitiveMetric<int64_t>* expansion_requests_rejected_metric_;
+
+  // Number of well-formed expansion requests that did not get fulfilled within
+  // the timeout period.
+  Metrics::PrimitiveMetric<int64_t>* expansion_requests_timedout_metric_;
+
 
   // Total number of fulfilled reservation requests that have been released.
   Metrics::PrimitiveMetric<int64_t>* requests_released_metric_;
@@ -165,15 +211,18 @@ class ResourceBroker {
   bool is_mini_llama_;
 
   // Used to implement a blocking resource-reservation interface on top of Llama's
-  // non-blocking request interface (the Llama asynchronously notifies the resource
-  // broker of granted/denied reservations). Callers of Reserve() block on a reservation
-  // promise until the Llama has issued a corresponding response via the resource
-  // broker's callback service (or until a timeout has been reached).
+  // non-blocking request interface (the Llama asynchronously notifies the resource broker
+  // of granted/denied reservations). Callers of Reserve() or Expand() block on a
+  // reservation promise until the Llama has issued a corresponding response via the
+  // resource broker's callback service (or until a timeout has been reached).
+  typedef std::map<TNetworkAddress, llama::TAllocatedResource> ResourceMap;
   class ReservationPromise {
    public:
-    ReservationPromise(TResourceBrokerReservationResponse* reservation)
-      : reservation_(reservation) {
-      DCHECK(reservation != NULL);
+    ReservationPromise(ResourceMap* resources, TUniqueId* reservation_id)
+      : resources_(resources),
+        reservation_id_(reservation_id) {
+      DCHECK(resources != NULL);
+      DCHECK(reservation_id != NULL);
     }
 
     // Returns true if the reservation request was granted, false if the request
@@ -188,8 +237,14 @@ class ResourceBroker {
         const std::vector<llama::TAllocatedResource>& allocated_resources);
 
    private:
-    TResourceBrokerReservationResponse* reservation_;
+    // Resource map to update when reservation is filled.
+    ResourceMap* resources_;
+
+    // Underlying Promise that handles the actual coordination details.
     Promise<bool> promise_;
+
+    // Address of TUniqueId to write filled reservation ID to.
+    TUniqueId* reservation_id_;
   };
 
   // Protects pending_requests_;
@@ -200,6 +255,16 @@ class ResourceBroker {
   // fulfilled or rejected by the Llama. The original resource requester (the scheduler)
   // blocks on the promise.
   boost::unordered_map<llama::TUniqueId, ReservationPromise*> pending_requests_;
+
+  // Protects query_resource_mgrs_
+  boost::mutex query_resource_mgrs_lock_;
+  typedef boost::unordered_map<TUniqueId, std::pair<int32_t, QueryResourceMgr*> >
+        QueryResourceMgrsMap;
+
+  // Map from query ID to a (ref_count, QueryResourceMgr*) pair, i.e. one QueryResourceMgr
+  // per query. The refererence count is always non-zero - once it hits zero the entry in
+  // the map is removed and the QueryResourceMgr is deleted.
+  QueryResourceMgrsMap query_resource_mgrs_;
 };
 
 std::ostream& operator<<(std::ostream& os,
@@ -207,6 +272,12 @@ std::ostream& operator<<(std::ostream& os,
 
 std::ostream& operator<<(std::ostream& os,
     const TResourceBrokerReservationResponse& reservation);
+
+std::ostream& operator<<(std::ostream& os,
+    const TResourceBrokerExpansionRequest& request);
+
+std::ostream& operator<<(std::ostream& os,
+    const TResourceBrokerExpansionResponse& expansion);
 
 }
 

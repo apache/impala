@@ -51,6 +51,7 @@
 
 DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_");
 DECLARE_string(cgroup_hierarchy_path);
+DECLARE_bool(enable_rm);
 
 using namespace boost;
 using namespace impala;
@@ -459,6 +460,12 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   runtime_state_->resource_pool()->SetThreadAvailableCb(
       bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this, _1));
 
+  if (FLAGS_enable_rm) {
+    runtime_state_->query_resource_mgr()->AddVcoreAvailableCb(
+        bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this,
+            runtime_state_->resource_pool()));
+  }
+
   return Status::OK;
 }
 
@@ -632,6 +639,10 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   //  4. Don't start up if there are no thread tokens.
   bool started_scanner = false;
   while (true) {
+    if (FLAGS_enable_rm &&
+        runtime_state_->query_resource_mgr()->IsVcoreOverSubscribed()) {
+      break;
+    }
     // The lock must be given up between loops in order to give writers to done_,
     // all_ranges_started_ etc. a chance to grab the lock.
     // TODO: This still leans heavily on starvation-free locks, come up with a more
@@ -649,6 +660,8 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
     scanner_threads_.AddThread(
         new Thread("hdfs-scan-node", ss.str(), &HdfsScanNode::ScannerThread, this));
     started_scanner = true;
+
+    if (FLAGS_enable_rm) runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
   }
   if (!started_scanner) ++num_skipped_tokens_;
 }

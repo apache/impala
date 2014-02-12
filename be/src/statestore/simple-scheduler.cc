@@ -412,7 +412,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec
     bool exec_at_coord = (fragment.partition.type == TPartitionType::UNPARTITIONED);
 
     FragmentScanRangeAssignment* assignment =
-        &schedule->exec_params()[fragment_idx].scan_range_assignment;
+        &(*schedule->exec_params())[fragment_idx].scan_range_assignment;
     RETURN_IF_ERROR(ComputeScanRangeAssignment(
         entry->first, entry->second, exec_at_coord, schedule->query_options(),
         assignment));
@@ -547,10 +547,10 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
 
 void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_request,
     QuerySchedule* schedule) {
-  vector<FragmentExecParams>& fragment_exec_params = schedule->exec_params();
+  vector<FragmentExecParams>* fragment_exec_params = schedule->exec_params();
   // assign instance ids
   int64_t num_backends = 0;
-  BOOST_FOREACH(FragmentExecParams& params, fragment_exec_params) {
+  BOOST_FOREACH(FragmentExecParams& params, *fragment_exec_params) {
     for (int j = 0; j < params.hosts.size(); ++j) {
       int instance_num = num_backends + j;
       // we add instance_num to query_id.lo to create a globally-unique instance id
@@ -571,11 +571,11 @@ void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_re
 
   // compute destinations and # senders per exchange node
   // (the root fragment doesn't have a destination)
-  for (int i = 1; i < fragment_exec_params.size(); ++i) {
-    FragmentExecParams& params = fragment_exec_params[i];
+  for (int i = 1; i < fragment_exec_params->size(); ++i) {
+    FragmentExecParams& params = (*fragment_exec_params)[i];
     int dest_fragment_idx = exec_request.dest_fragment_idx[i - 1];
-    DCHECK_LT(dest_fragment_idx, fragment_exec_params.size());
-    FragmentExecParams& dest_params = fragment_exec_params[dest_fragment_idx];
+    DCHECK_LT(dest_fragment_idx, fragment_exec_params->size());
+    FragmentExecParams& dest_params = (*fragment_exec_params)[dest_fragment_idx];
 
     // set # of senders
     DCHECK(exec_request.fragments[i].output_sink.__isset.stream_sink);
@@ -604,9 +604,9 @@ void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_re
 
 void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request,
     QuerySchedule* schedule) {
-  vector<FragmentExecParams>& fragment_exec_params = schedule->exec_params();
+  vector<FragmentExecParams>* fragment_exec_params = schedule->exec_params();
   TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
-  DCHECK_EQ(fragment_exec_params.size(), exec_request.fragments.size());
+  DCHECK_EQ(fragment_exec_params->size(), exec_request.fragments.size());
   vector<TPlanNodeType::type> scan_node_types;
   scan_node_types.push_back(TPlanNodeType::HDFS_SCAN_NODE);
   scan_node_types.push_back(TPlanNodeType::HBASE_SCAN_NODE);
@@ -615,7 +615,7 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
   // the latter might inherit the set of hosts from the former
   for (int i = exec_request.fragments.size() - 1; i >= 0; --i) {
     const TPlanFragment& fragment = exec_request.fragments[i];
-    FragmentExecParams& params = fragment_exec_params[i];
+    FragmentExecParams& params = (*fragment_exec_params)[i];
     if (fragment.partition.type == TPartitionType::UNPARTITIONED) {
       // all single-node fragments run on the coordinator host
       params.hosts.push_back(coord);
@@ -629,8 +629,8 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
       // runs on the hosts that provide the input data)
       int input_fragment_idx = FindLeftmostInputFragment(i, exec_request);
       DCHECK_GE(input_fragment_idx, 0);
-      DCHECK_LT(input_fragment_idx, fragment_exec_params.size());
-      params.hosts = fragment_exec_params[input_fragment_idx].hosts;
+      DCHECK_LT(input_fragment_idx, fragment_exec_params->size());
+      params.hosts = (*fragment_exec_params)[input_fragment_idx].hosts;
       // TODO: switch to unpartitioned/coord execution if our input fragment
       // is executed that way (could have been downgraded from distributed)
       continue;
@@ -647,12 +647,14 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
       continue;
     }
 
+    unordered_set<TNetworkAddress> unique_hosts;
     // Get the list of impalad host from scan_range_assignment_
-    BOOST_FOREACH(const FragmentScanRangeAssignment::value_type scan_range_assignment,
+    BOOST_FOREACH(const FragmentScanRangeAssignment::value_type& scan_range_assignment,
         params.scan_range_assignment) {
       params.hosts.push_back(scan_range_assignment.first);
-      schedule->unique_hosts().insert(scan_range_assignment.first);
+      unique_hosts.insert(scan_range_assignment.first);
     }
+    schedule->SetUniqueHosts(unique_hosts);
   }
 }
 
@@ -731,15 +733,15 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);
   if (!FLAGS_enable_rm) return Status::OK;
-  schedule->CreateReservationRequest(pool, user, resource_broker_->llama_nodes());
-  const TResourceBrokerReservationRequest* reservation_request =
+  schedule->PrepareReservationRequest(pool, user);
+  const TResourceBrokerReservationRequest& reservation_request =
       schedule->reservation_request();
-  if (!reservation_request->resources.empty()) {
+  if (!reservation_request.resources.empty()) {
     Status status = resource_broker_->Reserve(
-        *reservation_request, schedule->reservation());
+        reservation_request, schedule->reservation());
     if (!status.ok()) {
       // Warn about missing table and/or column stats if necessary.
-      if(schedule->request().__isset.fe_error_msgs &&
+      if (schedule->request().__isset.fe_error_msgs &&
           !schedule->request().fe_error_msgs.empty()) {
         status.AddErrorMsg(schedule->request().fe_error_msgs[0]);
       }

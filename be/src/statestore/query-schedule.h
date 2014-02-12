@@ -23,6 +23,7 @@
 
 #include "common/global-types.h"
 #include "common/status.h"
+#include "statestore/query-resource-mgr.h"
 #include "util/promise.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
@@ -61,28 +62,12 @@ struct FragmentExecParams {
 class QuerySchedule {
  public:
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
-      const TQueryOptions& query_options, bool is_mini_llama,
-      RuntimeProfile* summary_profile, RuntimeProfile::EventSequence* query_events);
-
-  // Creates a reservation request for the given pool and user in reservation_request_.
-  // The request contains one resource per entry in unique_hosts_. The per-host resources
-  // are based on planner estimates in the exec request or on manual overrides given
-  // set in the query options.
-  void CreateReservationRequest(const std::string& pool, const std::string& user,
-      const std::vector<std::string>& llama_nodes);
+      const TQueryOptions& query_options, RuntimeProfile* summary_profile,
+      RuntimeProfile::EventSequence* query_events);
 
   // Returns OK if reservation_ contains a matching resource for each
   // of the hosts in fragment_exec_params_. Returns an error otherwise.
   Status ValidateReservation();
-
-  // Translates src into a network address suitable for identifying resources across
-  // interactions with the Llama. The MiniLlama expects resources to be requested on
-  // IP:port addresses of Hadoop DNs, whereas the regular Llama only deals with the
-  // hostnames of Yarn NMs. For MiniLlama setups this translation uses the
-  // impalad_to_dn_ mapping to populate dest. When using the regular Llama, this
-  // translation sets a fixed port of 0 in dest because the Llama strips away the port
-  // of resource locations.
-  void GetResourceHostport(const TNetworkAddress& src, TNetworkAddress* dest);
 
   const TUniqueId& query_id() const { return query_id_; }
   const TQueryExecRequest& request() const { return request_; }
@@ -103,6 +88,7 @@ class QuerySchedule {
   int16_t GetPerHostVCores() const;
   // Total estimated memory for all nodes. set_num_hosts() must be set before calling.
   int64_t GetClusterMemoryEstimate() const;
+  void GetResourceHostport(const TNetworkAddress& src, TNetworkAddress* dst);
 
   // Helper methods used by scheduler to populate this QuerySchedule.
   void AddScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
@@ -115,23 +101,26 @@ class QuerySchedule {
   int64_t num_hosts() const { return num_hosts_; }
   int64_t num_scan_ranges() const { return num_scan_ranges_; }
   int32_t GetFragmentIdx(PlanNodeId id) const { return plan_node_to_fragment_idx_[id]; }
-  std::vector<FragmentExecParams>& exec_params() { return fragment_exec_params_; }
-  boost::unordered_set<TNetworkAddress>& unique_hosts() { return unique_hosts_; }
+  std::vector<FragmentExecParams>* exec_params() { return &fragment_exec_params_; }
+  const boost::unordered_set<TNetworkAddress>& unique_hosts() const {
+    return unique_hosts_;
+  }
   TResourceBrokerReservationResponse* reservation() { return &reservation_; }
-  const TResourceBrokerReservationRequest* reservation_request() {
-    return reservation_request_.get();
+  const TResourceBrokerReservationRequest& reservation_request() const {
+    return reservation_request_;
   }
   bool is_admitted() const { return is_admitted_; }
   void set_is_admitted(bool is_admitted) { is_admitted_ = is_admitted; }
   RuntimeProfile* summary_profile() { return summary_profile_; }
   RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
+  void SetUniqueHosts(const boost::unordered_set<TNetworkAddress>& unique_hosts);
+
+  // Populates reservation_request_ ready to submit a query to Llama for all initial
+  // resources required for this query.
+  void PrepareReservationRequest(const std::string& pool, const std::string& user);
+
  private:
-  // Populates the bi-directional hostport mapping for the Mini Llama based on
-  // the given llama_nodes and the unique_hosts_ of this schedule.
-  // The MiniLlama expects resources to be requested on IP addresses, whereas the
-  // regular Llama requires hostnames.
-  void CreateMiniLlamaMapping(const std::vector<std::string>& llama_nodes);
 
   // These references are valid for the lifetime of this query schedule because they
   // are all owned by the enclosing QueryExecState.
@@ -141,13 +130,6 @@ class QuerySchedule {
   bool is_mini_llama_;
   RuntimeProfile* summary_profile_;
   RuntimeProfile::EventSequence* query_events_;
-
-  // Impala mini clusters using the Mini Llama require translating the impalad hostports
-  // to Hadoop DN hostports registered with the Llama during resource requests
-  // (and then in reverse for translating granted resources to impalads).
-  // These maps form a bi-directional hostport mapping Hadoop DN <-> impalad.
-  boost::unordered_map<TNetworkAddress, TNetworkAddress> impalad_to_dn_;
-  boost::unordered_map<TNetworkAddress, TNetworkAddress> dn_to_impalad_;
 
   // Maps from plan node id to its fragment index. Filled in c'tor.
   std::vector<int32_t> plan_node_to_fragment_idx_;
@@ -172,14 +154,18 @@ class QuerySchedule {
   // Request pool to which the request was submitted for admission.
   std::string request_pool_;
 
-  // Reservation request to be submitted to Llama. Set in CreateReservationRequest().
-  boost::scoped_ptr<TResourceBrokerReservationRequest> reservation_request_;
+  // Reservation request to be submitted to Llama. Set in PrepareReservationRequest().
+  TResourceBrokerReservationRequest reservation_request_;
 
   // Fulfilled reservation request. Populated by scheduler.
   TResourceBrokerReservationResponse reservation_;
 
   // Indicates if the query has been admitted for execution.
   bool is_admitted_;
+
+  // Resolves unique_hosts_ to node mgr addresses. Valid only after SetUniqueHosts() has
+  // been called.
+  boost::scoped_ptr<ResourceResolver> resource_resolver_;
 };
 
 }

@@ -63,6 +63,9 @@ PlanFragmentExecutor::PlanFragmentExecutor(ExecEnv* exec_env,
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
   Close();
+  if (FLAGS_enable_rm) {
+    exec_env_->resource_broker()->UnregisterQueryResourceMgr(query_id_);
+  }
   // at this point, the report thread should have been stopped
   DCHECK(!report_thread_active_);
 }
@@ -81,12 +84,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
                << request.reserved_resource;
   }
 
-  const string& resource_id =
-      request.__isset.reserved_resource ? request.reserved_resource.rm_resource_id : "";
-
   string cgroup = "";
   if (FLAGS_enable_rm) {
-    cgroup = exec_env_->cgroups_mgr()->ResourceIdToCgroup(resource_id);
+    cgroup = exec_env_->cgroups_mgr()->UniqueIdToCgroup(PrintId(query_id_, "_"));
   }
 
   runtime_state_.reset(new RuntimeState(query_id_, params.fragment_instance_id,
@@ -97,8 +97,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     bool is_first;
     RETURN_IF_ERROR(exec_env_->cgroups_mgr()->RegisterFragment(
         params.fragment_instance_id, cgroup, &is_first));
-    // The first fragment using cgroup sets the cgroup's CPU shares based on the
-    // reserved resource.
+    // The first fragment using cgroup sets the cgroup's CPU shares based on the reserved
+    // resource.
     if (is_first) {
       DCHECK(request.__isset.reserved_resource);
       int32_t cpu_shares = exec_env_->cgroups_mgr()->VirtualCoresToCpuShares(
@@ -107,10 +107,29 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     }
   }
 
+  // TODO: Find the reservation id when the resource request is not set
+  if (FLAGS_enable_rm && request.__isset.reserved_resource) {
+    TUniqueId reservation_id;
+    reservation_id << request.reserved_resource.reservation_id;
+
+    // TODO: Combine this with RegisterFragment() etc.
+    QueryResourceMgr* res_mgr;
+    bool is_first = exec_env_->resource_broker()->GetQueryResourceMgr(query_id_,
+        reservation_id, request.local_resource_address, &res_mgr);
+    DCHECK(res_mgr != NULL);
+    runtime_state_->SetQueryResourceMgr(res_mgr);
+    if (is_first) {
+      runtime_state_->query_resource_mgr()->InitVcoreAcquisition(
+          request.reserved_resource.v_cpu_cores);
+    }
+  } else {
+    DCHECK(!FLAGS_enable_rm)
+        << "No resource set for fragment, can't create resource context";
+  }
+
   // reservation or a query option.
   int64_t bytes_limit = -1;
-  if (request.__isset.reserved_resource &&
-      request.reserved_resource.memory_mb > 0) {
+  if (request.__isset.reserved_resource && request.reserved_resource.memory_mb > 0) {
     bytes_limit =
         static_cast<int64_t>(request.reserved_resource.memory_mb) * 1024L * 1024L;
     VLOG_QUERY << "Using query memory limit from resource reservation: "
@@ -121,12 +140,14 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     VLOG_QUERY << "Using query memory limit from query options: "
         << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
   }
+
   DCHECK(!params.request_pool.empty());
   RETURN_IF_ERROR(runtime_state_->InitMemTrackers(query_id_, &params.request_pool,
       bytes_limit));
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();
+  if (FLAGS_enable_rm) runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
   has_thread_token_ = true;
 
   average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",

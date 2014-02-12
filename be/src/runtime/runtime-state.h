@@ -27,6 +27,7 @@
 // stringstream is a typedef, so can't forward declare it.
 #include <sstream>
 
+#include "statestore/query-resource-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
 #include "runtime/mem-pool.h"
@@ -227,6 +228,9 @@ class RuntimeState {
   // doesn't continue if the query terminates abnormally.
   Status CheckQueryState();
 
+  QueryResourceMgr* query_resource_mgr() const { return query_resource_mgr_; }
+  void SetQueryResourceMgr(QueryResourceMgr* res_mgr) { query_resource_mgr_ = res_mgr; }
+
  private:
   // Set per-fragment state.
   Status Init(const TUniqueId& fragment_instance_id, ExecEnv* exec_env);
@@ -323,6 +327,10 @@ class RuntimeState {
   // TODO: this is a stopgap until we implement ExprContext
   boost::scoped_ptr<MemTracker> udf_mem_tracker_;
   boost::scoped_ptr<MemPool> udf_pool_;
+
+  // Query-wide resource manager for resource expansion etc. Not owned by us; owned by the
+  // ResourceBroker instead.
+  QueryResourceMgr* query_resource_mgr_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

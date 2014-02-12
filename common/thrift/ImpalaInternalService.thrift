@@ -221,6 +221,9 @@ struct TExecPlanFragmentParams {
 
   // Resource reservation to run this plan fragment in.
   8: optional Llama.TAllocatedResource reserved_resource
+
+  // Address of local node manager (used for expanding resource allocations)
+  9: optional Types.TNetworkAddress local_resource_address
 }
 
 struct TExecPlanFragmentResult {

@@ -125,7 +125,7 @@ class Coordinator::BackendExecState {
   BackendExecState(QuerySchedule& schedule, Coordinator* coord,
       const TNetworkAddress& coord_address,
       int backend_num, const TPlanFragment& fragment, int fragment_idx,
-      FragmentExecParams& params, int instance_idx,
+      const FragmentExecParams& params, int instance_idx,
       DebugOptions* debug_options, ObjectPool* obj_pool)
     : fragment_instance_id(params.instance_ids[instance_idx]),
       backend_address(params.hosts[instance_idx]),
@@ -301,7 +301,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
       new RuntimeProfile(obj_pool(), "Execution Profile " + PrintId(query_id_)));
   SCOPED_TIMER(query_profile_->total_time_counter());
 
-  vector<FragmentExecParams>& fragment_exec_params = schedule.exec_params();
+  vector<FragmentExecParams>* fragment_exec_params = schedule.exec_params();
 
   TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
 
@@ -324,7 +324,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
     // had a chance to register with the stream mgr.
     TExecPlanFragmentParams rpc_params;
     SetExecPlanFragmentParams(schedule, 0, request.fragments[0], 0,
-        fragment_exec_params[0], 0, coord, &rpc_params);
+        (*fragment_exec_params)[0], 0, coord, &rpc_params);
     RETURN_IF_ERROR(executor_->Prepare(rpc_params));
 
     // Prepare output_exprs before optimizing the LLVM module. The other exprs of this
@@ -396,7 +396,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
   int backend_num = 0;
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
        fragment_idx < request.fragments.size(); ++fragment_idx) {
-    FragmentExecParams& params = fragment_exec_params[fragment_idx];
+    const FragmentExecParams& params = (*fragment_exec_params)[fragment_idx];
 
     // set up exec states
     int num_hosts = params.hosts.size();
@@ -1284,7 +1284,7 @@ string Coordinator::GetErrorLog() {
 
 void Coordinator::SetExecPlanFragmentParams(
     QuerySchedule& schedule, int backend_num, const TPlanFragment& fragment,
-    int fragment_idx, FragmentExecParams& params, int instance_idx,
+    int fragment_idx, const FragmentExecParams& params, int instance_idx,
     const TNetworkAddress& coord, TExecPlanFragmentParams* rpc_params) {
   rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
   rpc_params->__set_fragment(fragment);
@@ -1292,15 +1292,21 @@ void Coordinator::SetExecPlanFragmentParams(
   rpc_params->params.__set_query_id(query_id_);
   rpc_params->params.__set_fragment_instance_id(params.instance_ids[instance_idx]);
   TNetworkAddress exec_host = params.hosts[instance_idx];
-  PerNodeScanRanges& scan_ranges = params.scan_range_assignment[exec_host];
   if (schedule.HasReservation()) {
     // The reservation has already have been validated at this point.
     TNetworkAddress resource_hostport;
     schedule.GetResourceHostport(exec_host, &resource_hostport);
     rpc_params->__set_reserved_resource(
         schedule.reservation()->allocated_resources[resource_hostport]);
+    rpc_params->__set_local_resource_address(resource_hostport);
   }
   rpc_params->params.__set_request_pool(schedule.request_pool());
+  FragmentScanRangeAssignment::const_iterator it =
+      params.scan_range_assignment.find(exec_host);
+  // Scan ranges may not always be set, so use an empty structure if so.
+  const PerNodeScanRanges& scan_ranges =
+      (it != params.scan_range_assignment.end()) ? it->second : PerNodeScanRanges();
+
   rpc_params->params.__set_per_node_scan_ranges(scan_ranges);
   rpc_params->params.__set_per_exch_num_senders(params.per_exch_num_senders);
   rpc_params->params.__set_destinations(params.destinations);

@@ -268,22 +268,19 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     return Status::OK;
   }
 
-  bool is_mini_llama = false;
   if (FLAGS_enable_rm) {
     DCHECK(exec_env_->resource_broker() != NULL);
-    is_mini_llama = exec_env_->resource_broker()->is_mini_llama();
   }
   schedule_.reset(new QuerySchedule(query_id_, query_exec_request,
-      exec_request_.query_options, is_mini_llama, &summary_profile_,
-      query_events_));
+          exec_request_.query_options, &summary_profile_, query_events_));
+
   coord_.reset(new Coordinator(exec_env_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
   summary_profile_.AddInfoString("Request Pool", schedule_->request_pool());
   if (FLAGS_enable_rm) {
     if (status.ok()) {
-      DCHECK(schedule_->reservation_request() != NULL);
       stringstream reservation_request_ss;
-      reservation_request_ss << *schedule_->reservation_request();
+      reservation_request_ss << schedule_->reservation_request();
       summary_profile_.AddInfoString("Resource reservation request",
           reservation_request_ss.str());
     }

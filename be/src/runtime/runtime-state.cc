@@ -123,7 +123,8 @@ Status RuntimeState::InitMemTrackers(const TUniqueId& query_id,
         query_parent_tracker);
   }
   query_mem_tracker_ =
-      MemTracker::GetQueryMemTracker(query_id, query_bytes_limit, query_parent_tracker);
+      MemTracker::GetQueryMemTracker(query_id, query_bytes_limit, query_parent_tracker,
+          query_resource_mgr());
   instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1,
       runtime_profile()->name(), query_mem_tracker_.get()));
   if (query_bytes_limit != -1) {

@@ -43,6 +43,18 @@ struct TResourceBrokerUnregisterResponse {
   1: optional Status.TStatus status;
 }
 
+struct TResourceBrokerExpansionRequest {
+  1: required TResourceBrokerServiceVersion version;
+  2: optional Llama.TResource resource;
+  3: optional Types.TUniqueId reservation_id;
+  4: optional i64 request_timeout;
+}
+
+struct TResourceBrokerExpansionResponse {
+  1: optional Types.TUniqueId reservation_id;
+  2: optional map<Types.TNetworkAddress, Llama.TAllocatedResource> allocated_resources;
+}
+
 struct TResourceBrokerReservationRequest {
   1: required TResourceBrokerServiceVersion version;
   2: optional Types.TUniqueId irb_handle;

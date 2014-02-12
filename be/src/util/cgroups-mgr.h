@@ -87,9 +87,9 @@ class CgroupsMgr {
       const std::string& staging_cgroup);
 
   // Returns the cgroup Impala should create and use for enforcing granted resources
-  // identified by the given Yarn resource id. Returns an empty string if
-  // rm_resource_id is empty.
-  std::string ResourceIdToCgroup(const std::string& rm_resource_id) const;
+  // identified by the given unique ID (which usually corresponds to a query ID). Returns
+  // an empty string if unique_id is empty.
+  std::string UniqueIdToCgroup(const std::string& unique_id) const;
 
   // Returns the cgroup CPU shares corresponding to the given number of virtual cores.
   // Returns -1 if v_cpu_cores is <= 0 (which is invalid).

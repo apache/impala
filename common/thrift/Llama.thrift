@@ -61,7 +61,7 @@ struct TResource {
 struct TAllocatedResource {
   1: required TUniqueId reservation_id;
   2: required TUniqueId client_resource_id;
-  3: required string    rm_resource_id; 
+  3: required string    rm_resource_id;
   4: required i16       v_cpu_cores;
   5: required i32       memory_mb;
   6: required string    location;
@@ -148,7 +148,7 @@ service LlamaAMService {
   TLlamaAMRegisterResponse Register(1: TLlamaAMRegisterRequest request);
 
   TLlamaAMUnregisterResponse Unregister(1: TLlamaAMUnregisterRequest request);
-  
+
   TLlamaAMReservationResponse Reserve(1: TLlamaAMReservationRequest request);
 
     TLlamaAMReservationExpansionResponse Expand(
@@ -223,7 +223,7 @@ service LlamaNMService {
   TLlamaNMRegisterResponse Register(1: TLlamaNMRegisterRequest request);
 
   TLlamaNMUnregisterResponse Unregister(1: TLlamaNMUnregisterRequest request);
-  
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////

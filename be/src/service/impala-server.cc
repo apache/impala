@@ -644,11 +644,10 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id, const Status* caus
     if (!unique_hosts.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
       BOOST_FOREACH(const TNetworkAddress& hostport, unique_hosts) {
-        // Query may have been removed already by cancellation path. In
-        // particular, if node to fail was last sender to an exchange, the
-        // coordinator will realise and fail the query at the same time the
-        // failure detection path does the same thing. They will harmlessly race
-        // to remove the query from this map.
+        // Query may have been removed already by cancellation path. In particular, if
+        // node to fail was last sender to an exchange, the coordinator will realise and
+        // fail the query at the same time the failure detection path does the same
+        // thing. They will harmlessly race to remove the query from this map.
         QueryLocations::iterator it = query_locations_.find(hostport);
         if (it != query_locations_.end()) {
           it->second.erase(exec_state->query_id());
@@ -1650,7 +1649,7 @@ void ImpalaServer::ExpireSessions() {
         // best not to interfere.
         if (session_state.second->closed || session_state.second->expired) continue;
         int64_t last_accessed = session_state.second->last_accessed;
-        if (now - last_accessed <= FLAGS_idle_session_timeout) continue;
+        if (now - last_accessed <= FLAGS_idle_session_timeout * 1000) continue;
         LOG(INFO) << "Expiring session: " << session_state.first << ", user:"
                   << session_state.second->connected_user << ", last active: "
                   << session_state.second->last_accessed.DebugString();

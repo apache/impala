@@ -699,4 +699,3 @@ string HashTable::DebugString(bool skip_empty, const RowDescriptor* desc) {
   }
   return ss.str();
 }
-

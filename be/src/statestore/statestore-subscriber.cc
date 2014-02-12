@@ -224,11 +224,12 @@ void StatestoreSubscriber::RecoveryModeChecker() {
                   << attempt_count++;
         Status status = Register();
         if (status.ok()) {
-          LOG(INFO) << "Reconnected to statestore. Exiting recovery mode";
           // Make sure to update failure detector so that we don't
           // immediately fail on the next loop while we're waiting for
           // heartbeats to resume.
           failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
+          LOG(INFO) << "Reconnected to statestore. Exiting recovery mode";
+
           // Break out of enclosing while (true) to top of outer-scope loop.
           break;
         } else {

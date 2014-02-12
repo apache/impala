@@ -320,7 +320,7 @@ class Coordinator {
   // Fill in rpc_params based on parameters.
   void SetExecPlanFragmentParams(QuerySchedule& schedule,
       int backend_num, const TPlanFragment& fragment,
-      int fragment_idx, FragmentExecParams& params, int instance_idx,
+      int fragment_idx, const FragmentExecParams& params, int instance_idx,
       const TNetworkAddress& coord, TExecPlanFragmentParams* rpc_params);
 
   // Wrapper for ExecPlanFragment() rpc.  This function will be called in parallel

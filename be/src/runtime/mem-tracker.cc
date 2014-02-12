@@ -18,6 +18,8 @@
 #include <gutil/strings/substitute.h>
 
 #include "runtime/exec-env.h"
+#include "resourcebroker/resource-broker.h"
+#include "statestore/query-resource-mgr.h"
 #include "util/debug-util.h"
 #include "util/uid-util.h"
 
@@ -45,6 +47,7 @@ MemTracker::MemTracker(int64_t byte_limit, const string& label, MemTracker* pare
     auto_unregister_(false),
     enable_logging_(false),
     log_stack_(false),
+    query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
     bytes_over_limit_metric_(NULL) {
@@ -64,6 +67,7 @@ MemTracker::MemTracker(
     auto_unregister_(false),
     enable_logging_(false),
     log_stack_(false),
+    query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
     bytes_over_limit_metric_(NULL) {
@@ -82,6 +86,7 @@ MemTracker::MemTracker(Metrics::PrimitiveMetric<uint64_t>* consumption_metric,
     auto_unregister_(false),
     enable_logging_(false),
     log_stack_(false),
+    query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
     bytes_over_limit_metric_(NULL) {
@@ -135,7 +140,8 @@ MemTracker* MemTracker::GetRequestPoolMemTracker(const string& pool_name,
 }
 
 shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
-    const TUniqueId& id, int64_t byte_limit, MemTracker* parent) {
+    const TUniqueId& id, int64_t byte_limit, MemTracker* parent,
+    QueryResourceMgr* res_mgr) {
   lock_guard<mutex> l(static_mem_trackers_lock_);
   RequestTrackersMap::iterator it = request_to_mem_trackers_.find(id);
   if (it != request_to_mem_trackers_.end()) {
@@ -153,6 +159,7 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
     tracker->auto_unregister_ = true;
     tracker->query_id_ = id;
     request_to_mem_trackers_[id] = tracker;
+    if (res_mgr != NULL) tracker->SetQueryResourceMgr(res_mgr);
     return tracker;
   }
 }
@@ -247,6 +254,45 @@ bool MemTracker::GcMemory(int64_t max_consumption) {
     bytes_freed_by_last_gc_metric_->Update(pre_gc_consumption - consumption());
   }
   return consumption() > max_consumption;
+}
+
+bool MemTracker::ExpandLimit(int64_t bytes) {
+  if (query_resource_mgr_ == NULL) return false;
+  // TODO: Make this asynchronous after IO mgr changes to use TryConsume() are done.
+  lock_guard<mutex> l(resource_acquisition_lock_);
+  // Test to see if we can satisfy the limit anyhow; maybe a different request was already
+  // in flight.
+  if (consumption_->current_value() + bytes < limit_) return true;
+
+  TResourceBrokerExpansionRequest exp;
+  query_resource_mgr_->CreateExpansionRequest(max(1L, bytes / (1024 * 1024)), 0L, &exp);
+
+  TResourceBrokerExpansionResponse response;
+  Status status = ExecEnv::GetInstance()->resource_broker()->Expand(exp, &response);
+  if (!status.ok()) {
+    LOG(INFO) << "Failed to expand memory limit by "
+              << PrettyPrinter::Print(bytes, TCounterType::BYTES) << ": "
+              << status.GetErrorMsg();
+    return false;
+  }
+
+  DCHECK(response.allocated_resources.size() == 1) << "Got more resources than expected";
+  const llama::TAllocatedResource& resource =
+      response.allocated_resources.begin()->second;
+  DCHECK(resource.v_cpu_cores == 0L) << "Unexpected VCPUs returned by Llama";
+  // Finally, check whether the allocation that we got took us over the limits for any of
+  // our ancestors.
+  int64_t bytes_allocated = resource.memory_mb * 1024 * 1024;
+  BOOST_FOREACH(const MemTracker* tracker, all_trackers_) {
+    if (tracker == this) continue;
+    if (tracker->consumption_->current_value() + bytes_allocated > tracker->limit_) {
+      // Don't adjust our limit; rely on query tear-down to release the resource.
+      return false;
+    }
+  }
+
+  limit_ += bytes_allocated;
+  return true;
 }
 
 }

@@ -18,11 +18,13 @@
 #include <sstream>
 #include <boost/filesystem.hpp>
 #include "util/debug-util.h"
+#include <gutil/strings/substitute.h>
 
 using namespace impala;
 using namespace std;
 using namespace boost::filesystem;
 using namespace boost;
+using namespace strings;
 
 namespace impala {
 
@@ -48,9 +50,9 @@ Status CgroupsMgr::Init(const string& cgroups_hierarchy_path,
   return Status::OK;
 }
 
-string CgroupsMgr::ResourceIdToCgroup(const string& rm_resource_id) const {
-  if (rm_resource_id.empty()) return "";
-  return rm_resource_id + IMPALA_CGROUP_SUFFIX;
+string CgroupsMgr::UniqueIdToCgroup(const string& unique_id) const {
+  if (unique_id.empty()) return "";
+  return unique_id + IMPALA_CGROUP_SUFFIX;
 }
 
 int32_t CgroupsMgr::VirtualCoresToCpuShares(int16_t v_cpu_cores) {
@@ -59,9 +61,7 @@ int32_t CgroupsMgr::VirtualCoresToCpuShares(int16_t v_cpu_cores) {
 }
 
 Status CgroupsMgr::CreateCgroup(const string& cgroup, bool if_not_exists) const {
-  stringstream cgroup_path_ss;
-  cgroup_path_ss << cgroups_hierarchy_path_ << "/" << cgroup;
-  string cgroup_path = cgroup_path_ss.str();
+  const string& cgroup_path = Substitute("$0/$1", cgroups_hierarchy_path_, cgroup);
   try {
     // Returns false if the dir already exists, otherwise throws an exception.
     if (!create_directory(cgroup_path) && !if_not_exists) {
@@ -80,10 +80,7 @@ Status CgroupsMgr::CreateCgroup(const string& cgroup, bool if_not_exists) const 
 }
 
 Status CgroupsMgr::DropCgroup(const string& cgroup, bool if_exists) const {
-  stringstream cgroup_path_ss;
-  cgroup_path_ss << cgroups_hierarchy_path_ << "/" << cgroup;
-  string cgroup_path = cgroup_path_ss.str();
-
+  const string& cgroup_path = Substitute("$0/$1", cgroups_hierarchy_path_, cgroup);
   LOG(INFO) << "Dropping CGroup " << cgroups_hierarchy_path_ << " " << cgroup;
   try {
     if(!remove(cgroup_path) && !if_exists) {
@@ -105,10 +102,7 @@ Status CgroupsMgr::SetCpuShares(const string& cgroup, int32_t num_shares) {
   string tasks_path;
   RETURN_IF_ERROR(GetCgroupPaths(cgroup, &cgroup_path, &tasks_path));
 
-  stringstream cpu_shares_ss;
-  cpu_shares_ss << cgroup_path << "/" << "cpu.shares";
-  string cpu_shares_path = cpu_shares_ss.str();
-
+  const string& cpu_shares_path = Substitute("$0/$1", cgroup_path, "cpu.shares");
   ofstream cpu_shares(tasks_path.c_str(), ios::out | ios::trunc);
   if (!cpu_shares.is_open()) {
     stringstream err_msg;
@@ -222,7 +216,7 @@ Status CgroupsMgr::UnregisterFragment(const TUniqueId& fragment_instance_id,
   if (cgroup.empty() || cgroups_hierarchy_path_.empty()) return Status::OK;
 
   LOG(INFO) << "Unregistering fragment " << PrintId(fragment_instance_id)
-            << " from CGroup " << cgroups_hierarchy_path_ << " " << cgroup;
+            << " from CGroup " << cgroups_hierarchy_path_ << "/" << cgroup;
   lock_guard<mutex> l(active_cgroups_lock_);
   unordered_map<string, int32_t>::iterator entry = active_cgroups_.find(cgroup);
   DCHECK(entry != active_cgroups_.end());
