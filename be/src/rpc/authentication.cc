@@ -286,12 +286,13 @@ void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
       } else {
         LOG(ERROR) << err_msg;
       }
-    } else {
-      first_time = false;
-      first_kinit->Set(Status::OK);
     }
 
     if (success) {
+      if (first_time) {
+        first_time = false;
+        first_kinit->Set(Status::OK);
+      }
       failures_since_renewal = 0;
       // Workaround for Kerberos 1.8.1 - wait a short time, before requesting a renewal of
       // the ticket-granting ticket. The sleep time is >1s, to force the system clock to
