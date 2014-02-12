@@ -40,8 +40,10 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.PlanNode;
+import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TQueryContext;
@@ -769,23 +771,23 @@ public class Analyzer {
       // skip this slot if we're not allowed to transfer values to slotId
       if (!globalState_.valueTransfer[equivSlotId.asInt()][slotId.asInt()]) continue;
 
+      // Indicates whether the equivalence class to which equivSlotId belongs
+      // contains a slot belonging to an outer-joined tuple.
+      boolean hasOuterJoinedTuple =
+          hasOuterJoinedTuple(globalState_.equivClassBySlotId.get(equivSlotId));
       for (ExprId id: globalState_.slotConjuncts.get(equivSlotId)) {
         Expr e = globalState_.conjuncts.get(id);
         LOG.trace("getBoundPredicates: considering " + e.toSql() + " " + e.debugString());
         if (!e.isBound(equivSlotId)) continue;
 
-        // if this predicate is directly against slotId, check whether 'node' can
-        // actually evaluate it (for other slot ids, this is expressed by value
-        // transfer)
-        // TODO: do we need this or is the following check sufficient?
-        //if (equivSlotId.equals(slotId) && !canEvalPredicate(node, e)) continue;
-
-        // we cannot evaluate anything containing '<> is null' from the Where clause if
-        // we're being outer-joined: this would alter the outcome of the outer join
-        if (globalState_.outerJoinedTupleIds.containsKey(tid)
-            && e.isWhereClauseConjunct()
-            // TODO: also check for IFNULL()
-            && e.contains(IsNullPredicate.class)) {
+        // It is incorrect to propagate a Where-clause predicate into a plan subtree that
+        // is on the nullable side of an outer join if the predicate evaluates to true
+        // when all its referenced tuples are NULL. The check below is conservative
+        // because the outer-joined tuple making 'hasOuterJoinedTuple' true could be in a
+        // parent block of 'e', in which case it is safe to propagate 'e' downwards.
+        // TODO: Make the check precise by considering the blocks (analyzers) where the
+        // outer-joined tuples in equivSlotId's equivalence class appear relative to 'e'.
+        if (e.isWhereClauseConjunct_ && hasOuterJoinedTuple && isTrueWithNullSlots(e)) {
           continue;
         }
 
@@ -853,6 +855,48 @@ public class Analyzer {
       }
     }
     return result;
+  }
+
+  /**
+   * Returns true if the equivalence class identified by 'eqClassId' contains
+   * a slot belonging to an outer-joined tuple.
+   */
+  private boolean hasOuterJoinedTuple(EquivalenceClassId eqClassId) {
+    ArrayList<SlotId> eqClass = globalState_.equivClassMembers.get(eqClassId);
+    for (SlotId s: eqClass) {
+      if (isOuterJoined(getTupleId(s))) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Returns true if 'p' evaluates to true when all its referenced slots are NULL,
+   * false otherwise.
+   * TODO: Can we avoid dealing with the exceptions thrown by analysis and eval?
+   */
+  private boolean isTrueWithNullSlots(Expr p) {
+    // Construct predicate with all SlotRefs substituted by NullLiterals.
+    List<SlotRef> slotRefs = Lists.newArrayList();
+    p.collect(SlotRef.class, slotRefs);
+    // Map for substituting SlotRefs with NullLiterals.
+    Expr.SubstitutionMap nullSmap = new Expr.SubstitutionMap();
+    for (SlotRef slotRef: slotRefs) {
+      nullSmap.addMapping(slotRef.clone(null), new NullLiteral());
+    }
+    Expr nullTuplePred = p.clone(nullSmap);
+    try {
+      nullTuplePred.analyze(this);
+    } catch (Exception e) {
+      Preconditions.checkState(false, "Failed to analyze generated predicate: "
+          + nullTuplePred.toSql() + "." + e.getMessage());
+    }
+    try {
+      return FeSupport.EvalPredicate(nullTuplePred, getQueryContext());
+    } catch (InternalException e) {
+      Preconditions.checkState(false, "Failed to evaluate generated predicate: "
+          + nullTuplePred.toSql() + "." + e.getMessage());
+    }
+    return true;
   }
 
   private TupleId getTupleId(SlotId slotId) {

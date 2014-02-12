@@ -63,7 +63,7 @@ from
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 size=956.90KB compact
-|     predicates: functional.alltypes.string_col = 'b'
+|     predicates: string_col = 'b'
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=956.90KB
@@ -302,15 +302,20 @@ NODE 2:
    predicates: functional.alltypes.id = 17, CAST(sin(functional.alltypes.tinyint_col) AS BOOLEAN) = TRUE
 ====
 # propagation between outer-joined tables only goes in one direction:
-# - predicate on a.tinyint_col is propagated to b
+# - predicates on a.year and a.tinyint_col are propagated to b
+# - predicate a.id is null isn't propagated to b because it would evaluate to true
+#   if b's tuple was NULL
 # - predicate on b.month is only used for partition pruning by the outer-joined table
-# - where-clause predicate on b is evaluated by node materializing oj
+# - where-clause predicate b.id = 17 evaluating to false if tuple is NULL
+#   is evaluated by scan and node materializing oj
+# - where-clause predicate b.int_col is null evaluating true if tuple is NULL
+#   is only evaluated by node materializing oj
 select a.year, a.month, b.year, b.month
 from functional.alltypes a
   left outer join functional.alltypessmall b on
   (a.tinyint_col = b.tinyint_col and a.id = b.id and a.year = b.year
    and a.month = b.month and b.month + 1 = 2)
-where a.year = 2009 and a.tinyint_col = 7 and b.id = 17 and b.int_col is null
+where a.year = 2009 and a.tinyint_col = 7 and a.id is null and b.id = 17 and b.int_col is null
 ---- PLAN
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
@@ -322,7 +327,7 @@ where a.year = 2009 and a.tinyint_col = 7 and b.id = 17 and b.int_col is null
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 size=238.68KB
-   predicates: a.tinyint_col = 7
+   predicates: a.tinyint_col = 7, a.id IS NULL
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
@@ -354,47 +359,52 @@ NODE 1:
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 size=238.68KB
-   predicates: a.tinyint_col = 7
+   predicates: a.tinyint_col = 7, a.id IS NULL
 ====
-# propagation between outer-joined tables only goes in one direction
-# - predicate on b.id is propagated to a
-# - a.month = 1 is only used for partition pruning by the outer-joined table
-# - where clause predicate on a is only evaluated by node materializing oj
+# propagation between outer-joined tables only goes in one direction:
+# - predicates on b.year, b.tinyint_col are propagated to a
+# - predicate b.id is null isn't propagated to a because it would evaluate to true
+#   if a's tuple was NULL
+# - predicate on a.month is only used for partition pruning by the outer-joined table
+# - where-clause predicate a.id = 17 evaluating to false if tuple is NULL
+#   is evaluated by scan and node materializing oj
+# - where-clause predicate a.int_col is null evaluating true if tuple is NULL
+#   is only evaluated by node materializing oj
 select a.year, a.month, b.year, b.month
-from functional.alltypes a
-  right outer join functional.alltypessmall b on
+from functional.alltypessmall a
+  right outer join functional.alltypes b on
   (a.tinyint_col = b.tinyint_col and a.id = b.id and a.year = b.year
    and a.month = b.month and a.month + 1 = 2)
-where a.tinyint_col = 7 and b.year = 2009 and b.id = 17
+where b.year = 2009 and b.tinyint_col = 7 and b.id is null and a.id = 17 and a.int_col is null
 ---- PLAN
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
-|  other predicates: a.tinyint_col = 7
+|  other predicates: a.id = 17, a.int_col IS NULL
 |
-|--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB compact
-|     predicates: b.id = 17
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=12/24 size=238.68KB compact
+|     predicates: b.tinyint_col = 7, b.id IS NULL
 |
-00:SCAN HDFS [functional.alltypes a]
-   partitions=1/24 size=19.95KB
+00:SCAN HDFS [functional.alltypessmall a]
+   partitions=1/4 size=1.57KB
    predicates: a.tinyint_col = 7, a.id = 17
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
-|  other predicates: a.tinyint_col = 7
+|  other predicates: a.id = 17, a.int_col IS NULL
 |
 |--04:EXCHANGE [PARTITION=HASH(b.tinyint_col,b.id,b.year,b.month)]
 |  |
-|  01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB
-|     predicates: b.id = 17
+|  01:SCAN HDFS [functional.alltypes b]
+|     partitions=12/24 size=238.68KB
+|     predicates: b.tinyint_col = 7, b.id IS NULL
 |
 03:EXCHANGE [PARTITION=HASH(a.tinyint_col,a.id,a.year,a.month)]
 |
-00:SCAN HDFS [functional.alltypes a]
-   partitions=1/24 size=19.95KB
+00:SCAN HDFS [functional.alltypessmall a]
+   partitions=1/4 size=1.57KB
    predicates: a.tinyint_col = 7, a.id = 17
 ====
 # propagation into inline view with aggregation:
@@ -720,4 +730,158 @@ and x.id + x.b_id = 17
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 size=238.68KB
+====
+# correct placement of predicates in the presence of aggregation in an inline view
+select a.id, b.id
+from functional.alltypes a left outer join
+(select id, int_col from functional.alltypes group by 1, 2) b on (a.id = b.id)
+where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
+---- PLAN
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: isnull(id, 0) = 0, int_col = 17
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: id, int_col
+|  |  having: int_col = 17
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|     predicates: functional.alltypes.int_col = 17
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+   predicates: a.id IS NULL
+====
+select a.id, b.id
+from functional.alltypes a left outer join
+((select id, int_col from functional.alltypes group by 1, 2)
+  union all (select id, int_col from functional.alltypessmall group by 1, 2)) b
+on (a.id = b.id)
+where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
+---- PLAN
+06:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: id IS NULL, int_col = 17
+|
+|--01:MERGE
+|  |
+|  |--05:AGGREGATE [FINALIZE]
+|  |  |  group by: id, int_col
+|  |  |  having: int_col = 17
+|  |  |
+|  |  04:SCAN HDFS [functional.alltypessmall]
+|  |     partitions=4/4 size=6.32KB
+|  |     predicates: functional.alltypessmall.int_col = 17
+|  |
+|  03:AGGREGATE [FINALIZE]
+|  |  group by: id, int_col
+|  |  having: int_col = 17
+|  |
+|  02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|     predicates: functional.alltypes.int_col = 17
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+   predicates: isnull(a.id, 0) = 0
+====
+select a.id, b.id
+from
+(select id, int_col from functional.alltypes group by 1, 2) b
+right outer join functional.alltypes a on (a.id = b.id)
+where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
+---- PLAN
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: id = a.id
+|  other predicates: isnull(id, 0) = 0, int_col = 17
+|
+|--02:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 size=478.45KB compact
+|     predicates: a.id IS NULL
+|
+01:AGGREGATE [FINALIZE]
+|  group by: id, int_col
+|  having: int_col = 17
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: functional.alltypes.int_col = 17
+====
+select a.id, b.id
+from
+((select id, int_col from functional.alltypes group by 1, 2)
+  union all (select id, int_col from functional.alltypessmall group by 1, 2)) b
+right outer join functional.alltypes a on (a.id = b.id)
+where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
+---- PLAN
+06:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: id = a.id
+|  other predicates: id IS NULL, int_col = 17
+|
+|--05:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 size=478.45KB compact
+|     predicates: isnull(a.id, 0) = 0
+|
+00:MERGE
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  group by: id, int_col
+|  |  having: int_col = 17
+|  |
+|  03:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: functional.alltypessmall.int_col = 17
+|
+02:AGGREGATE [FINALIZE]
+|  group by: id, int_col
+|  having: int_col = 17
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: functional.alltypes.int_col = 17
+====
+# predicate inside outer-joined inline view must be assigned in scan
+select a.string_col from functional.alltypes a
+full outer join (select * from functional.alltypessmall where id > 0) b
+ON a.id=b.id
+---- PLAN
+02:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: a.id = functional.alltypessmall.id
+|
+|--01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=12.64KB compact
+|     predicates: id > 0
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+====
+# TODO: Remove the following limitation in our predicate propagation:
+# It is safe to propagate 'y.id is null' to y's scan, but we prevent it
+# because b is outer joined and b's slots are in the same equivalence
+# class as y's slots. We do not recognize that b is in a parent block
+# and therefore does not affect the correctness of propagating
+# predicates in child blocks ('x.id is null').
+select a.string_col from functional.alltypes a
+left outer join
+  (select x.* from functional.alltypessmall x
+     inner join functional.alltypestiny y on x.id=y.id
+   where x.id is null) b
+on a.id=b.id
+---- PLAN
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = x.id
+|
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: y.id = x.id
+|  |
+|  |--01:SCAN HDFS [functional.alltypessmall x]
+|  |     partitions=4/4 size=6.32KB compact
+|  |     predicates: x.id IS NULL
+|  |
+|  02:SCAN HDFS [functional.alltypestiny y]
+|     partitions=4/4 size=460B compact
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
 ====

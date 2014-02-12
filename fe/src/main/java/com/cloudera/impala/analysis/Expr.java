@@ -550,6 +550,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     // TODO: this blows up, fix it
     //result.isAnalyzed = false;
     result.isAnalyzed_ = isAnalyzed_;
+    result.isWhereClauseConjunct_ = isWhereClauseConjunct_;
     result.numDistinctValues_ = numDistinctValues_;
     for (Expr child: children_) {
       result.children_.add(((Expr) child).clone(smap));

@@ -1105,8 +1105,7 @@ public class Planner {
       return createConstantSelectPlan(selectStmt, analyzer);
     }
 
-    // collect ids of tuples materialized by the subtree that includes all joins
-    // and scans
+    // collect output tuples of subtrees
     ArrayList<TupleId> rowTuples = Lists.newArrayList();
     for (TableRef tblRef: selectStmt.getTableRefs()) {
       rowTuples.addAll(tblRef.getMaterializedTupleIds());
@@ -1191,6 +1190,7 @@ public class Planner {
         defaultOrderByLimit, selectStmt.getOffset());
 
     // All the conjuncts_ should be assigned at this point.
+    // TODO: Re-enable this check here and/or elswehere.
     //Preconditions.checkState(!analyzer.hasUnassignedConjuncts());
 
     return root;
@@ -1308,22 +1308,22 @@ public class Planner {
    *   but only apply to the inline view are evaluated in a SelectNode placed
    *   on top of the inline view plan
    * - all slots that are referenced by predicates from the enclosing scope that cannot
-   *   be pushed down are marked as materialized (so that when computeMemLayout() is called
-   *   on the base table descriptors materialized by the inline view it has a complete
-   *   picture)
+   *   be pushed down are marked as materialized (so that when computeMemLayout() is
+   *   called on the base table descriptors materialized by the inline view it has a
+   *   complete picture)
    */
   private PlanNode createInlineViewPlan(Analyzer analyzer, InlineViewRef inlineViewRef)
       throws ImpalaException {
-    String alias = inlineViewRef.getDesc().getAlias();
-
     // If possible, "push down" view predicates; this is needed in order to ensure
     // that predicates such as "x + y = 10" are evaluated in the view's plan tree
     // rather than a SelectNode grafted on top of that plan tree.
     // This doesn't prevent predicate propagation, because predicates like
     // "x = 10" that get pushed down are still connected to equivalent slots
-    // via the equality predicates created for the view's select list
+    // via the equality predicates created for the view's select list.
+    // Include outer join conjuncts here as well because predicates from the
+    // On-clause of an outer join may be pushed into the inline view as well.
     List<Expr> unassigned =
-        analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), false);
+        analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
     if (!inlineViewRef.getViewStmt().hasLimitClause()) {
       // check if we can evaluate them
       List<Expr> preds = Lists.newArrayList();
@@ -1378,9 +1378,6 @@ public class Planner {
     // left
     rootNode = addUnassignedConjuncts(
         analyzer, inlineViewRef.getDesc().getId().asList(), rootNode);
-
-    List<Expr> unassignedViewConjuncts =
-        analyzer.getUnassignedConjuncts(inlineViewRef.getDesc().getId().asList(), false);
     return rootNode;
   }
 
@@ -1700,7 +1697,8 @@ public class Planner {
     PlanNode result = null;
     // create DISTINCT tree
     if (unionStmt.hasDistinctOps()) {
-      result = createUnionMergePlan(analyzer, unionStmt, unionStmt.getDistinctOperands());
+      result = createUnionMergePlan(
+          analyzer, unionStmt, unionStmt.getDistinctOperands());
       result = new AggregationNode(
           nodeIdGenerator_.getNextId(), result, unionStmt.getDistinctAggInfo());
       result.init(analyzer);
@@ -1714,8 +1712,8 @@ public class Planner {
       result = allMerge;
     }
 
-    result = addOrderByLimit(
-        analyzer, result, unionStmt.getSortInfo(), unionStmt.getLimit(), -1, unionStmt.getOffset());
+    result = addOrderByLimit(analyzer, result, unionStmt.getSortInfo(),
+        unionStmt.getLimit(), -1, unionStmt.getOffset());
     return result;
   }
 

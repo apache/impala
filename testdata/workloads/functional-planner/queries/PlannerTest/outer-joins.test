@@ -34,7 +34,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |
 |--02:SCAN HDFS [functional.testtbl t3]
 |     partitions=1/1 size=0B compact
-|     predicates: t3.id > 0, t3.zip = 94720
+|     predicates: t3.id > 0, t3.id IS NOT NULL, t3.zip = 94720
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t1.id - 1 = t2.id + 1
@@ -60,7 +60,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |  |
 |  02:SCAN HDFS [functional.testtbl t3]
 |     partitions=1/1 size=0B
-|     predicates: t3.id > 0, t3.zip = 94720
+|     predicates: t3.id > 0, t3.id IS NOT NULL, t3.zip = 94720
 |
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: t1.id - 1 = t2.id + 1
@@ -94,7 +94,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |
 |--02:SCAN HDFS [functional.testtbl a3]
 |     partitions=1/1 size=0B compact
-|     predicates: a3.id > 0, a3.zip = 94720
+|     predicates: a3.id > 0, a3.id IS NOT NULL, a3.zip = 94720
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a1.id - 1 = a2.id + 1
@@ -120,7 +120,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |  |
 |  02:SCAN HDFS [functional.testtbl a3]
 |     partitions=1/1 size=0B
-|     predicates: a3.id > 0, a3.zip = 94720
+|     predicates: a3.id > 0, a3.id IS NOT NULL, a3.zip = 94720
 |
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: a1.id - 1 = a2.id + 1
@@ -181,9 +181,9 @@ from functional.testtbl t1 right outer join functional.testtbl t2 on (
     and t3.zip = 94720
   )
 where
-# t1 predicate in where clause is applied by last last
+# t1 predicate in where clause is applied by scan and last join
 t1.id > 0
-# t2 predicate in where clause is applied by last last
+# t2 predicate in where clause is applied by last join
 and t2.id is null
 # t3 predicate in where clause is applied by scan
 and t3.id is not null
@@ -211,7 +211,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 size=0B
-   predicates: t1.id > 0
+   predicates: t1.id > 0, t1.id IS NOT NULL
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -242,7 +242,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 size=0B
-   predicates: t1.id > 0
+   predicates: t1.id > 0, t1.id IS NOT NULL
 ====
 # the same thing with subqueries; should produce the same result
 select *
@@ -272,7 +272,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |
 00:SCAN HDFS [functional.testtbl a1]
    partitions=1/1 size=0B
-   predicates: a1.id > 0
+   predicates: a1.id > 0, a1.id IS NOT NULL
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -303,7 +303,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |
 00:SCAN HDFS [functional.testtbl a1]
    partitions=1/1 size=0B
-   predicates: a1.id > 0
+   predicates: a1.id > 0, a1.id IS NOT NULL
 ====
 # right outer join requires the join op to be partitioned, otherwise non-matches cause
 # duplicates
