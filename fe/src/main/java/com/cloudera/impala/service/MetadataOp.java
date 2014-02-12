@@ -15,13 +15,16 @@
 package com.cloudera.impala.service;
 
 import java.sql.DatabaseMetaData;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.ColumnType;
+import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.Column;
@@ -207,11 +210,15 @@ public class MetadataOp {
     // tableNames[i] are the tables within dbs[i]
     public List<List<String>> tableNames = Lists.newArrayList();
 
-    // columns[i][j] are the columns of tableNames[j] in dbs[i]
+    // columns[i][j] are the columns of tableNames[j] in dbs[i].
+    // If the table is missing (not yet loaded) its column list will be empty.
     public List<List<List<Column>>> columns = Lists.newArrayList();
 
     // functions[i] are the functions within dbs[i]
     public List<List<String>> functions = Lists.newArrayList();
+
+    // Set of tables that are missing (not yet loaded).
+    public Set<TableName> missingTbls = new HashSet<TableName>();
   }
 
   /**
@@ -273,12 +280,18 @@ public class MetadataOp {
           if (columnName != null) {
             Table table = catalog.getTable(dbName, tabName, user, Privilege.ANY);
             if (table == null) continue;
-            for (Column column: table.getColumns()) {
-              String colName = column.getName();
-              if (!columnPattern.matcher(colName).matches()) {
-                continue;
+            // If the table is not yet loaded, the columns will be unknown. Add it
+            // to the set of missing tables.
+            if (!table.isLoaded()) {
+              result.missingTbls.add(new TableName(dbName, tabName));
+            } else {
+              for (Column column: table.getColumns()) {
+                String colName = column.getName();
+                if (!columnPattern.matcher(colName).matches()) {
+                  continue;
+                }
+                columns.add(column);
               }
-              columns.add(column);
             }
           }
           tablesColumnsList.add(columns);
@@ -313,19 +326,31 @@ public class MetadataOp {
 
   /**
    * Executes the GetColumns HiveServer2 operation and returns TResultSet.
-   * It queries the Impala catalog to return the list of table columns that fit the
-   * search patterns.
-   * catalogName, schemaName, tableName and columnName are JDBC search patterns.
+   * Queries the Impala catalog to return the list of table columns that fit the
+   * search patterns. Matching columns requires loading the table metadata, so if
+   * any missing tables are found an RPC to the CatalogServer will be executed
+   * to request loading these tables. The matching process will be restarted
+   * once the required tables have been loaded in the local Impalad Catalog or
+   * the wait timeout has been reached.
+   *
+   * The parameters catalogName, schemaName, tableName and columnName are JDBC search
+   * patterns.
    */
-  public static TResultSet getColumns(ImpaladCatalog catalog,
+  public static TResultSet getColumns(Frontend fe,
       String catalogName, String schemaName, String tableName, String columnName,
       User user)
       throws ImpalaException {
     TResultSet result = createEmptyResultSet(GET_COLUMNS_MD);
 
     // Get the list of schemas, tables, and columns that satisfy the search conditions.
-    DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
-        schemaName, tableName, columnName, null, user);
+    DbsMetadata dbsMetadata = null;
+    while (dbsMetadata == null || !dbsMetadata.missingTbls.isEmpty()) {
+      dbsMetadata = getDbsMetadata(fe.getCatalog(), catalogName,
+          schemaName, tableName, columnName, null, user);
+      if (!fe.requestTblLoadAndWait(dbsMetadata.missingTbls)) {
+        LOG.info("Timed out waiting for missing tables. Load request will be retried.");
+      }
+    }
 
     for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
       String dbName = dbsMetadata.dbs.get(i);
@@ -380,7 +405,6 @@ public class MetadataOp {
    */
   public static TResultSet getSchemas(ImpaladCatalog catalog,
       String catalogName, String schemaName, User user) throws ImpalaException {
-    LOG.info("HERE");
     TResultSet result = createEmptyResultSet(GET_SCHEMAS_MD);
 
     // Get the list of schemas that satisfy the search condition.

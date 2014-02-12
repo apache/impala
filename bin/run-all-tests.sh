@@ -63,7 +63,6 @@ do
   # Run backend tests.
   ${IMPALA_HOME}/bin/run-backend-tests.sh
 
-  # Run the remaining tests against a cluster with authorization disabled.
   ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3
 
   # Run some queries using run-workload to verify run-workload has not been broken.
@@ -84,6 +83,12 @@ do
   # tests to the new python framework.
   cd $IMPALA_FE_DIR
   mvn test
+
+  # Run the JDBC tests with background loading disabled. This is interesting because
+  # it requires loading missing table metadata.
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3 \
+    --catalogd_args=--load_catalog_in_background=false
+  mvn test -Dtest=JdbcTest
 
   # Run the custom-cluster tests after all other tests, since they will restart the
   # cluster repeatedly and lose state.

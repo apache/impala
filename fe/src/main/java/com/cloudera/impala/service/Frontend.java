@@ -507,6 +507,14 @@ public class Frontend {
   }
 
   /**
+   * Overload of requestTblLoadAndWait that uses the default timeout.
+   */
+  public boolean requestTblLoadAndWait(Set<TableName> requestedTbls)
+      throws InternalException {
+    return requestTblLoadAndWait(requestedTbls, MISSING_TBL_LOAD_WAIT_TIMEOUT_MS);
+  }
+
+  /**
    * Analyzes the SQL statement included in queryCtxt and returns the AnalysisResult.
    * If a statement fails analysis because table/view metadata was not loaded, an
    * RPC to the CatalogServer will be executed to request loading the missing metadata
@@ -744,7 +752,7 @@ public class Frontend {
       case GET_COLUMNS:
       {
         TGetColumnsReq req = request.getGet_columns_req();
-        return MetadataOp.getColumns(impaladCatalog_, req.getCatalogName(),
+        return MetadataOp.getColumns(this, req.getCatalogName(),
             req.getSchemaName(), req.getTableName(), req.getColumnName(), user);
       }
       case GET_CATALOGS: return MetadataOp.getCatalogs();

@@ -58,7 +58,7 @@ public class ImpalaJdbcClient {
   // The default connection string connects to localhost at the default hs2_port without
   // Sasl.
   private final static String DEFAULT_CONNECTION_STRING =
-      "jdbc:hive2://localhost:21050/";
+      "jdbc:hive2://localhost:21050/default";
 
   private final String driverName_;
   private final String connString_;

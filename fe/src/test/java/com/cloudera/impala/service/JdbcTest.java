@@ -2,15 +2,24 @@
 
 package com.cloudera.impala.service;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Test;
 
 import com.cloudera.impala.testutil.ImpalaJdbcClient;
 
@@ -20,8 +29,6 @@ import com.cloudera.impala.testutil.ImpalaJdbcClient;
  * Basic JDBC metadata test. It exercises getTables, getCatalogs, getSchemas,
  * getTableTypes, getColumns.
  *
- * TODO: these tests are disabled. The Hive12 JDBC driver will issue an "use" query
- * on connection which we can't handle. This is a breaking change from hive 11.
  */
 public class JdbcTest {
   private static Connection con_;
@@ -53,7 +60,6 @@ public class JdbcTest {
         expectedException);
   }
 
-  /*
   @Test
   public void testMetaDataGetTables() throws SQLException {
     // map from tablename search pattern to actual table name.
@@ -190,12 +196,10 @@ public class JdbcTest {
     assertFalse(rs.next());
     rs.close();
   }
-  */
 
   /**
    * Validate the Metadata for the result set of a metadata getColumns call.
    */
-  /*
   @Test
   public void testMetaDataGetColumnsMetaData() throws SQLException {
     ResultSet rs = con_.getMetaData().getColumns(null, "functional", "alltypes", null);
@@ -237,5 +241,4 @@ public class JdbcTest {
       rs.close();
     }
   }
-  */
 }
