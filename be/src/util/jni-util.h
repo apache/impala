@@ -161,6 +161,18 @@ class JniLocalFrame {
   JNIEnv* env_;
 };
 
+// Describes one method to look up in a Java object
+struct JniMethodDescriptor {
+  // Name of the method, case must match
+  const std::string name;
+
+  // JNI-style method signature
+  const std::string signature;
+
+  // Handle to the method
+  jmethodID* method_id;
+};
+
 // Utility class for JNI-related functionality.
 // Init() should be called as soon as the native library is loaded.
 // Creates global class references, and promotes local references to global references.
@@ -222,6 +234,12 @@ class JniUtil {
   // unless there is an exception.
   static Status GetJvmMetrics(const TGetJvmMetricsRequest& request,
       TGetJvmMetricsResponse* result);
+
+  // Loads a method whose signature is in the supplied descriptor. Returns Status::OK
+  // and sets descriptor->method_id to a JNI method handle if successful, otherwise an
+  // error status is returned.
+  static Status LoadJniMethod(JNIEnv* jni_env, const jclass& jni_class,
+      JniMethodDescriptor* descriptor);
 
   // Utility methods to avoid repeating lots of the JNI call boilerplate. It seems these
   // must be defined in the header to compile properly.

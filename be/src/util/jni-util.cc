@@ -190,4 +190,12 @@ Status JniUtil::GetJvmMetrics(const TGetJvmMetricsRequest& request,
   return JniUtil::CallJniMethod(jni_util_class(), get_jvm_metrics_id_, request, result);
 }
 
+Status JniUtil::LoadJniMethod(JNIEnv* env, const jclass& jni_class,
+    JniMethodDescriptor* descriptor) {
+  (*descriptor->method_id) = env->GetMethodID(jni_class,
+      descriptor->name.c_str(), descriptor->signature.c_str());
+  RETURN_ERROR_IF_EXC(env);
+  return Status::OK;
+}
+
 }

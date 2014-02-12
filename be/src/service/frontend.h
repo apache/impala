@@ -146,12 +146,6 @@ class Frontend {
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID fe_ctor_;
-
-  struct MethodDescriptor;
-
-  // Utility method to load a method whose signature is in the supplied descriptor; if
-  // successful descriptor->method_id is set to a JNI method handle.
-  void LoadJniFrontendMethod(JNIEnv* jni_env, MethodDescriptor* descriptor);
 };
 
 }

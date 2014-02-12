@@ -102,12 +102,6 @@ class Catalog {
   jmethodID get_functions_id_; // JniCatalog.getFunctions()
   jmethodID prioritize_load_id_; // JniCatalog.prioritizeLoad()
   jmethodID catalog_ctor_;
-
-  struct MethodDescriptor;
-
-  // Utility method to load a method whose signature is in the supplied descriptor; if
-  // successful descriptor->method_id is set to a JNI method handle.
-  void LoadJniMethod(JNIEnv* jni_env, MethodDescriptor* descriptor);
 };
 
 }

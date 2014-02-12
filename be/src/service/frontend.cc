@@ -46,21 +46,8 @@ DEFINE_string(authorized_proxy_user_config, "",
     "separated list of short usernames, or '*' to indicate all users. For example: "
     "hue=user1,user2;admin=*");
 
-// Describes one method to look up in a Frontend object
-struct Frontend::MethodDescriptor {
-  // Name of the method, case must match
-  const string name;
-
-  // JNI-style method signature
-  const string signature;
-
-  // Handle to the method, set by LoadJNIFrontendMethod
-  jmethodID* method_id;
-};
-
-
 Frontend::Frontend() {
-  MethodDescriptor methods[] = {
+  JniMethodDescriptor methods[] = {
     {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
@@ -83,7 +70,7 @@ Frontend::Frontend() {
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    LoadJniFrontendMethod(jni_env, &(methods[i]));
+    EXIT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, fe_class_, &(methods[i])));
   };
 
   jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
@@ -99,12 +86,6 @@ Frontend::Frontend() {
       FlagToTLogLevel(FLAGS_non_impala_java_vlog));
   EXIT_IF_EXC(jni_env);
   EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
-}
-
-void Frontend::LoadJniFrontendMethod(JNIEnv* jni_env, MethodDescriptor* descriptor) {
-  (*descriptor->method_id) = jni_env->GetMethodID(fe_class_, descriptor->name.c_str(),
-      descriptor->signature.c_str());
-  EXIT_IF_EXC(jni_env);
 }
 
 Status Frontend::UpdateCatalogCache(const TUpdateCatalogCacheRequest& req,
