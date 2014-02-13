@@ -1334,7 +1334,12 @@ void ImpalaServer::CatalogUpdateCallback(
       if (catalog_object.type == TCatalogObjectType::FUNCTION) {
         TCatalogObject dropped_function;
         if (frontend_->GetCatalogObject(catalog_object, &dropped_function).ok()) {
-          dropped_functions.push_back(dropped_function);
+          // This function may have been dropped and re-created. To avoid removing the
+          // re-created function's entry from the cache verify the existing function has a
+          // catalog version <= the catalog version included in this statestore heartbeat.
+          if (dropped_function.catalog_version <= new_catalog_version) {
+            dropped_functions.push_back(dropped_function);
+          }
         }
         // Nothing to do in error case.
       }

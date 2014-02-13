@@ -43,19 +43,19 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
     case TCatalogOpType::DDL: {
       // Compute stats stmts must be executed via ExecComputeStats().
       DCHECK(request.ddl_params.ddl_type != TDdlType::COMPUTE_STATS);
-      if (request.ddl_params.ddl_type == TDdlType::DROP_FUNCTION) {
-        HandleDropFunction(request.ddl_params.drop_fn_params);
-      }
-      catalog_update_result_.reset(new TCatalogUpdateResult());
+
       exec_response_.reset(new TDdlExecResponse());
       client->ExecDdl(*exec_response_.get(), request.ddl_params);
       catalog_update_result_.reset(
           new TCatalogUpdateResult(exec_response_.get()->result));
-      return Status(exec_response_->result.status);
+      Status status(exec_response_->result.status);
+      if (status.ok() && request.ddl_params.ddl_type == TDdlType::DROP_FUNCTION) {
+        HandleDropFunction(request.ddl_params.drop_fn_params);
+      }
+      return status;
     }
     case TCatalogOpType::RESET_METADATA: {
       TResetMetadataResponse response;
-      catalog_update_result_.reset(new TCatalogUpdateResult());
       client->ResetMetadata(response, request.reset_metadata_params);
       catalog_update_result_.reset(new TCatalogUpdateResult(response.result));
       return Status(response.result.status);
@@ -99,6 +99,8 @@ Status CatalogOpExecutor::ExecComputeStats(
 
 void CatalogOpExecutor::HandleDropFunction(const TDropFunctionParams& request) {
   DCHECK(fe_ != NULL) << "FE tests should not be calling this";
+  // Can only be called after successfully processing a catalog update.
+  DCHECK(catalog_update_result_ != NULL);
 
   // Lookup in the local catalog the metadata for the function.
   TCatalogObject obj;
@@ -117,7 +119,13 @@ void CatalogOpExecutor::HandleDropFunction(const TDropFunctionParams& request) {
                << apache::thrift::ThriftDebugString(request);
     return;
   }
-  env_->lib_cache()->RemoveEntry(fn.fn.hdfs_location);
+  // This function may have been dropped and re-created. To avoid removing the re-created
+  // function's entry from the cache verify the existing function has a catalog
+  // version <= the dropped version. This may happen if the update from the statestore
+  // gets applied *before* the result of a direct-DDL drop function command.
+  if (fn.catalog_version <= catalog_update_result_->version) {
+    env_->lib_cache()->RemoveEntry(fn.fn.hdfs_location);
+  }
 }
 
 void CatalogOpExecutor::SetTableStats(const TTableSchema& tbl_stats_schema,
