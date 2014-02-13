@@ -20,6 +20,11 @@ class TestUdfs(ImpalaTestSuite):
         v.get_value('table_format').compression_codec == 'none')
 
   def test_native_functions(self, vector):
+    # Run with sync_ddl to guarantee "drop function"s are processed by all impalads
+    # TODO: this is a temporary fix for IMPALA-795, remove when the real fix goes in
+    exec_options = vector.get_value('exec_option')
+    exec_options['sync_ddl'] = 1
+
     database = 'native_function_test'
 
     self.__load_functions(
@@ -31,12 +36,22 @@ class TestUdfs(ImpalaTestSuite):
     self.run_test_case('QueryTest/uda', vector, use_db=database)
 
   def test_ir_functions(self, vector):
+    # Run with sync_ddl to guarantee "drop function"s are processed by all impalads
+    # TODO: this is a temporary fix for IMPALA-795, remove when the real fix goes in
+    exec_options = vector.get_value('exec_option')
+    exec_options['sync_ddl'] = 1
+
     database = 'ir_function_test'
     self.__load_functions(
       self.create_udfs_template, vector, database, '/test-warehouse/test-udfs.ll')
     self.run_test_case('QueryTest/udf', vector, use_db=database)
 
   def test_hive_udfs(self, vector):
+    # Run with sync_ddl to guarantee "drop function"s are processed by all impalads
+    # TODO: this is a temporary fix for IMPALA-795, remove when the real fix goes in
+    exec_options = vector.get_value('exec_option')
+    exec_options['sync_ddl'] = 1
+
     self.client.execute('create database if not exists udf_test')
     self.client.execute('create database if not exists uda_test')
     self.run_test_case('QueryTest/load-hive-udfs', vector)
@@ -44,6 +59,11 @@ class TestUdfs(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_libs_with_same_filenames(self, vector):
+    # Run with sync_ddl to guarantee "drop function"s are processed by all impalads
+    # TODO: this is a temporary fix for IMPALA-795, remove when the real fix goes in
+    exec_options = vector.get_value('exec_option')
+    exec_options['sync_ddl'] = 1
+
     self.run_test_case('QueryTest/libs_with_same_filenames', vector)
 
   @pytest.mark.execute_serially

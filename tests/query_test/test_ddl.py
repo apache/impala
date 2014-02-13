@@ -120,6 +120,12 @@ class TestDdlStatements(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_functions_ddl(self, vector):
     self.__create_db_synced('function_ddl_test', vector)
+
+    # Run with sync_ddl to guarantee "drop function"s are processed by all impalads
+    # TODO: this is a temporary fix for IMPALA-795, remove when the real fix goes in
+    exec_options = vector.get_value('exec_option')
+    exec_options['sync_ddl'] = 1
+
     self.run_test_case('QueryTest/functions-ddl', vector, use_db='function_ddl_test',
         multiple_impalad=self.__use_multiple_impalad(vector))
 
