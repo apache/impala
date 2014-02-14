@@ -285,7 +285,8 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     // interface with the code in impalad.
     void* fn_ptr;
     Status status = state->lib_cache()->GetSoFunctionPtr(
-        state->fs_cache(), fn_.hdfs_location, fn_.scalar_fn.symbol, &fn_ptr);
+        state->fs_cache(), fn_.hdfs_location, fn_.scalar_fn.symbol, &fn_ptr,
+        &cache_entry_);
     if (!status.ok() && fn_.binary_type == TFunctionBinaryType::BUILTIN) {
       // Builtins symbols should exist unless there is a version mismatch.
       stringstream ss;

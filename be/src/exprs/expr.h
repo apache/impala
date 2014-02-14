@@ -21,6 +21,7 @@
 
 #include "common/status.h"
 #include "runtime/descriptors.h"
+#include "runtime/lib-cache.h"
 #include "runtime/raw-value.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
@@ -232,8 +233,7 @@ class Expr {
   // typedef for compute functions.
   typedef void* (*ComputeFn)(Expr*, TupleRow*);
 
-  // Empty virtual destructor
-  virtual ~Expr() {}
+  virtual ~Expr();
 
   // Evaluate expr and return pointer to result. The result is
   // valid as long as 'row' doesn't change.
@@ -319,6 +319,12 @@ class Expr {
   static Status Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
                         const RowDescriptor& row_desc, bool disable_codegen = true,
                         bool* thread_safe = NULL);
+
+  // Closes 'exprs'. Must be called for every expr tree created.
+  static void Close(const std::vector<Expr*>& exprs, RuntimeState* state);
+
+  // Must be called for each expr
+  void Close(RuntimeState* state);
 
   // Create a new literal expr of 'type' with initial 'data'.
   // data should match the PrimitiveType (i.e. type == TYPE_INT, data is a int*)
@@ -423,6 +429,9 @@ class Expr {
   // Does not do anything on the this expr.
   // Return OK if successful, otherwise return error status.
   Status PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc);
+
+  // Cache entry for the library implementing this function.
+  LibCache::LibCacheEntry* cache_entry_;
 
   // Function description.
   TFunction fn_;

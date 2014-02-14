@@ -76,7 +76,8 @@ AggFnEvaluator::AggFnEvaluator(const TExprNode& desc)
   : fn_(desc.fn),
     return_type_(desc.fn.ret_type),
     intermediate_type_(desc.fn.aggregate_fn.intermediate_type),
-    output_slot_desc_(NULL) {
+    output_slot_desc_(NULL),
+    cache_entry_(NULL) {
   DCHECK(desc.fn.__isset.aggregate_fn);
   DCHECK(desc.node_type == TExprNodeType::AGGREGATE_EXPR);
   // TODO: remove. See comment with AggregationOp
@@ -91,6 +92,10 @@ AggFnEvaluator::AggFnEvaluator(const TExprNode& desc)
   } else {
     agg_op_ = OTHER;
   }
+}
+
+AggFnEvaluator::~AggFnEvaluator() {
+  DCHECK(cache_entry_ == NULL) << "Need to call Close()";
 }
 
 Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
@@ -122,30 +127,38 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
 
   RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
       state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.init_fn_symbol,
-      &init_fn_));
+      &init_fn_, &cache_entry_));
   RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
       state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.update_fn_symbol,
-      &update_fn_));
+      &update_fn_, NULL));
   RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
       state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.merge_fn_symbol,
-      &merge_fn_));
+      &merge_fn_, NULL));
 
   // Serialize and Finalize are optional
   if (!fn_.aggregate_fn.serialize_fn_symbol.empty()) {
     RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
         state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.serialize_fn_symbol,
-        &serialize_fn_));
+        &serialize_fn_, NULL));
   } else {
     serialize_fn_ = NULL;
   }
   if (!fn_.aggregate_fn.finalize_fn_symbol.empty()) {
     RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
         state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.finalize_fn_symbol,
-        &finalize_fn_));
+        &finalize_fn_, NULL));
   } else {
     finalize_fn_ = NULL;
   }
   return Status::OK;
+}
+
+void AggFnEvaluator::Close(RuntimeState* state) {
+  Expr::Close(input_exprs_, state);
+  if (cache_entry_ != NULL) {
+    state->lib_cache()->DecrementUseCount(cache_entry_);
+    cache_entry_ = NULL;
+  }
 }
 
 // Utility to put val into an AnyVal struct

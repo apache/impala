@@ -42,14 +42,10 @@ class TestUdfs(ImpalaTestSuite):
     self.run_test_case('QueryTest/load-hive-udfs', vector)
     self.run_test_case('QueryTest/hive-udf', vector)
 
-  # TODO: Run this test in parallel once the concurrent lib cache drop issues are resolved
-  @pytest.mark.execute_serially
   def test_libs_with_same_filenames(self, vector):
     self.run_test_case('QueryTest/libs_with_same_filenames', vector)
 
-  @pytest.mark.execute_serially
   def test_udf_update(self, vector):
-    pytest.xfail("Fails with 'AnalysisException: default.udf_update_test() unknown'")
     # Test updating the UDF binary without restarting Impala. Dropping
     # the function should remove the binary from the local cache.
     # Run with sync_ddl to guarantee the drop is processed by all impalads.
@@ -61,10 +57,10 @@ class TestUdfs(ImpalaTestSuite):
         'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
     udf_dst = '/test-warehouse/impala-hive-udfs2.jar'
 
-    drop_fn_stmt = 'drop function if exists udf_update_test()'
-    create_fn_stmt = "create function udf_update_test() returns string "\
+    drop_fn_stmt = 'drop function if exists default.udf_update_test()'
+    create_fn_stmt = "create function default.udf_update_test() returns string "\
         "LOCATION '" + udf_dst + "' SYMBOL='com.cloudera.impala.TestUpdateUdf'"
-    query_stmt = "select udf_update_test()"
+    query_stmt = "select default.udf_update_test()"
 
     # Put the old UDF binary on HDFS, make the UDF in Impala and run it.
     call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
@@ -78,6 +74,30 @@ class TestUdfs(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, drop_fn_stmt, exec_options)
     self.execute_query_expect_success(self.client, create_fn_stmt, exec_options)
     self.__run_query_all_impalads(exec_options, query_stmt, ["New UDF"])
+
+  def test_drop_function_while_running(self, vector):
+    self.client.execute("drop function if exists default.drop_while_running(BIGINT)")
+    self.client.execute("create function default.drop_while_running(BIGINT) returns "\
+        "BIGINT LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Identity'")
+    query = \
+        "select default.drop_while_running(l_orderkey) from tpch.lineitem limit 10000";
+
+    # Run this query asynchronously.
+    handle = self.execute_query_async(query, vector.get_value('exec_option'),
+                                      table_format=vector.get_value('table_format'))
+
+    # Fetch some rows from the async query to make sure the UDF is being used
+    results = self.client.fetch(query, handle, 1)
+    assert results.success
+    assert len(results.data) == 1
+
+    # Drop the function while the original query is running.
+    self.client.execute("drop function default.drop_while_running(BIGINT)")
+
+    # Fetch the rest of the rows, this should still be able to run the UDF
+    results = self.client.fetch(query, handle, -1)
+    assert results.success
+    assert len(results.data) == 9999
 
   def __run_query_all_impalads(self, exec_options, query, expected):
     impala_cluster = ImpalaCluster()

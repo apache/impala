@@ -80,6 +80,7 @@ void HBaseTableSink::Close(RuntimeState* state) {
     hbase_table_writer_->Close(state);
     hbase_table_writer_.reset(NULL);
   }
+  Expr::Close(output_exprs_, state);
 }
 
 }  // namespace impala

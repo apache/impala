@@ -135,6 +135,8 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 void TopNNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
+  Expr::Close(lhs_ordering_exprs_, state);
+  Expr::Close(rhs_ordering_exprs_, state);
   ExecNode::Close(state);
 }
 

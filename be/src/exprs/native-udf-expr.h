@@ -17,6 +17,7 @@
 #define IMPALA_EXPRS_UDF_EXPR_H_
 
 #include <string>
+
 #include "exprs/expr.h"
 #include "udf/udf.h"
 

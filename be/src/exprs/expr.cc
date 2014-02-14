@@ -74,7 +74,8 @@ bool ParseString(const string& str, T* val) {
 }
 
 Expr::Expr(const ColumnType& type, bool is_slotref)
-    : is_udf_call_(false),
+    : cache_entry_(NULL),
+      is_udf_call_(false),
       compute_fn_(NULL),
       is_slotref_(is_slotref),
       type_(type),
@@ -86,7 +87,8 @@ Expr::Expr(const ColumnType& type, bool is_slotref)
 }
 
 Expr::Expr(const TExprNode& node, bool is_slotref)
-    : is_udf_call_(false),
+    : cache_entry_(NULL),
+      is_udf_call_(false),
       compute_fn_(NULL),
       is_slotref_(is_slotref),
       type_(ColumnType(node.type)),
@@ -96,6 +98,20 @@ Expr::Expr(const TExprNode& node, bool is_slotref)
       scratch_buffer_size_(0),
       jitted_compute_fn_(NULL) {
   if (node.__isset.fn) fn_ = node.fn;
+}
+
+Expr::~Expr() {
+  DCHECK(cache_entry_ == NULL) << "Need to call Close()";
+}
+
+void Expr::Close(RuntimeState* state) {
+  for (int i = 0; i < children_.size(); ++i) {
+    children_[i]->Close(state);
+  }
+  if (cache_entry_ != NULL) {
+    state->lib_cache()->DecrementUseCount(cache_entry_);
+    cache_entry_ = NULL;
+  }
 }
 
 Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_expr) {
@@ -462,6 +478,12 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   }
 }
 
+void Expr::Close(const vector<Expr*>& exprs, RuntimeState* state) {
+  for (int i = 0; i < exprs.size(); ++i) {
+    exprs[i]->Close(state);
+  }
+}
+
 Status Expr::PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK(type_.type != INVALID_TYPE);
   for (int i = 0; i < children_.size(); ++i) {
@@ -505,7 +527,7 @@ Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
       DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::BUILTIN);
       void* fn_ptr;
       Status status = state->lib_cache()->GetSoFunctionPtr(
-          state->fs_cache(), "", fn_.scalar_fn.symbol, &fn_ptr);
+          state->fs_cache(), "", fn_.scalar_fn.symbol, &fn_ptr, &cache_entry_);
       if (!status.ok()) {
         // Builtins symbols should exist unless there is a version mismatch.
         stringstream ss;

@@ -20,6 +20,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include "common/status.h"
+#include "runtime/lib-cache.h"
 #include "runtime/primitive-type.h"
 #include "udf/udf.h"
 
@@ -76,6 +77,10 @@ class AggFnEvaluator {
   Status Prepare(RuntimeState* state, const RowDescriptor& desc,
       MemPool* pool, const SlotDescriptor* output_slot_desc);
 
+  ~AggFnEvaluator();
+
+  void Close(RuntimeState* state);
+
   AggregationOp agg_op() const { return agg_op_; }
   const std::vector<Expr*>& input_exprs() const { return input_exprs_; }
   bool is_count_star() const {
@@ -125,6 +130,9 @@ class AggFnEvaluator {
   // TODO: this is awful, remove this when exprs are updated.
   std::vector<impala_udf::AnyVal*> staging_input_vals_;
   impala_udf::AnyVal* staging_output_val_;
+
+  // Cache entry for the library containing the function ptrs.
+  LibCache::LibCacheEntry* cache_entry_;
 
   // Function ptrs for the different phases of the aggregate function.
   void* init_fn_;

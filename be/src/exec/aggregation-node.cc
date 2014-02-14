@@ -234,6 +234,11 @@ void AggregationNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
+  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
+    aggregate_evaluators_[i]->Close(state);
+  }
+  Expr::Close(probe_exprs_, state);
+  Expr::Close(build_exprs_, state);
   ExecNode::Close(state);
 }
 

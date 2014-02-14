@@ -20,6 +20,7 @@
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/thread/mutex.hpp>
+#include "common/atomic.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 
@@ -42,11 +43,18 @@ class HdfsFsCache;
 // that is taken when doing the cache lookup, but is not taking during any blocking calls.
 // During the block calls, we take the per-lib lock.
 //
+// Entry lifetime management: We cannot delete the entry while a query is
+// using the library. When the caller requests a ptr into the library, they
+// are given the entry handle and must decrement the ref count when they
+// are done.
+//
 // TODO:
 // - refresh libraries
 // - better cached module management.
 class LibCache {
  public:
+  struct LibCacheEntry;
+
   enum LibType {
     TYPE_SO,      // Shared object
     TYPE_IR,      // IR intermediate
@@ -67,12 +75,6 @@ class LibCache {
   Status GetLocalLibPath(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
       LibType type, std::string* local_path);
 
-  // Copies 'hdfs_lib_file' to 'FLAGS_local_library_dir' and dlopens it, storing the
-  // result in *handle.
-  // Only callable if 'hdfs_lib_file' is a shared object.
-  Status GetSoHandle(HdfsFsCache* hdfs_cache,
-      const std::string& hdfs_lib_file, void** handle);
-
   // Returns status.ok() if the symbol exists in 'hdfs_lib_file', non-ok otherwise.
   Status CheckSymbolExists(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
       LibType type, const std::string& symbol);
@@ -82,8 +84,14 @@ class LibCache {
   // Otherwise, 'hdfs_lib_file' should be the HDFS path to a shared library (.so) file.
   // dlopen handles and symbols are cached.
   // Only usable if 'hdfs_lib_file' refers to a shared object.
+  // If entry is non-null, *entry will be set to the cached entry. The caller
+  // must call DecrementUseCount(*entry) when it is done using fn_ptr and it is
+  // no longer valid to use fn_ptr.
   Status GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
-                        const std::string& symbol, void** fn_ptr);
+      const std::string& symbol, void** fn_ptr, LibCacheEntry** entry);
+
+  // See comment in GetSoFunctionPtr().
+  void DecrementUseCount(LibCacheEntry* entry);
 
   // Removes the cache entry for 'hdfs_lib_file'
   void RemoveEntry(const std::string hdfs_lib_file);
@@ -95,40 +103,13 @@ class LibCache {
   // dlopen() handle for the current process (i.e. impalad).
   void* current_process_handle_;
 
+  // The number of libs that have been copied from HDFS to the local FS.
+  // This is appended to the local fs path to remove collisions.
+  AtomicInt<int64_t> num_libs_copied_;
+
   // Protects lib_cache_. For lock ordering, this lock must always be taken before
   // the per entry lock.
   boost::mutex lock_;
-
-  struct LibCacheEntry {
-    // Lock protecting all fields in this entry
-    boost::mutex lock;
-
-    // The type of this file.
-    LibType type;
-
-    // The path on the local file system for this library.
-    std::string local_path;
-
-    // Status returned from copying this file from HDFS.
-    Status copy_file_status;
-
-    // Handle from dlopen.
-    void* shared_object_handle;
-
-    // mapping from symbol => address of loaded symbol.
-    // Only used if the type is TYPE_SO is true.
-    typedef boost::unordered_map<std::string, void*> SymbolMap;
-    SymbolMap symbol_cache;
-
-    // Set of symbols in this entry. This is populated once on load and read
-    // only. This is only used if it is a llvm module.
-    // TODO: it would be nice to be able to do this for .so's as well but it's
-    // not trivial to walk an .so for the symbol table.
-    boost::unordered_set<std::string> symbols;
-
-    LibCacheEntry() : shared_object_handle(NULL) {}
-    ~LibCacheEntry();
-  };
 
   // Maps HDFS library path => cache entry.
   // Entries in the cache need to be explicitly deleted.

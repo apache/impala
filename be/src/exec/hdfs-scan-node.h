@@ -306,15 +306,20 @@ class HdfsScanNode : public ScanNode {
   typedef std::map<THdfsFileFormat::type, std::list<llvm::Function*> > CodegendFnMap;
   CodegendFnMap codegend_fn_map_;
 
+  // All conjunct copies that are created, including codegen'd and noncodegen'd
+  // conjuncts.
+  // TODO: remove when exprs are threadsafe
+  std::list<std::vector<Expr*>*> all_conjuncts_copies_;
+
   // Copies of the conjuncts for use by the scanners when they cannot use codegen'd
   // functions.
   // TODO: We will only need one copy once exprs are threadsafe.
-  boost::mutex conjuncts_copies_lock_;
-  std::list<std::vector<Expr*>*> conjuncts_copies_;
+  SpinLock interpreted_conjuncts_copies_lock_;
+  std::list<std::vector<Expr*>*> interpreted_conjuncts_copies_;
 
   // The number of non-codegen'd conjuncts copies we made in CreateConjunctsCopies(). Used
   // for debugging.
-  int num_conjuncts_copies_;
+  int num_interpreted_conjuncts_copies_;
 
   // Total number of partition slot descriptors, including non-materialized ones.
   int num_partition_keys_;

@@ -209,7 +209,7 @@ class ImpalaBeeswaxClient(object):
     """Refresh a specific table from the catalog"""
     return self.execute("refresh %s.%s" % (db_name, table_name))
 
-  def fetch_results(self, query_string, query_handle):
+  def fetch_results(self, query_string, query_handle, max_rows = -1):
     """Fetches query results given a handle and query type (insert, use, other)"""
     query_type = self.__get_query_type(query_string)
     if query_type == 'use':
@@ -222,17 +222,18 @@ class ImpalaBeeswaxClient(object):
     if query_type == 'insert':
       exec_result = self.__fetch_insert_results(query_handle)
     else:
-      exec_result = self.__fetch_results(query_handle)
+      exec_result = self.__fetch_results(query_handle, max_rows)
     exec_result.query = query_string
     return exec_result
 
-  def __fetch_results(self, handle):
+  def __fetch_results(self, handle, max_rows = -1):
     """Handles query results, returns a QueryResult object"""
     schema = self.__do_rpc(lambda: self.imp_service.get_results_metadata(handle)).schema
     # The query has finished, we can fetch the results
     result_rows = []
-    while True:
-      results = self.__do_rpc(lambda: self.imp_service.fetch(handle, False, -1))
+    while len(result_rows) < max_rows or max_rows < 0:
+      fetch_rows = -1 if max_rows < 0 else max_rows - len(result_rows)
+      results = self.__do_rpc(lambda: self.imp_service.fetch(handle, False, fetch_rows))
       result_rows.extend(results.data)
       if not results.has_more:
         break

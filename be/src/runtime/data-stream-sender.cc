@@ -462,6 +462,7 @@ void DataStreamSender::Close(RuntimeState* state) {
   for (int i = 0; i < channels_.size(); ++i) {
     channels_[i]->Close(state);
   }
+  Expr::Close(partition_exprs_, state);
   closed_ = true;
 }
 

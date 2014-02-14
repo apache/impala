@@ -80,18 +80,23 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       break;
     }
     case TCatalogObjectType::FUNCTION: {
+      // The key looks like: <db>.fn(<args>). We need to parse out the
+      // db, fn and signature.
       catalog_object->__set_type(object_type);
       catalog_object->__set_fn(TFunction());
-      // The key only contains the database name and signature string, which is all that
-      // is needed to uniquely identify the function.
-      int pos = object_name.find(".");
-      if (pos == string::npos || pos >= object_name.size() - 1) {
+      int dot = object_name.find(".");
+      int paren = object_name.find("(");
+      if (dot == string::npos || dot >= object_name.size() - 1 ||
+          paren == string::npos || paren >= object_name.size() - 1 ||
+          paren <= dot) {
         stringstream error_msg;
         error_msg << "Invalid function name: " << object_name;
         return Status(error_msg.str());
       }
-      catalog_object->fn.name.__set_db_name(object_name.substr(0, pos));
-      catalog_object->fn.__set_signature(object_name.substr(pos + 1));
+      catalog_object->fn.name.__set_db_name(object_name.substr(0, dot));
+      catalog_object->fn.name.__set_function_name(
+          object_name.substr(dot + 1, paren - dot - 1));
+      catalog_object->fn.__set_signature(object_name.substr(dot + 1));
       break;
     }
     case TCatalogObjectType::CATALOG:

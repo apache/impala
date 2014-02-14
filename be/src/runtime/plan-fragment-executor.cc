@@ -493,8 +493,7 @@ void PlanFragmentExecutor::ReleaseThreadToken() {
 }
 
 void PlanFragmentExecutor::Close() {
-  if (closed_)
-    return;
+  if (closed_) return;
   row_batch_.reset();
   // Prepare may not have been called, which sets runtime_state_
   if (runtime_state_.get() != NULL) {

@@ -24,7 +24,6 @@
 #include <sstream>
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
-#include <dlfcn.h>
 
 #include <hdfs.h>
 
@@ -71,7 +70,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       reader_context_(NULL),
       tuple_desc_(NULL),
       unknown_disk_id_warned_(false),
-      num_conjuncts_copies_(0),
+      num_interpreted_conjuncts_copies_(0),
       num_partition_keys_(0),
       disks_accessed_bitmap_(TCounterType::UNIT, 0),
       done_(false),
@@ -147,10 +146,8 @@ Status HdfsScanNode::CreateConjuncts(vector<Expr*>* expr, bool disable_codegen) 
   // TODO: we really need to stop having to create copies of exprs
   RETURN_IF_ERROR(Expr::CreateExprTrees(runtime_state_->obj_pool(),
       thrift_plan_node_->conjuncts, expr));
-  for (int i = 0; i < expr->size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare((*expr)[i], runtime_state_, row_desc(),
-        disable_codegen));
-  }
+  all_conjuncts_copies_.push_back(expr);
+  RETURN_IF_ERROR(Expr::Prepare(*expr, runtime_state_, row_desc(), disable_codegen));
   return Status::OK;
 }
 
@@ -223,18 +220,18 @@ void HdfsScanNode::ReleaseCodegenFn(THdfsFileFormat::type type, Function* fn) {
 }
 
 vector<Expr*>* HdfsScanNode::GetConjuncts() {
-  unique_lock<mutex> l(conjuncts_copies_lock_);
-  DCHECK(!conjuncts_copies_.empty());
-  vector<Expr*>* conjuncts = conjuncts_copies_.back();
-  conjuncts_copies_.pop_back();
+  ScopedSpinLock l(&interpreted_conjuncts_copies_lock_);
+  DCHECK(!interpreted_conjuncts_copies_.empty());
+  vector<Expr*>* conjuncts = interpreted_conjuncts_copies_.back();
+  interpreted_conjuncts_copies_.pop_back();
   return conjuncts;
 }
 
 void HdfsScanNode::ReleaseConjuncts(vector<Expr*>* conjuncts) {
   DCHECK(conjuncts != NULL);
-  unique_lock<mutex> l(conjuncts_copies_lock_);
-  conjuncts_copies_.push_back(conjuncts);
-  DCHECK_LE(conjuncts_copies_.size(), num_conjuncts_copies_);
+  ScopedSpinLock l(&interpreted_conjuncts_copies_lock_);
+  interpreted_conjuncts_copies_.push_back(conjuncts);
+  DCHECK_LE(interpreted_conjuncts_copies_.size(), num_interpreted_conjuncts_copies_);
 }
 
 HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
@@ -442,7 +439,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::AVRO));
   RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::PARQUET));
 
-  num_conjuncts_copies_ = conjuncts_copies_.size();
+  num_interpreted_conjuncts_copies_ = interpreted_conjuncts_copies_.size();
 
   // We need at least one scanner thread to make progress. We need to make this
   // reservation before any ranges are issued.
@@ -558,8 +555,9 @@ void HdfsScanNode::Close(RuntimeState* state) {
   scanner_threads_.JoinAll();
 
   // All conjuncts should have been released
-  DCHECK_EQ(conjuncts_copies_.size(), num_conjuncts_copies_)
-      << "conjuncts_copies_ leak, check that ReleaseConjuncts() is being called";
+  DCHECK_EQ(interpreted_conjuncts_copies_.size(), num_interpreted_conjuncts_copies_)
+      << "interpreted_conjuncts_copies_ leak, check that ReleaseConjuncts() "
+      << "is being called";
 
   num_owned_io_buffers_ -= materialized_row_batches_->Cleanup();
   DCHECK_EQ(num_owned_io_buffers_, 0) << "ScanNode has leaked io buffers";
@@ -575,6 +573,11 @@ void HdfsScanNode::Close(RuntimeState* state) {
   DCHECK_EQ(active_hdfs_read_thread_counter_.value(), 0);
 
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
+
+  for (list<vector<Expr*>*>::iterator it = all_conjuncts_copies_.begin();
+     it != all_conjuncts_copies_.end(); ++it) {
+    Expr::Close(**it, state);
+  }
 
   ScanNode::Close(state);
 }
@@ -889,19 +892,19 @@ Status HdfsScanNode::CreateConjunctsCopies(THdfsFileFormat::type format) {
   }
 
   for (int i = 0; i < num_codegen_copies; ++i) {
-    vector<Expr*> conjuncts_copy;
-    RETURN_IF_ERROR(CreateConjuncts(&conjuncts_copy, false));
+    vector<Expr*>* conjuncts = pool_->Add(new vector<Expr*>());
+    RETURN_IF_ERROR(CreateConjuncts(conjuncts, false));
     Function* fn;
     switch (format) {
       case THdfsFileFormat::TEXT:
       case THdfsFileFormat::LZO_TEXT:
-        fn = HdfsTextScanner::Codegen(this, conjuncts_copy);
+        fn = HdfsTextScanner::Codegen(this, *conjuncts);
         break;
       case THdfsFileFormat::SEQUENCE_FILE:
-        fn = HdfsSequenceScanner::Codegen(this, conjuncts_copy);
+        fn = HdfsSequenceScanner::Codegen(this, *conjuncts);
         break;
       case THdfsFileFormat::AVRO:
-        fn = HdfsAvroScanner::Codegen(this, conjuncts_copy);
+        fn = HdfsAvroScanner::Codegen(this, *conjuncts);
         break;
       default:
         // No codegen for this format
@@ -924,10 +927,11 @@ Status HdfsScanNode::CreateConjunctsCopies(THdfsFileFormat::type format) {
   int num_noncodegen_copies = min(max_threads, num_splits);
 
   // No point making more copies than the maximum possible number of threads
-  while (num_noncodegen_copies > 0 && conjuncts_copies_.size() < max_threads) {
+  while (num_noncodegen_copies > 0 &&
+      interpreted_conjuncts_copies_.size() < max_threads) {
     vector<Expr*>* conjuncts = pool_->Add(new vector<Expr*>());
     RETURN_IF_ERROR(CreateConjuncts(conjuncts, true));
-    conjuncts_copies_.push_back(conjuncts);
+    interpreted_conjuncts_copies_.push_back(conjuncts);
     --num_noncodegen_copies;
   }
 

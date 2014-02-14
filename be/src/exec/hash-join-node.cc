@@ -121,6 +121,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 void HashJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
+  Expr::Close(build_exprs_, state);
+  Expr::Close(probe_exprs_, state);
   BlockingJoinNode::Close(state);
 }
 

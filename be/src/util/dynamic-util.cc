@@ -54,4 +54,8 @@ Status DynamicOpen(const char* library, void** handle) {
   return Status::OK;
 }
 
+void DynamicClose(void* handle) {
+  dlclose(handle);
+}
+
 }

@@ -155,6 +155,12 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 void MergeNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   child_row_batch_.reset();
+  for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
+    Expr::Close(const_result_expr_lists_[i], state);
+  }
+  for (int i = 0; i < result_expr_lists_.size(); ++i) {
+    Expr::Close(result_expr_lists_[i], state);
+  }
   ExecNode::Close(state);
 }
 

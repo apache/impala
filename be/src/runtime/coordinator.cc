@@ -333,11 +333,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
     DCHECK(output_exprs != NULL);
     RETURN_IF_ERROR(Expr::CreateExprTrees(
         runtime_state()->obj_pool(), request.fragments[0].output_exprs, output_exprs));
-    for (int i = 0; i < output_exprs->size(); ++i) {
-      RETURN_IF_ERROR(
-          Expr::Prepare((*output_exprs)[i], runtime_state(), row_desc()));
-    }
-
+    RETURN_IF_ERROR(Expr::Prepare(*output_exprs, runtime_state(), row_desc()));
     // Run optimization only after preparing the executor and the output exprs.
     executor_->OptimizeLlvmModule();
   } else {
@@ -1167,7 +1163,7 @@ void Coordinator::UpdateFragmentInfo(BackendExecState* backend_exec_state) {
   data.rates(backend_exec_state->total_split_size / (completion_time / 1000.0
     / 1000.0 / 1000.0));
   // Merge obtains locks on the counter map and children while
-  // performing the merge, so concurrent merges into the same 
+  // performing the merge, so concurrent merges into the same
   // profile should be protected
   data.averaged_profile->Merge(backend_exec_state->profile);
   data.root_profile->AddChild(backend_exec_state->profile);

@@ -93,6 +93,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
 
   TColumnValue val;
   e->GetValue(NULL, false, &val);
+  e->Close(&state);
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &val, &result_bytes), env,
                      JniUtil::internal_exc_class(), result_bytes);
   return result_bytes;

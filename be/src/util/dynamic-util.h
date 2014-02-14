@@ -31,6 +31,9 @@ Status DynamicLookup(void* handle, const char* symbol, void** fn_ptr);
 // handle -- returned handle to the library.
 Status DynamicOpen(const char* library, void** handle);
 
+// Closes the handle.
+void DynamicClose(void* handle);
+
 }
 
 #endif

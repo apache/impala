@@ -276,7 +276,10 @@ public class Function implements CatalogObject {
           aggFn.getInit_fn_symbol(), aggFn.getSerialize_fn_symbol(),
           aggFn.getMerge_fn_symbol(), aggFn.getFinalize_fn_symbol());
     } else {
-      throw new IllegalStateException("Expected function type to be either UDA or UDF.");
+      // In the case where we are trying to look up the object, we only have the
+      // signature.
+      function = new Function(FunctionName.fromThrift(fn.getName()),
+          argTypes, ColumnType.fromThrift(fn.getRet_type()), fn.isHas_var_args());
     }
     function.setBinaryType(fn.getBinary_type());
     function.setHasVarArgs(fn.isHas_var_args());

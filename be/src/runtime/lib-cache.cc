@@ -17,7 +17,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
 #include <boost/thread/locks.hpp>
-#include <dlfcn.h>
+
 #include "codegen/llvm-codegen.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-state.h"
@@ -33,12 +33,51 @@ using namespace impala;
 DEFINE_string(local_library_dir, "/tmp",
               "Local directory to copy UDF libraries from HDFS into");
 
+struct LibCache::LibCacheEntry {
+  // Lock protecting all fields in this entry
+  boost::mutex lock;
+
+  // The number of users that are using this cache entry. If this is
+  // a .so, we can't dlclose unless the use_count goes to 0.
+  int use_count;
+
+  // If true, this cache entry should be removed from lib_cache_ when
+  // the use_count goes to 0.
+  bool should_remove;
+
+  // The type of this file.
+  LibType type;
+
+  // The path on the local file system for this library.
+  std::string local_path;
+
+  // Status returned from copying this file from HDFS.
+  Status copy_file_status;
+
+  // Handle from dlopen.
+  void* shared_object_handle;
+
+  // mapping from symbol => address of loaded symbol.
+  // Only used if the type is TYPE_SO.
+  typedef boost::unordered_map<std::string, void*> SymbolMap;
+  SymbolMap symbol_cache;
+
+  // Set of symbols in this entry. This is populated once on load and read
+  // only. This is only used if it is a llvm module.
+  // TODO: it would be nice to be able to do this for .so's as well but it's
+  // not trivial to walk an .so for the symbol table.
+  boost::unordered_set<std::string> symbols;
+
+  LibCacheEntry() : use_count(0), should_remove(false), shared_object_handle(NULL) {}
+  ~LibCacheEntry();
+};
+
 LibCache::LibCache() :current_process_handle_(NULL) {
 }
 
 LibCache::~LibCache() {
   DropCache();
-  if (current_process_handle_ != NULL) dlclose(current_process_handle_);
+  if (current_process_handle_ != NULL) DynamicClose(current_process_handle_);
 }
 
 Status LibCache::Init(bool is_fe_tests) {
@@ -58,16 +97,16 @@ Status LibCache::Init(bool is_fe_tests) {
 
 LibCache::LibCacheEntry::~LibCacheEntry() {
   if (shared_object_handle != NULL) {
-    int error = dlclose(shared_object_handle);
-    if (error != 0) {
-      LOG(WARNING) << "Error calling dlclose for " << local_path
-                   << ": (Error: " << error << ") " << dlerror();
-    }
+    DCHECK_EQ(use_count, 0);
+    DCHECK(should_remove);
+    DynamicClose(shared_object_handle);
   }
+  unlink(local_path.c_str());
 }
 
 Status LibCache::GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
-                                const string& symbol, void** fn_ptr) {
+    const string& symbol, void** fn_ptr, LibCacheEntry** ent) {
+  if (ent != NULL) *ent = NULL;
   if (hdfs_lib_file.empty()) {
     // Just loading a function ptr in the current process. No need to take any locks.
     DCHECK(current_process_handle_ != NULL);
@@ -75,8 +114,8 @@ Status LibCache::GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_li
     return Status::OK;
   }
 
-  unique_lock<mutex> lock;
   LibCacheEntry* entry = NULL;
+  unique_lock<mutex> lock;
   RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, TYPE_SO, &lock, &entry));
   DCHECK(entry != NULL);
   DCHECK_EQ(entry->type, TYPE_SO);
@@ -89,7 +128,22 @@ Status LibCache::GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_li
     entry->symbol_cache[symbol] = *fn_ptr;
   }
   DCHECK(*fn_ptr != NULL);
+  if (ent != NULL) {
+    *ent = entry;
+    ++(*ent)->use_count;
+  }
   return Status::OK;
+}
+
+void LibCache::DecrementUseCount(LibCacheEntry* entry) {
+  if (entry == NULL) return;
+  bool can_delete = false;
+  {
+    unique_lock<mutex> lock(entry->lock);;
+    --entry->use_count;
+    can_delete = (entry->use_count == 0 && entry->should_remove);
+  }
+  if (can_delete) delete entry;
 }
 
 Status LibCache::GetLocalLibPath(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
@@ -104,22 +158,11 @@ Status LibCache::GetLocalLibPath(HdfsFsCache* hdfs_cache, const string& hdfs_lib
   return Status::OK;
 }
 
-Status LibCache::GetSoHandle(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
-                           void** handle) {
-  unique_lock<mutex> lock;
-  LibCacheEntry* entry = NULL;
-  RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, TYPE_SO, &lock, &entry));
-  DCHECK(entry != NULL);
-  DCHECK_EQ(entry->type, TYPE_SO);
-  *handle = entry->shared_object_handle;
-  return Status::OK;
-}
-
 Status LibCache::CheckSymbolExists(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
     LibType type, const string& symbol) {
   if (type == TYPE_SO) {
     void* dummy_ptr = NULL;
-    return GetSoFunctionPtr(hdfs_cache, hdfs_lib_file, symbol, &dummy_ptr);
+    return GetSoFunctionPtr(hdfs_cache, hdfs_lib_file, symbol, &dummy_ptr, NULL);
   } else if (type == TYPE_IR) {
     unique_lock<mutex> lock;
     LibCacheEntry* entry = NULL;
@@ -156,23 +199,31 @@ void LibCache::RemoveEntry(const std::string hdfs_lib_file) {
   LibCacheEntry* entry = it->second;
   lib_cache_.erase(it);
 
+  entry->should_remove = true;
+  DCHECK_GE(entry->use_count, 0);
+  bool can_delete = entry->use_count == 0;
+
   // Now that the entry is removed from the map, it means no future threads
   // can find it->second (the entry), so it is safe to unlock.
   entry_lock.unlock();
 
-  // Now that we've unlocked, we can delete this entry.
-  delete entry;
+  // Now that we've unlocked, we can delete this entry if no one is using it.
+  if (can_delete) delete entry;
 }
 
 void LibCache::DropCache() {
   unique_lock<mutex> lib_cache_lock(lock_);
   BOOST_FOREACH(LibMap::value_type& v, lib_cache_) {
+    bool can_delete = false;
     {
       // Lock to wait for any threads currently processing the entry.
       unique_lock<mutex> entry_lock(v.second->lock);
+      v.second->should_remove = true;
+      DCHECK_GE(v.second->use_count, 0);
+      can_delete = v.second->use_count == 0;
     }
     VLOG(1) << "Removed lib cache entry: " << v.first;
-    delete v.second;
+    if (can_delete) delete v.second;
   }
   lib_cache_.clear();
 }
@@ -238,15 +289,10 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
 }
 
 string LibCache::MakeLocalPath(const string& hdfs_path, const string& local_dir) {
-  stringstream hash_ss;
-  hash_ss << getpid() << hdfs_path;
-  // Shorten the hash to 16 bits so the filenames aren't too long.
-  uint32_t hash = HashUtil::Hash(hash_ss.str().c_str(), hash_ss.str().size(), 0) >> 16;
-
-  // Append the filename + hash to the local directory.
+  // Append the pid and library number to the local directory.
   filesystem::path src(hdfs_path);
   stringstream dst;
-  dst << local_dir << "/" << src.stem().native() << "." << hash
-      << src.extension().native();
+  dst << local_dir << "/" << src.stem().native() << "." << getpid() << "."
+      << (num_libs_copied_++) << src.extension().native();
   return dst.str();
 }

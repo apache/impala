@@ -149,6 +149,7 @@ void ExecNode::Close(RuntimeState* state) {
   if (mem_tracker() != NULL) {
     DCHECK_EQ(mem_tracker()->consumption(), 0) << "Leaked memory.";
   }
+  Expr::Close(conjuncts_, state);
 }
 
 void ExecNode::AddRuntimeExecOption(const string& str) {
