@@ -27,6 +27,7 @@ import org.apache.log4j.Logger;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.thrift.TCatalogObject;
+import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTableName;
@@ -348,17 +349,15 @@ public abstract class Catalog {
         break;
       }
       case FUNCTION: {
-        for (String dbName: getDbNames(null)) {
-          Db db = getDb(dbName);
-          if (db == null) continue;
-          Function fn = db.getFunction(objectDesc.getFn().getSignature());
-          if (fn == null) continue;
-          result.setType(fn.getCatalogObjectType());
-          result.setCatalog_version(fn.getCatalogVersion());
-          result.setFn(fn.toThrift());
-          break;
+        TFunction tfn = objectDesc.getFn();
+        Function desc = Function.fromThrift(tfn);
+        Function fn = getFunction(desc, Function.CompareMode.IS_INDISTINGUISHABLE);
+        if (fn == null) {
+          throw new CatalogException("Function not found: " + tfn);
         }
-        if (!result.isSetFn()) throw new CatalogException("Function not found.");
+        result.setType(fn.getCatalogObjectType());
+        result.setCatalog_version(fn.getCatalogVersion());
+        result.setFn(fn.toThrift());
         break;
       }
       default: throw new IllegalStateException(
