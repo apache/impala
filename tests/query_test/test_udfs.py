@@ -42,6 +42,7 @@ class TestUdfs(ImpalaTestSuite):
     self.run_test_case('QueryTest/load-hive-udfs', vector)
     self.run_test_case('QueryTest/hive-udf', vector)
 
+  @pytest.mark.execute_serially
   def test_libs_with_same_filenames(self, vector):
     self.run_test_case('QueryTest/libs_with_same_filenames', vector)
 
