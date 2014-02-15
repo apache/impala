@@ -117,7 +117,7 @@ select * from functional.alltypes_view t1, functional.alltypes_view_sub t2,
 functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 ---- PLAN
 08:HASH JOIN [INNER JOIN]
-|  hash predicates: functional.alltypes.id = int_col
+|  hash predicates: functional.alltypes.id = int_col, count(a.bigint_col) = int_col
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 size=1.40MB compact
@@ -149,7 +149,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 16:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: functional.alltypes.id = int_col
+|  hash predicates: functional.alltypes.id = int_col, count(a.bigint_col) = int_col
 |
 |--15:EXCHANGE [BROADCAST]
 |  |

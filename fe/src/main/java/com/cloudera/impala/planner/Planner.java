@@ -36,7 +36,6 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
@@ -51,7 +50,6 @@ import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
@@ -1491,6 +1489,11 @@ public class Planner {
       // ignore predicates that express an equivalence relationship if that
       // relationship is already captured via another predicate; we still
       // return those predicates in joinPredicates so they get marked as assigned
+      // TODO: The code block below is not quite correct because it only selects
+      // a *single* predicate per equivalence class. Instead, we must select
+      // a minimal set of predicates that are able to express the equivalence
+      // class (the minimal spanning tree).
+      /*
       Pair<SlotId, SlotId> joinSlots = ((Predicate) e).getEqSlots();
       if (joinSlots != null) {
         EquivalenceClassId id1 = analyzer.getEquivClassId(joinSlots.first);
@@ -1505,6 +1508,7 @@ public class Planner {
         }
         joinEquivClasses.add(id1);
       }
+      */
 
       // e is a non-redundant join predicate
       Preconditions.checkState(lhsExpr != rhsExpr);
