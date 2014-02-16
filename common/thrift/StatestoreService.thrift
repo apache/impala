@@ -153,6 +153,11 @@ struct TUpdateStateResponse {
 
   // List of updates published by the subscriber to be made centrally by the statestore
   2: required list<TTopicDelta> topic_updates;
+
+  // True if this update was skipped by the subscriber. This is distinguished from a
+  // non-OK status since the former indicates an error which contributes to the
+  // statestore's view of a subscriber's liveness.
+  3: optional bool skipped;
 }
 
 service StatestoreSubscriber {

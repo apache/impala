@@ -21,6 +21,7 @@
 #include <boost/foreach.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/shared_mutex.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "common/status.h"
@@ -35,6 +36,7 @@ using namespace boost;
 using namespace boost::posix_time;
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::transport;
+using namespace strings;
 
 DEFINE_int32(statestore_subscriber_timeout_seconds, 10, "The amount of time (in seconds)"
      " that may elapse before the connection with the statestore is considered lost.");
@@ -47,6 +49,9 @@ namespace impala {
 
 // Used to identify the statestore in the failure detector
 const string STATESTORE_ID = "STATESTORE";
+
+// Template for metrics that measure the processing time for individual topics.
+const string CALLBACK_METRIC_PATTERN = "statestore-subscriber.topic-$0.processing-time-s";
 
 // Duration, in ms, to sleep between attempts to reconnect to the
 // statestore after a failure.
@@ -68,7 +73,9 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
     }
 
     subscriber_->UpdateState(params.topic_deltas, registration_id,
-        &response.topic_updates).ToThrift(&response.status);
+        &response.topic_updates, &response.skipped).ToThrift(&response.status);
+    // Make sure Thrift thinks the field is set.
+    response.__set_skipped(response.skipped);
   }
 
  private:
@@ -86,7 +93,8 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
           seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
       is_registered_(false),
       client_cache_(new StatestoreClientCache(FLAGS_statestore_subscriber_cnxn_attempts,
-          FLAGS_statestore_subscriber_cnxn_retry_interval_ms)) {
+          FLAGS_statestore_subscriber_cnxn_retry_interval_ms)),
+      metrics_(metrics) {
   connected_to_statestore_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric("statestore-subscriber.connected", false);
   last_recovery_duration_metric_ = metrics->CreateAndRegisterPrimitiveMetric(
@@ -106,7 +114,13 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
     bool is_transient, const UpdateCallback& callback) {
   lock_guard<mutex> l(lock_);
   if (is_registered_) return Status("Subscriber already started, can't add new topic");
-  update_callbacks_[topic_id].push_back(callback);
+  Callbacks* cb = &(update_callbacks_[topic_id]);
+  cb->callbacks.push_back(callback);
+  if (cb->processing_time_metric == NULL) {
+    const string& metric_name = Substitute(CALLBACK_METRIC_PATTERN, topic_id);
+    cb->processing_time_metric =
+        metrics_->RegisterMetric(new StatsMetric<double>(metric_name));
+  }
   topic_registrations_[topic_id] = is_transient;
   return Status::OK;
 }
@@ -196,6 +210,10 @@ void StatestoreSubscriber::RecoveryModeChecker() {
       // When entering recovery mode, the class-wide lock_ is taken to
       // ensure mutual exclusion with any operations in flight.
       lock_guard<mutex> l(lock_);
+      // Check again - we might have finished processing
+      if (failure_detector_->GetPeerState(STATESTORE_ID) != FailureDetector::FAILED) {
+        continue;
+      }
       MonotonicStopWatch recovery_timer;
       recovery_timer.Start();
       connected_to_statestore_metric_->Update(false);
@@ -238,15 +256,29 @@ void StatestoreSubscriber::RecoveryModeChecker() {
 }
 
 Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_deltas,
-    const TUniqueId& registration_id, vector<TTopicDelta>* subscriber_topic_updates) {
-  failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
-
+    const TUniqueId& registration_id, vector<TTopicDelta>* subscriber_topic_updates,
+    bool* skipped) {
   // We don't want to block here because this is an RPC, and delaying the return causes
-  // the statestore to delay sending the next batch of heartbeats. The only time that
-  // lock_ will be taken once UpdateState() might be called is in RecoveryModeChecker();
-  // if we're in recovery mode we don't want to process the update.
+  // the statestore to delay sending further heartbeats. The only time that lock_ might be
+  // taken concurrently is if:
+  //
+  // a) another heartbeat is still being processed (i.e. is still in UpdateState()). This
+  // could happen only when the subscriber has re-registered, and the statestore is still
+  // sending a heartbeat for the previous registration. In this case, return OK but set
+  // *skipped = true to tell the statestore to retry this heartbeat in the future.
+  //
+  // b) the subscriber is recovering, and has the lock held during
+  // RecoveryModeChecker(). Similarly, we set *skipped = true.
+  // TODO: Consider returning an error in this case so that the statestore will eventually
+  // stop sending heartbeats even if re-registration fails.
+  //
+  // We only update the failure detector *after* a heartbeat has been processed so that
+  // the time taken to do so doesn't factor into subscriber-side timeouts. Since
+  // RecoveryModeChacker() waits to take lock_ before checking the failure detector, it
+  // will not detect a failure situation while the heartbeat is being processed.
   try_mutex::scoped_try_lock l(lock_);
   if (l) {
+    *skipped = false;
     {
       lock_guard<mutex> r(registration_id_lock_);
       // If this subscriber has just started, the registration_id_ may not have been set
@@ -295,22 +327,27 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
     // Skip calling the callbacks when an unexpected delta update is found.
     if (!found_unexpected_delta) {
       BOOST_FOREACH(const UpdateCallbacks::value_type& callbacks, update_callbacks_) {
-        BOOST_FOREACH(const UpdateCallback& callback, callbacks.second) {
+        MonotonicStopWatch sw;
+        sw.Start();
+        BOOST_FOREACH(const UpdateCallback& callback, callbacks.second.callbacks) {
           // TODO: Consider filtering the topics to only send registered topics to
           // callbacks
           callback(incoming_topic_deltas, subscriber_topic_updates);
         }
+        callbacks.second.processing_time_metric->Update(
+            sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
       }
     }
     sw.Stop();
     heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-    return Status::OK;
+    // Do this while holding lock_ so that the double-check in RecoveryModeChecker will
+    // definitely see the most recent state.
+    failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
   } else {
-    stringstream ss;
-    ss << "Subscriber '" << subscriber_id_
-       << "' is registering with statestore, ignoring update.";
-    return Status(ss.str());
+    failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
+    *skipped = true;
   }
+  return Status::OK;
 }
 
 

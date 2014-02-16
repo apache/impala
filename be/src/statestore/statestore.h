@@ -51,11 +51,14 @@ class Status;
 // of a subscriber.
 //
 // Subscribers, in return, send topic updates to the statestore to merge with the current
-// topic. These updates are then sent to all other subscribers in the next heartbeat.
+// topic. These updates are then sent to all other subscribers in the next heartbeat. The
+// next heartbeat is scheduled for FLAGS_statestore_heartbeat_frequency_ms in the future,
+// unless the subscriber indicated that it skipped processing a heartbeat, in which case
+// the statestore will back off slightly before re-sending the same heartbeat.
 //
 // Topic entries usually have human-readable keys, and values which are some serialised
-// representation of a data structure, e.g. a Thrift struct. The contents of a value's bye
-// string is opaque to the statestore, which maintains no information about how to
+// representation of a data structure, e.g. a Thrift struct. The contents of a value's
+// byte string is opaque to the statestore, which maintains no information about how to
 // deserialise it. Subscribers must use convention to interpret each other's updates.
 //
 // A subscriber may have marked some updates that it made as 'transient', which implies
@@ -400,17 +403,32 @@ class Statestore {
   Metrics::IntMetric* value_size_metric_;
   Metrics::IntMetric* topic_size_metric_;
 
-  // Called by the subscriber heartbeat threadpool to process a single subscriber. Sends a
-  // heartbeat to one subscriber (by calling ProcessOneSubscriber) and updates the failure
-  // detector state with the result. Once complete, the subscriber is re-added to the
-  // heartbeat queue with a new scheduled time for its next heartbeat.
+  // Tracks the distribution of heartbeat durations - precisely the time spent in calling
+  // the UpdateState() RPC which allows us to measure the network transmission cost as
+  // well as the subscriber-side processing time.
+  StatsMetric<double>* heartbeat_duration_metric_;
+
+  // Called by the subscriber heartbeat thread pool to send one heartbeat to a subscriber
+  // by calling ProcessOneSubscriber(). Once complete, the subscriber is re-added to the
+  // heartbeat queue with a new scheduled time for its next heartbeat which depends on
+  // whether the heartbeat was skipped or not.
+  //
+  // The failure state of the subscriber is updated with the status returned from
+  // ProcessOneSubscriber(), and if the subscriber is judged to have failed it is removed
+  // from the list of active subscribers, and no further heartbeats are scheduled for it.
   void UpdateSubscriber(int thread_id, const ScheduledSubscriberUpdate& update);
 
-  // Does the work of updating a single subscriber. Tries to call UpdateState on the
-  // client. If that fails, informs the failure detector, and if the client is failed,
-  // adds it to the list of failed subscribers. Otherwise, it sends the deltas to the
-  // subscriber, and receives and processes a list of updates.
-  Status ProcessOneSubscriber(Subscriber* subscriber);
+  // Does the work of updating a single subscriber, by calling UpdateState() on the client
+  // to send a list of topic deltas to the subscriber. If that call fails (either because
+  // the RPC could not be completed, or the subscriber indicated an error), this method
+  // returns a non-OK status immediately without further processing.
+  //
+  // The subscriber may indicated that it skipped processing the heartbeat, either because
+  // it was not ready to do so or because it was busy. In that case, the UpdateState() RPC
+  // will return OK (since there was no error) and the output parameter heartbeat_skipped
+  // is set to true. Otherwise, any updates returned by the subscriber are applied to
+  // their target topics.
+  Status ProcessOneSubscriber(Subscriber* subscriber, bool* heartbeat_skipped);
 
   // Unregister a subscriber, removing all of its transient entries and evicting it from
   // the subscriber map. Callers must hold subscribers_lock_ prior to calling this method.

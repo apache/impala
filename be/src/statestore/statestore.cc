@@ -52,6 +52,7 @@ const string STATESTORE_LIVE_SUBSCRIBERS_LIST = "statestore.live-backends.list";
 const string STATESTORE_TOTAL_KEY_SIZE_BYTES = "statestore.total-key-size-bytes";
 const string STATESTORE_TOTAL_VALUE_SIZE_BYTES = "statestore.total-value-size-bytes";
 const string STATESTORE_TOTAL_TOPIC_SIZE_BYTES = "statestore.total-topic-size-bytes";
+const string STATESTORE_HEARTBEAT_DURATION = "statestore.heartbeat-durations";
 
 const Statestore::TopicEntry::Value Statestore::TopicEntry::NULL_VALUE = "";
 
@@ -206,6 +207,10 @@ Statestore::Statestore(Metrics* metrics)
       metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_TOTAL_VALUE_SIZE_BYTES, 0L);
   topic_size_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0L);
+
+  heartbeat_duration_metric_ = metrics->RegisterMetric(
+      new StatsMetric<double>(STATESTORE_HEARTBEAT_DURATION));
+
   client_cache_->InitMetrics(metrics, "subscriber");
 }
 
@@ -326,7 +331,12 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
   return Status::OK;
 }
 
-Status Statestore::ProcessOneSubscriber(Subscriber* subscriber) {
+Status Statestore::ProcessOneSubscriber(Subscriber* subscriber, bool* heartbeat_skipped) {
+  // Time any successful heartbeats (i.e. those for which UpdateState() completed, even
+  // though it may have returned an error.)
+  MonotonicStopWatch sw;
+  sw.Start();
+
   // First thing: make a list of updates to send
   TUpdateStateRequest update_state_request;
   GatherTopicUpdates(*subscriber, &update_state_request);
@@ -355,7 +365,21 @@ Status Statestore::ProcessOneSubscriber(Subscriber* subscriber) {
       return Status(e.what());
     }
   }
-  RETURN_IF_ERROR(Status(response.status));
+
+  status = Status(response.status);
+  if (!status.ok()) {
+    heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+    return status;
+  }
+
+  *heartbeat_skipped = (response.__isset.skipped && response.skipped);
+  if (*heartbeat_skipped) {
+    // The subscriber skipped processing this heartbeat. We don't consider this a failure
+    // - subscribers can decide what they do with any update - so, return OK and set
+    // heartbeat_skipped so the caller can compensate.
+    heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+    return Status::OK;
+  }
 
   // At this point the updates are assumed to have been successfully processed by the
   // subscriber. Update the subscriber's max version of each topic.
@@ -399,6 +423,7 @@ Status Statestore::ProcessOneSubscriber(Subscriber* subscriber) {
       }
     }
   }
+  heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   return Status::OK;
 }
 
@@ -424,6 +449,15 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
       topic_delta.__set_from_version(last_processed_version);
 
       const Topic& topic = topic_it->second;
+      if (!topic_delta.is_delta &&
+          topic.last_version() > Subscriber::TOPIC_INITIAL_VERSION) {
+        int64_t topic_size =
+            topic.total_key_size_bytes() + topic.total_value_size_bytes();
+        VLOG_QUERY << "Preparing initial " << topic_delta.topic_name
+                   << " topic update for " << subscriber.id() << ". Size = "
+                   << PrettyPrinter::Print(topic_size, TCounterType::BYTES);
+      }
+
       TopicUpdateLog::const_iterator next_update =
           topic.topic_update_log().upper_bound(last_processed_version);
 
@@ -505,8 +539,9 @@ void Statestore::UpdateSubscriber(int thread_id,
       SleepForMs(diff_ms);
       diff_ms = update_deadline - ms_since_epoch();
     }
+    diff_ms = abs(diff_ms);
     VLOG(3) << "Sending update to: " << update.second << " (deadline accuracy: "
-            << abs(diff_ms) << "ms)";
+            << diff_ms << "ms)";
 
     if (diff_ms > HEARTBEAT_WARN_THRESHOLD_MS) {
       // TODO: This should be a healthcheck in a monitored metric in CM, which would
@@ -527,7 +562,8 @@ void Statestore::UpdateSubscriber(int thread_id,
     subscriber = it->second;
   }
   // Give up the lock here so that others can get to the queue
-  Status status = ProcessOneSubscriber(subscriber.get());
+  bool heartbeat_skipped;
+  Status status = ProcessOneSubscriber(subscriber.get(), &heartbeat_skipped);
   {
     lock_guard<mutex> l(subscribers_lock_);
     // Check again if this registration has been removed while we were processing the
@@ -548,8 +584,13 @@ void Statestore::UpdateSubscriber(int thread_id,
                 << PrintId(subscriber->registration_id()) << ")";
       UnregisterSubscriber(subscriber.get());
     } else {
-      // Schedule the next heartbeat.
-      int64_t deadline_ms = ms_since_epoch() + FLAGS_statestore_heartbeat_frequency_ms;
+      // Schedule the next heartbeat. If the subscriber responded that it skipped the last
+      // heartbeat sent, we assume that it was busy doing something else, and back off
+      // slightly before sending another.
+      int64_t heartbeat_interval =
+          heartbeat_skipped ? (2 * FLAGS_statestore_heartbeat_frequency_ms) :
+              FLAGS_statestore_heartbeat_frequency_ms;
+      int64_t deadline_ms = ms_since_epoch() + heartbeat_interval;
       VLOG(3) << "Next deadline for: " << subscriber->id() << " is in "
               << FLAGS_statestore_heartbeat_frequency_ms << "ms";
       subscriber_heartbeat_threadpool_.Offer(make_pair(deadline_ms, subscriber->id()));

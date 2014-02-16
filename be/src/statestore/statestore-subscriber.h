@@ -41,26 +41,24 @@ class ThriftServer;
 
 typedef ClientCache<StatestoreServiceClient> StatestoreClientCache;
 
-// A StatestoreSubscriber communicates with a statestore periodically
-// through the exchange of heartbeat messages. These messages contain
-// updates from the statestore to a list of 'topics' that the
-// subscriber is interested in; in response the subscriber sends a
-// list of changes that it wishes to make to a topic.
+// A StatestoreSubscriber communicates with a statestore periodically through the exchange
+// of heartbeat messages. These messages contain updates from the statestore to a list of
+// 'topics' that the subscriber is interested in; in response the subscriber sends a list
+// of changes that it wishes to make to a topic.
 //
-// Clients of the subscriber register topics of interest, and a
-// function to call once an update has been received. Each callback
-// may optionally add one or more updates to a list of topic updates
-// to be sent back to the statestore. See AddTopic for the
+// Clients of the subscriber register topics of interest, and a function to call once an
+// update has been received. Each callback may optionally add one or more updates to a
+// list of topic updates to be sent back to the statestore. See AddTopic for the
 // requirements placed on these callbacks.
 //
-// Topics must be subscribed to before the subscriber is connected to
-// the statestore: there is no way to add a new subscription after
-// the subscriber has successfully registered.
+// Topics must be subscribed to before the subscriber is connected to the statestore:
+// there is no way to add a new subscription after the subscriber has successfully
+// registered.
 //
-// If the subscriber does not receive heartbeats from the statestore
-// within a configurable period of time, the subscriber enters
-// 'recovery mode', where it continually attempts to re-register with
-// the statestore.
+// If the subscriber does not receive heartbeats from the statestore within a configurable
+// period of time, the subscriber enters 'recovery mode', where it continually attempts to
+// re-register with the statestore. Recovery mode is not triggered if a heartbeat takes a
+// long time to process locally.
 class StatestoreSubscriber {
  public:
   // Only constructor.
@@ -161,21 +159,28 @@ class StatestoreSubscriber {
   // registration.
   TUniqueId registration_id_;
 
-  // Mapping of subscription ids to the associated callback. Because this mapping
+  struct Callbacks {
+    // Owned by the Metrics instance. Tracks how long callbacks took to process this
+    // topic.
+    StatsMetric<double>* processing_time_metric;
+
+    // List of callbacks to invoke for this topic.
+    std::vector<UpdateCallback> callbacks;
+  };
+
+  // Mapping of topic ids to their associated callbacks. Because this mapping
   // stores a pointer to an UpdateCallback, memory errors will occur if an UpdateCallback
   // is deleted before being unregistered. The UpdateCallback destructor checks for
   // such problems, so that we will have an assertion failure rather than a memory error.
-  typedef boost::unordered_map<Statestore::TopicId, std::vector<UpdateCallback> >
-      UpdateCallbacks;
+  typedef boost::unordered_map<Statestore::TopicId, Callbacks> UpdateCallbacks;
 
-  // Callback for all services that have registered for updates (indexed by the
-  // associated SubscriptionId), and associated lock.
+  // Callback for all services that have registered for updates (indexed by the associated
+  // SubscriptionId), and associated lock.
   UpdateCallbacks update_callbacks_;
 
-  // One entry for every topic subscribed to. The value is whether
-  // this subscriber considers this topic to be 'transient', that is
-  // any updates it makes will be deleted upon failure or
-  // disconnection.
+  // One entry for every topic subscribed to. The value is whether this subscriber
+  // considers this topic to be 'transient', that is any updates it makes will be deleted
+  // upon failure or disconnection.
   std::map<Statestore::TopicId, bool> topic_registrations_;
 
   // Mapping of TopicId to the last version of the topic this subscriber successfully
@@ -185,6 +190,9 @@ class StatestoreSubscriber {
 
   // statestore client cache - only one client is ever used.
   boost::scoped_ptr<StatestoreClientCache> client_cache_;
+
+  // Metrics instance that all metrics are registered in. Not owned by this class.
+  Metrics* metrics_;
 
   // Metric to indicate if we are successfully registered with the statestore
   Metrics::BooleanMetric* connected_to_statestore_metric_;
@@ -224,11 +232,15 @@ class StatestoreSubscriber {
   // "from_version" field of the TTopicDelta response. The next statestore update will
   // be based off the version the subscriber responds with.
   // If the subscriber is in recovery mode, this method returns immediately.
-  // Returns OK if not in recovery mode and the registration ID is current, and an error
-  // otherwise.
+  //
+  // Returns an error if some error was encountered (e.g. the supplied registration ID was
+  // unexpected), and OK otherwise. The output parameter 'skipped' is set to true if the
+  // subscriber chose not to process this heartbeat (if, for example, a concurrent
+  // heartbeat was being processed, or if the subscriber currently believes it is
+  // recovering). Doing so indicates that no topics were updated during this call.
   Status UpdateState(const TopicDeltaMap& incoming_topic_deltas,
       const TUniqueId& registration_id,
-      std::vector<TTopicDelta>* subscriber_topic_updates);
+      std::vector<TTopicDelta>* subscriber_topic_updates, bool* skipped);
 
   // Run in a separate thread. In a loop, check failure_detector_ to see if the
   // statestore is still sending heartbeats. If not, enter 'recovery mode'
