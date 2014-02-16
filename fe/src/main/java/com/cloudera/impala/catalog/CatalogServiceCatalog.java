@@ -15,16 +15,10 @@
 package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -57,13 +51,11 @@ import com.google.common.collect.Lists;
  * is incremented and assigned to a CatalogObject whenever it is
  * added/modified/removed from the catalog. This means each CatalogObject will have a
  * unique version and assigned versions are strictly increasing.
- * Table metadata is loaded in the background, by a pool of table loading threads.
- * These threads read from a deque of table names to determine which table to load
- * next. Tables added to the head of the deque will be loaded before tables added to the
- * tail, so the loading order can be prioritized (see prioritizeLoad()).
- * Additionally, a background collection thread can be enabled that will periodically
- * scan for missing tables (tables that are not yet loaded) and add them to the tail
- * of the loading deque.
+ * Table metadata is loaded in the background by the TableLoadingMgr; tables can be
+ * prioritized for loading by calling prioritizeLoad(). Background loading can also
+ * be enabled for the catalog, in which case missing tables (tables that are not yet
+ * loaded) are submitted to the TableLoadingMgr any table metadata is invalidated and
+ * on startup.
  * Accessing a table that is not yet loaded (via getTable()), will load the table's
  * metadata on-demand, out-of-band of the table loading thread pool.
  * TODO: Consider removing on-demand loading and have everything go through the table
@@ -71,15 +63,6 @@ import com.google.common.collect.Lists;
  */
 public class CatalogServiceCatalog extends Catalog {
   private static final Logger LOG = Logger.getLogger(CatalogServiceCatalog.class);
-
-  // The number of parallel threads to use to load table metadata. Should be set to a
-  // value that provides good throughput while not putting too much stress on the
-  // metastore.
-  private final int numLoadingThreads_;
-
-  // Number of milliseconds to sleep between calls to search for tables that do not have
-  // their metadata.
-  private final int BACKGROUND_TBL_COLLECTION_SLEEP_MS = 3 * 1000;
 
   private final TUniqueId catalogServiceId_;
 
@@ -96,20 +79,6 @@ public class CatalogServiceCatalog extends Catalog {
   //   atomically (potentially in a different database).
   private final ReentrantReadWriteLock catalogLock_ = new ReentrantReadWriteLock(true);
 
-  // A thread safe blocking deque that is used to prioritize the loading of table
-  // metadata. The CatalogServer has a background thread that will always add unloaded
-  // tables to the tail of the deque. However, a call to prioritizeLoad() will add
-  // tables to the head of the deque. The next table to load is always taken from the
-  // head of the deque. May contain the same table multiple times, but a secondary
-  // attempt to load the table metadata will be a no-op.
-  private final LinkedBlockingDeque<TTableName> tableLoadingDeque_ =
-      new LinkedBlockingDeque<TTableName>();
-
-  // A thread safe HashSet of table names that are in the tableLoadingDeque_. Used to
-  // efficiently check for existence of items in the deque.
-  private final Set<TTableName> tableLoadingSet_ =
-      Collections.synchronizedSet(new HashSet<TTableName>());
-
   // Last assigned catalog version. Starts at INITIAL_CATALOG_VERSION and is incremented
   // with each update to the Catalog. Continued across the lifetime of the object.
   // Protected by catalogLock_.
@@ -117,6 +86,11 @@ public class CatalogServiceCatalog extends Catalog {
   private long catalogVersion_ = INITIAL_CATALOG_VERSION;
 
   protected final AtomicInteger nextTableId_ = new AtomicInteger(0);
+
+  // Manages the scheduling of background table loading.
+  private final TableLoadingMgr tableLoadingMgr_;
+
+  private final boolean loadInBackground_;
 
   /**
    * Initialize the CatalogServiceCatalog, loading all table metadata
@@ -126,27 +100,8 @@ public class CatalogServiceCatalog extends Catalog {
       TUniqueId catalogServiceId) {
     super(true);
     catalogServiceId_ = catalogServiceId;
-    numLoadingThreads_ = numLoadingThreads;
-    if (loadInBackground) {
-      // Start a background thread that queues unloaded tables to be loaded.
-      Executors.newSingleThreadExecutor().execute(new Runnable() {
-        @Override
-        public void run() {
-          while(true) {
-            collectMissingTbls();
-            try {
-              Thread.sleep(BACKGROUND_TBL_COLLECTION_SLEEP_MS);
-            } catch (Exception e) {
-              LOG.error("Error collecting missing tables: ", e);
-              // Ignore exception.
-            }
-          }
-        }
-      });
-    }
-
-    // Start the background table loading threads.
-    startTableLoadingThreads();
+    tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
+    loadInBackground_ = loadInBackground;
   }
 
   /**
@@ -157,74 +112,6 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Starts table loading threads in a fixed sized thread pool with a size
-   * defined by NUM_TBL_LOADING_THREADS. Each thread polls the tableLoadingDeque_
-   * for new tables to load.
-   */
-  private void startTableLoadingThreads() {
-    ExecutorService executor = Executors.newFixedThreadPool(numLoadingThreads_);
-    try {
-      for (int i = 0; i < numLoadingThreads_; ++i) {
-        executor.execute(new Runnable() {
-          @Override
-          public void run() {
-            while (true) {
-              try {
-                loadNextTable();
-              } catch (Exception e) {
-                LOG.error("Error loading table: ", e);
-              }
-            }
-          }
-        });
-      }
-    } finally {
-      executor.shutdown();
-    }
-  }
-
-  /**
-   * Gets the next table name to load off the head of the table loading queue. If
-   * the queue is empty, this will block until a new table is added.
-   */
-  private void loadNextTable() throws InterruptedException {
-    // Always get the next table from the head of the deque.
-    TTableName tblName = tableLoadingDeque_.takeFirst();
-    tableLoadingSet_.remove(tblName);
-    LOG.debug("Loading next table. Remaining items in queue: "
-        + tableLoadingDeque_.size());
-
-    Db db = getDb(tblName.getDb_name());
-    if (db == null) return;
-
-    // Get the table, which will load the table's metadata if needed.
-    db.getTable(tblName.getTable_name());
-  }
-
-  /**
-   * Called on a periodic basis and adds all tables that are not yet loaded to the
-   * tail of the table loading deque.
-   */
-  private void collectMissingTbls() {
-    for (String dbName: getDbNames(null)) {
-      Db db = getDb(dbName);
-      if (db == null) continue;
-      for (String tblName: db.getAllTableNames()) {
-        Table existingTbl = db.getTableNoLoad(tblName);
-
-        // Only add this table if it isn't loaded and doesn't exist in the deque.
-        if (existingTbl != null && !existingTbl.isLoaded()) {
-          TTableName name = new TTableName(dbName.toLowerCase(), tblName.toLowerCase());
-          if (!tableLoadingSet_.contains(name)) {
-            tableLoadingSet_.add(name);
-            tableLoadingDeque_.offerLast(name);
-          }
-        }
-      }
-    }
-  }
-
-  /**
    * Prioritizes the loading of the given list TCatalogObjects. Currently only support
    * loading Table/View metadata since Db and Function metadata is not loaded lazily.
    */
@@ -232,10 +119,8 @@ public class CatalogServiceCatalog extends Catalog {
     for (TCatalogObject catalogObject: objectDescs) {
       Preconditions.checkState(catalogObject.isSetTable());
       TTable table = catalogObject.getTable();
-      TTableName tblName = new TTableName(table.getDb_name().toLowerCase(),
-          table.getTbl_name().toLowerCase());
-      tableLoadingSet_.add(tblName);
-      tableLoadingDeque_.offerFirst(tblName);
+      tableLoadingMgr_.prioritizeLoad(new TTableName(table.getDb_name().toLowerCase(),
+          table.getTbl_name().toLowerCase()));
     }
   }
 
@@ -380,6 +265,10 @@ public class CatalogServiceCatalog extends Catalog {
                 getNextTableId(), db, tableName);
             incompleteTbl.setCatalogVersion(incrementAndGetCatalogVersion());
             db.addTable(incompleteTbl);
+            if (loadInBackground_) {
+              tableLoadingMgr_.backgroundLoad(
+                  new TTableName(dbName.toLowerCase(), tableName.toLowerCase()));
+            }
           }
         }
       } finally {
@@ -452,7 +341,6 @@ public class CatalogServiceCatalog extends Catalog {
     Table incompleteTable =
         IncompleteTable.createUninitializedTable(getNextTableId(), db, tblName);
     db.addTable(incompleteTable);
-
     return db.getTable(tblName);
   }
 
@@ -632,6 +520,10 @@ public class CatalogServiceCatalog extends Catalog {
           getNextTableId(), db, tblName);
       newTable.setCatalogVersion(incrementAndGetCatalogVersion());
       db.addTable(newTable);
+      if (loadInBackground_) {
+        tableLoadingMgr_.prioritizeLoad(new TTableName(dbName.toLowerCase(),
+            tblName.toLowerCase()));
+      }
       updatedObjects.second = newTable;
       return false;
     }
