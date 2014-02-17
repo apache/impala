@@ -135,30 +135,6 @@ public class ImpaladCatalog extends Catalog {
     }
   }
 
-  public static ImpaladCatalog createForTesting(AuthorizationConfig authzConfig) {
-    ImpaladCatalog catalog = new ImpaladCatalog(authzConfig);
-
-    // This is a special branch used to bootstrap loading of the catalog for an Impalad
-    // during the FE tests. We want to invalidate anything in the cache so it will be
-    // loaded (from the catalog server) on the next access.
-    // TODO: Clean up how we bootstrap the FE tests.
-    CatalogServiceCatalog catalogServerCatalog =
-        CatalogServiceCatalog.createForTesting(true);
-    try {
-      catalogServerCatalog.reset();
-    } catch (CatalogException e) {
-      // Re-throw as an unchecked exception.
-      throw new IllegalStateException(e.getMessage(), e);
-    }
-
-    for (String dbName: catalogServerCatalog.getDbNames(null)) {
-      // Adding DB should include all tables/fns in that database.
-      catalog.addDb(catalogServerCatalog.getDb(dbName));
-    }
-    catalog.isReady_.set(true);
-    return catalog;
-  }
-
   private class AuthorizationPolicyReader implements Runnable {
     private final AuthorizationConfig config;
 
@@ -614,7 +590,7 @@ public class ImpaladCatalog extends Catalog {
     // The parent database doesn't exist, nothing to do.
     if (db == null) return;
 
-    Table table = db.getTableNoLoad(thriftTable.getTbl_name());
+    Table table = db.getTable(thriftTable.getTbl_name());
     if (table != null && table.getCatalogVersion() < dropCatalogVersion) {
       db.removeTable(thriftTable.tbl_name);
     }

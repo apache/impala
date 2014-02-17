@@ -23,7 +23,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.ColumnType;
-import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.THBaseTable;
@@ -36,12 +35,11 @@ import com.cloudera.impala.thrift.TTableType;
  * Test suite to verify proper conversion of Catalog objects to/from Thrift structs.
  */
 public class CatalogObjectToFromThriftTest {
-  private static ImpaladCatalog catalog_;
+  private static CatalogServiceCatalog catalog_;
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog_ = ImpaladCatalog.createForTesting(
-        AuthorizationConfig.createAuthDisabledConfig());
+    catalog_ = CatalogServiceCatalog.createForTesting(false);
   }
 
   @AfterClass
@@ -49,11 +47,11 @@ public class CatalogObjectToFromThriftTest {
 
   @Test
   public void TestPartitionedTable() throws DatabaseNotFoundException,
-      TableNotFoundException, TableLoadingException {
+      AuthorizationException, TableLoadingException {
     String[] dbNames = {"functional", "functional_avro", "functional_parquet",
                         "functional_seq"};
     for (String dbName: dbNames) {
-      Table table = catalog_.getTable(dbName, "alltypes");
+      Table table = catalog_.getOrLoadTable(dbName, "alltypes");
       TTable thriftTable = table.toThrift();
       Assert.assertEquals(thriftTable.tbl_name, "alltypes");
       Assert.assertEquals(thriftTable.db_name, dbName);
@@ -119,7 +117,8 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestMismatchedAvroAndTableSchemas() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
-    Table table = catalog_.getTable("functional_avro_snap", "schema_resolution_test");
+    Table table = catalog_.getOrLoadTable("functional_avro_snap",
+        "schema_resolution_test");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "schema_resolution_test");
     Assert.assertTrue(thriftTable.isSetTable_type());
@@ -140,7 +139,7 @@ public class CatalogObjectToFromThriftTest {
   public void TestHBaseTables() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
     String dbName = "functional_hbase";
-    Table table = catalog_.getTable(dbName, "alltypes");
+    Table table = catalog_.getOrLoadTable(dbName, "alltypes");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "alltypes");
     Assert.assertEquals(thriftTable.db_name, dbName);
@@ -170,7 +169,7 @@ public class CatalogObjectToFromThriftTest {
       throws DatabaseNotFoundException, TableNotFoundException,
       TableLoadingException {
     String dbName = "functional_hbase";
-    Table table = catalog_.getTable(dbName, "alltypessmallbinary");
+    Table table = catalog_.getOrLoadTable(dbName, "alltypessmallbinary");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "alltypessmallbinary");
     Assert.assertEquals(thriftTable.db_name, dbName);
@@ -203,7 +202,7 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestTableLoadingErrors() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
-    Table table = catalog_.getTable("functional", "hive_index_tbl");
+    Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "hive_index_tbl");
     Assert.assertEquals(thriftTable.db_name, "functional");
@@ -212,7 +211,7 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestView() throws DatabaseNotFoundException,
       TableNotFoundException, TableLoadingException {
-    Table table = catalog_.getTable("functional", "view_view");
+    Table table = catalog_.getOrLoadTable("functional", "view_view");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "view_view");
     Assert.assertEquals(thriftTable.db_name, "functional");

@@ -15,8 +15,6 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.ColumnType;
@@ -24,25 +22,14 @@ import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.thrift.TFunctionType;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {
-  private static ImpaladCatalog catalog_;
-
-  @BeforeClass
-  public static void setUp() throws Exception {
-    catalog_ = ImpaladCatalog.createForTesting(
-        AuthorizationConfig.createAuthDisabledConfig());
-  }
-
-  @AfterClass
-  public static void cleanUp() {
-    catalog_.close();
-  }
+  private static CatalogServiceCatalog catalog_ =
+      CatalogServiceCatalog.createForTesting(false);
 
   private void checkTableCols(Db db, String tblName, int numClusteringCols,
       String[] colNames, ColumnType[] colTypes) throws TableLoadingException {
@@ -82,52 +69,54 @@ public class CatalogTest {
   }
 
   @Test
-  public void TestColSchema() throws TableLoadingException {
+  public void TestColSchema() throws TableLoadingException,
+      DatabaseNotFoundException {
     Db functionalDb = catalog_.getDb("functional");
     assertNotNull(functionalDb);
     assertEquals(functionalDb.getName(), "functional");
-    assertNotNull(functionalDb.getTable("alltypes"));
-    assertNotNull(functionalDb.getTable("alltypes_view"));
-    assertNotNull(functionalDb.getTable("alltypes_view_sub"));
-    assertNotNull(functionalDb.getTable("alltypessmall"));
-    assertNotNull(functionalDb.getTable("alltypeserror"));
-    assertNotNull(functionalDb.getTable("alltypeserrornonulls"));
-    assertNotNull(functionalDb.getTable("alltypesagg"));
-    assertNotNull(functionalDb.getTable("alltypesaggnonulls"));
-    assertNotNull(functionalDb.getTable("alltypesnopart"));
-    assertNotNull(functionalDb.getTable("alltypesinsert"));
-    assertNotNull(functionalDb.getTable("complex_view"));
-    assertNotNull(functionalDb.getTable("testtbl"));
-    assertNotNull(functionalDb.getTable("dimtbl"));
-    assertNotNull(functionalDb.getTable("jointbl"));
-    assertNotNull(functionalDb.getTable("liketbl"));
-    assertNotNull(functionalDb.getTable("greptiny"));
-    assertNotNull(functionalDb.getTable("rankingssmall"));
-    assertNotNull(functionalDb.getTable("uservisitssmall"));
-    assertNotNull(functionalDb.getTable("view_view"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypes"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypes_view"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypes_view_sub"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypessmall"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypeserror"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypeserrornonulls"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesagg"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesaggnonulls"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesnopart"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "alltypesinsert"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "complex_view"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "testtbl"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "dimtbl"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "jointbl"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "liketbl"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "greptiny"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "rankingssmall"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "uservisitssmall"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "view_view"));
     // IMP-163 - table with string partition column does not load if there are partitions
-    assertNotNull(functionalDb.getTable("StringPartitionKey"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "StringPartitionKey"));
     // Test non-existent table
-    assertNull(functionalDb.getTable("nonexistenttable"));
+    assertNull(catalog_.getOrLoadTable("functional", "nonexistenttable"));
 
     // functional_seq contains the same tables as functional
     Db testDb = catalog_.getDb("functional_seq");
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "functional_seq");
-    assertNotNull(testDb.getTable("alltypes"));
-    assertNotNull(testDb.getTable("testtbl"));
+    assertNotNull(catalog_.getOrLoadTable("functional_seq", "alltypes"));
+    assertNotNull(catalog_.getOrLoadTable("functional_seq", "testtbl"));
 
     Db hbaseDb = catalog_.getDb("functional_hbase");
     assertNotNull(hbaseDb);
     assertEquals(hbaseDb.getName(), "functional_hbase");
     // Loading succeeds for an HBase table that has binary columns and an implicit key
     // column mapping
-    assertNotNull(hbaseDb.getTable("alltypessmallbinary"));
-    assertNotNull(hbaseDb.getTable("alltypessmall"));
-    assertNotNull(hbaseDb.getTable("hbasealltypeserror"));
-    assertNotNull(hbaseDb.getTable("hbasealltypeserrornonulls"));
-    assertNotNull(hbaseDb.getTable("alltypesagg"));
-    assertNotNull(hbaseDb.getTable("stringids"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "alltypessmallbinary"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "alltypessmall"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "hbasealltypeserror"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(),
+        "hbasealltypeserrornonulls"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "alltypesagg"));
+    assertNotNull(catalog_.getOrLoadTable(hbaseDb.getName(), "stringids"));
 
     checkTableCols(functionalDb, "alltypes", 2,
         new String[]
@@ -273,7 +262,8 @@ public class CatalogTest {
            ColumnType.STRING, ColumnType.STRING, ColumnType.INT});
 
     // case-insensitive lookup
-    assertEquals(functionalDb.getTable("alltypes"), functionalDb.getTable("AllTypes"));
+    assertEquals(catalog_.getOrLoadTable("functional", "alltypes"),
+        catalog_.getOrLoadTable("functional", "AllTypes"));
   }
 
   @Test public void TestPartitions() throws TableLoadingException {
@@ -455,10 +445,10 @@ public class CatalogTest {
   }
 
   @Test
-  public void testInternalHBaseTable() throws TableLoadingException {
+  public void testInternalHBaseTable() throws DatabaseNotFoundException {
     // Cast will fail if table not an HBaseTable
    HBaseTable table = (HBaseTable)
-       catalog_.getDb("functional_hbase").getTable("internal_hbase_table");
+       catalog_.getOrLoadTable("functional_hbase", "internal_hbase_table");
     assertNotNull("functional_hbase.internal_hbase_table was not found", table);
   }
 
@@ -505,8 +495,8 @@ public class CatalogTest {
   }
 
   @Test
-  public void testLoadingUnsupportedTableTypes() throws TableLoadingException {
-    Table table = catalog_.getDb("functional").getTable("hive_index_tbl");
+  public void testLoadingUnsupportedTableTypes() throws DatabaseNotFoundException {
+    Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl");
     assertTrue(table instanceof IncompleteTable);
     IncompleteTable incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
@@ -514,7 +504,7 @@ public class CatalogTest {
         incompleteTable.getCause().getMessage());
 
     // Table with unsupported SerDe library.
-    table = catalog_.getDb("functional").getTable("bad_serde");
+    table = catalog_.getOrLoadTable("functional", "bad_serde");
     assertTrue(table instanceof IncompleteTable);
     incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
@@ -524,7 +514,7 @@ public class CatalogTest {
 
     // Impala does not yet support Hive's LazyBinaryColumnarSerDe which can be
     // used for RCFILE tables.
-    table = catalog_.getDb("functional_rc").getTable("rcfile_lazy_binary_serde");
+    table = catalog_.getOrLoadTable("functional_rc", "rcfile_lazy_binary_serde");
     assertTrue(table instanceof IncompleteTable);
     incompleteTable = (IncompleteTable) table;
     assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
@@ -536,30 +526,14 @@ public class CatalogTest {
   // This table has metadata set so the escape is \n, which is also the tuple delim. This
   // test validates that our representation of the catalog fixes this and removes the
   // escape char.
-  @Test public void TestTableWithBadEscapeChar() throws TableLoadingException {
+  @Test public void TestTableWithBadEscapeChar() throws DatabaseNotFoundException {
     HdfsTable table =
-        (HdfsTable) catalog_.getDb("functional").getTable("escapechartesttable");
+        (HdfsTable) catalog_.getOrLoadTable("functional", "escapechartesttable");
     List<HdfsPartition> partitions = table.getPartitions();
     for (HdfsPartition p: partitions) {
       HdfsStorageDescriptor desc = p.getInputFormatDescriptor();
       assertEquals(desc.getEscapeChar(), HdfsStorageDescriptor.DEFAULT_ESCAPE_CHAR);
     }
-  }
-
-  @Test
-  public void TestReload() throws CatalogException {
-    // Exercise the internal logic of reloading a partitioned table, an unpartitioned
-    // table and an HBase table.
-    String[] tableNames = {"alltypes", "alltypesnopart"};
-    for (String tableName: tableNames) {
-      Table table = catalog_.getDb("functional").getTable(tableName);
-      catalog_.getDb("functional").reloadTable(tableName);
-      table = catalog_.getDb("functional").getTable(tableName);
-    }
-    // Test HBase table
-    Table table = catalog_.getDb("functional_hbase").getTable("alltypessmall");
-    catalog_.getDb("functional_hbase").reloadTable("alltypessmall");
-    table = catalog_.getDb("functional_hbase").getTable("alltypessmall");
   }
 
   @Test

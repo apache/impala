@@ -108,7 +108,14 @@ public class CatalogServiceCatalog extends Catalog {
    * Only used for testing. Creates a catalog server with default options.
    */
   public static CatalogServiceCatalog createForTesting(boolean loadInBackground) {
-    return new CatalogServiceCatalog(loadInBackground, 16, new TUniqueId());
+    CatalogServiceCatalog cs =
+        new CatalogServiceCatalog(loadInBackground, 16, new TUniqueId());
+    try {
+      cs.reset();
+    } catch (CatalogException e) {
+      throw new IllegalStateException(e.getMessage(), e);
+    }
+    return cs;
   }
 
   /**
@@ -154,7 +161,7 @@ public class CatalogServiceCatalog extends Catalog {
           TCatalogObject catalogTbl = new TCatalogObject(TCatalogObjectType.TABLE,
               Catalog.INITIAL_CATALOG_VERSION);
 
-          Table tbl = db.getTableNoLoad(tblName);
+          Table tbl = db.getTable(tblName);
           if (tbl == null) {
             LOG.error("Table: " + tblName + " was expected to be in the catalog " +
                 "cache. Skipping table for this update.");
@@ -252,7 +259,7 @@ public class CatalogServiceCatalog extends Catalog {
       // Build a new DB cache, populate it, and replace the existing cache in one
       // step.
       ConcurrentHashMap<String, Db> newDbCache = new ConcurrentHashMap<String, Db>();
-
+      List<TTableName> tblsToBackgroundLoad = Lists.newArrayList();
       MetaStoreClient msClient = metaStoreClientPool_.getClient();
       try {
         for (String dbName: msClient.getHiveClient().getAllDatabases()) {
@@ -266,7 +273,7 @@ public class CatalogServiceCatalog extends Catalog {
             incompleteTbl.setCatalogVersion(incrementAndGetCatalogVersion());
             db.addTable(incompleteTbl);
             if (loadInBackground_) {
-              tableLoadingMgr_.backgroundLoad(
+              tblsToBackgroundLoad.add(
                   new TTableName(dbName.toLowerCase(), tableName.toLowerCase()));
             }
           }
@@ -298,6 +305,10 @@ public class CatalogServiceCatalog extends Catalog {
         }
       }
       dbCache_.set(newDbCache);
+      // Submit tables for background loading.
+      for (TTableName tblName: tblsToBackgroundLoad) {
+        tableLoadingMgr_.backgroundLoad(tblName);
+      }
     } catch (Exception e) {
       LOG.error(e);
       throw new CatalogException("Error initializing Catalog. Catalog may be empty.", e);
@@ -340,10 +351,78 @@ public class CatalogServiceCatalog extends Catalog {
     if (db == null) return null;
     Table incompleteTable =
         IncompleteTable.createUninitializedTable(getNextTableId(), db, tblName);
+    incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
     db.addTable(incompleteTable);
     return db.getTable(tblName);
   }
 
+  /**
+   * Gets the table with the given name, loading it if needed (if the existing catalog
+   * object is not yet loaded). Returns the matching Table or null if no table with this
+   * name exists in the catalog.
+   * If the existing table is dropped or modified (indicated by the catalog version
+   * changing) while the load is in progress, the loaded value will be discarded
+   * and the current cached value will be returned. This may mean that a missing table
+   * (not yet loaded table) will be returned.
+   */
+  public Table getOrLoadTable(String dbName, String tblName)
+      throws DatabaseNotFoundException {
+    TTableName tableName = new TTableName(dbName.toLowerCase(), tblName.toLowerCase());
+    TableLoadingMgr.LoadRequest loadReq;
+
+    long previousCatalogVersion;
+    // Return the table if it is already loaded or submit a new load request.
+    catalogLock_.readLock().lock();
+    try {
+      Table tbl = getTable(dbName, tblName);
+      if (tbl == null || tbl.isLoaded()) return tbl;
+      previousCatalogVersion = tbl.getCatalogVersion();
+      loadReq = tableLoadingMgr_.loadAsync(tableName, null);
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
+    Preconditions.checkNotNull(loadReq);
+    try {
+      // The table may have been dropped/modified while the load was in progress, so only
+      // apply the update if the existing table hasn't changed.
+      return replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion);
+    } finally {
+      loadReq.close();
+    }
+  }
+
+  /**
+   * Replaces an existing Table with a new value if it exists and has not changed
+   * (has the same catalog version as 'expectedCatalogVersion').
+   */
+  private Table replaceTableIfUnchanged(Table updatedTbl, long expectedCatalogVersion)
+      throws DatabaseNotFoundException {
+    catalogLock_.writeLock().lock();
+    try {
+      Db db = getDb(updatedTbl.getDb().getName());
+      if (db == null) {
+        throw new DatabaseNotFoundException(
+            "Database does not exist: " + updatedTbl.getDb().getName());
+      }
+
+      Table existingTbl = db.getTable(updatedTbl.getName());
+      // The existing table does not exist or has been modified. Instead of
+      // adding the loaded value, return the existing table.
+      if (existingTbl == null ||
+          existingTbl.getCatalogVersion() != expectedCatalogVersion) return existingTbl;
+
+      updatedTbl.setCatalogVersion(incrementAndGetCatalogVersion());
+      db.addTable(updatedTbl);
+      return updatedTbl;
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Removes a table from the catalog and increments the catalog version.
+   * Returns the removed Table, or null if the table or db does not exist.
+   */
   public Table removeTable(String dbName, String tblName) {
     Db parentDb = getDb(dbName);
     if (parentDb == null) return null;
@@ -370,10 +449,8 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Removes a function from the catalog. Increments the catalog version and returns
-   * the Function object that was removed if the function existed, otherwise returns
-   * null.
-   * @throws DatabaseNotFoundException
+   * Adds a function from the catalog, incrementing the catalog version. Returns true if
+   * the add was successful, false otherwise.
    */
   @Override
   public boolean addFunction(Function fn) {
@@ -439,13 +516,33 @@ public class CatalogServiceCatalog extends Catalog {
    * Reloads a table's metadata, reusing any existing cached metadata to speed up
    * the operation. Returns the updated Table object or null if no table with
    * this name exists in the catalog.
+   * If the existing table is dropped or modified (indicated by the catalog version
+   * changing) while the reload is in progress, the loaded value will be discarded
+   * and the current cached value will be returned. This may mean that a missing table
+   * (not yet loaded table) will be returned.
    */
-  public Table reloadTable(TTableName tableName) throws CatalogException {
+  public Table reloadTable(TTableName tblName) throws CatalogException {
     LOG.debug(String.format("Refreshing table metadata: %s.%s",
-        tableName.getDb_name(), tableName.getTable_name()));
-    Table table = getTable(tableName.getDb_name(), tableName.getTable_name());
-    if (table == null) return null;
-    return table.getDb().reloadTable(table.getName());
+        tblName.getDb_name(), tblName.getTable_name()));
+    long previousCatalogVersion;
+    TableLoadingMgr.LoadRequest loadReq;
+    catalogLock_.readLock().lock();
+    try {
+      Table tbl = getTable(tblName.getDb_name(), tblName.getTable_name());
+      if (tbl == null) return null;
+      previousCatalogVersion = tbl.getCatalogVersion();
+      loadReq = tableLoadingMgr_.loadAsync(tblName, tbl);
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
+
+    Preconditions.checkNotNull(loadReq);
+
+    try {
+      return replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion);
+    } finally {
+      loadReq.close();
+    }
   }
 
   /**
@@ -521,7 +618,7 @@ public class CatalogServiceCatalog extends Catalog {
       newTable.setCatalogVersion(incrementAndGetCatalogVersion());
       db.addTable(newTable);
       if (loadInBackground_) {
-        tableLoadingMgr_.prioritizeLoad(new TTableName(dbName.toLowerCase(),
+        tableLoadingMgr_.backgroundLoad(new TTableName(dbName.toLowerCase(),
             tblName.toLowerCase()));
       }
       updatedObjects.second = newTable;

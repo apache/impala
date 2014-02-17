@@ -17,22 +17,72 @@ package com.cloudera.impala.catalog;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.thrift.TTableName;
+import com.google.common.base.Preconditions;
 
 /**
 * Class that manages scheduling the loading of table metadata from the Hive Metastore and
-* the Hadoop NameNode. Loads tables using a pool of table loading threads. Each thread
-* reads from a deque of table names to determine which table to load next. Tables added
+* the Hadoop NameNode. Loads tables using a pool of table loading threads. New load
+* requests can be submitted using loadAsync(), which will schedule the load when the
+* next thread becomes available.  Also manages prioritized background table loading by
+* reading from a deque of table names to determine which table to load next. Tables added
 * to the head of the deque will be loaded before tables added to the tail, so the loading
 * order can be prioritized (see prioritizeLoad()/backgroundLoad()).
 */
 public class TableLoadingMgr {
+  /**
+   * Represents the result of an asynchronous Table loading request. Calling
+   * get() will block until the Table has completed loading. When finished
+   * processing the request, call close() to clean up.
+   */
+  public class LoadRequest {
+    private final Future<Table> tblTask_;
+    private final TTableName tblName_;
+
+    private LoadRequest(TTableName tblName, Future<Table> tblTask) {
+      tblTask_ = tblTask;
+      tblName_ = tblName;
+    }
+
+    /**
+     * Blocks until the table has finished loading and returns the result. If any errors
+     * were encountered while loading the table an IncompleteTable will be returned.
+     */
+    public Table get() {
+      Table tbl;
+      try {
+        tbl = tblTask_.get();
+      } catch (Exception e) {
+        tbl = IncompleteTable.createFailedMetadataLoadTable(
+            TableId.createInvalidId(), catalog_.getDb(tblName_.getDb_name()),
+            tblName_.getTable_name(), new TableLoadingException(e.getMessage(), e));
+      }
+      Preconditions.checkState(tbl.isLoaded());
+      return tbl;
+    }
+
+    /**
+     * Cleans up the in-flight load request matching the given table name. Will not
+     * cancel the load if it is still in progress, frees a slot should another
+     * load for the same table come in. Can be called multiple times.
+     */
+    public void close() {
+      synchronized (loadingTables_) {
+        if (loadingTables_.get(tblName_) == tblTask_) loadingTables_.remove(tblName_);
+      }
+    }
+  }
+
   private static final Logger LOG = Logger.getLogger(TableLoadingMgr.class);
 
   // A thread safe blocking deque that is used to prioritize the loading of table
@@ -53,16 +103,30 @@ public class TableLoadingMgr {
   private final Set<TTableName> tableLoadingSet_ =
       Collections.synchronizedSet(new HashSet<TTableName>());
 
+  // Map of table name to a FutureTask associated with the table load. Used to
+  // prevent duplicate loads of the same table.
+  private final ConcurrentHashMap<TTableName, FutureTask<Table>> loadingTables_ =
+      new ConcurrentHashMap<TTableName, FutureTask<Table>>();
+
   // The number of parallel threads to use to load table metadata. Should be set to a
   // value that provides good throughput while not putting too much stress on the
   // metastore.
   private final int numLoadingThreads_;
 
+  // Pool of numLoadingThreads_ threads that loads table metadata. If additional tasks
+  // are submitted to the pool after it is full, they will be queued and executed when
+  // the next thread becomes available. There is no hard upper limit on the number of
+  // pending tasks (no work will be rejected, but memory consumption is unbounded).
+  ExecutorService tblLoadingPool_;
+
   private final CatalogServiceCatalog catalog_;
+  private final TableLoader tblLoader_;
 
   public TableLoadingMgr(CatalogServiceCatalog catalog, int numLoadingThreads) {
     catalog_ = catalog;
+    tblLoader_ = new TableLoader(catalog_);
     numLoadingThreads_ = numLoadingThreads;
+    tblLoadingPool_ = Executors.newFixedThreadPool(numLoadingThreads_);
 
     // Start the background table loading threads.
     startTableLoadingThreads();
@@ -85,6 +149,40 @@ public class TableLoadingMgr {
     if (tableLoadingSet_.add(tblName)) {
       tableLoadingDeque_.offerLast(tblName);
     }
+  }
+
+  /**
+   * Loads a table asynchronously, returning a LoadRequest that can be used to get
+   * the result (a Table). If there is already a load in flight for this table name,
+   * the same underlying loading task (Future) will be used, helping to prevent duplicate
+   * loads of the same table.
+   * Can also be used to perform an incremental refresh of an existing table, by passing
+   * the previous Table value in previousTbl. This may speedup the loading process, but
+   * may return a stale object.
+   */
+  public LoadRequest loadAsync(final TTableName tblName, final Table previousTbl)
+      throws DatabaseNotFoundException {
+    final Db parentDb = catalog_.getDb(tblName.getDb_name());
+    if (parentDb == null) {
+      throw new DatabaseNotFoundException(
+          "Database '" + tblName.getDb_name() + "' was not found.");
+    }
+
+    FutureTask<Table> tableLoadTask = new FutureTask<Table>(new Callable<Table>() {
+        @Override
+        public Table call() throws Exception {
+          return tblLoader_.load(parentDb, tblName.table_name,
+              previousTbl);
+        }});
+
+    FutureTask<Table> existingValue = loadingTables_.putIfAbsent(tblName, tableLoadTask);
+    if (existingValue == null) {
+      // There was no existing value, submit a new load request.
+      tblLoadingPool_.execute(tableLoadTask);
+    } else {
+      tableLoadTask = existingValue;
+    }
+    return new LoadRequest(tblName, tableLoadTask);
   }
 
   /**
@@ -125,11 +223,12 @@ public class TableLoadingMgr {
     tableLoadingSet_.remove(tblName);
     LOG.debug("Loading next table. Remaining items in queue: "
         + tableLoadingDeque_.size());
-
-    Db db = catalog_.getDb(tblName.getDb_name());
-    if (db == null) return;
-
-    // Get the table, which will load the table's metadata if needed.
-    db.getTable(tblName.getTable_name());
+    try {
+      // TODO: Instead of calling "getOrLoad" here we could call "loadAsync". We would
+      // just need to add a mechanism for moving loaded tables into the Catalog.
+      catalog_.getOrLoadTable(tblName.getDb_name(), tblName.getTable_name());
+    } catch (DatabaseNotFoundException e) {
+      // Ignore.
+    }
   }
 }

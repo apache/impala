@@ -454,7 +454,7 @@ public class Frontend {
     for (TableName tblName: tableNames) {
       Db db = getCatalog().getDb(tblName.getDb());
       if (db == null) continue;
-      Table tbl = db.getTableNoLoad(tblName.getTbl());
+      Table tbl = db.getTable(tblName.getTbl());
       if (tbl == null) continue;
       if (!tbl.isLoaded()) missingTbls.add(tblName);
     }

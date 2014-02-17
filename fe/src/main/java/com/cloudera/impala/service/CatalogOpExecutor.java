@@ -53,15 +53,14 @@ import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnNotFoundException;
-import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
+import com.cloudera.impala.catalog.IncompleteTable;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import com.cloudera.impala.catalog.PartitionNotFoundException;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
@@ -330,7 +329,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
     LOG.info(String.format("Updating table stats for %s", tableName));
 
-    Table table = catalog_.getTable(tableName.getDb(), tableName.getTbl());
+    Table table = getExistingTable(tableName.getDb(), tableName.getTbl());
     // Deep copy the msTbl to avoid updating our cache before successfully persisting
     // the results to the metastore.
     org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -753,7 +752,7 @@ public class CatalogOpExecutor {
       response.getResult().setVersion(catalog_.getCatalogVersion());
       return;
     }
-    Table srcTable = catalog_.getTable(srcTblName.getDb(), srcTblName.getTbl());
+    Table srcTable = getExistingTable(srcTblName.getDb(), srcTblName.getTbl());
     org.apache.hadoop.hive.metastore.api.Table tbl =
         srcTable.getMetaStoreTable().deepCopy();
     tbl.setDbName(tblName.getDb());
@@ -845,8 +844,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableAddReplaceCols(TableName tableName, List<TColumn> columns,
       boolean replaceExistingCols) throws MetaException, InvalidObjectException,
-      org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
-      TableLoadingException {
+      org.apache.thrift.TException, CatalogException {
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
 
     List<FieldSchema> newColumns = buildFieldSchemaList(columns);
@@ -867,8 +865,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableChangeCol(TableName tableName, String colName,
       TColumn newCol) throws MetaException, InvalidObjectException,
-      org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
-       TableLoadingException, ColumnNotFoundException {
+      org.apache.thrift.TException, CatalogException {
     synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       // Find the matching column name and change it.
@@ -900,8 +897,7 @@ public class CatalogOpExecutor {
   private void alterTableAddPartition(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, String location, boolean ifNotExists)
       throws MetaException, AlreadyExistsException, InvalidObjectException,
-      org.apache.thrift.TException, DatabaseNotFoundException, TableNotFoundException,
-      TableLoadingException {
+      org.apache.thrift.TException, CatalogException {
     org.apache.hadoop.hive.metastore.api.Partition partition =
         new org.apache.hadoop.hive.metastore.api.Partition();
     if (ifNotExists && catalog_.containsHdfsPartition(tableName.getDb(),
@@ -950,8 +946,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableDropPartition(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, boolean ifExists) throws MetaException,
-      NoSuchObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
-      TableNotFoundException, TableLoadingException {
+      NoSuchObjectException, org.apache.thrift.TException, CatalogException {
 
     if (ifExists && !catalog_.containsHdfsPartition(tableName.getDb(), tableName.getTbl(),
         partitionSpec)) {
@@ -993,8 +988,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableDropCol(TableName tableName, String colName)
       throws MetaException, InvalidObjectException, org.apache.thrift.TException,
-      DatabaseNotFoundException, TableNotFoundException, ColumnNotFoundException,
-      TableLoadingException {
+      CatalogException {
     synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
 
@@ -1059,8 +1053,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableSetFileFormat(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, THdfsFileFormat fileFormat) throws MetaException,
-      InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
-      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
+      InvalidObjectException, org.apache.thrift.TException, CatalogException {
     Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
     if (partitionSpec == null) {
       synchronized (metastoreDdlLock_) {
@@ -1103,8 +1096,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableSetLocation(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, String location) throws MetaException,
-      InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
-      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
+      InvalidObjectException, org.apache.thrift.TException, CatalogException {
     Preconditions.checkState(partitionSpec == null || !partitionSpec.isEmpty());
     if (partitionSpec == null) {
       synchronized (metastoreDdlLock_) {
@@ -1208,8 +1200,7 @@ public class CatalogOpExecutor {
 
   private void applyAlterPartition(TableName tableName,
       org.apache.hadoop.hive.metastore.api.Partition msPartition) throws MetaException,
-      InvalidObjectException, org.apache.thrift.TException, DatabaseNotFoundException,
-      TableNotFoundException, TableLoadingException {
+      InvalidObjectException, org.apache.thrift.TException, CatalogException {
     MetaStoreClient msClient = catalog_.getMetaStoreClient();
     try {
       msClient.getHiveClient().alter_partition(
@@ -1225,10 +1216,9 @@ public class CatalogOpExecutor {
    * Returns a deep copy of the metastore.api.Table object for the given TableName.
    */
   private org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable(
-      TableName tableName) throws DatabaseNotFoundException, TableNotFoundException,
-      TableLoadingException {
+      TableName tableName) throws CatalogException {
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    return catalog_.getTable(tableName.getDb(), tableName.getTbl())
+    return getExistingTable(tableName.getDb(), tableName.getTbl())
         .getMetaStoreTable().deepCopy();
   }
 
@@ -1475,8 +1465,7 @@ public class CatalogOpExecutor {
       throws ImpalaException {
     TUpdateCatalogResponse response = new TUpdateCatalogResponse();
     // Only update metastore for Hdfs tables.
-    Table table = catalog_.getTable(update.getDb_name(),
-        update.getTarget_table());
+    Table table = getExistingTable(update.getDb_name(), update.getTarget_table());
     if (!(table instanceof HdfsTable)) {
       throw new InternalException("Unexpected table type: " +
           update.getTarget_table());
@@ -1529,5 +1518,41 @@ public class CatalogOpExecutor {
     response.getResult().setVersion(
         response.getResult().getUpdated_catalog_object().getCatalog_version());
     return response;
+  }
+
+  /**
+   * Returns an existing, loaded table from the Catalog. Throws an exception if any
+   * of the following are true:
+   * - The table does not exist
+   * - There was an error loading the table metadata.
+   * - The table is missing (not yet loaded).
+   * This is to help protect against certain scenarios where the table was
+   * modified or dropped between the time analysis completed and the the catalog op
+   * started executing. However, even with these checks it is possible the table was
+   * modified or dropped/re-created without us knowing. TODO: Track object IDs to
+   * know when a table has been dropped and re-created with the same name.
+   */
+  public Table getExistingTable(String dbName, String tblName) throws CatalogException {
+    Table tbl = catalog_.getOrLoadTable(dbName, tblName);
+    if (tbl == null) {
+      throw new TableNotFoundException("Table not found: " + dbName + "." + tblName);
+    }
+
+    if (!tbl.isLoaded()) {
+      throw new CatalogException(String.format("Table '%s.%s' was modified while " +
+          "operation was in progress, aborting execution.", dbName, tblName));
+    }
+
+    if (tbl instanceof IncompleteTable && tbl.isLoaded()) {
+      // The table loading failed. Throw an exception.
+      ImpalaException e = ((IncompleteTable) tbl).getCause();
+      if (e instanceof TableLoadingException) {
+        throw (TableLoadingException) e;
+      }
+      throw new TableLoadingException(e.getMessage(), e);
+    }
+    Preconditions.checkNotNull(tbl);
+    Preconditions.checkState(tbl.isLoaded());
+    return tbl;
   }
 }
