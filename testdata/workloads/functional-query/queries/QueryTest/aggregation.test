@@ -867,3 +867,15 @@ string
 ---- RESULTS
 'NULL'
 ====
+---- QUERY
+# Test correct removal of redundant group-by expressions (IMPALA-817)
+select int_col * int_col, int_col + int_col
+from functional.alltypesagg
+group by int_col * int_col, int_col + int_col, int_col * int_col
+having (int_col + int_col) < 5 order by 1 limit 10
+---- TYPES
+bigint,bigint
+----
+1,2
+4,4
+====

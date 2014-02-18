@@ -157,6 +157,7 @@ public class Function implements CatalogObject {
    * for "most" compatible or maybe return an error if it is ambiguous?
    */
   private boolean isSubtype(Function other) {
+    if (!other.name_.equals(name_)) return false;
     if (!this.hasVarArgs_ && other.argTypes_.length != this.argTypes_.length) {
       return false;
     }
@@ -179,6 +180,7 @@ public class Function implements CatalogObject {
   }
 
   private boolean isIdentical(Function o) {
+    if (!o.name_.equals(name_)) return false;
     if (o.argTypes_.length != this.argTypes_.length) return false;
     if (o.hasVarArgs_ != this.hasVarArgs_) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
@@ -188,6 +190,7 @@ public class Function implements CatalogObject {
   }
 
   private boolean isIndistinguishable(Function o) {
+    if (!o.name_.equals(name_)) return false;
     int minArgs = Math.min(o.argTypes_.length, this.argTypes_.length);
     // The first fully specified args must be identical.
     for (int i = 0; i < minArgs; ++i) {

@@ -91,3 +91,33 @@ order by avg(zip) limit 10
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 size=0B
 ====
+# Test correct removal of redundant group-by expressions (IMPALA-817)
+select int_col + int_col, int_col * int_col
+from functional.alltypesagg
+group by int_col + int_col, int_col * int_col, int_col + int_col
+having (int_col * int_col) < 0 limit 10
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  group by: int_col + int_col, int_col * int_col
+|  having: int_col * int_col < 0
+|  limit: 10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
+---- DISTRIBUTEDPLAN
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+03:AGGREGATE [MERGE FINALIZE]
+|  group by: int_col + int_col, int_col * int_col
+|  having: int_col * int_col < 0
+|  limit: 10
+|
+02:EXCHANGE [PARTITION=HASH(int_col + int_col,int_col * int_col)]
+|
+01:AGGREGATE
+|  group by: int_col + int_col, int_col * int_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=10/10 size=743.67KB
+====
