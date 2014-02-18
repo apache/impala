@@ -74,56 +74,42 @@
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-core-common</artifactId>
       <version>${sentry.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-core-common-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-core-model-db</artifactId>
       <version>${sentry.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-core-model-db-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-provider-common</artifactId>
       <version>${sentry.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-provider-common-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-provider-file</artifactId>
       <version>${sentry.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-provider-file-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-policy-common</artifactId>
       <version>${sentry.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-policy-common-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-policy-db</artifactId>
       <version>${sentry.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-policy-db-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-binding-hive</artifactId>
       <version>${sentry.version}</version>
-      <scope>system</scope>
-      <systemPath>${env.IMPALA_HOME}/thirdparty/sentry-${sentry.version}/lib/sentry-binding-hive-${sentry.version}.jar</systemPath>
     </dependency>
 
     <dependency>
