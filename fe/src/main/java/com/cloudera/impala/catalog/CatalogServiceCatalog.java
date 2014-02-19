@@ -136,7 +136,8 @@ public class CatalogServiceCatalog extends Catalog {
             collectMissingTbls();
             try {
               Thread.sleep(BACKGROUND_TBL_COLLECTION_SLEEP_MS);
-            } catch (InterruptedException e) {
+            } catch (Exception e) {
+              LOG.error("Error collecting missing tables: ", e);
               // Ignore exception.
             }
           }
@@ -170,8 +171,8 @@ public class CatalogServiceCatalog extends Catalog {
             while (true) {
               try {
                 loadNextTable();
-              } catch (InterruptedException e) {
-                LOG.error("Error loading table: " + e.getMessage(), e);
+              } catch (Exception e) {
+                LOG.error("Error loading table: ", e);
               }
             }
           }

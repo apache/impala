@@ -86,10 +86,12 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
       LOG.info("Loading metadata for: " + fullTblName);
       Preconditions.checkState(db_.getParentCatalog() instanceof CatalogServiceCatalog);
       CatalogServiceCatalog catalog = (CatalogServiceCatalog) db_.getParentCatalog();
-      MetaStoreClient msClient = catalog.getMetaStoreClient();
+
+      MetaStoreClient msClient = null;
       Table table;
       // turn all exceptions into TableLoadingException
       try {
+        msClient = catalog.getMetaStoreClient();
         org.apache.hadoop.hive.metastore.api.Table msTbl = null;
         // All calls to getTable() need to be serialized due to HIVE-5457.
         synchronized (metastoreAccessLock_) {
@@ -122,9 +124,10 @@ public abstract class TableLoader extends CacheLoader<String, Table> {
       } catch (Exception e) {
         table = IncompleteTable.createFailedMetadataLoadTable(
             catalog.getNextTableId(), db_, tblName, new TableLoadingException(
-            "Failed to load metadata for table: " + tblName, e));
+            "Failed to load metadata for table: " + fullTblName + ". Running " +
+            "'invalidate metadata " + fullTblName + "' may resolve this problem.", e));
       } finally {
-        msClient.release();
+        if (msClient != null) msClient.release();
       }
       // Set the new catalog version for the table and return it.
       table.setCatalogVersion(catalogVersion);

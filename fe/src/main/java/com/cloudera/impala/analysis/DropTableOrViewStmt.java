@@ -86,7 +86,7 @@ public class DropTableOrViewStmt extends StatementBase {
     } catch (AuthorizationException e) {
       throw e;
     } catch (AnalysisException e) {
-      if (ifExists_) return;
+      if (ifExists_ && analyzer.getMissingTbls().isEmpty()) return;
       throw e;
     }
   }
