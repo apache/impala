@@ -135,6 +135,7 @@ class CatalogServer {
   // Executed by the catalog_update_gathering_thread_. Calls into JniCatalog
   // to get the latest set of catalog objects that exist, along with some metadata on
   // each object. The results are stored in the shared catalog_objects_ data structure.
+  // Also, explicitly releases free memory back to the OS after each complete iteration.
   void GatherCatalogUpdatesThread();
 
   void CatalogPathHandler(const Webserver::ArgumentMap& args,
