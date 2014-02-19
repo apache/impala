@@ -325,9 +325,6 @@ public class SelectStmt extends QueryStmt {
    * select list, Order By clause), substitute AVG with SUM/COUNT, create the
    * AggregationInfo, including the agg output tuple, and transform all post-agg exprs
    * given AggregationInfo's smap.
-   *
-   * @param analyzer
-   * @throws AnalysisException
    */
   private void analyzeAggregation(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
@@ -391,7 +388,6 @@ public class SelectStmt extends QueryStmt {
       havingPred_ = havingClause_.clone(aliasSmap_);
       havingPred_.analyze(analyzer);
       havingPred_.checkReturnsBool("HAVING clause", true);
-      analyzer.registerConjuncts(havingPred_, null, false);
     }
 
     List<Expr> orderingExprs = null;
@@ -425,6 +421,7 @@ public class SelectStmt extends QueryStmt {
     LOG.debug("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
     if (havingPred_ != null) {
       havingPred_ = havingPred_.substitute(combinedSMap);
+      analyzer.registerConjuncts(havingPred_, null, false);
       LOG.debug("post-agg havingPred: " + havingPred_.debugString());
     }
     Expr.substituteList(orderingExprs, combinedSMap);
@@ -538,9 +535,6 @@ public class SelectStmt extends QueryStmt {
   /**
    * Substitute exprs of the form "<number>"  with the corresponding
    * expressions from select list
-   * @param exprs
-   * @param errorPrefix
-   * @throws AnalysisException
    */
   @Override
   protected void substituteOrdinals(List<Expr> exprs, String errorPrefix)

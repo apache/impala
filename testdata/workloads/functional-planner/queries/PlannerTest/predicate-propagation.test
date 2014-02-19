@@ -885,3 +885,20 @@ on a.id=b.id
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 size=478.45KB
 ====
+# Test proper assignment of Having-clause predicates (IMPALA-820):
+# - Predicates only referencing the group-by exprs are assigned in the scan node.
+# - Predicates with aggregate exprs are assigned in aggregation node.
+select bool_col, int_col, count(bigint_col)
+from functional.alltypes
+group by bool_col, int_col
+having bool_col = false and int_col > 0 and count(bigint_col) > 0
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(bigint_col)
+|  group by: bool_col, int_col
+|  having: count(bigint_col) > 0
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: functional.alltypes.bool_col = FALSE, functional.alltypes.int_col > 0
+====

@@ -823,6 +823,8 @@ public class Analyzer {
             // not an executable predicate; ignore
             continue;
           }
+          // Set the original ExprId in case the conjunct should be marked as assigned.
+          p.setId(e.getId());
         }
 
         // check if we already created this predicate

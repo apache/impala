@@ -121,6 +121,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 size=1.40MB compact
+|     predicates: functional.alltypes.int_col > 1
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = count(a.bigint_col)
@@ -145,6 +146,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=956.90KB
+   predicates: functional.alltypes.id > 1
 ---- DISTRIBUTEDPLAN
 16:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -155,6 +157,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 size=1.40MB
+|     predicates: functional.alltypes.int_col > 1
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = count(a.bigint_col)
@@ -195,6 +198,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=956.90KB
+   predicates: functional.alltypes.id > 1
 ====
 # Self-join of view to make sure the on clause is properly set
 # in the cloned view instances.
