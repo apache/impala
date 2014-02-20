@@ -32,19 +32,6 @@ using namespace std;
 using namespace boost;
 using namespace strings;
 
-// TODO: Remove flags once the configuration mechanisms are in place
-DEFINE_string(default_pool_name, "default-pool", "Default pool name.");
-DEFINE_int64(default_pool_max_requests, -1, "Maximum number of concurrent outstanding "
-    "requests allowed to run before queueing incoming requests. A negative value "
-    "indicates no limit.");
-// TODO: Use ParseUtil to accept strings in friendly units, e.g. "10G".
-DEFINE_int64(default_pool_mem_limit, -1, "Maximum amount of memory usage (in bytes) "
-    "that all outstanding requests in this pool may use before new requests to this pool"
-    " are queued. A negative value indicates no memory limit.");
-DEFINE_int64(default_pool_max_queued, 0, "Maximum number of requests allowed to be "
-    "queued before rejecting requests. A negative value or 0 indicates requests "
-    "will always be rejected once the maximum number of concurrent requests are "
-    "executing.");
 DEFINE_int64(queue_wait_timeout_ms, 60 * 1000, "Maximum amount of time (in "
     "milliseconds) that a request will wait to be admitted before timing out.");
 
@@ -166,8 +153,10 @@ static string DebugPoolStats(const string& pool_name,
   return ss.str();
 }
 
-AdmissionController::AdmissionController(Metrics* metrics, const string& backend_id)
-    : metrics_(metrics),
+AdmissionController::AdmissionController(RequestPoolUtils* pool_utils, Metrics* metrics,
+    const string& backend_id)
+    : pool_utils_(pool_utils),
+      metrics_(metrics),
       backend_id_(backend_id),
       thrift_serializer_(false),
       done_(false) {
@@ -244,12 +233,12 @@ bool AdmissionController::RejectRequest(const string& pool, const int64_t max_re
 }
 
 Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
-  // TODO: Get the pool from the schedule and configs from the configuration
-  const int64_t max_requests = FLAGS_default_pool_max_requests;
-  const int64_t max_queued = FLAGS_default_pool_max_queued;
-  const int64_t mem_limit = FLAGS_default_pool_mem_limit;
-  const string& pool = FLAGS_default_pool_name;
-  schedule->set_request_pool(pool);
+  const string& pool = schedule->request_pool();
+  TPoolConfigResult pool_config;
+  RETURN_IF_ERROR(pool_utils_->GetPoolConfig(pool, &pool_config));
+  const int64_t max_requests = pool_config.max_requests;
+  const int64_t max_queued = pool_config.max_queued;
+  const int64_t mem_limit = pool_config.mem_limit;
 
   // Note the queue_node will not exist in the queue when this method returns.
   QueueNode queue_node(*schedule);
@@ -373,7 +362,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
 
 Status AdmissionController::ReleaseQuery(QuerySchedule* schedule) {
   if (!schedule->is_admitted()) return Status::OK; // No-op if query was not admitted
-  const string& pool = FLAGS_default_pool_name;
+  const string& pool = schedule->request_pool();
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
     TPoolStats* total_stats = &cluster_pool_stats_[pool];
@@ -579,8 +568,12 @@ void AdmissionController::DequeueLoop() {
     BOOST_FOREACH(PoolStatsMap::value_type& entry, local_pool_stats_) {
       const string& pool_name = entry.first;
       TPoolStats* local_stats = &entry.second;
-      const int64_t max_requests = FLAGS_default_pool_max_requests;
-      const int64_t mem_limit = FLAGS_default_pool_mem_limit;
+
+      TPoolConfigResult pool_config;
+      // TODO: Handle errors from GetPoolConfig
+      pool_utils_->GetPoolConfig(pool_name, &pool_config);
+      const int64_t max_requests = pool_config.max_requests;
+      const int64_t mem_limit = pool_config.mem_limit;
 
       // We should never have queued any requests in pools where either limit is 0 as no
       // requests should ever be admitted or when both limits are less than 0, i.e.

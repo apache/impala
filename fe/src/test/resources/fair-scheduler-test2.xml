@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<allocations>
+  <queue name="root">
+    <queue name="queueA">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>100000 mb, 2 vcores</maxResources>
+    </queue>
+    <queue name="queueB">
+      <aclSubmitApps>*</aclSubmitApps>
+    </queue>
+    <queue name="queueC">
+      <aclSubmitApps>userC root</aclSubmitApps>
+      <maxResources>128 mb, 1 vcores</maxResources>
+    </queue>
+    <aclSubmitApps> </aclSubmitApps>
+  </queue>
+  <queuePlacementPolicy>
+    <rule name="specified" create="false"/>
+    <rule name="reject" />
+  </queuePlacementPolicy>
+</allocations>

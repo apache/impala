@@ -25,6 +25,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "common/status.h"
+#include "scheduling/request-pool-utils.h"
 #include "statestore/statestore-subscriber.h"
 #include "statestore/query-schedule.h"
 #include "util/internal-queue.h"
@@ -79,7 +80,8 @@ class ExecEnv;
 //       combination of the estimate and the actual consumption as a function of time.
 class AdmissionController {
  public:
-  AdmissionController(Metrics* metrics, const std::string& backend_id);
+  AdmissionController(RequestPoolUtils* pool_utils, Metrics* metrics,
+      const std::string& backend_id);
   ~AdmissionController();
 
   // Submits the request for admission. Returns immediately if rejected, but
@@ -164,6 +166,10 @@ class AdmissionController {
     // The sum of planner memory estimates for requests that were started locally.
     Metrics::BytesMetric* local_mem_estimate;
   };
+
+  // Used for user-to-pool resolution and looking up pool configurations. Not owned by
+  // the AdmissionController.
+  RequestPoolUtils* pool_utils_;
 
   // Metrics subsystem access
   Metrics* metrics_;

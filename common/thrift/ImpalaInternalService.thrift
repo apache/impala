@@ -341,6 +341,44 @@ struct TTransmitDataResult {
   1: optional Status.TStatus status
 }
 
+// Parameters for RequestPoolUtils.resolveRequestPool()
+struct TResolveRequestPoolParams {
+  // User to resolve to a pool via the allocation placement policy and
+  // authorize for pool access.
+  1: required string user
+
+  // Pool name specified by the user. The allocation placement policy may
+  // return a different pool.
+  2: required string requested_pool
+}
+
+// Returned by RequestPoolUtils.resolveRequestPool()
+struct TResolveRequestPoolResult {
+  // Actual pool to use, as determined by the pool allocation policy.
+  1: required string resolved_pool
+
+  // True if the user has access to submit requests to the resolved_pool.
+  2: required bool has_access
+}
+
+// Parameters for RequestPoolUtils.getPoolConfig()
+struct TPoolConfigParams {
+  // Pool name
+  1: required string pool
+}
+
+// Returned by RequestPoolUtils.getPoolConfig()
+struct TPoolConfigResult {
+  // Maximum number of placed requests before incoming requests are queued.
+  1: required i64 max_requests
+
+  // Maximum number of queued requests before incoming requests are rejected.
+  2: required i64 max_queued
+
+  // Memory limit of the pool before incoming requests are queued.
+  // -1 indicates no limit.
+  3: required i64 mem_limit
+}
 
 service ImpalaInternalService {
   // Called by coord to start asynchronous execution of plan fragment in backend.

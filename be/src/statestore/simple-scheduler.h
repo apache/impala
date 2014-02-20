@@ -101,6 +101,8 @@ class SimpleScheduler : public Scheduler {
   // loaded from a file. Returns the first pool from all pools configured for a user. Does
   // not confirm that a user has access to a pool, if query_options.yarn_pool is set.
   // Public only for testing.
+  // TODO: Combine with GetRequestPool RM and admission control paths for looking up the
+  // pool once we've decided on a behavior for admission control when using RM as well.
   Status GetYarnPool(const std::string& user,
       const TQueryOptions& query_options, std::string* pool) const;
 
@@ -187,8 +189,11 @@ class SimpleScheduler : public Scheduler {
   // Default pools read from the whitelist, accessible to all users.
   std::set<std::string> default_pools_;
 
+  // Used for user-to-pool resolution and looking up pool configurations.
+  boost::scoped_ptr<RequestPoolUtils> request_pool_utils_;
+
   // Used to make admission decisions in 'Schedule()'
-  AdmissionController admission_controller_;
+  boost::scoped_ptr<AdmissionController> admission_controller_;
 
   // Adds the granted reservation and resources to the active_reservations_ and
   // active_client_resources_ maps, respectively.
@@ -210,6 +215,14 @@ class SimpleScheduler : public Scheduler {
   // Loads the list of permissible pools from the provided configuration file, failing if
   // there is an error or the file can't be found.
   Status InitPoolWhitelist(const std::string& conf_path);
+
+  // Determines the actual pool to use for a user and the request_pool query option and
+  // checks if the user has access to submit to that pool. If no request_pool query
+  // option is set, the policy uses the default pool. Uses request_pool_utils_ via the
+  // fair-scheduler allocation configuration. The policy may change the requested pool.
+  // If no pool can be used or the user does not have access, an error is returned.
+  Status GetRequestPool(const std::string& user,
+      const TQueryOptions& query_options, std::string* pool) const;
 
   // Computes the assignment of scan ranges to hosts for each scan node in schedule.
   // Unpartitioned fragments are assigned to the coord. Populates the schedule's

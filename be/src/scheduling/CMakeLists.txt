@@ -22,6 +22,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/scheduling")
 # TODO: Move other scheduling-related classes here
 add_library(Scheduling STATIC
   admission-controller.cc
+  request-pool-utils.cc
 )
 
 # TODO: Add BE test

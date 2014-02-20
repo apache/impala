@@ -19,6 +19,7 @@
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/foreach.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "util/metrics.h"
@@ -41,6 +42,7 @@ using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
 using namespace apache::thrift;
+using namespace strings;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
@@ -58,6 +60,11 @@ static const string DEFAULT_USER("*");
 
 const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
+static const string ERROR_USER_TO_POOL_MAPPING_NOT_FOUND(
+    "No mapping found for request from user '$0' with requested pool '$1'");
+static const string ERROR_USER_NOT_ALLOWED_IN_POOL("Request from user '$0' with "
+    "requested pool '$1' denied access to assigned pool '$2'");
+
 SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     const string& backend_id, const TNetworkAddress& backend_address,
     Metrics* metrics, Webserver* webserver,
@@ -71,10 +78,12 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     total_local_assignments_(NULL),
     initialised_(NULL),
     update_count_(0),
-    resource_broker_(resource_broker),
-    admission_controller_(metrics, backend_id) {
+    resource_broker_(resource_broker) {
   backend_descriptor_.address = backend_address;
   next_nonlocal_backend_entry_ = backend_map_.begin();
+  request_pool_utils_.reset(new RequestPoolUtils());
+  admission_controller_.reset(
+      new AdmissionController(request_pool_utils_.get(), metrics, backend_id_));
 }
 
 SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
@@ -87,9 +96,11 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
     total_local_assignments_(NULL),
     initialised_(NULL),
     update_count_(0),
-    resource_broker_(resource_broker),
-    admission_controller_(metrics, "localhost") {
+    resource_broker_(resource_broker) {
   DCHECK(backends.size() > 0);
+  request_pool_utils_.reset(new RequestPoolUtils());
+  admission_controller_.reset(
+      new AdmissionController(request_pool_utils_.get(), metrics, backend_id_));
 
   for (int i = 0; i < backends.size(); ++i) {
     vector<string> ipaddrs;
@@ -138,7 +149,7 @@ Status SimpleScheduler::Init() {
       status.AddErrorMsg("SimpleScheduler failed to register membership topic");
       return status;
     }
-    RETURN_IF_ERROR(admission_controller_.Init(statestore_subscriber_));
+    RETURN_IF_ERROR(admission_controller_->Init(statestore_subscriber_));
   }
   if (metrics_ != NULL) {
     total_assignments_ =
@@ -693,6 +704,24 @@ int SimpleScheduler::FindLeftmostInputFragment(
   return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
 }
 
+Status SimpleScheduler::GetRequestPool(const string& user,
+    const TQueryOptions& query_options, string* pool) const {
+  TResolveRequestPoolResult resolve_pool_result;
+  const string& configured_pool = query_options.yarn_pool;
+  RETURN_IF_ERROR(request_pool_utils_->ResolveRequestPool(configured_pool, user,
+        &resolve_pool_result));
+  if (resolve_pool_result.resolved_pool.empty()) {
+    return Status(Substitute(ERROR_USER_TO_POOL_MAPPING_NOT_FOUND, user,
+          configured_pool));
+  }
+  if (!resolve_pool_result.has_access) {
+    return Status(Substitute(ERROR_USER_NOT_ALLOWED_IN_POOL, user,
+          configured_pool, resolve_pool_result.resolved_pool));
+  }
+  *pool = resolve_pool_result.resolved_pool;
+  return Status::OK;
+}
+
 Status SimpleScheduler::GetYarnPool(const string& user,
     const TQueryOptions& query_options, string* pool) const {
   if (query_options.__isset.yarn_pool) {
@@ -799,17 +828,23 @@ Status SimpleScheduler::InitPoolWhitelist(const string& conf_path) {
 }
 
 Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
+  // TODO: Should this take impersonation into account?
+  const string& user = schedule->request().query_ctxt.session.connected_user;
+  string request_pool;
+  RETURN_IF_ERROR(GetRequestPool(user, schedule->query_options(), &request_pool));
+  schedule->set_request_pool(request_pool);
   schedule->set_num_hosts(num_backends_metric_->value());
-  RETURN_IF_ERROR(admission_controller_.AdmitQuery(schedule));
+
+  RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
   RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);
   if (!FLAGS_enable_rm) return Status::OK;
-  // TODO: Should this take impersonation into account?
-  const string& user = schedule->request().query_ctxt.session.connected_user;
-  string pool;
-  RETURN_IF_ERROR(GetYarnPool(user, schedule->query_options(), &pool));
-  schedule->CreateReservationRequest(pool, user, resource_broker_->llama_nodes());
+  // TODO: Combine related RM and admission control paths for looking up the pool once
+  // we've decided on a behavior for admission control when using RM as well.
+  string yarn_pool;
+  RETURN_IF_ERROR(GetYarnPool(user, schedule->query_options(), &yarn_pool));
+  schedule->CreateReservationRequest(yarn_pool, user, resource_broker_->llama_nodes());
   const TResourceBrokerReservationRequest* reservation_request =
       schedule->reservation_request();
   if (!reservation_request->resources.empty()) {
@@ -830,7 +865,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
 }
 
 Status SimpleScheduler::Release(QuerySchedule* schedule) {
-  RETURN_IF_ERROR(admission_controller_.ReleaseQuery(schedule));
+  RETURN_IF_ERROR(admission_controller_->ReleaseQuery(schedule));
   if (FLAGS_enable_rm && schedule->NeedsRelease()) {
     DCHECK(resource_broker_ != NULL);
     TResourceBrokerReleaseRequest request;

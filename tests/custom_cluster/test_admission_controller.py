@@ -49,9 +49,13 @@ MAX_NUM_CONCURRENT_QUERIES = 5
 # The number of queries that can be queued in the pool POOL_NAME
 MAX_NUM_QUEUED_QUERIES = 10
 
-_IMPALAD_ARGS = ("-vmodule admission-controller=3 -default_pool_max_requests %s "
- "-default_pool_max_queued %s -queue_wait_timeout_ms 60000" %\
+_IMPALAD_ARGS_WITH_FLAGS = ("-vmodule admission-controller=3 "
+ "-default_pool_max_requests %s -default_pool_max_queued %s" %\
   (MAX_NUM_CONCURRENT_QUERIES, MAX_NUM_QUEUED_QUERIES))
+
+_IMPALAD_ARGS_WITH_CONFIGS = ("-vmodule admission-controller=3 "
+ "-fair_scheduler_allocation_path fair-scheduler-test2.xml "
+ "-llama_site_path llama-site-test2.xml")
 
 _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s" % (STATESTORE_HEARTBEAT_MS)
 
@@ -65,9 +69,9 @@ def compute_metric_deltas(m2, m1, metric_names):
   """Returns a dictionary of the differences of metrics in m2 and m1 (m2 - m1)"""
   return dict((n, m2.get(n, 0) - m1.get(n, 0)) for n in metric_names)
 
-def metric_key(metric_name):
+def metric_key(pool_name, metric_name):
   """Helper method to construct the admission controller metric keys"""
-  return "admission-controller.%s.%s" % (POOL_NAME, metric_name)
+  return "admission-controller.%s.%s" % (pool_name, metric_name)
 
 class TestAdmissionController(CustomClusterTestSuite):
   """Submits a number of queries (parameterized) with some delay between submissions
@@ -162,7 +166,7 @@ class TestAdmissionController(CustomClusterTestSuite):
     for impalad in self.impalads:
       for short_name in metrics.keys():
         metrics[short_name] += impalad.service.get_metric_value(\
-            metric_key('local-%s' % short_name), 0)
+            metric_key(self.pool_name, 'local-%s' % short_name), 0)
     return metrics
 
   def wait_for_metric_changes(self, metric_names, initial, expected_delta, timeout=30):
@@ -271,7 +275,7 @@ class TestAdmissionController(CustomClusterTestSuite):
         client.close()
 
   class SubmitQueryThread(threading.Thread):
-    def __init__(self, impalad, vector, query_num, executing_threads):
+    def __init__(self, impalad, pool_name, vector, query_num, executing_threads):
       """
       executing_threads must be provided so that this thread can add itself when the
       query is admitted and begins execution.
@@ -279,6 +283,7 @@ class TestAdmissionController(CustomClusterTestSuite):
       super(self.__class__, self).__init__()
       self.executing_threads = executing_threads
       self.vector = vector
+      self.pool_name = pool_name
       self.query_num = query_num
       self.impalad = impalad
       self.error = None
@@ -304,6 +309,7 @@ class TestAdmissionController(CustomClusterTestSuite):
 
           exec_options = self.vector.get_value('exec_option')
           exec_options['debug_action'] = '0:GETNEXT:WAIT'
+          exec_options['yarn_pool'] = self.pool_name
           query = QUERY % (self.query_num,)
           self.query_state = 'SUBMITTING'
           client = self.impalad.service.create_beeswax_client()
@@ -356,11 +362,7 @@ class TestAdmissionController(CustomClusterTestSuite):
         if client is not None:
           client.close()
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args=_IMPALAD_ARGS,
-      statestored_args=_STATESTORED_ARGS)
-  def test_admission_controller(self, vector):
+  def run_admission_test(self, vector):
     LOG.debug("Starting test case with parameters: %s", vector)
     self.impalads = self.cluster.impalads
     round_robin_submission = vector.get_value('round_robin_submission')
@@ -379,7 +381,7 @@ class TestAdmissionController(CustomClusterTestSuite):
     # action.
     for query_num in xrange(1, num_queries + 1):
       impalad = self.impalads[query_num % len(self.impalads)]
-      thread = self.SubmitQueryThread(impalad, vector, query_num,\
+      thread = self.SubmitQueryThread(impalad, self.pool_name, vector, query_num,\
           self.executing_threads)
       thread.start()
       self.all_threads.append(thread)
@@ -449,3 +451,19 @@ class TestAdmissionController(CustomClusterTestSuite):
     for thread in self.all_threads:
       if thread.error is not None:
         raise thread.error
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=_IMPALAD_ARGS_WITH_FLAGS,
+      statestored_args=_STATESTORED_ARGS)
+  def test_admission_controller_with_flags(self, vector):
+    self.pool_name = "default-pool"
+    self.run_admission_test(vector)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=_IMPALAD_ARGS_WITH_CONFIGS,
+      statestored_args=_STATESTORED_ARGS)
+  def test_admission_controller_with_configs(self, vector):
+    self.pool_name = "root.queueB"
+    self.run_admission_test(vector)

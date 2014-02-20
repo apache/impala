@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration>
+  <!-- Default values -->
+  <property>
+    <name>llama.am.throttling.maximum.placed.reservations</name>
+    <value>5</value>
+  </property>
+  <property>
+    <name>llama.am.throttling.maximum.queued.reservations</name>
+    <value>10</value>
+  </property>
+
+  <property>
+    <name>llama.am.throttling.maximum.placed.reservations.root</name>
+    <value>15</value>
+  </property>
+  <property>
+    <name>llama.am.throttling.maximum.queued.reservations.root</name>
+    <value>100</value>
+  </property>
+  <property>
+    <name>llama.am.throttling.maximum.placed.reservations.root.queueA</name>
+    <value>10</value>
+  </property>
+  <property>
+    <name>llama.am.throttling.maximum.queued.reservations.root.queueA</name>
+    <value>30</value>
+  </property>
+    <property>
+    <name>llama.am.throttling.maximum.placed.reservations.root.queueC</name>
+    <value>10</value>
+  </property>
+  <property>
+    <name>llama.am.throttling.maximum.queued.reservations.root.queueC</name>
+    <value>30</value>
+  </property>
+</configuration>
