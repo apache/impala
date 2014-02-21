@@ -135,8 +135,11 @@ class ImpalaBeeswaxClient(object):
 
   def __get_transport(self):
     """Creates the proper transport type based environment (secure vs unsecure)"""
-    return create_transport(use_kerberos=self.use_kerberos,
-        host=self.impalad[0], port=int(self.impalad[1]), service='impala')
+    trans_type = 'buffered'
+    if self.use_kerberos:
+      trans_type = 'kerberos'
+    return create_transport(host=self.impalad[0], port=int(self.impalad[1]),
+                            service='impala', transport_type=trans_type)
 
   def execute(self, query_string):
     """Re-directs the query to its appropriate handler, returns QueryResult"""

@@ -17,16 +17,18 @@
 
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
+import getpass
 
-def create_transport(use_kerberos, host, port, service):
+def create_transport(host, port, service, transport_type="buffered"):
   """
-  Create a new Transport based on the connection type.
-
-  If not using kerberos, just return a simple buffered transport. For
-  the kerberos, a sasl transport is created.
+  Create a new Thrift Transport based on the requested type.
+  Supported transport types:
+  - buffered, returns simple buffered transport
+  - plain_sasl, return a SASL transport with the PLAIN mechanism
+  - kerberos, return a SASL transport with the GSSAPI mechanism
   """
   sock = TSocket(host, int(port))
-  if not use_kerberos:
+  if transport_type.lower() == "buffered":
     return TBufferedTransport(sock)
 
   # Initializes a sasl client
@@ -40,7 +42,13 @@ def create_transport(use_kerberos, host, port, service):
     sasl_client = sasl.Client()
     sasl_client.setAttr("host", host)
     sasl_client.setAttr("service", service)
+    if transport_type.lower() == "plain_sasl":
+      sasl_client.setAttr("username", getpass.getuser())
+      sasl_client.setAttr("password", getpass.getuser())
     sasl_client.init()
     return sasl_client
-  # GSSASPI is the underlying mechanism used by kerberos to authenticate.
-  return TSaslClientTransport(sasl_factory, "GSSAPI", sock)
+  if transport_type.lower() == "plain_sasl":
+    return TSaslClientTransport(sasl_factory, "PLAIN", sock)
+  else:
+    # GSSASPI is the underlying mechanism used by kerberos to authenticate.
+    return TSaslClientTransport(sasl_factory, "GSSAPI", sock)

@@ -59,8 +59,11 @@ class TestCatalogServiceClient(ImpalaTestSuite):
   def test_get_functions(self, vector):
     impala_cluster = ImpalaCluster()
     catalogd = impala_cluster.catalogd.service
-    transport = create_transport(use_kerberos=pytest.config.option.use_kerberos,
-        host=catalogd.hostname, port=catalogd.service_port, service='impala')
+    trans_type = 'buffered'
+    if pytest.config.option.use_kerberos:
+      trans_type = 'kerberos'
+    transport = create_transport(host=catalogd.hostname, port=catalogd.service_port,
+                                 service='impala', transport_type=trans_type)
     transport.open()
     protocol = TBinaryProtocol.TBinaryProtocol(transport)
     catalog_client = CatalogService.Client(protocol)

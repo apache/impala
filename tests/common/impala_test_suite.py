@@ -71,11 +71,14 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hive_client, cls.client = [None, None]
     # Create a Hive Metastore Client (used for executing some test SETUP steps
     metastore_host, metastore_port = pytest.config.option.metastore_server.split(':')
+    trans_type = 'buffered'
+    if pytest.config.option.use_kerberos:
+      trans_type = 'kerberos'
     cls.hive_transport = create_transport(
-        use_kerberos=pytest.config.option.use_kerberos,
         host=metastore_host,
         port=metastore_port,
-        service=pytest.config.option.hive_service_name)
+        service=pytest.config.option.hive_service_name,
+        transport_type=trans_type)
     protocol = TBinaryProtocol.TBinaryProtocol(cls.hive_transport)
     cls.hive_client = ThriftHiveMetastore.Client(protocol)
     cls.hive_transport.open()
