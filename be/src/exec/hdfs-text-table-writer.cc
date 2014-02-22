@@ -106,7 +106,7 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
     }
   }
 
-  if (rowbatch_stringstream_.tellp() >= HDFS_FLUSH_WRITE_SIZE || true) {
+  if (rowbatch_stringstream_.tellp() >= HDFS_FLUSH_WRITE_SIZE) {
     string rowbatch_string = rowbatch_stringstream_.str();
     SCOPED_TIMER(parent_->hdfs_write_timer());
     RETURN_IF_ERROR(Write(rowbatch_string.data(), rowbatch_string.size()));

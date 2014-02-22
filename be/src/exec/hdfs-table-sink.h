@@ -138,8 +138,10 @@ class HdfsTableSink : public DataSink {
 
   virtual RuntimeProfile* profile() { return runtime_profile_; }
 
-  RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
+
+  RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }
+  RuntimeProfile::Counter* bytes_written_counter() { return bytes_written_counter_; }
   RuntimeProfile::Counter* encode_timer() { return encode_timer_; }
   RuntimeProfile::Counter* hdfs_write_timer() { return hdfs_write_timer_; }
 
@@ -254,10 +256,12 @@ class HdfsTableSink : public DataSink {
       PartitionDescriptorMap;
   PartitionDescriptorMap partition_descriptor_map_;
 
+  boost::scoped_ptr<MemTracker> mem_tracker_;
+
   // Allocated from runtime state's pool.
   RuntimeProfile* runtime_profile_;
   RuntimeProfile::Counter* rows_inserted_counter_;
-  boost::scoped_ptr<MemTracker> mem_tracker_;
+  RuntimeProfile::Counter* bytes_written_counter_;
 
   // Time spent converting tuple to on disk format.
   RuntimeProfile::Counter* encode_timer_;
