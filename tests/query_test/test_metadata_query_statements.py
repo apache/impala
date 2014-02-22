@@ -100,6 +100,23 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     assert tbl_name in result.data
     assert len(result.data) == 1
 
+    self.client.execute("create table %s.%s (j int)" % (db_name, tbl_name + "_test"))
+    call(["hive", "-e", "drop table %s.%s" % (db_name, tbl_name + "_test")])
+
+    # Re-create the table in Hive. Use the same name, but different casing.
+    call(["hive", "-e", "CREATE TABLE %s.%s (i bigint)" % (db_name, tbl_name + "_TEST")])
+    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name + "_Test"))
+    result = self.client.execute("show tables in %s" % db_name)
+    assert tbl_name + "_test" in result.data
+    assert tbl_name + "_Test" not in result.data
+    assert tbl_name + "_TEST" not in result.data
+
+    # Verify this table is the version created in Hive (the column should be BIGINT)
+    result = self.client.execute("describe %s.%s" % (db_name, tbl_name + '_test'))
+    assert 'bigint' in result.data[0]
+
+    self.client.execute("drop table %s.%s" % (db_name, tbl_name + "_TEST"))
+
     # Make sure we can actually use the table
     self.client.execute(("insert overwrite table %s.%s "
                         "select 1 from functional.alltypes limit 5"

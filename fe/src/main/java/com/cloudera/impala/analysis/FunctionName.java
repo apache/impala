@@ -28,8 +28,8 @@ public class FunctionName {
   private final String fn_;
   boolean isBuiltin_;
 
-  public FunctionName(String db, String fn) {
-    db_ = db;
+  public FunctionName(String dbName, String fn) {
+    db_ = dbName;
     fn_ = fn.toLowerCase();
     if (db_ != null) db_ = db_.toLowerCase();
   }

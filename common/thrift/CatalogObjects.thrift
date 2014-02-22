@@ -230,10 +230,10 @@ struct THBaseTable {
 
 // Represents a table or view.
 struct TTable {
-  // Name of the parent database
+  // Name of the parent database. Case insensitive, expected to be stored as lowercase.
   1: required string db_name
 
-  // Unqualified table name
+  // Unqualified table name. Case insensitive, expected to be stored as lowercase.
   2: required string tbl_name
 
   // Set if there were any errors loading the Table metadata. The remaining fields in
@@ -273,7 +273,7 @@ struct TTable {
 
 // Represents a database.
 struct TDatabase {
-  // Name of the database
+  // Name of the database. Case insensitive, expected to be stored as lowercase.
   1: required string db_name
 
   // The HDFS location new tables will default their base directory to

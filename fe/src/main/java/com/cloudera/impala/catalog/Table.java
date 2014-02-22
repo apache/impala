@@ -89,7 +89,7 @@ public abstract class Table implements CatalogObject {
     id_ = id;
     msTable_ = msTable;
     db_ = db;
-    name_ = name;
+    name_ = name.toLowerCase();
     owner_ = owner;
     colsByPos_ = Lists.newArrayList();
     colsByName_ = Maps.newHashMap();
