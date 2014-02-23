@@ -45,6 +45,7 @@ Catalog::Catalog() {
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"getCatalogObjects", "(J)[B", &get_catalog_objects_id_},
+    {"getCatalogVersion", "()J", &get_catalog_version_id_},
     {"prioritizeLoad", "([B)V", &prioritize_load_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
@@ -69,6 +70,15 @@ Catalog::Catalog() {
 Status Catalog::GetCatalogObject(const TCatalogObject& req,
     TCatalogObject* resp) {
   return JniUtil::CallJniMethod(catalog_, get_catalog_object_id_, req, resp);
+}
+
+
+Status Catalog::GetCatalogVersion(long* version) {
+  JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
+  *version = jni_env->CallLongMethod(catalog_, get_catalog_version_id_);
+  return Status::OK;
 }
 
 Status Catalog::GetAllCatalogObjects(long from_version,

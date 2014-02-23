@@ -39,6 +39,9 @@ DECLARE_string(hostname);
 
 string CatalogServer::IMPALA_CATALOG_TOPIC = "catalog-update";
 
+const string CATALOG_SERVER_TOPIC_PROCESSING_TIMES =
+    "catalog-server.topic-processing-time-s";
+
 // Implementation for the CatalogService thrift interface.
 class CatalogServiceThriftIf : public CatalogServiceIf {
  public:
@@ -124,10 +127,11 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
 };
 
 CatalogServer::CatalogServer(Metrics* metrics)
-  : thrift_iface_(new CatalogServiceThriftIf(this)),
-    metrics_(metrics),
-    catalog_objects_ready_(false),
-    last_sent_catalog_version_(0L) {
+  : thrift_iface_(new CatalogServiceThriftIf(this)), thrift_serializer_(false),
+    metrics_(metrics), topic_updates_ready_(false), last_sent_catalog_version_(0L),
+    catalog_objects_min_version_(0L), catalog_objects_max_version_(0L) {
+  topic_processing_time_metric_ = metrics_->RegisterMetric(
+      new StatsMetric<double>(CATALOG_SERVER_TOPIC_PROCESSING_TIMES));
 }
 
 
@@ -184,128 +188,82 @@ void CatalogServer::UpdateCatalogTopicCallback(
       incoming_topic_deltas.find(CatalogServer::IMPALA_CATALOG_TOPIC);
   if (topic == incoming_topic_deltas.end()) return;
 
-  {
-    try_mutex::scoped_try_lock l(catalog_lock_);
-    // Return if unable to acquire the catalog_lock_ or if the catalog_objects data is
-    // not yet ready for processing. This indicates the catalog_update_gathering_thread_
-    // is still gathering results from the JniCatalog.
-    if (!l || !catalog_objects_ready_) return;
-  }
+  try_mutex::scoped_try_lock l(catalog_lock_);
+  // Return if unable to acquire the catalog_lock_ or if the topic update data is
+  // not yet ready for processing. This indicates the catalog_update_gathering_thread_
+  // is still building a topic update.
+  if (!l || !topic_updates_ready_) return;
 
-  // This function determines what items have been added/removed from the catalog
-  // since the last heartbeat. To do this, it enumerates all the catalog objects returned
-  // from the last call to the JniCatalog (updated by the catalog_update_gathering_thread_
-  // thread) looking for the objects that have a catalog version that is > the catalog
-  // version sent with the last heartbeat. To determine items that have been deleted,
-  // it saves the set of topic entry keys sent with the last update and looks at the
-  // difference between it and the current set of topic entry keys.
-  // The key for each entry is a string composed of:
-  // "TCatalogObjectType:<unique object name>". So for table foo.bar, the key would be
-  // "TABLE:foo.bar". By encoding the object type information in the key it helps uniquify
-  // the keys as well as help to determine what object type was removed in a state store
-  // delta update since the state store only sends key names for deleted items.
   const TTopicDelta& delta = topic->second;
 
   // If this is not a delta update, clear all catalog objects and request an update
-  // from version 0. There is a special check to see if the catalog_objects_ have been
-  // reloaded from version 0, if they have then skip this step and use that data.
+  // from version 0 from the local catalog. There is an optimization that checks if
+  // pending_topic_updates_ was just reloaded from version 0, if they have then skip this
+  // step and use that data.
   if (delta.from_version == 0 && delta.to_version == 0 &&
-      catalog_objects_from_version_ != 0) {
-    catalog_object_topic_entry_keys_.clear();
-    catalog_objects_.reset(new TGetAllCatalogObjectsResponse());
+      catalog_objects_min_version_ != 0) {
+    catalog_topic_entry_keys_.clear();
+    last_sent_catalog_version_ = 0L;
+  } else {
+    // Process the pending topic update.
+    LOG_EVERY_N(INFO, 300) << "Catalog Version: " << catalog_objects_max_version_
+                           << " Last Catalog Version: " << last_sent_catalog_version_;
+
+    BOOST_FOREACH(const TTopicItem& catalog_object, pending_topic_updates_) {
+      if (subscriber_topic_updates->size() == 0) {
+        subscriber_topic_updates->push_back(TTopicDelta());
+        subscriber_topic_updates->back().topic_name = IMPALA_CATALOG_TOPIC;
+      }
+      TTopicDelta& update = subscriber_topic_updates->back();
+      update.topic_entries.push_back(catalog_object);
+    }
+
+    // Update the new catalog version and the set of known catalog objects.
+    last_sent_catalog_version_ = catalog_objects_max_version_;
   }
-  LOG_EVERY_N(INFO, 300) << "Catalog Version: " << catalog_objects_->max_catalog_version
-                         << " Last Catalog Version: " << last_sent_catalog_version_;
-
-  // Add any new/updated catalog objects to the topic.
-  set<string> current_entry_keys;
-  ThriftSerializer thrift_serializer(false);
-  BOOST_FOREACH(const TCatalogObject& catalog_object, catalog_objects_->objects) {
-    const string& entry_key = TCatalogObjectToEntryKey(catalog_object);
-    if (entry_key.empty()) {
-      LOG_EVERY_N(WARNING, 60) << "Unable to build topic entry key for TCatalogObject: "
-                               << ThriftDebugString(catalog_object);
-    }
-    current_entry_keys.insert(entry_key);
-
-    // Check if we knew about this topic entry key in the last update, and if so remove
-    // it from the catalog_object_topic_entry_keys_. At the end of this loop, we will
-    // be left with the set of keys that were in the last update, but not in this
-    // update, indicating which objects have been removed/dropped.
-    set<string>::iterator itr = catalog_object_topic_entry_keys_.find(entry_key);
-    if (itr != catalog_object_topic_entry_keys_.end()) {
-      catalog_object_topic_entry_keys_.erase(itr);
-    }
-
-    // This isn't a new or an updated item, skip it.
-    if (catalog_object.catalog_version <= last_sent_catalog_version_) continue;
-
-    VLOG(1) << "Adding update: " << entry_key << "@"
-            << catalog_object.catalog_version;
-
-    if (subscriber_topic_updates->size() == 0) {
-      subscriber_topic_updates->push_back(TTopicDelta());
-      subscriber_topic_updates->back().topic_name = IMPALA_CATALOG_TOPIC;
-    }
-    TTopicDelta& update = subscriber_topic_updates->back();
-    update.topic_entries.push_back(TTopicItem());
-    TTopicItem& item = update.topic_entries.back();
-    item.key = entry_key;
-
-    Status status = thrift_serializer.Serialize(&catalog_object, &item.value);
-    if (!status.ok()) {
-      LOG(ERROR) << "Error serializing topic value: " << status.GetErrorMsg();
-      subscriber_topic_updates->pop_back();
-    }
-  }
-
-  // Add all deleted items to the topic. Any remaining items in
-  // catalog_object_topic_entry_keys_ indicate a difference since the last update
-  // (the object was removed), so mark it as deleted.
-  BOOST_FOREACH(const string& key, catalog_object_topic_entry_keys_) {
-    if (subscriber_topic_updates->size() == 0) {
-      subscriber_topic_updates->push_back(TTopicDelta());
-      subscriber_topic_updates->back().topic_name = IMPALA_CATALOG_TOPIC;
-    }
-    TTopicDelta& update = subscriber_topic_updates->back();
-    update.topic_entries.push_back(TTopicItem());
-    TTopicItem& item = update.topic_entries.back();
-    item.key = key;
-    VLOG(1) << "Adding deletion: " << key;
-    // Don't set a value to mark this item as deleted.
-  }
-
-  // Update the new catalog version and the set of known catalog objects.
-  catalog_object_topic_entry_keys_.swap(current_entry_keys);
-  last_sent_catalog_version_ = catalog_objects_->max_catalog_version;
 
   // Signal the catalog update gathering thread to start.
-  lock_guard<mutex> l(catalog_lock_);
-  catalog_objects_ready_ = false;
+  topic_updates_ready_ = false;
   catalog_update_cv_.notify_one();
 }
 
 void CatalogServer::GatherCatalogUpdatesThread() {
   while (1) {
     unique_lock<mutex> unique_lock(catalog_lock_);
-    catalog_update_cv_.wait(unique_lock);
-
-    // Protect against spurious wakups by checking the value of catalog_objects_ready_.
-    // It is only safe to continue on and update the shared catalog_objects_ struct
-    // when this flag is false, otherwise we may be in the middle processing a heartbeat.
-    if (catalog_objects_ready_) continue;
-
-    // Call into the Catalog to get all the catalog objects (as Thrift structs).
-    TGetAllCatalogObjectsResponse* resp = new TGetAllCatalogObjectsResponse();
-    Status s = catalog_->GetAllCatalogObjects(last_sent_catalog_version_, resp);
-    if (!s.ok()) {
-      LOG(ERROR) << s.GetErrorMsg();
-      delete resp;
-    } else {
-      catalog_objects_.reset(resp);
+    // Protect against spurious wakups by checking the value of topic_updates_ready_.
+    // It is only safe to continue on and update the shared pending_topic_updates_
+    // when topic_updates_ready_ is false, otherwise we may be in the middle of
+    // processing a heartbeat.
+    while (topic_updates_ready_) {
+      catalog_update_cv_.wait(unique_lock);
     }
-    catalog_objects_from_version_ = last_sent_catalog_version_;
-    catalog_objects_ready_ = true;
+
+    MonotonicStopWatch sw;
+    sw.Start();
+
+    // Clear any pending topic updates. They will have been processed by the heartbeat
+    // thread by the time we make it here.
+    pending_topic_updates_.clear();
+
+    long current_catalog_version;
+    Status status = catalog_->GetCatalogVersion(&current_catalog_version);
+    if (!status.ok()) {
+      LOG(ERROR) << status.GetErrorMsg();
+    } else if (current_catalog_version != last_sent_catalog_version_) {
+      // If there has been a change since the last time the catalog was queried,
+      // call into the Catalog to find out what has changed.
+      TGetAllCatalogObjectsResponse catalog_objects;
+      status = catalog_->GetAllCatalogObjects(last_sent_catalog_version_,
+          &catalog_objects);
+      if (!status.ok()) {
+        LOG(ERROR) << status.GetErrorMsg();
+      } else {
+        // Use the catalog objects to build a topic update list.
+        BuildTopicUpdates(catalog_objects.objects);
+        catalog_objects_min_version_ = last_sent_catalog_version_;
+        catalog_objects_max_version_ = catalog_objects.max_catalog_version;
+      }
+    }
 
 #ifndef ADDRESS_SANITIZER
     // Required to ensure memory gets released back to the OS, even if tcmalloc doesn't do
@@ -322,7 +280,55 @@ void CatalogServer::GatherCatalogUpdatesThread() {
     // See: http://google-perftools.googlecode.com/svn/trunk/doc/tcmalloc.html#runtime
     MallocExtension::instance()->ReleaseFreeMemory();
 #endif
+
+    topic_processing_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+    topic_updates_ready_ = true;
   }
+}
+
+void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_objects) {
+  unordered_set<string> current_entry_keys;
+
+  // Add any new/updated catalog objects to the topic.
+  BOOST_FOREACH(const TCatalogObject& catalog_object, catalog_objects) {
+    const string& entry_key = TCatalogObjectToEntryKey(catalog_object);
+    if (entry_key.empty()) {
+      LOG_EVERY_N(WARNING, 60) << "Unable to build topic entry key for TCatalogObject: "
+                               << ThriftDebugString(catalog_object);
+    }
+
+    current_entry_keys.insert(entry_key);
+    // Remove this entry from catalog_topic_entry_keys_. At the end of this loop, we will
+    // be left with the set of keys that were in the last update, but not in this
+    // update, indicating which objects have been removed/dropped.
+    catalog_topic_entry_keys_.erase(entry_key);
+
+    // This isn't a new or an updated item, skip it.
+    if (catalog_object.catalog_version <= last_sent_catalog_version_) continue;
+
+    VLOG(1) << "Publishing update: " << entry_key << "@"
+            << catalog_object.catalog_version;
+
+    pending_topic_updates_.push_back(TTopicItem());
+    TTopicItem& item = pending_topic_updates_.back();
+    item.key = entry_key;
+    Status status = thrift_serializer_.Serialize(&catalog_object, &item.value);
+    if (!status.ok()) {
+      LOG(ERROR) << "Error serializing topic value: " << status.GetErrorMsg();
+      pending_topic_updates_.pop_back();
+    }
+  }
+
+  // Any remaining items in catalog_topic_entry_keys_ indicate the object was removed
+  // since the last update.
+  BOOST_FOREACH(const string& key, catalog_topic_entry_keys_) {
+    pending_topic_updates_.push_back(TTopicItem());
+    TTopicItem& item = pending_topic_updates_.back();
+    item.key = key;
+    VLOG(1) << "Publishing deletion: " << key;
+    // Don't set a value to mark this item as deleted.
+  }
+  catalog_topic_entry_keys_.swap(current_entry_keys);
 }
 
 // TODO: Create utility function for rendering the Catalog handler so it can

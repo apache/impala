@@ -98,6 +98,13 @@ public class JniCatalog {
   }
 
   /**
+   * Gets the current catalog version.
+   */
+  public long getCatalogVersion() {
+    return catalog_.getCatalogVersion();
+  }
+
+  /**
    * Executes the given DDL request and returns the result.
    */
   public byte[] execDdl(byte[] thriftDdlExecReq) throws ImpalaException {

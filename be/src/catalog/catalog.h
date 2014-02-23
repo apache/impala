@@ -48,6 +48,11 @@ class Catalog {
   // a Status object with information on the error will be returned.
   Status ResetMetadata(const TResetMetadataRequest& req, TResetMetadataResponse* resp);
 
+  // Queries the catalog to get the current version and sets the 'version' output
+  // parameter to this value. Returns OK if the operation was successful, otherwise a
+  // Status object with information on the error will be returned.
+  Status GetCatalogVersion(long* version);
+
   // Gets all Catalog objects and the metadata that is applicable for the given request.
   // Always returns all object names that exist in the Catalog, but allows for extended
   // metadata for objects that were modified after the specified version.
@@ -97,6 +102,7 @@ class Catalog {
   jmethodID reset_metadata_id_;  // JniCatalog.resetMetdata()
   jmethodID get_catalog_object_id_;  // JniCatalog.getCatalogObject()
   jmethodID get_catalog_objects_id_;  // JniCatalog.getCatalogObjects()
+  jmethodID get_catalog_version_id_;  // JniCatalog.getCatalogVersion()
   jmethodID get_db_names_id_; // JniCatalog.getDbNames()
   jmethodID get_table_names_id_; // JniCatalog.getTableNames()
   jmethodID get_functions_id_; // JniCatalog.getFunctions()
