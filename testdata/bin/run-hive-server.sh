@@ -17,3 +17,5 @@ HADOOP_CLIENT_OPTS=-Xmx2024m hive --service metastore -p $HIVE_METASTORE_PORT &
 hive --service hiveserver2 &
 
 sleep 10
+
+$IMPALA_HOME/testdata/bin/avoid_hive_replication_bug.sh
