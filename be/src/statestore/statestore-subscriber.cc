@@ -38,7 +38,7 @@ using namespace ::apache::thrift;
 using namespace ::apache::thrift::transport;
 using namespace strings;
 
-DEFINE_int32(statestore_subscriber_timeout_seconds, 10, "The amount of time (in seconds)"
+DEFINE_int32(statestore_subscriber_timeout_seconds, 30, "The amount of time (in seconds)"
      " that may elapse before the connection with the statestore is considered lost.");
 DEFINE_int32(statestore_subscriber_cnxn_attempts, 10, "The number of times to retry an "
     "RPC connection to the statestore. A setting of 0 means retry indefinitely");

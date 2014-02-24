@@ -30,10 +30,10 @@ using namespace impala;
 using namespace std;
 using namespace boost;
 
-DEFINE_int32(statestore_max_missed_heartbeats, 5, "Maximum number of consecutive "
+DEFINE_int32(statestore_max_missed_heartbeats, 10, "Maximum number of consecutive "
     "heartbeats an impalad can miss before being declared failed by the "
     "statestore.");
-DEFINE_int32(statestore_suspect_heartbeats, 2, "(Advanced) Number of consecutive "
+DEFINE_int32(statestore_suspect_heartbeats, 5, "(Advanced) Number of consecutive "
     "heartbeats an impalad can miss before being suspected of failure by the"
     " statestore");
 DEFINE_int32(statestore_num_heartbeat_threads, 10, "(Advanced) Number of threads used to "
