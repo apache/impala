@@ -89,7 +89,7 @@ public class AggregationNode extends PlanNode {
     // logic to predicates over multiple slots
     for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds_.get(0)).getSlots()) {
       ArrayList<Pair<Expr, Boolean>> bindingPredicates =
-          analyzer.getBoundPredicates(slotDesc.getId(), this);
+          analyzer.getBoundPredicates(slotDesc.getId());
       for (Pair<Expr, Boolean> p: bindingPredicates) {
         if (!analyzer.isConjunctAssigned(p.first)) {
           conjuncts_.add(p.first);
@@ -100,7 +100,6 @@ public class AggregationNode extends PlanNode {
 
     // also add remaining unassigned conjuncts_
     assignConjuncts(analyzer);
-    markSlotsMaterialized(analyzer, conjuncts_);
     computeMemLayout(analyzer);
     // do this at the end so it can take all conjuncts into account
     computeStats(analyzer);
@@ -111,6 +110,8 @@ public class AggregationNode extends PlanNode {
     Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
     aggInfo_.substitute(combinedChildSmap);
     baseTblSmap_ = aggInfo_.getSMap();
+    // assert consistent aggregate expr and slot materialization
+    aggInfo_.checkConsistency();
   }
 
   @Override
@@ -165,6 +166,7 @@ public class AggregationNode extends PlanNode {
     for (FunctionCallExpr e: aggInfo_.getMaterializedAggregateExprs()) {
       aggregateFunctions.add(e.treeToThrift());
     }
+    aggInfo_.checkConsistency();
     msg.agg_node = new TAggregationNode(
         aggregateFunctions,
         aggInfo_.getAggTupleId().asInt(), needsFinalize_);

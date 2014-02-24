@@ -27,6 +27,7 @@ import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.Pair;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -209,21 +210,34 @@ public class SelectStmt extends QueryStmt {
         Expr.cloneList(unassignedJoinConjuncts, baseTblSmap_);
     materializeSlots(analyzer, baseTblJoinConjuncts);
 
-    if (aggInfo_ != null) {
-      // mark all agg exprs needed for HAVING pred as materialized before calling
-      // AggregateInfo.materializeRequiredSlots(), otherwise they won't show up in
-      // AggregateInfo.getMaterializedAggregateExprs()
-      if (havingPred_ != null) {
-        materializeSlots(analyzer, Lists.newArrayList(havingPred_));
-      }
-      aggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
-    }
-
     if (sortInfo_ != null) {
-      // mark ordering exprs
+      // mark ordering exprs before marking agg exprs because the ordering exprs
+      // may contain agg exprs that are not referenced anywhere but the ORDER BY clause
       List<Expr> resolvedExprs =
           Expr.cloneList(sortInfo_.getOrderingExprs(), baseTblSmap_);
       materializeSlots(analyzer, resolvedExprs);
+    }
+
+    if (aggInfo_ != null) {
+      // mark all agg exprs needed for HAVING pred and binding predicates as materialized
+      // before calling AggregateInfo.materializeRequiredSlots(), otherwise they won't
+      // show up in AggregateInfo.getMaterializedAggregateExprs()
+      ArrayList<Expr> havingConjuncts = Lists.newArrayList();
+      if (havingPred_ != null) havingConjuncts.add(havingPred_);
+      TupleDescriptor aggTupleDesc = analyzer.getTupleDesc(aggInfo_.getAggTupleId());
+      for (SlotDescriptor slotDesc: aggTupleDesc.getSlots()) {
+        ArrayList<Pair<Expr, Boolean>> bindingPredicates =
+            analyzer.getBoundPredicates(slotDesc.getId());
+        for (Pair<Expr, Boolean> p: bindingPredicates) {
+          if (!analyzer.isConjunctAssigned(p.first)) {
+            havingConjuncts.add(p.first);
+          }
+        }
+      }
+      havingConjuncts.addAll(
+          analyzer.getUnassignedConjuncts(aggInfo_.getAggTupleId().asList(), false));
+      materializeSlots(analyzer, havingConjuncts);
+      aggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
   }
 

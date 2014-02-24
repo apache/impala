@@ -749,9 +749,8 @@ public class Analyzer {
   }
 
   /**
-   * Returns pairs <Predicate, bool>: the predicate is fully bound by slotId and can
-   * be evaluated by 'node'; the bool indicates whether the application of the
-   * predicate to slotId implies an
+   * Returns pairs <Predicate, bool>: the predicate is fully bound by slotId;
+   * the bool indicates whether the application of the predicate to slotId implies an
    * assignment of that predicate (ie, it doesn't need to be applied to the slot
    * from which it originated).
    * Predicates are derived from binding predicates of slots in the same equivalence
@@ -761,7 +760,7 @@ public class Analyzer {
    * TODO: exclude UDFs from predicate propagation? their overloaded variants could
    * have very different semantics
    */
-  public ArrayList<Pair<Expr, Boolean>> getBoundPredicates(SlotId slotId, PlanNode node) {
+  public ArrayList<Pair<Expr, Boolean>> getBoundPredicates(SlotId slotId) {
     LOG.trace("getBoundPredicates(" + slotId.toString() + ")");
     TupleId tid = getTupleId(slotId);
     ArrayList<Pair<Expr, Boolean>> result = Lists.newArrayList();

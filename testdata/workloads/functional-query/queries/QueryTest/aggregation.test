@@ -879,3 +879,16 @@ bigint,bigint
 1,2
 4,4
 ====
+---- QUERY
+# Test that binding predicates on an aggregation properly trigger materialization of
+# slots in the agg tuple and the slots needed for evaluating the corresponding agg funcs
+# (IMPALA-822).
+select 1 from
+  (select count(bigint_col) c from functional.alltypesagg
+   having min(int_col) is not null) as t
+where c is not null
+---- TYPES
+bigint
+----
+1
+====

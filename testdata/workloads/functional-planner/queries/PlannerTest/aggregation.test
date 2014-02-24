@@ -142,3 +142,20 @@ having count(t2.int_col) = count(t1.bigint_col)
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 size=478.45KB
 ====
+# Tests proper slot materialization of agg-tuple slots for avg (IMP-1271).
+# 't.x > 10' is picked up as an unassigned conjunct, and not as a binding
+# predicate because avg gets rewritten into an expr against two slots
+# (and getBoundPredicates() cannot handle multi-slot predicates).
+select 1 from
+  (select int_col, avg(bigint_col) x from functional.alltypes
+   group by int_col) t
+where t.x > 10
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: sum(bigint_col), count(bigint_col)
+|  group by: int_col
+|  having: sum(bigint_col) / count(bigint_col) > 10.0
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====

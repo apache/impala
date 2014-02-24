@@ -596,6 +596,19 @@ public class AggregateInfo {
   }
 
   /**
+   * Sanity check that the number of materialized slots of the agg tuple corresponds to
+   * the number of materialized aggregate functions plus the number of grouping exprs.
+   */
+  public void checkConsistency() {
+    int numMaterializedSlots = 0;
+    for (SlotDescriptor slotDesc: aggTupleDesc_.getSlots()) {
+      if (slotDesc.isMaterialized()) ++numMaterializedSlots;
+    }
+    Preconditions.checkState(numMaterializedSlots ==
+        materializedAggregateSlots_.size() + groupingExprs_.size());
+  }
+
+  /**
    * Returns DataPartition derived from grouping exprs.
    * Returns unpartitioned spec if no grouping.
    * TODO: this won't work when we start supporting range partitions,

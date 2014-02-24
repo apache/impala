@@ -112,7 +112,7 @@ public class HdfsScanNode extends ScanNode {
     // loop over all materialized slots and add predicates to conjuncts_
     for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds_.get(0)).getSlots()) {
       ArrayList<Pair<Expr, Boolean>> bindingPredicates =
-          analyzer.getBoundPredicates(slotDesc.getId(), this);
+          analyzer.getBoundPredicates(slotDesc.getId());
       for (Pair<Expr, Boolean> p: bindingPredicates) {
         if (p.second) analyzer.markConjunctAssigned(p.first);
         conjuncts_.add(p.first);
