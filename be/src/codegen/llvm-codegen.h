@@ -34,7 +34,7 @@
 
 #include "exprs/expr.h"
 #include "impala-ir/impala-ir-functions.h"
-#include "runtime/primitive-type.h"
+#include "runtime/types.h"
 #include "util/runtime-profile.h"
 
 // Forward declare all llvm classes to avoid namespace pollution.

@@ -100,8 +100,10 @@ public class BinaryPredicate extends Predicate {
     Preconditions.checkState(children_.size() == 2);
     // This check is important because we often clone and/or evaluate predicates,
     // and it's easy to get the casting logic wrong, e.g., cloned predicates
-    // with expr substitutions need to be re-analyzed *after* unsetIsAnalyzed().
-    Preconditions.checkState(getChild(0).getType().matchesType(getChild(1).getType()));
+    // with expr substitutions need to be re-analyzed with reanalyze().
+    Preconditions.checkState(getChild(0).getType().matchesType(getChild(1).getType()),
+        "child 0 type: " + getChild(0).getType() +
+        " child 1 type: " + getChild(1).getType());
     msg.node_type = TExprNodeType.BINARY_PRED;
   }
 

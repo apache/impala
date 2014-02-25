@@ -31,6 +31,8 @@
 #include "exprs/compound-predicate.h"
 #include "exprs/conditional-functions.h"
 #include "exprs/date-literal.h"
+#include "exprs/decimal-functions.h"
+#include "exprs/decimal-operators.h"
 #include "exprs/float-literal.h"
 #include "exprs/function-call.h"
 #include "exprs/hive-udf-call.h"
@@ -519,7 +521,6 @@ bool Expr::codegend_fn_thread_safe() const {
 }
 
 Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
-  if (type() == TYPE_DECIMAL) return Status("DECIMAL is not yet implemented.");
   RETURN_IF_ERROR(PrepareChildren(state, row_desc));
   if (is_udf_call_) return Status::OK;
 
@@ -785,7 +786,8 @@ void Expr::SetComputeFn(void* jitted_function, int scratch_size) {
 }
 
 bool Expr::IsJittable(LlvmCodeGen* codegen) const {
-  if (type().type == TYPE_TIMESTAMP || type().type == TYPE_CHAR) return false;
+  if (type().type == TYPE_TIMESTAMP || type().type == TYPE_CHAR ||
+      type().type == TYPE_DECIMAL) return false;
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (!children()[i]->IsJittable(codegen)) return false;
   }
@@ -987,6 +989,8 @@ void Expr::InitBuiltinsDummy() {
   AggregateFunctions::InitNull(NULL, NULL);
   ComputeFunctions::Add_char_char(NULL, NULL);
   ConditionalFunctions::IsNull(NULL, NULL);
+  DecimalFunctions::Precision(NULL, NULL);
+  DecimalOperators::Cast_decimal_decimal(NULL, NULL);
   MathFunctions::Pi(NULL, NULL);
   StringFunctions::Length(NULL, NULL);
   TimestampFunctions::Year(NULL, NULL);

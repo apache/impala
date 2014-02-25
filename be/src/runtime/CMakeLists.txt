@@ -38,7 +38,7 @@ add_library(Runtime STATIC
   mem-pool.cc
   parallel-executor.cc
   plan-fragment-executor.cc
-  primitive-type.cc
+  types.cc
   raw-value.cc
   raw-value-test.cc
   row-batch.cc
@@ -67,3 +67,4 @@ ADD_BE_TEST(string-value-test)
 ADD_BE_TEST(thread-resource-mgr-test)
 ADD_BE_TEST(mem-tracker-test)
 ADD_BE_TEST(multi-precision-test)
+ADD_BE_TEST(decimal-test)

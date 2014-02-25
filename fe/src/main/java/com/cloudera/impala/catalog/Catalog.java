@@ -437,7 +437,8 @@ public abstract class Catalog {
             "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
         .put(ColumnType.TIMESTAMP,
             "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.DECIMAL, "")
+        .put(ColumnType.DECIMAL,
+            "9HllUpdateINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PNS3_9StringValE")
         .build();
 
   private static final Map<ColumnType, String> PC_UPDATE_SYMBOL =
@@ -460,7 +461,8 @@ public abstract class Catalog {
             "8PcUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
         .put(ColumnType.TIMESTAMP,
             "8PcUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-         .put(ColumnType.DECIMAL, "")
+         .put(ColumnType.DECIMAL,
+            "8PcUpdateINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PNS3_9StringValE")
         .build();
 
     private static final Map<ColumnType, String> PCSA_UPDATE_SYMBOL =
@@ -483,7 +485,8 @@ public abstract class Catalog {
               "10PcsaUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
           .put(ColumnType.TIMESTAMP,
               "10PcsaUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-          .put(ColumnType.DECIMAL, "")
+          .put(ColumnType.DECIMAL,
+              "10PcsaUpdateINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PNS3_9StringValE")
           .build();
 
   private static final Map<ColumnType, String> MIN_UPDATE_SYMBOL =
@@ -506,7 +509,8 @@ public abstract class Catalog {
             "3MinIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(ColumnType.TIMESTAMP,
             "3MinIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.DECIMAL, "")
+        .put(ColumnType.DECIMAL,
+            "3MinINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PS6_")
         .build();
 
   private static final Map<ColumnType, String> MAX_UPDATE_SYMBOL =
@@ -529,7 +533,8 @@ public abstract class Catalog {
             "3MaxIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(ColumnType.TIMESTAMP,
             "3MaxIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.DECIMAL, "")
+        .put(ColumnType.DECIMAL,
+            "3MaxINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PS6_")
         .build();
 
   // Populate all the aggregate builtins in the catalog.
@@ -631,8 +636,8 @@ public abstract class Catalog {
     db.addBuiltin(AggregateFunction.createBuiltin(db, "sum",
         Lists.newArrayList(ColumnType.DECIMAL), ColumnType.DECIMAL, ColumnType.DECIMAL,
         initNull,
-        prefix + "",
-        prefix + "",
+        prefix + "9SumUpdateEPN10impala_udf15FunctionContextERKNS_10DecimalValEPS4_",
+        prefix + "8SumMergeEPN10impala_udf15FunctionContextERKNS_10DecimalValEPS4_",
         null, null, false));
 
     for (ColumnType t: ColumnType.getNumericTypes()) {

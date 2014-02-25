@@ -422,6 +422,9 @@ HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchemaNode(
 
 Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc,
                                          avro_type_t avro_type) {
+  if (slot_desc->type().type == TYPE_DECIMAL) {
+    return Status("Decimal is not yet supported for avro tables.");
+  }
   switch (avro_type) {
     case AVRO_NULL:
       // All Impala types are nullable

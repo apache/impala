@@ -214,38 +214,56 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   /**
    * Generates the necessary casts for the children of this expr to call fn_.
-   * child(0) is cast to the functions first argument, child(1) to the second etc.
-   * This does not do any validation and the casts are assumed to be same.
+   * child(0) is cast to the function's first argument, child(1) to the second etc.
+   * This does not do any validation and the casts are assumed to be safe.
+   *
+   * If the function signature contains wildcard decimals, each wildcard child
+   * argument will be cast to the highest resolution that can contain all of
+   * the child wildcard arguments.
+   * e.g. cast(decimal(*), decimal(*))
+   *      called with cast(decimal(10,2), decimal(5,3))
+   * both children will be cast to (11, 3).
    */
   protected void castForFunctionCall() throws AnalysisException {
     Preconditions.checkState(fn_ != null);
     ColumnType[] fnArgs = fn_.getArgs();
-    if (fnArgs.length > 0) {
-      for (int i = 0; i < children_.size(); ++i) {
-        // For varargs, we must compare with the last type in fnArgs.argTypes.
-        int ix = Math.min(fnArgs.length - 1, i);
-        if (!children_.get(i).type_.matchesType(fnArgs[ix])) castChild(fnArgs[ix], i);
+    ColumnType resolvedWildcardType = getResolvedWildCardType();
+    for (int i = 0; i < children_.size(); ++i) {
+      // For varargs, we must compare with the last type in fnArgs.argTypes.
+      int ix = Math.min(fnArgs.length - 1, i);
+      if (fnArgs[ix].isWildcardDecimal()) {
+        Preconditions.checkState(resolvedWildcardType != null);
+        if (!children_.get(i).type_.equals(resolvedWildcardType)) {
+          castChild(resolvedWildcardType, i);
+        }
+      } else if (!children_.get(i).type_.matchesType(fnArgs[ix])) {
+        castChild(fnArgs[ix], i);
       }
     }
   }
 
   /**
-   * Checks that the given expr is within the expr child and expr depth limits.
-   * Throws an AnalysisException if any of those limits is exceeded.
+   * Returns the max resolution type of all the wild card decimal types.
+   * Returns null if there are no wild card types.
    */
-  private void checkExprLimits(Analyzer analyzer) throws AnalysisException {
-    if (children_.size() > EXPR_CHILDREN_LIMIT) {
-      String sql = toSql();
-      String sqlSubstr = sql.substring(0, Math.min(80, sql.length()));
-      throw new AnalysisException(String.format("Exceeded the maximum number of child " +
-          "expressions (%s).\nExpression has %s children:\n%s...",
-          EXPR_CHILDREN_LIMIT, children_.size(), sqlSubstr));
+  ColumnType getResolvedWildCardType() {
+    ColumnType result = null;
+    ColumnType[] fnArgs = fn_.getArgs();
+    for (int i = 0; i < children_.size(); ++i) {
+      // For varargs, we must compare with the last type in fnArgs.argTypes.
+      int ix = Math.min(fnArgs.length - 1, i);
+      if (!fnArgs[ix].isWildcardDecimal()) continue;
+
+      ColumnType childType = children_.get(i).type_;
+      Preconditions.checkState(!childType.isWildcardDecimal(),
+          "Child expr should have been resolved.");
+      if (result == null) {
+        result = childType;
+      } else {
+        result = ColumnType.getAssignmentCompatibleType(result, childType);
+      }
     }
-    // Do not print the expr because the toSql() may also overflow the stack.
-    if (analyzer.getCallDepth() > EXPR_DEPTH_LIMIT) {
-      throw new AnalysisException(String.format("Exceeded the maximum depth of an " +
-          "expresison tree (%s).", EXPR_DEPTH_LIMIT));
-    }
+    return result;
   }
 
   /**
@@ -280,6 +298,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   protected void treeToThriftHelper(TExpr container) {
     Preconditions.checkState(isAnalyzed_,
         "Must be analyzed before serializing to thrift. %s", this);
+    Preconditions.checkState(!type_.isWildcardDecimal());
     TExprNode msg = new TExprNode();
     msg.type = type_.toThrift();
     msg.num_children = children_.size();

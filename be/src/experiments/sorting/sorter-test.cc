@@ -27,12 +27,12 @@
 #include "exprs/expr.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/primitive-type.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/tuple-row.h"
+#include "runtime/types.h"
 #include "testutil/desc-tbl-builder.h"
 
 using namespace std;

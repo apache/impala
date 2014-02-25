@@ -24,9 +24,10 @@
 
 #include "common/status.h"
 #include "common/global-types.h"
+#include "runtime/types.h"
+
 #include "gen-cpp/Descriptors_types.h"  // for TTupleId
 #include "gen-cpp/Types_types.h"
-#include "runtime/primitive-type.h"
 
 namespace llvm {
   class Function;
@@ -86,6 +87,7 @@ class SlotDescriptor {
   }
   bool is_materialized() const { return is_materialized_; }
   bool is_nullable() const { return null_indicator_offset_.bit_mask != 0; }
+  int slot_size() const { return slot_size_; }
 
   std::string DebugString() const;
 
@@ -97,7 +99,7 @@ class SlotDescriptor {
   // The codegen function is cached.
   llvm::Function* CodegenUpdateNull(LlvmCodeGen*, llvm::StructType* tuple, bool set_null);
 
- protected:
+ private:
   friend class DescriptorTbl;
   friend class TupleDescriptor;
 
@@ -111,6 +113,9 @@ class SlotDescriptor {
   // the idx of the slot in the tuple descriptor (0-based).
   // this is provided by the FE
   const int slot_idx_;
+
+  // the byte size of this slot.
+  const int slot_size_;
 
   // the idx of the slot in the llvm codegen'd tuple struct
   // this is set by TupleDescriptor during codegen and takes into account

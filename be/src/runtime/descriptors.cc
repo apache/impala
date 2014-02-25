@@ -53,6 +53,7 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
     slot_idx_(tdesc.slotIdx),
+    slot_size_(type_.GetByteSize()),
     field_idx_(-1),
     is_materialized_(tdesc.isMaterialized),
     is_null_fn_(NULL),

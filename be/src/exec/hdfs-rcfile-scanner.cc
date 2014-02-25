@@ -378,7 +378,8 @@ inline Status HdfsRCFileScanner::NextField(int col_idx) {
     // Get the next column length or repeat count
     int64_t length = 0;
     uint8_t* col_key_buf = col_info.key_buffer;
-    int bytes_read = ReadWriteUtil::GetVLong(col_key_buf, col_info.key_buffer_pos, &length);
+    int bytes_read = ReadWriteUtil::GetVLong(
+        col_key_buf, col_info.key_buffer_pos, &length);
     if (bytes_read == -1) {
         int64_t position = stream_->file_offset();
         stringstream ss;

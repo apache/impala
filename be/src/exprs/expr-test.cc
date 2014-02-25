@@ -23,7 +23,6 @@
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "runtime/raw-value.h"
-#include "runtime/primitive-type.h"
 #include "runtime/string-value.h"
 #include "gen-cpp/Exprs_types.h"
 #include "exprs/bool-literal.h"
@@ -665,8 +664,8 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_3, "+5.9e-3");
   TestSingleLiteralConstruction(TYPE_STRING, &str_val, "Hello");
   TestSingleLiteralConstruction(TYPE_NULL, NULL, "NULL");
-  TestSingleLiteralConstruction(ColumnType(TYPE_CHAR, 5), "HelloWorld", "Hello");
-  TestSingleLiteralConstruction(ColumnType(TYPE_CHAR, 1), "H", "H");
+  TestSingleLiteralConstruction(ColumnType::CreateCharType(5), "HelloWorld", "Hello");
+  TestSingleLiteralConstruction(ColumnType::CreateCharType(1), "H", "H");
 
   // Min/Max Boundary value test for tiny/small/int/long
   c_val = 127;
@@ -2962,6 +2961,11 @@ TEST_F(ExprTest, ResultsLayoutTest) {
     std::random_shuffle(exprs.begin(), exprs.end());
     ValidateLayout(exprs, expected_byte_size, expected_var_begin, expected_offsets);
   }
+}
+
+TEST_F(ExprTest, DecimalFunctions) {
+  TestValue("precision(cast (1 as decimal(10,2)))", TYPE_INT, 10);
+  TestValue("scale(cast(1 as decimal(10,2)))", TYPE_INT, 2);
 }
 
 TEST_F(ExprTest, UdfInterfaceBuiltins) {

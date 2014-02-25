@@ -39,9 +39,9 @@
 #include "util/time.h"
 #include "util/uid-util.h"
 #include "runtime/coordinator.h"
-#include "runtime/primitive-type.h"
-#include "runtime/timestamp-value.h"
 #include "runtime/runtime-state.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/types.h"
 
 namespace impala {
 

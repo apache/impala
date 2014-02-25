@@ -46,6 +46,12 @@ void AggregateFunctions::InitZero(FunctionContext*, T* dst) {
   dst->val = 0;
 }
 
+template<>
+void AggregateFunctions::InitZero(FunctionContext*, DecimalVal* dst) {
+  *dst = DecimalVal();
+  dst->is_null = false;
+}
+
 StringVal AggregateFunctions::StringValSerializeOrFinalize(
     FunctionContext* ctx, const StringVal& src) {
   if (src.is_null) return src;
@@ -71,6 +77,29 @@ void AggregateFunctions::Sum(FunctionContext* ctx, const SRC_VAL& src, DST_VAL* 
   if (src.is_null) return;
   if (dst->is_null) InitZero<DST_VAL>(ctx, dst);
   dst->val += src.val;
+}
+
+void AggregateFunctions::SumUpdate(FunctionContext* ctx,
+    const DecimalVal& src, DecimalVal* dst) {
+  if (src.is_null) return;
+  if (dst->is_null) InitZero<DecimalVal>(ctx, dst);
+  const FunctionContext::TypeDesc* arg_desc = ctx->GetArgType(0);
+  // Since the src and dst are guaranteed to be the same scale, we can just
+  // do a simple add.
+  if (arg_desc->precision <= 9) {
+    dst->val16 += src.val4;
+  } else if (arg_desc->precision <= 19) {
+    dst->val16 += src.val8;
+  } else {
+    dst->val16 += src.val16;
+  }
+}
+
+void AggregateFunctions::SumMerge(FunctionContext* ctx,
+    const DecimalVal& src, DecimalVal* dst) {
+  if (src.is_null) return;
+  if (dst->is_null) InitZero<DecimalVal>(ctx, dst);
+  dst->val16 += src.val16;
 }
 
 template<typename T>
@@ -112,6 +141,36 @@ void AggregateFunctions::Max(FunctionContext* ctx, const StringVal& src, StringV
     uint8_t* copy = ctx->Allocate(src.len);
     memcpy(copy, src.ptr, src.len);
     *dst = StringVal(copy, src.len);
+  }
+}
+
+template<>
+void AggregateFunctions::Min(FunctionContext* ctx,
+    const DecimalVal& src, DecimalVal* dst) {
+  if (src.is_null) return;
+  const FunctionContext::TypeDesc* arg = ctx->GetArgType(0);
+  DCHECK(arg != NULL);
+  if (arg->precision <= 9) {
+    if (dst->is_null || src.val4 < dst->val4) *dst = src;
+  } else if (arg->precision <= 19) {
+    if (dst->is_null || src.val8 < dst->val8) *dst = src;
+  } else {
+    if (dst->is_null || src.val16 < dst->val16) *dst = src;
+  }
+}
+
+template<>
+void AggregateFunctions::Max(FunctionContext* ctx,
+    const DecimalVal& src, DecimalVal* dst) {
+  if (src.is_null) return;
+  const FunctionContext::TypeDesc* arg = ctx->GetArgType(0);
+  DCHECK(arg != NULL);
+  if (arg->precision <= 9) {
+    if (dst->is_null || src.val4 > dst->val4) *dst = src;
+  } else if (arg->precision <= 19) {
+    if (dst->is_null || src.val8 > dst->val8) *dst = src;
+  } else {
+    if (dst->is_null || src.val16 > dst->val16) *dst = src;
   }
 }
 
@@ -231,7 +290,7 @@ void AggregateFunctions::PcUpdate(FunctionContext* c, const T& input, StringVal*
   // values NUM_PC_BITMAPS times using NUM_PC_BITMAPS different hash functions (by using a
   // different seed).
   for (int i = 0; i < NUM_PC_BITMAPS; ++i) {
-    uint32_t hash_value = AnyValUtil::Hash(input, i);
+    uint32_t hash_value = AnyValUtil::Hash(input, *c->GetArgType(0), i);
     int bit_index = __builtin_ctz(hash_value);
     if (UNLIKELY(hash_value == 0)) bit_index = PC_BITMAP_LENGTH - 1;
     // Set bitmap[i, bit_index] to 1
@@ -246,7 +305,7 @@ void AggregateFunctions::PcsaUpdate(FunctionContext* c, const T& input, StringVa
   // Core of the algorithm. This is a direct translation of the code in the paper.
   // Please see the paper for details. Using stochastic averaging, we only need to
   // the hash value once for each row.
-  uint32_t hash_value = AnyValUtil::Hash(input, 0);
+  uint32_t hash_value = AnyValUtil::Hash(input, *c->GetArgType(0), 0);
   uint32_t row_index = hash_value % NUM_PC_BITMAPS;
 
   // We want the zero-based position of the least significant 1-bit in binary
@@ -373,7 +432,8 @@ void AggregateFunctions::HllUpdate(FunctionContext* ctx, const T& src, StringVal
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, pow(2, HLL_PRECISION));
-  uint64_t hash_value = AnyValUtil::Hash64(src, HashUtil::FNV64_SEED);
+  uint64_t hash_value =
+      AnyValUtil::Hash64(src, *ctx->GetArgType(0), HashUtil::FNV64_SEED);
   if (hash_value != 0) {
     // Use the lower bits to index into the number of streams and then
     // find the first 1 bit after the index bits.
@@ -468,6 +528,8 @@ template void AggregateFunctions::Min<DoubleVal>(
     FunctionContext*, const DoubleVal& src, DoubleVal* dst);
 template void AggregateFunctions::Min<StringVal>(
     FunctionContext*, const StringVal& src, StringVal* dst);
+template void AggregateFunctions::Min<DecimalVal>(
+    FunctionContext*, const DecimalVal& src, DecimalVal* dst);
 
 template void AggregateFunctions::Max<BooleanVal>(
     FunctionContext*, const BooleanVal& src, BooleanVal* dst);
@@ -485,6 +547,8 @@ template void AggregateFunctions::Max<DoubleVal>(
     FunctionContext*, const DoubleVal& src, DoubleVal* dst);
 template void AggregateFunctions::Max<StringVal>(
     FunctionContext*, const StringVal& src, StringVal* dst);
+template void AggregateFunctions::Max<DecimalVal>(
+    FunctionContext*, const DecimalVal& src, DecimalVal* dst);
 
 template void AggregateFunctions::PcUpdate(
     FunctionContext*, const BooleanVal&, StringVal*);
@@ -504,6 +568,8 @@ template void AggregateFunctions::PcUpdate(
     FunctionContext*, const StringVal&, StringVal*);
 template void AggregateFunctions::PcUpdate(
     FunctionContext*, const TimestampVal&, StringVal*);
+template void AggregateFunctions::PcUpdate(
+    FunctionContext*, const DecimalVal&, StringVal*);
 
 template void AggregateFunctions::PcsaUpdate(
     FunctionContext*, const BooleanVal&, StringVal*);
@@ -523,6 +589,8 @@ template void AggregateFunctions::PcsaUpdate(
     FunctionContext*, const StringVal&, StringVal*);
 template void AggregateFunctions::PcsaUpdate(
     FunctionContext*, const TimestampVal&, StringVal*);
+template void AggregateFunctions::PcsaUpdate(
+    FunctionContext*, const DecimalVal&, StringVal*);
 
 template void AggregateFunctions::HllUpdate(
     FunctionContext*, const BooleanVal&, StringVal*);
@@ -542,4 +610,6 @@ template void AggregateFunctions::HllUpdate(
     FunctionContext*, const StringVal&, StringVal*);
 template void AggregateFunctions::HllUpdate(
     FunctionContext*, const TimestampVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const DecimalVal&, StringVal*);
 }

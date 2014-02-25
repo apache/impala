@@ -879,7 +879,7 @@ void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col
       }
       break;
     default:
-      DCHECK(false) << "bad type: " << TypeToString(ThriftToType(type.type));
+      DCHECK(false) << "bad type: " << ColumnType(type);
       break;
   }
 }
@@ -949,7 +949,7 @@ void ImpalaServer::ExprValueToHiveServer2TColumnValue(const void* value,
       }
       break;
     default:
-      DCHECK(false) << "bad type: " << TypeToString(ThriftToType(type.type));
+      DCHECK(false) << "bad type: " << ColumnType(type);
       break;
   }
 }

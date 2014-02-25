@@ -139,6 +139,10 @@ hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/000013_0.lzo.i
 hadoop fs -put -f ${IMPALA_HOME}/testdata/tinytable_seq_snap/tinytable_seq_snap_header_only \
                   /test-warehouse/tinytable_seq_snap
 
+# Populate the decimal text tables.
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/decimal_tbl.txt /test-warehouse/decimal_tbl
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/decimal-tiny.txt /test-warehouse/decimal_tiny
+
 # Create special table for testing Avro schema resolution
 # (see testdata/avro_schema_resolution/README)
 pushd ${IMPALA_HOME}/testdata/avro_schema_resolution

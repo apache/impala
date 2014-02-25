@@ -50,7 +50,9 @@ public class ToSqlTest extends AnalyzerTest {
     AnalysisContext.AnalysisResult analysisResult = analyze(query);
     String actual = analysisResult.getStmt().toSql();
     if (!actual.equals(expected)) {
-      fail("Expected: " + expected + "\n Actual: " + actual + "\n");
+      String msg = "Expected: " + expected + "\n  Actual: " + actual + "\n";
+      System.err.println(msg);
+      fail(msg);
     }
     // Try to parse and analyze the resulting SQL to ensure its validity.
     AnalyzesOk(actual);

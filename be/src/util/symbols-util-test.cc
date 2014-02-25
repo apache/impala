@@ -215,7 +215,7 @@ TEST(SymbolsUtil, Mangling) {
   args.push_back(TYPE_FLOAT);
   args.push_back(TYPE_DOUBLE);
   args.push_back(TYPE_TIMESTAMP);
-  args.push_back(TYPE_CHAR);
+  args.push_back(ColumnType::CreateCharType(10));
   TestMangling("AllTypes", false, args, NULL,
       "_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10"
           "BooleanValERKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntVal"
@@ -249,11 +249,11 @@ TEST(SymbolsUtil, Mangling) {
 
   // CHAR(N) type. This has restricted use. It can only be an intermediate type.
   args.clear();
-  ColumnType char_ret_type(TYPE_CHAR, 10);
+  ColumnType char_ret_type = ColumnType::CreateCharType(10);
   TestMangling("TEST", false, args, &char_ret_type,
       "_Z4TESTPN10impala_udf15FunctionContextEPPh",
       "TEST(impala_udf::FunctionContext*, unsigned char**)");
-  args.push_back(ColumnType(TYPE_CHAR, 10));
+  args.push_back(ColumnType::CreateCharType(10));
   TestMangling("TEST", false, args, &char_ret_type,
       "_Z4TESTPN10impala_udf15FunctionContextERKPhPS2_",
       "TEST(impala_udf::FunctionContext*, unsigned char* const&, unsigned char**)");

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_RUNTIME_PRIMITIVE_TYPE_H
-#define IMPALA_RUNTIME_PRIMITIVE_TYPE_H
+#ifndef IMPALA_RUNTIME_TYPE_H
+#define IMPALA_RUNTIME_TYPE_H
 
 #include <string>
 
@@ -63,24 +63,52 @@ struct ColumnType {
   // Only set if type == TYPE_DECIMAL
   int precision, scale;
 
-  ColumnType(PrimitiveType type = INVALID_TYPE, int len = -1)
-    : type(type), len(len), precision(-1), scale(-1) {
+  ColumnType(PrimitiveType type = INVALID_TYPE)
+    : type(type), len(-1), precision(-1), scale(-1) {
+    DCHECK_NE(type, TYPE_CHAR);
+    DCHECK_NE(type, TYPE_DECIMAL);
+  }
+
+  static ColumnType CreateCharType(int len) {
+    DCHECK_GE(len, 0);
+    ColumnType ret;
+    ret.type = TYPE_CHAR;
+    ret.len = len;
+    return ret;
+  }
+
+  static ColumnType CreateDecimalType(int precision, int scale) {
+    DCHECK_GE(precision, 0);
+    DCHECK_LE(scale, precision);
+    ColumnType ret;
+    ret.type = TYPE_DECIMAL;
+    ret.precision = precision;
+    ret.scale = scale;
+    return ret;
   }
 
   ColumnType(const TColumnType& t) {
+    len = precision = scale = -1;
     type = ThriftToType(t.type);
     if (t.__isset.len) {
       DCHECK_EQ(type, TYPE_CHAR);
       len = t.len;
+    } else if (t.__isset.precision) {
+      DCHECK_EQ(type, TYPE_DECIMAL);
+      DCHECK(t.__isset.scale);
+      precision = t.precision;
+      scale = t.scale;
     } else {
+      DCHECK_NE(type, TYPE_DECIMAL);
       DCHECK_NE(type, TYPE_CHAR);
-      len = -1;
     }
-    precision = scale = -1;
   }
 
   bool operator==(const ColumnType& o) const {
-    return type == o.type && len == o.len && precision == o.precision && scale == o.scale;
+    if (type != o.type) return false;
+    if (type == TYPE_CHAR) return len == o.len;
+    if (type == TYPE_DECIMAL) return precision == o.precision && scale == o.scale;
+    return true;
   }
 
   bool operator!=(const ColumnType& other) const {
@@ -91,8 +119,13 @@ struct ColumnType {
     TColumnType thrift_type;
     thrift_type.type = impala::ToThrift(type);
     if (type == TYPE_CHAR) {
-      thrift_type.len = len;
-      thrift_type.__isset.len = true;
+      DCHECK_NE(len, -1);
+      thrift_type.__set_len(len);
+    } else if (type == TYPE_DECIMAL) {
+      DCHECK_NE(precision, -1);
+      DCHECK_NE(scale, -1);
+      thrift_type.__set_precision(precision);
+      thrift_type.__set_scale(scale);
     }
     return thrift_type;
   }
@@ -117,6 +150,8 @@ struct ColumnType {
       case TYPE_TIMESTAMP:
         // This is the size of the slot, the actual size of the data is 12.
         return 16;
+      case TYPE_DECIMAL:
+        return GetDecimalByteSize(precision);
       case TYPE_DATE:
       case INVALID_TYPE:
       default:
@@ -133,6 +168,13 @@ struct ColumnType {
       default:
         return GetByteSize();
     }
+  }
+
+  static inline int GetDecimalByteSize(int precision) {
+    DCHECK_GT(precision, 0);
+    if (precision <= 9) return 4;
+    if (precision <= 19) return 8;
+    return 24;
   }
 
   std::string DebugString() const;

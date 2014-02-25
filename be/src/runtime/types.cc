@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "runtime/primitive-type.h"
+#include "runtime/types.h"
 #include <ostream>
 #include <sstream>
 
@@ -138,6 +138,9 @@ string ColumnType::DebugString() const {
   switch (type) {
     case TYPE_CHAR:
       ss << "CHAR(" << len << ")";
+      return ss.str();
+    case TYPE_DECIMAL:
+      ss << "DECIMAL(" << precision << ", " << scale << ")";
       return ss.str();
     default:
       return TypeToString(type);

@@ -32,6 +32,8 @@ add_library(Exprs
   compound-predicate.cc
   conditional-functions.cc
   date-literal.cc
+  decimal-functions.cc
+  decimal-operators.cc
   expr.cc
   float-literal.cc
   function-call.cc
@@ -41,7 +43,7 @@ add_library(Exprs
   is-null-predicate.cc
   like-predicate.cc
   math-functions.cc
-  null-literal.cc  
+  null-literal.cc
   slot-ref.cc
   string-literal.cc
   string-functions.cc

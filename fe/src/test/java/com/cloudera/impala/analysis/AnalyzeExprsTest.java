@@ -635,7 +635,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    */
   private void checkCasts(Expr expr) {
     if (expr instanceof CastExpr) {
-      Assert.assertFalse(expr.getType() == expr.getChild(0).getType());
+      Assert.assertFalse(expr.getType() + " == " + expr.getChild(0).getType(),
+          expr.getType().equals(expr.getChild(0).getType()));
       Assert.assertFalse(expr.getChild(0) instanceof LiteralExpr);
     }
     for (Expr child: expr.getChildren()) {

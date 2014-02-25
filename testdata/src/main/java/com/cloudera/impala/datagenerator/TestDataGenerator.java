@@ -6,11 +6,12 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 
-class TestDataGenerator {  
+class TestDataGenerator {
   // 2 years
   private static final int DEFAULT_NUM_PARTITIONS = 24;
   // 10 tuples per day of month
@@ -19,7 +20,7 @@ class TestDataGenerator {
   private static final int DEFAULT_END_YEAR = 2010;
   // for generating unique ids.
   private static int id = 0;
-  
+
   private static void GenerateAllTypesData(String dir, int numPartitions,
       int maxTuplesPerPartition) throws IOException {
     id = 0;
@@ -61,7 +62,7 @@ class TestDataGenerator {
     Calendar date = (Calendar) startDate.clone();
     SimpleDateFormat df = new SimpleDateFormat("MM/dd/yy");
     SimpleDateFormat tsf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S");
-    
+
     int count = 0;
     while (date.before(endDate) && count < maxTuplesPerPartition) {
       for (int int_col = 0; int_col < intsPerDay && count < maxTuplesPerPartition;
@@ -94,9 +95,38 @@ class TestDataGenerator {
     writer.close();
   }
 
+  // Generate cols with schema: DECIMAL(10, 4) and DECIMAL(15, 5), DECIMAL(1,1)
+  private static void GenerateDecimalData(String dir, int numRows) throws IOException {
+    PrintWriter writer = new PrintWriter(new FileWriter(new File(new File(dir),
+        "data.txt")));
+    double col1 = 0;
+    double col2 = 100;
+    double col3 = 0;
+    double col1Delta = 0.1111;
+    double col2Delta = 1.22222;
+    double col3Delta = 0.1;
+
+    for (int i = 0; i < numRows; ++i) {
+      if (i % 10 == 0) col3 = 0;
+      String s1 =
+          BigDecimal.valueOf(col1).setScale(4, BigDecimal.ROUND_HALF_UP).toString();
+      String s2 =
+          BigDecimal.valueOf(col2).setScale(5, BigDecimal.ROUND_HALF_UP).toString();
+      String s3 =
+          BigDecimal.valueOf(col3).setScale(1, BigDecimal.ROUND_HALF_UP).toString();
+
+      writer.format("%s,%s,%s\n", s1, s2,s3);
+
+      col1 += col1Delta;
+      col2 += col2Delta;
+      col3 += col3Delta;
+    }
+    writer.close();
+  }
+
   /**
    * Generate some test data.
-   * 
+   *
    * @param BaseOutputDirectory
    *          : Required base output folder of generated data files.
    * @throws Exception
@@ -104,16 +134,16 @@ class TestDataGenerator {
    */
   public static void main(String args[]) throws Exception {
     if (args.length != 1) {
-      System.err.println("Usage: " + "TestDataGenerator BaseOutputDirectory");          
+      System.err.println("Usage: " + "TestDataGenerator BaseOutputDirectory");
     }
-    
+
     // Generate AllTypes
     String dirName = args[0] + "/AllTypes";
     File dir = new File(dirName);
     dir.mkdirs();
     GenerateAllTypesData(dirName, DEFAULT_NUM_PARTITIONS,
         DEFAULT_MAX_TUPLES_PER_PARTITION);
-    
+
     // Generate AllTypesSmall
     dirName = args[0] + "/AllTypesSmall";
     dir = new File(dirName);
@@ -137,5 +167,11 @@ class TestDataGenerator {
     dir = new File(dirName);
     dir.mkdirs();
     GenerateAllTypesAggData(dirName, false);
+
+    // Generate Decimal data
+    dirName = args[0] + "/DecimalTiny";
+    dir = new File(dirName);
+    dir.mkdirs();
+    GenerateDecimalData(dirName, 100);
   }
 }

@@ -16,7 +16,7 @@
 #ifndef IMPALA_EXPRS_AGGREGATE_FUNCTIONS_H
 #define IMPALA_EXPRS_AGGREGATE_FUNCTIONS_H
 
-#include "udf/udf.h"
+#include "udf/udf-internal.h"
 
 using namespace impala_udf;
 
@@ -49,6 +49,10 @@ class AggregateFunctions {
   // SumUpdate, SumMerge
   template <typename SRC_VAL, typename DST_VAL>
   static void Sum(FunctionContext*, const SRC_VAL& src, DST_VAL* dst);
+
+  // Sum for decimals
+  static void SumUpdate(FunctionContext*, const DecimalVal& src, DecimalVal* dst);
+  static void SumMerge(FunctionContext*, const DecimalVal& src, DecimalVal* dst);
 
   // MinUpdate/MinMerge
   template <typename T>

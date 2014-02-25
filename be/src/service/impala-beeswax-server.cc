@@ -107,8 +107,8 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
     for (int i = 0; i < num_col; ++i) {
       // ODBC-187 - ODBC can only take "\t" as the delimiter
       out_stream << (i > 0 ? "\t" : "");
-      RawValue::PrintValue(col_values[i],
-          ThriftToType(metadata_.columns[i].columnType.type), scales[i], &out_stream);
+      const ColumnType type(metadata_.columns[i].columnType);
+      RawValue::PrintValue(col_values[i], type, scales[i], &out_stream);
     }
     result_set_->push_back(out_stream.str());
     return Status::OK;

@@ -17,8 +17,7 @@
 #define IMPALA_EXPRS_ANYVAL_UTIL_H
 
 #include "codegen/llvm-codegen.h"
-#include "runtime/primitive-type.h"
-#include "udf/udf.h"
+#include "udf/udf-internal.h"
 #include "util/hash-util.h"
 
 using namespace impala_udf;
@@ -28,78 +27,113 @@ namespace impala {
 // Utilities for AnyVals
 class AnyValUtil {
  public:
-  static uint32_t Hash(const BooleanVal& v, int seed) {
+  static uint32_t Hash(const BooleanVal& v, const FunctionContext::TypeDesc&, int seed) {
     return HashUtil::Hash(&v.val, 1, seed);
   }
 
-  static uint32_t Hash(const TinyIntVal& v, int seed) {
+  static uint32_t Hash(const TinyIntVal& v, const FunctionContext::TypeDesc&, int seed) {
     return HashUtil::Hash(&v.val, 1, seed);
   }
 
-  static uint32_t Hash(const SmallIntVal& v, int seed) {
+  static uint32_t Hash(const SmallIntVal& v, const FunctionContext::TypeDesc&, int seed) {
     return HashUtil::Hash(&v.val, 2, seed);
   }
 
-  static uint32_t Hash(const IntVal& v, int seed) {
+  static uint32_t Hash(const IntVal& v, const FunctionContext::TypeDesc&, int seed) {
     return HashUtil::Hash(&v.val, 4, seed);
   }
 
-  static uint32_t Hash(const BigIntVal& v, int seed) {
+  static uint32_t Hash(const BigIntVal& v, const FunctionContext::TypeDesc&, int seed) {
     return HashUtil::Hash(&v.val, 8, seed);
   }
 
-  static uint32_t Hash(const FloatVal& v, int seed) {
+  static uint32_t Hash(const FloatVal& v, const FunctionContext::TypeDesc&, int seed) {
     return HashUtil::Hash(&v.val, 4, seed);
   }
 
-  static uint32_t Hash(const DoubleVal& v, int seed) {
+  static uint32_t Hash(const DoubleVal& v, const FunctionContext::TypeDesc&, int seed) {
     return HashUtil::Hash(&v.val, 8, seed);
   }
 
-  static uint32_t Hash(const StringVal& v, int seed) {
+  static uint32_t Hash(const StringVal& v, const FunctionContext::TypeDesc&, int seed) {
     return HashUtil::Hash(v.ptr, v.len, seed);
   }
 
-  static uint32_t Hash(const TimestampVal& v, int seed) {
+  static uint32_t Hash(const TimestampVal& v, const FunctionContext::TypeDesc&,
+      int seed) {
     TimestampValue tv = TimestampValue::FromTimestampVal(v);
     return tv.Hash(seed);
   }
 
-  static uint64_t Hash64(const BooleanVal& v, int64_t seed) {
+  static uint64_t Hash(const DecimalVal& v, const FunctionContext::TypeDesc& t,
+      int64_t seed) {
+    DCHECK_GT(t.precision, 0);
+    switch (ColumnType::GetDecimalByteSize(t.precision)) {
+      case 4: return HashUtil::Hash(&v.val4, 4, seed);
+      case 8: return HashUtil::Hash(&v.val8, 8, seed);
+      case 16: return HashUtil::Hash(&v.val16, 16, seed);
+      default:
+        DCHECK(false);
+        return 0;
+    }
+  }
+
+  static uint64_t Hash64(const BooleanVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
     return HashUtil::FnvHash64(&v.val, 1, seed);
   }
 
-  static uint64_t Hash64(const TinyIntVal& v, int64_t seed) {
+  static uint64_t Hash64(const TinyIntVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
     return HashUtil::FnvHash64(&v.val, 1, seed);
   }
 
-  static uint64_t Hash64(const SmallIntVal& v, int64_t seed) {
+  static uint64_t Hash64(const SmallIntVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
     return HashUtil::FnvHash64(&v.val, 2, seed);
   }
 
-  static uint64_t Hash64(const IntVal& v, int64_t seed) {
+  static uint64_t Hash64(const IntVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
     return HashUtil::FnvHash64(&v.val, 4, seed);
   }
 
-  static uint64_t Hash64(const BigIntVal& v, int64_t seed) {
+  static uint64_t Hash64(const BigIntVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
     return HashUtil::FnvHash64(&v.val, 8, seed);
   }
 
-  static uint64_t Hash64(const FloatVal& v, int64_t seed) {
+  static uint64_t Hash64(const FloatVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
     return HashUtil::FnvHash64(&v.val, 4, seed);
   }
 
-  static uint64_t Hash64(const DoubleVal& v, int64_t seed) {
+  static uint64_t Hash64(const DoubleVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
     return HashUtil::FnvHash64(&v.val, 8, seed);
   }
 
-  static uint64_t Hash64(const StringVal& v, int64_t seed) {
+  static uint64_t Hash64(const StringVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
     return HashUtil::FnvHash64(v.ptr, v.len, seed);
   }
 
-  static uint64_t Hash64(const TimestampVal& v, int64_t seed) {
+  static uint64_t Hash64(const TimestampVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
     TimestampValue tv = TimestampValue::FromTimestampVal(v);
     return HashUtil::FnvHash64(&tv, 12, seed);
+  }
+
+  static uint64_t Hash64(const DecimalVal& v, const FunctionContext::TypeDesc& t,
+      int64_t seed) {
+    switch (ColumnType::GetDecimalByteSize(t.precision)) {
+      case 4: return HashUtil::FnvHash64(&v.val4, 4, seed);
+      case 8: return HashUtil::FnvHash64(&v.val8, 8, seed);
+      case 16: return HashUtil::FnvHash64(&v.val16, 16, seed);
+      default:
+        DCHECK(false);
+        return 0;
+    }
   }
 
   // Returns the byte size of *Val for type t.

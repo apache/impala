@@ -27,6 +27,7 @@
 #include "util/debug-util.h"
 
 #include <thrift/protocol/TDebugProtocol.h>
+
 using namespace impala;
 using namespace impala_udf;
 using namespace llvm;
@@ -74,7 +75,7 @@ Status AggFnEvaluator::Create(ObjectPool* pool, const TExpr& desc,
 
 AggFnEvaluator::AggFnEvaluator(const TExprNode& desc)
   : fn_(desc.fn),
-    return_type_(desc.fn.ret_type),
+    return_type_(desc.type),
     intermediate_type_(desc.fn.aggregate_fn.intermediate_type),
     output_slot_desc_(NULL),
     cache_entry_(NULL) {
@@ -104,16 +105,13 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   DCHECK(output_slot_desc_ == NULL);
   output_slot_desc_ = output_slot_desc;
 
-  if (return_type_.type == TYPE_DECIMAL) {
-    return Status("DECIMAL is not yet implemented.");
-  }
   RETURN_IF_ERROR(Expr::Prepare(input_exprs_, state, desc, false));
 
   ObjectPool* obj_pool = state->obj_pool();
   for (int i = 0; i < input_exprs().size(); ++i) {
-    staging_input_vals_.push_back(CreateAnyVal(obj_pool, input_exprs()[i]->type().type));
+    staging_input_vals_.push_back(CreateAnyVal(obj_pool, input_exprs()[i]->type()));
   }
-  staging_output_val_ = CreateAnyVal(obj_pool, output_slot_desc_->type().type);
+  staging_output_val_ = CreateAnyVal(obj_pool, output_slot_desc_->type());
 
   // Load the function pointers.
   if (fn_.aggregate_fn.init_fn_symbol.empty() ||
@@ -231,8 +229,25 @@ inline void AggFnEvaluator::SetAnyVal(const void* slot,
       reinterpret_cast<const TimestampValue*>(slot)->ToTimestampVal(
           reinterpret_cast<TimestampVal*>(dst));
       return;
+    case TYPE_DECIMAL:
+      switch (type.GetByteSize()) {
+        case 4:
+          reinterpret_cast<DecimalVal*>(dst)->val4 =
+              reinterpret_cast<const Decimal4Value*>(slot)->value();
+          return;
+        case 8:
+          reinterpret_cast<DecimalVal*>(dst)->val8 =
+              reinterpret_cast<const Decimal8Value*>(slot)->value();
+          return;
+        case 24:
+          reinterpret_cast<DecimalVal*>(dst)->val16 = reinterpret_cast<
+              const Decimal16Value*>(slot)->value();
+          return;
+        default:
+          break;
+      }
     default:
-      DCHECK(false) << "NYI";
+      DCHECK(false) << "NYI: " << type;
   }
 }
 
@@ -276,8 +291,25 @@ inline void AggFnEvaluator::SetOutputSlot(const AnyVal* src, Tuple* dst) {
       *reinterpret_cast<TimestampValue*>(slot) = TimestampValue::FromTimestampVal(
           *reinterpret_cast<const TimestampVal*>(src));
       return;
+    case TYPE_DECIMAL:
+      switch (output_slot_desc_->type().GetByteSize()) {
+        case 4:
+          *reinterpret_cast<Decimal4Value*>(slot) =
+              Decimal4Value(reinterpret_cast<const DecimalVal*>(src)->val4);
+          return;
+        case 8:
+          *reinterpret_cast<Decimal8Value*>(slot) =
+              Decimal8Value(reinterpret_cast<const DecimalVal*>(src)->val8);
+          return;
+        case 24:
+          *reinterpret_cast<Decimal16Value*>(slot) =
+              Decimal16Value(reinterpret_cast<const DecimalVal*>(src)->val16);
+          return;
+        default:
+          break;
+      }
     default:
-      DCHECK(false) << "NYI";
+      DCHECK(false) << "NYI: " << output_slot_desc_->type();
   }
 }
 
@@ -422,6 +454,12 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* tuple, void* fn) {
     case TYPE_STRING: {
       typedef StringVal(*Fn)(FunctionContext*, AnyVal*);
       StringVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
+      SetOutputSlot(&v, tuple);
+      break;
+    }
+    case TYPE_DECIMAL: {
+      typedef DecimalVal(*Fn)(FunctionContext*, AnyVal*);
+      DecimalVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
       SetOutputSlot(&v, tuple);
       break;
     }

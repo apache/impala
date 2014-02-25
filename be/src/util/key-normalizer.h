@@ -16,7 +16,6 @@
 #define IMPALA_UTIL_KEY_NORMALIZER_H_
 
 #include "exprs/expr.h"
-#include "runtime/primitive-type.h"
 
 namespace impala {
 

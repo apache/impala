@@ -24,8 +24,8 @@
 
 #include "rpc/thrift-client.h"
 #include "common/status.h"
-#include "runtime/primitive-type.h"
 #include "runtime/runtime-state.h"
+#include "runtime/types.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaService_types.h"

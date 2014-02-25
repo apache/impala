@@ -16,7 +16,6 @@
 
 #include "common/version.h"
 #include "exprs/expr.h"
-#include "runtime/primitive-type.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"

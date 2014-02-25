@@ -16,7 +16,7 @@
 #define IMPALA_UTIL_SYMBOLS_UTIL_H
 
 #include <string>
-#include "runtime/primitive-type.h"
+#include "runtime/types.h"
 
 namespace impala {
 

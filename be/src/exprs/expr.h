@@ -21,6 +21,7 @@
 
 #include "common/status.h"
 #include "runtime/descriptors.h"
+#include "runtime/decimal-value.h"
 #include "runtime/lib-cache.h"
 #include "runtime/raw-value.h"
 #include "runtime/tuple.h"
@@ -62,6 +63,9 @@ struct ExprValue {
   std::string string_data;
   StringValue string_val;
   TimestampValue timestamp_val;
+  Decimal4Value decimal4_val;
+  Decimal8Value decimal8_val;
+  Decimal16Value decimal16_val;
 
   ExprValue()
     : bool_val(false),
@@ -426,7 +430,10 @@ class Expr {
 
  protected:
   friend class AggFnEvaluator;
+  friend class CastExpr;
   friend class ComputeFunctions;
+  friend class DecimalFunctions;
+  friend class DecimalOperators;
   friend class MathFunctions;
   friend class StringFunctions;
   friend class TimestampFunctions;

@@ -33,12 +33,23 @@
 #include "boost_multiprecision/cpp_int.hpp"
 #include "boost_multiprecision/cpp_dec_float.hpp"
 
+namespace impala {
+
 // Define 96 bit int type.
 typedef boost::multiprecision::number<
     boost::multiprecision::cpp_int_backend<96, 96,
     boost::multiprecision::signed_magnitude,
     boost::multiprecision::unchecked, void> > int96_t;
 
-// The header already defines int128_t
+// The header already defines int128_t, but redefine it in our namespace
+typedef boost::multiprecision::int128_t int128_t;
+
+// Define 256 bit int type.
+typedef boost::multiprecision::number<
+    boost::multiprecision::cpp_int_backend<256, 256,
+    boost::multiprecision::signed_magnitude,
+    boost::multiprecision::unchecked, void> > int256_t;
+
+}
 
 #endif

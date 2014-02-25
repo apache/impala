@@ -64,6 +64,9 @@ void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
     case TYPE_CHAR:
       stream->write(chars, type.len);
       break;
+    case TYPE_DECIMAL:
+      stream->write(chars, type.GetByteSize());
+      break;
     default:
       DCHECK(false) << "bad RawValue::PrintValue() type: " << type.DebugString();
   }
@@ -156,6 +159,21 @@ int RawValue::Compare(const void* v1, const void* v2, const ColumnType& type) {
     case TYPE_CHAR:
       return StringCompare(reinterpret_cast<const char*>(v1), type.len,
           reinterpret_cast<const char*>(v2), type.len, type.len);
+    case TYPE_DECIMAL:
+      switch (type.GetByteSize()) {
+        case 4:
+          return reinterpret_cast<const Decimal4Value*>(v1)->Compare(
+                 *reinterpret_cast<const Decimal4Value*>(v2));
+        case 8:
+          return reinterpret_cast<const Decimal8Value*>(v1)->Compare(
+                 *reinterpret_cast<const Decimal8Value*>(v2));
+        case 24:
+          return reinterpret_cast<const Decimal16Value*>(v1)->Compare(
+                 *reinterpret_cast<const Decimal16Value*>(v2));
+        default:
+          DCHECK(false) << type;
+          return 0;
+      }
     default:
       DCHECK(false) << "invalid type: " << type.DebugString();
       return 0;
@@ -207,6 +225,9 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
     }
     case TYPE_CHAR:
       memcpy(dst, value, type.len);
+      break;
+    case TYPE_DECIMAL:
+      memcpy(dst, value, type.GetByteSize());
       break;
     default:
       DCHECK(false) << "RawValue::Write(): bad type: " << type.DebugString();

@@ -300,6 +300,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   for (int i = 0; i < node->materialized_slots().size(); ++i) {
     SlotDescriptor* slot_desc = node->materialized_slots()[i];
     if (slot_desc->type().type == TYPE_TIMESTAMP) return NULL;
+    if (slot_desc->type().type == TYPE_DECIMAL) return NULL;
   }
 
   // TODO: can't codegen yet if strings need to be copied

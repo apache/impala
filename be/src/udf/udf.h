@@ -63,6 +63,7 @@ class FunctionContext {
     TYPE_TIMESTAMP,
     TYPE_STRING,
     TYPE_FIXED_BUFFER,
+    TYPE_DECIMAL,
   };
 
   struct TypeDesc {

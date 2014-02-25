@@ -868,6 +868,7 @@ void LlvmCodeGen::CodegenAssign(LlvmBuilder* builder,
     }
     case TYPE_CHAR:
     case TYPE_TIMESTAMP:
+    case TYPE_DECIMAL:
       DCHECK(false) << "NYI"; // TODO
       break;
     default:

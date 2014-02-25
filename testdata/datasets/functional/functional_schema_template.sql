@@ -1229,3 +1229,24 @@ d2 DECIMAL(10, 0)
 d3 DECIMAL(20, 10)
 d4 DECIMAL(38, 38)
 d5 DECIMAL(10, 5)
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+-- TODO: Beeline on CDH4 doesn't understand decimal with precision and scale so can't
+-- do the data load. This is done in testdata/bin/create_load_data for now.
+-- Fix this by allowing an "hdfs put" as the load command.
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+decimal_tiny
+---- COLUMNS
+c1 DECIMAL(10, 4)
+c2 DECIMAL(15, 5)
+c3 DECIMAL(1,1)
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+-- TODO: Beeline on CDH4 doesn't understand decimal with precision and scale so can't
+-- do the data load. This is done in testdata/bin/create_load_data for now.
+-- Fix this by allowing an "hdfs put" as the load command.

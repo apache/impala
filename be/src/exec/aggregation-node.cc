@@ -285,7 +285,8 @@ Tuple* AggregationNode::ConstructAggTuple() {
     // This optimization no longer applies with AnyVal
     if ((*slot_desc)->type().type != TYPE_STRING &&
         (*slot_desc)->type().type != TYPE_TIMESTAMP &&
-        (*slot_desc)->type().type != TYPE_CHAR) {
+        (*slot_desc)->type().type != TYPE_CHAR &&
+        (*slot_desc)->type().type != TYPE_DECIMAL) {
       ExprValue default_value;
       void* default_value_ptr = NULL;
       switch (evaluator->agg_op()) {
@@ -494,7 +495,8 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
     // string and timestamp aggregation currently not supported
     if (slot_desc->type().type == TYPE_STRING ||
         slot_desc->type().type == TYPE_TIMESTAMP ||
-        slot_desc->type().type == TYPE_CHAR) {
+        slot_desc->type().type == TYPE_CHAR ||
+        slot_desc->type().type == TYPE_DECIMAL) {
       VLOG_QUERY << "Could not codegen UpdateAggTuple because "
                  << "string, char and timestamp aggregation is not yet supported.";
       return NULL;

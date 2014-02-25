@@ -21,6 +21,7 @@
 #include "common/compiler-util.h"
 
 #include "common/logging.h"
+#include "runtime/decimal-value.h"
 
 // Our own definition of "isspace" that optimize on the ' ' branch.
 #define IS_SPACE(c) \
@@ -29,7 +30,7 @@
 
 namespace impala {
 
-// Utility functions for doing atoi/atof on non-null terminated strings.  On micro 
+// Utility functions for doing atoi/atof on non-null terminated strings.  On micro
 // benchmarks, this is significantly faster than libc (atoi/strtol and atof/strtod).
 //
 // Strings with leading and trailing whitespaces are accepted.
@@ -40,21 +41,22 @@ namespace impala {
 // branch mis-prediction.
 //
 // For overflows, we are following the mysql behavior, to cap values at the max/min value
-// for that data type.  This is different from hive, which returns NULL for overflow 
+// for that data type.  This is different from hive, which returns NULL for overflow
 // slots for int types and inf/-inf for float types.
 //
 // Things we tried that did not work:
 //  - lookup table for converting character to digit
 // Improvements (TODO):
 //  - Validate input using _sidd_compare_ranges
-//  - Since we know the length, we can parallelize this: i.e. result = 100*s[0] + 
+//  - Since we know the length, we can parallelize this: i.e. result = 100*s[0] +
 //    10*s[1] + s[2]
 class StringParser {
  public:
   enum ParseResult {
     PARSE_SUCCESS = 0,
     PARSE_FAILURE,
-    PARSE_OVERFLOW
+    PARSE_OVERFLOW,
+    PARSE_UNDERFLOW,
   };
 
   template <typename T>
@@ -92,6 +94,79 @@ class StringParser {
 
     int i = SkipLeadingWhitespace(s, len);
     return StringToBoolInternal(s + i, len - i, result);
+  }
+
+  // Parses a decimal from s, storing the result in *v.
+  template <typename T>
+  static inline DecimalValue<T> StringToDecimal(const char* s, int len,
+      const ColumnType& type, StringParser::ParseResult* result) {
+    bool negative = false;
+
+    while (len > 0 && IS_SPACE(*s)) {
+      ++s;
+      --len;
+    }
+
+    switch (*s) {
+      case '-':
+        negative = true;
+      case '+':
+        ++s;
+        --len;
+    }
+
+    // Removing leading 0's.
+    while (len > 0 && *s == '0') {
+      ++s;
+      --len;
+    }
+
+    T decimal = 0;
+    int digits_before = 0;
+    int digits_after = 0;
+    bool dot_found = false;
+
+    for (int i = 0; i < len; ++i) {
+      if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
+        T digit = s[i] - '0';
+        if (dot_found) {
+          ++digits_after;
+          decimal = decimal * 10 + digit;
+        } else {
+          ++digits_before;
+          decimal = decimal * 10 + digit;
+        }
+      } else if (s[i] == '.') {
+        dot_found = true;
+      } else {
+        if (!StringParser::isAllWhitespace(s + i, len - i)) {
+          *result = StringParser::PARSE_FAILURE;
+          return DecimalValue<T>();
+        }
+        break;
+      }
+    }
+
+    // TODO: consider making the Int parsing keep track of digits as well.
+    // It makes the overflow case much easier to think about.
+    if (UNLIKELY(digits_after > type.scale)) {
+      *result = StringParser::PARSE_UNDERFLOW;
+      return DecimalValue<T>();
+    }
+    if (UNLIKELY(digits_before > type.precision - type.scale)) {
+      *result = StringParser::PARSE_OVERFLOW;
+      return DecimalValue<T>();
+    }
+    if (UNLIKELY(digits_before + digits_after > type.precision)) {
+      *result = StringParser::PARSE_OVERFLOW;
+      return DecimalValue<T>();
+    }
+
+    // Pad the decimal out with 0's. e.g. scale of 3 for the string
+    // "1.1" should pad it out by 100 (as if the string was "1.100"
+    decimal *= DecimalUtil::GetScaleMultiplier<T>(type.scale - digits_after);
+    *result = StringParser::PARSE_SUCCESS;
+    return DecimalValue<T>(negative ? -decimal : decimal);
   }
 
  private:
@@ -168,12 +243,12 @@ class StringParser {
     }
     int i = 0;
     switch (*s) {
-      case '-': 
+      case '-':
         negative = true;
         max_val = std::numeric_limits<T>::max() + 1;
       case '+': i = 1;
     }
-    
+
     const T max_div_base = max_val / base;
     const T max_mod_base = max_val % base;
 
@@ -276,7 +351,7 @@ class StringParser {
       val = strtod(c_str, &s_end);
       if (s_end != c_str + len - negative) {
         // skip trailing whitespace
-        int trailing_len = len - negative - (int)(s_end - c_str); 
+        int trailing_len = len - negative - (int)(s_end - c_str);
         if (UNLIKELY(!isAllWhitespace(s_end, trailing_len))) {
           *result = PARSE_FAILURE;
           return val;
@@ -371,16 +446,16 @@ class StringParser {
   }
 };
 
-template<> 
+template<>
 inline int StringParser::StringParseTraits<int8_t>::max_ascii_len() { return 3; }
 
-template<> 
+template<>
 inline int StringParser::StringParseTraits<int16_t>::max_ascii_len() { return 5; }
 
-template<> 
+template<>
 inline int StringParser::StringParseTraits<int32_t>::max_ascii_len() { return 10; }
 
-template<> 
+template<>
 inline int StringParser::StringParseTraits<int64_t>::max_ascii_len() { return 19; }
 
 }

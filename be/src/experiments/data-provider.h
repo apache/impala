@@ -16,7 +16,7 @@
 #include <boost/generator_iterator.hpp>
 
 #include "runtime/mem-pool.h"
-#include "runtime/primitive-type.h"
+#include "runtime/types.h"
 #include "runtime/string-value.h"
 #include "util/runtime-profile.h"
 
@@ -81,8 +81,8 @@ class DataProvider {
           return (T)(i % (int64_t)(max - min) + min);
       }
       return 0;
-    } 
-    
+    }
+
     impala::PrimitiveType type;
     Value min, max;
     DataGen gen_type;
@@ -114,7 +114,7 @@ class DataProvider {
   // Returns NULL/0 when the generator is done.
   void* NextBatch(int* rows_returned);
 
-  // Print the row data in csv format. 
+  // Print the row data in csv format.
   void Print(std::ostream*, char* data, int num_rows) const;
 
  private:
@@ -130,8 +130,8 @@ class DataProvider {
 
   impala::RuntimeProfile::Counter* bytes_generated_;
 };
-  
-template<> 
+
+template<>
 inline DataProvider::ColDesc DataProvider::ColDesc::Create<bool>(
     const bool& min, const bool &max, DataGen gen) {
   ColDesc c(impala::TYPE_BOOLEAN, 1);
@@ -140,7 +140,7 @@ inline DataProvider::ColDesc DataProvider::ColDesc::Create<bool>(
   c.gen_type = gen;
   return c;
 }
-template<> 
+template<>
 inline DataProvider::ColDesc DataProvider::ColDesc::Create<int8_t>(
     const int8_t& min, const int8_t& max, DataGen gen) {
   ColDesc c(impala::TYPE_TINYINT, 1);
@@ -149,7 +149,7 @@ inline DataProvider::ColDesc DataProvider::ColDesc::Create<int8_t>(
   c.gen_type = gen;
   return c;
 }
-template<> 
+template<>
 inline DataProvider::ColDesc DataProvider::ColDesc::Create<int16_t>(
     const int16_t& min, const int16_t& max, DataGen gen) {
   ColDesc c(impala::TYPE_SMALLINT, 2);
@@ -158,7 +158,7 @@ inline DataProvider::ColDesc DataProvider::ColDesc::Create<int16_t>(
   c.gen_type = gen;
   return c;
 }
-template<> 
+template<>
 inline DataProvider::ColDesc DataProvider::ColDesc::Create<int32_t>(
     const int32_t& min, const int32_t& max, DataGen gen) {
   ColDesc c(impala::TYPE_INT, 4);
@@ -167,7 +167,7 @@ inline DataProvider::ColDesc DataProvider::ColDesc::Create<int32_t>(
   c.gen_type = gen;
   return c;
 }
-template<> 
+template<>
 inline DataProvider::ColDesc DataProvider::ColDesc::Create<int64_t>(
     const int64_t& min, const int64_t& max, DataGen gen) {
   ColDesc c(impala::TYPE_BIGINT, 8);
@@ -176,7 +176,7 @@ inline DataProvider::ColDesc DataProvider::ColDesc::Create<int64_t>(
   c.gen_type = gen;
   return c;
 }
-template<> 
+template<>
 inline DataProvider::ColDesc DataProvider::ColDesc::Create<float>(
     const float& min, const float& max, DataGen gen) {
   ColDesc c(impala::TYPE_FLOAT, 4);
@@ -185,7 +185,7 @@ inline DataProvider::ColDesc DataProvider::ColDesc::Create<float>(
   c.gen_type = gen;
   return c;
 }
-template<> 
+template<>
 inline DataProvider::ColDesc DataProvider::ColDesc::Create<double>(
     const double& min, const double& max, DataGen gen) {
   ColDesc c(impala::TYPE_DOUBLE, 8);
@@ -194,7 +194,7 @@ inline DataProvider::ColDesc DataProvider::ColDesc::Create<double>(
   c.gen_type = gen;
   return c;
 }
-template<> inline 
+template<> inline
 DataProvider::ColDesc DataProvider::ColDesc::Create<impala::StringValue>(
     const impala::StringValue& min, const impala::StringValue& max, DataGen gen) {
   ColDesc c(impala::TYPE_STRING, 16);

@@ -102,6 +102,35 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
       }
       break;
     }
+    case TYPE_DECIMAL: {
+      switch (slot_desc->slot_size()) {
+        case 4:
+          *reinterpret_cast<Decimal4Value*>(slot) =
+              StringParser::StringToDecimal<int32_t>(
+                  data, len, slot_desc->type(), &parse_result);
+          break;
+        case 8:
+          *reinterpret_cast<Decimal8Value*>(slot) =
+              StringParser::StringToDecimal<int64_t>(
+                  data, len, slot_desc->type(), &parse_result);
+          break;
+        case 12:
+          DCHECK(false) << "Planner should not generate this.";
+          break;
+        case 24:
+          *reinterpret_cast<Decimal16Value*>(slot) =
+              StringParser::StringToDecimal<int128_t>(
+                  data, len, slot_desc->type(), &parse_result);
+          break;
+        default:
+          DCHECK(false) << "Decimal slots can't be this size.";
+      }
+      if (parse_result != StringParser::PARSE_SUCCESS) {
+        // Don't accept underflow and overflow for decimals.
+        parse_result = StringParser::PARSE_FAILURE;
+      }
+      break;
+    }
     default:
       DCHECK(false) << "bad slot type: " << slot_desc->type();
       break;

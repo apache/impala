@@ -60,6 +60,8 @@ public class FunctionCallExpr extends Expr {
     params_ = params;
     // Just inherit the function object from 'e'.
     fn_ = e.fn_;
+    type_ = e.type_;
+    Preconditions.checkState(!type_.isWildcardDecimal());
     if (params.exprs() != null) children_.addAll(params.exprs());
   }
 
@@ -177,10 +179,10 @@ public class FunctionCallExpr extends Expr {
       // TODO: rethink how we generate the merge aggregation.
       AggregateFunction aggFn = (AggregateFunction)fn_;
       ColumnType intermediateType = aggFn.getIntermediateType();
-      type_ = fn_.getReturnType();
       if (intermediateType == null) intermediateType = type_;
       // TODO: this needs to change when the intermediate type != the return type
       Preconditions.checkArgument(intermediateType.equals(fn_.getReturnType()));
+      Preconditions.checkState(!type_.isWildcardDecimal());
       return;
     }
 
@@ -266,7 +268,11 @@ public class FunctionCallExpr extends Expr {
       // this mechanism (where the function can at planning type resolve types).
       Preconditions.checkState(fn_.getBinaryType() == TFunctionBinaryType.BUILTIN);
       Preconditions.checkState(children_.size() > 0);
-      type_ = children_.get(0).type_;
+      if (fnName_.getFunction().equalsIgnoreCase("sum")) {
+        type_ = children_.get(0).type_.getMaxResolutionType();
+      } else {
+        type_ = children_.get(0).type_;
+      }
       Preconditions.checkState(type_.isDecimal() && !type_.isWildcardDecimal());
     }
   }
