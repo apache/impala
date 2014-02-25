@@ -66,6 +66,14 @@ class InternalQueue {
     }
   }
 
+  // Returns the element at the head of the list without dequeuing or NULL
+  // if the queue is empty. This is O(1).
+  T* head() {
+    ScopedSpinLock lock(&lock_);
+    if (empty()) return NULL;
+    return reinterpret_cast<T*>(head_);
+  }
+
   // Dequeues an element from the queue's head. Returns NULL if the queue
   // is empty. This is O(1).
   T* Dequeue() {

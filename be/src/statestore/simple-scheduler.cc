@@ -530,7 +530,7 @@ void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_re
     // the root fragment is executed directly by the coordinator
     --num_backends;
   }
-  schedule->SetNumBackends(num_backends);
+  schedule->set_num_backends(num_backends);
 
   // compute destinations and # senders per exchange node
   // (the root fragment doesn't have a destination)
@@ -767,6 +767,7 @@ Status SimpleScheduler::InitPoolWhitelist(const string& conf_path) {
 }
 
 Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
+  schedule->set_num_hosts(num_backends_metric_->value());
   RETURN_IF_ERROR(admission_controller_.AdmitQuery(schedule));
   RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
   ComputeFragmentHosts(schedule->request(), schedule);

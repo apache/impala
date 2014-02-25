@@ -26,6 +26,7 @@
 
 #include "common/status.h"
 #include "statestore/statestore-subscriber.h"
+#include "statestore/query-schedule.h"
 #include "util/internal-queue.h"
 #include "util/thread.h"
 
@@ -61,6 +62,21 @@ class ExecEnv;
 // heartbeats and all decisions are made locally, the total pool statistics are
 // estimates. As a result, more requests may be admitted or queued than the configured
 // thresholds, which are really soft limits.
+//
+// Because the memory usage (tracked by the per-pool mem trackers) may not reflect the
+// peak memory usage of a query for some time, it would be possible to over admit
+// requests if they are submitted much faster than running queries were to start using
+// memory. However, to avoid this, we use the request's memory estimate from planning
+// (even though we know these estimates may be off) before admitting a request, and we
+// also keep track of the sum of the memory estimates for all running queries, per-pool.
+// The local, per-pool mem_usage is set to the maximum of the estimate and the actual
+// per-pool current consumption. We then need to update the local and cluster mem_usage
+// stats when admitting (in AdmitQuery() and DequeueLoop()) as well as in ReleaseQuery().
+// When requests are submitted very quickly and the memory estimates from planning are
+// significantly off this strategy can still result in over or under subscription, but
+// this is not completely unavoidable unless we can produce better estimates.
+// TODO: We can reduce the effect of very high estimates by using a weighted
+//       combination of the estimate and the actual consumption as a function of time.
 class AdmissionController {
  public:
   AdmissionController(Metrics* metrics, const std::string& backend_id);
@@ -89,7 +105,7 @@ class AdmissionController {
   // Structure stored in a QueryQueue representing a request. This struct lives only
   // during the call to AdmitQuery().
   struct QueueNode : public InternalQueue<QueueNode>::Node {
-    QueueNode(const TUniqueId& id) : query_id(id) { }
+    QueueNode(const QuerySchedule& query_schedule) : schedule(query_schedule) { }
 
     // Set when the request is admitted or rejected by the dequeuing thread. Used
     // by AdmitQuery() to wait for admission or until the timeout is reached.
@@ -98,8 +114,10 @@ class AdmissionController {
     // thread holds it to Set().
     Promise<bool> is_admitted;
 
-    // The query id of the queued request. This is only used for debug logging.
-    const TUniqueId query_id;
+    // The query schedule of the queued request. The schedule lives longer than the
+    // duration of the the QueueNode, which only lives the duration of the call to
+    // AdmitQuery.
+    const QuerySchedule& schedule;
   };
 
   // Metrics exposed for a pool.
@@ -174,6 +192,12 @@ class AdmissionController {
   // need to be sent to the statestore.
   PoolSet pools_for_updates_;
 
+  // The sum of the mem usage estimates for all the running requests, per-pool.
+  // The local TPoolStats.mem_usage is set to the maximum of the estimate and the
+  // actual consumption by the per-pool mem tracker.
+  typedef boost::unordered_map<std::string, int64_t> PoolMemEstimates;
+  PoolMemEstimates local_mem_estimates_;
+
   // Mimics the statestore topic, i.e. stores a local copy of the logical data structure
   // that the statestore broadcasts. The local stats are not stored in this map because
   // we need to be able to clear the stats for all remote backends when a full topic
@@ -227,12 +251,12 @@ class AdmissionController {
   // Re-computes the cluster_pool_stats_ aggregate stats for all pools.
   // Called by UpdatePoolStats() after handling updates and deletions.
   // Must hold admission_ctrl_lock_.
-  void UpdateClusterAggregates();
+  void UpdateClusterAggregates(const std::string& pool_name);
 
   // Updates the memory usage of the local pool stats based on the most recent mem
   // tracker consumption. Called by UpdatePoolStats() before sending local pool updates.
   // Must hold admission_ctrl_lock_.
-  void UpdateMemUsage();
+  void UpdateLocalMemUsage(const std::string& pool_name);
 
   // Adds updates for local pools that have changed to the subscriber topic updates.
   // Called by UpdatePoolStats() before handling updates.
@@ -241,6 +265,16 @@ class AdmissionController {
 
   // Dequeues and admits queued queries when notified by dequeue_cv_.
   void DequeueLoop();
+
+  // Returns true if the request can be admitted, i.e. admitting would not go over the
+  // limits for this pool.
+  bool CanAdmitRequest(const std::string& pool, const int64_t max_requests,
+      const int64_t mem_limit, const QuerySchedule& schedule, bool admit_from_queue);
+
+  // Returns true if this request must be rejected. error_msg returns the reason.
+  bool RejectRequest(const std::string& pool, const int64_t max_requests,
+      const int64_t mem_limit, const int64_t max_queued, const QuerySchedule& schedule,
+      std::string* error_msg);
 
   // Gets the metrics for a pool. The metrics are initialized if they don't already
   // exist. Returns NULL if there is no metrics system available.  Must hold

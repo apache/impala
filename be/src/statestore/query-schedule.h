@@ -96,10 +96,24 @@ class QuerySchedule {
   // the reservation_'s reservation_id is set.
   bool NeedsRelease() const { return reservation_.__isset.reservation_id; }
 
+  // Gets the estimated memory (bytes) and vcores per-node. Returns the user specified
+  // estimate (MEM_LIMIT query parameter) if provided or the estimate from planning if
+  // available, but is capped at the amount of physical memory to avoid problems if
+  // either estimate is unreasonably large.
+  int64_t GetPerHostMemoryEstimate() const;
+  int16_t GetPerHostVCores() const;
+  // Total estimated memory for all nodes. set_num_hosts() must be set before calling.
+  int64_t GetTotalClusterMemory() const;
+
   // Helper methods used by scheduler to populate this QuerySchedule.
   void AddScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
-  void SetNumBackends(int64_t num_backends) { num_backends_ = num_backends; }
+  void set_num_backends(int64_t num_backends) { num_backends_ = num_backends; }
+  void set_num_hosts(int64_t num_hosts) {
+    DCHECK_GT(num_hosts, 0);
+    num_hosts_ = num_hosts;
+  }
   int64_t num_backends() const { return num_backends_; }
+  int64_t num_hosts() const { return num_hosts_; }
   int64_t num_scan_ranges() const { return num_scan_ranges_; }
   int32_t GetFragmentIdx(PlanNodeId id) const { return plan_node_to_fragment_idx_[id]; }
   std::vector<FragmentExecParams>& exec_params() { return fragment_exec_params_; }
@@ -148,6 +162,10 @@ class QuerySchedule {
 
   // Number of backends executing plan fragments on behalf of this query.
   int64_t num_backends_;
+
+  // Total number of hosts. Used to compute the total cluster estimated memory
+  // in GetTotalClusterMemory().
+  int64_t num_hosts_;
 
   // Total number of scan ranges of this query.
   int64_t num_scan_ranges_;

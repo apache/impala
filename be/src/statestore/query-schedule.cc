@@ -21,6 +21,7 @@
 #include <boost/uuid/uuid_generators.hpp>
 
 #include "util/container-util.h"
+#include "util/mem-info.h"
 #include "util/network-util.h"
 #include "util/uid-util.h"
 #include "util/debug-util.h"
@@ -53,6 +54,7 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     summary_profile_(summary_profile),
     query_events_(query_events),
     num_backends_(0),
+    num_hosts_(0),
     num_scan_ranges_(0),
     is_admitted_(false) {
   fragment_exec_params_.resize(request.fragments.size());
@@ -92,6 +94,41 @@ void QuerySchedule::CreateMiniLlamaMapping(const vector<string>& llama_nodes) {
   }
 }
 
+int64_t QuerySchedule::GetTotalClusterMemory() const {
+  DCHECK_GT(num_hosts_, 0);
+  const int64_t total_cluster_mem = GetPerHostMemoryEstimate() * num_hosts_;
+  DCHECK_GE(total_cluster_mem, 0); // Assume total cluster memory fits in an int64_t.
+  return total_cluster_mem;
+}
+
+int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
+  // Prefer manual overrides from query options over the estimation given in the request.
+  int64_t per_host_mem = 0;
+  if (query_options_.__isset.mem_limit && query_options_.mem_limit > 0) {
+    per_host_mem = max(1024L * 1024, query_options_.mem_limit);
+  } else if (request_.__isset.per_host_mem_req && request_.per_host_mem_req > 0) {
+    per_host_mem = request_.per_host_mem_req;
+  } else {
+    // TODO: Remove default values. No estimate or query option should be an error.
+    per_host_mem = 4096L * 1024 * 1024; // Default value is 4096mb
+  }
+  // Cap the memory estimate at the amount of physical memory available. The user's
+  // provided value or the estimate from planning can each be unreasonable.
+  return min(per_host_mem, MemInfo::physical_mem());
+}
+
+int16_t QuerySchedule::GetPerHostVCores() const {
+  // Prefer manual overrides from query options over the estimation given in the request.
+  // TODO: Remove default values. No estimate or query option should be an error.
+  int16_t v_cpu_cores = 2;
+  if (query_options_.__isset.v_cpu_cores && query_options_.v_cpu_cores > 0) {
+    v_cpu_cores = query_options_.v_cpu_cores;
+  } else if (request_.__isset.per_host_vcores) {
+    v_cpu_cores = request_.per_host_vcores;
+  }
+  return v_cpu_cores;
+}
+
 void QuerySchedule::CreateReservationRequest(const string& pool, const string& user,
     const vector<string>& llama_nodes) {
   yarn_pool_ = pool;
@@ -110,24 +147,6 @@ void QuerySchedule::CreateReservationRequest(const string& pool, const string& u
         query_options_.reservation_request_timeout);
   }
 
-  // Set the per-host requested memory and virtual CPU cores.
-  // Prefer the manual overrides from the query options over the
-  // estimation given in the request.
-  // TODO: Remove default values. Not having an estimate or a query option
-  // should be an error.
-  int32_t memory_mb = 4096;
-  if (query_options_.__isset.mem_limit && query_options_.mem_limit > 0) {
-    memory_mb = max(1L, query_options_.mem_limit / (1024 * 1024));
-  } else if (request_.__isset.per_host_mem_req) {
-    memory_mb = request_.per_host_mem_req / (1024 * 1024);
-  }
-  int16_t v_cpu_cores = 2;
-  if (query_options_.__isset.v_cpu_cores && query_options_.v_cpu_cores > 0) {
-    v_cpu_cores = query_options_.v_cpu_cores;
-  } else if (request_.__isset.per_host_vcores) {
-    v_cpu_cores = request_.per_host_vcores;
-  }
-
   // Set the reservation timeout from the query options or use a default.
   int64_t timeout = DEFAULT_REQUEST_TIMEOUT_MS;
   if (query_options_.__isset.reservation_request_timeout) {
@@ -135,6 +154,8 @@ void QuerySchedule::CreateReservationRequest(const string& pool, const string& u
   }
   reservation_request_->__set_request_timeout(timeout);
 
+  int32_t memory_mb = GetPerHostMemoryEstimate() / 1024 / 1024;
+  int32_t v_cpu_cores = GetPerHostVCores();
   // The memory_mb and v_cpu_cores estimates may legitimately be zero,
   // e.g., for constant selects. Do not reserve any resources in those cases.
   if (memory_mb == 0 && v_cpu_cores == 0) return;

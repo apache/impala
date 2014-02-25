@@ -38,7 +38,7 @@ ROUND_ROBIN_SUBMISSION = [True, False]
 
 # The query pool to use. The impalads should be configured to recognize this
 # pool with the parameters below.
-POOL_NAME = "some-pool-name"
+POOL_NAME = "default-pool"
 
 # The statestore heartbeat of the impala cluster the test is executing against
 STATESTORE_HEARTBEAT_MS = 500
@@ -50,9 +50,8 @@ MAX_NUM_CONCURRENT_QUERIES = 5
 MAX_NUM_QUEUED_QUERIES = 10
 
 _IMPALAD_ARGS = ("-vmodule admission-controller=3 -default_pool_max_requests %s "
- "-default_pool_max_queue_size %s -default_pool_name %s "
- "-default_queue_wait_timeout_ms 60000" %\
-  (MAX_NUM_CONCURRENT_QUERIES, MAX_NUM_QUEUED_QUERIES, POOL_NAME))
+ "-default_pool_max_queued %s -queue_wait_timeout_ms 60000" %\
+  (MAX_NUM_CONCURRENT_QUERIES, MAX_NUM_QUEUED_QUERIES))
 
 _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s" % (STATESTORE_HEARTBEAT_MS)
 
