@@ -20,7 +20,7 @@
 #include <string>
 #include <map>
 #include <boost/function.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 #include "common/status.h"
 #include "util/network-util.h"
@@ -121,7 +121,7 @@ class Webserver {
   void BuildArgumentMap(const std::string& args, ArgumentMap* output);
 
   // Lock guarding the path_handlers_ map
-  boost::mutex path_handlers_lock_;
+  boost::shared_mutex path_handlers_lock_;
 
   // Map of path to a PathHandler containing a list of handlers for that
   // path. More than one handler may register itself with a path so that many

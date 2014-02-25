@@ -14,16 +14,17 @@
 
 #include "util/webserver.h"
 
+#include <boost/algorithm/string.hpp>
+#include <boost/bind.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/mem_fn.hpp>
+#include <boost/thread/locks.hpp>
+#include <map>
 #include <stdio.h>
 #include <signal.h>
 #include <string>
-#include <map>
-#include <boost/lexical_cast.hpp>
-#include <boost/foreach.hpp>
-#include <boost/bind.hpp>
-#include <boost/mem_fn.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem.hpp>
 
 #include "common/logging.h"
 #include "util/cpu-info.h"
@@ -266,7 +267,7 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
       return NOT_PROCESSED;
     }
   }
-  mutex::scoped_lock lock(path_handlers_lock_);
+  shared_lock<shared_mutex> lock(path_handlers_lock_);
   PathHandlerMap::const_iterator it = path_handlers_.find(request_info->uri);
   if (it == path_handlers_.end()) {
     sq_printf(connection, "HTTP/1.1 404 Not Found\r\n"
@@ -314,7 +315,8 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
 
 void Webserver::RegisterPathHandler(const string& path,
     const PathHandlerCallback& callback, bool is_styled, bool is_on_nav_bar) {
-  mutex::scoped_lock lock(path_handlers_lock_);
+  upgrade_lock<shared_mutex> lock(path_handlers_lock_);
+  upgrade_to_unique_lock<shared_mutex> writer_lock(lock);
   PathHandlerMap::iterator it = path_handlers_.find(path);
   if (it == path_handlers_.end()) {
     it = path_handlers_.insert(
