@@ -125,25 +125,31 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
   // multiple output format support. The map is keyed on the
   // concatenation of the non-constant keys of the PARTITION clause of
   // the INSERT statement.
-  HdfsTableDescriptor::PartitionIdToDescriptorMap::const_iterator it;
-  for (it = table_desc_->partition_descriptors().begin();
-       it != table_desc_->partition_descriptors().end();
-       ++it) {
-    if (it->first == g_ImpalaInternalService_constants.DEFAULT_PARTITION_ID) {
-      default_partition_ = it->second;
+  BOOST_FOREACH(
+      const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
+      table_desc_->partition_descriptors()) {
+    if (id_to_desc.first == g_ImpalaInternalService_constants.DEFAULT_PARTITION_ID) {
+      default_partition_ = id_to_desc.second;
     } else {
-      // Evaluate non-constant partition keys and build a map from hash value to
-      // partition descriptor
+      // Build a map whose key is computed from the value of dynamic partition keys for a
+      // particular partition, and whose value is the descriptor for that partition.
+
+      // True if this partition might be written to, false otherwise.
+      // A partition may be written to iff:
+      // For all partition key exprs e, either:
+      //   1. e is not constant
+      //   2. The value supplied by the query for this partition key is equal to e's
+      //   constant value.
+      // Only relevant partitions are remembered in partition_descriptor_map_.
       bool relevant_partition = true;
-      HdfsPartitionDescriptor* partition = it->second;
+      HdfsPartitionDescriptor* partition = id_to_desc.second;
       partition->PrepareExprs(state);
       DCHECK_EQ(partition->partition_key_values().size(), partition_key_exprs_.size());
       vector<Expr*> dynamic_partition_key_values;
       for (size_t i = 0; i < partition_key_exprs_.size(); ++i) {
         // Remember non-constant partition key exprs for building hash table of Hdfs files
         if (!partition_key_exprs_[i]->IsConstant()) {
-          dynamic_partition_key_values.push_back(
-              partition->partition_key_values()[i]);
+          dynamic_partition_key_values.push_back(partition->partition_key_values()[i]);
         } else {
           // Deal with the following: one partition has (year=2009, month=3); another has
           // (year=2010, month=3).
@@ -155,11 +161,11 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
               partition->partition_key_values()[i]->GetValue(NULL);
           void* target_partition_key_value = partition_key_exprs_[i]->GetValue(NULL);
           if (table_partition_key_value == NULL && target_partition_key_value == NULL) {
-            break;
+            continue;
           }
           if (table_partition_key_value == NULL || target_partition_key_value == NULL
               || !RawValue::Eq(table_partition_key_value, target_partition_key_value,
-                               partition_key_exprs_[i]->type())) {
+                  partition_key_exprs_[i]->type())) {
             relevant_partition = false;
             break;
           }
@@ -171,6 +177,8 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
         // expressions are constant, and can therefore be evaluated without a valid row
         // context.
         GetHashTblKey(dynamic_partition_key_values, &key);
+        DCHECK(partition_descriptor_map_.find(key) == partition_descriptor_map_.end())
+            << "Partitions with duplicate 'static' keys found during INSERT";
         partition_descriptor_map_[key] = partition;
       }
     }
