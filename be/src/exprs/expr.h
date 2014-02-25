@@ -120,8 +120,8 @@ struct ExprValue {
   template<typename T> void* Get();
 
   // Sets the value for type to '0' and returns a pointer to the data
-  void* SetToZero(PrimitiveType type) {
-    switch (type) {
+  void* SetToZero(const ColumnType& type) {
+    switch (type.type) {
       case TYPE_NULL:
         return NULL;
       case TYPE_BOOLEAN:
@@ -152,8 +152,8 @@ struct ExprValue {
   }
 
   // Sets the value for type to min and returns a pointer to the data
-  void* SetToMin(PrimitiveType type) {
-    switch (type) {
+  void* SetToMin(const ColumnType& type) {
+    switch (type.type) {
       case TYPE_NULL:
         return NULL;
       case TYPE_BOOLEAN:
@@ -184,8 +184,8 @@ struct ExprValue {
   }
 
   // Sets the value for type to max and returns a pointer to the data
-  void* SetToMax(PrimitiveType type) {
-    switch (type) {
+  void* SetToMax(const ColumnType& type) {
+    switch (type.type) {
       case TYPE_NULL:
         return NULL;
       case TYPE_BOOLEAN:
@@ -282,7 +282,8 @@ class Expr {
   Expr* GetChild(int i) const { return children_[i]; }
   int GetNumChildren() const { return children_.size(); }
 
-  PrimitiveType type() const { return type_.type; }
+  const ColumnType& type() const { return type_; }
+
   const std::vector<Expr*>& children() const { return children_; }
 
   // Returns true if expr doesn't contain slotrefs, ie, can be evaluated
@@ -327,7 +328,7 @@ class Expr {
   void Close(RuntimeState* state);
 
   // Create a new literal expr of 'type' with initial 'data'.
-  // data should match the PrimitiveType (i.e. type == TYPE_INT, data is a int*)
+  // data should match the ColumnType (i.e. type == TYPE_INT, data is a int*)
   // The new Expr will be allocated from the pool.
   static Expr* CreateLiteral(ObjectPool* pool, const ColumnType& type, void* data);
 
@@ -564,7 +565,7 @@ class SlotRef : public Expr {
   SlotRef(const SlotDescriptor* desc);
 
   // Used for testing.  GetValue will return tuple + offset interpreted as 'type'
-  SlotRef(PrimitiveType type, int offset);
+  SlotRef(const ColumnType& type, int offset);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
   static void* ComputeFn(Expr* expr, TupleRow* row);

@@ -49,15 +49,15 @@ class DescriptorTblBuilder {
 
 class TupleDescBuilder {
  public:
-  TupleDescBuilder& operator<< (PrimitiveType slot_type) {
+  TupleDescBuilder& operator<< (ColumnType slot_type) {
     slot_types_.push_back(slot_type);
     return *this;
   }
 
-  std::vector<PrimitiveType> slot_types() const { return slot_types_; }
+  std::vector<ColumnType> slot_types() const { return slot_types_; }
 
  private:
-  std::vector<PrimitiveType> slot_types_;
+  std::vector<ColumnType> slot_types_;
 };
 
 }

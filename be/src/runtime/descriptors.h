@@ -73,7 +73,7 @@ std::ostream& operator<<(std::ostream& os, const NullIndicatorOffset& null_indic
 class SlotDescriptor {
  public:
   SlotId id() const { return id_; }
-  PrimitiveType type() const { return type_.type; }
+  ColumnType type() const { return type_; }
   TupleId parent() const { return parent_; }
   // Returns the column index of this slot, including partition keys.
   // (e.g., col_pos - num_partition_keys = the table column this slot corresponds to)

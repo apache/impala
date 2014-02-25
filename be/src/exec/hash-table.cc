@@ -115,10 +115,10 @@ bool HashTable::EvalRow(TupleRow* row, const vector<Expr*>& exprs) {
 // evaluated to NULL.  We don't want (NULL, 1) to hash to the same as (0,1) so
 // we'll pick a more random value.
 static void CodegenAssignNullValue(LlvmCodeGen* codegen,
-    LlvmCodeGen::LlvmBuilder* builder, Value* dst, PrimitiveType type) {
+    LlvmCodeGen::LlvmBuilder* builder, Value* dst, const ColumnType& type) {
   int64_t fvn_seed = HashUtil::FNV_SEED;
 
-  if (type == TYPE_STRING) {
+  if (type.type == TYPE_STRING) {
     Value* dst_ptr = builder->CreateStructGEP(dst, 0, "string_ptr");
     Value* dst_len = builder->CreateStructGEP(dst, 1, "string_len");
     Value* null_len = codegen->GetIntConstant(TYPE_INT, fvn_seed);
@@ -129,7 +129,7 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
   } else {
     Value* null_value = NULL;
     // Get a type specific representation of fvn_seed
-    switch (type) {
+    switch (type.type) {
       case TYPE_BOOLEAN:
         // In results, booleans are stored as 1 byte
         dst = builder->CreateBitCast(dst, codegen->ptr_type());
@@ -291,7 +291,7 @@ uint32_t HashTable::HashVariableLenRow() {
 
   for (int i = 0; i < build_exprs_.size(); ++i) {
     // non-string and null slots are already part of expr_values_buffer
-    if (build_exprs_[i]->type() != TYPE_STRING) continue;
+    if (build_exprs_[i]->type().type != TYPE_STRING) continue;
 
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
     if (expr_value_null_bits_[i]) {
@@ -373,7 +373,7 @@ Function* HashTable::CodegenHashCurrentRow(LlvmCodeGen* codegen) {
 
     // Hash string slots
     for (int i = 0; i < build_exprs_.size(); ++i) {
-      if (build_exprs_[i]->type() != TYPE_STRING) continue;
+      if (build_exprs_[i]->type().type != TYPE_STRING) continue;
 
       BasicBlock* null_block = NULL;
       BasicBlock* not_null_block = NULL;
@@ -558,7 +558,7 @@ Function* HashTable::CodegenEquals(LlvmCodeGen* codegen) {
       void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
       Value* probe_val = codegen->CastPtrToLlvmPtr(
           codegen->GetPtrType(build_exprs_[i]->type()), loc);
-      if (build_exprs_[i]->type() != TYPE_STRING) {
+      if (build_exprs_[i]->type().type != TYPE_STRING) {
         probe_val = builder.CreateLoad(probe_val);
       }
 

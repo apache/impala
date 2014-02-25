@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "runtime/primitive-type.h"
+#include <ostream>
 #include <sstream>
 
 using namespace std;
@@ -141,6 +142,11 @@ string ColumnType::DebugString() const {
     default:
       return TypeToString(type);
   }
+}
+
+ostream& operator<<(ostream& os, const ColumnType& type) {
+  os << type.DebugString();
+  return os;
 }
 
 }

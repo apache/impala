@@ -271,8 +271,9 @@ Tuple* AggregationNode::ConstructAggTuple() {
     //  - max: min_value
     // TODO: remove when we don't use the irbuilder for codegen here.
     // This optimization no longer applies with AnyVal
-    if ((*slot_desc)->type() != TYPE_STRING && (*slot_desc)->type() != TYPE_TIMESTAMP
-        && (*slot_desc)->type() != TYPE_CHAR) {
+    if ((*slot_desc)->type().type != TYPE_STRING &&
+        (*slot_desc)->type().type != TYPE_TIMESTAMP &&
+        (*slot_desc)->type().type != TYPE_CHAR) {
       ExprValue default_value;
       void* default_value_ptr = NULL;
       switch (evaluator->agg_op()) {
@@ -417,7 +418,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
       break;
     }
     case AggFnEvaluator::SUM:
-      if (slot_desc->type() == TYPE_FLOAT || slot_desc->type() == TYPE_DOUBLE) {
+      if (slot_desc->type().type == TYPE_FLOAT || slot_desc->type().type == TYPE_DOUBLE) {
         result = builder.CreateFAdd(dst_value, src_value);
       } else {
         result = builder.CreateAdd(dst_value, src_value);
@@ -479,8 +480,9 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
 
     // string and timestamp aggregation currently not supported
-    if (slot_desc->type() == TYPE_STRING || slot_desc->type() == TYPE_TIMESTAMP ||
-        slot_desc->type() == TYPE_CHAR) {
+    if (slot_desc->type().type == TYPE_STRING ||
+        slot_desc->type().type == TYPE_TIMESTAMP ||
+        slot_desc->type().type == TYPE_CHAR) {
       VLOG_QUERY << "Could not codegen UpdateAggTuple because "
                  << "string, char and timestamp aggregation is not yet supported.";
       return NULL;

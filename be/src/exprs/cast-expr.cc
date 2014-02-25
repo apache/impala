@@ -40,7 +40,7 @@ string CastExpr::DebugString() const {
 
 bool CastExpr::IsJittable(LlvmCodeGen* codegen) const {
   // TODO: casts to and from StringValue are not yet done.
-  if (type() == TYPE_STRING || children()[0]->type() == TYPE_STRING) {
+  if (type().type == TYPE_STRING || children()[0]->type().type == TYPE_STRING) {
     return false;
   }
   return Expr::IsJittable(codegen);
@@ -69,8 +69,11 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
   Function* child_function = children()[0]->Codegen(codegen);
   if (child_function == NULL) return NULL;
 
-  PrimitiveType t1 = ThriftToType(fn_.arg_types[0].type);
-  PrimitiveType t2 = ThriftToType(fn_.arg_types[1].type);
+  const ColumnType& ct1 = ThriftToType(fn_.arg_types[0].type);
+  const ColumnType& ct2 = ThriftToType(fn_.arg_types[1].type);
+
+  PrimitiveType t1 = ct1.type;
+  PrimitiveType t2 = ct2.type;
 
   // No op cast.  Just return the child function.
   if (t1 == t2) {

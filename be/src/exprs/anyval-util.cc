@@ -19,8 +19,8 @@ using namespace impala_udf;
 
 namespace impala {
 
-Type* CodegenAnyVal::GetType(LlvmCodeGen* cg, PrimitiveType type) {
-  switch(type) {
+Type* CodegenAnyVal::GetType(LlvmCodeGen* cg, const ColumnType& type) {
+  switch(type.type) {
     case TYPE_BOOLEAN: // i16
       return cg->smallint_type();
     case TYPE_TINYINT: // i16
@@ -45,7 +45,7 @@ Type* CodegenAnyVal::GetType(LlvmCodeGen* cg, PrimitiveType type) {
 }
 
 CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmCodeGen::LlvmBuilder* builder,
-                             PrimitiveType type, Value* value, const char* name)
+                             const ColumnType& type, Value* value, const char* name)
   : type_(type),
     value_(value),
     name_(name),
@@ -61,7 +61,7 @@ CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmCodeGen::LlvmBuilder* bui
 }
 
 void CodegenAnyVal::SetIsNull(Value* is_null) {
-  if (type_ == TYPE_BIGINT || type_ == TYPE_DOUBLE) {
+  if (type_.type == TYPE_BIGINT || type_.type == TYPE_DOUBLE) {
     // Lowered type is of form { i8, * }. Set the i8 value to 'is_null'.
     Value* is_null_ext =
         builder_->CreateZExt(is_null, codegen_->tinyint_type(), "is_null_ext");
@@ -69,7 +69,7 @@ void CodegenAnyVal::SetIsNull(Value* is_null) {
     return;
   }
 
-  if (type_ == TYPE_STRING || type_ == TYPE_TIMESTAMP) {
+  if (type_.type == TYPE_STRING || type_.type == TYPE_TIMESTAMP) {
     // Lowered type is a struct with an i64 as the first element. Set the first byte of
     // the i64 value to 'is_null'
     Value* v = builder_->CreateExtractValue(value_, 0);
@@ -87,15 +87,16 @@ void CodegenAnyVal::SetIsNull(Value* is_null) {
 }
 
 void CodegenAnyVal::SetVal(Value* val) {
-  DCHECK(type_ != TYPE_STRING) << "Use SetPtr and SetLen for StringVals";
-  DCHECK(type_ != TYPE_TIMESTAMP) << "Use SetDate and SetTimeOfDay for TimestampVals";
-  switch(type_) {
+  DCHECK(type_.type != TYPE_STRING) << "Use SetPtr and SetLen for StringVals";
+  DCHECK(type_.type != TYPE_TIMESTAMP)
+      << "Use SetDate and SetTimeOfDay for TimestampVals";
+  switch(type_.type) {
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
     case TYPE_INT:{
       // Lowered type is an integer. Set the high bytes to 'val'.
-      int num_bits = GetByteSize(type_) * 8;
+      int num_bits = type_.GetByteSize() * 8;
       value_ = SetHighBits(num_bits, val, value_, name_);
       break;
     }
@@ -116,13 +117,13 @@ void CodegenAnyVal::SetVal(Value* val) {
 
 void CodegenAnyVal::SetPtr(Value* ptr) {
   // Set the second pointer value to 'ptr'.
-  DCHECK_EQ(type_, TYPE_STRING);
+  DCHECK_EQ(type_.type, TYPE_STRING);
   value_ = builder_->CreateInsertValue(value_, ptr, 1, name_);
 }
 
 void CodegenAnyVal::SetLen(Value* len) {
   // Set the high bytes of the first value to 'len'.
-  DCHECK_EQ(type_, TYPE_STRING);
+  DCHECK_EQ(type_.type, TYPE_STRING);
   Value* v = builder_->CreateExtractValue(value_, 0);
   v = SetHighBits(32, len, v);
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
@@ -130,13 +131,13 @@ void CodegenAnyVal::SetLen(Value* len) {
 
 void CodegenAnyVal::SetTimeOfDay(Value* time_of_day) {
   // Set the second i64 value to 'time_of_day'.
-  DCHECK_EQ(type_, TYPE_TIMESTAMP);
+  DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
   value_ = builder_->CreateInsertValue(value_, time_of_day, 1, name_);
 }
 
 void CodegenAnyVal::SetDate(Value* date) {
   // Set the high bytes of the first value to 'date'.
-  DCHECK_EQ(type_, TYPE_TIMESTAMP);
+  DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
   Value* v = builder_->CreateExtractValue(value_, 0);
   v = SetHighBits(32, date, v);
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
@@ -145,13 +146,13 @@ void CodegenAnyVal::SetDate(Value* date) {
 void CodegenAnyVal::SetFromRawPtr(Value* raw_ptr) {
   Value* val_ptr =
       builder_->CreateBitCast(raw_ptr, codegen_->GetPtrType(type_), "val_ptr");
-  if (type_ == TYPE_STRING) {
+  if (type_.type == TYPE_STRING) {
     // Convert StringValue to StringVal
     Value* ptr_ptr = builder_->CreateStructGEP(val_ptr, 0, "ptr_ptr");
     SetPtr(builder_->CreateLoad(ptr_ptr, "ptr"));
     Value* len_ptr = builder_->CreateStructGEP(val_ptr, 1, "len_ptr");
     SetLen(builder_->CreateLoad(len_ptr, "len"));
-  } else if (type_ == TYPE_TIMESTAMP) {
+  } else if (type_.type == TYPE_TIMESTAMP) {
     // Convert TimestampValue to TimestampVal
     Value* time_of_day_ptr = builder_->CreateStructGEP(val_ptr, 0, "time_of_day_ptr");
     // Cast boost::posix_time::time_duration to i64
@@ -183,7 +184,7 @@ Value* CodegenAnyVal::SetHighBits(int num_bits, Value* src, Value* dst,
   return builder_->CreateOr(masked_dst, shifted_src, name);
 }
 
-Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, PrimitiveType type) {
+Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, const ColumnType& type) {
   Type* val_type = GetType(codegen, type);
   if (val_type->isStructTy()) {
     // Return the struct { 1, 0 } (the 'is_null' byte, i.e. the first value's first byte,
@@ -201,15 +202,15 @@ Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, PrimitiveType type) {
 }
 
 CodegenAnyVal CodegenAnyVal::GetNonNullVal(LlvmCodeGen* codegen,
-    LlvmCodeGen::LlvmBuilder* builder, PrimitiveType type, const char* name) {
+    LlvmCodeGen::LlvmBuilder* builder, const ColumnType& type, const char* name) {
   Type* val_type = GetType(codegen, type);
   // All zeros => 'is_null' = false
   Value* value = Constant::getNullValue(val_type);
   return CodegenAnyVal(codegen, builder, type, value, name);
 }
 
-AnyVal* CreateAnyVal(ObjectPool* pool, PrimitiveType type) {
-  switch(type) {
+AnyVal* CreateAnyVal(ObjectPool* pool, const ColumnType& type) {
+  switch(type.type) {
     case TYPE_NULL: return pool->Add(new AnyVal);
     case TYPE_BOOLEAN: return pool->Add(new BooleanVal);
     case TYPE_TINYINT: return pool->Add(new TinyIntVal);

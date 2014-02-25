@@ -68,31 +68,31 @@ void TextConverter::UnescapeString(const char* src, char* dest, int* len) {
 //   %parse_result = alloca i32
 //   %0 = call i1 @IsNullString(i8* %data, i32 %len)
 //   br i1 %0, label %set_null, label %check_zero
-// 
+//
 // set_null:                                         ; preds = %check_zero, %entry
 //   call void @SetNull({ i8, i32 }* %tuple_arg)
 //   ret i1 true
-// 
+//
 // parse_slot:                                       ; preds = %check_zero
 //   %slot = getelementptr inbounds { i8, i32 }* %tuple_arg, i32 0, i32 1
 //   %1 = call i32 @IrStringToInt32(i8* %data, i32 %len, i32* %parse_result)
 //   %parse_result1 = load i32* %parse_result
 //   %failed = icmp eq i32 %parse_result1, 1
 //   br i1 %failed, label %parse_fail, label %parse_success
-// 
+//
 // check_zero:                                       ; preds = %entry
 //   %2 = icmp eq i32 %len, 0
 //   br i1 %2, label %set_null, label %parse_slot
-// 
+//
 // parse_success:                                    ; preds = %parse_slot
 //   store i32 %1, i32* %slot
 //   ret i1 true
-// 
+//
 // parse_fail:                                       ; preds = %parse_slot
 //   call void @SetNull({ i8, i32 }* %tuple_arg)
 //   ret i1 false
 // }
-Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen, 
+Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc,
     const char* null_col_val, int len, bool check_null) {
   SCOPED_TIMER(codegen->codegen_timer());
@@ -128,10 +128,10 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
 
   BasicBlock* set_null_block, *parse_slot_block, *check_zero_block = NULL;
-  codegen->CreateIfElseBlocks(fn, "set_null", "parse_slot", 
+  codegen->CreateIfElseBlocks(fn, "set_null", "parse_slot",
       &set_null_block, &parse_slot_block);
-  
-  if (slot_desc->type() != TYPE_STRING) {
+
+  if (slot_desc->type().type != TYPE_STRING) {
     check_zero_block = BasicBlock::Create(codegen->context(), "check_zero", fn);
   }
 
@@ -151,10 +151,10 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     // to remove the branch and THEN block.
     is_null = codegen->false_value();
   }
-  builder.CreateCondBr(is_null, set_null_block, 
-      slot_desc->type() == TYPE_STRING ? parse_slot_block : check_zero_block);
+  builder.CreateCondBr(is_null, set_null_block,
+      slot_desc->type().type == TYPE_STRING ? parse_slot_block : check_zero_block);
 
-  if (slot_desc->type() != TYPE_STRING) {
+  if (slot_desc->type().type != TYPE_STRING) {
     builder.SetInsertPoint(check_zero_block);
     // If len <= 0 and it is not a string col, set slot to NULL
     // The len can be less than 0 if the field contained an escape character which
@@ -162,13 +162,13 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     Value* null_len = builder.CreateICmpSLE(
         args[2], codegen->GetIntConstant(TYPE_INT, 0));
     builder.CreateCondBr(null_len, set_null_block, parse_slot_block);
-  } 
+  }
 
   // Codegen parse slot block
   builder.SetInsertPoint(parse_slot_block);
   Value* slot = builder.CreateStructGEP(args[0], slot_desc->field_idx(), "slot");
 
-  if (slot_desc->type() == TYPE_STRING) {
+  if (slot_desc->type().type == TYPE_STRING) {
     Value* ptr = builder.CreateStructGEP(slot, 0, "string_ptr");
     Value* len = builder.CreateStructGEP(slot, 1, "string_len");
     builder.CreateStore(args[1], ptr);
@@ -177,17 +177,17 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   } else {
     IRFunction::Type parse_fn_enum;
     Function* parse_fn = NULL;
-    switch (slot_desc->type()) {
+    switch (slot_desc->type().type) {
       case TYPE_BOOLEAN:
         parse_fn_enum = IRFunction::STRING_TO_BOOL;
         break;
       case TYPE_TINYINT:
         parse_fn_enum = IRFunction::STRING_TO_INT8;
         break;
-      case TYPE_SMALLINT: 
+      case TYPE_SMALLINT:
         parse_fn_enum = IRFunction::STRING_TO_INT16;
         break;
-      case TYPE_INT: 
+      case TYPE_INT:
         parse_fn_enum = IRFunction::STRING_TO_INT32;
         break;
       case TYPE_BIGINT:
@@ -221,7 +221,7 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     // Check for parse error.  TODO: handle overflow
     Value* parse_failed = builder.CreateICmpEQ(parse_result_val, failed_value, "failed");
     builder.CreateCondBr(parse_failed, parse_failed_block, parse_success_block);
-    
+
     // Parse succeeded
     builder.SetInsertPoint(parse_success_block);
     builder.CreateStore(result, slot);

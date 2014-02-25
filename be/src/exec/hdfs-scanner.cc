@@ -304,7 +304,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   // TODO: Timestamp is not yet supported
   for (int i = 0; i < node->materialized_slots().size(); ++i) {
     SlotDescriptor* slot_desc = node->materialized_slots()[i];
-    if (slot_desc->type() == TYPE_TIMESTAMP) return NULL;
+    if (slot_desc->type().type == TYPE_TIMESTAMP) return NULL;
   }
 
   // TODO: can't codegen yet if strings need to be copied
@@ -557,7 +557,7 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
     stringstream ss;
     ss << "Error converting column: "
        << desc->col_pos() - scan_node_->num_partition_keys()
-       << " TO " << TypeToString(desc->type())
+       << " TO " << desc->type()
        << " (Data is: " << string(data,len) << ")";
     if (state_->LogHasSpace()) state_->LogError(ss.str());
     if (state_->abort_on_error() && parse_status_.ok()) parse_status_ = Status(ss.str());

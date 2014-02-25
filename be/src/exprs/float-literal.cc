@@ -65,7 +65,7 @@ void* FloatLiteral::ReturnDoubleValue(Expr* e, TupleRow* row) {
 
 Status FloatLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK_EQ(children_.size(), 0);
-  switch (type()) {
+  switch (type().type) {
     case TYPE_FLOAT:
       compute_fn_ = ReturnFloatValue;
       break;
@@ -81,7 +81,7 @@ Status FloatLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc)
 string FloatLiteral::DebugString() const {
   stringstream out;
   out << "FloatLiteral(value=";
-  switch (type()) {
+  switch (type().type) {
     case TYPE_FLOAT:
       out << result_.float_val;
       break;
@@ -111,7 +111,7 @@ Function* FloatLiteral::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
 
   Value* result = NULL;
-  switch (type()) {
+  switch (type().type) {
     case TYPE_FLOAT:
       result = ConstantFP::get(context, APFloat(result_.float_val));
       break;

@@ -384,11 +384,11 @@ int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
   // Collect all the byte sizes and sort them
   for (int i = 0; i < exprs.size(); ++i) {
     data[i].expr_idx = i;
-    if (exprs[i]->type() == TYPE_STRING) {
+    if (exprs[i]->type().type == TYPE_STRING) {
       data[i].byte_size = 16;
       data[i].variable_length = true;
     } else {
-      data[i].byte_size = GetByteSize(exprs[i]->type());
+      data[i].byte_size = exprs[i]->type().GetByteSize();
       data[i].variable_length = false;
     }
     DCHECK_NE(data[i].byte_size, 0);
@@ -601,9 +601,9 @@ int Expr::GetSlotIds(vector<SlotId>* slot_ids) const {
 }
 
 Type* Expr::GetLlvmReturnType(LlvmCodeGen* codegen) const {
-  if (type() == TYPE_STRING) {
+  if (type().type == TYPE_STRING) {
     return codegen->GetPtrType(TYPE_STRING);
-  } else  if (type() == TYPE_TIMESTAMP) {
+  } else  if (type().type == TYPE_TIMESTAMP) {
     // TODO
     return NULL;
   } else {
@@ -629,7 +629,7 @@ Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& nam
 }
 
 Value* Expr::GetNullReturnValue(LlvmCodeGen* codegen) {
-  switch (type()) {
+  switch (type().type) {
     case TYPE_NULL:
       return ConstantInt::get(codegen->context(), APInt(1, 0, true));
     case TYPE_BOOLEAN:
@@ -700,7 +700,7 @@ void* Expr::EvalCodegendComputeFn(Expr* expr, TupleRow* row) {
   void* func = expr->jitted_compute_fn_;
   void* result = NULL;
   bool is_null = false;
-  switch (expr->type()) {
+  switch (expr->type().type) {
     case TYPE_NULL: {
       is_null = true;
       break;
@@ -767,7 +767,7 @@ void Expr::SetComputeFn(void* jitted_function, int scratch_size) {
 }
 
 bool Expr::IsJittable(LlvmCodeGen* codegen) const {
-  if (type() == TYPE_TIMESTAMP || type() == TYPE_CHAR) return false;
+  if (type().type == TYPE_TIMESTAMP || type().type == TYPE_CHAR) return false;
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (!children()[i]->IsJittable(codegen)) return false;
   }
@@ -844,7 +844,7 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
 
   builder.SetInsertPoint(not_null_block);
   // Convert the void* ComputeFn return value to the typed llvm version
-  switch (type()) {
+  switch (type().type) {
     case TYPE_NULL:
       builder.CreateRet(codegen->false_value());
       break;

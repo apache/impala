@@ -83,11 +83,11 @@ inline void KeyNormalizer::NormalizeTimestamp(uint8_t* src, uint8_t* dst, bool i
   StoreFinalValue<uint64_t>(time_ns, dst + sizeof(date), is_asc);
 }
 
-inline bool KeyNormalizer::WriteNormalizedKey(PrimitiveType type, bool is_asc,
+inline bool KeyNormalizer::WriteNormalizedKey(const ColumnType& type, bool is_asc,
     uint8_t* value, uint8_t* dst, int* bytes_left) {
   // Expend bytes_left or fail if we don't have enough.
   // Variable-length data types (i.e., strings) account for themselves.
-  int byte_size = GetByteSize(type);
+  int byte_size = type.GetByteSize();
   if (byte_size != 0) {
     if (*bytes_left >= byte_size) {
       *bytes_left -= byte_size;
@@ -96,7 +96,7 @@ inline bool KeyNormalizer::WriteNormalizedKey(PrimitiveType type, bool is_asc,
     }
   }
 
-  switch(type) {
+  switch(type.type) {
     case TYPE_BIGINT:
       NormalizeInt<int64_t>(value, dst, is_asc);
       break;
@@ -151,7 +151,7 @@ inline bool KeyNormalizer::WriteNormalizedKey(PrimitiveType type, bool is_asc,
   return false;
 }
 
-inline bool KeyNormalizer::NormalizeKeyColumn(PrimitiveType type, uint8_t null_bit,
+inline bool KeyNormalizer::NormalizeKeyColumn(const ColumnType& type, uint8_t null_bit,
     bool is_asc, uint8_t* value, uint8_t* dst, int* bytes_left) {
   bool went_over = WriteNullBit(null_bit, value, dst, bytes_left);
   if (went_over || value == NULL) return went_over;

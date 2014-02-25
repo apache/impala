@@ -50,13 +50,13 @@ string InPredicate::DebugString() const {
 void* InPredicate::ComputeFn(Expr* e, TupleRow* row) {
   void* cmp_val = e->children()[0]->GetValue(row);
   if (cmp_val == NULL) return NULL;
-  PrimitiveType type = e->children()[0]->type();
+  const ColumnType& type = e->children()[0]->type();
   InPredicate* in_pred = static_cast<InPredicate*>(e);
   int32_t num_children = e->GetNumChildren();
   bool found_null = false;
   for (int32_t i = 1; i < num_children; ++i) {
-    DCHECK(type == e->children()[i]->type() || type == TYPE_NULL
-        || e->children()[i]->type() == TYPE_NULL);
+    DCHECK(type.type == e->children()[i]->type().type || type.type == TYPE_NULL
+        || e->children()[i]->type().type == TYPE_NULL);
     void* in_list_val = e->children()[i]->GetValue(row);
     if (in_list_val == NULL) {
       found_null = true;
@@ -81,32 +81,32 @@ void* InPredicate::ComputeFn(Expr* e, TupleRow* row) {
 //   %cmp_value = call i32 @SlotRef(i8** %row, i8* %state_data, i1* %is_null)
 //   %child_null = load i1* %is_null
 //   br i1 %child_null, label %null_not_found, label %in_case
-// 
+//
 // in_case:                                          ; preds = %entry
 //   %in_val = call i32 @IntLiteral(i8** %row, i8* %state_data, i1* %is_null)
 //   %child_null1 = load i1* %is_null
 //   br i1 %child_null1, label %null_block, label %compare
-// 
+//
 // compare:                                          ; preds = %in_case
 //   %tmp_eq = icmp eq i32 %cmp_value, %in_val
 //   br i1 %tmp_eq, label %is_equal, label %continue
-// 
+//
 // is_equal:                                         ; preds = %compare
 //   store i1 false, i1* %is_null
 //   ret i1 true
-// 
+//
 // null_block:                                       ; preds = %in_case
 //   store i1 true, i1* %found_null
 //   br label %continue
-// 
+//
 // continue:                                         ; preds = %null_block, %compare
 //   %0 = load i1* %found_null
 //   br i1 %0, label %null_found, label %null_not_found
-// 
+//
 // null_found:                                       ; preds = %continue
 //   store i1 true, i1* %is_null
 //   ret i1 false
-// 
+//
 // null_not_found:                                   ; preds = %continue, %entry
 //   store i1 false, i1* %is_null
 //   ret i1 false
@@ -133,7 +133,7 @@ Function* InPredicate::Codegen(LlvmCodeGen* codegen) {
 
   Function* function = CreateComputeFnPrototype(codegen, "InPredicate");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
-  
+
   builder.SetInsertPoint(entry_block);
   Value* found_null_ptr = codegen->CreateEntryBlockAlloca(
       function, LlvmCodeGen::NamedVariable("found_null", codegen->GetType(TYPE_BOOLEAN)));
@@ -144,7 +144,7 @@ Function* InPredicate::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* null_found_block, *null_not_found_block;
   codegen->CreateIfElseBlocks(function, "null_found", "null_not_found",
       &null_found_block, &null_not_found_block);
-  
+
   // Get child value
   Value* cmp_value = children()[0]->CodegenGetValue(codegen, entry_block,
       null_not_found_block, in_case_block, "cmp_value");
@@ -152,22 +152,22 @@ Function* InPredicate::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* current_block = in_case_block;
   builder.SetInsertPoint(current_block);
   for (int i = 1; i  < GetNumChildren(); ++i) {
-    BasicBlock* compare_block = 
+    BasicBlock* compare_block =
         BasicBlock::Create(context, "compare", function, null_found_block);
-    BasicBlock* is_equal_block = 
+    BasicBlock* is_equal_block =
         BasicBlock::Create(context, "is_equal", function, null_found_block);
-    BasicBlock* null_block = 
+    BasicBlock* null_block =
         BasicBlock::Create(context, "null_block", function, null_found_block);
-    BasicBlock* continue_block = 
+    BasicBlock* continue_block =
         BasicBlock::Create(context, "continue", function, null_found_block);
 
     // Get the child value
-    Value* in_list_val = children()[i]->CodegenGetValue(codegen, current_block, 
+    Value* in_list_val = children()[i]->CodegenGetValue(codegen, current_block,
         null_block, compare_block, "in_val");
 
     builder.SetInsertPoint(compare_block);
     // Compare for equality
-    Value* is_equal = 
+    Value* is_equal =
         codegen->CodegenEquals(&builder, cmp_value, in_list_val, children()[0]->type());
     builder.CreateCondBr(is_equal, is_equal_block, continue_block);
 
@@ -194,7 +194,7 @@ Function* InPredicate::Codegen(LlvmCodeGen* codegen) {
   builder.SetInsertPoint(null_not_found_block);
   CodegenSetIsNullArg(codegen, null_not_found_block, false);
   builder.CreateRet(is_not_in_ ? codegen->true_value() : codegen->false_value());
-  
+
   return codegen->FinalizeFunction(function);
 }
 

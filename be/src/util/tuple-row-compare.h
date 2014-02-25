@@ -121,7 +121,7 @@ struct TupleEqualityChecker {
       }
 
       int tuple_offset = slot->tuple_offset();
-      PrimitiveType type = slot->type();
+      const ColumnType& type = slot->type();
       if (!RawValue::Eq(x->GetSlot(tuple_offset), y->GetSlot(tuple_offset), type)) {
         return false;
       }

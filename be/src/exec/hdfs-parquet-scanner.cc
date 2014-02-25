@@ -230,7 +230,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
  public:
   ColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
     : BaseColumnReader(parent, desc, file_idx) {
-    DCHECK_NE(desc->type(), TYPE_BOOLEAN);
+    DCHECK_NE(desc->type().type, TYPE_BOOLEAN);
   }
 
  protected:
@@ -286,7 +286,7 @@ class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColu
  public:
   BoolColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
     : BaseColumnReader(parent, desc, file_idx) {
-    DCHECK_EQ(desc->type(), TYPE_BOOLEAN);
+    DCHECK_EQ(desc->type().type, TYPE_BOOLEAN);
   }
 
  protected:
@@ -347,7 +347,7 @@ void HdfsParquetScanner::Close() {
 HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(
     SlotDescriptor* desc, int file_idx) {
   BaseColumnReader* reader = NULL;
-  switch (desc->type()) {
+  switch (desc->type().type) {
     case TYPE_BOOLEAN:
       reader = new BoolColumnReader(this, desc, file_idx);
       break;
@@ -464,7 +464,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
       if (dict_decoder_base_ != NULL) {
         return Status("Column chunk should not contain two dictionary pages.");
       }
-      if (desc_->type() == TYPE_BOOLEAN) {
+      if (desc_->type().type == TYPE_BOOLEAN) {
         return Status("Unexpected dictionary page. Dictionary page is not"
             " supported for booleans.");
       }
@@ -866,7 +866,7 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     RETURN_IF_ERROR(column_readers_[i]->Reset(&schema_element,
         &col_chunk.meta_data, stream));
 
-    if (scan_node_->materialized_slots()[i]->type() != TYPE_STRING ||
+    if (scan_node_->materialized_slots()[i]->type().type != TYPE_STRING ||
         col_chunk.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED) {
       // Non-string types are always compact.  Compressed columns don't reference data
       // in the io buffers after tuple materialization.  In both cases, we can set compact
@@ -991,7 +991,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   }
 
   // Check the type in the file is compatible with the catalog metadata.
-  parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[slot_desc->type()];
+  parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[slot_desc->type().type];
   if (type != file_data.meta_data.type) {
     stringstream ss;
     ss << "File " << stream_->filename() << " has an incompatible type with the"

@@ -91,15 +91,15 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
   // rhs not null, do arithmetic op
   builder.SetInsertPoint(rhs_not_null_block);
 
-  PrimitiveType t = children_[0]->type();
-  DCHECK_EQ(t, children_[1]->type());
+  const ColumnType& t = children_[0]->type();
+  DCHECK_EQ(t.type, children_[1]->type().type);
 
   Value* result = NULL;
   if (fn_.name.function_name == "eq") {
     result = codegen->CodegenEquals(&builder, lhs_value, rhs_value,
         children()[0]->type());
   } else if (fn_.name.function_name == "ne") {
-    switch (t) {
+    switch (t.type) {
       case TYPE_BOOLEAN:
       case TYPE_TINYINT:
       case TYPE_SMALLINT:
@@ -120,7 +120,7 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
         DCHECK(false) << "Shouldn't get here.";
     }
   } else if (fn_.name.function_name == "ge") {
-    switch (t) {
+    switch (t.type) {
       case TYPE_BOOLEAN:
         // LLVM defines false > true
         result = builder.CreateICmpSLE(lhs_value, rhs_value, "tmp_ge");
@@ -144,7 +144,7 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
         DCHECK(false) << "Shouldn't get here.";
     }
   } else if (fn_.name.function_name == "gt") {
-    switch (t) {
+    switch (t.type) {
       case TYPE_BOOLEAN:
         // LLVM defines false > true
         result = builder.CreateICmpSLT(lhs_value, rhs_value, "tmp_gt");
@@ -168,7 +168,7 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
         DCHECK(false) << "Shouldn't get here.";
     }
   } else if (fn_.name.function_name == "le") {
-    switch (t) {
+    switch (t.type) {
       case TYPE_BOOLEAN:
         // LLVM defines false > true
         result = builder.CreateICmpSGE(lhs_value, rhs_value, "tmp_le");
@@ -192,7 +192,7 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
         DCHECK(false) << "Shouldn't get here.";
     }
   } else if (fn_.name.function_name == "lt") {
-    switch (t) {
+    switch (t.type) {
       case TYPE_BOOLEAN:
         // LLVM defines false > true
         result = builder.CreateICmpSGT(lhs_value, rhs_value, "tmp_lt");

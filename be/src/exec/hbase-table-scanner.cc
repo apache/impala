@@ -563,7 +563,7 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
 inline void HBaseTableScanner::WriteTupleSlot(const SlotDescriptor* slot_desc,
     Tuple* tuple, void* data) {
   void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-  BitUtil::ByteSwap(slot, data, GetByteSize(slot_desc->type()));
+  BitUtil::ByteSwap(slot, data, slot_desc->type().GetByteSize());
 }
 
 inline void HBaseTableScanner::GetRowKey(JNIEnv* env, jobject cell,
@@ -623,7 +623,7 @@ Status HBaseTableScanner::GetRowKey(JNIEnv* env, const SlotDescriptor* slot_desc
   int key_length;
   jobject cell = env->GetObjectArrayElement(cells_, 0);
   GetRowKey(env, cell, &key, &key_length);
-  DCHECK_EQ(key_length, GetByteSize(slot_desc->type()));
+  DCHECK_EQ(key_length, slot_desc->type().GetByteSize());
   WriteTupleSlot(slot_desc, tuple, reinterpret_cast<char*>(key));
   RETURN_ERROR_IF_EXC(env);
   return Status::OK;
@@ -688,7 +688,7 @@ Status HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
     tuple->SetNull(slot_desc->null_indicator_offset());
     return Status::OK;
   }
-  DCHECK_EQ(value_length, GetByteSize(slot_desc->type()));
+  DCHECK_EQ(value_length, slot_desc->type().GetByteSize());
   WriteTupleSlot(slot_desc, tuple, reinterpret_cast<char*>(value));
   ++cell_index_;
   return Status::OK;

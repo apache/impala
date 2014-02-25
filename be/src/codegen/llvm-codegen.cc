@@ -284,8 +284,8 @@ string LlvmCodeGen::GetIR(bool full_module) const {
   return str;
 }
 
-Type* LlvmCodeGen::GetType(PrimitiveType type) {
-  switch (type) {
+Type* LlvmCodeGen::GetType(const ColumnType& type) {
+  switch (type.type) {
     case TYPE_NULL:
       return Type::getInt1Ty(context());
     case TYPE_BOOLEAN:
@@ -312,7 +312,7 @@ Type* LlvmCodeGen::GetType(PrimitiveType type) {
   }
 }
 
-PointerType* LlvmCodeGen::GetPtrType(PrimitiveType type) {
+PointerType* LlvmCodeGen::GetPtrType(const ColumnType& type) {
   return PointerType::get(GetType(type), 0);
 }
 
@@ -333,8 +333,8 @@ Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, void* ptr) {
   return ConstantExpr::getIntToPtr(const_int, type);
 }
 
-Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, int64_t val) {
-  switch (type) {
+Value* LlvmCodeGen::GetIntConstant(const ColumnType& type, int64_t val) {
+  switch (type.type) {
     case TYPE_NULL:
       return ConstantInt::get(context(), APInt(8, val));
     case TYPE_TINYINT:
@@ -709,7 +709,7 @@ void LlvmCodeGen::GetSymbols(unordered_set<string>* symbols) {
 // ret_v2:                                           ; preds = %entry
 //   ret i32 %v2
 // }
-Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
+Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
   LlvmCodeGen::FnPrototype prototype(this, min ? "Min" : "Max", GetType(type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("v1", GetType(type)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("v2", GetType(type)));
@@ -719,7 +719,7 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
   Function* fn = prototype.GeneratePrototype(&builder, &params[0]);
 
   Value* compare = NULL;
-  switch (type) {
+  switch (type.type) {
     case TYPE_NULL:
       compare = false_value();
       break;
@@ -754,7 +754,7 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
       DCHECK(false);
   }
 
-  if (type == TYPE_BOOLEAN) {
+  if (type.type == TYPE_BOOLEAN) {
     builder.CreateRet(compare);
   } else {
     BasicBlock* ret_v1, *ret_v2;
@@ -772,8 +772,8 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
 }
 
 Value* LlvmCodeGen::CodegenEquals(LlvmBuilder* builder, Value* v1, Value* v2,
-    PrimitiveType type) {
-  switch (type) {
+    const ColumnType& type) {
+  switch (type.type) {
     case TYPE_NULL: return false_value();
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
@@ -858,8 +858,8 @@ void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, in
 }
 
 void LlvmCodeGen::CodegenAssign(LlvmBuilder* builder,
-    Value* dst, Value* src, PrimitiveType type) {
-  switch (type) {
+    Value* dst, Value* src, const ColumnType& type) {
+  switch (type.type) {
     case TYPE_STRING:  {
       CodegenMemcpy(builder, dst, src, sizeof(StringValue));
       break;

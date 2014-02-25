@@ -67,7 +67,7 @@ Status HBaseTableWriter::Init(RuntimeState* state) {
   cf_arrays_.reserve(num_col - 1);
   qual_arrays_.reserve(num_col - 1);
   for (int i = 0; i < num_col; ++i) {
-    output_exprs_byte_sizes_[i] = GetByteSize(output_exprs_[i]->type());
+    output_exprs_byte_sizes_[i] = output_exprs_[i]->type().GetByteSize();
 
     if (i == 0) continue;
 

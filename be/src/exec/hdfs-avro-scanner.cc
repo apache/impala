@@ -427,38 +427,38 @@ Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc,
       return Status::OK;
     case AVRO_STRING:
     case AVRO_BYTES:
-      if (slot_desc->type() == TYPE_STRING) return Status::OK;
+      if (slot_desc->type().type == TYPE_STRING) return Status::OK;
       break;
     case AVRO_INT32:
-      if (slot_desc->type() == TYPE_INT) return Status::OK;
+      if (slot_desc->type().type == TYPE_INT) return Status::OK;
       // Type promotion
-      if (slot_desc->type() == TYPE_BIGINT) return Status::OK;
-      if (slot_desc->type() == TYPE_FLOAT) return Status::OK;
-      if (slot_desc->type() == TYPE_DOUBLE) return Status::OK;
+      if (slot_desc->type().type == TYPE_BIGINT) return Status::OK;
+      if (slot_desc->type().type == TYPE_FLOAT) return Status::OK;
+      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK;
       break;
     case AVRO_INT64:
-      if (slot_desc->type() == TYPE_BIGINT) return Status::OK;
+      if (slot_desc->type().type == TYPE_BIGINT) return Status::OK;
       // Type promotion
-      if (slot_desc->type() == TYPE_FLOAT) return Status::OK;
-      if (slot_desc->type() == TYPE_DOUBLE) return Status::OK;
+      if (slot_desc->type().type == TYPE_FLOAT) return Status::OK;
+      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK;
       break;
     case AVRO_FLOAT:
-      if (slot_desc->type() == TYPE_FLOAT) return Status::OK;
+      if (slot_desc->type().type == TYPE_FLOAT) return Status::OK;
       // Type promotion
-      if (slot_desc->type() == TYPE_DOUBLE) return Status::OK;
+      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK;
       break;
     case AVRO_DOUBLE:
-      if (slot_desc->type() == TYPE_DOUBLE) return Status::OK;
+      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK;
       break;
     case AVRO_BOOLEAN:
-      if (slot_desc->type() == TYPE_BOOLEAN) return Status::OK;
+      if (slot_desc->type().type == TYPE_BOOLEAN) return Status::OK;
       break;
     default:
       break;
   }
   stringstream ss;
   ss << "Unresolvable column types (column " << slot_desc->col_pos() << "): "
-     << "declared type = " << TypeToString(slot_desc->type()) << ", "
+     << "declared type = " << slot_desc->type() << ", "
      << "Avro type = " << avro_type;
   return Status(ss.str());
 }
@@ -565,7 +565,7 @@ void HdfsAvroScanner::MaterializeTuple(MemPool* pool, uint8_t** data, Tuple* tup
     if (slot_desc != NULL) {
       write_slot = true;
       slot = tuple->GetSlot(slot_desc->tuple_offset());
-      slot_type = slot_desc->type();
+      slot_type = slot_desc->type().type;
     }
 
     avro_type_t type = element.type;
@@ -778,7 +778,7 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
     if (slot_idx != HdfsScanNode::SKIP_COLUMN) {
       // Field corresponds to materialized column
       SlotDescriptor* slot_desc = node->materialized_slots()[slot_idx];
-      Value* slot_type_val = codegen->GetIntConstant(TYPE_INT, slot_desc->type());
+      Value* slot_type_val = codegen->GetIntConstant(TYPE_INT, slot_desc->type().type);
       Value* slot_val =
           builder.CreateStructGEP(tuple_val, slot_desc->field_idx(), "slot");
       Value* opaque_slot_val =

@@ -142,7 +142,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     if (dict_encoder_base_ != NULL) dict_encoder_base_->ClearIndices();
   }
 
-  PrimitiveType type() const { return expr_->type(); }
+  const ColumnType& type() const { return expr_->type(); }
   uint64_t num_values() const { return num_values_; }
   uint64_t total_compressed_size() const { return total_compressed_byte_size_; }
   uint64_t total_uncompressed_size() const { return total_uncompressed_byte_size_; }
@@ -236,7 +236,7 @@ class HdfsParquetTableWriter::ColumnWriter :
   ColumnWriter(HdfsParquetTableWriter* parent, Expr* expr,
       const THdfsCompression::type& codec) : BaseColumnWriter(parent, expr, codec),
       num_values_since_dict_size_check_(0) {
-    DCHECK_NE(expr->type(), TYPE_BOOLEAN);
+    DCHECK_NE(expr->type().type, TYPE_BOOLEAN);
   }
 
   virtual void Reset() {
@@ -307,7 +307,7 @@ class HdfsParquetTableWriter::BoolColumnWriter :
  public:
   BoolColumnWriter(HdfsParquetTableWriter* parent, Expr* expr,
       const THdfsCompression::type& codec) : BaseColumnWriter(parent, expr, codec) {
-    DCHECK_EQ(expr->type(), TYPE_BOOLEAN);
+    DCHECK_EQ(expr->type().type, TYPE_BOOLEAN);
     bool_values_ = parent_->state_->obj_pool()->Add(
         new BitWriter(values_buffer_, values_buffer_len_));
     // Dictionary encoding doesn't make sense for bools and is not allowed by
@@ -614,7 +614,7 @@ Status HdfsParquetTableWriter::Init() {
   // Initialize each column structure.
   for (int i = 0; i < columns_.size(); ++i) {
     BaseColumnWriter* writer = NULL;
-    switch (output_exprs_[i]->type()) {
+    switch (output_exprs_[i]->type().type) {
       case TYPE_BOOLEAN:
         writer = new BoolColumnWriter(this, output_exprs_[i], codec);
         break;
@@ -663,7 +663,7 @@ Status HdfsParquetTableWriter::CreateSchema() {
   for (int i = 0; i < columns_.size(); ++i) {
     parquet::SchemaElement& node = file_metadata_.schema[i + 1];
     node.name = table_desc_->col_names()[i + num_clustering_cols];
-    node.__set_type(IMPALA_TO_PARQUET_TYPES[output_exprs_[i]->type()]);
+    node.__set_type(IMPALA_TO_PARQUET_TYPES[output_exprs_[i]->type().type]);
     node.__set_repetition_type(FieldRepetitionType::OPTIONAL);
   }
 
@@ -680,7 +680,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   current_row_group_->columns.resize(columns_.size());
   for (int i = 0; i < columns_.size(); ++i) {
     ColumnMetaData metadata;
-    metadata.type = IMPALA_TO_PARQUET_TYPES[columns_[i]->expr_->type()];
+    metadata.type = IMPALA_TO_PARQUET_TYPES[columns_[i]->expr_->type().type];
     // Add all encodings that were used in this file.  Currently we use PLAIN and
     // PLAIN_DICTIONARY for data values and RLE for the definition levels.
     metadata.encodings.push_back(Encoding::RLE);

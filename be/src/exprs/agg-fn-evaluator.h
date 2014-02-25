@@ -159,7 +159,7 @@ class AggFnEvaluator {
   // Writes the result in src into dst pointed to by output_slot_desc_
   void SetOutputSlot(const impala_udf::AnyVal* src, Tuple* dst);
   // Sets 'dst' to the value from 'slot'.
-  void SetAnyVal(const void* slot, PrimitiveType type, impala_udf::AnyVal* dst);
+  void SetAnyVal(const void* slot, const ColumnType& type, impala_udf::AnyVal* dst);
 };
 
 }

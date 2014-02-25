@@ -142,7 +142,7 @@ void HBaseScanNode::WriteTextSlot(
       ss << "Error converting column " << family
           << ":" << qualifier << ": "
           << "'" << string(reinterpret_cast<char*>(value), value_length) << "' TO "
-          << TypeToString(slot->type());
+          << slot->type();
       state->LogError(ss.str());
     }
   }

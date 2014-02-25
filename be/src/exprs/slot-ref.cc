@@ -41,7 +41,7 @@ SlotRef::SlotRef(const SlotDescriptor* desc)
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
-SlotRef::SlotRef(PrimitiveType type, int offset)
+SlotRef::SlotRef(const ColumnType& type, int offset)
   : Expr(type, true),
     tuple_idx_(0),
     slot_offset_(offset),
@@ -235,7 +235,7 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   Value* result = NULL;
   Value* slot_cast = builder.CreatePointerCast(slot_ptr, result_ptr_type);
   // For non-native types, we return a pointer to the struct
-  if (type() == TYPE_STRING || type() == TYPE_TIMESTAMP) {
+  if (type().type == TYPE_STRING || type().type == TYPE_TIMESTAMP) {
     result = slot_cast;
   } else {
     result = builder.CreateLoad(slot_cast, "slot_value");

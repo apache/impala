@@ -568,7 +568,7 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
     if (slot->type() == TYPE_STRING) {
       ideal_sort_key_size += str_lens[string_id++] + 1 /* string terminator */;
     } else {
-      ideal_sort_key_size += GetByteSize(slot->type());
+      ideal_sort_key_size += slot->type().GetByteSize();
     }
   }
 
@@ -591,10 +591,11 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
   ThreadResourceMgr::ResourcePool* resource_pool = resource_mgr.RegisterPool();
 
   bool remove_dups = false;
-  scoped_ptr<Sorter> sorter(new Sorter(&writer, &io_mgr, reader, resource_pool,*tuple_desc,
-                                       output_slot_exprs, sort_exprs_lhs, sort_exprs_rhs,
-                                       sort_ascending, nulls_first, remove_dups,
-                                       sort_key_size, SORT_MEM_LIMIT, 8 * 1024 * 1024, EXTRACT_KEYS));
+  scoped_ptr<Sorter> sorter(
+      new Sorter(&writer, &io_mgr, reader, resource_pool,*tuple_desc,
+                  output_slot_exprs, sort_exprs_lhs, sort_exprs_rhs,
+                  sort_ascending, nulls_first, remove_dups,
+                  sort_key_size, SORT_MEM_LIMIT, 8 * 1024 * 1024, EXTRACT_KEYS));
 
   // Prepare a RowBatch to insert into the Sorter.
   uint8_t* source_data = (uint8_t*) data->source_data;
@@ -605,7 +606,7 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
     for (int slot_id = 0; slot_id < slots.size(); ++slot_id) {
       SlotDescriptor* slot = slots[slot_id];
 
-      if (slot->type() == TYPE_STRING) {
+      if (slot->type().type == TYPE_STRING) {
         int str_len = str_lens[string_id++];
         char* str_mem = (char*) batch->tuple_data_pool()->Allocate(str_len);
         memcpy(str_mem, source_data, str_len);
@@ -613,7 +614,7 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
         StringValue str(str_mem, str_len);
         *((StringValue*) row->GetTuple(0)->GetSlot(slot->tuple_offset())) = str;
       } else {
-        int byte_size = GetByteSize(slot->type());
+        int byte_size = slot->type().GetByteSize();
         memcpy(row->GetTuple(0)->GetSlot(slot->tuple_offset()), source_data, byte_size);
         source_data += byte_size;
       }

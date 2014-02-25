@@ -100,7 +100,7 @@ void* HiveUdfCall::Evaluate(Expr* e, TupleRow* row) {
     } else {
       uint8_t* input_ptr = ctx->input_values_buffer_ + udf->input_byte_offsets_[i];
       ctx->input_nulls_buffer_[i] = 0;
-      switch (e->GetChild(i)->type()) {
+      switch (e->GetChild(i)->type().type) {
         case TYPE_BOOLEAN:
         case TYPE_TINYINT:
           // Using explicit sizes helps the compiler unroll memcpy
@@ -174,14 +174,14 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
   for (int i = 0; i < GetNumChildren(); ++i) {
     ctor_params.input_byte_offsets.push_back(input_buffer_size);
     input_byte_offsets_.push_back(input_buffer_size);
-    input_buffer_size += GetSlotSize(GetChild(i)->type());
+    input_buffer_size += GetChild(i)->type().GetSlotSize();
     // Align all values up to 8 bytes. We don't care about footprint since we allocate
     // one buffer for all rows and we never copy the entire buffer.
     input_buffer_size = BitUtil::RoundUp(input_buffer_size, 8);
   }
   jni_context_->input_values_buffer_ = new uint8_t[input_buffer_size];
   jni_context_->input_nulls_buffer_ = new uint8_t[GetNumChildren()];
-  jni_context_->output_value_buffer_ = new uint8_t[GetSlotSize(type())];
+  jni_context_->output_value_buffer_ = new uint8_t[type().GetSlotSize()];
 
   ctor_params.input_buffer_ptr = (int64_t)jni_context_->input_values_buffer_;
   ctor_params.input_nulls_ptr = (int64_t)jni_context_->input_nulls_buffer_;

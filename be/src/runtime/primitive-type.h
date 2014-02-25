@@ -47,60 +47,6 @@ enum PrimitiveType {
   TYPE_CHAR,
 };
 
-// Returns the size of a slot for 'type'.
-inline int GetSlotSize(PrimitiveType type) {
-  switch (type) {
-    case TYPE_NULL:
-    case TYPE_BOOLEAN:
-    case TYPE_TINYINT:
-      return 1;
-    case TYPE_SMALLINT:
-      return 2;
-    case TYPE_INT:
-    case TYPE_FLOAT:
-      return 4;
-    case TYPE_BIGINT:
-    case TYPE_DOUBLE:
-      return 8;
-    case TYPE_STRING:
-    case TYPE_TIMESTAMP:
-      return 16;
-    case TYPE_DATE:
-    case INVALID_TYPE:
-    default:
-      DCHECK(false);
-  }
-  return 0;
-}
-
-// Returns the byte size of 'type'  Returns 0 for variable length types.
-inline int GetByteSize(PrimitiveType type) {
-  switch (type) {
-    case TYPE_STRING:
-      return 0;
-    case TYPE_NULL:
-    case TYPE_BOOLEAN:
-    case TYPE_TINYINT:
-      return 1;
-    case TYPE_SMALLINT:
-      return 2;
-    case TYPE_INT:
-    case TYPE_FLOAT:
-      return 4;
-    case TYPE_BIGINT:
-    case TYPE_DOUBLE:
-      return 8;
-    case TYPE_TIMESTAMP:
-      // This is the size of the slot, the actual size of the data is 12.
-      return 16;
-    case TYPE_DATE:
-    case INVALID_TYPE:
-    default:
-      DCHECK(false);
-  }
-  return 0;
-}
-
 PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 TPrimitiveType::type ToThrift(PrimitiveType ptype);
 std::string TypeToString(PrimitiveType t);
@@ -109,25 +55,36 @@ apache::hive::service::cli::thrift::TTypeId::type TypeToHiveServer2Type(Primitiv
 
 // Wrapper struct to describe a type. Includes the enum and, optionally,
 // size information.
-// TODO: PrimitiveType should not be used directly in the BE.
 struct ColumnType {
   PrimitiveType type;
   /// Only set if type == TYPE_CHAR
   int len;
 
+  // Only set if type == TYPE_DECIMAL
+  int precision, scale;
+
   ColumnType(PrimitiveType type = INVALID_TYPE, int len = -1)
-    : type(type), len(len) {
+    : type(type), len(len), precision(-1), scale(-1) {
   }
 
   ColumnType(const TColumnType& t) {
     type = ThriftToType(t.type);
     if (t.__isset.len) {
-      len = t.len;
       DCHECK_EQ(type, TYPE_CHAR);
+      len = t.len;
     } else {
       DCHECK_NE(type, TYPE_CHAR);
       len = -1;
     }
+    precision = scale = -1;
+  }
+
+  bool operator==(const ColumnType& o) const {
+    return type == o.type && len == o.len && precision == o.precision && scale == o.scale;
+  }
+
+  bool operator!=(const ColumnType& other) const {
+    return !(*this == other);
   }
 
   TColumnType ToThrift() const {
@@ -137,12 +94,51 @@ struct ColumnType {
       thrift_type.len = len;
       thrift_type.__isset.len = true;
     }
-    // TODO: decimal
     return thrift_type;
+  }
+
+  // Returns the byte size of this type.  Returns 0 for variable length types.
+  inline int GetByteSize() const {
+    switch (type) {
+      case TYPE_STRING:
+        return 0;
+      case TYPE_NULL:
+      case TYPE_BOOLEAN:
+      case TYPE_TINYINT:
+        return 1;
+      case TYPE_SMALLINT:
+        return 2;
+      case TYPE_INT:
+      case TYPE_FLOAT:
+        return 4;
+      case TYPE_BIGINT:
+      case TYPE_DOUBLE:
+        return 8;
+      case TYPE_TIMESTAMP:
+        // This is the size of the slot, the actual size of the data is 12.
+        return 16;
+      case TYPE_DATE:
+      case INVALID_TYPE:
+      default:
+        DCHECK(false);
+    }
+    return 0;
+  }
+
+  // Returns the size of a slot for this type.
+  inline int GetSlotSize() const {
+    switch (type) {
+      case TYPE_STRING:
+        return 16;
+      default:
+        return GetByteSize();
+    }
   }
 
   std::string DebugString() const;
 };
+
+std::ostream& operator<<(std::ostream& os, const ColumnType& type);
 
 }
 

@@ -116,7 +116,7 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
   } else if (fn_.name.function_name == "bitxor") {
     result = builder.CreateXor(lhs_value, rhs_value, "tmp_xor");
   } else if (fn_.name.function_name == "add") {
-    switch(type()) {
+    switch(type().type) {
       case TYPE_TINYINT:
       case TYPE_SMALLINT:
       case TYPE_INT:
@@ -131,7 +131,7 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
         DCHECK(false) << "Shouldn't get here.";
     }
   } else if (fn_.name.function_name == "subtract") {
-    switch(type()) {
+    switch(type().type) {
       case TYPE_TINYINT:
       case TYPE_SMALLINT:
       case TYPE_INT:
@@ -146,7 +146,7 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
         DCHECK(false) << "Shouldn't get here.";
     }
   } else if (fn_.name.function_name == "multiply") {
-    switch(type()) {
+    switch(type().type) {
       case TYPE_TINYINT:
       case TYPE_SMALLINT:
       case TYPE_INT:

@@ -47,7 +47,7 @@ IntLiteral::IntLiteral(const ColumnType& type, void* value)
 
 IntLiteral::IntLiteral(const TExprNode& node)
   : Expr(node) {
-  switch (type()) {
+  switch (type().type) {
     case TYPE_TINYINT:
       result_.tinyint_val = node.int_literal.value;
       break;
@@ -87,7 +87,7 @@ void* IntLiteral::ReturnBigintValue(Expr* e, TupleRow* row) {
 
 Status IntLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK_EQ(children_.size(), 0);
-  switch (type()) {
+  switch (type().type) {
     case TYPE_TINYINT:
       compute_fn_ = ReturnTinyintValue;
       break;
@@ -109,7 +109,7 @@ Status IntLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
 string IntLiteral::DebugString() const {
   stringstream out;
   out << "IntLiteral(value=";
-  switch (type()) {
+  switch (type().type) {
     case TYPE_TINYINT:
       out << static_cast<int>(result_.tinyint_val); // don't print it out as a char
       break;
@@ -125,7 +125,7 @@ string IntLiteral::DebugString() const {
     default:
       DCHECK(false) << "IntLiteral::DebugString(): bad type: " << type_.DebugString();
   }
-  out << " type=" << TypeToString(type()) << ")";
+  out << " type=" << type() << ")";
   return out.str();
 }
 
@@ -146,7 +146,7 @@ Function* IntLiteral::Codegen(LlvmCodeGen* codegen) {
 
   builder.SetInsertPoint(entry_block);
   Value* result = NULL;
-  switch (type()) {
+  switch (type().type) {
     case TYPE_TINYINT:
       result = ConstantInt::get(context, APInt(8, result_.tinyint_val, true));
       break;

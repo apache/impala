@@ -110,9 +110,9 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
 
   ObjectPool* obj_pool = state->obj_pool();
   for (int i = 0; i < input_exprs().size(); ++i) {
-    staging_input_vals_.push_back(CreateAnyVal(obj_pool, input_exprs()[i]->type()));
+    staging_input_vals_.push_back(CreateAnyVal(obj_pool, input_exprs()[i]->type().type));
   }
-  staging_output_val_ = CreateAnyVal(obj_pool, output_slot_desc_->type());
+  staging_output_val_ = CreateAnyVal(obj_pool, output_slot_desc_->type().type);
 
   // Load the function pointers.
   if (fn_.aggregate_fn.init_fn_symbol.empty() ||
@@ -163,14 +163,14 @@ void AggFnEvaluator::Close(RuntimeState* state) {
 
 // Utility to put val into an AnyVal struct
 inline void AggFnEvaluator::SetAnyVal(const void* slot,
-    PrimitiveType type, AnyVal* dst) {
+    const ColumnType& type, AnyVal* dst) {
   if (slot == NULL) {
     dst->is_null = true;
     return;
   }
 
   dst->is_null = false;
-  switch (type) {
+  switch (type.type) {
     case TYPE_NULL: return;
     case TYPE_BOOLEAN:
       reinterpret_cast<BooleanVal*>(dst)->val = *reinterpret_cast<const bool*>(slot);
@@ -214,7 +214,7 @@ inline void AggFnEvaluator::SetOutputSlot(const AnyVal* src, Tuple* dst) {
 
   dst->SetNotNull(output_slot_desc_->null_indicator_offset());
   void* slot = dst->GetSlot(output_slot_desc_->tuple_offset());
-  switch (output_slot_desc_->type()) {
+  switch (output_slot_desc_->type().type) {
     case TYPE_NULL:
       return;
     case TYPE_BOOLEAN:
@@ -338,7 +338,7 @@ void AggFnEvaluator::Merge(TupleRow* row, Tuple* dst) {
 }
 
 void AggFnEvaluator::SerializeOrFinalize(Tuple* tuple, void* fn) {
-  DCHECK_EQ(output_slot_desc_->type(), return_type_.type);
+  DCHECK_EQ(output_slot_desc_->type().type, return_type_.type);
   if (fn == NULL) return;
 
   bool slot_null = tuple->IsNull(output_slot_desc_->null_indicator_offset());

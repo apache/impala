@@ -187,11 +187,11 @@ class LlvmCodeGen {
     std::vector<NamedVariable> args_;
   };
 
-  // Returns llvm type for the primitive type
-  llvm::Type* GetType(PrimitiveType type);
+  // Returns llvm type for the column type
+  llvm::Type* GetType(const ColumnType& type);
 
   // Return a pointer type to 'type' (e.g. int16_t*)
-  llvm::PointerType* GetPtrType(PrimitiveType type);
+  llvm::PointerType* GetPtrType(const ColumnType& type);
 
   // Returns the type with 'name'.  This is used to pull types from clang
   // compiled IR.  The types we generate at runtime are unnamed.
@@ -353,7 +353,7 @@ class LlvmCodeGen {
   llvm::Value* CastPtrToLlvmPtr(llvm::Type* type, void* ptr);
 
   // Returns the constant 'val' of 'type'
-  llvm::Value* GetIntConstant(PrimitiveType type, int64_t val);
+  llvm::Value* GetIntConstant(const ColumnType& type, int64_t val);
 
   // Returns true/false constants (bool type)
   llvm::Value* true_value() { return true_value_; }
@@ -379,7 +379,7 @@ class LlvmCodeGen {
   void GetSymbols(boost::unordered_set<std::string>* symbols);
 
   // Generates function to return min/max(v1, v2)
-  llvm::Function* CodegenMinMax(PrimitiveType type, bool min);
+  llvm::Function* CodegenMinMax(const ColumnType& type, bool min);
 
   // Codegen to call llvm memcpy intrinsic at the current builder location
   // dst & src must be pointer types.  size is the number of bytes to copy.
@@ -387,11 +387,12 @@ class LlvmCodeGen {
 
   // Codegen computing v1 == v2.  Returns the result.  v1 and v2 must be the same type
   llvm::Value* CodegenEquals(LlvmBuilder*, llvm::Value* v1, llvm::Value* v2,
-      PrimitiveType);
+      const ColumnType& type);
 
   // Codegen for do *dst = src.  For native types, this is just a store, for structs
   // we need to assign the fields one by one
-  void CodegenAssign(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, PrimitiveType);
+  void CodegenAssign(LlvmBuilder*, llvm::Value* dst, llvm::Value* src,
+      const ColumnType&);
 
   // Loads an LLVM module. 'file' should be the local path to the LLVM bitcode (.ll)
   // file. If 'file_size' is not NULL, it will be set to the size of 'file'.

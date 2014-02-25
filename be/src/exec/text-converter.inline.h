@@ -35,7 +35,7 @@ namespace impala {
 // corresponding changes to CodegenWriteSlot.
 inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tuple,
     const char* data, int len, bool copy_string, bool need_escape, MemPool* pool) {
-  if ((len == 0 && slot_desc->type() != TYPE_STRING) || data == NULL) {
+  if ((len == 0 && slot_desc->type().type != TYPE_STRING) || data == NULL) {
     tuple->SetNull(slot_desc->null_indicator_offset());
     return true;
   } else if (check_null_ && len == null_col_val_.size() &&
@@ -49,7 +49,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
   void* slot = tuple->GetSlot(slot_desc->tuple_offset());
 
   // Parse the raw-text data. Translate the text string to internal format.
-  switch (slot_desc->type()) {
+  switch (slot_desc->type().type) {
     case TYPE_STRING: {
       StringValue* str_slot = reinterpret_cast<StringValue*>(slot);
       str_slot->ptr = const_cast<char*>(data);
@@ -103,7 +103,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
       break;
     }
     default:
-      DCHECK(false) << "bad slot type: " << TypeToString(slot_desc->type());
+      DCHECK(false) << "bad slot type: " << slot_desc->type();
       break;
   }
 

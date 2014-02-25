@@ -90,12 +90,12 @@ class KeyNormalizer {
 
   // Normalizes a sort key value and writes it to dst.
   // Updates bytes_left and returns true if we went over the max key size.
-  static bool WriteNormalizedKey(PrimitiveType type, bool is_asc,
+  static bool WriteNormalizedKey(const ColumnType& type, bool is_asc,
       uint8_t* value, uint8_t* dst, int* bytes_left);
 
   // Normalizes a column by writing a NULL byte and then the normalized value.
   // Updates bytes_left and returns true if we went over the max key size.
-  static bool NormalizeKeyColumn(PrimitiveType type, uint8_t null_bit, bool is_asc,
+  static bool NormalizeKeyColumn(const ColumnType& type, uint8_t null_bit, bool is_asc,
       uint8_t* value, uint8_t* dst, int* bytes_left);
 
   std::vector<Expr*> key_exprs_;

@@ -1724,8 +1724,9 @@ TEST_F(ExprTest, UtilityFunctions) {
   unordered_map<int, int64_t>::iterator int_iter;
   for(int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
       ++int_iter) {
-    PrimitiveType t = static_cast<PrimitiveType>(int_iter->first);
-    expected = HashUtil::FnvHash64(&int_iter->second, GetByteSize(t), HashUtil::FNV_SEED);
+    ColumnType t = ColumnType(static_cast<PrimitiveType>(int_iter->first));
+    expected = HashUtil::FnvHash64(
+        &int_iter->second, t.GetByteSize(), HashUtil::FNV_SEED);
     string& val = default_type_strs_[int_iter->first];
     TestValue("fnv_hash(" + val + ")", TYPE_BIGINT, expected);
   }
@@ -2811,7 +2812,7 @@ void ValidateLayout(const vector<Expr*>& exprs, int expected_byte_size,
 
   // Walk the computed offsets and make sure the resulting sets match expected_offsets
   for (int i = 0; i < exprs.size(); ++i) {
-    int expr_byte_size = GetByteSize(exprs[i]->type());
+    int expr_byte_size = exprs[i]->type().GetByteSize();
     map<int, set<int> >::const_iterator iter = expected_offsets.find(expr_byte_size);
     EXPECT_TRUE(iter != expected_offsets.end());
 
@@ -2838,16 +2839,16 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   // Test single Expr case
   expected_offsets.clear();
   for (int type = TYPE_BOOLEAN; type <= TYPE_STRING; ++type) {
-    PrimitiveType t = static_cast<PrimitiveType>(type);
+    ColumnType t = ColumnType(static_cast<PrimitiveType>(type));
     exprs.clear();
     expected_offsets.clear();
-    // With one expr, all offsets shoudl be 0.
-    expected_offsets[GetByteSize(t)] = list_of(0);
+    // With one expr, all offsets should be 0.
+    expected_offsets[t.GetByteSize()] = list_of(0);
     exprs.push_back(Expr::CreateLiteral(&pool, t, "0"));
-    if (t == TYPE_STRING) {
+    if (t.type == TYPE_STRING) {
       ValidateLayout(exprs, 16, 0, expected_offsets);
     } else {
-      ValidateLayout(exprs, GetByteSize(t), -1, expected_offsets);
+      ValidateLayout(exprs, t.GetByteSize(), -1, expected_offsets);
     }
   }
 
@@ -2864,7 +2865,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets[1].insert(expected_byte_size);
   expected_offsets[1].insert(expected_byte_size + 1);
   expected_offsets[1].insert(expected_byte_size + 2);
-  expected_byte_size += 3 * 1 + 1;  // 1 byte of paddding
+  expected_byte_size += 3 * 1 + 1;  // 1 byte of padding
 
   exprs.push_back(Expr::CreateLiteral(&pool, TYPE_SMALLINT, "0"));
   expected_offsets[2].insert(expected_byte_size);
