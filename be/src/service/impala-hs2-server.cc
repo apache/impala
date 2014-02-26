@@ -323,11 +323,13 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // create a session state: initialize start time, session type, database and default
   // query options.
   // TODO: put secret in session state map and check it
+  // TODO: Fix duplication of code between here and ConnectionStart().
   shared_ptr<SessionState> state(new SessionState());
   state->closed = false;
   state->start_time = TimestampValue::local_time();
   state->session_type = TSessionType::HIVESERVER2;
   state->network_address = ThriftServer::GetThreadConnectionContext()->network_address;
+  state->last_accessed_ms = ms_since_epoch();
 
   // If the username was set by a lower-level transport, use it.
   const ThriftServer::Username& username =

@@ -59,7 +59,6 @@
 #include "util/network-util.h"
 #include "util/parse-util.h"
 #include "util/string-parser.h"
-#include "util/time.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -804,7 +803,7 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
         stringstream ss;
         ss << "Client session expired due to more than " << FLAGS_idle_session_timeout
            << "s of inactivity (last activity was at: "
-           << i->second->last_accessed.DebugString() << ").";
+           << TimestampValue(i->second->last_accessed_ms / 1000).DebugString() << ").";
         return Status(ss.str());
       }
       if (i->second->closed) return Status("Session is closed");
@@ -1606,7 +1605,7 @@ void ImpalaServer::ConnectionStart(
     session_state.reset(new SessionState);
     session_state->closed = false;
     session_state->start_time = TimestampValue::local_time();
-    session_state->last_accessed = session_state->start_time;
+    session_state->last_accessed_ms = ms_since_epoch();
     session_state->database = "default";
     session_state->session_type = TSessionType::BEESWAX;
     session_state->network_address = connection_context.network_address;
@@ -1669,11 +1668,11 @@ void ImpalaServer::ExpireSessions() {
         // A session closed by other means is in the process of being removed, and it's
         // best not to interfere.
         if (session_state.second->closed || session_state.second->expired) continue;
-        int64_t last_accessed = session_state.second->last_accessed;
-        if (now - last_accessed <= FLAGS_idle_session_timeout * 1000) continue;
+        int64_t last_accessed_ms = session_state.second->last_accessed_ms;
+        if (now - last_accessed_ms <= (FLAGS_idle_session_timeout * 1000)) continue;
         LOG(INFO) << "Expiring session: " << session_state.first << ", user:"
                   << session_state.second->connected_user << ", last active: "
-                  << session_state.second->last_accessed.DebugString();
+                  << TimestampValue(last_accessed_ms / 1000).DebugString();
         session_state.second->expired = true;
         ImpaladMetrics::NUM_SESSIONS_EXPIRED->Increment(1L);
       }

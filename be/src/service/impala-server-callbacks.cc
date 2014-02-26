@@ -314,7 +314,8 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
               << "<td>" << session.second->network_address << "</td>"
               << "<td>" << session.second->database << "</td>"
               << "<td>" << session.second->start_time.DebugString() << "</td>"
-              << "<td>" << session.second->last_accessed.DebugString() << "</td>"
+              << "<td>" << TimestampValue(
+                  session.second->last_accessed_ms / 1000).DebugString() << "</td>"
               << "<td>" << session.second->expired << "</td>"
               << "<td>" << session.second->closed << "</td>"
               << "<td>" << session.second->ref_count << "</td>"

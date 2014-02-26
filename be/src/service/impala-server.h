@@ -36,6 +36,7 @@
 #include "util/runtime-profile.h"
 #include "util/simple-logger.h"
 #include "util/thread-pool.h"
+#include "util/time.h"
 #include "util/uid-util.h"
 #include "runtime/coordinator.h"
 #include "runtime/primitive-type.h"
@@ -751,7 +752,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     boost::unordered_set<TUniqueId> inflight_queries;
 
     // Time the session was last accessed.
-    TimestampValue last_accessed;
+    int64_t last_accessed_ms;
 
     // Number of RPCs concurrently accessing this session state. Used to detect when a
     // session may be correctly expired after a timeout (when ref_count == 0). Typically
@@ -829,13 +830,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status GetSessionState(const TUniqueId& session_id,
       boost::shared_ptr<SessionState>* session_state, bool mark_active = false);
 
-  // Decrement the session's reference counter and mark the last_accessed time so that
-  // state expiration can proceed.
+  // Decrement the session's reference counter and mark last_accessed_ms so that state
+  // expiration can proceed.
   inline void MarkSessionInactive(boost::shared_ptr<SessionState> session) {
     boost::lock_guard<boost::mutex> l(session->lock);
     DCHECK_GT(session->ref_count, 0);
     --session->ref_count;
-    session->last_accessed = TimestampValue::local_time();
+    session->last_accessed_ms = ms_since_epoch();
   }
 
   // protects query_locations_. Must always be taken after
