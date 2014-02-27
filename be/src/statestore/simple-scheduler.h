@@ -91,21 +91,6 @@ class SimpleScheduler : public Scheduler {
   virtual void HandlePreemptedResource(const TUniqueId& client_resource_id);
   virtual void HandleLostResource(const TUniqueId& client_resource_id);
 
-  // Map form a user ID to a list of pools they are allowed to submit work to
-  typedef boost::unordered_map<std::string, std::vector<std::string> > UserPoolMap;
-
-  // Used for testing, to confirm correct parsing of the configuration file
-  const UserPoolMap& user_pool_map() const { return user_pool_whitelist_; }
-
-  // Determines the pool for a user, given a set of query options and any configuration
-  // loaded from a file. Returns the first pool from all pools configured for a user. Does
-  // not confirm that a user has access to a pool, if query_options.yarn_pool is set.
-  // Public only for testing.
-  // TODO: Combine with GetRequestPool RM and admission control paths for looking up the
-  // pool once we've decided on a behavior for admission control when using RM as well.
-  Status GetYarnPool(const std::string& user,
-      const TQueryOptions& query_options, std::string* pool) const;
-
  private:
   // Protects access to backend_map_ and backend_ip_map_, which might otherwise be updated
   // asynchronously with respect to reads. Also protects the locality
@@ -183,12 +168,6 @@ class SimpleScheduler : public Scheduler {
   // Set to NULL if resource management is disabled.
   ResourceBroker* resource_broker_;
 
-  // Map from a user ID to a list of pools they are allowed to submit work to.
-  UserPoolMap user_pool_whitelist_;
-
-  // Default pools read from the whitelist, accessible to all users.
-  std::set<std::string> default_pools_;
-
   // Used for user-to-pool resolution and looking up pool configurations.
   boost::scoped_ptr<RequestPoolUtils> request_pool_utils_;
 
@@ -212,15 +191,7 @@ class SimpleScheduler : public Scheduler {
   // Webserver callback that prints a list of known backends
   void BackendsPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 
-  // Loads the list of permissible pools from the provided configuration file, failing if
-  // there is an error or the file can't be found.
-  Status InitPoolWhitelist(const std::string& conf_path);
-
-  // Determines the actual pool to use for a user and the request_pool query option and
-  // checks if the user has access to submit to that pool. If no request_pool query
-  // option is set, the policy uses the default pool. Uses request_pool_utils_ via the
-  // fair-scheduler allocation configuration. The policy may change the requested pool.
-  // If no pool can be used or the user does not have access, an error is returned.
+  // Determines the pool for a user and query options via request_pool_utils_.
   Status GetRequestPool(const std::string& user,
       const TQueryOptions& query_options, std::string* pool) const;
 

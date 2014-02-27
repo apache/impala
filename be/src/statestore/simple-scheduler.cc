@@ -47,8 +47,6 @@ using namespace strings;
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
 DECLARE_bool(enable_rm);
-DEFINE_string(pool_conf_file, "", "The full path to the YARN user-to-pool "
-    "configuration file");
 
 namespace impala {
 
@@ -193,10 +191,6 @@ Status SimpleScheduler::Init() {
       }
       backend_descriptor_.__set_secure_webserver(webserver_->IsSecure());
     }
-  }
-
-  if (!FLAGS_pool_conf_file.empty()) {
-    RETURN_IF_ERROR(InitPoolWhitelist(FLAGS_pool_conf_file));
   }
   return Status::OK;
 }
@@ -707,7 +701,7 @@ int SimpleScheduler::FindLeftmostInputFragment(
 Status SimpleScheduler::GetRequestPool(const string& user,
     const TQueryOptions& query_options, string* pool) const {
   TResolveRequestPoolResult resolve_pool_result;
-  const string& configured_pool = query_options.yarn_pool;
+  const string& configured_pool = query_options.request_pool;
   RETURN_IF_ERROR(request_pool_utils_->ResolveRequestPool(configured_pool, user,
         &resolve_pool_result));
   if (resolve_pool_result.resolved_pool.empty()) {
@@ -722,129 +716,22 @@ Status SimpleScheduler::GetRequestPool(const string& user,
   return Status::OK;
 }
 
-Status SimpleScheduler::GetYarnPool(const string& user,
-    const TQueryOptions& query_options, string* pool) const {
-  if (query_options.__isset.yarn_pool) {
-    *pool = query_options.yarn_pool;
-    if (default_pools_.find(*pool) != default_pools_.end()) return Status::OK;
-
-    UserPoolMap::const_iterator pool_it = user_pool_whitelist_.find(user);
-    if (pool_it == user_pool_whitelist_.end()) {
-      stringstream ss;
-      ss << "No whitelist found for user: " << user << " to access pool: " << *pool;
-      return Status(ss.str());
-    }
-
-    BOOST_FOREACH(const string& whitelisted_pool, pool_it->second) {
-      if (whitelisted_pool == *pool) return Status::OK;
-    }
-
-    stringstream ss;
-    ss << "User: " << user << " not authorized to access pool: " << *pool;
-    return Status(ss.str());
-  }
-
-  if (user_pool_whitelist_.empty()) {
-    return Status("Either a default pool must be configured, or the pool must be "
-        "explicitly specified by a query option");
-  }
-
-  // Per YARN, a default pool is used if a pool is not explicitly configured.
-  UserPoolMap::const_iterator pool_it = user_pool_whitelist_.find(DEFAULT_USER);
-  DCHECK(pool_it != user_pool_whitelist_.end());
-  DCHECK(!pool_it->second.empty());
-  *pool = pool_it->second[0];
-  return Status::OK;
-}
-
-Status SimpleScheduler::InitPoolWhitelist(const string& conf_path) {
-  ifstream whitelist(conf_path.c_str(), ios::in);
-  if (!whitelist.is_open()) {
-    stringstream err_msg;
-    err_msg << "Could not open pool configuration file: " << conf_path;
-    return Status(err_msg.str());
-  }
-
-  // Each line is user: pool1, pool2
-  string line;
-  bool in_user_section = false;
-  while (getline(whitelist, line)) {
-    trim(line);
-    if (line.empty()) continue;
-    if (line == "[users]") {
-      in_user_section = true;
-    } else if (line.size() > 2 && line[0] == '[' && line[line.size() - 1] == ']') {
-      // Headers are '[header name]'
-      in_user_section = false;
-    }
-
-    if (!in_user_section) continue;
-
-    size_t colon_pos = line.find_first_of(":");
-    if (colon_pos == string::npos) {
-      LOG(WARNING) << "Could not read line: " << line << " in pool configuration "
-                   << conf_path << ", ignoring.";
-      continue;
-    }
-    string user = line.substr(0, colon_pos);
-    trim(user);
-    if (user.empty()) {
-      LOG(WARNING) << "Empty user in line: "<< line << " in pool configuration "
-                   << conf_path << ", ignoring.";
-      continue;
-    }
-    colon_pos = min(colon_pos, line.size());
-    string pools = line.substr(colon_pos + 1);
-    trim(pools);
-    if (pools.empty()) {
-      LOG(WARNING) << "Empty pool configuration for user: " << user
-                   << " in pool configuration " << conf_path << ", ignoring.";
-      continue;
-    }
-
-    vector<string> splits;
-    split(splits, pools, is_any_of(","));
-    if (splits.empty()) {
-      LOG(WARNING) << "Empty pool configuration for user: " << user
-                   << " in pool configuration " << conf_path << ", ignoring.";
-      continue;
-    }
-    BOOST_FOREACH(string& split, splits) {
-      trim(split);
-    }
-    user_pool_whitelist_[user] = splits;
-  }
-
-  UserPoolMap::const_iterator pool_it = user_pool_whitelist_.find(DEFAULT_USER);
-  if (pool_it == user_pool_whitelist_.end() || pool_it->second.size() == 0) {
-    stringstream err_msg;
-    err_msg << "No default pool mapping found. Please set a value for user '*' in "
-            << conf_path;
-    return Status(err_msg.str());
-  }
-  default_pools_.insert(pool_it->second.begin(), pool_it->second.end());
-
-  return Status::OK;
-}
-
 Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   // TODO: Should this take impersonation into account?
   const string& user = schedule->request().query_ctxt.session.connected_user;
-  string request_pool;
-  RETURN_IF_ERROR(GetRequestPool(user, schedule->query_options(), &request_pool));
-  schedule->set_request_pool(request_pool);
-  schedule->set_num_hosts(num_backends_metric_->value());
+  string pool;
+  RETURN_IF_ERROR(GetRequestPool(user, schedule->query_options(), &pool));
+  schedule->set_request_pool(pool);
+  // Statestore topic may not have been updated yet if this is soon after startup, but
+  // there is always at least this backend.
+  schedule->set_num_hosts(max(num_backends_metric_->value(), 1L));
 
   RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
   RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);
   if (!FLAGS_enable_rm) return Status::OK;
-  // TODO: Combine related RM and admission control paths for looking up the pool once
-  // we've decided on a behavior for admission control when using RM as well.
-  string yarn_pool;
-  RETURN_IF_ERROR(GetYarnPool(user, schedule->query_options(), &yarn_pool));
-  schedule->CreateReservationRequest(yarn_pool, user, resource_broker_->llama_nodes());
+  schedule->CreateReservationRequest(pool, user, resource_broker_->llama_nodes());
   const TResourceBrokerReservationRequest* reservation_request =
       schedule->reservation_request();
   if (!reservation_request->resources.empty()) {

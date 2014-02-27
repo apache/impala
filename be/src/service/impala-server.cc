@@ -922,8 +922,8 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::SYNC_DDL:
         query_options->__set_sync_ddl(iequals(value, "true") || iequals(value, "1"));
         break;
-      case TImpalaQueryOptions::YARN_POOL:
-        query_options->__set_yarn_pool(value);
+      case TImpalaQueryOptions::REQUEST_POOL:
+        query_options->__set_request_pool(value);
         break;
       case TImpalaQueryOptions::V_CPU_CORES:
         query_options->__set_v_cpu_cores(atoi(value.c_str()));
@@ -1196,8 +1196,8 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
       case TImpalaQueryOptions::SYNC_DDL:
         val << query_option.sync_ddl;
         break;
-      case TImpalaQueryOptions::YARN_POOL:
-        val << query_option.yarn_pool;
+      case TImpalaQueryOptions::REQUEST_POOL:
+        val << query_option.request_pool;
         break;
       case TImpalaQueryOptions::V_CPU_CORES:
         val << query_option.v_cpu_cores;

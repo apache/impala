@@ -131,7 +131,6 @@ int16_t QuerySchedule::GetPerHostVCores() const {
 
 void QuerySchedule::CreateReservationRequest(const string& pool, const string& user,
     const vector<string>& llama_nodes) {
-  yarn_pool_ = pool;
   DCHECK(reservation_request_.get() == NULL);
   reservation_request_.reset(new TResourceBrokerReservationRequest());
   reservation_request_->resources.clear();

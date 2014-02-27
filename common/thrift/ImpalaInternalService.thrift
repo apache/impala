@@ -66,9 +66,9 @@ struct TQueryOptions {
   18: optional Types.TExplainLevel explain_level
   19: optional bool sync_ddl = 0
 
-  // Yarn pool this request should be submitted to. If not set
-  // the pool is determined based on the user (only relevant with RM).
-  20: optional string yarn_pool
+  // Request pool this request should be submitted to. If not set
+  // the pool is determined based on the user.
+  20: optional string request_pool
 
   // Per-host virtual CPU cores required for query (only relevant with RM).
   21: optional i16 v_cpu_cores

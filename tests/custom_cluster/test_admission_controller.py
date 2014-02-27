@@ -309,7 +309,7 @@ class TestAdmissionController(CustomClusterTestSuite):
 
           exec_options = self.vector.get_value('exec_option')
           exec_options['debug_action'] = '0:GETNEXT:WAIT'
-          exec_options['yarn_pool'] = self.pool_name
+          exec_options['request_pool'] = self.pool_name
           query = QUERY % (self.query_num,)
           self.query_state = 'SUBMITTING'
           client = self.impalad.service.create_beeswax_client()

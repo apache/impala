@@ -201,8 +201,8 @@ public class ImpaladClientExecutor {
         case PARQUET_FILE_SIZE:
           optionValue = String.valueOf(queryOptions.getParquet_file_size());
           break;
-        case YARN_POOL:
-          optionValue = String.valueOf(queryOptions.yarn_pool);
+        case REQUEST_POOL:
+          optionValue = String.valueOf(queryOptions.request_pool);
           break;
         case V_CPU_CORES:
           optionValue = String.valueOf(queryOptions.v_cpu_cores);

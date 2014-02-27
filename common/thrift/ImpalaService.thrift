@@ -122,9 +122,9 @@ enum TImpalaQueryOptions {
   // active impalad in the cluster before completing.
   SYNC_DDL,
 
-  // Yarn pool this request should be submitted to. If not set
-  // the pool is determined based on the user (only relevant with RM).
-  YARN_POOL,
+  // Request pool this request should be submitted to. If not set
+  // the pool is determined based on the user.
+  REQUEST_POOL,
 
   // Per-host virtual CPU cores required for query (only relevant with RM).
   V_CPU_CORES,

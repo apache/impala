@@ -1,9 +1,0 @@
-[unused section]
-
-[users]
-admin: prod, dev.
-root:
-user: dev.
-*: Staging, Default
-
-[groups]
