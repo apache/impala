@@ -147,6 +147,11 @@ find_package(RapidJson REQUIRED)
 include_directories(SYSTEM ${RAPIDJSON_INCLUDE_DIR})
 message(STATUS "RapidJson include dir: " ${RAPIDJSON_INCLUDE_DIR})
 
+# find boost multi precision headers
+find_package(BoostMultiPrecision REQUIRED)
+include_directories(SYSTEM ${BOOST_MULTI_PRECISION_INCLUDE_DIR})
+message(STATUS "BoostMultiPrecision include dir: " ${BOOST_MULTI_PRECISION_INCLUDE_DIR})
+
 # find Avro headers and libs
 find_package(Avro REQUIRED)
 include_directories(SYSTEM ${AVRO_INCLUDE_DIR})
