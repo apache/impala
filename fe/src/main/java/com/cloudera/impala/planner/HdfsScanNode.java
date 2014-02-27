@@ -34,7 +34,6 @@ import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -109,15 +108,9 @@ public class HdfsScanNode extends ScanNode {
   @Override
   public void init(Analyzer analyzer)
       throws InternalException, AuthorizationException {
-    // loop over all materialized slots and add predicates to conjuncts_
-    for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds_.get(0)).getSlots()) {
-      ArrayList<Pair<Expr, Boolean>> bindingPredicates =
-          analyzer.getBoundPredicates(slotDesc.getId());
-      for (Pair<Expr, Boolean> p: bindingPredicates) {
-        if (p.second) analyzer.markConjunctAssigned(p.first);
-        conjuncts_.add(p.first);
-      }
-    }
+    ArrayList<Expr> bindingPredicates = analyzer.getBoundPredicates(tupleIds_.get(0));
+    conjuncts_.addAll(bindingPredicates);
+
     // also add remaining unassigned conjuncts
     assignConjuncts(analyzer);
 

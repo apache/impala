@@ -531,7 +531,7 @@ where l_shipdate >= '1994-01-01' and
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 size=718.94MB
-   predicates: l_discount >= 0.05, l_discount <= 0.07, l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_quantity < 24.0
+   predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24.0
 ---- DISTRIBUTEDPLAN
 03:AGGREGATE [MERGE FINALIZE]
 |  output: sum(sum(l_extendedprice * l_discount))
@@ -543,7 +543,7 @@ where l_shipdate >= '1994-01-01' and
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 size=718.94MB
-   predicates: l_discount >= 0.05, l_discount <= 0.07, l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_quantity < 24.0
+   predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24.0
 ====
 # Q8 - National Market Share Query
 # Modifications: Got rid of subquery, converted select from multiple tables to joins,
@@ -1096,7 +1096,7 @@ limit 10
 |
 |--00:SCAN HDFS [tpch.lineitem l]
 |     partitions=1/1 size=718.94MB compact
-|     predicates: l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01', (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate
+|     predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
 |
 01:SCAN HDFS [tpch.orders o]
    partitions=1/1 size=162.56MB
@@ -1126,7 +1126,7 @@ limit 10
 |  |
 |  00:SCAN HDFS [tpch.lineitem l]
 |     partitions=1/1 size=718.94MB
-|     predicates: l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01', (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate
+|     predicates: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, (l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP'), l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
 |
 01:SCAN HDFS [tpch.orders o]
    partitions=1/1 size=162.56MB

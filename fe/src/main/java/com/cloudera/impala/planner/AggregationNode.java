@@ -16,6 +16,7 @@ package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +25,7 @@ import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.FunctionCallExpr;
-import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
@@ -35,6 +35,7 @@ import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Aggregation computation.
@@ -84,22 +85,22 @@ public class AggregationNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) {
-    // loop over all materialized slots and add binding predicates to conjuncts_
-    // TODO: unify this with HdfsScanNode; also, we should be able to apply this
-    // logic to predicates over multiple slots
-    for (SlotDescriptor slotDesc: analyzer.getTupleDesc(tupleIds_.get(0)).getSlots()) {
-      ArrayList<Pair<Expr, Boolean>> bindingPredicates =
-          analyzer.getBoundPredicates(slotDesc.getId());
-      for (Pair<Expr, Boolean> p: bindingPredicates) {
-        if (!analyzer.isConjunctAssigned(p.first)) {
-          conjuncts_.add(p.first);
-          if (p.second) analyzer.markConjunctAssigned(p.first);
-        }
+    // Only assign predicates to the non-merge agg node in in the single-node plan.
+    // The conjuncts are transferred to the merge agg via transferConjuncts().
+    if (!aggInfo_.isMerge()) {
+      // Ignore predicates bound to a group-by slot because those
+      // are already evaluated below this agg node (e.g., in a scan).
+      Set<SlotId> groupBySlots = Sets.newHashSet();
+      for (int i = 0; i < aggInfo_.getGroupingExprs().size(); ++i) {
+        groupBySlots.add(aggInfo_.getAggTupleDesc().getSlots().get(i).getId());
       }
-    }
+      ArrayList<Expr> bindingPredicates =
+          analyzer.getBoundPredicates(tupleIds_.get(0), groupBySlots);
+      conjuncts_.addAll(bindingPredicates);
 
-    // also add remaining unassigned conjuncts_
-    assignConjuncts(analyzer);
+      // also add remaining unassigned conjuncts_
+      assignConjuncts(analyzer);
+    }
     computeMemLayout(analyzer);
     // do this at the end so it can take all conjuncts into account
     computeStats(analyzer);

@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +28,9 @@ import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.Pair;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Representation of a single select block, including GROUP BY, ORDER BY and HAVING
@@ -183,28 +184,14 @@ public class SelectStmt extends QueryStmt {
    */
   @Override
   public void materializeRequiredSlots(Analyzer analyzer) {
-    // mark unassigned join predicates
+    // Mark unassigned join predicates. Some predicates that must be evaluated by a join
+    // can also be safely evaluated below the join (picked up by getBoundPredicates()).
+    // Such predicates will be marked twice and that is ok.
     List<Expr> unassigned =
         analyzer.getUnassignedConjuncts(getTableRefIds(), true);
     List<Expr> unassignedJoinConjuncts = Lists.newArrayList();
     for (Expr e: unassigned) {
-      List<TupleId> tids = Lists.newArrayList();
-      e.getIds(tids, null);
-      if (tids.isEmpty()) continue;
-
-      // isOjConjunct: mark this here, getBoundPredicates() won't return it
-      // for the ScanNode;
-      // same if this is for an outer-joined tid and e is from the Where clause
-      // TODO: figure out a better way to do this (should the ScanNode mark
-      // all slots from single-tid predicates as being referenced?)
-      if (tids.size() > 1
-          || analyzer.isOjConjunct(e)
-          || analyzer.isOuterJoined(tids.get(0))
-             && e.isWhereClauseConjunct()
-             && e.contains(IsNullPredicate.class)) {
-        unassignedJoinConjuncts.add(e);
-      }
-      //if (tids.size() > 1) unassignedJoinConjuncts.add(e);
+      if (analyzer.evalByJoin(e)) unassignedJoinConjuncts.add(e);
     }
     List<Expr> baseTblJoinConjuncts =
         Expr.cloneList(unassignedJoinConjuncts, baseTblSmap_);
@@ -224,16 +211,15 @@ public class SelectStmt extends QueryStmt {
       // show up in AggregateInfo.getMaterializedAggregateExprs()
       ArrayList<Expr> havingConjuncts = Lists.newArrayList();
       if (havingPred_ != null) havingConjuncts.add(havingPred_);
-      TupleDescriptor aggTupleDesc = analyzer.getTupleDesc(aggInfo_.getAggTupleId());
-      for (SlotDescriptor slotDesc: aggTupleDesc.getSlots()) {
-        ArrayList<Pair<Expr, Boolean>> bindingPredicates =
-            analyzer.getBoundPredicates(slotDesc.getId());
-        for (Pair<Expr, Boolean> p: bindingPredicates) {
-          if (!analyzer.isConjunctAssigned(p.first)) {
-            havingConjuncts.add(p.first);
-          }
-        }
+      // Ignore predicates bound to a group-by slot because those
+      // are already evaluated below this agg node (e.g., in a scan).
+      Set<SlotId> groupBySlots = Sets.newHashSet();
+      for (int i = 0; i < aggInfo_.getGroupingExprs().size(); ++i) {
+        groupBySlots.add(aggInfo_.getAggTupleDesc().getSlots().get(i).getId());
       }
+      ArrayList<Expr> bindingPredicates =
+          analyzer.getBoundPredicates(aggInfo_.getAggTupleId(), groupBySlots);
+      havingConjuncts.addAll(bindingPredicates);
       havingConjuncts.addAll(
           analyzer.getUnassignedConjuncts(aggInfo_.getAggTupleId().asList(), false));
       materializeSlots(analyzer, havingConjuncts);

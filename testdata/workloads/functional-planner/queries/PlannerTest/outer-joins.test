@@ -34,7 +34,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |
 |--02:SCAN HDFS [functional.testtbl t3]
 |     partitions=1/1 size=0B compact
-|     predicates: t3.id > 0, t3.id IS NOT NULL, t3.zip = 94720
+|     predicates: t3.zip = 94720, t3.id > 0, t3.id IS NOT NULL
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t1.id - 1 = t2.id + 1
@@ -60,7 +60,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |  |
 |  02:SCAN HDFS [functional.testtbl t3]
 |     partitions=1/1 size=0B
-|     predicates: t3.id > 0, t3.id IS NOT NULL, t3.zip = 94720
+|     predicates: t3.zip = 94720, t3.id > 0, t3.id IS NOT NULL
 |
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: t1.id - 1 = t2.id + 1

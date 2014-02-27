@@ -194,11 +194,11 @@ and b.id + 15 = 27
 |
 |--01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 size=6.33KB compact
-|     predicates: id + 15 = 27, string_col = '15'
+|     predicates: functional.alltypessmall.string_col = '15', functional.alltypessmall.id + 15 = 27
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=5/10 size=744.76KB
-   predicates: functional.alltypesagg.id + 15 = 27, functional.alltypesagg.tinyint_col = 15
+   predicates: functional.alltypesagg.tinyint_col = 15, functional.alltypesagg.id + 15 = 27
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -210,13 +210,13 @@ and b.id + 15 = 27
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 size=6.33KB
-|     predicates: id + 15 = 27, string_col = '15'
+|     predicates: functional.alltypessmall.string_col = '15', functional.alltypessmall.id + 15 = 27
 |
 03:EXCHANGE [PARTITION=HASH(id,int_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=5/10 size=744.76KB
-   predicates: functional.alltypesagg.id + 15 = 27, functional.alltypesagg.tinyint_col = 15
+   predicates: functional.alltypesagg.tinyint_col = 15, functional.alltypesagg.id + 15 = 27
 ====
 # subquery join
 # multiple join predicates;
@@ -242,7 +242,7 @@ and a.tinyint_col + b.tinyint_col < 15
 |
 |--01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 size=6.33KB compact
-|     predicates: string_col = '15'
+|     predicates: functional.alltypessmall.string_col = '15'
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=5/10 size=1.09MB
@@ -268,7 +268,7 @@ NODE 1:
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 size=6.33KB
-|     predicates: string_col = '15'
+|     predicates: functional.alltypessmall.string_col = '15'
 |
 03:EXCHANGE [PARTITION=HASH(id,int_col)]
 |
@@ -605,7 +605,7 @@ and   c2 > 10
 01:AGGREGATE [FINALIZE]
 |  output: count(*), sum(functional.alltypesagg.int_col), count(functional.alltypesagg.int_col)
 |  group by: functional.alltypesagg.int_col % 7
-|  having: int_col % 7 IS NOT NULL, count(*) > 10, sum(int_col) / count(int_col) > 500.0 OR count(*) = 10
+|  having: sum(int_col) / count(int_col) > 500.0 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=1.45MB
@@ -615,7 +615,7 @@ and   c2 > 10
 03:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*)), sum(sum(int_col)), sum(count(int_col))
 |  group by: int_col % 7
-|  having: int_col % 7 IS NOT NULL, count(*) > 10, sum(int_col) / count(int_col) > 500.0 OR count(*) = 10
+|  having: sum(int_col) / count(int_col) > 500.0 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
 |
 02:EXCHANGE [PARTITION=HASH(int_col % 7)]
 |
@@ -908,7 +908,7 @@ select * from
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=956.90KB
-   predicates: tinyint_col < 10
+   predicates: functional.alltypes.tinyint_col < 10
 ---- DISTRIBUTEDPLAN
 02:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -921,7 +921,7 @@ select * from
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=956.90KB
-   predicates: tinyint_col < 10
+   predicates: functional.alltypes.tinyint_col < 10
 ====
 # Union of constant selects in subquery
 # TODO: We could combine the merge nodes below.

@@ -113,11 +113,8 @@ public class Analyzer {
     // all registered conjuncts (map from id to Predicate)
     public final Map<ExprId, Expr> conjuncts = Maps.newHashMap();
 
-    // map from tuple id to list of conjuncts referencing tuple
-    public final Map<TupleId, List<ExprId>> tupleConjuncts = Maps.newHashMap();
-
-    // map from slot id to list of conjuncts referencing slot
-    public final Map<SlotId, List<ExprId>> slotConjuncts = Maps.newHashMap();
+    // all registered conjuncts bound by a single tuple id; used in getBoundPredicates()
+    public final ArrayList<ExprId> singleTidConjuncts = Lists.newArrayList();
 
     // eqJoinConjuncts[tid] contains all conjuncts of the form
     // "<lhs> = <rhs>" in which either lhs or rhs is fully bound by tid
@@ -413,7 +410,6 @@ public class Analyzer {
   public SlotDescriptor addSlotDescriptor(TupleDescriptor tupleDesc) {
     SlotDescriptor result = globalState_.descTbl.addSlotDescriptor(tupleDesc);
     globalState_.blockBySlot.put(result.getId(), this);
-    globalState_.slotConjuncts.put(result.getId(), new ArrayList<ExprId>());
     return result;
   }
 
@@ -491,22 +487,8 @@ public class Analyzer {
     ArrayList<SlotId> slotIds = Lists.newArrayList();
     e.getIds(tupleIds, slotIds);
 
-    // update tuplePredicates
-    for (TupleId id : tupleIds) {
-      if (!globalState_.tupleConjuncts.containsKey(id)) {
-        List<ExprId> conjunctIds = Lists.newArrayList();
-        conjunctIds.add(e.getId());
-        globalState_.tupleConjuncts.put(id, conjunctIds);
-      } else {
-        globalState_.tupleConjuncts.get(id).add(e.getId());
-      }
-    }
-
-    // update slotPredicates
-    for (SlotId id : slotIds) {
-      Preconditions.checkState(globalState_.slotConjuncts.containsKey(id));
-      globalState_.slotConjuncts.get(id).add(e.getId());
-    }
+    // register single tid conjuncts
+    if (tupleIds.size() == 1) globalState_.singleTidConjuncts.add(e.getId());
 
     LOG.trace("register tuple/slotConjunct: " + Integer.toString(e.getId().asInt())
         + " " + e.toSql() + " " + e.debugString());
@@ -601,6 +583,21 @@ public class Analyzer {
       }
     }
     return result;
+  }
+
+  /**
+   * Returns true if e must be evaluated by a join node. Note that it may still be
+   * safe to evaluate e elsewhere as well, but in any case the join must evaluate e.
+   */
+  public boolean evalByJoin(Expr e) {
+    List<TupleId> tids = Lists.newArrayList();
+    e.getIds(tids, null);
+    if (tids.isEmpty()) return false;
+    if (tids.size() > 1 || isOjConjunct(e)
+        || isOuterJoined(tids.get(0)) && e.isWhereClauseConjunct()) {
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -722,8 +719,7 @@ public class Analyzer {
         // non-OJ On-clause predicate: not okay if tid is nullable and the
         // predicate tests for null
         if (globalState_.outerJoinedTupleIds.containsKey(tid)
-            // TODO: also check for IFNULL()
-            && e.contains(IsNullPredicate.class)) {
+            && isTrueWithNullSlots(e)) {
           return false;
         }
       }
@@ -749,69 +745,86 @@ public class Analyzer {
   }
 
   /**
-   * Returns pairs <Predicate, bool>: the predicate is fully bound by slotId;
-   * the bool indicates whether the application of the predicate to slotId implies an
-   * assignment of that predicate (ie, it doesn't need to be applied to the slot
-   * from which it originated).
-   * Predicates are derived from binding predicates of slots in the same equivalence
-   * class as slotId.
-   * TODO: find a more descriptive name for this function
-   * getImpliedPredicates()? getInferredPredicates()?
+   * Returns a list of predicates that are fully bound by destTid. Predicates are derived
+   * by replacing the slots of a source predicate with slots of the destTid, if for each
+   * source slot there is an equivalent slot in destTid.
+   * In particular, the returned list contains predicates that must be evaluated
+   * at a join node (bound to outer-joined tuple) but can also be safely evaluated by a
+   * plan node materializing destTid. Such predicates are not marked as assigned.
+   * All other inferred predicates are marked as assigned.
+   * This function returns bound predicates regardless of whether the source predicates
+   * have been assigned. It is up to the caller to decide if a bound predicate
+   * should actually be used.
+   * Destination slots in destTid can be ignored by passing them in ignoreSlots.
    * TODO: exclude UDFs from predicate propagation? their overloaded variants could
    * have very different semantics
    */
-  public ArrayList<Pair<Expr, Boolean>> getBoundPredicates(SlotId slotId) {
-    LOG.trace("getBoundPredicates(" + slotId.toString() + ")");
-    TupleId tid = getTupleId(slotId);
-    ArrayList<Pair<Expr, Boolean>> result = Lists.newArrayList();
-    int maxSlotId = globalState_.descTbl.getMaxSlotId().asInt();
-    for (int i = 0; i <= maxSlotId; ++i) {
-      SlotId equivSlotId = new SlotId(i);
+  public ArrayList<Expr> getBoundPredicates(TupleId destTid, Set<SlotId> ignoreSlots) {
+    ArrayList<Expr> result = Lists.newArrayList();
+    for (ExprId srcConjunctId: globalState_.singleTidConjuncts) {
+      Expr srcConjunct = globalState_.conjuncts.get(srcConjunctId);
+      if (srcConjunct instanceof SlotRef) continue;
+      Preconditions.checkNotNull(srcConjunct);
+      List<TupleId> srcTids = Lists.newArrayList();
+      List<SlotId> srcSids = Lists.newArrayList();
+      srcConjunct.getIds(srcTids, srcSids);
+      Preconditions.checkState(srcTids.size() == 1);
 
-      // skip this slot if we're not allowed to transfer values to slotId
-      if (!globalState_.valueTransfer[equivSlotId.asInt()][slotId.asInt()]) continue;
+      // Generate slot-mappings to bind srcConjunct to destTid.
+      TupleId srcTid = srcTids.get(0);
+      List<List<SlotId>> allDestSids =
+          getEquivDestSlotIds(srcTid, srcSids, destTid, ignoreSlots);
+      if (allDestSids.isEmpty()) continue;
 
-      // Indicates whether the equivalence class to which equivSlotId belongs
-      // contains a slot belonging to an outer-joined tuple.
-      boolean hasOuterJoinedTuple =
-          hasOuterJoinedTuple(globalState_.equivClassBySlotId.get(equivSlotId));
-      for (ExprId id: globalState_.slotConjuncts.get(equivSlotId)) {
-        Expr e = globalState_.conjuncts.get(id);
-        LOG.trace("getBoundPredicates: considering " + e.toSql() + " " + e.debugString());
-        if (!e.isBound(equivSlotId)) continue;
+      // Indicates whether the source slots have equivalent slots that belong
+      // to an outer-joined tuple.
+      boolean hasOuterJoinedTuple = false;
+      for (SlotId srcSid: srcSids) {
+        if (hasOuterJoinedTuple(globalState_.equivClassBySlotId.get(srcSid))) {
+          hasOuterJoinedTuple = true;
+          break;
+        }
+      }
 
-        // It is incorrect to propagate a Where-clause predicate into a plan subtree that
-        // is on the nullable side of an outer join if the predicate evaluates to true
-        // when all its referenced tuples are NULL. The check below is conservative
-        // because the outer-joined tuple making 'hasOuterJoinedTuple' true could be in a
-        // parent block of 'e', in which case it is safe to propagate 'e' downwards.
-        // TODO: Make the check precise by considering the blocks (analyzers) where the
-        // outer-joined tuples in equivSlotId's equivalence class appear relative to 'e'.
-        if (e.isWhereClauseConjunct_ && hasOuterJoinedTuple && isTrueWithNullSlots(e)) {
+      // It is incorrect to propagate a Where-clause predicate into a plan subtree that
+      // is on the nullable side of an outer join if the predicate evaluates to true
+      // when all its referenced tuples are NULL. The check below is conservative
+      // because the outer-joined tuple making 'hasOuterJoinedTuple' true could be in a
+      // parent block of 'srcConjunct', in which case it is safe to propagate
+      // 'srcConjunct' within child blocks of the outer-joined parent block.
+      // TODO: Make the check precise by considering the blocks (analyzers) where the
+      // outer-joined tuples in the dest slot's equivalence classes appear
+      // relative to 'srcConjunct'.
+      if (srcConjunct.isWhereClauseConjunct_ && hasOuterJoinedTuple &&
+          isTrueWithNullSlots(srcConjunct)) {
+        continue;
+      }
+
+      // if srcConjunct comes out of an OJ's On clause, we need to make sure it's the
+      // same as the one that makes destTid nullable
+      // (otherwise srcConjunct needn't be true when destTid is set)
+      if (globalState_.ojClauseByConjunct.containsKey(srcConjunct.getId())) {
+        if (!globalState_.outerJoinedTupleIds.containsKey(destTid)) continue;
+        if (globalState_.ojClauseByConjunct.get(srcConjunct.getId())
+            != globalState_.outerJoinedTupleIds.get(destTid)) {
           continue;
         }
+      }
 
-        // if e comes out of an OJ's On clause, we need to make sure it's the same
-        // as the one that makes slotId's tuple nullable
-        // (otherwise e needn't be true when slotId's tuple is set)
-        if (globalState_.ojClauseByConjunct.containsKey(e.getId())) {
-          if (!globalState_.outerJoinedTupleIds.containsKey(tid)) continue;
-          if (globalState_.ojClauseByConjunct.get(e.getId())
-              != globalState_.outerJoinedTupleIds.get(tid)) {
-            continue;
-          }
-        }
-
+      // Generate predicates for all src-to-dest slot mappings.
+      for (List<SlotId> destSids: allDestSids) {
+        Preconditions.checkState(destSids.size() == srcSids.size());
         Expr p;
-        if (slotId.equals(equivSlotId)) {
-          Preconditions.checkState(e.isBound(slotId));
-          p = e;
+        if (srcSids.containsAll(destSids)) {
+          p = srcConjunct;
         } else {
           Expr.SubstitutionMap smap = new Expr.SubstitutionMap();
-          smap.addMapping(
-              new SlotRef(globalState_.descTbl.getSlotDesc(equivSlotId)),
-              new SlotRef(globalState_.descTbl.getSlotDesc(slotId)));
-          p = e.clone(smap);
+          for (int i = 0; i < srcSids.size(); ++i) {
+            smap.addMapping(
+                new SlotRef(globalState_.descTbl.getSlotDesc(srcSids.get(i))),
+                new SlotRef(globalState_.descTbl.getSlotDesc(destSids.get(i))));
+          }
+          p = srcConjunct.clone(smap);
           // we need to re-analyze in order to create casts, if necessary
           p.unsetIsAnalyzed();
           LOG.trace("new pred: " + p.toSql() + " " + p.debugString());
@@ -823,19 +836,7 @@ public class Analyzer {
             // not an executable predicate; ignore
             continue;
           }
-          // Set the original ExprId in case the conjunct should be marked as assigned.
-          p.setId(e.getId());
         }
-
-        // check if we already created this predicate
-        boolean isDuplicate = false;
-        for (Pair<Expr, Boolean> pair: result) {
-          if (pair.first.equals(p)) {
-            isDuplicate = true;
-            break;
-          }
-        }
-        if (isDuplicate) continue;
 
         // predicate assignment doesn't hold if:
         // - the application against slotId doesn't transfer the value back to its
@@ -844,19 +845,84 @@ public class Analyzer {
         //   that table's OJ clause's ON clause (if it comes from anywhere but that
         //   ON clause, it needs to be evaluated directly by the join node that
         //   materializes the OJ'd table)
-        boolean reverseValueTransfer =
-            globalState_.valueTransfer[slotId.asInt()][equivSlotId.asInt()];
-        TupleId origTupleId = getTupleId(equivSlotId);
-        boolean evalByJoin =
-            globalState_.outerJoinedTupleIds.containsKey(origTupleId)
-              && (!globalState_.ojClauseByConjunct.containsKey(e.getId())
-                  || globalState_.ojClauseByConjunct.get(e.getId())
-                    != globalState_.outerJoinedTupleIds.get(origTupleId));
-        LOG.trace("getBoundPredicates: adding " + p.toSql() + " " + p.debugString());
-        result.add(new Pair<Expr, Boolean>(p, reverseValueTransfer && ! evalByJoin));
+        boolean reverseValueTransfer = true;
+        for (int i = 0; i < srcSids.size(); ++i) {
+          if (!globalState_.valueTransfer[destSids.get(i).asInt()][srcSids.get(i).asInt()]) {
+            reverseValueTransfer = false;
+            break;
+          }
+        }
+
+        boolean evalByJoin = evalByJoin(srcConjunct) &&
+            (globalState_.ojClauseByConjunct.get(srcConjunct.getId())
+                != globalState_.outerJoinedTupleIds.get(srcTid));
+
+        // mark all bound predicates including duplicate ones
+        if (reverseValueTransfer && !evalByJoin) markConjunctAssigned(srcConjunct);
+
+        // check if we already created this predicate
+        if (!result.contains(p)) result.add(p);
       }
     }
     return result;
+  }
+
+  public ArrayList<Expr> getBoundPredicates(TupleId destTid) {
+    return getBoundPredicates(destTid, new HashSet<SlotId>());
+  }
+
+  /**
+   * Returns a list of slot mappings from srcTid to destTid for the purpose of predicate
+   * propagation. Each mapping assigns every slot in srcSids to an equivalent slot in
+   * destTid. Does not generate all possible mappings, but limits the results to
+   * useful and/or non-redundant mappings, i.e., those mappings that would improve
+   * the performance of query execution.
+   */
+  private List<List<SlotId>> getEquivDestSlotIds(TupleId srcTid, List<SlotId> srcSids,
+      TupleId destTid, Set<SlotId> ignoreSlots) {
+    List<List<SlotId>> allDestSids = Lists.newArrayList();
+    TupleDescriptor destTupleDesc = getTupleDesc(destTid);
+    if (srcSids.size() == 1) {
+      // Generate all mappings to propagate predicates of the form <slot> <op> <constant>
+      // to as many destination slots as possible.
+      // TODO: If srcTid == destTid we could limit the mapping to partition
+      // columns because mappings to non-partition columns do not provide
+      // a performance benefit.
+      SlotId srcSid = srcSids.get(0);
+      for (SlotDescriptor destSlot: destTupleDesc.getSlots()) {
+        if (ignoreSlots.contains(destSlot.getId())) continue;
+        if (globalState_.valueTransfer[srcSid.asInt()][destSlot.getId().asInt()]) {
+          allDestSids.add(Lists.newArrayList(destSlot.getId()));
+        }
+      }
+    } else if (srcTid.equals(destTid)) {
+      // Multiple source slot ids and srcTid == destTid. Inter-tuple transfers are
+      // already expressed by the original conjuncts. Any mapping would be redundant.
+      // Still add srcSids to the result because we rely on getBoundPredicates() to
+      // include predicates that can safely be evaluated below an outer join, but must
+      // also be evaluated by the join itself (evalByJoin() == true).
+      allDestSids.add(srcSids);
+    } else {
+      // Multiple source slot ids and srcTid != destTid. Pick the first mapping
+      // where each srcSid is mapped to a different destSid to avoid generating
+      // redundant and/or trivial predicates.
+      // TODO: This approach is not guaranteed to find the best slot mapping
+      // (e.g., against partition columns) or all non-redundant mappings.
+      // The limitations are show in predicate-propagation.test.
+      List<SlotId> destSids = Lists.newArrayList();
+      for (SlotId srcSid: srcSids) {
+        for (SlotDescriptor destSlot: destTupleDesc.getSlots()) {
+          if (ignoreSlots.contains(destSlot.getId())) continue;
+          if (globalState_.valueTransfer[srcSid.asInt()][destSlot.getId().asInt()]
+              && !destSids.contains(destSlot.getId())) {
+            destSids.add(destSlot.getId());
+            break;
+          }
+        }
+      }
+      if (destSids.size() == srcSids.size()) allDestSids.add(destSids);
+    }
+    return allDestSids;
   }
 
   /**
@@ -911,6 +977,13 @@ public class Analyzer {
 
   public boolean isOuterJoined(TupleId tid) {
     return globalState_.outerJoinedTupleIds.containsKey(tid);
+  }
+
+  public boolean containsOuterJoinedTid(List<TupleId> tids) {
+    for (TupleId tid: tids) {
+      if (isOuterJoined(tid)) return true;
+    }
+    return false;
   }
 
   /**

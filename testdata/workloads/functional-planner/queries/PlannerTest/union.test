@@ -2403,11 +2403,11 @@ where x.int_col < 5 and x.bool_col = false and x.month = 1
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 size=230B
-|     predicates: functional.alltypestiny.bool_col = FALSE, functional.alltypestiny.int_col < 5
+|     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 size=230B
-   predicates: functional.alltypestiny.bool_col = FALSE, functional.alltypestiny.int_col < 5
+   predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 ---- DISTRIBUTEDPLAN
 03:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -2415,11 +2415,11 @@ where x.int_col < 5 and x.bool_col = false and x.month = 1
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 size=230B
-|     predicates: functional.alltypestiny.bool_col = FALSE, functional.alltypestiny.int_col < 5
+|     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 |
 04:MERGE
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 size=230B
-   predicates: functional.alltypestiny.bool_col = FALSE, functional.alltypestiny.int_col < 5
+   predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 ====

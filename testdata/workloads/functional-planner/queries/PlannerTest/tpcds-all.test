@@ -499,7 +499,7 @@ LIMIT 100
 |
 |--01:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 size=9.84MB compact
-|     predicates: d.d_year = 1998, d.d_moy = 12
+|     predicates: d.d_moy = 12, d.d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=23.42MB
@@ -538,7 +538,7 @@ LIMIT 100
 |  |
 |  01:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 size=9.84MB
-|     predicates: d.d_year = 1998, d.d_moy = 12
+|     predicates: d.d_moy = 12, d.d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=23.42MB
@@ -860,7 +860,7 @@ LIMIT 100
 |
 |--01:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 size=9.84MB compact
-|     predicates: d.d_year = 1998, d.d_moy = 12
+|     predicates: d.d_moy = 12, d.d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=23.42MB
@@ -899,7 +899,7 @@ LIMIT 100
 |  |
 |  01:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 size=9.84MB
-|     predicates: d.d_year = 1998, d.d_moy = 12
+|     predicates: d.d_moy = 12, d.d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=23.42MB
@@ -1804,7 +1804,7 @@ LIMIT 100
 |--07:AGGREGATE [FINALIZE]
 |  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) <= 5, count(*) >= 1
+|  |  having: count(*) >= 1, count(*) <= 5
 |  |
 |  06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss.ss_store_sk = s.s_store_sk
@@ -1849,7 +1849,7 @@ LIMIT 100
 |  15:AGGREGATE [MERGE FINALIZE]
 |  |  output: sum(count(*))
 |  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) <= 5, count(*) >= 1
+|  |  having: count(*) >= 1, count(*) <= 5
 |  |
 |  14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk)]
 |  |
