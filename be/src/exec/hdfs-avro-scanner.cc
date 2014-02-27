@@ -818,9 +818,11 @@ Function* HdfsAvroScanner::CodegenDecodeAvroData(LlvmCodeGen* codegen,
   // interleave reading and evaluating the conjuncts for a field so we can skip more
   // unneeded fields
   Function* eval_conjuncts_fn = ExecNode::CodegenEvalConjuncts(codegen, conjuncts);
-  decode_avro_data_fn = codegen->ReplaceCallSites(decode_avro_data_fn, false,
-      eval_conjuncts_fn, "EvalConjuncts", &replaced);
-  DCHECK_EQ(replaced, 1);
+  if (eval_conjuncts_fn != NULL) {
+    decode_avro_data_fn = codegen->ReplaceCallSites(decode_avro_data_fn, false,
+        eval_conjuncts_fn, "EvalConjuncts", &replaced);
+    DCHECK_EQ(replaced, 1);
+  }
 
   return codegen->FinalizeFunction(decode_avro_data_fn);
 }

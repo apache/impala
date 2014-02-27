@@ -442,6 +442,8 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
 Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
     Function* new_fn, const string& replacee_name, int* replaced) {
   DCHECK(caller->getParent() == module_);
+  DCHECK(caller != NULL);
+  DCHECK(new_fn != NULL);
 
   if (!update_in_place) {
     // Clone the function and add it to the module

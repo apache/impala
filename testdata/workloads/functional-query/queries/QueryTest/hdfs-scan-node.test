@@ -713,3 +713,17 @@ int, string
 5,'val_5'
 10,'val_10'
 ====
+---- QUERY
+# Regression test for IMPALA-828.
+select cast(timestamp_col as timestamp) from alltypesagg
+where timestamp_col < cast('2010-01-01 00:05:20' as timestamp)
+---- TYPES
+timestamp
+---- RESULTS
+2010-01-01 00:00:00
+2010-01-01 00:01:00
+2010-01-01 00:02:00.100000000
+2010-01-01 00:03:00.300000000
+2010-01-01 00:04:00.600000000
+2010-01-01 00:05:00.100000000
+====
