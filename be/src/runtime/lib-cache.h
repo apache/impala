@@ -17,6 +17,7 @@
 #define IMPALA_RUNTIME_LIB_CACHE_H
 
 #include <string>
+#include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/thread/mutex.hpp>
@@ -26,9 +27,7 @@
 
 namespace impala {
 
-class HdfsFsCache;
 class RuntimeState;
-class HdfsFsCache;
 
 // Process-wide cache of dynamically-linked libraries loaded from HDFS.
 // These libraries can either be shared objects, llvm modules or jars. For
@@ -61,23 +60,23 @@ class LibCache {
     TYPE_JAR,     // Java jar file. We don't care about the contents in the BE.
   };
 
-  LibCache();
+  static LibCache* instance() { return LibCache::instance_.get(); }
 
   // Calls dlclose on all cached handles.
   ~LibCache();
 
   // Initializes the libcache. Must be called before any other APIs.
-  Status Init(bool is_fe_tests = false);
+  static Status Init();
 
   // Gets the local file system path for the library at 'hdfs_lib_file'. If
   // this file is not already on the local fs, it copies it and caches the
   // result. Returns an error if 'hdfs_lib_file' cannot be copied to the local fs.
-  Status GetLocalLibPath(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
-      LibType type, std::string* local_path);
+  Status GetLocalLibPath(const std::string& hdfs_lib_file, LibType type,
+                         std::string* local_path);
 
   // Returns status.ok() if the symbol exists in 'hdfs_lib_file', non-ok otherwise.
-  Status CheckSymbolExists(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
-      LibType type, const std::string& symbol);
+  Status CheckSymbolExists(const std::string& hdfs_lib_file, LibType type,
+                           const std::string& symbol);
 
   // Returns a pointer to the function for the given library and symbol.
   // If 'hdfs_lib_file' is empty, the symbol is looked up in the impalad process.
@@ -87,8 +86,8 @@ class LibCache {
   // If entry is non-null, *entry will be set to the cached entry. The caller
   // must call DecrementUseCount(*entry) when it is done using fn_ptr and it is
   // no longer valid to use fn_ptr.
-  Status GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
-      const std::string& symbol, void** fn_ptr, LibCacheEntry** entry);
+  Status GetSoFunctionPtr(const std::string& hdfs_lib_file, const std::string& symbol,
+                          void** fn_ptr, LibCacheEntry** entry);
 
   // See comment in GetSoFunctionPtr().
   void DecrementUseCount(LibCacheEntry* entry);
@@ -100,6 +99,9 @@ class LibCache {
   void DropCache();
 
  private:
+  // Singleton instance. Instantiated in Init().
+  static boost::scoped_ptr<LibCache> instance_;
+
   // dlopen() handle for the current process (i.e. impalad).
   void* current_process_handle_;
 
@@ -116,14 +118,19 @@ class LibCache {
   typedef boost::unordered_map<std::string, LibCacheEntry*> LibMap;
   LibMap lib_cache_;
 
+  LibCache();
+  LibCache(LibCache const& l); // disable copy ctor
+  LibCache& operator=(LibCache const& l); // disable assignment
+
+  Status InitInternal();
+
   // Returns the cache entry for 'hdfs_lib_file'. If this library has not been
   // copied locally, it will copy it and add a new LibCacheEntry to 'lib_cache_'.
   // Result is returned in *entry.
   // No locks should be take before calling this. On return the entry's lock is
   // taken and returned in *entry_lock.
-  Status GetCacheEntry(HdfsFsCache* hdfs_cache, const std::string& hdfs_lib_file,
-      LibType type, boost::unique_lock<boost::mutex>* entry_lock,
-      LibCacheEntry** entry);
+  Status GetCacheEntry(const std::string& hdfs_lib_file, LibType type,
+      boost::unique_lock<boost::mutex>* entry_lock, LibCacheEntry** entry);
 
   // Utility function for generating a filename unique to this process and
   // 'hdfs_path'. This is to prevent multiple impalad processes or different library files

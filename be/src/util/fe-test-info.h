@@ -12,17 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IMPALA_COMMON_INIT_H
-#define IMPALA_COMMON_INIT_H
+#ifndef IMPALA_UTIL_FE_TEST_INFO_H
+#define IMPALA_UTIL_FE_TEST_INFO_H
 
 namespace impala {
 
-// Initialises logging, flags, and, if init_jvm is true, an embedded JVM.
-// is_fe_tests is set to true when called from the FE during tests when there is no BE.
-// Callers that want to override default gflags variables should do so before calling
-// this method. No logging should be performed until after this method returns.
-void InitCommonRuntime(int argc, char** argv, bool init_jvm, bool is_fe_tests = false);
+// Provides global access to whether this binary is running as part of the FE tests
+// (i.e., without a full BE).
+class FeTestInfo {
+ public:
+  // Called in InitCommonRuntime().
+  static void Init(bool is_fe_tests) { is_fe_tests_ = is_fe_tests; }
+  static bool is_fe_tests() { return is_fe_tests_; }
+
+ private:
+  static bool is_fe_tests_;
+};
 
 }
-
 #endif

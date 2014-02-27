@@ -19,11 +19,16 @@ import java.util.List;
 import com.cloudera.impala.analysis.ColumnType;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
+import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TAggregateFunction;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.cloudera.impala.thrift.TSymbolLookupParams;
+import com.cloudera.impala.thrift.TSymbolLookupResult;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -288,4 +293,59 @@ public class Function implements CatalogObject {
 
   @Override
   public boolean isLoaded() { return true; }
+
+  // Returns the resolved symbol in the binary. The BE will do a lookup of 'symbol'
+  // in the binary and try to resolve unmangled names.
+  // If this function is expecting a return argument, retArgType is that type. It should
+  // be null if this function isn't expecting a return argument.
+  public String lookupSymbol(String symbol, ColumnType retArgType,
+      boolean hasVarArgs, ColumnType... argTypes) throws AnalysisException {
+    if (symbol.length() == 0) {
+      if (binaryType_ == TFunctionBinaryType.BUILTIN) {
+        // We allow empty builtin symbols in order to stage work in the FE before its
+        // implemented in the BE
+        return symbol;
+      }
+      throw new AnalysisException("Could not find symbol ''");
+    }
+    if (binaryType_ == TFunctionBinaryType.HIVE) {
+      // TODO: add this when hive udfs go in.
+      return symbol;
+    }
+    Preconditions.checkState(binaryType_ == TFunctionBinaryType.NATIVE ||
+        binaryType_ == TFunctionBinaryType.IR ||
+        binaryType_ == TFunctionBinaryType.BUILTIN);
+
+    TSymbolLookupParams lookup = new TSymbolLookupParams();
+    // Builtin functions do not have an external library, they are loaded directly from
+    // the running process
+    lookup.location =  binaryType_ != TFunctionBinaryType.BUILTIN ?
+        location_.toString() : "";
+    lookup.symbol = symbol;
+    lookup.fn_binary_type = binaryType_;
+    lookup.arg_types = ColumnType.toThrift(argTypes);
+    lookup.has_var_args = hasVarArgs;
+    if (retArgType != null) lookup.setRet_arg_type(retArgType.toThrift());
+
+    try {
+      TSymbolLookupResult result = FeSupport.LookupSymbol(lookup);
+      switch (result.result_code) {
+        case SYMBOL_FOUND:
+          return result.symbol;
+        case BINARY_NOT_FOUND:
+          Preconditions.checkState(binaryType_ != TFunctionBinaryType.BUILTIN);
+          throw new AnalysisException(
+              "Could not load binary: " + location_.getLocation() + "\n" +
+              result.error_msg);
+        case SYMBOL_NOT_FOUND:
+          throw new AnalysisException(result.error_msg);
+        default:
+          // Should never get here.
+          throw new AnalysisException("Internal Error");
+      }
+    } catch (InternalException e) {
+      throw new AnalysisException("Could not find symbol.", e);
+    }
+  }
+
 }

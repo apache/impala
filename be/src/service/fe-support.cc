@@ -55,7 +55,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeFeTestInit(
     JNIEnv* env, jclass caller_class) {
   DCHECK(ExecEnv::GetInstance() == NULL) << "This should only be called once from the FE";
   char* name = const_cast<char*>("FeSupport");
-  InitCommonRuntime(1, &name, false);
+  InitCommonRuntime(1, &name, false, true);
   LlvmCodeGen::InitializeLlvm();
   ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
   exec_env->InitForFeTests();
@@ -102,25 +102,29 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
 // Does the symbol resolution, filling in the result in *result.
 static void ResolveSymbolLookup(const TSymbolLookupParams params,
     const vector<ColumnType>& arg_types, TSymbolLookupResult* result) {
-  ExecEnv* env = ExecEnv::GetInstance();
-  DCHECK(env != NULL);
   DCHECK(params.fn_binary_type == TFunctionBinaryType::NATIVE ||
-         params.fn_binary_type == TFunctionBinaryType::IR);
-  LibCache::LibType type = params.fn_binary_type == TFunctionBinaryType::NATIVE ?
-      LibCache::TYPE_SO : LibCache::TYPE_IR;
+         params.fn_binary_type == TFunctionBinaryType::IR ||
+         params.fn_binary_type == TFunctionBinaryType::BUILTIN);
+  // We use TYPE_SO for builtins, since LibCache does not resolve symbols for IR
+  // builtins. This is ok since builtins have the same symbol whether we run the IR or
+  // native versions.
+  LibCache::LibType type = params.fn_binary_type == TFunctionBinaryType::IR ?
+      LibCache::TYPE_IR : LibCache::TYPE_SO;
 
-  string dummy_local_path;
-  Status status =
-      env->lib_cache()->GetLocalLibPath(env->fs_cache(), params.location,
-          type, &dummy_local_path);
-  if (!status.ok()) {
-    result->__set_result_code(TSymbolLookupResultCode::BINARY_NOT_FOUND);
-    result->__set_error_msg(status.GetErrorMsg());
-    return;
+  if (params.fn_binary_type != TFunctionBinaryType::BUILTIN) {
+    // Builtin functions are loaded directly from the running process
+    string dummy_local_path;
+    Status status =
+        LibCache::instance()->GetLocalLibPath(params.location, type, &dummy_local_path);
+    if (!status.ok()) {
+      result->__set_result_code(TSymbolLookupResultCode::BINARY_NOT_FOUND);
+      result->__set_error_msg(status.GetErrorMsg());
+      return;
+    }
   }
 
-  status = env->lib_cache()->CheckSymbolExists(
-      env->fs_cache(), params.location, type, params.symbol);
+  Status status =
+      LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol);
   if (status.ok()) {
     // The FE specified symbol exists, just use that.
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
@@ -146,8 +150,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   string symbol = SymbolsUtil::MangleUserFunction(params.symbol,
       arg_types, params.has_var_args, params.__isset.ret_arg_type ? &ret_type : NULL);
 
-  status = env->lib_cache()->CheckSymbolExists(
-      env->fs_cache(), params.location, type, symbol);
+  status = LibCache::instance()->CheckSymbolExists(params.location, type, symbol);
   if (!status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
     stringstream ss;

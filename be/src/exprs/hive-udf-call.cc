@@ -149,8 +149,8 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
 
   // Copy the Hive Jar from hdfs to local file system.
   string local_path;
-  RETURN_IF_ERROR(state->lib_cache()->GetLocalLibPath(
-        state->fs_cache(), fn_.hdfs_location, LibCache::TYPE_JAR, &local_path));
+  RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
+      fn_.hdfs_location, LibCache::TYPE_JAR, &local_path));
 
   JNIEnv* env = getJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");

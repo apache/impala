@@ -830,7 +830,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "SYMBOL='b'", "Could not find function b() in: " + hdfsPath);
     AnalysisError("create function foo() RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " +
-        "SYMBOL=''", "Could not find symbol '' in: /test-warehouse/libTestUdfs.so");
+        "SYMBOL=''", "Could not find symbol ''");
     AnalysisError("create function foo() RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " +
         "SYMBOL='_ZAB'",

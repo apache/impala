@@ -488,7 +488,7 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance
 }
 
 Status Coordinator::FinalizeSuccessfulInsert() {
-  hdfsFS hdfs_connection = exec_env_->fs_cache()->GetDefaultConnection();
+  hdfsFS hdfs_connection = HdfsFsCache::instance()->GetDefaultConnection();
   // INSERT finalization happens in the four following steps
   // 1. If OVERWRITE, remove all the files in the target directory
   // 2. Create all the necessary partition directories.
@@ -615,7 +615,7 @@ Status Coordinator::FinalizeQuery() {
 
   DCHECK(finalize_params_.__isset.staging_dir);
 
-  hdfsFS hdfs_connection = exec_env_->fs_cache()->GetDefaultConnection();
+  hdfsFS hdfs_connection = HdfsFsCache::instance()->GetDefaultConnection();
   stringstream staging_dir;
   staging_dir << finalize_params_.staging_dir << "/" << PrintId(query_id_,"_") << "/";
   VLOG_QUERY << "Removing staging directory: " << staging_dir.str();

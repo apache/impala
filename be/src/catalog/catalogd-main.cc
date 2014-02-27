@@ -24,6 +24,7 @@
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
 #include "runtime/mem-tracker.h"
+#include "service/fe-support.h"
 #include "util/debug-util.h"
 #include "util/jni-util.h"
 #include "util/metrics.h"
@@ -51,8 +52,7 @@ int main(int argc, char** argv) {
   FLAGS_webserver_port = 25020;
   FLAGS_state_store_subscriber_port = 23020;
   InitCommonRuntime(argc, argv, true);
-
-  EXIT_IF_ERROR(JniUtil::Init());
+  InitFeSupport();
 
   MemTracker process_mem_tracker;
   scoped_ptr<Webserver> webserver(new Webserver());

@@ -22,6 +22,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-state.h"
 #include "util/dynamic-util.h"
+#include "util/fe-test-info.h"
 #include "util/hash-util.h"
 #include "util/hdfs-util.h"
 #include "util/path-builder.h"
@@ -32,6 +33,8 @@ using namespace impala;
 
 DEFINE_string(local_library_dir, "/tmp",
               "Local directory to copy UDF libraries from HDFS into");
+
+scoped_ptr<LibCache> LibCache::instance_;
 
 struct LibCache::LibCacheEntry {
   // Lock protecting all fields in this entry
@@ -72,7 +75,7 @@ struct LibCache::LibCacheEntry {
   ~LibCacheEntry();
 };
 
-LibCache::LibCache() :current_process_handle_(NULL) {
+LibCache::LibCache() : current_process_handle_(NULL) {
 }
 
 LibCache::~LibCache() {
@@ -80,8 +83,14 @@ LibCache::~LibCache() {
   if (current_process_handle_ != NULL) DynamicClose(current_process_handle_);
 }
 
-Status LibCache::Init(bool is_fe_tests) {
-  if (is_fe_tests) {
+Status LibCache::Init() {
+  DCHECK(LibCache::instance_.get() == NULL);
+  LibCache::instance_.reset(new LibCache());
+  return LibCache::instance_->InitInternal();
+}
+
+Status LibCache::InitInternal() {
+  if (FeTestInfo::is_fe_tests()) {
     // In the FE tests, NULL gives the handle to the java process.
     // Explicitly load the fe-support shared object.
     string fe_support_path;
@@ -104,8 +113,8 @@ LibCache::LibCacheEntry::~LibCacheEntry() {
   unlink(local_path.c_str());
 }
 
-Status LibCache::GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
-    const string& symbol, void** fn_ptr, LibCacheEntry** ent) {
+Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& symbol, 
+                                  void** fn_ptr, LibCacheEntry** ent) {
   if (ent != NULL) *ent = NULL;
   if (hdfs_lib_file.empty()) {
     // Just loading a function ptr in the current process. No need to take any locks.
@@ -116,7 +125,7 @@ Status LibCache::GetSoFunctionPtr(HdfsFsCache* hdfs_cache, const string& hdfs_li
 
   LibCacheEntry* entry = NULL;
   unique_lock<mutex> lock;
-  RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, TYPE_SO, &lock, &entry));
+  RETURN_IF_ERROR(GetCacheEntry(hdfs_lib_file, TYPE_SO, &lock, &entry));
   DCHECK(entry != NULL);
   DCHECK_EQ(entry->type, TYPE_SO);
 
@@ -146,27 +155,26 @@ void LibCache::DecrementUseCount(LibCacheEntry* entry) {
   if (can_delete) delete entry;
 }
 
-Status LibCache::GetLocalLibPath(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
-      LibType type, string* local_path) {
+Status LibCache::GetLocalLibPath(const string& hdfs_lib_file, LibType type, 
+                                 string* local_path) {
   unique_lock<mutex> lock;
   LibCacheEntry* entry = NULL;
-  RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, type,
-      &lock, &entry));
+  RETURN_IF_ERROR(GetCacheEntry(hdfs_lib_file, type, &lock, &entry));
   DCHECK(entry != NULL);
   DCHECK_EQ(entry->type, type);
   *local_path = entry->local_path;
   return Status::OK;
 }
 
-Status LibCache::CheckSymbolExists(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
-    LibType type, const string& symbol) {
+Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
+                                   const string& symbol) {
   if (type == TYPE_SO) {
     void* dummy_ptr = NULL;
-    return GetSoFunctionPtr(hdfs_cache, hdfs_lib_file, symbol, &dummy_ptr, NULL);
+    return GetSoFunctionPtr(hdfs_lib_file, symbol, &dummy_ptr, NULL);
   } else if (type == TYPE_IR) {
     unique_lock<mutex> lock;
     LibCacheEntry* entry = NULL;
-    RETURN_IF_ERROR(GetCacheEntry(hdfs_cache, hdfs_lib_file, type, &lock, &entry));
+    RETURN_IF_ERROR(GetCacheEntry(hdfs_lib_file, type, &lock, &entry));
     DCHECK(entry != NULL);
     DCHECK_EQ(entry->type, TYPE_IR);
     if (entry->symbols.find(symbol) == entry->symbols.end()) {
@@ -178,7 +186,7 @@ Status LibCache::CheckSymbolExists(HdfsFsCache* hdfs_cache, const string& hdfs_l
   } else if (type == TYPE_JAR) {
     unique_lock<mutex> lock;
     LibCacheEntry* dummy_entry = NULL;
-    return GetCacheEntry(hdfs_cache, hdfs_lib_file, type, &lock, &dummy_entry);
+    return GetCacheEntry(hdfs_lib_file, type, &lock, &dummy_entry);
   } else {
     DCHECK(false);
     return Status("Shouldn't get here.");
@@ -228,8 +236,9 @@ void LibCache::DropCache() {
   lib_cache_.clear();
 }
 
-Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_file,
-    LibType type, unique_lock<mutex>* entry_lock, LibCacheEntry** entry) {
+Status LibCache::GetCacheEntry(const string& hdfs_lib_file, LibType type,
+                               unique_lock<mutex>* entry_lock, LibCacheEntry** entry) {
+  DCHECK(!hdfs_lib_file.empty());
   unique_lock<mutex> lib_cache_lock(lock_);
   LibMap::iterator it = lib_cache_.find(hdfs_lib_file);
   if (it != lib_cache_.end()) {
@@ -265,8 +274,8 @@ Status LibCache::GetCacheEntry(HdfsFsCache* hdfs_cache, const string& hdfs_lib_f
 
   // Copy the file
   (*entry)->local_path = MakeLocalPath(hdfs_lib_file, FLAGS_local_library_dir);
-  hdfsFS hdfs_conn = hdfs_cache->GetDefaultConnection();
-  hdfsFS local_conn = hdfs_cache->GetLocalConnection();
+  hdfsFS hdfs_conn = HdfsFsCache::instance()->GetDefaultConnection();
+  hdfsFS local_conn = HdfsFsCache::instance()->GetLocalConnection();
   (*entry)->copy_file_status = CopyHdfsFile(
       hdfs_conn, hdfs_lib_file, local_conn, (*entry)->local_path);
   RETURN_IF_ERROR((*entry)->copy_file_status);

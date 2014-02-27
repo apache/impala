@@ -17,6 +17,7 @@
 #define IMPALA_RUNTIME_HDFS_FS_CACHE_H
 
 #include <string>
+#include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/thread/mutex.hpp>
 #include <hdfs.h>
@@ -30,6 +31,11 @@ namespace impala {
 // other connections handed out via hdfsConnect() to the same URI.)
 class HdfsFsCache {
  public:
+  static HdfsFsCache* instance() { return HdfsFsCache::instance_.get(); }
+
+  // Initializes the cache. Must be called before any other APIs.
+  static void Init();
+
   ~HdfsFsCache();
 
   // Get connection to default fs.
@@ -43,9 +49,16 @@ class HdfsFsCache {
   hdfsFS GetConnection(const std::string& host, int port);
 
  private:
+  // Singleton instance. Instantiated in Init().
+  static boost::scoped_ptr<HdfsFsCache> instance_;
+
   boost::mutex lock_;  // protects fs_map_
   typedef boost::unordered_map<std::pair<std::string, int>, hdfsFS> HdfsFsMap;
   HdfsFsMap fs_map_;
+
+  HdfsFsCache() { };
+  HdfsFsCache(HdfsFsCache const& l); // disable copy ctor
+  HdfsFsCache& operator=(HdfsFsCache const& l); // disable assignment
 };
 
 }

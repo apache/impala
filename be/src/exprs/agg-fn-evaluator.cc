@@ -125,28 +125,23 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
     return Status(ss.str());
   }
 
-  RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-      state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.init_fn_symbol,
-      &init_fn_, &cache_entry_));
-  RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-      state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.update_fn_symbol,
-      &update_fn_, NULL));
-  RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-      state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.merge_fn_symbol,
-      &merge_fn_, NULL));
+  RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
+      fn_.hdfs_location, fn_.aggregate_fn.init_fn_symbol, &init_fn_, &cache_entry_));
+  RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
+      fn_.hdfs_location, fn_.aggregate_fn.update_fn_symbol, &update_fn_, NULL));
+  RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
+      fn_.hdfs_location, fn_.aggregate_fn.merge_fn_symbol, &merge_fn_, NULL));
 
   // Serialize and Finalize are optional
   if (!fn_.aggregate_fn.serialize_fn_symbol.empty()) {
-    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-        state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.serialize_fn_symbol,
-        &serialize_fn_, NULL));
+    RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
+        fn_.hdfs_location, fn_.aggregate_fn.serialize_fn_symbol, &serialize_fn_, NULL));
   } else {
     serialize_fn_ = NULL;
   }
   if (!fn_.aggregate_fn.finalize_fn_symbol.empty()) {
-    RETURN_IF_ERROR(state->lib_cache()->GetSoFunctionPtr(
-        state->fs_cache(), fn_.hdfs_location, fn_.aggregate_fn.finalize_fn_symbol,
-        &finalize_fn_, NULL));
+    RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
+        fn_.hdfs_location, fn_.aggregate_fn.finalize_fn_symbol, &finalize_fn_, NULL));
   } else {
     finalize_fn_ = NULL;
   }
@@ -156,7 +151,7 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
 void AggFnEvaluator::Close(RuntimeState* state) {
   Expr::Close(input_exprs_, state);
   if (cache_entry_ != NULL) {
-    state->lib_cache()->DecrementUseCount(cache_entry_);
+    LibCache::instance()->DecrementUseCount(cache_entry_);
     cache_entry_ = NULL;
   }
 }

@@ -1357,7 +1357,7 @@ void ImpalaServer::CatalogUpdateCallback(
       update.__set_from_version(0L);
       ImpaladMetrics::CATALOG_READY->Update(false);
       // Dropped all cached lib files (this behaves as if all functions are dropped).
-      exec_env_->lib_cache()->DropCache();
+      LibCache::instance()->DropCache();
     } else {
       {
         unique_lock<mutex> unique_lock(catalog_version_lock_);
@@ -1370,7 +1370,7 @@ void ImpalaServer::CatalogUpdateCallback(
       // Remove all dropped functions from the library cache.
       // TODO: is this expensive? We'd like to process heartbeats promptly.
       for (int i = 0; i < dropped_functions.size(); ++i) {
-        exec_env_->lib_cache()->RemoveEntry(dropped_functions[i].fn.hdfs_location);
+        LibCache::instance()->RemoveEntry(dropped_functions[i].fn.hdfs_location);
       }
     }
   }

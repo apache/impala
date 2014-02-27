@@ -76,9 +76,8 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     }
 
     // Check the user provided symbol exists
-    udf_.setSymbolName(lookupSymbol(
-        checkAndGetOptArg(OptArg.SYMBOL), null, fn_.hasVarArgs(),
-        fn_.getArgs()));
+    udf_.setSymbolName(udf_.lookupSymbol(
+        checkAndGetOptArg(OptArg.SYMBOL), null, udf_.hasVarArgs(), udf_.getArgs()));
 
     // Udfs should not set any of these
     checkOptArgNotSet(OptArg.UPDATE_FN);

@@ -112,8 +112,6 @@ class RuntimeState {
   const std::string& cgroup() const { return cgroup_; }
   ExecEnv* exec_env() { return exec_env_; }
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
-  HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
-  LibCache* lib_cache() { return exec_env_->lib_cache(); }
   HBaseTableFactory* htable_factory() { return exec_env_->htable_factory(); }
   ImpalaInternalServiceClientCache* impalad_client_cache() {
     return exec_env_->impalad_client_cache();

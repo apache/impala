@@ -22,10 +22,13 @@
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
+#include "util/fe-test-info.h"
 #include "util/logging-support.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"
 #include "util/os-info.h"
+#include "runtime/hdfs-fs-cache.h"
+#include "runtime/lib-cache.h"
 #include "runtime/timestamp-parse-util.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
@@ -53,11 +56,13 @@ static void GlogFlushThread() {
   }
 }
 
-void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
+void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm, bool is_fe_tests) {
   CpuInfo::Init();
   DiskInfo::Init();
   MemInfo::Init();
   OsInfo::Init();
+
+  FeTestInfo::Init(is_fe_tests);
 
   if (!CpuInfo::IsSupported(CpuInfo::SSE3)) {
     LOG(ERROR) << "CPU does not support the SSE3 instruction set, which is required."
@@ -88,6 +93,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm) {
   LOG(INFO) << MemInfo::DebugString();
   LOG(INFO) << OsInfo::DebugString();
   LOG(INFO) << "Process ID: " << getpid();
+
+  impala::LibCache::Init();
+  impala::HdfsFsCache::Init();
 
   if (init_jvm) {
     EXIT_IF_ERROR(JniUtil::Init());

@@ -100,8 +100,6 @@ ExecEnv::ExecEnv()
   : stream_mgr_(new DataStreamMgr()),
     impalad_client_cache_(new ImpalaInternalServiceClientCache()),
     catalogd_client_cache_(new CatalogServiceClientCache()),
-    fs_cache_(new HdfsFsCache()),
-    lib_cache_(new LibCache()),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver()),
@@ -154,8 +152,6 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
   : stream_mgr_(new DataStreamMgr()),
     impalad_client_cache_(new ImpalaInternalServiceClientCache()),
     catalogd_client_cache_(new CatalogServiceClientCache()),
-    fs_cache_(new HdfsFsCache()),
-    lib_cache_(new LibCache()),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver(webserver_port)),
@@ -205,7 +201,6 @@ ExecEnv::~ExecEnv() {
 
 Status ExecEnv::InitForFeTests() {
   mem_tracker_.reset(new MemTracker(-1, "Process"));
-  RETURN_IF_ERROR(lib_cache_->Init(true));
   is_fe_tests_ = true;
   return Status::OK;
 }
@@ -295,8 +290,6 @@ Status ExecEnv::StartServices() {
       return status;
     }
   }
-
-  RETURN_IF_ERROR(lib_cache_->Init());
 
   return Status::OK;
 }

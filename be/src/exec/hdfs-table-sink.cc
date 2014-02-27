@@ -180,8 +180,7 @@ Status HdfsTableSink::Init(RuntimeState* state) {
     return Status("No default partition found for HdfsTextTableSink");
   }
 
-  // Get Hdfs connection from runtime state.
-  hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
+  hdfs_connection_ = HdfsFsCache::instance()->GetDefaultConnection();
   if (hdfs_connection_ == NULL) {
     return Status(GetHdfsErrorMsg("Failed to connect to HDFS."));
   }

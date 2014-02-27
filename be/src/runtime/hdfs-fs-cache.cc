@@ -19,13 +19,25 @@
 #include "common/logging.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/fe-test-info.h"
 
 using namespace std;
 using namespace boost;
 
 namespace impala {
 
+scoped_ptr<HdfsFsCache> HdfsFsCache::instance_;
+
+void HdfsFsCache::Init() {
+  DCHECK(HdfsFsCache::instance_.get() == NULL);
+  HdfsFsCache::instance_.reset(new HdfsFsCache());
+}
+
 HdfsFsCache::~HdfsFsCache() {
+  // For some reason calling hdfsDisconnect() from fesupport causes a segfault, so just
+  // leak the connections.
+  if (FeTestInfo::is_fe_tests()) return;
+
   for (HdfsFsMap::iterator i = fs_map_.begin(); i != fs_map_.end(); ++i) {
     int status = hdfsDisconnect(i->second);
     if (status != 0) {

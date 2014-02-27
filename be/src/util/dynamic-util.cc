@@ -17,6 +17,7 @@
 #include <dlfcn.h>
 #include <sstream>
 #include "runtime/exec-env.h"
+#include "util/fe-test-info.h"
 
 using namespace std;
 
@@ -44,7 +45,7 @@ Status DynamicOpen(const char* library, void** handle) {
   // will prevent the FE tests from running the functions that cannot resolve
   // the symbols (e.g. planner tests with some UDFs).
   // TODO: this is to work around some build breaks. We need to fix this better.
-  if (ExecEnv::GetInstance()->is_fe_tests()) flags = RTLD_LAZY;
+  if (FeTestInfo::is_fe_tests()) flags = RTLD_LAZY;
   *handle = dlopen(library, flags);
   if (*handle == NULL) {
     stringstream ss;

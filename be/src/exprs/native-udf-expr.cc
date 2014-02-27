@@ -284,9 +284,8 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     // This can either be a UDF implemented in a .so or a builtin using the UDF
     // interface with the code in impalad.
     void* fn_ptr;
-    Status status = state->lib_cache()->GetSoFunctionPtr(
-        state->fs_cache(), fn_.hdfs_location, fn_.scalar_fn.symbol, &fn_ptr,
-        &cache_entry_);
+    Status status = LibCache::instance()->GetSoFunctionPtr(
+        fn_.hdfs_location, fn_.scalar_fn.symbol, &fn_ptr, &cache_entry_);
     if (!status.ok() && fn_.binary_type == TFunctionBinaryType::BUILTIN) {
       // Builtins symbols should exist unless there is a version mismatch.
       stringstream ss;
@@ -346,8 +345,8 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
     // We're running a IR UDF.
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
     string local_path;
-    RETURN_IF_ERROR(state->lib_cache()->GetLocalLibPath(
-          state->fs_cache(), fn_.hdfs_location, LibCache::TYPE_IR, &local_path));
+    RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
+        fn_.hdfs_location, LibCache::TYPE_IR, &local_path));
 
     // Link the UDF module into this query's main module (essentially copy the UDF module
     // into the main module) so the UDF function is available for inlining in the main

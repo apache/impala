@@ -124,7 +124,7 @@ void CatalogOpExecutor::HandleDropFunction(const TDropFunctionParams& request) {
   // version <= the dropped version. This may happen if the update from the statestore
   // gets applied *before* the result of a direct-DDL drop function command.
   if (fn.catalog_version <= catalog_update_result_->version) {
-    env_->lib_cache()->RemoveEntry(fn.fn.hdfs_location);
+    LibCache::instance()->RemoveEntry(fn.fn.hdfs_location);
   }
 }
 

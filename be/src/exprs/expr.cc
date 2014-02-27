@@ -109,7 +109,7 @@ void Expr::Close(RuntimeState* state) {
     children_[i]->Close(state);
   }
   if (cache_entry_ != NULL) {
-    state->lib_cache()->DecrementUseCount(cache_entry_);
+    LibCache::instance()->DecrementUseCount(cache_entry_);
     cache_entry_ = NULL;
   }
 }
@@ -526,8 +526,8 @@ Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
     if (!fn_.scalar_fn.symbol.empty()) {
       DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::BUILTIN);
       void* fn_ptr;
-      Status status = state->lib_cache()->GetSoFunctionPtr(
-          state->fs_cache(), "", fn_.scalar_fn.symbol, &fn_ptr, &cache_entry_);
+      Status status = LibCache::instance()->GetSoFunctionPtr(
+          "", fn_.scalar_fn.symbol, &fn_ptr, &cache_entry_);
       if (!status.ok()) {
         // Builtins symbols should exist unless there is a version mismatch.
         stringstream ss;

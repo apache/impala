@@ -145,9 +145,9 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     checkOptArgNotSet(OptArg.SYMBOL);
 
     // The user must provide the symbol for Update.
-    uda_.setUpdateFnSymbol(lookupSymbol(
-        checkAndGetOptArg(OptArg.UPDATE_FN), intermediateType_, fn_.hasVarArgs(),
-        fn_.getArgs()));
+    uda_.setUpdateFnSymbol(uda_.lookupSymbol(
+        checkAndGetOptArg(OptArg.UPDATE_FN), intermediateType_, uda_.hasVarArgs(),
+        uda_.getArgs()));
 
     // If the ddl did not specify the init/serialize/merge/finalize function
     // Symbols, guess them based on the update fn Symbol.
@@ -161,12 +161,14 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     if (uda_.getMergeFnSymbol() == null) reportCouldNotInferSymbol("merge");
 
     // Validate that all set symbols exist.
-    uda_.setInitFnSymbol(lookupSymbol(uda_.getInitFnSymbol(), intermediateType_, false));
-    uda_.setMergeFnSymbol(lookupSymbol(uda_.getMergeFnSymbol(), intermediateType_, false,
-        intermediateType_));
+    uda_.setInitFnSymbol(
+        uda_.lookupSymbol(uda_.getInitFnSymbol(), intermediateType_, false));
+    uda_.setMergeFnSymbol(
+        uda_.lookupSymbol(uda_.getMergeFnSymbol(), intermediateType_, false,
+            intermediateType_));
     if (uda_.getSerializeFnSymbol() != null) {
       try {
-        uda_.setSerializeFnSymbol(lookupSymbol(
+        uda_.setSerializeFnSymbol(uda_.lookupSymbol(
             uda_.getSerializeFnSymbol(), null, false, intermediateType_));
       } catch (AnalysisException e) {
         if (optArgs_.get(OptArg.SERIALIZE_FN) != null) {
@@ -179,7 +181,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     }
     if (uda_.getFinalizeFnSymbol() != null) {
       try {
-        uda_.setFinalizeFnSymbol(lookupSymbol(
+        uda_.setFinalizeFnSymbol(uda_.lookupSymbol(
             uda_.getFinalizeFnSymbol(), null, false, intermediateType_));
       } catch (AnalysisException e) {
         if (optArgs_.get(OptArg.FINALIZE_FN) != null) {

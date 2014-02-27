@@ -354,7 +354,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     }
   }
 
-  hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
+  hdfs_connection_ = HdfsFsCache::instance()->GetDefaultConnection();
   if (hdfs_connection_ == NULL) {
     string error_msg = GetStrErrMsg();
     stringstream ss;
