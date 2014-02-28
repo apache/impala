@@ -103,7 +103,7 @@ class QuerySchedule {
   int64_t GetPerHostMemoryEstimate() const;
   int16_t GetPerHostVCores() const;
   // Total estimated memory for all nodes. set_num_hosts() must be set before calling.
-  int64_t GetTotalClusterMemory() const;
+  int64_t GetClusterMemoryEstimate() const;
 
   // Helper methods used by scheduler to populate this QuerySchedule.
   void AddScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
@@ -164,7 +164,7 @@ class QuerySchedule {
   int64_t num_backends_;
 
   // Total number of hosts. Used to compute the total cluster estimated memory
-  // in GetTotalClusterMemory().
+  // in GetClusterMemoryEstimate().
   int64_t num_hosts_;
 
   // Total number of scan ranges of this query.

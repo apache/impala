@@ -33,8 +33,13 @@ struct TPoolStats {
   // The current number of queued requests. This is an instantaneous value.
   2: required i64 num_queued;
 
-  // The current memory used (in bytes) by everything executing in this pool.
+  // The current memory used (in bytes) by everything executing in this pool on this
+  // backend.
   3: required i64 mem_usage;
+
+  // The sum of the cluster memory estimates from planning (in bytes) by all running
+  // requests in this pool.
+  4: required i64 mem_estimate;
 }
 
 // Structure serialised in the Impala backend topic. Each Impalad

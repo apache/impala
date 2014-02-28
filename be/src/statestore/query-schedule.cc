@@ -94,7 +94,7 @@ void QuerySchedule::CreateMiniLlamaMapping(const vector<string>& llama_nodes) {
   }
 }
 
-int64_t QuerySchedule::GetTotalClusterMemory() const {
+int64_t QuerySchedule::GetClusterMemoryEstimate() const {
   DCHECK_GT(num_hosts_, 0);
   const int64_t total_cluster_mem = GetPerHostMemoryEstimate() * num_hosts_;
   DCHECK_GE(total_cluster_mem, 0); // Assume total cluster memory fits in an int64_t.

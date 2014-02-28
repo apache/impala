@@ -151,14 +151,18 @@ class AdmissionController {
     Metrics::IntMetric* cluster_num_running;
     // The estimated total number of requests currently queued across the cluster.
     Metrics::IntMetric* cluster_in_queue;
-    // The estimated total amount of memory used by this pool across the cluster.
+    // Approximate total amount of memory used by this pool across the cluster.
     Metrics::BytesMetric* cluster_mem_usage;
+    // The sum of planner memory estimates for requests across the cluster.
+    Metrics::BytesMetric* cluster_mem_estimate;
     // The total number of queries currently running that were initiated locally.
     Metrics::IntMetric* local_num_running;
     // The total number of requests currently queued locally.
     Metrics::IntMetric* local_in_queue;
     // The total amount of memory used by this pool locally.
     Metrics::BytesMetric* local_mem_usage;
+    // The sum of planner memory estimates for requests that were started locally.
+    Metrics::BytesMetric* local_mem_estimate;
   };
 
   // Metrics subsystem access
@@ -191,12 +195,6 @@ class AdmissionController {
   // The set of local pools that have changed between topic updates that
   // need to be sent to the statestore.
   PoolSet pools_for_updates_;
-
-  // The sum of the mem usage estimates for all the running requests, per-pool.
-  // The local TPoolStats.mem_usage is set to the maximum of the estimate and the
-  // actual consumption by the per-pool mem tracker.
-  typedef boost::unordered_map<std::string, int64_t> PoolMemEstimates;
-  PoolMemEstimates local_mem_estimates_;
 
   // Mimics the statestore topic, i.e. stores a local copy of the logical data structure
   // that the statestore broadcasts. The local stats are not stored in this map because
