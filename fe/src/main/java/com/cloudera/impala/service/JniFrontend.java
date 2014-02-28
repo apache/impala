@@ -662,13 +662,16 @@ public class JniFrontend {
       errorCause.append(" is not enabled.\n");
     }
 
-    // dfs.client.file-block-storage-locations.timeout should be >= 500
-    // TODO: OPSAPS-12765 - it should be >= 3000, but use 500 for now until CM refresh
-    if (conf.getInt(DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT,
-        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_DEFAULT) < 500) {
+    // dfs.client.file-block-storage-locations.timeout.millis should be >= 500 seconds
+    // TODO: OPSAPS-12765 - it should be >= 3000 seconds, but use 500 seconds for now
+    //       until CM refresh
+    int dfsClientFileBlockStorageLocationsTimeoutMs = conf.getInt(
+        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS,
+        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS_DEFAULT);
+    if (dfsClientFileBlockStorageLocationsTimeoutMs < 500 * 1000) {
       errorCause.append(prefix);
-      errorCause.append(DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT);
-      errorCause.append(" is too low. It should be at least 3000.\n");
+      errorCause.append(DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS);
+      errorCause.append(" is too low. It should be at least 3000 seconds.\n");
     }
 
     if (errorCause.length() > 0) {

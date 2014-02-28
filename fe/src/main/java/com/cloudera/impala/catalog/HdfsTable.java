@@ -169,7 +169,7 @@ public class HdfsTable extends Table {
     // Initialize the diskId as -1 to indicate it is unknown
     int diskId = -1;
 
-    if (hdfsVolumeId != null && hdfsVolumeId.isValid()) {
+    if (hdfsVolumeId != null) {
       // TODO: this is a hack and we'll have to address this by getting the
       // public API. Also, we need to be very mindful of this when we change
       // the version of HDFS.
