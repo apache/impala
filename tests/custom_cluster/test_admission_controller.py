@@ -49,15 +49,19 @@ MAX_NUM_CONCURRENT_QUERIES = 5
 # The number of queries that can be queued in the pool POOL_NAME
 MAX_NUM_QUEUED_QUERIES = 10
 
-_IMPALAD_ARGS_WITH_FLAGS = ("-vmodule admission-controller=3 "
- "-default_pool_max_requests %s -default_pool_max_queued %s" %\
-  (MAX_NUM_CONCURRENT_QUERIES, MAX_NUM_QUEUED_QUERIES))
+# Mem limit (bytes) used in the mem limit test
+MEM_TEST_LIMIT = 100000 * 1024 * 1024
 
 _IMPALAD_ARGS_WITH_CONFIGS = ("-vmodule admission-controller=3 "
  "-fair_scheduler_allocation_path fair-scheduler-test2.xml "
  "-llama_site_path llama-site-test2.xml")
 
 _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s" % (STATESTORE_HEARTBEAT_MS)
+
+def impalad_admission_ctrl_flags(max_requests, max_queued, mem_limit):
+  return ("-vmodule admission-controller=3 -default_pool_max_requests %s "
+      "-default_pool_max_queued %s -default_pool_mem_limit %s" %\
+      (max_requests, max_queued, mem_limit))
 
 def log_metrics(log_prefix, metrics, log_level=logging.DEBUG):
   LOG.log(log_level, "%sadmitted=%s, queued=%s, dequeued=%s, rejected=%s, "\
@@ -273,7 +277,8 @@ class TestAdmissionController(CustomClusterTestSuite):
         client.close()
 
   class SubmitQueryThread(threading.Thread):
-    def __init__(self, impalad, pool_name, vector, query_num, executing_threads):
+    def __init__(self, impalad, additional_query_options, vector, query_num,
+        executing_threads):
       """
       executing_threads must be provided so that this thread can add itself when the
       query is admitted and begins execution.
@@ -281,7 +286,7 @@ class TestAdmissionController(CustomClusterTestSuite):
       super(self.__class__, self).__init__()
       self.executing_threads = executing_threads
       self.vector = vector
-      self.pool_name = pool_name
+      self.additional_query_options = additional_query_options
       self.query_num = query_num
       self.impalad = impalad
       self.error = None
@@ -307,7 +312,7 @@ class TestAdmissionController(CustomClusterTestSuite):
 
           exec_options = self.vector.get_value('exec_option')
           exec_options['debug_action'] = '0:GETNEXT:WAIT'
-          exec_options['request_pool'] = self.pool_name
+          exec_options.update(self.additional_query_options)
           query = QUERY % (self.query_num,)
           self.query_state = 'SUBMITTING'
           client = self.impalad.service.create_beeswax_client()
@@ -360,7 +365,7 @@ class TestAdmissionController(CustomClusterTestSuite):
         if client is not None:
           client.close()
 
-  def run_admission_test(self, vector):
+  def run_admission_test(self, vector, additional_query_options):
     LOG.debug("Starting test case with parameters: %s", vector)
     self.impalads = self.cluster.impalads
     round_robin_submission = vector.get_value('round_robin_submission')
@@ -379,8 +384,8 @@ class TestAdmissionController(CustomClusterTestSuite):
     # action.
     for query_num in xrange(1, num_queries + 1):
       impalad = self.impalads[query_num % len(self.impalads)]
-      thread = self.SubmitQueryThread(impalad, self.pool_name, vector, query_num,\
-          self.executing_threads)
+      thread = self.SubmitQueryThread(impalad, additional_query_options, vector,
+          query_num, self.executing_threads)
       thread.start()
       self.all_threads.append(thread)
       sleep(submission_delay_ms / 1000.0)
@@ -452,16 +457,36 @@ class TestAdmissionController(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=_IMPALAD_ARGS_WITH_FLAGS,
+      impalad_args=impalad_admission_ctrl_flags(MAX_NUM_CONCURRENT_QUERIES,
+        MAX_NUM_QUEUED_QUERIES, -1),
       statestored_args=_STATESTORED_ARGS)
   def test_admission_controller_with_flags(self, vector):
-    self.pool_name = "default-pool"
-    self.run_admission_test(vector)
+    self.pool_name = 'default-pool'
+    self.run_admission_test(vector, {'request_pool': self.pool_name})
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=_IMPALAD_ARGS_WITH_CONFIGS,
       statestored_args=_STATESTORED_ARGS)
   def test_admission_controller_with_configs(self, vector):
-    self.pool_name = "root.queueB"
-    self.run_admission_test(vector)
+    self.pool_name = 'root.queueB'
+    self.run_admission_test(vector, {'request_pool': self.pool_name})
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(MAX_NUM_CONCURRENT_QUERIES * 100,
+        MAX_NUM_QUEUED_QUERIES, MEM_TEST_LIMIT),
+      statestored_args=_STATESTORED_ARGS)
+  def test_mem_limit(self, vector):
+    self.pool_name = 'default-pool'
+    # Each query mem limit (set the query option to override the per-host memory
+    # estimate) should use a bit less than (total pool mem limit) / #queries so that
+    # once #queries are running, the total pool mem usage is about at the limit and
+    # additional incoming requests will be rejected. The actual pool limit on the number
+    # of running requests is very high so that requests are only queued/rejected due to
+    # the mem limit.
+    num_impalads = len(self.cluster.impalads)
+    query_mem_limit = (MEM_TEST_LIMIT / MAX_NUM_CONCURRENT_QUERIES / num_impalads) - 1
+    self.run_admission_test(vector,
+        {'request_pool': self.pool_name, 'mem_limit': query_mem_limit})
+
