@@ -33,21 +33,6 @@ void HdfsFsCache::Init() {
   HdfsFsCache::instance_.reset(new HdfsFsCache());
 }
 
-HdfsFsCache::~HdfsFsCache() {
-  // For some reason calling hdfsDisconnect() from fesupport causes a segfault, so just
-  // leak the connections.
-  if (FeTestInfo::is_fe_tests()) return;
-
-  for (HdfsFsMap::iterator i = fs_map_.begin(); i != fs_map_.end(); ++i) {
-    int status = hdfsDisconnect(i->second);
-    if (status != 0) {
-      string error_msg = GetStrErrMsg();
-      LOG(ERROR) << "hdfsDisconnect(\"" << i->first.first << "\", " << i->first.second
-                 << ") failed: " << error_msg;
-    }
-  }
-}
-
 hdfsFS HdfsFsCache::GetConnection(const string& host, int port) {
   lock_guard<mutex> l(lock_);
   HdfsFsMap::iterator i = fs_map_.find(make_pair(host, port));

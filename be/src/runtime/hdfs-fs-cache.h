@@ -25,18 +25,21 @@
 namespace impala {
 
 // A (process-wide) cache of hdfsFS objects.
-// These connections are shared across all threads and kept
-// open until the process terminates.
-// (Calls to hdfsDisconnect() by individual threads would terminate all
-// other connections handed out via hdfsConnect() to the same URI.)
+// These connections are shared across all threads and kept open until the process
+// terminates.
+//
+// These connections are leaked, i.e. we never call hdfsDisconnect(). Calls to
+// hdfsDisconnect() by individual threads would terminate all other connections handed
+// out via hdfsConnect() to the same URI, and there is no simple, safe way to call
+// hdfsDisconnect() when process terminates (the proper solution is likely to create a
+// signal handler to detect when the process is killed, but we would still leak when
+// impalad crashes).
 class HdfsFsCache {
  public:
   static HdfsFsCache* instance() { return HdfsFsCache::instance_.get(); }
 
   // Initializes the cache. Must be called before any other APIs.
   static void Init();
-
-  ~HdfsFsCache();
 
   // Get connection to default fs.
   hdfsFS GetDefaultConnection();
