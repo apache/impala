@@ -149,7 +149,8 @@ bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::Execute(
 
 template<typename RESULT, typename INTERMEDIATE>
 RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteSingleNode() {
-  boost::scoped_ptr<FunctionContext> context(FunctionContext::CreateTestContext());
+  std::vector<FunctionContext::TypeDesc> types; // TODO
+  boost::scoped_ptr<FunctionContext> context(FunctionContext::CreateTestContext(types));
   INTERMEDIATE intermediate =
       UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
           context.get(), fixed_buffer_byte_size_);
@@ -175,8 +176,10 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes) 
   std::vector<INTERMEDIATE> intermediates;
   contexts.resize(num_nodes);
 
+  std::vector<FunctionContext::TypeDesc> types; // TODO
+
   for (int i = 0; i < num_nodes; ++i) {
-    FunctionContext* cxt = FunctionContext::CreateTestContext();
+    FunctionContext* cxt = FunctionContext::CreateTestContext(types);
     contexts[i].reset(cxt);
     intermediates.push_back(UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
           cxt, fixed_buffer_byte_size_));
@@ -184,7 +187,8 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes) 
     if (!CheckContext(cxt)) return RESULT::null();
   }
 
-  boost::scoped_ptr<FunctionContext> merge_context(FunctionContext::CreateTestContext());
+  boost::scoped_ptr<FunctionContext> merge_context(
+      FunctionContext::CreateTestContext(types));
   INTERMEDIATE merged =
       UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
           merge_context.get(), fixed_buffer_byte_size_);
@@ -232,9 +236,11 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
   level1_contexts.resize(num1);
   level2_contexts.resize(num2);
 
+  std::vector<FunctionContext::TypeDesc> types; // TODO
+
   // Initialize the intermediate contexts and intermediate result buffers
   for (int i = 0; i < num1; ++i) {
-    FunctionContext* cxt = FunctionContext::CreateTestContext();
+    FunctionContext* cxt = FunctionContext::CreateTestContext(types);
     level1_contexts[i].reset(cxt);
     level1_intermediates.push_back(
         UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
@@ -243,7 +249,7 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
     if (!CheckContext(cxt)) return RESULT::null();
   }
   for (int i = 0; i < num2; ++i) {
-    FunctionContext* cxt = FunctionContext::CreateTestContext();
+    FunctionContext* cxt = FunctionContext::CreateTestContext(types);
     level2_contexts[i].reset(cxt);
     level2_intermediates.push_back(
         UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
@@ -253,7 +259,8 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
   }
 
   // Initialize the final context and final intermediate buffer
-  boost::scoped_ptr<FunctionContext> final_context(FunctionContext::CreateTestContext());
+  boost::scoped_ptr<FunctionContext> final_context(
+      FunctionContext::CreateTestContext(types));
   INTERMEDIATE final_intermediate =
       UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
           final_context.get(), fixed_buffer_byte_size_);

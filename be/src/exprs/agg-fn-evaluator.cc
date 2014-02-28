@@ -104,7 +104,6 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   DCHECK(output_slot_desc != NULL);
   DCHECK(output_slot_desc_ == NULL);
   output_slot_desc_ = output_slot_desc;
-  ctx_.reset(FunctionContextImpl::CreateContext(state, pool));
 
   RETURN_IF_ERROR(Expr::Prepare(input_exprs_, state, desc, false));
 
@@ -145,6 +144,13 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   } else {
     finalize_fn_ = NULL;
   }
+
+  vector<FunctionContext::TypeDesc> arg_types(input_exprs_.size());
+  for (int i = 0; i < input_exprs_.size(); ++i) {
+    AnyValUtil::ColumnTypeToTypeDesc(input_exprs_[i]->type(), &arg_types[i]);
+  }
+  ctx_.reset(FunctionContextImpl::CreateContext(state, pool, arg_types));
+
   return Status::OK;
 }
 

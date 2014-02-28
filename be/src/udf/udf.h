@@ -18,6 +18,7 @@
 
 #include <boost/cstdint.hpp>
 #include <string.h>
+#include <vector>
 
 // This is the only Impala header required to develop UDFs and UDAs. This header
 // contains the types that need to be used and the FunctionContext object. The context
@@ -62,6 +63,14 @@ class FunctionContext {
     TYPE_TIMESTAMP,
     TYPE_STRING,
     TYPE_FIXED_BUFFER,
+  };
+
+  struct TypeDesc {
+    Type type;
+
+    // Only valid if type == TYPE_DECIMAL
+    int precision;
+    int scale;
   };
 
   struct UniqueId {
@@ -119,6 +128,10 @@ class FunctionContext {
   void TrackAllocation(int64_t byte_size);
   void Free(int64_t byte_size);
 
+  // Returns the type information for the arg_idx-th argument (0-indexed, not including
+  // the FunctionContexts* argument). Returns NULL if arg_idx is invalid.
+  const TypeDesc* GetArgType(int arg_idx) const;
+
   // TODO: Do we need to add arbitrary key/value metadata. This would be plumbed
   // through the query. E.g. "select UDA(col, 'sample=true') from tbl".
   // const char* GetMetadata(const char*) const;
@@ -131,9 +144,10 @@ class FunctionContext {
   // use this. This is used internally.
   impala::FunctionContextImpl* impl() { return impl_; }
 
-  // Create a test FunctionContext object. The caller is responsible for calling delete
-  // on it. This context has additional debugging validation enabled.
-  static FunctionContext* CreateTestContext();
+  // Create a test FunctionContext object. 'arg_types' should contain a TypeDesc for each
+  // argument of the UDF not including the FunctionContext*. The caller is responsible
+  // for calling delete on it. This context has additional debugging validation enabled.
+  static FunctionContext* CreateTestContext(const std::vector<TypeDesc>& arg_types);
 
   ~FunctionContext();
 

@@ -366,3 +366,11 @@ select count(*) from functional.alltypessmall where No_Args() != 'string'
 BIGINT
 ---- RESULTS
 0
+====
+---- QUERY
+select validate_arg_type("dummy")
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====

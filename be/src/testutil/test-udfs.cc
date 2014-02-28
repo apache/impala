@@ -140,3 +140,12 @@ IntVal Fn2(FunctionContext*, const IntVal&, const StringVal&) { return IntVal::n
 TimestampVal ConstantTimestamp(FunctionContext* context) {
   return TimestampVal(2456575, 1); // 2013-10-09 00:00:00.000000001
 }
+
+BooleanVal ValidateArgType(FunctionContext* context, const StringVal& dummy) {
+  if (context->GetArgType(0)->type != FunctionContext::TYPE_STRING) {
+    return BooleanVal(false);
+  }
+  if (context->GetArgType(-1) != NULL) return BooleanVal(false);
+  if (context->GetArgType(1) != NULL) return BooleanVal(false);
+  return BooleanVal(true);
+}

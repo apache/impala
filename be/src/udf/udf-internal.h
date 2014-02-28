@@ -35,7 +35,8 @@ class RuntimeState;
 class FunctionContextImpl {
  public:
   // Create a FunctionContext. The caller is responsible for calling delete on it.
-  static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool);
+  static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool,
+      const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types);
 
   FunctionContextImpl(impala_udf::FunctionContext* parent);
 
@@ -88,6 +89,8 @@ class FunctionContextImpl {
   // particularly for existing codebases (e.g. they use std::vector). Instead, they'll
   // have to track those allocations manually.
   int64_t external_bytes_tracked_;
+
+  std::vector<impala_udf::FunctionContext::TypeDesc> arg_types_;
 };
 
 }

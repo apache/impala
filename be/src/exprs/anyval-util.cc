@@ -227,4 +227,42 @@ AnyVal* CreateAnyVal(ObjectPool* pool, const ColumnType& type) {
   }
 }
 
+void AnyValUtil::ColumnTypeToTypeDesc(
+    const ColumnType& type, FunctionContext::TypeDesc* out) {
+  switch (type.type) {
+    case TYPE_BOOLEAN:
+      out->type = FunctionContext::TYPE_BOOLEAN;
+      break;
+    case TYPE_TINYINT:
+      out->type = FunctionContext::TYPE_TINYINT;
+      break;
+    case TYPE_SMALLINT:
+      out->type = FunctionContext::TYPE_SMALLINT;
+      break;
+    case TYPE_INT:
+      out->type = FunctionContext::TYPE_INT;
+      break;
+    case TYPE_BIGINT:
+      out->type = FunctionContext::TYPE_BIGINT;
+      break;
+    case TYPE_FLOAT:
+      out->type = FunctionContext::TYPE_FLOAT;
+      break;
+    case TYPE_DOUBLE:
+      out->type = FunctionContext::TYPE_DOUBLE;
+      break;
+    case TYPE_TIMESTAMP:
+      out->type = FunctionContext::TYPE_TIMESTAMP;
+      break;
+    case TYPE_STRING:
+      out->type = FunctionContext::TYPE_STRING;
+      break;
+    case TYPE_CHAR:
+      out->type = FunctionContext::TYPE_FIXED_BUFFER;
+      break;
+    default:
+      DCHECK(false) << "Unknown type: " << type;
+  }
+}
+
 }

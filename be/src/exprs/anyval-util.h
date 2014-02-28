@@ -119,6 +119,9 @@ class AnyValUtil {
         return 0;
     }
   }
+
+  static void ColumnTypeToTypeDesc(
+      const ColumnType& type, FunctionContext::TypeDesc* out);
 };
 
 // Class for handling AnyVal subclasses during codegen. Codegen functions should use this

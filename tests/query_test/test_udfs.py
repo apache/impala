@@ -150,6 +150,7 @@ drop function if exists {database}.var_sum(double...);
 drop function if exists {database}.var_sum(string...);
 drop function if exists {database}.var_sum_multiply(double, int...);
 drop function if exists {database}.constant_timestamp();
+drop function if exists {database}.validate_arg_type(string);
 
 create database if not exists {database};
 
@@ -209,4 +210,7 @@ symbol='_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_
 
 create function {database}.constant_timestamp() returns timestamp
 location '{location}' symbol='ConstantTimestamp';
+
+create function {database}.validate_arg_type(string) returns boolean
+location '{location}' symbol='ValidateArgType';
 """

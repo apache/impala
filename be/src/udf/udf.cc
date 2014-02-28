@@ -73,18 +73,21 @@ using namespace std;
 static const int MAX_WARNINGS = 1000;
 
 // Create a FunctionContext. The caller is responsible for calling delete on it.
-FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool) {
+FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool,
+    const vector<FunctionContext::TypeDesc>& arg_types) {
   impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
   ctx->impl_->state_ = state;
   ctx->impl_->pool_ = new FreePool(pool);
+  ctx->impl_->arg_types_ = arg_types;
   return ctx;
 }
 
-FunctionContext* FunctionContext::CreateTestContext() {
+FunctionContext* FunctionContext::CreateTestContext(const vector<TypeDesc>& arg_types) {
   FunctionContext* context = new FunctionContext;
   context->impl()->debug_ = true;
   context->impl()->state_ = NULL;
   context->impl()->pool_ = new FreePool(NULL);
+  context->impl()->arg_types_ = arg_types;
   return context;
 }
 
@@ -195,6 +198,11 @@ bool FunctionContext::AddWarning(const char* warning_msg) {
     cerr << ss.str() << endl;
     return true;
   }
+}
+
+const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const {
+  if (arg_idx < 0 || arg_idx >= impl_->arg_types_.size()) return NULL;
+  return &impl_->arg_types_[arg_idx];
 }
 
 uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {
