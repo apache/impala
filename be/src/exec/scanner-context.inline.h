@@ -30,6 +30,10 @@ using namespace impala;
 // (i.e. single int) of bytes.
 inline bool ScannerContext::Stream::GetBytes(int requested_len, uint8_t** buffer,
     int* out_len, Status* status, bool peek) {
+  if (UNLIKELY(requested_len < 0)) {
+    *status = ReportInvalidRead(requested_len);
+    return false;
+  }
   if (UNLIKELY(requested_len == 0)) {
     *out_len = 0;
     return true;
@@ -51,10 +55,6 @@ inline bool ScannerContext::Stream::GetBytes(int requested_len, uint8_t** buffer
 
 inline bool ScannerContext::Stream::ReadBytes(
     int length, uint8_t** buf, Status* status, bool peek) {
-  if (UNLIKELY(length < 0)) {
-    *status = Status("Negative length");
-    return false;
-  }
   int bytes_read;
   RETURN_IF_FALSE(GetBytes(length, buf, &bytes_read, status, peek));
   if (UNLIKELY(length != bytes_read)) {
@@ -65,7 +65,7 @@ inline bool ScannerContext::Stream::ReadBytes(
   return true;
 }
 
-// TODO: consider implementing a Skip in the context/stream object that's more 
+// TODO: consider implementing a Skip in the context/stream object that's more
 // efficient than GetBytes.
 inline bool ScannerContext::Stream::SkipBytes(int length, Status* status) {
   uint8_t* dummy_buf;
@@ -123,7 +123,7 @@ inline bool ScannerContext::Stream::ReadVLong(int64_t* value, Status* status) {
     *status = Status("ReadVLong: size is too big");
     return false;
   }
-  
+
   if (len == 1) {
     *value = static_cast<int64_t>(*firstbyte);
     return true;

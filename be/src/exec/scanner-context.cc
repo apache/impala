@@ -27,6 +27,12 @@ using namespace std;
 
 static const int DEFAULT_READ_PAST_SIZE = 1024; // in bytes
 
+// We always want output_buffer_bytes_left_ to be non-NULL, so we can avoid a NULL check
+// in GetBytes(). We use this variable, which is set to 0, to initialize
+// output_buffer_bytes_left_. After the first successful call to GetBytes(),
+// output_buffer_bytes_left_ will be set to something else.
+static const int OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
+
 ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
     HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range)
   : state_(state),
@@ -59,7 +65,7 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   stream->io_buffer_bytes_left_ = 0;
   stream->boundary_buffer_bytes_left_ = 0;
   stream->output_buffer_pos_ = NULL;
-  stream->output_buffer_bytes_left_ = &stream->io_buffer_bytes_left_;
+  stream->output_buffer_bytes_left_ = const_cast<int*>(&OUTPUT_BUFFER_BYTES_LEFT_INIT);
   stream->compact_data_ = scan_node_->compact_data();
   streams_.push_back(stream);
   return stream;
@@ -154,6 +160,8 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int* l
   }
 
   if (boundary_buffer_bytes_left_ > 0) {
+    DCHECK_EQ(output_buffer_pos_, &boundary_buffer_pos_);
+    DCHECK_EQ(output_buffer_bytes_left_, &boundary_buffer_bytes_left_);
     *out_buffer = boundary_buffer_pos_;
     // Don't return more bytes past eosr
     *len = min(static_cast<int64_t>(boundary_buffer_bytes_left_), bytes_left());
@@ -167,8 +175,11 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int* l
   }
 
   if (io_buffer_bytes_left_ == 0) {
-    output_buffer_pos_ = &io_buffer_pos_;
+    // We're at the end of the boundary buffer and the current IO buffer. Get a new IO
+    // buffer and set the current buffer to it.
     RETURN_IF_ERROR(GetNextBuffer());
+    output_buffer_pos_ = &io_buffer_pos_;
+    output_buffer_bytes_left_ = &io_buffer_bytes_left_;
   }
   DCHECK(io_buffer_ != NULL);
 
@@ -257,6 +268,13 @@ Status ScannerContext::Stream::ReportIncompleteRead(int length, int bytes_read) 
   stringstream ss;
   ss << "Tried to read " << length << " bytes but could only read "
      << bytes_read << " bytes. This may indicate data file corruption. "
+     << "(file: " << filename() << ", byte offset: " << file_offset() << ")";
+  return Status(ss.str());
+}
+
+Status ScannerContext::Stream::ReportInvalidRead(int length) {
+  stringstream ss;
+  ss << "Invalid read of " << length << " bytes. This may indicate data file corruption. "
      << "(file: " << filename() << ", byte offset: " << file_offset() << ")";
   return Status(ss.str());
 }

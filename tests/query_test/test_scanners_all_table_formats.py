@@ -36,6 +36,30 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/scanners', new_vector)
 
+# Test all the scanners with a simple limit clause. The limit clause triggers
+# cancellation in the scanner code paths.
+class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestScannersAllTableFormatsWithLimit, cls).add_test_dimensions()
+    # Exhaustively generate all table format vectors. This can still be overridden
+    # using the --table_formats flag.
+    cls.TestMatrix.add_dimension(cls.create_table_info_dimension('exhaustive'))
+
+  def test_limit(self, vector):
+    # Use a small batch size so changing the limit affects the timing of cancellation
+    vector.get_value('exec_option')['batch_size'] = 100
+    iterations = 50
+    query_template = "select * from alltypes limit %s"
+    for i in range(1, iterations):
+      # Vary the limit to vary the timing of cancellation
+      query = query_template % ((iterations * 100) % 1000 + 1)
+      self.execute_query(query, vector.get_value('exec_option'),
+          table_format=vector.get_value('table_format'))
 
 # Test case to verify the scanners work properly when the table metadata (specifically the
 # number of columns in the table) does not match the number of columns in the data file.

@@ -196,8 +196,11 @@ class ScannerContext {
     int boundary_buffer_bytes_left_;
 
     // Points to either io_buffer_pos_ or boundary_buffer_pos_
+    // (initialized to NULL before calling GetBytes())
     uint8_t** output_buffer_pos_;
+
     // Points to either io_buffer_bytes_left_ or boundary_buffer_bytes_left_
+    // (initialized to a static zero-value int before calling GetBytes())
     int* output_buffer_bytes_left_;
 
     // List of buffers that are completed but still have bytes referenced by the caller.
@@ -228,8 +231,9 @@ class ScannerContext {
     // Attach all completed io buffers and the boundary mem pool to batch.
     void AttachCompletedResources(RowBatch* batch, bool done);
 
-    // Error-reporting function used by ReadBytes and SkipBytes.
+    // Error-reporting functions.
     Status ReportIncompleteRead(int length, int bytes_read);
+    Status ReportInvalidRead(int length);
   };
 
   Stream* GetStream(int idx = 0) {
