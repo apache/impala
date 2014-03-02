@@ -108,12 +108,10 @@ public class AggregateInfo {
         (groupingExprs != null
           ? Expr.cloneList(groupingExprs, null)
           : new ArrayList<Expr>());
-    Expr.removeDuplicates(groupingExprs_);
     aggregateExprs_ =
         (aggExprs != null
           ? Expr.cloneList(aggExprs, null)
           : new ArrayList<FunctionCallExpr>());
-    Expr.removeDuplicates(aggregateExprs_);
   }
 
   /**
@@ -132,6 +130,8 @@ public class AggregateInfo {
     Preconditions.checkState(
         (groupingExprs != null && !groupingExprs.isEmpty())
         || (aggExprs != null && !aggExprs.isEmpty()));
+    Expr.removeDuplicates(groupingExprs);
+    Expr.removeDuplicates(aggExprs);
     AggregateInfo result = new AggregateInfo(groupingExprs, aggExprs, false);
 
     // collect agg exprs with DISTINCT clause

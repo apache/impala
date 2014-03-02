@@ -606,6 +606,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
         + "sum(distinct int_col) from functional.alltypesagg group by 1");
     AnalyzesOk("select avg(DISTINCT(tinyint_col)) from functional.alltypesagg");
+
+    // SUM(DISTINCT) and AVG(DISTINCT) with duplicate grouping exprs (IMPALA-847).
+    AnalyzesOk("select sum(distinct t1.bigint_col), avg(distinct t1.bigint_col) " +
+        "from functional.alltypes t1 group by t1.int_col, t1.int_col");
+
     AnalysisError("select tinyint_col, count(distinct int_col),"
         + "sum(distinct bigint_col) from functional.alltypesagg group by 1",
         "all DISTINCT aggregate functions need to have the same set of parameters");
