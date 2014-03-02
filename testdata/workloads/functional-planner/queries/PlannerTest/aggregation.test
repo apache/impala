@@ -121,3 +121,24 @@ having (int_col * int_col) < 0 limit 10
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=743.67KB
 ====
+# Tests that a having predicate triggers slot materialization (IMPALA-846).
+select count(*) from
+functional.alltypes t1 inner join functional.alltypestiny t2
+  on t1.smallint_col = t2.smallint_col
+group by t1.tinyint_col, t2.smallint_col
+having count(t2.int_col) = count(t1.bigint_col)
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: count(*), count(t2.int_col), count(t1.bigint_col)
+|  group by: t1.tinyint_col, t2.smallint_col
+|  having: count(t2.int_col) = count(t1.bigint_col)
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.smallint_col = t2.smallint_col
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 size=460B compact
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 size=478.45KB
+====
