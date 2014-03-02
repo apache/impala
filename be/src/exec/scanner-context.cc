@@ -130,7 +130,7 @@ Status ScannerContext::Stream::GetNextBuffer(int read_past_size) {
     // TODO: we're reading past this scan range so this is likely a remote read.
     // Update when the IoMgr has better support for remote reads.
     DiskIoMgr::ScanRange* range = parent_->scan_node_->AllocateScanRange(
-        filename(), read_past_buffer_size, offset, -1, scan_range_->disk_id());
+        filename(), read_past_buffer_size, offset, -1, scan_range_->disk_id(), false);
     RETURN_IF_ERROR(parent_->state_->io_mgr()->Read(
         parent_->scan_node_->reader_context(), range, &io_buffer_));
   }

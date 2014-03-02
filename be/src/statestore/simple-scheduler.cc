@@ -315,7 +315,7 @@ void SimpleScheduler::UpdateMembership(
       Status status = thrift_serializer_.Serialize(&backend_descriptor_, &item.value);
       if (!status.ok()) {
         LOG(WARNING) << "Failed to serialize Impala backend address for statestore topic: "
-                  << status.GetErrorMsg();
+                     << status.GetErrorMsg();
         subscriber_topic_updates->pop_back();
       }
     }
@@ -409,7 +409,8 @@ Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec
     FragmentScanRangeAssignment* assignment =
         &schedule->exec_params()[fragment_idx].scan_range_assignment;
     RETURN_IF_ERROR(ComputeScanRangeAssignment(
-        entry->first, entry->second, exec_at_coord, assignment));
+        entry->first, entry->second, exec_at_coord, schedule->query_options(),
+        assignment));
     schedule->AddScanRanges(entry->second.size());
   }
   return Status::OK;
@@ -417,7 +418,16 @@ Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec
 
 Status SimpleScheduler::ComputeScanRangeAssignment(
     PlanNodeId node_id, const vector<TScanRangeLocations>& locations, bool exec_at_coord,
-    FragmentScanRangeAssignment* assignment) {
+    const TQueryOptions& query_options, FragmentScanRangeAssignment* assignment) {
+  // If cached reads are enabled, we will always prefer cached replicas over non-cached
+  // replicas. Since it is likely that only one replica is cached, this could generate
+  // hotspots which is why this is controllable by a query option.
+  //
+  // We schedule greedily in this order:
+  // cached collocated replicas > collocated replicas > remote (cached or not) replicas.
+  // The query option to disable cached reads removes the first group.
+  bool schedule_with_caching = !query_options.disable_cached_reads;
+
   // map from datanode host to total assigned bytes;
   // If the data node does not have a collocated impalad, the actual assigned bytes is
   // "total assigned - numeric_limits<int64_t>::max()".
@@ -425,21 +435,39 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
   unordered_set<TNetworkAddress> remote_hosts;
   int64_t remote_bytes = 0L;
   int64_t local_bytes = 0L;
+  int64_t cached_bytes = 0L;
+
   BOOST_FOREACH(const TScanRangeLocations& scan_range_locations, locations) {
     // assign this scan range to the host w/ the fewest assigned bytes
     uint64_t min_assigned_bytes = numeric_limits<uint64_t>::max();
     const TNetworkAddress* data_host = NULL;  // data server; not necessarily backend
     int volume_id = -1;
+    bool is_cached = false;
     BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
       // Deprioritize non-collocated datanodes by assigning a very high initial bytes
       uint64_t initial_bytes =
           (!HasLocalBackend(location.server)) ? numeric_limits<int64_t>::max() : 0L;
       uint64_t* assigned_bytes =
           FindOrInsert(&assigned_bytes_per_host, location.server, initial_bytes);
-      if (*assigned_bytes < min_assigned_bytes) {
+
+      // Adjust whether or not this replica should count as being cached based on
+      // the query option and whether it is collocated. If the DN is not collocated
+      // treat the replica as not cached (network transfer dominates anyway in this
+      // case).
+      // TODO: measure this in a cluster setup. Are remote reads better with caching?
+      bool is_replica_cached = location.is_cached && schedule_with_caching;
+      if (initial_bytes != 0) is_replica_cached = false;
+
+      // We've found a cached replica and this one is not, skip this replica.
+      if (is_cached && !is_replica_cached) continue;
+
+      // Update the assignment if this is the first cached replica or if this is
+      // a less busy host.
+      if ((is_replica_cached && !is_cached) || *assigned_bytes < min_assigned_bytes) {
         min_assigned_bytes = *assigned_bytes;
         data_host = &location.server;
         volume_id = location.volume_id;
+        is_cached = is_replica_cached;
       }
     }
 
@@ -453,6 +481,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
       remote_hosts.insert(*data_host);
     } else {
       local_bytes += scan_range_length;
+      if (is_cached) cached_bytes += scan_range_length;
     }
     assigned_bytes_per_host[*data_host] += scan_range_length;
 
@@ -475,8 +504,9 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     // add scan range
     TScanRangeParams scan_range_params;
     scan_range_params.scan_range = scan_range_locations.scan_range;
-    // Volume is optional, so we need to set the value and the is-set bit
+    // Explicitly set the optional fields.
     scan_range_params.__set_volume_id(volume_id);
+    scan_range_params.__set_is_cached(is_cached);
     scan_range_params_list->push_back(scan_range_params);
   }
 
@@ -485,6 +515,8 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
         PrettyPrinter::Print(remote_bytes, TCounterType::BYTES);
     VLOG_FILE << "Total local scan volume = " <<
         PrettyPrinter::Print(local_bytes, TCounterType::BYTES);
+    VLOG_FILE << "Total cached scan volume = " <<
+        PrettyPrinter::Print(cached_bytes, TCounterType::BYTES);
     if (remote_hosts.size() > 0) {
       stringstream remote_node_log;
       remote_node_log << "Remote data node list: ";

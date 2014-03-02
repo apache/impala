@@ -76,6 +76,11 @@ struct TQueryOptions {
   // Max time in milliseconds the resource broker should wait for
   // a resource request to be granted by Llama/Yarn (only relevant with RM).
   22: optional i64 reservation_request_timeout
+
+  // Disables taking advantage of HDFS caching. This has two parts:
+  // 1. disable preferring to schedule to cached replicas
+  // 2. disable the cached read path.
+  23: optional bool disable_cached_reads = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

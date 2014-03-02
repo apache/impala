@@ -227,6 +227,7 @@ class DiskIoMgr {
     int64_t offset() const { return offset_; }
     void* meta_data() const { return meta_data_; }
     int disk_id() const { return disk_id_; }
+    bool try_cache() const { return try_cache_; }
     int ready_buffers_capacity() const { return ready_buffers_capacity_; }
 
     void set_len(int64_t len) { len_ = len; }

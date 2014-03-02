@@ -132,6 +132,9 @@ enum TImpalaQueryOptions {
   // Max time in milliseconds the resource broker should wait for
   // a resource request to be granted by Llama/Yarn (only relevant with RM).
   RESERVATION_REQUEST_TIMEOUT,
+
+  // if true, disables cached reads
+  DISABLE_CACHED_READS,
 }
 
 // The summary of an insert.

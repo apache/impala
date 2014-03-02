@@ -152,14 +152,14 @@ Status HdfsScanNode::CreateConjuncts(vector<Expr*>* expr, bool disable_codegen) 
 }
 
 DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t len,
-    int64_t offset, int64_t partition_id, int disk_id) {
+    int64_t offset, int64_t partition_id, int disk_id, bool try_cache) {
   DCHECK_GE(disk_id, -1);
   if (disk_id == -1) {
     // disk id is unknown, assign it a random one.
     static int next_disk_id = 0;
     disk_id = next_disk_id++;
-
   }
+
   // TODO: we need to parse the config for the number of dirs configured for this
   // data node.
   disk_id %= runtime_state_->io_mgr()->num_disks();
@@ -168,8 +168,7 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
       runtime_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id));
   DiskIoMgr::ScanRange* range =
       runtime_state_->obj_pool()->Add(new DiskIoMgr::ScanRange());
-  range->Reset(file, len, offset, disk_id, false, metadata);
-
+  range->Reset(file, len, offset, disk_id, try_cache, metadata);
   return range;
 }
 
@@ -408,9 +407,14 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       ++num_ranges_missing_volume_id;
     }
 
+    bool try_cache = (*scan_range_params_)[i].is_cached;
+    if (runtime_state_->query_options().disable_cached_reads) {
+      DCHECK(!try_cache) << "Params should not have had this set.";
+    }
     file_desc->splits.push_back(
         AllocateScanRange(file_desc->filename.c_str(), split.length, split.offset,
-                          split.partition_id, (*scan_range_params_)[i].volume_id));
+                          split.partition_id, (*scan_range_params_)[i].volume_id,
+                          try_cache));
   }
 
   // Prepare all the partitions scanned by the scan node
@@ -500,6 +504,8 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   bytes_read_local_ = ADD_COUNTER(runtime_profile(), "BytesReadLocal",
       TCounterType::BYTES);
   bytes_read_short_circuit_ = ADD_COUNTER(runtime_profile(), "BytesReadShortCircuit",
+      TCounterType::BYTES);
+  bytes_read_dn_cache_ = ADD_COUNTER(runtime_profile(), "BytesReadDataNodeCache",
       TCounterType::BYTES);
 
   // Create num_disks+1 bucket counters
@@ -842,6 +848,14 @@ void HdfsScanNode::StopAndFinalizeCounters() {
     bytes_read_local_->Set(runtime_state_->io_mgr()->bytes_read_local(reader_context_));
     bytes_read_short_circuit_->Set(
         runtime_state_->io_mgr()->bytes_read_short_circuit(reader_context_));
+    bytes_read_dn_cache_->Set(
+        runtime_state_->io_mgr()->bytes_read_dn_cache(reader_context_));
+
+    ImpaladMetrics::IO_MGR_BYTES_READ->Increment(bytes_read_counter()->value());
+    ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ->Increment(
+        bytes_read_local_->value());
+    ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ->Increment(
+        bytes_read_short_circuit_->value());
   }
 }
 

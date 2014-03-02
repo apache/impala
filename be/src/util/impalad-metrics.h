@@ -74,6 +74,15 @@ class ImpaladMetricKeys {
   // Number of IO buffers that are currently unused (and can be GC'ed)
   static const char* IO_MGR_NUM_UNUSED_BUFFERS;
 
+  // Total number of bytes read by the io mgr
+  static const char* IO_MGR_BYTES_READ;
+
+  // Total number of local bytes read by the io mgr
+  static const char* IO_MGR_LOCAL_BYTES_READ;
+
+  // Total number of short-circuit bytes read by the io mgr
+  static const char* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
+
   // Number of DBs in the catalog
   static const char* CATALOG_NUM_DBS;
 
@@ -124,6 +133,9 @@ class ImpaladMetrics {
   static Metrics::IntMetric* IO_MGR_NUM_BUFFERS;
   static Metrics::IntMetric* IO_MGR_TOTAL_BYTES;
   static Metrics::IntMetric* IO_MGR_NUM_UNUSED_BUFFERS;
+  static Metrics::BytesMetric* IO_MGR_BYTES_READ;
+  static Metrics::BytesMetric* IO_MGR_LOCAL_BYTES_READ;
+  static Metrics::BytesMetric* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
   static Metrics::IntMetric* CATALOG_NUM_DBS;
   static Metrics::IntMetric* CATALOG_NUM_TABLES;
   static Metrics::BooleanMetric* CATALOG_READY;

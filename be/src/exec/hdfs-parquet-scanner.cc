@@ -54,6 +54,7 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       // Since Parquet scanners always read entire files, only read a file if we're
       // assigned the first split to avoid reading multi-block files with multiple
       // scanners.
+      // We only process the split that starts at offset 0.
       if (split->offset() != 0) {
         // We are expecting each file to be one hdfs block (so all the scan range offsets
         // should be 0).  This is not incorrect but we will issue a warning.
@@ -73,10 +74,10 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       int64_t footer_start = files[i]->file_length - footer_size;
 
       ScanRangeMetadata* metadata =
-          reinterpret_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
+          reinterpret_cast<ScanRangeMetadata*>(split->meta_data());
       DiskIoMgr::ScanRange* footer_range = scan_node->AllocateScanRange(
           files[i]->filename.c_str(), footer_size,
-          footer_start, metadata->partition_id, files[i]->splits[0]->disk_id());
+          footer_start, metadata->partition_id, split->disk_id(), split->try_cache());
       footer_ranges.push_back(footer_range);
     }
   }
@@ -856,7 +857,7 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
 
     DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
         metadata_range_->file(), col_len, col_start, file_col_idx,
-        metadata_range_->disk_id());
+        metadata_range_->disk_id(), metadata_range_->try_cache());
     col_ranges.push_back(col_range);
 
     // Get the stream that will be used for this column

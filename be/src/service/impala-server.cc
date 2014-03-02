@@ -936,6 +936,10 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::RESERVATION_REQUEST_TIMEOUT:
         query_options->__set_reservation_request_timeout(atoi(value.c_str()));
         break;
+      case TImpalaQueryOptions::DISABLE_CACHED_READS:
+        query_options->__set_disable_cached_reads(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1205,6 +1209,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::RESERVATION_REQUEST_TIMEOUT:
         val << query_option.reservation_request_timeout;
+        break;
+      case TImpalaQueryOptions::DISABLE_CACHED_READS:
+        val << query_option.disable_cached_reads;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

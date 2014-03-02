@@ -222,7 +222,7 @@ class SimpleScheduler : public Scheduler {
   // If exec_at_coord is true, all scan ranges will be assigned to the coord node.
   Status ComputeScanRangeAssignment(PlanNodeId node_id,
       const std::vector<TScanRangeLocations>& locations, bool exec_at_coord,
-      FragmentScanRangeAssignment* assignment);
+      const TQueryOptions& query_options, FragmentScanRangeAssignment* assignment);
 
   // Populates fragment_exec_params_ in schedule.
   void ComputeFragmentExecParams(const TQueryExecRequest& exec_request,

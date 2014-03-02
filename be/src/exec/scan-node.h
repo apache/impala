@@ -32,7 +32,7 @@ class TScanRange;
 //     as a time series that samples the counter.
 //
 //   TotalRawReadTime - it measures the total time spent in underlying reads.
-//     For HDFS files, this is the time in the disk-io-mgr's reading threads for 
+//     For HDFS files, this is the time in the disk-io-mgr's reading threads for
 //     this node. For example, if we have 3 reading threads and each spent
 //     1 sec, this counter will report 3 sec.
 //     For HBase, this is the time spent in the region server.
@@ -50,11 +50,6 @@ class TScanRange;
 //   AverageScannerThreadConcurrency - the average number of active scanner threads. A
 //     scanner thread is considered active if it is not blocked by IO. This number would
 //     be low (less than 1) for IO-bound queries. For cpu-bound queries, this number
-//     would be close to the max scanner threads allowed.
-//
-//   AverageScannerThreadConcurrency - the average number of active scanner threads. A
-//     scanner thread is considered active if it is not blocked by IO. This number would
-//     be low (less than 1) for IO bounded queries. For cpu bounded queries, this number
 //     would be close to the max scanner threads allowed.
 //
 //   AverageHdfsReadThreadConcurrency - the average number of active hdfs reading threads

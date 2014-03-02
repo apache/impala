@@ -170,7 +170,7 @@ class HdfsScanNode : public ScanNode {
   // Allocate a new scan range object, stored in the runtime state's object pool.
   // This is thread safe.
   DiskIoMgr::ScanRange* AllocateScanRange(const char* file, int64_t len, int64_t offset,
-      int64_t partition_id, int disk_id);
+      int64_t partition_id, int disk_id, bool try_cache);
 
   // Adds ranges to the io mgr queue and starts up new scanner threads if possible.
   Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges);
@@ -377,6 +377,9 @@ class HdfsScanNode : public ScanNode {
 
   // Total number of bytes read via short circuit read
   RuntimeProfile::Counter* bytes_read_short_circuit_;
+
+  // Total number of bytes read from data node cache
+  RuntimeProfile::Counter* bytes_read_dn_cache_;
 
   // Lock protects access between scanner thread and main query thread (the one calling
   // GetNext()) for all fields below.  If this lock and any other locks needs to be taken
