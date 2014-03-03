@@ -24,8 +24,7 @@
 #include "runtime/exec-env.h"
 #include "service/impala-server.h"
 
-using namespace ::apache::thrift::server;
-using namespace ::apache::thrift::transport;
+using namespace apache::thrift;
 
 using namespace std;
 using namespace boost;

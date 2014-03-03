@@ -64,7 +64,6 @@ using namespace std;
 using namespace boost;
 using namespace boost::accumulators;
 using namespace boost::filesystem;
-using namespace apache::thrift::transport;
 using namespace apache::thrift;
 
 DECLARE_int32(be_port);
@@ -876,7 +875,7 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   try {
     try {
       backend_client->ExecPlanFragment(thrift_result, exec_state->rpc_params);
-    } catch (TTransportException& e) {
+    } catch (const TException& e) {
       // If a backend has stopped and restarted (without the failure detector
       // picking it up) an existing backend client may still think it is
       // connected. To avoid failing the first query after every failure, catch
@@ -890,7 +889,7 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
       }
       backend_client->ExecPlanFragment(thrift_result, exec_state->rpc_params);
     }
-  } catch (TTransportException& e) {
+  } catch (const TException& e) {
     stringstream msg;
     msg << "ExecPlanRequest rpc query_id=" << query_id_
         << " instance_id=" << exec_state->fragment_instance_id
@@ -974,7 +973,7 @@ void Coordinator::CancelRemoteFragments() {
                  << exec_state->backend_address;
       try {
         backend_client->CancelPlanFragment(res, params);
-      } catch (TTransportException& e) {
+      } catch (const TException& e) {
         VLOG_RPC << "Retrying CancelPlanFragment: " << e.what();
         Status status = backend_client.Reopen();
         if (!status.ok()) {
@@ -983,7 +982,7 @@ void Coordinator::CancelRemoteFragments() {
         }
         backend_client->CancelPlanFragment(res, params);
       }
-    } catch (TTransportException& e) {
+    } catch (const TException& e) {
       stringstream msg;
       msg << "CancelPlanFragment rpc query_id=" << query_id_
           << " instance_id=" << exec_state->fragment_instance_id

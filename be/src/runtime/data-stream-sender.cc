@@ -202,7 +202,7 @@ void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
       SCOPED_TIMER(parent_->thrift_transmit_timer_);
       try {
         client->TransmitData(res, params);
-      } catch (TTransportException& e) {
+      } catch (const TException& e) {
         VLOG_RPC << "Retrying TransmitData: " << e.what();
         rpc_status_ = client.Reopen();
         if (!rpc_status_.ok()) {
@@ -309,7 +309,7 @@ Status DataStreamSender::Channel::CloseInternal() {
     VLOG_RPC << "calling TransmitData to close channel";
     try {
       client->TransmitData(res, params);
-    } catch (TTransportException& e) {
+    } catch (const TException& e) {
       VLOG_RPC << "Retrying TransmitData: " << e.what();
       rpc_status_ = client.Reopen();
       if (!rpc_status_.ok()) {

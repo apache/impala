@@ -34,8 +34,7 @@
 using namespace std;
 using namespace boost;
 using namespace boost::posix_time;
-using namespace ::apache::thrift;
-using namespace ::apache::thrift::transport;
+using namespace apache::thrift;
 using namespace strings;
 
 DEFINE_int32(statestore_subscriber_timeout_seconds, 30, "The amount of time (in seconds)"
@@ -144,12 +143,12 @@ Status StatestoreSubscriber::Register() {
   TRegisterSubscriberResponse response;
   try {
     client->RegisterSubscriber(response, request);
-  } catch (apache::thrift::transport::TTransportException& e) {
+  } catch (const TException& e) {
     // Client may have been closed due to a failure
     RETURN_IF_ERROR(client.Reopen());
     try {
       client->RegisterSubscriber(response, request);
-    } catch (apache::thrift::transport::TTransportException& e) {
+    } catch (const TException& e) {
       return Status(e.what());
     }
   }

@@ -25,10 +25,12 @@
 #include "util/webserver.h"
 
 #include <boost/thread.hpp>
+#include <thrift/Thrift.h>
 
 using namespace impala;
 using namespace std;
 using namespace boost;
+using namespace apache::thrift;
 
 DEFINE_int32(statestore_max_missed_heartbeats, 10, "Maximum number of consecutive "
     "heartbeats an impalad can miss before being declared failed by the "
@@ -356,12 +358,12 @@ Status Statestore::ProcessOneSubscriber(Subscriber* subscriber, bool* heartbeat_
   // TODO: Rework the client-cache API so that this dance isn't necessary.
   try {
     client->UpdateState(response, update_state_request);
-  } catch (apache::thrift::transport::TTransportException& e) {
+  } catch (const TException& e) {
     // Client may have been closed due to a failure
     RETURN_IF_ERROR(client.Reopen());
     try {
       client->UpdateState(response, update_state_request);
-    } catch (apache::thrift::transport::TTransportException& e) {
+    } catch (const TException& e) {
       return Status(e.what());
     }
   }

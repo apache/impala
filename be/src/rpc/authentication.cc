@@ -24,7 +24,7 @@
 #include <gutil/strings/substitute.h>
 #include <string>
 #include <vector>
-
+#include <thrift/Thrift.h>
 #include <transport/TSasl.h>
 #include <transport/TSaslServerTransport.h>
 #include <glog/logging.h>
@@ -44,6 +44,7 @@
 #include "util/thread.h"
 #include "util/time.h"
 
+using namespace apache::thrift;
 using namespace std;
 using namespace strings;
 using namespace boost;
@@ -409,7 +410,7 @@ Status KerberosAuthProvider::GetServerTransportFactory(
     map<string, string> sasl_props;
     factory->reset(new TSaslServerTransport::Factory(
         KERBEROS_MECHANISM, service_name_, hostname_, 0, sasl_props, SASL_CALLBACKS));
-  } catch (TTransportException& e) {
+  } catch (const TException& e) {
     LOG(ERROR) << "Failed to create a Kerberos transport factory: " << e.what();
     return Status(e.what());
   }
@@ -490,19 +491,14 @@ Status LdapAuthProvider::Start() {
 
 Status LdapAuthProvider::GetServerTransportFactory(
     shared_ptr<TTransportFactory>* factory) {
-  try {
-    // TSaslServerTransport::Factory doesn't actually do anything with the properties
-    // argument, so we pass in an empty map
-    map<string, string> sasl_props;
-    // If overriding the hard-coded LDAP configuration, use the default callbacks,
-    // otherwise use those specific to LDAP.
-    factory->reset(
-        new TSaslServerTransport::Factory(PLAIN_MECHANISM, "", "", 0, sasl_props,
-            FLAGS_ldap_manual_config ? SASL_CALLBACKS : sasl_callbacks_));
-  } catch (sasl::SaslClientImplException& e) {
-    LOG(ERROR) << "LDAP server factory creation failed: " << e.what();
-    return Status(e.what());
-  }
+  // TSaslServerTransport::Factory doesn't actually do anything with the properties
+  // argument, so we pass in an empty map
+  map<string, string> sasl_props;
+  // If overriding the hard-coded LDAP configuration, use the default callbacks,
+  // otherwise use those specific to LDAP.
+  factory->reset(
+      new TSaslServerTransport::Factory(PLAIN_MECHANISM, "", "", 0, sasl_props,
+          FLAGS_ldap_manual_config ? SASL_CALLBACKS : sasl_callbacks_));
   return Status::OK;
 }
 

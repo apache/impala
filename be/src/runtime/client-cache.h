@@ -191,7 +191,7 @@ class ClientCache;
 //     ImpalaInternalServiceConnection client(cache, address, &status);
 //     try {
 //       client->TransmitData(...);
-//     } catch (TTransportException& e) {
+//     } catch (const TException& e) {
 //       // Retry
 //       RETURN_IF_ERROR(client.Reopen());
 //       client->TransmitData(...);

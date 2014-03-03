@@ -39,8 +39,7 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-using namespace ::apache::thrift::server;
-using namespace ::apache::thrift::transport;
+using namespace apache::thrift;
 
 int main(int argc, char** argv) {
   // Override default for webserver port

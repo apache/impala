@@ -32,8 +32,6 @@
 using namespace std;
 using namespace boost;
 using namespace apache::thrift;
-using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
 
 namespace impala {
 

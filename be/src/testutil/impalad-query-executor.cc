@@ -27,9 +27,6 @@ DECLARE_int32(num_nodes);
 using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
-using namespace apache::thrift;
-using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
 using namespace Apache::Hadoop::Hive;
 using namespace beeswax;
 

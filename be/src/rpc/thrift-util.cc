@@ -125,7 +125,7 @@ Status WaitForServer(const string& host, int port, int num_retries,
       socket.open();
       socket.close();
       return Status::OK;
-    } catch (TTransportException& e) {
+    } catch (const TException& e) {
       VLOG_QUERY << "Connection failed: " << e.what();
     }
     ++retry_count;

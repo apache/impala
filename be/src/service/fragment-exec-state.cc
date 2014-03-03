@@ -108,7 +108,7 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
   try {
     try {
       coord->ReportExecStatus(res, params);
-    } catch (TTransportException& e) {
+    } catch (const TException& e) {
       VLOG_RPC << "Retrying ReportExecStatus: " << e.what();
       rpc_status = coord.Reopen();
       if (!rpc_status.ok()) {

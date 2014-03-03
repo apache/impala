@@ -309,7 +309,7 @@ Status ThriftServer::CreateSocket(shared_ptr<TServerTransport>* socket) {
       socket_factory->loadCertificate(certificate_path_.c_str());
       socket_factory->loadPrivateKey(private_key_path_.c_str());
       socket->reset(new TSSLServerSocket(port_, socket_factory));
-    } catch (TTransportException& e) {
+    } catch (const TException& e) {
       stringstream err_msg;
       err_msg << "Could not create SSL socket: " << e.what();
       return Status(err_msg.str());

@@ -18,8 +18,6 @@
 
 #include <unistd.h>
 #include <jni.h>
-#include <boost/scoped_ptr.hpp>
-#include <boost/unordered_map.hpp>
 
 #include "common/logging.h"
 #include "common/init.h"
@@ -43,11 +41,6 @@
 
 using namespace impala;
 using namespace std;
-using namespace boost;
-using namespace apache::thrift::server;
-using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
-using namespace apache::thrift::concurrency;
 
 DECLARE_string(classpath);
 DECLARE_bool(use_statestore);

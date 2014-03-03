@@ -16,12 +16,14 @@
 
 #include <boost/assign.hpp>
 #include <ostream>
+#include <thrift/Thrift.h>
 
 #include "util/time.h"
 
 using namespace std;
 using namespace boost;
 using namespace apache::thrift::transport;
+using namespace apache::thrift;
 
 DECLARE_string(ssl_client_ca_certificate);
 
@@ -33,7 +35,7 @@ Status ThriftClientImpl::Open() {
     if (!transport_->isOpen()) {
       transport_->open();
     }
-  } catch (TTransportException& e) {
+  } catch (const TException& e) {
     stringstream msg;
     msg << "Couldn't open transport for " << address_ << "(" << e.what() << ")";
     return Status(msg.str());
@@ -77,7 +79,7 @@ Status ThriftClientImpl::CreateSocket() {
       // complex infrastructure to do right.
       factory.loadTrustedCertificates(FLAGS_ssl_client_ca_certificate.c_str());
       socket_ = factory.createSocket(address_.hostname, address_.port);
-    } catch (const TTransportException& ex) {
+    } catch (const TException& ex) {
       stringstream err_msg;
       err_msg << "Failed to create socket: " << ex.what();
       return Status(err_msg.str());

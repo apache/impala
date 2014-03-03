@@ -20,6 +20,7 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
+#include <thrift/Thrift.h>
 
 #include "common/status.h"
 #include "rpc/thrift-util.h"
@@ -40,7 +41,7 @@ using namespace boost::algorithm;
 using namespace boost::uuids;
 
 using namespace ::apache::thrift::server;
-using namespace ::apache::thrift::transport;
+using namespace ::apache::thrift;
 
 DECLARE_int32(resource_broker_cnxn_attempts);
 DECLARE_int32(resource_broker_cnxn_retry_interval_ms);
@@ -195,7 +196,7 @@ Status ResourceBroker::RegisterWithLlama() {
         llama_handle_ = response.am_handle;
         LOG(INFO) << "Received Llama client handle " << llama_handle_;
         break;
-      } catch (TTransportException& e) {
+      } catch (const TException& e) {
         needs_reopen = true;
       }
     }
@@ -292,7 +293,7 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
     sw.Start();
     try {
       llama_client->Reserve(llama_response, llama_request);
-    } catch (TTransportException& e) {
+    } catch (const TException& e) {
       VLOG_RPC << "Retrying Reserve: " << e.what();
       status = llama_client.Reopen();
       if (!status.ok()) continue;
@@ -381,7 +382,7 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
     RETURN_IF_ERROR(status);
     try {
       llama_client->Release(llama_response, llama_request);
-    } catch (TTransportException& e) {
+    } catch (const TException& e) {
       VLOG_RPC << "Retrying Release: " << e.what();
       status = llama_client.Reopen();
       if (!status.ok()) continue;
@@ -497,7 +498,7 @@ Status ResourceBroker::RefreshLlamaNodes() {
     RETURN_IF_ERROR(status);
     try {
       llama_client->GetNodes(llama_response, llama_request);
-    } catch (TTransportException& e) {
+    } catch (const TException& e) {
       VLOG_RPC << "Retrying GetNodes: " << e.what();
       status = llama_client.Reopen();
       if (!status.ok()) continue;

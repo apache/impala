@@ -44,9 +44,7 @@ using namespace impala;
 using namespace std;
 using namespace boost;
 
-using namespace ::apache::thrift::server;
-using namespace ::apache::thrift::protocol;
-using namespace ::apache::thrift::transport;
+using namespace apache::thrift;
 
 int main(int argc, char** argv) {
   FLAGS_webserver_port = 25020;
