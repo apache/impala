@@ -16,7 +16,7 @@
   </property>
 
   <property>
-    <name>fs.default.name</name>
+    <name>fs.defaultFS</name>
     <value>hdfs://localhost:20500</value>
   </property>
  <property>
