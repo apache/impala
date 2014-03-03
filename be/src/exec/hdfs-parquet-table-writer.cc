@@ -16,6 +16,7 @@
 
 #include "common/version.h"
 #include "exprs/expr.h"
+#include "runtime/decimal-value.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -236,6 +237,7 @@ class HdfsParquetTableWriter::ColumnWriter :
       const THdfsCompression::type& codec) : BaseColumnWriter(parent, expr, codec),
       num_values_since_dict_size_check_(0) {
     DCHECK_NE(expr->type().type, TYPE_BOOLEAN);
+    encoded_value_size_ = ParquetPlainEncoder::ByteSize(expr->type());
   }
 
   virtual void Reset() {
@@ -243,7 +245,8 @@ class HdfsParquetTableWriter::ColumnWriter :
     // Default to dictionary encoding.  If the cardinality ends up being too high,
     // it will fall back to plain.
     current_encoding_ = Encoding::PLAIN_DICTIONARY;
-    dict_encoder_.reset(new DictEncoder<T>(parent_->per_file_mem_pool_.get()));
+    dict_encoder_.reset(
+        new DictEncoder<T>(parent_->per_file_mem_pool_.get(), encoded_value_size_));
     dict_encoder_base_ = dict_encoder_.get();
   }
 
@@ -267,12 +270,14 @@ class HdfsParquetTableWriter::ColumnWriter :
       }
     } else if (current_encoding_ == Encoding::PLAIN) {
       T* v = reinterpret_cast<T*>(value);
-      int encoded_len = ParquetPlainEncoder::ByteSize<T>(*v);
+      int encoded_len = encoded_value_size_ < 0 ?
+          ParquetPlainEncoder::ByteSize<T>(*v) : encoded_value_size_;
       if (current_page_->header.uncompressed_page_size + encoded_len > DATA_PAGE_SIZE) {
         return false;
       }
       uint8_t* dst_ptr = values_buffer_ + current_page_->header.uncompressed_page_size;
-      int written_len = ParquetPlainEncoder::Encode(dst_ptr, *v);
+      int written_len =
+          ParquetPlainEncoder::Encode(dst_ptr, encoded_value_size_, *v);
       DCHECK_EQ(encoded_len, written_len);
       *bytes_added += written_len;
       current_page_->header.uncompressed_page_size += encoded_len;
@@ -298,6 +303,9 @@ class HdfsParquetTableWriter::ColumnWriter :
 
   // The number of values added since we last checked the dictionary.
   int num_values_since_dict_size_check_;
+
+  // Size of each encoded value. -1 if the size is type is variable-length.
+  int encoded_value_size_;
 };
 
 // Bools are encoded a bit differently so subclass it explicitly.
@@ -646,6 +654,21 @@ Status HdfsParquetTableWriter::Init() {
       case TYPE_STRING:
         writer = new ColumnWriter<StringValue>(this, output_exprs_[i], codec);
         break;
+      case TYPE_DECIMAL:
+        switch (output_exprs_[i]->type().GetByteSize()) {
+          case 4:
+            writer = new ColumnWriter<Decimal4Value>(this, output_exprs_[i], codec);
+            break;
+          case 8:
+            writer = new ColumnWriter<Decimal8Value>(this, output_exprs_[i], codec);
+            break;
+          case 16:
+            writer = new ColumnWriter<Decimal16Value>(this, output_exprs_[i], codec);
+            break;
+          default:
+            DCHECK(false);
+        }
+        break;
       default:
         DCHECK(false);
     }
@@ -669,6 +692,16 @@ Status HdfsParquetTableWriter::CreateSchema() {
     node.name = table_desc_->col_names()[i + num_clustering_cols];
     node.__set_type(IMPALA_TO_PARQUET_TYPES[output_exprs_[i]->type().type]);
     node.__set_repetition_type(FieldRepetitionType::OPTIONAL);
+    if (output_exprs_[i]->type().type == TYPE_DECIMAL) {
+      // This column is type decimal. Update the file metadata to include the
+      // additional fields:
+      //  1) type_length: the number of bytes used per decimal value in the data
+      //  2) precision/scale
+      node.__set_type_length(
+          ParquetPlainEncoder::DecimalSize(output_exprs_[i]->type()));
+      node.__set_scale(output_exprs_[i]->type().scale);
+      node.__set_precision(output_exprs_[i]->type().precision);
+    }
   }
 
   return Status::OK;

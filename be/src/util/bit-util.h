@@ -104,40 +104,67 @@ class BitUtil {
     return static_cast<uint16_t>(ByteSwap(static_cast<int16_t>(value)));
   }
 
-  // Write the swapped bytes into dst. len must be 1, 2, 4 or 8.
-  static inline void ByteSwap(void* dst, void* src, int len) {
+  // Write the swapped bytes into dst. Src and st cannot overlap.
+  static inline void ByteSwap(void* dst, const void* src, int len) {
     switch (len) {
       case 1:
-        *reinterpret_cast<int8_t*>(dst) = *reinterpret_cast<int8_t*>(src);
-        break;
+        *reinterpret_cast<int8_t*>(dst) = *reinterpret_cast<const int8_t*>(src);
+        return;
       case 2:
-        *reinterpret_cast<int16_t*>(dst) = ByteSwap(*reinterpret_cast<int16_t*>(src));
-        break;
+        *reinterpret_cast<int16_t*>(dst) =
+            ByteSwap(*reinterpret_cast<const int16_t*>(src));
+        return;
       case 4:
-        *reinterpret_cast<int32_t*>(dst) = ByteSwap(*reinterpret_cast<int32_t*>(src));
-        break;
+        *reinterpret_cast<int32_t*>(dst) =
+            ByteSwap(*reinterpret_cast<const int32_t*>(src));
+        return;
       case 8:
-        *reinterpret_cast<int64_t*>(dst) = ByteSwap(*reinterpret_cast<int64_t*>(src));
-        break;
-      default: DCHECK(false);
+        *reinterpret_cast<int64_t*>(dst) =
+            ByteSwap(*reinterpret_cast<const int64_t*>(src));
+        return;
+      default: break;
+    }
+
+    uint8_t* d = reinterpret_cast<uint8_t*>(dst);
+    const uint8_t* s = reinterpret_cast<const uint8_t*>(src);
+    for (int i = 0; i < len; ++i) {
+      d[i] = s[len - i - 1];
     }
   }
 
+  // Converts to big endian format (if not already in big endian) from the
+  // machine's native endian format.
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-  // Converts to big endian format (if not already in big endian).
-  static inline int64_t  BigEndian(int64_t value)  { return ByteSwap(value); }
-  static inline uint64_t BigEndian(uint64_t value) { return ByteSwap(value); }
-  static inline int32_t  BigEndian(int32_t value)  { return ByteSwap(value); }
-  static inline uint32_t BigEndian(uint32_t value) { return ByteSwap(value); }
-  static inline int16_t  BigEndian(int16_t value)  { return ByteSwap(value); }
-  static inline uint16_t BigEndian(uint16_t value) { return ByteSwap(value); }
+  static inline int64_t  ToBigEndian(int64_t value)  { return ByteSwap(value); }
+  static inline uint64_t ToBigEndian(uint64_t value) { return ByteSwap(value); }
+  static inline int32_t  ToBigEndian(int32_t value)  { return ByteSwap(value); }
+  static inline uint32_t ToBigEndian(uint32_t value) { return ByteSwap(value); }
+  static inline int16_t  ToBigEndian(int16_t value)  { return ByteSwap(value); }
+  static inline uint16_t ToBigEndian(uint16_t value) { return ByteSwap(value); }
 #else
-  static inline int64_t  BigEndian(int64_t val)  { return val; }
-  static inline uint64_t BigEndian(uint64_t val) { return val; }
-  static inline int32_t  BigEndian(int32_t val)  { return val; }
-  static inline uint32_t BigEndian(uint32_t val) { return val; }
-  static inline int16_t  BigEndian(int16_t val)  { return val; }
-  static inline uint16_t BigEndian(uint16_t val) { return val; }
+  static inline int64_t  ToBigEndian(int64_t val)  { return val; }
+  static inline uint64_t ToBigEndian(uint64_t val) { return val; }
+  static inline int32_t  ToBigEndian(int32_t val)  { return val; }
+  static inline uint32_t ToBigEndian(uint32_t val) { return val; }
+  static inline int16_t  ToBigEndian(int16_t val)  { return val; }
+  static inline uint16_t ToBigEndian(uint16_t val) { return val; }
+#endif
+
+  // Converts from big endian format to the machine's native endian format.
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+  static inline int64_t  FromBigEndian(int64_t value)  { return ByteSwap(value); }
+  static inline uint64_t FromBigEndian(uint64_t value) { return ByteSwap(value); }
+  static inline int32_t  FromBigEndian(int32_t value)  { return ByteSwap(value); }
+  static inline uint32_t FromBigEndian(uint32_t value) { return ByteSwap(value); }
+  static inline int16_t  FromBigEndian(int16_t value)  { return ByteSwap(value); }
+  static inline uint16_t FromBigEndian(uint16_t value) { return ByteSwap(value); }
+#else
+  static inline int64_t  FromBigEndian(int64_t val)  { return val; }
+  static inline uint64_t FromBigEndian(uint64_t val) { return val; }
+  static inline int32_t  FromBigEndian(int32_t val)  { return val; }
+  static inline uint32_t FromBigEndian(uint32_t val) { return val; }
+  static inline int16_t  FromBigEndian(int16_t val)  { return val; }
+  static inline uint16_t FromBigEndian(uint16_t val) { return val; }
 #endif
 
 };

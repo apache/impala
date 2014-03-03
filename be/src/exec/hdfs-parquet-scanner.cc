@@ -232,11 +232,16 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
   ColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
     : BaseColumnReader(parent, desc, file_idx) {
     DCHECK_NE(desc->type().type, TYPE_BOOLEAN);
+    if (desc->type().type == TYPE_DECIMAL) {
+      fixed_len_size_ = ParquetPlainEncoder::DecimalSize(desc->type());
+    } else {
+      fixed_len_size_ = -1;
+    }
   }
 
  protected:
   virtual void CreateDictionaryDecoder(uint8_t* values, int size) {
-    dict_decoder_.reset(new DictDecoder<T>(values, size));
+    dict_decoder_.reset(new DictDecoder<T>(values, size, fixed_len_size_));
     dict_decoder_base_ = dict_decoder_.get();
   }
 
@@ -259,7 +264,8 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
       result = dict_decoder_->GetValue(reinterpret_cast<T*>(slot));
     } else {
       DCHECK(page_encoding == parquet::Encoding::PLAIN);
-      data_ += ParquetPlainEncoder::Decode<T>(data_, reinterpret_cast<T*>(slot));
+      data_ += ParquetPlainEncoder::Decode<T>(data_, fixed_len_size_,
+          reinterpret_cast<T*>(slot));
       if (parent_->scan_node_->requires_compaction()) {
         CopySlot(reinterpret_cast<T*>(slot), pool);
       }
@@ -274,6 +280,10 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
   }
 
   scoped_ptr<DictDecoder<T> > dict_decoder_;
+
+  // The size of this column with plain encoding for FIXED_LEN_BYTE_ARRAY. Unused
+  // otherwise.
+  int fixed_len_size_;
 };
 
 template<>
@@ -379,6 +389,19 @@ HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(
       break;
     case TYPE_STRING:
       reader = new ColumnReader<StringValue>(this, desc, file_idx);
+      break;
+    case TYPE_DECIMAL:
+      switch (desc->type().GetByteSize()) {
+        case 4:
+          reader = new ColumnReader<Decimal4Value>(this, desc, file_idx);
+          break;
+        case 8:
+          reader = new ColumnReader<Decimal8Value>(this, desc, file_idx);
+          break;
+        case 16:
+          reader = new ColumnReader<Decimal16Value>(this, desc, file_idx);
+          break;
+      }
       break;
     default:
       DCHECK(false);
@@ -1019,8 +1042,9 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   for (int i = 0; i < encodings.size(); ++i) {
     if (!IsEncodingSupported(encodings[i])) {
       stringstream ss;
-      ss << "File " << stream_->filename() << " uses an unsupported encoding: "
-         << PrintEncoding(encodings[i]) << " for column " << schema_element.name;
+      ss << "File '" << stream_->filename() << "' uses an unsupported encoding: "
+         << PrintEncoding(encodings[i]) << " for column '" << schema_element.name
+         << "'.";
       return Status(ss.str());
     }
   }
@@ -1030,8 +1054,9 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
       file_data.meta_data.codec != parquet::CompressionCodec::SNAPPY &&
       file_data.meta_data.codec != parquet::CompressionCodec::GZIP) {
     stringstream ss;
-    ss << "File " << stream_->filename() << " uses an unsupported compression: "
-        << file_data.meta_data.codec << " for column " << schema_element.name;
+    ss << "File '" << stream_->filename() << "' uses an unsupported compression: "
+        << file_data.meta_data.codec << " for column '" << schema_element.name
+        << "'.";
     return Status(ss.str());
   }
 
@@ -1039,8 +1064,8 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[slot_desc->type().type];
   if (type != file_data.meta_data.type) {
     stringstream ss;
-    ss << "File " << stream_->filename() << " has an incompatible type with the"
-       << " table schema for column " << schema_element.name << ".  Expected type: "
+    ss << "File '" << stream_->filename() << "' has an incompatible type with the"
+       << " table schema for column '" << schema_element.name << "'.  Expected type: "
        << type << ".  Actual type: " << file_data.meta_data.type;
     return Status(ss.str());
   }
@@ -1049,8 +1074,8 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   const vector<string> schema_path = file_data.meta_data.path_in_schema;
   if (schema_path.size() != 1) {
     stringstream ss;
-    ss << "File " << stream_->filename() << " contains a nested schema for column "
-       << schema_element.name << ".  This is currently not supported.";
+    ss << "File '" << stream_->filename() << "' contains a nested schema for column '"
+       << schema_element.name << "'.  This is currently not supported.";
     return Status(ss.str());
   }
 
@@ -1058,11 +1083,66 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   if (schema_element.repetition_type != parquet::FieldRepetitionType::OPTIONAL &&
       schema_element.repetition_type != parquet::FieldRepetitionType::REQUIRED) {
     stringstream ss;
-    ss << "File " << stream_->filename() << " column " << schema_element.name
-       << " contains an unsupported column repetition type: "
+    ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+       << "' contains an unsupported column repetition type: "
        << schema_element.repetition_type;
     return Status(ss.str());
   }
 
+  // Check the decimal scale in the file matches the metastore scale and precision.
+  if (schema_element.__isset.scale || schema_element.__isset.precision) {
+    if (slot_desc->type().type != TYPE_DECIMAL) {
+      stringstream ss;
+      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+         << " has scale and precision set but the table metadata column type is not "
+         << " DECIMAL.";
+      return Status(ss.str());
+    }
+
+    if (!schema_element.__isset.scale) {
+      stringstream ss;
+      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+         << "' does not have the scale set.";
+      return Status(ss.str());
+    }
+    if (!schema_element.__isset.precision) {
+      stringstream ss;
+      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+         << "' does not have the precision set.";
+      return Status(ss.str());
+    }
+
+    if (schema_element.scale != slot_desc->type().scale) {
+      // TODO: we could allow a mismatch and do a conversion at this step.
+      stringstream ss;
+      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+         << "' has a scale that does not match the table metadata scale."
+         << " File metadata scale: " << schema_element.scale
+         << " Table metadata scale: " << slot_desc->type().scale;
+      return Status(ss.str());
+    }
+
+    if (schema_element.precision != slot_desc->type().precision) {
+      // TODO: we could allow a mismatch and do a conversion at this step.
+      stringstream ss;
+      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+         << "' has a precision that does not match the table metadata precision."
+         << " File metadata precision: " << schema_element.precision
+         << " Table metadata precision: " << slot_desc->type().precision;
+      return Status(ss.str());
+    }
+
+    if (!schema_element.__isset.type_length) {
+      stringstream ss;
+      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+         << "' does not have type_length set.";
+      return Status(ss.str());
+    }
+  } else if (slot_desc->type().type == TYPE_DECIMAL) {
+    stringstream ss;
+    ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+       << "' should contain decimal data but the scale and precision are not specified.";
+    return Status(ss.str());
+  }
   return Status::OK;
 }

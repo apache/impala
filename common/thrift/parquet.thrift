@@ -54,12 +54,12 @@ enum ConvertedType {
   /** a key/value pair is converted into a group of two fields */
   MAP_KEY_VALUE = 2;
 
-  /** a list is converted into an optional field containing a repeated field for its 
+  /** a list is converted into an optional field containing a repeated field for its
    * values */
   LIST = 3;
 }
 
-/** 
+/**
  * Representation of Schemas
  */
 enum FieldRepetitionType {
@@ -108,6 +108,13 @@ struct SchemaElement {
    * Used to record the original type to help with cross conversion.
    */
   6: optional ConvertedType converted_type;
+
+  /** Used when this column contains decimal data, in which case the data
+   * is encoded without the decimal point (e.g. 1.23 is encoded as 123).
+   * The scale is stored as part of the metadata on where the decimal point is.
+   */
+  7: optional i32 scale
+  8: optional i32 precision
 }
 
 /**
@@ -122,7 +129,7 @@ enum Encoding {
    * INT64 - 8 bytes per value.  Stored as little-endian.
    * FLOAT - 4 bytes per value.  IEEE. Stored as little-endian.
    * DOUBLE - 8 bytes per value.  IEEE. Stored as little-endian.
-   * BYTE_ARRAY - 4 byte length stored as little endian, followed by bytes.  
+   * BYTE_ARRAY - 4 byte length stored as little endian, followed by bytes.
    * FIXED_LEN_BYTE_ARRAY - Just the bytes.
    */
   PLAIN = 0;
@@ -130,8 +137,8 @@ enum Encoding {
   /** Group VarInt encoding for INT32/INT64. */
   GROUP_VAR_INT = 1;
 
-  /** Dictionary encoding. The values in the dictionary are encoded in the 
-   * plain type. 
+  /** Dictionary encoding. The values in the dictionary are encoded in the
+   * plain type.
    */
   PLAIN_DICTIONARY = 2;
 
@@ -145,7 +152,7 @@ enum Encoding {
 }
 
 /**
- * Supported compression algorithms.  
+ * Supported compression algorithms.
  */
 enum CompressionCodec {
   UNCOMPRESSED = 0;
@@ -198,7 +205,7 @@ struct PageHeader {
   3: required i32 compressed_page_size
 
   /** 32bit crc for the data below. This allows for disabling checksumming in HDFS
-   *  if only a few pages needs to be read 
+   *  if only a few pages needs to be read
    **/
   4: optional i32 crc
 
@@ -208,7 +215,7 @@ struct PageHeader {
   7: optional DictionaryPageHeader dictionary_page_header;
 }
 
-/** 
+/**
  * Wrapper struct to store key values
  */
  struct KeyValue {
@@ -223,7 +230,7 @@ struct ColumnMetaData {
   /** Type of this column **/
   1: required Type type
 
-  /** Set of all encodings used for this column. The purpose is to validate 
+  /** Set of all encodings used for this column. The purpose is to validate
    * whether we can decode those pages. **/
   2: required list<Encoding> encodings
 
@@ -256,7 +263,7 @@ struct ColumnMetaData {
 }
 
 struct ColumnChunk {
-  /** File where column data is stored.  If not set, assumed to be same file as 
+  /** File where column data is stored.  If not set, assumed to be same file as
     * metadata.  This path is relative to the current file.
     **/
   1: optional string file_path
@@ -266,11 +273,11 @@ struct ColumnChunk {
 
   /** Column metadata for this chunk. This is the same content as what is at
    * file_path/file_offset.  Having it here has it replicated in the file
-   * metadata. 
+   * metadata.
    **/
   3: optional ColumnMetaData meta_data
 }
-  
+
 struct RowGroup {
   1: required list<ColumnChunk> columns
 
@@ -306,7 +313,7 @@ struct FileMetaData {
   5: optional list<KeyValue> key_value_metadata
 
   /** String for application that wrote this file.  This should be in the format
-   * <Application> version <App Version> (build <App Build Hash>).  
+   * <Application> version <App Version> (build <App Build Hash>).
    * e.g. impala version 1.0 (build 6cf94d29b2b7115df4de2c06e2ab4326d721eb55)
    **/
   6: optional string created_by

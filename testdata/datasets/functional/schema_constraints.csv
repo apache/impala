@@ -89,9 +89,11 @@ table_name:widerow, constraint:exclude, table_format:hbase/none/none
 table_name:nullformat_custom, constraint:exclude, table_format:hbase/none/none
 table_name:unsupported_types, constraint:exclude, table_format:hbase/none/none
 
-# Decimal is only supported for text for now.
+# On CDH4, decimal can only be tested on formats Impala can write to (text and parquet)
 table_name:decimal_tbl, constraint:restrict_to, table_format:text/none/none
 table_name:decimal_tiny, constraint:restrict_to, table_format:text/none/none
+table_name:decimal_tbl, constraint:restrict_to, table_format:parquet/none/none
+table_name:decimal_tiny, constraint:restrict_to, table_format:parquet/none/none
 
 # hbase doesn't seem to like very wide tables
 table_name:widetable_250_cols, constraint:exclude, table_format:hbase/none/none

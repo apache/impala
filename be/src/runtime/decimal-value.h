@@ -24,6 +24,7 @@
 #include "common/logging.h"
 #include "runtime/multi-precision.h"
 #include "util/decimal-util.h"
+#include "util/hash-util.h"
 
 namespace impala {
 
@@ -211,6 +212,7 @@ class DecimalValue {
   // Returns the underlying storage. For a particular storage size, there is
   // only one representation for any decimal and the storage is directly comparable.
   const T& value() const { return value_; }
+  T& value() { return value_; }
 
   // Returns the value of the decimal before the decimal point.
   const T whole_part(const ColumnType& t) const {
@@ -226,6 +228,10 @@ class DecimalValue {
   // Returns an approximate double for this decimal.
   double ToDouble(const ColumnType& type) const {
     return static_cast<double>(value_) / powf(10.0, type.scale);
+  }
+
+  inline uint32_t Hash(int seed = 0) const {
+    return HashUtil::Hash(&value_, sizeof(value_), seed);
   }
 
   std::string ToString(const ColumnType& type) const;
@@ -290,6 +296,17 @@ inline std::ostream& operator<<(std::ostream& os, const Decimal8Value& d) {
 }
 inline std::ostream& operator<<(std::ostream& os, const Decimal16Value& d) {
   return os << d.value();
+}
+
+// This function must be called 'hash_value' to be picked up by boost.
+inline std::size_t hash_value(const Decimal4Value& v) {
+  return v.Hash();
+}
+inline std::size_t hash_value(const Decimal8Value& v) {
+  return v.Hash();
+}
+inline std::size_t hash_value(const Decimal16Value& v) {
+  return v.Hash();
 }
 
 // For comparisons, we need the intermediate to be at the next precision

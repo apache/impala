@@ -1232,9 +1232,11 @@ d5 DECIMAL(10, 5)
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
--- TODO: Beeline on CDH4 doesn't understand decimal with precision and scale so can't
--- do the data load. This is done in testdata/bin/create_load_data for now.
--- Fix this by allowing an "hdfs put" as the load command.
+`hadoop fs -mkdir -p /test-warehouse/decimal_tbl && hadoop fs -put -f \
+${IMPALA_HOME}/testdata/data/decimal_tbl.txt /test-warehouse/decimal_tbl/
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+select * from functional.{table_name};
 ====
 ---- DATASET
 functional
@@ -1247,9 +1249,11 @@ c3 DECIMAL(1,1)
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
--- TODO: Beeline on CDH4 doesn't understand decimal with precision and scale so can't
--- do the data load. This is done in testdata/bin/create_load_data for now.
--- Fix this by allowing an "hdfs put" as the load command.
+`hadoop fs -mkdir -p /test-warehouse/decimal_tiny && hadoop fs -put -f \
+${IMPALA_HOME}/testdata/data/decimal-tiny.txt /test-warehouse/decimal_tiny/
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+select * from functional.{table_name};
 ====
 ---- DATASET
 functional

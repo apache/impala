@@ -37,7 +37,7 @@ inline bool KeyNormalizer::WriteNullBit(uint8_t null_bit, uint8_t* value, uint8_
 
 template <typename ValueType>
 inline void KeyNormalizer::StoreFinalValue(ValueType value, void* dst, bool is_asc) {
-  if (sizeof(ValueType) > 1) value = BitUtil::BigEndian(value);
+  if (sizeof(ValueType) > 1) value = BitUtil::ToBigEndian(value);
   if (!is_asc) value = ~value;
   memcpy(dst, &value, sizeof(ValueType));
 }

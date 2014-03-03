@@ -21,12 +21,12 @@ class TestDecimalQueries(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(
         TestDimension('batch_size', *TestDecimalQueries.BATCH_SIZES))
 
-    # TODO: add parquet when that is supported.
     # On CDH4, hive does not support decimal so we can't run these tests against
     # the other file formats. Enable them on C5.
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'none')
+        (v.get_value('table_format').file_format == 'text' and
+         v.get_value('table_format').compression_codec == 'none') or
+         v.get_value('table_format').file_format == 'parquet')
 
   def test_queries(self, vector):
     new_vector = copy(vector)
