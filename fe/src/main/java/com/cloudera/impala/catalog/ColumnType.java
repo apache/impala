@@ -315,6 +315,24 @@ public class ColumnType {
   }
 
   /**
+   * Returns the smallest decimal type that can safely store this type. Returns
+   * INVALID if this type cannot be stored as a decimal.
+   */
+  public ColumnType getMinResolutionDecimal() {
+    switch (type_) {
+      case NULL_TYPE: return ColumnType.NULL;
+      case DECIMAL: return this;
+      case TINYINT: return createDecimalType(3);
+      case SMALLINT: return createDecimalType(5);
+      case INT: return createDecimalType(10);
+      case BIGINT: return createDecimalType(20);
+      case FLOAT: return createDecimalTypeInternal(MAX_PRECISION, 9);
+      case DOUBLE: return createDecimalTypeInternal(MAX_PRECISION, 17);
+    }
+    return ColumnType.INVALID;
+  }
+
+  /**
    * Return type t such that values from both t1 and t2 can be assigned to t
    * without loss of precision. Returns INVALID_TYPE if there is no such type
    * or if any of t1 and t2 is INVALID_TYPE.
@@ -324,15 +342,19 @@ public class ColumnType {
     if (!t1.isValid() || !t2.isValid()) return INVALID;
     if (t1.equals(t2)) return t1;
 
-    if (t1.isDecimal() && t2.isDecimal()) {
-      return TypesUtil.getDecimalAssignmentCompatibleType(t1, t2);
-    }
+
     if (t1.isDecimal() || t2.isDecimal()) {
-      // TODO: should we allow implicit casts from decimals with no fractional
-      // part to ints and vice versa?
       if (t1.isNull()) return t2;
       if (t2.isNull()) return t1;
-      return INVALID;
+
+      // Allow casts between decimal and numeric types by converting
+      // numeric types to the containing decimal type.
+      t1 = t1.getMinResolutionDecimal();
+      t2 = t2.getMinResolutionDecimal();
+      if (t1.isInvalid() || t2.isInvalid()) return ColumnType.INVALID;
+      Preconditions.checkState(t1.isDecimal());
+      Preconditions.checkState(t2.isDecimal());
+      return TypesUtil.getDecimalAssignmentCompatibleType(t1, t2);
     }
 
     PrimitiveType smallerType =

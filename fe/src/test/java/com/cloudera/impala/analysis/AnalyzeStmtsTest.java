@@ -585,8 +585,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         + "from functional.decimal_tbl");
     AnalyzesOk("select ndv(d1), distinctpc(d2), distinctpcsa(d3), count(distinct d4) "
         + "from functional.decimal_tbl");
-    AnalysisError("select avg(d5) from functional.decimal_tbl",
-        "AVG requires a numeric or timestamp parameter: avg(d5)");
+    AnalyzesOk("select avg(d5) from functional.decimal_tbl");
     AnalysisError("select group_concat(d5) from functional.decimal_tbl",
         "No matching function with signature: group_concat(DECIMAL(10,5))");
   }

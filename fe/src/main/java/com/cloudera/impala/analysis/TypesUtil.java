@@ -101,17 +101,11 @@ public class TypesUtil {
       if (t1.isNull()) return t2;
       if (t2.isNull()) return t1;
 
-      if (t1.isDecimal() && t2.isDecimal()) {
-        return getDecimalArithmeticResultType(t1, t2, op);
-      }
-
-      // Decimal + number --> Double
-      // TODO: rethink this some more. What should our rules be for adding
-      // decimals to ints and doubles. We can safely handle ints by casting them
-      // to a 0-scale decimal but doubles can't be perfectly represented.
-      if (t1.isNumericType() && t2.isNumericType()) return ColumnType.DOUBLE;
-      throw new AnalysisException("Cannot perform operation '" + op
-          + " ' on DECIMAL and non-numeric type.");
+      t1 = t1.getMinResolutionDecimal();
+      t2 = t2.getMinResolutionDecimal();
+      Preconditions.checkState(t1.isDecimal());
+      Preconditions.checkState(t2.isDecimal());
+      return getDecimalArithmeticResultType(t1, t2, op);
     }
 
     ColumnType type = null;

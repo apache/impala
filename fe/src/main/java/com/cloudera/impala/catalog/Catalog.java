@@ -632,9 +632,6 @@ public abstract class Catalog {
         null, null, false));
 
     for (ColumnType t: ColumnType.getNumericTypes()) {
-      // TODO: the rewrite does not support decimal since the current rewrite
-      // assumes double as the result.
-      if (t.isDecimal()) continue;
       // Avg
       // TODO: because of avg rewrite, BE doesn't implement it yet.
       db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",

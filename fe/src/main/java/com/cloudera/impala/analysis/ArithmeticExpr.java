@@ -129,6 +129,19 @@ public class ArithmeticExpr extends Expr {
     msg.node_type = TExprNodeType.ARITHMETIC_EXPR;
   }
 
+  /**
+   * Inserts a cast from child[childIdx] to targetType if one is necessary.
+   * Note this is different from Expr.castChild() since arithmetic for decimals
+   * the cast is handled as part of the operator and in general, the return type
+   * does not match the input types.
+   */
+  void castChild(int childIdx, ColumnType targetType) throws AnalysisException {
+    ColumnType t = getChild(childIdx).getType();
+    if (t.matchesType(targetType)) return;
+    if (targetType.isDecimal()) targetType = t.getMinResolutionDecimal();
+    castChild(targetType, childIdx);
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
@@ -198,12 +211,8 @@ public class ArithmeticExpr extends Expr {
       fnName = "fmod";
     }
 
-    if (!t1.isDecimalOrNull() || !t2.isDecimalOrNull()) {
-      // The decimal types, the cast is handled as part of the operator and in
-      // general, the return type does not match the input types. Don't cast
-      // the child types to the return type.
-      type_ = castBinaryOp(type_);
-    }
+    castChild(0, type_);
+    castChild(1, type_);
 
     fn_ = getBuiltinFunction(analyzer, fnName, collectChildReturnTypes(),
         CompareMode.IS_SUPERTYPE_OF);

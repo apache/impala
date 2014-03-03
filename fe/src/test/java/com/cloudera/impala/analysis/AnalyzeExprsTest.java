@@ -824,10 +824,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // Call function that only accepts decimal
     AnalyzesOk("select precision(cast('1.1' as decimal))");
+    AnalyzesOk("select scale(1.1)");
     AnalysisError("select scale('1.1')",
         "No matching function with signature: scale(STRING).");
-    AnalysisError("select scale(1.1)",
-        "No matching function with signature: scale(DOUBLE).");
 
     AnalyzesOk("select round(cast('1.1' as decimal), cast(1 as int))");
     // 1 is a tinyint, so the function is not a perfect match
@@ -1190,6 +1189,54 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         ColumnType.createDecimalType(32, 22));
     testDecimalExpr(decimal_10_0 + " % " + decimal_10_0 + " + " + decimal_10_0,
         ColumnType.createDecimalType(11, 0));
+
+    // Operators between decimal and numeric types should be supported. The int
+    // should be cast to the appropriate decimal (e.g. tinyint -> decimal(3,0)).
+    testDecimalExpr(decimal_10_0 + " + cast(1 as tinyint)",
+        ColumnType.createDecimalType(11, 0));
+    testDecimalExpr(decimal_10_0 + " + cast(1 as smallint)",
+        ColumnType.createDecimalType(11, 0));
+    testDecimalExpr(decimal_10_0 + " + cast(1 as int)",
+        ColumnType.createDecimalType(11, 0));
+    testDecimalExpr(decimal_10_0 + " + cast(1 as bigint)",
+        ColumnType.createDecimalType(21, 0));
+    testDecimalExpr(decimal_10_0 + " + cast(1 as float)",
+        ColumnType.createDecimalType(38, 9));
+    testDecimalExpr(decimal_10_0 + " + cast(1 as double)",
+        ColumnType.createDecimalType(38, 17));
+
+    testDecimalExpr(decimal_5_5 + " + cast(1 as tinyint)",
+        ColumnType.createDecimalType(9, 5));
+    testDecimalExpr(decimal_5_5 + " - cast(1 as smallint)",
+        ColumnType.createDecimalType(11, 5));
+    testDecimalExpr(decimal_5_5 + " * cast(1 as int)",
+        ColumnType.createDecimalType(16, 5));
+    testDecimalExpr(decimal_5_5 + " % cast(1 as bigint)",
+        ColumnType.createDecimalType(5, 5));
+    testDecimalExpr(decimal_5_5 + " / cast(1 as float)",
+        ColumnType.createDecimalType(38, 38));
+    testDecimalExpr(decimal_5_5 + " + cast(1 as double)",
+        ColumnType.createDecimalType(38, 17));
+
+    AnalyzesOk("select " + decimal_5_5 + " = cast(1 as tinyint)");
+    AnalyzesOk("select " + decimal_5_5 + " != cast(1 as smallint)");
+    AnalyzesOk("select " + decimal_5_5 + " > cast(1 as int)");
+    AnalyzesOk("select " + decimal_5_5 + " < cast(1 as bigint)");
+    AnalyzesOk("select " + decimal_5_5 + " >= cast(1 as float)");
+    AnalyzesOk("select " + decimal_5_5 + " <= cast(1 as double)");
+
+    AnalysisError("select " + decimal_5_5 + " + 'abcd'",
+        "Arithmetic operation requires numeric operands: "
+        + "CAST(1 AS DECIMAL(5,5)) + 'abcd'");
+    AnalysisError("select " + decimal_5_5 + " + 'cast(1 as timestamp)'",
+        "Arithmetic operation requires numeric operands: "
+        + "CAST(1 AS DECIMAL(5,5)) + 'cast(1 as timestamp)'");
+
+    AnalysisError("select " + decimal_5_5 + " = 'abcd'",
+        "operands are not comparable: CAST(1 AS DECIMAL(5,5)) = 'abcd'");
+    AnalysisError("select " + decimal_5_5 + " > 'cast(1 as timestamp)'",
+        "operands are not comparable: "
+        + "CAST(1 AS DECIMAL(5,5)) > 'cast(1 as timestamp)'");
   }
 
   @Test

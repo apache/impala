@@ -107,12 +107,15 @@ public class IntLiteral extends LiteralExpr {
   @Override
   protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType());
-    if (targetType.isFixedPointType()) {
+    if (targetType.isIntegerType()) {
       this.type_ = targetType;
       return this;
     } else if (targetType.isFloatingPointType()) {
       return new FloatLiteral(new Double(value_.longValue()), targetType);
+    } else if (targetType.isDecimal()) {
+      return new CastExpr(targetType, this, true);
     }
+    Preconditions.checkState(false, "Unhandled case");
     return this;
   }
 

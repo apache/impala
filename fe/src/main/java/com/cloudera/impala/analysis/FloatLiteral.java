@@ -95,8 +95,12 @@ public class FloatLiteral extends LiteralExpr {
 
   @Override
   protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
-    Preconditions.checkState(targetType.isFloatingPointType());
-    type_ = targetType;
+    Preconditions.checkState(targetType.isFloatingPointType() || targetType.isDecimal());
+    if (targetType.isFloatingPointType()) {
+      type_ = targetType;
+    } else {
+      return new CastExpr(targetType, this, true);
+    }
     return this;
   }
 
