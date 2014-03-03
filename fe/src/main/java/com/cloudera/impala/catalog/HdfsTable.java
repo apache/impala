@@ -56,7 +56,6 @@ import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
@@ -495,7 +494,7 @@ public class HdfsTable extends Table {
               // Force the literal to be of type declared in the metadata.
               expr = expr.castTo(type);
               keyValues.add((LiteralExpr) expr);
-            } catch (AnalysisException ex) {
+            } catch (Exception ex) {
               LOG.warn("Failed to create literal expression of type: " + type, ex);
               throw new InvalidStorageDescriptorException(ex);
             }

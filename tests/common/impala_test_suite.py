@@ -110,6 +110,7 @@ class ImpalaTestSuite(BaseTestSuite):
     client.connect()
     return client
 
+  @classmethod
   def cleanup_db(self, db_name):
     # To drop a db, we need to first drop all the tables in that db
     self.client.execute("use default")

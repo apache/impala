@@ -74,6 +74,15 @@ public class BoolLiteral extends LiteralExpr {
   }
 
   @Override
+  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
+    if (targetType.equals(this.type_)) {
+      return this;
+    } else {
+      return new CastExpr(targetType, this, true);
+    }
+  }
+
+  @Override
   public int compareTo(LiteralExpr o) {
     if (!(o instanceof BoolLiteral)) return -1;
     BoolLiteral other = (BoolLiteral) o;

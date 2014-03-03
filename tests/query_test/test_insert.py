@@ -46,7 +46,7 @@ class TestInsertQueries(ImpalaTestSuite):
     super(TestInsertQueries, cls).setup_class()
 
   @pytest.mark.execute_serially
-  def test_insert1(self, vector):
+  def test_insert(self, vector):
     vector.get_value('exec_option')['PARQUET_COMPRESSION_CODEC'] = \
         vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert', vector,

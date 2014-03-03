@@ -32,6 +32,7 @@ import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TExpr;
+import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileDesc;
 import com.cloudera.impala.thrift.THdfsPartition;
@@ -426,9 +427,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         clusterCols.add(table.getColumns().get(i));
       }
 
-      List<com.cloudera.impala.thrift.TExprNode> exprNodes = Lists.newArrayList();
-      for (com.cloudera.impala.thrift.TExpr expr: thriftPartition.getPartitionKeyExprs()) {
-        for (com.cloudera.impala.thrift.TExprNode node: expr.getNodes()) {
+      List<TExprNode> exprNodes = Lists.newArrayList();
+      for (TExpr expr: thriftPartition.getPartitionKeyExprs()) {
+        for (TExprNode node: expr.getNodes()) {
           exprNodes.add(node);
         }
       }
@@ -459,22 +460,25 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     return partition;
   }
 
-  private static LiteralExpr TExprNodeToLiteralExpr(
-      com.cloudera.impala.thrift.TExprNode exprNode, ColumnType primitiveType) {
+  private static LiteralExpr TExprNodeToLiteralExpr(TExprNode exprNode,
+      ColumnType primitiveType) {
     try {
       switch (exprNode.node_type) {
         case FLOAT_LITERAL:
-          return (LiteralExpr)(LiteralExpr.create(Double.toString(
+          return (LiteralExpr) (LiteralExpr.create(Double.toString(
               exprNode.float_literal.value), primitiveType).castTo(primitiveType));
         case INT_LITERAL:
-          return (LiteralExpr)(LiteralExpr.create(Long.toString(
+          return (LiteralExpr) (LiteralExpr.create(Long.toString(
               exprNode.int_literal.value), primitiveType).castTo(primitiveType));
         case STRING_LITERAL:
           return LiteralExpr.create(exprNode.string_literal.value, primitiveType);
+        case BOOL_LITERAL:
+          return LiteralExpr.create(Boolean.toString(exprNode.bool_literal.value),
+              primitiveType);
         case NULL_LITERAL:
           return new NullLiteral();
         default:
-          throw new IllegalStateException("Unsupported partition key type: " +
+          throw new UnsupportedOperationException("Unsupported partition key type: " +
               exprNode.node_type);
       }
     } catch (Exception e) {

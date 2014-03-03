@@ -297,14 +297,6 @@ public class InsertStmt extends StatementBase {
           table_.getFullName()));
     }
 
-    if (table_ instanceof HdfsTable) {
-      HdfsTable hdfsTable = (HdfsTable) table_;
-      if (!hdfsTable.hasWriteAccess()) {
-        throw new AnalysisException(String.format("Unable to INSERT into target table " +
-            "(%s) because Impala does not have WRITE access to at least one HDFS path" +
-            ": %s", targetTableName_, hdfsTable.getFirstLocationWithoutWriteAccess()));
-      }
-    }
 
     boolean isHBaseTable = (table_ instanceof HBaseTable);
     int numClusteringCols = isHBaseTable ? 0 : table_.getNumClusteringCols();
@@ -318,6 +310,28 @@ public class InsertStmt extends StatementBase {
         // Unpartitioned table, but INSERT has PARTITION clause
         throw new AnalysisException("PARTITION clause is only valid for INSERT into " +
             "partitioned table. '" + targetTableName_ + "' is not partitioned");
+      }
+    }
+
+    if (table_ instanceof HdfsTable) {
+      HdfsTable hdfsTable = (HdfsTable) table_;
+      if (!hdfsTable.hasWriteAccess()) {
+        throw new AnalysisException(String.format("Unable to INSERT into target table " +
+            "(%s) because Impala does not have WRITE access to at least one HDFS path" +
+            ": %s", targetTableName_, hdfsTable.getFirstLocationWithoutWriteAccess()));
+      }
+
+      for (int colIdx = 0; colIdx < numClusteringCols; ++colIdx) {
+        Column col = hdfsTable.getColumns().get(colIdx);
+        // Hive has a number of issues handling BOOLEAN partition columns (see HIVE-6590).
+        // Instead of working around the Hive bugs, INSERT is disabled for BOOLEAN
+        // partitions in Impala. Once the Hive JIRA is resolved, we can remove this
+        // analysis check.
+        if (col.getType() == ColumnType.BOOLEAN) {
+          throw new AnalysisException(String.format("INSERT into table with BOOLEAN " +
+              "partition column (%s) is not supported: %s", col.getName(),
+              targetTableName_));
+        }
       }
     }
 

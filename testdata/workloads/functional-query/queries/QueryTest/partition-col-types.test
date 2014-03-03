@@ -1,0 +1,237 @@
+====
+---- QUERY
+# Create a table with all partition types supported by INSERT statements.
+# INSERT into a BOOLEAN partition column is not currently supported due to
+# HIVE-6590.
+CREATE EXTERNAL TABLE all_insert_partition_col_types (id INT)
+PARTITIONED BY (
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  string_col STRING
+) LOCATION '/test-warehouse/all_insert_partition_col_types'
+====
+---- QUERY
+DESCRIBE all_insert_partition_col_types
+---- RESULTS
+'id','int',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'string_col','string',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+INSERT OVERWRITE all_insert_partition_col_types
+PARTITION (tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, string_col)
+SELECT id, tinyint_col, smallint_col, int_col, bigint_col,
+0.0, 1.1, string_col
+FROM functional.alltypes
+WHERE id >= 0 and id < 10;
+---- RESULTS
+tinyint_col=8/smallint_col=8/int_col=8/bigint_col=80/float_col=0/double_col=1.1/string_col=8/: 1
+tinyint_col=9/smallint_col=9/int_col=9/bigint_col=90/float_col=0/double_col=1.1/string_col=9/: 1
+tinyint_col=2/smallint_col=2/int_col=2/bigint_col=20/float_col=0/double_col=1.1/string_col=2/: 1
+tinyint_col=3/smallint_col=3/int_col=3/bigint_col=30/float_col=0/double_col=1.1/string_col=3/: 1
+tinyint_col=5/smallint_col=5/int_col=5/bigint_col=50/float_col=0/double_col=1.1/string_col=5/: 1
+tinyint_col=6/smallint_col=6/int_col=6/bigint_col=60/float_col=0/double_col=1.1/string_col=6/: 1
+tinyint_col=4/smallint_col=4/int_col=4/bigint_col=40/float_col=0/double_col=1.1/string_col=4/: 1
+tinyint_col=7/smallint_col=7/int_col=7/bigint_col=70/float_col=0/double_col=1.1/string_col=7/: 1
+tinyint_col=0/smallint_col=0/int_col=0/bigint_col=0/float_col=0/double_col=1.1/string_col=0/: 1
+tinyint_col=1/smallint_col=1/int_col=1/bigint_col=10/float_col=0/double_col=1.1/string_col=1/: 1
+====
+---- QUERY
+# Add another partition that contains different float/double values.
+INSERT OVERWRITE all_insert_partition_col_types
+PARTITION (tinyint_col=11, smallint_col=11, int_col=11, bigint_col=110,
+float_col=2, double_col=3.1, string_col='11')
+SELECT 11;
+---- RESULTS
+tinyint_col=11/smallint_col=11/int_col=11/bigint_col=110/float_col=2/double_col=3.1/string_col=11/: 1
+====
+---- QUERY
+SELECT * FROM all_insert_partition_col_types
+---- RESULTS
+0,0,0,0,0,0,1.1,'0'
+3,3,3,3,30,0,1.1,'3'
+8,8,8,8,80,0,1.1,'8'
+9,9,9,9,90,0,1.1,'9'
+2,2,2,2,20,0,1.1,'2'
+1,1,1,1,10,0,1.1,'1'
+11,11,11,11,110,2,3.1,'11'
+7,7,7,7,70,0,1.1,'7'
+5,5,5,5,50,0,1.1,'5'
+6,6,6,6,60,0,1.1,'6'
+4,4,4,4,40,0,1.1,'4'
+---- TYPES
+INT, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING
+====
+---- QUERY
+# Verify partition pruning works for all column types
+EXPLAIN
+SELECT * from all_insert_partition_col_types
+WHERE tinyint_col < 7 AND smallint_col < 6 AND int_col < 5 AND bigint_col < 40 AND
+string_col in ('1', '2', '3')
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+''
+'01:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|'
+'00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
+'   partitions=3/11 size=12B'
+====
+---- QUERY
+EXPLAIN
+SELECT * from all_insert_partition_col_types
+WHERE tinyint_col < 7
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=48.00MB VCores=1'
+''
+'01:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|'
+'00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
+'   partitions=7/11 size=28B'
+====
+---- QUERY
+EXPLAIN
+SELECT * from all_insert_partition_col_types
+WHERE smallint_col < 6
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=48.00MB VCores=1'
+''
+'01:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|'
+'00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
+'   partitions=6/11 size=24B'
+====
+---- QUERY
+EXPLAIN
+SELECT * from all_insert_partition_col_types
+WHERE int_col < 5
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+''
+'01:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|'
+'00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
+'   partitions=5/11 size=20B'
+====
+---- QUERY
+EXPLAIN
+SELECT * from all_insert_partition_col_types
+WHERE bigint_col < 40
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+''
+'01:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|'
+'00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
+'   partitions=4/11 size=16B'
+====
+---- QUERY
+EXPLAIN
+SELECT * from all_insert_partition_col_types
+WHERE string_col in ('1', '2', '3')
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+''
+'01:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|'
+'00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
+'   partitions=3/11 size=12B'
+====
+---- QUERY
+EXPLAIN
+SELECT * from all_insert_partition_col_types
+WHERE double_col = 1.1
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=64.00MB VCores=1'
+''
+'01:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|'
+'00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
+'   partitions=10/11 size=40B'
+====
+---- QUERY
+EXPLAIN
+SELECT * from all_insert_partition_col_types
+WHERE float_col = 2
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+''
+'01:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|'
+'00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
+'   partitions=1/11 size=6B'
+====
+---- QUERY
+# Create a table with all supported partition key column types. TIMESTAMP is not
+# currently a supported partition key column type.
+# TODO: Should we really support double/float partition key columns?
+CREATE EXTERNAL TABLE all_partition_col_types (id INT)
+PARTITIONED BY (
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  string_col STRING
+)
+====
+---- QUERY
+DESCRIBE all_partition_col_types
+---- RESULTS
+'id','int',''
+'bool_col','boolean',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'string_col','string',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Since Impala currently does not support INSERT into a boolean partition column,
+# just point this partition at some existing data.
+ALTER TABLE all_partition_col_types
+ADD PARTITION (bool_col=FALSE, tinyint_col=1, smallint_col=1, int_col=1,
+bigint_col=10, float_col=0, double_col=1.1, string_col='1')
+LOCATION '/test-warehouse/all_insert_partition_col_types/tinyint_col=1/smallint_col=1/int_col=1/bigint_col=10/float_col=0/double_col=1.1/string_col=1/'
+====
+---- QUERY
+ALTER TABLE all_partition_col_types
+ADD PARTITION (bool_col=TRUE, tinyint_col=2, smallint_col=2, int_col=2,
+bigint_col=20, float_col=0, double_col=1.1, string_col='2')
+LOCATION '/test-warehouse/all_insert_partition_col_types/tinyint_col=2/smallint_col=2/int_col=2/bigint_col=20/float_col=0/double_col=1.1/string_col=2/'
+====
+---- QUERY
+EXPLAIN
+SELECT * FROM all_partition_col_types
+WHERE bool_col=false
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=32.00MB VCores=1'
+''
+'01:EXCHANGE [PARTITION=UNPARTITIONED]'
+'|'
+'00:SCAN HDFS [hdfs_partitioning.all_partition_col_types]'
+'   partitions=1/2 size=4B'
+====
+---- QUERY
+DROP TABLE all_partition_col_types;
+====
+---- QUERY
+DROP TABLE all_insert_partition_col_types;
+====
