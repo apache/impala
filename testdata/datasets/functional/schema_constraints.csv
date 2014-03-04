@@ -91,4 +91,4 @@ table_name:nullformat_custom, constraint:exclude, table_format:hbase/none/none
 table_name:unsupported_types, constraint:exclude, table_format:hbase/none/none
 
 # Decimal is only supported for text for now.
-table_name:decimal_tbl, constraint:restrict_to, table_format:text/none/none
+#table_name:decimal_tbl, constraint:restrict_to, table_format:text/none/none
