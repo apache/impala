@@ -52,16 +52,20 @@ MAX_NUM_QUEUED_QUERIES = 10
 # Mem limit (bytes) used in the mem limit test
 MEM_TEST_LIMIT = 100000 * 1024 * 1024
 
-_IMPALAD_ARGS_WITH_CONFIGS = ("-vmodule admission-controller=3 "
- "-fair_scheduler_allocation_path fair-scheduler-test2.xml "
- "-llama_site_path llama-site-test2.xml")
-
 _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s" % (STATESTORE_HEARTBEAT_MS)
 
 def impalad_admission_ctrl_flags(max_requests, max_queued, mem_limit):
   return ("-vmodule admission-controller=3 -default_pool_max_requests %s "
       "-default_pool_max_queued %s -default_pool_mem_limit %s" %\
       (max_requests, max_queued, mem_limit))
+
+def impalad_admission_ctrl_config_args():
+  impalad_home = os.environ['IMPALA_HOME']
+  resources_dir = os.path.join(impalad_home, "fe", "src", "test", "resources")
+  fs_allocation_path = os.path.join(resources_dir, "fair-scheduler-test2.xml")
+  llama_site_path = os.path.join(resources_dir, "llama-site-test2.xml")
+  return ("-vmodule admission-controller=3 -fair_scheduler_allocation_path %s "
+        "-llama_site_path %s" % (fs_allocation_path, llama_site_path))
 
 def log_metrics(log_prefix, metrics, log_level=logging.DEBUG):
   LOG.log(log_level, "%sadmitted=%s, queued=%s, dequeued=%s, rejected=%s, "\
@@ -127,6 +131,9 @@ class TestAdmissionController(CustomClusterTestSuite):
         TestDimension('submission_delay_ms', *SUBMISSION_DELAY_MS))
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_constraint(lambda v: v.get_value('submission_delay_ms') == 0)
+      cls.TestMatrix.add_constraint(lambda v: v.get_value('num_queries') == 30)
+      cls.TestMatrix.add_constraint(\
+          lambda v: v.get_value('round_robin_submission') == True)
 
   def setup(self):
     # All threads are stored in this list and it's used just to make sure we clean up
@@ -466,7 +473,7 @@ class TestAdmissionController(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=_IMPALAD_ARGS_WITH_CONFIGS,
+      impalad_args=impalad_admission_ctrl_config_args(),
       statestored_args=_STATESTORED_ARGS)
   def test_admission_controller_with_configs(self, vector):
     self.pool_name = 'root.queueB'

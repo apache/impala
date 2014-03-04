@@ -15,6 +15,10 @@
 package com.cloudera.impala.util;
 
 import java.io.File;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -22,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
  * Service to watch a file for changes. A thread periodically checks the file
@@ -37,10 +42,10 @@ public class FileWatchService {
   // Time between checking for changes. Mutable for unit tests.
   private long checkIntervalMs_ = DEFAULT_CHECK_INTERVAL_MS;
 
-  // TODO: See if we can use Executors.newScheduledThreadPool
-  private Thread watchThread_;
-  private final AtomicBoolean running_;
+  // Future returned by scheduleAtFixedRate(), needed to stop the checking thread.
+  private ScheduledFuture<?> fileCheckFuture_;
 
+  private final AtomicBoolean running_;
   private final FileChangeListener changeListener_; // Used to notify when changes occur.
   private final File file_; // The file to check for changes.
   private boolean alreadyWarned_; // Avoid repeatedly warning if the file is missing
@@ -104,27 +109,21 @@ public class FileWatchService {
   public synchronized void start() {
     Preconditions.checkState(!running_.get());
     running_.set(true);
-    watchThread_ = new Thread() {
-      @Override
-      public void run() {
-        while (running_.get()) {
-          try {
-            checkFile();
-          } catch (SecurityException e) {
-            LOG.warn("Not allowed to check read file existence: " + file_.getPath(), e);
-          }
 
-          try {
-            Thread.sleep(checkIntervalMs_);
-          } catch (InterruptedException ex) {
-            LOG.info("Interrupted while waiting to check for file changes.");
-          }
+    ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("FileWatchThread(" + file_.getPath() + ")-%d")
+        .build());
+    fileCheckFuture_ = executor.scheduleAtFixedRate(new Runnable() {
+      public void run() {
+        try {
+          checkFile();
+        } catch (SecurityException e) {
+          LOG.warn("Not allowed to check read file existence: " + file_.getPath(), e);
         }
       }
-    };
-    watchThread_.setName("FileWatchThread(" + file_.getPath() + ")");
-    watchThread_.setDaemon(true);
-    watchThread_.start();
+    }, 0L, checkIntervalMs_, TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -133,6 +132,6 @@ public class FileWatchService {
   public synchronized void stop() {
     Preconditions.checkState(running_.get());
     running_.set(false);
-    watchThread_.interrupt();
+    fileCheckFuture_.cancel(false);
   }
 }

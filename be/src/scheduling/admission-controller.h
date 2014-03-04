@@ -25,7 +25,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "common/status.h"
-#include "scheduling/request-pool-utils.h"
+#include "scheduling/request-pool-service.h"
 #include "statestore/statestore-subscriber.h"
 #include "statestore/query-schedule.h"
 #include "util/internal-queue.h"
@@ -80,7 +80,7 @@ class ExecEnv;
 //       combination of the estimate and the actual consumption as a function of time.
 class AdmissionController {
  public:
-  AdmissionController(RequestPoolUtils* pool_utils, Metrics* metrics,
+  AdmissionController(RequestPoolService* request_pool_service, Metrics* metrics,
       const std::string& backend_id);
   ~AdmissionController();
 
@@ -169,7 +169,7 @@ class AdmissionController {
 
   // Used for user-to-pool resolution and looking up pool configurations. Not owned by
   // the AdmissionController.
-  RequestPoolUtils* pool_utils_;
+  RequestPoolService* request_pool_service_;
 
   // Metrics subsystem access
   Metrics* metrics_;
@@ -231,6 +231,12 @@ class AdmissionController {
   // Map of pool names to pool metrics.
   typedef boost::unordered_map<std::string, PoolMetrics> PoolMetricsMap;
   PoolMetricsMap pool_metrics_map_;
+
+  // Map of pool names to the most recent pool configs returned by request_pool_service_.
+  // Stored so that the dequeue thread does not need to access the configs via the
+  // request pool service again (which involves a JNI call and error checking).
+  typedef boost::unordered_map<std::string, TPoolConfigResult> PoolConfigMap;
+  PoolConfigMap pool_config_cache_;
 
   // Notifies the dequeuing thread that pool stats have changed and it may be
   // possible to dequeue and admit queries.

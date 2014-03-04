@@ -344,7 +344,7 @@ struct TTransmitDataResult {
   1: optional Status.TStatus status
 }
 
-// Parameters for RequestPoolUtils.resolveRequestPool()
+// Parameters for RequestPoolService.resolveRequestPool()
 struct TResolveRequestPoolParams {
   // User to resolve to a pool via the allocation placement policy and
   // authorize for pool access.
@@ -355,7 +355,7 @@ struct TResolveRequestPoolParams {
   2: required string requested_pool
 }
 
-// Returned by RequestPoolUtils.resolveRequestPool()
+// Returned by RequestPoolService.resolveRequestPool()
 struct TResolveRequestPoolResult {
   // Actual pool to use, as determined by the pool allocation policy.
   1: required string resolved_pool
@@ -364,13 +364,13 @@ struct TResolveRequestPoolResult {
   2: required bool has_access
 }
 
-// Parameters for RequestPoolUtils.getPoolConfig()
+// Parameters for RequestPoolService.getPoolConfig()
 struct TPoolConfigParams {
   // Pool name
   1: required string pool
 }
 
-// Returned by RequestPoolUtils.getPoolConfig()
+// Returned by RequestPoolService.getPoolConfig()
 struct TPoolConfigResult {
   // Maximum number of placed requests before incoming requests are queued.
   1: required i64 max_requests

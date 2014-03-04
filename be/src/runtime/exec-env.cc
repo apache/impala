@@ -30,6 +30,7 @@
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
+#include "scheduling/request-pool-service.h"
 #include "statestore/simple-scheduler.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
@@ -109,6 +110,7 @@ ExecEnv::ExecEnv()
     cgroups_mgr_(NULL),
     hdfs_op_thread_pool_(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
+    request_pool_service_(new RequestPoolService()),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()),
     is_fe_tests_(false) {
@@ -136,12 +138,12 @@ ExecEnv::ExecEnv()
 
     scheduler_.reset(new SimpleScheduler(statestore_subscriber_.get(),
         statestore_subscriber_->id(), backend_address, metrics_.get(),
-        webserver_.get(), resource_broker_.get()));
+        webserver_.get(), resource_broker_.get(), request_pool_service_.get()));
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get(),
-        resource_broker_.get()));
+        resource_broker_.get(), request_pool_service_.get()));
   }
   if (exec_env_ == NULL) exec_env_ = this;
   if (FLAGS_enable_rm) resource_broker_->set_scheduler(scheduler_.get());
@@ -160,6 +162,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     thread_mgr_(new ThreadResourceMgr),
     hdfs_op_thread_pool_(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
+    request_pool_service_(new RequestPoolService()),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     tz_database_(TimezoneDatabase()),
     is_fe_tests_(false) {
@@ -185,12 +188,12 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
 
     scheduler_.reset(new SimpleScheduler(statestore_subscriber_.get(),
         statestore_subscriber_->id(), backend_address, metrics_.get(),
-        webserver_.get(), resource_broker_.get()));
+        webserver_.get(), resource_broker_.get(), request_pool_service_.get()));
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(hostname, backend_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get(), webserver_.get(),
-        resource_broker_.get()));
+        resource_broker_.get(), request_pool_service_.get()));
   }
   if (exec_env_ == NULL) exec_env_ = this;
   if (FLAGS_enable_rm) resource_broker_->set_scheduler(scheduler_.get());

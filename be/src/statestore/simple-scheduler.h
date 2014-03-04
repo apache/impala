@@ -52,12 +52,13 @@ class SimpleScheduler : public Scheduler {
   //  - backend_address - the address that this backend listens on
   SimpleScheduler(StatestoreSubscriber* subscriber, const std::string& backend_id,
       const TNetworkAddress& backend_address, Metrics* metrics, Webserver* webserver,
-      ResourceBroker* resource_broker);
+      ResourceBroker* resource_broker, RequestPoolService* request_pool_service);
 
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   // backends is fixed and will not be updated.
   SimpleScheduler(const std::vector<TNetworkAddress>& backends, Metrics* metrics,
-      Webserver* webserver, ResourceBroker* resource_broker);
+      Webserver* webserver, ResourceBroker* resource_broker,
+      RequestPoolService* request_pool_service);
 
   // Returns a list of backends such that the impalad at backends[i] should be used to
   // read data from data_locations[i].
@@ -168,8 +169,9 @@ class SimpleScheduler : public Scheduler {
   // Set to NULL if resource management is disabled.
   ResourceBroker* resource_broker_;
 
-  // Used for user-to-pool resolution and looking up pool configurations.
-  boost::scoped_ptr<RequestPoolUtils> request_pool_utils_;
+  // Used for user-to-pool resolution and looking up pool configurations. Not owned by
+  // us.
+  RequestPoolService* request_pool_service_;
 
   // Used to make admission decisions in 'Schedule()'
   boost::scoped_ptr<AdmissionController> admission_controller_;
@@ -191,7 +193,7 @@ class SimpleScheduler : public Scheduler {
   // Webserver callback that prints a list of known backends
   void BackendsPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 
-  // Determines the pool for a user and query options via request_pool_utils_.
+  // Determines the pool for a user and query options via request_pool_service_.
   Status GetRequestPool(const std::string& user,
       const TQueryOptions& query_options, std::string* pool) const;
 

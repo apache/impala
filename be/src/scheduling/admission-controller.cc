@@ -153,9 +153,9 @@ static string DebugPoolStats(const string& pool_name,
   return ss.str();
 }
 
-AdmissionController::AdmissionController(RequestPoolUtils* pool_utils, Metrics* metrics,
-    const string& backend_id)
-    : pool_utils_(pool_utils),
+AdmissionController::AdmissionController(RequestPoolService* request_pool_service,
+    Metrics* metrics, const string& backend_id)
+    : request_pool_service_(request_pool_service),
       metrics_(metrics),
       backend_id_(backend_id),
       thrift_serializer_(false),
@@ -188,9 +188,10 @@ Status AdmissionController::Init(StatestoreSubscriber* subscriber) {
   return status;
 }
 
-bool AdmissionController::CanAdmitRequest(const string& pool, const int64_t max_requests,
-    const int64_t mem_limit, const QuerySchedule& schedule, bool admit_from_queue) {
-  const TPoolStats& total_stats = cluster_pool_stats_[pool];
+bool AdmissionController::CanAdmitRequest(const string& pool_name,
+    const int64_t max_requests, const int64_t mem_limit, const QuerySchedule& schedule,
+    bool admit_from_queue) {
+  const TPoolStats& total_stats = cluster_pool_stats_[pool_name];
   DCHECK_GE(total_stats.mem_usage, 0);
   DCHECK_GE(total_stats.mem_estimate, 0);
   const int64_t cluster_estimated_memory = schedule.GetClusterMemoryEstimate() +
@@ -209,33 +210,33 @@ bool AdmissionController::CanAdmitRequest(const string& pool, const int64_t max_
   return true;
 }
 
-bool AdmissionController::RejectRequest(const string& pool, const int64_t max_requests,
-    const int64_t mem_limit, const int64_t max_queued, const QuerySchedule& schedule,
-    string* error_msg) {
-  TPoolStats* total_stats = &cluster_pool_stats_[pool];
+bool AdmissionController::RejectRequest(const string& pool_name,
+    const int64_t max_requests, const int64_t mem_limit, const int64_t max_queued,
+    const QuerySchedule& schedule, string* error_msg) {
+  TPoolStats* total_stats = &cluster_pool_stats_[pool_name];
   const int64_t expected_mem_usage = schedule.GetClusterMemoryEstimate();
   string reject_reason;
   if (max_requests == 0) {
     reject_reason = REASON_DISABLED_REQUESTS_LIMIT;
   } else if (mem_limit == 0) {
     reject_reason = REASON_DISABLED_MEM_LIMIT;
-  } else if (total_stats->num_queued >= max_queued) {
-    reject_reason = Substitute(REASON_QUEUE_FULL, max_queued, total_stats->num_queued);
   } else if (mem_limit > 0 && expected_mem_usage >= mem_limit) {
     reject_reason = Substitute(REASON_REQ_OVER_MEM_LIMIT, expected_mem_usage,
         mem_limit);
+  } else if (total_stats->num_queued >= max_queued) {
+    reject_reason = Substitute(REASON_QUEUE_FULL, max_queued, total_stats->num_queued);
   } else {
     return false; // Not rejected
   }
-  *error_msg = Substitute(STATUS_REJECTED, PrintId(schedule.query_id()), pool,
+  *error_msg = Substitute(STATUS_REJECTED, PrintId(schedule.query_id()), pool_name,
       reject_reason);
   return true;
 }
 
 Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
-  const string& pool = schedule->request_pool();
+  const string& pool_name = schedule->request_pool();
   TPoolConfigResult pool_config;
-  RETURN_IF_ERROR(pool_utils_->GetPoolConfig(pool, &pool_config));
+  RETURN_IF_ERROR(request_pool_service_->GetPoolConfig(pool_name, &pool_config));
   const int64_t max_requests = pool_config.max_requests;
   const int64_t max_queued = pool_config.max_queued;
   const int64_t mem_limit = pool_config.mem_limit;
@@ -247,23 +248,25 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   ScopedEvent completedEvent(schedule->query_events(), QUERY_EVENT_COMPLETED_ADMISSION);
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    RequestQueue* queue = &request_queue_map_[pool];
-    PoolMetrics* pool_metrics = GetPoolMetrics(pool);
-    TPoolStats* total_stats = &cluster_pool_stats_[pool];
-    TPoolStats* local_stats = &local_pool_stats_[pool];
+    RequestQueue* queue = &request_queue_map_[pool_name];
+    pool_config_cache_[pool_name] = pool_config;
+    PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
+    TPoolStats* total_stats = &cluster_pool_stats_[pool_name];
+    TPoolStats* local_stats = &local_pool_stats_[pool_name];
     const int64_t cluster_mem_estimate = schedule->GetClusterMemoryEstimate();
-    VLOG_ROW << "Schedule for id=" << schedule->query_id() << " in pool=" << pool
+    VLOG_ROW << "Schedule for id=" << schedule->query_id()
+             << " in pool_name=" << pool_name
              << " max_requests=" << max_requests << " max_queued=" << max_queued
              << " mem_limit=" << PrettyPrinter::Print(mem_limit, TCounterType::BYTES)
              << " mem_usage="
              << PrettyPrinter::Print(total_stats->mem_usage, TCounterType::BYTES)
              << " cluster_mem_estimate="
              << PrettyPrinter::Print(cluster_mem_estimate, TCounterType::BYTES);
-    VLOG_ROW << "Initial stats: " << DebugPoolStats(pool, total_stats, local_stats);
+    VLOG_ROW << "Initial stats: " << DebugPoolStats(pool_name, total_stats, local_stats);
 
-    if (CanAdmitRequest(pool, max_requests, mem_limit, *schedule, false)) {
+    if (CanAdmitRequest(pool_name, max_requests, mem_limit, *schedule, false)) {
       // Execute immediately
-      pools_for_updates_.insert(pool);
+      pools_for_updates_.insert(pool_name);
       // The local and total stats get incremented together when we queue so if
       // there were any locally queued queries we should not admit immediately.
       DCHECK_EQ(local_stats->num_queued, 0);
@@ -281,12 +284,13 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
         pool_metrics->cluster_mem_estimate->Increment(mem_estimate);
       }
       VLOG_QUERY << "Admitted query id=" << schedule->query_id();
-      VLOG_ROW << "Final: " << DebugPoolStats(pool, total_stats, local_stats);
+      VLOG_ROW << "Final: " << DebugPoolStats(pool_name, total_stats, local_stats);
       return Status::OK;
     }
 
     string error_msg; // detailed error message returned if rejected
-    if (RejectRequest(pool, max_requests, mem_limit, max_queued, *schedule, &error_msg)) {
+    if (RejectRequest(pool_name, max_requests, mem_limit, max_queued, *schedule,
+        &error_msg)) {
       schedule->set_is_admitted(false);
       schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
           PROFILE_INFO_VAL_REJECTED);
@@ -299,7 +303,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     VLOG_QUERY << "Queuing, query id=" << schedule->query_id();
     DCHECK_LT(total_stats->num_queued, max_queued);
     DCHECK(max_requests > 0 || mem_limit > 0);
-    pools_for_updates_.insert(pool);
+    pools_for_updates_.insert(pool_name);
     ++local_stats->num_queued;
     ++total_stats->num_queued;
     queue->Enqueue(&queue_node);
@@ -323,17 +327,17 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   // stats.
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    RequestQueue* queue = &request_queue_map_[pool];
-    PoolMetrics* pool_metrics = GetPoolMetrics(pool);
-    pools_for_updates_.insert(pool);
+    RequestQueue* queue = &request_queue_map_[pool_name];
+    PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
+    pools_for_updates_.insert(pool_name);
     if (pool_metrics != NULL) {
       pool_metrics->local_time_in_queue_ms->Increment(wait_time_ms);
     }
     // Now that we have the lock, check again if the query was actually admitted (i.e.
     // if the promise still hasn't been set), in which case we just admit the query.
     timed_out = !queue_node.is_admitted.IsSet();
-    TPoolStats* total_stats = &cluster_pool_stats_[pool];
-    TPoolStats* local_stats = &local_pool_stats_[pool];
+    TPoolStats* total_stats = &cluster_pool_stats_[pool_name];
+    TPoolStats* local_stats = &local_pool_stats_[pool_name];
     if (timed_out) {
       queue->Remove(&queue_node);
       queue_node.is_admitted.Set(false);
@@ -355,18 +359,18 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
         PROFILE_INFO_VAL_ADMIT_QUEUED);
     if (pool_metrics != NULL) pool_metrics->local_admitted->Increment(1L);
     VLOG_QUERY << "Admitted queued query id=" << schedule->query_id();
-    VLOG_ROW << "Final: " << DebugPoolStats(pool, total_stats, local_stats);
+    VLOG_ROW << "Final: " << DebugPoolStats(pool_name, total_stats, local_stats);
     return Status::OK;
   }
 }
 
 Status AdmissionController::ReleaseQuery(QuerySchedule* schedule) {
   if (!schedule->is_admitted()) return Status::OK; // No-op if query was not admitted
-  const string& pool = schedule->request_pool();
+  const string& pool_name = schedule->request_pool();
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    TPoolStats* total_stats = &cluster_pool_stats_[pool];
-    TPoolStats* local_stats = &local_pool_stats_[pool];
+    TPoolStats* total_stats = &cluster_pool_stats_[pool_name];
+    TPoolStats* local_stats = &local_pool_stats_[pool_name];
     DCHECK_GT(total_stats->num_running, 0);
     DCHECK_GT(local_stats->num_running, 0);
     --total_stats->num_running;
@@ -375,15 +379,15 @@ Status AdmissionController::ReleaseQuery(QuerySchedule* schedule) {
     int64_t mem_estimate = schedule->GetClusterMemoryEstimate();
     local_stats->mem_estimate -= mem_estimate;
     total_stats->mem_estimate -= mem_estimate;
-    PoolMetrics* pool_metrics = GetPoolMetrics(pool);
+    PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
     if (pool_metrics != NULL) {
       pool_metrics->local_completed->Increment(1L);
       pool_metrics->local_mem_estimate->Increment(-1 * mem_estimate);
       pool_metrics->cluster_mem_estimate->Increment(-1 * mem_estimate);
     }
-    pools_for_updates_.insert(pool);
+    pools_for_updates_.insert(pool_name);
     VLOG_ROW << "Released query id=" << schedule->query_id() << " "
-             << DebugPoolStats(pool, total_stats, local_stats);
+             << DebugPoolStats(pool_name, total_stats, local_stats);
   }
   dequeue_cv_.notify_one();
   return Status::OK;
@@ -569,9 +573,10 @@ void AdmissionController::DequeueLoop() {
       const string& pool_name = entry.first;
       TPoolStats* local_stats = &entry.second;
 
-      TPoolConfigResult pool_config;
-      // TODO: Handle errors from GetPoolConfig
-      pool_utils_->GetPoolConfig(pool_name, &pool_config);
+      PoolConfigMap::iterator it = pool_config_cache_.find(pool_name);
+      if (it == pool_config_cache_.end()) continue; // No local requests in this pool
+      const TPoolConfigResult& pool_config = it->second;
+
       const int64_t max_requests = pool_config.max_requests;
       const int64_t mem_limit = pool_config.mem_limit;
 

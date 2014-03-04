@@ -33,6 +33,7 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.common.ByteUnits;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
@@ -66,8 +67,8 @@ import com.google.common.base.Strings;
  *
  * A single instance is created by the backend and lasts the duration of the process.
  */
-public class RequestPoolUtils {
-  final static Logger LOG = LoggerFactory.getLogger(RequestPoolUtils.class);
+public class RequestPoolService {
+  final static Logger LOG = LoggerFactory.getLogger(RequestPoolService.class);
 
   private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
@@ -98,8 +99,6 @@ public class RequestPoolUtils {
   // default, e.g. LLAMA_MAX_PLACED_RESERVATIONS_KEY, and the second parameter is the
   // pool name.
   final static String LLAMA_PER_POOL_CONFIG_KEY_FORMAT = "%s.%s";
-  // TODO: Find a common place for constants like these.
-  final static long ONE_MEGABYTE = 1024 * 1024; // One megabyte in bytes.
 
   // Watches for changes to the fair scheduler allocation file.
   @VisibleForTesting
@@ -122,7 +121,7 @@ public class RequestPoolUtils {
 
   /**
    * Updates the Llama configuration when the file changes. The file is llamaConfUrl_
-   * and it will exist when this is created (or RequestPoolUtils will not start). If
+   * and it will exist when this is created (or RequestPoolService will not start). If
    * the file is later removed, warnings will be written to the log but the previous
    * configuration will still be accessible.
    */
@@ -135,23 +134,23 @@ public class RequestPoolUtils {
   }
 
   /**
-   * Creates a RequestPoolUtils instance with a configuration containing the specified
-   * fair-scheduler.xml and llama-site.xml. Both files must either be specified as
-   * absolute paths or relative paths on the classpath.
+   * Creates a RequestPoolService instance with a configuration containing the specified
+   * fair-scheduler.xml and llama-site.xml.
    *
    * @param fsAllocationPath path to the fair scheduler allocation file.
    * @param llamaSitePath path to the Llama configuration file.
    */
-  public RequestPoolUtils(final String fsAllocationPath, final String llamaSitePath) {
+  public RequestPoolService(final String fsAllocationPath, final String llamaSitePath) {
     Preconditions.checkNotNull(fsAllocationPath);
     running_ = new AtomicBoolean(false);
     allocationConf_ = new AtomicReference<AllocationConfiguration>();
-    if (getURL(fsAllocationPath) == null) {
-      throw new IllegalArgumentException("Allocation configuration file " +
-          fsAllocationPath + " is not an absolute path or a file on the classpath.");
+    URL fsAllocationURL = getURL(fsAllocationPath);
+    if (fsAllocationURL == null) {
+      throw new IllegalArgumentException(
+          "Unable to find allocation configuration file: " + fsAllocationPath);
     }
     Configuration allocConf = new Configuration(false);
-    allocConf.set(FairSchedulerConfiguration.ALLOCATION_FILE, fsAllocationPath);
+    allocConf.set(FairSchedulerConfiguration.ALLOCATION_FILE, fsAllocationURL.getPath());
     allocLoader_ = new AllocationFileLoaderService();
     allocLoader_.init(allocConf);
 
@@ -172,35 +171,27 @@ public class RequestPoolUtils {
   }
 
   /**
-   * Returns a {@link URL} for the file which is either an absolute path or a file on
-   * the classpath.
+   * Returns a {@link URL} for the file if it exists, null otherwise.
    */
   @VisibleForTesting
   static URL getURL(String path) {
     Preconditions.checkNotNull(path);
     File file = new File(path);
-    if (file.isAbsolute()) {
-      try {
-        return file.toURI().toURL();
-      } catch (MalformedURLException ex) {
-        LOG.error("Unable to find specified file: " + path, ex);
-        return null;
-      }
-    }
-    URL url = Thread.currentThread().getContextClassLoader().getResource(path);
-    if (url == null) {
-      LOG.warn("Configuration file '{}' not found on the classpath.", path);
+    file = file.getAbsoluteFile();
+    if (!file.exists()) {
+      LOG.error("Unable to find specified file: " + path);
       return null;
-    } else if (!url.getProtocol().equalsIgnoreCase("file")) {
-      throw new RuntimeException("Allocation file " + url
-          + " found on the classpath is not on the local filesystem.");
-    } else {
-      return url;
+    }
+    try {
+      return file.toURI().toURL();
+    } catch (MalformedURLException ex) {
+      LOG.error("Unable to construct URL for file: " + path, ex);
+      return null;
     }
   }
 
   /**
-   * Starts the RequestPoolUtils instance. It does the initial loading of the
+   * Starts the RequestPoolService instance. It does the initial loading of the
    * configuration and starts the automatic reloading.
    */
   public void start() {
@@ -215,7 +206,12 @@ public class RequestPoolUtils {
     try {
       allocLoader_.reloadAllocations();
     } catch (Exception ex) {
-      stop();
+      try {
+        stopInternal();
+      } catch (Exception stopEx) {
+        LOG.error("Unable to stop AllocationFileLoaderService after failed start.",
+            stopEx);
+      }
       throw new RuntimeException(ex);
     }
     if (llamaConfWatcher_ != null) llamaConfWatcher_.start();
@@ -223,10 +219,19 @@ public class RequestPoolUtils {
   }
 
   /**
-   * Stops the RequestPoolUtils instance. Only used by tests.
+   * Stops the RequestPoolService instance. Only used by tests.
    */
   public void stop() {
     Preconditions.checkState(running_.get());
+    stopInternal();
+  }
+
+  /**
+   * Stops the RequestPoolService instance without checking the running state. Only
+   * called by stop() (which is only used in tests) or by start() if a failure occurs.
+   * Should not be called more than once.
+   */
+  private void stopInternal() {
     running_.set(false);
     if (llamaConfWatcher_ != null) llamaConfWatcher_.stop();
     allocLoader_.stop();
@@ -290,7 +295,7 @@ public class RequestPoolUtils {
     TPoolConfigResult result = new TPoolConfigResult();
     int maxMemoryMb = allocationConf_.get().getMaxResources(pool).getMemory();
     result.setMem_limit(
-        maxMemoryMb == Integer.MAX_VALUE ? -1 : (long) maxMemoryMb * ONE_MEGABYTE);
+        maxMemoryMb == Integer.MAX_VALUE ? -1 : (long) maxMemoryMb * ByteUnits.MEGABYTE);
     // Capture the current llamaConf_ in case it changes while we're using it.
     Configuration currentLlamaConf = llamaConf_;
     result.setMax_requests(getLlamaPoolConfigValue(currentLlamaConf, pool,

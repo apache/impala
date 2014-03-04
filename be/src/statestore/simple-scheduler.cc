@@ -66,8 +66,8 @@ static const string ERROR_USER_NOT_ALLOWED_IN_POOL("Request from user '$0' with 
 
 SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     const string& backend_id, const TNetworkAddress& backend_address,
-    Metrics* metrics, Webserver* webserver,
-    ResourceBroker* resource_broker)
+    Metrics* metrics, Webserver* webserver, ResourceBroker* resource_broker,
+    RequestPoolService* request_pool_service)
   : metrics_(metrics),
     webserver_(webserver),
     statestore_subscriber_(subscriber),
@@ -77,16 +77,17 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     total_local_assignments_(NULL),
     initialised_(NULL),
     update_count_(0),
-    resource_broker_(resource_broker) {
+    resource_broker_(resource_broker),
+    request_pool_service_(request_pool_service) {
   backend_descriptor_.address = backend_address;
   next_nonlocal_backend_entry_ = backend_map_.begin();
-  request_pool_utils_.reset(new RequestPoolUtils());
   admission_controller_.reset(
-      new AdmissionController(request_pool_utils_.get(), metrics, backend_id_));
+      new AdmissionController(request_pool_service_, metrics, backend_id_));
 }
 
 SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
-    Metrics* metrics, Webserver* webserver, ResourceBroker* resource_broker)
+    Metrics* metrics, Webserver* webserver, ResourceBroker* resource_broker,
+    RequestPoolService* request_pool_service)
   : metrics_(metrics),
     webserver_(webserver),
     statestore_subscriber_(NULL),
@@ -95,11 +96,13 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
     total_local_assignments_(NULL),
     initialised_(NULL),
     update_count_(0),
-    resource_broker_(resource_broker) {
+    resource_broker_(resource_broker),
+    request_pool_service_(request_pool_service) {
   DCHECK(backends.size() > 0);
-  request_pool_utils_.reset(new RequestPoolUtils());
-  admission_controller_.reset(
-      new AdmissionController(request_pool_utils_.get(), metrics, backend_id_));
+  if (request_pool_service_ != NULL) {
+    admission_controller_.reset(
+        new AdmissionController(request_pool_service_, metrics, backend_id_));
+  }
 
   for (int i = 0; i < backends.size(); ++i) {
     vector<string> ipaddrs;
@@ -714,7 +717,7 @@ Status SimpleScheduler::GetRequestPool(const string& user,
     const TQueryOptions& query_options, string* pool) const {
   TResolveRequestPoolResult resolve_pool_result;
   const string& configured_pool = query_options.request_pool;
-  RETURN_IF_ERROR(request_pool_utils_->ResolveRequestPool(configured_pool, user,
+  RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(configured_pool, user,
         &resolve_pool_result));
   if (resolve_pool_result.resolved_pool.empty()) {
     return Status(Substitute(ERROR_USER_TO_POOL_MAPPING_NOT_FOUND, user,

@@ -15,9 +15,9 @@
 package com.cloudera.impala.util;
 
 import java.io.File;
+import java.lang.reflect.Field;
 
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderService;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderServiceHelper;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -25,18 +25,19 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import com.cloudera.impala.common.ByteUnits;
 import com.cloudera.impala.thrift.TPoolConfigResult;
 import com.google.common.io.Files;
 
 /**
  * Unit tests for the user to pool resolution, authorization, and getting configuration
- * parameters via {@link RequestPoolUtils}. Sets a configuration file and ensures the
+ * parameters via {@link RequestPoolService}. Sets a configuration file and ensures the
  * appropriate user to pool resolution, authentication, and pool configs are returned.
  * This also tests that updating the files after startup causes them to be reloaded and
  * the updated values are returned.
  * TODO: Move tests to C++ to test the API that's actually used.
  */
-public class TestRequestPoolUtils {
+public class TestRequestPoolService {
   // Pool definitions and includes memory resource limits, copied to a temporary file
   private static final String ALLOCATION_FILE = "fair-scheduler-test.xml";
 
@@ -59,52 +60,59 @@ public class TestRequestPoolUtils {
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
 
-  private RequestPoolUtils poolUtils_;
+  private RequestPoolService poolService_;
   private File allocationConfFile_;
   private File llamaConfFile_;
 
   @Before
   public void setUp() throws Exception {
     allocationConfFile_ = tempFolder.newFile("fair-scheduler-temp-file.xml");
-    Files.copy(
-        new File(RequestPoolUtils.getURL(ALLOCATION_FILE).getPath()),
-        allocationConfFile_);
+    Files.copy(getClasspathFile(ALLOCATION_FILE), allocationConfFile_);
     llamaConfFile_ = tempFolder.newFile("llama-conf-temp-file.xml");
-    Files.copy(
-        new File(RequestPoolUtils.getURL(LLAMA_CONFIG_FILE).getPath()),
-        llamaConfFile_);
-
-    poolUtils_ = new RequestPoolUtils(allocationConfFile_.getAbsolutePath(),
+    Files.copy(getClasspathFile(LLAMA_CONFIG_FILE), llamaConfFile_);
+    poolService_ = new RequestPoolService(allocationConfFile_.getAbsolutePath(),
         llamaConfFile_.getAbsolutePath());
-    AllocationFileLoaderServiceHelper.setFileReloadIntervalMs(poolUtils_.allocLoader_,
-        CHECK_INTERVAL_MS);
-    poolUtils_.llamaConfWatcher_.setCheckIntervalMs(CHECK_INTERVAL_MS);
-    poolUtils_.start();
+
+    // Lower the wait times on the AllocationFileLoaderService and RequestPoolService so
+    // the test doesn't have to wait very long to test that file changes are reloaded.
+    Field f = AllocationFileLoaderService.class.getDeclaredField("reloadIntervalMs");
+    f.setAccessible(true);
+    f.set(poolService_.allocLoader_, CHECK_INTERVAL_MS);
+    poolService_.llamaConfWatcher_.setCheckIntervalMs(CHECK_INTERVAL_MS);
+    poolService_.start();
   }
 
   @After
-  public void cleanUp() {
-    if (poolUtils_ != null) poolUtils_.stop();
+  public void cleanUp() throws Exception {
+    if (poolService_ != null) poolService_.stop();
+  }
+
+  /**
+   * Returns a {@link File} for the file on the classpath.
+   */
+  private static File getClasspathFile(String filename) {
+    return new File(
+        Thread.currentThread().getContextClassLoader().getResource(filename).getPath());
   }
 
   @Test
   public void testPoolResolution() throws Exception {
-    Assert.assertEquals("root.queueA", poolUtils_.assignToPool("queueA", "userA"));
-    Assert.assertNull(poolUtils_.assignToPool("queueC", "userA"));
+    Assert.assertEquals("root.queueA", poolService_.assignToPool("queueA", "userA"));
+    Assert.assertNull(poolService_.assignToPool("queueC", "userA"));
   }
 
   @Test
   public void testPoolAcls() throws Exception {
-    Assert.assertTrue(poolUtils_.hasAccess("root.queueA", "userA"));
-    Assert.assertTrue(poolUtils_.hasAccess("root.queueB", "userB"));
-    Assert.assertFalse(poolUtils_.hasAccess("root.queueB", "userA"));
-    Assert.assertTrue(poolUtils_.hasAccess("root.queueB", "root"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueA", "userA"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueB", "userB"));
+    Assert.assertFalse(poolService_.hasAccess("root.queueB", "userA"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueB", "root"));
   }
 
   @Test
   public void testPoolLimitConfigs() throws Exception {
     checkPoolConfigResult("root", 15, 50, -1);
-    checkPoolConfigResult("root.queueA", 10, 30, 1024 * RequestPoolUtils.ONE_MEGABYTE);
+    checkPoolConfigResult("root.queueA", 10, 30, 1024 * ByteUnits.MEGABYTE);
     checkPoolConfigResult("root.queueB", 5, 10, -1);
   }
 
@@ -117,12 +125,8 @@ public class TestRequestPoolUtils {
     // A one second pause is necessary to ensure the file timestamps are unique if the
     // test gets here within one second.
     Thread.sleep(1000L);
-    Files.copy(
-        new File(RequestPoolUtils.getURL(ALLOCATION_FILE_MODIFIED).getPath()),
-        allocationConfFile_);
-    Files.copy(
-        new File(RequestPoolUtils.getURL(LLAMA_CONFIG_FILE_MODIFIED).getPath()),
-        llamaConfFile_);
+    Files.copy(getClasspathFile(ALLOCATION_FILE_MODIFIED), allocationConfFile_);
+    Files.copy(getClasspathFile(LLAMA_CONFIG_FILE_MODIFIED), llamaConfFile_);
 
     // Wait at least 1 second more than the time it will take for the
     // AllocationFileLoaderService to update the file. The FileWatchService does not
@@ -131,22 +135,22 @@ public class TestRequestPoolUtils {
         AllocationFileLoaderService.ALLOC_RELOAD_WAIT_MS);
 
     // Test pool resolution: now there's a queueC
-    Assert.assertEquals("root.queueA", poolUtils_.assignToPool("queueA", "userA"));
-    Assert.assertNull(poolUtils_.assignToPool("queueX", "userA"));
-    Assert.assertEquals("root.queueC", poolUtils_.assignToPool("queueC", "userA"));
+    Assert.assertEquals("root.queueA", poolService_.assignToPool("queueA", "userA"));
+    Assert.assertNull(poolService_.assignToPool("queueX", "userA"));
+    Assert.assertEquals("root.queueC", poolService_.assignToPool("queueC", "userA"));
 
     // Test pool ACL changes
-    Assert.assertTrue(poolUtils_.hasAccess("root.queueA", "userA"));
-    Assert.assertTrue(poolUtils_.hasAccess("root.queueB", "userB"));
-    Assert.assertTrue(poolUtils_.hasAccess("root.queueB", "userA"));
-    Assert.assertFalse(poolUtils_.hasAccess("root.queueC", "userA"));
-    Assert.assertTrue(poolUtils_.hasAccess("root.queueC", "root"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueA", "userA"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueB", "userB"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueB", "userA"));
+    Assert.assertFalse(poolService_.hasAccess("root.queueC", "userA"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueC", "root"));
 
     // Test pool limit changes
     checkPoolConfigResult("root", 15, 100, -1);
-    checkPoolConfigResult("root.queueA", 10, 30, 100000 * RequestPoolUtils.ONE_MEGABYTE);
+    checkPoolConfigResult("root.queueA", 10, 30, 100000 * ByteUnits.MEGABYTE);
     checkPoolConfigResult("root.queueB", 5, 10, -1);
-    checkPoolConfigResult("root.queueC", 10, 30, 128 * RequestPoolUtils.ONE_MEGABYTE);
+    checkPoolConfigResult("root.queueC", 10, 30, 128 * ByteUnits.MEGABYTE);
   }
 
   /**
@@ -159,6 +163,6 @@ public class TestRequestPoolUtils {
     expectedResult.setMax_queued(expectedMaxQueued);
     expectedResult.setMem_limit(expectedMaxMemUsage);
     Assert.assertEquals("Unexpected config values for pool " + pool,
-        expectedResult, poolUtils_.getPoolConfig(pool));
+        expectedResult, poolService_.getPoolConfig(pool));
   }
 }

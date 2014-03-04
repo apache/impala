@@ -43,6 +43,7 @@ class MemTracker;
 class ThreadResourceMgr;
 class CgroupsManager;
 class ImpalaServer;
+class RequestPoolService;
 
 // Execution environment for queries/plan fragments.
 // Contains all required global structures, and handles to
@@ -120,6 +121,7 @@ class ExecEnv {
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
   boost::scoped_ptr<CgroupsMgr> cgroups_mgr_;
   boost::scoped_ptr<HdfsOpThreadPool> hdfs_op_thread_pool_;
+  boost::scoped_ptr<RequestPoolService> request_pool_service_;
 
   // Not owned by this class
   ImpalaServer* impala_server_;

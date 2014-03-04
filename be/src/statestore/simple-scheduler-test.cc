@@ -45,7 +45,7 @@ class SimpleSchedulerTest : public testing::Test {
     backends.at(1).hostname = "localhost";
     backends.at(1).port = base_port_;
 
-    hostname_scheduler_.reset(new SimpleScheduler(backends, NULL, NULL, NULL));
+    hostname_scheduler_.reset(new SimpleScheduler(backends, NULL, NULL, NULL, NULL));
 
     // Setup local_remote_scheduler_
     backends.resize(4);
@@ -59,7 +59,7 @@ class SimpleSchedulerTest : public testing::Test {
         ++k;
       }
     }
-    local_remote_scheduler_.reset(new SimpleScheduler(backends, NULL, NULL, NULL));
+    local_remote_scheduler_.reset(new SimpleScheduler(backends, NULL, NULL, NULL, NULL));
   }
 
   int base_port_;

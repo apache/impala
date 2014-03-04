@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "scheduling/request-pool-utils.h"
+#include "scheduling/request-pool-service.h"
 
 #include <list>
 #include <string>
@@ -26,11 +26,9 @@ using namespace std;
 using namespace impala;
 
 DEFINE_string(fair_scheduler_allocation_path, "", "Path to the fair scheduler "
-    "allocation file (fair-scheduler.xml), either an absolute path or a relative path "
-    "on the classpath.");
+    "allocation file (fair-scheduler.xml).");
 DEFINE_string(llama_site_path, "", "Path to the Llama configuration file "
-    "(llama-site.xml), either an absolute path or a relative path on the classpath. If "
-    "set, fair_scheduler_allocation_path must also be set.");
+    "(llama-site.xml). If set, fair_scheduler_allocation_path must also be set.");
 
 // The default_pool parameters are used if fair scheduler allocation and Llama
 // configuration files are not provided.
@@ -50,10 +48,15 @@ DEFINE_int64(default_pool_max_queued, 0, "Maximum number of requests allowed to 
     "executing. Ignored if fair_scheduler_config_path and "
     "llama_site_path are set.");
 
+// Flags to disable the pool limits for all pools.
+DEFINE_bool(disable_pool_mem_limits, false, "Disables all per-pool mem limits.");
+DEFINE_bool(disable_pool_max_requests, false, "Disables all per-pool limits on the "
+    "maximum number of running requests.");
+
 // Pool name used when the configuration files are not specified.
 const string DEFAULT_POOL_NAME = "default-pool";
 
-RequestPoolUtils::RequestPoolUtils() {
+RequestPoolService::RequestPoolService() {
   if (FLAGS_fair_scheduler_allocation_path.empty() &&
       FLAGS_llama_site_path.empty()) {
     default_pool_only_ = true;
@@ -76,7 +79,7 @@ RequestPoolUtils::RequestPoolUtils() {
   }
   default_pool_only_ = false;
 
-  jmethodID start_id; // RequestPoolUtils.start(), only called in this method.
+  jmethodID start_id; // RequestPoolService.start(), only called in this method.
   JniMethodDescriptor methods[] = {
     {"<init>", "(Ljava/lang/String;Ljava/lang/String;)V", &ctor_},
     {"start", "()V", &start_id},
@@ -84,10 +87,12 @@ RequestPoolUtils::RequestPoolUtils() {
     {"getPoolConfig", "([B)[B", &get_pool_config_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
-  pool_utils_class_ = jni_env->FindClass("com/cloudera/impala/util/RequestPoolUtils");
+  request_pool_service_class_ =
+    jni_env->FindClass("com/cloudera/impala/util/RequestPoolService");
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    EXIT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, pool_utils_class_, &(methods[i])));
+    EXIT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, request_pool_service_class_,
+        &(methods[i])));
   }
 
   jstring fair_scheduler_config_path =
@@ -97,16 +102,17 @@ RequestPoolUtils::RequestPoolUtils() {
       jni_env->NewStringUTF(FLAGS_llama_site_path.c_str());
   EXIT_IF_EXC(jni_env);
 
-  jobject pool_utils = jni_env->NewObject(pool_utils_class_, ctor_,
+  jobject request_pool_service = jni_env->NewObject(request_pool_service_class_, ctor_,
       fair_scheduler_config_path, llama_site_path);
   EXIT_IF_EXC(jni_env);
-  EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, pool_utils, &pool_utils_));
-  jni_env->CallObjectMethod(pool_utils_, start_id);
+  EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, request_pool_service,
+      &request_pool_service_));
+  jni_env->CallObjectMethod(request_pool_service_, start_id);
   EXIT_IF_EXC(jni_env);
 }
 
-Status RequestPoolUtils::ResolveRequestPool(const string& pool, const string& user,
-    TResolveRequestPoolResult* resolved_pool) {
+Status RequestPoolService::ResolveRequestPool(const string& requested_pool_name,
+    const string& user, TResolveRequestPoolResult* resolved_pool) {
   if (default_pool_only_) {
     resolved_pool->__set_resolved_pool(DEFAULT_POOL_NAME);
     resolved_pool->__set_has_access(true);
@@ -115,21 +121,27 @@ Status RequestPoolUtils::ResolveRequestPool(const string& pool, const string& us
 
   TResolveRequestPoolParams params;
   params.__set_user(user);
-  params.__set_requested_pool(pool);
-  return JniUtil::CallJniMethod(pool_utils_, resolve_request_pool_id_, params,
+  params.__set_requested_pool(requested_pool_name);
+  return JniUtil::CallJniMethod(request_pool_service_, resolve_request_pool_id_, params,
       resolved_pool);
 }
 
-Status RequestPoolUtils::GetPoolConfig(const string& pool,
+Status RequestPoolService::GetPoolConfig(const string& pool_name,
     TPoolConfigResult* pool_config) {
   if (default_pool_only_) {
-    pool_config->__set_max_requests(FLAGS_default_pool_max_requests);
+    pool_config->__set_max_requests(
+        FLAGS_disable_pool_max_requests ? -1 : FLAGS_default_pool_max_requests);
+    pool_config->__set_mem_limit(
+        FLAGS_disable_pool_mem_limits ? -1 : default_pool_mem_limit_);
     pool_config->__set_max_queued(FLAGS_default_pool_max_queued);
-    pool_config->__set_mem_limit(default_pool_mem_limit_);
     return Status::OK;
   }
 
   TPoolConfigParams params;
-  params.__set_pool(pool);
-  return JniUtil::CallJniMethod(pool_utils_, get_pool_config_id_, params, pool_config);
+  params.__set_pool(pool_name);
+  RETURN_IF_ERROR(JniUtil::CallJniMethod(
+        request_pool_service_, get_pool_config_id_, params, pool_config));
+  if (FLAGS_disable_pool_max_requests) pool_config->__set_max_requests(-1);
+  if (FLAGS_disable_pool_mem_limits) pool_config->__set_mem_limit(-1);
+  return Status::OK;
 }
