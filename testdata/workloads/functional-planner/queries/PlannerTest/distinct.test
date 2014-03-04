@@ -282,3 +282,45 @@ select t1.c, t2.c from
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
 ====
+# Test placement of having predicate into 2nd phase merge agg for
+# distinct + non-distinct aggregates without group by (IMPALA-845).
+# TODO: Fix the incorrect labels for non-distinct agg expr after the
+# 1st phase merge. We'd need to create more smaps during analysis
+# because there are more than two levels of merging for the
+# non-distinct agg expr.
+select count(distinct tinyint_col) from functional.alltypes
+having count(bigint_col) > 0
+---- PLAN
+02:AGGREGATE [MERGE FINALIZE]
+|  output: count(tinyint_col), sum(count(bigint_col))
+|  having: sum(count(bigint_col)) > 0
+|
+01:AGGREGATE
+|  output: count(bigint_col)
+|  group by: tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+06:AGGREGATE [MERGE FINALIZE]
+|  output: sum(count(tinyint_col)), sum(sum(count(bigint_col)))
+|  having: sum(count(bigint_col)) > 0
+|
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:AGGREGATE [MERGE]
+|  output: count(tinyint_col), sum(count(bigint_col))
+|
+04:AGGREGATE [MERGE]
+|  output: sum(count(bigint_col))
+|  group by: tinyint_col
+|
+03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+|
+01:AGGREGATE
+|  output: count(bigint_col)
+|  group by: tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====

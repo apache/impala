@@ -803,7 +803,8 @@ public class Planner {
     }
 
     // place a merge aggregation step for the 1st phase in a new fragment
-    PlanFragment mergeFragment = createParentAggFragment(analyzer, childFragment, mergePartition);
+    PlanFragment mergeFragment =
+        createParentAggFragment(analyzer, childFragment, mergePartition);
     AggregateInfo mergeAggInfo =
         ((AggregationNode)(node.getChild(0))).getAggInfo().getMergeAggInfo();
     AggregationNode mergeAggNode =
@@ -830,11 +831,11 @@ public class Planner {
           new AggregationNode(
             nodeIdGenerator_.getNextId(), node.getChild(0), mergeAggInfo);
       mergeAggNode.init(analyzer);
+      // Transfer having predicates. If hasGrouping == true, the predicates should
+      // instead be evaluated by the 2nd phase agg (the predicates are already there).
+      node.transferConjuncts(mergeAggNode);
       mergeFragment.addPlanRoot(mergeAggNode);
     }
-
-    // TODO: transfer having predicates? (aren't they already in the 2nd-phase
-    // agg node?)
     return mergeFragment;
   }
 

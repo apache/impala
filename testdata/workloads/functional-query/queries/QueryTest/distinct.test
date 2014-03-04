@@ -284,3 +284,22 @@ bigint, bigint
 ---- RESULTS
 2,2
 ====
+---- QUERY
+# Test distinct + non-distinct aggregates without group by and having clause (IMPALA-845)
+# alltypessmall has 100 non-null values for bigint_col, expect a single result
+select count(distinct tinyint_col) from functional.alltypessmall
+having count(bigint_col) > 99
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+# Test distinct + non-distinct aggregates without group by and having clause (IMPALA-845)
+# alltypessmall has 100 non-null values for bigint_col, expect an empty result
+select count(distinct tinyint_col) from functional.alltypessmall
+having count(bigint_col) > 100
+---- TYPES
+bigint
+---- RESULTS
+====
