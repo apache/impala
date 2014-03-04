@@ -31,7 +31,7 @@ order by
   i_manufact
 limit 100
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=144.66MB VCores=5'
+'Estimated Per-Host Requirements: Memory=72.66MB VCores=5'
 ''
 '19:TOP-N [LIMIT=100]'
 '|  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC'
@@ -77,7 +77,7 @@ limit 100
 '|     partitions=1/1 size=3.08KB'
 '|     table stats: 12 rows total'
 '|     column stats: all'
-'|     hosts=3 per-host-mem=32.00MB'
+'|     hosts=3 per-host-mem=16.00MB'
 '|     tuple-ids=4 row-size=29B cardinality=12'
 '|'
 '07:HASH JOIN [INNER JOIN, BROADCAST]'
@@ -94,7 +94,7 @@ limit 100
 '|     predicates: i_manager_id = 7'
 '|     table stats: 18000 rows total'
 '|     column stats: all'
-'|     hosts=3 per-host-mem=32.00MB'
+'|     hosts=3 per-host-mem=16.00MB'
 '|     tuple-ids=1 row-size=79B cardinality=171'
 '|'
 '06:HASH JOIN [INNER JOIN, BROADCAST]'
@@ -110,7 +110,7 @@ limit 100
 '|     partitions=2/120 size=663.52KB'
 '|     table stats: 183592 rows total'
 '|     column stats: all'
-'|     hosts=3 per-host-mem=32.00MB'
+'|     hosts=3 per-host-mem=16.00MB'
 '|     tuple-ids=0 row-size=43B cardinality=5082'
 '|'
 '05:HASH JOIN [INNER JOIN, PARTITIONED]'
@@ -126,7 +126,7 @@ limit 100
 '|     partitions=1/1 size=12.60MB'
 '|     table stats: 100000 rows total'
 '|     column stats: all'
-'|     hosts=3 per-host-mem=48.00MB'
+'|     hosts=3 per-host-mem=24.00MB'
 '|     tuple-ids=2 row-size=12B cardinality=100000'
 '|'
 '11:EXCHANGE [PARTITION=HASH(customer_address.ca_address_sk)]'
@@ -137,7 +137,7 @@ limit 100
 '   partitions=1/1 size=5.25MB'
 '   table stats: 50000 rows total'
 '   column stats: all'
-'   hosts=3 per-host-mem=32.00MB'
+'   hosts=3 per-host-mem=16.00MB'
 '   tuple-ids=3 row-size=29B cardinality=50000'
 ====
 ---- QUERY
@@ -150,7 +150,7 @@ where a.year > 2009 and a.month = 4
 union distinct
 select id, string_col, year, month from functional.alltypes
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=192.01MB VCores=3'
+'Estimated Per-Host Requirements: Memory=32.01MB VCores=3'
 ''
 'WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(year,month)]'
 '|  partitions=96'
@@ -173,7 +173,7 @@ select id, string_col, year, month from functional.alltypes
 '|     partitions=24/24 size=956.90KB'
 '|     table stats: 7300 rows total'
 '|     column stats: all'
-'|     hosts=3 per-host-mem=160.00MB'
+'|     hosts=3 per-host-mem=16.00MB'
 '|     tuple-ids=2 row-size=29B cardinality=7300'
 '|'
 '09:MERGE'
@@ -193,7 +193,7 @@ select id, string_col, year, month from functional.alltypes
 '|     partitions=10/10 size=743.67KB'
 '|     table stats: 10000 rows total'
 '|     column stats: all'
-'|     hosts=3 per-host-mem=64.00MB'
+'|     hosts=3 per-host-mem=16.00MB'
 '|     tuple-ids=1 row-size=4B cardinality=10000'
 '|'
 '06:EXCHANGE [PARTITION=HASH(a.id)]'
@@ -204,7 +204,7 @@ select id, string_col, year, month from functional.alltypes
 '   partitions=1/24 size=19.71KB'
 '   table stats: 7300 rows total'
 '   column stats: all'
-'   hosts=3 per-host-mem=32.00MB'
+'   hosts=3 per-host-mem=16.00MB'
 '   tuple-ids=0 row-size=29B cardinality=300'
 ====
 ---- QUERY
@@ -216,7 +216,7 @@ where a.year > 2009 and a.month = 4
 union all
 select * from functional_hbase.alltypessmall
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=1.03GB VCores=3'
+'Estimated Per-Host Requirements: Memory=1.02GB VCores=3'
 ''
 'WRITE TO HBASE table=functional_hbase.alltypes'
 '|  hosts=1 per-host-mem=unavailable'
@@ -251,7 +251,7 @@ select * from functional_hbase.alltypessmall
 '|     partitions=4/4 size=6.32KB'
 '|     table stats: 100 rows total'
 '|     column stats: all'
-'|     hosts=3 per-host-mem=32.00MB'
+'|     hosts=3 per-host-mem=16.00MB'
 '|     tuple-ids=1 row-size=0B cardinality=100'
 '|'
 '01:SCAN HBASE [functional_hbase.alltypessmall a]'

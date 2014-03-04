@@ -31,7 +31,7 @@ order by
   i_manufact
 limit 100
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=144.66MB VCores=5'
+'Estimated Per-Host Requirements: Memory=72.66MB VCores=5'
 ''
 'F07:PLAN FRAGMENT [PARTITION=UNPARTITIONED]'
 '  19:TOP-N [LIMIT=100]'
@@ -115,7 +115,7 @@ limit 100
 '     partitions=1/1 size=3.08KB'
 '     table stats: 12 rows total'
 '     column stats: all'
-'     hosts=3 per-host-mem=32.00MB'
+'     hosts=3 per-host-mem=16.00MB'
 '     tuple-ids=4 row-size=29B cardinality=12'
 ''
 'F04:PLAN FRAGMENT [PARTITION=RANDOM]'
@@ -125,7 +125,7 @@ limit 100
 '     predicates: i_manager_id = 7'
 '     table stats: 18000 rows total'
 '     column stats: all'
-'     hosts=3 per-host-mem=32.00MB'
+'     hosts=3 per-host-mem=16.00MB'
 '     tuple-ids=1 row-size=79B cardinality=171'
 ''
 'F03:PLAN FRAGMENT [PARTITION=RANDOM]'
@@ -134,7 +134,7 @@ limit 100
 '     partitions=2/120 size=663.52KB'
 '     table stats: 183592 rows total'
 '     column stats: all'
-'     hosts=3 per-host-mem=32.00MB'
+'     hosts=3 per-host-mem=16.00MB'
 '     tuple-ids=0 row-size=43B cardinality=5082'
 ''
 'F01:PLAN FRAGMENT [PARTITION=RANDOM]'
@@ -143,7 +143,7 @@ limit 100
 '     partitions=1/1 size=12.60MB'
 '     table stats: 100000 rows total'
 '     column stats: all'
-'     hosts=3 per-host-mem=48.00MB'
+'     hosts=3 per-host-mem=24.00MB'
 '     tuple-ids=2 row-size=12B cardinality=100000'
 ''
 'F00:PLAN FRAGMENT [PARTITION=RANDOM]'
@@ -152,7 +152,7 @@ limit 100
 '     partitions=1/1 size=5.25MB'
 '     table stats: 50000 rows total'
 '     column stats: all'
-'     hosts=3 per-host-mem=32.00MB'
+'     hosts=3 per-host-mem=16.00MB'
 '     tuple-ids=3 row-size=29B cardinality=50000'
 ====
 ---- QUERY
@@ -165,7 +165,7 @@ where a.year > 2009 and a.month = 4
 union distinct
 select id, string_col, year, month from functional.alltypes
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=192.01MB VCores=3'
+'Estimated Per-Host Requirements: Memory=32.01MB VCores=3'
 ''
 'F04:PLAN FRAGMENT [PARTITION=UNPARTITIONED]'
 '  WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(year,month)]'
@@ -191,7 +191,7 @@ select id, string_col, year, month from functional.alltypes
 '     partitions=24/24 size=956.90KB'
 '     table stats: 7300 rows total'
 '     column stats: all'
-'     hosts=3 per-host-mem=160.00MB'
+'     hosts=3 per-host-mem=16.00MB'
 '     tuple-ids=2 row-size=29B cardinality=7300'
 ''
 'F02:PLAN FRAGMENT [PARTITION=HASH(a.id)]'
@@ -219,7 +219,7 @@ select id, string_col, year, month from functional.alltypes
 '     partitions=10/10 size=743.67KB'
 '     table stats: 10000 rows total'
 '     column stats: all'
-'     hosts=3 per-host-mem=64.00MB'
+'     hosts=3 per-host-mem=16.00MB'
 '     tuple-ids=1 row-size=4B cardinality=10000'
 ''
 'F00:PLAN FRAGMENT [PARTITION=RANDOM]'
@@ -228,7 +228,7 @@ select id, string_col, year, month from functional.alltypes
 '     partitions=1/24 size=19.71KB'
 '     table stats: 7300 rows total'
 '     column stats: all'
-'     hosts=3 per-host-mem=32.00MB'
+'     hosts=3 per-host-mem=16.00MB'
 '     tuple-ids=0 row-size=29B cardinality=300'
 ====
 ---- QUERY
@@ -240,7 +240,7 @@ where a.year > 2009 and a.month = 4
 union all
 select * from functional_hbase.alltypessmall
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=1.03GB VCores=3'
+'Estimated Per-Host Requirements: Memory=1.02GB VCores=3'
 ''
 'F03:PLAN FRAGMENT [PARTITION=UNPARTITIONED]'
 '  WRITE TO HBASE table=functional_hbase.alltypes'
@@ -289,6 +289,6 @@ select * from functional_hbase.alltypessmall
 '     partitions=4/4 size=6.32KB'
 '     table stats: 100 rows total'
 '     column stats: all'
-'     hosts=3 per-host-mem=32.00MB'
+'     hosts=3 per-host-mem=16.00MB'
 '     tuple-ids=1 row-size=0B cardinality=100'
 ====

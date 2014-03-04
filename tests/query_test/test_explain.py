@@ -11,6 +11,10 @@ from tests.common.impala_test_suite import *
 # TODO: Clean up this test to use an explain level test dimension and appropriate
 # result sub-sections for the expected explain plans.
 class TestExplain(ImpalaTestSuite):
+  # Value for the num_scanner_threads query option to ensure that the memory estimates of
+  # scan nodes are consistent even when run on machines with different numbers of cores.
+  NUM_SCANNER_THREADS = 1
+
   @classmethod
   def get_workload(self):
     return 'functional-query'
@@ -25,17 +29,21 @@ class TestExplain(ImpalaTestSuite):
         v.get_value('exec_option')['num_nodes'] != 1)
 
   def test_explain_level0(self, vector):
-    vector.get_value('exec_option')['explain_level'] = 0
+    vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
+    vector.get_value('exec_option')['explain_level'] = 0    
     self.run_test_case('QueryTest/explain-level0', vector)
 
   def test_explain_level1(self, vector):
+    vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 1
     self.run_test_case('QueryTest/explain-level1', vector)
 
   def test_explain_level2(self, vector):
+    vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 2
     self.run_test_case('QueryTest/explain-level2', vector)
 
   def test_explain_level3(self, vector):
+    vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 3
     self.run_test_case('QueryTest/explain-level3', vector)

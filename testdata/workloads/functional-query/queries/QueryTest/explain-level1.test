@@ -31,7 +31,7 @@ order by
   i_manufact
 limit 100
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=144.66MB VCores=5'
+'Estimated Per-Host Requirements: Memory=72.66MB VCores=5'
 ''
 '19:TOP-N [LIMIT=100]'
 '|  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC'
@@ -100,7 +100,7 @@ where a.year > 2009 and a.month = 4
 union distinct
 select id, string_col, year, month from functional.alltypes
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=192.01MB VCores=3'
+'Estimated Per-Host Requirements: Memory=32.01MB VCores=3'
 ''
 'WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(year,month)]'
 '|  partitions=96'
@@ -139,7 +139,7 @@ where a.year > 2009 and a.month = 4
 union all
 select * from functional_hbase.alltypessmall
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=1.03GB VCores=3'
+'Estimated Per-Host Requirements: Memory=1.02GB VCores=3'
 ''
 'WRITE TO HBASE table=functional_hbase.alltypes'
 '|'
