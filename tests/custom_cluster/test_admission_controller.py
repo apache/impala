@@ -260,18 +260,16 @@ class TestAdmissionController(CustomClusterTestSuite):
       assert thread.query_state == 'ADMITTED'
       client = thread.impalad.service.create_beeswax_client()
       try:
-        thread.lock.acquire()
         cancel_result = client.cancel(thread.query_handle)
         assert cancel_result.status_code == 0,\
             'Unexpected status code from cancel request: %s' % cancel_result
         # Wait for the query to be cancelled and return
-        thread.join(10)
+        thread.join(20)
         LOG.debug("Cancelled admitted query %s %s",
             thread.query_num, "TIMED OUT" if thread.isAlive() else "")
         assert not thread.isAlive()
         assert thread.query_state == 'COMPLETED'
       finally:
-        thread.lock.release()
         client.close()
 
   class SubmitQueryThread(threading.Thread):
