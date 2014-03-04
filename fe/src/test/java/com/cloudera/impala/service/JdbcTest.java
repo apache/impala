@@ -215,15 +215,26 @@ public class JdbcTest {
 
   @Test
   public void testMetaDataGetFunctions() throws SQLException {
-    // It should return one function "parse_url".
+    // Look up the 'substring' function.
+    // We support 4 overloaded version of it.
     ResultSet rs = con_.getMetaData().getFunctions(
-        null, null, "sqrt%");
-    assertTrue(rs.next());
-    String funcName = rs.getString("FUNCTION_NAME");
-    assertEquals("Incorrect function name",
-        "sqrt(double)", funcName.toLowerCase());
-    assertFalse(rs.next());
+        null, null, "substring");
+    int numFound = 0;
+    while (rs.next()) {
+      String funcName = rs.getString("FUNCTION_NAME");
+      assertEquals("Incorrect function name", "substring", funcName.toLowerCase());
+      String dbName = rs.getString("FUNCTION_SCHEM");
+      assertEquals("Incorrect function name", "_impala_builtins", dbName.toLowerCase());
+      String fnSignature = rs.getString("SPECIFIC_NAME");
+      assertTrue(fnSignature.startsWith("substring("));
+      ++numFound;
+    }
+    assertEquals(numFound, 4);
     rs.close();
+
+    // substring is not in default db
+    rs = con_.getMetaData().getFunctions(null, "default", "substring");
+    assertFalse(rs.next());
   }
 
   @Test

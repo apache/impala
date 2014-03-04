@@ -16,6 +16,8 @@ package com.cloudera.impala.catalog;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
@@ -262,9 +264,28 @@ public class Db implements CatalogObject {
 
   /**
    * Returns a map of functionNames to list of (overloaded) functions with that name.
+   * This is not thread safe so a higher level lock must be taken while iterating
+   * over the returned functions.
    */
-  public HashMap<String, List<Function>> getAllFunctions() {
+  protected HashMap<String, List<Function>> getAllFunctions() {
     return functions_;
+  }
+
+  /**
+   * Returns all functions that match 'p'.
+   */
+  public List<Function> getFunctions(Pattern p) {
+    List<Function> functions = Lists.newArrayList();
+    synchronized (functions_) {
+      for (Map.Entry<String, List<Function>> fns: functions_.entrySet()) {
+        if (p.matcher(fns.getKey()).matches()) {
+          for (Function fn: fns.getValue()) {
+            if (fn.userVisible()) functions.add(fn);
+          }
+        }
+      }
+    }
+    return functions;
   }
 
   @Override

@@ -29,13 +29,13 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
@@ -215,7 +215,7 @@ public class MetadataOp {
     public List<List<List<Column>>> columns = Lists.newArrayList();
 
     // functions[i] are the functions within dbs[i]
-    public List<List<String>> functions = Lists.newArrayList();
+    public List<List<Function>> functions = Lists.newArrayList();
 
     // Set of tables that are missing (not yet loaded).
     public Set<TableName> missingTbls = new HashSet<TableName>();
@@ -298,15 +298,8 @@ public class MetadataOp {
         }
       }
       if (functionName != null) {
-        List<String> fns = db.getAllFunctionSignatures(TFunctionType.SCALAR);
-        fns.addAll(db.getAllFunctionSignatures(TFunctionType.AGGREGATE));
-        List<String> filteredFns = Lists.newArrayList();
-        for (String fn: fns) {
-          if (functionPattern.matcher(fn).matches()) {
-            filteredFns.add(fn);
-          }
-        }
-        result.functions.add(filteredFns);
+        List<Function> fns = db.getFunctions(functionPattern);
+        result.functions.add(fns);
       }
 
       result.dbs.add(dbName);
@@ -492,16 +485,19 @@ public class MetadataOp {
     return result;
   }
 
-  private static TResultRow createFunctionResultRow(String name) {
+  /**
+   * Create a function result row in the JDBC format.
+   */
+  private static TResultRow createFunctionResultRow(Function fn) {
     TResultRow row = new TResultRow();
     row.colVals = Lists.newArrayList();
     row.colVals.add(NULL_COL_VAL); // FUNCTION_CAT
-    row.colVals.add(NULL_COL_VAL); // FUNCTION_SCHEM
-    row.colVals.add(createTColumnValue(name)); // FUNCTION_NAME
+    row.colVals.add(createTColumnValue(fn.dbName())); // FUNCTION_SCHEM
+    row.colVals.add(createTColumnValue(fn.functionName())); // FUNCTION_NAME
     row.colVals.add(EMPTY_COL_VAL); // REMARKS
     // FUNCTION_TYPE
     row.colVals.add(createTColumnValue(DatabaseMetaData.functionNoTable));
-    row.colVals.add(createTColumnValue(name)); // SPECIFIC_NAME
+    row.colVals.add(createTColumnValue(fn.signatureString())); // SPECIFIC_NAME
     return row;
   }
 
@@ -523,8 +519,8 @@ public class MetadataOp {
 
     DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
         schemaName, null, null, functionName, user);
-    for (List<String> fns: dbsMetadata.functions) {
-      for (String fn: fns) {
+    for (List<Function> fns: dbsMetadata.functions) {
+      for (Function fn: fns) {
         result.rows.add(createFunctionResultRow(fn));
       }
     }

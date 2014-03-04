@@ -176,7 +176,6 @@ public class FrontendTest {
     Set<String> fns = Sets.newHashSet();
     for (TResultRow row: resp.rows) {
       String fn = row.colVals.get(2).stringVal.toLowerCase();
-      fn = fn.substring(0, fn.indexOf('('));
       fns.add(fn);
     }
     assertEquals(3, fns.size());
