@@ -14,6 +14,12 @@ $IMPALA_HOME/testdata/bin/kill-mini-llama.sh
 # - Single Llama service
 CLASSPATH=`hadoop classpath`
 export MINI_LLAMA_OPTS="-Dtest.build.data=$MINI_DFS_BASE_DATA_DIR -Djava.library.path=${HADOOP_HOME}/lib/native"
+# Workaround for https://jira.cloudera.com/browse/CDH-17751
+# A core-site.xml got introduced in the YARN test jar upstream. This jar was prefixed to
+# the classpath before starting minillama, causing settings in /fe/src/test/resources to
+# be ignored. The workaround can be removed when the next thirdparty update is made in
+# CDH5.
+export MINI_LLAMA_CLASSPATH="${IMPALA_HOME}/fe/src/test/resources"
 pushd ${LLAMA_HOME}
 
 echo "Running mini llama"
