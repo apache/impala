@@ -145,8 +145,15 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 }
 
 Status AggregationNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
+  RETURN_IF_ERROR(ExecNode::Open(state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+
+  RETURN_IF_ERROR(Expr::Open(probe_exprs_, state));
+  RETURN_IF_ERROR(Expr::Open(build_exprs_, state));
+
+  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
+    RETURN_IF_ERROR(aggregate_evaluators_[i]->Open(state));
+  }
 
   RETURN_IF_ERROR(children_[0]->Open(state));
 

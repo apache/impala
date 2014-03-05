@@ -553,7 +553,7 @@ public class CatalogTest {
     assertEquals(fnNames.size(), 0);
 
     ScalarFunction udf1 = new ScalarFunction(new FunctionName("default", "Foo"),
-        args1, ColumnType.INVALID, new HdfsUri("/Foo"), "Foo.class");
+        args1, ColumnType.INVALID, new HdfsUri("/Foo"), "Foo.class", null, null);
     catalog_.addFunction(udf1);
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 1);
@@ -561,7 +561,7 @@ public class CatalogTest {
 
     // Same function name, overloaded arguments
     ScalarFunction udf2 = new ScalarFunction(new FunctionName("default", "Foo"),
-        args2, ColumnType.INVALID, new HdfsUri("/Foo"), "Foo.class");
+        args2, ColumnType.INVALID, new HdfsUri("/Foo"), "Foo.class", null, null);
     catalog_.addFunction(udf2);
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 2);
@@ -570,7 +570,7 @@ public class CatalogTest {
 
     // Add a function with a new name
     ScalarFunction udf3 = new ScalarFunction(new FunctionName("default", "Bar"),
-        args2, ColumnType.INVALID, new HdfsUri("/Foo"), "Foo.class");
+        args2, ColumnType.INVALID, new HdfsUri("/Foo"), "Foo.class", null, null);
     catalog_.addFunction(udf3);
     fnNames = catalog_.getFunctionSignatures(TFunctionType.SCALAR, "default", null);
     assertEquals(fnNames.size(), 3);

@@ -108,6 +108,9 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
   InitRuntimeProfile(PrintPlanNodeType(tnode.node_type));
 }
 
+ExecNode::~ExecNode() {
+}
+
 Status ExecNode::Init(const TPlanNode& tnode) {
   return Expr::CreateExprTrees(pool_, tnode.conjuncts, &conjuncts_);
 }
@@ -133,7 +136,9 @@ Status ExecNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
-ExecNode::~ExecNode() {
+Status ExecNode::Open(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
+  return Expr::Open(conjuncts_, state);
 }
 
 void ExecNode::Close(RuntimeState* state) {

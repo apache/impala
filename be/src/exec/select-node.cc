@@ -39,7 +39,7 @@ Status SelectNode::Prepare(RuntimeState* state) {
 }
 
 Status SelectNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
+  RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(child(0)->Open(state));
   return Status::OK;
 }

@@ -374,3 +374,24 @@ BOOLEAN
 ---- RESULTS
 true
 ====
+---- QUERY
+select count_rows() from functional.alltypestiny
+---- TYPES
+BIGINT
+---- RESULTS
+1
+2
+3
+4
+5
+6
+7
+8
+====
+---- QUERY
+select constant_arg(1), constant_arg(int_col) from functional.alltypestiny limit 1;
+---- TYPES
+int,int
+---- RESULTS
+1,NULL
+====

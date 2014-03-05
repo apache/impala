@@ -86,7 +86,7 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   return Status::OK;
 }
 
-Status HdfsTableSink::Init(RuntimeState* state) {
+Status HdfsTableSink::Prepare(RuntimeState* state) {
   runtime_profile_ = state->obj_pool()->Add(
       new RuntimeProfile(state->obj_pool(), "HdfsTableSink"));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
@@ -196,6 +196,11 @@ Status HdfsTableSink::Init(RuntimeState* state) {
   hdfs_write_timer_ = ADD_TIMER(profile(), "HdfsWriteTimer");
 
   return Status::OK;
+}
+
+Status HdfsTableSink::Open(RuntimeState* state) {
+  RETURN_IF_ERROR(Expr::Open(output_exprs_, state));
+  return Expr::Open(partition_key_exprs_, state);
 }
 
 void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
@@ -488,6 +493,8 @@ void HdfsTableSink::Close(RuntimeState* state) {
     ClosePartitionFile(state, cur_partition->second.first);
   }
   partition_keys_to_output_partitions_.clear();
+  Expr::Close(output_exprs_, state);
+  Expr::Close(partition_key_exprs_, state);
 }
 
 Status HdfsTableSink::GetFileBlockSize(OutputPartition* output_partition, int64_t* size) {

@@ -195,9 +195,10 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   // set up sink, if required
   if (request.fragment.__isset.output_sink) {
-    RETURN_IF_ERROR(
-        DataSink::CreateDataSink(obj_pool(), request.fragment.output_sink, request.fragment.output_exprs, params, row_desc(), &sink_));
-    RETURN_IF_ERROR(sink_->Init(runtime_state()));
+    RETURN_IF_ERROR(DataSink::CreateDataSink(
+        obj_pool(), request.fragment.output_sink, request.fragment.output_exprs,
+        params, row_desc(), &sink_));
+    RETURN_IF_ERROR(sink_->Prepare(runtime_state()));
 
     RuntimeProfile* sink_profile = sink_->profile();
     if (sink_profile != NULL) {
@@ -283,8 +284,9 @@ Status PlanFragmentExecutor::OpenInternal() {
     RETURN_IF_ERROR(plan_->Open(runtime_state_.get()));
   }
 
-  if (sink_.get() == NULL)
-    return Status::OK;
+  if (sink_.get() == NULL) return Status::OK;
+
+  RETURN_IF_ERROR(sink_->Open(runtime_state_.get()));
 
   // If there is a sink, do all the work of driving it here, so that
   // when this returns the query has actually finished

@@ -34,6 +34,8 @@ public class CreateFunctionStmtBase extends StatementBase {
   public enum OptArg {
     COMMENT,
     SYMBOL,           // Only used for Udfs
+    PREPARE_FN,       // Only used for Udfs
+    CLOSE_FN,         // Only used for Udfs
     UPDATE_FN,        // Only used for Udas
     INIT_FN,          // Only used for Udas
     SERIALIZE_FN,     // Only used for Udas
@@ -61,9 +63,10 @@ public class CreateFunctionStmtBase extends StatementBase {
   public String getComment() { return optArgs_.get(OptArg.COMMENT); }
   public boolean getIfNotExists() { return ifNotExists_; }
 
-  protected TCreateFunctionParams toThrift() {
+  public TCreateFunctionParams toThrift() {
     TCreateFunctionParams params = new TCreateFunctionParams(fn_.toThrift());
     params.setIf_not_exists(getIfNotExists());
+    params.setFn(fn_.toThrift());
     return params;
   }
 

@@ -35,7 +35,8 @@ class HBaseTableSink : public DataSink {
   HBaseTableSink(const RowDescriptor& row_desc,
                  const std::vector<TExpr>& select_list_texprs,
                  const TDataSink& tsink);
-  virtual Status Init(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state);
+  virtual Status Open(RuntimeState* state);
   virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
   virtual void Close(RuntimeState* state);
   virtual RuntimeProfile* profile() { return runtime_profile_; }

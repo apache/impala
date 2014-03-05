@@ -36,7 +36,8 @@ class FunctionContextImpl {
  public:
   // Create a FunctionContext. The caller is responsible for calling delete on it.
   static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool,
-      const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types);
+      const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
+      bool debug = false);
 
   FunctionContextImpl(impala_udf::FunctionContext* parent);
 
@@ -55,6 +56,11 @@ class FunctionContextImpl {
 
   // Returns true if there are no outstanding local allocations.
   bool CheckLocalAlloctionsEmpty();
+
+  // Sets constant_args_. The AnyVal* values are owned by the caller.
+  void SetConstantArgs(const std::vector<impala_udf::AnyVal*>& constant_args);
+
+  bool debug() { return debug_; }
 
  private:
   friend class impala_udf::FunctionContext;
@@ -84,13 +90,23 @@ class FunctionContextImpl {
   std::map<uint8_t*, int> allocations_;
   std::vector<uint8_t*> local_allocations_;
 
+  // The function state accessed via FunctionContext::Get/SetFunctionState()
+  void* thread_local_fn_state_;
+  void* fragment_local_fn_state_;
+
   // The number of bytes allocated externally by the user function. In some cases,
   // it is too inconvenient to use the Allocate()/Free() APIs in the FunctionContext,
   // particularly for existing codebases (e.g. they use std::vector). Instead, they'll
   // have to track those allocations manually.
   int64_t external_bytes_tracked_;
 
+  // Type descriptors for each argument of the function.
   std::vector<impala_udf::FunctionContext::TypeDesc> arg_types_;
+
+  // Contains an AnyVal* for each argument of the function. If the AnyVal* is NULL,
+  // indicates that the corresponding argument is non-constant. Otherwise contains the
+  // value of the argument.
+  std::vector<impala_udf::AnyVal*> constant_args_;
 };
 
 }

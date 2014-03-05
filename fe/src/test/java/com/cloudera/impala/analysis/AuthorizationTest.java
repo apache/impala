@@ -1049,9 +1049,9 @@ public class AuthorizationTest {
 
     // Add default.f(), tpch.f()
     catalog_.addFunction(new ScalarFunction(new FunctionName("default", "f"),
-        new ArrayList<ColumnType>(), ColumnType.INT, null, null));
+        new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
     catalog_.addFunction(new ScalarFunction(new FunctionName("tpch", "f"),
-        new ArrayList<ColumnType>(), ColumnType.INT, null, null));
+        new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
 
     AuthzError(context, "select default.f()",
         "User '%s' does not have privileges to access: default",

@@ -26,8 +26,10 @@ import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.cloudera.impala.thrift.TScalarFunction;
 import com.cloudera.impala.thrift.TSymbolLookupParams;
 import com.cloudera.impala.thrift.TSymbolLookupResult;
+import com.cloudera.impala.thrift.TSymbolType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -275,9 +277,11 @@ public class Function implements CatalogObject {
 
     Function function = null;
     if (fn.isSetScalar_fn()) {
+      TScalarFunction scalarFn = fn.getScalar_fn();
       function = new ScalarFunction(FunctionName.fromThrift(fn.getName()), argTypes,
           ColumnType.fromThrift(fn.getRet_type()), new HdfsUri(fn.getHdfs_location()),
-          fn.getScalar_fn().getSymbol());
+          scalarFn.getSymbol(), scalarFn.getPrepare_fn_symbol(),
+          scalarFn.getClose_fn_symbol());
     } else if (fn.isSetAggregate_fn()) {
       TAggregateFunction aggFn = fn.getAggregate_fn();
       function = new AggregateFunction(FunctionName.fromThrift(fn.getName()), argTypes,
@@ -304,7 +308,7 @@ public class Function implements CatalogObject {
   // in the binary and try to resolve unmangled names.
   // If this function is expecting a return argument, retArgType is that type. It should
   // be null if this function isn't expecting a return argument.
-  public String lookupSymbol(String symbol, ColumnType retArgType,
+  public String lookupSymbol(String symbol, TSymbolType symbolType, ColumnType retArgType,
       boolean hasVarArgs, ColumnType... argTypes) throws AnalysisException {
     if (symbol.length() == 0) {
       if (binaryType_ == TFunctionBinaryType.BUILTIN) {
@@ -328,6 +332,7 @@ public class Function implements CatalogObject {
     lookup.location =  binaryType_ != TFunctionBinaryType.BUILTIN ?
         location_.toString() : "";
     lookup.symbol = symbol;
+    lookup.symbol_type = symbolType;
     lookup.fn_binary_type = binaryType_;
     lookup.arg_types = ColumnType.toThrift(argTypes);
     lookup.has_var_args = hasVarArgs;
@@ -350,8 +355,17 @@ public class Function implements CatalogObject {
           throw new AnalysisException("Internal Error");
       }
     } catch (InternalException e) {
-      throw new AnalysisException("Could not find symbol.", e);
+      // Should never get here.
+      e.printStackTrace();
+      throw new AnalysisException("Could not find symbol: " + symbol, e);
     }
+  }
+
+  public String lookupSymbol(String symbol, TSymbolType symbolType)
+      throws AnalysisException {
+    Preconditions.checkState(
+        symbolType == TSymbolType.UDF_PREPARE || symbolType == TSymbolType.UDF_CLOSE);
+    return lookupSymbol(symbol, symbolType, null, false);
   }
 
 }

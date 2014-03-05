@@ -83,9 +83,11 @@ class LibCache {
   // Otherwise, 'hdfs_lib_file' should be the HDFS path to a shared library (.so) file.
   // dlopen handles and symbols are cached.
   // Only usable if 'hdfs_lib_file' refers to a shared object.
-  // If entry is non-null, *entry will be set to the cached entry. The caller
-  // must call DecrementUseCount(*entry) when it is done using fn_ptr and it is
-  // no longer valid to use fn_ptr.
+  //
+  // If entry is non-null and *entry is null, *entry will be set to the cached entry. If
+  // entry is non-null and *entry is non-null, *entry will be reused (i.e., the use count
+  // is not increased). The caller must call DecrementUseCount(*entry) when it is done
+  // using fn_ptr and it is no longer valid to use fn_ptr.
   Status GetSoFunctionPtr(const std::string& hdfs_lib_file, const std::string& symbol,
                           void** fn_ptr, LibCacheEntry** entry);
 

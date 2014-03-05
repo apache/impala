@@ -776,6 +776,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'";
     final String udfSuffix = " LOCATION '/test-warehouse/libTestUdfs.so' " +
         "SYMBOL=" + symbol;
+    final String udfSuffixIr = " LOCATION '/test-warehouse/test-udfs.ll' " +
+        "SYMBOL=" + symbol;
     final String hdfsPath = "hdfs://localhost:20500/test-warehouse/libTestUdfs.so";
 
     AnalyzesOk("create function foo() RETURNS int" + udfSuffix);
@@ -818,6 +820,24 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Varargs
     AnalyzesOk("create function foo(INT...) RETURNS int" + udfSuffix);
+
+    // Prepare/Close functions
+    AnalyzesOk("create function foo() returns int" + udfSuffix
+        + " prepare_fn='_Z19ValidateOpenPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'"
+        + " close_fn='_Z17ValidateOpenClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'");
+    AnalyzesOk("create function foo() returns int" + udfSuffixIr
+        + " prepare_fn='_Z19ValidateOpenPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'"
+        + " close_fn='_Z17ValidateOpenClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'");
+    AnalysisError("create function foo() returns int" + udfSuffix + " prepare_fn=''",
+        "Could not find symbol ''");
+    AnalysisError("create function foo() returns int" + udfSuffixIr + " prepare_fn=''",
+        "Could not find symbol ''");
+    AnalysisError("create function foo() returns int" + udfSuffix + " close_fn=''",
+        "Could not find symbol ''");
+    // NYI
+    AnalysisError("create function foo() returns int" + udfSuffixIr
+        + " prepare_fn='ValidateOpenPrepare'" + " close_fn='ValidateOpenClose'",
+        "Mangling of prepare and close symbols not yet implemented");
 
     // Try to create a function with the same name as a builtin
     AnalysisError("create function sin(double) RETURNS double" + udfSuffix,

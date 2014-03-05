@@ -74,21 +74,13 @@ static const int MAX_WARNINGS = 1000;
 
 // Create a FunctionContext. The caller is responsible for calling delete on it.
 FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool,
-    const vector<FunctionContext::TypeDesc>& arg_types) {
+    const vector<FunctionContext::TypeDesc>& arg_types, bool debug) {
   impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
   ctx->impl_->state_ = state;
   ctx->impl_->pool_ = new FreePool(pool);
   ctx->impl_->arg_types_ = arg_types;
+  ctx->impl_->debug_ = debug;
   return ctx;
-}
-
-FunctionContext* FunctionContext::CreateTestContext(const vector<TypeDesc>& arg_types) {
-  FunctionContext* context = new FunctionContext;
-  context->impl()->debug_ = true;
-  context->impl()->state_ = NULL;
-  context->impl()->pool_ = new FreePool(NULL);
-  context->impl()->arg_types_ = arg_types;
-  return context;
 }
 
 FunctionContext::FunctionContext() : impl_(new FunctionContextImpl(this)) {
@@ -104,8 +96,10 @@ FunctionContext::~FunctionContext() {
 }
 
 FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
-  : context_(parent), debug_(false), version_(FunctionContext::v1_2),
+  : context_(parent), debug_(false), version_(FunctionContext::v1_3),
     num_warnings_(0),
+    thread_local_fn_state_(NULL),
+    fragment_local_fn_state_(NULL),
     external_bytes_tracked_(0) {
 }
 
@@ -200,9 +194,33 @@ bool FunctionContext::AddWarning(const char* warning_msg) {
   }
 }
 
-const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const {
-  if (arg_idx < 0 || arg_idx >= impl_->arg_types_.size()) return NULL;
-  return &impl_->arg_types_[arg_idx];
+void* FunctionContext::GetFunctionState(FunctionStateScope scope) const {
+  switch (scope) {
+    case THREAD_LOCAL:
+      return impl_->thread_local_fn_state_;
+      break;
+    case FRAGMENT_LOCAL:
+      return impl_->fragment_local_fn_state_;
+      break;
+    default:
+      // TODO: signal error somehow
+      return NULL;
+  }
+}
+
+void FunctionContext::SetFunctionState(FunctionStateScope scope, void* ptr) {
+  switch (scope) {
+    case THREAD_LOCAL:
+      impl_->thread_local_fn_state_ = ptr;
+      break;
+    case FRAGMENT_LOCAL:
+      impl_->fragment_local_fn_state_ = ptr;
+      break;
+    default:
+      stringstream ss;
+      ss << "Unknown FunctionStateScope: " << scope;
+      SetError(ss.str().c_str());
+  }
 }
 
 uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {
@@ -231,6 +249,25 @@ bool FunctionContextImpl::CheckLocalAlloctionsEmpty() {
   // TODO: fix this
   //if (debug_) context_->SetError("Leaked local allocations.");
   return false;
+}
+
+void FunctionContextImpl::SetConstantArgs(const vector<AnyVal*>& constant_args) {
+  constant_args_ = constant_args;
+}
+
+bool FunctionContext::IsArgConstant(int i) const {
+  if (i < 0 || i >= impl_->constant_args_.size()) return false;
+  return impl_->constant_args_[i] == NULL;
+}
+
+AnyVal* FunctionContext::GetConstantArg(int i) const {
+  if (i < 0 || i >= impl_->constant_args_.size()) return NULL;
+  return impl_->constant_args_[i];
+}
+
+const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const {
+  if (arg_idx < 0 || arg_idx >= impl_->arg_types_.size()) return NULL;
+  return &impl_->arg_types_[arg_idx];
 }
 
 StringVal::StringVal(FunctionContext* context, int len)

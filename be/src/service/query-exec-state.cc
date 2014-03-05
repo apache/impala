@@ -408,6 +408,7 @@ Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request
 Status ImpalaServer::QueryExecState::Wait() {
   RETURN_IF_ERROR(WaitForChildQueries());
   if (coord_.get() != NULL) {
+    Expr::Open(output_exprs_, coord_->runtime_state());
     RETURN_IF_ERROR(coord_->Wait());
     RETURN_IF_ERROR(UpdateCatalog());
   }

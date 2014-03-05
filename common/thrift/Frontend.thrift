@@ -415,6 +415,14 @@ struct TExecRequest {
   8: optional list<TAccessEvent> access_events
 }
 
+// A UDF may include optional prepare and close functions in addition the main evaluation
+// function. This enum distinguishes between these when doing a symbol lookup.
+enum TSymbolType {
+  UDF_EVALUATE,
+  UDF_PREPARE,
+  UDF_CLOSE,
+}
+
 // Parameters to pass to validate that the binary contains the symbol. If the
 // symbols is fully specified (i.e. full mangled name), we validate that the
 // mangled name is correct. If only the function name is specified, we try
@@ -439,6 +447,9 @@ struct TSymbolLookupParams {
 
   // If set this function needs to have an return out argument of this type.
   6: optional Types.TColumnType ret_arg_type
+
+  // Determines the signature of the mangled symbol
+  7: required TSymbolType symbol_type;
 }
 
 enum TSymbolLookupResultCode {

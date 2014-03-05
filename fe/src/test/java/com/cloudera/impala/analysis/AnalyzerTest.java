@@ -92,7 +92,7 @@ public class AnalyzerTest {
   protected Function addTestFunction(String db, String fnName,
       ArrayList<ColumnType> args, boolean varArgs) {
     Function fn = new ScalarFunction(
-        new FunctionName(db, fnName), args, ColumnType.INT, null, null);
+        new FunctionName(db, fnName), args, ColumnType.INT, null, null, null, null);
     fn.setHasVarArgs(varArgs);
     catalog_.addFunction(fn);
     return fn;

@@ -123,10 +123,15 @@ void HashJoinNode::Close(RuntimeState* state) {
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
   Expr::Close(build_exprs_, state);
   Expr::Close(probe_exprs_, state);
+  Expr::Close(other_join_conjuncts_, state);
   BlockingJoinNode::Close(state);
 }
 
 Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
+  RETURN_IF_ERROR(Expr::Open(build_exprs_, state));
+  RETURN_IF_ERROR(Expr::Open(probe_exprs_, state));
+  RETURN_IF_ERROR(Expr::Open(other_join_conjuncts_, state));
+
   // Do a full scan of child(1) and store everything in hash_tbl_
   // The hash join node needs to keep in memory all build tuples, including the tuple
   // row ptrs.  The row ptrs are copied into the hash table's internal structure so they

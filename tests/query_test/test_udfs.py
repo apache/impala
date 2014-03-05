@@ -28,6 +28,7 @@ class TestUdfs(ImpalaTestSuite):
       self.create_udas_template, vector, database, '/test-warehouse/libudasample.so')
 
     self.run_test_case('QueryTest/udf', vector, use_db=database)
+    self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
     self.run_test_case('QueryTest/uda', vector, use_db=database)
 
   def test_ir_functions(self, vector):
@@ -35,6 +36,7 @@ class TestUdfs(ImpalaTestSuite):
     self.__load_functions(
       self.create_udfs_template, vector, database, '/test-warehouse/test-udfs.ll')
     self.run_test_case('QueryTest/udf', vector, use_db=database)
+    self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
 
   def test_hive_udfs(self, vector):
     self.client.execute('create database if not exists udf_test')
@@ -151,6 +153,9 @@ drop function if exists {database}.var_sum(string...);
 drop function if exists {database}.var_sum_multiply(double, int...);
 drop function if exists {database}.constant_timestamp();
 drop function if exists {database}.validate_arg_type(string);
+drop function if exists {database}.count_rows();
+drop function if exists {database}.constant_arg(int);
+drop function if exists {database}.validate_open(int);
 
 create database if not exists {database};
 
@@ -213,4 +218,19 @@ location '{location}' symbol='ConstantTimestamp';
 
 create function {database}.validate_arg_type(string) returns boolean
 location '{location}' symbol='ValidateArgType';
+
+create function {database}.count_rows() returns bigint
+location '{location}' symbol='Count'
+prepare_fn='_Z12CountPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'
+close_fn='_Z10CountClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE';
+
+create function {database}.constant_arg(int) returns int
+location '{location}' symbol="ConstantArg"
+prepare_fn='_Z18ConstantArgPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'
+close_fn='_Z16ConstantArgClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE';
+
+create function {database}.validate_open(int) returns boolean
+location '{location}' symbol='ValidateOpen'
+prepare_fn='_Z19ValidateOpenPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'
+close_fn='_Z17ValidateOpenClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE';
 """

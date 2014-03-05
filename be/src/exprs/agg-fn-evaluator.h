@@ -79,6 +79,7 @@ class AggFnEvaluator {
 
   ~AggFnEvaluator();
 
+  Status Open(RuntimeState* state);
   void Close(RuntimeState* state);
 
   AggregationOp agg_op() const { return agg_op_; }

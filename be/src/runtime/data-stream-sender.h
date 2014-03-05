@@ -57,8 +57,13 @@ class DataStreamSender : public DataSink {
     int per_channel_buffer_size);
   virtual ~DataStreamSender();
 
-  // Setup. Call before Send() or Close().
-  virtual Status Init(RuntimeState* state);
+  // Must be called before other API calls, and before the codegen'd IR module is
+  // compiled (i.e. in an ExecNode's Prepare() function).
+  virtual Status Prepare(RuntimeState* state);
+
+  // Must be called before Send() or Close(), and after the codegen'd IR module is
+  // compiled (i.e. in an ExecNode's Open() function).
+  virtual Status Open(RuntimeState* state);
 
   // Send data in 'batch' to destination nodes according to partitioning
   // specification provided in c'tor.

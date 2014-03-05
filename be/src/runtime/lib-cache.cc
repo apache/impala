@@ -115,7 +115,6 @@ LibCache::LibCacheEntry::~LibCacheEntry() {
 
 Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& symbol, 
                                   void** fn_ptr, LibCacheEntry** ent) {
-  if (ent != NULL) *ent = NULL;
   if (hdfs_lib_file.empty()) {
     // Just loading a function ptr in the current process. No need to take any locks.
     DCHECK(current_process_handle_ != NULL);
@@ -125,7 +124,14 @@ Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& sym
 
   LibCacheEntry* entry = NULL;
   unique_lock<mutex> lock;
-  RETURN_IF_ERROR(GetCacheEntry(hdfs_lib_file, TYPE_SO, &lock, &entry));
+  if (ent != NULL && *ent != NULL) {
+    // Reuse already-cached entry provided by user
+    entry = *ent;
+    unique_lock<mutex> l(entry->lock);
+    lock.swap(l);
+  } else {
+    RETURN_IF_ERROR(GetCacheEntry(hdfs_lib_file, TYPE_SO, &lock, &entry));
+  }
   DCHECK(entry != NULL);
   DCHECK_EQ(entry->type, TYPE_SO);
 
@@ -136,8 +142,10 @@ Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& sym
     RETURN_IF_ERROR(DynamicLookup(entry->shared_object_handle, symbol.c_str(), fn_ptr));
     entry->symbol_cache[symbol] = *fn_ptr;
   }
+
   DCHECK(*fn_ptr != NULL);
-  if (ent != NULL) {
+  if (ent != NULL && *ent == NULL) {
+    // Only set and increment user's entry if it wasn't already cached
     *ent = entry;
     ++(*ent)->use_count;
   }
@@ -179,7 +187,8 @@ Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
     DCHECK_EQ(entry->type, TYPE_IR);
     if (entry->symbols.find(symbol) == entry->symbols.end()) {
       stringstream ss;
-      ss << "Symbol '" << symbol << "' does not exist in module: " << hdfs_lib_file;
+      ss << "Symbol '" << symbol << "' does not exist in module: " << hdfs_lib_file
+         << " (local path: " << entry->local_path << ")";
       return Status(ss.str());
     }
     return Status::OK;

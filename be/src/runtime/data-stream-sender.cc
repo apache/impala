@@ -380,7 +380,7 @@ DataStreamSender::~DataStreamSender() {
   }
 }
 
-Status DataStreamSender::Init(RuntimeState* state) {
+Status DataStreamSender::Prepare(RuntimeState* state) {
   DCHECK(state != NULL);
   state_ = state;
   stringstream title;
@@ -412,6 +412,10 @@ Status DataStreamSender::Init(RuntimeState* state) {
     RETURN_IF_ERROR(channels_[i]->Init(state));
   }
   return Status::OK;
+}
+
+Status DataStreamSender::Open(RuntimeState* state) {
+  return Expr::Open(partition_exprs_, state);
 }
 
 Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {

@@ -122,13 +122,17 @@ class HdfsTableSink : public DataSink {
 
   // Prepares output_exprs and partition_key_exprs.
   // Also, connects to Hdfs, and prepares the single output partition for static inserts.
-  virtual Status Init(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state);
+
+  // Opens output_exprs adn partition_key_exprs.
+  virtual Status Open(RuntimeState* state);
 
   // Append all rows in batch to the temporary Hdfs files corresponding to partitions.
   virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos);
 
   // Move temporary Hdfs files to final locations.
   // Remove original Hdfs files if overwrite was specified.
+  // Closes output_exprs and partition_key_exprs.
   virtual void Close(RuntimeState* state);
 
   // Get the block size of the current file opened for this partition.
@@ -194,7 +198,7 @@ class HdfsTableSink : public DataSink {
   // Closes the hdfs file for this partition as well as the writer.
   void ClosePartitionFile(RuntimeState* state, OutputPartition* partition);
 
-  // Descriptor of target table. Set in Init().
+  // Descriptor of target table. Set in Prepare().
   const HdfsTableDescriptor* table_desc_;
 
   // Currently this is the default partition since we don't support multi-format sinks.
@@ -230,7 +234,7 @@ class HdfsTableSink : public DataSink {
   bool overwrite_;
 
   // The directory in which to write intermediate results. Set to
-  // <hdfs_table_base_dir>/.impala_insert_staging/ during Init()
+  // <hdfs_table_base_dir>/.impala_insert_staging/ during Prepare()
   std::string staging_dir_;
 
   // string representation of c'tors unique_id. Used for per-partition Hdfs file names,

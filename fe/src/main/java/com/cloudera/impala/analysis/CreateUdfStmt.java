@@ -21,9 +21,8 @@ import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
-import com.cloudera.impala.thrift.TScalarFunction;
+import com.cloudera.impala.thrift.TSymbolType;
 
 /**
  * Represents a CREATE FUNCTION statement.
@@ -50,15 +49,6 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
   }
 
   @Override
-  public TCreateFunctionParams toThrift() {
-    TCreateFunctionParams params = super.toThrift();
-    TScalarFunction udf = new TScalarFunction();
-    udf.setSymbol(udf_.getSymbolName());
-    params.getFn().setScalar_fn(udf);
-    return params;
-  }
-
-  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
@@ -78,7 +68,18 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
 
     // Check the user provided symbol exists
     udf_.setSymbolName(udf_.lookupSymbol(
-        checkAndGetOptArg(OptArg.SYMBOL), null, udf_.hasVarArgs(), udf_.getArgs()));
+        checkAndGetOptArg(OptArg.SYMBOL), TSymbolType.UDF_EVALUATE, null,
+        udf_.hasVarArgs(), udf_.getArgs()));
+
+    // Set optional Prepare/Close functions
+    String prepareFn = optArgs_.get(OptArg.PREPARE_FN);
+    if (prepareFn != null) {
+      udf_.setPrepareFnSymbol(udf_.lookupSymbol(prepareFn, TSymbolType.UDF_PREPARE));
+    }
+    String closeFn = optArgs_.get(OptArg.CLOSE_FN);
+    if (closeFn != null) {
+      udf_.setCloseFnSymbol(udf_.lookupSymbol(closeFn, TSymbolType.UDF_CLOSE));
+    }
 
     // Udfs should not set any of these
     checkOptArgNotSet(OptArg.UPDATE_FN);

@@ -24,7 +24,7 @@
 namespace impala_udf {
 
 template<typename T>
-std::string DebugString(const T& val) {
+inline std::string DebugString(const T& val) {
   if (val.is_null) return "NULL";
   std::stringstream ss;
   ss << val.val;
@@ -32,7 +32,7 @@ std::string DebugString(const T& val) {
 }
 
 template<>
-std::string DebugString(const StringVal& val) {
+inline std::string DebugString(const StringVal& val) {
   if (val.is_null) return "NULL";
   return std::string(reinterpret_cast<const char*>(val.ptr), val.len);
 }

@@ -40,14 +40,17 @@ class DataSink {
  public:
   virtual ~DataSink() {}
 
-  // Setup. Call before Send() or Close().
-  virtual Status Init(RuntimeState* state) = 0;
+  // Setup. Call before Send(), Open(), or Close().
+  virtual Status Prepare(RuntimeState* state) = 0;
+
+  // Call before Send() or Close().
+  virtual Status Open(RuntimeState* state) = 0;
 
   // Send a row batch into this sink.
   // eos should be true when the last batch is passed to Send()
   virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos) = 0;
 
-  // Releases all resources that were allocated in Init()/Send().
+  // Releases all resources that were allocated in Prepare()/Send().
   // Further Send() calls are illegal after calling Close().
   // It must be okay to call this multiple times. Subsequent calls should
   // be ignored.

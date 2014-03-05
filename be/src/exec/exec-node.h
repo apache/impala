@@ -64,7 +64,8 @@ class ExecNode {
 
   // Performs any preparatory work prior to calling GetNext().
   // Caller must not be holding any io buffers. This will cause deadlock.
-  virtual Status Open(RuntimeState* state) = 0;
+  // If overridden in subclass, must first call superclass's Open().
+  virtual Status Open(RuntimeState* state);
 
   // Retrieves rows and returns them via row_batch. Sets eos to true
   // if subsequent calls will not retrieve any more rows.

@@ -1001,24 +1001,24 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Add a udf default.udf(), default.udf(int), default.udf(string...),
     // default.udf(int, string...) and functional.udf(double)
     catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
-        new ArrayList<ColumnType>(), ColumnType.INT, dummyUri, null));
+        new ArrayList<ColumnType>(), ColumnType.INT, dummyUri, null, null, null));
     catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
         Lists.newArrayList(ColumnType.INT),
-        ColumnType.INT, dummyUri, null));
+        ColumnType.INT, dummyUri, null, null, null));
     ScalarFunction varArgsUdf1 = new ScalarFunction(new FunctionName("default", "udf"),
         Lists.newArrayList(ColumnType.STRING),
-        ColumnType.INT, dummyUri, null);
+        ColumnType.INT, dummyUri, null, null, null);
     varArgsUdf1.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf1);
     ScalarFunction varArgsUdf2 = new ScalarFunction(new FunctionName("default", "udf"),
         Lists.newArrayList(
             ColumnType.INT, ColumnType.STRING),
-        ColumnType.INT, dummyUri, null);
+        ColumnType.INT, dummyUri, null, null, null);
     varArgsUdf2.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf2);
     ScalarFunction udf = new ScalarFunction(new FunctionName("functional", "udf"),
         Lists.newArrayList(ColumnType.DOUBLE),
-        ColumnType.INT, dummyUri, null);
+        ColumnType.INT, dummyUri, null, null, null);
     catalog_.addFunction(udf);
 
     AnalyzesOk("select udf()");
@@ -1094,7 +1094,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // UDF.
     catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
         Lists.newArrayList(ColumnType.INT),
-        ColumnType.INT, new HdfsUri(""), null));
+        ColumnType.INT, new HdfsUri(""), null, null, null));
     testFuncExprDepthLimit("udf(", "1", ")");
 
     // Timestamp arithmetic expr.

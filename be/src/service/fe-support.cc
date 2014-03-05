@@ -91,6 +91,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
   // Optimize the module so any UDF functions are jit'd
   if (state.codegen() != NULL) state.codegen()->OptimizeModule();
 
+  THROW_IF_ERROR_RET(e->Open(&state), env, JniUtil::internal_exc_class(), result_bytes);
   TColumnValue val;
   e->GetValue(NULL, false, &val);
   e->Close(&state);
@@ -141,6 +142,13 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
     stringstream ss;
     ss << "Could not find symbol '" << params.symbol << "' in: " << params.location;
     result->__set_error_msg(ss.str());
+    return;
+  }
+
+  // TODO: mangle Prepare() and Close() functions
+  if (params.symbol_type != TSymbolType::UDF_EVALUATE) {
+    result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
+    result->__set_error_msg("Mangling of prepare and close symbols not yet implemented");
     return;
   }
 

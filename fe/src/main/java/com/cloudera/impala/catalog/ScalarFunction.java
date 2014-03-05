@@ -33,6 +33,8 @@ public class ScalarFunction extends Function {
   // The name inside the binary at location_ that contains this particular
   // function. e.g. org.example.MyUdf.class.
   private String symbolName_;
+  private String prepareFnSymbol_;
+  private String closeFnSymbol_;
 
   // If true, this function is implemented with the Udf interface. Otherwise,
   // it is implemented using the old ComputeFn interface.
@@ -44,10 +46,13 @@ public class ScalarFunction extends Function {
   }
 
   public ScalarFunction(FunctionName fnName, List<ColumnType> argTypes,
-      ColumnType retType, HdfsUri location, String symbolName) {
+      ColumnType retType, HdfsUri location, String symbolName, String initFnSymbol,
+      String closeFnSymbol) {
     super(fnName, argTypes, retType, false);
     setLocation(location);
     setSymbolName(symbolName);
+    setPrepareFnSymbol(initFnSymbol);
+    setCloseFnSymbol(closeFnSymbol);
   }
 
   /**
@@ -159,7 +164,13 @@ public class ScalarFunction extends Function {
   }
 
   public void setSymbolName(String s) { symbolName_ = s; }
+  public void setPrepareFnSymbol(String s) { prepareFnSymbol_ = s; }
+  public void setCloseFnSymbol(String s) { closeFnSymbol_ = s; }
+
   public String getSymbolName() { return symbolName_; }
+  public String getPrepareFnSymbol() { return prepareFnSymbol_; }
+  public String getCloseFnSymbol() { return closeFnSymbol_; }
+
   public boolean isUdfInterface() { return udfInterface_; }
 
   @Override
@@ -167,6 +178,8 @@ public class ScalarFunction extends Function {
     TFunction fn = super.toThrift();
     fn.setScalar_fn(new TScalarFunction());
     fn.getScalar_fn().setSymbol(symbolName_);
+    if (prepareFnSymbol_ != null) fn.getScalar_fn().setPrepare_fn_symbol(prepareFnSymbol_);
+    if (closeFnSymbol_ != null) fn.getScalar_fn().setClose_fn_symbol(closeFnSymbol_);
     return fn;
   }
 }

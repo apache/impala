@@ -107,7 +107,7 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_pa
 }
 
 Status HdfsPartitionDescriptor::PrepareExprs(RuntimeState* state) {
-  if (exprs_prepared_ == false) {
+  if (!exprs_prepared_) {
     // TODO: RowDescriptor should arguably be optional in Prepare for known literals
     exprs_prepared_ = true;
     // Partition exprs are not used in the codegen case.  Don't codegen them.

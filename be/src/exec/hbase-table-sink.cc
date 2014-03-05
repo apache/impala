@@ -42,7 +42,7 @@ Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
   return Status::OK;
 }
 
-Status HBaseTableSink::Init(RuntimeState* state) {
+Status HBaseTableSink::Prepare(RuntimeState* state) {
   runtime_profile_ = state->obj_pool()->Add(
       new RuntimeProfile(state->obj_pool(), "HbaseTableSink"));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
@@ -63,6 +63,10 @@ Status HBaseTableSink::Init(RuntimeState* state) {
   (*state->num_appended_rows())[""] = 0L;
 
   return Status::OK;
+}
+
+Status HBaseTableSink::Open(RuntimeState* state) {
+  return Expr::Open(output_exprs_, state);
 }
 
 Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {

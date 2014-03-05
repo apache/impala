@@ -25,6 +25,7 @@
 
 #include "udf/udf.h"
 #include "udf/udf-debug.h"
+#include "udf/udf-test-harness.h"
 
 namespace impala_udf {
 

@@ -409,7 +409,8 @@ class DataStreamTest : public testing::Test {
         (partition_type == TPartitionType::UNPARTITIONED ? broadcast_sink_ : hash_sink_);
     DataStreamSender sender(
         &obj_pool_, *row_desc_, sink, dest_, channel_buffer_size);
-    EXPECT_TRUE(sender.Init(&state).ok());
+    EXPECT_TRUE(sender.Prepare(&state).ok());
+    EXPECT_TRUE(sender.Open(&state).ok());
     scoped_ptr<RowBatch> batch(CreateRowBatch());
     SenderInfo& info = sender_info_[sender_num];
     int next_val = 0;

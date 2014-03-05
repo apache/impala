@@ -149,3 +149,86 @@ BooleanVal ValidateArgType(FunctionContext* context, const StringVal& dummy) {
   if (context->GetArgType(1) != NULL) return BooleanVal(false);
   return BooleanVal(true);
 }
+
+// Count UDF: counts the number of input rows per thread-local FunctionContext
+void CountPrepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    uint64_t* state = reinterpret_cast<uint64_t*>(context->Allocate(sizeof(uint64_t)));
+    *state = 0;
+    context->SetFunctionState(scope, state);
+  }
+}
+
+BigIntVal Count(FunctionContext* context) {
+  uint64_t* state = reinterpret_cast<uint64_t*>(
+      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+  return BigIntVal(++(*state));
+}
+
+void CountClose(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    void* state = context->GetFunctionState(scope);
+    context->Free(reinterpret_cast<uint8_t*>(state));
+    context->SetFunctionState(scope, NULL);
+  }
+}
+
+// ConstantArg UDF: returns the first argument if it's constant, otherwise returns NULL.
+void ConstantArgPrepare(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    IntVal* arg = reinterpret_cast<IntVal*>(context->GetConstantArg(0));
+    if (arg == NULL) {
+      IntVal* state = reinterpret_cast<IntVal*>(context->Allocate(sizeof(IntVal)));
+      *state = IntVal::null();
+      context->SetFunctionState(scope, state);
+    } else {
+      context->SetFunctionState(scope, arg);
+    }
+  }
+}
+
+IntVal ConstantArg(FunctionContext* context, const IntVal& const_val) {
+  IntVal* state = reinterpret_cast<IntVal*>(
+      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+  return *state;
+}
+
+void ConstantArgClose(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    void* state = context->GetFunctionState(scope);
+    context->Free(reinterpret_cast<uint8_t*>(state));
+    context->SetFunctionState(scope, NULL);
+  }
+}
+
+// ValidateOpen UDF: returns true if the UDF was opened, false otherwise. Can also be
+// used to validate close since it will leak if it's not closed.
+void ValidateOpenPrepare(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    uint8_t* state = context->Allocate(100);
+    context->SetFunctionState(scope, state);
+  }
+}
+
+BooleanVal ValidateOpen(FunctionContext* context, const IntVal& dummy) {
+  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  return BooleanVal(state != NULL);
+}
+
+void ValidateOpenClose(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    void* state = context->GetFunctionState(scope);
+    context->Free(reinterpret_cast<uint8_t*>(state));
+    context->SetFunctionState(scope, NULL);
+  }
+}
+
+namespace foo {
+  void bar(
+      FunctionContext* context, FunctionContext::FunctionStateScope scope) { }
+
+}

@@ -130,20 +130,22 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
       fn_.hdfs_location, fn_.aggregate_fn.init_fn_symbol, &init_fn_, &cache_entry_));
   RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
-      fn_.hdfs_location, fn_.aggregate_fn.update_fn_symbol, &update_fn_, NULL));
+      fn_.hdfs_location, fn_.aggregate_fn.update_fn_symbol, &update_fn_, &cache_entry_));
   RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
-      fn_.hdfs_location, fn_.aggregate_fn.merge_fn_symbol, &merge_fn_, NULL));
+      fn_.hdfs_location, fn_.aggregate_fn.merge_fn_symbol, &merge_fn_, &cache_entry_));
 
   // Serialize and Finalize are optional
   if (!fn_.aggregate_fn.serialize_fn_symbol.empty()) {
     RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
-        fn_.hdfs_location, fn_.aggregate_fn.serialize_fn_symbol, &serialize_fn_, NULL));
+        fn_.hdfs_location, fn_.aggregate_fn.serialize_fn_symbol, &serialize_fn_,
+        &cache_entry_));
   } else {
     serialize_fn_ = NULL;
   }
   if (!fn_.aggregate_fn.finalize_fn_symbol.empty()) {
     RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
-        fn_.hdfs_location, fn_.aggregate_fn.finalize_fn_symbol, &finalize_fn_, NULL));
+        fn_.hdfs_location, fn_.aggregate_fn.finalize_fn_symbol, &finalize_fn_,
+        &cache_entry_));
   } else {
     finalize_fn_ = NULL;
   }
@@ -154,6 +156,19 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   }
   ctx_.reset(FunctionContextImpl::CreateContext(state, pool, arg_types));
 
+  return Status::OK;
+}
+
+Status AggFnEvaluator::Open(RuntimeState* state) {
+  RETURN_IF_ERROR(Expr::Open(input_exprs_, state));
+  // Now that we have opened all our input exprs, it is safe to evaluate any constant
+  // values for the UDA's FunctionContext (we cannot evaluate exprs before calling Open()
+  // on them).
+  vector<AnyVal*> constant_args(input_exprs_.size());
+  for (int i = 0; i < input_exprs_.size(); ++i) {
+    constant_args[i] = input_exprs_[i]->GetConstVal();
+  }
+  ctx_->impl()->SetConstantArgs(constant_args);
   return Status::OK;
 }
 

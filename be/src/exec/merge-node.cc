@@ -80,7 +80,15 @@ Status MergeNode::Prepare(RuntimeState* state) {
 }
 
 Status MergeNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
+  RETURN_IF_ERROR(ExecNode::Open(state));
+  // Open const expr lists.
+  for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
+    RETURN_IF_ERROR(Expr::Open(const_result_expr_lists_[i], state));
+  }
+  // Open result expr lists.
+  for (int i = 0; i < result_expr_lists_.size(); ++i) {
+    RETURN_IF_ERROR(Expr::Open(result_expr_lists_[i], state));
+  }
   return Status::OK;
 }
 

@@ -16,13 +16,12 @@ package com.cloudera.impala.analysis;
 
 import java.util.HashMap;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.AggregateFunction;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TAggregateFunction;
-import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.cloudera.impala.thrift.TSymbolType;
 import com.google.common.base.Preconditions;
 
 /**
@@ -51,20 +50,6 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     super(new AggregateFunction(fnSymbol, args, retType), location, ifNotExists, optArgs);
     uda_ = (AggregateFunction)super.fn_;
     intermediateType_ = intermediateType;
-  }
-
-  @Override
-  public TCreateFunctionParams toThrift() {
-    TCreateFunctionParams params = super.toThrift();
-    TAggregateFunction udaFn = new TAggregateFunction();
-    udaFn.setUpdate_fn_symbol(uda_.getUpdateFnSymbol());
-    udaFn.setInit_fn_symbol(uda_.getInitFnSymbol());
-    udaFn.setSerialize_fn_symbol(uda_.getSerializeFnSymbol());
-    udaFn.setMerge_fn_symbol(uda_.getMergeFnSymbol());
-    udaFn.setFinalize_fn_symbol(uda_.getFinalizeFnSymbol());
-    udaFn.setIntermediate_type(uda_.getIntermediateType().toThrift());
-    params.getFn().setAggregate_fn(udaFn);
-    return params;
   }
 
   private void reportCouldNotInferSymbol(String function) throws AnalysisException {
@@ -144,11 +129,13 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
 
     // Check arguments that are only valid in UDFs are not set.
     checkOptArgNotSet(OptArg.SYMBOL);
+    checkOptArgNotSet(OptArg.PREPARE_FN);
+    checkOptArgNotSet(OptArg.CLOSE_FN);
 
     // The user must provide the symbol for Update.
     uda_.setUpdateFnSymbol(uda_.lookupSymbol(
-        checkAndGetOptArg(OptArg.UPDATE_FN), intermediateType_, uda_.hasVarArgs(),
-        uda_.getArgs()));
+        checkAndGetOptArg(OptArg.UPDATE_FN), TSymbolType.UDF_EVALUATE, intermediateType_,
+        uda_.hasVarArgs(), uda_.getArgs()));
 
     // If the ddl did not specify the init/serialize/merge/finalize function
     // Symbols, guess them based on the update fn Symbol.
@@ -162,15 +149,14 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     if (uda_.getMergeFnSymbol() == null) reportCouldNotInferSymbol("merge");
 
     // Validate that all set symbols exist.
-    uda_.setInitFnSymbol(
-        uda_.lookupSymbol(uda_.getInitFnSymbol(), intermediateType_, false));
-    uda_.setMergeFnSymbol(
-        uda_.lookupSymbol(uda_.getMergeFnSymbol(), intermediateType_, false,
-            intermediateType_));
+    uda_.setInitFnSymbol(uda_.lookupSymbol(uda_.getInitFnSymbol(),
+        TSymbolType.UDF_EVALUATE, intermediateType_, false));
+    uda_.setMergeFnSymbol(uda_.lookupSymbol(uda_.getMergeFnSymbol(),
+        TSymbolType.UDF_EVALUATE, intermediateType_, false, intermediateType_));
     if (uda_.getSerializeFnSymbol() != null) {
       try {
-        uda_.setSerializeFnSymbol(uda_.lookupSymbol(
-            uda_.getSerializeFnSymbol(), null, false, intermediateType_));
+        uda_.setSerializeFnSymbol(uda_.lookupSymbol(uda_.getSerializeFnSymbol(),
+            TSymbolType.UDF_EVALUATE, null, false, intermediateType_));
       } catch (AnalysisException e) {
         if (optArgs_.get(OptArg.SERIALIZE_FN) != null) {
           throw e;
@@ -183,7 +169,8 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     if (uda_.getFinalizeFnSymbol() != null) {
       try {
         uda_.setFinalizeFnSymbol(uda_.lookupSymbol(
-            uda_.getFinalizeFnSymbol(), null, false, intermediateType_));
+            uda_.getFinalizeFnSymbol(), TSymbolType.UDF_EVALUATE, null, false,
+            intermediateType_));
       } catch (AnalysisException e) {
         if (optArgs_.get(OptArg.FINALIZE_FN) != null) {
           throw e;

@@ -466,11 +466,16 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 // threads. The scanner subclasses are passed the initial splits.  Scanners are expected
 // to queue up a non-zero number of those splits to the io mgr (via the ScanNode).
 Status HdfsScanNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
+  RETURN_IF_ERROR(ExecNode::Open(state));
 
   if (file_descs_.empty()) {
     SetDone();
     return Status::OK;
+  }
+
+  for (list<vector<Expr*>*>::iterator it = all_conjuncts_copies_.begin();
+     it != all_conjuncts_copies_.end(); ++it) {
+    RETURN_IF_ERROR(Expr::Open(**it, state));
   }
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterReader(

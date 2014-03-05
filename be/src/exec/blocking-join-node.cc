@@ -91,7 +91,7 @@ void BlockingJoinNode::BuildSideThread(RuntimeState* state, Promise<Status>* sta
 }
 
 Status BlockingJoinNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
+  RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());

@@ -83,6 +83,7 @@ Expr::Expr(const ColumnType& type, bool is_slotref)
       codegen_fn_(NULL),
       adapter_fn_used_(false),
       scratch_buffer_size_(0),
+      opened_(false) ,
       jitted_compute_fn_(NULL) {
 }
 
@@ -558,6 +559,22 @@ Status Expr::Prepare(const vector<Expr*>& exprs, RuntimeState* state,
   return Status::OK;
 }
 
+Status Expr::Open(const vector<Expr*>& exprs, RuntimeState* state) {
+  // TODO: call prepare function with FRAGMENT_LOCAL scope
+  for (int i = 0; i < exprs.size(); ++i) {
+    RETURN_IF_ERROR(exprs[i]->Open(state));
+  }
+  return Status::OK;
+}
+
+Status Expr::Open(RuntimeState* state) {
+  for (int i = 0; i < children_.size(); ++i) {
+    RETURN_IF_ERROR(children_[i]->Open(state));
+  }
+  opened_ = true;
+  return Status::OK;
+}
+
 bool Expr::IsCodegenAvailable(const vector<Expr*>& exprs) {
   for (int i = 0; i < exprs.size(); ++i) {
     if (exprs[i]->codegen_fn() == NULL) return false;
@@ -975,6 +992,80 @@ void Expr::InitBuiltinsDummy() {
   TimestampFunctions::Year(NULL, NULL);
   UdfBuiltins::Pi(NULL);
   UtilityFunctions::Pid(NULL, NULL);
+}
+
+AnyVal* Expr::GetConstVal() {
+  DCHECK(opened_);
+  if (!IsConstant()) return NULL;
+  if (constant_val_.get() != NULL) return constant_val_.get();
+
+  void* val = GetValue(NULL);
+  switch (type_.type) {
+    case TYPE_BOOLEAN: {
+      BooleanVal v = BooleanVal::null();
+      if (val != NULL) v = BooleanVal(*reinterpret_cast<bool*>(val));
+      constant_val_.reset(new BooleanVal(v));
+      break;
+    }
+    case TYPE_TINYINT: {
+      TinyIntVal v = TinyIntVal::null();
+      if (val != NULL) v = TinyIntVal(*reinterpret_cast<int8_t*>(val));
+      constant_val_.reset(new TinyIntVal(v));
+      break;
+    }
+    case TYPE_SMALLINT: {
+      SmallIntVal v = SmallIntVal::null();
+      if (val != NULL) v = SmallIntVal(*reinterpret_cast<int16_t*>(val));
+      constant_val_.reset(new SmallIntVal(v));
+      break;
+    }
+    case TYPE_INT: {
+      IntVal v = IntVal::null();
+      if (val != NULL) v = IntVal(*reinterpret_cast<int32_t*>(val));
+      constant_val_.reset(new IntVal(v));
+      break;
+    }
+    case TYPE_BIGINT: {
+      BigIntVal v = BigIntVal::null();
+      if (val != NULL) v = BigIntVal(*reinterpret_cast<int64_t*>(val));
+      constant_val_.reset(new BigIntVal(v));
+      break;
+    }
+    case TYPE_FLOAT: {
+      FloatVal v = FloatVal::null();
+      if (val != NULL) v = FloatVal(*reinterpret_cast<float*>(val));
+      constant_val_.reset(new FloatVal(v));
+      break;
+    }
+    case TYPE_DOUBLE: {
+      DoubleVal v = DoubleVal::null();
+      if (val != NULL) v = DoubleVal(*reinterpret_cast<double*>(val));
+      constant_val_.reset(new DoubleVal(v));
+      break;
+    }
+    case TYPE_STRING: {
+      StringVal v = StringVal::null();
+      if (val != NULL) {
+        StringValue* sv = reinterpret_cast<StringValue*>(val);
+        sv->ToStringVal(&v);
+      }
+      constant_val_.reset(new StringVal(v));
+      break;
+    }
+    case TYPE_TIMESTAMP: {
+      TimestampVal v = TimestampVal::null();
+      if (val != NULL) {
+        TimestampValue* tv = reinterpret_cast<TimestampValue*>(val);
+        tv->ToTimestampVal(&v);
+      }
+      constant_val_.reset(new TimestampVal(v));
+      break;
+    }
+    default:
+      DCHECK(false) << "Type not implemented: " << type();
+  }
+  DCHECK(constant_val_.get() != NULL);
+  return constant_val_.get();
 }
 
 }

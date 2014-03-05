@@ -52,13 +52,16 @@ class NativeUdfExpr: public Expr {
  public:
   ~NativeUdfExpr();
   virtual std::string DebugString() const;
+  virtual impala_udf::AnyVal* GetConstVal();
 
  protected:
   friend class Expr;
 
   NativeUdfExpr(const TExprNode& node);
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc);
+  virtual Status Open(RuntimeState* state);
   virtual Status GetIrComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual void Close(RuntimeState* state);
 
  private:
   // Compute function that calls udf_wrapper_ and writes the result to e->result_.
@@ -77,12 +80,26 @@ class NativeUdfExpr: public Expr {
   // Function pointer to the JIT'd function produced by GetIrComputeFn().
   void* udf_wrapper_;
 
+  // The UDF's prepare function, if specified. This is initialized in Prepare() and
+  // called in Open() (since we may have needed to codegen the function if it's from an
+  // IR module).
+  impala_udf::UdfPrepare prepare_fn_;
+
+  // THe UDF's close function, if specified. This is initialized in Prepare() and called
+  // in Close().
+  impala_udf::UdfClose close_fn_;
+
   // Buffer of preallocated input objects to pass to UDF if it has varargs.
   // TODO: Move to to ExprContext
   uint8_t* varargs_input_;
 
   // Loads the native or IR function from HDFS and puts the result in *udf.
   Status GetUdf(RuntimeState* state, llvm::Function** udf);
+
+  // Loads the native or IR function 'symbol' from HDFS and puts the result in *fn.
+  // If the function is loaded from an IR module, it cannot be called until the module
+  // has been JIT'd (i.e. after Prepare() has completed).
+  Status GetFunction(RuntimeState* state, const std::string& symbol, void** fn);
 };
 
 }
