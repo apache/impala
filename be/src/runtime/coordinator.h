@@ -285,6 +285,10 @@ class Coordinator {
   // Per fragment profile information
   struct PerFragmentProfileData {
     // Averaged profile for this fragment.  Stored in obj_pool.
+    // The counters in this profile are averages (type AveragedCounter) of the
+    // counters in the fragment instance profiles.
+    // Note that the individual fragment instance profiles themselves are stored and
+    // displayed as children of the root_profile below.
     RuntimeProfile* averaged_profile;
 
     // Number of instances running this fragment.
@@ -385,9 +389,16 @@ class Coordinator {
   Status FinalizeSuccessfulInsert();
 
   // Update fragment profile information from a backend exec state.
-  // This method calls Merge and AddChild, which obtain their own locks
+  // This is called repeatedly from UpdateFragmentExecStatus(),
+  // and also at the end of the query from ReportQuerySummary().
+  // This method calls UpdateAverage() and AddChild(), which obtain their own locks
   // on the backend state.
-  void UpdateFragmentInfo(BackendExecState* backend_exec_state);
+  void UpdateAverageProfile(BackendExecState* backend_exec_state);
+
+  // Compute the summary stats (completion_time and rates)
+  // for an individual fragment_profile_ based on the specified backed_exec_state.
+  // Called only from ReportQuerySummary() below.
+  void ComputeFragmentSummaryStats(BackendExecState* backend_exec_state);
 
   // Outputs aggregate query profile summary.  This is assumed to be called at the end of
   // a query -- remote fragments' profiles must not be updated while this is running.

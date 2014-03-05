@@ -363,7 +363,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
     stringstream ss;
     ss << "Averaged Fragment " << i;
     fragment_profiles_[i].averaged_profile =
-        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
+        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str(), true));
     // Insert the avg profiles in ascending fragment number order. If
     // there is a coordinator fragment, it's been placed in
     // fragment_profiles_[0].averaged_profile, ensuring that this code
@@ -1033,7 +1033,10 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       // TODO: We're losing this profile information. Call ReportQuerySummary only after
       // all backends have completed.
       exec_state->profile->Update(cumulative_profile);
-      UpdateFragmentInfo(exec_state);
+
+      // Update the average profile for the fragment corresponding to this instance.
+      exec_state->profile->ComputeTimeInProfile();
+      UpdateAverageProfile(exec_state);
     }
     if (!exec_state->profile_created) {
       CollectScanNodeCounters(exec_state->profile, &exec_state->aggregate_counters);
@@ -1150,8 +1153,20 @@ typedef struct {
   }
 } InstanceComparator;
 
-// Update fragment profile information from a backend execution state.
-void Coordinator::UpdateFragmentInfo(BackendExecState* backend_exec_state) {
+// Update fragment average profile information from a backend execution state.
+void Coordinator::UpdateAverageProfile(BackendExecState* backend_exec_state) {
+  int fragment_idx = backend_exec_state->fragment_idx;
+  DCHECK_GE(fragment_idx, 0);
+  DCHECK_LT(fragment_idx, fragment_profiles_.size());
+  PerFragmentProfileData& data = fragment_profiles_[fragment_idx];
+
+  // No locks are taken since UpdateAverage() and AddChild() take their own locks
+  data.averaged_profile->UpdateAverage(backend_exec_state->profile);
+  data.root_profile->AddChild(backend_exec_state->profile);
+}
+
+// Compute fragment summary information from a backend execution state.
+void Coordinator::ComputeFragmentSummaryStats(BackendExecState* backend_exec_state) {
   int fragment_idx = backend_exec_state->fragment_idx;
   DCHECK_GE(fragment_idx, 0);
   DCHECK_LT(fragment_idx, fragment_profiles_.size());
@@ -1161,10 +1176,10 @@ void Coordinator::UpdateFragmentInfo(BackendExecState* backend_exec_state) {
   data.completion_times(completion_time);
   data.rates(backend_exec_state->total_split_size / (completion_time / 1000.0
     / 1000.0 / 1000.0));
-  // Merge obtains locks on the counter map and children while
-  // performing the merge, so concurrent merges into the same
-  // profile should be protected
-  data.averaged_profile->Merge(backend_exec_state->profile);
+
+  // Add the child in case it has not been added previously
+  // via UpdateAverageProfile(). AddChild() will do nothing if the child
+  // already exists.
   data.root_profile->AddChild(backend_exec_state->profile);
 }
 
@@ -1188,17 +1203,14 @@ void Coordinator::ReportQuerySummary() {
     // Average all remote fragments for each fragment.
     for (int i = 0; i < backend_exec_states_.size(); ++i) {
       backend_exec_states_[i]->profile->ComputeTimeInProfile();
-
-      UpdateFragmentInfo(backend_exec_states_[i]);
+      UpdateAverageProfile(backend_exec_states_[i]);
+      ComputeFragmentSummaryStats(backend_exec_states_[i]);
     }
 
     InstanceComparator comparator;
     // Per fragment instances have been collected, output summaries
     for (int i = (executor_.get() != NULL ? 1 : 0); i < fragment_profiles_.size(); ++i) {
       fragment_profiles_[i].root_profile->SortChildren(comparator);
-      RuntimeProfile* profile = fragment_profiles_[i].averaged_profile;
-      profile->Divide(fragment_profiles_[i].num_instances);
-
       SummaryStats& completion_times = fragment_profiles_[i].completion_times;
       SummaryStats& rates = fragment_profiles_[i].rates;
 

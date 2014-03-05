@@ -69,16 +69,20 @@ TEST(CountersTest, Basic) {
   EXPECT_EQ(counter_merged->value(), 1);
   EXPECT_TRUE(from_thrift->GetCounter("Not there") ==  NULL);
 
-  // Merge
-  RuntimeProfile merged_profile(&pool, "Merged");
-  merged_profile.Merge(from_thrift);
-  counter_merged = merged_profile.GetCounter("A");
+  // Averaged
+  RuntimeProfile averaged_profile(&pool, "Merged", true);
+  averaged_profile.UpdateAverage(from_thrift);
+  counter_merged = averaged_profile.GetCounter("A");
   EXPECT_EQ(counter_merged->value(), 1);
 
-  // Merge 2 more times, counters should get aggregated
-  merged_profile.Merge(from_thrift);
-  merged_profile.Merge(from_thrift);
-  EXPECT_EQ(counter_merged->value(), 3);
+  // UpdateAverage again, there should be no change.
+  averaged_profile.UpdateAverage(from_thrift);
+  EXPECT_EQ(counter_merged->value(), 1);
+
+  counter_a = profile_a2.AddCounter("A", TCounterType::UNIT);
+  counter_a->Set(3L);
+  averaged_profile.UpdateAverage(&profile_a2);
+  EXPECT_EQ(counter_merged->value(), 2);
 
   // Update
   RuntimeProfile updated_profile(&pool, "Updated");
@@ -153,22 +157,23 @@ TEST(CountersTest, MergeAndUpdate) {
   // Merge the two and validate
   TRuntimeProfileTree tprofile1;
   profile1.ToThrift(&tprofile1);
-  RuntimeProfile* merged_profile = RuntimeProfile::CreateFromThrift(&pool, tprofile1);
-  merged_profile->Merge(&profile2);
-  EXPECT_EQ(4, merged_profile->num_counters());
-  ValidateCounter(merged_profile, "Parent Shared", 4);
-  ValidateCounter(merged_profile, "Parent 1 Only", 2);
-  ValidateCounter(merged_profile, "Parent 2 Only", 5);
+  RuntimeProfile averaged_profile(&pool, "merged", true);
+  averaged_profile.UpdateAverage(&profile1);
+  averaged_profile.UpdateAverage(&profile2);
+  EXPECT_EQ(4, averaged_profile.num_counters());
+  ValidateCounter(&averaged_profile, "Parent Shared", 2);
+  ValidateCounter(&averaged_profile, "Parent 1 Only", 2);
+  ValidateCounter(&averaged_profile, "Parent 2 Only", 5);
 
   vector<RuntimeProfile*> children;
-  merged_profile->GetChildren(&children);
+  averaged_profile.GetChildren(&children);
   EXPECT_EQ(children.size(), 3);
 
   for (int i = 0; i < 3; ++i) {
     RuntimeProfile* profile = children[i];
     if (profile->name().compare("Child1") == 0) {
       EXPECT_EQ(4, profile->num_counters());
-      ValidateCounter(profile, "Child1 Shared", 30);
+      ValidateCounter(profile, "Child1 Shared", 15);
       ValidateCounter(profile, "Child1 Parent 1 Only", 50);
       ValidateCounter(profile, "Child1 Parent 2 Only", 100);
     } else if (profile->name().compare("Child2") == 0) {
@@ -184,7 +189,7 @@ TEST(CountersTest, MergeAndUpdate) {
 
   // make sure we can print
   stringstream dummy;
-  merged_profile->PrettyPrint(&dummy);
+  averaged_profile.PrettyPrint(&dummy);
 
   // Update profile2 w/ profile1 and validate
   profile2.Update(tprofile1);
@@ -238,6 +243,55 @@ TEST(CountersTest, DerivedCounters) {
   EXPECT_EQ(throughput_counter->value(), 20);
   ticks_counter->Set(ticks_counter->value() / 2);
   EXPECT_EQ(throughput_counter->value(), 40);
+}
+
+TEST(CountersTest, AverageSetCounters) {
+  ObjectPool pool;
+  RuntimeProfile profile(&pool, "Profile");
+  RuntimeProfile::Counter* bytes_1_counter =
+      profile.AddCounter("bytes 1", TCounterType::BYTES);
+  RuntimeProfile::Counter* bytes_2_counter =
+      profile.AddCounter("bytes 2", TCounterType::BYTES);
+
+  bytes_1_counter->Set(10L);
+  RuntimeProfile::AveragedCounter bytes_avg(TCounterType::BYTES);
+  bytes_avg.UpdateCounter(bytes_1_counter);
+  // Avg of 10L
+  EXPECT_EQ(bytes_avg.value(), 10L);
+  bytes_1_counter->Set(20L);
+  bytes_avg.UpdateCounter(bytes_1_counter);
+  // Avg of 20L
+  EXPECT_EQ(bytes_avg.value(), 20L);
+  bytes_2_counter->Set(40L);
+  bytes_avg.UpdateCounter(bytes_2_counter);
+  // Avg of 20L and 40L
+  EXPECT_EQ(bytes_avg.value(), 30L);
+  bytes_2_counter->Set(30L);
+  bytes_avg.UpdateCounter(bytes_2_counter);
+  // Avg of 20L and 30L
+  EXPECT_EQ(bytes_avg.value(), 25L);
+
+  RuntimeProfile::Counter* double_1_counter =
+      profile.AddCounter("double 1", TCounterType::DOUBLE_VALUE);
+  RuntimeProfile::Counter* double_2_counter =
+      profile.AddCounter("double 2", TCounterType::DOUBLE_VALUE);
+  double_1_counter->Set(1.0f);
+  RuntimeProfile::AveragedCounter double_avg(TCounterType::DOUBLE_VALUE);
+  double_avg.UpdateCounter(double_1_counter);
+  // Avg of 1.0f
+  EXPECT_EQ(double_avg.double_value(), 1.0f);
+  double_1_counter->Set(2.0f);
+  double_avg.UpdateCounter(double_1_counter);
+  // Avg of 2.0f
+  EXPECT_EQ(double_avg.double_value(), 2.0f);
+  double_2_counter->Set(4.0f);
+  double_avg.UpdateCounter(double_2_counter);
+  // Avg of 2.0f and 4.0f
+  EXPECT_EQ(double_avg.double_value(), 3.0f);
+  double_2_counter->Set(3.0f);
+  double_avg.UpdateCounter(double_2_counter);
+  // Avg of 2.0f and 3.0f
+  EXPECT_EQ(double_avg.double_value(), 2.5f);
 }
 
 TEST(CountersTest, InfoStringTest) {

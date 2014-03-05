@@ -19,6 +19,7 @@
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/unordered_map.hpp>
 #include <iostream>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -175,6 +176,70 @@ class RuntimeProfile {
     DerivedCounterFunction counter_fn_;
   };
 
+  // An AveragedCounter maintains a set of counters and its value is the
+  // average of the values in that set. The average is updated through calls
+  // to UpdateCounter(), which may add a new counter or update an existing counter.
+  // Set() and Update() should not be called.
+  class AveragedCounter : public Counter {
+   public:
+    AveragedCounter(TCounterType::type type)
+     : Counter(type),
+       current_double_sum_(0.0),
+       current_int_sum_(0) {
+    }
+
+    // Update counter_value_map_ with the new counter. This may require the counter
+    // to be added to the map.
+    // No locks are obtained within this class because UpdateCounter() is called from
+    // UpdateAverage(), which obtains locks on the entire counter map in a profile.
+    void UpdateCounter(Counter* new_counter) {
+      DCHECK_EQ(new_counter->type_, type_);
+      boost::unordered_map<Counter*, int64_t>::iterator it =
+          counter_value_map_.find(new_counter);
+      int64_t old_val = 0;
+      if (it != counter_value_map_.end()) {
+        old_val = it->second;
+        it->second = new_counter->value_;
+      } else {
+        counter_value_map_[new_counter] = new_counter->value();
+      }
+
+      if (type_ == TCounterType::DOUBLE_VALUE) {
+        double old_double_val = *reinterpret_cast<double*>(&old_val);
+        current_double_sum_ += (new_counter->double_value() - old_double_val);
+        double result_val = current_double_sum_ / (double) counter_value_map_.size();
+        value_ = *reinterpret_cast<int64_t*>(&result_val);
+      } else {
+        current_int_sum_ += (new_counter->value_ - old_val);
+        value_ = current_int_sum_ / counter_value_map_.size();
+      }
+    }
+
+    // The value for this counter should be updated through UpdateCounter().
+    // Set() and Update() should not be used.
+    virtual void Set(double value) {
+      DCHECK(false);
+    }
+
+    virtual void Set(int64_t value) {
+      DCHECK(false);
+    }
+
+    virtual void Update(int64_t delta) {
+      DCHECK(false);
+    }
+
+   private:
+    // Map from counters to their existing values. Modified via UpdateCounter().
+    boost::unordered_map<Counter*, int64_t> counter_value_map_;
+
+    // Current sums of values from counter_value_map_. Only one of these is used,
+    // depending on the type of the counter. current_double_sum_ is used for
+    // DOUBLE_VALUE, current_int_sum_ otherwise.
+    double current_double_sum_;
+    int64_t current_int_sum_;
+  };
+
   // A set of counters that measure thread info, such as total time, user time, sys time.
   class ThreadCounters {
    private:
@@ -279,7 +344,11 @@ class RuntimeProfile {
 
   // Create a runtime profile object with 'name'.  Counters and merged profile are
   // allocated from pool.
-  RuntimeProfile(ObjectPool* pool, const std::string& name);
+  // If is_averaged_profile is true, the counters in this profile will be derived averages
+  // (of type AveragedCounter) from other profiles, so the counter map will be left empty
+  // Otherwise, the counter map is initialized with a single entry for TotalTime.
+  RuntimeProfile(ObjectPool* pool, const std::string& name,
+      bool is_averaged_profile = false);
 
   ~RuntimeProfile();
 
@@ -305,16 +374,16 @@ class RuntimeProfile {
     std::sort(children_.begin(), children_.end(), cmp);
   }
 
-  // Merges the src profile into this one, combining counters that have an identical
-  // path. Info strings from profiles are not merged. 'src' would be a const if it
-  // weren't for locking.
-  // Calling this concurrently on two RuntimeProfiles in reverse order results in
-  // undefined behavior.
-  // TODO: Event sequences are ignored
-  void Merge(RuntimeProfile* src);
+  // Updates the AveragedCounter counters in this profile with the counters from the
+  // 'src' profile. If a counter is present in 'src' but missing in this profile, a new
+  // AveragedCounter is created with the same name. This method should not be invoked
+  // if is_average_profile_ is false. Obtains locks on the counter maps and child counter
+  // maps in both this and 'src' profiles.
+  void UpdateAverage(RuntimeProfile* src);
 
-  // Updates this profile w/ the thrift profile: behaves like Merge(), except
-  // that existing counters are updated rather than added up.
+  // Updates this profile w/ the thrift profile.
+  // Counters and child profiles in thrift_profile that already exist in this profile
+  // are updated. Counters that do not already exist are created.
   // Info strings matched up by key and are updated or added, depending on whether
   // the key has already been registered.
   // TODO: Event sequences are ignored
@@ -372,7 +441,7 @@ class RuntimeProfile {
   const std::string* GetInfoString(const std::string& key);
 
   // Returns the counter for the total elapsed time.
-  Counter* total_time_counter() { return &counter_total_time_; }
+  Counter* total_time_counter() { return counter_map_[TOTAL_TIME_COUNTER_NAME]; }
 
   // Prints the counters in a name: value format.
   // Does not hold locks when it makes any function calls.
@@ -476,6 +545,10 @@ class RuntimeProfile {
   // user-supplied, uninterpreted metadata.
   int64_t metadata_;
 
+  // True if this profile is an average derived from other profiles.
+  // All counters in this profile must be of type AveragedCounter.
+  bool is_averaged_profile_;
+
   // Map from counter names to counters.  The profile owns the memory for the
   // counters.
   typedef std::map<std::string, Counter*> CounterMap;
@@ -533,6 +606,9 @@ class RuntimeProfile {
   // this profile and its children.
   // Called recusively.
   void ComputeTimeInProfile(int64_t total_time);
+
+  // Name of the counter maintaining the total time.
+  static const std::string TOTAL_TIME_COUNTER_NAME;
 
   // Create a subtree of runtime profiles from nodes, starting at *node_idx.
   // On return, *node_idx is the index one past the end of this subtree
