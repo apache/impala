@@ -10,8 +10,8 @@ $HBASE_HOME/bin/start-hbase.sh
 # TODO: Remove once the race between master and RS has been
 # resolved. Note this script requires having
 # org.apache.zookeeper.ZooKeeperMain on the classpath, so make sure
-# that mvn dependency:unpack-dependencies has been run from
-# $IMPALA_HOME/fe.
+# that the classpath has been set properly.
+. ${IMPALA_HOME}/bin/set-classpath.sh
 python $IMPALA_HOME/testdata/bin/wait-for-hbase-master.py
 
 $HBASE_HOME/bin/local-regionservers.sh start 1 2 3

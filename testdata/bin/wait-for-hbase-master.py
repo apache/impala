@@ -17,7 +17,7 @@ while time.time() - now < TIMEOUT_SECONDS:
   out, err = p.communicate()
   if "Could not find the main class: org.apache.zookeeper.ZooKeeperMain" in err:
     print """CLASSPATH does not contain org.apache.zookeeper.ZooKeeperMain.
-          Have you run mvn dependency:unpack-dependencies from $IMPALA_HOME/fe?"""
+          Please check your CLASSPATH"""
     exit(1)
 
   if "numChildren" in err:
