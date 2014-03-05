@@ -369,15 +369,21 @@ with t1 as (values('a', 'b'))
 01:MERGE
    constant-selects=1
 ---- DISTRIBUTEDPLAN
-03:TOP-N [LIMIT=1]
+09:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
 |
-04:EXCHANGE [PARTITION=UNPARTITIONED]
+08:EXCHANGE [PARTITION=UNPARTITIONED]
 |
-|--06:MERGE
+|--07:TOP-N [LIMIT=1]
+|  |  order by: 'c' ASC
+|  |
+|  06:MERGE
 |  |
 |  02:MERGE
 |     constant-selects=1
+|
+03:TOP-N [LIMIT=1]
+|  order by: 'c' ASC
 |
 05:MERGE
 |
@@ -400,15 +406,21 @@ with t1 as (values('a', 'b'))
 01:MERGE
    constant-selects=1
 ---- DISTRIBUTEDPLAN
-03:TOP-N [LIMIT=1]
+09:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
 |
-04:EXCHANGE [PARTITION=UNPARTITIONED]
+08:EXCHANGE [PARTITION=UNPARTITIONED]
 |
-|--06:MERGE
+|--07:TOP-N [LIMIT=1]
+|  |  order by: 'c' ASC
+|  |
+|  06:MERGE
 |  |
 |  02:MERGE
 |     constant-selects=1
+|
+03:TOP-N [LIMIT=1]
+|  order by: 'c' ASC
 |
 05:MERGE
 |

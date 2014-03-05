@@ -681,51 +681,109 @@ public class Planner {
   }
 
   /**
-   * Create a new fragment containing a single ExchangeNode that consumes the output
-   * of childFragment, set the destination of childFragment to the new parent
-   * and the output partition of childFragment to that of the new parent.
+   * Returns a fragment containing a single ExchangeNode that consumes the output
+   * of all childFragments. Sets the destination of childFragments to the new parent
+   * and the output partition of the childFragments to that of the new parent.
+   * Creates the ExchangeNode inside parentFragment if one was provided (not null),
+   * otherwise creates a new parent fragment.
    * TODO: the output partition of a child isn't necessarily the same as the data
    * partition of the receiving parent (if there is more materialization happening
    * in the parent, such as during distinct aggregation). Do we care about the data
    * partition of the parent being applicable to the *output* of the parent (it's
    * correct for the input).
    */
-  private PlanFragment createParentAggFragment(
-      Analyzer analyzer, PlanFragment childFragment, DataPartition parentPartition)
+  private PlanFragment createParentFragment(
+      Analyzer analyzer, List<PlanFragment> childFragments,
+      DataPartition parentPartition, PlanFragment parentFragment)
       throws InternalException, AuthorizationException {
     ExchangeNode exchangeNode = new ExchangeNode(nodeIdGenerator_.getNextId());
-    exchangeNode.addChild(childFragment.getPlanRoot(), false);
+    for (PlanFragment childFragment: childFragments) {
+      exchangeNode.addChild(childFragment.getPlanRoot(), false);
+      childFragment.setDestination(exchangeNode);
+      childFragment.setOutputPartition(parentPartition);
+    }
+    if (parentFragment == null) {
+      parentFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
+          exchangeNode, parentPartition);
+    } else {
+      parentFragment.setPlanRoot(exchangeNode);
+      parentFragment.setDataPartition(parentPartition);
+    }
     exchangeNode.init(analyzer);
-    PlanFragment parentFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
-        exchangeNode, parentPartition);
-    childFragment.setDestination(exchangeNode);
-    childFragment.setOutputPartition(parentPartition);
     return parentFragment;
   }
 
   /**
+   * Populates childFragments. If fragment is unpartitioned and its root is an
+   * ExchangeNode without a limit, then childFragments contains all the child
+   * fragments of the exchange and this function returns true. Otherwise
+   * childFragments simply contains the given fragment and this function
+   * returns false.
+   * Used for distributing operations (e.g., agg, topn) over union branches.
+   */
+  private boolean getUnionInputs(
+      PlanFragment fragment, List<PlanFragment> childFragments) {
+    PlanNode root = fragment.getPlanRoot();
+    if (fragment.isPartitioned() || !(root instanceof ExchangeNode) || root.hasLimit()) {
+      childFragments.add(fragment);
+      return false;
+    }
+    ExchangeNode childPlanRoot = (ExchangeNode) fragment.getPlanRoot();
+    for (PlanNode p: childPlanRoot.getChildren()) {
+      childFragments.add(p.getFragment());
+    }
+    return true;
+  }
+
+  /**
+   * Makes 'root' the new plan root for all fragments. Uses the original root
+   * for the first fragment and clones root for the remaining fragments.
+   */
+  private void addPlanRoots(List<PlanFragment> fragments, PlanNode root,
+      Analyzer analyzer) {
+    for (int i = 0; i < fragments.size(); ++i) {
+      PlanNode newRoot = root;
+      if (i != 0) newRoot = root.clone(nodeIdGenerator_.getNextId());
+      newRoot.getChildren().clear();
+      newRoot.addChild(fragments.get(i).getPlanRoot());
+      newRoot.unsetLimit();
+      newRoot.computeStats(analyzer);
+      fragments.get(i).addPlanRoot(newRoot);
+    }
+  }
+
+  /**
    * Returns a fragment that materializes the aggregation result of 'node'.
-   * If the input fragment is partitioned, the result fragment will be partitioned on
+   * If the child fragment is partitioned, the result fragment will be partitioned on
    * the grouping exprs of 'node'.
+   * To handle distributed aggregation over unions, we extract the children of
+   * childFragment if it contains an unpartitioned ExchangeNode, and use those as the
+   * child fragments on which to perform local aggregation.
    * If 'node' is phase 1 of a 2-phase DISTINCT aggregation, this will simply
-   * add 'node' to the child fragment and return the child fragment; the new
+   * add 'node' to the child fragment(s) and return the childFragment; the new
    * fragment will be created by the subsequent call of createAggregationFragment()
    * for the phase 2 AggregationNode.
    */
   private PlanFragment createAggregationFragment(AggregationNode node,
       PlanFragment childFragment, ArrayList<PlanFragment> fragments, Analyzer analyzer)
       throws InternalException, AuthorizationException {
-    if (!childFragment.isPartitioned()) {
-      // nothing to distribute; do full aggregation directly within childFragment
-      childFragment.addPlanRoot(node);
-      return childFragment;
+    List<PlanFragment> childFragments = Lists.newArrayList();
+    PlanFragment parentAggFragment = null;
+    if (getUnionInputs(childFragment, childFragments)) {
+      // Use childFragment for merge aggregation if we unwrapped an exchange.
+      parentAggFragment = childFragment;
+    }
+    if (parentAggFragment == null && !childFragment.isPartitioned()) {
+        // nothing to distribute; do full aggregation directly within childFragment
+        childFragment.addPlanRoot(node);
+        return childFragment;
     }
 
     if (node.getAggInfo().isDistinctAgg()) {
       // 'node' is phase 1 of a DISTINCT aggregation; the actual agg fragment
       // will get created in the next createAggregationFragment() call
       // for the parent AggregationNode
-      childFragment.addPlanRoot(node);
+      addPlanRoots(childFragments, node, analyzer);
       return childFragment;
     }
 
@@ -737,14 +795,18 @@ public class Planner {
           && ((AggregationNode)(node.getChild(0))).getAggInfo().isDistinctAgg();
 
     if (!isDistinct) {
-      // the original aggregation goes into the child fragment,
-      // merge aggregation into a parent fragment
-      childFragment.addPlanRoot(node);
       // if there is a limit, we need to transfer it from the pre-aggregation
-      // node in the child fragment to the merge aggregation node in the parent
+      // node to the merge aggregation node in the parent; remember the limit here
+      // because addPlanRoots() will unset the limit of the pre-aggregation
       long limit = node.getLimit();
-      node.unsetLimit();
-      node.unsetNeedsFinalize();
+      // the original aggregation goes into all child fragments,
+      // merge aggregation into a single parent fragment
+      addPlanRoots(childFragments, node, analyzer);
+      for (PlanFragment f: childFragments) {
+        Preconditions.checkState(f.getPlanRoot() instanceof AggregationNode);
+        AggregationNode childPlanFoot = (AggregationNode) f.getPlanRoot();
+        childPlanFoot.unsetNeedsFinalize();
+      }
 
       DataPartition parentPartition = null;
       if (hasGrouping) {
@@ -762,9 +824,10 @@ public class Planner {
         parentPartition = DataPartition.UNPARTITIONED;
       }
 
-      // place a merge aggregation step in a new fragment
-      PlanFragment mergeFragment =
-          createParentAggFragment(analyzer, childFragment, parentPartition);
+      // place a merge aggregation step in a new fragment, or an existing
+      // parentAggFragment if we are aggregating over a union
+      PlanFragment mergeFragment = createParentFragment(analyzer, childFragments,
+          parentPartition, parentAggFragment);
       AggregationNode mergeAggNode =
           new AggregationNode(
             nodeIdGenerator_.getNextId(), mergeFragment.getPlanRoot(),
@@ -785,8 +848,8 @@ public class Planner {
     }
 
     Preconditions.checkState(isDistinct);
-    // The first-phase aggregation node is already in the child fragment.
-    Preconditions.checkState(node.getChild(0) == childFragment.getPlanRoot());
+    // The first-phase aggregation node is already in the child fragments.
+    Preconditions.checkState(node.getChild(0) == childFragments.get(0).getPlanRoot());
 
     DataPartition mergePartition = null;
     if (hasGrouping) {
@@ -819,9 +882,10 @@ public class Planner {
           new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
     }
 
-    // place a merge aggregation step for the 1st phase in a new fragment
-    PlanFragment mergeFragment =
-        createParentAggFragment(analyzer, childFragment, mergePartition);
+    // place a merge aggregation step for the 1st phase in parentAggFragment or a new
+    // fragment, depending on whether we unwrapped an exchange
+    PlanFragment mergeFragment = createParentFragment(analyzer, childFragments,
+        mergePartition, parentAggFragment);
     AggregateInfo mergeAggInfo =
         ((AggregationNode)(node.getChild(0))).getAggInfo().getMergeAggInfo();
     AggregationNode mergeAggNode =
@@ -837,12 +901,14 @@ public class Planner {
 
     if (!hasGrouping) {
       // place the merge aggregation of the 2nd phase in an unpartitioned fragment;
-      // add preceding merge fragment at end
+      // add preceding merge fragment at end; remove mergeFragment because it may have
+      // already been added if we are aggregating over a union
+      fragments.remove(mergeFragment);
       fragments.add(mergeFragment);
 
       node.unsetNeedsFinalize();
-      mergeFragment =
-          createParentAggFragment(analyzer, mergeFragment, DataPartition.UNPARTITIONED);
+      mergeFragment = createParentFragment(analyzer,
+          Lists.newArrayList(mergeFragment), DataPartition.UNPARTITIONED, null);
       mergeAggInfo = node.getAggInfo().getMergeAggInfo();
       mergeAggNode =
           new AggregationNode(
@@ -858,47 +924,59 @@ public class Planner {
 
   /**
    * Returns a fragment that outputs the result of 'node'.
-   * - adds the top-n computation to the child fragment
+   * - adds the top-n computation to the child fragment(s)
    * - if the child fragment is partitioned creates a new unpartitioned fragment that
    *   merges the output of the child and does another top-n computation
+   * - for a top-n over a union, the child fragment is unpartitioned and only contains an
+   *   ExchangeNoode; adds local top-n nodes to the children of the exchange, and then
+   *   merges the output in childFragment with another top-n
    */
   private PlanFragment createTopnFragment(SortNode node,
       PlanFragment childFragment, ArrayList<PlanFragment> fragments, Analyzer analyzer)
       throws InternalException, AuthorizationException {
-    node.setChild(0, childFragment.getPlanRoot());
-    childFragment.addPlanRoot(node);
-    if (!childFragment.isPartitioned()) {
+    List<PlanFragment> childFragments = Lists.newArrayList();
+    PlanFragment mergeFragment = null;
+    if (getUnionInputs(childFragment, childFragments)) {
+      mergeFragment = childFragment;
+    }
+    if (mergeFragment == null && !childFragment.isPartitioned()) {
+      childFragment.addPlanRoot(node);
       return childFragment;
     }
+    // Remember original offset and limit.
+    long limit = node.getLimit();
+    long offset = node.getOffset();
+    addPlanRoots(childFragments, node, analyzer);
 
     // we're doing top-n in a single unpartitioned new fragment
     // that merges the output of childFragment
-    PlanFragment mergeFragment = createMergeFragment(childFragment, analyzer);
-    // insert sort node that repeats the child's sort
-    SortNode childSortNode = (SortNode) childFragment.getPlanRoot();
-    LOG.debug("childsortnode limit: " + Long.toString(childSortNode.getLimit()) +
-        " offset_: " + Long.toString(childSortNode.getOffset()));
-    Preconditions.checkState(childSortNode.hasLimit());
+    mergeFragment = createParentFragment(analyzer, childFragments,
+        DataPartition.UNPARTITIONED, mergeFragment);
+    // insert sort node that repeats the childrens' sort
     PlanNode exchNode = mergeFragment.getPlanRoot();
+    SortNode mergeNode = (SortNode) node.clone(nodeIdGenerator_.getNextId());
+    mergeNode.addChild(exchNode);
     // the merging exchange node must not apply the limit (that's done by the
     // merging top-n)
     exchNode.unsetLimit();
-    PlanNode mergeNode =
-        new SortNode(nodeIdGenerator_.getNextId(), childSortNode, exchNode);
 
     // If there is an offset_, it must be applied at the top-n. Child nodes do not apply
     // the offset_, and instead must keep at least (limit+offset_) rows so that the top-n
     // node does not miss any rows that should be in the top-n.
-    long offset = childSortNode.getOffset();
-    if (offset != 0) {
-      long sortLimit = childSortNode.getLimit();
+    for (PlanFragment f: childFragments) {
+      SortNode childSortNode = (SortNode) f.getPlanRoot();
       childSortNode.unsetLimit();
-      childSortNode.setLimit(sortLimit + offset);
+      childSortNode.setLimit(limit + ((offset > 0) ? offset : 0));
       childSortNode.setOffset(0);
+      childSortNode.init(analyzer);
     }
+    // Set limit and offset in merge node.
+    mergeNode.setLimit(limit);
+    mergeNode.setOffset(offset);
     mergeNode.init(analyzer);
     Preconditions.checkState(mergeNode.hasValidStats());
     mergeFragment.setPlanRoot(mergeNode);
+    exchNode.computeStats(analyzer);
 
     return mergeFragment;
   }

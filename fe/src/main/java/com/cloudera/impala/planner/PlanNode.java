@@ -538,4 +538,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     perHostMemCost_ = 0;
   }
 
+  public PlanNode clone(PlanNodeId id) {
+    Preconditions.checkState(false, "Not implemented");
+    return null;
+  }
 }

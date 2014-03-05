@@ -63,18 +63,15 @@ public class SortNode extends PlanNode {
   }
 
   /**
-   * Clone 'inputSortNode' for distributed Top-N
+   * Copy c'tor used in clone().
    */
-  public SortNode(PlanNodeId id, SortNode inputSortNode, PlanNode child) {
-    super(id, inputSortNode, "TOP-N");
-    info_ = inputSortNode.info_;
-    // set this directly (and don't reassign in init()): inputSortNode's smap
-    // may not be able to remap info_.orderingExprs
-    baseTblOrderingExprs_ = inputSortNode.baseTblOrderingExprs_;
-    useTopN_ = inputSortNode.useTopN_;
-    isDefaultLimit_ = inputSortNode.isDefaultLimit_;
-    children_.add(child);
-    offset_ = inputSortNode.offset_;
+  private SortNode(PlanNodeId id, SortNode src) {
+    super(id, src, "TOP-N");
+    info_ = src.info_;
+    baseTblOrderingExprs_ = src.baseTblOrderingExprs_;
+    useTopN_ = src.useTopN_;
+    isDefaultLimit_ = src.isDefaultLimit_;
+    offset_ = src.offset_;
   }
 
   public long getOffset() { return offset_; }
@@ -164,4 +161,7 @@ public class SortNode extends PlanNode {
     Preconditions.checkState(useTopN_);
     perHostMemCost_ = (long) Math.ceil((cardinality_ + offset_) * avgRowSize_);
   }
+
+  @Override
+  public PlanNode clone(PlanNodeId id) { return new SortNode(id, this); }
 }

@@ -64,13 +64,16 @@ where a.year > 2009 and a.month = 4
 union distinct
 select id, string_col, year, month from functional.alltypes
 ---- RESULTS
-'Estimated Per-Host Requirements: Memory=32.01MB VCores=3'
+'Estimated Per-Host Requirements: Memory=30.00MB VCores=3'
 ''
 'WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(year,month)]'
-'05:AGGREGATE [FINALIZE]'
-'08:EXCHANGE [PARTITION=UNPARTITIONED]'
-'|--10:MERGE'
+'14:EXCHANGE [PARTITION=HASH(year,month)]'
+'13:AGGREGATE [MERGE FINALIZE]'
+'12:EXCHANGE [PARTITION=HASH(id,string_col,year,month)]'
+'|--11:AGGREGATE'
+'|  10:MERGE'
 '|  04:SCAN HDFS [functional.alltypes]'
+'05:AGGREGATE'
 '09:MERGE'
 '03:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
 '|--07:EXCHANGE [PARTITION=HASH(b.id)]'

@@ -68,6 +68,15 @@ public class AggregationNode extends PlanNode {
     needsFinalize_ = true;
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  private AggregationNode(PlanNodeId id, AggregationNode src) {
+    super(id, src, "AGGREGATE");
+    aggInfo_ = src.aggInfo_;
+    needsFinalize_ = src.needsFinalize_;
+  }
+
   public AggregateInfo getAggInfo() { return aggInfo_; }
 
   // Unsets this node as requiring finalize. Only valid to call this if it is
@@ -257,4 +266,7 @@ public class AggregationNode extends PlanNode {
     perHostMemCost_ += Math.max(perHostCardinality * avgRowSize_ *
         Planner.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
   }
+
+  @Override
+  public AggregationNode clone(PlanNodeId id) { return new AggregationNode(id, this); }
 }

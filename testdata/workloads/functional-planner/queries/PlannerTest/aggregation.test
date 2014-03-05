@@ -159,3 +159,442 @@ where t.x > 10
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
+# test distributed aggregation over unions (IMPALA-831)
+# non-distinct agg without grouping over a union
+select count(*) from
+  (select * from functional.alltypes
+   union all
+   select * from functional.alltypessmall) t
+limit 10
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  limit: 10
+|
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+09:AGGREGATE [MERGE FINALIZE]
+|  output: sum(count(*))
+|  limit: 10
+|
+08:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+|--07:AGGREGATE
+|  |  output: count(*)
+|  |
+|  06:MERGE
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+03:AGGREGATE
+|  output: count(*)
+|
+05:MERGE
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# non-distinct agg with grouping over a union
+select count(*) from
+  (select * from functional.alltypes
+   union all
+   select * from functional.alltypessmall) t
+group by t.bigint_col
+limit 10
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: bigint_col
+|  limit: 10
+|
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+10:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+09:AGGREGATE [MERGE FINALIZE]
+|  output: sum(count(*))
+|  group by: t.bigint_col
+|  limit: 10
+|
+08:EXCHANGE [PARTITION=HASH(t.bigint_col)]
+|
+|--07:AGGREGATE
+|  |  output: count(*)
+|  |  group by: bigint_col
+|  |
+|  06:MERGE
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+03:AGGREGATE
+|  output: count(*)
+|  group by: bigint_col
+|
+05:MERGE
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# distinct agg without grouping over a union
+select count(distinct int_col)
+from
+  (select * from functional.alltypes
+   union all
+   select * from functional.alltypessmall) t
+limit 10
+---- PLAN
+04:AGGREGATE [MERGE FINALIZE]
+|  output: count(int_col)
+|  limit: 10
+|
+03:AGGREGATE
+|  group by: int_col
+|
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+12:AGGREGATE [MERGE FINALIZE]
+|  output: sum(count(int_col))
+|
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+04:AGGREGATE [MERGE]
+|  output: count(int_col)
+|  limit: 10
+|
+10:AGGREGATE [MERGE]
+|  group by: int_col
+|
+09:EXCHANGE [PARTITION=HASH(int_col)]
+|
+|--08:AGGREGATE
+|  |  group by: int_col
+|  |
+|  07:MERGE
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+03:AGGREGATE
+|  group by: int_col
+|
+06:MERGE
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# distinct agg with grouping over a union
+select count(distinct int_col)
+from
+  (select * from functional.alltypes
+   union all
+   select * from functional.alltypessmall) t
+group by t.bigint_col
+limit 10
+---- PLAN
+04:AGGREGATE [MERGE FINALIZE]
+|  output: count(int_col)
+|  group by: t.bigint_col
+|  limit: 10
+|
+03:AGGREGATE
+|  group by: bigint_col, int_col
+|
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+04:AGGREGATE [MERGE FINALIZE]
+|  output: count(int_col)
+|  group by: t.bigint_col
+|  limit: 10
+|
+10:AGGREGATE [MERGE]
+|  group by: t.bigint_col, int_col
+|
+09:EXCHANGE [PARTITION=HASH(t.bigint_col)]
+|
+|--08:AGGREGATE
+|  |  group by: bigint_col, int_col
+|  |
+|  07:MERGE
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+03:AGGREGATE
+|  group by: bigint_col, int_col
+|
+06:MERGE
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# mixed distinct and non-distinct agg without grouping over a union
+select count(smallint_col), count(distinct int_col)
+from
+  (select * from functional.alltypes
+   union all
+   select * from functional.alltypessmall) t
+limit 10
+---- PLAN
+04:AGGREGATE [MERGE FINALIZE]
+|  output: count(int_col), sum(count(smallint_col))
+|  limit: 10
+|
+03:AGGREGATE
+|  output: count(smallint_col)
+|  group by: int_col
+|
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+12:AGGREGATE [MERGE FINALIZE]
+|  output: sum(count(int_col)), sum(sum(count(smallint_col)))
+|
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+04:AGGREGATE [MERGE]
+|  output: count(int_col), sum(count(smallint_col))
+|  limit: 10
+|
+10:AGGREGATE [MERGE]
+|  output: sum(count(smallint_col))
+|  group by: int_col
+|
+09:EXCHANGE [PARTITION=HASH(int_col)]
+|
+|--08:AGGREGATE
+|  |  output: count(smallint_col)
+|  |  group by: int_col
+|  |
+|  07:MERGE
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+03:AGGREGATE
+|  output: count(smallint_col)
+|  group by: int_col
+|
+06:MERGE
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# mixed distinct and non-distinct agg with grouping over a union
+select count(smallint_col), count(distinct int_col)
+from
+  (select * from functional.alltypes
+   union all
+   select * from functional.alltypessmall) t
+group by t.bigint_col
+limit 10
+---- PLAN
+04:AGGREGATE [MERGE FINALIZE]
+|  output: count(int_col), sum(count(smallint_col))
+|  group by: t.bigint_col
+|  limit: 10
+|
+03:AGGREGATE
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+11:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+04:AGGREGATE [MERGE FINALIZE]
+|  output: count(int_col), sum(count(smallint_col))
+|  group by: t.bigint_col
+|  limit: 10
+|
+10:AGGREGATE [MERGE]
+|  output: sum(count(smallint_col))
+|  group by: t.bigint_col, int_col
+|
+09:EXCHANGE [PARTITION=HASH(t.bigint_col)]
+|
+|--08:AGGREGATE
+|  |  output: count(smallint_col)
+|  |  group by: bigint_col, int_col
+|  |
+|  07:MERGE
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+03:AGGREGATE
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|
+06:MERGE
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# mixed distinct and non-distinct agg with grouping over a union distinct
+select count(smallint_col), count(distinct int_col)
+from
+  (select * from functional.alltypes
+   union distinct
+   select * from functional.alltypessmall) t
+group by t.bigint_col
+limit 10
+---- PLAN
+05:AGGREGATE [MERGE FINALIZE]
+|  output: count(int_col), sum(count(smallint_col))
+|  group by: t.bigint_col
+|  limit: 10
+|
+04:AGGREGATE
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|
+03:AGGREGATE [FINALIZE]
+|  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+14:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+05:AGGREGATE [MERGE FINALIZE]
+|  output: count(int_col), sum(count(smallint_col))
+|  group by: t.bigint_col
+|  limit: 10
+|
+13:AGGREGATE [MERGE]
+|  output: sum(count(smallint_col))
+|  group by: t.bigint_col, int_col
+|
+12:EXCHANGE [PARTITION=HASH(t.bigint_col)]
+|
+04:AGGREGATE
+|  output: count(smallint_col)
+|  group by: bigint_col, int_col
+|
+11:AGGREGATE [MERGE FINALIZE]
+|  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|
+10:EXCHANGE [PARTITION=HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
+|
+|--09:AGGREGATE
+|  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  |
+|  08:MERGE
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+03:AGGREGATE
+|  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|
+07:MERGE
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# test that aggregations are not placed below an unpartitioned exchange with a limit
+select count(*) from (select * from functional.alltypes limit 10) t
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   limit: 10
+---- DISTRIBUTEDPLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+02:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   limit: 10
+====
+# test that aggregations are not placed below an unpartitioned exchange with a limit
+select count(*) from
+  (select * from functional.alltypes
+   union all
+   (select * from functional.alltypessmall) limit 10) t
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:MERGE
+|  limit: 10
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+04:EXCHANGE [PARTITION=UNPARTITIONED]
+|  limit: 10
+|
+|--06:MERGE
+|  |  limit: 10
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+05:MERGE
+|  limit: 10
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
