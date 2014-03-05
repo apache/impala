@@ -300,12 +300,9 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
   // Disable checksumming for cached reads.
   int ret = hadoopRzOptionsSetSkipChecksum(cached_read_options_, true);
   DCHECK_EQ(ret, 0);
-#if 0
-  IMPALA-748
   // Disable automatic fallback for cached reads.
-  //ret = hadoopRzOptionsSetByteBufferPool(cached_read_options_, NULL);
-  //DCHECK_EQ(ret, 0);
-#endif
+  ret = hadoopRzOptionsSetByteBufferPool(cached_read_options_, NULL);
+  DCHECK_EQ(ret, 0);
 
   return Status::OK;
 }
