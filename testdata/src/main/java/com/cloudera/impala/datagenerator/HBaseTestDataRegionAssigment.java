@@ -17,7 +17,6 @@ import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.catalog.MetaReader;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
@@ -40,7 +39,7 @@ class HBaseTestDataRegionAssigment {
       super(s);
     }
   }
-  
+
   private final static Logger LOG = LoggerFactory.getLogger(
       HBaseTestDataRegionAssigment.class);
   private final Configuration conf;
@@ -56,7 +55,11 @@ class HBaseTestDataRegionAssigment {
     sortedRS = new ArrayList<ServerName>(regionServerNames);
     Collections.sort(sortedRS);
   }
-  
+
+  public void close() throws IOException {
+    hbaseAdmin.close();
+  }
+
   /**
    * Split the table regions according to splitPoints and pair up adjacent regions to the
    * same server. Each region pair in ([unbound:1,1:3], [3:5,5:7], [7:9,9:unbound])
@@ -107,26 +110,29 @@ class HBaseTestDataRegionAssigment {
     // the move to complete. It should be done in 10sec.
     int sleepCnt = 0;
     HTable hbaseTable = new HTable(conf, tableName);
-    while(!expectedLocs.equals(hbaseTable.getRegionLocations()) &&
-        sleepCnt < 100) {
-      Thread.sleep(100);
-      ++sleepCnt;
-    }
-    NavigableMap<HRegionInfo, ServerName> actualLocs = 
-        (new HTable(conf, tableName)).getRegionLocations();
-    Preconditions.checkArgument(expectedLocs.equals(actualLocs));
-    
-    // Log the actual region location map
-    for (Map.Entry<HRegionInfo, ServerName> entry: actualLocs.entrySet()) {
-      LOG.info(printKey(entry.getKey().getStartKey()) + " -> " +
-          entry.getValue().getHostAndPort());
-    }
+    try {
+      while(!expectedLocs.equals(hbaseTable.getRegionLocations()) &&
+          sleepCnt < 100) {
+        Thread.sleep(100);
+        ++sleepCnt;
+      }
+      NavigableMap<HRegionInfo, ServerName> actualLocs = hbaseTable.getRegionLocations();
+      Preconditions.checkArgument(expectedLocs.equals(actualLocs));
 
-    // Force a major compaction such that the HBase table is backed by deterministic
-    // physical artifacts (files, WAL, etc.). Our #rows estimate relies on the sizes of
-    // these physical artifacts.
-    LOG.info("Major compacting HBase table: " + tableName);
-    hbaseAdmin.majorCompact(tableName);
+      // Log the actual region location map
+      for (Map.Entry<HRegionInfo, ServerName> entry: actualLocs.entrySet()) {
+        LOG.info(printKey(entry.getKey().getStartKey()) + " -> " +
+            entry.getValue().getHostAndPort());
+      }
+
+      // Force a major compaction such that the HBase table is backed by deterministic
+      // physical artifacts (files, WAL, etc.). Our #rows estimate relies on the sizes of
+      // these physical artifacts.
+      LOG.info("Major compacting HBase table: " + tableName);
+      hbaseAdmin.majorCompact(tableName);
+    } finally {
+      IOUtils.closeQuietly(hbaseTable);
+    }
   }
 
   /**
@@ -263,6 +269,10 @@ class HBaseTestDataRegionAssigment {
     for (String htable: args) {
       assignment.performAssigment(htable);
     }
+    assignment.close();
+    // Exit forcefully because of HDFS-6057. Otherwise, there the JVM won't exit due to a
+    // non-daemon thread still being up.
+    System.exit(0);
   }
 }
 
