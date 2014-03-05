@@ -484,12 +484,18 @@ int64_t HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
   DCHECK(current_page_ != NULL);
   if (current_page_->finalized) return 0;
 
+  // If the entire page was NULL, encode it as PLAIN since there is no
+  // data anyway. We don't output a useless dictionary page and it works
+  // around a parquet MR bug (see IMPALA-759 for more details).
+  if (current_page_->num_non_null == 0) current_encoding_ = Encoding::PLAIN;
+
   int64_t bytes_added = 0;
   if (current_encoding_ == Encoding::PLAIN_DICTIONARY) {
     bytes_added += WriteDictDataPage();
   }
 
   PageHeader& header = current_page_->header;
+  header.data_page_header.encoding = current_encoding_;
 
   // Compute size of definition bits
   def_levels_->Flush();
@@ -570,7 +576,6 @@ void HdfsParquetTableWriter::BaseColumnWriter::NewPage() {
     header.repetition_level_encoding = Encoding::BIT_PACKED;
     current_page_->header.__set_data_page_header(header);
   }
-  current_page_->header.data_page_header.encoding = current_encoding_;
   current_page_->finalized = false;
   current_page_->num_non_null = 0;
 }
