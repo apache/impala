@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -46,6 +45,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,9 +175,9 @@ public class HdfsTable extends Table {
       // the version of HDFS.
       String volumeIdString = hdfsVolumeId.toString();
       // This is the hacky part. The toString is currently the underlying id
-      // encoded in base64.
-      byte[] volumeIdBytes = Base64.decodeBase64(volumeIdString);
-      if (volumeIdBytes.length == 4) {
+      // encoded as hex.
+      byte[] volumeIdBytes = StringUtils.hexStringToByte(volumeIdString);
+      if (volumeIdBytes != null && volumeIdBytes.length == 4) {
         diskId = Bytes.toInt(volumeIdBytes);
       } else if (!hasLoggedDiskIdFormatWarning_) {
         LOG.warn("wrong disk id format: " + volumeIdString);
