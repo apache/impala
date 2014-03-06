@@ -14,6 +14,11 @@ class TestUdfs(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestUdfs, cls).add_test_dimensions()
+    # Without limiting the test suite to a single exec option, the tests will fail
+    # because the same test case may be executed in parallel with different exec option
+    # values leading to conflicting DDL ops.
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
