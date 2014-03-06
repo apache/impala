@@ -86,6 +86,11 @@ public class JniFrontend {
       new TBinaryProtocol.Factory();
   private final Frontend frontend_;
 
+  // Required minimum value (in milliseconds) for the HDFS config
+  // 'dfs.client.file-block-storage-locations.timeout.millis'
+  private static final long MIN_DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS =
+      10 * 1000;
+
   /**
    * Create a new instance of the Jni Frontend.
    */
@@ -662,16 +667,15 @@ public class JniFrontend {
       errorCause.append(" is not enabled.\n");
     }
 
-    // dfs.client.file-block-storage-locations.timeout.millis should be >= 500 seconds
-    // TODO: OPSAPS-12765 - it should be >= 3000 seconds, but use 500 seconds for now
-    //       until CM refresh
+    // dfs.client.file-block-storage-locations.timeout.millis should be >= 10 seconds
     int dfsClientFileBlockStorageLocationsTimeoutMs = conf.getInt(
         DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS,
         DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS_DEFAULT);
-    if (dfsClientFileBlockStorageLocationsTimeoutMs < 500 * 1000) {
+    if (dfsClientFileBlockStorageLocationsTimeoutMs <
+        MIN_DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS) {
       errorCause.append(prefix);
       errorCause.append(DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS);
-      errorCause.append(" is too low. It should be at least 3000 seconds.\n");
+      errorCause.append(" is too low. It should be at least 10 seconds.\n");
     }
 
     if (errorCause.length() > 0) {
