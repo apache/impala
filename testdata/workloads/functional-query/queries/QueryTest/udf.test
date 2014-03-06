@@ -1,6 +1,6 @@
 ====
-# Test identity functions
 ---- QUERY
+# Test identity functions
 select identity(true);
 ---- TYPES
 boolean
@@ -82,8 +82,8 @@ timestamp
 ---- RESULTS
 2013-10-09 00:00:00.000000001
 ====
-# Test UDFs with different arguments
 ---- QUERY
+# Test UDFs with different arguments
 select all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0);
 ---- TYPES
 int
@@ -97,8 +97,8 @@ string
 ---- RESULTS
 'string'
 ====
-# Test UDFs over tables
 ---- QUERY
+# Test UDFs over tables
 select sum(identity(bigint_col)) from functional.alltypes
 ---- TYPES
 bigint
@@ -154,8 +154,8 @@ string
 ---- RESULTS
 'string'
 ====
-# Chain UDFs/exprs together to test glue
 ---- QUERY
+# Chain UDFs/exprs together to test glue
 select identity(no_args());
 ---- TYPES
 string
@@ -351,9 +351,9 @@ tinyint, int, double
 0,0,0
 1,1,4
 ====
+---- QUERY
 # Test UDFs that are evaluated in the planner (doesn't take cols as input)
 # and returns a string.
----- QUERY
 select count(*) from functional.alltypessmall where No_Args() = 'string'
 ---- TYPES
 BIGINT
