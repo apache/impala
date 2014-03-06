@@ -6,7 +6,7 @@
   </property>
   <property>
     <name>dfs.client.file-block-storage-locations.timeout</name>
-    <value>500</value>
+    <value>60000</value>
   </property>
 
   <!-- Configurations to enable short circuit reads -->
