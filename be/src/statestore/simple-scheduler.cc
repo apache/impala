@@ -25,6 +25,7 @@
 #include "util/metrics.h"
 #include "runtime/exec-env.h"
 #include "runtime/coordinator.h"
+#include "service/impala-server.h"
 
 #include "statestore/simple-scheduler.h"
 #include "statestore/statestore-subscriber.h"
@@ -308,7 +309,9 @@ void SimpleScheduler::UpdateMembership(
 
     // If this impalad is not in our view of the membership list, we should add it and
     // tell the statestore.
-    if (current_membership_.find(backend_id_) == current_membership_.end()) {
+    bool is_offline = ExecEnv::GetInstance()->impala_server()->IsOffline();
+    if (!is_offline &&
+        current_membership_.find(backend_id_) == current_membership_.end()) {
       VLOG(1) << "Registering local backend with statestore";
       subscriber_topic_updates->push_back(TTopicDelta());
       TTopicDelta& update = subscriber_topic_updates->back();
@@ -323,6 +326,13 @@ void SimpleScheduler::UpdateMembership(
                      << status.GetErrorMsg();
         subscriber_topic_updates->pop_back();
       }
+    } else if (is_offline &&
+        current_membership_.find(backend_id_) != current_membership_.end()) {
+      LOG(WARNING) << "Removing offline ImpalaServer from statestore";
+      subscriber_topic_updates->push_back(TTopicDelta());
+      TTopicDelta& update = subscriber_topic_updates->back();
+      update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
+      update.topic_deletions.push_back(backend_id_);
     }
     if (metrics_ != NULL) num_backends_metric_->Update(current_membership_.size());
   }
@@ -729,6 +739,10 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   schedule->set_num_hosts(max(num_backends_metric_->value(), 1L));
 
   RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
+  if (ExecEnv::GetInstance()->impala_server()->IsOffline()) {
+    return Status("This Impala server is offine. Please retry your query later.");
+  }
+
   RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
   ComputeFragmentHosts(schedule->request(), schedule);
   ComputeFragmentExecParams(schedule->request(), schedule);

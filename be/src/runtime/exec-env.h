@@ -42,6 +42,7 @@ class Metrics;
 class MemTracker;
 class ThreadResourceMgr;
 class CgroupsManager;
+class ImpalaServer;
 
 // Execution environment for queries/plan fragments.
 // Contains all required global structures, and handles to
@@ -63,6 +64,8 @@ class ExecEnv {
   // declarations for classes in scoped_ptrs.
   virtual ~ExecEnv();
 
+  void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }
+
   StatestoreSubscriber* statestore_subscriber() {
     return statestore_subscriber_.get();
   }
@@ -82,6 +85,7 @@ class ExecEnv {
   ThreadResourceMgr* thread_mgr() { return thread_mgr_.get(); }
   CgroupsMgr* cgroups_mgr() { return cgroups_mgr_.get(); }
   HdfsOpThreadPool* hdfs_op_thread_pool() { return hdfs_op_thread_pool_.get(); }
+  ImpalaServer* impala_server() { return impala_server_; }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
@@ -116,6 +120,9 @@ class ExecEnv {
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
   boost::scoped_ptr<CgroupsMgr> cgroups_mgr_;
   boost::scoped_ptr<HdfsOpThreadPool> hdfs_op_thread_pool_;
+
+  // Not owned by this class
+  ImpalaServer* impala_server_;
 
   bool enable_webserver_;
 

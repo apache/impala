@@ -242,6 +242,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void CatalogUpdateCallback(const StatestoreSubscriber::TopicDeltaMap& topic_deltas,
       std::vector<TTopicDelta>* topic_updates);
 
+  // Returns true if Impala is offline (and not accepting queries), false otherwise.
+  bool IsOffline() {
+    boost::lock_guard<boost::mutex> l(is_offline_lock_);
+    return is_offline_;
+  }
+
  private:
   class FragmentExecState;
   friend class ChildQuery;
@@ -637,6 +643,15 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // FLAGS_idle_query_timeout seconds.
   void ExpireQueries();
 
+  // Periodically opens a socket to FLAGS_local_nodemanager_url to check if the Yarn Node
+  // Manager is running. If not, this method calls SetOffline(true), and when the NM
+  // recovers, calls SetOffline(false). Only called (in nm_failure_detection_thread_) if
+  // FLAGS_enable_rm is true.
+  void DetectNmFailures();
+
+  // Set is_offline_ to the argument's value.
+  void SetOffline(bool offline);
+
   // Guards query_log_ and query_log_index_
   boost::mutex query_log_lock_;
 
@@ -931,6 +946,15 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Container for a thread that runs ExpireQueries() if FLAGS_idle_query_timeout is set.
   boost::scoped_ptr<Thread> query_expiration_thread_;
+
+  // Container thread for DetectNmFailures().
+  boost::scoped_ptr<Thread> nm_failure_detection_thread_;
+
+  // Protects is_offline_
+  boost::mutex is_offline_lock_;
+
+  // True if Impala server is offline, false otherwise.
+  bool is_offline_;
 };
 
 // Create an ImpalaServer and Thrift servers.

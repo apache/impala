@@ -30,6 +30,10 @@
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <unistd.h>
 
 #include "catalog/catalog-server.h"
 #include "catalog/catalog-util.h"
@@ -50,6 +54,7 @@
 #include "util/cgroups-mgr.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
+#include "util/error-util.h"
 #include "util/impalad-metrics.h"
 #include "util/network-util.h"
 #include "util/parse-util.h"
@@ -133,6 +138,10 @@ DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be i
     " (i.e. no processing work is done and no updates are received from the client) "
     "before it is cancelled. If 0, idle queries are never expired.");
 
+DEFINE_string(local_nodemanager_url, "", "The URL of the local Yarn Node Manager's HTTP "
+    "interface, used to detect if the Node Manager fails");
+DECLARE_bool(enable_rm);
+
 namespace impala {
 
 // Prefix of profile and event log filenames. The version number is
@@ -150,6 +159,8 @@ const char* ImpalaServer::SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION = "42000";
 const char* ImpalaServer::SQLSTATE_GENERAL_ERROR = "HY000";
 const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 const int ImpalaServer::ASCII_PRECISION = 16; // print 16 digits for double/float
+
+const int MAX_NM_MISSED_HEARTBEATS = 5;
 
 // Work item for ImpalaServer::cancellation_thread_pool_.
 class CancellationWork {
@@ -278,6 +289,14 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     query_expiration_thread_.reset(new Thread("impala-server", "query-expirer",
             bind<void>(&ImpalaServer::ExpireQueries, this)));
   }
+
+  is_offline_ = false;
+  if (FLAGS_enable_rm) {
+    nm_failure_detection_thread_.reset(new Thread("impala-server", "nm-failure-detector",
+            bind<void>(&ImpalaServer::DetectNmFailures, this)));
+  }
+
+  exec_env_->SetImpalaServer(this);
 }
 
 Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_state,
@@ -503,7 +522,9 @@ Status ImpalaServer::ExecuteInternal(
     bool* registered_exec_state,
     shared_ptr<QueryExecState>* exec_state) {
   DCHECK(session_state != NULL);
-
+  if (IsOffline()) {
+    return Status("This Impala server is offline. Please retry your query later.");
+  }
   *registered_exec_state = false;
 
   exec_state->reset(new QueryExecState(query_ctxt, exec_env_, frontend_.get(),
@@ -1829,6 +1850,81 @@ shared_ptr<ImpalaServer::QueryExecState> ImpalaServer::GetQueryExecState(
     if (lock) i->second->lock()->lock();
     return i->second;
   }
+}
+
+void ImpalaServer::SetOffline(bool is_offline) {
+  lock_guard<mutex> l(is_offline_lock_);
+  is_offline_ = is_offline;
+  ImpaladMetrics::IMPALA_SERVER_READY->Update(is_offline);
+}
+
+void ImpalaServer::DetectNmFailures() {
+  DCHECK(FLAGS_enable_rm);
+  if (FLAGS_local_nodemanager_url.empty()) {
+    LOG(WARNING) << "No NM address set (--nm_addr is empty), no NM failure detection "
+                 << "thread started";
+    return;
+  }
+  // We only want a network address to open a socket to, for now. Get rid of http(s)://
+  // prefix, and split the string into hostname:port.
+  if (istarts_with(FLAGS_local_nodemanager_url, "http://")) {
+    FLAGS_local_nodemanager_url =
+        FLAGS_local_nodemanager_url.substr(string("http://").size());
+  } else if (istarts_with(FLAGS_local_nodemanager_url, "https://")) {
+    FLAGS_local_nodemanager_url =
+        FLAGS_local_nodemanager_url.substr(string("https://").size());
+  }
+  vector<string> components;
+  split(components, FLAGS_local_nodemanager_url, is_any_of(":"));
+  if (components.size() < 2) {
+    LOG(ERROR) << "Could not parse network address from --local_nodemanager_url, no NM"
+               << " failure detection thread started";
+    return;
+  }
+  DCHECK_GE(components.size(), 2);
+  TNetworkAddress nm_addr =
+      MakeNetworkAddress(components[0], atoi(components[1].c_str()));
+
+  MissedHeartbeatFailureDetector failure_detector(MAX_NM_MISSED_HEARTBEATS,
+      MAX_NM_MISSED_HEARTBEATS / 2);
+  struct addrinfo* addr;
+  if (getaddrinfo(nm_addr.hostname.c_str(), components[1].c_str(), NULL, &addr)) {
+    LOG(WARNING) << "Could not resolve NM address: " << nm_addr << ". Error was: "
+                 << GetStrErrMsg();
+    return;
+  }
+  LOG(INFO) << "Starting NM failure-detection thread, NM at: " << nm_addr;
+  // True if the last time through the loop Impala had failed, otherwise false. Used to
+  // only change the offline status when there's a change in state.
+  bool last_failure_state = false;
+  while (true) {
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd >= 0) {
+      if (connect(sockfd, addr->ai_addr, sizeof(sockaddr)) < 0) {
+        failure_detector.UpdateHeartbeat(FLAGS_local_nodemanager_url, false);
+      } else {
+        failure_detector.UpdateHeartbeat(FLAGS_local_nodemanager_url, true);
+      }
+      ::close(sockfd);
+    } else {
+      LOG(ERROR) << "Could not create socket! Error was: " << GetStrErrMsg();
+    }
+    bool is_failed = (failure_detector.GetPeerState(FLAGS_local_nodemanager_url) ==
+        FailureDetector::FAILED);
+    if (is_failed != last_failure_state) {
+      if (is_failed) {
+        LOG(WARNING) <<
+            "ImpalaServer is going offline while local node-manager connectivity is bad";
+      } else {
+        LOG(WARNING) <<
+            "Node-manager connectivity has been restored. ImpalaServer is now online";
+      }
+      SetOffline(is_failed);
+    }
+    last_failure_state = is_failed;
+    SleepForMs(2000);
+  }
+  freeaddrinfo(addr);
 }
 
 }

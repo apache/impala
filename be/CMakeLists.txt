@@ -97,8 +97,8 @@ SET(CMAKE_CXX_FLAGS "${CXX_COMMON_FLAGS} ${CMAKE_CXX_FLAGS}")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fverbose-asm")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CFLAGS}")
 
-# Thrift requires these two definitions for some types that we use
-add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H)
+# Thrift requires these definitions for some types that we use
+add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
 
 # Set clang to IR cross compile flags
 # IR_COMPILE is #defined for the cross compile to remove code that bloats the IR
