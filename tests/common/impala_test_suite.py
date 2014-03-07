@@ -129,7 +129,8 @@ class ImpalaTestSuite(BaseTestSuite):
         self.client.execute("drop function %s.%s" % (db_name, fn_name))
       self.client.execute("drop database " + db_name)
 
-  def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False):
+  def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
+      encoding=None):
     """
     Runs the queries in the specified test based on the vector values
 
@@ -137,6 +138,9 @@ class ImpalaTestSuite(BaseTestSuite):
     vector and the exec options specified in the test vector. If multiple_impalad=True
     a connection to a random impalad will be chosen to execute each test section.
     Otherwise, the default impalad client will be used.
+    Additionally, the encoding for all test data can be specified using the 'encoding'
+    parameter. This is useful when data is ingested in a different encoding (ex.
+    latin). If not set, the default system encoding will be used.
     """
     table_format_info = vector.get_value('table_format')
     exec_options = vector.get_value('exec_option')
@@ -154,7 +158,8 @@ class ImpalaTestSuite(BaseTestSuite):
       ImpalaTestSuite.change_database(impalad_client, table_format_info, use_db)
       impalad_client.set_configuration(exec_options)
 
-    sections = self.load_query_test_file(self.get_workload(), test_file_name)
+    sections = self.load_query_test_file(self.get_workload(), test_file_name,
+        encoding=encoding)
     for test_section in sections:
       if 'QUERY' not in test_section:
         assert 0, 'Error in test file %s. Test cases require a -- QUERY section.\n%s' %\
@@ -180,12 +185,15 @@ class ImpalaTestSuite(BaseTestSuite):
             self.execute_query_expect_success(target_impalad_client, query)
       assert result is not None
 
+      # Decode the results read back if the data is stored with a specific encoding.
+      if encoding: result.data = [row.decode(encoding) for row in result.data]
+
       verify_raw_results(test_section, result,
                          vector.get_value('table_format').file_format,
                          pytest.config.option.update_results)
     if pytest.config.option.update_results:
       output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
-      write_test_file(output_file, sections)
+      write_test_file(output_file, sections, encoding=encoding)
 
   def execute_test_case_setup(self, setup_section, table_format):
     """
@@ -298,7 +306,8 @@ class ImpalaTestSuite(BaseTestSuite):
     for impala, hive in zip(impala_results, hive_results):
       assert impala == hive
 
-  def load_query_test_file(self, workload, file_name, valid_section_names=None):
+  def load_query_test_file(self, workload, file_name, valid_section_names=None,
+      encoding=None):
     """
     Loads/Reads the specified query test file. Accepts the given section names as valid.
     Uses a default list of valid section names if valid_section_names is None.
@@ -306,7 +315,7 @@ class ImpalaTestSuite(BaseTestSuite):
     test_file_path = os.path.join(WORKLOAD_DIR, workload, 'queries', file_name + '.test')
     if not os.path.isfile(test_file_path):
       assert False, 'Test file not found: %s' % file_name
-    return parse_query_test_file(test_file_path, valid_section_names)
+    return parse_query_test_file(test_file_path, valid_section_names, encoding=encoding)
 
   def __drop_partitions(self, db_name, table_name):
     """Drops all partitions in the given table"""

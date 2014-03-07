@@ -1,0 +1,38 @@
+====
+---- QUERY
+# test querying text table "extended" ASCII (latin) delimiters:
+# fields terminated by '-2' -- thorn character
+# escaped by '-22' -- lowercase e with circumflex
+# lines terminated by '\n'
+select * from text_thorn_ecirc_newline
+---- RESULTS
+'one','two',3,4
+'oneþone','two',3,4
+'oneê','two',3,4
+'oneêþone','two',3,4
+'oneêê','two',3,4
+---- TYPES
+STRING,STRING,INT,INT
+====
+---- QUERY
+# create new tables like the ones above to test inserting
+create table delim_text_test_db.tecn like text_thorn_ecirc_newline;
+---- RESULTS
+====
+---- QUERY
+# insert data into tecn table and check results
+# TODO: Expand verification to cover inserting a field terminator and escape character.
+# Some additional work needs to be done in the test framework to properly encode/decode
+# the values going into the INSERT query before this will work.
+insert overwrite delim_text_test_db.tecn values
+('abc', 'xyz', 1, 2),
+('efg', 'xyz', 3, 4)
+====
+---- QUERY
+select * from delim_text_test_db.tecn
+---- RESULTS
+'abc','xyz',1,2
+'efg','xyz',3,4
+---- TYPES
+STRING,STRING,INT,INT
+====

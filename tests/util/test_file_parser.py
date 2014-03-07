@@ -2,6 +2,7 @@
 #
 # This module is used for common utilities related to parsing test files
 import collections
+import codecs
 import logging
 import re
 from collections import defaultdict
@@ -64,7 +65,7 @@ class QueryTestSectionReader(object):
 def remove_comments(section_text):
   return '\n'.join([l for l in section_text.split('\n') if not l.strip().startswith('#')])
 
-def parse_query_test_file(file_name, valid_section_names=None):
+def parse_query_test_file(file_name, valid_section_names=None, encoding=None):
   """
   Reads the specified query test file accepting the given list of valid section names
   Uses a default list of valid section names if valid_section_names is None
@@ -74,10 +75,10 @@ def parse_query_test_file(file_name, valid_section_names=None):
   """
   # Update the valid section names as we support other test types
   # (ex. planner, data error)
-  if valid_section_names is None:
-    return parse_test_file(file_name, ['QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP'])
-  else:
-    return parse_test_file(file_name, valid_section_names)
+  section_names = valid_section_names
+  if section_names is None:
+    section_names = ['QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP']
+  return parse_test_file(file_name, section_names, encoding=encoding)
 
 def parse_table_constraints(constraints_file):
   """Reads a table contraints file, if one exists"""
@@ -109,7 +110,8 @@ def parse_table_format_constraint(table_format_constraint):
   # a table format string with a wildcard character. Right now we don't do anything.
   return table_format_constraint
 
-def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=True):
+def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=True,
+    encoding=None):
   """
   Parses an Impala test file
 
@@ -121,10 +123,13 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
   ...
   ====
 
-  The valid section names are passed in to this function.
+  The valid section names are passed in to this function. The encoding to use
+  when reading the data can be specified with the 'encoding' flag.
   """
   with open(test_file_name, 'rb') as test_file:
-    return parse_test_file_text(test_file.read(), valid_section_names,
+    file_data = test_file.read()
+    if encoding: file_data = file_data.decode(encoding)
+    return parse_test_file_text(file_data, valid_section_names,
                                 skip_unknown_sections)
 
 def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
@@ -172,13 +177,15 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
   return sections
 
 
-def write_test_file(test_file_name, test_file_sections):
+def write_test_file(test_file_name, test_file_sections, encoding=None):
   """
   Given a list of test file sections, write out the corresponding test file
 
   This is useful when updating the results of a test.
+  The file encoding can be specified in the 'encoding' parameter. If not specified
+  the default system encoding will be used.
   """
-  with open(test_file_name, 'w') as test_file:
+  with codecs.open(test_file_name, 'w', encoding=encoding) as test_file:
     test_file_text = list()
     for test_case in test_file_sections:
       test_file_text.append(SECTION_DELIMITER)

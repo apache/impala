@@ -740,6 +740,26 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/text-dollar-hash-pipe.txt' O
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+text_thorn_ecirc_newline
+---- COLUMNS
+col1 string
+col2 string
+col3 int
+col4 int
+---- ROW_FORMAT
+-- -2 => ASCII 254 (thorn character) and -22 is a lowercase e with a circumflex
+delimited fields terminated by '-2' escaped by '-22' lines terminated by '\n'
+---- LOAD
+-- Hive has a bug where it will not load a table's table metadata if ESCAPED BY and
+-- TERMINATED BY are specified at the same time and set to extended ASCII characters.
+-- To work around this, the data file is loaded into a temp table with the same location.
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_tmp(i int) LOCATION '/test-warehouse/{table_name}';
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/text-thorn-ecirc-newline.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name}_tmp;
+DROP TABLE {db_name}{db_suffix}.{table_name}_tmp;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 overflow
 ---- COLUMNS
 tinyint_col tinyint

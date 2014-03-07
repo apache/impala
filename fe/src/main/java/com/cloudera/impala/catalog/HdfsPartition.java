@@ -411,13 +411,13 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       long id, THdfsPartition thriftPartition) {
     HdfsStorageDescriptor storageDesc = new HdfsStorageDescriptor(table.getName(),
         HdfsFileFormat.fromThrift(thriftPartition.getFileFormat()),
-        (char) thriftPartition.lineDelim,
-        (char) thriftPartition.fieldDelim,
-        (char) thriftPartition.collectionDelim,
-        (char) thriftPartition.mapKeyDelim,
-        (char) thriftPartition.escapeChar,
-        '"', // TODO: We should probably add quoteChar to THdfsPartition.
-        (int) thriftPartition.blockSize,
+        thriftPartition.lineDelim,
+        thriftPartition.fieldDelim,
+        thriftPartition.collectionDelim,
+        thriftPartition.mapKeyDelim,
+        thriftPartition.escapeChar,
+        (byte) '"', // TODO: We should probably add quoteChar to THdfsPartition.
+        thriftPartition.blockSize,
         thriftPartition.compression);
 
     List<LiteralExpr> literalExpr = Lists.newArrayList();
@@ -489,12 +489,12 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   public THdfsPartition toThrift(boolean includeFileDescriptorMetadata) {
     List<TExpr> thriftExprs = Expr.treesToThrift(getPartitionValues());
 
-    THdfsPartition thriftHdfsPart =
-        new THdfsPartition((byte)fileFormatDescriptor.getLineDelim(),
-        (byte)fileFormatDescriptor.getFieldDelim(),
-        (byte)fileFormatDescriptor.getCollectionDelim(),
-        (byte)fileFormatDescriptor.getMapKeyDelim(),
-        (byte)fileFormatDescriptor.getEscapeChar(),
+    THdfsPartition thriftHdfsPart = new THdfsPartition(
+        fileFormatDescriptor.getLineDelim(),
+        fileFormatDescriptor.getFieldDelim(),
+        fileFormatDescriptor.getCollectionDelim(),
+        fileFormatDescriptor.getMapKeyDelim(),
+        fileFormatDescriptor.getEscapeChar(),
         fileFormatDescriptor.getFileFormat().toThrift(), thriftExprs,
         fileFormatDescriptor.getBlockSize(), fileFormatDescriptor.getCompression());
     thriftHdfsPart.setLocation(location);

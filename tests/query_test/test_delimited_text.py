@@ -40,7 +40,15 @@ class TestDelimitedText(ImpalaTestSuite):
     self.client.execute('use default')
     self.client.execute('drop table if exists %s.cbn' % self.TEST_DB_NAME)
     self.client.execute('drop table if exists %s.dhp' % self.TEST_DB_NAME)
+    self.client.execute('drop table if exists %s.tecn' % self.TEST_DB_NAME)
     self.client.execute('drop database if exists %s' % self.TEST_DB_NAME)
 
   def test_delimited_text(self, vector):
     self.run_test_case('QueryTest/delimited-text', vector)
+
+  @pytest.mark.execute_serially
+  def test_delimited_text_latin_chars(self, vector):
+    """Verifies Impala is able to properly handle delimited text that contains
+    extended ASCII/latin characters. Marked as running serial because of shared
+    cleanup/setup"""
+    self.run_test_case('QueryTest/delimited-latin-text', vector, encoding="latin-1")

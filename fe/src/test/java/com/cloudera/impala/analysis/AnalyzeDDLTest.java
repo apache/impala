@@ -625,10 +625,29 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // metastore for the ESCAPED BY field.
     AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
         "terminated by '\\t' escaped by '\\\\' lines terminated by '\\n'");
+    AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
+        "terminated by '\\001' escaped by '\\002' lines terminated by '\\n'");
+    AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
+        "terminated by '-2' escaped by '-3' lines terminated by '\\n'");
+    AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
+        "terminated by '-128' escaped by '127' lines terminated by '40'");
 
     AnalysisError("create table functional.new_table (i int) row format delimited " +
+        "fields terminated by '-2' escaped by '128' lines terminated by '\\n'",
+        "ESCAPED BY values and LINE/FIELD terminators must be specified as a single " +
+        "character or as a decimal value in the range [-128:127]: 128");
+    AnalysisError("create table functional.new_table (i int) row format delimited " +
+        "fields terminated by '-2' escaped by '127' lines terminated by '255'",
+        "ESCAPED BY values and LINE/FIELD terminators must be specified as a single " +
+        "character or as a decimal value in the range [-128:127]: 255");
+    AnalysisError("create table functional.new_table (i int) row format delimited " +
+        "fields terminated by '-129' escaped by '127' lines terminated by '\\n'",
+        "ESCAPED BY values and LINE/FIELD terminators must be specified as a single " +
+        "character or as a decimal value in the range [-128:127]: -129");
+    AnalysisError("create table functional.new_table (i int) row format delimited " +
         "fields terminated by '||' escaped by '\\\\' lines terminated by '\\n'",
-        "ESCAPED BY values and LINE/FIELD terminators must have length of 1: ||");
+        "ESCAPED BY values and LINE/FIELD terminators must be specified as a single " +
+        "character or as a decimal value in the range [-128:127]: ||");
 
     AnalysisError("create table db_does_not_exist.new_table (i int)",
         "Database does not exist: db_does_not_exist");
@@ -650,17 +669,17 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Type 'DATETIME' is not supported as partition-column type in column: d");
 
     // Analysis of Avro schemas
-    AnalyzesOk("create table foo (i int) with serdeproperties ('avro.schema.url'=" +
+    AnalyzesOk("create table foo_avro (i int) with serdeproperties ('avro.schema.url'=" +
         "'hdfs://schema.avsc') stored as avro");
-    AnalyzesOk("create table foo (i int) stored as avro tblproperties " +
+    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.url'='hdfs://schema.avsc')");
-    AnalyzesOk("create table foo (i int) stored as avro tblproperties " +
+    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.literal'='{\"name\": \"my_record\"}')");
-    AnalysisError("create table foo (i int) stored as avro",
+    AnalysisError("create table foo_avro (i int) stored as avro",
         "No Avro schema provided for table: default.foo");
-    AnalysisError("create table foo (i int) stored as avro tblproperties ('a'='b')",
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties ('a'='b')",
         "No Avro schema provided for table: default.foo");
-    AnalysisError("create table foo (i int) stored as avro tblproperties " +
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.url'='schema.avsc')", "avro.schema.url must be of form " +
         "\"http://path/to/schema/file\" or \"hdfs://namenode:port/path/to/schema/file" +
         "\", got schema.avsc");

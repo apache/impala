@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.thrift.CatalogObjectsConstants;
 import com.cloudera.impala.thrift.THdfsCompression;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 
@@ -64,12 +65,12 @@ public class HdfsStorageDescriptor {
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 
   private final HdfsFileFormat fileFormat_;
-  private final char lineDelim_;
-  private final char fieldDelim_;
-  private final char collectionDelim_;
-  private final char mapKeyDelim_;
-  private final char escapeChar_;
-  private final char quoteChar_;
+  private final byte lineDelim_;
+  private final byte fieldDelim_;
+  private final byte collectionDelim_;
+  private final byte mapKeyDelim_;
+  private final byte escapeChar_;
+  private final byte quoteChar_;
   private final int blockSize_;
   private final THdfsCompression compression_;
 
@@ -80,43 +81,70 @@ public class HdfsStorageDescriptor {
    *
    * @throws InvalidStorageDescriptorException - if an invalid delimiter is found
    */
-  private static Map<String, Character> extractDelimiters(SerDeInfo serdeInfo)
+  private static Map<String, Byte> extractDelimiters(SerDeInfo serdeInfo)
       throws InvalidStorageDescriptorException {
     // The metastore may return null for delimiter parameters,
     // which means we need to use a default instead.
     // We tried long and hard to find default values for delimiters in Hive,
     // but could not find them.
-    Map<String, Character> delimMap = Maps.newHashMap();
+    Map<String, Byte> delimMap = Maps.newHashMap();
 
     for (String delimKey: DELIMITER_KEYS) {
       String delimValue = serdeInfo.getParameters().get(delimKey);
       if (delimValue == null) {
         if (delimKey.equals(serdeConstants.FIELD_DELIM)) {
-          delimMap.put(delimKey, DEFAULT_FIELD_DELIM);
+          delimMap.put(delimKey, (byte) DEFAULT_FIELD_DELIM);
         } else if (delimKey.equals(serdeConstants.ESCAPE_CHAR)) {
-          delimMap.put(delimKey, DEFAULT_ESCAPE_CHAR);
+          delimMap.put(delimKey, (byte) DEFAULT_ESCAPE_CHAR);
         } else if (delimKey.equals(serdeConstants.LINE_DELIM)) {
-          delimMap.put(delimKey, DEFAULT_LINE_DELIM);
+          delimMap.put(delimKey, (byte) DEFAULT_LINE_DELIM);
         } else {
           delimMap.put(delimKey, delimMap.get(serdeConstants.FIELD_DELIM));
         }
       } else {
-        if (delimValue.length() != 1) {
-          throw new InvalidStorageDescriptorException("Invalid delimiter: " + delimKey +
-              " has invalid length (" + delimValue + ")"
-              + ". Already found: " + delimMap);
+        Byte delimByteValue = parseDelim(delimValue);
+        if (delimByteValue == null) {
+          throw new InvalidStorageDescriptorException("Invalid delimiter: '" +
+              delimValue + "'. Delimiter must be specified as a single character or " +
+              "as a decimal value in the range [-128:127]");
         }
-
-        delimMap.put(delimKey, delimValue.charAt(0));
+        delimMap.put(delimKey, parseDelim(delimValue));
       }
     }
-
     return delimMap;
   }
 
-  public HdfsStorageDescriptor(String tblName, HdfsFileFormat fileFormat, char lineDelim,
-      char fieldDelim, char collectionDelim, char mapKeyDelim, char escapeChar,
-      char quoteChar, int blockSize, THdfsCompression compression) {
+  /**
+   * Parses a delimiter in a similar way as Hive, with some additional error checking.
+   * A delimiter must fit in a single byte and can be specified in the following
+   * formats, as far as I can tell (there isn't documentation):
+   * - A single ASCII or unicode character (ex. '|')
+   * - An escape character in octal format (ex. \001. Stored in the metastore as a
+   *   unicode character: \u0001).
+   * - A signed decimal integer in the range [-128:127]. Used to support delimiters
+   *   for ASCII character values between 128-255 (-2 maps to ASCII 254).
+   *
+   * The delimiter is first parsed as a decimal number. If the parsing succeeds AND
+   * the resulting value fits in a signed byte, the byte value of the parsed int is
+   * returned. Otherwise, if the string has a single char, the byte value of this
+   * char is returned.
+   * If the delimiter is invalid, null will be returned.
+   */
+  public static Byte parseDelim(String delimVal) {
+    Preconditions.checkNotNull(delimVal);
+    try {
+      // In the future we could support delimiters specified in hex format, but we would
+      // need support from the Hive side.
+      return Byte.parseByte(delimVal);
+    } catch (NumberFormatException e) {
+      if (delimVal.length() == 1) return (byte) delimVal.charAt(0);
+    }
+    return null;
+  }
+
+  public HdfsStorageDescriptor(String tblName, HdfsFileFormat fileFormat, byte lineDelim,
+      byte fieldDelim, byte collectionDelim, byte mapKeyDelim, byte escapeChar,
+      byte quoteChar, int blockSize, THdfsCompression compression) {
     this.fileFormat_ = fileFormat;
     this.lineDelim_ = lineDelim;
     this.fieldDelim_ = fieldDelim;
@@ -164,7 +192,7 @@ public class HdfsStorageDescriptor {
   public static HdfsStorageDescriptor fromStorageDescriptor(String tblName,
       StorageDescriptor sd)
       throws InvalidStorageDescriptorException {
-    Map<String, Character> delimMap = extractDelimiters(sd.getSerdeInfo());
+    Map<String, Byte> delimMap = extractDelimiters(sd.getSerdeInfo());
     if (!COMPATIBLE_SERDES.contains(sd.getSerdeInfo().getSerializationLib())) {
       throw new InvalidStorageDescriptorException(String.format("Impala does not " +
           "support tables of this type. REASON: SerDe library '%s' is not " +
@@ -204,12 +232,12 @@ public class HdfsStorageDescriptor {
     }
   }
 
-  public char getLineDelim() { return lineDelim_; }
-  public char getFieldDelim() { return fieldDelim_; }
-  public char getCollectionDelim() { return collectionDelim_; }
-  public char getMapKeyDelim() { return mapKeyDelim_; }
-  public char getEscapeChar() { return escapeChar_; }
-  public char getQuoteChar() { return quoteChar_; }
+  public byte getLineDelim() { return lineDelim_; }
+  public byte getFieldDelim() { return fieldDelim_; }
+  public byte getCollectionDelim() { return collectionDelim_; }
+  public byte getMapKeyDelim() { return mapKeyDelim_; }
+  public byte getEscapeChar() { return escapeChar_; }
+  public byte getQuoteChar() { return quoteChar_; }
   public HdfsFileFormat getFileFormat() { return fileFormat_; }
   public int getBlockSize() { return blockSize_; }
   public THdfsCompression getCompression() { return compression_; }

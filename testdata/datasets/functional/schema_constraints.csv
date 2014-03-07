@@ -50,6 +50,7 @@ table_name:TblWithRaggedColumns, constraint:exclude, table_format:parquet/none/n
 # the text_ tables are for testing test delimiters and escape chars in text files
 table_name:text_comma_backslash_newline, constraint:restrict_to, table_format:text/none/none
 table_name:text_dollar_hash_pipe, constraint:restrict_to, table_format:text/none/none
+table_name:text_thorn_ecirc_newline, constraint:restrict_to, table_format:text/none/none
 
 table_name:bad_serde, constraint:restrict_to, table_format:text/none/none
 table_name:rcfile_lazy_binary_serde, constraint:restrict_to, table_format:rc/none/none

@@ -16,6 +16,7 @@ package com.cloudera.impala.catalog;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.collect.ImmutableList;
 
 public class HdfsStorageDescriptorTest {
@@ -73,6 +75,84 @@ public class HdfsStorageDescriptorTest {
           assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTblName", sd));
         }
       }
+    }
+  }
+
+  /**
+   * Verifies Impala is able to properly parse delimiters in supported formats.
+   * See HdfsStorageDescriptor.parseDelim() for details.
+   */
+  @Test
+  public void testDelimiters() throws InvalidStorageDescriptorException {
+    StorageDescriptor sd = HiveStorageDescriptorFactory.createSd(THdfsFileFormat.TEXT,
+        RowFormat.DEFAULT_ROW_FORMAT);
+    sd.setParameters(new HashMap<String, String>());
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "-2");
+    assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
+
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "-128");
+    assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
+
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "127");
+    assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
+
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.LINE_DELIM, "\001");
+    assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
+
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "|");
+    assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
+
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "\t");
+    assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
+
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "ab");
+    try {
+      HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
+      fail();
+    } catch (HdfsStorageDescriptor.InvalidStorageDescriptorException e) {
+      assertEquals("Invalid delimiter: 'ab'. Delimiter must be specified as a " +
+          "single character or as a decimal value in the range [-128:127]",
+          e.getMessage());
+    }
+
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "128");
+    try {
+      HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
+      fail();
+    } catch (HdfsStorageDescriptor.InvalidStorageDescriptorException e) {
+      assertEquals("Invalid delimiter: '128'. Delimiter must be specified as a " +
+          "single character or as a decimal value in the range [-128:127]",
+          e.getMessage());
+    }
+
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "\128");
+    try {
+      HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
+      fail();
+    } catch (HdfsStorageDescriptor.InvalidStorageDescriptorException e) {
+      assertEquals("Invalid delimiter: '\128'. Delimiter must be specified as a " +
+          "single character or as a decimal value in the range [-128:127]",
+          e.getMessage());
+    }
+
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.LINE_DELIM, "-129");
+    try {
+      HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
+      fail();
+    } catch (HdfsStorageDescriptor.InvalidStorageDescriptorException e) {
+      assertEquals("Invalid delimiter: '-129'. Delimiter must be specified as a " +
+          "single character or as a decimal value in the range [-128:127]",
+          e.getMessage());
     }
   }
 }
