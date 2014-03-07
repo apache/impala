@@ -1807,6 +1807,12 @@ TEST_F(ExprTest, MathConversionFunctions) {
   TestStringValue("hex('aAzZ')", "61417A5A");
   TestStringValue("hex('Impala')", "496D70616C61");
   TestStringValue("hex('impalA')", "696D70616C41");
+  // Test non-ASCII characters
+  TestStringValue("hex(unhex('D3'))", "D3");
+  // Test width(2) and fill('0') for multiple characters < 16
+  TestStringValue("hex(unhex('0303'))", "0303");
+  TestStringValue("hex(unhex('D303D303'))", "D303D303");
+
   TestStringValue("unhex('30')", "0");
   TestStringValue("unhex('61417A5A')", "aAzZ");
   TestStringValue("unhex('496D70616C61')", "Impala");
