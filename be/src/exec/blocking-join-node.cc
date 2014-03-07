@@ -144,7 +144,6 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
       continue;
     } else {
       current_left_child_row_ = left_batch_->GetRow(left_batch_pos_++);
-      VLOG_ROW << "left child row: " << GetLeftChildRowString(current_left_child_row_);
       InitGetNext(current_left_child_row_);
       break;
     }
