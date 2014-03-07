@@ -182,6 +182,8 @@ functions = [
   [['rpad'], 'STRING', ['STRING', 'BIGINT', 'STRING'],
       symbol('StringFunctions', 'Rpad', 'int64_t')],
   [['length'], 'INT', ['STRING'], symbol('StringFunctions', 'Length')],
+  [['char_length'], 'INT', ['STRING'], symbol('StringFunctions', 'Length')],
+  [['character_length'], 'INT', ['STRING'], symbol('StringFunctions', 'Length')],
   [['lower', 'lcase'], 'STRING', ['STRING'], symbol('StringFunctions', 'Lower')],
   [['upper', 'ucase'], 'STRING', ['STRING'], symbol('StringFunctions', 'Upper')],
   [['initcap'], 'STRING', ['STRING'], symbol('StringFunctions', 'InitCap')],

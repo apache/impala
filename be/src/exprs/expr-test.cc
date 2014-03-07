@@ -1187,10 +1187,13 @@ TEST_F(ExprTest, StringFunctions) {
       "\nIs\rA\tLong\fMessage");
   TestIsNull("initcap(NULL)", TYPE_STRING);
 
-  TestValue("length('')", TYPE_INT, 0);
-  TestValue("length('a')", TYPE_INT, 1);
-  TestValue("length('abcdefg')", TYPE_INT, 7);
-  TestIsNull("length(NULL)", TYPE_INT);
+  string length_aliases[] = {"length", "char_length", "character_length"};
+  for (int i = 0; i < 3; i++) {
+    TestValue(length_aliases[i] + "('')", TYPE_INT, 0);
+    TestValue(length_aliases[i] + "('a')", TYPE_INT, 1);
+    TestValue(length_aliases[i] + "('abcdefg')", TYPE_INT, 7);
+    TestIsNull(length_aliases[i] + "(NULL)", TYPE_INT);
+  }
 
   TestStringValue("reverse('abcdefg')", "gfedcba");
   TestStringValue("reverse('')", "");
