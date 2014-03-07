@@ -29,6 +29,8 @@ using namespace impala;
 using namespace llvm;
 using namespace std;
 
+const char* BlockingJoinNode::LLVM_CLASS_NAME = "class.impala::BlockingJoinNode";
+
 BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type join_op,
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),

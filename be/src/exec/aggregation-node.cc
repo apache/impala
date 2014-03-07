@@ -573,7 +573,8 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
   }
   builder.CreateRetVoid();
 
-  return codegen->OptimizeFunctionWithExprs(fn);
+  // CodegenProcessRowBatch() does the final optimizations.
+  return codegen->FinalizeFunction(fn);
 }
 
 Function* AggregationNode::CodegenProcessRowBatch(

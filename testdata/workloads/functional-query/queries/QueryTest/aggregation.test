@@ -875,7 +875,7 @@ group by int_col * int_col, int_col + int_col, int_col * int_col
 having (int_col + int_col) < 5 order by 1 limit 10
 ---- TYPES
 bigint,bigint
-----
+---- RESULTS
 1,2
 4,4
 ====
@@ -888,7 +888,32 @@ select 1 from
    having min(int_col) is not null) as t
 where c is not null
 ---- TYPES
-bigint
-----
+tinyint
+---- RESULTS
 1
+====
+---- QUERY
+# Regression test for subexpr elimination in codegen. IMPALA-765
+select count(tinyint_col), sum(tinyint_col * tinyint_col) from alltypesagg
+---- TYPES
+bigint,bigint
+---- RESULTS
+9000,285000
+====
+---- QUERY
+# Regression test for subexpr elimination in codegen. IMPALA-765
+select count(int_col), sum(int_col), avg(int_col) from alltypesagg where int_col is NULL
+---- TYPES
+bigint,bigint,double
+---- RESULTS
+0,NULL,NULL
+====
+---- QUERY
+# Regression test for subexpr elimination in codegen. IMPALA-850
+select id % 2, int_col > 1, id from alltypesagg where id < 2 group by 1,2,3
+---- TYPES
+int,boolean,int
+---- RESULTS
+0,NULL,0
+1,false,1
 ====

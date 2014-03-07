@@ -57,6 +57,8 @@ class BlockingJoinNode : public ExecNode {
   // BlockingJoinNode::Close().
   virtual void Close(RuntimeState* state);
 
+  static const char* LLVM_CLASS_NAME;
+
  protected:
   const std::string node_name_;
   TJoinOp::type join_op_;

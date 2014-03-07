@@ -387,7 +387,8 @@ void HashJoinNode::AddToDebugString(int indentation_level, stringstream* out) co
 
 // This codegen'd function should only be used for left join cases so it assumes that
 // the probe row is non-null.  For a left outer join, the IR looks like:
-// define void @CreateOutputRow(%"class.impala::TupleRow"* %out_arg,
+// define void @CreateOutputRow(%"class.impala::BlockingJoinNode"* %this_ptr,
+//                              %"class.impala::TupleRow"* %out_arg,
 //                              %"class.impala::TupleRow"* %probe_arg,
 //                              %"class.impala::TupleRow"* %build_arg) {
 // entry:
@@ -417,7 +418,7 @@ Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
   DCHECK(tuple_row_type != NULL);
   PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
 
-  Type* this_type = codegen->GetType(HashJoinNode::LLVM_CLASS_NAME);
+  Type* this_type = codegen->GetType(BlockingJoinNode::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
   PointerType* this_ptr_type = PointerType::get(this_type, 0);
 
