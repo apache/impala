@@ -70,6 +70,10 @@ add_library(Webserver STATIC
   webserver.cc
 )
 
+# Squeasel requires C99 compatibility to build.
+SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
+  PROPERTIES COMPILE_FLAGS -std=c99)
+
 # shared library which provides native logging support to JVMs over JNI.
 add_library(loggingsupport SHARED
   logging-support.cc
