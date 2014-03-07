@@ -57,7 +57,9 @@ public enum HdfsFileFormat {
   // of these format classes as Parquet
   private static final String[] PARQUET_INPUT_FORMATS = {
       "com.cloudera.impala.hive.serde.ParquetInputFormat",
-      "parquet.hive.DeprecatedParquetInputFormat"
+      "parquet.hive.DeprecatedParquetInputFormat",
+      "parquet.hive.MapredParquetInputFormat",
+      "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
   };
 
   // Input format class for Avro tables read by hive.
@@ -73,8 +75,9 @@ public enum HdfsFileFormat {
           .put(AVRO_INPUT_FORMAT, AVRO)
           .put(PARQUET_INPUT_FORMATS[0], PARQUET)
           .put(PARQUET_INPUT_FORMATS[1], PARQUET)
+          .put(PARQUET_INPUT_FORMATS[2], PARQUET)
+          .put(PARQUET_INPUT_FORMATS[3], PARQUET)
           .build();
-
   /**
    * Returns true if the string describes an input format class that we support.
    */
