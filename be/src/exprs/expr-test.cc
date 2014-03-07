@@ -2762,6 +2762,45 @@ TEST_F(ExprTest, ConditionalFunctions) {
     TestValue("case when false then 1 else " + s + " end", t, int_iter->second);
     TestValue("case when true then 1 else " + s + " end", t, 1);
     TestValue("case 0 when " + s + " then true else false end", TYPE_BOOLEAN, false);
+
+    // Test for zeroifnull
+    // zeroifnull(NULL) returns 0, zeroifnull(non-null) returns the argument
+    TestValue("zeroifnull(NULL)", TYPE_TINYINT, 0);
+    TestValue("zeroifnull(cast (NULL as TINYINT))", TYPE_TINYINT, 0);
+    TestValue("zeroifnull(cast (5 as TINYINT))", TYPE_TINYINT, 5);
+    TestValue("zeroifnull(cast (NULL as SMALLINT))", TYPE_SMALLINT, 0);
+    TestValue("zeroifnull(cast (5 as SMALLINT))", TYPE_SMALLINT, 5);
+    TestValue("zeroifnull(cast (NULL as INT))", TYPE_INT, 0);
+    TestValue("zeroifnull(cast (5 as INT))", TYPE_INT, 5);
+    TestValue("zeroifnull(cast (NULL as BIGINT))", TYPE_BIGINT, 0);
+    TestValue("zeroifnull(cast (5 as BIGINT))", TYPE_BIGINT, 5);
+    TestValue<float>("zeroifnull(cast (NULL as FLOAT))", TYPE_FLOAT, 0.0f);
+    TestValue<float>("zeroifnull(cast (5 as FLOAT))", TYPE_FLOAT, 5.0f);
+    TestValue<double>("zeroifnull(cast (NULL as DOUBLE))", TYPE_DOUBLE, 0.0);
+    TestValue<double>("zeroifnull(cast (5 as DOUBLE))", TYPE_DOUBLE, 5.0);
+
+    // Test for NullIfZero
+    // Test that 0 converts to NULL and NULL remains NULL
+    TestIsNull("nullifzero(cast (0 as TINYINT))", TYPE_TINYINT);
+    TestIsNull("nullifzero(cast (NULL as TINYINT))", TYPE_TINYINT);
+    TestIsNull("nullifzero(cast (0 as SMALLINT))", TYPE_SMALLINT);
+    TestIsNull("nullifzero(cast (NULL as SMALLINT))", TYPE_SMALLINT);
+    TestIsNull("nullifzero(cast (0 as INT))", TYPE_INT);
+    TestIsNull("nullifzero(cast (NULL as INT))", TYPE_INT);
+    TestIsNull("nullifzero(cast (0 as BIGINT))", TYPE_BIGINT);
+    TestIsNull("nullifzero(cast (NULL as BIGINT))", TYPE_BIGINT);
+    TestIsNull("nullifzero(cast (0 as FLOAT))", TYPE_FLOAT);
+    TestIsNull("nullifzero(cast (NULL as FLOAT))", TYPE_FLOAT);
+    TestIsNull("nullifzero(cast (0 as DOUBLE))", TYPE_DOUBLE);
+    TestIsNull("nullifzero(cast (NULL as DOUBLE))", TYPE_DOUBLE);
+
+    // test that non-zero args are returned unchanged.
+    TestValue("nullifzero(cast (5 as TINYINT))", TYPE_TINYINT, 5);
+    TestValue("nullifzero(cast (5 as SMALLINT))", TYPE_SMALLINT, 5);
+    TestValue("nullifzero(cast (5 as INT))", TYPE_INT, 5);
+    TestValue("nullifzero(cast (5 as BIGINT))", TYPE_BIGINT, 5);
+    TestValue<float>("nullifzero(cast (5 as FLOAT))", TYPE_FLOAT, 5.0f);
+    TestValue<double>("nullifzero(cast (5 as DOUBLE))", TYPE_DOUBLE, 5.0);
   }
 
   // Test all float types in then and else exprs.

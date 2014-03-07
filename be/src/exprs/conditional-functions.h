@@ -27,6 +27,15 @@ class ConditionalFunctions {
  public:
   static void* IsNull(Expr* e, TupleRow* row);
   template <typename T> static void* NullIf(Expr* e, TupleRow* row);
+
+  // Return NULL if the numeric argument is zero, the argument otherwise.
+  // Returns the same type as the argument.
+  template <typename T> static void* NullIfZero(Expr* e, TupleRow* row);
+
+  // Returns 0 if the argument is NULL, the argument otherwise. Returns the
+  // same type as the argument.
+  template <typename T> static void* ZeroIfNull(Expr* e, TupleRow* row);
+
   template <typename T> static void* IfFn(Expr* e, TupleRow* row);
   template <typename T> static void* Coalesce(Expr* e, TupleRow* row);
 

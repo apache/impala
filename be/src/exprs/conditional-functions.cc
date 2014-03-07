@@ -45,6 +45,29 @@ template <typename T> void* ConditionalFunctions::NullIf(Expr* e, TupleRow* row)
   }
 }
 
+template <typename T> void* ConditionalFunctions::NullIfZero(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  T* argument = reinterpret_cast<T*>(e->children()[0]->GetValue(row));
+
+  if ((argument == NULL) || (*argument == static_cast<T>(0))) {
+    return NULL;
+  } else {
+    return e->result_.Set(*argument);
+  }
+}
+
+
+template <typename T> void* ConditionalFunctions::ZeroIfNull(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  T* argument = reinterpret_cast<T*>(e->children()[0]->GetValue(row));
+
+  if (argument == NULL) {
+    return e->result_.Set(static_cast<T>(0));
+  } else {
+    return e->result_.Set(*argument);
+  }
+}
+
 template <typename T> void* ConditionalFunctions::IfFn(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 3);
   bool* cond = reinterpret_cast<bool*>(e->children()[0]->GetValue(row));
@@ -102,6 +125,18 @@ template void* ConditionalFunctions::NullIf<float>(Expr* e, TupleRow* row);
 template void* ConditionalFunctions::NullIf<double>(Expr* e, TupleRow* row);
 template void* ConditionalFunctions::NullIf<TimestampValue>(Expr* e, TupleRow* row);
 template void* ConditionalFunctions::NullIf<StringValue>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIfZero<int8_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIfZero<int16_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIfZero<int32_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIfZero<int64_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIfZero<float>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::NullIfZero<double>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::ZeroIfNull<int8_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::ZeroIfNull<int16_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::ZeroIfNull<int32_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::ZeroIfNull<int64_t>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::ZeroIfNull<float>(Expr* e, TupleRow* row);
+template void* ConditionalFunctions::ZeroIfNull<double>(Expr* e, TupleRow* row);
 template void* ConditionalFunctions::IfFn<bool>(Expr* e, TupleRow* row);
 template void* ConditionalFunctions::IfFn<int8_t>(Expr* e, TupleRow* row);
 template void* ConditionalFunctions::IfFn<int16_t>(Expr* e, TupleRow* row);
