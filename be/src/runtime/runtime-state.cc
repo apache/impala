@@ -57,7 +57,8 @@ RuntimeState::RuntimeState(const TUniqueId& query_id,
     query_id_(query_id),
     cgroup_(cgroup),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
-    is_cancelled_(false) {
+    is_cancelled_(false),
+    query_resource_mgr_(NULL) {
   Status status = Init(fragment_instance_id, exec_env);
   DCHECK(status.ok()) << status.GetErrorMsg();
 }
@@ -71,7 +72,8 @@ RuntimeState::RuntimeState(const TQueryContext& query_ctxt)
         query_ctxt.now_string.size())),
     exec_env_(ExecEnv::GetInstance()),
     profile_(obj_pool_.get(), "<unnamed>"),
-    is_cancelled_(false) {
+    is_cancelled_(false),
+    query_resource_mgr_(NULL) {
   query_ctxt_.request.query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
 }
 
