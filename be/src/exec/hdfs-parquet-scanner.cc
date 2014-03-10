@@ -699,94 +699,128 @@ Status HdfsParquetScanner::AssembleRows() {
 Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   *eosr = false;
 
-  // Need to loop in case we need to read more bytes.
-  while (true) {
-    uint8_t* buffer;
-    int len;
+  uint8_t* buffer;
+  int len;
 
-    RETURN_IF_ERROR(stream_->GetBuffer(false, &buffer, &len));
-    DCHECK(stream_->eosr());
+  RETURN_IF_ERROR(stream_->GetBuffer(false, &buffer, &len));
+  DCHECK(stream_->eosr());
 
-    // Number of bytes in buffer after the fixed size footer is accounted for.
-    int remaining_bytes_buffered = len - sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER);
+  // Number of bytes in buffer after the fixed size footer is accounted for.
+  int remaining_bytes_buffered = len - sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER);
 
-    // Make sure footer has enough bytes to contain the required information.
-    if (remaining_bytes_buffered < 0) {
-      stringstream ss;
-      ss << "File " << stream_->filename() << " is invalid.  Missing metadata.";
-      return Status(ss.str());
-    }
-
-    // Validate magic file bytes are correct
-    uint8_t* magic_number_ptr = buffer + len - sizeof(PARQUET_VERSION_NUMBER);
-    if (memcmp(magic_number_ptr,
-        PARQUET_VERSION_NUMBER, sizeof(PARQUET_VERSION_NUMBER) != 0)) {
-      stringstream ss;
-      ss << "File " << stream_->filename() << " is invalid.  Invalid file footer: "
-         << string((char*)magic_number_ptr, sizeof(PARQUET_VERSION_NUMBER));
-      return Status(ss.str());
-    }
-
-    // The size of the metadata is encoded as a 4 byte little endian value before
-    // the magic number
-    uint8_t* metadata_size_ptr = magic_number_ptr - sizeof(int32_t);
-    uint32_t metadata_size = *reinterpret_cast<uint32_t*>(metadata_size_ptr);
-
-    // TODO: we need to read more from the file, the footer size guess was wrong.
-    DCHECK_LE(metadata_size, remaining_bytes_buffered);
-
-    // Deserialize file header
-    uint8_t* metadata_ptr = metadata_size_ptr - metadata_size;
-    Status status =
-        DeserializeThriftMsg(metadata_ptr, &metadata_size, true, &file_metadata_);
-    if (!status.ok()) {
-      stringstream ss;
-      ss << "File " << stream_->filename() << " has invalid file metadata at file offset "
-         << (metadata_size + sizeof(PARQUET_VERSION_NUMBER) + sizeof(uint32_t)) << ". "
-         << "Error = " << status.GetErrorMsg();
-      return Status(ss.str());
-    }
-
-    metadata_range_ = stream_->scan_range();
-    RETURN_IF_ERROR(ValidateFileMetadata());
-
-    // Tell the scan node this file has been taken care of.
-    HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
-    scan_node_->MarkFileDescIssued(desc);
-
-    if (scan_node_->materialized_slots().empty()) {
-      // No materialized columns.  We can serve this query from just the metadata.  We
-      // don't need to read the column data.
-      int64_t num_tuples = file_metadata_.num_rows;
-      COUNTER_UPDATE(scan_node_->rows_read_counter(), num_tuples);
-
-      while (num_tuples > 0) {
-        MemPool* pool;
-        Tuple* tuple;
-        TupleRow* current_row;
-        int max_tuples = GetMemory(&pool, &tuple, &current_row);
-        max_tuples = min(static_cast<int64_t>(max_tuples), num_tuples);
-        num_tuples -= max_tuples;
-
-        int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
-        RETURN_IF_ERROR(CommitRows(num_to_commit));
-      }
-
-      *eosr = true;
-      return Status::OK;
-    } else if (file_metadata_.num_rows == 0) {
-      // Empty file
-      *eosr = true;
-      return Status::OK;
-    }
-
-    if (file_metadata_.row_groups.empty()) {
-      stringstream ss;
-      ss << "Invalid file. This file: " << stream_->filename() << " has no row groups";
-      return Status(ss.str());
-    }
-    break;
+  // Make sure footer has enough bytes to contain the required information.
+  if (remaining_bytes_buffered < 0) {
+    stringstream ss;
+    ss << "File " << stream_->filename() << " is invalid.  Missing metadata.";
+    return Status(ss.str());
   }
+
+  // Validate magic file bytes are correct
+  uint8_t* magic_number_ptr = buffer + len - sizeof(PARQUET_VERSION_NUMBER);
+  if (memcmp(magic_number_ptr,
+      PARQUET_VERSION_NUMBER, sizeof(PARQUET_VERSION_NUMBER) != 0)) {
+    stringstream ss;
+    ss << "File " << stream_->filename() << " is invalid.  Invalid file footer: "
+        << string((char*)magic_number_ptr, sizeof(PARQUET_VERSION_NUMBER));
+    return Status(ss.str());
+  }
+
+  // The size of the metadata is encoded as a 4 byte little endian value before
+  // the magic number
+  uint8_t* metadata_size_ptr = magic_number_ptr - sizeof(int32_t);
+  uint32_t metadata_size = *reinterpret_cast<uint32_t*>(metadata_size_ptr);
+  uint8_t* metadata_ptr = metadata_size_ptr - metadata_size;
+  // If the metadata was too big, we need to stitch it before deserializing it.
+  // In that case, we stitch the data in this buffer.
+  vector<uint8_t> metadata_buffer;
+  metadata_range_ = stream_->scan_range();
+
+  if (UNLIKELY(metadata_size > remaining_bytes_buffered)) {
+    // In this case, the metadata is bigger than our guess meaning there are
+    // not enough bytes in the footer range from IssueInitialRanges().
+    // We'll just issue more ranges to the IoMgr that is the actual footer.
+    const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(metadata_range_->file());
+    // The start of the metadata is:
+    // file_length - 4-byte metadata size - footer-size - metadata size
+    int64_t metadata_start = file_desc->file_length -
+      sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) - metadata_size;
+    int metadata_bytes_to_read = metadata_size;
+
+    // IoMgr can only do a fixed size Read(). The metadata could be larger
+    // so we stitch it here.
+    // TODO: consider moving this stitching into the scanner context. The scanner
+    // context usually handles the stitching but no other scanner need this logic
+    // now.
+    metadata_buffer.resize(metadata_size);
+    metadata_ptr = &metadata_buffer[0];
+    int copy_offset = 0;
+    DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();
+
+    while (metadata_bytes_to_read > 0) {
+      int to_read = ::min(io_mgr->max_read_buffer_size(), metadata_bytes_to_read);
+      DiskIoMgr::ScanRange* range = scan_node_->AllocateScanRange(
+          metadata_range_->file(), to_read, metadata_start + copy_offset, -1,
+          metadata_range_->disk_id(), metadata_range_->try_cache());
+
+      DiskIoMgr::BufferDescriptor* io_buffer = NULL;
+      RETURN_IF_ERROR(io_mgr->Read(scan_node_->reader_context(), range, &io_buffer));
+      memcpy(metadata_ptr + copy_offset, io_buffer->buffer(), io_buffer->len());
+      io_buffer->Return();
+
+      metadata_bytes_to_read -= to_read;
+      copy_offset += to_read;
+    }
+    DCHECK_EQ(metadata_bytes_to_read, 0);
+  }
+  // Deserialize file header
+  Status status =
+      DeserializeThriftMsg(metadata_ptr, &metadata_size, true, &file_metadata_);
+  if (!status.ok()) {
+    stringstream ss;
+    ss << "File " << stream_->filename() << " has invalid file metadata at file offset "
+        << (metadata_size + sizeof(PARQUET_VERSION_NUMBER) + sizeof(uint32_t)) << ". "
+        << "Error = " << status.GetErrorMsg();
+    return Status(ss.str());
+  }
+
+  RETURN_IF_ERROR(ValidateFileMetadata());
+
+  // Tell the scan node this file has been taken care of.
+  HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
+  scan_node_->MarkFileDescIssued(desc);
+
+  if (scan_node_->materialized_slots().empty()) {
+    // No materialized columns.  We can serve this query from just the metadata.  We
+    // don't need to read the column data.
+    int64_t num_tuples = file_metadata_.num_rows;
+    COUNTER_UPDATE(scan_node_->rows_read_counter(), num_tuples);
+
+    while (num_tuples > 0) {
+      MemPool* pool;
+      Tuple* tuple;
+      TupleRow* current_row;
+      int max_tuples = GetMemory(&pool, &tuple, &current_row);
+      max_tuples = min(static_cast<int64_t>(max_tuples), num_tuples);
+      num_tuples -= max_tuples;
+
+      int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
+      RETURN_IF_ERROR(CommitRows(num_to_commit));
+    }
+
+    *eosr = true;
+    return Status::OK;
+  } else if (file_metadata_.num_rows == 0) {
+    // Empty file
+    *eosr = true;
+    return Status::OK;
+  }
+
+  if (file_metadata_.row_groups.empty()) {
+    stringstream ss;
+    ss << "Invalid file. This file: " << stream_->filename() << " has no row groups";
+    return Status(ss.str());
+  }
+
   return Status::OK;
 }
 

@@ -168,6 +168,9 @@ class HdfsScanNode : public ScanNode {
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
   // Allocate a new scan range object, stored in the runtime state's object pool.
+  // For scan ranges that correspond to the original hdfs splits, the partition id
+  // must be set to the range's partition id. For other ranges (e.g. columns in parquet,
+  // read past buffers), the partition_id is unused.
   // This is thread safe.
   DiskIoMgr::ScanRange* AllocateScanRange(const char* file, int64_t len, int64_t offset,
       int64_t partition_id, int disk_id, bool try_cache);
