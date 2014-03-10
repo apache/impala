@@ -109,7 +109,7 @@ class RowBatch {
   // and io buffers).  This would be a trigger to compact the row batch or reclaim
   // the memory in some way.
   bool AtResourceLimit() {
-    return io_buffers_.size() > MAX_IO_BUFFERS ||
+    return io_buffers_.size() >= MAX_IO_BUFFERS ||
            tuple_data_pool()->total_allocated_bytes() > MAX_MEM_POOL_SIZE;
   }
 
@@ -181,10 +181,10 @@ class RowBatch {
 
   const RowDescriptor& row_desc() const { return row_desc_; }
 
-  // Allow the row batch to accumulate 32MBs before it is considered at the limit.
+  // Allow the row batch to accumulate 8MBs before it is considered at the limit.
   // TODO: are these numbers reasonable?
-  static const int MAX_IO_BUFFERS = 4;
-  static const int MAX_MEM_POOL_SIZE = 32 * 1024 * 1024;
+  static const int MAX_IO_BUFFERS = 1;
+  static const int MAX_MEM_POOL_SIZE = 8 * 1024 * 1024;
 
  private:
   MemTracker* mem_tracker_;  // not owned
@@ -206,6 +206,10 @@ class RowBatch {
   // holding (some of the) data referenced by rows
   boost::scoped_ptr<MemPool> tuple_data_pool_;
 
+  // IO buffers current owned by this row batch. Ownership of IO buffers transfer
+  // between row batches up the plan tree. Any IO buffer will be owned by at most
+  // one row batch (i.e. they are not ref counted) so most row batches don't own
+  // any.
   std::vector<DiskIoMgr::BufferDescriptor*> io_buffers_;
 
   // String to write compressed tuple data to in Serialize().

@@ -37,7 +37,8 @@ ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
     HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range)
   : state_(state),
     scan_node_(scan_node),
-    partition_desc_(partition_desc) {
+    partition_desc_(partition_desc),
+    num_completed_io_buffers_(0) {
   AddStream(scan_range);
 }
 
@@ -75,7 +76,10 @@ void ScannerContext::Stream::AttachCompletedResources(RowBatch* batch, bool done
   DCHECK(batch != NULL);
   if (done) {
     // Mark any pending resources as completed
-    if (io_buffer_ != NULL) completed_io_buffers_.push_back(io_buffer_);
+    if (io_buffer_ != NULL) {
+      ++parent_->num_completed_io_buffers_;
+      completed_io_buffers_.push_back(io_buffer_);
+    }
     // Set variables to NULL to make sure streams are not used again
     io_buffer_ = NULL;
     io_buffer_pos_ = NULL;
@@ -96,6 +100,7 @@ void ScannerContext::Stream::AttachCompletedResources(RowBatch* batch, bool done
       // there are too many, we should compact.
     }
   }
+  parent_->num_completed_io_buffers_ -= completed_io_buffers_.size();
   completed_io_buffers_.clear();
 
   if (!compact_data_) {
@@ -118,6 +123,7 @@ Status ScannerContext::Stream::GetNextBuffer(int read_past_size) {
   bool eosr = false;
   if (io_buffer_ != NULL) {
     eosr = io_buffer_->eosr();
+    ++parent_->num_completed_io_buffers_;
     completed_io_buffers_.push_back(io_buffer_);
     io_buffer_ = NULL;
   }

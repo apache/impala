@@ -264,6 +264,7 @@ class ScannerContext {
   // If true, the ScanNode has been cancelled and the scanner thread should finish up
   bool cancelled() const;
 
+  int num_completed_io_buffers() const { return num_completed_io_buffers_; }
   HdfsPartitionDescriptor* partition_descriptor() { return partition_desc_; }
 
  private:
@@ -276,6 +277,9 @@ class ScannerContext {
 
   // Vector of streams.  Non-columnar formats will always have one stream per context.
   std::vector<Stream*> streams_;
+
+  // The total number of completed io buffers in all streams.
+  int num_completed_io_buffers_;
 };
 
 }

@@ -135,12 +135,11 @@ Status HdfsScanner::CommitRows(int num_rows) {
   batch_->CommitRows(num_rows);
   tuple_mem_ += scan_node_->tuple_desc()->byte_size() * num_rows;
 
-  // We need to pass the row batch to the scan node if we accumulate too much
-  // memory (in io buffers and mem pools).  This can happen if the query is very
-  // selective.
-  // TODO: We could also compact the row batch and at this point to reclaim the
-  // memory that way.
-  if (batch_->IsFull() || batch_->AtResourceLimit()) {
+  // We need to pass the row batch to the scan node if there too much memory attached to
+  // which can happen if the query is very selective. Operators above the scan node
+  // compact the data if they cannot stream the tuples through.
+  if (batch_->IsFull() || batch_->AtResourceLimit() ||
+      context_->num_completed_io_buffers() > 0) {
     context_->AttachCompletedResources(batch_, /* done */ false);
     scan_node_->AddMaterializedRowBatch(batch_);
     StartNewRowBatch();
