@@ -525,10 +525,11 @@ void PlanFragmentExecutor::Close() {
       exec_env_->cgroups_mgr()->UnregisterFragment(
           runtime_state_->fragment_instance_id(), runtime_state_->cgroup());
     }
-    if (plan_ != NULL)
-      plan_->Close(runtime_state_.get());
-    if (sink_.get() != NULL)
-      sink_->Close(runtime_state());
+    if (plan_ != NULL) plan_->Close(runtime_state_.get());
+    if (sink_.get() != NULL) sink_->Close(runtime_state());
+    BOOST_FOREACH(DiskIoMgr::ReaderContext* reader, *runtime_state_->reader_contexts()) {
+      runtime_state_->io_mgr()->UnregisterReader(reader);
+    }
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
   }
   if (mem_usage_sampled_counter_ != NULL) {

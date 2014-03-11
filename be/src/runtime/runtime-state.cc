@@ -23,7 +23,6 @@
 #include "common/status.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
-#include "runtime/disk-io-mgr.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/data-stream-recvr.h"

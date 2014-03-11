@@ -795,3 +795,13 @@ int, bigint
 1,1
 2,3
 ====
+---- QUERY
+# IMPALA-843: Impalads crash while running join on string column + union
+select count(*) from
+(select 1 FROM alltypes AS t1 JOIN alltypestiny AS t2 ON t1.string_col = t2.string_col
+UNION ALL SELECT 1 FROM tinytable AS t1) as t3
+---- TYPES
+bigint
+---- RESULTS
+5843
+====

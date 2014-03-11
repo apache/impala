@@ -584,7 +584,13 @@ void HdfsScanNode::Close(RuntimeState* state) {
   DCHECK_EQ(num_owned_io_buffers_, 0) << "ScanNode has leaked io buffers";
 
   if (reader_context_ != NULL) {
-    state->io_mgr()->UnregisterReader(reader_context_);
+    // There may still be io buffers used by parent nodes so we can't unregister the
+    // reader context yet. The runtime state keeps a list of all the reader contexts and
+    // they are unregistered when the fragment is closed.
+    state->reader_contexts()->push_back(reader_context_);
+    // Need to wait for all the active scanner threads to finish to ensure there is no
+    // more memory tracked by this scan node's mem tracker.
+    state->io_mgr()->WaitForDisksCompletion(reader_context_);
   }
 
   StopAndFinalizeCounters();

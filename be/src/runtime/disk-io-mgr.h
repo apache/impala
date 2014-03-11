@@ -397,6 +397,12 @@ class DiskIoMgr {
   // UnregisterReader also cancels the reader from the disk IoMgr.
   void UnregisterReader(ReaderContext* reader);
 
+  // Cancels the reader and waits for the number of active disks for this reader to reach
+  // 0. This call blocks until all the disk threads have finished cleaning up the reader.
+  // After calling, the only valid API is returning IO buffers that have already been
+  // returned. Takes reader->lock_.
+  void WaitForDisksCompletion(ReaderContext* reader);
+
   // This function cancels the reader asychronously. All outstanding requests
   // are aborted and tracking structures cleaned up. This does not need to be
   // called if the reader finishes normally.

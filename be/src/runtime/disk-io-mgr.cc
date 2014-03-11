@@ -315,7 +315,7 @@ Status DiskIoMgr::RegisterReader(hdfsFS hdfs, ReaderContext** reader,
   return Status::OK;
 }
 
-void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
+void DiskIoMgr::WaitForDisksCompletion(ReaderContext* reader) {
   // First cancel the reader.  This is more or less a no-op if the reader is
   // complete (common case).
   reader->Cancel(Status::CANCELLED);
@@ -325,8 +325,13 @@ void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
   while (reader->num_disks_with_ranges_ > 0) {
     reader->disks_complete_cond_var_.wait(reader_lock);
   }
+}
+
+void DiskIoMgr::UnregisterReader(ReaderContext* reader) {
+  WaitForDisksCompletion(reader);
 
   // All the disks are done with clean, validate nothing is leaking.
+  unique_lock<mutex> reader_lock(reader->lock_);
   DCHECK_EQ(reader->num_buffers_in_reader_, 0) << endl << reader->DebugString();
   DCHECK_EQ(reader->num_used_buffers_, 0) << endl << reader->DebugString();
 

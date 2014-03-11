@@ -30,6 +30,7 @@
 #include "statestore/query-resource-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
+#include "runtime/disk-io-mgr.h"  // for DiskIoMgr::ReaderContext
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
@@ -41,7 +42,6 @@
 namespace impala {
 
 class DescriptorTbl;
-class DiskIoMgr;
 class ObjectPool;
 class Status;
 class ExecEnv;
@@ -128,6 +128,7 @@ class RuntimeState {
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
   PartitionRowCount* num_appended_rows() { return &num_appended_rows_; }
   PartitionInsertStats* insert_stats() { return &insert_stats_; }
+  std::vector<DiskIoMgr::ReaderContext*>* reader_contexts() { return &reader_contexts_; }
 
   // Returns runtime state profile
   RuntimeProfile* runtime_profile() { return &profile_; }
@@ -331,6 +332,9 @@ class RuntimeState {
   // Query-wide resource manager for resource expansion etc. Not owned by us; owned by the
   // ResourceBroker instead.
   QueryResourceMgr* query_resource_mgr_;
+
+  // Reader contexts that need to be closed when the fragment is closed.
+  std::vector<DiskIoMgr::ReaderContext*> reader_contexts_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);
