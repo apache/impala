@@ -917,3 +917,11 @@ int,boolean,int
 0,NULL,0
 1,false,1
 ====
+---- QUERY
+# Regression test for min/max of all negative values. IMPALA-869.
+select min(-1.0), max(-1.0) from tinytable
+---- TYPES
+float,float
+---- RESULTS
+-1,-1
+====

@@ -172,10 +172,12 @@ struct ExprValue {
         bigint_val = std::numeric_limits<int64_t>::min();
         return &bigint_val;
       case TYPE_FLOAT:
-        float_val = std::numeric_limits<float>::min();
+        // For floats and doubles, numeric_limits::min() is the smallest positive
+        // representable value.
+        float_val = -std::numeric_limits<float>::max();
         return &float_val;
       case TYPE_DOUBLE:
-        double_val = std::numeric_limits<double>::min();
+        double_val = -std::numeric_limits<double>::max();
         return &double_val;
       default:
         DCHECK(false);
