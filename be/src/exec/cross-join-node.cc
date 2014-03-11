@@ -95,7 +95,7 @@ Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool*
         ProcessLeftChildBatch(output_batch, left_batch_.get(), max_added_rows);
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
-    if (ReachedLimit() || output_batch->IsFull()) {
+    if (ReachedLimit() || output_batch->AtCapacity()) {
       *eos = ReachedLimit();
       break;
     }
@@ -104,7 +104,7 @@ Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool*
     if (current_build_row_.AtEnd() && left_batch_pos_ == left_batch_->num_rows()) {
       left_batch_->TransferResourceOwnership(output_batch);
       left_batch_pos_ = 0;
-      if (output_batch->IsFull() || output_batch->AtResourceLimit()) break;
+      if (output_batch->AtCapacity()) break;
       if (left_side_eos_) {
         *eos = eos_ = true;
         break;

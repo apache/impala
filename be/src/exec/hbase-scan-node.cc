@@ -176,8 +176,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   while (true) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(state->CheckQueryState());
-    if (ReachedLimit() || row_batch->IsFull() ||
-        tuple_pool_->total_allocated_bytes() > RowBatch::MAX_MEM_POOL_SIZE) {
+    if (ReachedLimit() || row_batch->AtCapacity() ||
+        tuple_pool_->total_allocated_bytes() > RowBatch::AT_CAPACITY_MEM_USAGE) {
       // hang on to last allocated chunk in pool, we'll keep writing into it in the
       // next GetNext() call
       row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), !ReachedLimit());

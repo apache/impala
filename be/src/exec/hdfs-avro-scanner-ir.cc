@@ -120,7 +120,7 @@ void HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data, bool wr
     DCHECK_EQ(type, TYPE_STRING);
     StringValue* sv = reinterpret_cast<StringValue*>(slot);
     sv->len = len;
-    if (stream_->compact_data()) {
+    if (scan_node_->requires_compaction()) {
       sv->ptr = reinterpret_cast<char*>(pool->Allocate(len));
       memcpy(sv->ptr, *data, len);
     } else {

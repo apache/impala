@@ -160,6 +160,7 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
     COUNTER_SET(build_buckets_counter_, hash_tbl_->num_buckets());
     COUNTER_SET(hash_tbl_load_factor_counter_, hash_tbl_->load_factor());
     build_batch.Reset();
+    DCHECK(!build_batch.AtCapacity());
     if (eos) break;
   }
   return Status::OK;
@@ -229,7 +230,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
         COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-        if (out_batch->IsFull() || ReachedLimit()) {
+        if (out_batch->AtCapacity() || ReachedLimit()) {
           *eos = ReachedLimit();
           return Status::OK;
         }
@@ -248,7 +249,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         ++num_rows_returned_;
         COUNTER_SET(rows_returned_counter_, num_rows_returned_);
         matched_probe_ = true;
-        if (out_batch->IsFull() || ReachedLimit()) {
+        if (out_batch->AtCapacity() || ReachedLimit()) {
           *eos = ReachedLimit();
           return Status::OK;
         }
@@ -259,7 +260,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       // pass on resources, out_batch might still need them
       left_batch_->TransferResourceOwnership(out_batch);
       left_batch_pos_ = 0;
-      if (out_batch->IsFull() || out_batch->AtResourceLimit()) return Status::OK;
+      if (out_batch->AtCapacity()) return Status::OK;
       // get new probe batch
       if (!left_side_eos_) {
         while (true) {
@@ -274,7 +275,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
               eos_ = true;
               break;
             }
-            if (out_batch->IsFull() || out_batch->AtResourceLimit()) return Status::OK;
+            if (out_batch->AtCapacity()) return Status::OK;
             continue;
           } else {
             COUNTER_UPDATE(left_child_row_counter_, left_batch_->num_rows());
@@ -303,7 +304,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
   if (match_all_build_) {
     // output remaining unmatched build rows
     TupleRow* build_row = NULL;
-    while (!out_batch->IsFull() && !hash_tbl_iterator_.AtEnd()) {
+    while (!out_batch->AtCapacity() && !hash_tbl_iterator_.AtEnd()) {
       build_row = hash_tbl_iterator_.GetRow();
       hash_tbl_iterator_.Next<false>();
       if (joined_build_rows_.find(build_row) != joined_build_rows_.end()) {
@@ -351,7 +352,7 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     }
 
-    if (ReachedLimit() || out_batch->IsFull()) {
+    if (ReachedLimit() || out_batch->AtCapacity()) {
       *eos = ReachedLimit();
       break;
     }
@@ -360,7 +361,7 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     if (hash_tbl_iterator_.AtEnd() && left_batch_pos_ == left_batch_->num_rows()) {
       left_batch_->TransferResourceOwnership(out_batch);
       left_batch_pos_ = 0;
-      if (out_batch->IsFull() || out_batch->AtResourceLimit()) break;
+      if (out_batch->AtCapacity()) break;
       if (left_side_eos_) {
         *eos = eos_ = true;
         break;

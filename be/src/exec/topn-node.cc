@@ -115,7 +115,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  while (!row_batch->IsFull() && (get_next_iter_ != sorted_top_n_.end())) {
+  while (!row_batch->AtCapacity() && (get_next_iter_ != sorted_top_n_.end())) {
     if (num_rows_skipped_ < offset_) {
       ++get_next_iter_;
       ++num_rows_skipped_;

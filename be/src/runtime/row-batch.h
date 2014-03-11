@@ -24,6 +24,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 
 namespace impala {
 
@@ -34,12 +35,11 @@ class TupleRow;
 class TupleDescriptor;
 
 // A RowBatch encapsulates a batch of rows, each composed of a number of tuples.
-// The maximum number of rows is fixed at the time of construction, and the caller
-// can add rows up to that capacity.
+// The maximum number of rows is fixed at the time of construction.
 // The row batch reference a few different sources of memory.
 //   1. TupleRow ptrs - this is always owned and managed by the row batch.
 //   2. Tuple memory - this is allocated (or transferred to) the row batches tuple pool.
-//   3. Auxillary tuple memory (e.g. string data) - this can either be stored externally
+//   3. Auxiliary tuple memory (e.g. string data) - this can either be stored externally
 //      (don't copy strings) or from the tuple pool (strings are copied).  If external,
 //      the data is in an io buffer that may not be attached to this row batch.  The
 //      creator of that row batch has to make sure that the io buffer is not recycled
@@ -47,6 +47,22 @@ class TupleDescriptor;
 // In order to minimize memory allocations, RowBatches and TRowBatches that have been
 // serialized and sent over the wire should be reused (this prevents compression_scratch_
 // from being needlessly reallocated).
+//
+// Row batches and memory usage: We attempt to stream row batches through the plan
+// tree without copying the data. This means that row batches are often not-compact
+// and reference memory outside of the row batch. This results in most row batches
+// having a very small memory footprint and in some row batches having a very large
+// one (it contains all the memory that other row batches are referencing). An example
+// is IoBuffers which are only attached to one row batch. Only when the row batch reaches
+// a blocking operator or the root of the fragment is the row batch memory freed.
+// This means that in some cases (e.g. very selective queries), we still need to
+// pass the row batch through the exec nodes (even if they have no rows) to trigger
+// memory deletion. AtCapacity() encapsulates the check that we are not accumulating
+// excessive memory.
+//
+// A row batch is considered at capacity if all the rows are full or it has accumulated
+// auxiliary memory up to a soft cap. (See AT_CAPACITY_MEM_USAGE comment).
+//
 // TODO: stick tuple_ptrs_ into a pool?
 class RowBatch {
  public:
@@ -100,25 +116,15 @@ class RowBatch {
     num_rows_ = num_rows;
   }
 
-  // Returns true if row_batch has reached capacity.
-  bool IsFull() {
-    return num_rows_ == capacity_;
-  }
-
-  // Returns true if the row batch has accumulated enough external memory (in MemPools
-  // and io buffers).  This would be a trigger to compact the row batch or reclaim
-  // the memory in some way.
-  bool AtResourceLimit() {
-    return io_buffers_.size() >= MAX_IO_BUFFERS ||
-           tuple_data_pool()->total_allocated_bytes() > MAX_MEM_POOL_SIZE;
-  }
-
-  int row_byte_size() {
-    return num_tuples_per_row_ * sizeof(Tuple*);
+  // Returns true if the row batch has filled all the rows or has accumulated
+  // enough memory.
+  bool AtCapacity() {
+    return num_rows_ == capacity_ || auxiliary_mem_usage_ >= AT_CAPACITY_MEM_USAGE;
   }
 
   // The total size of all data represented in this row batch (tuples and referenced
-  // string data).
+  // string data). This is the size of the row batch after removing all gaps in the
+  // auxiliary (i.e. the smallest footprint for the row batch).
   int TotalByteSize();
 
   TupleRow* GetRow(int row_idx) {
@@ -128,6 +134,7 @@ class RowBatch {
     return reinterpret_cast<TupleRow*>(tuple_ptrs_ + row_idx * num_tuples_per_row_);
   }
 
+  int row_byte_size() { return num_tuples_per_row_ * sizeof(Tuple*); }
   MemPool* tuple_data_pool() { return tuple_data_pool_.get(); }
   int num_io_buffers() { return io_buffers_.size(); }
 
@@ -161,6 +168,7 @@ class RowBatch {
   // multiple threads which push row batches.
   // TODO: this is wasteful and makes a copy that's unnecessary.  Think about cleaning
   // this up.
+  // TOOD: rename this or unify with TransferResourceOwnership()
   void AcquireState(RowBatch* src);
 
   // Create a serialized version of this row batch in output_batch, attaching all of the
@@ -181,10 +189,14 @@ class RowBatch {
 
   const RowDescriptor& row_desc() const { return row_desc_; }
 
-  // Allow the row batch to accumulate 8MBs before it is considered at the limit.
-  // TODO: are these numbers reasonable?
-  static const int MAX_IO_BUFFERS = 1;
-  static const int MAX_MEM_POOL_SIZE = 8 * 1024 * 1024;
+  // Max memory that this row batch can accumulate in tuple_data_pool_ before it
+  // is considered at capacity.
+  // If this value is larger, we will use more memory. If this value is smaller,
+  // we are more likely to generate row batches less than the maximum number of rows.
+  // The value currently is very large compared to the typical row size.
+  // TODO: is this numbers reasonable? We can make this dynamic based on the estimated
+  // row size and mem limit.
+  static const int AT_CAPACITY_MEM_USAGE = 8 * 1024 * 1024;
 
  private:
   MemTracker* mem_tracker_;  // not owned
@@ -203,13 +215,16 @@ class RowBatch {
   Tuple** tuple_ptrs_;
   int tuple_ptrs_size_;
 
+  // Sum of all auxiliary bytes. This includes IoBuffers and memory from
+  // TransferResourceOwnership().
+  int64_t auxiliary_mem_usage_;
+
   // holding (some of the) data referenced by rows
   boost::scoped_ptr<MemPool> tuple_data_pool_;
 
   // IO buffers current owned by this row batch. Ownership of IO buffers transfer
-  // between row batches up the plan tree. Any IO buffer will be owned by at most
-  // one row batch (i.e. they are not ref counted) so most row batches don't own
-  // any.
+  // between row batches. Any IO buffer will be owned by at most one row batch
+  // (i.e. they are not ref counted) so most row batches don't own any.
   std::vector<DiskIoMgr::BufferDescriptor*> io_buffers_;
 
   // String to write compressed tuple data to in Serialize().

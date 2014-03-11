@@ -126,6 +126,8 @@ class Codec {
   // Must be called on codec before destructor for final cleanup.
   virtual void Close();
 
+  bool reuse_output_buffer() const { return reuse_buffer_; }
+
   // Largest block we will compress/decompress: 2GB.
   // We are dealing with compressed blocks that are never this big but we
   // want to guard against a corrupt file that has the block length as some

@@ -410,7 +410,7 @@ Status Sorter::RunBatchSupplier::GetNext(RowBatch* row_batch, bool* eos) {
   const vector<SlotDescriptor*>& string_slots =
       sorter_->output_tuple_desc_.string_slots();
 
-  while (!row_batch->IsFull() && tuple_blocks_iterator_ != run_->tuple_blocks_.end()) {
+  while (!row_batch->AtCapacity() && tuple_blocks_iterator_ != run_->tuple_blocks_.end()) {
     DCHECK(cur_tuple_block_->in_mem());
     Tuple* tuple = reinterpret_cast<Tuple*>(
         cur_tuple_block_->buf_desc()->buffer + cur_tuple_index_ * tuple_size_);

@@ -114,7 +114,7 @@ void SortedMerger::AddRun(RowBatchSupplier* batch_supplier) {
 }
 
 Status SortedMerger::GetNext(RowBatch* batch, bool* eos) {
-  while (!batch->IsFull() && !merge_heap_.empty()) {
+  while (!batch->AtCapacity() && !merge_heap_.empty()) {
     MergeTuple min = merge_heap_.Pop();
 
     // Possibly skip this row if remove_dups is on and it's a duplicate

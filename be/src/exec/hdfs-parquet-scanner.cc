@@ -260,7 +260,9 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
     } else {
       DCHECK(page_encoding == parquet::Encoding::PLAIN);
       data_ += ParquetPlainEncoder::Decode<T>(data_, reinterpret_cast<T*>(slot));
-      if (stream_->compact_data()) CopySlot(reinterpret_cast<T*>(slot), pool);
+      if (parent_->scan_node_->requires_compaction()) {
+        CopySlot(reinterpret_cast<T*>(slot), pool);
+      }
       return true;
     }
     return result;
@@ -328,12 +330,14 @@ void HdfsParquetScanner::Close() {
   vector<THdfsCompression::type> compression_types;
   for (int i = 0; i < column_readers_.size(); ++i) {
     if (column_readers_[i]->decompressed_data_pool_.get() != NULL) {
-      AttachPool(column_readers_[i]->decompressed_data_pool_.get());
+      // No need to commit the row batches with the AttachPool() calls
+      // since AddFinalRowBatch() already does below.
+      AttachPool(column_readers_[i]->decompressed_data_pool_.get(), false);
     }
     column_readers_[i]->Close();
     compression_types.push_back(column_readers_[i]->codec());
   }
-  AttachPool(dictionary_pool_.get());
+  AttachPool(dictionary_pool_.get(), false);
   AddFinalRowBatch();
 
   // If this was a metadata only read (i.e. count(*)), there are no columns.
@@ -398,7 +402,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
 
   // We're about to move to the next data page.  The previous data page is
   // now complete, pass along the memory allocated for it.
-  parent_->AttachPool(decompressed_data_pool_.get());
+  parent_->AttachPool(decompressed_data_pool_.get(), false);
 
   // Read the next data page, skipping page types we don't care about.
   // We break out of this loop on the non-error case (a data page was found or we read all
@@ -491,6 +495,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
         dict_values = parent_->dictionary_pool_->Allocate(uncompressed_size);
         RETURN_IF_ERROR(decompressor_->ProcessBlock(true, data_size, data_,
             &uncompressed_size, &dict_values));
+        VLOG_FILE << "Decompressed " << data_size << " to " << uncompressed_size;
         data_size = uncompressed_size;
       } else {
         DCHECK_EQ(data_size, current_page_header_.uncompressed_page_size);
@@ -528,6 +533,8 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
       RETURN_IF_ERROR(decompressor_->ProcessBlock(
           true, current_page_header_.compressed_page_size, data_,
           &uncompressed_size, &decompressed_buffer));
+      VLOG_FILE << "Decompressed " << current_page_header_.compressed_page_size
+                << " to " << uncompressed_size;
       DCHECK_EQ(current_page_header_.uncompressed_page_size, uncompressed_size);
       data_ = decompressed_buffer;
       data_size = current_page_header_.uncompressed_page_size;
@@ -645,6 +652,8 @@ Status HdfsParquetScanner::ProcessSplit() {
     // streams could either be just the footer stream or streams for the previous row
     // group.
     context_->AttachCompletedResources(batch_, /* done */ true);
+    // Commit the rows to flush the row batch from the previous row group
+    CommitRows(0);
 
     RETURN_IF_ERROR(InitColumns(i));
     RETURN_IF_ERROR(AssembleRows());
@@ -906,7 +915,7 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
       // Non-string types are always compact.  Compressed columns don't reference data
       // in the io buffers after tuple materialization.  In both cases, we can set compact
       // to true and recycle buffers more promptly.
-      stream->set_compact_data(true);
+      stream->set_contains_tuple_data(false);
     }
   }
   DCHECK_EQ(col_ranges.size(), column_readers_.size());

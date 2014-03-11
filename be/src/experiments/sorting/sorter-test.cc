@@ -798,7 +798,7 @@ class BatchSupplier : public RowBatchSupplier {
       RowBatch* batch = batches_[index_];
 
       for (int i = 0; i < batch->num_rows(); ++i) {
-        DCHECK(!row_batch->IsFull()) << "Merge batch is too small for test";
+        DCHECK(!row_batch->AtCapacity()) << "Merge batch is too small for test";
         Tuple* tuple = batch->GetRow(i)->GetTuple(0);
         int row_idx = row_batch->AddRow();
         row_batch->GetRow(row_idx)->SetTuple(0, tuple);

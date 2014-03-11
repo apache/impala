@@ -186,11 +186,6 @@ class HdfsScanner {
   // Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
 
-  // True if the descriptor of the tuple the scanner is writing has
-  // string slots and we are not compacting data. This is used to decide
-  // how to treat buffer memory that contains slot data.
-  bool has_noncompact_strings_;
-
   // Number of null bytes in the tuple.
   int32_t num_null_bytes_;
 
@@ -231,6 +226,8 @@ class HdfsScanner {
   // Commit num_rows to the current row batch.  If this completes the row batch, the
   // row batch is enqueued with the scan node and StartNewRowBatch is called.
   // Returns Status::OK if the query is not cancelled and hasn't exceeded any mem limits.
+  // Scanner can call this with 0 rows to flush any pending resources (attached pools
+  // and io buffers) to minimize memory consumption.
   Status CommitRows(int num_rows);
 
   // Attach all remaining resources from context_ to batch_ and send batch_ to the scan
@@ -239,11 +236,14 @@ class HdfsScanner {
   // implementation).
   void AddFinalRowBatch();
 
-  // Release all memory in 'pool' to batch_.
-  void AttachPool(MemPool* pool) {
+  // Release all memory in 'pool' to batch_. If commit_batch is true, the row batch
+  // will be committed. commit_batch should be true if the attached pool is expected
+  // to be non-trivial (i.e. a decompression buffer) to minimize scanner mem usage.
+  void AttachPool(MemPool* pool, bool commit_batch) {
     DCHECK(batch_ != NULL);
     DCHECK(pool != NULL);
     batch_->tuple_data_pool()->AcquireData(pool, false);
+    if (commit_batch) CommitRows(0);
   }
 
   // Utility method to write out tuples when there are no materialized

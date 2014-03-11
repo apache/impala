@@ -139,7 +139,7 @@
 //
 // rowgroup-key-length ::= Int
 //
-// -- Total compressed length in bytes of the rowgroup's key sections.  
+// -- Total compressed length in bytes of the rowgroup's key sections.
 //
 // rowgroup-compressed-key-length ::= Int
 //
@@ -227,12 +227,12 @@ class HdfsScanNode;
 class TupleDescriptor;
 class Tuple;
 
-// A scanner for reading RCFiles into tuples. 
+// A scanner for reading RCFiles into tuples.
 class HdfsRCFileScanner : public BaseSequenceScanner {
  public:
   HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state);
   virtual ~HdfsRCFileScanner();
-  
+
   virtual Status Prepare(ScannerContext* context);
 
   void DebugString(int indentation_level, std::stringstream* out) const;
@@ -251,7 +251,7 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   static const char* const RCFILE_METADATA_KEY_NUM_COLS;
 
   // The four byte RCFile unique version header present at the beginning
-  // of the file {'R', 'C', 'F' 1} 
+  // of the file {'R', 'C', 'F' 1}
   static const uint8_t RCFILE_VERSION_HEADER[4];
 
   // Implementation of superclass functions.
@@ -260,8 +260,8 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   virtual Status InitNewRange();
   virtual Status ProcessRange();
 
-  virtual THdfsFileFormat::type file_format() const { 
-    return THdfsFileFormat::RC_FILE; 
+  virtual THdfsFileFormat::type file_format() const {
+    return THdfsFileFormat::RC_FILE;
   }
 
   // Reads the RCFile Header Metadata section in the current file to determine the number
@@ -316,7 +316,7 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   //   ReadKeyBuffers
   //   ReadColumnBuffers
   Status ReadRowGroup();
-  
+
   // Reset state for a new row group
   void ResetRowGroup();
 
@@ -354,10 +354,10 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
     int32_t key_buffer_len;
     // This is a ptr into the scanner's key_buffer_ for this column.
     uint8_t* key_buffer;
-    
+
     // Current position in the key buffer
     int32_t key_buffer_pos;
-  
+
     // Offset into row_group_buffer_ for the start of this column.
     int32_t start_offset;
 
@@ -369,7 +369,7 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
     // RLE: Repetition count of the current field
     int32_t current_field_len_rep;
   };
-  
+
   // Vector of column descriptions for each column in the file (i.e., may contain a
   // different number of non-partition columns than are in the table metadata).  Indexed
   // by column index, including non-materialized columns.
@@ -377,7 +377,7 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
 
   // Buffer for copying key buffers.  This buffer is reused between row groups.
   std::vector<uint8_t> key_buffer_;
-  
+
   // number of rows in this rowgroup object
   int num_rows_;
 
@@ -392,6 +392,11 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   // Compressed size of the row group's key buffers.
   // Read from the row group header.
   int compressed_key_length_;
+
+  // If true, the row_group_buffer_ can be reused across row groups, otherwise,
+  // it (more specifically the data_buffer_pool_ that allocated the row_group_buffer_)
+  // must be attached to the row batch.
+  bool reuse_row_group_buffer_;
 
   // Buffer containing the entire row group.  We allocate a buffer for the entire
   // row group, skipping non-materialized columns.

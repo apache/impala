@@ -67,7 +67,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       thrift_plan_node_(new TPlanNode(tnode)),
       runtime_state_(NULL),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
-      compact_data_(tnode.compact_data),
+      requires_compaction_(tnode.compact_data),
       reader_context_(NULL),
       tuple_desc_(NULL),
       unknown_disk_id_warned_(false),
@@ -316,7 +316,10 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   DCHECK(tuple_desc_->table_desc() != NULL);
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
   scan_node_pool_.reset(new MemPool(mem_tracker()));
-  compact_data_ |= tuple_desc_->string_slots().empty();
+
+  // If there are no materialized string cols, we never need to compact data
+  // (it is already compact).
+  requires_compaction_ &= tuple_desc_->string_slots().size() > 0;
 
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.

@@ -471,7 +471,7 @@ Status HdfsAvroScanner::InitNewRange() {
   template_tuple_ = avro_header_->template_tuple;
   if (header_->is_compressed) {
     RETURN_IF_ERROR(Codec::CreateDecompressor(
-        data_buffer_pool_.get(), stream_->compact_data(),
+        data_buffer_pool_.get(), scan_node_->tuple_desc()->string_slots().empty(),
         header_->compression_type, &decompressor_));
   }
 
@@ -518,6 +518,7 @@ Status HdfsAvroScanner::ProcessRange() {
       SCOPED_TIMER(decompress_timer_);
       RETURN_IF_ERROR(decompressor_->ProcessBlock(
           false, compressed_size, compressed_data, &size, &data));
+      VLOG_FILE << "Decompressed " << compressed_size << " to " << size;
     } else {
       data = compressed_data;
     }
@@ -550,7 +551,9 @@ Status HdfsAvroScanner::ProcessRange() {
       if (scan_node_->ReachedLimit()) return Status::OK;
     }
 
-    if (!stream_->compact_data()) AttachPool(data_buffer_pool_.get());
+    if (decompressor_.get() != NULL && !decompressor_->reuse_output_buffer()) {
+      AttachPool(data_buffer_pool_.get(), true);
+    }
     RETURN_IF_ERROR(ReadSync());
   }
 

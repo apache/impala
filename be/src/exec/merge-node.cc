@@ -108,7 +108,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
         &tuple, row_batch);
     ++const_result_expr_idx_;
     *eos = ReachedLimit();
-    if (*eos || row_batch->IsFull()) return Status::OK;
+    if (*eos || row_batch->AtCapacity()) return Status::OK;
   }
   if (child_idx_ == INVALID_CHILD_IDX) child_idx_ = 0;
 
@@ -221,7 +221,7 @@ bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
       (*tuple)->Init(tuple_desc_->byte_size());
     }
 
-    if (row_batch->IsFull() || row_batch->AtResourceLimit() || ReachedLimit()) {
+    if (row_batch->AtCapacity() || ReachedLimit()) {
       return true;
     }
   } while (!done);

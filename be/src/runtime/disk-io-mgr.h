@@ -160,6 +160,7 @@ class DiskIoMgr {
    public:
     ScanRange* scan_range() { return scan_range_; }
     char* buffer() { return buffer_; }
+    int64_t buffer_len() { return buffer_len_; }
     int64_t len() { return len_; }
     bool eosr() { return eosr_; }
 

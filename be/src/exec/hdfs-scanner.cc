@@ -59,8 +59,6 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
       tuple_(NULL),
       batch_(NULL),
       num_errors_in_file_(0),
-      has_noncompact_strings_(!scan_node->compact_data() &&
-                              !scan_node->tuple_desc()->string_slots().empty()),
       num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
       write_tuples_fn_(NULL) {
 }
@@ -98,7 +96,7 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
     return Status::OK;
   }
   if (!scan_node_->tuple_desc()->string_slots().empty() &&
-        ((partition->escape_char() != '\0') || stream_->compact_data())) {
+        ((partition->escape_char() != '\0') || scan_node_->requires_compaction())) {
     // Cannot use codegen if there are strings slots and we need to
     // compact (i.e. copy) the data.
     scan_node_->IncNumScannersCodegenDisabled();
@@ -122,7 +120,7 @@ void HdfsScanner::StartNewRowBatch() {
 
 int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem) {
   DCHECK(batch_ != NULL);
-  DCHECK(!batch_->IsFull());
+  DCHECK_GT(batch_->capacity(), batch_->num_rows());
   *pool = batch_->tuple_data_pool();
   *tuple_mem = reinterpret_cast<Tuple*>(tuple_mem_);
   *tuple_row_mem = batch_->GetRow(batch_->AddRow());
@@ -135,11 +133,9 @@ Status HdfsScanner::CommitRows(int num_rows) {
   batch_->CommitRows(num_rows);
   tuple_mem_ += scan_node_->tuple_desc()->byte_size() * num_rows;
 
-  // We need to pass the row batch to the scan node if there too much memory attached to
-  // which can happen if the query is very selective. Operators above the scan node
-  // compact the data if they cannot stream the tuples through.
-  if (batch_->IsFull() || batch_->AtResourceLimit() ||
-      context_->num_completed_io_buffers() > 0) {
+  // We need to pass the row batch to the scan node if there is too much memory attached,
+  // which can happen if the query is very selective.
+  if (batch_->AtCapacity() || context_->num_completed_io_buffers() > 0) {
     context_->AttachCompletedResources(batch_, /* done */ false);
     scan_node_->AddMaterializedRowBatch(batch_);
     StartNewRowBatch();
@@ -186,7 +182,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
     DCHECK_LE(num_tuples, row_batch->capacity() - row_batch->num_rows());
 
     for (int n = 0; n < num_tuples; ++n) {
-      DCHECK(!row_batch->IsFull());
+      DCHECK(!row_batch->AtCapacity());
       row_idx = row_batch->AddRow();
       DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);
       TupleRow* current_row = row_batch->GetRow(row_idx);
@@ -241,7 +237,7 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 
     SlotDescriptor* desc = scan_node_->materialized_slots()[i];
     bool error = !text_converter_->WriteSlot(desc, tuple,
-        fields[i].start, len, stream_->compact_data(), need_escape, pool);
+        fields[i].start, len, scan_node_->requires_compaction(), need_escape, pool);
     error_fields[i] = error;
     *error_in_row |= error;
   }
@@ -307,9 +303,7 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   }
 
   // TODO: can't codegen yet if strings need to be copied
-  if (node->compact_data() && !node->tuple_desc()->string_slots().empty()) {
-    return NULL;
-  }
+  if (node->requires_compaction()) return NULL;
 
   // Codegen for eval conjuncts
   for (int i = 0; i < conjuncts.size(); ++i) {

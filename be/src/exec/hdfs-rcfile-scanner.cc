@@ -70,17 +70,22 @@ Status HdfsRCFileScanner::InitNewRange() {
   DCHECK(header_ != NULL);
 
   only_parsing_header_ = false;
-
   row_group_buffer_size_ = 0;
 
-  if (header_->is_compressed) {
-    RETURN_IF_ERROR(Codec::CreateDecompressor(
-        data_buffer_pool_.get(), stream_->compact_data(),
-        header_->codec, &decompressor_));
-  }
+  // Can reuse buffer if we need to compact (because the data is copied out)
+  reuse_row_group_buffer_ = scan_node_->requires_compaction();
+  // Or, there are no string columns (since the tuple won't contain ptrs into
+  // the decompressed data).
+  reuse_row_group_buffer_ |= scan_node_->tuple_desc()->string_slots().empty();
 
-  // All data is copied out of the io buffers, so they can be recycled immediately
-  stream_->set_compact_data(true);
+  // The scanner currently copies all the column data out of the io buffer so the
+  // stream never contains any tuple data.
+  stream_->set_contains_tuple_data(false);
+
+  if (header_->is_compressed) {
+    RETURN_IF_ERROR(Codec::CreateDecompressor(NULL,
+        reuse_row_group_buffer_, header_->codec, &decompressor_));
+  }
 
   // Allocate the buffers for the key information that is used to read and decode
   // the column data.
@@ -241,9 +246,9 @@ void HdfsRCFileScanner::ResetRowGroup() {
     columns_[i].current_field_len_rep = 0;
   }
 
-  if (!stream_->compact_data()) {
-    // We are done with this row group, pass along non-compact external buffers
-    AttachPool(data_buffer_pool_.get());
+  // We are done with this row group, pass along external buffers if necessary.
+  if (!reuse_row_group_buffer_) {
+    AttachPool(data_buffer_pool_.get(), true);
     row_group_buffer_size_ = 0;
   }
 }
@@ -254,7 +259,7 @@ Status HdfsRCFileScanner::ReadRowGroup() {
   while (num_rows_ == 0) {
     RETURN_IF_ERROR(ReadRowGroupHeader());
     RETURN_IF_ERROR(ReadKeyBuffers());
-    if (stream_->compact_data() || row_group_buffer_size_ < row_group_length_) {
+    if (!reuse_row_group_buffer_ || row_group_buffer_size_ < row_group_length_) {
       // Allocate a new buffer for reading the row group.  Row groups have a
       // fixed number of rows so take a guess at how big it will be based on
       // the previous row group size.
@@ -314,6 +319,7 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
       SCOPED_TIMER(decompress_timer_);
       RETURN_IF_ERROR(decompressor_->ProcessBlock(true, compressed_key_length_,
           compressed_buffer, &key_length_, &key_buffer));
+      VLOG_FILE << "Decompressed " << compressed_key_length_ << " to " << key_length_;
     }
   } else {
     uint8_t* buffer;
@@ -428,6 +434,8 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
         RETURN_IF_ERROR(decompressor_->ProcessBlock(true, column.buffer_len,
             compressed_input, &column.uncompressed_buffer_len,
             &compressed_output));
+        VLOG_FILE << "Decompressed " << column.buffer_len << " to "
+                  << column.uncompressed_buffer_len;
       }
     } else {
       uint8_t* uncompressed_data;
@@ -505,10 +513,10 @@ Status HdfsRCFileScanner::ProcessRange() {
               row_group_buffer_ + column.start_offset + column.buffer_pos);
           int field_len = column.current_field_len;
           DCHECK_LE(col_start + field_len,
-                    reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
+              reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
 
           if (!text_converter_->WriteSlot(slot_desc, tuple, col_start, field_len,
-                                          stream_->compact_data(), false, pool)) {
+              scan_node_->requires_compaction(), false, pool)) {
             ReportColumnParseError(slot_desc, col_start, field_len);
             error_in_row = true;
           }

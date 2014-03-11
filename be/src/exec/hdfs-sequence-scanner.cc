@@ -74,7 +74,7 @@ Status HdfsSequenceScanner::InitNewRange() {
   SeqFileHeader* seq_header = reinterpret_cast<SeqFileHeader*>(header_);
   if (seq_header->is_compressed) {
     RETURN_IF_ERROR(Codec::CreateDecompressor(
-        data_buffer_pool_.get(), stream_->compact_data(),
+        data_buffer_pool_.get(), scan_node_->tuple_desc()->string_slots().empty(),
         header_->codec, &decompressor_));
   }
 
@@ -125,6 +125,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
       SCOPED_TIMER(decompress_timer_);
       RETURN_IF_ERROR(decompressor_->ProcessBlock(false, in_size, compressed_data,
           &len, &unparsed_data_buffer_));
+      VLOG_FILE << "Decompressed " << in_size << " to " << len;
     }
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
@@ -439,9 +440,10 @@ Status HdfsSequenceScanner::ReadBlockHeader() {
 Status HdfsSequenceScanner::ReadCompressedBlock() {
   // We are reading a new compressed block.  Pass the previous buffer pool
   // bytes to the batch.  We don't need them anymore.
-  if (!stream_->compact_data()) {
-    AttachPool(data_buffer_pool_.get());
+  if (!decompressor_->reuse_output_buffer()) {
+    AttachPool(data_buffer_pool_.get(), true);
   }
+
   RETURN_IF_FALSE(stream_->ReadVLong(
       &num_buffered_records_in_compressed_block_, &parse_status_));
   if (num_buffered_records_in_compressed_block_ < 0) {
@@ -480,6 +482,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
     SCOPED_TIMER(decompress_timer_);
     RETURN_IF_ERROR(decompressor_->ProcessBlock(false, block_size, compressed_data,
                                                 &len, &unparsed_data_buffer_));
+    VLOG_FILE << "Decompressed " << block_size << " to " << len;
     next_record_in_compressed_block_ = unparsed_data_buffer_;
   }
 

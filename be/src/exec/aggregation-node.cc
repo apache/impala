@@ -218,7 +218,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   Expr** conjuncts = &conjuncts_[0];
   int num_conjuncts = conjuncts_.size();
 
-  while (!output_iterator_.AtEnd() && !row_batch->IsFull()) {
+  while (!output_iterator_.AtEnd() && !row_batch->AtCapacity()) {
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
     Tuple* agg_tuple = output_iterator_.GetRow()->GetTuple(0);

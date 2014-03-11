@@ -104,7 +104,7 @@ class HdfsScanNode : public ScanNode {
 
   int limit() const { return limit_; }
 
-  bool compact_data() const { return compact_data_; }
+  bool requires_compaction() const { return requires_compaction_; }
 
   const std::vector<SlotDescriptor*>& materialized_slots()
       const { return materialized_slots_; }
@@ -241,7 +241,7 @@ class HdfsScanNode : public ScanNode {
       const std::vector<TScanRangeParams>& scan_range_params_list,
       PerVolumnStats* per_volume_stats);
 
-  // Output the per_volume_stats to stringsteam. The output format is a list of:
+  // Output the per_volume_stats to stringstream. The output format is a list of:
   // <volume id>:<# splits>/<per volume split lengths>
   static void PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
       std::stringstream* ss);
@@ -261,10 +261,10 @@ class HdfsScanNode : public ScanNode {
   // Tuple id resolved in Prepare() to set tuple_desc_;
   const int tuple_id_;
 
-  // Copy strings to tuple memory pool if true.
-  // We try to avoid the overhead copying strings if the data will just
-  // stream to another node that will release the memory.
-  bool compact_data_;
+  // If true, scanners need to compact the resulting tuples. This is only true if
+  // the planner marked this node as producing compact row batches and there are
+  // materialized string slots.
+  bool requires_compaction_;
 
   // ReaderContext object to use with the disk-io-mgr
   DiskIoMgr::ReaderContext* reader_context_;

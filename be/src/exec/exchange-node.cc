@@ -88,7 +88,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     {
       SCOPED_TIMER(convert_row_batch_timer_);
       // copy rows until we hit the limit/capacity or until we exhaust input_batch_
-      while (!ReachedLimit() && !output_batch->IsFull()
+      while (!ReachedLimit() && !output_batch->AtCapacity()
           && input_batch_.get() != NULL && next_row_idx_ < input_batch_->capacity()) {
         TupleRow* src = input_batch_->GetRow(next_row_idx_);
         ++next_row_idx_;
@@ -110,7 +110,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
         *eos = true;
         return Status::OK;
       }
-      if (output_batch->IsFull()) return Status::OK;
+      if (output_batch->AtCapacity()) return Status::OK;
     }
 
     // we need more rows

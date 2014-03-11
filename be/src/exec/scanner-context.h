@@ -89,18 +89,16 @@ class ScannerContext {
     // If we are past the end of the scan range, no bytes are returned.
     Status GetBuffer(bool peek, uint8_t** buffer, int* out_len);
 
-    // Sets whether of not the resulting tuples have a compact format.  If not, the
-    // io buffers must be attached to the row batch, otherwise they can be returned
-    // immediately.  This by default, is inferred from the scan_node tuple descriptor
-    // but can be overridden (e.g. row compressed sequence files are always compact).
-    void set_compact_data(bool is_compact) { compact_data_ = is_compact; }
-
-    // Returns if the scanner should return compact row batches.
-    bool compact_data() const { return compact_data_; }
+    // Sets whether of not the resulting tuples contain ptrs into memory owned by
+    // the scanner context. This by default, is inferred from the scan_node tuple
+    // descriptor (i.e. contains string slots)  but can be overridden. If possible,
+    // this should be set to false to reduce memory usage as resources can be reused
+    // and recycled more quickly.
+    void set_contains_tuple_data(bool v) { contains_tuple_data_ = v; }
 
     // Callback that returns the buffer size to use when reading past the end of the scan
     // range.  By default a constant value is used, which scanners can override with this
-    // callback.  The callback takes the file offset of the asyncronous read (this may be
+    // callback.  The callback takes the file offset of the asynchronous read (this may be
     // more than file_offset() due to data being assembled in the boundary buffer).
     // Reading past the end of the scan range is likely a remote read, so we want to
     // minimize the number of io requests as well as the data volume.
@@ -165,9 +163,9 @@ class ScannerContext {
     DiskIoMgr::ScanRange* scan_range_;
     const HdfsFileDesc* file_desc_;
 
-    // If true, tuple data in the row batches is compact and the io buffers can be
-    // recycled immediately.
-    bool compact_data_;
+    // If true, tuples will contain pointers into memory contained in this object.
+    // That memory (io buffers or boundary buffers) must be attached to the row batch.
+    bool contains_tuple_data_;
 
     // Total number of bytes returned from GetBytes()
     int64_t total_bytes_returned_;
@@ -278,7 +276,7 @@ class ScannerContext {
   // Vector of streams.  Non-columnar formats will always have one stream per context.
   std::vector<Stream*> streams_;
 
-  // The total number of completed io buffers in all streams.
+  // Always equal to the sum of completed_io_buffers_.size() across all streams.
   int num_completed_io_buffers_;
 };
 

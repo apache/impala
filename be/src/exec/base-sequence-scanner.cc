@@ -84,7 +84,7 @@ void BaseSequenceScanner::Close() {
   VLOG_FILE << "Average block size: "
             << (num_syncs_ > 1 ? total_block_size_ / (num_syncs_ - 1) : 0);
   if (decompressor_.get() != NULL) decompressor_->Close();
-  AttachPool(data_buffer_pool_.get());
+  AttachPool(data_buffer_pool_.get(), false);
   AddFinalRowBatch();
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
@@ -125,7 +125,8 @@ Status BaseSequenceScanner::ProcessSplit() {
 
   // Initialize state for new scan range
   finished_ = false;
-  if (header_->is_compressed) stream_->set_compact_data(true);
+  // If the file is compressed, the buffers in the stream_ are not used directly.
+  if (header_->is_compressed) stream_->set_contains_tuple_data(false);
   RETURN_IF_ERROR(InitNewRange());
 
   Status status = Status::OK;

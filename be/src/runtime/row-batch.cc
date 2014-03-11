@@ -37,6 +37,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
     capacity_(capacity),
     num_tuples_per_row_(row_desc.tuple_descriptors().size()),
     row_desc_(row_desc),
+    auxiliary_mem_usage_(0),
     tuple_data_pool_(new MemPool(mem_tracker_)) {
   DCHECK(mem_tracker_ != NULL);
   tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
@@ -60,6 +61,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     num_tuples_per_row_(input_batch.row_tuples.size()),
     row_desc_(row_desc),
     tuple_ptrs_(new Tuple*[num_rows_ * input_batch.row_tuples.size()]),
+    auxiliary_mem_usage_(0),
     tuple_data_pool_(new MemPool(mem_tracker)) {
   DCHECK(mem_tracker_ != NULL);
   tuple_ptrs_size_ = num_rows_ * input_batch.row_tuples.size() * sizeof(Tuple*);
@@ -206,6 +208,7 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
 void RowBatch::AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
   DCHECK(buffer != NULL);
   io_buffers_.push_back(buffer);
+  auxiliary_mem_usage_ += buffer->buffer_len();
   buffer->SetMemTracker(mem_tracker_);
 }
 
@@ -219,16 +222,20 @@ void RowBatch::Reset() {
     io_buffers_[i]->Return();
   }
   io_buffers_.clear();
+  auxiliary_mem_usage_ = 0;
 }
 
 void RowBatch::TransferResourceOwnership(RowBatch* dest) {
   dest->tuple_data_pool_->AcquireData(tuple_data_pool_.get(), false);
+  dest->auxiliary_mem_usage_ += tuple_data_pool_->total_allocated_bytes();
   for (int i = 0; i < io_buffers_.size(); ++i) {
     DiskIoMgr::BufferDescriptor* buffer = io_buffers_[i];
     dest->io_buffers_.push_back(buffer);
+    dest->auxiliary_mem_usage_ += buffer->buffer_len();
     buffer->SetMemTracker(dest->mem_tracker_);
   }
   io_buffers_.clear();
+  auxiliary_mem_usage_ = 0;
   // make sure we can't access our tuples after we gave up the pools holding the
   // tuple data
   Reset();
@@ -246,6 +253,7 @@ void RowBatch::AcquireState(RowBatch* src) {
   DCHECK_EQ(num_tuples_per_row_, src->num_tuples_per_row_);
   DCHECK_EQ(tuple_ptrs_size_, src->tuple_ptrs_size_);
   DCHECK_EQ(capacity_, src->capacity_);
+  DCHECK_EQ(auxiliary_mem_usage_, 0);
 
   // The destination row batch should be empty.
   DCHECK(!has_in_flight_row_);
@@ -254,15 +262,18 @@ void RowBatch::AcquireState(RowBatch* src) {
   for (int i = 0; i < src->io_buffers_.size(); ++i) {
     DiskIoMgr::BufferDescriptor* buffer = src->io_buffers_[i];
     io_buffers_.push_back(buffer);
+    auxiliary_mem_usage_ += buffer->buffer_len();
     buffer->SetMemTracker(mem_tracker_);
   }
   src->io_buffers_.clear();
+  src->auxiliary_mem_usage_ = 0;
 
   has_in_flight_row_ = src->has_in_flight_row_;
   num_rows_ = src->num_rows_;
   capacity_ = src->capacity_;
   std::swap(tuple_ptrs_, src->tuple_ptrs_);
   tuple_data_pool_->AcquireData(src->tuple_data_pool_.get(), false);
+  auxiliary_mem_usage_ += src->tuple_data_pool_->total_allocated_bytes();
 }
 
 // TODO: consider computing size of batches as they are built up
