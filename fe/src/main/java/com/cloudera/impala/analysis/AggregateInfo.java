@@ -239,6 +239,14 @@ public class AggregateInfo {
     aggTupleDesc_ = aggTupleDesc;
   }
 
+  /**
+   * Return the tuple id produced in the final aggregation step.
+   */
+  public TupleId getOutputTupleId() {
+    if (isDistinctAgg()) return secondPhaseDistinctAggInfo_.getAggTupleId();
+    return getAggTupleId();
+  }
+
   public ArrayList<FunctionCallExpr> getMaterializedAggregateExprs() {
     ArrayList<FunctionCallExpr> result = Lists.newArrayList();
     for (Integer i: materializedAggregateSlots_) {

@@ -85,9 +85,22 @@ public class AggregationNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) {
-    // Only assign predicates to the non-merge agg node in in the single-node plan.
-    // The conjuncts are transferred to the merge agg via transferConjuncts().
-    if (!aggInfo_.isMerge()) {
+    // TODO: It seems wrong that the 2nd phase agg has aggInfo_.isMerge() == true.
+    // The reason for this is that the non-distinct aggregate functions need to use
+    // the merge function in the BE (see toThrift() of this class). Clean this up.
+    boolean isSecondPhaseAgg = false;
+    if (getChild(0) instanceof AggregationNode) {
+      AggregationNode childAggNode = (AggregationNode) getChild(0);
+      if (childAggNode.getAggInfo().getSecondPhaseDistinctAggInfo() == aggInfo_) {
+        isSecondPhaseAgg = true;
+      }
+    }
+    // Assign predicates to the top-most agg in the single-node plan that can evaluate
+    // them, as follows: For non-distinct aggs place them in the 1st phase agg node. For
+    // distinct aggs place them in the 2nd phase agg node. The conjuncts are
+    // transferred to the proper place in the multi-node plan via transferConjuncts().
+    if (tupleIds_.get(0).equals(aggInfo_.getOutputTupleId()) &&
+        (isSecondPhaseAgg || !aggInfo_.isMerge())) {
       // Ignore predicates bound to a group-by slot because those
       // are already evaluated below this agg node (e.g., in a scan).
       Set<SlotId> groupBySlots = Sets.newHashSet();

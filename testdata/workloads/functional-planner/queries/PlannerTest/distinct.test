@@ -324,3 +324,78 @@ having count(bigint_col) > 0
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
+# test slot materialization on a distinct agg inside an inline view
+# triggered by a predicate in an outer query block (IMPALA-861)
+select 1 from
+  (select count(distinct 1) x from functional.alltypes) t
+where t.x is not null
+---- PLAN
+02:AGGREGATE [MERGE FINALIZE]
+|  output: count(1)
+|  having: count(1) IS NOT NULL
+|
+01:AGGREGATE
+|  group by: 1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+06:AGGREGATE [MERGE FINALIZE]
+|  output: sum(count(1))
+|  having: count(1) IS NOT NULL
+|
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:AGGREGATE [MERGE]
+|  output: count(1)
+|
+04:AGGREGATE [MERGE]
+|  group by: 1
+|
+03:EXCHANGE [PARTITION=HASH(1)]
+|
+01:AGGREGATE
+|  group by: 1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# test slot materialization on a distinct agg inside an inline view
+# triggered by a predicate in an outer query block (IMPALA-861)
+select 1 from
+  (select count(distinct 1) x, count(1) y from functional.alltypes) t
+where t.x + t.y > 10 and t.x > 0 and t.y > 1
+---- PLAN
+02:AGGREGATE [MERGE FINALIZE]
+|  output: count(1), sum(count(1))
+|  having: count(1) + sum(count(1)) > 10, count(1) > 0, sum(count(1)) > 1
+|
+01:AGGREGATE
+|  output: count(1)
+|  group by: 1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+06:AGGREGATE [MERGE FINALIZE]
+|  output: sum(count(1)), sum(sum(count(1)))
+|  having: count(1) + sum(count(1)) > 10, count(1) > 0, sum(count(1)) > 1
+|
+05:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+02:AGGREGATE [MERGE]
+|  output: count(1), sum(count(1))
+|
+04:AGGREGATE [MERGE]
+|  output: sum(count(1))
+|  group by: 1
+|
+03:EXCHANGE [PARTITION=HASH(1)]
+|
+01:AGGREGATE
+|  output: count(1)
+|  group by: 1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====

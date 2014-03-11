@@ -220,11 +220,13 @@ public class SelectStmt extends QueryStmt {
       for (int i = 0; i < aggInfo_.getGroupingExprs().size(); ++i) {
         groupBySlots.add(aggInfo_.getAggTupleDesc().getSlots().get(i).getId());
       }
+      // Binding predicates are assigned to the final output tuple of the aggregation,
+      // which is the tuple of the 2nd phase agg for distinct aggs.
       ArrayList<Expr> bindingPredicates =
-          analyzer.getBoundPredicates(aggInfo_.getAggTupleId(), groupBySlots);
+          analyzer.getBoundPredicates(aggInfo_.getOutputTupleId(), groupBySlots);
       havingConjuncts.addAll(bindingPredicates);
       havingConjuncts.addAll(
-          analyzer.getUnassignedConjuncts(aggInfo_.getAggTupleId().asList(), false));
+          analyzer.getUnassignedConjuncts(aggInfo_.getOutputTupleId().asList(), false));
       materializeSlots(analyzer, havingConjuncts);
       aggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
@@ -637,11 +639,7 @@ public class SelectStmt extends QueryStmt {
     // Otherwise, all referenced tables are materialized.
     if (aggInfo_ != null) {
       // Return the tuple id produced in the final aggregation step.
-      if (aggInfo_.isDistinctAgg()) {
-        tupleIdList.add(aggInfo_.getSecondPhaseDistinctAggInfo().getAggTupleId());
-      } else {
-        tupleIdList.add(aggInfo_.getAggTupleId());
-      }
+      tupleIdList.add(aggInfo_.getOutputTupleId());
     } else {
       for (TableRef tblRef: tableRefs_) {
         tupleIdList.addAll(tblRef.getMaterializedTupleIds());
