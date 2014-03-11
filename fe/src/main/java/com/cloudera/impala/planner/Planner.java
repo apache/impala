@@ -129,11 +129,12 @@ public class Planner {
       fragments.add(new PlanFragment(
           fragmentIdGenerator_.getNextId(), singleNodePlan, DataPartition.UNPARTITIONED));
     } else {
-      // For inserts, unless there is a limit clause, leave the root fragment
+      // For inserts or CTAS, unless there is a limit clause, leave the root fragment
       // partitioned, otherwise merge everything into a single coordinator fragment,
       // so we can pass it back to the client.
       boolean isPartitioned = false;
-      if (analysisResult.isInsertStmt() && !queryStmt.hasLimitClause()) {
+      if ((analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())
+          && !queryStmt.hasLimitClause()) {
         isPartitioned = true;
       }
       LOG.debug("create plan fragments");

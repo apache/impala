@@ -401,6 +401,12 @@ Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request
 }
 
 Status ImpalaServer::QueryExecState::Wait() {
+  // Explain requests have already populated the result set. Nothing to do here.
+  if (exec_request_.stmt_type == TStmtType::EXPLAIN) {
+    MarkInactive();
+    return Status::OK;
+  }
+
   RETURN_IF_ERROR(WaitForChildQueries());
   if (coord_.get() != NULL) {
     Expr::Open(output_exprs_, coord_->runtime_state());

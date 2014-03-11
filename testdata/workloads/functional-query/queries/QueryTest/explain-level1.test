@@ -161,3 +161,17 @@ select * from functional_hbase.alltypessmall
 '01:SCAN HBASE [functional_hbase.alltypessmall a]'
 '   predicates: a.year > 2009, a.month = 4'
 ====
+---- QUERY
+# Tests explaining an CTAS statement.
+explain create table t as
+select * from functional.alltypes
+where month = 2
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=16.02MB VCores=1'
+''
+'WRITE TO HDFS [functional.t, OVERWRITE=false]'
+'|  partitions=1'
+'|'
+'00:SCAN HDFS [functional.alltypes]'
+'   partitions=2/24 size=36.51KB'
+====

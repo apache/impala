@@ -39,9 +39,7 @@ import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TScanRangeLocations;
-import com.cloudera.impala.thrift.TStmtType;
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class PlannerTest {
@@ -189,8 +187,6 @@ public class PlannerTest {
     actualOutput.append(Section.PLAN.getHeader() + "\n");
     try {
       execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
-      Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
-          || execRequest.stmt_type == TStmtType.QUERY);
       String explainStr = removeResourceEstimates(explainBuilder.toString());
       actualOutput.append(explainStr);
       if (!isImplemented) {
@@ -204,8 +200,11 @@ public class PlannerTest {
           errorLog.append("section " + Section.PLAN.toString() + " of query:\n" + query
               + "\n" + result);
         }
-        locationsStr =
-            PrintScanRangeLocations(execRequest.query_exec_request).toString();
+        // Query exec request may not be set for DDL, e.g., CTAS.
+        if (execRequest.isSetQuery_exec_request()) {
+          locationsStr =
+              PrintScanRangeLocations(execRequest.query_exec_request).toString();
+        }
       }
     } catch (ImpalaException e) {
       if (e instanceof AnalysisException) {
@@ -267,8 +266,6 @@ public class PlannerTest {
    try {
      // distributed plan
      execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
-     Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
-         || execRequest.stmt_type == TStmtType.QUERY);
      String explainStr = removeResourceEstimates(explainBuilder.toString());
      actualOutput.append(explainStr);
      if (!isImplemented) {
@@ -450,6 +447,11 @@ public class PlannerTest {
   @Test
   public void testDistinctEstimate() {
     runPlannerTestFile("distinct-estimate");
+  }
+
+  @Test
+  public void testDdl() {
+    runPlannerTestFile("ddl");
   }
 
   @Test

@@ -435,7 +435,7 @@ stmt ::=
   {: RESULT = drop_tbl; :}
   | drop_function_stmt:drop_function
   {: RESULT = drop_function; :}
-  | explain_stmt: explain
+  | explain_stmt:explain
   {: RESULT = explain; :}
   | load_stmt: load
   {: RESULT = load; :}
@@ -475,6 +475,11 @@ explain_stmt ::=
   {:
      insert.setIsExplain(true);
      RESULT = insert;
+  :}
+  | KW_EXPLAIN create_tbl_as_select_stmt:ctas_stmt
+  {:
+     ctas_stmt.setIsExplain(true);
+     RESULT = ctas_stmt;
   :}
   ;
 

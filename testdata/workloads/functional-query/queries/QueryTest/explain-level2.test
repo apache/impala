@@ -261,3 +261,22 @@ select * from functional_hbase.alltypessmall
 '   hosts=100 per-host-mem=1.00GB'
 '   tuple-ids=0 row-size=97B cardinality=4'
 ====
+---- QUERY
+# Tests explaining an CTAS statement.
+explain create table t as
+select * from functional.alltypes
+where month = 2
+---- RESULTS
+'Estimated Per-Host Requirements: Memory=16.02MB VCores=1'
+''
+'WRITE TO HDFS [functional.t, OVERWRITE=false]'
+'|  partitions=1'
+'|  hosts=3 per-host-mem=17.62KB'
+'|'
+'00:SCAN HDFS [functional.alltypes, PARTITION=RANDOM]'
+'   partitions=2/24 size=36.51KB'
+'   table stats: 7300 rows total'
+'   column stats: all'
+'   hosts=3 per-host-mem=16.00MB'
+'   tuple-ids=1 row-size=97B cardinality=560'
+====

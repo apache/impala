@@ -79,12 +79,7 @@ public class AnalysisContext {
     }
     public boolean isDescribeStmt() { return stmt_ instanceof DescribeStmt; }
     public boolean isResetMetadataStmt() { return stmt_ instanceof ResetMetadataStmt; }
-
-    public boolean isExplainStmt() {
-      if (isQueryStmt()) return ((QueryStmt)stmt_).isExplain();
-      if (isInsertStmt()) return ((InsertStmt)stmt_).isExplain();
-      return false;
-    }
+    public boolean isExplainStmt() { return stmt_.isExplain(); }
 
     public boolean isCatalogOp() {
       return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isShowStatsStmt() ||

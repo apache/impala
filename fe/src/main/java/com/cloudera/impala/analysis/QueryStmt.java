@@ -64,9 +64,6 @@ public abstract class QueryStmt extends StatementBase {
 
   protected SortInfo sortInfo_;
 
-  // True if this QueryStmt is the top level query from an EXPLAIN <query>
-  protected boolean isExplain_ = false;
-
   // Analyzer that was used to analyze this query statement.
   protected Analyzer analyzer_;
 
@@ -80,10 +77,10 @@ public abstract class QueryStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    super.analyze(analyzer);
     this.analyzer_ = analyzer;
     analyzeLimit(analyzer);
     if (hasWithClause()) withClause_.analyze(analyzer);
-    analyzer.setIsExplain(isExplain_);
   }
 
   private void analyzeLimit(Analyzer analyzer) throws AnalysisException,
@@ -172,8 +169,6 @@ public abstract class QueryStmt extends StatementBase {
   public SortInfo getSortInfo() { return sortInfo_; }
   public ArrayList<Expr> getResultExprs() { return resultExprs_; }
   public ArrayList<Expr> getBaseTblResultExprs() { return baseTblResultExprs_; }
-  public void setIsExplain(boolean isExplain) { this.isExplain_ = isExplain; }
-  public boolean isExplain() { return isExplain_; }
 
   public void setResultExprs(List<Expr> resultExprs) {
     this.resultExprs_.clear();

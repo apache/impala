@@ -58,6 +58,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    super.analyze(analyzer);
 
     // The analysis for CTAS happens in two phases - the first phase happens before
     // the target table exists and we want to validate the CREATE statement and the
