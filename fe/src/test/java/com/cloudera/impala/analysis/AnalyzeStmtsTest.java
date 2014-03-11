@@ -318,7 +318,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError(
         "select a.int_col from functional.alltypes a join " +
         "functional.alltypes b on a.bool_col = b.string_col",
-        "operands are not comparable: a.bool_col = b.string_col");
+        "operands of type BOOLEAN and STRING are not comparable: "
+            + "a.bool_col = b.string_col");
     AnalyzesOk(
     "select a.int_col, b.int_col, c.int_col " +
         "from functional.alltypes a join functional.alltypes b on " +

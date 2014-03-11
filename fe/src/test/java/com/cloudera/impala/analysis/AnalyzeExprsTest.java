@@ -157,7 +157,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where timestamp_col = NULL");
     // invalid casts
     AnalysisError("select * from functional.alltypes where bool_col = '15'",
-        "operands are not comparable: bool_col = '15'");
+        "operands of type BOOLEAN and STRING are not comparable: bool_col = '15'");
     // AnalysisError("select * from functional.alltypes where date_col = 15",
     // "operands are not comparable: date_col = 15");
     // AnalysisError("select * from functional.alltypes where datetime_col = 1.0",
@@ -204,9 +204,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   public void TestStringCasts() throws AnalysisException {
     // No implicit cast from STRING to numeric and boolean
     AnalysisError("select * from functional.alltypes where tinyint_col = '1'",
-        "operands are not comparable: tinyint_col = '1'");
+        "operands of type TINYINT and STRING are not comparable: tinyint_col = '1'");
     AnalysisError("select * from functional.alltypes where bool_col = '0'",
-        "operands are not comparable: bool_col = '0'");
+        "operands of type BOOLEAN and STRING are not comparable: bool_col = '0'");
     // No explicit cast from STRING to boolean.
     AnalysisError("select cast('false' as boolean) from functional.alltypes",
         "Invalid type cast of 'false' from STRING to BOOLEAN");
@@ -1233,9 +1233,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         + "CAST(1 AS DECIMAL(5,5)) + 'cast(1 as timestamp)'");
 
     AnalysisError("select " + decimal_5_5 + " = 'abcd'",
-        "operands are not comparable: CAST(1 AS DECIMAL(5,5)) = 'abcd'");
+        "operands of type DECIMAL(5,5) and STRING are not comparable: " +
+        "CAST(1 AS DECIMAL(5,5)) = 'abcd'");
     AnalysisError("select " + decimal_5_5 + " > 'cast(1 as timestamp)'",
-        "operands are not comparable: "
+        "operands of type DECIMAL(5,5) and STRING are not comparable: "
         + "CAST(1 AS DECIMAL(5,5)) > 'cast(1 as timestamp)'");
   }
 

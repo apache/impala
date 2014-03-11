@@ -32,7 +32,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
- * Most predicates with two operands..
+ * Most predicates with two operands.
  *
  */
 public class BinaryPredicate extends Predicate {
@@ -117,7 +117,8 @@ public class BinaryPredicate extends Predicate {
     fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
         CompareMode.IS_SUPERTYPE_OF);
     if (fn_ == null) {
-      throw new AnalysisException("operands are not comparable: " + toSql());
+      throw new AnalysisException("operands of type " + getChild(0).getType() +
+          " and " + getChild(1).getType()  + " are not comparable: " + toSql());
     }
     Preconditions.checkState(fn_.getReturnType().isBoolean());
     castForFunctionCall();
