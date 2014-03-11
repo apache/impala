@@ -2,13 +2,13 @@
 select * from (select * from functional.alltypessmall) a where id < 5
 ---- PLAN
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=18.96KB
+   partitions=4/4 size=6.32KB
    predicates: functional.alltypessmall.id < 5
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=18.96KB
+   partitions=4/4 size=6.32KB
    predicates: functional.alltypessmall.id < 5
 ====
 # predicate pushdown is prevented in presence of limit clause
@@ -19,7 +19,7 @@ select * from (select * from functional.alltypessmall limit 10) a where id < 5 l
 |  limit: 5
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=12.64KB
+   partitions=4/4 size=6.32KB
    limit: 10
 ---- DISTRIBUTEDPLAN
 01:SELECT
@@ -30,7 +30,7 @@ select * from (select * from functional.alltypessmall limit 10) a where id < 5 l
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=12.64KB
+   partitions=4/4 size=6.32KB
    limit: 10
 ====
 # predicate pushdown is prevented in presence of order by/limit clause;
@@ -181,7 +181,7 @@ limit 5
 |  predicates: functional.alltypessmall.id < 5
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=12.64KB
+   partitions=4/4 size=6.32KB
    limit: 10
 ---- DISTRIBUTEDPLAN
 02:TOP-N [LIMIT=5]
@@ -194,7 +194,7 @@ limit 5
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=12.64KB
+   partitions=4/4 size=6.32KB
    limit: 10
 ====
 # predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
@@ -254,7 +254,7 @@ from functional.alltypes
 |  hash predicates: functional.alltypes.id = id
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=12.64KB compact
+|     partitions=4/4 size=6.32KB compact
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
@@ -272,7 +272,7 @@ from functional.alltypes
 |  |  limit: 10
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=12.64KB compact
+|     partitions=4/4 size=6.32KB compact
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]

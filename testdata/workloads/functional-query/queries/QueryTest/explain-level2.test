@@ -170,7 +170,7 @@ select id, string_col, year, month from functional.alltypes
 '|  |  tuple-ids=3 row-size=28B cardinality=7300'
 '|  |'
 '|  04:SCAN HDFS [functional.alltypes, PARTITION=RANDOM]'
-'|     partitions=24/24 size=956.90KB'
+'|     partitions=24/24 size=478.45KB'
 '|     table stats: 7300 rows total'
 '|     column stats: all'
 '|     hosts=3 per-host-mem=16.00MB'

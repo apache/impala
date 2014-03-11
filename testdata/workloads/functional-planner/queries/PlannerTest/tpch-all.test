@@ -1394,14 +1394,14 @@ WRITE TO HDFS [tpch.supplier_tmp, OVERWRITE=true]
 |  partitions=1
 |
 00:SCAN HDFS [tpch.supplier]
-   partitions=1/1 size=2.67MB
+   partitions=1/1 size=1.33MB
    predicates: NOT s_comment LIKE '%Customer%Complaints%'
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [tpch.supplier_tmp, OVERWRITE=true]
 |  partitions=1
 |
 00:SCAN HDFS [tpch.supplier]
-   partitions=1/1 size=2.67MB
+   partitions=1/1 size=1.33MB
    predicates: NOT s_comment LIKE '%Customer%Complaints%'
 ====
 insert overwrite table tpch.q16_tmp
@@ -1480,7 +1480,7 @@ limit 1000
 |  group by: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size, tpch.q16_tmp.ps_suppkey
 |
 00:SCAN HDFS [tpch.q16_tmp]
-   partitions=1/1 size=54.19MB
+   partitions=1/1 size=27.10MB
    predicates: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
 ---- DISTRIBUTEDPLAN
 07:TOP-N [LIMIT=1000]
@@ -1504,7 +1504,7 @@ limit 1000
 |  group by: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size, tpch.q16_tmp.ps_suppkey
 |
 00:SCAN HDFS [tpch.q16_tmp]
-   partitions=1/1 size=54.19MB
+   partitions=1/1 size=27.10MB
    predicates: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
 ====
 # Q17 - Small-Quantity-Order Revenue Query

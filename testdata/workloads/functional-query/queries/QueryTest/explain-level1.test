@@ -113,7 +113,7 @@ select id, string_col, year, month from functional.alltypes
 '|--10:MERGE'
 '|  |'
 '|  04:SCAN HDFS [functional.alltypes]'
-'|     partitions=24/24 size=956.90KB'
+'|     partitions=24/24 size=478.45KB'
 '|'
 '09:MERGE'
 '|'

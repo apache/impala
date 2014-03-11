@@ -9,7 +9,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=40.73KB
+   partitions=1/24 size=20.36KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
@@ -18,7 +18,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=40.73KB
+   partitions=1/24 size=20.36KB
 ====
 # insert into a static partition
 insert into table functional.alltypessmall
@@ -32,7 +32,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,4
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=40.73KB
+   partitions=1/24 size=20.36KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
@@ -41,7 +41,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,4
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=40.73KB
+   partitions=1/24 size=20.36KB
 ====
 # overwrite a static partition
 insert overwrite table functional.alltypessmall
@@ -55,7 +55,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(2009,4)
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=40.73KB
+   partitions=1/24 size=20.36KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
@@ -64,7 +64,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(2009,4)
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=40.73KB
+   partitions=1/24 size=20.36KB
 ====
 # insert into fully dynamic partitions
 insert into table functional.alltypessmall
@@ -78,7 +78,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |  partitions=24
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=2/24 size=80.14KB
+   partitions=2/24 size=40.07KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
@@ -90,7 +90,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 01:EXCHANGE [PARTITION=HASH(year,month)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=2/24 size=80.14KB
+   partitions=2/24 size=40.07KB
 ====
 # insert into fully dynamic partitions. The source table has no stats and the insert
 # statement has a partition clause, so hash partition before the sink.
@@ -105,7 +105,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |  partitions=24
 |
 00:SCAN HDFS [functional_seq_snap.alltypes]
-   partitions=2/24 size=22.68KB
+   partitions=2/24 size=11.34KB
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
@@ -113,7 +113,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 01:EXCHANGE [PARTITION=HASH(year,month)]
 |
 00:SCAN HDFS [functional_seq_snap.alltypes]
-   partitions=2/24 size=22.68KB
+   partitions=2/24 size=11.34KB
 ====
 # insert into fully dynamic partitions;
 # partitioned output doesn't require repartitioning
@@ -168,7 +168,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |  partitions=12
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=2/24 size=80.14KB
+   partitions=2/24 size=40.07KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
@@ -180,7 +180,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 01:EXCHANGE [PARTITION=HASH(month)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=2/24 size=80.14KB
+   partitions=2/24 size=40.07KB
 ====
 # insert into a partially dynamic partition
 # partitioned output doesn't require repartitioning
@@ -235,7 +235,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,4
 |  partitions=2
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=39.41KB
+   partitions=1/24 size=19.71KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
@@ -244,7 +244,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,4
 |  partitions=2
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=39.41KB
+   partitions=1/24 size=19.71KB
 ====
 # insert with limit from partitioned table.
 insert into table functional.alltypesnopart
@@ -256,7 +256,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=39.91KB
+   partitions=1/24 size=19.95KB
    limit: 10
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -269,7 +269,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 size=39.91KB
+   partitions=1/24 size=19.95KB
    limit: 10
 ====
 # static partition insert from a constant select
@@ -429,7 +429,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.
 01:EXCHANGE [PARTITION=HASH(functional.alltypes.year,functional.alltypes.month)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=956.90KB
+   partitions=24/24 size=478.45KB
 ====
 # test noshuffle hint to prevent repartitioning (same query as above with hint)
 insert into table functional.alltypes partition(year, month) [noshuffle]
@@ -439,7 +439,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.
 |  partitions=24
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=956.90KB
+   partitions=24/24 size=478.45KB
 ====
 # test that the planner does not repartition before the table sink
 # alltypes has column stats and since year only has 2 distinct values the planner
@@ -453,7 +453,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,1)]
 |  partitions=2
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=956.90KB
+   partitions=24/24 size=478.45KB
 ====
 # test shuffle hint to force repartitioning (same query as above with hint)
 insert into table functional.alltypes partition(year, month=1) [shuffle]
@@ -467,5 +467,5 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,1)]
 01:EXCHANGE [PARTITION=HASH(year)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=956.90KB
+   partitions=24/24 size=478.45KB
 ====

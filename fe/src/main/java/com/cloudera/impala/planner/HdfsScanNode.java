@@ -186,6 +186,7 @@ public class HdfsScanNode extends ScanNode {
       cardinality_ = tbl_.getNumRows();
     } else {
       cardinality_ = 0;
+      totalBytes_ = 0;
       boolean hasValidPartitionCardinality = false;
       for (HdfsPartition p: partitions_) {
         // ignore partitions with missing stats in the hope they don't matter
