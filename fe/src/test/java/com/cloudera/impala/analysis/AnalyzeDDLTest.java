@@ -487,6 +487,33 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Cannot compute stats on a view.
     AnalysisError("compute stats functional.alltypes_view",
         "COMPUTE STATS not allowed on a view: functional.alltypes_view");
+
+    AnalyzesOk("compute stats functional_avro_snap.alltypes");
+    // Test mismatched column definitions and Avro schema (HIVE-6308, IMPALA-867).
+    // See testdata/avro_schema_resolution/create_table.sql for the CREATE TABLE stmts.
+    // Mismatched column type is ok because the conflict is resolved in favor of
+    // the type in the column definition list in the CREATE TABLE.
+    AnalyzesOk("compute stats functional_avro_snap.alltypes_type_mismatch");
+    // Missing column definition is ok because the schema mismatch is resolved
+    // in the CREATE TABLE.
+    AnalyzesOk("compute stats functional_avro_snap.alltypes_missing_coldef");
+    // Extra column definition is ok because the schema mismatch is resolved
+    // in the CREATE TABLE.
+    AnalyzesOk("compute stats functional_avro_snap.alltypes_extra_coldef");
+    // Mismatched column name.
+    AnalysisError("compute stats functional_avro_snap.schema_resolution_test",
+        "Cannot COMPUTE STATS on Avro table 'schema_resolution_test' because its " +
+            "column definitions do not match those in the Avro schema.\nDefinition of " +
+            "column 'col1' of type 'string' does not match the Avro-schema column " +
+            "'boolean1' of type 'BOOLEAN' at position '0'.\nPlease re-create the table " +
+            "with column definitions, e.g., using the result of 'SHOW CREATE TABLE'");
+    // No column definitions were given at all. This case is broken in Hive (HIVE-6308).
+    AnalysisError("compute stats functional_avro_snap.alltypes_no_coldef",
+        "Cannot COMPUTE STATS on Avro table 'alltypes_no_coldef' because its column " +
+            "definitions do not match those in the Avro schema.\nMissing column " +
+            "definition corresponding to Avro-schema column 'id' of type 'INT' at " +
+            "position '0'.\nPlease re-create the table with column definitions, e.g., " +
+            "using the result of 'SHOW CREATE TABLE'");
   }
 
   @Test

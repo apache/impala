@@ -14,8 +14,10 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.Iterator;
 import java.util.List;
 
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.authorization.Privilege;
@@ -42,6 +44,11 @@ import com.google.common.collect.Lists;
  */
 public class ComputeStatsStmt extends StatementBase {
   private static final Logger LOG = Logger.getLogger(ComputeStatsStmt.class);
+
+  private static String AVRO_SCHEMA_MSG_PREFIX = "Cannot COMPUTE STATS on Avro table " +
+      "'%s' because its column definitions do not match those in the Avro schema.";
+  private static String AVRO_SCHEMA_MSG_SUFFIX = "Please re-create the table with " +
+          "column definitions, e.g., using the result of 'SHOW CREATE TABLE'";
 
   protected final TableName tableName_;
 
@@ -78,6 +85,8 @@ public class ComputeStatsStmt extends StatementBase {
     List<String> groupByCols = Lists.newArrayList();
     // Only add group by clause for HdfsTables.
     if (table_ instanceof HdfsTable) {
+      HdfsTable hdfsTable = (HdfsTable) table_;
+      if (hdfsTable.isAvroTable()) checkIncompleteAvroSchema(hdfsTable);
       for (int i = 0; i < table_.getNumClusteringCols(); ++i) {
         String colRefSql = ToSqlUtils.getIdentSql(table_.getColumns().get(i).getName());
         groupByCols.add(colRefSql);
@@ -128,6 +137,73 @@ public class ComputeStatsStmt extends StatementBase {
     columnStatsQueryBuilder.append(" FROM " + table_.getFullName());
     columnStatsQueryStr_ = columnStatsQueryBuilder.toString();
     LOG.debug(columnStatsQueryStr_);
+  }
+
+  /**
+   * Checks whether the column definitions from the CREATE TABLE stmt match the columns
+   * in the Avro schema. If there is a mismatch, then COMPUTE STATS cannot update the
+   * statistics in the Metastore's backend DB due to HIVE-6308. Throws an
+   * AnalysisException for such ill-created Avro tables. Does nothing if
+   * the column definitions match the Avro schema exactly.
+   */
+  private void checkIncompleteAvroSchema(HdfsTable table) throws AnalysisException {
+    Preconditions.checkState(table.isAvroTable());
+    org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
+    // The column definitions from 'CREATE TABLE (column definitions) ...'
+    Iterator<FieldSchema> colDefs = msTable.getSd().getCols().iterator();
+    // The columns derived from the Avro schema file or literal schema.
+    // Inconsistencies between the Avro-schema columns and the column definitions
+    // are sometimes resolved in the CREATE TABLE, and sometimes not (see below).
+    Iterator<Column> avroSchemaCols = table.getColumns().iterator();
+    // Skip partition columns from 'table' since those are not present in
+    // the msTable field schemas.
+    for (int i = 0; i < table.getNumClusteringCols(); ++i) {
+      if (avroSchemaCols.hasNext()) avroSchemaCols.next();
+    }
+    int pos = 0;
+    while (colDefs.hasNext() || avroSchemaCols.hasNext()) {
+      if (colDefs.hasNext() && avroSchemaCols.hasNext()) {
+        FieldSchema colDef = colDefs.next();
+        Column avroSchemaCol = avroSchemaCols.next();
+        // Check that the column names are identical. Ignore mismatched types
+        // as those will either fail in the scan or succeed.
+        if (!colDef.getName().equalsIgnoreCase(avroSchemaCol.getName())) {
+          throw new AnalysisException(
+              String.format(AVRO_SCHEMA_MSG_PREFIX +
+                  "\nDefinition of column '%s' of type '%s' does not match " +
+                  "the Avro-schema column '%s' of type '%s' at position '%s'.\n" +
+                  AVRO_SCHEMA_MSG_SUFFIX,
+                  table.getName(), colDef.getName(), colDef.getType(),
+                  avroSchemaCol.getName(), avroSchemaCol.getType(), pos));
+        }
+      }
+      // The following two cases are typically not possible because Hive resolves
+      // inconsistencies between the column-definition list and the Avro schema if a
+      // column-definition list was given in the CREATE TABLE (having no column
+      // definitions at all results in HIVE-6308). Even so, we check these cases for
+      // extra safety. COMPUTE STATS could be made to succeed in special instances of
+      // the cases below but we chose to throw an AnalysisException to avoid confusion
+      // because this scenario "should" never arise as mentioned above.
+      if (colDefs.hasNext() && !avroSchemaCols.hasNext()) {
+        FieldSchema colDef = colDefs.next();
+        throw new AnalysisException(
+            String.format(AVRO_SCHEMA_MSG_PREFIX +
+                "\nMissing Avro-schema column corresponding to column " +
+                "definition '%s' of type '%s' at position '%s'.\n" +
+                AVRO_SCHEMA_MSG_SUFFIX,
+                table.getName(), colDef.getName(), colDef.getType(), pos));
+      }
+      if (!colDefs.hasNext() && avroSchemaCols.hasNext()) {
+        Column avroSchemaCol = avroSchemaCols.next();
+        throw new AnalysisException(
+            String.format(AVRO_SCHEMA_MSG_PREFIX +
+                "\nMissing column definition corresponding to Avro-schema " +
+                "column '%s' of type '%s' at position '%s'.\n" +
+                AVRO_SCHEMA_MSG_SUFFIX,
+                table.getName(), avroSchemaCol.getName(), avroSchemaCol.getType(), pos));
+      }
+      ++pos;
+    }
   }
 
   public String getTblStatsQuery() { return tableStatsQueryStr_; }

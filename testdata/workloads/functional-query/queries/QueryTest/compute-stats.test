@@ -340,3 +340,167 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
+---- QUERY
+# IMPALA-867: Test computing stats on Avro tables with matching/mismatched
+# column definitions and Avro schema. Clone the used tables here.
+create table compute_stats_db.avro_alltypes
+like functional_avro_snap.alltypes;
+create table compute_stats_db.avro_alltypes_extra_coldef
+like functional_avro_snap.alltypes_extra_coldef;
+create table compute_stats_db.avro_alltypes_missing_coldef
+like functional_avro_snap.alltypes_missing_coldef;
+create table compute_stats_db.avro_alltypes_type_mismatch
+like functional_avro_snap.alltypes_type_mismatch;
+====
+---- QUERY
+# Avro table with matching column definitions and Avro schema
+compute stats compute_stats_db.avro_alltypes
+---- RESULTS
+'Updated 0 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.avro_alltypes
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+Total,,0,0,'0B',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.avro_alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',0,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','INT',0,0,4,4
+'smallint_col','INT',0,0,4,4
+'int_col','INT',0,0,4,4
+'bigint_col','BIGINT',0,0,8,8
+'float_col','FLOAT',0,0,4,4
+'double_col','DOUBLE',0,0,8,8
+'date_string_col','STRING',0,0,0,0
+'string_col','STRING',0,0,0,0
+'timestamp_col','STRING',0,0,0,0
+'year','INT',0,0,4,4
+'month','INT',0,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# Avro table with an extra column definition.
+compute stats compute_stats_db.avro_alltypes_extra_coldef
+---- RESULTS
+'Updated 0 partition(s) and 12 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.avro_alltypes_extra_coldef
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+Total,,0,0,'0B',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.avro_alltypes_extra_coldef
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',0,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',0,0,1,1
+'smallint_col','SMALLINT',0,0,2,2
+'int_col','INT',0,0,4,4
+'bigint_col','BIGINT',0,0,8,8
+'float_col','FLOAT',0,0,4,4
+'double_col','DOUBLE',0,0,8,8
+'date_string_col','STRING',0,0,0,0
+'string_col','STRING',0,0,0,0
+'timestamp_col','TIMESTAMP',0,0,16,16
+'extra_col','STRING',0,0,0,0
+'year','INT',0,0,4,4
+'month','INT',0,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# Avro table with missing two column definitions.
+compute stats compute_stats_db.avro_alltypes_missing_coldef
+---- RESULTS
+'Updated 0 partition(s) and 9 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.avro_alltypes_missing_coldef
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+Total,,0,0,'0B',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.avro_alltypes_missing_coldef
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',0,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'smallint_col','SMALLINT',0,0,2,2
+'int_col','INT',0,0,4,4
+'bigint_col','BIGINT',0,0,8,8
+'float_col','FLOAT',0,0,4,4
+'double_col','DOUBLE',0,0,8,8
+'date_string_col','STRING',0,0,0,0
+'string_col','STRING',0,0,0,0
+'year','INT',0,0,4,4
+'month','INT',0,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# Avro table with one column definition having a different
+# type than the Avro schema (bigint_col is a string).
+compute stats compute_stats_db.avro_alltypes_type_mismatch
+---- RESULTS
+'Updated 0 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.avro_alltypes_type_mismatch
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT
+---- RESULTS
+Total,,0,0,'0B',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.avro_alltypes_type_mismatch
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',0,0,4,4
+'bool_col','BOOLEAN',2,0,1,1
+'tinyint_col','TINYINT',0,0,1,1
+'smallint_col','SMALLINT',0,0,2,2
+'int_col','INT',0,0,4,4
+'bigint_col','STRING',0,0,0,0
+'float_col','FLOAT',0,0,4,4
+'double_col','DOUBLE',0,0,8,8
+'date_string_col','STRING',0,0,0,0
+'string_col','STRING',0,0,0,0
+'timestamp_col','TIMESTAMP',0,0,16,16
+'year','INT',0,0,4,4
+'month','INT',0,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
