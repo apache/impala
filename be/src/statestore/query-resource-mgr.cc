@@ -193,13 +193,13 @@ bool QueryResourceMgr::ShouldExit() {
 
 void QueryResourceMgr::Shutdown() {
   {
-    lock_guard<mutex> l(callbacks_lock_);
-    callbacks_.clear();
+    lock_guard<mutex> l(exit_lock_);
+    if (exit_) return;
+    exit_ = true;
   }
   {
-    lock_guard<mutex> l(exit_lock_);
-    DCHECK(!exit_) << "QueryResourceMgr::Shutdown() called twice";
-    exit_ = true;
+    lock_guard<mutex> l(callbacks_lock_);
+    callbacks_.clear();
   }
   threads_changed_cv_.notify_all();
 }

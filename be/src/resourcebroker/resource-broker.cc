@@ -661,6 +661,7 @@ void ResourceBroker::UnregisterQueryResourceMgr(const TUniqueId& query_id) {
   QueryResourceMgrsMap::iterator it = query_resource_mgrs_.find(query_id);
   DCHECK(it != query_resource_mgrs_.end())
       << "UnregisterQueryResourceMgr() without corresponding GetQueryResourceMgr()";
+  it->second.second->Shutdown();
   if (--it->second.first == 0) {
     delete it->second.second;
     query_resource_mgrs_.erase(it);

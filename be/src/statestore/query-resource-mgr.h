@@ -126,7 +126,9 @@ class QueryResourceMgr {
   Status CreateExpansionRequest(int64_t memory_mb, int64_t vcores,
       TResourceBrokerExpansionRequest* request);
 
-  // Sets the exit flag for the VCore acquisiton thread, but does not block.
+  // Sets the exit flag for the VCore acquisiton thread, but does not block. Also clears
+  // the set of callbacks, so that after Shutdown() has returned, no callback will be
+  // invoked.
   void Shutdown();
 
   // Waits for the VCore acquisition thread to stop.

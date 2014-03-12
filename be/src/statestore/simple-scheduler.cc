@@ -625,6 +625,7 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
   scan_node_types.push_back(TPlanNodeType::HDFS_SCAN_NODE);
   scan_node_types.push_back(TPlanNodeType::HBASE_SCAN_NODE);
 
+  unordered_set<TNetworkAddress> unique_hosts;
   // compute hosts of producer fragment before those of consumer fragment(s),
   // the latter might inherit the set of hosts from the former
   for (int i = exec_request.fragments.size() - 1; i >= 0; --i) {
@@ -661,15 +662,14 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
       continue;
     }
 
-    unordered_set<TNetworkAddress> unique_hosts;
     // Get the list of impalad host from scan_range_assignment_
     BOOST_FOREACH(const FragmentScanRangeAssignment::value_type& scan_range_assignment,
         params.scan_range_assignment) {
       params.hosts.push_back(scan_range_assignment.first);
       unique_hosts.insert(scan_range_assignment.first);
     }
-    schedule->SetUniqueHosts(unique_hosts);
   }
+  schedule->SetUniqueHosts(unique_hosts);
 }
 
 PlanNodeId SimpleScheduler::FindLeftmostNode(
