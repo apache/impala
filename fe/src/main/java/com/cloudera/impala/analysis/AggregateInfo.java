@@ -106,11 +106,11 @@ public class AggregateInfo {
     aggTupleSMap_ = new Expr.SubstitutionMap();
     groupingExprs_ =
         (groupingExprs != null
-          ? Expr.cloneList(groupingExprs, null)
+          ? Expr.cloneList(groupingExprs)
           : new ArrayList<Expr>());
     aggregateExprs_ =
         (aggExprs != null
-          ? Expr.cloneList(aggExprs, null)
+          ? Expr.cloneList(aggExprs)
           : new ArrayList<FunctionCallExpr>());
   }
 
@@ -293,7 +293,15 @@ public class AggregateInfo {
   public void substitute(Expr.SubstitutionMap smap) {
     Expr.substituteList(groupingExprs_, smap);
     LOG.trace("AggInfo: grouping_exprs=" + Expr.debugString(groupingExprs_));
-    Expr.substituteList(aggregateExprs_, smap);
+
+    // The smap in this case should not substitute the aggs themselves, only
+    // their subexpressions.
+    List<Expr> substitutedAggs = Expr.cloneList(aggregateExprs_, smap);
+    aggregateExprs_.clear();
+    for (Expr substitutedAgg : substitutedAggs) {
+      aggregateExprs_.add((FunctionCallExpr) substitutedAgg);
+    }
+
     LOG.trace("AggInfo: agg_exprs=" + Expr.debugString(aggregateExprs_));
     aggTupleSMap_.substituteLhs(smap);
     if (secondPhaseDistinctAggInfo_ != null) {

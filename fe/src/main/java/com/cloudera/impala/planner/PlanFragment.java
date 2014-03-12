@@ -29,6 +29,7 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
 /**
@@ -122,7 +123,7 @@ public class PlanFragment {
     if (planRoot_ != null && validateFileFormats) {
       // verify that after partition pruning hdfs partitions only use supported formats
       ArrayList<HdfsScanNode> hdfsScans = Lists.newArrayList();
-      planRoot_.collectSubclasses(HdfsScanNode.class, hdfsScans);
+      planRoot_.collect(Predicates.instanceOf(HdfsScanNode.class), hdfsScans);
       for (HdfsScanNode hdfsScanNode: hdfsScans) {
         hdfsScanNode.validateFileFormat();
       }

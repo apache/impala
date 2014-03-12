@@ -303,3 +303,27 @@ having count(bigint_col) > 100
 bigint
 ---- RESULTS
 ====
+---- QUERY
+# Regression test for COUNT(ALL ) with no group-by and other distinct agg. IMPALA-862
+select count(*), COUNT(distinct 1) from alltypesagg where false
+---- RESULTS
+0,0
+---- TYPES
+bigint, bigint
+====
+---- QUERY
+# Regression test for COUNT(ALL ) with no group-by and other distinct agg. IMPALA-862
+select count(tinyint_col), sum(distinct int_col) from alltypesagg
+---- RESULTS
+9000,499500
+---- TYPES
+bigint, bigint
+====
+---- QUERY
+# Regression test for COUNT(ALL ) with no group-by and other distinct agg. IMPALA-862
+select count(*), COUNT(distinct 1) from alltypesagg
+---- RESULTS
+10000,1
+---- TYPES
+bigint, bigint
+====

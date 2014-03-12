@@ -17,6 +17,8 @@ package com.cloudera.impala.common;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.base.Predicate;
+
 public class TreeNode<NodeType extends TreeNode<NodeType>> {
   protected ArrayList<NodeType> children_;
 
@@ -44,72 +46,58 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     return children_;
   }
 
-  // Collect all unique subnodes of type C (but not of subclasses of C), including
-  // possibly 'this' if the subnode does not exist in subNodes.
-  // If a subnode is collected, none of its own subnodes will be.
-  public <C extends NodeType> void collect(Class<C> cl, List<C> subNodes) {
-    if (cl.isAssignableFrom(this.getClass()) && this.getClass().isAssignableFrom(cl) &&
-        !subNodes.contains((C) this)) {
-      subNodes.add((C) this);
+  /**
+   * Add all nodes in the tree that satisfy 'predicate' to the list 'matches'
+   * This node is checked first, followed by its children in order. If the node
+   * itself matches, the children are skipped.
+   */
+  public <C extends TreeNode<NodeType>, D extends C> void collect(
+      Predicate<? super C> predicate, List<D> matches) {
+    if (predicate.apply((C) this) && !matches.contains(this)) {
+      matches.add((D) this);
       return;
     }
+
     for (NodeType child: children_) {
-      child.collect(cl, subNodes);
+      child.collect(predicate, matches);
     }
   }
 
-  // Collect all unique subnodes of type C (or subclasses of C), including
-  // possibly 'this' if the subnode does not exist in subNodes.
-  // If a subnode is collected, none of its own subnodes will be.
-  public <C extends NodeType> void collectSubclasses(Class<C> cl, List<C> subNodes) {
-    if (cl.isAssignableFrom(this.getClass()) && !subNodes.contains((C) this)) {
-      subNodes.add((C) this);
-      return;
-    }
-    for (NodeType child: children_) {
-      child.collectSubclasses(cl, subNodes);
+  /**
+   * For each expression in 'nodeList', collect all subexpressions satisfying 'predicate'
+   * into 'matches'
+   */
+  public static <C extends TreeNode<C>, D extends C> void collect(
+      List<C> nodeList, Predicate<? super C> predicate, List<D> matches) {
+    for (C node : nodeList) {
+      node.collect(predicate, matches);
     }
   }
 
-  public boolean contains(Class cl) {
-    if (cl.isAssignableFrom(this.getClass()) && this.getClass().isAssignableFrom(cl)) {
-      return true;
-    }
-    for (NodeType child: children_) {
-      if (child.contains(cl)) {
-        return true;
-      }
-    }
-    return false;
-  }
+  /**
+   * Return true if this node or any of its children satisfy 'predicate'.
+   */
+  public <C extends TreeNode<NodeType>> boolean contains(
+      Predicate<? super C> predicate) {
+    if (predicate.apply((C) this)) return true;
 
-  public boolean containsSubclass(Class cl) {
-    if (cl.isAssignableFrom(this.getClass())) {
-      return true;
-    }
     for (NodeType child: children_) {
-      if (child.containsSubclass(cl)) {
-        return true;
-      }
+      if (child.contains(predicate)) return true;
     }
+
     return false;
   }
 
   /**
-   * Return 'this' or first child that is exactly of class 'cl'.
-   * Looks for matching children via depth-first, left-to-right traversal.
+   * For each expression in 'exprList', return true if any subexpression satisfies
+   * contains('predicate').
    */
-  public <C extends NodeType> C findFirstOf(Class<C> cl) {
-    if (this.getClass().equals(cl)) {
-      return (C) this;
+  public static <C extends TreeNode<C>, D extends C> boolean contains(
+      List<C> nodeList, Predicate<? super C> predicate) {
+    for (C node : nodeList) {
+      if (node.contains(predicate)) return true;
     }
-    for (NodeType child: children_) {
-      NodeType result = child.findFirstOf(cl);
-      if (result != null) {
-        return (C) result;
-      }
-    }
-    return null;
-  }
 
+    return false;
+  }
 }

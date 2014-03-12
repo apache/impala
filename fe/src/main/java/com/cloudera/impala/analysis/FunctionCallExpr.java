@@ -25,6 +25,7 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
@@ -120,7 +121,7 @@ public class FunctionCallExpr extends Expr {
 
   @Override
   protected void toThrift(TExprNode msg) {
-    if (isAggregate()) {
+    if (Expr.isAggregatePredicate().apply(this)) {
       msg.node_type = TExprNodeType.AGGREGATE_EXPR;
     } else {
       ScalarFunction fn = (ScalarFunction)fn_;
@@ -169,7 +170,7 @@ public class FunctionCallExpr extends Expr {
     super.analyze(analyzer);
     fnName_.analyze(analyzer);
 
-    if (fn_ != null && isAggregate()) {
+    if (fn_ != null && Expr.isAggregatePredicate().apply(this)) {
       // This is the function call expr after splitting up to a merge aggregation.
       // The function has already been analyzed so just do the minimal sanity
       // check here.
@@ -223,7 +224,7 @@ public class FunctionCallExpr extends Expr {
 
     if (isAggregateFunction()) {
       // subexprs must not contain aggregates
-      if (Expr.containsAggregate(children_)) {
+      if (TreeNode.contains(children_, Expr.isAggregatePredicate())) {
         throw new AnalysisException(
             "aggregate function cannot contain aggregate parameters: " + this.toSql());
       }

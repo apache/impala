@@ -38,6 +38,7 @@ import com.cloudera.impala.thrift.TExprNode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -53,6 +54,15 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // experimentally determined to be safe.
   public final static int EXPR_CHILDREN_LIMIT = 10000;
   public final static int EXPR_DEPTH_LIMIT = 2000;
+
+  // isAggregatePredicate_ is a Predicate that returns true if an Expr is an aggregate.
+  private final static com.google.common.base.Predicate<Expr> isAggregatePredicate_ =
+      new com.google.common.base.Predicate<Expr>() {
+        public boolean apply(Expr arg) {
+          return arg instanceof FunctionCallExpr &&
+              ((FunctionCallExpr)arg).isAggregateFunction();
+        }
+      };
 
   // id that's unique across the entire query statement and is assigned by
   // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
@@ -161,7 +171,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       // the subclass analyze() function may well want to override this, if it
       // knows better
       List<SlotRef> slotRefs = Lists.newArrayList();
-      this.collect(SlotRef.class, slotRefs);
+      this.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
       numDistinctValues_ = -1;
       for (SlotRef slotRef: slotRefs) {
         numDistinctValues_ = Math.max(numDistinctValues_, slotRef.numDistinctValues_);
@@ -299,6 +309,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       result.add(expr.treeToThrift());
     }
     return result;
+  }
+
+  /*
+   * Return a predicate to test if an Expr object is an aggregate.
+   */
+  public static com.google.common.base.Predicate<Expr> isAggregatePredicate() {
+    return isAggregatePredicate_;
   }
 
   public List<String> childrenToSql() {
@@ -480,12 +497,25 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       if (g == null) return f;
       SubstitutionMap result = new SubstitutionMap();
       // f's substitution targets need to be substituted via g
-      result.lhs = Expr.cloneList(f.lhs, null);
+      result.lhs = Expr.cloneList(f.lhs);
       result.rhs = Expr.cloneList(f.rhs, g);
       // substitution maps are cumulative: the combined map contains all
-      // substitutions from f and g
-      result.lhs.addAll(Expr.cloneList(g.lhs, null));
-      result.rhs.addAll(Expr.cloneList(g.rhs, null));
+      // substitutions from f and g.
+      for (int i = 0; i < g.lhs.size(); i++) {
+        // If f contains expr1->fn(expr2) and g contains expr2->expr3,
+        // then result must contain expr1->fn(expr3).
+        // The check before adding to result.lhs is to ensure that cases
+        // where expr2.equals(expr1) are handled correctly.
+        // For example f: count(*) -> zeroifnull(count(*))
+        // and g: count(*) -> slotref
+        // result.lhs must only have: count(*) -> zeroifnull(slotref) from f above,
+        // and not count(*) -> slotref from g as well.
+        if (!result.lhs.contains(g.lhs.get(i))) {
+          result.lhs.add(g.lhs.get(i).clone(null));
+          result.rhs.add(g.rhs.get(i).clone(null));
+        }
+      }
+
       result.verify();
       return result;
     }
@@ -560,80 +590,36 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Create a deep copy of 'l'. If smap is non-null, use it to substitute the
-   * elements of l.
+   * Create a deep copy of 'l'. Use smap to substitute the elements of l.
+   * The elements of the returned list are of type Expr (different from the
+   * elements of 'l' due to substitution).
    */
-  public static <C extends Expr> ArrayList<C> cloneList(
-      List<C> l, SubstitutionMap smap) {
+  public static ArrayList<Expr> cloneList(
+      Iterable<? extends Expr> l, SubstitutionMap smap) {
     Preconditions.checkNotNull(l);
-    ArrayList<C> result = new ArrayList<C>();
-    for (C element: l) {
-      result.add((C) element.clone(smap));
+    ArrayList<Expr> result = new ArrayList<Expr>();
+    for (Expr element: l) {
+      result.add(element.clone(smap));
     }
     return result;
   }
 
   /**
-   * Collect all unique Expr nodes of type 'cl' present in 'input' and add them to
-   * 'output' if they do not exist in 'output'.
-   * This can't go into TreeNode<>, because we'd be using the template param
-   * NodeType.
+   * Create a deep copy of 'l'. The elements of the returned list are of the same
+   * type as the input list.
    */
-  public static <C extends Expr> void collectList(
-      List<? extends Expr> input, Class<C> cl, List<C> output) {
-    Preconditions.checkNotNull(input);
-    for (Expr e: input) {
-      e.collect(cl, output);
+  public static <C extends Expr> ArrayList<C> cloneList(Iterable<C> l) {
+    Preconditions.checkNotNull(l);
+    ArrayList<C> result = new ArrayList<C>();
+    for (Expr element: l) {
+      result.add((C) element.clone(null));
     }
-  }
-
-  public static <C extends Expr> void collectAggregateExprs(
-      List<? extends Expr> input, List<C> output) {
-    Preconditions.checkNotNull(input);
-    for (Expr e: input) {
-      e.collectAggregateExprs(output);
-    }
-  }
-
-  // Identical behavior to TreeNode.collect() except it matches expr that are aggregates
-  public <C extends Expr> void collectAggregateExprs(List<C> output) {
-    if (isAggregate() && !output.contains((C)this)) {
-      output.add((C)this);
-      return;
-    }
-    for (Expr child:children_) {
-      child.collectAggregateExprs(output);
-    }
-  }
-
-  /**
-   * Return true if the list contains a node of type C in any of
-   * its elements or their children, otherwise return false.
-   */
-  public static <C extends Expr> boolean contains(
-      List<? extends Expr> input, Class<C> cl) {
-    Preconditions.checkNotNull(input);
-    for (Expr e: input) {
-      if (e.contains(cl)) return true;
-    }
-    return false;
+    return result;
   }
 
   /**
    * Returns true if the list contains an aggregate expr.
    */
-  public static <C extends Expr> boolean containsAggregate(List<? extends Expr> input) {
-    for (Expr e: input) {
-      if (e.containsAggregate()) return true;
-    }
-    return false;
-  }
-
-  public boolean containsAggregate() {
-    if (isAggregate()) return true;
-    return containsAggregate(children_);
-  }
-
   /**
    * Return 'this' with all sub-exprs substituted according to
    * smap. Ids of 'this' and its children are retained.
@@ -656,12 +642,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * Substitute sub-exprs in the input list according to smap.
    */
-  public static <C extends Expr> void substituteList(
-      List<C> l, SubstitutionMap smap) {
+  public static void substituteList(
+      List<Expr> l, SubstitutionMap smap) {
     if (l == null || smap == null) return;
-    ListIterator<C> it = l.listIterator();
+    ListIterator<Expr> it = l.listIterator();
     while (it.hasNext()) {
-      it.set((C) it.next().substitute(smap));
+      it.set(it.next().substitute(smap));
     }
   }
 
@@ -763,11 +749,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
   }
 
-  public boolean isAggregate() {
-    return this instanceof FunctionCallExpr &&
-        ((FunctionCallExpr)this).isAggregateFunction();
-  }
-
   /**
    * @return true if this is an instance of LiteralExpr
    */
@@ -781,7 +762,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * at the moment are only slotrefs).
    */
   public boolean isConstant() {
-    return !contains(SlotRef.class);
+    return !contains(Predicates.instanceOf(SlotRef.class));
   }
 
   /**

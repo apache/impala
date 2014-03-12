@@ -293,7 +293,7 @@ having count(bigint_col) > 0
 ---- PLAN
 02:AGGREGATE [MERGE FINALIZE]
 |  output: count(tinyint_col), sum(count(bigint_col))
-|  having: sum(count(bigint_col)) > 0
+|  having: zeroifnull(sum(count(bigint_col))) > 0
 |
 01:AGGREGATE
 |  output: count(bigint_col)
@@ -304,7 +304,7 @@ having count(bigint_col) > 0
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(tinyint_col)), sum(sum(count(bigint_col)))
-|  having: sum(count(bigint_col)) > 0
+|  having: zeroifnull(sum(count(bigint_col))) > 0
 |
 05:EXCHANGE [PARTITION=UNPARTITIONED]
 |
@@ -368,7 +368,7 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 ---- PLAN
 02:AGGREGATE [MERGE FINALIZE]
 |  output: count(1), sum(count(1))
-|  having: count(1) + sum(count(1)) > 10, count(1) > 0, sum(count(1)) > 1
+|  having: count(1) > 0, count(1) + zeroifnull(sum(count(1))) > 10, zeroifnull(sum(count(1))) > 1
 |
 01:AGGREGATE
 |  output: count(1)
@@ -379,7 +379,7 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(1)), sum(sum(count(1)))
-|  having: count(1) + sum(count(1)) > 10, count(1) > 0, sum(count(1)) > 1
+|  having: count(1) > 0, count(1) + zeroifnull(sum(count(1))) > 10, zeroifnull(sum(count(1))) > 1
 |
 05:EXCHANGE [PARTITION=UNPARTITIONED]
 |

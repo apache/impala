@@ -97,6 +97,7 @@ import com.cloudera.impala.util.TResultRowBuilder;
 import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -601,7 +602,7 @@ public class Frontend {
       TPlanFragment thriftFragment = fragment.toThrift();
       queryExecRequest.addToFragments(thriftFragment);
       Preconditions.checkNotNull(fragment.getPlanRoot());
-      fragment.getPlanRoot().collectSubclasses(ScanNode.class, scanNodes);
+      fragment.getPlanRoot().collect(Predicates.instanceOf(ScanNode.class), scanNodes);
       fragmentIdx.put(fragment, queryExecRequest.fragments.size() - 1);
     }
 

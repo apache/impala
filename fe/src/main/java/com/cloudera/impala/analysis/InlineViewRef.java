@@ -27,8 +27,10 @@ import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.service.FeSupport;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
 
@@ -187,7 +189,7 @@ public class InlineViewRef extends TableRef {
       throws AnalysisException, InternalException, AuthorizationException {
     // Gather all unique rhs SlotRefs into rhsSlotRefs
     List<SlotRef> rhsSlotRefs = Lists.newArrayList();
-    Expr.collectList(smap.getRhs(), SlotRef.class, rhsSlotRefs);
+    TreeNode.collect(smap.getRhs(), Predicates.instanceOf(SlotRef.class), rhsSlotRefs);
     // Map for substituting SlotRefs with NullLiterals.
     Expr.SubstitutionMap nullSMap = new Expr.SubstitutionMap();
     for (SlotRef rhsSlotRef: rhsSlotRefs) {
@@ -217,7 +219,7 @@ public class InlineViewRef extends TableRef {
     // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
     // then do not try to execute it.
     // TODO: return true in this case?
-    if (expr.contains(TupleIsNullPredicate.class)) return true;
+    if (expr.contains(Predicates.instanceOf(TupleIsNullPredicate.class))) return true;
 
     // Replace all SlotRefs in expr with NullLiterals, and wrap the result
     // with an IS NOT NULL predicate.

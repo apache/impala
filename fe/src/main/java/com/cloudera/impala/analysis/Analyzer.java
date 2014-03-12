@@ -51,6 +51,7 @@ import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -945,7 +946,8 @@ public class Analyzer {
   private boolean isTrueWithNullSlots(Expr p) {
     // Construct predicate with all SlotRefs substituted by NullLiterals.
     List<SlotRef> slotRefs = Lists.newArrayList();
-    p.collect(SlotRef.class, slotRefs);
+    p.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
+
     // Map for substituting SlotRefs with NullLiterals.
     Expr.SubstitutionMap nullSmap = new Expr.SubstitutionMap();
     for (SlotRef slotRef: slotRefs) {
