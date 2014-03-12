@@ -149,7 +149,7 @@ class TestImpalaShell(object):
     args = ('-q "set abort_on_error=false;'
         ' select count(*) from functional_seq_snap.bad_seq_snap" --quiet')
     result = run_impala_shell_cmd(args)
-    assert 'ERRORS ENCOUNTERED DURING EXECUTION:' in result.stderr
+    assert 'ERRORS:' in result.stderr
     assert 'Bad synchronization marker' in result.stderr
     assert 'Expected: ' in result.stderr
     assert 'Actual: ' in result.stderr

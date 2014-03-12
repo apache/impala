@@ -187,6 +187,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   // us to advance query state to FINISHED or EXCEPTION
   Thread wait_thread(
       "impala-server", "wait-thread", &ImpalaServer::Wait, this, exec_state);
+  RAISE_IF_ERROR(exec_state->query_status(), SQLSTATE_GENERAL_ERROR);
 }
 
 void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
@@ -379,8 +380,16 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
     LOG(ERROR) << str.str();
     return;
   }
+  stringstream error_log_ss;
+  // If the query status is !ok, include the status error message at the top of the log.
+  if (!exec_state->query_status().ok()) {
+    error_log_ss << exec_state->query_status().GetErrorMsg();
+    log = error_log_ss.str();
+  }
   if (exec_state->coord() != NULL) {
-    log = exec_state->coord()->GetErrorLog();
+    if (!exec_state->query_status().ok()) error_log_ss << "\n\n";
+    error_log_ss << exec_state->coord()->GetErrorLog();
+    log = error_log_ss.str();
   }
 }
 
