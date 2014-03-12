@@ -86,7 +86,7 @@ string_col in ('1', '2', '3')
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
 '00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
-'   partitions=3/11 size=12B'
+'   partitions=3/11 size=6B'
 ====
 ---- QUERY
 EXPLAIN
@@ -98,7 +98,7 @@ WHERE tinyint_col < 7
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
 '00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
-'   partitions=7/11 size=28B'
+'   partitions=7/11 size=14B'
 ====
 ---- QUERY
 EXPLAIN
@@ -110,7 +110,7 @@ WHERE smallint_col < 6
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
 '00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
-'   partitions=6/11 size=24B'
+'   partitions=6/11 size=12B'
 ====
 ---- QUERY
 EXPLAIN
@@ -122,7 +122,7 @@ WHERE int_col < 5
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
 '00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
-'   partitions=5/11 size=20B'
+'   partitions=5/11 size=10B'
 ====
 ---- QUERY
 EXPLAIN
@@ -134,7 +134,7 @@ WHERE bigint_col < 40
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
 '00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
-'   partitions=4/11 size=16B'
+'   partitions=4/11 size=8B'
 ====
 ---- QUERY
 EXPLAIN
@@ -146,7 +146,7 @@ WHERE string_col in ('1', '2', '3')
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
 '00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
-'   partitions=3/11 size=12B'
+'   partitions=3/11 size=6B'
 ====
 ---- QUERY
 EXPLAIN
@@ -158,7 +158,7 @@ WHERE double_col = 1.1
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
 '00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
-'   partitions=10/11 size=40B'
+'   partitions=10/11 size=20B'
 ====
 ---- QUERY
 EXPLAIN
@@ -170,7 +170,7 @@ WHERE float_col = 2
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
 '00:SCAN HDFS [hdfs_partitioning.all_insert_partition_col_types]'
-'   partitions=1/11 size=6B'
+'   partitions=1/11 size=3B'
 ====
 ---- QUERY
 # Create a table with all supported partition key column types. TIMESTAMP is not
@@ -227,7 +227,7 @@ WHERE bool_col=false
 '01:EXCHANGE [PARTITION=UNPARTITIONED]'
 '|'
 '00:SCAN HDFS [hdfs_partitioning.all_partition_col_types]'
-'   partitions=1/2 size=4B'
+'   partitions=1/2 size=2B'
 ====
 ---- QUERY
 DROP TABLE all_partition_col_types;
