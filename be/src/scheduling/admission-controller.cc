@@ -221,8 +221,9 @@ bool AdmissionController::RejectRequest(const string& pool_name,
   } else if (mem_limit == 0) {
     reject_reason = REASON_DISABLED_MEM_LIMIT;
   } else if (mem_limit > 0 && expected_mem_usage >= mem_limit) {
-    reject_reason = Substitute(REASON_REQ_OVER_MEM_LIMIT, expected_mem_usage,
-        mem_limit);
+    reject_reason = Substitute(REASON_REQ_OVER_MEM_LIMIT,
+        PrettyPrinter::Print(expected_mem_usage, TCounterType::BYTES),
+        PrettyPrinter::Print(mem_limit, TCounterType::BYTES));
   } else if (total_stats->num_queued >= max_queued) {
     reject_reason = Substitute(REASON_QUEUE_FULL, max_queued, total_stats->num_queued);
   } else {
