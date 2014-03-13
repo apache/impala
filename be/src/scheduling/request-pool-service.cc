@@ -89,6 +89,7 @@ RequestPoolService::RequestPoolService() {
   JNIEnv* jni_env = getJNIEnv();
   request_pool_service_class_ =
     jni_env->FindClass("com/cloudera/impala/util/RequestPoolService");
+  EXIT_IF_EXC(jni_env);
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
     EXIT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, request_pool_service_class_,

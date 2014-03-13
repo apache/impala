@@ -68,6 +68,7 @@ Frontend::Frontend() {
   JNIEnv* jni_env = getJNIEnv();
   // create instance of java class JniFrontend
   fe_class_ = jni_env->FindClass("com/cloudera/impala/service/JniFrontend");
+  EXIT_IF_EXC(jni_env);
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
