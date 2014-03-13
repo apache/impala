@@ -278,21 +278,52 @@ void ResourceBroker::CreateLlamaReleaseRequest(const TResourceBrokerReleaseReque
   dest.reservation_id << src.reservation_id;
 }
 
-void ResourceBroker::ReservationPromise::FillReservation(
-    const llama::TUniqueId& reservation_id,
-    const vector<llama::TAllocatedResource>& allocated_resources) {
-  resources_->clear();
+void ResourceBroker::ReservationFulfillment::GetResources(ResourceMap* resources,
+    TUniqueId* reservation_id) {
+  resources->clear();
   // TODO: Llama returns a dump of all resources that we need to manually
   // group by reservation id. Can Llama do the grouping for us?
-  BOOST_FOREACH(const llama::TAllocatedResource& resource, allocated_resources) {
+  BOOST_FOREACH(const llama::TAllocatedResource& resource, allocated_resources_) {
     // Ignore resources that don't belong to the given reservation id.
-    if (resource.reservation_id != reservation_id) continue;
+    if (resource.reservation_id != reservation_id_) continue;
     TNetworkAddress host = MakeNetworkAddress(resource.location);
-    (*resources_)[host] = resource;
+    (*resources)[host] = resource;
     VLOG_QUERY << "Getting allocated resource for reservation id "
-               << reservation_id << " and location " << host;
+               << reservation_id_ << " and location " << host;
   }
-  (*reservation_id_) << reservation_id;
+  (*reservation_id) << reservation_id_;
+}
+
+bool ResourceBroker::WaitForNotification(const llama::TUniqueId& request_id,
+    int64_t timeout, TUniqueId* reservation_id, ResourceMap* resources, bool* timed_out) {
+  shared_ptr<ReservationFulfillment> fulfillment;
+  {
+    lock_guard<mutex> l(requests_lock_);
+    // It's possible that the AM notification arrived before we called into this method
+    // and took the lock. If so, AMNotification() should have placed a
+    // ReservationFulfillment in the pending_requests_ map already.
+    FulfillmentMap::iterator it = pending_requests_.find(request_id);
+    if (it == pending_requests_.end()) {
+      // We got here first, so add the ReservationFulfillment object implicitly and set
+      // the promise field so that we get signalled when AMNotification() gets an update.
+      fulfillment.reset(new ReservationFulfillment());
+      pending_requests_.insert(make_pair(request_id, fulfillment));
+    } else {
+      fulfillment = it->second;
+    }
+  }
+
+  // Need to give up requests_lock_ before waiting
+  bool request_granted = fulfillment->promise()->Get(timeout, timed_out);
+  fulfillment->GetResources(resources, reservation_id);
+
+  // Remove the promise from the pending-requests map.
+  {
+    lock_guard<mutex> l(requests_lock_);
+    pending_requests_.erase(request_id);
+  }
+
+  return request_granted;
 }
 
 Status ResourceBroker::Expand(const TResourceBrokerExpansionRequest& request,
@@ -344,23 +375,14 @@ Status ResourceBroker::Expand(const TResourceBrokerExpansionRequest& request,
   }
 
   TUniqueId reservation_id;
-  ReservationPromise reservation_promise(&response->allocated_resources, &reservation_id);
-  {
-    lock_guard<mutex> l(requests_lock_);
-    pending_requests_[ll_response.reservation_id] = &reservation_promise;
-  }
-
   bool timed_out = false;
-  bool request_granted = reservation_promise.Get(request.request_timeout, &timed_out);
-
-  // Remove the promise from the pending-requests map.
-  {
-    lock_guard<mutex> l(requests_lock_);
-    pending_requests_.erase(ll_response.reservation_id);
-  }
+  bool request_granted = WaitForNotification(ll_response.reservation_id,
+      request.request_timeout, &reservation_id, &response->allocated_resources,
+      &timed_out);
 
   if (!timed_out) {
-    expansion_response_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+    expansion_response_time_metric_->Update(
+        sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   } else {
     expansion_requests_timedout_metric_->Increment(1);
     stringstream error_msg;
@@ -431,24 +453,14 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
     return request_status;
   }
 
-  // Add a promise to the pending-requests map and wait for it to be fulfilled by
-  // the Llama via an async call into LlamaNotificationThriftIf::AMNotification().
+  VLOG_RPC << "Received reservation response from Llama, waiting for notification on: "
+           << llama_response.reservation_id;
+
   TUniqueId reservation_id;
-  ReservationPromise reservation_promise(&response->allocated_resources, &reservation_id);
-  {
-    lock_guard<mutex> l(requests_lock_);
-    pending_requests_[llama_response.reservation_id] = &reservation_promise;
-  }
-
-  DCHECK(request.__isset.request_timeout);
   bool timed_out = false;
-  bool request_granted = reservation_promise.Get(request.request_timeout, &timed_out);
-
-  // Remove the promise from the pending-requests map.
-  {
-    lock_guard<mutex> l(requests_lock_);
-    pending_requests_.erase(llama_response.reservation_id);
-  }
+  bool request_granted = WaitForNotification(llama_response.reservation_id,
+      request.request_timeout, &reservation_id, &response->allocated_resources,
+      &timed_out);
 
   if (!timed_out) {
     reservation_response_time_metric_->Update(
@@ -521,7 +533,8 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
 }
 
 void ResourceBroker::AMNotification(const llama::TLlamaAMNotificationRequest& request,
-    llama::TLlamaAMNotificationResponse& response) {  {
+    llama::TLlamaAMNotificationResponse& response) {
+  {
     // This Impalad may have restarted, so it is possible Llama is sending notifications
     // while this Impalad is registering with Llama.
     lock_guard<mutex> l(llama_registration_lock_);
@@ -541,23 +554,33 @@ void ResourceBroker::AMNotification(const llama::TLlamaAMNotificationRequest& re
 
   // Process granted allocations.
   BOOST_FOREACH(const llama::TUniqueId& res_id, request.allocated_reservation_ids) {
-    ReservationPromise* reservation_promise = pending_requests_[res_id];
-    if (reservation_promise == NULL) {
-      LOG(WARNING) << "Ignoring unknown allocated reservation id " << res_id;
-      continue;
+    // TODO: Garbage collect fulfillments that live for a long time, since they probably
+    // don't correspond to any query.
+    FulfillmentMap::iterator it = pending_requests_.find(res_id);
+    shared_ptr<ReservationFulfillment> fulfillment;
+    if (it == pending_requests_.end()) {
+      fulfillment.reset(new ReservationFulfillment());
+      pending_requests_.insert(make_pair(res_id, fulfillment));
+    } else {
+      fulfillment = it->second;
     }
-    reservation_promise->FillReservation(res_id, request.allocated_resources);
-    reservation_promise->Set(true);
+    LOG(INFO) << "Received allocated resource for reservation id: " << res_id;
+    fulfillment->SetResources(request.allocated_resources, res_id);
+    fulfillment->promise()->Set(true);
   }
 
   // Process rejected allocations.
   BOOST_FOREACH(const llama::TUniqueId& res_id, request.rejected_reservation_ids) {
-    ReservationPromise* reservation_promise = pending_requests_[res_id];
-    if (reservation_promise == NULL) {
-      LOG(WARNING) << "Ignoring unknown rejected reservation id " << res_id;
-      continue;
+    FulfillmentMap::iterator it = pending_requests_.find(res_id);
+    shared_ptr<ReservationFulfillment> fulfillment;
+    if (it == pending_requests_.end()) {
+      fulfillment.reset(new ReservationFulfillment());
+      pending_requests_.insert(make_pair(res_id, fulfillment));
+    } else {
+      fulfillment = it->second;
     }
-    reservation_promise->Set(false);
+
+    fulfillment->promise()->Set(false);
   }
 
   // TODO: We maybe want a thread pool for handling preemptions to avoid

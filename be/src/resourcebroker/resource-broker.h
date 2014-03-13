@@ -98,6 +98,8 @@ class ResourceBroker {
   void UnregisterQueryResourceMgr(const TUniqueId& query_id);
 
  private:
+  typedef std::map<TNetworkAddress, llama::TAllocatedResource> ResourceMap;
+
   // Registers this resource broker with the Llama and refreshes the Llama nodes
   // after a successful registration. Returns a non-OK status if the registration
   // or the node refresh failed.
@@ -117,6 +119,13 @@ class ResourceBroker {
   // Creates a Llama release request from a resource broker release request.
   void CreateLlamaReleaseRequest(const TResourceBrokerReleaseRequest& src,
       llama::TLlamaAMReleaseRequest& dest);
+
+  // Wait for a reservation or expansion request to be fulfilled by the Llama via an async
+  // call into LlamaNotificationThriftIf::AMNotification(), or for a timeout to occur (in
+  // which case *timed_out is set to true). If the request is fulfilled, resources and
+  // reservation_id are populated.
+  bool WaitForNotification(const llama::TUniqueId& request_id, int64_t timeout,
+      TUniqueId* reservation_id, ResourceMap* resources, bool* timed_out);
 
   // Address where the Llama service is running on.
   TNetworkAddress llama_address_;
@@ -210,51 +219,49 @@ class ResourceBroker {
   // True if this resource broker is using a Mini LLama. Set in RefreshLlamaNodes().
   bool is_mini_llama_;
 
-  // Used to implement a blocking resource-reservation interface on top of Llama's
-  // non-blocking request interface (the Llama asynchronously notifies the resource broker
-  // of granted/denied reservations). Callers of Reserve() or Expand() block on a
-  // reservation promise until the Llama has issued a corresponding response via the
-  // resource broker's callback service (or until a timeout has been reached).
-  typedef std::map<TNetworkAddress, llama::TAllocatedResource> ResourceMap;
-  class ReservationPromise {
+  // Used to coordinate between AMNotification() and WaitForNotification(). Either method
+  // might create this object (if it's the first to look up a reservation in
+  // pending_requests_). Callers of Reserve() and Expand() are blocked (via
+  // WaitForNotification()), on a ReservationFulfillment's promise().
+  class ReservationFulfillment {
    public:
-    ReservationPromise(ResourceMap* resources, TUniqueId* reservation_id)
-      : resources_(resources),
-        reservation_id_(reservation_id) {
-      DCHECK(resources != NULL);
-      DCHECK(reservation_id != NULL);
-    }
+    // Promise is set to true if the reservation or expansion request was granted, false
+    // if it was rejected by Yarn.
+    Promise<bool>* promise() { return &promise_; }
 
-    // Returns true if the reservation request was granted, false if the request
-    // was denied by the central resource manager (Yarn).
-    bool Get(int64_t timeout_millis, bool* timed_out) {
-      return promise_.Get(timeout_millis, timed_out);
-    }
-    void Set(bool val) { promise_.Set(val); }
+    // Called by WaitForNotification() to populate a map of resources once the
+    // corresponding request has returned successfully (and promise() therefore has
+    // returned true).
+    // TODO: Can we remove reservation_id?
+    void GetResources(ResourceMap* resources, TUniqueId* reservation_id);
 
-    // Populates reservation_ based on the allocated_resources.
-    void FillReservation(const llama::TUniqueId& reservation_id,
-        const std::vector<llama::TAllocatedResource>& allocated_resources);
+    void SetResources(const std::vector<llama::TAllocatedResource>& resources,
+        const llama::TUniqueId& id) {
+      allocated_resources_ = resources;
+      reservation_id_ = id;
+    }
 
    private:
-    // Resource map to update when reservation is filled.
-    ResourceMap* resources_;
-
-    // Underlying Promise that handles the actual coordination details.
+    // Promise object that WaitForNotification() waits on and AMNotification() signals.
     Promise<bool> promise_;
 
-    // Address of TUniqueId to write filled reservation ID to.
-    TUniqueId* reservation_id_;
+    // Filled in by AMNotification(), so that WaitForNotification() can read the set of
+    // allocated_resources without AMNotification() having to wait (hence the copy is
+    // deliberate, since the original copy may go out of scope).
+    std::vector<llama::TAllocatedResource> allocated_resources_;
+
+    // The ID for this reservation
+    llama::TUniqueId reservation_id_;
   };
 
   // Protects pending_requests_;
   boost::mutex requests_lock_;
 
-  // Maps from the unique reservation id received from Llama as response to a
-  // reservation request to a promise that will be set once that request has been
-  // fulfilled or rejected by the Llama. The original resource requester (the scheduler)
-  // blocks on the promise.
-  boost::unordered_map<llama::TUniqueId, ReservationPromise*> pending_requests_;
+  // Maps from the unique reservation id received from Llama as response to a reservation
+  // request to a structure that contains the results of the reservation request.
+  typedef boost::unordered_map<llama::TUniqueId,
+                               boost::shared_ptr<ReservationFulfillment> > FulfillmentMap;
+  FulfillmentMap pending_requests_;
 
   // Protects query_resource_mgrs_
   boost::mutex query_resource_mgrs_lock_;
