@@ -24,6 +24,14 @@ if [ "x${IMPALA_HOME}" == "x" ]; then
 fi
 
 IMPALA_VERSION_INFO_FILE=${IMPALA_HOME}/bin/version.info
+
+if [ ! -f ${IMPALA_VERSION_INFO_FILE} ]; then
+  echo "No version.info file found. Generating new version info"
+  ${IMPALA_HOME}/bin/save-version.sh
+else
+  echo "Using existing version.info file."
+fi
+
 VERSION=$(grep "VERSION: " ${IMPALA_VERSION_INFO_FILE} | awk '{print $2}')
 GIT_HASH=$(grep "GIT_HASH: " ${IMPALA_VERSION_INFO_FILE} | awk '{print $2}')
 BUILD_DATE=$(grep "BUILD_TIME: " ${IMPALA_VERSION_INFO_FILE} | cut -f 2- -d ' ')
@@ -41,13 +49,6 @@ rm -rf ${TARBALL_ROOT}/gen-py/* 2>&1 > /dev/null
 rm -rf ${TARBALL_ROOT}/ext-py/* 2>&1 > /dev/null
 mkdir -p ${TARBALL_ROOT}/lib
 mkdir -p ${TARBALL_ROOT}/ext-py
-
-if [ ! -f ${IMPALA_VERSION_INFO_FILE} ]; then
-  echo "No version.info file found. Generating new version info"
-  ${IMPALA_HOME}/bin/save-version.sh
-else
-  echo "Using existing version.info file."
-fi
 
 rm -f ${SHELL_HOME}/gen-py/impala_build_version.py
 cat > ${SHELL_HOME}/gen-py/impala_build_version.py <<EOF
