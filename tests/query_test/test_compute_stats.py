@@ -44,3 +44,7 @@ class TestComputeStats(ImpalaTestSuite):
 
   def test_compute_stats(self, vector):
     self.run_test_case('QueryTest/compute-stats', vector)
+    # To cut down on test execution time, only run the compute stats test against many
+    # partitions if performing an exhaustive test run.
+    if self.exploration_strategy() != 'exhaustive': return
+    self.run_test_case('QueryTest/compute-stats-many-partitions', vector)

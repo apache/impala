@@ -42,14 +42,13 @@ class TestLargeNumPartitions(ImpalaTestSuite):
         v.get_value('table_format').compression_codec == 'none')
 
   def test_list_partitions(self, vector):
-    full_tbl_name = 'scale_db.num_partitions_1234_blocks_per_partition_0'
+    full_tbl_name = 'scale_db.num_partitions_1234_blocks_per_partition_1'
     result = self.client.execute("show table stats %s" % full_tbl_name)
     # Should list all 1,234 partitions + 1 result for the summary
     assert len(result.data) == 1234 + 1
 
     count = self.execute_scalar("select count(*) from %s" % full_tbl_name)
-    # Table doesn't contain any data
-    assert int(count) == 0
+    assert int(count) == 1234
 
     # Should still get the same results after a refresh or invalidate
     self.client.execute("refresh %s" % full_tbl_name)

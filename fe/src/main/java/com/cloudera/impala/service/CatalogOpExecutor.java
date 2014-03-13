@@ -135,6 +135,10 @@ public class CatalogOpExecutor {
   // Only applies to partition updates after an INSERT for now.
   private static final int NUM_CONCURRENT_METASTORE_OPERATIONS = 16;
 
+  // The maximum number of partitions to update in one Hive Metastore RPC.
+  // Used when persisting the results of COMPUTE STATS statements.
+  private final static short MAX_PARTITION_UPDATES_PER_RPC = 500;
+
   // Used to execute metastore updates in parallel. Currently only used for bulk
   // partition creations.
   private final ExecutorService executor_ =
@@ -317,7 +321,8 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Alters an existing table's table and column statistics.
+   * Alters an existing table's table and column statistics. Partitions are updated
+   * in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'.
    */
   private void alterTableUpdateStats(TAlterTableUpdateStatsParams params,
       TDdlExecResponse resp) throws NoSuchObjectException, MetaException, TException,
@@ -327,7 +332,7 @@ public class CatalogOpExecutor {
 
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    LOG.info(String.format("Updating table stats for %s", tableName));
+    LOG.info(String.format("Updating table stats for: %s", tableName));
 
     Table table = getExistingTable(tableName.getDb(), tableName.getTbl());
     // Deep copy the msTbl to avoid updating our cache before successfully persisting
@@ -347,22 +352,35 @@ public class CatalogOpExecutor {
     }
 
     MetaStoreClient msClient = catalog_.getMetaStoreClient();
-    int numUpdatedPartitions;
+    int numTargetedPartitions;
     int numUpdatedColumns;
     try {
         // Update the table and partition row counts based on the query results.
-        numUpdatedPartitions = updateTableStats(table, params, msTbl, msPartitions);
+        List<org.apache.hadoop.hive.metastore.api.Partition> modifiedParts =
+            Lists.newArrayList();
+        numTargetedPartitions = updateTableStats(table, params, msTbl, msPartitions,
+            modifiedParts);
 
         // Create Hive column stats from the query results.
         ColumnStatistics colStats = createHiveColStats(params.getColumn_stats(), table);
         numUpdatedColumns = colStats.getStatsObjSize();
 
-        // Ensure updates are atomic with respect to conflicting DDL operations.
-        synchronized (metastoreDdlLock_) {
-          // Alter all partitions in bulk.
-          msClient.getHiveClient().alter_partitions(tableName.getDb(),
-              tableName.getTbl(), msPartitions);
+        // Update partitions in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'. This
+        // reduces the time spent in a single update and helps avoid metastore client
+        // timeouts.
+        for (int i = 0; i < modifiedParts.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
+          int numPartitionsToUpdate =
+              Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, modifiedParts.size());
+          List<org.apache.hadoop.hive.metastore.api.Partition> partsToUpdate =
+              modifiedParts.subList(i, numPartitionsToUpdate);
+          synchronized (metastoreDdlLock_) {
+            // Alter partitions in bulk.
+            msClient.getHiveClient().alter_partitions(tableName.getDb(),
+                tableName.getTbl(), partsToUpdate);
+          }
+        }
 
+        synchronized (metastoreDdlLock_) {
           // Update column stats.
           msClient.getHiveClient().updateTableColumnStatistics(colStats);
 
@@ -379,7 +397,7 @@ public class CatalogOpExecutor {
     resultSet.setSchema(new TResultSetMetadata(Lists.newArrayList(
         new TColumn("summary", ColumnType.STRING.toThrift()))));
     TColumnValue resultColVal = new TColumnValue();
-    resultColVal.setStringVal("Updated " + numUpdatedPartitions + " partition(s) and " +
+    resultColVal.setStringVal("Updated " + numTargetedPartitions + " partition(s) and " +
         numUpdatedColumns + " column(s).");
     TResultRow resultRow = new TResultRow();
     resultRow.setColVals(Lists.newArrayList(resultColVal));
@@ -389,36 +407,48 @@ public class CatalogOpExecutor {
 
   /**
    * Updates the row counts of the given Hive partitions and the total row count of the
-   * given Hive table based on the given update stats parameters.
+   * given Hive table based on the given update stats parameters. The partitions whose
+   * row counts have not changed are skipped. The modified partitions are returned
+   * in the modifiedParts parameter.
    * Missing or new partitions as a result of concurrent table alterations are ignored.
-   * Returns the number of successfully updated partitions.
+   * Returns the number of partitions that were targeted for update (includes partitions
+   * whose row counts have not changed).
    */
   private int updateTableStats(Table table, TAlterTableUpdateStatsParams params,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
-      List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions) {
+      List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
+      List<org.apache.hadoop.hive.metastore.api.Partition> modifiedParts) {
     Preconditions.checkState(params.isSetPartition_stats());
     Preconditions.checkState(params.isSetTable_stats());
 
     // Update the partitions' ROW_COUNT parameter.
-    int numUpdatedPartitions = 0;
+    int numTargetedPartitions = 0;
     for(org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
       TTableStats partitionStats = params.partition_stats.get(msPartition.getValues());
       if (partitionStats == null) continue;
-      LOG.debug(String.format("Updating stats for partition %s: numRows=%s",
+      LOG.trace(String.format("Updating stats for partition %s: numRows=%s",
           Joiner.on(",").join(msPartition.getValues()), partitionStats.num_rows));
-      msPartition.putToParameters(StatsSetupConst.ROW_COUNT,
-          String.valueOf(partitionStats.num_rows));
-      ++numUpdatedPartitions;
+
+      String newRowCount = String.valueOf(partitionStats.num_rows);
+      String existingRowCount =
+          msPartition.getParameters().get(StatsSetupConst.ROW_COUNT);
+      if (existingRowCount == null || !existingRowCount.equals(newRowCount)) {
+        // The existing row count value wasn't set or has changed.
+        msPartition.putToParameters(StatsSetupConst.ROW_COUNT, newRowCount);
+        modifiedParts.add(msPartition);
+      }
+      ++numTargetedPartitions;
     }
+
     // For unpartitioned tables and HBase tables report a single updated partition.
     if (table.getNumClusteringCols() == 0 || table instanceof HBaseTable) {
-      numUpdatedPartitions = 1;
+      numTargetedPartitions = 1;
     }
 
     // Update the table's ROW_COUNT parameter.
     msTbl.putToParameters(StatsSetupConst.ROW_COUNT,
         String.valueOf(params.getTable_stats().num_rows));
-    return numUpdatedPartitions;
+    return numTargetedPartitions;
   }
 
   /**

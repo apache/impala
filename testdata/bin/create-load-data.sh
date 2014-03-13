@@ -51,9 +51,9 @@ else
 fi
 popd
 
-# Create a table w/ 1234 partitions that is empty. Used to validate fetching partitions
-# in batches.
-${IMPALA_HOME}/testdata/bin/create-table-many-blocks.sh -p 1234 -b 0
+# Create a table w/ 1234 partitions. Used to validate fetching/updating partitions in
+# batches.
+${IMPALA_HOME}/testdata/bin/create-table-many-blocks.sh -p 1234 -b 1
 
 # Split HBase table
 echo "Splitting HBase table"

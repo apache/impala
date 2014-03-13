@@ -74,7 +74,7 @@ done
 echo "Copying data files to HDFS"
 hadoop fs -rm -r -f ${HDFS_PATH}
 hadoop fs -mkdir -p ${HDFS_PATH}
-hadoop fs -put ${LOCAL_OUTPUT_DIR} ${HDFS_PATH}
+hadoop fs -put ${LOCAL_OUTPUT_DIR}/* ${HDFS_PATH}
 
 echo "Generating DDL statements"
 # Use Hive to create the partitions because it supports bulk adding of partitions.
@@ -86,7 +86,7 @@ echo "use ${DB_NAME};" > ${LOCAL_OUTPUT_DIR}/hive_create_partitions.q
 echo "ALTER TABLE ${TBL_NAME} ADD " >> ${LOCAL_OUTPUT_DIR}/hive_create_partitions.q
 for p in $(seq ${NUM_PARTITIONS})
 do
-  echo " PARTITION (j=$p) LOCATION '${HDFS_PATH}/impala_tmp_files'" >>\
+  echo " PARTITION (j=$p) LOCATION '${HDFS_PATH}'" >>\
       ${LOCAL_OUTPUT_DIR}/hive_create_partitions.q
 done
 echo ";" >> ${LOCAL_OUTPUT_DIR}/hive_create_partitions.q
