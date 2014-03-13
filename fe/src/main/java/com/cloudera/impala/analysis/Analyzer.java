@@ -952,6 +952,7 @@ public class Analyzer {
       nullSmap.addMapping(slotRef.clone(null), new NullLiteral());
     }
     Expr nullTuplePred = p.clone(nullSmap);
+    nullTuplePred.unsetIsAnalyzed();
     try {
       nullTuplePred.analyze(this);
     } catch (Exception e) {

@@ -89,6 +89,7 @@ public class HdfsPartitionFilter {
     }
 
     Expr literalPredicate = predicate_.clone(sMap);
+    literalPredicate.unsetIsAnalyzed();
     LOG.trace(
         "isMatch: " + literalPredicate.toSql() + " " + literalPredicate.debugString());
     Preconditions.checkState(literalPredicate.isConstant());
