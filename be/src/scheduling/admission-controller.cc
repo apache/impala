@@ -255,15 +255,13 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     TPoolStats* total_stats = &cluster_pool_stats_[pool_name];
     TPoolStats* local_stats = &local_pool_stats_[pool_name];
     const int64_t cluster_mem_estimate = schedule->GetClusterMemoryEstimate();
-    VLOG_ROW << "Schedule for id=" << schedule->query_id()
-             << " in pool_name=" << pool_name
-             << " max_requests=" << max_requests << " max_queued=" << max_queued
+    VLOG_RPC << "Schedule for id=" << schedule->query_id()
+             << " in pool_name=" << pool_name << " PoolConfig(max_requests="
+             << max_requests << " max_queued=" << max_queued
              << " mem_limit=" << PrettyPrinter::Print(mem_limit, TCounterType::BYTES)
-             << " mem_usage="
-             << PrettyPrinter::Print(total_stats->mem_usage, TCounterType::BYTES)
-             << " cluster_mem_estimate="
+             << ") query cluster_mem_estimate="
              << PrettyPrinter::Print(cluster_mem_estimate, TCounterType::BYTES);
-    VLOG_ROW << "Initial stats: " << DebugPoolStats(pool_name, total_stats, local_stats);
+    VLOG_RPC << "Initial stats: " << DebugPoolStats(pool_name, total_stats, local_stats);
 
     if (CanAdmitRequest(pool_name, max_requests, mem_limit, *schedule, false)) {
       // Execute immediately
@@ -285,7 +283,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
         pool_metrics->cluster_mem_estimate->Increment(mem_estimate);
       }
       VLOG_QUERY << "Admitted query id=" << schedule->query_id();
-      VLOG_ROW << "Final: " << DebugPoolStats(pool_name, total_stats, local_stats);
+      VLOG_RPC << "Final: " << DebugPoolStats(pool_name, total_stats, local_stats);
       return Status::OK;
     }
 
@@ -360,7 +358,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
         PROFILE_INFO_VAL_ADMIT_QUEUED);
     if (pool_metrics != NULL) pool_metrics->local_admitted->Increment(1L);
     VLOG_QUERY << "Admitted queued query id=" << schedule->query_id();
-    VLOG_ROW << "Final: " << DebugPoolStats(pool_name, total_stats, local_stats);
+    VLOG_RPC << "Final: " << DebugPoolStats(pool_name, total_stats, local_stats);
     return Status::OK;
   }
 }
@@ -387,7 +385,7 @@ Status AdmissionController::ReleaseQuery(QuerySchedule* schedule) {
       pool_metrics->cluster_mem_estimate->Increment(-1 * mem_estimate);
     }
     pools_for_updates_.insert(pool_name);
-    VLOG_ROW << "Released query id=" << schedule->query_id() << " "
+    VLOG_RPC << "Released query id=" << schedule->query_id() << " "
              << DebugPoolStats(pool_name, total_stats, local_stats);
   }
   dequeue_cv_.notify_one();
@@ -609,7 +607,7 @@ void AdmissionController::DequeueLoop() {
       }
 
       RequestQueue& queue = request_queue_map_[pool_name];
-      VLOG_ROW << "Dequeue thread will try to admit " << max_num_to_admit << " requests"
+      VLOG_RPC << "Dequeue thread will try to admit " << max_num_to_admit << " requests"
                << ", pool=" << pool_name << ", num_queued=" << local_stats->num_queued;
 
       PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
@@ -619,7 +617,7 @@ void AdmissionController::DequeueLoop() {
         DCHECK(!queue_node->is_admitted.IsSet());
         const QuerySchedule& schedule = queue_node->schedule;
         if (!CanAdmitRequest(pool_name, max_requests, mem_limit, schedule, true)) {
-          VLOG_ROW << "Could not dequeue query id=" << queue_node->schedule.query_id();
+          VLOG_RPC << "Could not dequeue query id=" << queue_node->schedule.query_id();
           break;
         }
         queue.Dequeue();
