@@ -219,6 +219,20 @@ class MemTracker {
     return false;
   }
 
+  // Returns the maximum consumption that can be made without exceeding the limit on
+  // this tracker or any of its parents. Returns int64_t::max() if there are no
+  // limits and a negative value if any limit is already exceeded.
+  int64_t SpareCapacity() const {
+    int64_t result = std::numeric_limits<int64_t>::max();
+    for (std::vector<MemTracker*>::const_iterator tracker = limit_trackers_.begin();
+         tracker != limit_trackers_.end(); ++tracker) {
+      int64_t mem_left = (*tracker)->limit() - (*tracker)->consumption();
+      result = std::min(result, mem_left);
+    }
+    return result;
+  }
+
+
   int64_t limit() const { return limit_; }
   bool has_limit() const { return limit_ >= 0; }
   const std::string& label() const { return label_; }

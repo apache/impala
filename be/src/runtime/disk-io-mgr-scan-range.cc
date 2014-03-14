@@ -76,8 +76,8 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
 
     if (ready_buffers_.empty()) {
       // The queue is empty indicating this thread could use more
-      // IO. Double the capacity to allow for more queueing.
-      ready_buffers_capacity_ *= 2;
+      // IO. Increase the capacity to allow for more queueing.
+      ++ready_buffers_capacity_ ;
       ready_buffers_capacity_ = ::min(ready_buffers_capacity_, MAX_QUEUE_CAPACITY);
     }
 

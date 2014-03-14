@@ -15,6 +15,10 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-internal.h"
 
+using namespace boost;
+using namespace impala;
+using namespace std;
+
 // Control the number of disks on the machine.  If 0, this comes from the system
 // settings.
 DEFINE_int32(num_disks, 0, "Number of disks on data node.");
@@ -38,11 +42,12 @@ DEFINE_bool(reuse_io_buffers, true, "(Advanced) If true, IoMgr will reuse IoBuff
 static const int THREADS_PER_ROTATIONAL_DISK = 1;
 static const int THREADS_PER_FLASH_DISK = 8;
 
-using namespace boost;
-using namespace impala;
-using namespace std;
+// The IoMgr is able to run with a wide range of memory usage. If a query has memory
+// remaining less than this value, the IoMgr will stop all buffering regardless of the
+// current queue size.
+static const int LOW_MEMORY = 64 * 1024 * 1024;
 
-const int DiskIoMgr::DEFAULT_QUEUE_CAPACITY = 5;
+const int DiskIoMgr::DEFAULT_QUEUE_CAPACITY = 2;
 
 // This class provides a cache of ReaderContext objects.  ReaderContexts are recycled.
 // This is good for locality as well as lock contention.  The cache has the property that
@@ -860,6 +865,33 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
 
     int64_t bytes_remaining = range->len_ - range->bytes_read_;
     int64_t buffer_size = ::min(bytes_remaining, static_cast<int64_t>(max_buffer_size_));
+    bool enough_memory = true;
+    if (reader->mem_tracker_ != NULL) {
+      enough_memory = reader->mem_tracker_->SpareCapacity() > LOW_MEMORY;
+      if (!enough_memory) {
+        // Low memory, GC and try again.
+        GcIoBuffers();
+        enough_memory = reader->mem_tracker_->SpareCapacity() > LOW_MEMORY;
+      }
+    }
+
+    if (!enough_memory) {
+      ReaderContext::PerDiskState& state = reader->disk_states_[disk_queue->disk_id];
+      unique_lock<mutex> reader_lock(reader->lock_);
+      if (!range->ready_buffers_.empty()) {
+        // We have memory pressure and this range doesn't need another buffer
+        // (it already has one queued). Skip this range and pick it up later.
+        range->blocked_on_queue_ = true;
+        reader->blocked_ranges_.Enqueue(range);
+        state.DecrementReadThread();
+        continue;
+      } else {
+        // We need to get a buffer anyway since there are none queued. The query
+        // is likely to fail due to mem limits but there's nothing we can do about that
+        // now.
+      }
+    }
+
     buffer = GetFreeBuffer(&buffer_size);
     ++reader->num_used_buffers_;
 

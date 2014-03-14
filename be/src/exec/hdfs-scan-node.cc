@@ -61,6 +61,13 @@ using namespace std;
 const string HdfsScanNode::HDFS_SPLIT_STATS_DESC =
     "Hdfs split stats (<volume id>:<# splits>/<split lengths>)";
 
+
+// Amount of memory that we approximate a scanner thread will use not including IoBuffers.
+// The memory used does not vary considerably between file formats (just a couple of MBs).
+// This value is conservative and taken from running against the tpch lineitem table.
+// TODO: revisit how we do this.
+const int SCANNER_THREAD_MEM_USAGE = 32 * 1024 * 1024;
+
 HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
@@ -71,6 +78,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       reader_context_(NULL),
       tuple_desc_(NULL),
       unknown_disk_id_warned_(false),
+      scanner_thread_bytes_required_(0),
       num_interpreted_conjuncts_copies_(0),
       num_partition_keys_(0),
       disks_accessed_bitmap_(TCounterType::UNIT, 0),
@@ -427,6 +435,27 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
                           try_cache));
   }
 
+  // Compute the minimum bytes required to start a new thread. This is based on the
+  // file format.
+  // The higher the estimate, the less likely it is the query will fail but more likely
+  // the query will be throttled when it does not need to be.
+  // TODO: how many buffers should we estimate per range. The IoMgr will throttle down to
+  // one but if there are already buffers queued before memory pressure was hit, we can't
+  // reclaim that memory.
+  if (per_type_files_[THdfsFileFormat::PARQUET].size() > 0) {
+    // Parquet files require buffers per column
+    scanner_thread_bytes_required_ =
+        materialized_slots_.size() * 3 * runtime_state_->io_mgr()->max_read_buffer_size();
+  } else {
+    scanner_thread_bytes_required_ =
+        3 * runtime_state_->io_mgr()->max_read_buffer_size();
+  }
+  // scanner_thread_bytes_required_ now contains the IoBuffer requirement.
+  // Next we add a constant for the other memory the scanner thread will use.
+  // e.g. decompression buffers, tuple buffers, etc.
+  // TODO: can we do something better?
+  scanner_thread_bytes_required_ += SCANNER_THREAD_MEM_USAGE;
+
   // Prepare all the partitions scanned by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_id_set) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
@@ -640,6 +669,39 @@ void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
   materialized_row_batches_->AddBatch(row_batch);
 }
 
+// For controlling the amount of memory used for scanners, we approximate the
+// scanner mem usage based on scanner_thread_bytes_required_, rather than the
+// consumption in the scan node's mem tracker. The problem with the scan node
+// trackers is that it does not account for the memory the scanner will use.
+// For example, if there is 110 MB of memory left (based on the mem tracker)
+// and we estimate that a scanner will use 100MB, we want to make sure to only
+// start up one additional thread. However, after starting the first thread, the
+// mem tracker value will not change immediately (it takes some time before the
+// scanner is running and starts using memory). Therefore we just use the estimate
+// based on the number of running scanner threads.
+bool HdfsScanNode::EnoughMemoryForScannerThread(bool new_thread) {
+  int64_t committed_scanner_mem =
+      active_scanner_thread_counter_.value() * scanner_thread_bytes_required_;
+  int64_t tracker_consumption = mem_tracker()->consumption();
+  int64_t est_additional_scanner_mem = committed_scanner_mem - tracker_consumption;
+  if (est_additional_scanner_mem < 0) {
+    // This is the case where our estimate was too low. Expand the estimate based
+    // on the usage.
+    int64_t avg_consumption =
+        tracker_consumption / active_scanner_thread_counter_.value();
+    // Take the average and expand it by 50%. Some scanners will not have hit their
+    // steady state mem usage yet.
+    // TODO: how can we scale down if we've overestimated.
+    // TODO: better heuristic?
+    scanner_thread_bytes_required_ = static_cast<int64_t>(avg_consumption * 1.5);
+    est_additional_scanner_mem = 0;
+  }
+
+  // If we are starting a new thread, take that into account now.
+  if (new_thread) est_additional_scanner_mem += scanner_thread_bytes_required_;
+  return est_additional_scanner_mem < mem_tracker()->SpareCapacity();
+}
+
 void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool) {
   // This is called to start up new scanner threads. It's not a big deal if we
   // spin up more than strictly necessary since they will go through and terminate
@@ -648,7 +710,10 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   //  2. Don't start up if all the ranges have been taken by another thread.
   //  3. Don't start up if the number of ranges left is less than the number of
   //     active scanner threads.
-  //  4. Don't start up if there are no thread tokens.
+  //  4. Don't start up a ScannerThread if materialized_row_batches_ is full since
+  //     we are not scanner bound.
+  //  5. Don't start up a thread if there isn't enough memory left to run it.
+  //  6. Don't start up if there are no thread tokens.
   bool started_scanner = false;
   while (true) {
     if (runtime_state_->query_resource_mgr() != NULL &&
@@ -660,11 +725,22 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
     // TODO: This still leans heavily on starvation-free locks, come up with a more
     // correct way to communicate between this method and ScannerThreadHelper
     unique_lock<mutex> lock(lock_);
+    // Cases 1, 2, 3
     if (done_ || all_ranges_started_ ||
-      active_scanner_thread_counter_.value() >= progress_.remaining() ||
-      !pool->TryAcquireThreadToken()) {
+      active_scanner_thread_counter_.value() >= progress_.remaining()) {
       break;
     }
+
+    // Cases 4 and 5
+    if (active_scanner_thread_counter_.value() > 0 &&
+        (materialized_row_batches_->GetSize() >= max_materialized_row_batches_ ||
+         !EnoughMemoryForScannerThread(true))) {
+      break;
+    }
+
+    // Case 6
+    if (!pool->TryAcquireThreadToken()) break;
+
     COUNTER_UPDATE(&active_scanner_thread_counter_, 1);
     COUNTER_UPDATE(num_scanner_threads_started_counter_, 1);
     stringstream ss;
@@ -680,9 +756,31 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   if (!started_scanner) ++num_skipped_tokens_;
 }
 
-inline void HdfsScanNode::ScannerThreadHelper() {
+void HdfsScanNode::ScannerThread() {
+  SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
   SCOPED_TIMER(runtime_state_->total_cpu_timer());
-  while (!done_ && !runtime_state_->resource_pool()->optional_exceeded()) {
+
+  while (!done_) {
+    {
+      // Check if we have enough resources (thread token and memory) to keep using
+      // this thread.
+      unique_lock<mutex> l(lock_);
+      if (active_scanner_thread_counter_.value() > 1) {
+        if (runtime_state_->resource_pool()->optional_exceeded() ||
+            !EnoughMemoryForScannerThread(false)) {
+          // We can't break here. We need to update the counter and release the token
+          // with the lock held or else all threads might see
+          // active_scanner_thread_counter_.value > 1
+          COUNTER_UPDATE(&active_scanner_thread_counter_, -1);
+          runtime_state_->resource_pool()->ReleaseThreadToken(false);
+          return;
+        }
+      } else {
+        // If this is the only scanner thread, it should keep running regardless
+        // of resource constraints.
+      }
+    }
+
     DiskIoMgr::ScanRange* scan_range;
     // Take a snapshot of num_unqueued_files_ before calling GetNextRange().
     // We don't want num_unqueued_files_ to go to zero between the return from
@@ -735,27 +833,27 @@ inline void HdfsScanNode::ScannerThreadHelper() {
       {
         unique_lock<mutex> l(lock_);
         // If there was already an error, the main thread will do the cleanup
-        if (!status_.ok()) return;
+        if (!status_.ok()) break;
 
         if (status.IsCancelled()) {
           // Scan node should be the only thing that initiated scanner threads to see
           // cancelled (i.e. limit reached).  No need to do anything here.
           DCHECK(done_);
-          return;
+          break;
         }
         status_ = status;
       }
 
       if (status.IsMemLimitExceeded()) runtime_state_->SetMemLimitExceeded();
       SetDone();
-      return;
+      break;
     }
 
     // Done with range and it completed successfully
     if (progress_.done()) {
       // All ranges are finished.  Indicate we are done.
       SetDone();
-      return;
+      break;
     }
 
     if (scan_range == NULL && num_unqueued_files == 0) {
@@ -764,14 +862,10 @@ inline void HdfsScanNode::ScannerThreadHelper() {
       // means that every range is either done or being processed by
       // another thread.
       all_ranges_started_ = true;
-      return;
+      break;
     }
   }
-}
 
-void HdfsScanNode::ScannerThread() {
-  SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
-  ScannerThreadHelper();
   COUNTER_UPDATE(&active_scanner_thread_counter_, -1);
   if (runtime_state_->query_resource_mgr() != NULL) {
     runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(-1);
