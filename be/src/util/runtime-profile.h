@@ -264,7 +264,6 @@ class RuntimeProfile {
   // (measured relative to the moment Start() was called as t=0). It is
   // useful for tracking the evolution of some serial process, such as
   // the query lifecycle.
-  // Not thread-safe.
   class EventSequence {
    public:
     EventSequence() { }
@@ -281,13 +280,11 @@ class RuntimeProfile {
     // Starts the timer without resetting it.
     void Start() { sw_.Start(); }
 
-    // Stops (or effectively pauses) the timer.
-    void Stop() { sw_.Stop(); }
-
     // Stores an event in sequence with the given label and the
     // current time (relative to the first time Start() was called) as
     // the timestamp.
     void MarkEvent(const std::string& label) {
+      boost::lock_guard<boost::mutex> event_lock(lock_);
       events_.push_back(make_pair(label, sw_.ElapsedTime()));
     }
 
@@ -299,9 +296,18 @@ class RuntimeProfile {
     // An EventList is a sequence of Events, in increasing timestamp order
     typedef std::vector<Event> EventList;
 
-    const EventList& events() const { return events_; }
+    // Copies the member events_ into the supplied vector 'events'.
+    // The supplied vector 'events' is cleared before this.
+    void GetEvents(std::vector<Event>* events) {
+      events->clear();
+      boost::lock_guard<boost::mutex> event_lock(lock_);
+      events->insert(events->end(), events_.begin(), events_.end());
+    }
 
    private:
+    // Protect access to events_
+    boost::mutex lock_;
+
     // Stored in increasing time order
     EventList events_;
 

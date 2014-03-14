@@ -521,6 +521,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     //     - Event 2: 2s288ms (2s288ms)
     //     - Event 3: 2s410ms (121.138ms)
     // The times in parentheses are the time elapsed since the last event.
+    vector<EventSequence::Event> events;
     lock_guard<mutex> l(event_sequence_lock_);
     BOOST_FOREACH(
         const EventSequenceMap::value_type& event_sequence, event_sequence_map_) {
@@ -530,7 +531,8 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
              << endl;
 
       int64_t last = 0L;
-      BOOST_FOREACH(const EventSequence::Event& event, event_sequence.second->events()) {
+      event_sequence.second->GetEvents(&events);
+      BOOST_FOREACH(const EventSequence::Event& event, events) {
         stream << prefix << "     - " << event.first << ": "
                << PrettyPrinter::Print(
                    event.second, TCounterType::TIME_NS) << " ("
@@ -652,6 +654,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   }
 
   {
+    vector<EventSequence::Event> events;
     lock_guard<mutex> l(event_sequence_lock_);
     if (event_sequence_map_.size() != 0) {
       node.__set_event_sequences(vector<TEventSequence>());
@@ -660,7 +663,8 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
       BOOST_FOREACH(const EventSequenceMap::value_type& val, event_sequence_map_) {
         TEventSequence* seq = &node.event_sequences[idx++];
         seq->name = val.first;
-        BOOST_FOREACH(const EventSequence::Event& ev, val.second->events()) {
+        val.second->GetEvents(&events);
+        BOOST_FOREACH(const EventSequence::Event& ev, events) {
           seq->labels.push_back(ev.first);
           seq->timestamps.push_back(ev.second);
         }

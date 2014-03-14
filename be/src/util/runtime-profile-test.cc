@@ -416,11 +416,13 @@ TEST(CountersTest, EventSequences) {
   seq->MarkEvent("bbbb");
   seq->MarkEvent("cccc");
 
-  EXPECT_EQ(3, seq->events().size());
+  vector<RuntimeProfile::EventSequence::Event> events;
+  seq->GetEvents(&events);
+  EXPECT_EQ(3, events.size());
 
   uint64_t last_timestamp = 0;
   string last_string = "";
-  BOOST_FOREACH(const RuntimeProfile::EventSequence::Event& ev, seq->events()) {
+  BOOST_FOREACH(const RuntimeProfile::EventSequence::Event& ev, events) {
     EXPECT_TRUE(ev.second >= last_timestamp);
     last_timestamp = ev.second;
     EXPECT_TRUE(ev.first > last_string);
@@ -440,8 +442,9 @@ TEST(CountersTest, EventSequences) {
   EXPECT_EQ(NULL, reconstructed_profile->GetEventSequence("doesn't exist"));
   seq = reconstructed_profile->GetEventSequence("event sequence");
   EXPECT_TRUE(seq != NULL);
-  EXPECT_EQ(3, seq->events().size());
-  BOOST_FOREACH(const RuntimeProfile::EventSequence::Event& ev, seq->events()) {
+  seq->GetEvents(&events);
+  EXPECT_EQ(3, events.size());
+  BOOST_FOREACH(const RuntimeProfile::EventSequence::Event& ev, events) {
     EXPECT_TRUE(ev.second >= last_timestamp);
     last_timestamp = ev.second;
     EXPECT_TRUE(ev.first > last_string);
