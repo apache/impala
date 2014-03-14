@@ -64,21 +64,22 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     """Test that inserts after changing the location of a partition work correctly"""
     partition_dir = "tmp/test_insert_alter_partition_location"
 
-    self.client.execute("DROP TABLE IF EXISTS functional.insert_alter_partition_location")
+    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS "
+                                      "functional.insert_alter_partition_location")
     self.hdfs_client.delete_file_dir(partition_dir, recursive=True)
     self.hdfs_client.make_dir(partition_dir)
 
-    self.client.execute(
+    self.execute_query_expect_success(self.client,
 "CREATE TABLE functional.insert_alter_partition_location (c int) PARTITIONED BY (p int)")
-    self.client.execute(
+    self.execute_query_expect_success(self.client,
 "ALTER TABLE functional.insert_alter_partition_location ADD PARTITION(p=1)")
-    self.client.execute(
+    self.execute_query_expect_success(self.client,
 "ALTER TABLE functional.insert_alter_partition_location PARTITION(p=1) SET LOCATION '/%s'"
       % partition_dir)
-    self.client.execute(
+    self.execute_query_expect_success(self.client,
 "INSERT OVERWRITE functional.insert_alter_partition_location PARTITION(p=1) VALUES(1)")
 
-    result = self.client.execute(
+    result = self.execute_query_expect_success(self.client,
 "SELECT COUNT(*) FROM functional.insert_alter_partition_location")
     assert int(result.get_data()) == 1
 

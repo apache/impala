@@ -38,6 +38,13 @@ HdfsOp::HdfsOp(HdfsOpType op, const std::string& src, const std::string& dst,
   DCHECK(!dst_.empty());
 }
 
+HdfsOp::HdfsOp(HdfsOpType op, const string& src, short permissions,
+    HdfsOperationSet* op_set)
+    : op_(op), src_(src), permissions_(permissions), op_set_(op_set) {
+  DCHECK(op == CHMOD);
+  DCHECK(!src_.empty());
+}
+
 // Required for ThreadPool
 HdfsOp::HdfsOp() { }
 
@@ -59,6 +66,9 @@ void HdfsOp::Execute() const {
       err = hdfsDelete(*hdfs_connection, src_.c_str(), 1);
       if (err != -1) err = hdfsCreateDirectory(*hdfs_connection, src_.c_str());
       break;
+    case CHMOD:
+      err = hdfsChmod(*hdfs_connection, src_.c_str(), permissions_);
+      break;
   }
 
   if (err == -1) {
@@ -77,6 +87,9 @@ void HdfsOp::Execute() const {
         break;
       case DELETE_THEN_CREATE:
         ss << "DELETE_THEN_CREATE " << src_;
+        break;
+      case CHMOD:
+        ss << "CHMOD " << src_ << " " << oct << permissions_;
         break;
     }
     ss << ") failed, error was: " << error_msg;
@@ -120,13 +133,16 @@ bool HdfsOperationSet::Execute(ThreadPool<HdfsOp>* pool,
   return promise_.Get();
 }
 
-void HdfsOperationSet::Add(HdfsOpType op, const std::string& src) {
+void HdfsOperationSet::Add(HdfsOpType op, const string& src) {
   ops_.push_back(HdfsOp(op, src, this));
 }
 
-void HdfsOperationSet::Add(HdfsOpType op, const std::string& src,
-    const std::string& dst) {
+void HdfsOperationSet::Add(HdfsOpType op, const string& src, const string& dst) {
   ops_.push_back(HdfsOp(op, src, dst, this));
+}
+
+void HdfsOperationSet::Add(HdfsOpType op, const string& src, short permissions) {
+  ops_.push_back(HdfsOp(op, src, permissions, this));
 }
 
 void HdfsOperationSet::AddError(const string& err, const HdfsOp* op) {

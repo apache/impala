@@ -59,7 +59,6 @@ class TReportExecStatusParams;
 class TRowBatch;
 class TPlanExecRequest;
 class TRuntimeProfileTree;
-class TQueryOptions;
 class RuntimeProfile;
 
 // Query coordinator: handles execution of plan fragments on remote nodes, given
@@ -403,6 +402,21 @@ class Coordinator {
   // Outputs aggregate query profile summary.  This is assumed to be called at the end of
   // a query -- remote fragments' profiles must not be updated while this is running.
   void ReportQuerySummary();
+
+  // Builds a map from a path in Hdfs to a pair (newly_created, permissions). Used to
+  // determine what the permissions of newly created directories should be if permission
+  // inheritance is enabled (and not called otherwise). The PermissionCache argument is
+  // used to avoid repeatedly calling hdfsGetPathInfo() on the same path. The caller
+  // (FinalizeSuccessfulInsert()) will iterate over the contents of the map after
+  // BuildPermissionCache() has been called for all created partitions and change the
+  // permissions for all directories for which newly_created == true.
+  //
+  // The permissions value is set to the permission of the lowest ancestor of path_str
+  // that actually exists.
+  typedef boost::unordered_map<std::string, std::pair<bool, short> > PermissionCache;
+  void BuildPermissionCache(hdfsFS fs, const std::string& path_str,
+      PermissionCache* permissions_cache);
+
 };
 
 }

@@ -29,7 +29,8 @@ enum HdfsOpType {
   DELETE,
   CREATE_DIR,
   RENAME,
-  DELETE_THEN_CREATE
+  DELETE_THEN_CREATE,
+  CHMOD
 };
 
 class HdfsOperationSet;
@@ -41,6 +42,9 @@ class HdfsOp {
   HdfsOp(HdfsOpType op, const std::string& src, HdfsOperationSet* op_set);
 
   HdfsOp(HdfsOpType op, const std::string& src, const std::string& dst,
+      HdfsOperationSet* op_set);
+
+  HdfsOp(HdfsOpType op, const std::string& src, short permissions,
       HdfsOperationSet* op_set);
 
   // Required for ThreadPool
@@ -61,8 +65,11 @@ class HdfsOp {
   // First operand
   std::string src_;
 
-  // Second operand, ignored except for RENAME
+  // Second string operand, ignored except for RENAME
   std::string dst_;
+
+  // Permission operand, ignored except for CHMOD
+  short permissions_;
 
   // Containing operation set, used to record errors and to signal completion.
   HdfsOperationSet* op_set_;
@@ -90,6 +97,9 @@ class HdfsOperationSet {
 
   // Add an operation that takes two parameters (e.g. RENAME)
   void Add(HdfsOpType op, const std::string& src, const std::string& dst);
+
+  // Add an operation that takes a permission argument (i.e. CHMOD)
+  void Add(HdfsOpType op, const std::string& src, short permissions);
 
   // Run all operations on the given pool, blocking until all are complete. Returns false
   // if there were any errors, true otherwise.

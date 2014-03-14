@@ -26,8 +26,8 @@
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/bind.hpp>
-#include <boost/foreach.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -68,6 +68,9 @@ using namespace apache::thrift;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
+
+DEFINE_bool(insert_inherit_permissions, false, "If true, new directories created by "
+    "INSERTs will inherit the permissions of their parent directories");
 
 namespace impala {
 
@@ -486,9 +489,73 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance
   return query_status_;
 }
 
+void Coordinator::BuildPermissionCache(hdfsFS fs, const string& path_str,
+    PermissionCache* permissions_cache) {
+  // Find out if the path begins with a hdfs:// -style prefix, and remove it and the
+  // location (e.g. host:port) if so.
+  int scheme_end = path_str.find("://");
+  string stripped_str;
+  if (scheme_end != string::npos) {
+    // Skip past the subsequent location:port/ prefix.
+    stripped_str = path_str.substr(path_str.find("/", scheme_end + 3));
+  } else {
+    stripped_str = path_str;
+  }
+
+  // Get the list of path components, used to build all path prefixes.
+  vector<string> components;
+  split(components, stripped_str, is_any_of("/"));
+
+  // Build a set of all prefixes (including the complete string) of stripped_path. So
+  // /a/b/c/d leads to a vector of: /a, /a/b, /a/b/c, /a/b/c/d
+  vector<string> prefixes;
+  // Stores the current prefix
+  stringstream accumulator;
+  BOOST_FOREACH(const string& component, components) {
+    if (component.empty()) continue;
+    accumulator << "/" << component;
+    prefixes.push_back(accumulator.str());
+  }
+
+  // Now for each prefix, stat() it to see if a) it exists and b) if so what its
+  // permissions are. Every directory in prefix will be created if it isn't already, so
+  // when we meet a directory that doesn't exist, we record the fact that we need to
+  // create it, and the permissions of its parent dir to inherit.
+  //
+  // Every prefix is recorded in the PermissionCache so we don't do more than one stat()
+  // for each path. If we need to create the directory, we record it as the pair (true,
+  // perms) so that the caller can identify which directories need their permissions
+  // explicitly set.
+
+  // Set to the permission of the immediate parent (i.e. the permissions to inherit if the
+  // current dir doesn't exist).
+  short permissions = 0;
+  BOOST_FOREACH(const string& path, prefixes) {
+    PermissionCache::const_iterator it = permissions_cache->find(path);
+    if (it == permissions_cache->end()) {
+      hdfsFileInfo* info = hdfsGetPathInfo(fs, path.c_str());
+      if (info != NULL) {
+        // File exists, so fill the cache with its current permissions.
+        permissions_cache->insert(
+            make_pair(path, make_pair(false, info->mPermissions)));
+        permissions = info->mPermissions;
+        hdfsFreeFileInfo(info, 1);
+      } else {
+        // File doesn't exist, so we need to set its permissions to its immediate parent
+        // once it's been created.
+        permissions_cache->insert(make_pair(path, make_pair(true, permissions)));
+      }
+    } else {
+      permissions = it->second.second;
+    }
+  }
+}
+
 Status Coordinator::FinalizeSuccessfulInsert() {
   hdfsFS hdfs_connection = HdfsFsCache::instance()->GetDefaultConnection();
-  // INSERT finalization happens in the four following steps
+  PermissionCache permissions_cache;
+
+  // INSERT finalization happens in the five following steps
   // 1. If OVERWRITE, remove all the files in the target directory
   // 2. Create all the necessary partition directories.
   HdfsOperationSet partition_create_ops(&hdfs_connection);
@@ -527,6 +594,9 @@ Status Coordinator::FinalizeSuccessfulInsert() {
         // recursively with abandon, after checking that it ever existed.
         // TODO: There's a potential race here between checking for the directory
         // and a third-party deleting it.
+        if (FLAGS_insert_inherit_permissions) {
+          BuildPermissionCache(hdfs_connection, part_path, &permissions_cache);
+        }
         if (hdfsExists(hdfs_connection, part_path.c_str()) != -1) {
           partition_create_ops.Add(DELETE_THEN_CREATE, part_path);
         } else {
@@ -535,6 +605,9 @@ Status Coordinator::FinalizeSuccessfulInsert() {
         }
       }
     } else {
+      if (FLAGS_insert_inherit_permissions) {
+        BuildPermissionCache(hdfs_connection, part_path, &permissions_cache);
+      }
       partition_create_ops.Add(CREATE_DIR, part_path);
     }
   }
@@ -594,6 +667,29 @@ Status Coordinator::FinalizeSuccessfulInsert() {
       return Status(ss.str());
     }
   }
+
+  // 5. Optionally update the permissions of the created partition directories
+  // Do this last in case we make the dirs unwriteable.
+  if (FLAGS_insert_inherit_permissions) {
+    HdfsOperationSet chmod_ops(&hdfs_connection);
+    BOOST_FOREACH(const PermissionCache::value_type& perm, permissions_cache) {
+      bool new_dir = perm.second.first;
+      if (new_dir) {
+        short permissions = perm.second.second;
+        VLOG_QUERY << "INSERT created new directory: " << perm.first
+                   << ", inherited permissions are: " << oct << permissions;
+        chmod_ops.Add(CHMOD, perm.first, permissions);
+      }
+    }
+    if (!chmod_ops.Execute(exec_env_->hdfs_op_thread_pool(), false)) {
+      stringstream ss;
+      ss << "Error(s) setting permissions on newly created partition directories. First"
+         << " error (of " << chmod_ops.errors().size() << ") was: "
+         << chmod_ops.errors()[0].second;
+      return Status(ss.str());
+    }
+  }
+
 
   return Status::OK;
 }

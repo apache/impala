@@ -134,7 +134,7 @@ enum TImpalaQueryOptions {
   RESERVATION_REQUEST_TIMEOUT,
 
   // if true, disables cached reads
-  DISABLE_CACHED_READS,
+  DISABLE_CACHED_READS
 }
 
 // The summary of an insert.

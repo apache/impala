@@ -16,9 +16,21 @@
 # Hdfs access utilities
 
 from xml.etree.ElementTree import parse
-from pywebhdfs.webhdfs import PyWebHdfsClient, errors
+from pywebhdfs.webhdfs import PyWebHdfsClient, errors, _raise_pywebhdfs_exception
 import getpass
 import types
+import requests, httplib
+
+class PyWebHdfsClientWithChmod(PyWebHdfsClient):
+  def chmod(self, path, permission):
+    """Set the permission of 'path' to 'permission' (specified as an octal string, e.g.
+    '775'"""
+    uri = self._create_uri(path, "SETPERMISSION", permission=permission)
+    response = requests.put(uri, allow_redirects=True)
+    if not response.status_code == httplib.OK:
+      _raise_pywebhdfs_exception(response.status_code, response.text)
+
+    return True
 
 class HdfsConfig(object):
   """Reads an XML configuration file (produced by a mini-cluster) into a dictionary
@@ -57,7 +69,7 @@ def __pyweb_hdfs_client_exists(self, path):
 
 def get_hdfs_client(host, port, user_name=getpass.getuser()):
   """Returns a new HTTP client for an HDFS cluster using an explict host:port pair"""
-  hdfs_client = PyWebHdfsClient(host=host, port=port, user_name=user_name)
+  hdfs_client = PyWebHdfsClientWithChmod(host=host, port=port, user_name=user_name)
   # Bind our "exists" method to hdfs_client.exists
   hdfs_client.exists = types.MethodType(__pyweb_hdfs_client_exists, hdfs_client)
   return hdfs_client
