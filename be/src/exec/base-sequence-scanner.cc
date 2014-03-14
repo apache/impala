@@ -110,6 +110,7 @@ Status BaseSequenceScanner::ProcessSplit() {
     Status status = ReadFileHeader();
     if (!status.ok()) {
       if (state_->abort_on_error()) return status;
+      state_->LogError(status);
       // We need to complete the ranges for this file.
       CloseFileRanges(stream_->filename());
       return Status::OK;

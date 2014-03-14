@@ -377,7 +377,6 @@ inline Status HdfsRCFileScanner::NextField(int col_idx) {
         int64_t position = stream_->file_offset();
         stringstream ss;
         ss << "Invalid column length at offset: " << position;
-        if (state_->LogHasSpace()) state_->LogError(ss.str());
         return Status(ss.str());
     }
     col_info.key_buffer_pos += bytes_read;

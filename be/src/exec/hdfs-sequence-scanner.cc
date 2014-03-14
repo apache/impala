@@ -114,7 +114,6 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     if (in_size < 0) {
       stringstream ss;
       ss << "Invalid record size: " << in_size;
-      if (state_->LogHasSpace()) state_->LogError(ss.str());
       return Status(ss.str());
     }
     uint8_t* compressed_data;
@@ -130,12 +129,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
     int size = ReadWriteUtil::GetVLong(*record_ptr, record_len);
-    if (size == -1) {
-        stringstream ss;
-        ss << "Invalid record size";
-        if (state_->LogHasSpace()) state_->LogError(ss.str());
-        return Status(ss.str());
-    }
+    if (size == -1) return Status("Invalid record sizse");
     *record_ptr += size;
   } else {
     // Uncompressed records
@@ -143,7 +137,6 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     if (*record_len < 0) {
       stringstream ss;
       ss << "Invalid record length: " << *record_len;
-      if (state_->LogHasSpace()) state_->LogError(ss.str());
       return Status(ss.str());
     }
     RETURN_IF_FALSE(
@@ -222,10 +215,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
     int bytes_read = ReadWriteUtil::GetVLong(
         next_record_in_compressed_block_, &record_locations_[i].len);
     if (UNLIKELY(bytes_read == -1)) {
-      stringstream ss;
-      ss << "Invalid record size in compressed block.";
-      if (state_->LogHasSpace()) state_->LogError(ss.str());
-      return Status(ss.str());
+      return Status("Invalid record sizes in compressed block.");
     }
     next_record_in_compressed_block_ += bytes_read;
     record_locations_[i].record = next_record_in_compressed_block_;
@@ -479,7 +469,6 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   if (block_size > MAX_BLOCK_SIZE || block_size < 0) {
     stringstream ss;
     ss << "Compressed block size is: " << block_size;
-    if (state_->LogHasSpace()) state_->LogError(ss.str());
     return Status(ss.str());
   }
 

@@ -258,7 +258,8 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
     SchemaElement element = ConvertSchemaNode(file_field);
     if (element.type >= COMPLEX_TYPE) {
       stringstream ss;
-      ss << "Complex Avro types unsupported: " << element.type;
+      ss << "Complex Avro data types (records, enums, arrays, maps, unions, and fixed) "
+         << "are not supported. Got type: " << element.type;
       return Status(ss.str());
     }
 
@@ -772,7 +773,9 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
         read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_STRING);
         break;
       default:
-        DCHECK(false) << "Unsupported SchemaElement: " << element.type;
+        // Unsupported type, can't codegen
+        fn->eraseFromParent();
+        return NULL;
     }
 
     if (slot_idx != HdfsScanNode::SKIP_COLUMN) {
