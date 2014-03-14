@@ -4,6 +4,7 @@
 #
 import logging
 import pytest
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
@@ -56,3 +57,25 @@ class TestInsertQueries(ImpalaTestSuite):
   def test_insert_overwrite(self, vector):
     self.run_test_case('QueryTest/insert_overwrite', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+
+class TestUnsupportedInsertFormats(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestUnsupportedInsertFormats, cls).add_test_dimensions()
+    # Only run on file formats we can't write to
+    cls.TestMatrix.add_constraint(lambda v: \
+        not (v.get_value('table_format').file_format == 'parquet' or
+             v.get_value('table_format').file_format == 'hbase' or
+             (v.get_value('table_format').file_format == 'text' and
+              v.get_value('table_format').compression_codec == 'none')))
+
+  def test_unsupported_formats(self, vector):
+    try:
+      self.execute_query_using_client(
+        self.client, 'insert into table tinytable values("hi", "there")', vector)
+      assert False, 'Query was expected to fail'
+    except ImpalaBeeswaxException, e: pass

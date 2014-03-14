@@ -344,11 +344,14 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
       stringstream error_msg;
       map<int, const char*>::const_iterator i =
           _THdfsFileFormat_VALUES_TO_NAMES.find(partition_descriptor.file_format());
-      const char* str = "Unknown data sink type";
       if (i != _THdfsFileFormat_VALUES_TO_NAMES.end()) {
-        str = i->second;
+        error_msg << "Cannot write to table with format " << i->second << ". "
+                  << "Impala only supports writing to TEXT and PARQUET tables.";
+      } else {
+        error_msg << "Cannot write to table. Impala only supports writing to TEXT"
+                  << " and PARQUET tables. (Unknown file format: "
+                  << partition_descriptor.file_format() << ")";
       }
-      error_msg << str << " not implemented.";
       return Status(error_msg.str());
   }
   RETURN_IF_ERROR(output_partition->writer->Init());
