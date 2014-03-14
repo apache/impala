@@ -157,8 +157,8 @@ public class RequestPoolService {
     if (!Strings.isNullOrEmpty(llamaSitePath)) {
       llamaConfUrl_ = getURL(llamaSitePath);
       if (llamaConfUrl_ == null) {
-        throw new IllegalArgumentException("Llama configuration file " + llamaSitePath +
-            " is not an absolute path or a file on the classpath.");
+        throw new IllegalArgumentException(
+            "Unable to find Llama configuration file: " + llamaSitePath);
       }
       llamaConf_ = new Configuration(false);
       llamaConf_.addResource(llamaConfUrl_);
