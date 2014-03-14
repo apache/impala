@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "statestore/simple-scheduler.h"
+
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
@@ -27,7 +29,6 @@
 #include "runtime/coordinator.h"
 #include "service/impala-server.h"
 
-#include "statestore/simple-scheduler.h"
 #include "statestore/statestore-subscriber.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
