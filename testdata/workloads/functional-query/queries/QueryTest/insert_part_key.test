@@ -1,0 +1,19 @@
+====
+# Pre IMPALA-875, IntLiterals with value 1 would be cast to TINYINT during analysis of
+# the insert statement.
+#
+# In this example, we create a partitioned table with three partitions whose partition
+# columns are equal when evaluated TINYINT (i.e. mod 1024). The backend will fail if
+# more than one partition is considered a potential target for an INSERT when
+# considering its statically specified partition keys.
+---- QUERY
+DROP TABLE IF EXISTS functional.insert_partition_key_type_promotion;
+CREATE TABLE functional.insert_partition_key_type_promotion (c int)
+    PARTITIONED BY (p int);
+ALTER TABLE functional.insert_partition_key_type_promotion ADD PARTITION(p=1025);
+ALTER TABLE functional.insert_partition_key_type_promotion ADD PARTITION(p=2049);
+# Will fail pre IMPALA-875
+INSERT INTO functional.insert_partition_key_type_promotion PARTITION(p=1) VALUES(1)
+---- RESULTS
+p=1/: 1
+====

@@ -34,6 +34,7 @@ public class IntLiteral extends LiteralExpr {
 
   public IntLiteral(BigInteger value) {
     this.value_ = value;
+    isAnalyzed_ = false;
   }
 
   public IntLiteral(String value) throws AnalysisException,
@@ -45,12 +46,14 @@ public class IntLiteral extends LiteralExpr {
       throw new AnalysisException("invalid integer literal: " + value, e);
     }
     this.value_ = BigInteger.valueOf(longValue.longValue());
+    isAnalyzed_ = false;
     analyze(null);
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
     if (value_.compareTo(BigInteger.valueOf(Byte.MAX_VALUE)) <= 0 &&
         value_.compareTo(BigInteger.valueOf(Byte.MIN_VALUE)) >= 0) {
@@ -69,6 +72,7 @@ public class IntLiteral extends LiteralExpr {
       }
       type_ = ColumnType.BIGINT;
     }
+    isAnalyzed_ = true;
   }
 
   public long getValue() { return value_.longValue(); }

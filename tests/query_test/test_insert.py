@@ -79,3 +79,28 @@ class TestUnsupportedInsertFormats(ImpalaTestSuite):
         self.client, 'insert into table tinytable values("hi", "there")', vector)
       assert False, 'Query was expected to fail'
     except ImpalaBeeswaxException, e: pass
+
+class TestInsertPartKey(ImpalaTestSuite):
+  """Regression test for IMPALA-875"""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInsertPartKey, cls).add_test_dimensions()
+    # Only run for a single table type
+    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
+        sync_ddl=[1]))
+
+    cls.TestMatrix.add_constraint(lambda v:
+        (v.get_value('table_format').file_format == 'text'))
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').compression_codec == 'none')
+
+  @pytest.mark.execute_serially
+  def test_insert_part_key(self, vector):
+    """Test that partition column exprs are cast to the correct type. See IMPALA-875."""
+    self.run_test_case('QueryTest/insert_part_key', vector,
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
