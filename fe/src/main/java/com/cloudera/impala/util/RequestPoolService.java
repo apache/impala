@@ -128,6 +128,9 @@ public class RequestPoolService {
    */
   private final class LlamaConfWatcher implements FileChangeListener {
     public void onFileChange() {
+      // If llamaConfUrl_ is null the watcher should not have been created.
+      Preconditions.checkNotNull(llamaConfUrl_);
+      LOG.info("Loading Llama configuration: " + llamaConfUrl_.getFile());
       Configuration conf = new Configuration();
       conf.addResource(llamaConfUrl_);
       llamaConf_ = conf;

@@ -255,13 +255,13 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     TPoolStats* total_stats = &cluster_pool_stats_[pool_name];
     TPoolStats* local_stats = &local_pool_stats_[pool_name];
     const int64_t cluster_mem_estimate = schedule->GetClusterMemoryEstimate();
-    VLOG_RPC << "Schedule for id=" << schedule->query_id()
-             << " in pool_name=" << pool_name << " PoolConfig(max_requests="
-             << max_requests << " max_queued=" << max_queued
-             << " mem_limit=" << PrettyPrinter::Print(mem_limit, TCounterType::BYTES)
-             << ") query cluster_mem_estimate="
-             << PrettyPrinter::Print(cluster_mem_estimate, TCounterType::BYTES);
-    VLOG_RPC << "Initial stats: " << DebugPoolStats(pool_name, total_stats, local_stats);
+    VLOG_QUERY << "Schedule for id=" << schedule->query_id()
+               << " in pool_name=" << pool_name << " PoolConfig(max_requests="
+               << max_requests << " max_queued=" << max_queued
+               << " mem_limit=" << PrettyPrinter::Print(mem_limit, TCounterType::BYTES)
+               << ") query cluster_mem_estimate="
+               << PrettyPrinter::Print(cluster_mem_estimate, TCounterType::BYTES);
+    VLOG_QUERY << "Stats: " << DebugPoolStats(pool_name, total_stats, local_stats);
 
     if (CanAdmitRequest(pool_name, max_requests, mem_limit, *schedule, false)) {
       // Execute immediately
@@ -593,25 +593,33 @@ void AdmissionController::DequeueLoop() {
       DCHECK_GT(local_stats->num_queued, 0);
       DCHECK_GE(total_stats->num_queued, local_stats->num_queued);
 
-      int64_t max_num_to_admit = 0;
+      // Determine the maximum number of requests that can possibly be dequeued based
+      // on the max_requests limit and the current queue size. We will attempt to
+      // dequeue up to this number of requests until reaching the per-pool memory limit.
+      int64_t max_to_dequeue = 0;
       if (max_requests > 0) {
         const int64_t total_available = max_requests - total_stats->num_running;
         if (total_available <= 0) continue;
         double queue_size_ratio = static_cast<double>(local_stats->num_queued) /
             static_cast<double>(total_stats->num_queued);
-        // TODO: Use a simple heuristic rather than always admitting at least 1 query.
-        max_num_to_admit =
-            max(1L, static_cast<int64_t>(queue_size_ratio * total_available));
+        // The maximum number of requests that can possibly be dequeued is the total
+        // number of available requests scaled by the ratio of the size of the local
+        // queue to the size of the total queue. We attempt to dequeue at least one
+        // request and at most the size of the local queue.
+        // TODO: Use a simple heuristic rather than a lower bound of 1 to avoid admitting
+        // too many requests globally when only a single request can be admitted.
+        max_to_dequeue = min(local_stats->num_queued,
+            max(1L, static_cast<int64_t>(queue_size_ratio * total_available)));
       } else {
-        max_num_to_admit = local_stats->num_queued; // No limit on num running requests
+        max_to_dequeue = local_stats->num_queued; // No limit on num running requests
       }
 
       RequestQueue& queue = request_queue_map_[pool_name];
-      VLOG_RPC << "Dequeue thread will try to admit " << max_num_to_admit << " requests"
+      VLOG_RPC << "Dequeue thread will try to admit " << max_to_dequeue << " requests"
                << ", pool=" << pool_name << ", num_queued=" << local_stats->num_queued;
 
       PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
-      while (max_num_to_admit > 0 && !queue.empty()) {
+      while (max_to_dequeue > 0 && !queue.empty()) {
         QueueNode* queue_node = queue.head();
         DCHECK(queue_node != NULL);
         DCHECK(!queue_node->is_admitted.IsSet());
@@ -635,7 +643,7 @@ void AdmissionController::DequeueLoop() {
         }
         VLOG_ROW << "Dequeuing query id=" << queue_node->schedule.query_id();
         queue_node->is_admitted.Set(true);
-        --max_num_to_admit;
+        --max_to_dequeue;
       }
       pools_for_updates_.insert(pool_name);
     }
