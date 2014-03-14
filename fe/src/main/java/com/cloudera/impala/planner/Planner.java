@@ -1029,17 +1029,14 @@ public class Planner {
       Analyzer analyzer, List<Pair<TableRef, PlanNode>> refPlans)
       throws ImpalaException {
     LOG.trace("createCheapestJoinPlan");
+
     // collect eligible candidates for the leftmost input; list contains
     // (plan, materialized size)
     ArrayList<Pair<TableRef, Long>> candidates = Lists.newArrayList();
     for (Pair<TableRef, PlanNode> entry: refPlans) {
       TableRef ref = entry.first;
       JoinOperator joinOp = ref.getJoinOp();
-      if (joinOp == JoinOperator.LEFT_OUTER_JOIN
-          || joinOp == JoinOperator.RIGHT_OUTER_JOIN
-          || joinOp == JoinOperator.FULL_OUTER_JOIN
-          || joinOp == JoinOperator.LEFT_SEMI_JOIN
-          || joinOp == JoinOperator.CROSS_JOIN) {
+      if (joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isCrossJoin()) {
         // this cannot appear as the leftmost input
         // TODO: make this less restrictive by considering plans with inverted Outer
         // Join directions
@@ -1080,7 +1077,7 @@ public class Planner {
 
   /**
    * Returns a plan with leftmostRef's plan as its leftmost input; the joins
-   * are in decreasing order of selectiveness (percentage of rows they eliminated).
+   * are in decreasing order of selectiveness (percentage of rows they eliminate).
    */
   private PlanNode createJoinPlan(
       Analyzer analyzer, TableRef leftmostRef, List<Pair<TableRef, PlanNode>> refPlans)
@@ -1105,7 +1102,7 @@ public class Planner {
     long numOps = 0;
     int i = 0;
     while (!remainingRefs.isEmpty()) {
-      // we minimize the resulting cardinality_ at each step in the join chain,
+      // we minimize the resulting cardinality at each step in the join chain,
       // which minimizes the total number of hash table lookups
       PlanNode newRoot = null;
       Pair<TableRef, PlanNode> minEntry = null;
@@ -1113,20 +1110,34 @@ public class Planner {
         TableRef ref = entry.first;
         LOG.trace(Integer.toString(i) + " considering ref " + ref.getAlias());
 
-        // determine whether we can consider this join at this point in the plan
+        // Determine whether we can or must consider this join at this point in the plan.
+        // Place outer/semi joins at a fixed position in the plan tree (IMPALA-860), s.t.
+        // all the tables appearing to the left/right of an outer/semi join in the
+        // original query still remain to the left/right after join ordering. This
+        // prevents join ordering across outer/semi joins which is generally incorrect.
+        // The checks below relies on remainingRefs being in the order as they originally
+        // appeared in the query.
+        boolean fixedJoinPos = false;
         JoinOperator joinOp = ref.getJoinOp();
-        if (joinOp == JoinOperator.LEFT_OUTER_JOIN
-            || joinOp == JoinOperator.RIGHT_OUTER_JOIN
-            || joinOp == JoinOperator.FULL_OUTER_JOIN
-            || joinOp == JoinOperator.LEFT_SEMI_JOIN) {
+        if (joinOp.isOuterJoin() || joinOp.isSemiJoin()) {
           List<TupleId> currentTids = Lists.newArrayList(root.getTblRefIds());
           currentTids.add(ref.getId());
-          // if this join has special semantics, we need to make sure we have everything
-          // available in order to evaluate the entire On clause
           // TODO: make this less restrictive by considering plans with inverted Outer
           // Join directions
-          if (!currentTids.containsAll(ref.getOnClauseTupleIds())) continue;
-        } else if (ref.getJoinOp() == JoinOperator.CROSS_JOIN) {
+          // Place outer/semi joins at a fixed position in the plan tree. We know that
+          // the join resulting from 'ref' must become the new root if the current root
+          // materializes exactly those tuple ids corresponding to TableRefs appearing
+          // to the left of 'ref' in the original query.
+          List<TupleId> tableRefTupleIds = ref.getAllTupleIds();
+          if (currentTids.containsAll(tableRefTupleIds)
+              && tableRefTupleIds.containsAll(currentTids)) {
+            fixedJoinPos = true;
+          } else {
+            // Do not consider the remaining table refs to prevent incorrect re-ordering
+            // of tables across outer/semi joins.
+            break;
+          }
+        } else if (ref.getJoinOp().isCrossJoin()) {
           if (!joinedRefs.contains(ref.getLeftTblRef())) continue;
         }
 
@@ -1134,7 +1145,16 @@ public class Planner {
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
         PlanNode candidate = createJoinNode(analyzer, root, rhsPlan, ref, false);
         if (candidate == null) continue;
-        LOG.trace("cardinality_=" + Long.toString(candidate.getCardinality()));
+        LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
+
+        // Use 'candidate' as the new root; don't consider any other table refs at this
+        // position in the plan.
+        if (fixedJoinPos) {
+          newRoot = candidate;
+          minEntry = entry;
+          break;
+        }
+
         if (newRoot == null || candidate.getCardinality() < newRoot.getCardinality()) {
           newRoot = candidate;
           minEntry = entry;

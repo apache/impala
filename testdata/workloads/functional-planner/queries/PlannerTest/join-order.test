@@ -598,18 +598,18 @@ where n_name = 'x'
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-04:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: c_custkey = o_custkey
-|
-|--01:SCAN HDFS [tpch.orders]
-|     partitions=1/1 size=162.56MB compact
-|
-03:HASH JOIN [INNER JOIN]
+04:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n_nationkey
 |
 |--02:SCAN HDFS [tpch.nation]
 |     partitions=1/1 size=2.15KB compact
 |     predicates: n_name = 'x'
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: c_custkey = o_custkey
+|
+|--01:SCAN HDFS [tpch.orders]
+|     partitions=1/1 size=162.56MB compact
 |
 00:SCAN HDFS [tpch.customer]
    partitions=1/1 size=23.08MB
@@ -622,24 +622,24 @@ where n_name = 'x'
 05:AGGREGATE
 |  output: count(*)
 |
-04:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
-|  hash predicates: c_custkey = o_custkey
-|
-|--08:EXCHANGE [PARTITION=HASH(o_custkey)]
-|  |
-|  01:SCAN HDFS [tpch.orders]
-|     partitions=1/1 size=162.56MB
-|
-07:EXCHANGE [PARTITION=HASH(c_custkey)]
-|
-03:HASH JOIN [INNER JOIN, BROADCAST]
+04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n_nationkey
 |
-|--06:EXCHANGE [BROADCAST]
+|--08:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpch.nation]
 |     partitions=1/1 size=2.15KB
 |     predicates: n_name = 'x'
+|
+03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: c_custkey = o_custkey
+|
+|--07:EXCHANGE [PARTITION=HASH(o_custkey)]
+|  |
+|  01:SCAN HDFS [tpch.orders]
+|     partitions=1/1 size=162.56MB
+|
+06:EXCHANGE [PARTITION=HASH(c_custkey)]
 |
 00:SCAN HDFS [tpch.customer]
    partitions=1/1 size=23.08MB
@@ -739,4 +739,142 @@ where alltypes.id = alltypestiny.id and alltypes.id = alltypessmall.id
 |
 01:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 size=6.32KB
+====
+# Test that tables are not re-ordered across outer/semi joins (IMPALA-860),
+# but the tables to the left/right of outer/semi joins are still re-ordered.
+select count(*) from
+functional.alltypestiny t1
+inner join functional.alltypes t2 on (t1.id = t2.id)
+inner join functional.alltypessmall t3 on (t2.id = t3.id)
+right join functional.alltypesagg t4 on (t3.id = t4.id)
+inner join functional.alltypes t5 on (t4.id = t5.id)
+inner join functional.alltypestiny t6 on (t5.id = t6.id)
+---- PLAN
+11:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: t5.id = t6.id
+|
+|--05:SCAN HDFS [functional.alltypestiny t6]
+|     partitions=4/4 size=460B compact
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: t4.id = t5.id
+|
+|--04:SCAN HDFS [functional.alltypes t5]
+|     partitions=24/24 size=478.45KB compact
+|
+08:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t3.id = t4.id
+|
+|--03:SCAN HDFS [functional.alltypesagg t4]
+|     partitions=10/10 size=743.67KB compact
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t3.id
+|
+|--02:SCAN HDFS [functional.alltypessmall t3]
+|     partitions=4/4 size=6.32KB compact
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t1.id
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 size=460B compact
+|
+01:SCAN HDFS [functional.alltypes t2]
+   partitions=24/24 size=478.45KB
+====
+# No tables can be re-ordered because of semi and outer joins that must
+# remain at a fixed position in the plan (IMPALA-860).
+select count(*) from
+functional.alltypestiny t1
+left join functional.alltypes t2 on (t1.id = t2.id)
+inner join functional.alltypessmall t3 on (t2.id = t3.id)
+left semi join functional.alltypesagg t4 on (t3.id = t4.id)
+inner join functional.alltypes t5 on (t4.id = t5.id)
+right join functional.alltypestiny t6 on (t5.id = t6.id)
+---- PLAN
+13:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+12:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t5.id = t6.id
+|
+|--05:SCAN HDFS [functional.alltypestiny t6]
+|     partitions=4/4 size=460B compact
+|
+11:HASH JOIN [INNER JOIN]
+|  hash predicates: t4.id = t5.id
+|
+|--04:SCAN HDFS [functional.alltypes t5]
+|     partitions=24/24 size=478.45KB compact
+|
+10:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t3.id = t4.id
+|
+|--03:SCAN HDFS [functional.alltypesagg t4]
+|     partitions=10/10 size=743.67KB compact
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t3.id
+|
+|--02:SCAN HDFS [functional.alltypessmall t3]
+|     partitions=4/4 size=6.32KB compact
+|
+08:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 size=478.45KB compact
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 size=460B compact
+====
+# Check that a join in between outer/semi joins is re-ordered correctly.
+# We expect t4 is joined before t3.
+select count(*) from
+functional.alltypestiny t1
+left join functional.alltypes t2 on (t1.id = t2.id)
+inner join functional.alltypesagg t3 on (t2.id = t3.id)
+inner join functional.alltypessmall t4 on (t3.id = t4.id)
+left semi join functional.alltypes t5 on (t4.id = t5.id)
+inner join functional.alltypestiny t6 on (t5.id = t6.id)
+---- PLAN
+13:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: t5.id = t6.id
+|
+|--05:SCAN HDFS [functional.alltypestiny t6]
+|     partitions=4/4 size=460B compact
+|
+11:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t4.id = t5.id
+|
+|--04:SCAN HDFS [functional.alltypes t5]
+|     partitions=24/24 size=478.45KB compact
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: t3.id = t4.id
+|
+|--03:SCAN HDFS [functional.alltypessmall t4]
+|     partitions=4/4 size=6.32KB compact
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t3.id
+|
+|--02:SCAN HDFS [functional.alltypesagg t3]
+|     partitions=10/10 size=743.67KB compact
+|
+08:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 size=478.45KB compact
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 size=460B compact
 ====
