@@ -69,7 +69,8 @@ DECLARE_int32(num_cores);
 DECLARE_int32(be_port);
 DECLARE_string(mem_limit);
 
-DEFINE_bool(enable_rm, false, "Whether to enable resource management");
+DEFINE_bool(enable_rm, false, "Whether to enable resource management. If enabled, "
+                              "-fair_scheduler_allocation_path is required.");
 DEFINE_int32(llama_callback_port, 28000,
              "Port where Llama notification callback should be started");
 DEFINE_string(llama_host, "127.0.0.1",

@@ -53,12 +53,19 @@ DEFINE_bool(disable_pool_mem_limits, false, "Disables all per-pool mem limits.")
 DEFINE_bool(disable_pool_max_requests, false, "Disables all per-pool limits on the "
     "maximum number of running requests.");
 
+DECLARE_bool(enable_rm);
+
 // Pool name used when the configuration files are not specified.
 const string DEFAULT_POOL_NAME = "default-pool";
 
 RequestPoolService::RequestPoolService() {
   if (FLAGS_fair_scheduler_allocation_path.empty() &&
       FLAGS_llama_site_path.empty()) {
+    if (FLAGS_enable_rm) {
+      LOG(ERROR) << "If resource management is enabled, -fair_scheduler_config_path is "
+                 << "required.";
+      exit(1);
+    }
     default_pool_only_ = true;
     bool is_percent; // not used
     int64_t bytes_limit = ParseUtil::ParseMemSpec(FLAGS_default_pool_mem_limit,
