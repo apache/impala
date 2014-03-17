@@ -99,8 +99,7 @@ AggFnEvaluator::~AggFnEvaluator() {
 }
 
 Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
-      MemPool* pool, const SlotDescriptor* output_slot_desc) {
-  DCHECK(pool != NULL);
+      const SlotDescriptor* output_slot_desc) {
   DCHECK(output_slot_desc != NULL);
   DCHECK(output_slot_desc_ == NULL);
   output_slot_desc_ = output_slot_desc;
@@ -154,7 +153,7 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   for (int i = 0; i < input_exprs_.size(); ++i) {
     AnyValUtil::ColumnTypeToTypeDesc(input_exprs_[i]->type(), &arg_types[i]);
   }
-  ctx_.reset(FunctionContextImpl::CreateContext(state, pool, arg_types));
+  ctx_.reset(FunctionContextImpl::CreateContext(state, state->udf_pool(), arg_types));
 
   return Status::OK;
 }
@@ -174,6 +173,18 @@ Status AggFnEvaluator::Open(RuntimeState* state) {
 
 void AggFnEvaluator::Close(RuntimeState* state) {
   Expr::Close(input_exprs_, state);
+
+  if (ctx_.get() != NULL) {
+    bool previous_error = ctx_->has_error();
+    ctx_->impl()->Close();
+    if (!previous_error && ctx_->has_error()) {
+      // TODO: revisit this (see comment in NativeUdfExpr)
+      stringstream ss;
+      ss << "UDA ERROR: " << ctx_->error_msg();
+      state->LogError(ss.str());
+    }
+  }
+
   if (cache_entry_ != NULL) {
     LibCache::instance()->DecrementUseCount(cache_entry_);
     cache_entry_ = NULL;

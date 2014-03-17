@@ -34,6 +34,7 @@ set (UDF_TEST_LINK_LIBS
   GlobalFlags
   ImpalaUdf
   Runtime
+  TestUtil
   Util
   -Wl,--end-group
 # Below are all external dependencies.  They should some after the impala libs.

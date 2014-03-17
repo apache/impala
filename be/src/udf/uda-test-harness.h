@@ -77,6 +77,23 @@ class UdaTestHarnessBase {
       num_input_values_(0) {
   }
 
+  struct ScopedFunctionContext {
+    ScopedFunctionContext(FunctionContext* context, UdaTestHarnessBase* harness)
+        : context_(context), harness_(harness) { }
+
+    ~ScopedFunctionContext() {
+      UdfTestHarness::CloseContext(context_);
+      harness_->CheckContext(context_);
+      delete context_;
+    }
+
+    FunctionContext* get() { return context_; }
+
+   private:
+    FunctionContext* context_;
+    UdaTestHarnessBase* harness_;
+  };
+
   // Runs the UDA in all the modes, validating the result is 'expected' each time.
   bool Execute(const RESULT& expected, UdaExecutionMode mode);
 
@@ -88,16 +105,16 @@ class UdaTestHarnessBase {
 
   // Runs the UDA on a single node. The entire execution happens in 1 context.
   // The UDA does a update on all the input values and then a finalize.
-  RESULT ExecuteSingleNode();
+  RESULT ExecuteSingleNode(ScopedFunctionContext* result_context);
 
   // Runs the UDA, simulating a single level aggregation. The values are processed
   // on num_nodes + 1 contexts. There are num_nodes that do update and serialize.
   // There is a final context that does merge and finalize.
-  RESULT ExecuteOneLevel(int num_nodes);
+  RESULT ExecuteOneLevel(int num_nodes, ScopedFunctionContext* result_context);
 
   // Runs the UDA, simulating a two level aggregation with num1 in the first level and
   // num2 in the second. The values are processed in num1 + num2 contexts.
-  RESULT ExecuteTwoLevel(int num1, int num2);
+  RESULT ExecuteTwoLevel(int num1, int num2, ScopedFunctionContext* result_context);
 
   virtual void Update(int idx, FunctionContext* context, INTERMEDIATE* dst) = 0;
 

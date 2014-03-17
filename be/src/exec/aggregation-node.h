@@ -75,7 +75,9 @@ class AggregationNode : public ExecNode {
   std::vector<Expr*> build_exprs_;
   TupleId agg_tuple_id_;
   TupleDescriptor* agg_tuple_desc_;
-  Tuple* singleton_output_tuple_;  // result of aggregation w/o GROUP BY
+  // Result of aggregation w/o GROUP BY.
+  // Note: can be NULL even if there is no grouping if the result tuple is 0 width
+  Tuple* singleton_output_tuple_;
 
   boost::scoped_ptr<MemPool> tuple_pool_;
 

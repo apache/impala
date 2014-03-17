@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.impala_cluster import ImpalaCluster
@@ -105,6 +106,28 @@ class TestUdfs(ImpalaTestSuite):
     results = self.client.fetch(query, handle, -1)
     assert results.success
     assert len(results.data) == 9999
+
+  def test_mem_limits(self, vector):
+    # Set the mem limit high enough that a simple scan can run
+    mem_limit = 1024 * 1024
+    vector.get_value('exec_option')['mem_limit'] = mem_limit
+
+    try:
+      self.run_test_case('QueryTest/udf-mem-limit', vector)
+      assert False, "Query was expected to fail"
+    except ImpalaBeeswaxException, e:
+      self.__check_exception(e)
+
+    try:
+      self.run_test_case('QueryTest/uda-mem-limit', vector)
+      assert False, "Query was expected to fail"
+    except ImpalaBeeswaxException, e:
+      self.__check_exception(e)
+
+  def __check_exception(self, e):
+    if ('Memory limit exceeded' not in e.inner_exception.message and
+        'Cancelled' not in e.inner_exception.message):
+      raise e
 
   def __run_query_all_impalads(self, exec_options, query, expected):
     impala_cluster = ImpalaCluster()

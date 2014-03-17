@@ -46,6 +46,15 @@ void AggregateFunctions::InitZero(FunctionContext*, T* dst) {
   dst->val = 0;
 }
 
+StringVal AggregateFunctions::StringValSerializeOrFinalize(
+    FunctionContext* ctx, const StringVal& src) {
+  if (src.is_null) return src;
+  StringVal result(ctx, src.len);
+  memcpy(result.ptr, src.ptr, src.len);
+  ctx->Free(src.ptr);
+  return result;
+}
+
 void AggregateFunctions::CountUpdate(
     FunctionContext*, const AnyVal& src, BigIntVal* dst) {
   DCHECK(!dst->is_null);
@@ -330,9 +339,9 @@ StringVal AggregateFunctions::PcFinalize(FunctionContext* c, const StringVal& sr
   stringstream ss;
   ss << result;
   string str = ss.str();
-  StringVal dst = src;
+  StringVal dst(c, str.length());
   memcpy(dst.ptr, str.c_str(), str.length());
-  dst.len = str.length();
+  c->Free(src.ptr);
   return dst;
 }
 
@@ -347,6 +356,7 @@ StringVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& 
   StringVal dst = src;
   memcpy(dst.ptr, str.c_str(), str.length());
   dst.len = str.length();
+  c->Free(src.ptr);
   return dst;
 }
 
@@ -422,6 +432,7 @@ StringVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
   string out_str = out.str();
   StringVal result_str(ctx, out_str.size());
   memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  ctx->Free(src.ptr);
   return result_str;
 }
 

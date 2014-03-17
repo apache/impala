@@ -38,6 +38,10 @@ class AggregateFunctions {
   template <typename T>
   static void InitZero(FunctionContext*, T* dst);
 
+  // StringVal Serialize/Finalize function that copies and frees src
+  static StringVal StringValSerializeOrFinalize(
+      FunctionContext* ctx, const StringVal& src);
+
   // Implementation of Count and Count(*)
   static void CountUpdate(FunctionContext*, const AnyVal& src, BigIntVal* dst);
   static void CountStarUpdate(FunctionContext*, BigIntVal* dst);

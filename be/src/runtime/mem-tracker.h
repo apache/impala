@@ -113,7 +113,9 @@ class MemTracker {
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {
       (*tracker)->consumption_->Update(bytes);
-      DCHECK_GE((*tracker)->consumption_->current_value(), 0);
+      if ((*tracker)->consumption_metric_ == NULL) {
+        DCHECK_GE((*tracker)->consumption_->current_value(), 0);
+      }
     }
   }
 
@@ -180,7 +182,15 @@ class MemTracker {
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {
       (*tracker)->consumption_->Update(-bytes);
-      DCHECK_GE((*tracker)->consumption_->current_value(), 0);
+      // If a UDF calls FunctionContext::TrackAllocation() but allocates less than the
+      // reported amount, the subsequent call to FunctionContext::Free() may cause the
+      // process mem tracker to go negative until it is synced back to the tcmalloc
+      // metric. Don't blow up in this case. (Note that this doesn't affect non-process
+      // trackers since we can enforce that the reported memory usage is internally
+      // consistent.)
+      if ((*tracker)->consumption_metric_ == NULL) {
+        DCHECK_GE((*tracker)->consumption_->current_value(), 0);
+      }
     }
 
     // TODO: Release brokered memory?

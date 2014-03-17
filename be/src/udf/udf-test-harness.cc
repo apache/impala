@@ -34,3 +34,7 @@ void UdfTestHarness::SetConstantArgs(
   }
   context->impl()->SetConstantArgs(constant_args);
 }
+
+void UdfTestHarness::CloseContext(FunctionContext* context) {
+  context->impl()->Close();
+}

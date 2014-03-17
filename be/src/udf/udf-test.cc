@@ -17,6 +17,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "common/logging.h"
+#include "testutil/test-udfs.h"
 #include "udf/udf-test-harness.h"
 
 using namespace boost;
@@ -174,9 +175,9 @@ TEST(UdfTest, TestFunctionContext) {
   scoped_ptr<SmallIntVal> arg(new SmallIntVal(100));
   vector<AnyVal*> constant_args;
   constant_args.push_back(arg.get());
-  UdfTestHarness::ValidateUdf<SmallIntVal, SmallIntVal>(
+  EXPECT_TRUE((UdfTestHarness::ValidateUdf<SmallIntVal, SmallIntVal>(
       ValidateSharedState, *arg, SmallIntVal::null(),
-      ValidateSharedStatePrepare, ValidateSharedStateClose, constant_args);
+      ValidateSharedStatePrepare, ValidateSharedStateClose, constant_args)));
 }
 
 TEST(UdfTest, TestValidate) {
@@ -224,6 +225,23 @@ TEST(UdfTest, TestVarArgs) {
   args.resize(10);
   EXPECT_TRUE((UdfTestHarness::ValidateUdf<IntVal, BigIntVal, IntVal>(
       NumVarArgs, BigIntVal(0), args, IntVal(args.size()))));
+}
+
+TEST(UdfTest, MemTest) {
+  scoped_ptr<BigIntVal> bytes_arg(new BigIntVal(1000));
+  vector<AnyVal*> constant_args;
+  constant_args.push_back(bytes_arg.get());
+
+  EXPECT_TRUE((UdfTestHarness::ValidateUdf<BigIntVal, BigIntVal>(
+      ::MemTest, *bytes_arg, *bytes_arg, ::MemTestPrepare, ::MemTestClose,
+      constant_args)));
+
+  EXPECT_FALSE((UdfTestHarness::ValidateUdf<BigIntVal, BigIntVal>(
+      ::MemTest, *bytes_arg, *bytes_arg, ::MemTestPrepare, NULL, constant_args)));
+
+  EXPECT_FALSE((UdfTestHarness::ValidateUdf<BigIntVal, BigIntVal>(
+      ::DoubleFreeTest, *bytes_arg, *bytes_arg)));
+
 }
 
 int main(int argc, char** argv) {

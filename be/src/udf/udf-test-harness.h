@@ -47,6 +47,10 @@ class UdfTestHarness {
   static void SetConstantArgs(
       FunctionContext* context, const std::vector<AnyVal*>& constant_args);
 
+  // Test contexts should be closed in order to check for UDF memory leaks. Leaks cause
+  // the error to be set on context.
+  static void CloseContext(FunctionContext* context);
+
   // Template function to execute a UDF and validate the result. They should be
   // used like:
   // ValidateUdf(udf_fn, arg1, arg2, ..., expected_result);
@@ -65,6 +69,7 @@ class UdfTestHarness {
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get());
     RunCloseFn(close_fn, context.get());
+    CloseContext(context.get());
     return Validate(context.get(), expected, ret);
   }
 
@@ -270,13 +275,16 @@ class UdfTestHarness {
 
   template<typename RET>
   static bool Validate(FunctionContext* context, const RET& expected, const RET& actual) {
-    if (!ValidateError(context)) return false;
-    if (actual == expected) return true;
-
-    std::cerr << "UDF did not return the correct result:" << std::endl
-              << "  Expected: " << DebugString(expected) << std::endl
-              << "  Actual: " << DebugString(actual) << std::endl;
-    return false;
+    bool valid = true;
+    if (!context->has_error() && actual != expected) {
+      std::cerr << "UDF did not return the correct result:" << std::endl
+                << "  Expected: " << DebugString(expected) << std::endl
+                << "  Actual: " << DebugString(actual) << std::endl;
+      valid = false;
+    }
+    CloseContext(context);
+    if (!ValidateError(context)) valid = false;
+    return valid;
   }
 
   static bool RunPrepareFn(UdfPrepare prepare_fn, FunctionContext* context) {
@@ -290,7 +298,8 @@ class UdfTestHarness {
 
   static void RunCloseFn(UdfClose close_fn, FunctionContext* context) {
     if (close_fn != NULL) {
-      close_fn(context, FunctionContext::FRAGMENT_LOCAL);
+      // TODO: FRAGMENT_LOCAL
+      close_fn(context, FunctionContext::THREAD_LOCAL);
     }
   }
 };

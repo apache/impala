@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "testutil/test-udas.h"
+
 #include <udf/udf.h>
 
 using namespace impala_udf;
@@ -53,4 +55,39 @@ void AggInit(FunctionContext*, BufferVal*) {}
 void AggMerge(FunctionContext*, const BufferVal&, BufferVal*) {}
 BigIntVal AggFinalize(FunctionContext*, const BufferVal&) {
   return BigIntVal::null();
+}
+
+// Defines MemTest(bigint) return bigint
+// "Allocates" the specified number of bytes in the update function and frees them in the
+// serialize function. Useful for testing mem limits.
+void MemTestInit(FunctionContext*, BigIntVal* total) {
+  *total = BigIntVal(0);
+}
+
+void MemTestUpdate(FunctionContext* context, const BigIntVal& bytes, BigIntVal* total) {
+  if (bytes.is_null) return;
+  context->TrackAllocation(bytes.val); // freed by serialize()
+  total->val += bytes.val;
+}
+
+void MemTestMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst) {
+  if (src.is_null) return;
+  context->TrackAllocation(src.val); // freed by finalize()
+  if (dst->is_null) {
+    *dst = src;
+    return;
+  }
+  dst->val += src.val;
+}
+
+const BigIntVal MemTestSerialize(FunctionContext* context, const BigIntVal& total) {
+  if (total.is_null) return BigIntVal(0);
+  context->Free(total.val);
+  return total;
+}
+
+BigIntVal MemTestFinalize(FunctionContext* context, const BigIntVal& total) {
+  if (total.is_null) return BigIntVal(0);
+  context->Free(total.val);
+  return total;
 }

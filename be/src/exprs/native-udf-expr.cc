@@ -285,6 +285,20 @@ void NativeUdfExpr::Close(RuntimeState* state) {
   if (close_fn_ != NULL && opened_) {
     close_fn_(udf_context_.get(), FunctionContext::THREAD_LOCAL);
   }
+
+  if (udf_context_.get() != NULL) {
+    bool previous_error = udf_context_->has_error();
+    udf_context_->impl()->Close();
+    if (!previous_error && udf_context_->has_error()) {
+      // TODO: revisit this. Errors logged in close will likely not be displayed to the
+      // shell, and we may want to automatically log bad query statuses set in close
+      // rather than manually doing it here and in AggFnEvaluator.
+      stringstream ss;
+      ss << "UDF ERROR: " << udf_context_->error_msg();
+      state->LogError(ss.str());
+    }
+  }
+
   Expr::Close(state);
 }
 

@@ -81,6 +81,14 @@ void HllMerge(FunctionContext* ctx, const StringVal& src, StringVal* dst) {
   }
 }
 
+StringVal HllSerialize(FunctionContext* ctx, const StringVal& src) {
+  if (src.is_null) return src;
+  StringVal result(ctx, src.len);
+  memcpy(result.ptr, src.ptr, src.len);
+  ctx->Free(src.ptr);
+  return result;
+}
+
 StringVal HllFinalize(FunctionContext* ctx, const StringVal& src) {
   assert(!src.is_null);
   assert(src.len == pow(2, HLL_PRECISION));
@@ -119,6 +127,7 @@ StringVal HllFinalize(FunctionContext* ctx, const StringVal& src) {
   string out_str = out.str();
   StringVal result_str(ctx, out_str.size());
   memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  ctx->Free(src.ptr);
   return result_str;
 }
 

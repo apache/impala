@@ -17,6 +17,7 @@
 
 #include "common/logging.h"
 #include "udf/uda-test-harness.h"
+#include "testutil/test-udas.h"
 
 using namespace impala;
 using namespace impala_udf;
@@ -110,6 +111,14 @@ void MinUpdate(FunctionContext* context, const StringVal& input, BufferVal* val)
 
 // Serialize the state into the min string
 const BufferVal MinSerialize(FunctionContext* context, const BufferVal& intermediate) {
+  MinState* state = reinterpret_cast<MinState*>(intermediate);
+  if (state->value == NULL) return intermediate;
+  // Hack to persist the intermediate state's value without leaking.
+  // TODO: revisit BufferVal and design a better way to do this
+  StringVal copy_buffer(context, state->len);
+  memcpy(copy_buffer.ptr, state->value, state->len);
+  context->Free(state->value);
+  state->value = copy_buffer.ptr;
   return intermediate;
 }
 
@@ -126,6 +135,7 @@ StringVal MinFinalize(FunctionContext* context, const BufferVal& val) {
   if (state->value == NULL) return StringVal::null();
   StringVal result = StringVal(context, state->len);
   memcpy(result.ptr, state->value, state->len);
+  context->Free(state->value);
   return result;
 }
 
@@ -280,6 +290,21 @@ TEST(MinTest, Basic) {
 
   values.push_back(StringVal("ZZZ"));
   EXPECT_TRUE(test.Execute(values, StringVal("ZZZ"))) << test.GetErrorMsg();
+}
+
+TEST(MemTest, Basic) {
+  UdaTestHarness<BigIntVal, BigIntVal, BigIntVal> test(
+      ::MemTestInit, ::MemTestUpdate, ::MemTestMerge, ::MemTestSerialize,
+      ::MemTestFinalize);
+  vector<BigIntVal> input;
+  for (int i = 0; i < 10; ++i) {
+    input.push_back(10);
+  }
+  EXPECT_TRUE(test.Execute(input, BigIntVal(100))) << test.GetErrorMsg();
+
+  UdaTestHarness<BigIntVal, BigIntVal, BigIntVal> test_leak(
+      ::MemTestInit, ::MemTestUpdate, ::MemTestMerge, NULL, ::MemTestFinalize);
+  EXPECT_FALSE(test_leak.Execute(input, BigIntVal(100))) << test.GetErrorMsg();
 }
 
 int main(int argc, char** argv) {

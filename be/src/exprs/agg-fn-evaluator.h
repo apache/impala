@@ -33,6 +33,7 @@ namespace impala {
 class AggregationNode;
 class Expr;
 class MemPool;
+class MemTracker;
 class ObjectPool;
 class RowDescriptor;
 class RuntimeState;
@@ -70,12 +71,8 @@ class AggFnEvaluator {
   // Initializes the agg expr. 'desc' must be the row descriptor for the input TupleRow.
   // It is used to get the input values in the Update() and Merge() functions.
   // 'output_slot_desc' is the slot that this evaluator should write to.
-  // The underlying aggregate function allocates memory from the 'pool'. This is
-  // either string data for intermediate results or whatever memory the UDA might
-  // need.
-  // TODO: should we give them their own pool?
   Status Prepare(RuntimeState* state, const RowDescriptor& desc,
-      MemPool* pool, const SlotDescriptor* output_slot_desc);
+      const SlotDescriptor* output_slot_desc);
 
   ~AggFnEvaluator();
 

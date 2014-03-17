@@ -178,13 +178,9 @@ void ConstantArgPrepare(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
     IntVal* arg = reinterpret_cast<IntVal*>(context->GetConstantArg(0));
-    if (arg == NULL) {
-      IntVal* state = reinterpret_cast<IntVal*>(context->Allocate(sizeof(IntVal)));
-      *state = IntVal::null();
-      context->SetFunctionState(scope, state);
-    } else {
-      context->SetFunctionState(scope, arg);
-    }
+    IntVal* state = reinterpret_cast<IntVal*>(context->Allocate(sizeof(IntVal)));
+    *state = (arg != NULL) ? *arg : IntVal::null();
+    context->SetFunctionState(scope, state);
   }
 }
 
@@ -227,8 +223,37 @@ void ValidateOpenClose(
   }
 }
 
-namespace foo {
-  void bar(
-      FunctionContext* context, FunctionContext::FunctionStateScope scope) { }
+// MemTest UDF: "Allocates" the specified number of bytes per call.
+void MemTestPrepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    int64_t* total =
+        reinterpret_cast<int64_t*>(context->Allocate(sizeof(int64_t)));
+    *total = 0;
+    context->SetFunctionState(scope, total);
+  }
+}
 
+BigIntVal MemTest(FunctionContext* context, const BigIntVal& bytes) {
+  int64_t* total = reinterpret_cast<int64_t*>(
+      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+  context->TrackAllocation(bytes.val);
+  *total += bytes.val;
+  return bytes;
+}
+
+void MemTestClose(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    int64_t* total = reinterpret_cast<int64_t*>(
+        context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+    context->Free(*total);
+    context->Free(reinterpret_cast<uint8_t*>(total));
+    context->SetFunctionState(scope, NULL);
+  }
+}
+
+BigIntVal DoubleFreeTest(FunctionContext* context, BigIntVal bytes) {
+  context->TrackAllocation(bytes.val);
+  context->Free(bytes.val);
+  context->Free(bytes.val);
+  return bytes;
 }

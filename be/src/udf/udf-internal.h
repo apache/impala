@@ -41,6 +41,11 @@ class FunctionContextImpl {
 
   FunctionContextImpl(impala_udf::FunctionContext* parent);
 
+  // Checks for any outstanding memory allocations. If there is unfreed memory, adds a
+  // warning and frees the allocations. Note that local allocations are freed with the
+  // MemPool backing pool_.
+  void Close();
+
   // Allocates a buffer of 'byte_size' with "local" memory management. These
   // allocations are not freed one by one but freed as a pool by FreeLocalAllocations()
   // This is used where the lifetime of the allocation is clear.
@@ -50,12 +55,6 @@ class FunctionContextImpl {
 
   // Frees all allocations returned by AllocateLocal().
   void FreeLocalAllocations();
-
-  // Returns true if there are no outstanding allocations.
-  bool CheckAllocationsEmpty();
-
-  // Returns true if there are no outstanding local allocations.
-  bool CheckLocalAlloctionsEmpty();
 
   // Sets constant_args_. The AnyVal* values are owned by the caller.
   void SetConstantArgs(const std::vector<impala_udf::AnyVal*>& constant_args);
@@ -107,6 +106,9 @@ class FunctionContextImpl {
   // indicates that the corresponding argument is non-constant. Otherwise contains the
   // value of the argument.
   std::vector<impala_udf::AnyVal*> constant_args_;
+
+  // Indicates whether this context has been closed. Used for verification/debugging.
+  bool closed_;
 };
 
 }

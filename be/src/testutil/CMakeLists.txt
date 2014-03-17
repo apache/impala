@@ -22,9 +22,11 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 
 add_library(TestUtil STATIC
-  impalad-query-executor.cc  
+  impalad-query-executor.cc
   in-process-servers.cc
   desc-tbl-builder.cc
+  test-udas.cc
+  test-udfs.cc
 )
 
 add_library(TestUdfs SHARED test-udfs.cc)

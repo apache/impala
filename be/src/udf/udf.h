@@ -275,9 +275,10 @@ typedef void (*UdfClose)(FunctionContext* context,
 //----------------------------------------------------------------------------
 // The UDA execution is broken up into a few steps. The general calling pattern
 // is one of these:
-//  1) Init(), Evaluate() (repeatedly), Serialize()
-//  2) Init(), Merge() (repeatedly), Serialize()
-//  3) Init(), Finalize()
+//  1) Init(), Update() (repeatedly), Serialize()
+//  2) Init(), Update() (repeatedly), Finalize()
+//  3) Init(), Merge() (repeatedly), Serialize()
+//  4) Init(), Merge() (repeatedly), Finalize()
 // The UDA is registered with three types: the result type, the input type and
 // the intermediate type.
 //
@@ -289,11 +290,13 @@ typedef void (*UdfClose)(FunctionContext* context,
 // intermediate type should be string and the UDA can cast the ptr to the structure
 // it is using.
 //
-// Memory Management: For allocations that are not returned to Impala, the UDA
-// should use the FunctionContext::Allocate()/Free() methods. For StringVal allocations
-// returned to Impala (e.g. UdaSerialize()), the UDA should allocate the result
-// via StringVal(FunctionContext*, int) ctor and Impala will automatically handle
-// freeing it.
+// Memory Management: For allocations that are not returned to Impala, the UDA should use
+// the FunctionContext::Allocate()/Free() methods. In general, Allocate() is called in
+// Init(), and then Free() must be called in both Serialize() and Finalize(), since
+// either of these functions may be called to clean up the state. For StringVal
+// allocations returned to Impala (e.g. returned by UdaSerialize()), the UDA should
+// allocate the result via StringVal(FunctionContext*, int) ctor and Impala will
+// automatically handle freeing it.
 //
 // For clarity in documenting the UDA interface, the various types will be typedefed
 // here. The actual execution resolves all the types at runtime and none of these types
@@ -320,7 +323,7 @@ typedef void (*UdaMerge)(FunctionContext* context, const IntermediateType& src,
     IntermediateType* dst);
 
 // Serialize the intermediate type. The serialized data is then sent across the
-// wire. This is not called unless the intermediate type is String.
+// wire.
 // No additional functions will be called with this FunctionContext object and the
 // UDA should do final clean (e.g. Free()) here.
 typedef const IntermediateType (*UdaSerialize)(FunctionContext* context,

@@ -542,6 +542,8 @@ public abstract class Catalog {
         "14InitNullStringEPN10impala_udf15FunctionContextEPNS1_9StringValE";
     final String initNull = prefix +
         "8InitNullEPN10impala_udf15FunctionContextEPNS1_6AnyValE";
+    final String stringValSerializeOrFinalize = prefix +
+        "28StringValSerializeOrFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE";
 
     Db db = builtinsDb_;
     // Count (*)
@@ -566,17 +568,19 @@ public abstract class Catalog {
           null, null, false));
       // Min
       String minMaxInit = t.isStringType() ? initNullString : initNull;
+      String minMaxSerializeOrFinalize = t.isStringType() ?
+          stringValSerializeOrFinalize : null;
       db.addBuiltin(AggregateFunction.createBuiltin(db, "min",
           Lists.newArrayList(t), t, t, minMaxInit,
           prefix + MIN_UPDATE_SYMBOL.get(t),
           prefix + MIN_UPDATE_SYMBOL.get(t),
-          null, null, true));
+          minMaxSerializeOrFinalize, minMaxSerializeOrFinalize, true));
       // Max
       db.addBuiltin(AggregateFunction.createBuiltin(db, "max",
           Lists.newArrayList(t), t, t, minMaxInit,
           prefix + MAX_UPDATE_SYMBOL.get(t),
           prefix + MAX_UPDATE_SYMBOL.get(t),
-          null, null, true));
+          minMaxSerializeOrFinalize, minMaxSerializeOrFinalize, true));
       // NDV
       // TODO: this needs to switch to CHAR(64) as the intermediate type
       db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv",
@@ -584,7 +588,7 @@ public abstract class Catalog {
           prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + HLL_UPDATE_SYMBOL.get(t),
           prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          null,
+          stringValSerializeOrFinalize,
           prefix + "11HllFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
           true));
 
@@ -595,7 +599,7 @@ public abstract class Catalog {
           prefix + "6PcInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + PC_UPDATE_SYMBOL.get(t),
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          null,
+          stringValSerializeOrFinalize,
           prefix + "10PcFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
           true));
 
@@ -606,7 +610,7 @@ public abstract class Catalog {
           prefix + "6PcInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + PCSA_UPDATE_SYMBOL.get(t),
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          null,
+          stringValSerializeOrFinalize,
           prefix + "12PcsaFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
           true));
     }
@@ -652,7 +656,7 @@ public abstract class Catalog {
         initNullString,
         prefix + "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
         prefix + "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-        null, null, false));
+        stringValSerializeOrFinalize, stringValSerializeOrFinalize, false));
     // Group_concat(string, string)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "group_concat",
         Lists.newArrayList(ColumnType.STRING, ColumnType.STRING),
@@ -661,6 +665,6 @@ public abstract class Catalog {
         prefix +
             "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValES6_PS4_",
         prefix + "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-        null, null, false));
+        stringValSerializeOrFinalize, stringValSerializeOrFinalize, false));
   }
 }

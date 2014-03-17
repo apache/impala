@@ -45,9 +45,16 @@ class TExprNode;
 // path.
 //
 // TODO:
-// - convert other Exprs to UDFs or override GetIrComputeFn()
-// - ExprContext
-// - remove current Codegen/ComputeFn API
+// - Refactoring
+//   - convert other Exprs to UDFs or override GetIrComputeFn()
+//   - ExprContext
+// -   remove current Codegen/ComputeFn API
+// - Fix error reporting, e.g. reporting leaks
+// - Testing
+//    - Test cancellation
+//    - Type descs in UDA test harness
+//    - Allow more functions to be NULL in UDA test harness
+//
 class NativeUdfExpr: public Expr {
  public:
   ~NativeUdfExpr();

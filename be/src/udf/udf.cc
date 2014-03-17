@@ -30,6 +30,12 @@
 // When they build their library to a .so, they'd use the version of FunctionContext
 // in the main binary, which does include FreePool.
 namespace impala {
+class MemTracker {
+ public:
+  void Consume(int64_t bytes) { }
+  void Release(int64_t bytes) { }
+};
+
 class FreePool {
  public:
   FreePool(MemPool*) { }
@@ -45,6 +51,11 @@ class FreePool {
   void Free(uint8_t* ptr) {
     free(ptr);
   }
+
+  MemTracker* mem_tracker() { return &mem_tracker_; }
+
+ private:
+  MemTracker mem_tracker_;
 };
 
 class RuntimeState {
@@ -63,6 +74,7 @@ class RuntimeState {
 }
 #else
 #include "runtime/free-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 #endif
 
@@ -87,10 +99,7 @@ FunctionContext::FunctionContext() : impl_(new FunctionContextImpl(this)) {
 }
 
 FunctionContext::~FunctionContext() {
-  // TODO: this needs to free local allocations but there's a mem issue
-  // in the uda harness now.
-  impl_->CheckLocalAlloctionsEmpty();
-  impl_->CheckAllocationsEmpty();
+  assert(impl_->closed_ && "FunctionContext wasn't closed!");
   delete impl_->pool_;
   delete impl_;
 }
@@ -100,7 +109,47 @@ FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
     num_warnings_(0),
     thread_local_fn_state_(NULL),
     fragment_local_fn_state_(NULL),
-    external_bytes_tracked_(0) {
+    external_bytes_tracked_(0),
+    closed_(false) {
+}
+
+void FunctionContextImpl::Close() {
+  if (!allocations_.empty()) {
+    int bytes = 0;
+    for (map<uint8_t*, int>::iterator i = allocations_.begin();
+         i != allocations_.end(); ++i) {
+      bytes += i->second;
+    }
+    stringstream ss;
+    ss << bytes << " bytes leaked via FunctionContext::Allocate()";
+    context_->SetError(ss.str().c_str());
+#ifndef IMPALA_UDF_SDK_BUILD
+    // TODO: this is a stopgap because setting the error in Close() causes it to not be
+    // displayed in the shell.
+    LOG(WARNING) << ss.str();
+#endif
+  }
+  allocations_.clear();
+
+  FreeLocalAllocations();
+
+  if (external_bytes_tracked_ > 0) {
+    stringstream ss;
+    ss << external_bytes_tracked_
+       << " bytes leaked via FunctionContext::TrackAllocation()";
+    context_->SetError(ss.str().c_str());
+#ifndef IMPALA_UDF_SDK_BUILD
+    // TODO: this is a stopgap because setting the error in Close() causes it to not be
+    // displayed in the shell.
+    LOG(WARNING) << ss.str();
+#endif
+  }
+  // This isn't ideal because the memory is still leaked, but don't track it so our
+  // accounting stays sane.
+  // TODO: we need to modify the memtrackers to allow leaked user-allocated memory.
+  context_->Free(external_bytes_tracked_);
+
+  closed_ = true;
 }
 
 FunctionContext::ImpalaVersion FunctionContext::version() const {
@@ -162,15 +211,26 @@ void FunctionContext::Free(uint8_t* buffer) {
     }
   } else {
     impl_->allocations_.erase(buffer);
+    impl_->pool_->Free(buffer);
   }
 }
 
 void FunctionContext::TrackAllocation(int64_t bytes) {
   impl_->external_bytes_tracked_ += bytes;
+  impl_->pool_->mem_tracker()->Consume(bytes);
 }
 
 void FunctionContext::Free(int64_t bytes) {
+  if (bytes > impl_->external_bytes_tracked_) {
+    stringstream ss;
+    ss << "FunctionContext::Free() called with " << bytes << " bytes, but only "
+       << impl_->external_bytes_tracked_ << " bytes are tracked via "
+       << "FunctionContext::TrackAllocation()";
+    SetError(ss.str().c_str());
+    return;
+  }
   impl_->external_bytes_tracked_ -= bytes;
+  impl_->pool_->mem_tracker()->Release(bytes);
 }
 
 void FunctionContext::SetError(const char* error_msg) {
@@ -187,6 +247,14 @@ bool FunctionContext::AddWarning(const char* warning_msg) {
   stringstream ss;
   ss << "UDF WARNING: " << warning_msg;
   if (impl_->state_ != NULL) {
+#ifndef IMPALA_UDF_SDK_BUILD
+    // If this is called while the query is being closed, the runtime state log will have
+    // already been displayed to the user. Also log the warning so there's some chance
+    // the user will actually see it.
+    // TODO: somehow print the full error log in the shell? This is a problem for any
+    // function using LogError() during close.
+    LOG(WARNING) << ss.str();
+#endif
     return impl_->state_->LogError(ss.str());
   } else {
     cerr << ss.str() << endl;
@@ -235,20 +303,6 @@ void FunctionContextImpl::FreeLocalAllocations() {
     pool_->Free(local_allocations_[i]);
   }
   local_allocations_.clear();
-}
-
-bool FunctionContextImpl::CheckAllocationsEmpty() {
-  if (allocations_.empty() && external_bytes_tracked_ == 0) return true;
-  // TODO: fix this
-  //if (debug_) context_->SetError("Leaked allocations.");
-  return false;
-}
-
-bool FunctionContextImpl::CheckLocalAlloctionsEmpty() {
-  if (local_allocations_.empty()) return true;
-  // TODO: fix this
-  //if (debug_) context_->SetError("Leaked local allocations.");
-  return false;
 }
 
 void FunctionContextImpl::SetConstantArgs(const vector<AnyVal*>& constant_args) {

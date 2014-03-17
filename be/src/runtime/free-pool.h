@@ -109,6 +109,8 @@ class FreePool {
     return new_ptr;
   }
 
+  MemTracker* mem_tracker() { return mem_pool_->mem_tracker(); }
+
  private:
   static const int NUM_LISTS = 64;
 
