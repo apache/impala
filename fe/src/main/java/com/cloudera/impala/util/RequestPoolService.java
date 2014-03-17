@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.QueueACL;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.AllocationConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderService;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairSchedulerConfiguration;
@@ -338,7 +339,8 @@ public class RequestPoolService {
     Preconditions.checkNotNull(requestedPool);
     Preconditions.checkArgument(!Strings.isNullOrEmpty(user));
     return allocationConf_.get().getPlacementPolicy().assignAppToQueue(
-        requestedPool, user);
+        requestedPool.isEmpty() ? YarnConfiguration.DEFAULT_QUEUE_NAME : requestedPool,
+        user);
   }
 
   /**

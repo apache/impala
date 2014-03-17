@@ -15,12 +15,12 @@
 package com.cloudera.impala.util;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Field;
 
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderService;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -43,6 +43,7 @@ public class TestRequestPoolService {
 
   // A second allocation file which overwrites the temporary file to check for changes.
   private static final String ALLOCATION_FILE_MODIFIED = "fair-scheduler-test2.xml";
+  private static final String ALLOCATION_FILE_EMPTY = "fair-scheduler-empty.xml";
 
   // Contains per-pool configurations for maximum number of running queries and queued
   // requests.
@@ -50,6 +51,7 @@ public class TestRequestPoolService {
 
   // A second Llama config which overwrites the temporary file to check for changes.
   private static final String LLAMA_CONFIG_FILE_MODIFIED = "llama-site-test2.xml";
+  private static final String LLAMA_CONFIG_FILE_EMPTY = "llama-site-empty.xml";
 
   // Set the file check interval to something short so we don't have to wait long after
   // changing the file.
@@ -64,12 +66,12 @@ public class TestRequestPoolService {
   private File allocationConfFile_;
   private File llamaConfFile_;
 
-  @Before
-  public void setUp() throws Exception {
+  void createPoolService(String allocationFilename, String llamaConfFilename)
+      throws Exception {
     allocationConfFile_ = tempFolder.newFile("fair-scheduler-temp-file.xml");
-    Files.copy(getClasspathFile(ALLOCATION_FILE), allocationConfFile_);
+    Files.copy(getClasspathFile(allocationFilename), allocationConfFile_);
     llamaConfFile_ = tempFolder.newFile("llama-conf-temp-file.xml");
-    Files.copy(getClasspathFile(LLAMA_CONFIG_FILE), llamaConfFile_);
+    Files.copy(getClasspathFile(llamaConfFilename), llamaConfFile_);
     poolService_ = new RequestPoolService(allocationConfFile_.getAbsolutePath(),
         llamaConfFile_.getAbsolutePath());
 
@@ -97,12 +99,14 @@ public class TestRequestPoolService {
 
   @Test
   public void testPoolResolution() throws Exception {
-    Assert.assertEquals("root.queueA", poolService_.assignToPool("queueA", "userA"));
+    createPoolService(ALLOCATION_FILE, LLAMA_CONFIG_FILE);
+    Assert.assertEquals("root.queueA", poolService_.assignToPool("root.queueA", "userA"));
     Assert.assertNull(poolService_.assignToPool("queueC", "userA"));
   }
 
   @Test
   public void testPoolAcls() throws Exception {
+    createPoolService(ALLOCATION_FILE, LLAMA_CONFIG_FILE);
     Assert.assertTrue(poolService_.hasAccess("root.queueA", "userA"));
     Assert.assertTrue(poolService_.hasAccess("root.queueB", "userB"));
     Assert.assertFalse(poolService_.hasAccess("root.queueB", "userA"));
@@ -111,9 +115,18 @@ public class TestRequestPoolService {
 
   @Test
   public void testPoolLimitConfigs() throws Exception {
+    createPoolService(ALLOCATION_FILE, LLAMA_CONFIG_FILE);
     checkPoolConfigResult("root", 15, 50, -1);
     checkPoolConfigResult("root.queueA", 10, 30, 1024 * ByteUnits.MEGABYTE);
     checkPoolConfigResult("root.queueB", 5, 10, -1);
+  }
+
+  @Test
+  public void testDefaultConfigs() throws Exception {
+    createPoolService(ALLOCATION_FILE_EMPTY, LLAMA_CONFIG_FILE_EMPTY);
+    Assert.assertEquals("root.userA", poolService_.assignToPool("", "userA"));
+    Assert.assertTrue(poolService_.hasAccess("root.userA", "userA"));
+    checkPoolConfigResult("root", 20, 50, -1);
   }
 
   @Test
@@ -124,16 +137,27 @@ public class TestRequestPoolService {
     // seconds, so this helps cut down on the total test execution time.
     // A one second pause is necessary to ensure the file timestamps are unique if the
     // test gets here within one second.
+    createPoolService(ALLOCATION_FILE, LLAMA_CONFIG_FILE);
     Thread.sleep(1000L);
     Files.copy(getClasspathFile(ALLOCATION_FILE_MODIFIED), allocationConfFile_);
     Files.copy(getClasspathFile(LLAMA_CONFIG_FILE_MODIFIED), llamaConfFile_);
-
     // Wait at least 1 second more than the time it will take for the
     // AllocationFileLoaderService to update the file. The FileWatchService does not
     // have that additional wait time, so it will be updated within 'CHECK_INTERVAL_MS'
     Thread.sleep(1000L + CHECK_INTERVAL_MS +
         AllocationFileLoaderService.ALLOC_RELOAD_WAIT_MS);
+    checkModifiedConfigResults();
+  }
 
+  @Test
+  public void testModifiedConfigs() throws Exception {
+    // Tests the results are the same as testUpdatingConfigs() as when we create the
+    // pool service with the same modified configs initially (i.e. not updating).
+    createPoolService(ALLOCATION_FILE_MODIFIED, LLAMA_CONFIG_FILE_MODIFIED);
+    checkModifiedConfigResults();
+  }
+
+  private void checkModifiedConfigResults() throws IOException {
     // Test pool resolution: now there's a queueC
     Assert.assertEquals("root.queueA", poolService_.assignToPool("queueA", "userA"));
     Assert.assertNull(poolService_.assignToPool("queueX", "userA"));
