@@ -28,11 +28,13 @@ class TestExplain(ImpalaTestSuite):
         v.get_value('exec_option')['disable_codegen'] == False and\
         v.get_value('exec_option')['num_nodes'] != 1)
 
+  @pytest.mark.xfail(run=False, reason="Expected per-host mem requirements inconsistent")
   def test_explain_level0(self, vector):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 0
     self.run_test_case('QueryTest/explain-level0', vector)
 
+  @pytest.mark.xfail(run=False, reason="Expected per-host mem requirements inconsistent")
   def test_explain_level1(self, vector):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 1
