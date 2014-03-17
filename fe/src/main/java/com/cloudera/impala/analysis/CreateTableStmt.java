@@ -51,6 +51,7 @@ public class CreateTableStmt extends StatementBase {
   private final TableName tableName_;
   private final Map<String, String> tblProperties_;
   private final Map<String, String> serdeProperties_;
+  private final HdfsCachingOp cachingOp_;
   private HdfsUri location_;
 
   // Set during analysis
@@ -68,6 +69,7 @@ public class CreateTableStmt extends StatementBase {
    *          to specify default row format.
    * @param fileFormat - File format of the table
    * @param location - The HDFS location of where the table data will stored.
+   * @param cachingOp - The HDFS caching op that should be applied to this table.
    * @param ifNotExists - If true, no errors are thrown if the table already exists.
    * @param tblProperties - Optional map of key/values to persist with table metadata.
    * @param serdeProperties - Optional map of key/values to persist with table serde
@@ -76,7 +78,7 @@ public class CreateTableStmt extends StatementBase {
   public CreateTableStmt(TableName tableName, List<ColumnDesc> columnDefs,
       List<ColumnDesc> partitionColumnDescs, boolean isExternal, String comment,
       RowFormat rowFormat, THdfsFileFormat fileFormat, HdfsUri location,
-      boolean ifNotExists, Map<String, String> tblProperties,
+      HdfsCachingOp cachingOp, boolean ifNotExists, Map<String, String> tblProperties,
       Map<String, String> serdeProperties) {
     Preconditions.checkNotNull(columnDefs);
     Preconditions.checkNotNull(partitionColumnDescs);
@@ -90,6 +92,7 @@ public class CreateTableStmt extends StatementBase {
     this.ifNotExists_ = ifNotExists;
     this.fileFormat_ = fileFormat;
     this.location_ = location;
+    this.cachingOp_ = cachingOp;
     this.partitionColumnDescs_ = Lists.newArrayList(partitionColumnDescs);
     this.rowFormat_ = rowFormat;
     this.tableName_ = tableName;
@@ -149,6 +152,7 @@ public class CreateTableStmt extends StatementBase {
     params.setIs_external(isExternal());
     params.setComment(comment_);
     params.setLocation(location_ == null ? null : location_.toString());
+    if (cachingOp_ != null) params.setCache_op(cachingOp_.toThrift());
     params.setRow_format(rowFormat_.toThrift());
     params.setFile_format(fileFormat_);
     params.setIf_not_exists(getIfNotExists());
@@ -232,6 +236,8 @@ public class CreateTableStmt extends StatementBase {
             e.getMessage()));
       }
     }
+
+    if (cachingOp_ != null) cachingOp_.analyze(analyzer);
   }
 
   private void analyzeRowFormatValue(String value) throws AnalysisException {

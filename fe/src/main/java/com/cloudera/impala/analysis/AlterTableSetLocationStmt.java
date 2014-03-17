@@ -16,6 +16,9 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.HdfsPartition;
+import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableSetLocationParams;
@@ -54,6 +57,28 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     super.analyze(analyzer);
-    if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
+    location_.analyze(analyzer, Privilege.ALL);
+
+    Table table = getTargetTable();
+    Preconditions.checkNotNull(table);
+    if (table instanceof HdfsTable) {
+      HdfsTable hdfsTable = (HdfsTable) table;
+      if (getPartitionSpec() != null) {
+        // Targeting a partition rather than a table.
+        PartitionSpec partitionSpec = getPartitionSpec();
+        HdfsPartition partition = hdfsTable.getPartition(
+            partitionSpec.getPartitionSpecKeyValues());
+        Preconditions.checkNotNull(partition);
+        if (partition.isMarkedCached()) {
+          throw new AnalysisException(String.format("Target partition is cached, " +
+              "please uncache before changing the location using: ALTER TABLE %s %s " +
+              "SET UNCACHED", table.getFullName(), partitionSpec.toSql()));
+        }
+      } else if (hdfsTable.isMarkedCached()) {
+        throw new AnalysisException(String.format("Target table is cached, please " +
+            "uncache before changing the location using: ALTER TABLE %s SET UNCACHED",
+            table.getFullName()));
+      }
+    }
   }
 }

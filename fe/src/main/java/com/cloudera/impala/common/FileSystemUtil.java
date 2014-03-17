@@ -205,6 +205,10 @@ public class FileSystemUtil {
     return (DistributedFileSystem) fs;
   }
 
+  public static DistributedFileSystem getDistributedFileSystem() throws IOException {
+    return getDistributedFileSystem(new Path(FileSystem.getDefaultUri(CONF)));
+  }
+
   /**
    * Fully-qualifies the given path based on the FileSystem configuration. If the given
    * path is already fully qualified, a new Path object with the same location will be

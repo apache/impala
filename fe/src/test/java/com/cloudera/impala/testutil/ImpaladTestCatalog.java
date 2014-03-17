@@ -21,6 +21,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.HdfsCachePool;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
@@ -45,6 +46,11 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
     }
     srcCatalog_ = catalogServerCatalog;
     setIsReady();
+  }
+
+  @Override
+  public HdfsCachePool getHdfsCachePool(String poolName) {
+    return srcCatalog_.getHdfsCachePool(poolName);
   }
 
   /**

@@ -495,6 +495,11 @@ public class ImpaladCatalog extends Catalog {
       case DATA_SOURCE:
         addDataSource(catalogObject.getData_source(), catalogObject.getCatalog_version());
         break;
+      case HDFS_CACHE_POOL:
+        HdfsCachePool cachePool = new HdfsCachePool(catalogObject.getCache_pool());
+        cachePool.setCatalogVersion(catalogObject.getCatalog_version());
+        hdfsCachePools_.add(cachePool);
+        break;
       default:
         throw new IllegalStateException(
             "Unexpected TCatalogObjectType: " + catalogObject.getType());
@@ -535,6 +540,13 @@ public class ImpaladCatalog extends Catalog {
         break;
       case DATA_SOURCE:
         removeDataSource(catalogObject.getData_source(), dropCatalogVersion);
+        break;
+      case HDFS_CACHE_POOL:
+        HdfsCachePool existingItem =
+            hdfsCachePools_.get(catalogObject.getCache_pool().getPool_name());
+        if (existingItem.getCatalogVersion() > catalogObject.getCatalog_version()) {
+          hdfsCachePools_.remove(catalogObject.getCache_pool().getPool_name());
+        }
         break;
       default:
         throw new IllegalStateException(

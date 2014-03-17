@@ -74,6 +74,7 @@ import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.cloudera.impala.util.AvroSchemaParser;
 import com.cloudera.impala.util.FSPermissionChecker;
+import com.cloudera.impala.util.HdfsCachingUtil;
 import com.cloudera.impala.util.MetaStoreUtil;
 import com.cloudera.impala.util.TAccessLevelUtil;
 import com.cloudera.impala.util.TResultRowBuilder;
@@ -104,6 +105,10 @@ public class HdfsTable extends Table {
 
   // Avro schema of this table if this is an Avro table, otherwise null. Set in load().
   private String avroSchema_ = null;
+
+  // True if this table's metadata is marked as cached. Does not necessarily mean the
+  // data is cached or that all/any partitions are cached.
+  private boolean isMarkedCached_ = false;
 
   private static boolean hasLoggedDiskIdFormatWarning_ = false;
 
@@ -348,6 +353,7 @@ public class HdfsTable extends Table {
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
   public List<HdfsPartition> getPartitions() { return partitions_; }
+  public boolean isMarkedCached() { return isMarkedCached_; }
 
   /**
    * Returns the value Hive is configured to use for NULL partition key values.
@@ -520,14 +526,19 @@ public class HdfsTable extends Table {
     // exist.
     addDefaultPartition(msTbl.getSd());
 
+    Long cacheDirectiveId =
+        HdfsCachingUtil.getCacheDirIdFromParams(msTbl.getParameters());
+    isMarkedCached_ = cacheDirectiveId != null;
+
     if (msTbl.getPartitionKeysSize() == 0) {
       Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
       // This table has no partition key, which means it has no declared partitions.
       // We model partitions slightly differently to Hive - every file must exist in a
       // partition, so add a single partition with no keys which will get all the
       // files in the table's root directory.
-      addPartition(msTbl.getSd(), null,
+      HdfsPartition part = addPartition(msTbl.getSd(), null,
           new ArrayList<LiteralExpr>(), oldFileDescMap, fileDescsToLoad);
+      if (isMarkedCached_) part.markCached();
       Path location = new Path(hdfsBaseDir_);
       if (DFS.exists(location)) {
         accessLevel_ = getAvailableAccessLevel(location);
@@ -571,9 +582,10 @@ public class HdfsTable extends Table {
         // this table's partition list. Skip the partition.
         if (partition == null) continue;
 
-        if (msPartition.getParameters() != null) {
+        if (msPartition.getParameters() != null); {
           partition.setNumRows(getRowCount(msPartition.getParameters()));
         }
+
         if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
           // TODO: READ_ONLY isn't exactly correct because the it's possible the
           // partition does not have READ permissions either. When we start checking
@@ -626,10 +638,11 @@ public class HdfsTable extends Table {
    * Adds a new HdfsPartition to the internal partition list, populating with file format
    * information and file locations. If a partition contains no files, it's not added.
    * For unchanged files (indicated by unchanged mtime), reuses the FileDescriptor from
-   * the oldFileDescMap. Otherwise, creates a new FileDescriptor for each modified or
-   * new file and adds it to newFileDescsMap. Both old and newFileDescMap are Maps of
-   * parent directory (partition location) to list of files (FileDescriptors) under that
-   * directory.
+   * the oldFileDescMap. The one exception is if the partition is marked as cached in
+   * which case the block metadata cannot be reused. Otherwise, creates a new
+   * FileDescriptor for each modified or new file and adds it to newFileDescsMap. Both
+   * old and newFileDescMap are Maps of parent directory (partition location) to list of
+   * files (FileDescriptors) under that directory.
    * Returns new partition or null, if none was added.
    *
    * @throws InvalidStorageDescriptorException
@@ -646,6 +659,14 @@ public class HdfsTable extends Table {
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
     Path partDirPath = new Path(storageDescriptor.getLocation());
     List<FileDescriptor> fileDescriptors = Lists.newArrayList();
+    // If the partition is marked as cached, the block location metadata must be
+    // reloaded, even if the file times have not changed.
+    boolean isMarkedCached = isMarkedCached_;
+    if (msPartition != null) {
+      isMarkedCached =
+          HdfsCachingUtil.getCacheDirIdFromParams(msPartition.getParameters()) != null;
+    }
+
     if (DFS.exists(partDirPath)) {
       // DistributedFilesystem does not have an API that takes in a timestamp and return
       // a list of files that has been added/changed since. Therefore, we are calling
@@ -677,7 +698,7 @@ public class HdfsTable extends Table {
         // Check if this FileDescriptor has been modified since last loading its block
         // location information. If it has not been changed, the previously loaded
         // value can be reused.
-        if (fd == null || fd.getFileLength() != fileStatus.getLen()
+        if (fd == null || isMarkedCached || fd.getFileLength() != fileStatus.getLen()
             || fd.getModificationTime() != fileStatus.getModificationTime()) {
           // Create a new file descriptor, the block metadata will be populated by
           // loadBlockMd.
@@ -982,6 +1003,8 @@ public class HdfsTable extends Table {
       partitions_.add(hdfsPart);
     }
     avroSchema_ = hdfsTable.isSetAvroSchema() ? hdfsTable.getAvroSchema() : null;
+    isMarkedCached_ = HdfsCachingUtil.getCacheDirIdFromParams(
+        getMetaStoreTable().getParameters()) != null;
   }
 
   @Override
@@ -1010,7 +1033,6 @@ public class HdfsTable extends Table {
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition);
     hdfsTable.setAvroSchema(avroSchema_);
-
     hdfsTable.setNetwork_addresses(hostList_);
     return hdfsTable;
   }
@@ -1078,6 +1100,8 @@ public class HdfsTable extends Table {
     resultSchema.addToColumns(new TColumn("#Files", ColumnType.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("Size", ColumnType.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Format", ColumnType.STRING.toThrift()));
+    resultSchema.addToColumns(
+        new TColumn("IsMarkedCached", ColumnType.BOOLEAN.toThrift()));
 
     // Pretty print partitions and their stats.
     ArrayList<HdfsPartition> orderedPartitions = Lists.newArrayList(partitions_);
@@ -1096,7 +1120,8 @@ public class HdfsTable extends Table {
       // Add number of rows, files, bytes and the file format.
       rowBuilder.add(p.getNumRows()).add(p.getFileDescriptors().size())
           .addBytes(p.getSize())
-          .add(p.getInputFormatDescriptor().getFileFormat().toString());
+          .add(p.getInputFormatDescriptor().getFileFormat().toString())
+          .add(Boolean.toString(p.isMarkedCached()));
       result.addToRows(rowBuilder.get());
     }
 
@@ -1110,7 +1135,8 @@ public class HdfsTable extends Table {
       }
 
       // Total num rows, files, and bytes (leave format empty).
-      rowBuilder.add(numRows_).add(numHdfsFiles_).addBytes(totalHdfsBytes_).add("");
+      rowBuilder.add(numRows_).add(numHdfsFiles_).addBytes(totalHdfsBytes_).add("")
+          .add("");
       result.addToRows(rowBuilder.get());
     }
     return result;

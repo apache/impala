@@ -7,4 +7,3 @@ hdfs cacheadmin -removePool testPool
 
 set -e
 hdfs cacheadmin -addPool testPool
-hdfs cacheadmin -addDirective -pool testPool -path /test-warehouse/tpch.nation

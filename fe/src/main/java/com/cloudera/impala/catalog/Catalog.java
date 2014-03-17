@@ -81,6 +81,11 @@ public abstract class Catalog {
   // Cache of data sources.
   protected final CatalogObjectCache<DataSource> dataSources_;
 
+  // Cache of known HDFS cache pools. Allows for checking the existence
+  // of pools without hitting HDFS.
+  protected final CatalogObjectCache<HdfsCachePool> hdfsCachePools_ =
+      new CatalogObjectCache<HdfsCachePool>(false);
+
   /**
    * Creates a new instance of a Catalog. If initMetastoreClientPool is true, will
    * also add META_STORE_CLIENT_POOL_SIZE clients to metastoreClientPool_.
@@ -221,7 +226,7 @@ public abstract class Catalog {
    * pattern may be null (and thus matches everything).
    */
   public List<String> getDataSourceNames(String pattern) {
-    return filterStringsByPattern(dataSources_.getAllNames(), pattern);
+    return filterStringsByPattern(dataSources_.keySet(), pattern);
   }
 
   /**
@@ -231,7 +236,7 @@ public abstract class Catalog {
    * pattern may be null (and thus matches everything).
    */
   public List<DataSource> getDataSources(String pattern) {
-    List<String> names = filterStringsByPattern(dataSources_.getAllNames(), pattern);
+    List<String> names = filterStringsByPattern(dataSources_.keySet(), pattern);
     List<DataSource> dataSources = Lists.newArrayListWithCapacity(names.size());
     for (String name: names) {
       dataSources.add(dataSources_.get(name));
@@ -288,6 +293,21 @@ public abstract class Catalog {
     Db db = getDb(name.getDb());
     if (db == null) return false;
     return db.containsFunction(name.getFunction());
+  }
+
+  /**
+   * Adds a new HdfsCachePool to the catalog.
+   */
+  public boolean addHdfsCachePool(HdfsCachePool cachePool) {
+    return hdfsCachePools_.add(cachePool);
+  }
+
+  /**
+   * Gets a HdfsCachePool given a cache pool name. Returns null if the cache
+   * pool does not exist.
+   */
+  public HdfsCachePool getHdfsCachePool(String poolName) {
+    return hdfsCachePools_.get(poolName);
   }
 
   /**
@@ -413,6 +433,17 @@ public abstract class Catalog {
         result.setType(fn.getCatalogObjectType());
         result.setCatalog_version(fn.getCatalogVersion());
         result.setFn(fn.toThrift());
+        break;
+      }
+      case HDFS_CACHE_POOL: {
+        HdfsCachePool pool = getHdfsCachePool(objectDesc.getCache_pool().getPool_name());
+        if (pool == null) {
+          throw new CatalogException(
+              "Hdfs cache pool not found: " + objectDesc.getCache_pool().getPool_name());
+        }
+        result.setType(pool.getCatalogObjectType());
+        result.setCatalog_version(pool.getCatalogVersion());
+        result.setCache_pool(pool.toThrift());
         break;
       }
       default: throw new IllegalStateException(

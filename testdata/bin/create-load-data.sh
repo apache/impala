@@ -19,6 +19,9 @@ fi
 . ${IMPALA_HOME}/bin/impala-config.sh
 set -e
 
+# Setup for HDFS caching
+${IMPALA_HOME}/testdata/bin/setup-hdfs-caching.sh
+
 # If the user has specified a command line argument, treat it as the test-warehouse
 # snapshot file and pass it to the load-test-warehouse-snapshot.sh script for processing.
 if [[ $1 ]]; then
@@ -45,6 +48,12 @@ pushd ${IMPALA_HOME}/bin
 python -u ./load-data.py --workloads functional-query --exploration_strategy exhaustive
 python -u ./load-data.py --workloads tpcds --exploration_strategy core
 python -u ./load-data.py --workloads tpch --exploration_strategy core
+
+# Cache test tables
+./impala-shell.sh -q "alter table tpch.nation set cached in 'testPool'"
+# Add this back once IMPALA-1019 is resolved.
+#./impala-shell.sh -q "alter table functional.alltypestiny set cached in 'testPool'"
+
 # Load the test data source and table
 ./impala-shell.sh -f ${IMPALA_HOME}/testdata/bin/create-data-source-table.sql
 # Load all the auxiliary workloads (if any exist)
@@ -159,8 +168,5 @@ popd
 
 # Copy the test UDF/UDA libraries into HDFS
 ${IMPALA_HOME}/testdata/bin/copy-udfs-udas.sh
-
-# Setup for HDFS caching
-${IMPALA_HOME}/testdata/bin/setup-hdfs-caching.sh
 
 ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only

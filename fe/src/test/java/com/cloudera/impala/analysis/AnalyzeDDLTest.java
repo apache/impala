@@ -139,6 +139,15 @@ public class AnalyzeDDLTest extends AnalyzerTest {
           "Partition spec does not exist: (year=2050, month=10).");
     AnalyzesOk("alter table functional.alltypes drop if exists " +
           "partition(year=2050, month=10)");
+
+    // Caching ops
+    AnalyzesOk("alter table functional.alltypes add " +
+        "partition(year=2050, month=10) cached in 'testPool'");
+    AnalyzesOk("alter table functional.alltypes add " +
+        "partition(year=2050, month=10) uncached");
+    AnalysisError("alter table functional.alltypes add " +
+        "partition(year=2050, month=10) cached in 'badPool'",
+        "The specified cache pool does not exist: badPool");
   }
 
   @Test
@@ -383,6 +392,55 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Cannot ALTER TABLE SET on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes set tblproperties('a'='b')",
         "ALTER TABLE SET not currently supported on HBase tables.");
+  }
+
+  @Test
+  public void TestAlterTableSetCached() {
+    // Positive cases
+    AnalyzesOk("alter table functional.alltypesnopart set cached in 'testPool'");
+    AnalyzesOk("alter table functional.alltypes set cached in 'testPool'");
+    AnalyzesOk("alter table functional.alltypes partition(year=2010, month=12) " +
+        "set cached in 'testPool'");
+
+    // Attempt to alter a table that is not backed by HDFS.
+    AnalysisError("alter table functional_hbase.alltypesnopart set cached in 'testPool'",
+        "ALTER TABLE SET not currently supported on HBase tables.");
+    AnalysisError("alter table functional.view_view set cached in 'testPool'",
+        "ALTER TABLE not allowed on a view: functional.view_view");
+
+    AnalysisError("alter table functional.alltypes set cached in 'badPool'",
+        "The specified cache pool does not exist: badPool");
+    AnalysisError("alter table functional.alltypes partition(year=2010, month=12) " +
+        "set cached in 'badPool'", "The specified cache pool does not exist: badPool");
+
+    // Attempt to uncache a table that is not cached. Should be a no-op.
+    AnalyzesOk("alter table functional.alltypes set uncached");
+    AnalyzesOk("alter table functional.alltypes partition(year=2010, month=12) " +
+        "set uncached");
+
+    // Attempt to cache a table that is already cached. Should be a no-op.
+    AnalyzesOk("alter table functional.alltypestiny set cached in 'testPool'");
+    AnalyzesOk("alter table functional.alltypestiny partition(year=2009, month=1) " +
+        "set cached in 'testPool'");
+
+    // Change location of a cached table/partition
+    AnalysisError("alter table functional.alltypestiny set location '/tmp/tiny'",
+        "Target table is cached, please uncache before changing the location using: " +
+        "ALTER TABLE functional.alltypestiny SET UNCACHED");
+    AnalysisError("alter table functional.alltypestiny partition (year=2009,month=1) " +
+        "set location '/test-warehouse/new_location'",
+        "Target partition is cached, please uncache before changing the location " +
+        "using: ALTER TABLE functional.alltypestiny PARTITION (year=2009, month=1) " +
+        "SET UNCACHED");
+
+    // Table/db/partition do not exist
+    AnalysisError("alter table baddb.alltypestiny set cached in 'testPool'",
+        "Database does not exist: baddb");
+    AnalysisError("alter table functional.badtbl set cached in 'testPool'",
+        "Table does not exist: functional.badtbl");
+    AnalysisError("alter table functional.alltypestiny partition(year=9999, month=1) " +
+        "set cached in 'testPool'",
+        "Partition spec does not exist: (year=9999, month=1).");
   }
 
   @Test
@@ -649,6 +707,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create table functional.tbl as select a.* from functional.alltypes a " +
         "join functional.alltypes b on (a.int_col=b.int_col) limit 1000");
 
+    // Caching operations
+    AnalyzesOk("create table functional.newtbl cached in 'testPool'" +
+        " as select count(*) as CNT from functional.alltypes");
+    AnalyzesOk("create table functional.newtbl uncached" +
+        " as select count(*) as CNT from functional.alltypes");
+
     // Table already exists with and without IF NOT EXISTS
     AnalysisError("create table functional.alltypes as select 1",
         "Table already exists: functional.alltypes");
@@ -748,6 +812,15 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Type 'DATE' is not supported as partition-column type in column: d");
     AnalysisError("create table new_table (i int) PARTITIONED BY (d datetime)",
         "Type 'DATETIME' is not supported as partition-column type in column: d");
+
+    // Caching ops
+    AnalyzesOk("create table cached_tbl(i int) partitioned by(j int) " +
+        "cached in 'testPool'");
+    AnalyzesOk("create table cached_tbl(i int) partitioned by(j int) uncached");
+    AnalyzesOk("create table cached_tbl(i int) partitioned by(j int) " +
+        "location '/test-warehouse/' cached in 'testPool'");
+    AnalyzesOk("create table cached_tbl(i int) partitioned by(j int) " +
+        "location '/test-warehouse/' uncached");
 
     // Invalid database name.
     AnalysisError("create table `???`.new_table (x int) PARTITIONED BY (y int)",

@@ -53,7 +53,8 @@ enum TAlterTableType {
   SET_LOCATION,
   SET_TBL_PROPERTIES,
   // Used internally by the COMPUTE STATS DDL command.
-  UPDATE_STATS
+  UPDATE_STATS,
+  SET_CACHED,
 }
 
 // Parameters of CREATE DATABASE commands
@@ -112,6 +113,17 @@ struct TTableRowFormat {
   3: optional string escaped_by
 }
 
+// A caching operation to perform on a target table or partition. Used by ALTER and CREATE
+// statements.
+struct THdfsCachingOp {
+  // True if this op should cache the target table/partition, false if it should uncache
+  // the table/partition.
+  1: required bool set_cached
+
+  // Set only if set_cached=true. Provides the name of the pool to use when caching.
+  2: optional string cache_pool_name
+}
+
 // Parameters for ALTER TABLE rename commands
 struct TAlterTableOrViewRenameParams {
   // The new table name
@@ -138,6 +150,9 @@ struct TAlterTableAddPartitionParams {
   // Optional HDFS storage location for the Partition. If not specified the
   // default storage location is used.
   2: optional string location
+
+  // Optional caching operation to perform on the newly added partition.
+  4: optional THdfsCachingOp cache_op
 }
 
 // Parameters for ALTER TABLE DROP COLUMN commands.
@@ -213,6 +228,16 @@ struct TAlterTableUpdateStatsParams {
   4: optional map<string, CatalogObjects.TColumnStats> column_stats
 }
 
+// Parameters for ALTER TABLE SET [PARTITION partitionSpec] CACHED|UNCACHED
+struct TAlterTableSetCachedParams {
+  // Details on what operation to perform (cache or uncache)
+  1: required THdfsCachingOp cache_op
+
+  // An optional partition spec, set if marking a partition as cached/uncached
+  // rather than a table.
+  2: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+}
+
 // Parameters for all ALTER TABLE commands.
 struct TAlterTableParams {
   1: required TAlterTableType alter_type
@@ -249,6 +274,9 @@ struct TAlterTableParams {
 
   // Parameters for updating table/column stats. Used internally by COMPUTE STATS
   12: optional TAlterTableUpdateStatsParams update_stats_params
+
+  // Parameters for ALTER TABLE SET CACHED|UNCACHED
+  13: optional TAlterTableSetCachedParams set_cached_params
 }
 
 // Parameters of CREATE TABLE LIKE commands
@@ -319,6 +347,9 @@ struct TCreateTableParams {
 
   // Map of serde property names to property values
   12: optional map<string, string> serde_properties
+
+  // If set, the table will be cached after creation with details specified in cache_op.
+  13: optional THdfsCachingOp cache_op
 }
 
 // Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command

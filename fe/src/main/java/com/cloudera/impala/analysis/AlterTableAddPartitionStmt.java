@@ -29,15 +29,18 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
   private final HdfsUri location_;
   private final boolean ifNotExists_;
   private final PartitionSpec partitionSpec_;
+  private final HdfsCachingOp cacheOp_;
 
   public AlterTableAddPartitionStmt(TableName tableName,
-      PartitionSpec partitionSpec, HdfsUri location, boolean ifNotExists) {
+      PartitionSpec partitionSpec, HdfsUri location, boolean ifNotExists,
+      HdfsCachingOp cacheOp) {
     super(tableName);
     Preconditions.checkState(partitionSpec != null);
     location_ = location;
     ifNotExists_ = ifNotExists;
     partitionSpec_ = partitionSpec;
     partitionSpec_.setTableName(tableName);
+    cacheOp_ = cacheOp;
   }
 
   public boolean getIfNotExists() { return ifNotExists_; }
@@ -54,6 +57,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     if (location_ != null) {
       sb.append(String.format(" LOCATION '%s'", location_));
     }
+    if (cacheOp_ != null) sb.append(cacheOp_.toSql());
     return sb.toString();
   }
 
@@ -65,6 +69,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     addPartParams.setPartition_spec(partitionSpec_.toThrift());
     addPartParams.setLocation(location_ == null ? null : location_.toString());
     addPartParams.setIf_not_exists(ifNotExists_);
+    if (cacheOp_ != null) addPartParams.setCache_op(cacheOp_.toThrift());
     params.setAdd_partition_params(addPartParams);
     return params;
   }
@@ -78,5 +83,6 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     partitionSpec_.analyze(analyzer);
 
     if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
+    if (cacheOp_ != null) cacheOp_.analyze(analyzer);
   }
 }

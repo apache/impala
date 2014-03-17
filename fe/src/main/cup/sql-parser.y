@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
@@ -200,14 +201,14 @@ parser code {:
 // List of keywords. Please keep them sorted alphabetically.
 terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_API_VERSION, KW_AS, KW_ASC, KW_AVRO,
-  KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE,
-  KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE,
-  KW_CREATE, KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME,
-  KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE,
-  KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE,
-  KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT, KW_FORMAT, KW_FORMATTED,
-  KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_HAVING, KW_IF, KW_IN,
-  KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
+  KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CACHED, KW_CASE, KW_CAST,
+  KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT,
+  KW_COMPUTE, KW_CREATE, KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE,
+  KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV,
+  KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL,
+  KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT, KW_FORMAT,
+  KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_HAVING, KW_IF,
+  KW_IN, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
   KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES,
   KW_LOAD, KW_LOCATION, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET,
   KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE,
@@ -217,8 +218,8 @@ terminal
   KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_SOURCE, KW_SOURCES, KW_STORED,
   KW_STRAIGHT_JOIN, KW_STRING, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO,
-  KW_TRUE, KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN,
-  KW_WHERE, KW_WITH;
+  KW_TRUE,KW_UNCACHED, KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES, KW_VIEW,
+  KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
   DIVIDE, MOD, ADD, SUBTRACT;
@@ -330,6 +331,7 @@ nonterminal ColumnDesc column_def, view_column_def;
 nonterminal ArrayList<ColumnDesc> column_def_list, view_column_def_list;
 nonterminal ArrayList<ColumnDesc> partition_column_defs, view_column_defs;
 // Options for DDL commands - CREATE/DROP/ALTER
+nonterminal HdfsCachingOp cache_op_val;
 nonterminal String comment_val;
 nonterminal Boolean external_val;
 nonterminal String opt_init_string_val;
@@ -544,10 +546,10 @@ alter_tbl_stmt ::=
   LPAREN column_def_list:col_defs RPAREN
   {: RESULT = new AlterTableAddReplaceColsStmt(table, col_defs, replace); :}
   | KW_ALTER KW_TABLE table_name:table KW_ADD if_not_exists_val:if_not_exists
-    partition_spec:partition location_val:location
+    partition_spec:partition location_val:location cache_op_val:cache_op
   {:
     RESULT = new AlterTableAddPartitionStmt(table, partition,
-        location, if_not_exists);
+        location, if_not_exists, cache_op);
   :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP optional_kw_column IDENT:col_name
   {: RESULT = new AlterTableDropColStmt(table, col_name); :}
@@ -568,6 +570,15 @@ alter_tbl_stmt ::=
   | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
     table_property_type:target LPAREN properties_map:properties RPAREN
   {: RESULT = new AlterTableSetTblProperties(table, partition, target, properties); :}
+  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
+    cache_op_val:cache_op
+  {:
+    // Ensure a parser error is thrown for ALTER statements if no cache op is specified.
+    if (cache_op == null) {
+      parser.parseError("set", SqlParserSymbols.KW_SET);
+    }
+    RESULT = new AlterTableSetCachedStmt(table, partition, cache_op);
+  :}
   ;
 
 table_property_type ::=
@@ -616,14 +627,14 @@ create_tbl_as_select_stmt ::=
   KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
   table_name:table comment_val:comment row_format_val:row_format
   serde_properties:serde_props file_format_create_table_val:file_format
-  location_val:location tbl_properties:tbl_props
+  location_val:location cache_op_val:cache_op tbl_properties:tbl_props
   KW_AS query_stmt:query
   {:
     // Initialize with empty List of columns and partition columns. The
     // columns will be added from the query statement during analysis
     CreateTableStmt create_stmt = new CreateTableStmt(table, new ArrayList<ColumnDesc>(),
         new ArrayList<ColumnDesc>(), external, comment, row_format,
-        file_format, location, if_not_exists, tbl_props, serde_props);
+        file_format, location, cache_op, if_not_exists, tbl_props, serde_props);
     RESULT = new CreateTableAsSelectStmt(create_stmt, query);
   :}
   ;
@@ -633,10 +644,12 @@ create_tbl_stmt ::=
   table_name:table LPAREN column_def_list:col_defs RPAREN
   partition_column_defs:partition_col_defs comment_val:comment
   row_format_val:row_format serde_properties:serde_props
-  file_format_create_table_val:file_format location_val:location tbl_properties:tbl_props
+  file_format_create_table_val:file_format location_val:location cache_op_val:cache_op
+  tbl_properties:tbl_props
   {:
     RESULT = new CreateTableStmt(table, col_defs, partition_col_defs, external, comment,
-        row_format, file_format, location, if_not_exists, tbl_props, serde_props);
+        row_format, file_format, location, cache_op, if_not_exists, tbl_props,
+        serde_props);
   :}
   | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
     table_name:table LPAREN column_def_list:col_defs RPAREN
@@ -674,6 +687,15 @@ create_uda_stmt ::=
     RESULT = new CreateUdaStmt(fn_name, fn_args, return_type, intermediate_type,
         new HdfsUri(binary_path), if_not_exists, arg_map);
   :}
+  ;
+
+cache_op_val ::=
+  KW_CACHED KW_IN STRING_LITERAL:pool_name
+  {: RESULT = new HdfsCachingOp(pool_name); :}
+  | KW_UNCACHED
+  {: RESULT = new HdfsCachingOp(); :}
+  | /* empty */
+  {: RESULT = null; :}
   ;
 
 comment_val ::=

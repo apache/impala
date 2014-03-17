@@ -14,7 +14,9 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
@@ -26,8 +28,25 @@ import com.google.common.collect.Lists;
  * Thread safe cache for storing CatalogObjects. Enforces that updates to existing
  * entries only get applied if the new/updated object has a larger catalog version.
  */
-public class CatalogObjectCache<T extends CatalogObject> {
+public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> {
   private static final Logger LOG = Logger.getLogger(CatalogObjectCache.class);
+  private final boolean caseInsensitiveKeys_;
+
+  /**
+   * Creates a new instance of the CatalogObjectCache that compares keys as
+   * insensitive.
+   */
+  public CatalogObjectCache() {
+    this(true);
+  }
+
+  /**
+   * Creates a new instance of the CatalogObjectCache that compares keys as case
+   * insensitive/sensitive based on whether 'caseInsensitiveKeys' is true/false.
+   */
+  public CatalogObjectCache(boolean caseInsensitiveKeys) {
+    caseInsensitiveKeys_ = caseInsensitiveKeys;
+  }
 
   // Map of lower-case object name to CatalogObject. New entries are added
   // by calling add(). Updates of the cache must be synchronized because adding
@@ -47,15 +66,16 @@ public class CatalogObjectCache<T extends CatalogObject> {
    */
   public synchronized boolean add(T catalogObject) {
     Preconditions.checkNotNull(catalogObject);
-    T existingItem = metadataCache_.putIfAbsent(
-        catalogObject.getName().toLowerCase(), catalogObject);
+    String key = catalogObject.getName();
+    if (caseInsensitiveKeys_) key = key.toLowerCase();
+    T existingItem = metadataCache_.putIfAbsent(key, catalogObject);
     if (existingItem == null) return true;
 
     if (existingItem.getCatalogVersion() < catalogObject.getCatalogVersion()) {
       // When existingItem != null it indicates there was already an existing entry
       // associated with the key. Add the updated object iff it has a catalog
       // version greater than the existing entry.
-      metadataCache_.put(catalogObject.getName().toLowerCase(), catalogObject);
+      metadataCache_.put(key, catalogObject);
       return true;
     }
     return false;
@@ -66,7 +86,8 @@ public class CatalogObjectCache<T extends CatalogObject> {
    * if no item was removed.
    */
   public synchronized T remove(String name) {
-    return metadataCache_.remove(name.toLowerCase());
+    if (caseInsensitiveKeys_) name = name.toLowerCase();
+    return metadataCache_.remove(name);
   }
 
   /**
@@ -77,10 +98,13 @@ public class CatalogObjectCache<T extends CatalogObject> {
   }
 
   /**
-   * Returns all known object names.
+   * Returns the set of all known object names. The returned set is backed by
+   * the cache, so updates to the cache will be visible in the returned set
+   * and vice-versa. However, updates to the cache should not be done via the
+   * returned set, use add()/remove() instead.
    */
-  public List<String> getAllNames() {
-    return Lists.newArrayList(metadataCache_.keySet());
+  public Set<String> keySet() {
+    return metadataCache_.keySet();
   }
 
   /**
@@ -94,7 +118,8 @@ public class CatalogObjectCache<T extends CatalogObject> {
    * Returns true if the metadataCache_ contains a key with the given name.
    */
   public boolean contains(String name) {
-    return metadataCache_.containsKey(name.toLowerCase());
+    if (caseInsensitiveKeys_) name = name.toLowerCase();
+    return metadataCache_.containsKey(name);
   }
 
   /**
@@ -103,6 +128,18 @@ public class CatalogObjectCache<T extends CatalogObject> {
    * key.
    */
   public T get(String name) {
-    return metadataCache_.get(name.toLowerCase());
+    if (caseInsensitiveKeys_) name = name.toLowerCase();
+    return metadataCache_.get(name);
+  }
+
+  /**
+   * Returns an iterator for the values in the cache. There are no guarantees
+   * about the order in which elements are returned. All items at the time of
+   * iterator creation will be visible and new items may or may not be visible.
+   * Thread safe (will never throw a ConcurrentModificationException).
+   */
+  @Override
+  public Iterator<T> iterator() {
+    return metadataCache_.values().iterator();
   }
 }

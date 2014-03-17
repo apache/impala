@@ -1446,6 +1446,18 @@ public class ParserTest {
     // Location needs to be a string literal
     ParserError("ALTER TABLE TestDb.Foo ADD PARTITION (i=1, s='Hello') LOCATION a/b");
 
+    // Caching ops
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) CACHED IN 'pool'");
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) CACHED IN 'pool'");
+    ParserError("ALTER TABLE Foo ADD PARTITION (j=2) CACHED 'pool'");
+    ParserError("ALTER TABLE Foo ADD PARTITION (j=2) CACHED IN");
+    ParserError("ALTER TABLE Foo ADD PARTITION (j=2) CACHED");
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) UNCACHED");
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) LOCATION 'a/b' UNCACHED");
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) LOCATION 'a/b' CACHED IN 'pool'");
+    ParserError("ALTER TABLE Foo ADD PARTITION (j=2) CACHED IN 'pool' LOCATION 'a/b'");
+    ParserError("ALTER TABLE Foo ADD PARTITION (j=2) UNCACHED LOCATION 'a/b'");
+
     ParserError("ALTER TABLE Foo ADD IF EXISTS PARTITION (i=1, s='Hello')");
     ParserError("ALTER TABLE TestDb.Foo ADD (i=1, s='Hello')");
     ParserError("ALTER TABLE TestDb.Foo ADD (i=1)");
@@ -1571,6 +1583,12 @@ public class ParserTest {
         ParserError(String.format("ALTER TABLE Foo %s SET %s (a='b')", part, propType));
         ParserError(String.format("ALTER TABLE Foo %s SET %s (a=b)", part, propType));
       }
+    }
+
+    for (String cacheClause: Lists.newArrayList("UNCACHED", "CACHED in 'pool'")) {
+      ParsesOk("ALTER TABLE Foo SET " + cacheClause);
+      ParsesOk("ALTER TABLE Foo PARTITION(j=0) SET " + cacheClause);
+      ParserError("ALTER TABLE Foo PARTITION(j=0) " + cacheClause);
     }
   }
 
@@ -1698,12 +1716,14 @@ public class ParserTest {
     ParserError("CREATE TABLE T (i int) ESCAPED BY '\0'");
 
     // Order should be: [comment] [partition by cols] [row format] [serdeproperties (..)]
-    // [stored as FILEFORMAT] [location] [tblproperties (...)]
+    // [stored as FILEFORMAT] [location] [cache spec] [tblproperties (...)]
     ParserError("CREATE TABLE Foo (d double) COMMENT 'c' PARTITIONED BY (i int)");
     ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE COMMENT 'c'");
     ParserError("CREATE TABLE Foo (d double) STORED AS TEXTFILE ROW FORMAT DELIMITED");
     ParserError("CREATE TABLE Foo (d double) ROW FORMAT DELIMITED COMMENT 'c'");
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' COMMENT 'c'");
+    ParserError("CREATE TABLE Foo (d double) UNCACHED LOCATION '/a/b'");
+    ParserError("CREATE TABLE Foo (d double) CACHED IN 'pool' LOCATION '/a/b'");
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' COMMENT 'c' STORED AS RCFILE");
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' STORED AS RCFILE");
     ParserError("CREATE TABLE Foo (d double) TBLPROPERTIES('a'='b') LOCATION 'a'");
@@ -1715,6 +1735,19 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo (d double COMMENT c)");
     ParserError("CREATE TABLE Foo (d double COMMENT 'c') PARTITIONED BY (j COMMENT hi)");
     ParserError("CREATE TABLE Foo (d double) STORED AS 'TEXTFILE'");
+
+    // Caching
+    ParsesOk("CREATE TABLE Foo (i int) CACHED IN 'myPool'");
+    ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN 'myPool'");
+    ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN 'myPool'");
+    ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY(j int) LOCATION '/a' " +
+          "CACHED IN 'myPool'");
+    ParserError("CREATE TABLE Foo (i int) CACHED IN myPool");
+    ParserError("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN");
+    ParserError("CREATE TABLE Foo (i int) CACHED 'myPool'");
+    ParserError("CREATE TABLE Foo (i int) IN 'myPool'");
+    ParserError("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN 'myPool' " +
+        "LOCATION '/a'");
 
     // Invalid syntax
     ParserError("CREATE TABLE IF EXISTS Foo.Bar (i int)");

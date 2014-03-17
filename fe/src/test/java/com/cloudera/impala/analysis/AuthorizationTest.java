@@ -578,6 +578,9 @@ public class AuthorizationTest {
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes PARTITION(year=2009, month=1) " +
         "SET LOCATION 'hdfs://localhost:20500/test-warehouse/new_table'");
 
+    AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET CACHED IN 'testPool'");
+
+
     // Alter table and set location to a path the user does not have access to.
     AuthzError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'hdfs://localhost:20500/test-warehouse/no_access'",
@@ -611,6 +614,10 @@ public class AuthorizationTest {
     AuthzError("ALTER TABLE functional.alltypes rename to functional_seq_snap.t1",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
     AuthzError("ALTER TABLE functional.alltypes add partition (year=1, month=1)",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
+    AuthzError("ALTER TABLE functional.alltypes set cached in 'testPool'",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
+    AuthzError("ALTER TABLE functional.alltypes set uncached",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
 
     // Trying to ALTER TABLE a view does not reveal any privileged information.

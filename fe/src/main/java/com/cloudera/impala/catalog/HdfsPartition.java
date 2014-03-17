@@ -36,6 +36,7 @@ import com.cloudera.impala.thrift.THdfsFileDesc;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TTableStats;
+import com.cloudera.impala.util.HdfsCachingUtil;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -245,6 +246,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   private final String location;
   private final static Logger LOG = LoggerFactory.getLogger(HdfsPartition.class);
   private boolean isDirty_ = false;
+  // True if this partition is marked as cached. Does not necessarily mean the data is
+  // cached.
+  private boolean isMarkedCached_ = false;
   private final TAccessLevel accessLevel;
 
   public HdfsStorageDescriptor getInputFormatDescriptor() {
@@ -293,6 +297,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   public HdfsTable getTable() { return table; }
   public void setNumRows(long numRows) { this.numRows = numRows; }
   public long getNumRows() { return numRows; }
+  public boolean isMarkedCached() { return isMarkedCached_; }
+  void markCached() { isMarkedCached_ = true; }
 
   // Returns the HDFS permissions Impala has to this partition's directory - READ_ONLY,
   // READ_WRITE, etc.
@@ -328,6 +334,10 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     this.fileFormatDescriptor = fileFormatDescriptor;
     this.id = id;
     this.accessLevel = accessLevel;
+    if (msPartition != null && msPartition.getParameters() != null) {
+      isMarkedCached_ = HdfsCachingUtil.getCacheDirIdFromParams(
+          msPartition.getParameters()) != null;
+    }
     // TODO: instead of raising an exception, we should consider marking this partition
     // invalid and moving on, so that table loading won't fail and user can query other
     // partitions.
@@ -459,6 +469,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     if (thriftPartition.isSetStats()) {
       partition.setNumRows(thriftPartition.getStats().getNum_rows());
     }
+    if (thriftPartition.isSetIs_marked_cached()) {
+      partition.isMarkedCached_ = thriftPartition.isIs_marked_cached();
+    }
     return partition;
   }
 
@@ -502,6 +515,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     thriftHdfsPart.setLocation(location);
     thriftHdfsPart.setStats(new TTableStats(numRows));
     thriftHdfsPart.setAccess_level(accessLevel);
+    thriftHdfsPart.setIs_marked_cached(isMarkedCached_);
     if (includeFileDescriptorMetadata) {
       // Add block location information
       for (FileDescriptor fd: fileDescriptors) {

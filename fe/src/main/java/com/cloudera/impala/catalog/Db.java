@@ -94,7 +94,7 @@ public class Db implements CatalogObject {
    * Gets all table names in the table cache.
    */
   public List<String> getAllTableNames() {
-    return tableCache_.getAllNames();
+    return Lists.newArrayList(tableCache_.keySet());
   }
 
   public boolean containsTable(String tableName) {

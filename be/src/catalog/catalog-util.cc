@@ -39,6 +39,8 @@ TCatalogObjectType::type TCatalogObjectTypeFromName(const string& name) {
     return TCatalogObjectType::CATALOG;
   } else if (upper == "DATA_SOURCE") {
     return TCatalogObjectType::DATA_SOURCE;
+  } else if (upper == "HDFS_CACHE_POOL") {
+    return TCatalogObjectType::HDFS_CACHE_POOL;
   }
   return TCatalogObjectType::UNKNOWN;
 }
@@ -106,6 +108,12 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       catalog_object->__set_data_source(TDataSource());
       catalog_object->data_source.__set_name(object_name);
       break;
+    case TCatalogObjectType::HDFS_CACHE_POOL: {
+      catalog_object->__set_type(object_type);
+      catalog_object->__set_cache_pool(THdfsCachePool());
+      catalog_object->cache_pool.__set_pool_name(object_name);
+      break;
+    }
     case TCatalogObjectType::CATALOG:
     case TCatalogObjectType::UNKNOWN:
     default:
@@ -137,6 +145,8 @@ string TCatalogObjectToEntryKey(const TCatalogObject& catalog_object) {
       break;
     case TCatalogObjectType::DATA_SOURCE:
       entry_key << catalog_object.data_source.name;
+    case TCatalogObjectType::HDFS_CACHE_POOL:
+      entry_key << catalog_object.cache_pool.pool_name;
       break;
     default:
       break;

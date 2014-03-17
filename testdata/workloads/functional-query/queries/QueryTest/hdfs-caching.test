@@ -1,0 +1,180 @@
+====
+---- QUERY
+drop table if exists cached_tbl_nopart;
+====
+---- QUERY
+drop table if exists cached_tbl_part;
+====
+---- QUERY
+create table cached_tbl_nopart (i int) cached in 'testPool'
+====
+---- QUERY
+insert into cached_tbl_nopart select 1
+---- RESULTS
+: 1
+====
+---- QUERY
+select * from cached_tbl_nopart
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+show table stats cached_tbl_nopart
+---- RESULTS
+-1,1,'2B','TEXT',true
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====
+---- QUERY
+alter table cached_tbl_nopart set uncached
+====
+---- QUERY
+show table stats cached_tbl_nopart
+---- RESULTS
+-1,1,'2B','TEXT',false
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====
+---- QUERY
+create table cached_tbl_part (i int) partitioned by (j int) cached in 'testPool'
+====
+---- QUERY
+# new partition should inherit the cached property
+alter table cached_tbl_part add partition (j=0)
+====
+---- QUERY
+# should be able to override the inherited cached property
+alter table cached_tbl_part add partition (j=1) uncached
+====
+---- QUERY
+alter table cached_tbl_part add partition (j=2) cached in 'testPool'
+====
+---- QUERY
+show partitions cached_tbl_part
+---- RESULTS
+0,-1,0,'0B','TEXT',true
+1,-1,0,'0B','TEXT',false
+2,-1,0,'0B','TEXT',true
+Total,-1,0,'0B','',
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====
+---- QUERY
+# uncache one of the partitions
+alter table cached_tbl_part partition (j=2) set uncached
+====
+---- QUERY
+show partitions cached_tbl_part
+---- RESULTS
+0,-1,0,'0B','TEXT',true
+1,-1,0,'0B','TEXT',false
+2,-1,0,'0B','TEXT',false
+Total,-1,0,'0B','',
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====
+---- QUERY
+# Can uncache the same partition twice without an error.
+alter table cached_tbl_part partition (j=2) set uncached
+====
+---- QUERY
+show partitions cached_tbl_part
+---- RESULTS
+0,-1,0,'0B','TEXT',true
+1,-1,0,'0B','TEXT',false
+2,-1,0,'0B','TEXT',false
+Total,-1,0,'0B','',
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====
+---- QUERY
+# mark an uncached partition as cached
+alter table cached_tbl_part partition (j=1) set cached in 'testPool'
+====
+---- QUERY
+show partitions cached_tbl_part
+---- RESULTS
+0,-1,0,'0B','TEXT',true
+1,-1,0,'0B','TEXT',true
+2,-1,0,'0B','TEXT',false
+Total,-1,0,'0B','',
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====
+---- QUERY
+# dynamic partition insert inherits table properties
+insert into cached_tbl_part partition(j) values(3, 3), (4, 4);
+---- RESULTS
+j=3/: 1
+j=4/: 1
+====
+---- QUERY
+show partitions cached_tbl_part
+---- RESULTS
+0,-1,0,'0B','TEXT',true
+1,-1,0,'0B','TEXT',true
+2,-1,0,'0B','TEXT',false
+3,-1,1,'2B','TEXT',true
+4,-1,1,'2B','TEXT',true
+Total,-1,2,'4B','',
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====
+---- QUERY
+# Set uncached clears all cache requests
+alter table cached_tbl_part set uncached
+---- RESULTS
+====
+---- QUERY
+show partitions cached_tbl_part
+---- RESULTS
+0,-1,0,'0B','TEXT',false
+1,-1,0,'0B','TEXT',false
+2,-1,0,'0B','TEXT',false
+3,-1,1,'2B','TEXT',false
+4,-1,1,'2B','TEXT',false
+Total,-1,2,'4B','',
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====
+---- QUERY
+# Can call set uncached multiple times on the same partitioned table
+alter table cached_tbl_part set uncached
+---- RESULTS
+====
+---- QUERY
+# Set cached caches all partitions
+alter table cached_tbl_part set cached in 'testPool'
+---- RESULTS
+====
+---- QUERY
+show partitions cached_tbl_part
+---- RESULTS
+0,-1,0,'0B','TEXT',true
+1,-1,0,'0B','TEXT',true
+2,-1,0,'0B','TEXT',true
+3,-1,1,'2B','TEXT',true
+4,-1,1,'2B','TEXT',true
+Total,-1,2,'4B','',
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====
+---- QUERY
+# Can call set cached multiple times on the same partitioned table.
+alter table cached_tbl_part set cached in 'testPool'
+---- RESULTS
+====
+---- QUERY
+show partitions cached_tbl_part
+---- RESULTS
+0,-1,0,'0B','TEXT',true
+1,-1,0,'0B','TEXT',true
+2,-1,0,'0B','TEXT',true
+3,-1,1,'2B','TEXT',true
+4,-1,1,'2B','TEXT',true
+Total,-1,2,'4B','',
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+====

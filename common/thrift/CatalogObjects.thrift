@@ -34,7 +34,8 @@ enum TCatalogObjectType {
   FUNCTION,
   DATA_SOURCE,
   ROLE,
-  PRIVILEGE
+  PRIVILEGE,
+  HDFS_CACHE_POOL,
 }
 
 enum TTableType {
@@ -200,6 +201,10 @@ struct THdfsPartition {
 
   // Statistics on this partition, e.g., number of rows in this partition.
   13: optional TTableStats stats
+
+  // True if this partition has been marked as cached (does not necessarily mean the
+  // underlying data is cached).
+  14: optional bool is_marked_cached
 }
 
 struct THdfsTable {
@@ -351,6 +356,15 @@ struct TPrivilege {
   3: required i32 role_id
 }
 
+// Thrift representation of an HdfsCachePool.
+struct THdfsCachePool {
+  // Name of the cache pool
+  1: required string pool_name
+
+  // In the future we may want to include additional info on the pool such as
+  // the pool limits, pool owner, etc.
+}
+
 // Represents state associated with the overall catalog.
 struct TCatalog {
   // The CatalogService service ID.
@@ -385,4 +399,7 @@ struct TCatalogObject {
 
   // Set iff object type is PRIVILEGE
   9: optional TPrivilege privilege
+
+  // Set iff object type is HDFS_CACHE_POOL
+  10: optional THdfsCachePool cache_pool
 }
