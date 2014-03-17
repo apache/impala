@@ -34,13 +34,13 @@ DEFINE_string(llama_site_path, "", "Path to the Llama configuration file "
 // configuration files are not provided.
 DEFINE_int64(default_pool_max_requests, -1, "Maximum number of concurrent outstanding "
     "requests allowed to run before queueing incoming requests. A negative value "
-    "indicates no limit. Ignored if fair_scheduler_config_path and "
-    "llama_site_path are set.");
+    "indicates no limit. 0 indicates no requests will be admitted. Ignored if "
+    "fair_scheduler_config_path and llama_site_path are set.");
 DEFINE_string(default_pool_mem_limit, "", "Maximum amount of memory that all "
     "outstanding requests in this pool may use before new requests to this pool"
     " are queued. Specified as a number of bytes ('<int>[bB]?'), megabytes "
     "('<float>[mM]'), gigabytes ('<float>[gG]'), or percentage of the physical memory "
-    "('<int>%'). -1 or not setting indicates no limit. Defaults to bytes if no unit is "
+    "('<int>%'). 0 or not setting indicates no limit. Defaults to bytes if no unit is "
     "given. Ignored if fair_scheduler_config_path and llama_site_path are set.");
 DEFINE_int64(default_pool_max_queued, 0, "Maximum number of requests allowed to be "
     "queued before rejecting requests. A negative value or 0 indicates requests "

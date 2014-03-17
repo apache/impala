@@ -51,6 +51,8 @@ DECLARE_int32(be_port);
 DECLARE_string(hostname);
 DECLARE_bool(enable_rm);
 
+DEFINE_bool(disable_admission_control, false, "Disables admission control.");
+
 namespace impala {
 
 static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.total");
@@ -83,8 +85,11 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     request_pool_service_(request_pool_service) {
   backend_descriptor_.address = backend_address;
   next_nonlocal_backend_entry_ = backend_map_.begin();
-  admission_controller_.reset(
-      new AdmissionController(request_pool_service_, metrics, backend_id_));
+  if (FLAGS_disable_admission_control) LOG(INFO) << "Admission control is disabled.";
+  if (!FLAGS_disable_admission_control) {
+    admission_controller_.reset(
+        new AdmissionController(request_pool_service_, metrics, backend_id_));
+  }
 }
 
 SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
@@ -101,7 +106,9 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
     resource_broker_(resource_broker),
     request_pool_service_(request_pool_service) {
   DCHECK(backends.size() > 0);
-  if (request_pool_service_ != NULL) {
+  if (FLAGS_disable_admission_control) LOG(INFO) << "Admission control is disabled.";
+  // request_pool_service_ may be null in unit tests
+  if (request_pool_service_ != NULL && !FLAGS_disable_admission_control) {
     admission_controller_.reset(
         new AdmissionController(request_pool_service_, metrics, backend_id_));
   }
@@ -153,7 +160,9 @@ Status SimpleScheduler::Init() {
       status.AddErrorMsg("SimpleScheduler failed to register membership topic");
       return status;
     }
-    RETURN_IF_ERROR(admission_controller_->Init(statestore_subscriber_));
+    if (!FLAGS_disable_admission_control) {
+      RETURN_IF_ERROR(admission_controller_->Init(statestore_subscriber_));
+    }
   }
   if (metrics_ != NULL) {
     total_assignments_ =
@@ -743,7 +752,9 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   // there is always at least this backend.
   schedule->set_num_hosts(max(num_backends_metric_->value(), 1L));
 
-  RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
+  if (!FLAGS_disable_admission_control) {
+    RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
+  }
   if (ExecEnv::GetInstance()->impala_server()->IsOffline()) {
     return Status("This Impala server is offine. Please retry your query later.");
   }
@@ -774,7 +785,9 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
 }
 
 Status SimpleScheduler::Release(QuerySchedule* schedule) {
-  RETURN_IF_ERROR(admission_controller_->ReleaseQuery(schedule));
+  if (!FLAGS_disable_admission_control) {
+    RETURN_IF_ERROR(admission_controller_->ReleaseQuery(schedule));
+  }
   if (FLAGS_enable_rm && schedule->NeedsRelease()) {
     DCHECK(resource_broker_ != NULL);
     TResourceBrokerReleaseRequest request;
