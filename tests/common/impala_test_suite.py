@@ -204,7 +204,6 @@ class ImpalaTestSuite(BaseTestSuite):
     empty. The current supported setup actions:
     RESET <table name> - Drop and recreate the table
     DROP PARTITIONS <table name> - Drop all partitions from the table
-    RELOAD - Reload the catalog
     """
     setup_section = QueryTestSectionReader.build_query(setup_section)
     for row in setup_section.split('\n'):
@@ -219,8 +218,6 @@ class ImpalaTestSuite(BaseTestSuite):
           table_format, row.split('DROP PARTITIONS')[1])
         self.__drop_partitions(db_name, table_name)
         self.client.execute("invalidate metadata " + db_name + "." + table_name)
-      elif row.startswith('RELOAD'):
-        self.client.refresh()
       else:
         assert False, 'Unsupported setup command: %s' % row
 

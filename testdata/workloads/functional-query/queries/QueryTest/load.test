@@ -174,7 +174,7 @@ select count(*) from functional.test_load where year=2010 and month=1
 ---- SETUP
 # A refresh needs to happen before selecting from this table because file(s) changed
 # underneath it.
-RELOAD
+RESET functional.test_load
 ---- RESULTS
 0
 ---- TYPES

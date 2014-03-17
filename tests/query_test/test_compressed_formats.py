@@ -87,7 +87,7 @@ class TestCompressedFormats(ImpalaTestSuite):
     query = 'select count(*) from %s' % dest_table
     try:
       # Need to refresh
-      self.client.refresh()
+      self.client.execute("refresh %s" % dest_table)
       result = self.execute_scalar(query)
       # Fail iff we expected an error
       assert expected_error is None, 'Query is expected to fail'
