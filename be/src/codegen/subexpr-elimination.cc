@@ -178,6 +178,13 @@ bool SubExprElimination::Run(Function* fn) {
     LoadInst* is_null_value = reinterpret_cast<LoadInst*>(instr);
     Value* loaded_ptr = is_null_value->getPointerOperand();
 
+    // Subexpr elimination requires the IR to be a very specific form.
+    //   call SlotRef(row, NULL, is_null_ptr)
+    //   load is_null_ptr
+    // Since we generate this IR currently, we can enforce this logic in our exprs
+    // TODO: this should be removed/generalized with expr refactoring
+    DCHECK_EQ(loaded_ptr, call_instr->getArgOperand(2));
+
     pair<Function*, Value*> call_desc = make_pair(called_fn, row_arg);
     if (cached_slot_ref_results.find(call_desc) == cached_slot_ref_results.end()) {
       CachedExprResult cache_entry;

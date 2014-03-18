@@ -227,11 +227,12 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
 
   // Call lhs
   Value* lhs_value = builder.CreateCall(lhs_function, args, "lhs_call");
+  Value* lhs_is_null_val = builder.CreateLoad(lhs_is_null, "lhs_null");
+
   // Call rhs
   args[2] = rhs_is_null;
   Value* rhs_value = builder.CreateCall(rhs_function, args, "rhs_call");
 
-  Value* lhs_is_null_val = builder.CreateLoad(lhs_is_null, "lhs_null");
   Value* rhs_is_null_val = builder.CreateLoad(rhs_is_null, "rhs_null");
   Value* compare = NULL;
 

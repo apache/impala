@@ -925,3 +925,11 @@ float,float
 ---- RESULTS
 -1,-1
 ====
+---- QUERY
+# Regression test codegen with nulls and compound predicates. IMPALA-892.
+select COUNT(int_col is not null AND bool_col) - COUNT(bool_col) FROM alltypesagg
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
