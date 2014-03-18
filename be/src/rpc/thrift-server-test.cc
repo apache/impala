@@ -49,7 +49,7 @@ TEST(SslTest, Connectivity) {
       impala->StartWithClientServers(FLAGS_beeswax_port, FLAGS_beeswax_port + 1, false));
 
   ThriftClient<ImpalaServiceClient> ssl_client(
-      "localhost", FLAGS_beeswax_port, NULL, true);
+      "localhost", FLAGS_beeswax_port, "", NULL, true);
   EXPECT_TRUE(ssl_client.Open().ok());
 
   TPingImpalaServiceResp resp;
@@ -58,7 +58,7 @@ TEST(SslTest, Connectivity) {
   });
 
   ThriftClient<ImpalaServiceClient> non_ssl_client(
-      "localhost", FLAGS_beeswax_port, NULL, false);
+      "localhost", FLAGS_beeswax_port, "", NULL, false);
   EXPECT_TRUE(non_ssl_client.Open().ok());
   EXPECT_THROW(non_ssl_client.iface()->PingImpalaService(resp), TTransportException);
 }

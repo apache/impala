@@ -102,10 +102,12 @@ class ThriftClient : public ThriftClientImpl {
   // Creates, but does not connect, a new ThriftClient for a remote server.
   //  - ipaddress: address of remote server
   //  - port: port on which remote service runs
+  //  - service_name: If set, the target service to connect to.
   //  - auth_provider: Authentication scheme to use. If NULL, use the global default
   //    client<->demon authentication scheme.
   //  - ssl: if true, SSL is enabled on this connection
-  ThriftClient(const std::string& ipaddress, int port, AuthProvider* auth_provider = NULL,
+  ThriftClient(const std::string& ipaddress, int port,
+      const std::string& service_name = "", AuthProvider* auth_provider = NULL,
       bool ssl = false);
 
   // Returns the object used to actually make RPCs against the remote server
@@ -119,6 +121,7 @@ class ThriftClient : public ThriftClientImpl {
 
 template <class InterfaceType>
 ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port,
+    const std::string& service_name,
     AuthProvider* auth_provider, bool ssl)
     : ThriftClientImpl(ipaddress, port, ssl),
       iface_(new InterfaceType(protocol_)),
@@ -130,7 +133,8 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
     auth_provider_ = AuthManager::GetInstance()->GetServerFacingAuthProvider();
   }
 
-  auth_provider_->WrapClientTransport(address_.hostname, transport_, &transport_);
+  auth_provider_->WrapClientTransport(address_.hostname, transport_, service_name,
+      &transport_);
 
   protocol_.reset(new apache::thrift::protocol::TBinaryProtocol(transport_));
   iface_.reset(new InterfaceType(protocol_));

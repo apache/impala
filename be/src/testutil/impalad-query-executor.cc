@@ -50,7 +50,7 @@ Status ImpaladQueryExecutor::Setup() {
   int port = atoi(elems[1].c_str());
   DCHECK_GT(port, 0);
 
-  client_.reset(new ThriftClient<ImpalaServiceClient>(elems[0], port, NULL, false));
+  client_.reset(new ThriftClient<ImpalaServiceClient>(elems[0], port));
 
   // Wait for up to 10s for the server to start, polling at 50ms intervals
   RETURN_IF_ERROR(WaitForServer(elems[0], port, 200, 50));

@@ -47,6 +47,7 @@ class AuthProvider {
   // an auth protocol requires.
   virtual Status WrapClientTransport(const std::string& hostname,
       boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
+      const std::string& service_name,
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport) = 0;
 
   // Returns true if this provider uses SASL at the transport layer.
@@ -67,6 +68,7 @@ class KerberosAuthProvider : public AuthProvider {
 
   virtual Status WrapClientTransport(const std::string& hostname,
       boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
+      const std::string& service_name,
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
 
   virtual Status GetServerTransportFactory(
@@ -124,6 +126,7 @@ class LdapAuthProvider : public AuthProvider {
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
   virtual Status WrapClientTransport(const std::string& hostname,
       boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
+      const std::string& service_name,
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
 
   virtual bool is_sasl() { return true; }
@@ -147,6 +150,7 @@ class NoAuthProvider : public AuthProvider {
 
   virtual Status WrapClientTransport(const std::string& hostname,
       boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
+      const std::string& service_name,
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
 
   virtual bool is_sasl() { return false; }

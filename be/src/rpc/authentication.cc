@@ -419,14 +419,16 @@ Status KerberosAuthProvider::GetServerTransportFactory(
 }
 
 Status KerberosAuthProvider::WrapClientTransport(const string& hostname,
-    shared_ptr<TTransport> raw_transport, shared_ptr<TTransport>* wrapped_transport) {
+    shared_ptr<TTransport> raw_transport, const string& service_name,
+    shared_ptr<TTransport>* wrapped_transport) {
   shared_ptr<sasl::TSasl> sasl_client;
   map<string, string> props;
   // We do not set this.
   string auth_id;
 
   try {
-    sasl_client.reset(new sasl::TSaslClient(KERBEROS_MECHANISM, auth_id, service_name_,
+    string service = service_name.empty() ? service_name_ : service_name;
+    sasl_client.reset(new sasl::TSaslClient(KERBEROS_MECHANISM, auth_id, service,
         hostname, props, &SASL_CALLBACKS[0]));
   } catch (sasl::SaslClientImplException& e) {
     LOG(ERROR) << "Failed to create a GSSAPI/SASL client: " << e.what();
@@ -503,7 +505,8 @@ Status LdapAuthProvider::GetServerTransportFactory(
 }
 
 Status LdapAuthProvider::WrapClientTransport(const string& hostname,
-  shared_ptr<TTransport> raw_transport, shared_ptr<TTransport>* wrapped_transport) {
+  shared_ptr<TTransport> raw_transport, const string& dummy_service,
+  shared_ptr<TTransport>* wrapped_transport) {
   *wrapped_transport = raw_transport;
   return Status::OK;
 }
@@ -514,7 +517,8 @@ Status NoAuthProvider::GetServerTransportFactory(shared_ptr<TTransportFactory>* 
 }
 
 Status NoAuthProvider::WrapClientTransport(const string& hostname,
-    shared_ptr<TTransport> raw_transport, shared_ptr<TTransport>* wrapped_transport) {
+    shared_ptr<TTransport> raw_transport, const string& dummy_service,
+    shared_ptr<TTransport>* wrapped_transport) {
   *wrapped_transport = raw_transport;
   return Status::OK;
 }

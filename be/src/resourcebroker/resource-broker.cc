@@ -49,6 +49,8 @@ DECLARE_int32(resource_broker_cnxn_retry_interval_ms);
 DECLARE_int32(resource_broker_send_timeout);
 DECLARE_int32(resource_broker_recv_timeout);
 
+static const string LLAMA_KERBEROS_SERVICE_NAME = "llama";
+
 // TODO: Refactor the Llama restart and thrift connect/reconnect/reopen logic into
 // a common place.
 
@@ -103,7 +105,8 @@ ResourceBroker::ResourceBroker(const TNetworkAddress& llama_address,
         FLAGS_resource_broker_cnxn_attempts,
         FLAGS_resource_broker_cnxn_retry_interval_ms,
         FLAGS_resource_broker_send_timeout,
-        FLAGS_resource_broker_recv_timeout)),
+        FLAGS_resource_broker_recv_timeout,
+        LLAMA_KERBEROS_SERVICE_NAME)),
     is_mini_llama_(false) {
   DCHECK(metrics != NULL);
   reservation_rpc_time_metric_ =
