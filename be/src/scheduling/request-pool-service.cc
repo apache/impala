@@ -62,8 +62,8 @@ RequestPoolService::RequestPoolService() {
   if (FLAGS_fair_scheduler_allocation_path.empty() &&
       FLAGS_llama_site_path.empty()) {
     if (FLAGS_enable_rm) {
-      LOG(ERROR) << "If resource management is enabled, -fair_scheduler_config_path is "
-                 << "required.";
+      LOG(ERROR) << "If resource management is enabled, -fair_scheduler_allocation_path "
+                 << "is required.";
       exit(1);
     }
     default_pool_only_ = true;
