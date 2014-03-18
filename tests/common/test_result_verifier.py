@@ -200,6 +200,26 @@ def verify_results(expected_results, actual_results, order_matters):
     actual_results = sorted(actual_results)
   assert expected_results == actual_results
 
+def verify_errors(expected_errors, actual_errors):
+  """Convert the errors to our test format, treating them as a single string column row
+  set. This requires enclosing the data in single quotes."""
+  expected = QueryTestResult(["'%s'" % l for l in expected_errors if l], ['STRING'],
+      order_matters=False)
+  actual = QueryTestResult(["'%s'" % l for l in actual_errors if l], ['STRING'],
+      order_matters=False)
+  VERIFIER_MAP['VERIFY_IS_EQUAL'](expected, actual)
+
+def apply_error_match_filter(error_list):
+  """Applies a filter to each entry in the given list of errors to ensure result matching
+  is stable."""
+  updated_errors = list()
+  for row in error_list:
+    # The actual file path isn't very interesting and can vary. Filter it out.
+    row = re.sub(r'^file:.+$|file hdfs:.+$', 'file: hdfs://regex:.$', row)
+    # The "Backend <id>" can also vary, so filter it out as well.
+    updated_errors.append(re.sub(r'Backend \d+:', '', row))
+  return updated_errors
+
 def verify_raw_results(test_section, exec_result, file_format, update_section=False):
   """
   Accepts a raw exec_result object and verifies it matches the expected results.
@@ -217,6 +237,17 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
   else:
     LOG.info("No results found. Skipping verification");
     return
+
+  if 'ERRORS' in test_section:
+    expected_errors = test_section['ERRORS'].split('\n')
+    actual_errors = apply_error_match_filter(exec_result.log.split('\n'))
+    try:
+      verify_errors(expected_errors, actual_errors)
+    except AssertionError:
+      if update_section:
+        test_section['ERRORS'] = '\n'.join(actual_errors)
+      else:
+        raise
 
   if 'TYPES' in test_section:
     # Distinguish between an empty list and a list with an empty string.

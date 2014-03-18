@@ -57,6 +57,7 @@ class QueryResult(object):
     self.summary = summary
     self.schema = schema
     self.runtime_profile = runtime_profile
+    self.log = None
 
   def get_data(self):
     return self.__format_data()
@@ -150,6 +151,7 @@ class ImpalaBeeswaxClient(object):
     result.time_taken = time.time() - start
     # Don't include the time it takes to get the runtime profile in the execution time
     result.runtime_profile = self.get_runtime_profile(handle)
+    result.log = self.get_log(handle.log_context)
     # Closing INSERT queries is done as part of fetching the results so don't close
     # the handle twice.
     if self.__get_query_type(query_string) != 'insert':

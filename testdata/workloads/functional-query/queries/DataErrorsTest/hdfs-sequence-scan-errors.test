@@ -2,15 +2,17 @@
 ---- QUERY
 select count(*) from functional_seq_snap.bad_seq_snap
 ---- ERRORS
-Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset 899514: Bad synchronization marker
+
+Problem parsing file: hdfs://regex:.$
   Expected: '6e 91 6 ec be 78 a0 ac 72 10 7e 41 b4 da 93 3c '
   Actual:   '6e 91 6 78 78 78 a0 ac 72 10 7e 41 b4 da 93 3c '
-Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset 1784692: Decompressor: invalid compressed length.  Data is likely corrupt.
-Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset 1790812: Decompressor: invalid compressed length.  Data is likely corrupt.
-Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at offset 1791562: Decompressor: invalid compressed length.  Data is likely corrupt.
-Problem parsing file hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file at end of file: Tried to read 896782 bytes but could only read 896777 bytes. This may indicate data file corruption. (file: hdfs: test-warehouse/bad_seq_snap_seq_snap/bad_file, byte offset: 2691508)
----- TYPES
-bigint
+Problem parsing file: hdfs://regex:.$
+Problem parsing file: hdfs://regex:.$
+Problem parsing file: hdfs://regex:.$
+Problem parsing file: hdfs://regex:.$
+
 ---- RESULTS
 9434
+---- TYPES
+bigint
 ====

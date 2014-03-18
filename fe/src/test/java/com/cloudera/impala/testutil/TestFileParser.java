@@ -171,22 +171,6 @@ public class TestFileParser {
     public String getQuery() {
       return getSectionAsString(Section.QUERY, false, "\n");
     }
-
-
-    public QueryExecTestResult getQueryExecTestResult(String dbSuffix) {
-      QueryExecTestResult result = new QueryExecTestResult();
-      result.getColTypes().addAll(getSectionContents(Section.TYPES));
-      result.getColLabels().addAll(getSectionContents(Section.COLLABELS));
-      result.getFileErrors().addAll(getSectionContents(Section.FILEERRORS, true,
-          dbSuffix));
-      result.getSetup().addAll(getSectionContents(Section.SETUP, true, dbSuffix));
-      result.getQuery().addAll(getSectionContents(Section.QUERY, true));
-      result.getResultSet().addAll(getSectionContents(Section.RESULTS));
-      result.getModifiedPartitions().addAll(
-          getSectionContents(Section.PARTITIONS, false, dbSuffix));
-      result.getErrors().addAll(getSectionContents(Section.ERRORS, true, dbSuffix));
-      return result;
-    }
   }
 
   private final List<TestCase> testCases = Lists.newArrayList();
@@ -225,7 +209,9 @@ public class TestFileParser {
    */
   private void open(String table) {
     try {
-      String fullPath = new File(TestFileUtils.getTestFileBaseDir(), fileName).getPath();
+      String testFileBaseDir =
+          new File(System.getenv("IMPALA_HOME"), "testdata/workloads").getPath();
+      String fullPath = new File(testFileBaseDir, fileName).getPath();
       reader = new BufferedReader(new FileReader(fullPath));
       scanner = new Scanner(reader);
     } catch (Exception e) {
