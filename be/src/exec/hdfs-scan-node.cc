@@ -463,7 +463,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   runtime_state_->resource_pool()->SetThreadAvailableCb(
       bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this, _1));
 
-  if (FLAGS_enable_rm) {
+  if (runtime_state_->query_resource_mgr() != NULL) {
     runtime_state_->query_resource_mgr()->AddVcoreAvailableCb(
         bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this,
             runtime_state_->resource_pool()));
@@ -648,7 +648,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   //  4. Don't start up if there are no thread tokens.
   bool started_scanner = false;
   while (true) {
-    if (FLAGS_enable_rm &&
+    if (runtime_state_->query_resource_mgr() != NULL &&
         runtime_state_->query_resource_mgr()->IsVcoreOverSubscribed()) {
       break;
     }
@@ -670,7 +670,9 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
         new Thread("hdfs-scan-node", ss.str(), &HdfsScanNode::ScannerThread, this));
     started_scanner = true;
 
-    if (FLAGS_enable_rm) runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
+    if (runtime_state_->query_resource_mgr() != NULL) {
+      runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
+    }
   }
   if (!started_scanner) ++num_skipped_tokens_;
 }

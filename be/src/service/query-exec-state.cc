@@ -318,7 +318,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     RETURN_IF_ERROR(UpdateQueryStatus(status));
   }
 
-  if (FLAGS_enable_rm) {
+  if (FLAGS_enable_rm && schedule_->HasReservation()) {
     // Add the granted reservation to the query profile.
     stringstream reservation_ss;
     reservation_ss << *schedule_->reservation();

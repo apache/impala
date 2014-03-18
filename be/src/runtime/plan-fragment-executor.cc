@@ -63,7 +63,7 @@ PlanFragmentExecutor::PlanFragmentExecutor(ExecEnv* exec_env,
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
   Close();
-  if (FLAGS_enable_rm) {
+  if (runtime_state_->query_resource_mgr() != NULL) {
     exec_env_->resource_broker()->UnregisterQueryResourceMgr(query_id_);
   }
   // at this point, the report thread should have been stopped
@@ -85,7 +85,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   }
 
   string cgroup = "";
-  if (FLAGS_enable_rm) {
+  if (FLAGS_enable_rm && request.__isset.reserved_resource) {
     cgroup = exec_env_->cgroups_mgr()->UniqueIdToCgroup(PrintId(query_id_, "_"));
   }
 
@@ -93,7 +93,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
       request.query_ctxt, cgroup, exec_env_));
 
   // Register after setting runtime_state_ to ensure proper cleanup.
-  if (FLAGS_enable_rm && !cgroup.empty()) {
+  if (FLAGS_enable_rm && !cgroup.empty() && request.__isset.reserved_resource) {
     bool is_first;
     RETURN_IF_ERROR(exec_env_->cgroups_mgr()->RegisterFragment(
         params.fragment_instance_id, cgroup, &is_first));
@@ -122,9 +122,6 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
       runtime_state_->query_resource_mgr()->InitVcoreAcquisition(
           request.reserved_resource.v_cpu_cores);
     }
-  } else {
-    DCHECK(!FLAGS_enable_rm)
-        << "No resource set for fragment, can't create resource context";
   }
 
   // reservation or a query option.
@@ -147,7 +144,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();
-  if (FLAGS_enable_rm) runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
+  if (runtime_state_->query_resource_mgr() != NULL) {
+    runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(1);
+  }
   has_thread_token_ = true;
 
   average_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
@@ -521,7 +520,7 @@ void PlanFragmentExecutor::Close() {
   row_batch_.reset();
   // Prepare may not have been called, which sets runtime_state_
   if (runtime_state_.get() != NULL) {
-    if (FLAGS_enable_rm) {
+    if (runtime_state_->query_resource_mgr() != NULL) {
       exec_env_->cgroups_mgr()->UnregisterFragment(
           runtime_state_->fragment_instance_id(), runtime_state_->cgroup());
     }
