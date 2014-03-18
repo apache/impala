@@ -86,8 +86,8 @@ class TestCompressedFormats(ImpalaTestSuite):
     # Try to read the compressed file with extension
     query = 'select count(*) from %s' % dest_table
     try:
-      # Need to refresh
-      self.client.execute("refresh %s" % dest_table)
+      # Need to invalidate the metadata because the table was created external to Impala.
+      self.client.execute("invalidate metadata %s" % dest_table)
       result = self.execute_scalar(query)
       # Fail iff we expected an error
       assert expected_error is None, 'Query is expected to fail'
