@@ -348,7 +348,6 @@ class ImpalaShell(cmd.Cmd):
   def precmd(self, args):
     self.is_interrupted.clear()
     self.rpc_is_interruptable = False
-    self.query_handle_closed = False
     args = self.sanitise_input(args)
     if not args: return args
     # Split args using sqlparse. If there are multiple queries present in user input,
@@ -606,6 +605,7 @@ class ImpalaShell(cmd.Cmd):
     start_time = time.time()
     rpc_result = self.__do_rpc(lambda: self.imp_service.query(query))
     self.last_query_handle, status = rpc_result.get_results()
+    self.query_handle_closed = False
 
     if self.is_interrupted.isSet():
       if status == RpcStatus.OK:

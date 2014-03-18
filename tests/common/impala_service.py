@@ -93,6 +93,12 @@ class ImpaladService(BaseImpalaService):
     match = re.match(r'Known Backends \((\d+)\)', result)
     return None if match is None else int(match.group(1))
 
+  def get_num_in_flight_queries(self, timeout=30, interval=1):
+    LOG.info("Getting num_in_flight_queries from %s:%s" %\
+        (self.hostname, self.webserver_port))
+    result = self.read_debug_webpage('inflight_query_ids?raw', timeout, interval)
+    return None if result is None else len([l for l in result.split('\n') if l])
+
   def wait_for_num_known_live_backends(self, expected_value, timeout=30, interval=1):
     start_time = time()
     while (time() - start_time < timeout):

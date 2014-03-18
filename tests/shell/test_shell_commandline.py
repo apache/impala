@@ -17,7 +17,9 @@ import os
 import logging
 import pytest
 import shlex
+from time import sleep
 from subprocess import Popen, PIPE, call
+from tests.common.impala_cluster import ImpalaCluster
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 DEFAULT_QUERY = 'select 1'
@@ -190,12 +192,29 @@ class TestImpalaShell(object):
     result_desc = run_impala_shell_cmd(args)
     assert result_describe.stdout == result_desc.stdout
 
+  @pytest.mark.execute_serially
+  def test_queries_closed(self):
+    """Regression test for IMPALA-897"""
+    args = '-f %s/test_close_queries.sql --quiet -B' % QUERY_FILE_PATH
+    cmd = "%s %s" % (SHELL_CMD, args)
+    # Execute the shell command async
+    p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE)
+
+    impala_cluster = ImpalaCluster()
+    impalad = impala_cluster.impalads[0].service
+    # The last query in the test SQL script will sleep for 10 seconds, so sleep
+    # here for 5 seconds and verify the number of in-flight queries is 1.
+    sleep(5)
+    assert 1 == impalad.get_num_in_flight_queries()
+    assert get_shell_cmd_result(p).rc == 0
+    assert 0 == impalad.get_num_in_flight_queries()
 
 class ImpalaShellResult(object):
   def __init__(self):
     self.rc = 0
     self.stdout = str()
     self.stderr = str()
+
 
 def run_impala_shell_cmd(shell_args, expect_success=True):
   """Runs the Impala shell on the commandline.
@@ -205,12 +224,15 @@ def run_impala_shell_cmd(shell_args, expect_success=True):
   """
   cmd = "%s %s" % (SHELL_CMD, shell_args)
   p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE)
-  result = ImpalaShellResult()
-  result.stdout, result.stderr = p.communicate()
-  result.rc = p.returncode
+  result = get_shell_cmd_result(p)
   if expect_success:
-    assert result.rc == 0, "Command %s was expected to succeed: %s" % (cmd,
-                                                                       result.stderr)
+    assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (cmd, result.stderr)
   else:
-    assert result.rc != 0, "Command %s was expected to fail" % cmd
+    assert result.rc != 0, "Cmd %s was expected to fail" % cmd
+  return result
+
+def get_shell_cmd_result(process):
+  result = ImpalaShellResult()
+  result.stdout, result.stderr = process.communicate()
+  result.rc = process.returncode
   return result
