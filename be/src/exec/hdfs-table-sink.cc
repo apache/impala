@@ -503,6 +503,7 @@ void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* par
 }
 
 void HdfsTableSink::Close(RuntimeState* state) {
+  if (closed_) return;
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   for (PartitionMap::iterator cur_partition =
           partition_keys_to_output_partitions_.begin();
@@ -514,6 +515,7 @@ void HdfsTableSink::Close(RuntimeState* state) {
   partition_keys_to_output_partitions_.clear();
   Expr::Close(output_exprs_, state);
   Expr::Close(partition_key_exprs_, state);
+  closed_ = true;
 }
 
 Status HdfsTableSink::GetFileBlockSize(OutputPartition* output_partition, int64_t* size) {

@@ -38,6 +38,7 @@ class RowDescriptor;
 // Superclass of all data sinks.
 class DataSink {
  public:
+  DataSink() : closed_(false) { }
   virtual ~DataSink() {}
 
   // Setup. Call before Send(), Open(), or Close().
@@ -74,6 +75,12 @@ class DataSink {
   // Outputs the insert stats to a string
   static std::string OutputInsertStats(const PartitionInsertStats& stats,
       const std::string& prefix = "");
+
+ protected:
+  // Set to true after Close() has been called. Subclasses should check and set this in
+  // Close().
+  bool closed_;
+
 };
 
 }  // namespace impala

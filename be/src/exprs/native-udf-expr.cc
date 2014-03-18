@@ -283,6 +283,7 @@ Status NativeUdfExpr::Open(RuntimeState* state) {
 
 void NativeUdfExpr::Close(RuntimeState* state) {
   if (close_fn_ != NULL && opened_) {
+    DCHECK(!udf_context_->impl()->closed()) << "Expr::Close() called twice";
     close_fn_(udf_context_.get(), FunctionContext::THREAD_LOCAL);
   }
 

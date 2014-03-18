@@ -60,6 +60,7 @@ class FunctionContextImpl {
   void SetConstantArgs(const std::vector<impala_udf::AnyVal*>& constant_args);
 
   bool debug() { return debug_; }
+  bool closed() { return closed_; }
 
  private:
   friend class impala_udf::FunctionContext;

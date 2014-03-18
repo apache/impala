@@ -78,6 +78,7 @@ Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
 }
 
 void HBaseTableSink::Close(RuntimeState* state) {
+  if (closed_) return;
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   if (hbase_table_writer_.get() != NULL) {
@@ -85,6 +86,7 @@ void HBaseTableSink::Close(RuntimeState* state) {
     hbase_table_writer_.reset(NULL);
   }
   Expr::Close(output_exprs_, state);
+  closed_ = true;
 }
 
 }  // namespace impala
