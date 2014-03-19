@@ -145,28 +145,36 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
     return;
   }
 
-  // TODO: mangle Prepare() and Close() functions
-  if (params.symbol_type != TSymbolType::UDF_EVALUATE) {
-    result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
-    result->__set_error_msg("Mangling of prepare and close symbols not yet implemented");
-    return;
-  }
-
   // Mangle the user input and do another lookup.
+  string symbol;
   ColumnType ret_type(INVALID_TYPE);
   if (params.__isset.ret_arg_type) ret_type = ColumnType(params.ret_arg_type);
-  string symbol = SymbolsUtil::MangleUserFunction(params.symbol,
-      arg_types, params.has_var_args, params.__isset.ret_arg_type ? &ret_type : NULL);
+
+  if (params.symbol_type == TSymbolType::UDF_EVALUATE) {
+    symbol = SymbolsUtil::MangleUserFunction(params.symbol,
+        arg_types, params.has_var_args, params.__isset.ret_arg_type ? &ret_type : NULL);
+  } else {
+    DCHECK(params.symbol_type == TSymbolType::UDF_PREPARE ||
+           params.symbol_type == TSymbolType::UDF_CLOSE);
+    symbol = SymbolsUtil::ManglePrepareOrCloseFunction(params.symbol);
+  }
 
   status = LibCache::instance()->CheckSymbolExists(params.location, type, symbol);
   if (!status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
     stringstream ss;
     ss << "Could not find function " << params.symbol << "(";
-    for (int i = 0; i < arg_types.size(); ++i) {
-      ss << arg_types[i].DebugString();
-      if (i != arg_types.size() - 1) ss << ", ";
+
+    if (params.symbol_type == TSymbolType::UDF_EVALUATE) {
+      for (int i = 0; i < arg_types.size(); ++i) {
+        ss << arg_types[i].DebugString();
+        if (i != arg_types.size() - 1) ss << ", ";
+      }
+    } else {
+      ss << "impala_udf::FunctionContext*, "
+         << "impala_udf::FunctionContext::FunctionStateScope";
     }
+
     ss << ")";
     if (params.__isset.ret_arg_type) ss << " returns " << ret_type.DebugString();
     ss << " in: " << params.location;

@@ -225,3 +225,40 @@ string SymbolsUtil::MangleUserFunction(const string& fn_name,
   return ss.str();
 }
 
+string SymbolsUtil::ManglePrepareOrCloseFunction(const string& fn_name) {
+  // We need to split fn_name by :: to separate scoping from tokens
+  vector<string> name_tokens;
+  split_regex(name_tokens, fn_name, regex("::"));
+
+  // Mangled names use substitution as a builtin compression. The first time a token
+  // is seen, we output the raw token string and store the index ("seq_id"). The
+  // next time we see the same token, we output the index instead.
+  int seq_id = 0;
+
+  // Sequence id for the impala_udf namespace token
+  int impala_udf_seq_id = -1;
+
+  stringstream ss;
+  ss << MANGLE_PREFIX;
+  if (name_tokens.size() > 1) {
+    ss << "N";  // Start namespace
+    seq_id += name_tokens.size() - 1; // Append for all the name space tokens.
+  }
+  for (int i = 0; i < name_tokens.size(); ++i) {
+    AppendMangledToken(name_tokens[i], &ss);
+  }
+  if (name_tokens.size() > 1) ss << "E"; // End fn namespace
+
+  ss << "PN"; // FunctionContext* argument and start of FunctionContext namespace
+  AppendMangledToken("impala_udf", &ss);
+  AppendMangledToken("FunctionContext", &ss);
+  ss << "E"; // E indicates end of namespace
+
+  ss << "NS"; // FunctionStateScope argument
+  ss << seq_id;
+  ss << "_";
+  AppendMangledToken("FunctionStateScope", &ss);
+  ss << "E"; // E indicates end of namespace
+
+  return ss.str();
+}

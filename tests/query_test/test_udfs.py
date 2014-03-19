@@ -248,17 +248,12 @@ create function {database}.validate_arg_type(string) returns boolean
 location '{location}' symbol='ValidateArgType';
 
 create function {database}.count_rows() returns bigint
-location '{location}' symbol='Count'
-prepare_fn='_Z12CountPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'
-close_fn='_Z10CountClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE';
+location '{location}' symbol='Count' prepare_fn='CountPrepare' close_fn='CountClose';
 
 create function {database}.constant_arg(int) returns int
-location '{location}' symbol="ConstantArg"
-prepare_fn='_Z18ConstantArgPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'
-close_fn='_Z16ConstantArgClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE';
+location '{location}' symbol='ConstantArg' prepare_fn='ConstantArgPrepare' close_fn='ConstantArgClose';
 
 create function {database}.validate_open(int) returns boolean
 location '{location}' symbol='ValidateOpen'
-prepare_fn='_Z19ValidateOpenPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'
-close_fn='_Z17ValidateOpenClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE';
+prepare_fn='ValidateOpenPrepare' close_fn='ValidateOpenClose';
 """

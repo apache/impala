@@ -44,6 +44,10 @@ class SymbolsUtil {
   static std::string MangleUserFunction(const std::string& fn_name,
       const std::vector<ColumnType>& arg_types, bool has_var_args = false,
       ColumnType* ret_argument = NULL);
+
+  // Mangles fn_name assuming arguments
+  // (impala_udf::FunctionContext*, impala_udf::FunctionContext::FunctionStateScope).
+  static std::string ManglePrepareOrCloseFunction(const std::string& fn_name);
 };
 
 }

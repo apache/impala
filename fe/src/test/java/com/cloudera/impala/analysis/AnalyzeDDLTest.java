@@ -876,21 +876,20 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Prepare/Close functions
     AnalyzesOk("create function foo() returns int" + udfSuffix
-        + " prepare_fn='_Z19ValidateOpenPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'"
-        + " close_fn='_Z17ValidateOpenClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'");
+        + " prepare_fn='ValidateOpenPrepare'" + " close_fn='ValidateOpenClose'");
+    AnalyzesOk("create function foo() returns int" + udfSuffixIr
+        + " prepare_fn='ValidateOpenPrepare'" + " close_fn='ValidateOpenClose'");
     AnalyzesOk("create function foo() returns int" + udfSuffixIr
         + " prepare_fn='_Z19ValidateOpenPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'"
         + " close_fn='_Z17ValidateOpenClosePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE'");
     AnalysisError("create function foo() returns int" + udfSuffix + " prepare_fn=''",
         "Could not find symbol ''");
-    AnalysisError("create function foo() returns int" + udfSuffixIr + " prepare_fn=''",
-        "Could not find symbol ''");
     AnalysisError("create function foo() returns int" + udfSuffix + " close_fn=''",
         "Could not find symbol ''");
-    // NYI
-    AnalysisError("create function foo() returns int" + udfSuffixIr
-        + " prepare_fn='ValidateOpenPrepare'" + " close_fn='ValidateOpenClose'",
-        "Mangling of prepare and close symbols not yet implemented");
+    AnalysisError("create function foo() returns int" + udfSuffix +
+        " prepare_fn='FakePrepare'",
+        "Could not find function FakePrepare(impala_udf::FunctionContext*, "+
+        "impala_udf::FunctionContext::FunctionStateScope) in: ");
 
     // Try to create a function with the same name as a builtin
     AnalysisError("create function sin(double) RETURNS double" + udfSuffix,

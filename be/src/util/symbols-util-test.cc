@@ -43,6 +43,17 @@ void TestMangling(const string& name, bool var_args, const vector<ColumnType> ar
   EXPECT_EQ(demangled, expected_demangled);
 }
 
+void TestManglingPrepareOrClose(const string& name, const string& expected_mangled,
+    const string& expected_demangled) {
+  string mangled = SymbolsUtil::ManglePrepareOrCloseFunction(name);
+  string demangled = SymbolsUtil::Demangle(mangled);
+
+  // Check we could demangle it.
+  EXPECT_TRUE(!demangled.empty()) << demangled;
+  EXPECT_EQ(mangled, expected_mangled);
+  EXPECT_EQ(demangled, expected_demangled);
+}
+
 // Not very thoroughly tested since our implementation is just a wrapper around
 // the gcc library.
 TEST(SymbolsUtil, Demangling) {
@@ -246,6 +257,17 @@ TEST(SymbolsUtil, Mangling) {
   TestMangling("TEST", false, args, &char_ret_type,
       "_Z4TESTPN10impala_udf15FunctionContextERKPhPS2_",
       "TEST(impala_udf::FunctionContext*, unsigned char* const&, unsigned char**)");
+}
+
+TEST(SymbolsUtil, ManglingPrepareOrClose) {
+  TestManglingPrepareOrClose("CountPrepare",
+      "_Z12CountPreparePN10impala_udf15FunctionContextENS0_18FunctionStateScopeE",
+      "CountPrepare(impala_udf::FunctionContext*,"
+      " impala_udf::FunctionContext::FunctionStateScope)");
+  TestManglingPrepareOrClose("foo::bar",
+      "_ZN3foo3barEPN10impala_udf15FunctionContextENS1_18FunctionStateScopeE",
+      "foo::bar(impala_udf::FunctionContext*,"
+      " impala_udf::FunctionContext::FunctionStateScope)");
 }
 
 }
