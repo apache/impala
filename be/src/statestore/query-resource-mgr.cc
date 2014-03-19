@@ -85,9 +85,21 @@ void QueryResourceMgr::InitVcoreAcquisition(int32_t init_vcores) {
   DCHECK(acquire_vcore_thread_.get() == NULL)
       << "Double initialisation of QueryResourceMgr::InitCpuAcquisition()";
   vcores_ = init_vcores;
+
+  // These shared pointers to atomic values are used to communicate between the vcore
+  // acquisition thread and the class destructor. If the acquisition thread is in the
+  // middle of an Expand() call, the destructor might have to wait 5s (the default
+  // timeout) to return. This holds up query close operations. So instead check to see if
+  // the thread is in Expand(), and if so we set a synchronised flag early_exit_ which it
+  // inspects immediately after exiting Expand(), and if true, exits before touching any
+  // of the class-wide state (because the destructor may have finished before this point).
+
+  thread_in_expand_.reset(new AtomicInt<int16_t>());
+  early_exit_.reset(new AtomicInt<int16_t>());
   acquire_vcore_thread_.reset(
       new Thread("resource-mgmt", Substitute("acquire-cpu-$0", PrintId(query_id_)),
-      bind<void>(mem_fn(&QueryResourceMgr::AcquireVcoreResources), this)));
+          bind<void>(mem_fn(&QueryResourceMgr::AcquireVcoreResources), this,
+              thread_in_expand_, early_exit_)));
 }
 
 Status QueryResourceMgr::CreateExpansionRequest(int64_t memory_mb, int64_t vcores,
@@ -136,7 +148,9 @@ void QueryResourceMgr::AddVcoreAvailableCb(const VcoreAvailableCb& callback) {
   callbacks_it_ = callbacks_.begin();
 }
 
-void QueryResourceMgr::AcquireVcoreResources() {
+void QueryResourceMgr::AcquireVcoreResources(
+    shared_ptr<AtomicInt<int16_t> > thread_in_expand,
+    shared_ptr<AtomicInt<int16_t> > early_exit) {
   while (!ShouldExit()) {
     {
       unique_lock<mutex> l(threads_running_lock_);
@@ -150,7 +164,15 @@ void QueryResourceMgr::AcquireVcoreResources() {
     CreateExpansionRequest(0L, 1, &request);
     TResourceBrokerExpansionResponse response;
     LOG(INFO) << "Expanding VCore allocation";
+
+    // First signal that we are about to enter a blocking Expand() call.
+    thread_in_expand->FetchAndUpdate(1L);
+    // TODO: Could cause problems if called during or after a system-wide shutdown
     Status status = ExecEnv::GetInstance()->resource_broker()->Expand(request, &response);
+    thread_in_expand->FetchAndUpdate(-1L);
+    // If signalled to exit quickly by the destructor, exit the loop now. It's important
+    // to do so without accessing any class variables since they may no longer be valid.
+    if (early_exit->FetchAndUpdate(0L) != 0) break;
     if (!status.ok()) {
       LOG(INFO) << "Could not expand CPU resources for query " << PrintId(query_id_)
                 << ", reservation: " << PrintId(reservation_id_) << ". Error was: "
@@ -164,7 +186,7 @@ void QueryResourceMgr::AcquireVcoreResources() {
 
     const llama::TAllocatedResource& resource =
         response.allocated_resources.begin()->second;
-    DCHECK(resource.v_cpu_cores == 1);
+    DCHECK(resource.v_cpu_cores == 1) << "Asked for 1 core, got: " << resource.v_cpu_cores;
     vcores_ += resource.v_cpu_cores;
 
     ExecEnv* exec_env = ExecEnv::GetInstance();
@@ -207,5 +229,11 @@ void QueryResourceMgr::Shutdown() {
 QueryResourceMgr::~QueryResourceMgr() {
   if (acquire_vcore_thread_.get() == NULL) return;
   if (!ShouldExit()) Shutdown();
-  acquire_vcore_thread_->Join();
+  // First, set the early exit flag. Then check to see if the thread is in Expand(). If
+  // so, the acquisition thread is guaranteed to see early_exit_ == 1L once it finishes
+  // Expand(), and will exit immediately. It's therefore safe not to wait for it.
+  early_exit_->FetchAndUpdate(1L);
+  if (thread_in_expand_->FetchAndUpdate(0L) == 0L) {
+    acquire_vcore_thread_->Join();
+  }
 }

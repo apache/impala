@@ -39,6 +39,7 @@
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/llama-util.h"
+#include "util/parse-util.h"
 #include "gen-cpp/ResourceBrokerService_types.h"
 
 using namespace std;
@@ -50,6 +51,8 @@ using namespace strings;
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
 DECLARE_bool(enable_rm);
+DECLARE_int32(rm_default_cpu_vcores);
+DECLARE_string(rm_default_memory);
 
 DEFINE_bool(disable_admission_control, false, "Disables admission control.");
 
@@ -89,6 +92,26 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
   if (!FLAGS_disable_admission_control) {
     admission_controller_.reset(
         new AdmissionController(request_pool_service_, metrics, backend_id_));
+  }
+
+  if (FLAGS_enable_rm) {
+    if (FLAGS_rm_default_cpu_vcores <= 0) {
+      LOG(ERROR) << "Bad value for --rm_default_cpu_vcores (must be postive): "
+                 << FLAGS_rm_default_cpu_vcores;
+      exit(1);
+    }
+    bool is_percent;
+    int64_t mem_bytes =
+        ParseUtil::ParseMemSpec(FLAGS_rm_default_memory, &is_percent);
+    if (mem_bytes <= 1024 * 1024) {
+      LOG(ERROR) << "Bad value for --rm_default_memory (must be larger than 1M):"
+                 << FLAGS_rm_default_memory;
+      exit(1);
+    } else if (is_percent) {
+      LOG(ERROR) << "Must use absolute value for --rm_default_memory: "
+                 << FLAGS_rm_default_memory;
+      exit(1);
+    }
   }
 }
 

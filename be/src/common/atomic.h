@@ -15,6 +15,8 @@
 #ifndef IMPALA_COMMON_ATOMIC_H
 #define IMPALA_COMMON_ATOMIC_H
 
+#include <algorithm>
+
 #include "common/compiler-util.h"
 
 namespace impala {

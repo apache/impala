@@ -15,6 +15,7 @@
 #ifndef STATESTORE_QUERY_RESOURCE_MGR_H
 #define STATESTORE_QUERY_RESOURCE_MGR_H
 
+#include "common/atomic.h"
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ResourceBrokerService.h"
@@ -179,10 +180,23 @@ class QueryResourceMgr {
   // Runs AcquireVcoreResources() after InitVcoreAcquisition() is called.
   boost::scoped_ptr<Thread> acquire_vcore_thread_;
 
+  // Signals to the vcore acquisition thread that it should exit after it exits from any
+  // pending Expand() call. Is a shared_ptr so that it will remain valid even after the
+  // parent QueryResourceMgr has been destroyed.
+  // TODO: Combine with ShouldExit(), and replace with AtomicBool when we have such a
+  // thing.
+  boost::shared_ptr<AtomicInt<int16_t> > early_exit_;
+
+  // Signals to the destructor that the vcore acquisition thread is currently in an
+  // Expand() RPC. If so, the destructor does not need to wait for the acquisition thread
+  // to exit.
+  boost::shared_ptr<AtomicInt<int16_t> > thread_in_expand_;
+
   // Run as a thread owned by acquire_cpu_thread_. Waits for notification from
   // NotifyThreadUsageChange(), then checks the subscription level to decide if more
   // VCores are needed, and starts a new expansion request if so.
-  void AcquireVcoreResources();
+  void AcquireVcoreResources(boost::shared_ptr<AtomicInt<int16_t> > thread_in_expand,
+      boost::shared_ptr<AtomicInt<int16_t> > early_exit);
 
   // True if thread:VCore subscription is too high, meaning more VCores are required.
   // Must be called holding threads_running_ lock.

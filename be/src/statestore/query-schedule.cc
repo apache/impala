@@ -25,12 +25,24 @@
 #include "util/network-util.h"
 #include "util/uid-util.h"
 #include "util/debug-util.h"
+#include "util/parse-util.h"
 
 using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
 using namespace boost::uuids;
 using namespace impala;
+
+DEFINE_bool(rm_always_use_defaults, false, "If true, all queries use the same initial"
+    " resource requests regardless of their computed resource estimates. Only meaningful "
+    "if --enable_rm is set.");
+DEFINE_string(rm_default_memory, "4G", "The initial amount of memory that"
+    " a query should reserve on each node if either it does not have an available "
+    "estimate, or if --rm_always_use_defaults is set.");
+DEFINE_int32(rm_default_cpu_vcores, 2, "The initial number of virtual cores that"
+    " a query should reserve on each node if either it does not have an available "
+    "estimate, or if --rm_always_use_defaults is set.");
+
 
 namespace impala {
 
@@ -76,28 +88,30 @@ int64_t QuerySchedule::GetClusterMemoryEstimate() const {
 }
 
 int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
-  // Prefer manual overrides from query options over the estimation given in the request.
-  int64_t per_host_mem = 0;
+  // Precedence of different estimate sources is:
+  // query_options > defaults (if rm_always_use_defaults == true) > computed estimates
+  bool ignored;
+  int64_t per_host_mem = ParseUtil::ParseMemSpec(FLAGS_rm_default_memory,
+      &ignored);
   if (query_options_.__isset.mem_limit && query_options_.mem_limit > 0) {
     per_host_mem = max(1024L * 1024, query_options_.mem_limit);
-  } else if (request_.__isset.per_host_mem_req && request_.per_host_mem_req > 0) {
+  } else if (!FLAGS_rm_always_use_defaults && request_.__isset.per_host_mem_req &&
+      request_.per_host_mem_req > 0) {
     per_host_mem = request_.per_host_mem_req;
-  } else {
-    // TODO: Remove default values. No estimate or query option should be an error.
-    per_host_mem = 4096L * 1024 * 1024; // Default value is 4096mb
   }
   // Cap the memory estimate at the amount of physical memory available. The user's
   // provided value or the estimate from planning can each be unreasonable.
+  // TODO: Get this limit from Llama (Yarn sets it).
   return min(per_host_mem, MemInfo::physical_mem());
 }
 
 int16_t QuerySchedule::GetPerHostVCores() const {
-  // Prefer manual overrides from query options over the estimation given in the request.
-  // TODO: Remove default values. No estimate or query option should be an error.
-  int16_t v_cpu_cores = 2;
+  // Precedence of different estimate sources is:
+  // query_options > defaults (if rm_always_use_defaults == true) > computed estimates
+  int16_t v_cpu_cores = FLAGS_rm_default_cpu_vcores;
   if (query_options_.__isset.v_cpu_cores && query_options_.v_cpu_cores > 0) {
     v_cpu_cores = query_options_.v_cpu_cores;
-  } else if (request_.__isset.per_host_vcores) {
+  } else if (request_.__isset.per_host_vcores && !FLAGS_rm_always_use_defaults) {
     v_cpu_cores = request_.per_host_vcores;
   }
   return v_cpu_cores;
