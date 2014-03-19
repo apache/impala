@@ -107,6 +107,9 @@ class TestUdfs(ImpalaTestSuite):
     assert results.success
     assert len(results.data) == 9999
 
+  # Run serially because this will blow the process limit, potentially causing other
+  # queries to fail
+  @pytest.mark.execute_serially
   def test_mem_limits(self, vector):
     # Set the mem limit high enough that a simple scan can run
     mem_limit = 1024 * 1024
