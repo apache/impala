@@ -203,6 +203,7 @@ void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors
 bool RuntimeState::LogError(const string& error) {
   lock_guard<mutex> l(error_log_lock_);
   if (error_log_.size() < query_ctxt_.request.query_options.max_errors) {
+    VLOG_QUERY << "Error from query " << query_id_ << ": " << error;
     error_log_.push_back(error);
     return true;
   }
