@@ -81,6 +81,14 @@ RuntimeState::~RuntimeState() {
   if (udf_pool_.get() != NULL) udf_pool_->FreeAll();
   // query_mem_tracker_ must be valid as long as instance_mem_tracker_ is so
   // delete instance_mem_tracker_ first.
+  // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded.
+  // Break the link between the instance_mem_tracker and its parent (query_mem_tracker_)
+  // before the instance_mem_tracker_ and its children are destroyed.
+  if (instance_mem_tracker_.get() != NULL) {
+    // May be NULL if InitMemTrackers() is not called, for example from tests.
+    instance_mem_tracker_->UnregisterFromParent();
+  }
+
   instance_mem_tracker_.reset();
   query_mem_tracker_.reset();
 }

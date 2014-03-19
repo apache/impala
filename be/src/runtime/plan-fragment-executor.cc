@@ -536,9 +536,6 @@ void PlanFragmentExecutor::Close() {
     PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);
     mem_usage_sampled_counter_ = NULL;
   }
-  if (runtime_state_->instance_mem_tracker() != NULL) {
-    runtime_state_->instance_mem_tracker()->UnregisterFromParent();
-  }
   closed_ = true;
 }
 
