@@ -41,6 +41,7 @@ Status ChildQuery::ExecAndFetch() {
   ImpalaServer::TUniqueIdToTHandleIdentifier(session_id, session_id,
       &exec_stmt_req.sessionHandle.sessionId);
   exec_stmt_req.__set_statement(query_);
+  SetQueryOptions(parent_exec_state_->exec_request().query_options, &exec_stmt_req);
 
   // Starting executing of the child query and setting is_running are not made atomic
   // because holding a lock while calling into the parent_server_ may result in deadlock.
@@ -90,6 +91,54 @@ Status ChildQuery::ExecAndFetch() {
   }
   status = close_resp.status;
   return status;
+}
+
+template <typename T>
+void SetQueryOption(TImpalaQueryOptions::type opt, const T& opt_val,
+    TExecuteStatementReq* exec_stmt_req) {
+  stringstream opt_val_ss;
+  opt_val_ss << opt_val;
+  map<int, const char*>::const_iterator it =
+      _TImpalaQueryOptions_VALUES_TO_NAMES.find(opt);
+  if (it == _TImpalaQueryOptions_VALUES_TO_NAMES.end()) return;
+  exec_stmt_req->confOverlay[it->second] = opt_val_ss.str();
+  exec_stmt_req->__isset.confOverlay = true;
+}
+
+#define SET_QUERY_OPTION(NAME, ENUM)\
+  if (parent_options.__isset.NAME) {\
+    SetQueryOption(TImpalaQueryOptions::ENUM,\
+        parent_options.NAME, exec_stmt_req);\
+  }
+
+void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
+    TExecuteStatementReq* exec_stmt_req) {
+  // If this DCHECK is hit then handle the missing query option below.
+  DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),
+      TImpalaQueryOptions::DISABLE_CACHED_READS + 1);
+  SET_QUERY_OPTION(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED);
+  SET_QUERY_OPTION(abort_on_error, ABORT_ON_ERROR);
+  SET_QUERY_OPTION(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS);
+  SET_QUERY_OPTION(batch_size, BATCH_SIZE);
+  // Ignore debug actions on child queries because they may cause deadlock.
+  SET_QUERY_OPTION(default_order_by_limit, DEFAULT_ORDER_BY_LIMIT);
+  SET_QUERY_OPTION(disable_cached_reads, DISABLE_CACHED_READS);
+  SET_QUERY_OPTION(disable_codegen, DISABLE_CODEGEN);
+  SET_QUERY_OPTION(explain_level, EXPLAIN_LEVEL);
+  SET_QUERY_OPTION(hbase_cache_blocks, HBASE_CACHE_BLOCKS);
+  SET_QUERY_OPTION(hbase_caching, HBASE_CACHING);
+  SET_QUERY_OPTION(max_errors, MAX_ERRORS);
+  SET_QUERY_OPTION(max_io_buffers, MAX_IO_BUFFERS);
+  SET_QUERY_OPTION(max_scan_range_length, MAX_SCAN_RANGE_LENGTH);
+  SET_QUERY_OPTION(mem_limit, MEM_LIMIT);
+  SET_QUERY_OPTION(num_nodes, NUM_NODES);
+  SET_QUERY_OPTION(num_scanner_threads, NUM_SCANNER_THREADS);
+  SET_QUERY_OPTION(parquet_compression_codec, PARQUET_COMPRESSION_CODEC);
+  SET_QUERY_OPTION(parquet_file_size, PARQUET_FILE_SIZE);
+  SET_QUERY_OPTION(request_pool, REQUEST_POOL);
+  SET_QUERY_OPTION(reservation_request_timeout, RESERVATION_REQUEST_TIMEOUT);
+  SET_QUERY_OPTION(sync_ddl, SYNC_DDL);
+  SET_QUERY_OPTION(v_cpu_cores, V_CPU_CORES);
 }
 
 void ChildQuery::Cancel() {

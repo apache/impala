@@ -96,6 +96,11 @@ class ChildQuery {
   }
 
  private:
+  // Sets the query options from the parent query in child's HS2 request.
+  // TODO: Consider moving this function into a more appropriate place.
+  void SetQueryOptions(const TQueryOptions& parent_options,
+      apache::hive::service::cli::thrift::TExecuteStatementReq* exec_stmt_req);
+
   // Checks whether the parent query has failed or been cancelled. If so, cancels this
   // child query (but not the parent query). Returns the status of the parent query.
   Status CheckParentStatus();
