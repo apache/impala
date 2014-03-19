@@ -66,21 +66,35 @@ public class TestRequestPoolService {
   private File allocationConfFile_;
   private File llamaConfFile_;
 
-  void createPoolService(String allocationFilename, String llamaConfFilename)
+  /**
+   * Creates the poolService_ with the specified configuration.
+   * @param allocationFile The file on the classpath of the allocation conf.
+   * @param llamaConfFile The file on the classpath of the Llama conf. May be null to
+   *                      create a RequestPoolService with no llama-conf.xml as it is
+   *                      not required.
+   */
+  void createPoolService(String allocationFile, String llamaConfFile)
       throws Exception {
     allocationConfFile_ = tempFolder.newFile("fair-scheduler-temp-file.xml");
-    Files.copy(getClasspathFile(allocationFilename), allocationConfFile_);
-    llamaConfFile_ = tempFolder.newFile("llama-conf-temp-file.xml");
-    Files.copy(getClasspathFile(llamaConfFilename), llamaConfFile_);
+    Files.copy(getClasspathFile(allocationFile), allocationConfFile_);
+
+    String llamaConfPath = null;
+    if (llamaConfFile != null) {
+      llamaConfFile_ = tempFolder.newFile("llama-conf-temp-file.xml");
+      Files.copy(getClasspathFile(llamaConfFile), llamaConfFile_);
+      llamaConfPath = llamaConfFile_.getAbsolutePath();
+    }
     poolService_ = new RequestPoolService(allocationConfFile_.getAbsolutePath(),
-        llamaConfFile_.getAbsolutePath());
+        llamaConfPath);
 
     // Lower the wait times on the AllocationFileLoaderService and RequestPoolService so
     // the test doesn't have to wait very long to test that file changes are reloaded.
     Field f = AllocationFileLoaderService.class.getDeclaredField("reloadIntervalMs");
     f.setAccessible(true);
     f.set(poolService_.allocLoader_, CHECK_INTERVAL_MS);
-    poolService_.llamaConfWatcher_.setCheckIntervalMs(CHECK_INTERVAL_MS);
+    if (llamaConfFile != null) {
+      poolService_.llamaConfWatcher_.setCheckIntervalMs(CHECK_INTERVAL_MS);
+    }
     poolService_.start();
   }
 
@@ -155,6 +169,29 @@ public class TestRequestPoolService {
     // pool service with the same modified configs initially (i.e. not updating).
     createPoolService(ALLOCATION_FILE_MODIFIED, LLAMA_CONFIG_FILE_MODIFIED);
     checkModifiedConfigResults();
+  }
+
+  @Test
+  public void testNullLlamaSite() throws Exception {
+    createPoolService(ALLOCATION_FILE_MODIFIED, null);
+
+    // Test pool resolution
+    Assert.assertEquals("root.queueA", poolService_.assignToPool("queueA", "userA"));
+    Assert.assertNull(poolService_.assignToPool("queueX", "userA"));
+    Assert.assertEquals("root.queueC", poolService_.assignToPool("queueC", "userA"));
+
+    // Test pool ACLs
+    Assert.assertTrue(poolService_.hasAccess("root.queueA", "userA"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueB", "userB"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueB", "userA"));
+    Assert.assertFalse(poolService_.hasAccess("root.queueC", "userA"));
+    Assert.assertTrue(poolService_.hasAccess("root.queueC", "root"));
+
+    // Test pool limits
+    checkPoolConfigResult("root", 20, 50, -1);
+    checkPoolConfigResult("root.queueA", 20, 50, 100000 * ByteUnits.MEGABYTE);
+    checkPoolConfigResult("root.queueB", 20, 50, -1);
+    checkPoolConfigResult("root.queueC", 20, 50, 128 * ByteUnits.MEGABYTE);
   }
 
   private void checkModifiedConfigResults() throws IOException {

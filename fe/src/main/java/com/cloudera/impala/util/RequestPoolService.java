@@ -300,14 +300,19 @@ public class RequestPoolService {
     int maxMemoryMb = allocationConf_.get().getMaxResources(pool).getMemory();
     result.setMem_limit(
         maxMemoryMb == Integer.MAX_VALUE ? -1 : (long) maxMemoryMb * ByteUnits.MEGABYTE);
-    // Capture the current llamaConf_ in case it changes while we're using it.
-    Configuration currentLlamaConf = llamaConf_;
-    result.setMax_requests(getLlamaPoolConfigValue(currentLlamaConf, pool,
-        LLAMA_MAX_PLACED_RESERVATIONS_KEY,
-        LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT));
-    result.setMax_queued(getLlamaPoolConfigValue(currentLlamaConf, pool,
-        LLAMA_MAX_QUEUED_RESERVATIONS_KEY,
-        LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT));
+    if (llamaConf_ == null) {
+      result.setMax_requests(LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT);
+      result.setMax_queued(LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT);
+    } else {
+      // Capture the current llamaConf_ in case it changes while we're using it.
+      Configuration currentLlamaConf = llamaConf_;
+      result.setMax_requests(getLlamaPoolConfigValue(currentLlamaConf, pool,
+          LLAMA_MAX_PLACED_RESERVATIONS_KEY,
+          LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT));
+      result.setMax_queued(getLlamaPoolConfigValue(currentLlamaConf, pool,
+          LLAMA_MAX_QUEUED_RESERVATIONS_KEY,
+          LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT));
+    }
     LOG.trace("getPoolConfig(pool={}): mem_limit={}, max_requests={}, max_queued={}",
         new Object[] { pool, result.mem_limit, result.max_requests, result.max_queued });
     return result;
