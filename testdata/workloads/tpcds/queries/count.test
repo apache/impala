@@ -47,6 +47,7 @@ select count(*) from promotion;
 300
 ---- TYPES
 BIGINT
+====
 ---- QUERY : TPCDS-COUNT-STORE
 select count(*) from store;
 ---- RESULTS
