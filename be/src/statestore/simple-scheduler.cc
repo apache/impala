@@ -55,6 +55,10 @@ DECLARE_int32(rm_default_cpu_vcores);
 DECLARE_string(rm_default_memory);
 
 DEFINE_bool(disable_admission_control, false, "Disables admission control.");
+DEFINE_bool(require_username, false, "Requires that a user be provided in order to "
+    "schedule requests. If enabled and a user is not provided, requests will be "
+    "rejected, otherwise requests without a username will be submitted with the "
+    "username 'default'.");
 
 namespace impala {
 
@@ -62,7 +66,7 @@ static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.to
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
-static const string DEFAULT_USER("*");
+static const string DEFAULT_USER("default");
 
 const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
@@ -70,6 +74,8 @@ static const string ERROR_USER_TO_POOL_MAPPING_NOT_FOUND(
     "No mapping found for request from user '$0' with requested pool '$1'");
 static const string ERROR_USER_NOT_ALLOWED_IN_POOL("Request from user '$0' with "
     "requested pool '$1' denied access to assigned pool '$2'");
+static const string ERROR_USER_NOT_SPECIFIED("User must be specified because "
+    "-require_username=true.");
 
 SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     const string& backend_id, const TNetworkAddress& backend_address,
@@ -767,7 +773,16 @@ Status SimpleScheduler::GetRequestPool(const string& user,
 
 Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   // TODO: Should this take impersonation into account?
-  const string& user = schedule->request().query_ctxt.session.connected_user;
+  const TQueryContext& query_ctxt = schedule->request().query_ctxt;
+  if (query_ctxt.session.connected_user.empty()) {
+    if (FLAGS_require_username) return Status(ERROR_USER_NOT_SPECIFIED);
+    // Fall back to a 'default' user if not set so that queries can still run.
+    VLOG(2) << "No user specified: using user=default";
+  }
+  const string& user = query_ctxt.session.connected_user.empty() ?
+      DEFAULT_USER : query_ctxt.session.connected_user;
+  VLOG(3) << "user='" << user << "', session.connected_user='"
+          << query_ctxt.session.connected_user << "'";
   string pool;
   RETURN_IF_ERROR(GetRequestPool(user, schedule->query_options(), &pool));
   schedule->set_request_pool(pool);
@@ -794,10 +809,9 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
         reservation_request, schedule->reservation());
     if (!status.ok()) {
       // Warn about missing table and/or column stats if necessary.
-      if(schedule->request().query_ctxt.__isset.tables_missing_stats &&
-          !schedule->request().query_ctxt.tables_missing_stats.empty()) {
-        status.AddErrorMsg(GetTablesMissingStatsWarning(
-            schedule->request().query_ctxt.tables_missing_stats));
+      if(query_ctxt.__isset.tables_missing_stats &&
+          !query_ctxt.tables_missing_stats.empty()) {
+        status.AddErrorMsg(GetTablesMissingStatsWarning(query_ctxt.tables_missing_stats));
       }
       return status;
     }

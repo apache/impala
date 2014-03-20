@@ -95,7 +95,8 @@ const string STATUS_REJECTED = "Rejected query id=$0 from pool $1 : $2";
 const string REASON_DISABLED_MEM_LIMIT = "disabled by mem limit set to 0";
 const string REASON_DISABLED_REQUESTS_LIMIT = "disabled by requests limit set to 0";
 const string REASON_QUEUE_FULL = "queue full, limit=$0, num_queued=$1";
-const string REASON_REQ_OVER_MEM_LIMIT = "request memory estimate $0 over limit $1";
+const string REASON_REQ_OVER_MEM_LIMIT =
+    "request memory estimate $0, greater than pool limit $1";
 // $0 = query_id, $1 = timeout in milliseconds
 const string STATUS_TIME_OUT = "Admission for query id=$0 exceeded timeout $1ms";
 
