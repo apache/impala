@@ -268,7 +268,9 @@ void ResourceBroker::CreateLlamaReservationRequest(
   dest.version = llama::TLlamaServiceVersion::V1;
   dest.am_handle = llama_handle_;
   dest.gang = src.gang;
-  dest.queue = src.queue;
+  // Queue is optional, so must be explicitly set for all versions of Thrift to work
+  // together.
+  dest.__set_queue(src.queue);
   dest.user = src.user;
   dest.resources = src.resources;
 }
