@@ -226,8 +226,8 @@ void RowBatch::Reset() {
 }
 
 void RowBatch::TransferResourceOwnership(RowBatch* dest) {
-  dest->tuple_data_pool_->AcquireData(tuple_data_pool_.get(), false);
   dest->auxiliary_mem_usage_ += tuple_data_pool_->total_allocated_bytes();
+  dest->tuple_data_pool_->AcquireData(tuple_data_pool_.get(), false);
   for (int i = 0; i < io_buffers_.size(); ++i) {
     DiskIoMgr::BufferDescriptor* buffer = io_buffers_[i];
     dest->io_buffers_.push_back(buffer);
