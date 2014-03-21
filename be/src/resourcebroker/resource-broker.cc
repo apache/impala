@@ -333,6 +333,7 @@ bool ResourceBroker::WaitForNotification(const llama::TUniqueId& request_id,
 
 Status ResourceBroker::Expand(const TResourceBrokerExpansionRequest& request,
     TResourceBrokerExpansionResponse* response) {
+  VLOG_RPC << "Sending expansion request: " << request;
   llama::TLlamaAMReservationExpansionRequest ll_request;
   llama::TLlamaAMReservationExpansionResponse ll_response;
 

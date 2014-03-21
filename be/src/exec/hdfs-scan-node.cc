@@ -770,6 +770,9 @@ void HdfsScanNode::ScannerThread() {
   SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
   ScannerThreadHelper();
   COUNTER_UPDATE(&active_scanner_thread_counter_, -1);
+  if (runtime_state_->query_resource_mgr() != NULL) {
+    runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(-1);
+  }
   runtime_state_->resource_pool()->ReleaseThreadToken(false);
 }
 
