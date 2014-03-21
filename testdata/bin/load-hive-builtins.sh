@@ -15,6 +15,10 @@ ${HADOOP_HOME}/bin/hadoop fs -put ${HADOOP_HOME}/share/hadoop/common/*.jar ${HAD
 ${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${HADOOP_HOME}/share/hadoop/common/lib/
 ${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${HADOOP_HOME}/share/hadoop/common/lib/
 ${HADOOP_HOME}/bin/hadoop fs -put ${HADOOP_HOME}/share/hadoop/common/lib/*.jar ${HADOOP_HOME}/share/hadoop/common/lib/
+${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${HADOOP_HOME}/share/hadoop/mapreduce/
+${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${HADOOP_HOME}/share/hadoop/mapreduce/
+${HADOOP_HOME}/bin/hadoop fs -put ${HADOOP_HOME}/share/hadoop/mapreduce/*.jar ${HADOOP_HOME}/share/hadoop/mapreduce/
+
 
 ${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${IMPALA_HOME}/fe/target/
 ${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${IMPALA_HOME}/fe/target/
