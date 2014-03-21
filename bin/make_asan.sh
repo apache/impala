@@ -17,18 +17,6 @@
 TARGET_BUILD_TYPE=Address_Sanitizer
 
 cd $IMPALA_HOME
-bin/gen_build_version.py --noclean
 rm -f ./CMakeCache.txt
 cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
-make clean
-
-rm -f $IMPALA_HOME/llvm-ir/impala-nosse.ll
-rm -f $IMPALA_HOME/llvm-ir/impala-sse.ll
-
-cd $IMPALA_HOME/common/function-registry
-make
-cd $IMPALA_HOME/common/thrift
-make
-cd $IMPALA_BE_DIR
-python src/codegen/gen_ir_descriptions.py
-make -j${IMPALA_BUILD_THREADS:-4}
+$IMPALA_HOME/bin/make_impala.sh -clean $*

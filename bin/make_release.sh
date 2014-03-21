@@ -29,6 +29,8 @@ do
     -codecoverage)
       TARGET_BUILD_TYPE=CODE_COVERAGE_RELEASE
       ;;
+    -notests)
+      ;;
     -help|*)
       echo "make_release.sh [-nopgo] [-codecoverage]"
       echo "[-nopgo] : do not use performance guided optimizations for building"
@@ -39,11 +41,7 @@ do
 done
 
 cd $IMPALA_HOME
-bin/gen_build_version.py --noclean
 rm -f ./CMakeCache.txt
-
-rm -f $IMPALA_HOME/llvm-ir/impala-nosse.ll
-rm -f $IMPALA_HOME/llvm-ir/impala-sse.ll
 
 if [ $USE_PGO -eq 1 ]
 then
@@ -102,19 +100,11 @@ then
   cd $IMPALA_HOME
 
   # Remove all the PGO intermediates and set build to release.  This seems to be the most
-  # convenient workflow.  Otherwise, changing one src file after a PGO build causes many warnings
-  # about stale PGO data.
+  # convenient workflow.  Otherwise, changing one src file after a PGO build causes many
+  # warnings about stale PGO data.
   find . -type f -name "*.gcda" -exec rm -rf {} \;
   cmake -DCMAKE_BUILD_TYPE=RELEASE
 else
   cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE
-  make clean
-
-  cd $IMPALA_HOME/common/function-registry
-  make
-  cd $IMPALA_HOME/common/thrift
-  make
-  cd $IMPALA_BE_DIR
-  python src/codegen/gen_ir_descriptions.py
-  make -j${IMPALA_BUILD_THREADS:-4}
+  $IMPALA_HOME/bin/make_impala.sh -clean $*
 fi

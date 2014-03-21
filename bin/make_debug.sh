@@ -23,6 +23,8 @@ do
     -codecoverage)
       TARGET_BUILD_TYPE=CODE_COVERAGE_DEBUG
       ;;
+    -notests)
+      ;;
     -help)
       echo "make_debug.sh [-codecoverage]"
       echo "[-codecoverage] : build with 'gcov' code coverage instrumentation at the cost of performance"
@@ -31,20 +33,6 @@ do
   esac
 done
 
-cd $IMPALA_HOME
-bin/gen_build_version.py --noclean
 rm -f ./CMakeCache.txt
 cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
-make clean
-
-rm -f $IMPALA_HOME/llvm-ir/impala-nosse.ll
-rm -f $IMPALA_HOME/llvm-ir/impala-sse.ll
-
-cd $IMPALA_HOME/common/function-registry
-make
-cd $IMPALA_HOME/common/thrift
-make
-cd $IMPALA_BE_DIR
-# TODO: we need to figure out how to use CMake dependencies properly
-python src/codegen/gen_ir_descriptions.py
-make -j${IMPALA_BUILD_THREADS:-4}
+$IMPALA_HOME/bin/make_impala.sh -clean $*
