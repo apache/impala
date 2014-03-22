@@ -1308,9 +1308,15 @@ void Coordinator::SetExecPlanFragmentParams(
     // The reservation has already have been validated at this point.
     TNetworkAddress resource_hostport;
     schedule.GetResourceHostport(exec_host, &resource_hostport);
-    rpc_params->__set_reserved_resource(
-        schedule.reservation()->allocated_resources[resource_hostport]);
-    rpc_params->__set_local_resource_address(resource_hostport);
+    map<TNetworkAddress, llama::TAllocatedResource>::const_iterator it =
+        schedule.reservation()->allocated_resources.find(resource_hostport);
+    // Only set reserved resource if we actually have one for this plan
+    // fragment. Otherwise, don't set it (usually this the coordinator fragment), and it
+    // won't participate in dynamic RM controls.
+    if (it != schedule.reservation()->allocated_resources.end()) {
+      rpc_params->__set_reserved_resource(it->second);
+      rpc_params->__set_local_resource_address(resource_hostport);
+    }
   }
   rpc_params->params.__set_request_pool(schedule.request_pool());
   FragmentScanRangeAssignment::const_iterator it =

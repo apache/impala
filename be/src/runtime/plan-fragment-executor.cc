@@ -509,6 +509,9 @@ void PlanFragmentExecutor::ReleaseThreadToken() {
   if (has_thread_token_) {
     has_thread_token_ = false;
     runtime_state_->resource_pool()->ReleaseThreadToken(true);
+    if (runtime_state_->query_resource_mgr() != NULL) {
+      runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(-1);
+    }
     PeriodicCounterUpdater::StopSamplingCounter(average_thread_tokens_);
     PeriodicCounterUpdater::StopTimeSeriesCounter(
         thread_usage_sampled_counter_);

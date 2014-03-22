@@ -151,6 +151,9 @@ void QueryResourceMgr::AddVcoreAvailableCb(const VcoreAvailableCb& callback) {
 void QueryResourceMgr::AcquireVcoreResources(
     shared_ptr<AtomicInt<int16_t> > thread_in_expand,
     shared_ptr<AtomicInt<int16_t> > early_exit) {
+  // Take a copy because we'd like to print it in some cases after the destructor.
+  TUniqueId reservation_id = reservation_id_;
+  VLOG_QUERY << "Starting Vcore acquisition for: " << reservation_id;
   while (!ShouldExit()) {
     {
       unique_lock<mutex> l(threads_running_lock_);
@@ -163,7 +166,7 @@ void QueryResourceMgr::AcquireVcoreResources(
     TResourceBrokerExpansionRequest request;
     CreateExpansionRequest(0L, 1, &request);
     TResourceBrokerExpansionResponse response;
-    LOG(INFO) << "Expanding VCore allocation";
+    VLOG_QUERY << "Expanding VCore allocation: " << reservation_id_;
 
     // First signal that we are about to enter a blocking Expand() call.
     thread_in_expand->FetchAndUpdate(1L);
@@ -172,11 +175,14 @@ void QueryResourceMgr::AcquireVcoreResources(
     thread_in_expand->FetchAndUpdate(-1L);
     // If signalled to exit quickly by the destructor, exit the loop now. It's important
     // to do so without accessing any class variables since they may no longer be valid.
-    if (early_exit->FetchAndUpdate(0L) != 0) break;
+    if (early_exit->FetchAndUpdate(0L) != 0) {
+      VLOG_QUERY << "Fragment finished during Expand(): " << reservation_id;
+      break;
+    }
     if (!status.ok()) {
-      LOG(INFO) << "Could not expand CPU resources for query " << PrintId(query_id_)
-                << ", reservation: " << PrintId(reservation_id_) << ". Error was: "
-                << status.GetErrorMsg();
+      VLOG_QUERY << "Could not expand CPU resources for query " << PrintId(query_id_)
+                 << ", reservation: " << PrintId(reservation_id_) << ". Error was: "
+                 << status.GetErrorMsg();
       // Sleep to avoid flooding the resource broker, particularly if requests are being
       // rejected quickly (and therefore we stay oversubscribed)
       // TODO: configurable timeout
@@ -186,7 +192,8 @@ void QueryResourceMgr::AcquireVcoreResources(
 
     const llama::TAllocatedResource& resource =
         response.allocated_resources.begin()->second;
-    DCHECK(resource.v_cpu_cores == 1) << "Asked for 1 core, got: " << resource.v_cpu_cores;
+    DCHECK(resource.v_cpu_cores == 1)
+        << "Asked for 1 core, got: " << resource.v_cpu_cores;
     vcores_ += resource.v_cpu_cores;
 
     ExecEnv* exec_env = ExecEnv::GetInstance();
@@ -205,7 +212,7 @@ void QueryResourceMgr::AcquireVcoreResources(
       }
     }
   }
-  VLOG_QUERY << "Leaving VCore acquisition thread";
+  VLOG_QUERY << "Leaving VCore acquisition thread: " << reservation_id;
 }
 
 bool QueryResourceMgr::ShouldExit() {

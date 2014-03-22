@@ -150,7 +150,7 @@ def start_impalad_instances(cluster_size):
       service_name = "impalad_node%s" % i
     args = "%s %s %s %s" %\
           (build_impalad_logging_args(i, service_name), build_jvm_args(i),
-           build_impalad_port_args(i), options.impalad_args)
+           build_impalad_port_args(i), options.impalad_args.replace("#ID", str(i)))
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
 
