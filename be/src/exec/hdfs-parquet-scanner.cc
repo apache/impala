@@ -431,7 +431,8 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
 
     // We don't know the actual header size until the thrift object is deserialized.
     uint32_t header_size = num_bytes;
-    status = DeserializeThriftMsg(buffer, &header_size, true, &current_page_header_);
+    status = DeserializeThriftMsg(
+        buffer, &header_size, true, &current_page_header_, true);
     if (!status.ok()) {
       if (header_size >= MAX_PAGE_HEADER_SIZE) {
         status.AddErrorMsg("ParquetScanner: Could not deserialize page header.");

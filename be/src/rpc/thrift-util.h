@@ -128,7 +128,7 @@ CreateDeserializeProtocol(
 // set to the actual length of the header.
 template <class T>
 Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
-    T* deserialized_msg) {
+    T* deserialized_msg, bool quiet = false) {
   // Deserialize msg bytes into c++ thrift msg using memory
   // transport. TMemoryBuffer is not const-safe, although we use it in
   // a const-safe way, so we have to explicitly cast away the const.
@@ -141,10 +141,10 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
   } catch (std::exception& e) {
     std::stringstream msg;
     msg << "couldn't deserialize thrift msg:\n" << e.what();
-    return Status(msg.str());
+    return Status(msg.str(), quiet);
   } catch (...) {
     // TODO: Find the right exception for 0 bytes
-    return Status("Unknown exception");
+    return Status("Unknown exception", quiet);
   }
   uint32_t bytes_left = tmem_transport->available_read();
   *len = *len - bytes_left;
@@ -152,13 +152,14 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
 }
 
 template <class T>
-Status DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialized_msg) {
+Status DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialized_msg,
+    bool quiet = false) {
   jboolean is_copy = false;
   uint32_t buf_size = env->GetArrayLength(serialized_msg);
   jbyte* buf = env->GetByteArrayElements(serialized_msg, &is_copy);
 
   RETURN_IF_ERROR(DeserializeThriftMsg(
-      reinterpret_cast<uint8_t*>(buf), &buf_size, false, deserialized_msg));
+      reinterpret_cast<uint8_t*>(buf), &buf_size, false, deserialized_msg, quiet));
 
   // Return buffer back. JNI_ABORT indicates to not copy contents back to java
   // side.
