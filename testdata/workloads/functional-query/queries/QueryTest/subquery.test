@@ -488,3 +488,13 @@ bigint
 ---- RESULTS
 10
 ====
+---- QUERY
+# Regression test for IMPALA-812
+select bool_col, count(*) from
+  (select bool_col FROM ( SELECT bool_col FROM alltypessmall t ) t WHERE bool_col ) t
+group by 1
+---- TYPES
+boolean, bigint
+---- RESULTS
+true,50
+====
