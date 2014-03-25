@@ -14,7 +14,6 @@
 
 #include "catalog/catalog-server.h"
 
-#include <google/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
@@ -264,22 +263,6 @@ void CatalogServer::GatherCatalogUpdatesThread() {
         catalog_objects_max_version_ = catalog_objects.max_catalog_version;
       }
     }
-
-#ifndef ADDRESS_SANITIZER
-    // Required to ensure memory gets released back to the OS, even if tcmalloc doesn't do
-    // it for us. This is because tcmalloc releases memory based on the
-    // TCMALLOC_RELEASE_RATE property, which is not actually a rate but a divisor based
-    // on the number of blocks that have been deleted. When tcmalloc does decide to
-    // release memory, it removes a single span from the PageHeap. This means there are
-    // certain allocation patterns that can lead to OOM due to not enough memory being
-    // released by tcmalloc, even when that memory is no longer being used.
-    // One example is continually resizing a vector which results in many allocations.
-    // Even after the vector goes out of scope, all the memory will not be released
-    // unless there are enough other deletions that are occurring in the system.
-    // This can eventually lead to OOM/crashes (see IMPALA-818).
-    // See: http://google-perftools.googlecode.com/svn/trunk/doc/tcmalloc.html#runtime
-    MallocExtension::instance()->ReleaseFreeMemory();
-#endif
 
     topic_processing_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     topic_updates_ready_ = true;
