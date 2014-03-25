@@ -28,6 +28,10 @@ import org.junit.rules.TemporaryFolder;
 
 import com.cloudera.impala.common.ByteUnits;
 import com.cloudera.impala.thrift.TPoolConfigResult;
+import com.cloudera.impala.thrift.TResolveRequestPoolParams;
+import com.cloudera.impala.thrift.TResolveRequestPoolResult;
+import com.cloudera.impala.thrift.TStatusCode;
+import com.google.common.collect.Iterables;
 import com.google.common.io.Files;
 
 /**
@@ -45,6 +49,7 @@ public class TestRequestPoolService {
   // A second allocation file which overwrites the temporary file to check for changes.
   private static final String ALLOCATION_FILE_MODIFIED = "fair-scheduler-test2.xml";
   private static final String ALLOCATION_FILE_EMPTY = "fair-scheduler-empty.xml";
+  private static final String ALLOCATION_FILE_GROUP_RULE = "fair-scheduler-group-rule.xml";
 
   // Contains per-pool configurations for maximum number of running queries and queued
   // requests.
@@ -116,6 +121,24 @@ public class TestRequestPoolService {
     createPoolService(ALLOCATION_FILE, LLAMA_CONFIG_FILE);
     Assert.assertEquals("root.queueA", poolService_.assignToPool("root.queueA", "userA"));
     Assert.assertNull(poolService_.assignToPool("queueC", "userA"));
+  }
+
+  @Test
+  public void testUserNoGroupsError() throws Exception {
+    // Test fix for IMPALA-922: "Return helpful errors with Yarn group rules"
+    createPoolService(ALLOCATION_FILE_GROUP_RULE, LLAMA_CONFIG_FILE);
+    TResolveRequestPoolResult result = poolService_.resolveRequestPool(
+        new TResolveRequestPoolParams("userA", "root.NOT_A_POOL"));
+    Assert.assertEquals("", result.getResolved_pool());
+    Assert.assertEquals(false, result.has_access);
+    Assert.assertEquals(TStatusCode.INTERNAL_ERROR, result.getStatus().getStatus_code());
+
+    String expectedMessage = "Failed to resolve user 'userA' to a pool while " +
+    "evaluating the 'primaryGroup' or 'secondaryGroup' queue placement rules because " +
+    "no groups were found for the user. This is likely because the user does not " +
+    "exist on the local operating system.";
+    Assert.assertEquals(expectedMessage,
+        Iterables.getOnlyElement(result.getStatus().getError_msgs()));
   }
 
   @Test

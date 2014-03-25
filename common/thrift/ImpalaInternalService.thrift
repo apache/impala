@@ -366,6 +366,8 @@ struct TResolveRequestPoolResult {
 
   // True if the user has access to submit requests to the resolved_pool.
   2: required bool has_access
+
+  3: optional Status.TStatus status
 }
 
 // Parameters for RequestPoolService.getPoolConfig()

@@ -42,10 +42,13 @@ import com.cloudera.impala.thrift.TPoolConfigParams;
 import com.cloudera.impala.thrift.TPoolConfigResult;
 import com.cloudera.impala.thrift.TResolveRequestPoolParams;
 import com.cloudera.impala.thrift.TResolveRequestPoolResult;
+import com.cloudera.impala.thrift.TStatus;
+import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.util.FileWatchService.FileChangeListener;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 
 /**
  * Admission control utility class that provides user to request pool mapping, ACL
@@ -249,30 +252,56 @@ public class RequestPoolService {
    * @return serialized {@link TResolveRequestPoolResult}
    */
   public byte[] resolveRequestPool(byte[] thriftResolvePoolParams)
-      throws ImpalaException, IOException {
+      throws ImpalaException {
     TResolveRequestPoolParams resolvePoolParams = new TResolveRequestPoolParams();
     JniUtil.deserializeThrift(protocolFactory_, resolvePoolParams,
         thriftResolvePoolParams);
-    TResolveRequestPoolResult result = new TResolveRequestPoolResult();
-    String pool = assignToPool(resolvePoolParams.getRequested_pool(),
-        resolvePoolParams.getUser());
-    if (pool == null) {
-      result.setResolved_pool("");
-      result.setHas_access(false);
-    } else {
-      result.setResolved_pool(pool);
-      result.setHas_access(hasAccess(
-          result.getResolved_pool(),
-          resolvePoolParams.getUser()));
-    }
+    TResolveRequestPoolResult result = resolveRequestPool(resolvePoolParams);
     LOG.trace("resolveRequestPool(pool={}, user={}): resolved_pool={}, has_access={}",
-        new Object[] {resolvePoolParams.getRequested_pool(), resolvePoolParams.getUser(),
-        result.resolved_pool, result.has_access});
+        new Object[] { resolvePoolParams.getRequested_pool(), resolvePoolParams.getUser(),
+                       result.resolved_pool, result.has_access });
     try {
       return new TSerializer(protocolFactory_).serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  @VisibleForTesting
+  TResolveRequestPoolResult resolveRequestPool(
+      TResolveRequestPoolParams resolvePoolParams) {
+    String requestedPool = resolvePoolParams.getRequested_pool();
+    String user = resolvePoolParams.getUser();
+    TResolveRequestPoolResult result = new TResolveRequestPoolResult();
+    String errorMessage = null;
+    String pool = null;
+    try {
+      pool = assignToPool(requestedPool, user);
+    } catch (IOException ex) {
+      errorMessage = ex.getMessage();
+      if (errorMessage.startsWith("No groups found for user")) {
+        // The error thrown when using the 'primaryGroup' or 'secondaryGroup' rules and
+        // the user does not exist are not helpful.
+        errorMessage = String.format(
+            "Failed to resolve user '%s' to a pool while evaluating the " +
+            "'primaryGroup' or 'secondaryGroup' queue placement rules because no " +
+            "groups were found for the user. This is likely because the user does not " +
+            "exist on the local operating system.", resolvePoolParams.getUser());
+      }
+      LOG.warn(String.format("Error assigning to pool. requested='%s', user='%s', msg=%s",
+          requestedPool, user, errorMessage), ex);
+    }
+    if (pool == null) {
+      result.setResolved_pool("");
+      result.setHas_access(false);
+      result.setStatus(
+          new TStatus(TStatusCode.INTERNAL_ERROR, Lists.newArrayList(errorMessage)));
+    } else {
+      result.setResolved_pool(pool);
+      result.setHas_access(hasAccess(pool, user));
+      result.setStatus(new TStatus(TStatusCode.OK, Lists.<String>newArrayList()));
+    }
+    return result;
   }
 
   /**

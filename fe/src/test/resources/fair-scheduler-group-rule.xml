@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<allocations>
+  <queue name="root" />
+  <queuePlacementPolicy>
+    <rule name="primaryGroup" create="true" />
+  </queuePlacementPolicy>
+</allocations>

@@ -759,6 +759,9 @@ Status SimpleScheduler::GetRequestPool(const string& user,
   const string& configured_pool = query_options.request_pool;
   RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(configured_pool, user,
         &resolve_pool_result));
+  if (resolve_pool_result.status.status_code != TStatusCode::OK) {
+    return Status(join(resolve_pool_result.status.error_msgs, "; "));
+  }
   if (resolve_pool_result.resolved_pool.empty()) {
     return Status(Substitute(ERROR_USER_TO_POOL_MAPPING_NOT_FOUND, user,
           configured_pool));
