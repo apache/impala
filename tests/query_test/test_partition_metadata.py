@@ -28,6 +28,7 @@ from tests.common.impala_test_suite import *
 # here.
 class TestPartitionMetadata(ImpalaTestSuite):
   TEST_DB = 'partition_md'
+  TEST_TBL = 'bulk_part'
 
   @classmethod
   def get_workload(self):
@@ -47,49 +48,40 @@ class TestPartitionMetadata(ImpalaTestSuite):
     self.cleanup_db(self.TEST_DB)
     self.client.execute("create database %s" % self.TEST_DB)
 
+  def teardown_method(self, method):
+    self.cleanup_db(self.TEST_DB)
+
   @pytest.mark.execute_serially
-  def test_hive_bulk_partition(self, vector):
+  def test_multiple_partitions_same_location(self, vector):
     """Regression test for IMPALA-597. Verifies Impala is able to properly read
-    tables that were altered using Hive's bulk partition statements that result
-    in multiple partitions pointing to the same location.
-    TODO: Once IMPALA-624 is resolved re-write this test using Impala instead of Hive.
+    tables that have multiple partitions pointing to the same location.
     """
     self.client.execute("use %s" % self.TEST_DB)
-    location = '/test-warehouse/hive_bulk_part'
+    location = '/test-warehouse/%s' % self.TEST_TBL
     # Cleanup any existing data in the table directory.
     self.hdfs_client.delete_file_dir(location[1:], recursive=True)
     # Create the table
-    self.client.execute("create table hive_bulk_part(i int) partitioned by(j int)"\
-        "location '%s'" % location)
+    self.client.execute("create table %s(i int) partitioned by(j int)"\
+        "location '%s'" % (self.TEST_TBL, location))
 
     # Point multiple partitions to the same location and use partition locations that
     # do not contain a key=value path.
     self.hdfs_client.make_dir(location[1:] + '/p')
 
-    hive_cmd = "use %s; alter table hive_bulk_part add partition (j=1) location '%s/p'"\
-        " partition(j=2) location '%s/p'" % (self.TEST_DB, location, location)
-    print "Executing: %s" % hive_cmd
-    rc, stdout, stderr = exec_process("hive -e \"%s\"" % hive_cmd)
-    assert rc == 0, stdout + '\n' + stderr
+    # Point both partitions to the same location.
+    self.client.execute("alter table %s add partition (j=1) location '%s/p'" %
+        (self.TEST_TBL, location))
+    self.client.execute("alter table %s add partition (j=2) location '%s/p'" %
+        (self.TEST_TBL, location))
 
     # Insert some data.
-    hive_cmd = "insert into table %s.hive_bulk_part partition(j=1) select 1 from "\
-               "functional.alltypes limit 1" % self.TEST_DB
-    print "Executing: %s" % hive_cmd
-    rc, stdout, stderr = exec_process("hive -e \"%s\"" % hive_cmd)
-    assert rc == 0, stdout + '\n' + stderr
-
-    # Reload the table metadata and ensure Impala detects this properly.
-    self.client.execute("invalidate metadata hive_bulk_part")
+    self.client.execute("insert into table %s partition(j=1) select 1" % self.TEST_TBL)
 
     # The data will be read twice because each partition points to the same location.
-    data = self.execute_scalar("select sum(i), sum(j) from hive_bulk_part")
+    data = self.execute_scalar("select sum(i), sum(j) from %s" % self.TEST_TBL)
     assert data.split('\t') == ['2', '3']
 
-    self.client.execute("insert into hive_bulk_part partition(j) select 1, 1")
-    self.client.execute("insert into hive_bulk_part partition(j) select 1, 2")
-    data = self.execute_scalar("select sum(i), sum(j) from hive_bulk_part")
-    try:
-      assert data.split('\t') == ['6', '6']
-    except AssertionError:
-      pytest.xfail('IMPALA 624: Impala does not use a partition location for INSERT')
+    self.client.execute("insert into %s partition(j) select 1, 1" % self.TEST_TBL)
+    self.client.execute("insert into %s partition(j) select 1, 2" % self.TEST_TBL)
+    data = self.execute_scalar("select sum(i), sum(j) from %s" % self.TEST_TBL)
+    assert data.split('\t') == ['6', '9']
