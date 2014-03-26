@@ -45,15 +45,12 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
 
   def test_describe_formatted(self, vector):
     # Describe a partitioned table.
-    try:
-      self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes")
-      self.exec_and_compare_hive_and_impala_hs2(
-          "describe formatted functional_text_lzo.alltypes")
-      # Describe an unpartitioned table.
-      self.exec_and_compare_hive_and_impala_hs2("describe formatted tpch.lineitem")
-      self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.jointbl")
-    except Exception:
-      pytest.xfail(reason="IMPALA-1085, hiveserver2 does not start on occasion")
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes")
+    self.exec_and_compare_hive_and_impala_hs2(
+        "describe formatted functional_text_lzo.alltypes")
+    # Describe an unpartitioned table.
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted tpch.lineitem")
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.jointbl")
 
     try:
       # Describe a view
