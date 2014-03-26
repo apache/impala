@@ -121,6 +121,6 @@ class TestFailpoints(ImpalaTestSuite):
     LOG.info('Sleeping')
     sleep(3)
     cancel_result = self.client.cancel(handle)
-
+    self.client.close_query(handle)
     assert cancel_result.status_code == 0,\
-          'Unexpected status code from cancel request: %s' % cancel_result
+        'Unexpected status code from cancel request: %s' % cancel_result

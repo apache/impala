@@ -78,6 +78,11 @@ class ImpalaConnection(object):
     pass
 
   @abc.abstractmethod
+  def close_query(self, handle):
+    """Closes the query."""
+    pass
+
+  @abc.abstractmethod
   def get_state(self, operation_handle):
     """Returns the state of a query"""
     pass
@@ -138,9 +143,14 @@ class BeeswaxConnection(ImpalaConnection):
     LOG.info("-- connecting to: %s" % self.__host_port)
     self.__beeswax_client.connect()
 
+  # TODO: rename to close_connection
   def close(self):
     LOG.info("-- closing connection to: %s" % self.__host_port)
     self.__beeswax_client.close_connection()
+
+  def close_query(self, operation_handle):
+    LOG.info("-- closing query for operation handle: %s" % operation_handle)
+    self.__beeswax_client.close_query(operation_handle.get_handle())
 
   def execute(self, sql_stmt):
     LOG.info("-- executing against %s\n%s;\n" % (self.__host_port, sql_stmt))

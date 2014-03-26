@@ -154,7 +154,7 @@ class ImpalaBeeswaxClient(object):
     # Closing INSERT queries is done as part of fetching the results so don't close
     # the handle twice.
     if self.__get_query_type(query_string) != 'insert':
-      self.__do_rpc(lambda: self.imp_service.close(handle))
+      self.close_query(handle)
     return result
 
   def get_runtime_profile(self, handle):
@@ -181,6 +181,9 @@ class ImpalaBeeswaxClient(object):
 
   def cancel_query(self, query_id):
     return self.__do_rpc(lambda: self.imp_service.Cancel(query_id))
+
+  def close_query(self, handle):
+    self.__do_rpc(lambda: self.imp_service.close(handle))
 
   def wait_for_completion(self, query_handle):
     """Given a query handle, polls the coordinator waiting for the query to complete"""
