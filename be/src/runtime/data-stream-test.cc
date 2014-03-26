@@ -340,9 +340,9 @@ class DataStreamTest : public testing::Test {
         } else if (stream_type == TPartitionType::HASH_PARTITIONED) {
           // hash-partitioned streams send values to the right partition
           int64_t value = *j;
-          EXPECT_EQ(
-              RawValue::GetHashValueFnv(&value, TYPE_BIGINT, 0) % receiver_info_.size(),
-              info.receiver_num);
+          uint32_t hash_val =
+              RawValue::GetHashValueFnv(&value, TYPE_BIGINT, HashUtil::FNV_SEED);
+          EXPECT_EQ(hash_val % receiver_info_.size(), info.receiver_num);
         }
       }
     }

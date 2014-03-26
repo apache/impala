@@ -53,20 +53,20 @@ using namespace std;
 //                      = n / e
 //                      = 367
 
-// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
-// Int Hash:             Function                Rate          Comparison
+// Machine Info: Intel(R) Core(TM) i7-4770 CPU @ 3.40GHz
+// Int Hash:             Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                            Fnv               96.35                  1X
-//                          Boost                 176              1.826X
-//                            Crc               375.6              3.898X
-//                        Codegen               890.2               9.24X
+//                            Fnv               102.6                  1X
+//                          Boost               269.8               2.63X
+//                            Crc               502.1              4.895X
+//                        Codegen               420.4              4.098X
 //
-// Mixed Hash:           Function                Rate          Comparison
+// Mixed Hash:           Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                            Fnv               82.01                  1X
-//                          Boost               82.71              1.008X
-//                            Crc               271.1              3.305X
-//                        Codegen                 215              2.647X
+//                           Fnv               78.43                  1X
+//                         Boost                 115              1.467X
+//                           Crc               330.3              4.212X
+//                       Codegen               165.6              2.112X
 
 typedef uint32_t (*CodegenHashFn)(int rows, char* data, int32_t* results);
 
@@ -87,7 +87,7 @@ void TestFnvIntHash(int batch, void* d) {
     for (int j = 0; j < rows; ++j) {
       size_t hash = HashUtil::FNV_SEED;
       for (int k = 0; k < cols; ++k) {
-        hash = HashUtil::FnvHash(&values[k], sizeof(uint32_t), hash);
+        hash = HashUtil::FnvHash64to32(&values[k], sizeof(uint32_t), hash);
       }
       data->results[j] = hash;
       values += cols;
@@ -148,17 +148,17 @@ void TestFnvMixedHash(int batch, void* d) {
     for (int j = 0; j < rows; ++j) {
       size_t hash = HashUtil::FNV_SEED;
 
-      hash = HashUtil::FnvHash(values, sizeof(int8_t), hash);
+      hash = HashUtil::FnvHash64to32(values, sizeof(int8_t), hash);
       values += sizeof(int8_t);
 
-      hash = HashUtil::FnvHash(values, sizeof(int32_t), hash);
+      hash = HashUtil::FnvHash64to32(values, sizeof(int32_t), hash);
       values += sizeof(int32_t);
 
-      hash = HashUtil::FnvHash(values, sizeof(int64_t), hash);
+      hash = HashUtil::FnvHash64to32(values, sizeof(int64_t), hash);
       values += sizeof(int64_t);
 
       StringValue* str = reinterpret_cast<StringValue*>(values);
-      hash = HashUtil::FnvHash(str->ptr, str->len, hash);
+      hash = HashUtil::FnvHash64to32(str->ptr, str->len, hash);
       values += sizeof(StringValue);
 
       data->results[j] = hash;

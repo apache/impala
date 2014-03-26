@@ -444,17 +444,18 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
     int num_channels = channels_.size();
     for (int i = 0; i < batch->num_rows(); ++i) {
       TupleRow* row = batch->GetRow(i);
-      size_t hash_val = 0;
+      uint32_t hash_val = HashUtil::FNV_SEED;
       for (vector<Expr*>::iterator expr = partition_exprs_.begin();
            expr != partition_exprs_.end(); ++expr) {
         void* partition_val = (*expr)->GetValue(row);
         // We can't use the crc hash function here because it does not result
         // in uncorrelated hashes with different seeds.  Instead we must use
-        // fvn hash.
+        // fnv hash.
         // TODO: fix crc hash/GetHashValue()
         hash_val =
             RawValue::GetHashValueFnv(partition_val, (*expr)->type(), hash_val);
       }
+
       RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
     }
   }

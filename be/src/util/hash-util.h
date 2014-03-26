@@ -71,21 +71,15 @@ class HashUtil {
   static const uint64_t FNV64_PRIME = 1099511628211UL;
   static const uint64_t FNV64_SEED = 14695981039346656037UL;
 
-  // Implementation of the Fowler–Noll–Vo hash function.  This is not as performant
+  // Implementation of the Fowler–Noll–Vo hash function. This is not as performant
   // as boost's hash on int types (2x slower) but has bit entropy.
   // For ints, boost just returns the value of the int which can be pathological.
   // For example, if the data is <1000, 2000, 3000, 4000, ..> and then the mod of 1000
   // is taken on the hash, all values will collide to the same bucket.
   // For string values, Fnv is slightly faster than boost.
-  static uint32_t FnvHash(const void* data, int32_t bytes, uint32_t hash) {
-    const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data);
-    while (bytes--) {
-      hash = (*ptr ^ hash) * FNV_PRIME;
-      ++ptr;
-    }
-    return hash;
-  }
-
+  // IMPORTANT: FNV hash suffers from poor diffusion of the least significant bit,
+  // which can lead to poor results when input bytes are duplicated.
+  // See FnvHash64to32() for how this can be mitigated.
   static uint64_t FnvHash64(const void* data, int32_t bytes, uint64_t hash) {
     const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data);
     while (bytes--) {
@@ -93,6 +87,16 @@ class HashUtil {
       ++ptr;
     }
     return hash;
+  }
+
+  // Return a 32-bit hash computed by invoking FNV-64 and folding the result to 32-bits.
+  // This technique is recommended instead of FNV-32 since the LSB of an FNV hash is the
+  // XOR of the LSBs of its input bytes, leading to poor results for duplicate inputs.
+  // The input seed 'hash' is duplicated so the top half of the seed is not all zero.
+  static uint32_t FnvHash64to32(const void* data, int32_t bytes, uint32_t hash) {
+    uint64_t hash_u64 = hash | ((uint64_t)hash << 32);
+    hash_u64 = FnvHash64(data, bytes, hash_u64);
+    return (hash_u64 >> 32) ^ (hash_u64 & 0xFFFFFFFF);
   }
 
   // Computes the hash value for data.  Will call either CrcHash or FnvHash
@@ -104,10 +108,10 @@ class HashUtil {
     if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
       return CrcHash(data, bytes, seed);
     } else {
-      return FnvHash(data, bytes, seed);
+      return FnvHash64to32(data, bytes, seed);
     }
 #else
-    return FnvHash(data, bytes, seed);
+    return FnvHash64to32(data, bytes, seed);
 #endif
   }
 
