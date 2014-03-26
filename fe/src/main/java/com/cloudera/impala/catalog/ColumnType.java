@@ -412,8 +412,9 @@ public class ColumnType {
   }
 
   public void analyze() throws AnalysisException {
-    if (isAnalyzed_) return;
     Preconditions.checkState(type_ != PrimitiveType.INVALID_TYPE);
+
+    if (isAnalyzed_) return;
     if (type_ == PrimitiveType.CHAR) {
       if (len_ <= 0) {
         throw new AnalysisException("Char size must be > 0. Size was set to: " +
@@ -431,7 +432,6 @@ public class ColumnType {
         throw new AnalysisException("Decimal scale (" + scale_+ ") must be <= " +
             "precision (" + precision_ + ").");
       }
-      throw new AnalysisException("Decimal is not yet implemented.");
     }
     isAnalyzed_ = true;
   }

@@ -635,11 +635,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
         "terminated by '|'");
 
-    // TODO: add more tests: Reenable decimal and update tests.
-    //AnalyzesOk("create table new_table (i int) PARTITIONED BY (d decimal)");
-    //AnalyzesOk("create table new_table(d1 decimal, d2 decimal(10), d3 decimal(5, 2))");
-    AnalysisError("create table new_table (i int) PARTITIONED BY (d decimal)",
-        "Decimal is not yet implemented.");
+    // TODO: add more tests
+    AnalyzesOk("create table new_table (i int) PARTITIONED BY (d decimal)");
+    AnalyzesOk("create table new_table(d1 decimal, d2 decimal(10), d3 decimal(5, 2))");
     AnalysisError("create table new_table(d1 decimal(1,10))",
         "Decimal scale (10) must be <= precision (1).");
     AnalysisError("create table new_table(d1 decimal(0,0))",
@@ -858,8 +856,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'");
     AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.JAR' SYMBOL='a'");
 
-    /*
-     TODO Reenable tests.
     AnalyzesOk("create function foo() RETURNS decimal" + udfSuffix);
     AnalyzesOk("create function foo() RETURNS decimal(38,10)" + udfSuffix);
     AnalyzesOk("create function foo(Decimal, decimal(10, 2)) RETURNS int" + udfSuffix);
@@ -867,9 +863,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Decimal precision must be <= 38.");
     AnalysisError("create function foo(Decimal(2, 3)) RETURNS int" + udfSuffix,
         "Decimal scale (3) must be <= precision (2).");
-        */
-    AnalysisError("create function foo() RETURNS decimal" + udfSuffix,
-        "Decimal is not yet implemented.");
 
     // Varargs
     AnalyzesOk("create function foo(INT...) RETURNS int" + udfSuffix);
@@ -1098,7 +1091,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "INTERMEDIATE char(10)" + loc + "UPDATE_FN='AggUpdate'",
         "UDAs with an intermediate type, CHAR(10), that is different from the " +
         "return type, INT, are currently not supported.");
-    /*
     AnalysisError("create aggregate function foo(int) RETURNS int " +
         "INTERMEDIATE decimal(10)" + loc + "UPDATE_FN='AggUpdate'",
         "UDAs with an intermediate type, DECIMAL(10,0), that is different from the " +
@@ -1106,7 +1098,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create aggregate function foo(int) RETURNS int " +
         "INTERMEDIATE decimal(40)" + loc + "UPDATE_FN='AggUpdate'",
         "Decimal precision must be <= 38.");
-        */
     //AnalyzesOk("create aggregate function foo(int) RETURNS int " +
     //    "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='AggUpdate'");
     //AnalysisError("create aggregate function foo(int) RETURNS int " +
