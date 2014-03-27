@@ -17,6 +17,7 @@ package com.cloudera.impala.util;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.net.URISyntaxException;
 
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderService;
 import org.junit.After;
@@ -106,9 +107,8 @@ public class TestRequestPoolService {
   /**
    * Returns a {@link File} for the file on the classpath.
    */
-  private static File getClasspathFile(String filename) {
-    return new File(
-        Thread.currentThread().getContextClassLoader().getResource(filename).getPath());
+  private File getClasspathFile(String filename) throws URISyntaxException {
+    return new File(getClass().getClassLoader().getResource(filename).toURI());
   }
 
   @Test
