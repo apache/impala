@@ -448,6 +448,8 @@ bool HashTable::Equals(TupleRow* build_row) {
       if (!stores_nulls_) return false;
       if (!expr_value_null_bits_[i]) return false;
       continue;
+    } else {
+      if (expr_value_null_bits_[i]) return false;
     }
 
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];

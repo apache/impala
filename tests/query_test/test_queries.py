@@ -19,11 +19,6 @@ class TestQueries(ImpalaTestSuite):
                     "making result verication fail."))
     self.run_test_case('QueryTest/distinct', vector)
 
-  def test_aggregation(self, vector):
-    if vector.get_value('table_format').file_format == 'hbase':
-      pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
-    self.run_test_case('QueryTest/aggregation', vector)
-
   def test_exprs(self, vector):
     # TODO: Enable some of these tests for Avro if possible
     # Don't attempt to evaluate timestamp expressions with Avro tables (which)
