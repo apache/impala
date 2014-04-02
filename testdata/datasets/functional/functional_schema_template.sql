@@ -966,6 +966,8 @@ b string
 c string
 d int
 e double
+f string
+g string
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- DEPENDENT_LOAD
@@ -984,6 +986,8 @@ b string
 c string
 d int
 e double
+f string
+g string
 ---- ROW_FORMAT
 delimited fields terminated by ',' escaped by '\\'
 ---- DEPENDENT_LOAD

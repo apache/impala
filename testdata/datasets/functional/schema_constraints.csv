@@ -43,8 +43,6 @@ table_name:alltypeserror, constraint:exclude, table_format:parquet/none/none
 table_name:alltypeserrornonulls, constraint:exclude, table_format:parquet/none/none
 table_name:unsupported_types, constraint:exclude, table_format:parquet/none/none
 table_name:escapechartesttable, constraint:exclude, table_format:parquet/none/none
-table_name:nulltable, constraint:exclude, table_format:parquet/none/none
-table_name:nullescapedtable, constraint:exclude, table_format:parquet/none/none
 table_name:TblWithRaggedColumns, constraint:exclude, table_format:parquet/none/none
 
 # the text_ tables are for testing test delimiters and escape chars in text files

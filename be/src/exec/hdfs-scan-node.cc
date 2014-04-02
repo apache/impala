@@ -360,6 +360,12 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     }
   }
 
+  // Initialize is_materialized_col_
+  is_materialized_col_.resize(column_idx_to_materialized_slot_idx_.size());
+  for (int i = 0; i < is_materialized_col_.size(); ++i) {
+    is_materialized_col_[i] = column_idx_to_materialized_slot_idx_[i] != SKIP_COLUMN;
+  }
+
   hdfs_connection_ = HdfsFsCache::instance()->GetDefaultConnection();
   if (hdfs_connection_ == NULL) {
     string error_msg = GetStrErrMsg();

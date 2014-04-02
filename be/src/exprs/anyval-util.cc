@@ -41,6 +41,7 @@ Type* CodegenAnyVal::GetType(LlvmCodeGen* cg, const ColumnType& type) {
       return StructType::get(cg->bigint_type(), cg->bigint_type(), NULL);
     default:
       DCHECK(false) << "Unsupported type: " << type;
+      return NULL;
   }
 }
 

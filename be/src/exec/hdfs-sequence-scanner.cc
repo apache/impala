@@ -65,9 +65,10 @@ Status HdfsSequenceScanner::InitNewRange() {
   text_converter_.reset(new TextConverter(hdfs_partition->escape_char(),
       scan_node_->hdfs_table()->null_column_value()));
 
-  delimited_text_parser_.reset(new DelimitedTextParser(scan_node_, '\0',
-      hdfs_partition->field_delim(), hdfs_partition->collection_delim(),
-      hdfs_partition->escape_char()));
+  delimited_text_parser_.reset(new DelimitedTextParser(
+      scan_node_->num_cols(), scan_node_->num_partition_keys(),
+      scan_node_->is_materialized_col(), '\0', hdfs_partition->field_delim(),
+      hdfs_partition->collection_delim(), hdfs_partition->escape_char()));
 
   num_buffered_records_in_compressed_block_ = 0;
 

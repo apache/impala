@@ -20,20 +20,21 @@
 using namespace impala;
 using namespace std;
 
-DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
-                                         char tuple_delim,
-                                         char field_delim,
-                                         char collection_item_delim,
-                                         char escape_char)
-    : scan_node_(scan_node),
+DelimitedTextParser::DelimitedTextParser(
+    int num_cols, int num_partition_keys, const bool* is_materialized_col,
+    char tuple_delim, char field_delim, char collection_item_delim, char escape_char)
+    : num_delims_(0),
       field_delim_(field_delim),
+      process_escapes_(escape_char != '\0'),
       escape_char_(escape_char),
       collection_item_delim_(collection_item_delim),
       tuple_delim_(tuple_delim),
       current_column_has_escape_(false),
       last_char_is_escape_(false),
       last_row_delim_offset_(-1),
-      is_materialized_col_(NULL),
+      num_cols_(num_cols),
+      num_partition_keys_(num_partition_keys),
+      is_materialized_col_(is_materialized_col),
       column_idx_(0) {
   // Escape character should not be the same as tuple or col delim unless it is the
   // empty delimiter.
@@ -44,7 +45,7 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
   // Initialize the sse search registers.
   char search_chars[SSEUtil::CHARS_PER_128_BIT_REGISTER];
   memset(search_chars, 0, sizeof(search_chars));
-  if (escape_char_ != '\0') {
+  if (process_escapes_) {
     search_chars[0] = escape_char_;
     xmm_escape_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
 
@@ -65,45 +66,30 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
     memset(low_mask_, 0, sizeof(low_mask_));
   }
 
-  int num_delims = 0;
   if (tuple_delim != '\0') {
-    search_chars[num_delims++] = tuple_delim_;
+    search_chars[num_delims_++] = tuple_delim_;
     // Hive will treats \r (^M) as an alternate tuple delimiter, but \r\n is a
     // single tuple delimiter.
-    if (tuple_delim_ == '\n') search_chars[num_delims++] = '\r';
+    if (tuple_delim_ == '\n') search_chars[num_delims_++] = '\r';
     xmm_tuple_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
   }
 
   if (field_delim != '\0' || collection_item_delim != '\0') {
-    search_chars[num_delims++] = field_delim_;
-    search_chars[num_delims++] = collection_item_delim_;
+    search_chars[num_delims_++] = field_delim_;
+    search_chars[num_delims_++] = collection_item_delim_;
   }
 
-  DCHECK_GT(num_delims, 0);
+  DCHECK_GT(num_delims_, 0);
   xmm_delim_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
 
-  // scan_node_ can be NULL in test setups
-  if (scan_node_ == NULL) return;
-
   ParserReset();
-
-  num_cols_ = scan_node_->num_cols();
-  is_materialized_col_ = new bool[num_cols_];
-  for (int i = 0; i < num_cols_; ++i) {
-    is_materialized_col_[i] =
-        scan_node_->GetMaterializedSlotIdx(i) != HdfsScanNode::SKIP_COLUMN;
-  }
-}
-
-DelimitedTextParser::~DelimitedTextParser() {
-  delete[] is_materialized_col_;
 }
 
 void DelimitedTextParser::ParserReset() {
   current_column_has_escape_ = false;
   last_char_is_escape_ = false;
   last_row_delim_offset_ = -1;
-  column_idx_ = scan_node_->num_partition_keys();
+  column_idx_ = num_partition_keys_;
 }
 
 // Parsing raw csv data into FieldLocation descriptors.
@@ -122,11 +108,11 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   }
 
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
-    if (escape_char_ == '\0') {
-      ParseSse<false>(max_tuples, &remaining_len, byte_buffer_ptr, row_end_locations,
+    if (process_escapes_) {
+      ParseSse<true>(max_tuples, &remaining_len, byte_buffer_ptr, row_end_locations,
           field_locations, num_tuples, num_fields, next_column_start);
     } else {
-      ParseSse<true>(max_tuples, &remaining_len, byte_buffer_ptr, row_end_locations,
+      ParseSse<false>(max_tuples, &remaining_len, byte_buffer_ptr, row_end_locations,
           field_locations, num_tuples, num_fields, next_column_start);
     }
   }
@@ -149,7 +135,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
       }
     }
 
-    if (**byte_buffer_ptr == escape_char_) {
+    if (process_escapes_ && **byte_buffer_ptr == escape_char_) {
       current_column_has_escape_ = true;
       last_char_is_escape_ = !last_char_is_escape_;
     } else {
@@ -164,7 +150,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
         AddColumn<true>(*byte_buffer_ptr - *next_column_start,
             next_column_start, num_fields, field_locations);
         FillColumns<false>(0, NULL, num_fields, field_locations);
-        column_idx_ = scan_node_->num_partition_keys();
+        column_idx_ = num_partition_keys_;
         row_end_locations[*num_tuples] = *byte_buffer_ptr;
         ++(*num_tuples);
       }
@@ -191,7 +177,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     AddColumn<true>(*byte_buffer_ptr - *next_column_start,
         next_column_start, num_fields, field_locations);
     FillColumns<false>(0, NULL, num_fields, field_locations);
-    column_idx_ = scan_node_->num_partition_keys();
+    column_idx_ = num_partition_keys_;
     ++(*num_tuples);
   }
   return Status::OK;
@@ -254,7 +240,7 @@ restart:
 
   if (!found) return -1;
 
-  if (escape_char_ != '\0') {
+  if (process_escapes_) {
     // Scan backwards for escape characters.  We do this after
     // finding the tuple break rather than during the (above)
     // forward scan to make the forward scan faster.  This will

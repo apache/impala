@@ -72,7 +72,7 @@ void inline DelimitedTextParser:: FillColumns(int len, char** last_column,
   // Fill in any columns missing from the end of the tuple.
   char* dummy = NULL;
   if (last_column == NULL) last_column = &dummy;
-  while (column_idx_ < scan_node_->num_cols()) {
+  while (column_idx_ < num_cols_) {
     AddColumn<process_escapes>(len, last_column, num_fields, field_locations);
     // The rest of the columns will be null.
     last_column = &dummy;
@@ -132,15 +132,18 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
     // _mm_extract_epi16 will extract 16 bits out of the xmm register.  The second
     // parameter specifies which 16 bits to extract (0 for the lowest 16 bits).
     xmm_delim_mask =
-        _mm_cmpistrm(xmm_delim_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
+        _mm_cmpestrm(xmm_delim_search_, num_delims_,
+                     xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER,
+                     SSEUtil::STRCHR_MODE);
     uint16_t delim_mask = _mm_extract_epi16(xmm_delim_mask, 0);
 
     uint16_t escape_mask = 0;
     // If the table does not use escape characters, skip processing for it.
     if (process_escapes) {
       DCHECK(escape_char_ != '\0');
-      xmm_escape_mask = _mm_cmpistrm(xmm_escape_search_, xmm_buffer,
-                                    SSEUtil::STRCHR_MODE);
+      xmm_escape_mask = _mm_cmpestrm(xmm_escape_search_, 1,
+                                     xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER,
+                                     SSEUtil::STRCHR_MODE);
       escape_mask = _mm_extract_epi16(xmm_escape_mask, 0);
       ProcessEscapeMask(escape_mask, &last_char_is_escape_, &delim_mask);
     }
@@ -182,7 +185,7 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
         AddColumn<process_escapes>(delim_ptr - *next_column_start,
             next_column_start, num_fields, field_locations);
         FillColumns<false>(0, NULL, num_fields, field_locations);
-        column_idx_ = scan_node_->num_partition_keys();
+        column_idx_ = num_partition_keys_;
         row_end_locations[*num_tuples] = delim_ptr;
         ++(*num_tuples);
         // Remember where we saw the last \r.
@@ -217,7 +220,7 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
   char* next_column_start = buffer;
   __m128i xmm_buffer, xmm_delim_mask, xmm_escape_mask;
 
-  column_idx_ = scan_node_->num_partition_keys();
+  column_idx_ = num_partition_keys_;
   current_column_has_escape_ = false;
 
   if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
@@ -226,14 +229,17 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
       xmm_buffer = _mm_loadu_si128(reinterpret_cast<__m128i*>(buffer));
 
       xmm_delim_mask =
-          _mm_cmpistrm(xmm_delim_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
+          _mm_cmpestrm(xmm_delim_search_, num_delims_,
+                       xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER,
+                       SSEUtil::STRCHR_MODE);
       uint16_t delim_mask = _mm_extract_epi16(xmm_delim_mask, 0);
 
       uint16_t escape_mask = 0;
       // If the table does not use escape characters, skip processing for it.
       if (process_escapes) {
         DCHECK(escape_char_ != '\0');
-        xmm_escape_mask = _mm_cmpistrm(xmm_escape_search_, xmm_buffer,
+        xmm_escape_mask = _mm_cmpestrm(xmm_escape_search_, 1,
+                                       xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER,
                                       SSEUtil::STRCHR_MODE);
         escape_mask = _mm_extract_epi16(xmm_escape_mask, 0);
         ProcessEscapeMask(escape_mask, &last_char_is_escape_, &delim_mask);

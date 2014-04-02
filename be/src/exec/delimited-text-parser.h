@@ -31,26 +31,26 @@ class DelimitedTextParser {
   //   field_delim: delimits fields
   //   collection_item_delim: delimits collection items
   //   escape_char: escape delimiters, make them part of the data.
-  // Other parameters to the creator:
-  //   map_column_to_slot: maps a column in the input to the output slot.
-  //   start_column: the index in the above vector where the columns start.
-  //                 it will be non-zero if there are partition columns.
-  //   timer: timer to use to time the parsing operation, or NULL.
   //
-  // The main method is ParseData which fills in a vector of
-  // pointers and lengths to the fields.  It also can handle an excape character
-  // which masks a tuple or field delimiter that occurs in the data.
-  DelimitedTextParser(HdfsScanNode* scan_node,
-                      char tuple_delim, char field_delim_ = '\0',
-                      char collection_item_delim = '\0', char escape_char = '\0');
-
-  ~DelimitedTextParser();
+  // num_cols is the total number of columns including partition keys.
+  //
+  // is_materialized_col should be initialized to an array of length 'num_cols', with
+  // is_materialized_col[i] = <true if column i should be materialized, false otherwise>
+  // Owned by caller.
+  //
+  // The main method is ParseData which fills in a vector of pointers and lengths to the
+  // fields.  It also can handle an escape character which masks a tuple or field
+  // delimiter that occurs in the data.
+  DelimitedTextParser(
+      int num_cols, int num_partition_keys, const bool* is_materialized_col,
+      char tuple_delim, char field_delim_ = '\0', char collection_item_delim = '^',
+      char escape_char = '\0');
 
   // Called to initialize parser at beginning of scan range.
   void ParserReset();
 
   // Check if we are at the start of a tuple.
-  bool AtTupleStart() { return column_idx_ == scan_node_->num_partition_keys(); }
+  bool AtTupleStart() { return column_idx_ == num_partition_keys_; }
 
   char escape_char() const { return escape_char_; }
 
@@ -146,14 +146,14 @@ class DelimitedTextParser {
       FieldLocation* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
 
-  // ScanNode reference to map columns in the data to slots in the tuples.
-  HdfsScanNode* scan_node_;
-
   // SSE(xmm) register containing the tuple search character.
   __m128i xmm_tuple_search_;
 
   // SSE(xmm) register containing the delimiter search character.
   __m128i xmm_delim_search_;
+
+  // The number of delimiters contained in xmm_delim_search_, i.e. its length
+  int num_delims_;
 
   // SSE(xmm) register containing the escape search character.
   __m128i xmm_escape_search_;
@@ -161,7 +161,10 @@ class DelimitedTextParser {
   // Character delimiting fields (to become slots).
   char field_delim_;
 
-  // Escape character.
+  // True if this parser should handle escape characters.
+  bool process_escapes_;
+
+  // Escape character. Only used if process_escapes_ is true.
   char escape_char_;
 
   // Character delimiting collection items (to become slots).
@@ -190,14 +193,15 @@ class DelimitedTextParser {
   uint16_t low_mask_[16];
   uint16_t high_mask_[16];
 
-  // Number of non partition cols in the table.  Replicated from ScanNode for 
-  // performance reasons.
+  // Number of columns in the table (including partition columns)
   int num_cols_;
 
-  // For each col index [0, num_cols), true if the column should be materialized.
-  // Replicated from the ScanNode for performance reasons.  Memory owned by this
-  // object.
-  bool* is_materialized_col_;
+  // Number of partition columns in the table.
+  int num_partition_keys_;
+
+  // For each col index [0, num_cols_), true if the column should be materialized.
+  // Not owned.
+  const bool* is_materialized_col_;
 
   // Index to keep track of the current current column in the current file
   int column_idx_;

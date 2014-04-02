@@ -39,10 +39,11 @@ static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, 
   DCHECK_EQ(len, std::min(n1, n2));
 #ifdef __SSE4_2__
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
-    while (len >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
+    while (len > 0) {
       __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s1));
       __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s2));
-      int chars_match = _mm_cmpistri(xmm0, xmm1, SSEUtil::STRCMP_MODE);
+      int n = std::min(len, SSEUtil::CHARS_PER_128_BIT_REGISTER);
+      int chars_match = _mm_cmpestri(xmm0, n, xmm1, n, SSEUtil::STRCMP_MODE);
       if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         return s1[chars_match] - s2[chars_match];
       }
@@ -50,20 +51,7 @@ static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, 
       s1 += SSEUtil::CHARS_PER_128_BIT_REGISTER;
       s2 += SSEUtil::CHARS_PER_128_BIT_REGISTER;
     }
-    if (len >= SSEUtil::CHARS_PER_64_BIT_REGISTER) {
-      // Load 64 bits at a time, the upper 64 bits of the xmm register is set to 0
-      __m128i xmm0 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(s1));
-      __m128i xmm1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(s2));
-      // The upper bits always match (always 0), hence the comparison to 
-      // CHAR_PER_128_REGISTER
-      int chars_match = _mm_cmpistri(xmm0, xmm1, SSEUtil::STRCMP_MODE);
-      if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
-        return s1[chars_match] - s2[chars_match];
-      }
-      len -= SSEUtil::CHARS_PER_64_BIT_REGISTER;
-      s1 += SSEUtil::CHARS_PER_64_BIT_REGISTER;
-      s2 += SSEUtil::CHARS_PER_64_BIT_REGISTER;
-    } 
+    return n1 - n2;
   }
 #endif
   // TODO: for some reason memcmp is way slower than strncmp (2.5x)  why?

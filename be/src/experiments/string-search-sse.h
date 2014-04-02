@@ -14,6 +14,7 @@ namespace impala {
 // NOTE: Because this modifies the strings in place, you *cannot* pass it data
 // that was from the data section (e.g. StringSearchSSE(StringValue("abcd", 4));
 // TODO: this is still 25% slower than just calling strstr.  Look into why
+// TODO: this cannot be used with data containing nulls (I think)
 class StringSearchSSE {
  public:
   // Create a search needle for *null-terminated strings*.  This is more

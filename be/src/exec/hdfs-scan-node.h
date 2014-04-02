@@ -119,6 +119,7 @@ class HdfsScanNode : public ScanNode {
   // Returns number of materialized partition key slots
   int num_materialized_partition_keys() const { return partition_key_slots_.size(); }
 
+  // Number of columns, including partition keys
   int num_cols() const { return column_idx_to_materialized_slot_idx_.size(); }
 
   const TupleDescriptor* tuple_desc() { return tuple_desc_; }
@@ -137,6 +138,12 @@ class HdfsScanNode : public ScanNode {
   // that column is not materialized.
   int GetMaterializedSlotIdx(int col_idx) const {
     return column_idx_to_materialized_slot_idx_[col_idx];
+  }
+
+  // The result array is of length num_cols(). The i-th element is true iff column i
+  // should be materialized.
+  const bool* is_materialized_col() {
+    return reinterpret_cast<const bool*>(&is_materialized_col_[0]);
   }
 
   // Returns the per format codegen'd function.  Scanners call this to get the
@@ -331,6 +338,13 @@ class HdfsScanNode : public ScanNode {
   // the slot_desc's col_pos.  Non-materialized slots and partition key slots will
   // have SKIP_COLUMN as its entry.
   std::vector<int> column_idx_to_materialized_slot_idx_;
+
+  // is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
+  // for 0 <= i < total # columns
+  //
+  // This should be a vector<bool>, but bool vectors are special-cased and not stored
+  // internally as arrays, so instead we store as chars and cast to bools as needed
+  std::vector<char> is_materialized_col_;
 
   // Vector containing slot descriptors for all materialized non-partition key
   // slots.  These descriptors are sorted in order of increasing col_pos
