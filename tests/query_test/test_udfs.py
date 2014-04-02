@@ -128,9 +128,15 @@ class TestUdfs(ImpalaTestSuite):
       self.__check_exception(e)
 
   def __check_exception(self, e):
-    if ('Memory limit exceeded' not in e.inner_exception.message and
-        'Cancelled' not in e.inner_exception.message):
-      raise e
+    # The interesting exception message may be in 'e' or in its inner_exception
+    # depending on the point of query failure.
+    if 'Memory limit exceeded' in str(e) or 'Cancelled' in str(e):
+      return
+    if e.inner_exception is not None\
+       and ('Memory limit exceeded' in e.inner_exception.message
+            or 'Cancelled' not in e.inner_exception.message):
+      return
+    raise e
 
   def __run_query_all_impalads(self, exec_options, query, expected):
     impala_cluster = ImpalaCluster()

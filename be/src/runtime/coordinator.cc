@@ -787,7 +787,7 @@ Status Coordinator::Wait() {
     ReportQuerySummary();
   }
 
-  return Status::OK;
+  return return_status;
 }
 
 Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {

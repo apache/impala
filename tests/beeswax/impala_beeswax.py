@@ -36,8 +36,7 @@ class ImpalaBeeswaxException(Exception):
   __name__ = "ImpalaBeeswaxException"
   def __init__(self, message, inner_exception):
     self.__message = message
-    if inner_exception is not None:
-      self.inner_exception = inner_exception
+    self.inner_exception = inner_exception
 
   def __str__(self):
     return "%s:\n %s" % (self.__name__, self.__message)

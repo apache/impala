@@ -56,6 +56,7 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
 Status ExchangeNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  RETURN_IF_ERROR(FillInputRowBatch(state));
   return Status::OK;
 }
 
@@ -64,6 +65,20 @@ void ExchangeNode::Close(RuntimeState* state) {
   input_batch_.reset();
   if (stream_recvr_ != NULL) stream_recvr_->Close();
   ExecNode::Close(state);
+}
+
+Status ExchangeNode::FillInputRowBatch(RuntimeState* state) {
+  bool is_cancelled;
+  {
+    SCOPED_TIMER(state->total_network_receive_timer());
+    input_batch_.reset(stream_recvr_->GetBatch(&is_cancelled));
+  }
+  VLOG_FILE << "exch: has batch=" << (input_batch_.get() == NULL ? "false" : "true")
+            << " #rows=" << (input_batch_.get() != NULL ? input_batch_->num_rows() : 0)
+            << " is_cancelled=" << (is_cancelled ? "true" : "false")
+            << " instance_id=" << state->fragment_instance_id();
+  if (is_cancelled) return Status(TStatusCode::CANCELLED);
+  return Status::OK;
 }
 
 void ExchangeNode::TransferInputBatchOwnership(RowBatch* output_batch) {
@@ -115,16 +130,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
 
     // we need more rows
     TransferInputBatchOwnership(output_batch);
-    bool is_cancelled;
-    {
-      SCOPED_TIMER(state->total_network_receive_timer());
-      input_batch_.reset(stream_recvr_->GetBatch(&is_cancelled));
-    }
-    VLOG_FILE << "exch: has batch=" << (input_batch_.get() == NULL ? "false" : "true")
-              << " #rows=" << (input_batch_.get() != NULL ? input_batch_->num_rows() : 0)
-              << " is_cancelled=" << (is_cancelled ? "true" : "false")
-              << " instance_id=" << state->fragment_instance_id();
-    if (is_cancelled) return Status(TStatusCode::CANCELLED);
+    RETURN_IF_ERROR(FillInputRowBatch(state));
     *eos = (input_batch_.get() == NULL);
     if (*eos) return Status::OK;
     next_row_idx_ = 0;

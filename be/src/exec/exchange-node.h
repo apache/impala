@@ -32,6 +32,7 @@ class ExchangeNode : public ExecNode {
   ExchangeNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   virtual Status Prepare(RuntimeState* state);
+  // Blocks until the first batch is available for consumption via GetNext().
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual void Close(RuntimeState* state);
@@ -44,6 +45,9 @@ class ExchangeNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
+  // Resets input_batch_ to the next batch from the from stream_recvr_.
+  Status FillInputRowBatch(RuntimeState* state);
+
   // Transfer ownership of input_batch_ to output_batch if it is not null.
   void TransferInputBatchOwnership(RowBatch* output_batch);
 
