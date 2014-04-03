@@ -553,7 +553,7 @@ void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
     buffer_desc->buffer_ = NULL;
     // Returning the cached buffer means we're done with the scan range. It is
     // safe to close it (this is the only buffer that will be used for this range).
-    buffer_desc->scan_range_->CloseScanRange();
+    buffer_desc->scan_range_->Close();
   }
 
   if (buffer_desc->buffer_ == NULL) {
@@ -826,7 +826,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
     --state.num_remaining_ranges();
     buffer->scan_range_->Cancel(buffer->status_);
   } else if (buffer->eosr_) {
-    buffer->scan_range_->CloseScanRange();
+    buffer->scan_range_->Close();
     --state.num_remaining_ranges();
   }
 
@@ -879,7 +879,7 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
 
     // No locks in this section.  Only working on local vars.  We don't want to hold a
     // lock across the read call.
-    buffer_desc->status_ = range->OpenScanRange();
+    buffer_desc->status_ = range->Open();
     if (buffer_desc->status_.ok()) {
       // Update counters.
       if (reader->active_read_thread_counter_) {
@@ -891,8 +891,7 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
       SCOPED_TIMER(&read_timer_);
       SCOPED_TIMER(reader->read_timer_);
 
-      buffer_desc->status_ = range->ReadFromScanRange(
-          buffer, &buffer_desc->len_, &buffer_desc->eosr_);
+      buffer_desc->status_ = range->Read(buffer, &buffer_desc->len_, &buffer_desc->eosr_);
       buffer_desc->scan_range_offset_ = range->bytes_read_ - buffer_desc->len_;
 
       if (reader->bytes_read_counter_ != NULL) {

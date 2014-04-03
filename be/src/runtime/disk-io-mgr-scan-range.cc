@@ -145,7 +145,9 @@ void DiskIoMgr::ScanRange::Cancel(const Status& status) {
 
   DCHECK(!status.ok());
   {
+    // Grab both locks to make sure that all working threads see is_cancelled_.
     unique_lock<mutex> scan_range_lock(lock_);
+    unique_lock<mutex> hdfs_lock(hdfs_lock_);
     DCHECK(Validate()) << DebugString();
     if (is_cancelled_) {
       DCHECK(ready_buffers_.empty());
@@ -159,7 +161,7 @@ void DiskIoMgr::ScanRange::Cancel(const Status& status) {
 
   // For cached buffers, we can't close the range until the cached buffer is returned.
   // Close is handled in DiskIoMgr::ReturnBuffer().
-  if (cached_buffer_ == NULL) CloseScanRange();
+  if (cached_buffer_ == NULL) Close();
 }
 
 void DiskIoMgr::ScanRange::CleanupQueuedBuffers() {
@@ -241,8 +243,8 @@ void DiskIoMgr::ScanRange::InitInternal(DiskIoMgr* io_mgr, ReaderContext* reader
   DCHECK(Validate()) << DebugString();
 }
 
-Status DiskIoMgr::ScanRange::OpenScanRange() {
-  unique_lock<mutex> scan_range_lock(lock_);
+Status DiskIoMgr::ScanRange::Open() {
+  unique_lock<mutex> hdfs_lock(hdfs_lock_);
   if (is_cancelled_) return Status::CANCELLED;
 
   if (reader_->hdfs_connection_ != NULL) {
@@ -285,8 +287,8 @@ Status DiskIoMgr::ScanRange::OpenScanRange() {
   return Status::OK;
 }
 
-void DiskIoMgr::ScanRange::CloseScanRange() {
-  unique_lock<mutex> scan_range_lock(lock_);
+void DiskIoMgr::ScanRange::Close() {
+  unique_lock<mutex> hdfs_lock(hdfs_lock_);
   if (reader_->hdfs_connection_ != NULL) {
     if (hdfs_file_ == NULL) return;
 
@@ -318,9 +320,8 @@ void DiskIoMgr::ScanRange::CloseScanRange() {
 // TODO: how do we best use the disk here.  e.g. is it good to break up a
 // 1MB read into 8 128K reads?
 // TODO: look at linux disk scheduling
-Status DiskIoMgr::ScanRange::ReadFromScanRange(
-    char* buffer, int64_t* bytes_read, bool* eosr) {
-  unique_lock<mutex> scan_range_lock(lock_);
+Status DiskIoMgr::ScanRange::Read(char* buffer, int64_t* bytes_read, bool* eosr) {
+  unique_lock<mutex> hdfs_lock(hdfs_lock_);
   if (is_cancelled_) return Status::CANCELLED;
 
   *eosr = false;
@@ -364,7 +365,7 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
   DCHECK(try_cache_);
   DCHECK_EQ(bytes_read_, 0);
   *read_succeeded = false;
-  Status status = OpenScanRange();
+  Status status = Open();
   if (!status.ok()) return status;
 
   // Cached reads not supported on local filesystem.

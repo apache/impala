@@ -268,14 +268,14 @@ class DiskIoMgr {
     bool Validate();
 
     // Opens the file for this range. This function only modifies state in this range.
-    Status OpenScanRange();
+    Status Open();
 
     // Closes the file for this range. This function only modifies state in this range.
-    void CloseScanRange();
+    void Close();
 
     // Reads from this range into 'buffer'. Buffer is preallocated. Returns the number
     // of bytes read. Updates range to keep track of where in the file we are.
-    Status ReadFromScanRange(char* buffer, int64_t* bytes_read, bool* eosr);
+    Status Read(char* buffer, int64_t* bytes_read, bool* eosr);
 
     // Reads from the DN cache. On success, sets cached_buffer_ to the DN buffer
     // and *read_succeeded to true.
@@ -319,17 +319,12 @@ class DiskIoMgr {
     // and all the bytes for the range are in this buffer.
     struct hadoopRzBuffer* cached_buffer_;
 
-    // Lock protecting fields below. This lock is taken during the calls to
-    // Open/Read/Close ScanRange. This is okay since only one disk thread can
-    // work on a range at any time and this locked is used to synchronize with
-    // the cancellation path.
+    // Lock protecting fields below.
+    // This lock should not be taken during Open/Read/Close.
     boost::mutex lock_;
 
     // Number of bytes read so far for this scan range
     int bytes_read_;
-
-    // If true, this scan range has been cancelled.
-    bool is_cancelled_;
 
     // Status for this range. This is non-ok if is_cancelled_ is true.
     // Note: an individual range can fail without the ReaderContext being
@@ -356,6 +351,17 @@ class DiskIoMgr {
     // In that case, the capcity is only realized when the caller removes buffers
     // from ready_buffers_.
     int ready_buffers_capacity_;
+
+    // Lock that should be taken during hdfs calls. Only one thread (the disk reading
+    // thread) calls into hdfs at a time so this lock does not have performance impact.
+    // This lock only serves to coordinate cleanup. Specifically it serves to ensure
+    // that the disk threads are finished with HDFS calls before is_cancelled_ is set
+    // to true and cleanup starts.
+    // If this lock and lock_ need to be taken, lock_ must be taken first.
+    boost::mutex hdfs_lock_;
+
+    // If true, this scan range has been cancelled.
+    bool is_cancelled_;
   };
 
   // Create a DiskIoMgr object.
