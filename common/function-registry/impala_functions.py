@@ -43,7 +43,10 @@ def symbol(class_name, fn_name, templated_type = None):
     sym += 'EEPvPNS_4ExprEPNS_8TupleRowE'
   return sym
 
-# The format is: [sql aliases], <return_type>, [<args>], <backend symbol>
+# The format is:
+#   [sql aliases], <return_type>, [<args>], <backend symbol>,
+# With an optional
+#   <prepare symbol>, <close symbol>
 #
 # 'sql aliases' are the function names that can be used from sql. There must be
 # at least one per function.
@@ -481,4 +484,9 @@ udf_functions = [
    '_ZN6impala11UdfBuiltins3AbsEPN10impala_udf15FunctionContextERKNS1_9DoubleValE'],
   [['udf_lower'], 'STRING', ['STRING'],
    '_ZN6impala11UdfBuiltins5LowerEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+
+  [['trunc'], 'TIMESTAMP', ['TIMESTAMP', 'STRING'],
+   '_ZN6impala11UdfBuiltins5TruncEPN10impala_udf15FunctionContextERKNS1_12TimestampValERKNS1_9StringValE',
+   '_ZN6impala11UdfBuiltins12TruncPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
+   '_ZN6impala11UdfBuiltins10TruncCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
 ]

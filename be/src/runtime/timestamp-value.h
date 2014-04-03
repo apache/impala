@@ -90,6 +90,8 @@ class TimestampValue {
 
   void set_date(boost::gregorian::date d) { date_ = d; }
   void set_time(boost::posix_time::time_duration t) { time_of_day_ = t; }
+  const boost::gregorian::date& get_date() const { return date_; }
+  const boost::posix_time::time_duration& get_time() const { return time_of_day_; }
 
   std::string DebugString() const {
     std::stringstream ss;
@@ -223,7 +225,7 @@ class TimestampValue {
 
   // Boost ptime leaves a gap in the structure, so we swap the order to make it
   // 12 contiguous bytes.  We then must convert to and from the boost ptime data type.
-  
+
   // 8 bytes - stores the nanoseconds within the current day
   boost::posix_time::time_duration time_of_day_;
 

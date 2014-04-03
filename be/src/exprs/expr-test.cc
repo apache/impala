@@ -2598,6 +2598,207 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("from_unixtime(0, NULL)", TYPE_STRING);
   TestIsNull("from_unixtime(0, ' ')", TYPE_STRING);
   TestIsNull("from_unixtime(0, ' -=++=- ')", TYPE_STRING);
+
+  TestStringValue(
+        "cast(trunc(cast('2014-04-01 01:01:01' as timestamp), 'SYYYY') as string)",
+          "2014-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-04-01 01:01:01' as timestamp), 'YYYY') as string)",
+          "2014-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-04-01 01:01:01' as timestamp), 'YEAR') as string)",
+          "2014-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-04-01 01:01:01' as timestamp), 'SYEAR') as string)",
+          "2014-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-04-01 01:01:01' as timestamp), 'YYY') as string)",
+          "2014-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-04-01 01:01:01' as timestamp), 'YY') as string)",
+          "2014-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-04-01 01:01:01' as timestamp), 'Y') as string)",
+          "2014-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-01-01 00:00:00' as timestamp), 'Y') as string)",
+          "2000-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-01-01 00:00:00' as timestamp), 'Q') as string)",
+          "2000-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-01-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-02-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-03-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-04-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-04-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-05-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-04-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-06-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-04-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-07-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-07-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-08-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-07-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-09-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-07-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-10-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-10-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-11-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-10-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2000-12-01 01:00:00' as timestamp), 'Q') as string)",
+          "2000-10-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2001-02-05 01:01:01' as timestamp), 'MONTH') as string)",
+          "2001-02-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2001-02-05 01:01:01' as timestamp), 'MON') as string)",
+          "2001-02-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2001-02-05 01:01:01' as timestamp), 'MM') as string)",
+          "2001-02-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2001-02-05 01:01:01' as timestamp), 'RM') as string)",
+          "2001-02-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2001-01-01 00:00:00' as timestamp), 'MM') as string)",
+          "2001-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2001-12-29 00:00:00' as timestamp), 'MM') as string)",
+          "2001-12-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-08 01:02:03' as timestamp), 'WW') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-07 00:00:00' as timestamp), 'WW') as string)",
+          "2014-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-08 00:00:00' as timestamp), 'WW') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-09 00:00:00' as timestamp), 'WW') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-14 00:00:00' as timestamp), 'WW') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-08 01:02:03' as timestamp), 'W') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-07 00:00:00' as timestamp), 'W') as string)",
+          "2014-01-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-08 00:00:00' as timestamp), 'W') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-09 00:00:00' as timestamp), 'W') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-14 00:00:00' as timestamp), 'W') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-02-01 01:02:03' as timestamp), 'W') as string)",
+          "2014-02-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-02-02 00:00:00' as timestamp), 'W') as string)",
+          "2014-02-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-02-03 00:00:00' as timestamp), 'W') as string)",
+          "2014-02-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-02-07 00:00:00' as timestamp), 'W') as string)",
+          "2014-02-01 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-02-08 00:00:00' as timestamp), 'W') as string)",
+          "2014-02-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-02-24 00:00:00' as timestamp), 'W') as string)",
+          "2014-02-22 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-08 01:02:03' as timestamp), 'DDD') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-01-08 01:02:03' as timestamp), 'DD') as string)",
+          "2014-01-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-02-08 01:02:03' as timestamp), 'J') as string)",
+          "2014-02-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-02-08 00:00:00' as timestamp), 'J') as string)",
+          "2014-02-08 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2014-02-19 00:00:00' as timestamp), 'J') as string)",
+          "2014-02-19 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 01:02:03' as timestamp), 'DAY') as string)",
+          "2012-09-10 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 01:02:03' as timestamp), 'DY') as string)",
+          "2012-09-10 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 01:02:03' as timestamp), 'D') as string)",
+          "2012-09-10 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-11 01:02:03' as timestamp), 'D') as string)",
+          "2012-09-10 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-12 01:02:03' as timestamp), 'D') as string)",
+          "2012-09-10 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-16 01:02:03' as timestamp), 'D') as string)",
+          "2012-09-10 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 07:02:03' as timestamp), 'HH') as string)",
+          "2012-09-10 07:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 07:02:03' as timestamp), 'HH12') as string)",
+          "2012-09-10 07:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 07:02:03' as timestamp), 'HH24') as string)",
+          "2012-09-10 07:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 00:02:03' as timestamp), 'HH') as string)",
+          "2012-09-10 00:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 23:02:03' as timestamp), 'HH') as string)",
+          "2012-09-10 23:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 23:59:59' as timestamp), 'HH') as string)",
+          "2012-09-10 23:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 07:02:03' as timestamp), 'MI') as string)",
+          "2012-09-10 07:02:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 07:00:03' as timestamp), 'MI') as string)",
+          "2012-09-10 07:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 07:00:00' as timestamp), 'MI') as string)",
+          "2012-09-10 07:00:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 07:59:03' as timestamp), 'MI') as string)",
+          "2012-09-10 07:59:00");
+  TestStringValue(
+        "cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MI') as string)",
+          "2012-09-10 07:59:00");
+
+  TestIsNull("cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MIN') as string)",
+             TYPE_STRING);
+  TestIsNull("cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'XXYYZZ') as string)",
+             TYPE_STRING);
 }
 
 TEST_F(ExprTest, ConditionalFunctions) {

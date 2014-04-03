@@ -57,10 +57,22 @@ public class ScalarFunction extends Function {
 
   /**
    * Creates a builtin scalar function. This is a helper that wraps a few steps
-   * into one call.
+   * into one call. This defaults to not using a Prepare/Close function.
    */
   public static ScalarFunction createBuiltin(String name, ArrayList<ColumnType> argTypes,
       boolean hasVarArgs, ColumnType retType, String symbol, boolean udfInterface) {
+    return createBuiltin(name, argTypes, hasVarArgs, retType,
+                         symbol, null, null, udfInterface);
+  }
+
+  /**
+   * Creates a builtin scalar function. This is a helper that wraps a few steps
+   * into one call.
+   */
+  public static ScalarFunction createBuiltin(String name, ArrayList<ColumnType> argTypes,
+      boolean hasVarArgs, ColumnType retType, String symbol,
+      String prepareFnSymbol, String closeFnSymbol, boolean udfInterface) {
+    Preconditions.checkNotNull(symbol);
     FunctionArgs fnArgs = new FunctionArgs(argTypes, hasVarArgs);
     ScalarFunction fn =
         new ScalarFunction(new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, retType);
@@ -68,6 +80,8 @@ public class ScalarFunction extends Function {
     fn.setUserVisible(true);
     fn.udfInterface_ = udfInterface;
     fn.symbolName_ = symbol;
+    fn.prepareFnSymbol_ = prepareFnSymbol;
+    fn.closeFnSymbol_ = closeFnSymbol;
     return fn;
   }
 

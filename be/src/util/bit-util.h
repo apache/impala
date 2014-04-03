@@ -37,6 +37,11 @@ class BitUtil {
     return (value + (factor - 1)) / factor * factor;
   }
 
+  // Returns 'value' rounded down to the nearest multiple of 'factor'
+  static inline int RoundDown(int value, int factor) {
+    return (value / factor) * factor;
+  }
+
   // Non hw accelerated pop count.
   // TODO: we don't use this in any perf sensitive code paths currently.  There
   // might be a much faster way to implement this.
