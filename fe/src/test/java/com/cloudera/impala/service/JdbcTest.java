@@ -67,18 +67,34 @@ public class JdbcTest {
     tests.put("alltypes", "alltypes");
     tests.put("%all_ypes", "alltypes");
 
-    for (String tblNamePattern: tests.keySet()) {
-      ResultSet rs = con_.getMetaData().getTables("", "functional",
-          tblNamePattern, null);
-      assertTrue(rs.next());
-      // TABLE_NAME is the 3rd column.
-      String resultTableName = rs.getString("TABLE_NAME");
-      assertEquals(rs.getString(3), resultTableName);
+    String[][] tblTypes = {null, {"TABLE"}};
 
-      assertEquals("Table mismatch", tests.get(tblNamePattern), resultTableName);
-      String tableType = rs.getString("TABLE_TYPE");
-      assertEquals("table", tableType.toLowerCase());
-      assertFalse(rs.next());
+    for (String tblNamePattern: tests.keySet()) {
+      for (String[] tblType: tblTypes) {
+        ResultSet rs = con_.getMetaData().getTables("", "functional",
+            tblNamePattern, tblType);
+        assertTrue(rs.next());
+
+        // TABLE_NAME is the 3rd column.
+        String resultTableName = rs.getString("TABLE_NAME");
+        assertEquals(rs.getString(3), resultTableName);
+
+        assertEquals("Table mismatch", tests.get(tblNamePattern), resultTableName);
+        String tableType = rs.getString("TABLE_TYPE");
+        assertEquals("table", tableType.toLowerCase());
+        assertFalse(rs.next());
+        rs.close();
+      }
+    }
+
+    for (String[] tblType: tblTypes) {
+      ResultSet rs = con_.getMetaData().getTables(null, null, null, tblType);
+      // Should return at least one value.
+      assertTrue(rs.next());
+      rs.close();
+
+      rs = con_.getMetaData().getTables(null, null, null, tblType);
+      assertTrue(rs.next());
       rs.close();
     }
   }
@@ -195,6 +211,15 @@ public class JdbcTest {
     assertEquals("Incorrect type", java.sql.Types.TIMESTAMP, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
+
+    // validate null column name returns all columns.
+    rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall", null);
+    int numCols = 0;
+    while (rs.next()) {
+      ++numCols;
+    }
+    assertEquals(13, numCols);
+    rs.close();
   }
 
   /**
@@ -235,6 +260,7 @@ public class JdbcTest {
     // substring is not in default db
     rs = con_.getMetaData().getFunctions(null, "default", "substring");
     assertFalse(rs.next());
+    rs.close();
   }
 
   @Test

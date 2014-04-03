@@ -33,6 +33,7 @@ import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -269,34 +270,37 @@ public class MetadataOp {
 
       List<String> tableList = Lists.newArrayList();
       List<List<Column>> tablesColumnsList = Lists.newArrayList();
-      if (tableName != null) {
-        for (String tabName: catalog.getTableNames(db.getName(), "*", user)) {
-          if (!tablePattern.matcher(tabName).matches()) {
-            continue;
-          }
-          tableList.add(tabName);
-          List<Column> columns = Lists.newArrayList();
-
-          if (columnName != null) {
-            Table table = catalog.getTable(dbName, tabName, user, Privilege.ANY);
-            if (table == null) continue;
-            // If the table is not yet loaded, the columns will be unknown. Add it
-            // to the set of missing tables.
-            if (!table.isLoaded()) {
-              result.missingTbls.add(new TableName(dbName, tabName));
-            } else {
-              for (Column column: table.getColumns()) {
-                String colName = column.getName();
-                if (!columnPattern.matcher(colName).matches()) {
-                  continue;
-                }
-                columns.add(column);
-              }
-            }
-          }
-          tablesColumnsList.add(columns);
+      for (String tabName: catalog.getTableNames(db.getName(), "*", user)) {
+        if (!tablePattern.matcher(tabName).matches()) {
+          continue;
         }
+        tableList.add(tabName);
+        List<Column> columns = Lists.newArrayList();
+
+        Table table = null;
+        try {
+          table = catalog.getTable(dbName, tabName, user, Privilege.ANY);
+        } catch (TableLoadingException e) {
+          // Ignore exception (this table will be skipped).
+        }
+        if (table == null) continue;
+
+        // If the table is not yet loaded, the columns will be unknown. Add it
+        // to the set of missing tables.
+        if (!table.isLoaded()) {
+          result.missingTbls.add(new TableName(dbName, tabName));
+        } else {
+          for (Column column: table.getColumns()) {
+            String colName = column.getName();
+            if (!columnPattern.matcher(colName).matches()) {
+              continue;
+            }
+            columns.add(column);
+          }
+        }
+        tablesColumnsList.add(columns);
       }
+
       if (functionName != null) {
         List<Function> fns = db.getFunctions(functionPattern);
         result.functions.add(fns);
