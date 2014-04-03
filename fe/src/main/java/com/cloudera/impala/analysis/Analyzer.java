@@ -826,17 +826,14 @@ public class Analyzer {
                 new SlotRef(globalState_.descTbl.getSlotDesc(destSids.get(i))));
           }
           p = srcConjunct.clone(smap);
-          // we need to re-analyze in order to create casts, if necessary
-          p.unsetIsAnalyzed();
-          LOG.trace("new pred: " + p.toSql() + " " + p.debugString());
-
           try {
             // create casts if needed
-            p.analyze(this);
+            p.reanalyze(this);
           } catch (ImpalaException exc) {
             // not an executable predicate; ignore
             continue;
           }
+          LOG.trace("new pred: " + p.toSql() + " " + p.debugString());
         }
 
         // predicate assignment doesn't hold if:
@@ -954,9 +951,8 @@ public class Analyzer {
       nullSmap.addMapping(slotRef.clone(null), new NullLiteral());
     }
     Expr nullTuplePred = p.clone(nullSmap);
-    nullTuplePred.unsetIsAnalyzed();
     try {
-      nullTuplePred.analyze(this);
+      nullTuplePred.reanalyze(this);
     } catch (Exception e) {
       Preconditions.checkState(false, "Failed to analyze generated predicate: "
           + nullTuplePred.toSql() + "." + e.getMessage());

@@ -1794,6 +1794,10 @@ public class Planner {
         continue;
       }
       List<Expr> opConjuncts = Expr.cloneList(conjuncts, op.getSmap());
+      // analyze after expr substitution to insert casts, etc.
+      for (Expr e: opConjuncts) {
+        e.reanalyze(analyzer);
+      }
 
       // eliminate constant predicates: they would (incorrectly) get picked up by
       // the first call to Analyzer.getUnassignedConjuncts()

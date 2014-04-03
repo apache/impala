@@ -2746,8 +2746,8 @@ select count(*) from (
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
-// UNION ALL in subquery with a WHERE condition in the outer select;
-// Where clause conjuncts are used as scan predicates and for partition pruning.
+# UNION ALL in subquery with a WHERE condition in the outer select;
+# Where clause conjuncts are used as scan predicates and for partition pruning.
 select x.int_col, x.bool_col, x.month from
   (select * from functional.alltypestiny where year=2009 
    union all
@@ -2777,4 +2777,31 @@ where x.int_col < 5 and x.bool_col = false and x.month = 1
 01:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 size=115B
    predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
+====
+# Test materialization of slots in the union's result tuple for predicates
+# whose underlying base table exprs are constant in at least one of the union
+# operands. Such predicates are always assigned at the MergNode, in addition
+# to those operands with non-constant base table exprs (IMPALA-888).
+select 1 from
+  (select 1 a, 2 b, int_col c from functional.alltypestiny
+   union all
+   select tinyint_col, int_col, smallint_col from functional.alltypes
+   union all
+   select 1, tinyint_col, 3 from functional.alltypessmall) t
+where a + b < 100 and c > 20
+---- PLAN
+00:MERGE
+|  predicates: a + b < 100, c > 20
+|
+|--03:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: 1 + tinyint_col < 100
+|
+|--02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|     predicates: functional.alltypes.tinyint_col + functional.alltypes.int_col < 100, functional.alltypes.smallint_col > 20
+|
+01:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+   predicates: functional.alltypestiny.int_col > 20
 ====

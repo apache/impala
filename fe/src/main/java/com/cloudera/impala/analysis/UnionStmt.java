@@ -60,7 +60,7 @@ public class UnionStmt extends QueryStmt {
     private Analyzer analyzer_;
 
     // map from UnionStmts result slots to our resultExprs; useful during plan generation
-    private final Expr.SubstitutionMap smap = new Expr.SubstitutionMap();
+    private final Expr.SubstitutionMap smap_ = new Expr.SubstitutionMap();
 
     public UnionOperand(QueryStmt queryStmt, Qualifier qualifier) {
       this.queryStmt_ = queryStmt;
@@ -78,7 +78,7 @@ public class UnionStmt extends QueryStmt {
     // Used for propagating DISTINCT.
     public void setQualifier(Qualifier qualifier) { this.qualifier_ = qualifier; }
     public Analyzer getAnalyzer() { return analyzer_; }
-    public Expr.SubstitutionMap getSmap() { return smap; }
+    public Expr.SubstitutionMap getSmap() { return smap_; }
 
     @Override
     public UnionOperand clone() {
@@ -221,6 +221,13 @@ public class UnionStmt extends QueryStmt {
       for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
         slotDesc.setIsMaterialized(true);
       }
+    } else {
+      // To keep the predicate assignment/propagation logic simple, we assign conjuncts
+      // whose underlying base table exprs are constant in at least one union operand
+      // to the evaluating MergeNode, and not to the operand(s) whose corresponding base
+      // table exprs are constant.
+      // Mark those used slots in the result tuple of this union as materialized.
+      materializeSlots(analyzer, getConstOperandConjuncts(analyzer));
     }
 
     // collect operands' result exprs
@@ -243,6 +250,32 @@ public class UnionStmt extends QueryStmt {
     for (UnionOperand op: operands_) {
       op.getQueryStmt().materializeRequiredSlots(analyzer);
     }
+  }
+
+  /**
+   * Returns a list of unassigned conjuncts bound by tupleId_. Each expr in the
+   * result is fully bound by slots whose underlying base table exprs are constant in at
+   * least one union operand.
+   */
+  private List<Expr> getConstOperandConjuncts(Analyzer analyzer) {
+    TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tupleId_);
+    List<SlotDescriptor> outputSlots = tupleDesc.getSlots();
+    List<Expr> conjuncts = analyzer.getUnassignedConjuncts(tupleId_.asList(), false);
+    List<Expr> result = Lists.newArrayList();
+    for (UnionOperand op: operands_) {
+      List<SlotId> opConstantSlots = Lists.newArrayList();
+      for (int i = 0; i < outputSlots.size(); ++i) {
+        if (op.getQueryStmt().getBaseTblResultExprs().get(i).isConstant()) {
+          opConstantSlots.add(outputSlots.get(i).getId());
+        }
+      }
+      if (opConstantSlots.isEmpty()) continue;
+      for (Expr conjunct: conjuncts) {
+        if (conjunct.isBoundBySlotIds(opConstantSlots)) result.add(conjunct);
+      }
+    }
+    Expr.removeDuplicates(result);
+    return result;
   }
 
   /**

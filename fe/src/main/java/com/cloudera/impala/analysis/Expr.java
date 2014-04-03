@@ -162,6 +162,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     if (analyzer != null) analyzer.decrementCallDepth();
   }
 
+  /**
+   * Calls unsetIsAnalyzed() and performs semantic analysis again. Re-analysis is useful
+   * after cloning and expr and/or substituting exprs to insert casts, etc, because the
+   * original expr will typically have been analyzed already.
+   */
+  public void reanalyze(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
+    unsetIsAnalyzed();
+    analyze(analyzer);
+  }
+
   protected void computeNumDistinctValues() {
     if (isConstant()) {
       numDistinctValues_ = 1;
