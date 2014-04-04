@@ -616,3 +616,15 @@ NULL
 8
 9
 ====
+---- QUERY
+# Regression test for IMPALA-904. Tests correct execution of exprs from an outer-joined
+# inline view that can evaluate to a non-NULL value with NULL-valued slots. Use an
+# explicit [shuffle] hint for extra coverage because the expr will also be evaluated in
+# a hashing data sink.
+select count(*) from functional.alltypestiny t1 left outer join [shuffle]
+(select zeroifnull(int_col) as id from functional.alltypessmall) t2 on (t1.id = t2.id)
+---- TYPES
+bigint
+---- RESULTS
+8
+====

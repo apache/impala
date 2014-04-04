@@ -22,18 +22,27 @@ namespace impala {
 
 class TExprNode;
 
+// Returns true if all of the given tuples are NULL, false otherwise.
+// It is important that this predicate not require the given tuples to be nullable,
+// because the FE may sometimes wrap expressions in this predicate that contain SlotRefs
+// on non-nullable tuples (see IMPALA-904).
+// TODO: Implement codegen to eliminate overhead on non-nullable tuples.
 class TupleIsNullPredicate: public Predicate {
  protected:
   friend class Expr;
 
   TupleIsNullPredicate(const TExprNode& node);
-  
+
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
   virtual std::string DebugString() const;
 
  private:
   static void* ComputeFn(Expr* e, TupleRow* row);
+
+  // Tuple ids to check for NULL. May contain ids of nullable and non-nullable tuples.
   std::vector<TupleId> tuple_ids_;
+
+  // Tuple indexes into the RowDescriptor. Only contains indexes of nullable tuples.
   std::vector<int32_t> tuple_idxs_;
 };
 

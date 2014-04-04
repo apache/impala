@@ -47,8 +47,7 @@ Status TupleIsNullPredicate::Prepare(RuntimeState* state, const RowDescriptor& r
   // Resolve tuple ids to tuple indexes.
   for (int i = 0; i < tuple_ids_.size(); ++i) {
     int32_t tuple_idx = row_desc.GetTupleIdx(tuple_ids_[i]);
-    DCHECK(row_desc.TupleIsNullable(tuple_idx));
-    tuple_idxs_.push_back(tuple_idx);
+    if (row_desc.TupleIsNullable(tuple_idx)) tuple_idxs_.push_back(tuple_idx);
   }
   compute_fn_ = ComputeFn;
   return Status::OK;

@@ -24,7 +24,12 @@ import com.google.common.base.Preconditions;
 /**
  * Internal expr that returns true if all of the given tuples are NULL, otherwise false.
  * Used to make exprs originating from an inline view nullable in an outer join.
- * The given tupleIds must be materialized and nullable at the appropriate PlanNode.
+ * The given tupleIds must be materialized but not necessarily nullable at the
+ * appropriate PlanNode. It is important not to require nullability of the tuples
+ * because some exprs may be wrapped in a TupleIsNullPredicate that contain
+ * SlotRefs on non-nullable tuples, e.g., an expr in the On-clause of an outer join
+ * that refers to an outer-joined inline view (see IMPALA-904).
+ *
  */
 public class TupleIsNullPredicate extends Predicate {
   private final List<TupleId> tupleIds_;
@@ -44,6 +49,6 @@ public class TupleIsNullPredicate extends Predicate {
   }
 
   @Override
-  protected String toSqlImpl() { return ""; }
+  protected String toSqlImpl() { return "TupleIsNull()"; }
   public List<TupleId> getTupleIds() { return tupleIds_; }
 }
