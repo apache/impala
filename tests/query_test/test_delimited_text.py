@@ -6,6 +6,7 @@
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.test_dimensions import create_uncompressed_text_dimension
 
 class TestDelimitedText(ImpalaTestSuite):
   """
@@ -24,9 +25,7 @@ class TestDelimitedText(ImpalaTestSuite):
     super(TestDelimitedText, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
     # Only run on delimited text with no compression.
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and\
-        v.get_value('table_format').compression_codec == 'none')
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
     # cleanup and create a fresh test database

@@ -22,11 +22,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
         disable_codegen_options=[False],
         batch_sizes=[0],
         sync_ddl=[0, 1]))
-
-    # There is no reason to run these tests using all table format dimensions.
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and\
-        v.get_value('table_format').compression_codec == 'none')
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
     self.cleanup_db('hive_test_db')

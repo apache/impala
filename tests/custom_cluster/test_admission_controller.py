@@ -10,6 +10,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.test_vector import TestDimension
 
 import logging
@@ -118,14 +119,13 @@ class TestAdmissionController(CustomClusterTestSuite):
   def add_test_dimensions(cls):
     super(TestAdmissionController, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+
+    # There's no reason to test this on other file formats/compression codecs right now
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+
     cls.TestMatrix.add_dimension(TestDimension('num_queries', *NUM_QUERIES))
     cls.TestMatrix.add_dimension(
         TestDimension('round_robin_submission', *ROUND_ROBIN_SUBMISSION))
-
-    # There's no reason to test this on other file formats/compression codecs right now
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and\
-        v.get_value('table_format').compression_codec == 'none')
 
     cls.TestMatrix.add_dimension(
         TestDimension('submission_delay_ms', *SUBMISSION_DELAY_MS))

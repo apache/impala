@@ -26,7 +26,13 @@ class TestMiniStress(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestMiniStress, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(TestDimension('test_id', *TEST_IDS))
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
+    if cls.exploration_strategy() != 'exhaustive':
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('exec_option')['batch_size'] == 0)
+    else:
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('exec_option')['batch_size'] != 1)
+
 
   @pytest.mark.stress
   def test_mini_stress(self, vector):

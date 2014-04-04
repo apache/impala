@@ -21,9 +21,7 @@ class TestUdfs(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
 
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and\
-        v.get_value('table_format').compression_codec == 'none')
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_native_functions(self, vector):
     database = 'native_function_test'

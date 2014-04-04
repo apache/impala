@@ -35,6 +35,8 @@ class TestLimit(ImpalaTestSuite):
     # network traffic and makes the machine run very slowly.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('limit_value') < 100 or v.get_value('exec_option')['batch_size'] == 0)
+    # TPCH is not generated in hbase format.
+    # TODO: Add test coverage for hbase.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format != "hbase")
 

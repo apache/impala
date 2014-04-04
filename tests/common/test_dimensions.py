@@ -69,6 +69,15 @@ class TableFormatInfo(object):
       compression_str = 'none'
     return '%s/%s' % (self.file_format, compression_str)
 
+def create_uncompressed_text_dimension(workload):
+  dataset = get_dataset_from_workload(workload)
+  return TestDimension('table_format',
+      TableFormatInfo.create_from_string(dataset, 'text/none'))
+
+def create_parquet_dimension(workload):
+  dataset = get_dataset_from_workload(workload)
+  return TestDimension('table_format',
+      TableFormatInfo.create_from_string(dataset, 'parquet/none'))
 
 # Available Exec Options:
 #01: abort_on_error (bool)

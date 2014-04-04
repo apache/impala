@@ -28,7 +28,7 @@ class TestInsertQueriesWithPermutation(ImpalaTestSuite):
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
     # Insert is currently only supported for text and parquet
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format in ['text'])
+        v.get_value('table_format').file_format in ['text', 'parquet'])
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
 

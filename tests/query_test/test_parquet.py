@@ -16,8 +16,8 @@ class TestParquetManyColumns(ImpalaTestSuite):
     super(TestParquetManyColumns, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'parquet')
+    cls.TestMatrix.add_dimension(create_parquet_dimension(cls.get_workload()))
+
     if cls.exploration_strategy() == 'core':
       # Don't run on core. This test is very slow (IMPALA-864) and we are unlikely
       # to regress here.

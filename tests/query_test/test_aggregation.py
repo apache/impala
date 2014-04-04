@@ -37,11 +37,14 @@ class TestAggregation(ImpalaTestSuite):
     # Add two more dimensions
     cls.TestMatrix.add_dimension(TestDimension('agg_func', *agg_functions))
     cls.TestMatrix.add_dimension(TestDimension('data_type', *data_types))
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
     cls.TestMatrix.add_constraint(lambda v: cls.is_valid_vector(v))
 
   @classmethod
   def is_valid_vector(cls, vector):
+    # Reduce execution time when exploration strategy is 'core'
+    if cls.exploration_strategy() == 'core':
+      if vector.get_value('exec_option')['batch_size'] != 0: return False
+
     data_type, agg_func = vector.get_value('data_type'), vector.get_value('agg_func')
     file_format = vector.get_value('table_format').file_format
 

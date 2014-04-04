@@ -39,6 +39,7 @@ class TestShowCreateTable(ImpalaTestSuite):
     # don't use any exec options, running exactly once is fine
     cls.TestMatrix.clear_dimension('exec_option')
     # There is no reason to run these tests using all dimensions.
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')

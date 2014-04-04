@@ -8,6 +8,7 @@ from copy import copy
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import *
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.test_dimensions import create_uncompressed_text_dimension
 
 # Tests very deep expression trees and expressions with many children. Impala defines
 # a 'safe' upper bound on the expr depth and the number of expr children in the
@@ -26,14 +27,15 @@ class TestExprLimits(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestExprLimits, cls).add_test_dimensions()
-    cls.TestMatrix.clear_dimension('exec_option')
-    # Run with codegen enabled and disabled.
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
-        cluster_sizes=[0], disable_codegen_options=[False, True], batch_sizes=[0]))
+    if cls.exploration_strategy() != 'exhaustive':
+      # Ensure the test runs with codegen enabled and disabled, even when the
+      # exploration strategy is not exhaustive.
+      cls.TestMatrix.clear_dimension('exec_option')
+      cls.TestMatrix.add_dimension(create_exec_option_dimension(
+          cluster_sizes=[0], disable_codegen_options=[False, True], batch_sizes=[0]))
+
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and\
-        v.get_value('table_format').compression_codec == 'none')
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_expr_child_limit(self, vector):
     # IN predicate
@@ -63,9 +65,8 @@ class TestExprLimits(ImpalaTestSuite):
     arith_query = "select " + self.__gen_deep_infix_expr("1", " + 1")
     self.__exec_query(arith_query)
 
-    # TODO: Test function-call exprs after IMPALA-621 has been fixed.
-    #func_query = "select " + self.__gen_deep_func_expr("lower(", "'abc'", ")")
-    #self.__exec_query(func_query)
+    func_query = "select " + self.__gen_deep_func_expr("lower(", "'abc'", ")")
+    self.__exec_query(func_query)
 
     # Casts.
     cast_query = "select " + self.__gen_deep_func_expr("cast(", "1", " as int)")

@@ -19,6 +19,7 @@ from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
 
+
 TEST_DB = 'read_only_table_test_db'
 
 class TestHdfsPermissions(ImpalaTestSuite):
@@ -30,9 +31,7 @@ class TestHdfsPermissions(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestHdfsPermissions, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and \
-        v.get_value('table_format').compression_codec == 'none')
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
     self.__cleanup()
