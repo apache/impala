@@ -519,21 +519,25 @@ void* StringFunctions::Concat(Expr* e, TupleRow* row) {
   e->result_.string_data.clear();
   int32_t total_size = 0;
   int32_t num_children = e->GetNumChildren();
+
+  // Pass through if there's only one argument
+  if (num_children == 1) return e->children()[0]->GetValue(row);
+
   // Loop once to compute the final size and reserve space.
+  StringValue* strs[num_children];
   for (int32_t i = 0; i < num_children; ++i) {
-    StringValue* str = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
-    if (str == NULL) return NULL;
-    total_size += str->len;
+    strs[i] = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
+    if (strs[i] == NULL) return NULL;
+    total_size += strs[i]->len;
   }
   e->result_.string_data.resize(total_size);
   e->result_.SyncStringVal();
   char* ptr = e->result_.string_val.ptr;
-  
+
   // Loop again to append the data.
   for (int32_t i = 0; i < num_children; ++i) {
-    StringValue* str = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
-    memcpy(ptr, str->ptr, str->len);
-    ptr += str->len;
+    memcpy(ptr, strs[i]->ptr, strs[i]->len);
+    ptr += strs[i]->len;
   }
   return &e->result_.string_val;
 }
@@ -547,25 +551,29 @@ void* StringFunctions::ConcatWs(Expr* e, TupleRow* row) {
   e->result_.string_data.clear();
   int32_t total_size = first->len;
   int32_t num_children = e->GetNumChildren();
+
+  // Pass through if there's only one argument
+  if (num_children == 1) return e->children()[0]->GetValue(row);
+
   // Loop once to compute the final size and reserve space.
+  StringValue* strs[num_children];
   for (int32_t i = 2; i < num_children; ++i) {
-      StringValue* str = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
-      if (str == NULL) return NULL;
-      total_size += sep->len + str->len;
+      strs[i] = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
+      if (strs[i] == NULL) return NULL;
+      total_size += sep->len + strs[i]->len;
     }
   e->result_.string_data.resize(total_size);
   e->result_.SyncStringVal();
   char* ptr = e->result_.string_val.ptr;
-  
+
   // Loop again to append the data.
   memcpy(ptr, first->ptr, first->len);
   ptr += first->len;
   for (int32_t i = 2; i < num_children; ++i) {
-    StringValue* str = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
     memcpy(ptr, sep->ptr, sep->len);
     ptr += sep->len;
-    memcpy(ptr, str->ptr, str->len);
-    ptr += str->len;
+    memcpy(ptr, strs[i]->ptr, strs[i]->len);
+    ptr += strs[i]->len;
   }
   return &e->result_.string_val;
 }
