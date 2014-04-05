@@ -250,7 +250,10 @@ public class PlanFragment {
   }
 
   public PlanFragmentId getId() { return fragmentId_; }
-  public PlanFragment getDestFragment() { return destNode_.getFragment(); }
+  public PlanFragment getDestFragment() {
+    if (destNode_ == null) return null;
+    return destNode_.getFragment();
+  }
   public ExchangeNode getDestNode() { return destNode_; }
   public DataPartition getDataPartition() { return dataPartition_; }
   public void setDataPartition(DataPartition dataPartition) {
