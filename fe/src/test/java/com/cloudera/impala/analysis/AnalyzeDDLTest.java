@@ -1239,4 +1239,19 @@ public class AnalyzeDDLTest extends AnalyzerTest {
               "functional.alltypes_view", qual.toUpperCase()));
     }
   }
+
+  @Test
+  public void TestShowPartitions() throws AnalysisException {
+    AnalyzesOk("show partitions functional.alltypes");
+    AnalysisError("show partitions baddb.alltypes",
+        "Database does not exist: baddb");
+    AnalysisError("show partitions functional.badtbl",
+        "Table does not exist: functional.badtbl");
+    AnalysisError("show partitions functional.alltypesnopart",
+        "Table is not partitioned: functional.alltypesnopart");
+    AnalysisError("show partitions functional.view_view",
+        "SHOW PARTITIONS not applicable to a view: functional.view_view");
+    AnalysisError("show partitions functional_hbase.alltypes",
+        "SHOW PARTITIONS must target an HDFS table: functional_hbase.alltypes");
+  }
 }

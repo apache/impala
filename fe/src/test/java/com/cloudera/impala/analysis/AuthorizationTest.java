@@ -825,17 +825,17 @@ public class AuthorizationTest {
       Assert.assertEquals(e.getMessage(), "Database does not exist: newdb");
     }
 
-    // Show table/column stats.
-    String[] statsQuals = new String[] { "table", "column" };
+    // Show partitions and show table/column stats.
+    String[] statsQuals = new String[] { "partitions", "table stats", "column stats" };
     for (String qual: statsQuals) {
-      AuthzOk(String.format("show %s stats functional.alltypesagg", qual));
-      AuthzOk(String.format("show %s stats functional.alltypes", qual));
+      AuthzOk(String.format("show %s functional.alltypesagg", qual));
+      AuthzOk(String.format("show %s functional.alltypes", qual));
       // User does not have access to db/table.
-      AuthzError(String.format("show %s stats nodb.tbl", qual),
+      AuthzError(String.format("show %s nodb.tbl", qual),
           "User '%s' does not have privileges to access: nodb.tbl");
-      AuthzError(String.format("show %s stats functional.badtbl", qual),
+      AuthzError(String.format("show %s functional.badtbl", qual),
           "User '%s' does not have privileges to access: functional.badtbl");
-      AuthzError(String.format("show %s stats functional_rc.alltypes", qual),
+      AuthzError(String.format("show %s functional_rc.alltypes", qual),
           "User '%s' does not have privileges to access: functional_rc.alltypes");
     }
   }

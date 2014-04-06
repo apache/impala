@@ -242,11 +242,11 @@ public class AuditingTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestShowStats() throws AnalysisException, AuthorizationException{
-    String[] statsQuals = new String[]{ "table", "column" };
+  public void TestShow() throws AnalysisException, AuthorizationException{
+    String[] statsQuals = new String[]{ "partitions", "table stats", "column stats" };
     for (String qual: statsQuals) {
       List<TAccessEvent> accessEvents =
-          AnalyzeAccessEvents(String.format("show %s stats functional.alltypes", qual));
+          AnalyzeAccessEvents(String.format("show %s functional.alltypes", qual));
       Assert.assertEquals(accessEvents, Lists.newArrayList(new TAccessEvent(
           "functional.alltypes", TCatalogObjectType.TABLE, "VIEW_METADATA")));
     }

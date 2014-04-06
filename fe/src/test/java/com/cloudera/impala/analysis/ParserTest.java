@@ -1213,6 +1213,11 @@ public class ParserTest {
     ParsesOk("SHOW COLUMN STATS db.tbl");
     ParsesOk("SHOW COLUMN STATS `db`.`tbl`");
 
+    // Show partitions
+    ParsesOk("SHOW PARTITIONS tbl");
+    ParsesOk("SHOW PARTITIONS db.tbl");
+    ParsesOk("SHOW PARTITIONS `db`.`tbl`");
+
     // Missing arguments
     ParserError("SHOW");
     // Malformed pattern (no quotes)

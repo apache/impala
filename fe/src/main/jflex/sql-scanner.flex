@@ -143,6 +143,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("parquetfile", new Integer(SqlParserSymbols.KW_PARQUETFILE));
     keywordMap.put("partition", new Integer(SqlParserSymbols.KW_PARTITION));
     keywordMap.put("partitioned", new Integer(SqlParserSymbols.KW_PARTITIONED));
+    keywordMap.put("partitions", new Integer(SqlParserSymbols.KW_PARTITIONS));
     keywordMap.put("prepare_fn", new Integer(SqlParserSymbols.KW_PREPARE_FN));
     keywordMap.put("rcfile", new Integer(SqlParserSymbols.KW_RCFILE));
     keywordMap.put("real", new Integer(SqlParserSymbols.KW_DOUBLE));

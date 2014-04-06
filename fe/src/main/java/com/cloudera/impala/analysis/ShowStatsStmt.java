@@ -22,8 +22,8 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TShowStatsParams;
 
 /**
- * Representation of a SHOW TABLE/COLUMN STATS statement for displaying
- * column and table statistics for a given table.
+ * Representation of a SHOW TABLE/COLUMN STATS statement for
+ * displaying column and table/partition statistics for a given table.
  */
 public class ShowStatsStmt extends StatementBase {
   protected final boolean isShowColStats_;
@@ -42,7 +42,7 @@ public class ShowStatsStmt extends StatementBase {
     return getSqlPrefix() + " " + tableName_.toString();
   }
 
-  private String getSqlPrefix() {
+  protected String getSqlPrefix() {
     return "SHOW " + ((isShowColStats_) ? "COLUMN" : "TABLE") + " STATS";
   }
 
