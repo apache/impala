@@ -504,7 +504,7 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance
   return query_status_;
 }
 
-void Coordinator::BuildPermissionCache(hdfsFS fs, const string& path_str,
+void Coordinator::PopulatePathPermissionCache(hdfsFS fs, const string& path_str,
     PermissionCache* permissions_cache) {
   // Find out if the path begins with a hdfs:// -style prefix, and remove it and the
   // location (e.g. host:port) if so.
@@ -533,9 +533,8 @@ void Coordinator::BuildPermissionCache(hdfsFS fs, const string& path_str,
   }
 
   // Now for each prefix, stat() it to see if a) it exists and b) if so what its
-  // permissions are. Every directory in prefix will be created if it isn't already, so
-  // when we meet a directory that doesn't exist, we record the fact that we need to
-  // create it, and the permissions of its parent dir to inherit.
+  // permissions are. When we meet a directory that doesn't exist, we record the fact that
+  // we need to create it, and the permissions of its parent dir to inherit.
   //
   // Every prefix is recorded in the PermissionCache so we don't do more than one stat()
   // for each path. If we need to create the directory, we record it as the pair (true,
@@ -630,7 +629,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
         // TODO: There's a potential race here between checking for the directory
         // and a third-party deleting it.
         if (FLAGS_insert_inherit_permissions) {
-          BuildPermissionCache(hdfs_connection, part_path, &permissions_cache);
+          PopulatePathPermissionCache(hdfs_connection, part_path, &permissions_cache);
         }
         if (hdfsExists(hdfs_connection, part_path.c_str()) != -1) {
           partition_create_ops.Add(DELETE_THEN_CREATE, part_path);
@@ -641,7 +640,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
       }
     } else {
       if (FLAGS_insert_inherit_permissions) {
-        BuildPermissionCache(hdfs_connection, part_path, &permissions_cache);
+        PopulatePathPermissionCache(hdfs_connection, part_path, &permissions_cache);
       }
       if (hdfsExists(hdfs_connection, part_path.c_str()) == -1) {
         partition_create_ops.Add(CREATE_DIR, part_path);

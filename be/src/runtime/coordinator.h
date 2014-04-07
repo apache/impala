@@ -410,18 +410,17 @@ class Coordinator {
   // a query -- remote fragments' profiles must not be updated while this is running.
   void ReportQuerySummary();
 
-  // Builds a map from a path in Hdfs to a pair (newly_created, permissions). Used to
-  // determine what the permissions of newly created directories should be if permission
-  // inheritance is enabled (and not called otherwise). The PermissionCache argument is
-  // used to avoid repeatedly calling hdfsGetPathInfo() on the same path. The caller
-  // (FinalizeSuccessfulInsert()) will iterate over the contents of the map after
-  // BuildPermissionCache() has been called for all created partitions and change the
-  // permissions for all directories for which newly_created == true.
-  //
-  // The permissions value is set to the permission of the lowest ancestor of path_str
-  // that actually exists.
+  // Determines what the permissions of directories created by INSERT statements should be
+  // if permission inheritance is enabled. Populates a map from all prefixes of path_str
+  // (including the full path itself) which is a path in Hdfs, to pairs (does_not_exist,
+  // permissions), where does_not_exist is true if the path does not exist in Hdfs. If
+  // does_not_exist is true, permissions is set to the permissions of the most immediate
+  // ancestor of the path that does exist, i.e. the permissions that the path should
+  // inherit when created. Otherwise permissions is set to the actual permissions of the
+  // path. The PermissionCache argument is also used to cache the output across repeated
+  // calls, to avoid repeatedly calling hdfsGetPathInfo() on the same path.
   typedef boost::unordered_map<std::string, std::pair<bool, short> > PermissionCache;
-  void BuildPermissionCache(hdfsFS fs, const std::string& path_str,
+  void PopulatePathPermissionCache(hdfsFS fs, const std::string& path_str,
       PermissionCache* permissions_cache);
 
 };
