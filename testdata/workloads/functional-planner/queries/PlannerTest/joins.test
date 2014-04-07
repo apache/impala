@@ -468,7 +468,7 @@ from functional.testtbl t1, functional.testtbl t2, functional.testtbl t3
 where t1.id = t3.id and t2.id = t3.id
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.id = t3.id, t2.id = t3.id
+|  hash predicates: t1.id = t3.id
 |
 |--02:SCAN HDFS [functional.testtbl t3]
 |     partitions=1/1 size=0B compact
@@ -485,7 +485,7 @@ where t1.id = t3.id and t2.id = t3.id
 07:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: t1.id = t3.id, t2.id = t3.id
+|  hash predicates: t1.id = t3.id
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -681,7 +681,7 @@ inner join [shuffle]
 on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 ---- PLAN
 05:HASH JOIN [INNER JOIN]
-|  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col, int_col = b.int_col, bool_col = b.bool_col
+|  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 size=478.45KB compact
@@ -702,9 +702,9 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 10:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 05:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col, int_col = b.int_col, bool_col = b.bool_col
+|  hash predicates: a.int_col = b.int_col, a.bool_col = b.bool_col
 |
-|--09:EXCHANGE [PARTITION=HASH(b.int_col,b.bool_col,b.int_col,b.bool_col)]
+|--09:EXCHANGE [PARTITION=HASH(b.int_col,b.bool_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 size=478.45KB
@@ -730,18 +730,130 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 size=478.45KB
 ====
-# tests that all predicates from the On-clause are applied (IMPALA-805)
+# Tests that all predicates from the On-clause are applied (IMPALA-805)
+# and that slot equivalences are enforced at lowest possible plan node.
 select 1 from functional.alltypes a
-join functional.alltypes b
-on a.int_col = b.id and a.int_col = b.int_col and a.smallint_col = b.int_col
+inner join functional.alltypes b
+# first equivalence class
+on a.id = b.id and a.id = b.int_col and a.id = b.bigint_col
+and a.tinyint_col = b.id and a.smallint_col = b.id
+and a.int_col = b.id and a.bigint_col = b.id
+# second equivalence class
+and b.string_col = a.string_col and b.date_string_col = a.string_col
+# redundant predicates to test minimal spanning tree of equivalent slots at a
+where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
-|  hash predicates: b.id = a.int_col, b.int_col = a.int_col, b.int_col = a.smallint_col
+|  hash predicates: b.id = a.id, b.string_col = a.string_col
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 size=478.45KB compact
+|     predicates: a.tinyint_col = a.smallint_col, a.int_col = a.bigint_col, a.id = a.tinyint_col, a.id = a.int_col
 |
 01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 size=478.45KB
+   predicates: b.id = b.int_col, b.id = b.bigint_col, b.string_col = b.date_string_col
+====
+# Tests that all predicates from the On-clause are applied (IMPALA-805).
+select 1 from functional.alltypes a
+left outer join functional.alltypes b
+# first equivalence class
+on a.id = b.id and a.id = b.int_col and a.id = b.bigint_col
+and a.tinyint_col = b.id and a.smallint_col = b.id
+and a.int_col = b.id and a.bigint_col = b.id
+# second equivalence class
+and b.string_col = a.string_col and b.date_string_col = a.string_col
+# redundant predicates to test minimal spanning tree of equivalent slots at a
+where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
+---- PLAN
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = b.id, a.id = b.int_col, a.id = b.bigint_col, a.tinyint_col = b.id, a.smallint_col = b.id, a.int_col = b.id, a.bigint_col = b.id, a.string_col = b.string_col, a.string_col = b.date_string_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 size=478.45KB compact
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+   predicates: a.tinyint_col = a.smallint_col, a.int_col = a.bigint_col
+====
+# Tests elimination of redundant join predicates (IMPALA-912).
+select * from
+functional.alltypes a
+inner join functional.alltypestiny b
+  on (a.id = b.id and a.int_col = b.int_col)
+inner join functional.alltypessmall c
+  on (b.id = c.id and b.int_col = c.int_col)
+# redundant join predicates
+where a.id = c.id and a.int_col = c.int_col
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = c.id, b.int_col = c.int_col
+|
+|--02:SCAN HDFS [functional.alltypessmall c]
+|     partitions=4/4 size=6.32KB compact
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.int_col = b.int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 size=460B compact
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+====
+# Tests elimination of redundant join predicates (IMPALA-912).
+# This test relies on the desired join order b,a,c which requires
+# inference of the predicate 'b.int_col = a.id' which makes one of
+# the original predicates redundant.
+select * from
+functional.alltypestiny a,
+functional.alltypes b,
+functional.alltypessmall c
+where a.id = c.id and b.int_col = c.int_col and b.int_col = c.id
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = c.id
+|
+|--02:SCAN HDFS [functional.alltypessmall c]
+|     partitions=4/4 size=6.32KB compact
+|     predicates: c.id = c.int_col
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.id
+|
+|--00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 size=460B compact
+|
+01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 size=478.45KB
+====
+# Tests elimination of redundant join predicates (IMPALA-912)
+# and that slot equivalences are enforced at the lowest possible plan node.
+select a.* from
+  (select int_col, smallint_col, count(*) c from functional.alltypes
+   group by 1, 2) a
+  inner join
+  (select int_col, smallint_col, count(*) c from functional.alltypessmall
+   group by 1, 2) b
+on a.int_col = b.int_col and a.int_col = b.smallint_col and a.int_col = b.c
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: int_col = int_col
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  group by: int_col, smallint_col
+|  |  having: int_col = count(*)
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: functional.alltypessmall.int_col = functional.alltypessmall.smallint_col
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: int_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
 # Regression test for IMPALA-935.

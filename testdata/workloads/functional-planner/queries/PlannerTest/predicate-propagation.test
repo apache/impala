@@ -1023,14 +1023,14 @@ on (t1.id = t2.month and t1.year = t2.year and t1.month = t2.month)
 where t2.year + t2.month > 10
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.id = t2.month, t1.year = t2.year, t1.month = t2.month
+|  hash predicates: t2.month = t1.id, t2.year = t1.year
 |
-|--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB compact
+|--00:SCAN HDFS [functional.alltypes t1]
+|     partitions=24/24 size=478.45KB compact
+|     predicates: t1.year + t1.id > 10, t1.id = t1.month
 |
-00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 size=478.45KB
-   predicates: t1.year + t1.id > 10
+01:SCAN HDFS [functional.alltypessmall t2]
+   partitions=4/4 size=6.32KB
 ====
 # TODO: Fix this limitation of our getBindingPredicates() implementation:
 # We use the first multi-slot mapping and not all non-redundant mappings, i.e.,
@@ -1044,11 +1044,11 @@ on (t1.id = t2.id
 where t1.id + t1.tinyint_col > 10
 ---- PLAN
 02:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.id = t2.id, t1.tinyint_col = t2.tinyint_col, t1.id = t2.smallint_col, t1.tinyint_col = t2.int_col
+|  hash predicates: t1.id = t2.id, t1.tinyint_col = t2.tinyint_col
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 size=6.32KB compact
-|     predicates: t2.id + t2.tinyint_col > 10
+|     predicates: t2.id + t2.tinyint_col > 10, t2.id = t2.smallint_col, t2.tinyint_col = t2.int_col
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 size=478.45KB

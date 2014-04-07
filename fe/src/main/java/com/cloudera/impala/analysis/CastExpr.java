@@ -47,8 +47,14 @@ public class CastExpr extends Expr {
     this.targetType_ = targetType;
     this.isImplicit_ = isImplicit;
     Preconditions.checkNotNull(e);
-    children_.add(e);
     if (isImplicit) {
+      // replace existing implicit casts
+      if (e instanceof CastExpr) {
+        CastExpr castExpr = (CastExpr) e;
+        if (castExpr.isImplicit()) e = castExpr.getChild(0);
+      }
+      children_.add(e);
+
       // Implicit casts don't call analyze()
       // TODO: this doesn't seem like the cleanest approach but there are places
       // we generate these (e.g. table loading) where there is no analyzer object.
@@ -60,6 +66,8 @@ public class CastExpr extends Expr {
           "Implicit casts should never throw analysis exception.");
       }
       isAnalyzed_ = true;
+    } else {
+      children_.add(e);
     }
   }
 

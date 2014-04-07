@@ -16,7 +16,6 @@ package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
@@ -51,7 +50,6 @@ import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Scan of a single single table. Currently limited to full-table scans.
@@ -114,6 +112,8 @@ public class HdfsScanNode extends ScanNode {
     // also add remaining unassigned conjuncts
     assignConjuncts(analyzer);
 
+    analyzer.enforceSlotEquivalences(tupleIds_.get(0), conjuncts_);
+
     // do partition pruning before deciding which slots to materialize,
     // we might end up removing some predicates
     prunePartitions(analyzer);
@@ -146,7 +146,7 @@ public class HdfsScanNode extends ScanNode {
       }
     }
     List<HdfsPartitionFilter> partitionFilters = Lists.newArrayList();
-    Set<Expr> filterConjuncts = Sets.newHashSet();
+    List<Expr> filterConjuncts = Lists.newArrayList();
     for (Expr conjunct: conjuncts_) {
       if (conjunct.isBoundBySlotIds(partitionSlots)) {
         partitionFilters.add(new HdfsPartitionFilter(conjunct, tbl_, analyzer));

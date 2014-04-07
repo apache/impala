@@ -17,6 +17,9 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
 
+/**
+ * Tuple identifier unique within a single query.
+ */
 public class TupleId extends Id<TupleId> {
   // Construction only allowed via an IdGenerator.
   protected TupleId(int id) {

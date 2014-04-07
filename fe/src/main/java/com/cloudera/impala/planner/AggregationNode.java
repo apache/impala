@@ -122,6 +122,8 @@ public class AggregationNode extends PlanNode {
 
       // also add remaining unassigned conjuncts_
       assignConjuncts(analyzer);
+
+      analyzer.enforceSlotEquivalences(tupleIds_.get(0), conjuncts_, groupBySlots);
     }
     computeMemLayout(analyzer);
     // do this at the end so it can take all conjuncts into account

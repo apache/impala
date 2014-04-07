@@ -35,6 +35,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.JoinOperator;
+import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
@@ -50,7 +51,6 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -1604,14 +1604,14 @@ public class Planner {
         continue;
       }
 
-      // ignore predicates that express an equivalence relationship if that
-      // relationship is already captured via another predicate; we still
-      // return those predicates in joinPredicates so they get marked as assigned
-      // TODO: The code block below is not quite correct because it only selects
-      // a *single* predicate per equivalence class. Instead, we must select
-      // a minimal set of predicates that are able to express the equivalence
-      // class (the minimal spanning tree).
-      /*
+      // Ignore predicates that express a redundant equivalence relationship. We assume
+      // that for each equivalence class, the equivalences between slots from only the
+      // lhs or rhs are already enforced by predicates in the lhs/rhs plan trees,
+      // respectively (see Analyzer.enforceSlotEquivalences()). Therefore, it is
+      // sufficient to establish equivalence between the lhs and rhs slots by assigning
+      // a single join predicate per equivalence class, i.e., any join predicates beyond
+      // that are redundant. We still return those predicates in joinPredicates so they
+      // get marked as assigned.
       Pair<SlotId, SlotId> joinSlots = ((Predicate) e).getEqSlots();
       if (joinSlots != null) {
         EquivalenceClassId id1 = analyzer.getEquivClassId(joinSlots.first);
@@ -1626,7 +1626,6 @@ public class Planner {
         }
         joinEquivClasses.add(id1);
       }
-      */
 
       // e is a non-redundant join predicate
       Preconditions.checkState(lhsExpr != rhsExpr);
@@ -1642,20 +1641,10 @@ public class Planner {
     for (SlotDescriptor slotDesc: rhs.getDesc().getSlots()) {
       analyzer.getEquivSlots(slotDesc.getId(), lhsIds, lhsSlotIds);
       if (!lhsSlotIds.isEmpty()) {
-        SlotId lhsSlotId = lhsSlotIds.get(0);
         // construct a BinaryPredicates in order to get correct casting;
         // we only do this for one of the equivalent slots, all the other implied
         // equalities are redundant
-        BinaryPredicate pred = new BinaryPredicate(BinaryPredicate.Operator.EQ,
-            new SlotRef(analyzer.getDescTbl().getSlotDesc(lhsSlotId)),
-            new SlotRef(analyzer.getDescTbl().getSlotDesc(slotDesc.getId())));
-        // analyze() creates casts, if needed
-        try {
-          pred.analyze(analyzer);
-        } catch(AnalysisException e) {
-          throw new IllegalStateException(
-              "constructed predicate failed analysis: " + pred.toSql());
-        }
+        Expr pred = analyzer.createEqPredicate(lhsSlotIds.get(0), slotDesc.getId());
         joinConjuncts.add(new Pair<Expr, Expr>(pred.getChild(0), pred.getChild(1)));
       }
     }
