@@ -226,25 +226,20 @@ public class HdfsTable extends Table {
           // Loop over all blocks in the file.
           for (BlockLocation block: locations) {
             Preconditions.checkNotNull(block);
-
+            // Get the location of all block replicas in ip:port format.
             String[] blockHostPorts = block.getNames();
-            try {
-              blockHostPorts = block.getNames();
-            } catch (IOException e) {
-              // this shouldn't happen, getNames() doesn't throw anything
-              String errorMsg = "BlockLocation.getNames() failed:\n" + e.getMessage();
-              LOG.error(errorMsg);
-              throw new IllegalStateException(errorMsg);
-            }
 
-            // Get the list of hosts this block is cached on.
-            Set<String> cachedHosts = Sets.newHashSet();
-            String[] hdfsCachedHosts = block.getCachedHosts();
-            if (hdfsCachedHosts != null) {
-              cachedHosts.addAll(Arrays.asList(hdfsCachedHosts));
-            }
+            // Get the hostnames for all block replicas. Used to resolve which hosts
+            // contain cached data. The results are returned in the same order as
+            // block.getNames() so it allows us to match a host specified as ip:port
+            // to corresponding hostname using the same array index.
+            String[] blockHostNames = block.getHosts();
+            Preconditions.checkState(blockHostNames.length == blockHostPorts.length);
 
-            Preconditions.checkState(cachedHosts.size() <= blockHostPorts.length);
+            // Get the hostnames that contain cached replicas of this block.
+            Set<String> cachedHosts =
+                Sets.newHashSet(Arrays.asList(block.getCachedHosts()));
+            Preconditions.checkState(cachedHosts.size() <= blockHostNames.length);
 
             // Now enumerate all replicas of the block, adding any unknown hosts
             // to hostMap_/hostList_. The host ID (index in to the hostList_) for each
@@ -264,7 +259,7 @@ public class HdfsTable extends Table {
                 hostIdx = hostList_.size() - 1;
               }
               blockReplicas.add(new BlockReplica(hostIdx,
-                  cachedHosts.contains(networkAddress.getHostname())));
+                  cachedHosts.contains(blockHostNames[i])));
             }
             FileBlock fileBlock =
                 new FileBlock(block.getOffset(), block.getLength(), blockReplicas);
