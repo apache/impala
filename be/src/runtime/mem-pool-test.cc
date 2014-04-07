@@ -208,6 +208,14 @@ TEST(MemPoolTest, ReturnPartial) {
   p.FreeAll();
 }
 
+// Utility class to call private functions on MemPool.
+class MemPoolTest {
+ public:
+  static bool CheckIntegrity(MemPool* pool, bool current_chunk_empty) {
+    return pool->CheckIntegrity(current_chunk_empty);
+  }
+};
+
 TEST(MemPoolTest, Limits) {
   MemTracker limit3(320);
   MemTracker limit1(160, "", &limit3);
@@ -251,6 +259,25 @@ TEST(MemPoolTest, Limits) {
   EXPECT_EQ(limit1.consumption(), 0);
   EXPECT_EQ(limit2.consumption(), 160);
   EXPECT_EQ(limit3.consumption(), 160);
+
+  // Allocate 160 bytes from 240 byte limit.
+  p2->FreeAll();
+  EXPECT_FALSE(limit2.LimitExceeded());
+  uint8_t* result = p2->TryAllocate(160);
+  DCHECK(result != NULL);
+  DCHECK(MemPoolTest::CheckIntegrity(p2, false));
+
+  // Try To allocate another 160 bytes, this should fail.
+  result = p2->TryAllocate(160);
+  DCHECK(result == NULL);
+  DCHECK(MemPoolTest::CheckIntegrity(p2, false));
+
+  // Try To allocate 20 bytes, this should succeed. TryAllocate() should leave the
+  // pool in a functional state..
+  result = p2->TryAllocate(20);
+  DCHECK(result != NULL);
+  DCHECK(MemPoolTest::CheckIntegrity(p2, false));
+
 
   p2->FreeAll();
   delete p2;

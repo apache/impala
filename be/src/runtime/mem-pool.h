@@ -177,6 +177,7 @@ class MemPool {
   static const char* LLVM_CLASS_NAME;
 
  private:
+  friend class MemPoolTest;
   static const int DEFAULT_INITIAL_CHUNK_SIZE = 4 * 1024;
 
   struct ChunkInfo {

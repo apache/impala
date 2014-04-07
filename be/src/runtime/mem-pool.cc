@@ -120,7 +120,13 @@ bool MemPool::FindChunk(int min_size, bool check_limits) {
     chunk_size = ::max(min_size, chunk_size);
 
     if (check_limits) {
-      if (!mem_tracker_->TryConsume(chunk_size)) return false;
+      if (!mem_tracker_->TryConsume(chunk_size)) {
+        // We couldn't allocate a new chunk so current_chunk_idx_ is now be past the
+        // end of chunks_.
+        DCHECK_EQ(current_chunk_idx_, static_cast<int>(chunks_.size()));
+        current_chunk_idx_ = static_cast<int>(chunks_.size()) - 1;
+        return false;
+      }
     } else {
       mem_tracker_->Consume(chunk_size);
     }
@@ -253,6 +259,7 @@ int64_t MemPool::GetTotalChunkSizes() const {
 
 bool MemPool::CheckIntegrity(bool current_chunk_empty) {
   // check that current_chunk_idx_ points to the last chunk with allocated data
+  DCHECK_LT(current_chunk_idx_, static_cast<int>(chunks_.size()));
   int64_t total_allocated = 0;
   for (int i = 0; i < chunks_.size(); ++i) {
     DCHECK_GT(chunks_[i].size, 0);
