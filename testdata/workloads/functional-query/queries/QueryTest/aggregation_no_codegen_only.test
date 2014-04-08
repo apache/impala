@@ -1,6 +1,6 @@
 ====
-# Regression test for IMPALA-901.
 ---- QUERY
+# Regression test for IMPALA-901.
 DROP TABLE IF EXISTS functional.imp_901;
 CREATE TABLE functional.imp_901 (col tinyint);
 # The second value is carefully chosen to be equal to (int8_t)HashUtil::FNV_SEED, which

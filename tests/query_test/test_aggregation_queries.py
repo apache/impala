@@ -22,6 +22,7 @@ class TestAggregationQueries(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(
       create_exec_option_dimension(disable_codegen_options=[False, True]))
 
+  @pytest.mark.execute_serially
   def test_non_codegen_tinyint_grouping(self, vector):
     # Regression for IMPALA-901. The test includes an INSERT statement, so can only be run
     # on INSERT-able formats - text only in this case, since the bug doesn't depend on the
