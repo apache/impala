@@ -24,12 +24,12 @@
 using namespace std;
 
 namespace impala {
-  
+
 double Benchmark::Measure(BenchmarkFunction function, void* args,
     int max_time, int batch_size) {
   int64_t target_cycles = CpuInfo::cycles_per_ms() * max_time;
   int64_t iters = 0;
-  
+
   // Run it with the default batch size to roughly estimate how many iterations
   // it will take
   StopWatch sw;
@@ -61,7 +61,11 @@ double Benchmark::Measure(BenchmarkFunction function, void* args,
   return iters / ms_elapsed;
 }
 
-Benchmark::Benchmark(const string& name) : name_(name) {}
+Benchmark::Benchmark(const string& name) : name_(name) {
+#ifndef NDEBUG
+  LOG(ERROR) << "WARNING: Running benchmark in DEBUG mode.";
+#endif
+}
 
 int Benchmark::AddBenchmark(const string& name, BenchmarkFunction fn, void* args,
     int baseline_idx) {
@@ -106,13 +110,13 @@ string Benchmark::Measure() {
   for (int i = 0; i < benchmarks_.size(); ++i) {
     double base_line = benchmarks_[benchmarks_[i].baseline_idx].rate;
     if (previous_baseline_idx != benchmarks_[i].baseline_idx && i > 0) ss << endl;
-    ss << setw(function_out_width) << benchmarks_[i].name 
-       << setw(rate_out_width) << setprecision(4) << benchmarks_[i].rate 
-       << setw(comparison_out_width - 1) << setprecision(4) 
+    ss << setw(function_out_width) << benchmarks_[i].name
+       << setw(rate_out_width) << setprecision(4) << benchmarks_[i].rate
+       << setw(comparison_out_width - 1) << setprecision(4)
        << (benchmarks_[i].rate / base_line) << "X" << endl;
     previous_baseline_idx = benchmarks_[i].baseline_idx;
   }
-  
+
   return ss.str();
 }
 

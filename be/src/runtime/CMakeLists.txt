@@ -36,6 +36,7 @@ add_library(Runtime STATIC
   lib-cache.cc
   mem-tracker.cc
   mem-pool.cc
+  multi-precision.cc
   parallel-executor.cc
   plan-fragment-executor.cc
   types.cc

@@ -35,20 +35,40 @@
 
 namespace impala {
 
-// Define 96 bit int type.
-typedef boost::multiprecision::number<
-    boost::multiprecision::cpp_int_backend<96, 96,
-    boost::multiprecision::signed_magnitude,
-    boost::multiprecision::unchecked, void> > int96_t;
-
-// The header already defines int128_t, but redefine it in our namespace
-typedef boost::multiprecision::int128_t int128_t;
+// We use the c++ int128_t type. This is stored using 16 bytes and very performant.
+typedef __int128_t int128_t;
 
 // Define 256 bit int type.
 typedef boost::multiprecision::number<
     boost::multiprecision::cpp_int_backend<256, 256,
     boost::multiprecision::signed_magnitude,
     boost::multiprecision::unchecked, void> > int256_t;
+
+// There is no implicit assignment from int128_t to int256_t (or in general, the boost
+// multi precision types and __int128_t).
+// TODO: look into the perf of this. I think the boost library is very slow with bitwise
+// ops but reasonably fast with arithmetic ops so different implementations of this
+// could have big perf differences.
+inline int256_t ConvertToInt256(const int128_t& x) {
+  if (x < 0) {
+    uint64_t hi = static_cast<uint64_t>(-x >> 64);
+    uint64_t lo = static_cast<uint64_t>(-x);
+    int256_t v = hi;
+    v <<= 64;
+    v |= lo;
+    return -v;
+  } else {
+    uint64_t hi = static_cast<uint64_t>(x >> 64);
+    uint64_t lo = static_cast<uint64_t>(x);
+    int256_t v = hi;
+    v <<= 64;
+    v |= lo;
+    return v;
+  }
+}
+
+// Prints v in base 10.
+std::ostream& operator<<(std::ostream& os, const int128_t& val);
 
 }
 

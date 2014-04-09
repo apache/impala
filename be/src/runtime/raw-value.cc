@@ -167,7 +167,7 @@ int RawValue::Compare(const void* v1, const void* v2, const ColumnType& type) {
         case 8:
           return reinterpret_cast<const Decimal8Value*>(v1)->Compare(
                  *reinterpret_cast<const Decimal8Value*>(v2));
-        case 24:
+        case 16:
           return reinterpret_cast<const Decimal16Value*>(v1)->Compare(
                  *reinterpret_cast<const Decimal16Value*>(v2));
         default:

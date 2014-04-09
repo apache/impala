@@ -117,7 +117,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         case 12:
           DCHECK(false) << "Planner should not generate this.";
           break;
-        case 24:
+        case 16:
           *reinterpret_cast<Decimal16Value*>(slot) =
               StringParser::StringToDecimal<int128_t>(
                   data, len, slot_desc->type(), &parse_result);

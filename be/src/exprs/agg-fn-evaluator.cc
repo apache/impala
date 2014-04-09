@@ -239,7 +239,7 @@ inline void AggFnEvaluator::SetAnyVal(const void* slot,
           reinterpret_cast<DecimalVal*>(dst)->val8 =
               reinterpret_cast<const Decimal8Value*>(slot)->value();
           return;
-        case 24:
+        case 16:
           reinterpret_cast<DecimalVal*>(dst)->val16 = reinterpret_cast<
               const Decimal16Value*>(slot)->value();
           return;
@@ -301,7 +301,7 @@ inline void AggFnEvaluator::SetOutputSlot(const AnyVal* src, Tuple* dst) {
           *reinterpret_cast<Decimal8Value*>(slot) =
               Decimal8Value(reinterpret_cast<const DecimalVal*>(src)->val8);
           return;
-        case 24:
+        case 16:
           *reinterpret_cast<Decimal16Value*>(slot) =
               Decimal16Value(reinterpret_cast<const DecimalVal*>(src)->val16);
           return;

@@ -157,7 +157,7 @@ class DecimalValue {
     int128_t x = DecimalUtil::MultiplyByScale<RESULT_T>(value(), scale_by);
     int128_t y = other.value();
     int128_t r = x / y;
-    return DecimalValue<RESULT_T>(r.convert_to<RESULT_T>());
+    return DecimalValue<RESULT_T>(static_cast<RESULT_T>(r));
   }
 
   // is_nan is set to true if 'other' is 0. The value returned is undefined.
@@ -276,10 +276,10 @@ inline Decimal16Value Decimal8ToDecimal16(const Decimal8Value& v) {
   return Decimal16Value(static_cast<int128_t>(v.value()));
 }
 inline Decimal4Value Decimal16ToDecimal4(const Decimal16Value& v) {
-  return Decimal4Value(v.value().convert_to<int32_t>());
+  return Decimal4Value(static_cast<int32_t>(v.value()));
 }
 inline Decimal8Value Decimal16ToDecimal8(const Decimal16Value& v) {
-  return Decimal8Value(v.value().convert_to<int64_t>());
+  return Decimal8Value(static_cast<int64_t>(v.value()));
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Decimal4Value& d) {
@@ -316,8 +316,14 @@ inline int Decimal8Value::Compare(const ColumnType& this_type,
 template <>
 inline int Decimal16Value::Compare(const ColumnType& this_type,
     const Decimal16Value& other, const ColumnType& other_type) const {
-  int256_t x, y;
-  AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
+  int256_t x = ConvertToInt256(this->value());
+  int256_t y = ConvertToInt256(other.value());
+  int delta_scale = this_type.scale - other_type.scale;
+  if (delta_scale > 0) {
+    y = DecimalUtil::MultiplyByScale<int256_t>(y, delta_scale);
+  } else if (delta_scale < 0) {
+    x = DecimalUtil::MultiplyByScale<int256_t>(x, -delta_scale);
+  }
   if (x == y) return 0;
   if (x < y) return -1;
   return 1;
@@ -335,12 +341,7 @@ inline std::string DecimalValue<T>::ToString(const ColumnType& type) const {
     ss << "." << std::right << std::setw(type.scale) << std::setfill('0') << after;
   }
   return ss.str();
-}
-
-// Returns an approximate double for this decimal.
-template<>
-inline double Decimal16Value::ToDouble(const ColumnType& type) const {
-  return value_.convert_to<double>() / powf(10.0, type.scale);
+  return "";
 }
 
 }

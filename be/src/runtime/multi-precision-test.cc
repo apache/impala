@@ -23,10 +23,46 @@ using namespace std;
 
 namespace impala {
 
+TEST(MultiPrecisionIntTest, Conversion) {
+  int128_t x = 0;
+  int256_t y = 0;
+  EXPECT_TRUE(ConvertToInt256(x) == 0);
+
+  x = -1;
+  EXPECT_TRUE(ConvertToInt256(x) == -1);
+
+  x = 1;
+  EXPECT_TRUE(ConvertToInt256(x) == 1);
+
+  x = numeric_limits<int32_t>::max();
+  EXPECT_TRUE(ConvertToInt256(x) == numeric_limits<int32_t>::max());
+
+  x = numeric_limits<int32_t>::min();
+  EXPECT_TRUE(ConvertToInt256(x) == numeric_limits<int32_t>::min());
+
+  x = numeric_limits<int64_t>::max();
+  EXPECT_TRUE(ConvertToInt256(x) == numeric_limits<int64_t>::max());
+
+  x = numeric_limits<int64_t>::min();
+  EXPECT_TRUE(ConvertToInt256(x) == numeric_limits<int64_t>::min());
+
+  x = numeric_limits<int64_t>::max();
+  x *= 1000;
+  y = numeric_limits<int64_t>::max();
+  y *= 1000;
+  EXPECT_TRUE(ConvertToInt256(x) == y);
+
+  x = -numeric_limits<int64_t>::max();
+  x *= 1000;
+  y = -numeric_limits<int64_t>::max();
+  y *= 1000;
+  EXPECT_TRUE(ConvertToInt256(x) == y);
+}
+
 // Simple example of adding and subtracting numbers that use more than
 // 64 bits.
 TEST(MultiPrecisionIntTest, Example) {
-  int128_t v128;
+  int128_t v128 = 0;
   v128 += int128_t(numeric_limits<uint64_t>::max());
   v128 += int128_t(numeric_limits<uint64_t>::max());
 
@@ -35,16 +71,6 @@ TEST(MultiPrecisionIntTest, Example) {
 
   v128 -= int128_t(numeric_limits<uint64_t>::max());
   EXPECT_EQ(v128, 0);
-
-  int96_t v96;
-  v96 += int96_t(numeric_limits<uint64_t>::max());
-  v96 += int96_t(numeric_limits<uint64_t>::max());
-
-  v96 -= int96_t(numeric_limits<uint64_t>::max());
-  EXPECT_EQ(v96, numeric_limits<uint64_t>::max());
-
-  v96 -= int96_t(numeric_limits<uint64_t>::max());
-  EXPECT_EQ(v96, 0);
 }
 
 // Example taken from:

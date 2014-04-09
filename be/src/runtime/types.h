@@ -39,7 +39,7 @@ enum PrimitiveType {
   TYPE_DATE,        // Not implemented
   TYPE_DATETIME,    // Not implemented
   TYPE_BINARY,      // Not implemented
-  TYPE_DECIMAL,     // Not implemented
+  TYPE_DECIMAL,
 
   // This is minimally supported currently. It can't be returned to the user or
   // parsed from scan nodes. It can be returned from exprs and must be consumable
@@ -174,7 +174,7 @@ struct ColumnType {
     DCHECK_GT(precision, 0);
     if (precision <= 9) return 4;
     if (precision <= 19) return 8;
-    return 24;
+    return 16;
   }
 
   std::string DebugString() const;

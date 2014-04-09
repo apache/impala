@@ -37,7 +37,7 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, int64_t val) {
     case 8:
       e->result_.decimal8_val = Decimal8Value(val);
       return &e->result_.decimal8_val;
-    case 24:
+    case 16:
       e->result_.decimal16_val = Decimal16Value(val);
       return &e->result_.decimal16_val;
     default:
@@ -61,7 +61,7 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, double val) {
       } else {
         return NULL;
       }
-    case 24:
+    case 16:
       if (Decimal16Value::FromDouble(e->type(), val, &e->result_.decimal16_val)) {
         return &e->result_.decimal16_val;
       } else {
@@ -86,7 +86,7 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
       e->result_.decimal8_val = val8.ScaleTo(val_type, e->type());
       return &e->result_.decimal8_val;
     }
-    case 24: {
+    case 16: {
       Decimal16Value val16 = Decimal4ToDecimal16(val);
       e->result_.decimal16_val = val16.ScaleTo(val_type, e->type());
       return &e->result_.decimal16_val;
@@ -110,7 +110,7 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
     case 8:
       e->result_.decimal8_val = val.ScaleTo(val_type, e->type());
       return &e->result_.decimal8_val;
-    case 24: {
+    case 16: {
       Decimal16Value val16 = Decimal8ToDecimal16(val);
       e->result_.decimal16_val = val16.ScaleTo(val_type, e->type());
       return &e->result_.decimal16_val;
@@ -135,7 +135,7 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
       e->result_.decimal8_val = val8.ScaleTo(val_type, e->type());
       return &e->result_.decimal8_val;
     }
-    case 24:
+    case 16:
       e->result_.decimal16_val = val.ScaleTo(val_type, e->type());
       return &e->result_.decimal16_val;
     default:
@@ -148,7 +148,7 @@ static inline Decimal4Value GetDecimal4Val(void* v, const ColumnType& type) {
   switch (type.GetByteSize()) {
     case 4: return *reinterpret_cast<Decimal4Value*>(v);
     case 8: return Decimal8ToDecimal4(*reinterpret_cast<Decimal8Value*>(v));
-    case 24: return Decimal16ToDecimal4(*reinterpret_cast<Decimal16Value*>(v));
+    case 16: return Decimal16ToDecimal4(*reinterpret_cast<Decimal16Value*>(v));
     default:
       DCHECK(false);
       break;
@@ -161,7 +161,7 @@ static inline Decimal8Value GetDecimal8Val(void* v, const ColumnType& type) {
   switch (type.GetByteSize()) {
     case 4: return Decimal4ToDecimal8(*reinterpret_cast<Decimal4Value*>(v));
     case 8: return *reinterpret_cast<Decimal8Value*>(v);
-    case 24: return Decimal16ToDecimal8(*reinterpret_cast<Decimal16Value*>(v));
+    case 16: return Decimal16ToDecimal8(*reinterpret_cast<Decimal16Value*>(v));
     default:
       DCHECK(false);
       break;
@@ -174,7 +174,7 @@ static inline Decimal16Value GetDecimal16Val(void* v, const ColumnType& type) {
   switch (type.GetByteSize()) {
     case 4: return Decimal4ToDecimal16(*reinterpret_cast<Decimal4Value*>(v));
     case 8: return Decimal8ToDecimal16(*reinterpret_cast<Decimal8Value*>(v));
-    case 24: return *reinterpret_cast<Decimal16Value*>(v);
+    case 16: return *reinterpret_cast<Decimal16Value*>(v);
     default:
       DCHECK(false);
       break;
@@ -216,9 +216,9 @@ static inline Decimal16Value GetDecimal16Val(void* v, const ColumnType& type) {
         result = static_cast<TYPE>(\
             reinterpret_cast<Decimal8Value*>(v)->whole_part(c->type()));\
         break;\
-      case 24:\
-        result = reinterpret_cast<\
-            Decimal16Value*>(v)->whole_part(c->type()).convert_to<TYPE>();\
+      case 16:\
+        result = static_cast<TYPE>(\
+            reinterpret_cast<Decimal16Value*>(v)->whole_part(c->type()));\
         break;\
       default:\
         return NULL;\
@@ -275,7 +275,7 @@ void* DecimalOperators::Cast_decimal_decimal(Expr* e, TupleRow* row) {
       return SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal4Value*>(v));
     case 8:
       return SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal8Value*>(v));
-    case 24:
+    case 16:
       return SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal16Value*>(v));
     default:
       return NULL;
@@ -303,7 +303,7 @@ void* DecimalOperators::Cast_StringValue_decimal(Expr* e, TupleRow* row) {
           sv->ptr, sv->len, e->type(), &result);
       ptr = &e->result_.decimal8_val;
       break;
-    case 24:
+    case 16:
       e->result_.decimal16_val = StringParser::StringToDecimal<int128_t>(
           sv->ptr, sv->len, e->type(), &result);
       ptr = &e->result_.decimal16_val;
@@ -327,7 +327,7 @@ void* DecimalOperators::Cast_decimal_StringValue(Expr* e, TupleRow* row) {
     case 8:
       result = reinterpret_cast<Decimal8Value*>(v)->ToString(c->type());
       break;
-    case 24:
+    case 16:
       result = reinterpret_cast<Decimal16Value*>(v)->ToString(c->type());
       break;
     default:
@@ -362,7 +362,7 @@ void* DecimalOperators::Cast_decimal_StringValue(Expr* e, TupleRow* row) {
             x_val.OP_FN<int64_t>(c1->type(), y_val, c2->type(), e->type().scale);\
         return &e->result_.decimal8_val;\
       }\
-      case 24: {\
+      case 16: {\
         Decimal16Value x_val = GetDecimal16Val(x, c1->type());\
         Decimal16Value y_val = GetDecimal16Val(y, c2->type());\
         e->result_.decimal16_val =\
@@ -403,7 +403,7 @@ void* DecimalOperators::Cast_decimal_StringValue(Expr* e, TupleRow* row) {
         if (is_nan) return NULL;\
         return &e->result_.decimal8_val;\
       }\
-      case 24: {\
+      case 16: {\
         Decimal16Value x_val = GetDecimal16Val(x, c1->type());\
         Decimal16Value y_val = GetDecimal16Val(y, c2->type());\
         e->result_.decimal16_val = x_val.OP_FN<int128_t>(\
@@ -441,7 +441,7 @@ void* DecimalOperators::Cast_decimal_StringValue(Expr* e, TupleRow* row) {
         e->result_.bool_val = x_val.OP_FN(c1->type(), y_val, c2->type());\
         return &e->result_.bool_val;\
       }\
-      case 24: {\
+      case 16: {\
         Decimal16Value x_val = GetDecimal16Val(x, c1->type());\
         Decimal16Value y_val = GetDecimal16Val(y, c2->type());\
         e->result_.bool_val = x_val.OP_FN(c1->type(), y_val, c2->type());\

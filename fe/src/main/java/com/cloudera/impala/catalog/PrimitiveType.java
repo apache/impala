@@ -41,8 +41,8 @@ public enum PrimitiveType {
   // Unsupported scalar type.
   BINARY("BINARY", -1, TPrimitiveType.BINARY),
 
-  // For decimal at the highest precision, the BE uses 24 bytes.
-  DECIMAL("DECIMAL", 24, TPrimitiveType.DECIMAL),
+  // For decimal at the highest precision, the BE uses 16 bytes.
+  DECIMAL("DECIMAL", 16, TPrimitiveType.DECIMAL),
 
   // Fixed length char array.
   CHAR("CHAR", -1, TPrimitiveType.CHAR);

@@ -28,18 +28,16 @@ public class TypesUtil {
   /**
    * [1-9] precision -> 4 bytes
    * [10-19] precision -> 8 bytes
-   * [20-38] precision -> 24 bytes
-   * TODO:
-   * At 38 digits of precision, this only requires 16 bytes but the backend
-   * library currently uses 8 additional bytes. Also, for precision [20-28],
-   * we could support a 12 byte decimal but currently a 12 byte decimal in
-   * the BE still takes 24 bytes due to the padding.
+   * [20-38] precision -> 16 bytes
+   * TODO: Support 12 byte decimal?
+   * For precision [20-28], we could support a 12 byte decimal but currently a 12
+   * byte decimal in the BE is not implemented.
    */
   public static int getDecimalSlotSize(ColumnType type) {
     Preconditions.checkState(type.isFullySpecifiedDecimal());
     if (type.decimalPrecision() <= 9) return 4;
     if (type.decimalPrecision() <= 19) return 8;
-    return 24;
+    return 16;
   }
 
   /**

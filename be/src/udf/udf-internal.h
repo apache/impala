@@ -36,10 +36,10 @@ struct DecimalVal : public impala_udf::AnyVal {
   union {
     int32_t val4;
     int64_t val8;
+    int128_t val16;
   };
-  int128_t val16;
 
-  DecimalVal() : val8(0), val16(0) {}
+  DecimalVal() : val16(0) {}
   DecimalVal(int32_t v) : val4(v) {}
   DecimalVal(int64_t v) : val8(v) {}
   DecimalVal(int128_t v) : val16(v) {}

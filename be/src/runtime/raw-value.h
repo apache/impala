@@ -140,7 +140,7 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
         case 8:
           return reinterpret_cast<const Decimal8Value*>(v1)->value()
               == reinterpret_cast<const Decimal8Value*>(v2)->value();
-        case 24:
+        case 16:
           return reinterpret_cast<const Decimal16Value*>(v1)->value()
               == reinterpret_cast<const Decimal16Value*>(v2)->value();
         default:
@@ -266,7 +266,7 @@ inline void RawValue::PrintValue(const void* value, const ColumnType& type, int 
         case 8:
           *stream << reinterpret_cast<const Decimal8Value*>(value)->ToString(type);
           break;
-        case 24:
+        case 16:
           *stream << reinterpret_cast<const Decimal16Value*>(value)->ToString(type);
           break;
         default:
