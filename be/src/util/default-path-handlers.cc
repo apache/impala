@@ -61,11 +61,10 @@ struct Tags {
 // Writes the last FLAGS_web_log_bytes of the INFO logfile to a webpage
 // Note to get best performance, set GLOG_logbuflevel=-1 to prevent log buffering
 void LogsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
-  bool as_text = (args.find("raw") != args.end());
-  Tags tags(as_text);
+  Tags tags(args.find("raw") != args.end());
   string logfile;
   impala::GetFullLogFilename(google::INFO, &logfile);
-  (*output) << tags.header <<"INFO logs" << tags.end_header << endl;
+  (*output) << tags.header << "INFO logs" << tags.end_header << endl;
   (*output) << "Log path is: " << logfile << endl;
 
   struct stat file_stat;
@@ -89,8 +88,7 @@ void LogsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
 
 // Registered to handle "/flags", and prints out all command-line flags and their values
 void FlagsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
-  bool as_text = (args.find("raw") != args.end());
-  Tags tags(as_text);
+  Tags tags(args.find("raw") != args.end());
   (*output) << tags.header << "Command-line Flags" << tags.end_header;
   (*output) << tags.pre_tag << CommandlineFlagsIntoString() << tags.end_pre_tag;
 }
@@ -98,8 +96,7 @@ void FlagsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
 // Registered to handle "/memz", and prints out memory allocation statistics.
 void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args,
     stringstream* output) {
-  bool as_text = (args.find("raw") != args.end());
-  Tags tags(as_text);
+  Tags tags(false);
 
   DCHECK(mem_tracker != NULL);
   (*output) << tags.pre_tag
@@ -132,19 +129,19 @@ void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args
   }
 }
 
-void impala::AddDefaultPathHandlers(
+void impala::AddDefaultUrlCallbacks(
     Webserver* webserver, MemTracker* process_mem_tracker) {
-  webserver->RegisterPathHandler("/logs", LogsHandler);
-  webserver->RegisterPathHandler("/varz", FlagsHandler);
+  webserver->RegisterHtmlUrlCallback("/logs", LogsHandler);
+  webserver->RegisterHtmlUrlCallback("/varz", FlagsHandler);
   if (process_mem_tracker != NULL) {
-    webserver->RegisterPathHandler("/memz",
+    webserver->RegisterHtmlUrlCallback("/memz",
         bind<void>(&MemUsageHandler, process_mem_tracker, _1, _2));
   }
 
 #ifndef ADDRESS_SANITIZER
   // Remote (on-demand) profiling is disabled if the process is already being profiled.
   if (!FLAGS_enable_process_lifetime_heap_profiling) {
-    AddPprofPathHandlers(webserver);
+    AddPprofUrlCallbacks(webserver);
   }
 #endif
 }

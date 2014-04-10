@@ -21,10 +21,15 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/thread/locks.hpp>
+#include <gutil/strings/substitute.h>
 #include <map>
+#include <fstream>
 #include <stdio.h>
 #include <signal.h>
 #include <string>
+#include <mustache/mustache.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
 
 #include "common/logging.h"
 #include "util/cpu-info.h"
@@ -33,12 +38,16 @@
 #include "util/os-info.h"
 #include "util/url-coding.h"
 #include "util/debug-util.h"
+#include "util/stopwatch.h"
 #include "rpc/thrift-util.h"
 
 using namespace std;
 using namespace boost;
 using namespace boost::filesystem;
 using namespace google;
+using namespace strings;
+using namespace rapidjson;
+using namespace mustache;
 
 const char* GetDefaultDocumentRoot();
 
@@ -67,6 +76,12 @@ static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
 // Easy-to-read constants for Squeasel return codes
 static const uint32_t PROCESSING_COMPLETE = 1;
 static const uint32_t NOT_PROCESSED = 0;
+
+// Standard keys in the json document sent to templates for rendering. Must be kept in
+// sync with the templates themselves.
+static const string COMMON_JSON_KEY = "__common__";
+static const string PRERENDERED_JSON_KEY = "__prerendered__";
+static const string ENABLE_RAW_JSON_KEY = "__raw__";
 
 // Returns $IMPALA_HOME if set, otherwise /tmp/impala_www
 const char* GetDefaultDocumentRoot() {
@@ -99,34 +114,18 @@ Webserver::~Webserver() {
   Stop();
 }
 
-void Webserver::RootHandler(const Webserver::ArgumentMap& args, stringstream* output) {
-  // path_handler_lock_ already held by SqueaselCallback
-  (*output) << "<h2>Version</h2>";
-  (*output) << "<pre>" << GetVersionString() << "</pre>" << endl;
-
-  (*output) << "<h2>Hardware Info</h2>";
-  (*output) << "<pre>";
-  (*output) << CpuInfo::DebugString();
-  (*output) << MemInfo::DebugString();
-  (*output) << DiskInfo::DebugString();
-  (*output) << "</pre>";
-
-  (*output) << "<h2>OS Info</h2>";
-  (*output) << "<pre>";
-  (*output) << OsInfo::DebugString();
-  (*output) << "</pre>";
-
-  (*output) << "<h2>Process Info</h2>";
-  (*output) << "<pre>";
-  (*output) << "Process ID: " << getpid();
-  (*output) << "</pre>";
-
-  (*output) << "<h2>Status Pages</h2>";
-  BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
-    if (handler.second.is_on_nav_bar()) {
-      (*output) << "<a href=\"" << handler.first << "\">" << handler.first << "</a><br/>";
-    }
-  }
+void Webserver::RootHandler(const Webserver::ArgumentMap& args, Document* document) {
+  document->AddMember("version", GetVersionString().c_str(),
+      document->GetAllocator());
+  document->AddMember("cpu_info", CpuInfo::DebugString().c_str(),
+      document->GetAllocator());
+  document->AddMember("mem_info", MemInfo::DebugString().c_str(),
+      document->GetAllocator());
+  document->AddMember("disk_info", DiskInfo::DebugString().c_str(),
+      document->GetAllocator());
+  document->AddMember("os_info", OsInfo::DebugString().c_str(),
+      document->GetAllocator());
+  document->AddMember("pid", getpid(), document->GetAllocator());
 }
 
 void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
@@ -227,10 +226,10 @@ Status Webserver::Start() {
     return Status(error_msg.str());
   }
 
-  PathHandlerCallback default_callback =
+  JsonUrlCallback default_callback =
       bind<void>(mem_fn(&Webserver::RootHandler), this, _1, _2);
 
-  RegisterPathHandler("/", default_callback);
+  RegisterJsonUrlCallback("/", "root.tmpl", default_callback);
 
   LOG(INFO) << "Webserver started";
   return Status::OK;
@@ -241,6 +240,26 @@ void Webserver::Stop() {
     sq_stop(context_);
     context_ = NULL;
   }
+}
+
+void Webserver::GetCommonJson(Document* document) {
+  DCHECK(document != NULL);
+  Value obj(kObjectType);
+  obj.AddMember("process-name", google::ProgramInvocationShortName(),
+      document->GetAllocator());
+
+  Value lst(kArrayType);
+  BOOST_FOREACH(const UrlHandlerMap::value_type& handler, url_handlers_) {
+    if (handler.second.is_on_nav_bar()) {
+      Value obj(kObjectType);
+      obj.AddMember("link", handler.first.c_str(), document->GetAllocator());
+      obj.AddMember("title", handler.first.c_str(), document->GetAllocator());
+      lst.PushBack(obj, document->GetAllocator());
+    }
+  }
+
+  obj.AddMember("navbar", lst, document->GetAllocator());
+  document->AddMember(COMMON_JSON_KEY.c_str(), obj, document->GetAllocator());
 }
 
 int Webserver::LogMessageCallbackStatic(const struct sq_connection* connection,
@@ -267,43 +286,94 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
       return NOT_PROCESSED;
     }
   }
-  shared_lock<shared_mutex> lock(path_handlers_lock_);
-  PathHandlerMap::const_iterator it = path_handlers_.find(request_info->uri);
-  if (it == path_handlers_.end()) {
+  shared_lock<shared_mutex> lock(url_handlers_lock_);
+  UrlHandlerMap::const_iterator it = url_handlers_.find(request_info->uri);
+  if (it == url_handlers_.end()) {
     sq_printf(connection, "HTTP/1.1 404 Not Found\r\n"
         "Content-Type: text/plain\r\n\r\n");
     sq_printf(connection, "No handler for URI %s\r\n\r\n", request_info->uri);
     return PROCESSING_COMPLETE;
   }
 
-  // Should we render with css styles?
-  bool use_style = true;
-
   map<string, string> arguments;
   if (request_info->query_string != NULL) {
     BuildArgumentMap(request_info->query_string, &arguments);
   }
-  if (!it->second.is_styled() || arguments.find("raw") != arguments.end()) {
-    use_style = false;
-  }
+  MonotonicStopWatch sw;
+  sw.Start();
 
+  Document document;
+  document.SetObject();
+  GetCommonJson(&document);
+
+  bool send_html_headers = true;
+  // The output of this page is accumulated into this stringstream.
   stringstream output;
-  if (use_style) BootstrapPageHeader(&output);
-  BOOST_FOREACH(const PathHandlerCallback& callback_, it->second.callbacks()) {
-    callback_(arguments, &output);
-  }
-  if (use_style) BootstrapPageFooter(&output);
+  bool raw_json = (arguments.find("json") != arguments.end());
+  if (raw_json && it->second.is_json())  {
+    // Json callbacks have the option of being rendered as text, pretty-printed Json
+    // document (mostly for debugging or integration with third-party tools).
+    StringBuffer strbuf;
+    PrettyWriter<StringBuffer> writer(strbuf);
+    it->second.json_callback()(arguments, &document);
+    document.Accept(writer);
+    output << strbuf.GetString();
+    send_html_headers = false;
+  } else {
+    string template_filename = "static.tmpl";
 
-  string str = output.str();
+    // We may write 'prerendered' content into this string, then reference it from the
+    // RapidJson document rather than copy it (which requires a custom
+    // allocator...). Therefore this string must not be destroyed until after
+    // RenderTemplate() returns.
+    string prerendered_content;
+    if (it->second.is_json()) {
+      // This callback has its own template, and produces json.
+      it->second.json_callback()(arguments, &document);
+      template_filename = it->second.template_filename();
+    } else {
+      // If the callback doesn't have its own template, we'll render it using either the
+      // standard header+footer template, or, if the callback is unstyled, without any
+      // boilerplate at all. To do this, we add the text output from the callback to the
+      // __prerendered__ key in the json document, which is expected by the static
+      // template
+      stringstream prerendered_stream;
+      it->second.html_callback()(arguments, &prerendered_stream);
+      prerendered_content = prerendered_stream.str();
+      document.AddMember(PRERENDERED_JSON_KEY.c_str(), prerendered_content.c_str(),
+          document.GetAllocator());
+      if (!it->second.is_styled() || arguments.find("raw") != arguments.end()) {
+        document.AddMember(ENABLE_RAW_JSON_KEY.c_str(), "true", document.GetAllocator());
+      }
+      if (document.HasMember(ENABLE_RAW_JSON_KEY.c_str())) send_html_headers = false;
+    }
+
+    const string& full_template_path =
+        Substitute("$0/$1/$2", FLAGS_webserver_doc_root, DOC_FOLDER, template_filename);
+    ifstream tmpl(full_template_path.c_str());
+    if (!tmpl.is_open()) {
+      output << "Could not open template: " << full_template_path;
+      send_html_headers = false;
+    } else {
+      stringstream buffer;
+      buffer << tmpl.rdbuf();
+      RenderTemplate(buffer.str(), document, &output);
+    }
+  }
+
+  VLOG_QUERY << "Rendering page " << request_info->uri << " took "
+             << PrettyPrinter::Print(sw.ElapsedTime(), TCounterType::CPU_TICKS);
+
+  const string& str = output.str();
   // Without styling, render the page as plain text
-  if (arguments.find("raw") != arguments.end()) {
+  if (send_html_headers) {
     sq_printf(connection, "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/plain\r\n"
+        "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "\r\n", (int)str.length());
   } else {
     sq_printf(connection, "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html\r\n"
+        "Content-Type: text/plain\r\n"
         "Content-Length: %d\r\n"
         "\r\n", (int)str.length());
   }
@@ -313,67 +383,26 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
   return PROCESSING_COMPLETE;
 }
 
-void Webserver::RegisterPathHandler(const string& path,
-    const PathHandlerCallback& callback, bool is_styled, bool is_on_nav_bar) {
-  upgrade_lock<shared_mutex> lock(path_handlers_lock_);
+void Webserver::RegisterHtmlUrlCallback(const string& path,
+    const HtmlUrlCallback& callback, bool is_styled, bool is_on_nav_bar) {
+  upgrade_lock<shared_mutex> lock(url_handlers_lock_);
   upgrade_to_unique_lock<shared_mutex> writer_lock(lock);
-  PathHandlerMap::iterator it = path_handlers_.find(path);
-  if (it == path_handlers_.end()) {
-    it = path_handlers_.insert(
-        make_pair(path, PathHandler(is_styled, is_on_nav_bar))).first;
-  }
-  it->second.AddCallback(callback);
+  DCHECK(url_handlers_.find(path) == url_handlers_.end())
+      << "Duplicate Url handler for: " << path;
+
+  url_handlers_.insert(make_pair(path, UrlHandler(callback, is_styled, is_on_nav_bar)));
 }
 
-const string PAGE_HEADER = "<!DOCTYPE html>"
-" <html>"
-"   <head><title>Cloudera Impala</title>"
-" <link href='www/bootstrap/css/bootstrap.min.css' rel='stylesheet' media='screen'>"
-"  <style>"
-"  body {"
-"    padding-top: 60px; "
-"  }"
-"  </style>"
-" </head>"
-" <body>";
+void Webserver::RegisterJsonUrlCallback(const string& path,
+    const string& template_filename, const JsonUrlCallback& callback, bool is_styled,
+    bool is_on_nav_bar) {
+  upgrade_lock<shared_mutex> lock(url_handlers_lock_);
+  upgrade_to_unique_lock<shared_mutex> writer_lock(lock);
+  DCHECK(url_handlers_.find(path) == url_handlers_.end())
+      << "Duplicate Url handler for: " << path;
 
-static const string PAGE_FOOTER = "</div></body></html>";
-
-static const string NAVIGATION_BAR_PREFIX =
-"<div class='navbar navbar-inverse navbar-fixed-top'>"
-"      <div class='navbar-inner'>"
-"        <div class='container'>"
-"          <a class='btn btn-navbar' data-toggle='collapse' data-target='.nav-collapse'>"
-"            <span class='icon-bar'></span>"
-"            <span class='icon-bar'></span>"
-"            <span class='icon-bar'></span>"
-"          </a>"
-"          <a class='brand' href='/'>Impala</a>"
-"          <div class='nav-collapse collapse'>"
-"            <ul class='nav'>";
-
-static const string NAVIGATION_BAR_SUFFIX =
-"            </ul>"
-"          </div>"
-"        </div>"
-"      </div>"
-"    </div>"
-"    <div class='container'>";
-
-void Webserver::BootstrapPageHeader(stringstream* output) {
-  (*output) << PAGE_HEADER;
-  (*output) << NAVIGATION_BAR_PREFIX;
-  BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
-    if (handler.second.is_on_nav_bar()) {
-      (*output) << "<li><a href=\"" << handler.first << "\">" << handler.first
-                << "</a></li>";
-    }
-  }
-  (*output) << NAVIGATION_BAR_SUFFIX;
-}
-
-void Webserver::BootstrapPageFooter(stringstream* output) {
-  (*output) << PAGE_FOOTER;
+  url_handlers_.insert(
+      make_pair(path, UrlHandler(callback, template_filename, is_styled, is_on_nav_bar)));
 }
 
 }

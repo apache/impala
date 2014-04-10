@@ -87,7 +87,7 @@ InProcessStatestore::InProcessStatestore(int statestore_port, int webserver_port
       metrics_(new Metrics()),
       statestore_port_(statestore_port),
       statestore_(new Statestore(metrics_.get())) {
-  AddDefaultPathHandlers(webserver_.get());
+  AddDefaultUrlCallbacks(webserver_.get());
   statestore_->RegisterWebpages(webserver_.get());
 }
 

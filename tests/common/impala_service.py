@@ -90,9 +90,9 @@ class ImpaladService(BaseImpalaService):
   def get_num_known_live_backends(self, timeout=30, interval=1):
     LOG.info("Getting num_known_live_backends from %s:%s" %\
         (self.hostname, self.webserver_port))
-    result = self.read_debug_webpage('backends?raw', timeout, interval)
-    match = re.match(r'Known Backends \((\d+)\)', result)
-    return None if match is None else int(match.group(1))
+    result = json.loads(self.read_debug_webpage('backends?json', timeout, interval))
+    num = result['num_backends']
+    return None if num is None else int(num)
 
   def get_num_in_flight_queries(self, timeout=30, interval=1):
     LOG.info("Getting num_in_flight_queries from %s:%s" %\

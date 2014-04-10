@@ -217,13 +217,13 @@ Statestore::Statestore(Metrics* metrics)
 }
 
 void Statestore::RegisterWebpages(Webserver* webserver) {
-  Webserver::PathHandlerCallback topics_callback =
+  Webserver::HtmlUrlCallback topics_callback =
       bind<void>(mem_fn(&Statestore::TopicsHandler), this, _1, _2);
-  webserver->RegisterPathHandler("/topics", topics_callback);
+  webserver->RegisterHtmlUrlCallback("/topics", topics_callback);
 
-  Webserver::PathHandlerCallback subscribers_callback =
+  Webserver::HtmlUrlCallback subscribers_callback =
       bind<void>(mem_fn(&Statestore::SubscribersHandler), this, _1, _2);
-  webserver->RegisterPathHandler("/subscribers", subscribers_callback);
+  webserver->RegisterHtmlUrlCallback("/subscribers", subscribers_callback);
 }
 
 void Statestore::TopicsHandler(const Webserver::ArgumentMap& args,

@@ -27,6 +27,7 @@
 #include "catalog/catalog.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/metrics.h"
+#include "rapidjson/rapidjson.h"
 
 namespace impala {
 
@@ -164,16 +165,34 @@ class CatalogServer {
   // Must hold catalog_lock_ when calling this function.
   void BuildTopicUpdates(const std::vector<TCatalogObject>& catalog_objects);
 
-  void CatalogPathHandler(const Webserver::ArgumentMap& args,
-      std::stringstream* output);
+  // Example output:
+  // "databases": [
+  //         {
+  //             "name": "_impala_builtins",
+  //             "num_tables": 0,
+  //             "tables": []
+  //         },
+  //         {
+  //             "name": "default",
+  //             "num_tables": 1,
+  //             "tables": [
+  //                 {
+  //                     "fqtn": "default.test_table",
+  //                     "name": "test_table"
+  //                 }
+  //             ]
+  //         }
+  //     ]
+  void CatalogUrlCallback(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
 
   // Debug webpage handler that is used to dump the internal state of catalog objects.
   // The caller specifies a "object_type" and "object_name" parameters and this function
   // will get the matching TCatalogObject struct, if one exists.
   // For example, to dump table "bar" in database "foo":
   // <host>:25020/catalog_objects?object_type=TABLE&object_name=foo.bar
-  void CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
-      std::stringstream* output);
+  void CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
 };
 
 }

@@ -34,13 +34,13 @@ Metrics::Metrics()
 
 Status Metrics::Init(Webserver* webserver) {
   if (webserver != NULL) {
-    Webserver::PathHandlerCallback default_callback =
+    Webserver::HtmlUrlCallback default_callback =
         bind<void>(mem_fn(&Metrics::TextCallback), this, _1, _2);
-    webserver->RegisterPathHandler("/metrics", default_callback);
+    webserver->RegisterHtmlUrlCallback("/metrics", default_callback);
 
-    Webserver::PathHandlerCallback json_callback =
+    Webserver::HtmlUrlCallback json_callback =
         bind<void>(mem_fn(&Metrics::JsonCallback), this, _1, _2);
-    webserver->RegisterPathHandler("/jsonmetrics", json_callback, false, false);
+    webserver->RegisterHtmlUrlCallback("/jsonmetrics", json_callback, false, false);
   }
 
   return Status::OK;
@@ -63,7 +63,7 @@ string Metrics::DebugStringJson() {
 void Metrics::TextCallback(const Webserver::ArgumentMap& args, stringstream* output) {
   Webserver::ArgumentMap::const_iterator metric_name = args.find("metric");
   lock_guard<mutex> l(lock_);
-  if (args.find("raw") == args.end()) (*output) << "<pre>";
+  (*output) << "<pre>";
   if (metric_name == args.end()) {
     BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
       m.second->Print(output);
@@ -78,7 +78,7 @@ void Metrics::TextCallback(const Webserver::ArgumentMap& args, stringstream* out
       (*output) << endl;
     }
   }
-  if (args.find("raw") == args.end()) (*output) << "</pre>";
+  (*output) << "</pre>";
 }
 
 void Metrics::JsonCallback(const Webserver::ArgumentMap& args, stringstream* output) {
@@ -122,4 +122,3 @@ template<> void PrintPrimitiveAsJson<double>(const double& v, stringstream* out)
 }
 
 }
-

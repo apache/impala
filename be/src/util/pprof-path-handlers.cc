@@ -130,12 +130,13 @@ void PprofSymbolHandler(const Webserver::ArgumentMap& args, stringstream* output
   (*output) << "num_symbols: 0";
 }
 
-void impala::AddPprofPathHandlers(Webserver* webserver) {
+void impala::AddPprofUrlCallbacks(Webserver* webserver) {
   // Path handlers for remote pprof profiling. For information see:
   // https://gperftools.googlecode.com/svn/trunk/doc/pprof_remote_servers.html
-  webserver->RegisterPathHandler("/pprof/cmdline", PprofCmdLineHandler, false, false);
-  webserver->RegisterPathHandler("/pprof/heap", PprofHeapHandler, false, false);
-  webserver->RegisterPathHandler("/pprof/growth", PprofGrowthHandler, false, false);
-  webserver->RegisterPathHandler("/pprof/profile", PprofCpuProfileHandler, false, false);
-  webserver->RegisterPathHandler("/pprof/symbol", PprofSymbolHandler, false, false);
+  webserver->RegisterHtmlUrlCallback("/pprof/cmdline", PprofCmdLineHandler, false, false);
+  webserver->RegisterHtmlUrlCallback("/pprof/heap", PprofHeapHandler, false, false);
+  webserver->RegisterHtmlUrlCallback("/pprof/growth", PprofGrowthHandler, false, false);
+  webserver->RegisterHtmlUrlCallback("/pprof/profile", PprofCpuProfileHandler, false,
+      false);
+  webserver->RegisterHtmlUrlCallback("/pprof/symbol", PprofSymbolHandler, false, false);
 }

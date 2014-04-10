@@ -1,0 +1,48 @@
+<!--
+Copyright 2012- Cloudera Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+{{> www/common-header.tmpl }}
+
+<h2>Catalog</h2>
+
+<ol class="breadcrumb">
+{{#databases}}
+<li><a href='#{{name}}'>{{name}}</a></li>
+{{/databases}}
+</ol>
+
+{{#databases}}
+
+<div class="panel panel-info">
+  <div class="panel-heading">
+    <a href='catalog_objects?object_type=DATABASE&object_name={{name}}' id='{{name}}'>
+      <h2 class="panel-title">{{name}}
+      <span class="pull-right">{{num_tables}} table(s)</span></h2>
+    </a>
+  </div>
+  <div class="panel-body">
+    <ul>
+      {{#tables}}
+      <li>
+        <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+      </li>
+      {{/tables}}
+    </ul>
+  </div>
+</div>
+
+{{/databases}}
+
+{{> www/common-footer.tmpl }}

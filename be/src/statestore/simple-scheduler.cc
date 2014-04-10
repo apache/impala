@@ -47,6 +47,7 @@ using namespace boost;
 using namespace boost::algorithm;
 using namespace apache::thrift;
 using namespace strings;
+using namespace rapidjson;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
@@ -67,6 +68,9 @@ static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
 static const string DEFAULT_USER("default");
+
+static const string BACKENDS_WEB_PAGE = "/backends";
+static const string BACKENDS_TEMPLATE = "backends.tmpl";
 
 const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
@@ -176,9 +180,10 @@ Status SimpleScheduler::Init() {
   LOG(INFO) << "Starting simple scheduler";
 
   if (webserver_ != NULL) {
-    Webserver::PathHandlerCallback backends_callback =
-        bind<void>(mem_fn(&SimpleScheduler::BackendsPathHandler), this, _1, _2);
-    webserver_->RegisterPathHandler("/backends", backends_callback);
+    Webserver::JsonUrlCallback backends_callback =
+        bind<void>(mem_fn(&SimpleScheduler::BackendsUrlCallback), this, _1, _2);
+    webserver_->RegisterJsonUrlCallback(BACKENDS_WEB_PAGE, BACKENDS_TEMPLATE,
+        backends_callback);
   }
 
   if (statestore_subscriber_ != NULL) {
@@ -245,41 +250,18 @@ bool TBackendDescriptorComparator(const TBackendDescriptor& a,
   return TNetworkAddressComparator(a.address, b.address);
 }
 
-void SimpleScheduler::BackendsPathHandler(const Webserver::ArgumentMap& args,
-                                          stringstream* output) {
+void SimpleScheduler::BackendsUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
   BackendList backends;
   GetAllKnownBackends(&backends);
-  sort(backends.begin(), backends.end(), TBackendDescriptorComparator);
-  if (args.find("raw") == args.end()) {
-    (*output) << "<h2>Known Backends "
-              << "(" << backends.size() << ")"
-              << "</h2>" << endl;
-
-    (*output) << "<table class='table table-hover table-bordered'>";
-    (*output) << "<tr><th>Backend</th><th></th>" << endl;
-    BOOST_FOREACH(const BackendList::value_type& backend, backends) {
-      (*output) << "<tr><td>" << backend.address << "</td>"
-                << "<td>";
-      if (backend.__isset.debug_http_address) {
-        if (backend.__isset.secure_webserver && backend.secure_webserver) {
-          (*output) << "<a href='https://";
-        } else {
-          (*output) << "<a href='http://";
-        }
-        (*output) << backend.debug_http_address << "'>Debug pages</a>";
-      } else {
-        (*output) << "N/A";
-      }
-      (*output) << "</td></tr>" << endl;
-    }
-    (*output) << "</table>";
-  } else {
-    (*output) << "Known Backends " << "(" << backends.size() << ")" << endl;
-
-    BOOST_FOREACH(const BackendList::value_type& backend, backends) {
-      (*output) << backend.address << endl;
-    }
+  Value backends_list(kArrayType);
+  BOOST_FOREACH(const BackendList::value_type& backend, backends) {
+    Value str(TNetworkAddressToString(backend.address).c_str(), document->GetAllocator());
+    backends_list.PushBack(str, document->GetAllocator());
   }
+
+  document->AddMember("backends", backends_list, document->GetAllocator());
+  document->AddMember("num_backends", backends.size(), document->GetAllocator());
 }
 
 void SimpleScheduler::UpdateMembership(

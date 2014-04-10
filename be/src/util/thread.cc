@@ -30,9 +30,13 @@
 #include "util/os-util.h"
 
 using namespace boost;
+using namespace rapidjson;
 using namespace std;
 
 namespace impala {
+
+static const string THREADS_WEB_PAGE = "/threadz";
+static const string THREADS_TEMPLATE = "threadz.tmpl";
 
 class ThreadMgr;
 
@@ -104,9 +108,46 @@ class ThreadMgr {
   Metrics::IntMetric* total_threads_metric_;
   Metrics::IntMetric* current_num_threads_metric_;
 
-  // Webpage callback; prints all threads by category
-  void ThreadPathHandler(const Webserver::ArgumentMap& args, stringstream* output);
-  void PrintThreadCategoryRows(const ThreadCategory& category, stringstream* output);
+  // Webpage callbacks; print all threads by category
+  // Example output:
+  // "total_threads": 144,
+  //   "thread-groups": [
+  //       {
+  //         "name": "common",
+  //             "size": 1
+  //             },
+  //       {
+  //         "name": "disk-io-mgr",
+  //             "size": 2
+  //             },
+  //       {
+  //         "name": "hdfs-worker-pool",
+  //             "size": 16
+  //             },
+  //             ... etc ...
+  //      ]
+  void ThreadGroupUrlCallback(const Webserver::ArgumentMap& args, Document* output);
+
+  // Example output:
+  // "thread-group": {
+  //   "category": "disk-io-mgr",
+  //       "size": 2
+  //       },
+  //   "threads": [
+  //       {
+  //         "name": "work-loop(Disk: 0, Thread: 0)-17049",
+  //             "user_ns": 0,
+  //             "kernel_ns": 0,
+  //             "iowait_ns": 0
+  //             },
+  //       {
+  //         "name": "work-loop(Disk: 1, Thread: 0)-17050",
+  //             "user_ns": 0,
+  //             "kernel_ns": 0,
+  //             "iowait_ns": 0
+  //             }
+  //        ]
+  void ThreadOverviewUrlCallback(const Webserver::ArgumentMap& args, Document* document);
 };
 
 Status ThreadMgr::StartInstrumentation(Metrics* metrics, Webserver* webserver) {
@@ -119,9 +160,16 @@ Status ThreadMgr::StartInstrumentation(Metrics* metrics, Webserver* webserver) {
   current_num_threads_metric_ = metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
       "thread-manager.running-threads", 0L);
 
-  Webserver::PathHandlerCallback thread_callback =
-      bind<void>(mem_fn(&ThreadMgr::ThreadPathHandler), this, _1, _2);
-  webserver->RegisterPathHandler("/threadz", thread_callback);
+  Webserver::JsonUrlCallback template_callback =
+      bind<void>(mem_fn(&ThreadMgr::ThreadOverviewUrlCallback), this, _1, _2);
+  webserver->RegisterJsonUrlCallback(THREADS_WEB_PAGE, THREADS_TEMPLATE,
+      template_callback);
+
+  Webserver::JsonUrlCallback overview_callback =
+      bind<void>(mem_fn(&ThreadMgr::ThreadGroupUrlCallback), this, _1, _2);
+  webserver->RegisterJsonUrlCallback("/thread-group", "thread-group.tmpl",
+      overview_callback, true, false);
+
   return Status::OK;
 }
 
@@ -143,69 +191,69 @@ void ThreadMgr::RemoveThread(const thread::id& boost_id, const string& category)
   if (metrics_enabled_) current_num_threads_metric_->Increment(-1L);
 }
 
-void ThreadMgr::PrintThreadCategoryRows(const ThreadCategory& category,
-    stringstream* output) {
-  BOOST_FOREACH(const ThreadCategory::value_type& thread, category) {
-    ThreadStats stats;
-    Status status = GetThreadStats(thread.second.thread_id(), &stats);
-    if (!status.ok()) {
-      LOG_EVERY_N(INFO, 100) << "Could not get per-thread statistics: "
-                             << status.GetErrorMsg();
-    }
-    (*output) << "<tr><td>" << thread.second.name() << "</td><td>"
-              << (static_cast<double>(stats.user_ns) / 1e9) << "</td><td>"
-              << (static_cast<double>(stats.kernel_ns) / 1e9) << "</td><td>"
-              << (static_cast<double>(stats.iowait_ns) / 1e9) << "</td></tr>";
+void ThreadMgr::ThreadOverviewUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
+  lock_guard<mutex> l(lock_);
+  if (metrics_enabled_) {
+    document->AddMember("total_threads", current_num_threads_metric_->value(),
+        document->GetAllocator());
   }
+  Value lst(kArrayType);
+  BOOST_FOREACH(const ThreadCategoryMap::value_type& category, thread_categories_) {
+    Value val(kObjectType);
+    val.AddMember("name", category.first.c_str(), document->GetAllocator());
+    val.AddMember("size", category.second.size(), document->GetAllocator());
+    // TODO: URLEncode() name?
+    lst.PushBack(val, document->GetAllocator());
+  }
+  document->AddMember("thread-groups", lst, document->GetAllocator());
 }
 
-void ThreadMgr::ThreadPathHandler(const Webserver::ArgumentMap& args,
-    stringstream* output) {
+void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
   lock_guard<mutex> l(lock_);
   vector<const ThreadCategory*> categories_to_print;
-  Webserver::ArgumentMap::const_iterator category_name = args.find("group");
-  if (category_name != args.end()) {
-    (*output) << "<h2>Thread Group: " << category_name->second << "</h2>" << endl;
-    if (category_name->second != "all") {
-      ThreadCategoryMap::const_iterator category =
-          thread_categories_.find(category_name->second);
-      if (category == thread_categories_.end()) {
-        (*output) << "Thread group '" << category_name->second << "' not found" << endl;
-        return;
-      }
-      categories_to_print.push_back(&category->second);
-      (*output) << "<h3>" << category->first << " : " << category->second.size()
-                << "</h3>";
-    } else {
-      BOOST_FOREACH(const ThreadCategoryMap::value_type& category, thread_categories_) {
-        categories_to_print.push_back(&category.second);
-      }
-      (*output) << "<h3>All Threads : </h3>";
+  Webserver::ArgumentMap::const_iterator category_it = args.find("group");
+  string category_name = (category_it == args.end()) ? "all" : category_it->second;
+  if (category_name != "all") {
+    ThreadCategoryMap::const_iterator category =
+        thread_categories_.find(category_name);
+    if (category == thread_categories_.end()) {
+      return;
     }
-
-    (*output) << "<table class='table table-hover table-border'>";
-    (*output) << "<tr><th>Thread name</th><th>Cumulative User CPU(s)</th>"
-              << "<th>Cumulative Kernel CPU(s)</th>"
-              << "<th>Cumulative IO-wait(s)</th></tr>";
-
-    BOOST_FOREACH(const ThreadCategory* category, categories_to_print) {
-      PrintThreadCategoryRows(*category, output);
-    }
-    (*output) << "</table>";
+    categories_to_print.push_back(&category->second);
+    Value val(kObjectType);
+    val.AddMember("category", category->first.c_str(), document->GetAllocator());
+    val.AddMember("size", category->second.size(), document->GetAllocator());
+    document->AddMember("thread-group", val, document->GetAllocator());
   } else {
-    (*output) << "<h2>Thread Groups</h2>";
-    if (metrics_enabled_) {
-      (*output) << "<h4>" << current_num_threads_metric_->value() << " thread(s) running";
-    }
-    (*output) << "<a href='/threadz?group=all'><h3>All Threads</h3>";
-
     BOOST_FOREACH(const ThreadCategoryMap::value_type& category, thread_categories_) {
-      string category_arg;
-      UrlEncode(category.first, &category_arg);
-      (*output) << "<a href='/threadz?group=" << category_arg << "'><h3>"
-                << category.first << " : " << category.second.size() << "</h3></a>";
+      categories_to_print.push_back(&category.second);
     }
   }
+
+  Value lst(kArrayType);
+  BOOST_FOREACH(const ThreadCategory* category, categories_to_print) {
+    BOOST_FOREACH(const ThreadCategory::value_type& thread, *category) {
+      Value val(kObjectType);
+      val.AddMember("name", thread.second.name().c_str(), document->GetAllocator());
+      ThreadStats stats;
+      Status status = GetThreadStats(thread.second.thread_id(), &stats);
+      if (!status.ok()) {
+        LOG_EVERY_N(INFO, 100) << "Could not get per-thread statistics: "
+                               << status.GetErrorMsg();
+      } else {
+        val.AddMember("user_ns", static_cast<double>(stats.user_ns) / 1e9,
+            document->GetAllocator());
+        val.AddMember("kernel_ns", static_cast<double>(stats.kernel_ns) / 1e9,
+            document->GetAllocator());
+        val.AddMember("iowait_ns", static_cast<double>(stats.iowait_ns) / 1e9,
+            document->GetAllocator());
+      }
+      lst.PushBack(val, document->GetAllocator());
+    }
+  }
+  document->AddMember("threads", lst, document->GetAllocator());
 }
 
 void InitThreading() {

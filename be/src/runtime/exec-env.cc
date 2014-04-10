@@ -337,7 +337,7 @@ Status ExecEnv::StartServices() {
 
   // Start services in order to ensure that dependencies between them are met
   if (enable_webserver_) {
-    AddDefaultPathHandlers(webserver_.get(), mem_tracker_.get());
+    AddDefaultUrlCallbacks(webserver_.get(), mem_tracker_.get());
     RETURN_IF_ERROR(webserver_->Start());
   } else {
     LOG(INFO) << "Not starting webserver";

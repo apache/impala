@@ -32,55 +32,57 @@ using namespace std;
 using namespace impala;
 using namespace beeswax;
 using namespace strings;
+using namespace rapidjson;
 
 DECLARE_int32(query_log_size);
 
 void ImpalaServer::RegisterWebserverCallbacks(Webserver* webserver) {
   DCHECK(webserver != NULL);
 
-  Webserver::PathHandlerCallback varz_callback =
+  Webserver::HtmlUrlCallback varz_callback =
       bind<void>(mem_fn(&ImpalaServer::RenderHadoopConfigs), this, _1, _2);
-  webserver->RegisterPathHandler("/varz", varz_callback);
+  webserver->RegisterHtmlUrlCallback("/hadoop-varz", varz_callback);
 
-  Webserver::PathHandlerCallback query_callback =
-      bind<void>(mem_fn(&ImpalaServer::QueryStatePathHandler), this, _1, _2);
-  webserver->RegisterPathHandler("/queries", query_callback);
+  Webserver::HtmlUrlCallback query_callback =
+      bind<void>(mem_fn(&ImpalaServer::QueryStateUrlCallback), this, _1, _2);
+  webserver->RegisterHtmlUrlCallback("/queries", query_callback);
 
-  Webserver::PathHandlerCallback sessions_callback =
-      bind<void>(mem_fn(&ImpalaServer::SessionPathHandler), this, _1, _2);
-  webserver->RegisterPathHandler("/sessions", sessions_callback);
+  Webserver::HtmlUrlCallback sessions_callback =
+      bind<void>(mem_fn(&ImpalaServer::SessionUrlCallback), this, _1, _2);
+  webserver->RegisterHtmlUrlCallback("/sessions", sessions_callback);
 
-  Webserver::PathHandlerCallback catalog_callback =
-      bind<void>(mem_fn(&ImpalaServer::CatalogPathHandler), this, _1, _2);
-  webserver->RegisterPathHandler("/catalog", catalog_callback);
+  Webserver::JsonUrlCallback catalog_callback =
+      bind<void>(mem_fn(&ImpalaServer::CatalogUrlCallback), this, _1, _2);
+  webserver->RegisterJsonUrlCallback("/catalog", "catalog.tmpl",
+      catalog_callback);
 
-  Webserver::PathHandlerCallback catalog_objects_callback =
-      bind<void>(mem_fn(&ImpalaServer::CatalogObjectsPathHandler), this, _1, _2);
-  webserver->RegisterPathHandler("/catalog_objects", catalog_objects_callback, false,
-      false);
+  Webserver::JsonUrlCallback catalog_objects_callback =
+      bind<void>(mem_fn(&ImpalaServer::CatalogObjectsUrlCallback), this, _1, _2);
+  webserver->RegisterJsonUrlCallback("/catalog_object", "catalog_object.tmpl",
+      catalog_objects_callback, true, false);
 
-  Webserver::PathHandlerCallback profile_callback =
-      bind<void>(mem_fn(&ImpalaServer::QueryProfilePathHandler), this, _1, _2);
-  webserver-> RegisterPathHandler("/query_profile", profile_callback, true, false);
+  Webserver::HtmlUrlCallback profile_callback =
+      bind<void>(mem_fn(&ImpalaServer::QueryProfileUrlCallback), this, _1, _2);
+  webserver-> RegisterHtmlUrlCallback("/query_profile", profile_callback, true, false);
 
-  Webserver::PathHandlerCallback cancel_callback =
-      bind<void>(mem_fn(&ImpalaServer::CancelQueryPathHandler), this, _1, _2);
-  webserver-> RegisterPathHandler("/cancel_query", cancel_callback, true, false);
+  Webserver::HtmlUrlCallback cancel_callback =
+      bind<void>(mem_fn(&ImpalaServer::CancelQueryUrlCallback), this, _1, _2);
+  webserver-> RegisterHtmlUrlCallback("/cancel_query", cancel_callback, true, false);
 
-  Webserver::PathHandlerCallback profile_encoded_callback =
-      bind<void>(mem_fn(&ImpalaServer::QueryProfileEncodedPathHandler), this, _1, _2);
-  webserver->RegisterPathHandler("/query_profile_encoded", profile_encoded_callback,
+  Webserver::HtmlUrlCallback profile_encoded_callback =
+      bind<void>(mem_fn(&ImpalaServer::QueryProfileEncodedUrlCallback), this, _1, _2);
+  webserver->RegisterHtmlUrlCallback("/query_profile_encoded", profile_encoded_callback,
       false, false);
 
-  Webserver::PathHandlerCallback inflight_query_ids_callback =
-      bind<void>(mem_fn(&ImpalaServer::InflightQueryIdsPathHandler), this, _1, _2);
-  webserver->RegisterPathHandler("/inflight_query_ids", inflight_query_ids_callback,
+  Webserver::HtmlUrlCallback inflight_query_ids_callback =
+      bind<void>(mem_fn(&ImpalaServer::InflightQueryIdsUrlCallback), this, _1, _2);
+  webserver->RegisterHtmlUrlCallback("/inflight_query_ids", inflight_query_ids_callback,
       false, false);
 }
 
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
     stringstream* output) {
-  exec_env_->frontend()->RenderHadoopConfigs(args.find("raw") != args.end(), output);
+  exec_env_->frontend()->RenderHadoopConfigs(args.find("raw") == args.end(), output);
 }
 
 // We expect the query id to be passed as one parameter, 'query_id'.
@@ -94,7 +96,7 @@ static bool ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
   }
 }
 
-void ImpalaServer::CancelQueryPathHandler(const Webserver::ArgumentMap& args,
+void ImpalaServer::CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
     stringstream* output) {
   TUniqueId unique_id;
   if (!ParseQueryId(args, &unique_id)) {
@@ -109,7 +111,7 @@ void ImpalaServer::CancelQueryPathHandler(const Webserver::ArgumentMap& args,
   }
 }
 
-void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
+void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
     stringstream* output) {
   TUniqueId unique_id;
   if (!ParseQueryId(args, &unique_id)) {
@@ -117,25 +119,18 @@ void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
     return;
   }
 
-  if (args.find("raw") == args.end()) {
-    (*output) << "<pre>";
-    stringstream ss;
-    Status status = GetRuntimeProfileStr(unique_id, false, &ss);
-    if (!status.ok()) {
-      (*output) << status.GetErrorMsg();
-    } else {
-      EscapeForHtml(ss.str(), output);
-    }
-    (*output) << "</pre>";
+  (*output) << "<pre>";
+  stringstream ss;
+  Status status = GetRuntimeProfileStr(unique_id, false, &ss);
+  if (!status.ok()) {
+    (*output) << status.GetErrorMsg();
   } else {
-    Status status = GetRuntimeProfileStr(unique_id, false, output);
-    if (!status.ok()) {
-      (*output) << status.GetErrorMsg();
-    }
+    EscapeForHtml(ss.str(), output);
   }
+  (*output) << "</pre>";
 }
 
-void ImpalaServer::QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& args,
+void ImpalaServer::QueryProfileEncodedUrlCallback(const Webserver::ArgumentMap& args,
     stringstream* output) {
   TUniqueId unique_id;
   if (!ParseQueryId(args, &unique_id)) {
@@ -147,7 +142,7 @@ void ImpalaServer::QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& 
   if (!status.ok()) (*output) << status.GetErrorMsg();
 }
 
-void ImpalaServer::InflightQueryIdsPathHandler(const Webserver::ArgumentMap& args,
+void ImpalaServer::InflightQueryIdsUrlCallback(const Webserver::ArgumentMap& args,
     stringstream* output) {
   lock_guard<mutex> l(query_exec_state_map_lock_);
   BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
@@ -202,7 +197,7 @@ void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecor
   (*output) << "</tr>" << endl;
 }
 
-void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
+void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
     stringstream* output) {
   set<QueryStateRecord, QueryStateRecord> sorted_query_records;
   {
@@ -285,7 +280,7 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
   (*output) << "</table>";
 }
 
-void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
+void ImpalaServer::SessionUrlCallback(const Webserver::ArgumentMap& args,
     stringstream* output) {
   (*output) << "<h2>Sessions</h2>" << endl;
   lock_guard<mutex> l(session_state_map_lock_);
@@ -326,80 +321,49 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
   (*output) << "</table>";
 }
 
-void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  // TODO: This is an almost exact copy of CatalogServer::CatalogPathHandler(). Merge the
-  // two and deal with the different ways to get tables and databases.
+void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
   TGetDbsResult get_dbs_result;
   Status status = exec_env_->frontend()->GetDbNames(NULL, NULL, &get_dbs_result);
   if (!status.ok()) {
-    (*output) << "Error: " << status.GetErrorMsg();
+    Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
     return;
   }
-  vector<string>& db_names = get_dbs_result.dbs;
 
-  if (args.find("raw") == args.end()) {
-    (*output) << "<h2>Catalog</h2>" << endl;
+  Value databases(kArrayType);
+  BOOST_FOREACH(const string& db, get_dbs_result.dbs) {
+    Value database(kObjectType);
+    Value str(db.c_str(), document->GetAllocator());
+    database.AddMember("name", str, document->GetAllocator());
 
-    // Build a navigation string like [ default | tpch | ... ]
-    vector<string> links;
-    BOOST_FOREACH(const string& db, db_names) {
-      stringstream ss;
-      ss << "<a href='#" << db << "'>" << db << "</a>";
-      links.push_back(ss.str());
+    TGetTablesResult get_table_results;
+    Status status =
+        exec_env_->frontend()->GetTableNames(db, NULL, NULL, &get_table_results);
+    if (!status.ok()) {
+      Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+      database.AddMember("error", error, document->GetAllocator());
+      continue;
     }
-    (*output) << "[ " <<  join(links, " | ") << " ] ";
 
-    BOOST_FOREACH(const string& db, db_names) {
-      (*output) << Substitute(
-          "<a href='catalog_objects?object_type=DATABASE&object_name=$0' id='$0'>"
-          "<h3>$0</h3></a>", db);
-      TGetTablesResult get_table_results;
-      Status status = exec_env_->frontend()->
-          GetTableNames(db, NULL, NULL, &get_table_results);
-      if (!status.ok()) {
-        (*output) << "Error: " << status.GetErrorMsg();
-        continue;
-      }
-      vector<string>& table_names = get_table_results.tables;
-      (*output) << "<p>" << db << " contains <b>" << table_names.size()
-                << "</b> tables</p>";
-
-      (*output) << "<ul>" << endl;
-      BOOST_FOREACH(const string& table, table_names) {
-        const string& link_text = Substitute(
-            "<a href='catalog_objects?object_type=TABLE&object_name=$0.$1'>$1</a>",
-            db, table);
-        (*output) << "<li>" << link_text << "</li>" << endl;
-      }
-      (*output) << "</ul>" << endl;
+    Value table_array(kArrayType);
+    BOOST_FOREACH(const string& table, get_table_results.tables) {
+      Value table_obj(kObjectType);
+      Value fq_name(Substitute("$0.$1", db, table).c_str(), document->GetAllocator());
+      table_obj.AddMember("fqtn", fq_name, document->GetAllocator());
+      Value table_name(table.c_str(), document->GetAllocator());
+      table_obj.AddMember("name", table_name, document->GetAllocator());
+      table_array.PushBack(table_obj, document->GetAllocator());
     }
-  } else {
-    (*output) << "Catalog" << endl << endl;
-    (*output) << "List of databases:" << endl;
-    (*output) << join(db_names, "\n") << endl << endl;
-
-    BOOST_FOREACH(const string& db, db_names) {
-      TGetTablesResult get_table_results;
-      Status status = exec_env_->frontend()->
-          GetTableNames(db, NULL, NULL, &get_table_results);
-      if (!status.ok()) {
-        (*output) << "Error: " << status.GetErrorMsg();
-        continue;
-      }
-      vector<string>& table_names = get_table_results.tables;
-      (*output) << db << " contains " << table_names.size()
-                << " tables" << endl;
-      BOOST_FOREACH(const string& table, table_names) {
-        (*output) << "- " << table << endl;
-      }
-      (*output) << endl << endl;
-    }
+    database.AddMember("num_tables", table_array.Size(), document->GetAllocator());
+    database.AddMember("tables", table_array, document->GetAllocator());
+    databases.PushBack(database, document->GetAllocator());
   }
+  document->AddMember("databases", databases, document->GetAllocator());
 }
 
-void ImpalaServer::CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
-    stringstream* output) {
+void ImpalaServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
   Webserver::ArgumentMap::const_iterator object_type_arg = args.find("object_type");
   Webserver::ArgumentMap::const_iterator object_name_arg = args.find("object_name");
   if (object_type_arg != args.end() && object_name_arg != args.end()) {
@@ -414,15 +378,15 @@ void ImpalaServer::CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
     TCatalogObject result;
     Status status = exec_env_->frontend()->GetCatalogObject(request, &result);
     if (status.ok()) {
-      if (args.find("raw") == args.end()) {
-        (*output) << "<pre>" << ThriftDebugString(result) << "</pre>";
-      } else {
-        (*output) << ThriftDebugString(result);
-      }
+      Value debug_string(ThriftDebugString(result).c_str(), document->GetAllocator());
+      document->AddMember("thrift_string", debug_string, document->GetAllocator());
     } else {
-      (*output) << status.GetErrorMsg();
+      Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+      document->AddMember("error", error, document->GetAllocator());
     }
   } else {
-    (*output) << "Please specify values for the object_type and object_name parameters.";
+    Value error("Please specify values for the object_type and object_name parameters.",
+        document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
   }
 }

@@ -13,19 +13,150 @@
 // limitations under the License.
 
 #include "util/webserver.h"
+#include "common/init.h"
 
 #include <gtest/gtest.h>
 #include <string>
+#include <boost/asio.hpp>
+#include <boost/bind.hpp>
+#include <boost/lexical_cast.hpp>
+#include <gutil/strings/substitute.h>
 
 DECLARE_int32(webserver_port);
 DECLARE_string(webserver_password_file);
 
 using namespace impala;
 using namespace std;
+using namespace boost;
+using namespace boost::asio::ip;
+using namespace rapidjson;
+using namespace strings;
+
+const string TEST_ARG = "test-arg";
+const string SALUTATION_KEY = "Salutation";
+const string SALUTATION_VALUE = "Hello!";
+
+// Adapted from:
+// http://stackoverflow.com/questions/10982717/get-html-without-header-with-boostasio
+Status HttpGet(const string& host, const int32_t& port, const string& url_path,
+    ostream* out) {
+  try {
+    tcp::iostream request_stream;
+    request_stream.connect(host, lexical_cast<string>(port));
+    if (!request_stream) return Status("Could not connect request_stream");
+
+    request_stream << "GET " << url_path << " HTTP/1.0\r\n";
+    request_stream << "Host: " << host << "\r\n";
+    request_stream << "Accept: */*\r\n";
+    request_stream << "Cache-Control: no-cache\r\n";
+    request_stream << "Connection: close\r\n\r\n";
+    request_stream.flush();
+
+    string line1;
+    getline(request_stream, line1);
+    if (!request_stream) return Status("No response");
+
+    stringstream response_stream(line1);
+    string http_version;
+    response_stream >> http_version;
+
+    unsigned int status_code;
+    response_stream >> status_code;
+
+    string status_message;
+    getline(response_stream,status_message);
+    if (!response_stream || http_version.substr(0,5) != "HTTP/") {
+      return Status("Malformed response");
+    }
+
+    if (status_code != 200) {
+      return Status(Substitute("Unexpected status code: $0", status_code));
+    }
+
+    (*out) << request_stream.rdbuf();
+    return Status::OK;
+  } catch (const std::exception& e){
+    return Status(e.what());
+  }
+}
 
 TEST(Webserver, SmokeTest) {
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_TRUE(webserver.Start().ok());
+
+  stringstream contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, "/", &contents).ok());
+}
+
+void AssertArgsCallback(bool* success, const Webserver::ArgumentMap& args,
+    stringstream* out) {
+  *success = args.find(TEST_ARG) != args.end();
+}
+
+TEST(Webserver, ArgsTest) {
+  Webserver webserver(FLAGS_webserver_port);
+
+  const string ARGS_TEST_PATH = "/args-test";
+  bool success = false;
+  Webserver::HtmlUrlCallback callback = bind<void>(AssertArgsCallback, &success , _1, _2);
+  webserver.RegisterHtmlUrlCallback(ARGS_TEST_PATH, callback);
+
+  ASSERT_TRUE(webserver.Start().ok());
+  stringstream contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, ARGS_TEST_PATH, &contents).ok());
+  ASSERT_FALSE(success) << "Unexpectedly found " << TEST_ARG;
+
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
+      Substitute("$0?$1", ARGS_TEST_PATH, TEST_ARG), &contents).ok());
+  ASSERT_TRUE(success) << "Did not find " << TEST_ARG;
+}
+
+void HtmlCallback(const Webserver::ArgumentMap& args, stringstream* out) {
+  (*out) << SALUTATION_VALUE;
+}
+
+TEST(Webserver, HtmlCallback) {
+  Webserver webserver(FLAGS_webserver_port);
+
+  const string HTML_TEST_PATH = "/html-test";
+  Webserver::HtmlUrlCallback callback = bind<void>(HtmlCallback, _1, _2);
+  webserver.RegisterHtmlUrlCallback(HTML_TEST_PATH, callback);
+
+  ASSERT_TRUE(webserver.Start().ok());
+  stringstream contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, HTML_TEST_PATH, &contents).ok());
+  ASSERT_TRUE(contents.str().find(SALUTATION_VALUE) != string::npos);
+}
+
+void JsonCallback(const Webserver::ArgumentMap& args, Document* document) {
+  document->AddMember(SALUTATION_KEY.c_str(), SALUTATION_VALUE.c_str(),
+      document->GetAllocator());
+}
+
+TEST(Webserver, JsonTest) {
+  Webserver webserver(FLAGS_webserver_port);
+
+  const string JSON_TEST_PATH = "/json-test";
+  const string NO_TEMPLATE_PATH = "/no-template";
+  Webserver::JsonUrlCallback callback = bind<void>(JsonCallback, _1, _2);
+  webserver.RegisterJsonUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback);
+  webserver.RegisterJsonUrlCallback(NO_TEMPLATE_PATH, "doesnt-exist.tmpl", callback);
+
+  ASSERT_TRUE(webserver.Start().ok());
+  stringstream contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents).ok());
+  ASSERT_TRUE(contents.str().find(SALUTATION_VALUE) != string::npos);
+  ASSERT_TRUE(contents.str().find(SALUTATION_KEY) == string::npos);
+
+  stringstream json_contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
+      Substitute("$0?json", JSON_TEST_PATH), &json_contents).ok());
+  ASSERT_TRUE(json_contents.str().find("\"Salutation\": \"Hello!\"") != string::npos);
+
+  stringstream error_contents;
+  ASSERT_TRUE(
+      HttpGet("localhost", FLAGS_webserver_port, NO_TEMPLATE_PATH, &error_contents).ok());
+  ASSERT_TRUE(error_contents.str().find("Could not open template: ") != string::npos);
 }
 
 TEST(Webserver, StartWithPasswordFileTest) {
@@ -35,6 +166,10 @@ TEST(Webserver, StartWithPasswordFileTest) {
 
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_TRUE(webserver.Start().ok());
+
+  // Don't expect HTTP requests to work without a password
+  stringstream contents;
+  ASSERT_FALSE(HttpGet("localhost", FLAGS_webserver_port, "/", &contents).ok());
 }
 
 TEST(Webserver, StartWithMissingPasswordFileTest) {
@@ -47,7 +182,7 @@ TEST(Webserver, StartWithMissingPasswordFileTest) {
 }
 
 int main(int argc, char **argv) {
-  google::InitGoogleLogging(argv[0]);
+  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

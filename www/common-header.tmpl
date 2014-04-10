@@ -1,0 +1,46 @@
+<!--
+Copyright 2012- Cloudera Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+{{! Common header template with navbar which starts a container div for content (closed by
+common-footer.tmpl) }}
+<!DOCTYPE html>
+<html>
+  <head><title>Cloudera Impala</title>
+    <link href='www/bootstrap/css/bootstrap.min.css' rel='stylesheet' media='screen'>
+    <style>
+    </style>
+  </head>
+  <body>
+    <header class="navbar navbar-default navbar-static-top" id="top" role="banner">
+      <div class="container">
+        <div class="navbar-header">
+          <a class='navbar-brand' href='/'>{{ __common__.process-name }}</a>
+        </div>
+        <nav class="collapse navbar-collapse bs-navbar-collapse" role="navigation">
+          <ul class="nav navbar-nav">
+            {{#__common__.navbar}}
+            <li><a href="{{link}}">{{title}}</a></li>
+            {{/__common__.navbar}}
+          </ul>
+        </nav>
+      </div>
+    </header>
+<div class='container'>
+{{#error}}
+<div class="alert alert-warning">
+  <strong>Error:</strong>
+  {{.}}
+</div>
+{{/error}}

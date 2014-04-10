@@ -42,6 +42,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/types.h"
+#include "rapidjson/rapidjson.h"
 
 namespace impala {
 
@@ -404,34 +405,34 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Webserver callback. Prints a sorted table of current queries, including their states,
   // types and IDs.
-  void QueryStatePathHandler(const Webserver::ArgumentMap& args,
+  void QueryStateUrlCallback(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
   // Webserver callback.  Prints the query profile (via PrettyPrint)
-  void QueryProfilePathHandler(const Webserver::ArgumentMap& args,
+  void QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
   // Webserver callback.  Cancels an in-flight query.
-  void CancelQueryPathHandler(const Webserver::ArgumentMap& args,
+  void CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
   // Webserver callback.  Prints the query profile as a base64 encoded object.
-  void QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& args,
+  void QueryProfileEncodedUrlCallback(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
   // Webserver callback.  Prints the inflight query ids.
-  void InflightQueryIdsPathHandler(const Webserver::ArgumentMap& args,
+  void InflightQueryIdsUrlCallback(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
   // Webserver callback that prints a table of active sessions.
-  void SessionPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
+  void SessionUrlCallback(const Webserver::ArgumentMap& args, std::stringstream* output);
 
   // Webserver callback that prints a list of all known databases and tables
-  void CatalogPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
+  void CatalogUrlCallback(const Webserver::ArgumentMap& args, rapidjson::Document* output);
 
   // Webserver callback that allows for dumping information on objects in the catalog.
-  void CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
-      std::stringstream* output);
+  void CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
+      rapidjson::Document* output);
 
   // Initialize "default_configs_" to show the default values for ImpalaQueryOptions and
   // "support_start_over/false" to indicate that Impala does not support start over
@@ -541,7 +542,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   };
 
   // Helper method to render a single QueryStateRecord as an HTML table
-  // row. Used by QueryStatePathHandler.
+  // row. Used by QueryStateUrlCallback().
   void RenderSingleQueryTableRow(const QueryStateRecord& record, bool render_end_time,
       bool render_cancel, std::stringstream* output);
 

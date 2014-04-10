@@ -57,9 +57,9 @@ scoped_ptr<RpcEventHandlerManager> handler_manager;
 void impala::InitRpcEventTracing(Webserver* webserver) {
   handler_manager.reset(new RpcEventHandlerManager());
   if (webserver != NULL) {
-    Webserver::PathHandlerCallback callback = bind<void>(
+    Webserver::HtmlUrlCallback callback = bind<void>(
         mem_fn(&RpcEventHandlerManager::WebCallback), handler_manager.get(), _1, _2);
-    webserver->RegisterPathHandler("/rpcz", callback);
+    webserver->RegisterHtmlUrlCallback("/rpcz", callback);
   }
 }
 

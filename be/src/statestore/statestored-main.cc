@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
   scoped_ptr<Webserver> webserver(new Webserver());
 
   if (FLAGS_enable_webserver) {
-    AddDefaultPathHandlers(webserver.get(), &mem_tracker);
+    AddDefaultUrlCallbacks(webserver.get(), &mem_tracker);
     EXIT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";
