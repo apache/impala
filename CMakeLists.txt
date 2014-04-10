@@ -49,6 +49,10 @@ set(LIBS ${LIBS} ${HDFS_LIBS})
 find_package(Squeasel REQUIRED)
 include_directories(SYSTEM ${SQUEASEL_INCLUDE_DIR})
 
+# find the Mustache template library
+find_package(Mustache REQUIRED)
+include_directories(SYSTEM ${MUSTACHE_INCLUDE_DIR})
+
 # find GLog headers and libs.  Must include glog headers before the other
 # google libraries.  They all have a config.h and we want glog's to be picked
 # up first.

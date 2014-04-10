@@ -71,6 +71,7 @@ add_library(Util
 add_library(Webserver STATIC
   ${SQUEASEL_SRC_DIR}/squeasel.c
   webserver.cc
+  ${MUSTACHE_SRC_DIR}/mustache.cc
 )
 
 # Squeasel requires C99 compatibility to build.
