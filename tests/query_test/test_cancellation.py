@@ -30,6 +30,7 @@ NUM_CANCELATION_ITERATIONS = 1
 # Test cancellation on both running and hung queries
 DEBUG_ACTIONS = [None, 'WAIT']
 
+
 class TestCancellation(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -78,7 +79,7 @@ class TestCancellation(ImpalaTestSuite):
     debug_action = '0:GETNEXT:' + action if action != None else ''
     vector.get_value('exec_option')['debug_action'] = debug_action
 
-    # Execute the query multiple times, each time canceling it
+    # Execute the query multiple times, cancelling it each time.
     for i in xrange(NUM_CANCELATION_ITERATIONS):
       handle = self.execute_query_async(query, vector.get_value('exec_option'),
                                         table_format=vector.get_value('table_format'))
@@ -88,12 +89,8 @@ class TestCancellation(ImpalaTestSuite):
         try:
           new_client = self.create_impala_client()
           new_client.fetch(query, handle)
-        except Exception as e:
-          # We expect the RPC to fail only when the query is cancelled.
-          if not (type(e) is ImpalaBeeswaxException and "Cancelled" in str(e)):
-            threading.current_thread().fetch_results_error = e
-        finally:
-          new_client.close()
+        except ImpalaBeeswaxException as e:
+          threading.current_thread().fetch_results_error = e
 
       thread = threading.Thread(target=fetch_results)
       thread.start()
@@ -103,9 +100,14 @@ class TestCancellation(ImpalaTestSuite):
       cancel_result = self.client.cancel(handle)
       assert cancel_result.status_code == 0,\
           'Unexpected status code from cancel request: %s' % cancel_result
-
       thread.join()
-      if thread.fetch_results_error is not None:
+
+      if thread.fetch_results_error is None:
+        # If the query is cancelled while it's in the fetch rpc, it gets unregistered and
+        # therefore closed. Only call close on queries that did not fail fetch.
+        self.client.close_query(handle)
+      elif 'Cancelled' not in str(thread.fetch_results_error):
+        # If fetch failed for any reason other than cancellation, raise the error.
         raise thread.fetch_results_error
 
       if query_type == "CTAS":
