@@ -181,6 +181,7 @@ struct TGetFunctionsParams {
 // getFunctions() returns a list of function signatures
 struct TGetFunctionsResult {
   1: list<string> fn_signatures
+  2: list<string> fn_ret_types
 }
 
 // Parameters for the USE db command

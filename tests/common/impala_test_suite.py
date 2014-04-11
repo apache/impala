@@ -123,9 +123,12 @@ class ImpalaTestSuite(BaseTestSuite):
           self.client.execute("drop view " + full_tbl_name)
         else:
           self.client.execute("drop table " + full_tbl_name)
-      for fn_name in self.client.execute("show functions in " + db_name).data:
+      for fn_result in self.client.execute("show functions in " + db_name).data:
+        # First column is the return type, second is the function signature
+        fn_name = fn_result.split('\t')[1]
         self.client.execute("drop function %s.%s" % (db_name, fn_name))
-      for fn_name in self.client.execute("show aggregate functions in " + db_name).data:
+      for fn_result in self.client.execute("show aggregate functions in " + db_name).data:
+        fn_name = fn_result.split('\t')[1]
         self.client.execute("drop function %s.%s" % (db_name, fn_name))
       self.client.execute("drop database " + db_name)
 

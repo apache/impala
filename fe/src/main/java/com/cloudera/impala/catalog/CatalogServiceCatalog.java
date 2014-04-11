@@ -37,6 +37,7 @@ import com.cloudera.impala.thrift.TGetAllCatalogObjectsResponse;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUniqueId;
+import com.cloudera.impala.util.PatternMatcher;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -185,9 +186,7 @@ public class CatalogServiceCatalog extends Catalog {
           resp.addToObjects(catalogTbl);
         }
 
-        for (String signature: db.getAllFunctionSignatures(null)) {
-          Function fn = db.getFunction(signature);
-          if (fn == null) continue;
+        for (Function fn: db.getFunctions(null, new PatternMatcher())) {
           TCatalogObject function = new TCatalogObject(TCatalogObjectType.FUNCTION,
               fn.getCatalogVersion());
           function.setType(TCatalogObjectType.FUNCTION);

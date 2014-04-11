@@ -17,14 +17,14 @@ drop function if exists function_ddl_test.agg_fn(int, string);
 show functions in function_ddl_test
 ---- RESULTS
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 # Verify all the test functions are removed
 show aggregate functions in function_ddl_test
 ---- RESULTS
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 # Add them and test function overloading and scoping.
@@ -70,30 +70,30 @@ LOCATION '/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'
 ---- QUERY
 show functions in default
 ---- RESULTS
-'fn()'
+'INT','fn()'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 show functions in function_ddl_test
 ---- RESULTS
-'fn()'
-'fn(INT)'
-'fn(INT, STRING)'
-'fn(STRING, INT)'
-'fn2(INT)'
-'fn2(INT, STRING)'
-'fn_var_arg(INT...)'
+'INT','fn_var_arg(INT...)'
+'INT','fn2(INT)'
+'INT','fn2(INT, STRING)'
+'INT','fn()'
+'DOUBLE','fn(INT)'
+'INT','fn(INT, STRING)'
+'INT','fn(STRING, INT)'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 show aggregate functions in function_ddl_test
 ---- RESULTS
-'agg_fn(INT)'
-'agg_fn(INT, STRING)'
+'BIGINT','agg_fn(INT)'
+'INT','agg_fn(INT, STRING)'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 drop function function_ddl_test.fn2(int, string)
@@ -101,14 +101,14 @@ drop function function_ddl_test.fn2(int, string)
 ---- QUERY
 show functions
 ---- RESULTS
-'fn()'
-'fn(INT)'
-'fn(INT, STRING)'
-'fn(STRING, INT)'
-'fn2(INT)'
-'fn_var_arg(INT...)'
+'INT','fn_var_arg(INT...)'
+'INT','fn2(INT)'
+'INT','fn()'
+'DOUBLE','fn(INT)'
+'INT','fn(INT, STRING)'
+'INT','fn(STRING, INT)'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 drop function if exists function_ddl_test.fn2(int, string)
@@ -116,21 +116,21 @@ drop function if exists function_ddl_test.fn2(int, string)
 ---- QUERY
 show functions in function_ddl_test
 ---- RESULTS
-'fn()'
-'fn(INT)'
-'fn(INT, STRING)'
-'fn(STRING, INT)'
-'fn2(INT)'
-'fn_var_arg(INT...)'
+'INT','fn_var_arg(INT...)'
+'INT','fn2(INT)'
+'INT','fn()'
+'DOUBLE','fn(INT)'
+'INT','fn(INT, STRING)'
+'INT','fn(STRING, INT)'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 show functions in default;
 ---- RESULTS
-'fn()'
+'INT','fn()'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 drop function default.fn()
@@ -139,19 +139,19 @@ drop function default.fn()
 show functions in default;
 ---- RESULTS
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 show functions in function_ddl_test;
 ---- RESULTS
-'fn()'
-'fn(INT)'
-'fn(INT, STRING)'
-'fn(STRING, INT)'
-'fn2(INT)'
-'fn_var_arg(INT...)'
+'INT','fn_var_arg(INT...)'
+'INT','fn2(INT)'
+'INT','fn()'
+'DOUBLE','fn(INT)'
+'INT','fn(INT, STRING)'
+'INT','fn(STRING, INT)'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 drop function fn()
@@ -159,13 +159,13 @@ drop function fn()
 ---- QUERY
 show functions;
 ---- RESULTS
-'fn(INT)'
-'fn(INT, STRING)'
-'fn(STRING, INT)'
-'fn2(INT)'
-'fn_var_arg(INT...)'
+'INT','fn_var_arg(INT...)'
+'INT','fn2(INT)'
+'DOUBLE','fn(INT)'
+'INT','fn(INT, STRING)'
+'INT','fn(STRING, INT)'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 drop function fn_var_arg(INT...)
@@ -173,12 +173,12 @@ drop function fn_var_arg(INT...)
 ---- QUERY
 show functions;
 ---- RESULTS
-'fn(INT)'
-'fn(INT, STRING)'
-'fn(STRING, INT)'
-'fn2(INT)'
+'INT','fn2(INT)'
+'DOUBLE','fn(INT)'
+'INT','fn(INT, STRING)'
+'INT','fn(STRING, INT)'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 drop function agg_fn(int)
@@ -186,9 +186,9 @@ drop function agg_fn(int)
 ---- QUERY
 show aggregate functions
 ---- RESULTS
-'agg_fn(INT, STRING)'
+'INT','agg_fn(INT, STRING)'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 # Call invalidate metadata and make sure the functions are still there
@@ -199,17 +199,17 @@ invalidate metadata
 ---- QUERY
 show functions
 ---- RESULTS
-'fn(INT)'
-'fn(INT, STRING)'
-'fn(STRING, INT)'
-'fn2(INT)'
+'INT','fn2(INT)'
+'DOUBLE','fn(INT)'
+'INT','fn(INT, STRING)'
+'INT','fn(STRING, INT)'
 ---- TYPES
-STRING
+STRING, STRING
 ====
 ---- QUERY
 show aggregate functions
 ---- RESULTS
-'agg_fn(INT, STRING)'
+'INT','agg_fn(INT, STRING)'
 ---- TYPES
-STRING
+STRING, STRING
 ====

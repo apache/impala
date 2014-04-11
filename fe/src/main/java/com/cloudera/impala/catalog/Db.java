@@ -17,7 +17,6 @@ package com.cloudera.impala.catalog;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
@@ -25,6 +24,7 @@ import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TFunctionType;
+import com.cloudera.impala.util.PatternMatcher;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -114,27 +114,6 @@ public class Db implements CatalogObject {
    */
   public Table removeTable(String tableName) {
     return tableCache_.remove(tableName.toLowerCase());
-  }
-
-  /**
-   * Returns all the function signatures in this DB that match the specified
-   * function type. If the function type is null, all function signatures are returned.
-   */
-  public List<String> getAllFunctionSignatures(TFunctionType type) {
-    List<String> names = Lists.newArrayList();
-    synchronized (functions_) {
-      for (List<Function> fns: functions_.values()) {
-        for (Function f: fns) {
-          if (!f.userVisible()) continue;
-          if (type == null ||
-              (type == TFunctionType.SCALAR && f instanceof ScalarFunction) ||
-              (type == TFunctionType.AGGREGATE && f instanceof AggregateFunction)) {
-            names.add(f.signatureString());
-          }
-        }
-      }
-    }
-    return names;
   }
 
   /**
@@ -272,15 +251,20 @@ public class Db implements CatalogObject {
   }
 
   /**
-   * Returns all functions that match 'p'.
+   * Returns all functions that match 'fnPattern'.
    */
-  public List<Function> getFunctions(Pattern p) {
+  public List<Function> getFunctions(TFunctionType type, PatternMatcher fnPattern) {
     List<Function> functions = Lists.newArrayList();
     synchronized (functions_) {
       for (Map.Entry<String, List<Function>> fns: functions_.entrySet()) {
-        if (p.matcher(fns.getKey()).matches()) {
+        if (fnPattern.matches(fns.getKey())) {
           for (Function fn: fns.getValue()) {
-            if (fn.userVisible()) functions.add(fn);
+            if (fn.userVisible()) {
+              if (type == null ||
+                  (type == TFunctionType.SCALAR && fn instanceof ScalarFunction) ||
+                  (type == TFunctionType.AGGREGATE && fn instanceof AggregateFunction))
+              functions.add(fn);
+            }
           }
         }
       }

@@ -18,7 +18,6 @@ import java.sql.DatabaseMetaData;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +39,7 @@ import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
+import com.cloudera.impala.util.PatternMatcher;
 import com.google.common.collect.Lists;
 
 /**
@@ -251,29 +251,21 @@ public class MetadataOp {
       return result;
     }
 
-    // Creates the schema, table and column search patterns
-    String convertedSchemaPattern = convertPattern(schemaName);
-    String convertedTablePattern = convertPattern(tableName);
-    String convertedColumnPattern = convertPattern(columnName);
-    String convertedFunctionPattern = convertPattern(functionName);
-    Pattern schemaPattern = Pattern.compile(convertedSchemaPattern);
-    Pattern tablePattern = Pattern.compile(convertedTablePattern);
-    Pattern columnPattern = Pattern.compile(convertedColumnPattern);
-    Pattern functionPattern = Pattern.compile(convertedFunctionPattern);
+    // Creates the schema, table, column and function search patterns
+    PatternMatcher schemaPattern = PatternMatcher.createJdbcPatternMatcher(schemaName);
+    PatternMatcher tablePattern = PatternMatcher.createJdbcPatternMatcher(tableName);
+    PatternMatcher columnPattern = PatternMatcher.createJdbcPatternMatcher(columnName);
+    PatternMatcher fnPattern = PatternMatcher.createJdbcPatternMatcher(functionName);
 
     for (String dbName: catalog.getDbNames(null, user)) {
-      if (!schemaPattern.matcher(dbName).matches()) {
-        continue;
-      }
+      if (!schemaPattern.matches(dbName)) continue;
 
       Db db = catalog.getDb(dbName, user, Privilege.ANY);
 
       List<String> tableList = Lists.newArrayList();
       List<List<Column>> tablesColumnsList = Lists.newArrayList();
       for (String tabName: catalog.getTableNames(db.getName(), "*", user)) {
-        if (!tablePattern.matcher(tabName).matches()) {
-          continue;
-        }
+        if (!tablePattern.matches(tabName)) continue;
         tableList.add(tabName);
         List<Column> columns = Lists.newArrayList();
 
@@ -292,9 +284,7 @@ public class MetadataOp {
         } else {
           for (Column column: table.getColumns()) {
             String colName = column.getName();
-            if (!columnPattern.matcher(colName).matches()) {
-              continue;
-            }
+            if (!columnPattern.matches(colName)) continue;
             columns.add(column);
           }
         }
@@ -302,7 +292,7 @@ public class MetadataOp {
       }
 
       if (functionName != null) {
-        List<Function> fns = db.getFunctions(functionPattern);
+        List<Function> fns = db.getFunctions(null, fnPattern);
         result.functions.add(fns);
       }
 
@@ -621,24 +611,5 @@ public class MetadataOp {
   public static boolean isEmptyPattern(final String pattern) {
     return (pattern == null) || pattern.isEmpty() ||
            (pattern.length() == 1 && pattern.equals("%"));
-  }
-
-  /**
-   * Convert a pattern containing JDBC catalog search wildcard into Java regex patterns.
-   */
-  public static String convertPattern(final String pattern) {
-    String wildcardPattern = ".*";
-    String workPattern = pattern;
-    if (workPattern == null || pattern.isEmpty()) {
-      workPattern = "%";
-    }
-    String result = workPattern
-        .replaceAll("([^\\\\])%", "$1" + wildcardPattern)
-        .replaceAll("\\\\%", "%")
-        .replaceAll("^%", wildcardPattern)
-        .replaceAll("([^\\\\])_", "$1.")
-        .replaceAll("\\\\_", "_")
-        .replaceAll("^_", ".");
-    return result;
   }
 }

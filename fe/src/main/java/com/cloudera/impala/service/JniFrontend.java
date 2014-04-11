@@ -49,6 +49,7 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -75,6 +76,7 @@ import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.util.GlogAppender;
 import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -258,8 +260,15 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetFunctionsParams);
 
     TGetFunctionsResult result = new TGetFunctionsResult();
-    result.setFn_signatures(
-        frontend_.getFunctions(params.type, params.db, params.pattern));
+    List<String> signatures = Lists.newArrayList();
+    List<String> retTypes = Lists.newArrayList();
+    List<Function> fns = frontend_.getFunctions(params.type, params.db, params.pattern);
+    for (Function fn: fns) {
+      signatures.add(fn.signatureString());
+      retTypes.add(fn.getReturnType().toString());
+    }
+    result.setFn_signatures(signatures);
+    result.setFn_ret_types(retTypes);
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);

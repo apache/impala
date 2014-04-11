@@ -52,6 +52,7 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
@@ -93,6 +94,7 @@ import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
+import com.cloudera.impala.util.PatternMatcher;
 import com.cloudera.impala.util.TResultRowBuilder;
 import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Joiner;
@@ -177,7 +179,8 @@ public class Frontend {
       ShowFunctionsStmt stmt = (ShowFunctionsStmt)analysis.getStmt();
       ddl.setShow_fns_params(stmt.toThrift());
       metadata.setColumns(Arrays.asList(
-          new TColumn("name", ColumnType.STRING.toThrift())));
+          new TColumn("return type", ColumnType.STRING.toThrift()),
+          new TColumn("signature", ColumnType.STRING.toThrift())));
     } else if (analysis.isShowCreateTableStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_CREATE_TABLE;
       ddl.setShow_create_table_params(analysis.getShowCreateTableStmt().toThrift());
@@ -431,9 +434,13 @@ public class Frontend {
    * Returns all function signatures that match the pattern. If pattern is null,
    * matches all functions.
    */
-  public List<String> getFunctions(TFunctionType type, String dbName, String fnPattern)
+  public List<Function> getFunctions(TFunctionType type, String dbName, String fnPattern)
       throws DatabaseNotFoundException {
-    return impaladCatalog_.getFunctionSignatures(type, dbName, fnPattern);
+    Db db = impaladCatalog_.getDb(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
+    }
+    return db.getFunctions(type, PatternMatcher.createHivePatternMatcher(fnPattern));
   }
 
   /**

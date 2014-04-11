@@ -213,7 +213,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(frontend_->GetFunctions(
           params->type, params->db, fn_pattern, &query_ctxt_.session, &functions));
-      SetResultSet(functions.fn_signatures);
+      SetResultSet(functions.fn_ret_types, functions.fn_signatures);
       return Status::OK;
     }
     case TCatalogOpType::DESCRIBE: {
@@ -724,6 +724,20 @@ void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& results) {
     (*request_result_set_.get())[i].__isset.colVals = true;
     (*request_result_set_.get())[i].colVals.resize(1);
     (*request_result_set_.get())[i].colVals[0].__set_stringVal(results[i]);
+  }
+}
+
+void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& col1,
+    const vector<string>& col2) {
+  DCHECK_EQ(col1.size(), col2.size());
+
+  request_result_set_.reset(new vector<TResultRow>);
+  request_result_set_->resize(col1.size());
+  for (int i = 0; i < col1.size(); ++i) {
+    (*request_result_set_.get())[i].__isset.colVals = true;
+    (*request_result_set_.get())[i].colVals.resize(2);
+    (*request_result_set_.get())[i].colVals[0].__set_stringVal(col1[i]);
+    (*request_result_set_.get())[i].colVals[1].__set_stringVal(col2[i]);
   }
 }
 

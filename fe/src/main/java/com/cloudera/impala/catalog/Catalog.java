@@ -15,14 +15,11 @@
 package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.cloudera.impala.analysis.ArithmeticExpr;
 import com.cloudera.impala.analysis.BinaryPredicate;
@@ -35,9 +32,9 @@ import com.cloudera.impala.builtins.ScalarBuiltins;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TFunction;
-import com.cloudera.impala.thrift.TFunctionType;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTableName;
+import com.cloudera.impala.util.PatternMatcher;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -222,18 +219,6 @@ public abstract class Catalog {
   }
 
   /**
-   * Returns all the function for 'type' in this DB.
-   */
-  public List<String> getFunctionSignatures(TFunctionType type, String dbName,
-      String pattern) throws DatabaseNotFoundException {
-    Db db = getDb(dbName);
-    if (db == null) {
-      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
-    }
-    return filterStringsByPattern(db.getAllFunctionSignatures(type), pattern);
-  }
-
-  /**
    * Returns true if there is a function with this function name. Parameters
    * are ignored.
    */
@@ -271,24 +256,9 @@ public abstract class Catalog {
     if (matchPattern == null) {
       filtered = Lists.newArrayList(candidates);
     } else {
-      List<String> patterns = Lists.newArrayList();
-      // Hive ignores pretty much all metacharacters, so we have to escape them.
-      final String metaCharacters = "+?.^()]\\/{}";
-      final Pattern regex = Pattern.compile("([" + Pattern.quote(metaCharacters) + "])");
-
-      for (String pattern: Arrays.asList(matchPattern.split("\\|"))) {
-        Matcher matcher = regex.matcher(pattern);
-        pattern = matcher.replaceAll("\\\\$1").replace("*", ".*");
-        patterns.add(pattern);
-      }
-
+      PatternMatcher matcher = PatternMatcher.createHivePatternMatcher(matchPattern);
       for (String candidate: candidates) {
-        for (String pattern: patterns) {
-          // Empty string matches nothing in Hive's implementation
-          if (!pattern.isEmpty() && candidate.matches(pattern)) {
-            filtered.add(candidate);
-          }
-        }
+        if (matcher.matches(candidate)) filtered.add(candidate);
       }
     }
     Collections.sort(filtered, String.CASE_INSENSITIVE_ORDER);

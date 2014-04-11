@@ -320,6 +320,8 @@ class ImpalaServer::QueryExecState {
 
   // Copies results into request_result_set_
   void SetResultSet(const std::vector<std::string>& results);
+  void SetResultSet(const std::vector<std::string>& col1,
+      const std::vector<std::string>& col2);
 
   // Sets the result set for a CREATE TABLE AS SELECT statement. The results will not be
   // ready until all BEs complete execution. This can be called as part of Wait(),
