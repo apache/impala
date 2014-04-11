@@ -1,5 +1,75 @@
 ====
 ---- QUERY
+# test a larger dataset, includes nulls
+# the exact result could vary slightly due to numeric instability
+# 0.001 is a conservative upperbound on the possible difference in results
+SELECT abs(cast(variance(tinyint_col) as double) - 6.66741) < 0.001,
+ abs(cast(variance(double_col) as double) - 8484680) < 0.001
+from alltypesagg
+---- TYPES
+boolean, boolean
+---- RESULTS
+true,true
+====
+---- QUERY
+# No tuples processed (should return null)
+SELECT variance(tinyint_col), stddev(smallint_col), variance_pop(int_col),
+stddev_pop(bigint_col)
+from alltypesagg WHERE id = -9999999
+---- TYPES
+string, string, string, string
+---- RESULTS
+'NULL','NULL','NULL','NULL'
+====
+---- QUERY
+# exactly 1 tuple processed (variance & stddev are 0)
+SELECT variance(tinyint_col), stddev(smallint_col), variance_pop(int_col),
+stddev_pop(bigint_col)
+from alltypesagg WHERE id = 1006
+---- TYPES
+string, string, string, string
+---- RESULTS
+'0','0','0','0'
+====
+---- QUERY
+# Includes one row which is null
+SELECT variance(tinyint_col), variance(smallint_col), variance(int_col),
+variance(bigint_col), variance(float_col), variance(double_col)
+from alltypesagg WHERE id >= 1000 AND id < 1006
+---- TYPES
+string, string, string, string, string, string
+---- RESULTS
+'2.5','2.5','2.5','250','3.025','255.025'
+====
+---- QUERY
+SELECT variance_pop(tinyint_col), variance_pop(smallint_col), variance_pop(int_col),
+variance_pop(bigint_col), variance_pop(float_col), variance_pop(double_col)
+from alltypesagg WHERE id >= 1000 AND id < 1006
+---- TYPES
+string, string, string, string, string, string
+---- RESULTS
+'2','2','2','200','2.42','204.02'
+====
+---- QUERY
+SELECT stddev(tinyint_col), stddev(smallint_col), stddev(int_col), stddev(bigint_col),
+stddev(float_col), stddev(double_col)
+from alltypesagg WHERE id >= 1000 AND id < 1006
+---- TYPES
+string, string, string, string, string, string
+---- RESULTS
+'1.58114','1.58114','1.58114','15.8114','1.73925','15.9695'
+====
+---- QUERY
+# no grouping exprs, cols contain nulls except for bool cols
+SELECT stddev_pop(tinyint_col), stddev_pop(smallint_col), stddev_pop(int_col),
+stddev_pop(bigint_col), stddev_pop(float_col), stddev_pop(double_col)
+from alltypesagg WHERE id >= 1000 AND id < 1006
+---- TYPES
+string, string, string, string, string, string
+---- RESULTS
+'1.41421','1.41421','1.41421','14.1421','1.55563','14.2836'
+====
+---- QUERY
 # no grouping exprs, cols contain nulls except for bool cols
 select count(bool_col), min(bool_col), max(bool_col)
 from alltypesagg

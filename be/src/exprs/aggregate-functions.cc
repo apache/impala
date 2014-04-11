@@ -29,6 +29,17 @@ using namespace std;
 // the custom code in aggregation node.
 namespace impala {
 
+// Converts any UDF Val Type to a string representation
+template <typename T>
+StringVal ToStringVal(FunctionContext* context, T val) {
+  stringstream ss;
+  ss << val;
+  const string &str = ss.str();
+  StringVal string_val(context, str.size());
+  memcpy(string_val.ptr, str.c_str(), str.size());
+  return string_val;
+}
+
 // Delimiter to use if the separator is NULL.
 static const StringVal DEFAULT_STRING_CONCAT_DELIM((uint8_t*)", ", 2);
 
@@ -496,6 +507,91 @@ StringVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
   return result_str;
 }
 
+// An implementation of a simple single pass variance algorithm. A standard UDA must
+// be single pass (i.e. does not scan the table more than once), so the most canonical
+// two pass approach is not practical.
+struct KnuthVarianceState {
+  double mean;
+  double m2;
+  int64_t count;
+};
+
+// Set pop=true for population variance, false for sample variance
+double ComputeKnuthVariance(const KnuthVarianceState& state, bool pop) {
+  // Return zero for 1 tuple specified by
+  // http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions212.htm
+  if (state.count == 1) return 0.0;
+  if (pop) return state.m2 / state.count;
+  return state.m2 / (state.count - 1);
+}
+
+void AggregateFunctions::KnuthVarInit(FunctionContext* ctx, StringVal* dst) {
+  dst->is_null = false;
+  dst->len = sizeof(KnuthVarianceState);
+  dst->ptr = ctx->Allocate(dst->len);
+  memset(dst->ptr, 0, dst->len);
+}
+
+template <typename T>
+void AggregateFunctions::KnuthVarUpdate(FunctionContext* ctx, const T& src,
+                                        StringVal* dst) {
+  if (src.is_null) return;
+  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(dst->ptr);
+  double temp = 1 + state->count;
+  double delta = src.val - state->mean;
+  double r = delta / temp;
+  state->mean += r;
+  state->m2 += state->count * delta * r;
+  state->count = temp;
+}
+
+void AggregateFunctions::KnuthVarMerge(FunctionContext* ctx, const StringVal& src,
+                                       StringVal* dst) {
+  // Reference implementation:
+  // http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
+  KnuthVarianceState* src_state = reinterpret_cast<KnuthVarianceState*>(src.ptr);
+  KnuthVarianceState* dst_state = reinterpret_cast<KnuthVarianceState*>(dst->ptr);
+  if (src_state->count == 0) return;
+  double delta = dst_state->mean - src_state->mean;
+  double sum_count = dst_state->count + src_state->count;
+  dst_state->mean = src_state->mean + delta * (dst_state->count / sum_count);
+  dst_state->m2 = (src_state->m2) + dst_state->m2 +
+      (delta * delta) * (src_state->count * dst_state->count / sum_count);
+  dst_state->count = sum_count;
+}
+
+StringVal AggregateFunctions::KnuthVarFinalize(FunctionContext* ctx,
+                                               const StringVal& state_sv) {
+  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  if (state->count == 0) return StringVal::null();
+  double variance = ComputeKnuthVariance(*state, false);
+  return ToStringVal(ctx, variance);
+}
+
+StringVal AggregateFunctions::KnuthVarPopFinalize(FunctionContext* ctx,
+                                                  const StringVal& state_sv) {
+  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  if (state->count == 0) return StringVal::null();
+  double variance = ComputeKnuthVariance(*state, true);
+  return ToStringVal(ctx, variance);
+}
+
+StringVal AggregateFunctions::KnuthStddevFinalize(FunctionContext* ctx,
+                                                  const StringVal& state_sv) {
+  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  if (state->count == 0) return StringVal::null();
+  double variance = ComputeKnuthVariance(*state, false);
+  return ToStringVal(ctx, sqrt(variance));
+}
+
+StringVal AggregateFunctions::KnuthStddevPopFinalize(FunctionContext* ctx,
+                                                     const StringVal& state_sv) {
+  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  if (state->count == 0) return StringVal::null();
+  double variance = ComputeKnuthVariance(*state, true);
+  return ToStringVal(ctx, sqrt(variance));
+}
+
 // Stamp out the templates for the types we need.
 template void AggregateFunctions::InitZero<BigIntVal>(FunctionContext*, BigIntVal* dst);
 
@@ -612,4 +708,17 @@ template void AggregateFunctions::HllUpdate(
     FunctionContext*, const TimestampVal&, StringVal*);
 template void AggregateFunctions::HllUpdate(
     FunctionContext*, const DecimalVal&, StringVal*);
+
+template void AggregateFunctions::KnuthVarUpdate(
+    FunctionContext*, const TinyIntVal&, StringVal*);
+template void AggregateFunctions::KnuthVarUpdate(
+    FunctionContext*, const SmallIntVal&, StringVal*);
+template void AggregateFunctions::KnuthVarUpdate(
+    FunctionContext*, const IntVal&, StringVal*);
+template void AggregateFunctions::KnuthVarUpdate(
+    FunctionContext*, const BigIntVal&, StringVal*);
+template void AggregateFunctions::KnuthVarUpdate(
+    FunctionContext*, const FloatVal&, StringVal*);
+template void AggregateFunctions::KnuthVarUpdate(
+    FunctionContext*, const DoubleVal&, StringVal*);
 }
