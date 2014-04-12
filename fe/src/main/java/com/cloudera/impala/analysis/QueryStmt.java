@@ -170,11 +170,6 @@ public abstract class QueryStmt extends StatementBase {
   public ArrayList<Expr> getResultExprs() { return resultExprs_; }
   public ArrayList<Expr> getBaseTblResultExprs() { return baseTblResultExprs_; }
 
-  public void setResultExprs(List<Expr> resultExprs) {
-    this.resultExprs_.clear();
-    this.resultExprs_.addAll(resultExprs);
-  }
-
   /**
    * Mark all slots that need to be materialized for the execution of this stmt.
    * This excludes slots referenced in resultExprs (it depends on the consumer of

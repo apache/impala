@@ -194,3 +194,142 @@ NULL,'NULL',2,'foo'
 ---- TYPES
 INT,STRING,INT,STRING
 ====
+---- QUERY
+# Perform the same set of queries, but with SELECT clauses rather than VALUES
+# Simple non-permutation
+insert into perm_nopart(int_col1, string_col, int_col2) select 1,'str',2
+---- SETUP
+RESET insert_permutation_test.perm_nopart
+---- RESULTS
+: 1
+====
+---- QUERY
+select * from perm_nopart
+---- RESULTS
+1,'str',2
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Permute the int columns
+insert into perm_nopart(int_col2, string_col, int_col1) select 1,'str',2
+---- SETUP
+RESET insert_permutation_test.perm_nopart
+---- RESULTS
+: 1
+====
+---- QUERY
+select * from perm_nopart
+---- RESULTS
+2,'str',1
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Leave out two columns, check they are assigned NULL
+insert into perm_nopart(int_col2) select 1
+---- SETUP
+RESET insert_permutation_test.perm_nopart
+---- RESULTS
+: 1
+====
+---- QUERY
+select * from perm_nopart
+---- RESULTS
+NULL,'NULL',1
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Permute the partition columns
+insert into perm_part(p1, string_col, int_col1, p2) select 10,'str',1, 'hello'
+---- SETUP
+RESET insert_permutation_test.perm_part
+---- RESULTS
+p1=10/p2=hello/: 1
+====
+---- QUERY
+select * from perm_part
+---- RESULTS
+1,'str',10,'hello'
+---- TYPES
+INT,STRING,INT,STRING
+====
+---- QUERY
+# Same thing - permute the partition columns, but invert their order relative to Hive
+insert into perm_part(p2, string_col, int_col1, p1) select 'hello','str',1, 10
+---- SETUP
+RESET insert_permutation_test.perm_part
+---- RESULTS
+p1=10/p2=hello/: 1
+====
+---- QUERY
+select * from perm_part
+---- RESULTS
+1,'str',10,'hello'
+---- TYPES
+INT,STRING,INT,STRING
+====
+---- QUERY
+# Check NULL if only partition keys are mentioned
+insert into perm_part(p2, p1) select 'hello', 10
+---- SETUP
+RESET insert_permutation_test.perm_part
+---- RESULTS
+p1=10/p2=hello/: 1
+====
+---- QUERY
+select * from perm_part
+---- RESULTS
+NULL,'NULL',10,'hello'
+---- TYPES
+INT,STRING,INT,STRING
+====
+---- QUERY
+# Check NULL if only partition keys are mentioned, one static
+insert into perm_part(p2) PARTITION(p1=10) select 'hello'
+---- SETUP
+RESET insert_permutation_test.perm_part
+---- RESULTS
+p1=10/p2=hello/: 1
+====
+---- QUERY
+select * from perm_part
+---- RESULTS
+NULL,'NULL',10,'hello'
+---- TYPES
+INT,STRING,INT,STRING
+====
+---- QUERY
+# Now some queries that use SELECT FROM
+# Simple non-permutation
+insert into perm_nopart(int_col1, string_col, int_col2) select 1,'str',2 FROM
+functional.alltypes LIMIT 2
+---- SETUP
+RESET insert_permutation_test.perm_nopart
+---- RESULTS
+: 2
+====
+---- QUERY
+select * from perm_nopart
+---- RESULTS
+1,'str',2
+1,'str',2
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+insert into perm_nopart(int_col1) select id FROM functional.alltypes ORDER BY ID LIMIT 2
+---- SETUP
+RESET insert_permutation_test.perm_nopart
+---- RESULTS
+: 2
+====
+---- QUERY
+select * from perm_nopart
+---- RESULTS
+0,'NULL',NULL
+1,'NULL',NULL
+---- TYPES
+INT,STRING,INT
+====

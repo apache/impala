@@ -91,6 +91,12 @@ public class InsertStmt extends StatementBase {
   // should decide whether to re-partition or not).
   private Boolean isRepartition_ = null;
 
+  // Output expressions that produce the final results to write to the target table. May
+  // include casts, and NullLiterals where an output column isn't explicitly mentioned.
+  // Set in prepareExpressions(). The i'th expr produces the i'th column of the target
+  // table.
+  private final ArrayList<Expr> resultExprs_ = new ArrayList<Expr>();
+
   // The column permutation is specified by writing INSERT INTO tbl(col3, col1, col2...)
   //
   // It is a mapping from select-list expr index to (non-partition) output column. If
@@ -144,7 +150,7 @@ public class InsertStmt extends StatementBase {
     if (!needsGeneratedQueryStatement_) {
       try {
         queryStmt_.analyze(analyzer);
-        selectListExprs = queryStmt_.getBaseTblResultExprs();
+        selectListExprs = Expr.cloneList(queryStmt_.getBaseTblResultExprs());
       } catch (AnalysisException e) {
         if (analyzer.getMissingTbls().isEmpty()) throw e;
       }
@@ -256,7 +262,6 @@ public class InsertStmt extends StatementBase {
 
     // Populate partitionKeyExprs from partitionKeyValues and selectExprTargetColumns
     prepareExpressions(selectExprTargetColumns, selectListExprs, table_, analyzer);
-
     // Analyze plan hints at the end to prefer reporting other error messages first
     // (e.g., the PARTITION clause is not applicable to unpartitioned and HBase tables).
     analyzePlanHints();
@@ -418,7 +423,7 @@ public class InsertStmt extends StatementBase {
    * 2. Populates partitionKeyExprs with type-compatible expressions, in Hive
    * partition-column order, for all partition columns
    *
-   * 3. Replaces selectListExprs with type-compatible expressions, in Hive column order,
+   * 3. Populates resultExprs_ with type-compatible expressions, in Hive column order,
    * for all expressions in the select-list. Unmentioned columns are assigned NULL literal
    * expressions.
    *
@@ -483,12 +488,11 @@ public class InsertStmt extends StatementBase {
 
     // Finally, 'undo' the permutation so that the selectListExprs are in Hive column
     // order, and add NULL expressions to all missing columns.
-    List<Expr> permutedSelectListExprs = Lists.newArrayList();
     for (Column tblColumn: table_.getColumnsInHiveOrder()) {
       boolean matchFound = false;
       for (int i = 0; i < selectListExprs.size(); ++i) {
         if (selectExprTargetColumns.get(i).getName().equals(tblColumn.getName())) {
-          permutedSelectListExprs.add(selectListExprs.get(i));
+          resultExprs_.add(selectListExprs.get(i));
           matchFound = true;
           break;
         }
@@ -500,7 +504,7 @@ public class InsertStmt extends StatementBase {
         if (tblColumn.getPosition() >= numClusteringCols) {
           // Unmentioned non-clustering columns get NULL literals with the appropriate
           // target type because Parquet cannot handle NULL_TYPE (IMPALA-617).
-          permutedSelectListExprs.add(new NullLiteral().castTo(tblColumn.getType()));
+          resultExprs_.add(new NullLiteral().castTo(tblColumn.getType()));
         }
       }
     }
@@ -508,14 +512,13 @@ public class InsertStmt extends StatementBase {
     if (needsGeneratedQueryStatement_) {
       // Build a query statement that returns NULL for every column
       List<SelectListItem> selectListItems = Lists.newArrayList();
-      for(Expr e: permutedSelectListExprs) {
+      for(Expr e: resultExprs_) {
         selectListItems.add(new SelectListItem(e, null));
       }
       SelectList selectList = new SelectList(selectListItems);
       queryStmt_ = new SelectStmt(selectList, null, null, null, null, null, null);
       queryStmt_.analyze(analyzer);
     }
-    queryStmt_.setResultExprs(permutedSelectListExprs);
   }
 
   /**
@@ -593,6 +596,7 @@ public class InsertStmt extends StatementBase {
   public QueryStmt getQueryStmt() { return queryStmt_; }
   public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
   public Boolean isRepartition() { return isRepartition_; }
+  public ArrayList<Expr> getResultExprs() { return resultExprs_; }
 
   public DataSink createDataSink() {
     // analyze() must have been called before.

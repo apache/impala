@@ -159,7 +159,12 @@ public class Planner {
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
     }
-    rootFragment.setOutputExprs(queryStmt.getBaseTblResultExprs());
+
+    if (analysisResult.isInsertStmt()) {
+      rootFragment.setOutputExprs(analysisResult.getInsertStmt().getResultExprs());
+    } else {
+      rootFragment.setOutputExprs(queryStmt.getBaseTblResultExprs());
+    }
 
     LOG.debug("finalize plan fragments");
     for (PlanFragment fragment: fragments) {
