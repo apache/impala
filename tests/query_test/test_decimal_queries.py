@@ -25,7 +25,8 @@ class TestDecimalQueries(ImpalaTestSuite):
     # On CDH4, hive does not support decimal so we can't run these tests against
     # the other file formats. Enable them on C5.
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text')
+        v.get_value('table_format').file_format == 'text' and
+        v.get_value('table_format').compression_codec == 'none')
 
   def test_queries(self, vector):
     new_vector = copy(vector)
