@@ -49,6 +49,7 @@ BlockingJoinNode::~BlockingJoinNode() {
 }
 
 Status BlockingJoinNode::Prepare(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   build_pool_.reset(new MemPool(mem_tracker()));
@@ -83,6 +84,7 @@ void BlockingJoinNode::BuildSideThread(RuntimeState* state, Promise<Status>* sta
   Status s;
   {
     SCOPED_TIMER(state->total_cpu_timer());
+    SCOPED_TIMER(runtime_profile()->total_async_timer());
     s = ConstructBuildSide(state);
   }
   // Release the thread token as soon as possible (before the main thread joins
@@ -93,10 +95,10 @@ void BlockingJoinNode::BuildSideThread(RuntimeState* state, Promise<Status>* sta
 }
 
 Status BlockingJoinNode::Open(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   eos_ = false;
 

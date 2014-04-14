@@ -91,6 +91,7 @@ HdfsScanNode::~HdfsScanNode() {
 }
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   Status status = GetNextInternal(state, row_batch, eos);
   if (status.IsMemLimitExceeded()) state->SetMemLimitExceeded();
   if (!status.ok() || *eos) StopAndFinalizeCounters();
@@ -101,7 +102,6 @@ Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, b
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   {
     unique_lock<mutex> l(lock_);

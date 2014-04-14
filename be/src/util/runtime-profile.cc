@@ -45,7 +45,8 @@ static const string THREAD_INVOLUNTARY_CONTEXT_SWITCHES = "InvoluntaryContextSwi
 // The root counter name for all top level counters.
 static const string ROOT_COUNTER = "";
 
-const std::string RuntimeProfile::TOTAL_TIME_COUNTER_NAME = "TotalTime";
+const string RuntimeProfile::TOTAL_TIME_COUNTER_NAME = "TotalTime";
+const string RuntimeProfile::ASYNC_TIME_COUNTER_NAME = "AsyncTotalTime";
 
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
     bool is_averaged_profile)
@@ -55,7 +56,9 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
     metadata_(-1),
     is_averaged_profile_(is_averaged_profile),
     counter_total_time_(TCounterType::TIME_NS),
-    local_time_percent_(0) {
+    total_async_timer_(TCounterType::TIME_NS),
+    local_time_percent_(0),
+    local_time_ns_(0) {
   Counter* total_time_counter;
   if (!is_averaged_profile) {
     total_time_counter = &counter_total_time_;
@@ -64,6 +67,9 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
   }
 
   counter_map_[TOTAL_TIME_COUNTER_NAME] = total_time_counter;
+  if (!is_averaged_profile) {
+    AddCounter(ASYNC_TIME_COUNTER_NAME, TCounterType::TIME_NS);
+  }
 }
 
 RuntimeProfile::~RuntimeProfile() {
@@ -147,6 +153,10 @@ void RuntimeProfile::UpdateAverage(RuntimeProfile* other) {
     lock_guard<mutex> m(other->counter_map_lock_);
     for (src_iter = other->counter_map_.begin();
          src_iter != other->counter_map_.end(); ++src_iter) {
+
+      // Ignore this counter for averages.
+      if (src_iter->first == ASYNC_TIME_COUNTER_NAME) continue;
+
       dst_iter = counter_map_.find(src_iter->first);
       AveragedCounter* avg_counter;
 
@@ -329,10 +339,15 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
     total_child_time += children_[i].first->total_time_counter()->value();
   }
 
-  int64_t local_time = total_time_counter()->value() - total_child_time;
+  local_time_ns_ = total_time_counter()->value() - total_child_time;
+  if (!is_averaged_profile_) {
+    local_time_ns_ += total_async_timer()->value();
+  }
+
   // Counters have some margin, set to 0 if it was negative.
-  local_time = ::max(0L, local_time);
-  local_time_percent_ = static_cast<double>(local_time) / total;
+  local_time_ns_ = ::max(0L, local_time_ns_);
+  local_time_percent_ =
+      static_cast<double>(local_time_ns_) / total_time_counter()->value();
   local_time_percent_ = ::min(1.0, local_time_percent_) * 100;
 
   // Recurse on children
@@ -498,9 +513,11 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   stream.flags(ios::fixed);
   stream << prefix << name_ << ":";
   if (total_time->second->value() != 0) {
-    stream << "(Active: "
+    stream << "(Total: "
            << PrettyPrinter::Print(total_time->second->value(),
                total_time->second->type())
+           << ", non-child: "
+           << PrettyPrinter::Print(local_time_ns_, TCounterType::TIME_NS)
            << ", % non-child: "
            << setprecision(2) << local_time_percent_
            << "%)";
@@ -792,7 +809,7 @@ void RuntimeProfile::PrintChildCounters(const string& prefix,
     const set<string>& child_counters = itr->second;
     BOOST_FOREACH(const string& child_counter, child_counters) {
       CounterMap::const_iterator iter = counter_map.find(child_counter);
-      DCHECK(iter != counter_map.end());
+      if (iter == counter_map.end()) continue;
       stream << prefix << "   - " << iter->first << ": "
              << PrettyPrinter::Print(iter->second->value(), iter->second->type())
              << endl;

@@ -318,7 +318,11 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
     case TCounterType::BYTES: {
       string unit;
       double output = GetByteUnit(value, &unit);
-      ss << setprecision(PRECISION) << output << " " << unit;
+      if (output == 0) {
+        ss << "0";
+      } else {
+        ss << setprecision(PRECISION) << output << " " << unit;
+      }
       break;
     }
 

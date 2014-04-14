@@ -78,6 +78,7 @@ Status AggregationNode::Init(const TPlanNode& tnode) {
 }
 
 Status AggregationNode::Prepare(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   tuple_pool_.reset(new MemPool(mem_tracker()));
@@ -88,7 +89,6 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   hash_table_load_factor_counter_ =
       ADD_COUNTER(runtime_profile(), "LoadFactor", TCounterType::DOUBLE_VALUE);
 
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   agg_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(agg_tuple_id_);
   RETURN_IF_ERROR(Expr::Prepare(probe_exprs_, state, child(0)->row_desc(), false));
@@ -146,8 +146,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 }
 
 Status AggregationNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Open(state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  RETURN_IF_ERROR(ExecNode::Open(state));
 
   RETURN_IF_ERROR(Expr::Open(probe_exprs_, state));
   RETURN_IF_ERROR(Expr::Open(build_exprs_, state));
@@ -201,10 +201,10 @@ Status AggregationNode::Open(RuntimeState* state) {
 }
 
 Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
   SCOPED_TIMER(get_results_timer_);
 
   if (ReachedLimit()) {

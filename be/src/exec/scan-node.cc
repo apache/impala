@@ -43,6 +43,7 @@ const string ScanNode::NUM_SCANNER_THREADS_STARTED =
     "NumScannerThreadsStarted";
 
 Status ScanNode::Prepare(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   scanner_thread_counters_ =

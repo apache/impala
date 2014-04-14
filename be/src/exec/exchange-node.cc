@@ -54,8 +54,8 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
 }
 
 Status ExchangeNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Open(state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(FillInputRowBatch(state));
   return Status::OK;
 }

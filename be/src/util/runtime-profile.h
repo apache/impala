@@ -363,7 +363,7 @@ class RuntimeProfile {
       const TRuntimeProfileTree& profiles);
 
   // Adds a child profile.  This is thread safe.
-  // Checks if 'child' is already added by searching for its name in the 
+  // Checks if 'child' is already added by searching for its name in the
   // child map, and only adds it if the name doesn't exist.
   // 'indent' indicates whether the child will be printed w/ extra indentation
   // relative to the parent.
@@ -448,6 +448,9 @@ class RuntimeProfile {
 
   // Returns the counter for the total elapsed time.
   Counter* total_time_counter() { return counter_map_[TOTAL_TIME_COUNTER_NAME]; }
+  Counter* total_async_timer() { return counter_map_[ASYNC_TIME_COUNTER_NAME]; }
+
+  int64_t local_time() { return local_time_ns_; }
 
   // Prints the counters in a name: value format.
   // Does not hold locks when it makes any function calls.
@@ -600,9 +603,18 @@ class RuntimeProfile {
   mutable boost::mutex time_series_counter_map_lock_;
 
   Counter counter_total_time_;
+
+  // Total time that child profiles spent in an asychronous thread. This is used
+  // in the local_time_percent_ calculation.
+  Counter total_async_timer_;
+
   // Time spent in just in this profile (i.e. not the children) as a fraction
   // of the total time in the entire profile tree.
   double local_time_percent_;
+
+  // Time spent in this node (not including the children). Computed in
+  // ComputeTimeInProfile()
+  int64_t local_time_ns_;
 
   // Update a subtree of profiles from nodes, rooted at *idx.
   // On return, *idx points to the node immediately following this subtree.
@@ -615,6 +627,7 @@ class RuntimeProfile {
 
   // Name of the counter maintaining the total time.
   static const std::string TOTAL_TIME_COUNTER_NAME;
+  static const std::string ASYNC_TIME_COUNTER_NAME;
 
   // Create a subtree of runtime profiles from nodes, starting at *node_idx.
   // On return, *node_idx is the index one past the end of this subtree
