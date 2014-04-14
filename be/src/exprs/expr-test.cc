@@ -1010,6 +1010,10 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'abxcy1234a' RLIKE 'a.x.y.*a'", TYPE_BOOLEAN, true);
   TestValue("'axcy1234a' REGEXP 'a.x.y.*a'", TYPE_BOOLEAN, false);
   TestValue("'axcy1234a' RLIKE 'a.x.y.*a'", TYPE_BOOLEAN, false);
+  TestValue("'english' REGEXP 'en'", TYPE_BOOLEAN, true);
+  TestValue("'english' REGEXP 'lis'", TYPE_BOOLEAN, true);
+  TestValue("'english' REGEXP 'english'", TYPE_BOOLEAN, true);
+  TestValue("'english' REGEXP 'engilsh'", TYPE_BOOLEAN, false);
   // regex escape chars; insert special character in the middle to prevent
   // it from being matched as a substring
   TestValue("'.[]{}()x\\\\*+?|^$' LIKE '.[]{}()_\\\\\\\\*+?|^$'", TYPE_BOOLEAN, true);

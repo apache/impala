@@ -1746,28 +1746,40 @@ join tpch.part p
 where
 (
   p_brand = 'Brand#12'
-  and p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG'
+  and (p_container LIKE 'SM CASE' or
+       p_container LIKE 'SM BOX' or
+       p_container LIKE 'SM PACK' or
+       p_container LIKE 'SM PKG')
   and l_quantity >= 1 and l_quantity <= 11
   and p_size >= 1 and p_size <= 5
-  and l_shipmode REGEXP 'AIR||AIR REG'
+  and (l_shipmode LIKE 'AIR' or
+       l_shipmode LIKE 'AIR REG')
   and l_shipinstruct = 'DELIVER IN PERSON'
 )
 or
 (
   p_brand = 'Brand#23'
-  and p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK'
+  and (p_container LIKE 'MED BAG' or
+       p_container LIKE 'MED BOX' or
+       p_container LIKE 'MED PKG' or
+       p_container LIKE 'MED PACK')
   and l_quantity >= 10 and l_quantity <= 20
   and p_size >= 1 and p_size <= 10
-  and l_shipmode REGEXP 'AIR||AIR REG'
+  and (l_shipmode LIKE 'AIR' or
+       l_shipmode LIKE 'AIR REG')
   and l_shipinstruct = 'DELIVER IN PERSON'
 )
 or
 (
   p_brand = 'Brand#34'
-  and p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG'
+  and (p_container LIKE 'LG BAG' or
+       p_container LIKE 'LG BOX' or
+       p_container LIKE 'LG PKG' or
+       p_container LIKE 'LG PACK')
   and l_quantity >= 20 and l_quantity <= 30
   and p_size >= 1 and p_size <= 15
-  and l_shipmode REGEXP 'AIR||AIR REG'
+  and (l_shipmode LIKE 'AIR' or
+       l_shipmode LIKE 'AIR REG')
   and l_shipinstruct = 'DELIVER IN PERSON'
 )
 ---- PLAN
@@ -1776,7 +1788,7 @@ or
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: l.l_partkey = p.p_partkey
-|  other predicates: (p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON')
+|  other predicates: (p_brand = 'Brand#12' AND (p_container LIKE 'SM CASE' OR p_container LIKE 'SM BOX' OR p_container LIKE 'SM PACK' OR p_container LIKE 'SM PKG') AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND (l_shipmode LIKE 'AIR' OR l_shipmode LIKE 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND (p_container LIKE 'MED BAG' OR p_container LIKE 'MED BOX' OR p_container LIKE 'MED PKG' OR p_container LIKE 'MED PACK') AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND (l_shipmode LIKE 'AIR' OR l_shipmode LIKE 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND (p_container LIKE 'LG BAG' OR p_container LIKE 'LG BOX' OR p_container LIKE 'LG PKG' OR p_container LIKE 'LG PACK') AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND (l_shipmode LIKE 'AIR' OR l_shipmode LIKE 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON')
 |
 |--01:SCAN HDFS [tpch.part p]
 |     partitions=1/1 size=22.83MB compact
@@ -1794,7 +1806,7 @@ or
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l.l_partkey = p.p_partkey
-|  other predicates: (p_brand = 'Brand#12' AND p_container REGEXP 'SM CASE||SM BOX||SM PACK||SM PKG' AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container REGEXP 'MED BAG||MED BOX||MED PKG||MED PACK' AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container REGEXP 'LG CASE||LG BOX||LG PACK||LG PKG' AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND l_shipmode REGEXP 'AIR||AIR REG' AND l_shipinstruct = 'DELIVER IN PERSON')
+|  other predicates: (p_brand = 'Brand#12' AND (p_container LIKE 'SM CASE' OR p_container LIKE 'SM BOX' OR p_container LIKE 'SM PACK' OR p_container LIKE 'SM PKG') AND l_quantity >= 1.0 AND l_quantity <= 11.0 AND p_size >= 1 AND p_size <= 5 AND (l_shipmode LIKE 'AIR' OR l_shipmode LIKE 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND (p_container LIKE 'MED BAG' OR p_container LIKE 'MED BOX' OR p_container LIKE 'MED PKG' OR p_container LIKE 'MED PACK') AND l_quantity >= 10.0 AND l_quantity <= 20.0 AND p_size >= 1 AND p_size <= 10 AND (l_shipmode LIKE 'AIR' OR l_shipmode LIKE 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND (p_container LIKE 'LG BAG' OR p_container LIKE 'LG BOX' OR p_container LIKE 'LG PKG' OR p_container LIKE 'LG PACK') AND l_quantity >= 20.0 AND l_quantity <= 30.0 AND p_size >= 1 AND p_size <= 15 AND (l_shipmode LIKE 'AIR' OR l_shipmode LIKE 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON')
 |
 |--04:EXCHANGE [BROADCAST]
 |  |

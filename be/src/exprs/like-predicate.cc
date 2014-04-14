@@ -85,6 +85,17 @@ void* LikePredicate::ConstantEqualsFn(Expr* e, TupleRow* row) {
   return &p->result_.bool_val;
 }
 
+void* LikePredicate::ConstantRegexFnPartial(Expr* e, TupleRow* row) {
+  LikePredicate* p = static_cast<LikePredicate*>(e);
+  DCHECK_EQ(p->GetNumChildren(), 2);
+  StringValue* operand_val = static_cast<StringValue*>(e->GetChild(0)->GetValue(row));
+  if (operand_val == NULL) return NULL;
+
+  re2::StringPiece operand_sp(operand_val->ptr, operand_val->len);
+  p->result_.bool_val = RE2::PartialMatch(operand_sp, *p->regex_);
+  return &p->result_.bool_val;
+}
+
 void* LikePredicate::ConstantRegexFn(Expr* e, TupleRow* row) {
   LikePredicate* p = static_cast<LikePredicate*>(e);
   DCHECK_EQ(p->GetNumChildren(), 2);
@@ -110,8 +121,13 @@ void* LikePredicate::RegexMatch(Expr* e, TupleRow* row, bool is_like_pattern) {
   }
   re2::RE2 re(re_pattern);
   if (re.ok()) {
-    p->result_.bool_val =
-        RE2::FullMatch(re2::StringPiece(operand_value->ptr, operand_value->len), re);
+    if (is_like_pattern) {
+      p->result_.bool_val =
+          RE2::FullMatch(re2::StringPiece(operand_value->ptr, operand_value->len), re);
+    } else {
+      p->result_.bool_val =
+          RE2::PartialMatch(re2::StringPiece(operand_value->ptr, operand_value->len), re);
+    }
     return &p->result_.bool_val;
   } else {
     // TODO: log error in runtime state
@@ -128,6 +144,9 @@ void* LikePredicate::RegexFn(Expr* e, TupleRow* row) {
   return RegexMatch(e, row, false);
 }
 
+// There is a difference in the semantics of LIKE and REGEXP
+// LIKE only requires explicit use of '%' to preform partial matches
+// REGEXP does partial matching by default
 Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   RETURN_IF_ERROR(Expr::PrepareChildren(state, row_desc));
   DCHECK_EQ(children_.size(), 2);
@@ -192,7 +211,12 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
     }
     regex_.reset(new RE2(re_pattern));
     if (!regex_->ok()) return Status("Invalid regular expression: " + pattern_str);
-    compute_fn_ = ConstantRegexFn;
+    if (fn_.name.function_name == "regexp" || fn_.name.function_name == "rlike") {
+      compute_fn_ = ConstantRegexFnPartial;
+    } else {
+      compute_fn_ = ConstantRegexFn;
+    }
+
   }
   return Status::OK;
 }

@@ -17,7 +17,7 @@
 #define IMPALA_EXPRS_LIKE_PREDICATE_H_
 
 #include <string>
-#include <boost/scoped_ptr.hpp> 
+#include <boost/scoped_ptr.hpp>
 
 #include "exprs/predicate.h"
 #include "gen-cpp/Exprs_types.h"
@@ -56,7 +56,7 @@ class LikePredicate: public Predicate {
 
   // Handling of like predicates that can be implemented using strncmp
   static void* ConstantStartsWithFn(Expr* e, TupleRow* row);
-  
+
   // Handling of like predicates that can be implemented using strncmp
   static void* ConstantEndsWithFn(Expr* e, TupleRow* row);
 
@@ -64,6 +64,7 @@ class LikePredicate: public Predicate {
   static void* ConstantEqualsFn(Expr* e, TupleRow* row);
 
   static void* ConstantRegexFn(Expr* e, TupleRow* row);
+  static void* ConstantRegexFnPartial(Expr* e, TupleRow* row);
   static void* LikeFn(Expr* e, TupleRow* row);
   static void* RegexFn(Expr* e, TupleRow* row);
   static void* RegexMatch(Expr* e, TupleRow* row, bool is_like_pattern);
