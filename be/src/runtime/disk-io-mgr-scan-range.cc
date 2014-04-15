@@ -98,12 +98,8 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
     eosr_returned_ = (*buffer)->eosr();
   }
 
-  // Update tracking counters.  The buffer has now moved from the IoMgr to the
+  // Update tracking counters. The buffer has now moved from the IoMgr to the
   // caller.
-  if (eosr_returned_) {
-    reader_->total_range_queue_capacity_ += ready_buffers_capacity_;
-    ++reader_->num_finished_ranges_;
-  }
   if (cached_buffer_ == NULL) {
     ++io_mgr_->num_buffers_in_readers_;
     ++reader_->num_buffers_in_reader_;
@@ -119,6 +115,13 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
   }
 
   unique_lock<mutex> reader_lock(reader_->lock_);
+  if (eosr_returned_) {
+    reader_->total_range_queue_capacity_ += ready_buffers_capacity_;
+    ++reader_->num_finished_ranges_;
+    reader_->initial_queue_capacity_ =
+        reader_->total_range_queue_capacity_ / reader_->num_finished_ranges_;
+  }
+
   DCHECK(reader_->Validate()) << endl << reader_->DebugString();
   if (reader_->state_ == ReaderContext::Cancelled) {
     reader_->blocked_ranges_.Remove(this);

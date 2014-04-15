@@ -123,6 +123,7 @@ void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemTracker* tracker
   bytes_read_local_ = 0;
   bytes_read_short_circuit_ = 0;
   bytes_read_dn_cache_ = 0;
+  initial_queue_capacity_ = DiskIoMgr::DEFAULT_QUEUE_CAPACITY;
 
   DCHECK(ready_to_start_ranges_.empty());
   DCHECK(blocked_ranges_.empty());
@@ -130,13 +131,6 @@ void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemTracker* tracker
   for (int i = 0; i < disk_states_.size(); ++i) {
     disk_states_[i].Reset();
   }
-}
-
-int DiskIoMgr::ReaderContext::initial_scan_range_queue_capacity() {
-  if (num_finished_ranges_ > 0) {
-    return total_range_queue_capacity_ / num_finished_ranges_;
-  }
-  return DiskIoMgr::DEFAULT_QUEUE_CAPACITY;
 }
 
 // Dumps out reader information.  Lock should be taken by caller

@@ -33,12 +33,7 @@ DEFINE_int32(min_buffer_size, 1024, "The minimum read buffer size (in bytes)");
 DEFINE_bool(reuse_io_buffers, true, "(Advanced) If true, IoMgr will reuse IoBuffers "
                                      "across queries.");
 
-// Defaults to constrain the queue size.  These constants don't matter much since
-// the IoMgr will dynamically find the optimal number.
-static const int MAX_QUEUE_CAPACITY = 256;
-static const int MIN_QUEUE_CAPACITY = 4;
-
-// Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotaional
+// Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotational
 // don't have this penalty and benefit from multiple concurrent IO requests.
 static const int THREADS_PER_ROTATIONAL_DISK = 1;
 static const int THREADS_PER_FLASH_DISK = 8;

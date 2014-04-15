@@ -148,7 +148,7 @@ class DiskIoMgr::ReaderContext {
 
   // Returns the default queue capacity for scan ranges. This is updated
   // as the reader processes ranges.
-  int initial_scan_range_queue_capacity();
+  int initial_scan_range_queue_capacity() const { return initial_queue_capacity_; }
 
   // Validates invariants of reader.  Reader lock must be taken beforehand.
   bool Validate() const;
@@ -219,6 +219,13 @@ class DiskIoMgr::ReaderContext {
   // is that if previous ranges were fast, new ones will be fast too. The scan
   // range adjusts the queue capacity dynamically so a rough approximation will do.
   AtomicInt<int> total_range_queue_capacity_;
+
+  // The initial queue size for new scan ranges. This is always
+  // total_range_queue_capacity_ / num_finished_ranges_ but stored as a separate
+  // variable to allow reading this value without taking a lock. Doing the division
+  // at read time (with no lock) could lead to a race where only
+  // total_range_queue_capacity_ or num_finished_ranges_ was updated.
+  int initial_queue_capacity_;
 
   // All fields below are accessed by multiple threads and the lock needs to be
   // taken before accessing them.
