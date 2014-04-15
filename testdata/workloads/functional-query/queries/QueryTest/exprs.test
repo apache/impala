@@ -1,5 +1,13 @@
 ====
 ---- QUERY
+# check that add_months alias is working
+select ADD_MONTHS(cast('2013-02-18 16:46:00.01' as timestamp), 1)
+---- TYPES
+timestamp
+---- RESULTS
+2013-03-18 16:46:00.010000000
+====
+---- QUERY
 # test extract with non-constant field name
 select b.unit, extract(a.ts, b.unit) from
 (values(cast('2013-02-18 16:46:00.01' as timestamp) ts)) a
