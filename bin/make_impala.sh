@@ -68,6 +68,6 @@ else
   # TODO: is there a way to get CMake to do this?
   make compile_to_ir_no_sse compile_to_ir_sse
   make -j${IMPALA_BUILD_THREADS:-4} impalad
-  make -j${IMPALA_BUILD_THREADS:-4} statestored catalogd fesupport
+  make -j${IMPALA_BUILD_THREADS:-4} statestored catalogd fesupport loggingsupport ImpalaUdf
 fi
 
