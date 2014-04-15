@@ -1,0 +1,20 @@
+target
+
+# Eclipse artifacts
+.classpath
+.settings
+.project
+
+# IntelliJ artifacts
+*.iml
+*.ipr
+*.iws
+
+# OS X Artifacts
+.DS_Store
+
+# emacs backup files
+*~
+
+# Generated thrift files
+generated-sources

@@ -213,14 +213,13 @@ then
   (cd $IMPALA_LZO; cmake .; make)
 fi
 
-# Get Hadoop dependencies onto the classpath
-cd $IMPALA_FE_DIR
-mvn dependency:copy-dependencies
+# build the external data source API
+cd ${IMPALA_HOME}/ext-data-source
+mvn install -DskipTests
 
-# build frontend
-# Package first since any test failure will prevent the package phase from completing.
-# We need to do this before loading data so that hive can see the parquet input/output
-# classes.
+# build frontend and copy dependencies
+cd ${IMPALA_FE_DIR}
+mvn dependency:copy-dependencies
 mvn package -DskipTests=true
 
 # Build the shell tarball

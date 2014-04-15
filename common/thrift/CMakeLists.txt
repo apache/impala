@@ -75,7 +75,8 @@ function(THRIFT_GEN VAR)
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${FIL}
-        COMMAND ${THRIFT_COMPILER} ${JAVA_ARGS} ${FIL}
+        COMMAND ${THRIFT_COMPILER} ${JAVA_FE_ARGS} ${FIL}
+        COMMAND ${THRIFT_COMPILER} ${JAVA_EXT_DS_ARGS} ${FIL}
         COMMAND ${THRIFT_COMPILER} ${PYTHON_ARGS} ${FIL}
         DEPENDS ${ABS_FIL}
         COMMENT "Running thrift compiler on ${FIL}"
@@ -91,14 +92,18 @@ message("Using Thrift compiler: ${THRIFT_COMPILER}")
 set(THRIFT_INCLUDE_DIR_OPTION -I ${THRIFT_CONTRIB_DIR} -I $ENV{HIVE_HOME}/src/metastore/if)
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
 set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources)
+# TODO: avoid duplicating generated java classes
+set(EXT_DS_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/ext-data-source/api/generated-sources)
 set(PYTHON_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/shell/)
 MESSAGE("Found output dir: " ${PYTHON_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${BE_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${FE_OUTPUT_DIR})
+file(MAKE_DIRECTORY ${EXT_DS_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${PYTHON_OUTPUT_DIR})
 
 # Args passed to thrift for Java gen
-set(JAVA_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${FE_OUTPUT_DIR})
+set(JAVA_FE_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${FE_OUTPUT_DIR})
+set(JAVA_EXT_DS_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${EXT_DS_OUTPUT_DIR})
 set(PYTHON_ARGS ${THRIFT_INCLUDE_DIR_OPTION} -r --gen py -o ${PYTHON_OUTPUT_DIR})
 
 set (SRC_FILES
@@ -112,6 +117,7 @@ set (SRC_FILES
   Descriptors.thrift
   Frontend.thrift
   Exprs.thrift
+  ExternalDataSource.thrift
   ImpalaInternalService.thrift
   ImpalaService.thrift
   JniCatalog.thrift
