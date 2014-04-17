@@ -886,12 +886,10 @@ group by x.smallint_col
 select * from (select y from (values((1 as y),(11))) a where y < 10) b
 ---- PLAN
 00:MERGE
-   predicates: y < 10
-   constant-selects=2
+   constant-selects=1
 ---- DISTRIBUTEDPLAN
 00:MERGE
-   predicates: y < 10
-   constant-selects=2
+   constant-selects=1
 ====
 # Mixed constant and non-constant select; the predicate is evaluated directly
 # by the non-const select
@@ -903,7 +901,6 @@ select * from
    where y < 10) b
 ---- PLAN
 00:MERGE
-|  predicates: y < 10
 |  constant-selects=1
 |
 01:SCAN HDFS [functional.alltypes]
@@ -913,11 +910,9 @@ select * from
 02:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 |--04:MERGE
-|     predicates: y < 10
 |     constant-selects=1
 |
 03:MERGE
-|  predicates: y < 10
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -929,7 +924,6 @@ select * from (select 1 as y union all select 2 union all select * from (select 
 where y < 10
 ---- PLAN
 00:MERGE
-|  predicates: y < 10
 |  constant-selects=2
 |
 01:MERGE
@@ -939,11 +933,9 @@ where y < 10
 02:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 |--04:MERGE
-|     predicates: y < 10
 |     constant-selects=2
 |
 03:MERGE
-|  predicates: y < 10
 |
 01:MERGE
    predicates: 11 < 10
@@ -955,25 +947,18 @@ select * from (values(1 as y) union all values(2) union all select * from (value
 where y < 10
 ---- PLAN
 00:MERGE
-|  predicates: y < 10
 |  constant-selects=2
 |
 01:MERGE
-   predicates: 11 < 10
-   constant-selects=1
 ---- DISTRIBUTEDPLAN
 02:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 |--04:MERGE
-|     predicates: y < 10
 |     constant-selects=2
 |
 03:MERGE
-|  predicates: y < 10
 |
 01:MERGE
-   predicates: 11 < 10
-   constant-selects=1
 ====
 # Inner join on inline views made up of unions of constant selects
 select * from

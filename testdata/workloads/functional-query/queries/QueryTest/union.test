@@ -805,3 +805,16 @@ bigint
 ---- RESULTS
 5843
 ====
+---- QUERY
+# Test union where all operands are dropped because of constant conjuncts.
+select * from
+  (select 1 a, 2 b
+   union all
+   select 3, 4
+   union all
+   select 10, 20) t
+where a > b
+---- TYPES
+tinyint, tinyint
+---- RESULTS
+====

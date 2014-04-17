@@ -129,6 +129,16 @@ public class MergeNode extends PlanNode {
   @Override
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
+    // All non-constant conjuncts should have been assigned to children.
+    // This requirement is important to guarantee that conjuncts do not trigger
+    // materialization of slots in this MergeNode's tuple.
+    // TODO: It's possible to get constant conjuncts if a union operand
+    // consists of a select stmt on a constant inline view. We should
+    // drop the operand in such cases.
+    for (Expr conjunct: conjuncts_) {
+      Preconditions.checkState(conjunct.isConstant());
+    }
+
     computeMemLayout(analyzer);
     computeStats(analyzer);
     Preconditions.checkState(resultExprLists_.size() == getChildren().size());
@@ -146,7 +156,7 @@ public class MergeNode extends PlanNode {
       }
       for (List<Expr> l: constExprLists_) {
         Preconditions.checkState(l.size() == numMaterializedSlots);
-       }
+      }
       return;
     }
 

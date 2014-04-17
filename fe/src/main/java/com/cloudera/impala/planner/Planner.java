@@ -58,6 +58,7 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
+import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
@@ -607,9 +608,9 @@ public class Planner {
       Analyzer analyzer) throws InternalException, AuthorizationException {
     Preconditions.checkState(mergeNode.getChildren().size() == childFragments.size());
 
-    // If the mergeNode only has constant exprs, return it in an unpartitioned fragment.
+    // A MergeNode could have no children or constant selects if all of its operands
+    // were dropped because of constant predicates that evaluated to false.
     if (mergeNode.getChildren().isEmpty()) {
-      Preconditions.checkState(!mergeNode.getConstExprLists().isEmpty());
       return new PlanFragment(
           fragmentIdGenerator_.getNextId(), mergeNode, DataPartition.UNPARTITIONED);
     }
@@ -1723,6 +1724,7 @@ public class Planner {
         new MergeNode(nodeIdGenerator_.getNextId(), unionStmt.getTupleId());
     for (UnionOperand op: unionOperands) {
       QueryStmt queryStmt = op.getQueryStmt();
+      if (op.isDropped()) continue;
       if (queryStmt instanceof SelectStmt) {
         SelectStmt selectStmt = (SelectStmt) queryStmt;
         if (selectStmt.getTableRefs().isEmpty()) {
@@ -1735,29 +1737,6 @@ public class Planner {
     }
     mergeNode.init(analyzer);
     return mergeNode;
-  }
-
-  private boolean isConstantSelect(QueryStmt queryStmt) {
-    if (!(queryStmt instanceof SelectStmt)) return false;
-    SelectStmt stmt = (SelectStmt) queryStmt;
-    return stmt.getTableRefs().isEmpty();
-  }
-
-  /**
-   * Removes constant exprs in 'exprs' and returns true if any elements
-   * of 'exprs' were removed.
-   */
-  private boolean removeConstantExprs(List<Expr> exprs) {
-    ListIterator<Expr> i = exprs.listIterator();
-    boolean result = false;
-    while (i.hasNext()) {
-      Expr e = i.next();
-      if (e.isConstant()) {
-        i.remove();
-        result = true;
-      }
-    }
-    return result;
   }
 
   /**
@@ -1773,37 +1752,30 @@ public class Planner {
     // the individual operands.
     // Do this prior to creating the operands' plan trees so they get a chance to
     // pick up propagated predicates.
-    // The exceptions are constant selects, for which we need to evaluate the
-    // predicates in the merge node itself.
+    // Drop operands that have constant conjuncts evaluating to false, and drop
+    // constant conjuncts evaluating to true.
     List<Expr> conjuncts =
         analyzer.getUnassignedConjuncts(unionStmt.getTupleId().asList(), false);
-    boolean markAssigned = true;
     for (UnionOperand op: unionStmt.getOperands()) {
-      if (isConstantSelect(op.getQueryStmt())) {
-        // if we have constant selects, the MergeNode needs to evaluate
-        // all conjuncts_ as well
-        // TODO: evaluate predicates directly against constant selects and drop
-        // non-matching rows right away
-        markAssigned = false;
-        continue;
-      }
       List<Expr> opConjuncts = Expr.cloneList(conjuncts, op.getSmap());
-      // analyze after expr substitution to insert casts, etc.
-      for (Expr e: opConjuncts) {
-        e.reanalyze(analyzer);
+      List<Expr> nonConstOpConjuncts = Lists.newArrayList();
+      for (int i = 0; i < opConjuncts.size(); ++i) {
+        // analyze after expr substitution to insert casts, etc.
+        Expr opConjunct = opConjuncts.get(i);
+        opConjunct.reanalyze(analyzer);
+        if (!opConjunct.isConstant()) {
+          nonConstOpConjuncts.add(opConjunct);
+          continue;
+        }
+        // Evaluate constant conjunct and drop operand if it evals to false.
+        if (!FeSupport.EvalPredicate(opConjunct, analyzer.getQueryContext())) {
+          op.drop();
+          break;
+        }
       }
-
-      // eliminate constant predicates: they would (incorrectly) get picked up by
-      // the first call to Analyzer.getUnassignedConjuncts()
-      // TODO: drop the operand if one of its conjuncts_ is always false
-      if (removeConstantExprs(opConjuncts)) {
-        // in this case, we still need to evaluate the conjuncts_ in the MergeNode
-        // itself
-        markAssigned = false;
-      }
-      analyzer.registerConjuncts(opConjuncts);
+      if (!op.isDropped()) analyzer.registerConjuncts(nonConstOpConjuncts);
     }
-    if (markAssigned) analyzer.markConjunctsAssigned(conjuncts);
+    analyzer.markConjunctsAssigned(conjuncts);
 
     // mark slots after predicate propagation but prior to plan tree generation
     unionStmt.materializeRequiredSlots(analyzer);
