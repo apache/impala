@@ -139,7 +139,9 @@ void* TimestampFunctions::UnixFromString(Expr* e, TupleRow* row) {
 }
 
 void TimestampFunctions::ReportBadFormat(StringValue* format) {
-  LOG(WARNING) << "Bad date/time conversion format: " << format->DebugString();
+  // This was filling up log space -- temporary solution is to disable logging
+  // TODO (victor.bittorf) set the error in the runtime state and then bubble up
+  //LOG(WARNING) << "Bad date/time conversion format: " << format->DebugString();
 }
 
 void* TimestampFunctions::DayName(Expr* e, TupleRow* row) {
