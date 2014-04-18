@@ -34,6 +34,7 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.common.ByteUnits;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -375,9 +376,13 @@ public class RequestPoolService {
     Preconditions.checkState(running_.get());
     Preconditions.checkNotNull(requestedPool);
     Preconditions.checkArgument(!Strings.isNullOrEmpty(user));
+    // Convert the user name to a short name (e.g. 'user1@domain' to 'user1') because
+    // assignAppToQueue() will check group membership which should always be done on
+    // the short name of the principal.
+    String shortName = new User(user).getShortName();
     return allocationConf_.get().getPlacementPolicy().assignAppToQueue(
         requestedPool.isEmpty() ? YarnConfiguration.DEFAULT_QUEUE_NAME : requestedPool,
-        user);
+        shortName);
   }
 
   /**
@@ -393,7 +398,11 @@ public class RequestPoolService {
     Preconditions.checkState(running_.get());
     Preconditions.checkArgument(!Strings.isNullOrEmpty(pool));
     Preconditions.checkArgument(!Strings.isNullOrEmpty(user));
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+    // Convert the user name to a short name (e.g. 'user1@domain' to 'user1') because
+    // the UserGroupInformation will check group membership which should always be done
+    // on the short name of the principal.
+    String shortName = new User(user).getShortName();
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(shortName);
     return allocationConf_.get().hasAccess(pool, QueueACL.SUBMIT_APPLICATIONS, ugi);
   }
 }

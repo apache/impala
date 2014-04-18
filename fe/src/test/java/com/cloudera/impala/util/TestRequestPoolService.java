@@ -124,6 +124,21 @@ public class TestRequestPoolService {
   }
 
   @Test
+  public void testResolvePrincipalName() throws Exception {
+    // Tests that we can resolve user names that are Kerberos principals/LDAP users.
+    createPoolService(ALLOCATION_FILE, LLAMA_CONFIG_FILE);
+    TResolveRequestPoolResult result = poolService_.resolveRequestPool(
+        new TResolveRequestPoolParams("userA@abc.com", "root.queueA"));
+    Assert.assertEquals(TStatusCode.OK, result.getStatus().getStatus_code());
+    Assert.assertEquals("root.queueA", result.getResolved_pool());
+
+    result = poolService_.resolveRequestPool(
+        new TResolveRequestPoolParams("userA/a.qualified.domain@abc.com", "root.queueA"));
+    Assert.assertEquals(TStatusCode.OK, result.getStatus().getStatus_code());
+    Assert.assertEquals("root.queueA", result.getResolved_pool());
+  }
+
+  @Test
   public void testUserNoGroupsError() throws Exception {
     // Test fix for IMPALA-922: "Return helpful errors with Yarn group rules"
     createPoolService(ALLOCATION_FILE_GROUP_RULE, LLAMA_CONFIG_FILE);
