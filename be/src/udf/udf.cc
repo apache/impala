@@ -311,7 +311,7 @@ void FunctionContextImpl::SetConstantArgs(const vector<AnyVal*>& constant_args) 
 
 bool FunctionContext::IsArgConstant(int i) const {
   if (i < 0 || i >= impl_->constant_args_.size()) return false;
-  return impl_->constant_args_[i] == NULL;
+  return impl_->constant_args_[i] != NULL;
 }
 
 AnyVal* FunctionContext::GetConstantArg(int i) const {

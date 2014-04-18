@@ -2794,11 +2794,31 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue(
         "cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MI') as string)",
           "2012-09-10 07:59:00");
+  TestNonOkStatus("cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MIN') as string)");
+  TestNonOkStatus("cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'XXYYZZ') as string)");
 
-  TestIsNull("cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MIN') as string)",
-             TYPE_STRING);
-  TestIsNull("cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'XXYYZZ') as string)",
-             TYPE_STRING);
+  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'YEAR')",
+            TYPE_INT, 2006);
+  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'MoNTH')",
+            TYPE_INT, 5);
+  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'DaY')",
+            TYPE_INT, 12);
+  TestValue("extract(cast('2006-05-12 06:27:28.12345' as timestamp), 'hour')",
+            TYPE_INT, 6);
+  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'MINUTE')",
+            TYPE_INT, 27);
+  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'SECOND')",
+            TYPE_INT, 28);
+  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'MILLISECOND')",
+            TYPE_INT, 123);
+  TestValue("extract(cast('2006-05-13 01:27:28.12345' as timestamp), 'EPOCH')",
+            TYPE_INT, 1147483648);
+  TestValue("extract(cast('2006-05-13 01:27:28.12345' as timestamp), 'EPOCH')",
+            TYPE_INT, 1147483648);
+  TestNonOkStatus("extract(cast('2006-05-13 01:27:28.12345' as timestamp), 'foo')");
+  TestNonOkStatus("extract(cast('2006-05-13 01:27:28.12345' as timestamp), NULL)");
+  TestIsNull("extract(NULL, 'EPOCH')", TYPE_INT);
+  TestNonOkStatus("extract(NULL, NULL)");
 }
 
 TEST_F(ExprTest, ConditionalFunctions) {

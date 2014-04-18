@@ -53,6 +53,18 @@ class UdfBuiltins {
                            FunctionContext::FunctionStateScope scope);
   static void TruncClose(FunctionContext* context,
                          FunctionContext::FunctionStateScope scope);
+
+  // Returns a single field from a timestamp
+  //    Fields:
+  //      YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, MILLISECOND, EPOCH
+  //    Reference:
+  //    http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions050.htm
+  static IntVal Extract(FunctionContext* context, const TimestampVal& date,
+                        const StringVal& field_str);
+  static void ExtractPrepare(FunctionContext* context,
+                             FunctionContext::FunctionStateScope scope);
+  static void ExtractClose(FunctionContext* context,
+                           FunctionContext::FunctionStateScope scope);
 };
 
 } // namespace impala

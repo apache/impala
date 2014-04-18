@@ -1,5 +1,37 @@
 ====
 ---- QUERY
+# test extract with non-constant field name
+select b.unit, extract(a.ts, b.unit) from
+(values(cast('2013-02-18 16:46:00.01' as timestamp) ts)) a
+cross join
+(values('year' unit), ('month'), ('day'), ('hour'), ('minute'), ('second'),
+('millisecond'), ('epoch' )) b
+---- TYPES
+string, int
+---- RESULTS
+'year',2013
+'month',2
+'day',18
+'hour',16
+'minute',46
+'second',0
+'millisecond',10
+'epoch',1361205960
+====
+---- QUERY
+# EXTRACT fields from timestamp
+select EXTRACT(timestamp_col, 'yEar'), EXTRACT(timestamp_col, 'MilliSECond')
+from alltypesagg order by id limit 5
+---- TYPES
+int, int
+---- RESULTS
+2010,0
+2010,0
+2010,100
+2010,300
+2010,600
+====
+---- QUERY
 # IS NULL predicate
 select count(*) from alltypesagg
 ---- TYPES

@@ -48,6 +48,7 @@ StringVal UdfBuiltins::Lower(FunctionContext* context, const StringVal& v) {
 // The units which can be used when Truncating a Timestamp
 struct TruncUnit {
   enum Type {
+    UNIT_INVALID,
     YEAR,
     QUARTER,
     MONTH,
@@ -56,33 +57,32 @@ struct TruncUnit {
     DAY,
     DAY_OF_WEEK,
     HOUR,
-    MINUTE,
-    UNIT_INVALID
+    MINUTE
   };
 };
 
 // Maps the user facing name of a unit to a TruncUnit
-// Returns the TruncUnit via parameter trunc_unit
-// Returns true if unit is a known unit, else false
-TruncUnit::Type StrToTruncUnit(const StringVal& unit) {
-  if ((unit == "SYYYY") || (unit == "YYYY") || (unit == "YEAR") || (unit == "SYEAR") ||
-      (unit == "YYY") || (unit == "YY") || (unit == "Y")) {
+// Returns the TruncUnit for the given string
+TruncUnit::Type StrToTruncUnit(FunctionContext* ctx, const StringVal& unit_str) {
+  StringVal unit = UdfBuiltins::Lower(ctx, unit_str);
+  if ((unit == "syyyy") || (unit == "yyyy") || (unit == "year") || (unit == "syear") ||
+      (unit == "yyy") || (unit == "yy") || (unit == "y")) {
     return TruncUnit::YEAR;
-  } else if (unit == "Q") {
+  } else if (unit == "q") {
     return TruncUnit::QUARTER;
-  } else if ((unit == "MONTH") || (unit == "MON") || (unit == "MM") || (unit == "RM")) {
+  } else if ((unit == "month") || (unit == "mon") || (unit == "mm") || (unit == "rm")) {
     return TruncUnit::MONTH;
-  } else if (unit == "WW") {
+  } else if (unit == "ww") {
     return TruncUnit::WW;
-  } else if (unit == "W") {
+  } else if (unit == "w") {
     return TruncUnit::W;
-  } else if ((unit == "DDD") || (unit == "DD") || (unit == "J")) {
+  } else if ((unit == "ddd") || (unit == "dd") || (unit == "j")) {
     return TruncUnit::DAY;
-  } else if ((unit == "DAY") || (unit == "DY") || (unit == "D")) {
+  } else if ((unit == "day") || (unit == "dy") || (unit == "d")) {
     return TruncUnit::DAY_OF_WEEK;
-  } else if ((unit == "HH") || (unit == "HH12") || (unit == "HH24")) {
+  } else if ((unit == "hh") || (unit == "hh12") || (unit == "hh24")) {
     return TruncUnit::HOUR;
-  } else if (unit == "MI") {
+  } else if (unit == "mi") {
     return TruncUnit::MINUTE;
   } else {
     return TruncUnit::UNIT_INVALID;
@@ -181,7 +181,7 @@ TimestampVal UdfBuiltins::Trunc(
   if (state != NULL) {
     trunc_unit = *reinterpret_cast<TruncUnit::Type*>(state);
   } else {
-    trunc_unit = StrToTruncUnit(unit_str);
+    trunc_unit = StrToTruncUnit(context, unit_str);
     if (trunc_unit == TruncUnit::UNIT_INVALID) {
       string string_unit(reinterpret_cast<char*>(unit_str.ptr), unit_str.len);
       context->SetError(Substitute("Invalid Truncate Unit: $0", string_unit).c_str());
@@ -233,7 +233,7 @@ void UdfBuiltins::TruncPrepare(FunctionContext* ctx,
   // Parse the unit up front if we can, otherwise do it on the fly in Trunc()
   if (ctx->IsArgConstant(1)) {
     StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(1));
-    TruncUnit::Type trunc_unit = StrToTruncUnit(*unit_str);
+    TruncUnit::Type trunc_unit = StrToTruncUnit(ctx, *unit_str);
     if (trunc_unit == TruncUnit::UNIT_INVALID) {
       string string_unit(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
       ctx->SetError(Substitute("Invalid Truncate Unit: $0", string_unit).c_str());
@@ -254,4 +254,118 @@ void UdfBuiltins::TruncClose(FunctionContext* ctx,
     ctx->SetFunctionState(scope, NULL);
   }
 }
+
+// The units which can be used when extracting a Timestamp
+struct ExtractField {
+  enum Type {
+    INVALID_FIELD,
+    YEAR,
+    MONTH,
+    DAY,
+    HOUR,
+    MINUTE,
+    SECOND,
+    MILLISECOND,
+    EPOCH
+  };
+};
+
+// Maps the user facing name of a unit to a ExtractField
+// Returns the ExtractField for the given unit
+ExtractField::Type StrToExtractField(FunctionContext* ctx, const StringVal& unit_str) {
+  StringVal unit = UdfBuiltins::Lower(ctx, unit_str);
+  if (unit == "year") return ExtractField::YEAR;
+  if (unit == "month") return ExtractField::MONTH;
+  if (unit == "day") return ExtractField::DAY;
+  if (unit == "hour") return ExtractField::HOUR;
+  if (unit == "minute") return ExtractField::MINUTE;
+  if (unit == "second") return ExtractField::SECOND;
+  if (unit == "millisecond") return ExtractField::MILLISECOND;
+  if (unit == "epoch") return ExtractField::EPOCH;
+  return ExtractField::INVALID_FIELD;
+}
+
+IntVal UdfBuiltins::Extract(
+    FunctionContext* context, const TimestampVal& tv, const StringVal &unit_str) {
+  // resolve extract_field using the prepared state if possible, o.w. parse now
+  // ExtractPrepare() can only parse extract_field if user passes it as a string literal
+  ExtractField::Type field;
+  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  if (state != NULL) {
+    field = *reinterpret_cast<ExtractField::Type*>(state);
+  } else {
+    field = StrToExtractField(context, unit_str);
+    if (field == ExtractField::INVALID_FIELD) {
+      string string_unit(reinterpret_cast<char*>(unit_str.ptr), unit_str.len);
+      context->SetError(Substitute("invalid extract field: $0", string_unit).c_str());
+      return IntVal::null();
+    }
+  }
+
+  const date& orig_date = *reinterpret_cast<const date*>(&tv.date);
+  const time_duration& time = *reinterpret_cast<const time_duration*>(&tv.time_of_day);
+  if (orig_date.is_special()) return IntVal::null();
+
+  switch (field) {
+    case ExtractField::YEAR: {
+      return IntVal(orig_date.year());
+    }
+    case ExtractField::MONTH: {
+      return IntVal(orig_date.month());
+    }
+    case ExtractField::DAY: {
+      return IntVal(orig_date.day());
+    }
+    case ExtractField::HOUR: {
+      return IntVal(time.hours());
+    }
+    case ExtractField::MINUTE: {
+      return IntVal(time.minutes());
+    }
+    case ExtractField::SECOND: {
+      return IntVal(time.seconds());
+    }
+    case ExtractField::MILLISECOND: {
+      return IntVal(time.total_milliseconds() - time.total_seconds() * 1000);
+    }
+    case ExtractField::EPOCH: {
+      ptime epoch_date(date(1970, 1, 1), time_duration(0, 0, 0));
+      ptime cur_date(orig_date, time);
+      time_duration diff = cur_date - epoch_date;
+      return IntVal(diff.total_seconds());
+    }
+    default: {
+      DCHECK(false) << field;
+      return IntVal::null();
+    }
+  }
+}
+
+void UdfBuiltins::ExtractPrepare(FunctionContext* ctx,
+                                 FunctionContext::FunctionStateScope scope) {
+  // Parse the unit up front if we can, otherwise do it on the fly in Extract()
+  if (ctx->IsArgConstant(1)) {
+    StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(1));
+    ExtractField::Type field = StrToExtractField(ctx, *unit_str);
+    if (field == ExtractField::INVALID_FIELD) {
+      string string_field(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
+      ctx->SetError(Substitute("invalid extract field: $0", string_field).c_str());
+    } else {
+      ExtractField::Type* state = reinterpret_cast<ExtractField::Type*>(
+          ctx->Allocate(sizeof(ExtractField::Type)));
+      *state = field;
+      ctx->SetFunctionState(scope, state);
+    }
+  }
+}
+
+void UdfBuiltins::ExtractClose(FunctionContext* ctx,
+                               FunctionContext::FunctionStateScope scope) {
+  void* state = ctx->GetFunctionState(scope);
+  if (state != NULL) {
+    ctx->Free(reinterpret_cast<uint8_t*>(state));
+    ctx->SetFunctionState(scope, NULL);
+  }
+}
+
 } // namespace impala
