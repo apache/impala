@@ -277,4 +277,20 @@ public class JdbcTest {
       rs.close();
     }
   }
+
+  @Test
+  public void testRegressions() throws SQLException {
+    // Regression test for IMPALA-914.
+    ResultSet rs = con_.createStatement().executeQuery("select NULL");
+    // Expect the column to be of type BOOLEAN to be compatible with Hive.
+    assertEquals(rs.getMetaData().getColumnType(1), Types.BOOLEAN);
+    try {
+      // We expect exactly one result row with a NULL inside the first column.
+      assertTrue(rs.next());
+      assertNull(rs.getString(1));
+      assertFalse(rs.next());
+    } finally {
+      rs.close();
+    }
+  }
 }

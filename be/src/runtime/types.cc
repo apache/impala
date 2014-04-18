@@ -112,7 +112,9 @@ string TypeToOdbcString(PrimitiveType t) {
 
 TTypeId::type TypeToHiveServer2Type(PrimitiveType t) {
   switch (t) {
-    case TYPE_NULL: return TTypeId::USER_DEFINED_TYPE;
+    // Map NULL_TYPE to BOOLEAN, otherwise Hive's JDBC driver won't
+    // work for queries like "SELECT NULL" (IMPALA-914).
+    case TYPE_NULL: return TTypeId::BOOLEAN_TYPE;
     case TYPE_BOOLEAN: return TTypeId::BOOLEAN_TYPE;
     case TYPE_TINYINT: return TTypeId::TINYINT_TYPE;
     case TYPE_SMALLINT: return TTypeId::SMALLINT_TYPE;
