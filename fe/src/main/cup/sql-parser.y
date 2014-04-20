@@ -301,6 +301,9 @@ nonterminal ColumnType column_type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
 nonterminal StatementBase explain_stmt;
+// Optional partition spec
+nonterminal PartitionSpec opt_partition_spec;
+// Required partition spec
 nonterminal PartitionSpec partition_spec;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
 nonterminal ArrayList<PartitionKeyValue> static_partition_key_value_list;
@@ -448,7 +451,7 @@ stmt ::=
 
 load_stmt ::=
   KW_LOAD KW_DATA KW_INPATH STRING_LITERAL:path overwrite_val:overwrite KW_INTO KW_TABLE
-  table_name:table partition_spec:partition
+  table_name:table opt_partition_spec:partition
   {: RESULT = new LoadDataStmt(table, new HdfsUri(path), overwrite, partition); :}
   ;
 
@@ -543,15 +546,15 @@ alter_tbl_stmt ::=
   | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
     partition_spec:partition
   {: RESULT = new AlterTableDropPartitionStmt(table, partition, if_exists); :}
-  | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET KW_FILEFORMAT
+  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET KW_FILEFORMAT
     file_format_val:file_format
   {: RESULT = new AlterTableSetFileFormatStmt(table, partition, file_format); :}
-  | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET
+  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
     KW_LOCATION STRING_LITERAL:location
   {: RESULT = new AlterTableSetLocationStmt(table, partition, new HdfsUri(location)); :}
   | KW_ALTER KW_TABLE table_name:table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableOrViewRenameStmt(table, new_table, true); :}
-  | KW_ALTER KW_TABLE table_name:table partition_spec:partition KW_SET
+  | KW_ALTER KW_TABLE table_name:table opt_partition_spec:partition KW_SET
     table_property_type:target LPAREN properties_map:properties RPAREN
   {: RESULT = new AlterTableSetTblProperties(table, partition, target, properties); :}
   ;
@@ -898,6 +901,11 @@ partition_key_value_list ::=
 partition_spec ::=
   KW_PARTITION LPAREN static_partition_key_value_list:list RPAREN
   {: RESULT = new PartitionSpec(list); :}
+  ;
+
+opt_partition_spec ::=
+  partition_spec:partition_spec
+  {: RESULT = partition_spec; :}
   | /* Empty */
   {: RESULT = null; :}
   ;

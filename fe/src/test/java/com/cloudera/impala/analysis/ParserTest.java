@@ -1445,6 +1445,8 @@ public class ParserTest {
     ParserError("ALTER TABLE TestDb.Foo ADD PARTITION ()");
     ParserError("ALTER Foo ADD PARTITION (i=1)");
     ParserError("ALTER TABLE ADD PARTITION (i=1)");
+    ParserError("ALTER TABLE ADD");
+    ParserError("ALTER TABLE DROP");
   }
 
   @Test
