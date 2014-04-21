@@ -160,6 +160,15 @@ public class BinaryPredicate extends Predicate {
   }
 
   /**
+   * If e is an equality predicate between two slots that only require implicit
+   * casts, returns those two slots; otherwise returns null.
+   */
+  public static Pair<SlotId, SlotId> getEqSlots(Expr e) {
+    if (!(e instanceof BinaryPredicate)) return null;
+    return ((BinaryPredicate) e).getEqSlots();
+  }
+
+  /**
    * If this is an equality predicate between two slots that only require implicit
    * casts, returns those two slots; otherwise returns null.
    */

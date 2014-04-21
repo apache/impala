@@ -31,12 +31,15 @@ import com.google.common.collect.Sets;
 public class DisjointSet<T> {
   // Maps from an item to its item set.
   private final Map<T, Set<T>> itemSets_ = Maps.newHashMap();
+  private final Set<Set<T>> uniqueSets_ = Sets.newHashSet();
 
   /**
    * Returns the item set corresponding to the given item or null if it
    * doesn't exist.
    */
   public Set<T> get(T item) { return itemSets_.get(item); }
+
+  public Set<Set<T>> getSets() { return uniqueSets_; }
 
   /**
    * Registers a new item set with a single item. Returns the new item set.
@@ -49,6 +52,7 @@ public class DisjointSet<T> {
     }
     Set<T> s = Sets.newHashSet(item);
     itemSets_.put(item, s);
+    uniqueSets_.add(s);
     return s;
   }
 
@@ -86,6 +90,7 @@ public class DisjointSet<T> {
       mergedItems.add(item);
       itemSets_.put(item, mergedItems);
     }
+    uniqueSets_.remove(updateItems);
     return true;
   }
 

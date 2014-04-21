@@ -35,7 +35,6 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
@@ -1613,7 +1612,7 @@ public class Planner {
       // a single join predicate per equivalence class, i.e., any join predicates beyond
       // that are redundant. We still return those predicates in joinPredicates so they
       // get marked as assigned.
-      Pair<SlotId, SlotId> joinSlots = ((Predicate) e).getEqSlots();
+      Pair<SlotId, SlotId> joinSlots = BinaryPredicate.getEqSlots(e);
       if (joinSlots != null) {
         EquivalenceClassId id1 = analyzer.getEquivClassId(joinSlots.first);
         EquivalenceClassId id2 = analyzer.getEquivClassId(joinSlots.second);

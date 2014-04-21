@@ -44,6 +44,7 @@ import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TAccessEvent;
@@ -51,7 +52,6 @@ import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.util.DisjointSet;
 import com.cloudera.impala.util.TSessionStateUtil;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
@@ -158,9 +158,8 @@ public class Analyzer {
     // only visible at the root Analyzer
     private final Map<SlotId, EquivalenceClassId> equivClassBySlotId = Maps.newHashMap();
 
-    // valueTransfer[slotA][slotB] is true if slotB always has the same value as slotA
-    // or the tuple containing slotB is NULL
-    private boolean[][] valueTransfer;
+    // represents the direct and transitive value transfers between slots
+    private ValueTransferGraph valueTransferGraph;
 
     private final List<Pair<SlotId, SlotId>> registeredValueTransfers =
         Lists.newArrayList();
@@ -864,7 +863,7 @@ public class Analyzer {
         //   materializes the OJ'd table)
         boolean reverseValueTransfer = true;
         for (int i = 0; i < srcSids.size(); ++i) {
-          if (!globalState_.valueTransfer[destSids.get(i).asInt()][srcSids.get(i).asInt()]) {
+          if (!hasValueTransfer(destSids.get(i), srcSids.get(i))) {
             reverseValueTransfer = false;
             break;
           }
@@ -907,8 +906,7 @@ public class Analyzer {
     Iterator<Expr> conjunctIter = conjuncts.iterator();
     while (conjunctIter.hasNext()) {
       Expr conjunct = conjunctIter.next();
-      if (!(conjunct instanceof Predicate)) continue;
-      Pair<SlotId, SlotId> eqSlots = ((Predicate) conjunct).getEqSlots();
+      Pair<SlotId, SlotId> eqSlots = BinaryPredicate.getEqSlots(conjunct);
       if (eqSlots == null) continue;
       EquivalenceClassId lhsEqClassId = getEquivClassId(eqSlots.first);
       EquivalenceClassId rhsEqClassId = getEquivClassId(eqSlots.second);
@@ -1004,7 +1002,7 @@ public class Analyzer {
       SlotId srcSid = srcSids.get(0);
       for (SlotDescriptor destSlot: destTupleDesc.getSlots()) {
         if (ignoreSlots.contains(destSlot.getId())) continue;
-        if (globalState_.valueTransfer[srcSid.asInt()][destSlot.getId().asInt()]) {
+        if (hasValueTransfer(srcSid, destSlot.getId())) {
           allDestSids.add(Lists.newArrayList(destSlot.getId()));
         }
       }
@@ -1026,7 +1024,7 @@ public class Analyzer {
       for (SlotId srcSid: srcSids) {
         for (SlotDescriptor destSlot: destTupleDesc.getSlots()) {
           if (ignoreSlots.contains(destSlot.getId())) continue;
-          if (globalState_.valueTransfer[srcSid.asInt()][destSlot.getId().asInt()]
+          if (hasValueTransfer(srcSid, destSlot.getId())
               && !destSids.contains(destSlot.getId())) {
             destSids.add(destSlot.getId());
             break;
@@ -1104,121 +1102,9 @@ public class Analyzer {
    * Populate globalState.valueTransfer based on the registered equi-join predicates
    * of the form <slotref> = <slotref>.
    */
-  private void computeValueTransferGraph() {
-    int numSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
-    globalState_.valueTransfer = new boolean[numSlots][numSlots];
-    for (int i = 0; i < numSlots; ++i) {
-      Arrays.fill(globalState_.valueTransfer[i], false);
-      globalState_.valueTransfer[i][i] = true;
-    }
-    for (Pair<SlotId, SlotId> t: globalState_.registeredValueTransfers) {
-      Preconditions.checkState(t.first.asInt() < numSlots);
-      Preconditions.checkState(t.second.asInt() < numSlots);
-      globalState_.valueTransfer[t.first.asInt()][t.second.asInt()] = true;
-    }
-    Set<ExprId> analyzedIds = Sets.newHashSet();
-
-    // transform equality predicates into a transfer graph
-    for (ExprId id: globalState_.conjuncts.keySet()) {
-      LOG.trace("check id " + Integer.toString(id.asInt()));
-      if (!analyzedIds.add(id)) continue;
-
-      Expr e = globalState_.conjuncts.get(id);
-      Preconditions.checkState(e != null);
-      if (!(e instanceof BinaryPredicate)) continue;
-      BinaryPredicate p = (BinaryPredicate) e;
-      if (p.getOp() != BinaryPredicate.Operator.EQ) continue;
-      LOG.trace("check " + p.toSql() + " " + p.debugString());
-      Pair<SlotId, SlotId> slotIds = p.getEqSlots();
-      if (slotIds == null) continue;
-      TableRef tblRef = globalState_.ojClauseByConjunct.get(id);
-      Preconditions.checkState(tblRef == null || tblRef.getJoinOp().isOuterJoin());
-      if (tblRef == null) {
-        // this eq predicate doesn't involve any outer join, ie, it is true for
-        // each result row;
-        // value transfer is not legal if the receiving slot is in an enclosed
-        // scope of the source slot and the receiving slot's block has a limit
-        Analyzer firstBlock = globalState_.blockBySlot.get(slotIds.first);
-        Analyzer secondBlock = globalState_.blockBySlot.get(slotIds.second);
-        LOG.trace("value transfer: from " + slotIds.first.toString());
-        if (!(secondBlock.hasLimit_ && secondBlock.ancestors_.contains(firstBlock))) {
-          globalState_.valueTransfer[slotIds.first.asInt()][slotIds.second.asInt()] =
-              true;
-        }
-        if (!(firstBlock.hasLimit_ && firstBlock.ancestors_.contains(secondBlock))) {
-          globalState_.valueTransfer[slotIds.second.asInt()][slotIds.first.asInt()] =
-              true;
-        }
-        continue;
-      }
-
-      // this is some form of outer join
-      SlotId outerSlot, innerSlot;
-      if (tblRef.getId() == getTupleId(slotIds.first)) {
-        innerSlot = slotIds.first;
-        outerSlot = slotIds.second;
-      } else if (tblRef.getId() == getTupleId(slotIds.second)) {
-        innerSlot = slotIds.second;
-        outerSlot = slotIds.first;
-      } else {
-        // this eq predicate is part of an OJ clause but doesn't reference
-        // the joined table -> ignore this, we can't reason about when it'll
-        // actually be true
-        continue;
-      }
-
-      if (tblRef.getJoinOp() == JoinOperator.FULL_OUTER_JOIN) {
-        // full outer joins don't guarantee any value transfer
-        continue;
-      }
-
-      // value transfer is not legal if the receiving slot is in an enclosed
-      // scope of the source slot and the receiving slot's block has a limit
-      Analyzer innerBlock = globalState_.blockBySlot.get(innerSlot);
-      Analyzer outerBlock = globalState_.blockBySlot.get(outerSlot);
-      if (tblRef.getJoinOp() == JoinOperator.LEFT_OUTER_JOIN) {
-        if (!(outerBlock.hasLimit_ && outerBlock.ancestors_.contains(innerBlock))) {
-          globalState_.valueTransfer[outerSlot.asInt()][innerSlot.asInt()] = true;
-        }
-      } else if (tblRef.getJoinOp() == JoinOperator.RIGHT_OUTER_JOIN) {
-        if (!(innerBlock.hasLimit_ && innerBlock.ancestors_.contains(outerBlock))) {
-          globalState_.valueTransfer[innerSlot.asInt()][outerSlot.asInt()] = true;
-        }
-      }
-    }
-
-    // compute the transitive closure
-    boolean changed = false;
-    do {
-      changed = false;
-      for (int i = 0; i < numSlots; ++i) {
-        for (int j = 0; j < numSlots; ++j) {
-          for (int k = 0; k < numSlots; ++k) {
-            if (globalState_.valueTransfer[i][j] && globalState_.valueTransfer[j][k]
-                && !globalState_.valueTransfer[i][k]) {
-              globalState_.valueTransfer[i][k] = true;
-              changed = true;
-            }
-          }
-        }
-      }
-    } while (changed);
-
-    // TODO: remove
-    for (int i = 0; i < numSlots; ++i) {
-      List<String> strings = Lists.newArrayList();
-      for (int j = 0; j < numSlots; ++j) {
-        if (i != j && globalState_.valueTransfer[i][j]) strings.add(Integer.toString(j));
-      }
-      if (!strings.isEmpty()) {
-        LOG.trace("transfer from " + Integer.toString(i) + " to: "
-            + Joiner.on(" ").join(strings));
-      }
-    }
-  }
-
   public void computeEquivClasses() {
-    computeValueTransferGraph();
+    globalState_.valueTransferGraph = new ValueTransferGraph();
+    globalState_.valueTransferGraph.computeValueTransfers();
 
     // we start out by assigning each slot to its own equiv class
     int numSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
@@ -1248,8 +1134,8 @@ public class Analyzer {
           boolean canMerge = true;
           for (SlotId class1Slot: class1Members) {
             for (SlotId class2Slot: class2Members) {
-              if (!globalState_.valueTransfer[class1Slot.asInt()][class2Slot.asInt()]
-                  && !globalState_.valueTransfer[class2Slot.asInt()][class1Slot.asInt()]) {
+              if (!hasValueTransfer(class1Slot, class2Slot)
+                  && !hasValueTransfer(class2Slot, class1Slot)) {
                 canMerge = false;
                 break;
               }
@@ -1271,18 +1157,6 @@ public class Analyzer {
       for (SlotId slotId: globalState_.equivClassMembers.get(id)) {
         globalState_.equivClassBySlotId.put(slotId, id);
       }
-    }
-
-    // TODO: remove
-    for (EquivalenceClassId id: globalState_.equivClassMembers.keySet()) {
-      List<SlotId> members = globalState_.equivClassMembers.get(id);
-      if (members.isEmpty()) continue;
-      List<String> strings = Lists.newArrayList();
-      for (SlotId slotId: members) {
-        strings.add(slotId.toString());
-      }
-      LOG.trace("equiv class: id=" + id.toString() + " members=("
-          + Joiner.on(" ").join(strings) + ")");
     }
   }
 
@@ -1604,4 +1478,330 @@ public class Analyzer {
   public int incrementCallDepth() { return ++callDepth_; }
   public int decrementCallDepth() { return --callDepth_; }
   public int getCallDepth() { return callDepth_; }
+
+  public boolean hasValueTransfer(SlotId a, SlotId b) {
+    return globalState_.valueTransferGraph.hasValueTransfer(a, b);
+  }
+
+  /**
+   * Efficiently computes and stores the transitive closure of the value transfer graph
+   * of slots. After calling computeValueTransfers(), value transfers between slots can
+   * be queried via hasValueTransfer(). Value transfers can be uni-directional due to
+   * outer joins, inline views with a limit, or unions.
+   */
+  private class ValueTransferGraph {
+    // Represents all bi-directional value transfers. Each disjoint set is a complete
+    // subgraph of value transfers. Maps from a slot id to its set of slots with mutual
+    // value transfers (in the original slot domain). Since the value transfer graph is
+    // a DAG these disjoint sets represent all the strongly connected components.
+    private final DisjointSet<SlotId> completeSubGraphs_ = new DisjointSet<SlotId>();
+
+    // Maps each slot id in the original slot domain to a slot id in the new slot domain
+    // created by coalescing complete subgraphs into a single slot, and retaining only
+    // slots that have value transfers.
+    // Used for representing a condensed value-transfer graph with dense slot ids.
+    private int[] coalescedSlots_;
+
+    // Used for generating slot ids in the new slot domain.
+    private int nextCoalescedSlotId_ = 0;
+
+    // Condensed DAG of value transfers in the new slot domain.
+    private boolean[][] valueTransfer_;
+
+    /**
+     * Computes all direct and transitive value transfers based on the registered
+     * conjuncts of the form <slotref> = <slotref>. The high-level steps are:
+     * 1. Identify complete subgraps based on bi-directional value transfers, and
+     *    coalesce the slots of each complete subgraph into a single slot.
+     * 2. Map the remaining uni-directional value transfers into the new slot domain.
+     * 3. Identify the connected components of the uni-directional value transfers.
+     *    This step partitions the value transfers into disjoint sets.
+     * 4. Compute the transitive closure of each partition from (3) in the new slot
+     *    domain separately. Hopefully, the partitions are small enough to afford
+     *    the O(N^3) complexity of the brute-force transitive closure computation.
+     * The condensed graph is not transformed back into the original slot domain because
+     * of the potential performance penalty. Instead, hasValueTransfer() consults
+     * coalescedSlots_, valueTransfer_, and completeSubGraphs_ which can together
+     * determine any value transfer in the original slot domain in constant time.
+     */
+    public void computeValueTransfers() {
+      long start = System.currentTimeMillis();
+
+      // Step1: Compute complete subgraphs and get uni-directional value transfers.
+      List<Pair<SlotId, SlotId>> origValueTransfers = Lists.newArrayList();
+      partitionValueTransfers(completeSubGraphs_, origValueTransfers);
+
+      // Coalesce complete subgraphs into a single slot and assign new slot ids.
+      int origNumSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
+      coalescedSlots_ = new int[origNumSlots];
+      Arrays.fill(coalescedSlots_, -1);
+      for (Set<SlotId> equivClass: completeSubGraphs_.getSets()) {
+        int representative = nextCoalescedSlotId_;
+        for (SlotId slotId: equivClass) {
+          coalescedSlots_[slotId.asInt()] = representative;
+        }
+        ++nextCoalescedSlotId_;
+      }
+
+      // Step 2: Map uni-directional value transfers onto the new slot domain, and
+      // store the connected components in graphPartitions.
+      List<Pair<Integer, Integer>> coalescedValueTransfers = Lists.newArrayList();
+      // A graph partition is a set of slot ids that are connected by uni-directional
+      // value transfers. The graph corresponding to a graph partition is a DAG.
+      DisjointSet<Integer> graphPartitions = new DisjointSet<Integer>();
+      mapSlots(origValueTransfers, coalescedValueTransfers, graphPartitions);
+      mapSlots(globalState_.registeredValueTransfers, coalescedValueTransfers,
+          graphPartitions);
+
+      // Step 3: Group the coalesced value transfers by the graph partition they
+      // belong to. Maps from the graph partition to its list of value transfers.
+      // TODO: Implement a specialized DisjointSet data structure to avoid this step.
+      Map<Set<Integer>, List<Pair<Integer, Integer>>> partitionedValueTransfers =
+          Maps.newHashMap();
+      for (Pair<Integer, Integer> vt: coalescedValueTransfers) {
+        Set<Integer> partition = graphPartitions.get(vt.first.intValue());
+        List<Pair<Integer, Integer>> l = partitionedValueTransfers.get(partition);
+        if (l == null) {
+          l = Lists.newArrayList();
+          partitionedValueTransfers.put(partition, l);
+        }
+        l.add(vt);
+      }
+
+      // Initialize the value transfer graph.
+      int numCoalescedSlots = nextCoalescedSlotId_ + 1;
+      valueTransfer_ = new boolean[numCoalescedSlots][numCoalescedSlots];
+      for (int i = 0; i < numCoalescedSlots; ++i) {
+        valueTransfer_[i][i] = true;
+      }
+
+      // Step 4: Compute the transitive closure for each graph partition.
+      for (Map.Entry<Set<Integer>, List<Pair<Integer, Integer>>> graphPartition:
+        partitionedValueTransfers.entrySet()) {
+        // Set value transfers of this partition.
+        for (Pair<Integer, Integer> vt: graphPartition.getValue()) {
+          valueTransfer_[vt.first][vt.second] = true;
+        }
+        Set<Integer> partitionSlotIds = graphPartition.getKey();
+        // No transitive value transfers.
+        if (partitionSlotIds.size() <= 2) continue;
+
+        // Indirection vector into valueTransfer_. Contains one entry for each distinct
+        // slot id referenced in a value transfer of this partition.
+        int[] p = new int[partitionSlotIds.size()];
+        int numPartitionSlots = 0;
+        for (Integer slotId: partitionSlotIds) {
+          p[numPartitionSlots++] = slotId;
+        }
+        // Compute the transitive closure of this graph partition.
+        // TODO: Since we are operating on a DAG the performance can be improved if
+        // necessary (e.g., topological sort + backwards propagation of the transitive
+        // closure).
+        boolean changed = false;
+        do {
+          changed = false;
+          for (int i = 0; i < numPartitionSlots; ++i) {
+            for (int j = 0; j < numPartitionSlots; ++j) {
+              for (int k = 0; k < numPartitionSlots; ++k) {
+                if (valueTransfer_[p[i]][p[j]] && valueTransfer_[p[j]][p[k]]
+                    && !valueTransfer_[p[i]][p[k]]) {
+                  valueTransfer_[p[i]][p[k]] = true;
+                  changed = true;
+                }
+              }
+            }
+          }
+        } while (changed);
+      }
+
+      long end = System.currentTimeMillis();
+      LOG.trace("Time taken in computeValueTransfers(): " + (end - start) + "ms");
+    }
+
+    /**
+     * Returns true if slotA always has the same value as slotB or the tuple
+     * containing slotB is NULL.
+     */
+    public boolean hasValueTransfer(SlotId slotA, SlotId slotB) {
+      if (slotA.equals(slotB)) return true;
+      int mappedSrcId = coalescedSlots_[slotA.asInt()];
+      int mappedDestId = coalescedSlots_[slotB.asInt()];
+      if (mappedSrcId == -1 || mappedDestId == -1) return false;
+      if (valueTransfer_[mappedSrcId][mappedDestId]) return true;
+      Set<SlotId> eqSlots = completeSubGraphs_.get(slotA);
+      if (eqSlots == null) return false;
+      return eqSlots.contains(slotB);
+    }
+
+    /**
+     * Maps the slots of the given origValueTransfers to the coalescedSlots_. For most
+     * queries the uni-directional value transfers only reference a fraction of the
+     * original slots, so we assign new slot ids as necessary to make them dense. Returns
+     * the new list of value transfers in coalescedValueTransfers. Also adds each new
+     * value transfer into the given graphPartitions (via union() on the slots).
+     */
+    private void mapSlots(List<Pair<SlotId, SlotId>> origValueTransfers,
+        List<Pair<Integer, Integer>> coalescedValueTransfers,
+        DisjointSet<Integer> graphPartitions) {
+      for (Pair<SlotId, SlotId> vt: origValueTransfers) {
+        int src = coalescedSlots_[vt.first.asInt()];
+        if (src == -1) {
+          src = nextCoalescedSlotId_;
+          coalescedSlots_[vt.first.asInt()] = nextCoalescedSlotId_;
+          ++nextCoalescedSlotId_;
+        }
+        int dest = coalescedSlots_[vt.second.asInt()];
+        if (dest == -1) {
+          dest = nextCoalescedSlotId_;
+          coalescedSlots_[vt.second.asInt()] = nextCoalescedSlotId_;
+          ++nextCoalescedSlotId_;
+        }
+        coalescedValueTransfers.add(
+            new Pair<Integer, Integer>(Integer.valueOf(src), Integer.valueOf(dest)));
+        graphPartitions.union(Integer.valueOf(src), Integer.valueOf(dest));
+      }
+    }
+
+    /**
+     * Transforms the registered equality predicates of the form <slotref> = <slotref>
+     * into disjoint sets of slots with mutual value transfers (completeSubGraphs),
+     * and a list of remaining uni-directional value transfers (valueTransfers).
+     * Both completeSubGraphs and valueTransfers use the original slot ids.
+     *
+     * For debugging: If completeSubGraphs is null, adds all value transfers including
+     * bi-directional ones into valueTransfers.
+     */
+    private void partitionValueTransfers(DisjointSet<SlotId> completeSubGraphs,
+        List<Pair<SlotId, SlotId>> valueTransfers) {
+      // transform equality predicates into a transfer graph
+      for (ExprId id: globalState_.conjuncts.keySet()) {
+        Expr e = globalState_.conjuncts.get(id);
+        Pair<SlotId, SlotId> slotIds = BinaryPredicate.getEqSlots(e);
+        if (slotIds == null) continue;
+        TableRef tblRef = globalState_.ojClauseByConjunct.get(id);
+        Preconditions.checkState(tblRef == null || tblRef.getJoinOp().isOuterJoin());
+        if (tblRef == null) {
+          // this eq predicate doesn't involve any outer join, ie, it is true for
+          // each result row;
+          // value transfer is not legal if the receiving slot is in an enclosed
+          // scope of the source slot and the receiving slot's block has a limit
+          Analyzer firstBlock = globalState_.blockBySlot.get(slotIds.first);
+          Analyzer secondBlock = globalState_.blockBySlot.get(slotIds.second);
+          LOG.trace("value transfer: from " + slotIds.first.toString());
+          Pair<SlotId, SlotId> firstToSecond = null;
+          Pair<SlotId, SlotId> secondToFirst = null;
+          if (!(secondBlock.hasLimit_ && secondBlock.ancestors_.contains(firstBlock))) {
+            firstToSecond = new Pair<SlotId, SlotId>(slotIds.first, slotIds.second);
+          }
+          if (!(firstBlock.hasLimit_ && firstBlock.ancestors_.contains(secondBlock))) {
+            secondToFirst = new Pair<SlotId, SlotId>(slotIds.second, slotIds.first);
+          }
+          // Add bi-directional value transfers to the completeSubGraphs, or
+          // uni-directional value transfers to valueTransfers.
+          if (firstToSecond != null && secondToFirst != null
+              && completeSubGraphs != null) {
+            completeSubGraphs.union(slotIds.first, slotIds.second);
+          } else {
+            if (firstToSecond != null) valueTransfers.add(firstToSecond);
+            if (secondToFirst != null) valueTransfers.add(secondToFirst);
+          }
+          continue;
+        }
+
+        if (tblRef.getJoinOp() == JoinOperator.FULL_OUTER_JOIN) {
+          // full outer joins don't guarantee any value transfer
+          continue;
+        }
+
+        // this is some form of outer join
+        SlotId outerSlot, innerSlot;
+        if (tblRef.getId() == getTupleId(slotIds.first)) {
+          innerSlot = slotIds.first;
+          outerSlot = slotIds.second;
+        } else if (tblRef.getId() == getTupleId(slotIds.second)) {
+          innerSlot = slotIds.second;
+          outerSlot = slotIds.first;
+        } else {
+          // this eq predicate is part of an OJ clause but doesn't reference
+          // the joined table -> ignore this, we can't reason about when it'll
+          // actually be true
+          continue;
+        }
+
+        // value transfer is not legal if the receiving slot is in an enclosed
+        // scope of the source slot and the receiving slot's block has a limit
+        Analyzer innerBlock = globalState_.blockBySlot.get(innerSlot);
+        Analyzer outerBlock = globalState_.blockBySlot.get(outerSlot);
+        if (tblRef.getJoinOp() == JoinOperator.LEFT_OUTER_JOIN) {
+          if (!(outerBlock.hasLimit_ && outerBlock.ancestors_.contains(innerBlock))) {
+            valueTransfers.add(new Pair<SlotId, SlotId>(outerSlot, innerSlot));
+          }
+        } else if (tblRef.getJoinOp() == JoinOperator.RIGHT_OUTER_JOIN) {
+          if (!(innerBlock.hasLimit_ && innerBlock.ancestors_.contains(outerBlock))) {
+            valueTransfers.add(new Pair<SlotId, SlotId>(innerSlot, outerSlot));
+          }
+        }
+      }
+    }
+
+    /**
+     * Debug utility to validate the correctness of the value transfer graph using a
+     * brute-force transitive closure algorithm.
+     * Returns true if this value transfer graph is identical to one computed with
+     * the brute-force method, false otherwise.
+     * Writes string representations of the expected and actual value transfer
+     * matrices into expected and actual, respectively.
+     */
+    public boolean validate(StringBuilder expected, StringBuilder actual) {
+      Preconditions.checkState(expected.length() == 0 && actual.length() == 0);
+      int numSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
+      boolean[][] expectedValueTransfer = new boolean[numSlots][numSlots];
+      for (int i = 0; i < numSlots; ++i) {
+        expectedValueTransfer[i][i] = true;
+      }
+
+      // Initialize expectedValueTransfer with the value transfers from conjuncts_.
+      List<Pair<SlotId, SlotId>> valueTransfers = Lists.newArrayList();
+      partitionValueTransfers(null, valueTransfers);
+      for (Pair<SlotId, SlotId> vt: valueTransfers) {
+        expectedValueTransfer[vt.first.asInt()][vt.second.asInt()] = true;
+      }
+      // Set registered value tranfers in expectedValueTransfer.
+      for (Pair<SlotId, SlotId> vt: globalState_.registeredValueTransfers) {
+        expectedValueTransfer[vt.first.asInt()][vt.second.asInt()] = true;
+      }
+
+      // Compute the expected transitive closure.
+      boolean changed = false;
+      do {
+        changed = false;
+        for (int i = 0; i < numSlots; ++i) {
+          for (int j = 0; j < numSlots; ++j) {
+            for (int k = 0; k < numSlots; ++k) {
+              if (expectedValueTransfer[i][j] && expectedValueTransfer[j][k]
+                  && !expectedValueTransfer[i][k]) {
+                expectedValueTransfer[i][k] = true;
+                changed = true;
+              }
+            }
+          }
+        }
+      } while (changed);
+
+      // Populate actual value transfer graph.
+      boolean[][] actualValueTransfer = new boolean[numSlots][numSlots];
+      for (int i = 0; i < numSlots; ++i) {
+        for (int j = 0; j < numSlots; ++j) {
+          actualValueTransfer[i][j] = hasValueTransfer(new SlotId(i), new SlotId(j));
+        }
+      }
+
+      // Print matrices and string-compare them.
+      PrintUtils.printMatrix(expectedValueTransfer, 3, expected);
+      PrintUtils.printMatrix(actualValueTransfer, 3, actual);
+      String expectedStr = expected.toString();
+      String actualStr = actual.toString();
+      return expectedStr.equals(actualStr);
+    }
+  }
 }

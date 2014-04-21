@@ -51,4 +51,30 @@ public class PrintUtils {
     return prefix + "per-host-mem=" +
         ((perHostMemCost != -1) ? printBytes(perHostMemCost) : "unavailable");
   }
+
+  /**
+   * Prints the given square matrix into matrixStr. Separates cells by cellSpacing.
+   */
+  public static void printMatrix(boolean[][] matrix, int cellSpacing,
+      StringBuilder matrixStr) {
+    // Print labels.
+    for (int i = 0; i < cellSpacing; ++i) {
+      matrixStr.append(" ");
+    }
+    String formatStr = "%Xd".replace("X", String.valueOf(cellSpacing));
+    for (int i = 0; i < matrix.length; ++i) {
+      matrixStr.append(String.format(formatStr, i));
+    }
+    matrixStr.append("\n");
+
+    // Print matrix.
+    for (int i = 0; i < matrix.length; ++i) {
+      matrixStr.append(String.format(formatStr, i));
+      for (int j = 0; j < matrix.length; ++j) {
+        int cell = (matrix[i][j]) ? 1 : 0;
+        matrixStr.append(String.format(formatStr, cell));
+      }
+      matrixStr.append("\n");
+    }
+  }
 }
