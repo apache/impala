@@ -34,6 +34,8 @@ DEFINE_string(principal, "", "Kerberos principal. If set, both client and backen
 DEFINE_string(be_principal, "", "Kerberos principal for backend network connections only,"
     "overriding --principal if set.");
 DEFINE_string(keytab_file, "", "Absolute path to Kerberos keytab file");
+DEFINE_string(krb_credential_cache, "", "(Advanced) Absolute path to credential cache "
+    "used by Kerberos. If not set, the default is /tmp/krb5_impala_<process_name>_<pid>");
 
 DEFINE_string(mem_limit, "80%", "Process memory limit specified as number of bytes "
               "('<int>[bB]?'), megabytes ('<float>[mM]'), gigabytes ('<float>[gG]'), "
@@ -50,4 +52,3 @@ DEFINE_string(heap_profile_dir, "", "Output directory to store heap profiles. If
 
 DEFINE_bool(abort_on_config_error, true, "Abort Impala startup if there are improper "
     "configs or running on unsupported hardware.");
-

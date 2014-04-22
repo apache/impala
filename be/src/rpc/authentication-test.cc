@@ -26,7 +26,7 @@ namespace impala {
 TEST(Auth, PrincipalSubstitution) {
   string hostname;
   ASSERT_TRUE(GetHostname(&hostname).ok());
-  KerberosAuthProvider kerberos("service_name/_HOST@some.realm", "", false);
+  KerberosAuthProvider kerberos("service_name/_HOST@some.realm", "", "", false);
   ASSERT_TRUE(kerberos.Start().ok());
   ASSERT_EQ(string::npos, kerberos.principal().find("_HOST"));
   ASSERT_NE(string::npos, kerberos.principal().find(hostname));
