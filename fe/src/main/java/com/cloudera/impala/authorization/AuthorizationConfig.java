@@ -14,8 +14,10 @@
 
 package com.cloudera.impala.authorization;
 
-import org.apache.sentry.provider.file.ResourceAuthorizationProvider;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 
+import com.cloudera.impala.common.FileSystemUtil;
 import com.google.common.base.Preconditions;
 
 /*
@@ -25,12 +27,18 @@ public class AuthorizationConfig {
   private final String serverName_;
   private final String policyFile_;
   private final String policyProviderClassName_;
+  private Configuration sentryConfig_;
 
   public AuthorizationConfig(String serverName, String policyFile,
       String policyProviderClassName) {
     serverName_ = serverName;
     policyFile_ = policyFile;
     policyProviderClassName_ = policyProviderClassName;
+    if (isEnabled()) {
+      sentryConfig_ = FileSystemUtil.getConfiguration();
+      // TODO: Support and load the sentry-service.xml configuration file:
+      // sentryConfig_.addResource(sentryServiceConfigFile);
+    }
   }
 
   /*
@@ -42,6 +50,7 @@ public class AuthorizationConfig {
     if (!isEnabled()) {
       return;
     }
+    Preconditions.checkNotNull(sentryConfig_);
 
     if (serverName_ == null || serverName_.isEmpty()) {
       throw new IllegalArgumentException("Authorization is enabled but the server name" +
@@ -108,4 +117,5 @@ public class AuthorizationConfig {
    * org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider.
    */
   public String getPolicyProviderClassName() { return policyProviderClassName_; }
+  public Configuration getSentryConfig() { return sentryConfig_; }
 }

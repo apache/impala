@@ -18,10 +18,12 @@ import java.util.EnumSet;
 import java.util.List;
 
 import org.apache.commons.lang.reflect.ConstructorUtils;
+import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.core.common.Authorizable;
+import org.apache.sentry.core.common.Subject;
 import org.apache.sentry.core.model.db.DBModelAction;
 import org.apache.sentry.policy.db.SimpleDBPolicyEngine;
-import org.apache.sentry.provider.file.ResourceAuthorizationProvider;
+import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import org.apache.sentry.provider.file.SimpleFileProviderBackend;
 
 import com.google.common.base.Preconditions;
@@ -54,8 +56,8 @@ public class AuthorizationChecker {
   private static ResourceAuthorizationProvider
       createAuthorizationProvider(AuthorizationConfig config) {
     try {
-      SimpleFileProviderBackend providerBackend =
-          new SimpleFileProviderBackend(config.getPolicyFile());
+      SimpleFileProviderBackend providerBackend = new SimpleFileProviderBackend(
+          config.getSentryConfig(), config.getPolicyFile());
       SimpleDBPolicyEngine engine =
           new SimpleDBPolicyEngine(config.getServerName(), providerBackend);
 
@@ -68,7 +70,7 @@ public class AuthorizationChecker {
     } catch (Exception e) {
       // Re-throw as unchecked exception.
       throw new IllegalStateException(
-          "Error creating ResourceAuthorizationProvider: " + e.getMessage(), e);
+          "Error creating ResourceAuthorizationProvider: ", e);
     }
   }
 
@@ -106,14 +108,14 @@ public class AuthorizationChecker {
     // has any privileges on a given resource.
     if (request.getPrivilege().getAnyOf()) {
       for (DBModelAction action: actions) {
-        if (provider_.hasAccess(new org.apache.sentry.core.common.Subject(user.getShortName()),
-            authorizeables, EnumSet.of(action))) {
+        if (provider_.hasAccess(new Subject(user.getShortName()), authorizeables,
+            EnumSet.of(action), ActiveRoleSet.ALL)) {
           return true;
         }
       }
       return false;
     }
-    return provider_.hasAccess(new org.apache.sentry.core.common.Subject(user.getShortName()),
-        authorizeables, actions);
+    return provider_.hasAccess(new Subject(user.getShortName()), authorizeables, actions,
+        ActiveRoleSet.ALL);
   }
 }

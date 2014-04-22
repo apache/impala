@@ -25,9 +25,9 @@ import junit.framework.Assert;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
-import org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider;
+import org.apache.sentry.provider.common.HadoopGroupResourceAuthorizationProvider;
+import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider;
-import org.apache.sentry.provider.file.ResourceAuthorizationProvider;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
