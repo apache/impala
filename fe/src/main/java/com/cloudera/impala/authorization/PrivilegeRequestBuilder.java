@@ -16,7 +16,7 @@ package com.cloudera.impala.authorization;
 
 import com.google.common.base.Preconditions;
 
-/*
+/**
  * Class that helps build PrivilegeRequest objects.
  * For example:
  * PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder();
@@ -33,7 +33,7 @@ public class PrivilegeRequestBuilder {
   Authorizeable authorizeable_;
   Privilege privilege_;
 
-  /*
+  /**
    * Sets the authorizeable object to be a table.
    */
   public PrivilegeRequestBuilder onTable(String dbName, String tableName) {
@@ -41,7 +41,7 @@ public class PrivilegeRequestBuilder {
     return this;
   }
 
-  /*
+  /**
    * Sets the authorizeable object to be a database.
    */
   public PrivilegeRequestBuilder onDb(String dbName) {
@@ -49,7 +49,7 @@ public class PrivilegeRequestBuilder {
     return this;
   }
 
-  /*
+  /**
    * Sets the authorizeable object to be a URI.
    */
   public PrivilegeRequestBuilder onURI(String uriName) {
@@ -57,14 +57,14 @@ public class PrivilegeRequestBuilder {
     return this;
   }
 
-  /*
+  /**
    * Specifies that permissions on any table in the given database.
    */
   public PrivilegeRequestBuilder onAnyTable(String dbName) {
     return onTable(dbName, AuthorizeableTable.ANY_TABLE_NAME);
   }
 
-  /*
+  /**
    * Specifies the privilege the user needs to have.
    */
   public PrivilegeRequestBuilder allOf(Privilege privilege) {
@@ -72,7 +72,7 @@ public class PrivilegeRequestBuilder {
     return this;
   }
 
-  /*
+  /**
    * Specifies the user needs "ALL" privileges
    */
   public PrivilegeRequestBuilder all() {
@@ -80,7 +80,7 @@ public class PrivilegeRequestBuilder {
     return this;
   }
 
-  /*
+  /**
    * Specifies that any privileges are sufficient.
    */
   public PrivilegeRequestBuilder any() {
@@ -88,7 +88,7 @@ public class PrivilegeRequestBuilder {
     return this;
   }
 
-  /*
+  /**
    * Builds a PrivilegeRequest object based on the current Authorizeable object
    * and privilege settings.
    */

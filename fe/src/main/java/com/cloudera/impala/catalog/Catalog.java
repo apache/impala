@@ -62,6 +62,10 @@ public abstract class Catalog {
 
   protected final MetaStoreClientPool metaStoreClientPool_ = new MetaStoreClientPool(0);
 
+  // Cache of authorization policy metadata. Populated from data retried from the
+  // Sentry Service, if configured.
+  protected AuthorizationPolicy authPolicy_ = new AuthorizationPolicy();
+
   // Thread safe cache of database metadata. Uses an AtomicReference so reset()
   // operations can atomically swap dbCache_ references.
   // TODO: Update this to use a CatalogObjectCache?
@@ -93,7 +97,7 @@ public abstract class Catalog {
     addDb(builtinsDb_);
   }
 
-  public Db getBuiltinsDb() { return builtinsDb_;}
+  public Db getBuiltinsDb() { return builtinsDb_; }
 
   /**
    * Adds a new database to the catalog, replacing any existing database with the same
@@ -441,6 +445,32 @@ public abstract class Catalog {
         result.setCache_pool(pool.toThrift());
         break;
       }
+      case ROLE:
+        Role role = authPolicy_.getRole(objectDesc.getRole().getRole_name());
+        if (role == null) {
+          throw new CatalogException("Role not found: " +
+              objectDesc.getRole().getRole_name());
+        }
+        result.setType(role.getCatalogObjectType());
+        result.setCatalog_version(role.getCatalogVersion());
+        result.setRole(role.toThrift());
+        break;
+      case PRIVILEGE:
+        Role tmpRole = authPolicy_.getRole(objectDesc.getPrivilege().getRole_id());
+        if (tmpRole == null) {
+          throw new CatalogException("No role associated with ID: " +
+              objectDesc.getPrivilege().getRole_id());
+        }
+        for (RolePrivilege p: tmpRole.getPrivileges()) {
+          if (p.getName().equals(objectDesc.getPrivilege().getPrivilege_name())) {
+            result.setType(p.getCatalogObjectType());
+            result.setCatalog_version(p.getCatalogVersion());
+            result.setPrivilege(p.toThrift());
+            break;
+          }
+        }
+        throw new CatalogException("Privilege not found: " +
+            objectDesc.getPrivilege().getPrivilege_name());
       default: throw new IllegalStateException(
           "Unexpected TCatalogObject type: " + objectDesc.getType());
     }

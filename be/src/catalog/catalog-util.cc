@@ -41,6 +41,10 @@ TCatalogObjectType::type TCatalogObjectTypeFromName(const string& name) {
     return TCatalogObjectType::DATA_SOURCE;
   } else if (upper == "HDFS_CACHE_POOL") {
     return TCatalogObjectType::HDFS_CACHE_POOL;
+  } else if (upper == "ROLE") {
+    return TCatalogObjectType::ROLE;
+  } else if (upper == "PRIVILEGE") {
+    return TCatalogObjectType::PRIVILEGE;
   }
   return TCatalogObjectType::UNKNOWN;
 }
@@ -108,10 +112,27 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       catalog_object->__set_data_source(TDataSource());
       catalog_object->data_source.__set_name(object_name);
       break;
-    case TCatalogObjectType::HDFS_CACHE_POOL: {
+    case TCatalogObjectType::HDFS_CACHE_POOL:
       catalog_object->__set_type(object_type);
       catalog_object->__set_cache_pool(THdfsCachePool());
       catalog_object->cache_pool.__set_pool_name(object_name);
+      break;
+    case TCatalogObjectType::ROLE:
+      catalog_object->__set_type(object_type);
+      catalog_object->__set_role(TRole());
+      catalog_object->role.__set_role_name(object_name);
+      break;
+    case TCatalogObjectType::PRIVILEGE: {
+      int pos = object_name.find(".");
+      if (pos == string::npos || pos >= object_name.size() - 1) {
+        stringstream error_msg;
+        error_msg << "Invalid privilege name: " << object_name;
+        return Status(error_msg.str());
+      }
+      catalog_object->__set_type(object_type);
+      catalog_object->__set_privilege(TPrivilege());
+      catalog_object->privilege.__set_role_id(atoi(object_name.substr(0, pos).c_str()));
+      catalog_object->privilege.__set_privilege_name(object_name.substr(pos + 1));
       break;
     }
     case TCatalogObjectType::CATALOG:
@@ -145,8 +166,16 @@ string TCatalogObjectToEntryKey(const TCatalogObject& catalog_object) {
       break;
     case TCatalogObjectType::DATA_SOURCE:
       entry_key << catalog_object.data_source.name;
+      break;
     case TCatalogObjectType::HDFS_CACHE_POOL:
       entry_key << catalog_object.cache_pool.pool_name;
+      break;
+    case TCatalogObjectType::ROLE:
+      entry_key << catalog_object.role.role_name;
+      break;
+    case TCatalogObjectType::PRIVILEGE:
+      entry_key << catalog_object.privilege.role_id << "."
+                << catalog_object.privilege.privilege_name;
       break;
     default:
       break;

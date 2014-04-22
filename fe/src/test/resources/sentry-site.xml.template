@@ -24,7 +24,7 @@
 </property>
 <property>
  <name>sentry.service.admin.group</name>
- <value>lskuff</value>
+ <value>${USER}</value>
 </property>
 <property>
  <name>sentry.service.server.rpc-address</name>
@@ -44,7 +44,7 @@
 </property>
 <property>
  <name>sentry.store.jdbc.url</name>
- <value>jdbc:postgresql://localhost:5432/sentry_test2/;create=true</value>
+ <value>jdbc:postgresql://localhost:5432/sentry_policy/;create=true</value>
 </property>
 <property>
  <name>sentry.store.jdbc.user</name>
@@ -53,5 +53,9 @@
 <property>
  <name>sentry.store.jdbc.password</name>
  <value>password</value>
+</property>
+<property>
+ <name>sentry.verify.schema.version</name>
+ <value>false</value>
 </property>
 </configuration>

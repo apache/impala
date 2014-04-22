@@ -22,12 +22,13 @@ import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import com.cloudera.impala.testutil.CatalogServiceTestCatalog;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {
   private static CatalogServiceCatalog catalog_ =
-      CatalogServiceCatalog.createForTesting(false);
+      CatalogServiceTestCatalog.create();
 
   private void checkTableCols(Db db, String tblName, int numClusteringCols,
       String[] colNames, ColumnType[] colTypes) throws TableLoadingException {

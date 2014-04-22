@@ -44,11 +44,14 @@ import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TDataSource;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TFunction;
+import com.cloudera.impala.thrift.TPrivilege;
+import com.cloudera.impala.thrift.TRole;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 /**
  * Thread safe Catalog for an Impalad. The Impalad Catalog provides an interface to
@@ -105,7 +108,8 @@ public class ImpaladCatalog extends Catalog {
   private final AuthorizationConfig authzConfig_;
   // Lock used to synchronize refreshing the AuthorizationChecker.
   private final ReentrantReadWriteLock authzCheckerLock_ = new ReentrantReadWriteLock();
-  private AuthorizationChecker authzChecker_;
+  // Visibility is protected for testing.
+  protected AuthorizationChecker authzChecker_;
 
   // Flag to determine if the Catalog is ready to accept user requests. See isReady().
   private final AtomicBoolean isReady_ = new AtomicBoolean(false);
@@ -123,13 +127,14 @@ public class ImpaladCatalog extends Catalog {
   public ImpaladCatalog(AuthorizationConfig authzConfig) {
     super(false);
     authzConfig_ = authzConfig;
-    authzChecker_ = new AuthorizationChecker(authzConfig);
-    // If authorization is enabled, reload the policy on a regular basis.
-    if (authzConfig.isEnabled()) {
+    authzChecker_ = new AuthorizationChecker(authzConfig, authPolicy_);
+    if (authzConfig.isEnabled() && !Strings.isNullOrEmpty(authzConfig.getPolicyFile())) {
+      // If file based authorization is enabled, reload the policy file on a regular
+      // basis.
+
       // Stagger the reads across nodes
       Random randomGen = new Random(UUID.randomUUID().hashCode());
       int delay = AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS + randomGen.nextInt(60);
-
       policyReader_.scheduleAtFixedRate(
           new AuthorizationPolicyReader(authzConfig),
           delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
@@ -147,7 +152,7 @@ public class ImpaladCatalog extends Catalog {
       LOG.info("Reloading authorization policy file from: " + config.getPolicyFile());
       authzCheckerLock_.writeLock().lock();
       try {
-        authzChecker_ = new AuthorizationChecker(config);
+        authzChecker_ = new AuthorizationChecker(config, authPolicy_);
       } finally {
         authzCheckerLock_.writeLock().unlock();
       }
@@ -495,6 +500,21 @@ public class ImpaladCatalog extends Catalog {
       case DATA_SOURCE:
         addDataSource(catalogObject.getData_source(), catalogObject.getCatalog_version());
         break;
+      case ROLE:
+        Role role = Role.fromThrift(catalogObject.getRole());
+        role.setCatalogVersion(catalogObject.getCatalog_version());
+        authPolicy_.addRole(role);
+        break;
+      case PRIVILEGE:
+        RolePrivilege privilege =
+            RolePrivilege.fromThrift(catalogObject.getPrivilege());
+        privilege.setCatalogVersion(catalogObject.getCatalog_version());
+        try {
+          authPolicy_.addPrivilege(privilege);
+        } catch (CatalogException e) {
+          LOG.error("Error adding privilege: ", e);
+        }
+        break;
       case HDFS_CACHE_POOL:
         HdfsCachePool cachePool = new HdfsCachePool(catalogObject.getCache_pool());
         cachePool.setCatalogVersion(catalogObject.getCatalog_version());
@@ -540,6 +560,12 @@ public class ImpaladCatalog extends Catalog {
         break;
       case DATA_SOURCE:
         removeDataSource(catalogObject.getData_source(), dropCatalogVersion);
+        break;
+      case ROLE:
+        removeRole(catalogObject.getRole(), dropCatalogVersion);
+        break;
+      case PRIVILEGE:
+        removePrivilege(catalogObject.getPrivilege(), dropCatalogVersion);
         break;
       case HDFS_CACHE_POOL:
         HdfsCachePool existingItem =
@@ -635,6 +661,26 @@ public class ImpaladCatalog extends Catalog {
     Function fn = db.getFunction(thriftFn.getSignature());
     if (fn != null && fn.getCatalogVersion() < dropCatalogVersion) {
       db.removeFunction(thriftFn.getSignature());
+    }
+  }
+
+  private void removeRole(TRole thriftRole, long dropCatalogVersion) {
+    Role existingRole = authPolicy_.getRole(thriftRole.getRole_name());
+    // version of the drop, remove the function.
+    if (existingRole != null && existingRole.getCatalogVersion() < dropCatalogVersion) {
+      authPolicy_.removeRole(thriftRole.getRole_name());
+    }
+  }
+
+  private void removePrivilege(TPrivilege thriftPrivilege, long dropCatalogVersion) {
+    Role role = authPolicy_.getRole(thriftPrivilege.getRole_id());
+    if (role == null) return;
+    RolePrivilege existingPrivilege =
+        role.getPrivilege(thriftPrivilege.getPrivilege_name());
+    // version of the drop, remove the function.
+    if (existingPrivilege != null &&
+        existingPrivilege.getCatalogVersion() < dropCatalogVersion) {
+      role.removePrivilege(thriftPrivilege.getPrivilege_name());
     }
   }
 

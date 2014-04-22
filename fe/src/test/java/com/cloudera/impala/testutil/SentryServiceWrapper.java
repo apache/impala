@@ -25,16 +25,44 @@ import org.apache.sentry.service.thrift.SentryServiceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.SentryServiceConfig;
+import com.cloudera.impala.authorization.SentryConfig;
 
 /**
- * Wrapper script for starting a Sentry Policy Server.
+ * Wrapper script for starting a Sentry Policy Server in our test environment.
  */
 public class SentryServiceWrapper {
   private final static Logger LOG =
       LoggerFactory.getLogger(SentryServiceWrapper.class);
-  private static SentryServiceConfig serviceConfig_;
-  private static SentryService server;
+  private final SentryConfig serviceConfig_;
+  private final SentryService server_;
+
+  public SentryServiceWrapper(SentryConfig serviceConfig) throws Exception {
+    serviceConfig_ = serviceConfig;
+    serviceConfig_.loadConfig();
+    server_ = new SentryServiceFactory().create(serviceConfig_.getConfig());
+  }
+
+  public void start() throws Exception {
+    // Start the server.
+    LOG.info("Starting Sentry Policy Server...");
+    startSentryService();
+    LOG.info(String.format("Sentry Policy Server running on: %s:%s",
+        serviceConfig_.getConfig().get("sentry.service.server.rpc-address"),
+        serviceConfig_.getConfig().get("sentry.service.server.rpc-port")));
+  }
+
+  private void startSentryService() throws Exception {
+    server_.start();
+    // Wait for the server to come online.
+    final long start = System.currentTimeMillis();
+    while (!server_.isRunning()) {
+      LOG.info("Server not up yet. Sleeping...");
+      Thread.sleep(1000);
+      if (System.currentTimeMillis() - start > 60000L) {
+        throw new TimeoutException("Server did not start after 60 seconds");
+      }
+    }
+  }
 
   // Suppress warnings from OptionBuilder.
   @SuppressWarnings("static-access")
@@ -50,29 +78,8 @@ public class SentryServiceWrapper {
     BasicParser optionParser = new BasicParser();
     CommandLine cmdArgs = optionParser.parse(options, args);
 
-    // Load the configuration file.
-    serviceConfig_ = new SentryServiceConfig(cmdArgs.getOptionValue("config_file"));
-    serviceConfig_.loadConfig();
-
-    // Start the server.
-    server = new SentryServiceFactory().create(serviceConfig_.getConfig());
-    LOG.info("Starting Sentry Policy Server...");
-    startSentryService();
-    LOG.info(String.format("Sentry Policy Server running on: %s:%s",
-        serviceConfig_.getConfig().get("sentry.service.server.rpc-address"),
-        serviceConfig_.getConfig().get("sentry.service.server.rpc-port")));
-  }
-
-  private static void startSentryService() throws Exception {
+    SentryServiceWrapper server = new SentryServiceWrapper(
+        new SentryConfig(cmdArgs.getOptionValue("config_file")));
     server.start();
-    // Wait for the server to come online.
-    final long start = System.currentTimeMillis();
-    while(!server.isRunning()) {
-      LOG.info("Server not up yet. Sleeping...");
-      Thread.sleep(1000);
-      if(System.currentTimeMillis() - start > 60000L) {
-        throw new TimeoutException("Server did not start after 60 seconds");
-      }
-    }
   }
 }

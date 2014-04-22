@@ -107,6 +107,12 @@
 
     <dependency>
       <groupId>org.apache.sentry</groupId>
+      <artifactId>sentry-provider-cache</artifactId>
+      <version>${sentry.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-policy-common</artifactId>
       <version>${sentry.version}</version>
     </dependency>

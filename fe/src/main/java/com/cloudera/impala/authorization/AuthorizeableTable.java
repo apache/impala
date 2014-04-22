@@ -16,6 +16,8 @@ package com.cloudera.impala.authorization;
 
 import java.util.List;
 
+import org.apache.sentry.core.model.db.DBModelAuthorizable;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -41,13 +43,12 @@ public class AuthorizeableTable implements Authorizeable {
   }
 
   @Override
-  public List<org.apache.sentry.core.model.db.DBModelAuthorizable>
-      getHiveAuthorizeableHierarchy() {
+  public List<DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
     return Lists.newArrayList(database_, table_);
   }
 
   @Override
-  public String getName() {
-    return database_.getName() + "." + table_.getName();
-  }
+  public String getName() { return database_.getName() + "." + table_.getName(); }
+  public String getDbName() { return database_.getName(); }
+  public String getTblName() { return table_.getName(); }
 }

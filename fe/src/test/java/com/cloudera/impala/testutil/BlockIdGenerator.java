@@ -12,7 +12,6 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
@@ -44,7 +43,7 @@ public class BlockIdGenerator {
       writer = new FileWriter(output);
 
       // Load all tables in the catalog
-      Catalog catalog = CatalogServiceCatalog.createForTesting(true);
+      Catalog catalog = CatalogServiceTestCatalog.create();
       for (String dbName: catalog.getDbNames(null)) {
         Db database = catalog.getDb(dbName);
         for (String tableName: database.getAllTableNames()) {

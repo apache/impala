@@ -25,6 +25,7 @@
 using namespace std;
 using namespace impala;
 
+DECLARE_string(sentry_config);
 DECLARE_int32(non_impala_java_vlog);
 
 DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at startup");
@@ -32,12 +33,15 @@ DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at s
 // Authorization related flags. Must be set to valid values to properly configure
 // authorization.
 DEFINE_string(server_name, "", "The name to use for securing this impalad "
-    "server during authorization. If set, authorization will be enabled.");
+    "server during authorization. Set to enable authorization. By default, the "
+    "authorization policy will be loaded from the catalog server (via the statestore)."
+    "To use a file based authorization policy, set --authorization_policy_file.");
 DEFINE_string(authorization_policy_file, "", "HDFS path to the authorization policy "
-    "file. If set, authorization will be enabled.");
+    "file. If set, authorization will be enabled and the authorization policy will be "
+    "read from a file.");
 DEFINE_string(authorization_policy_provider_class,
     "org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider",
-    "Advanced: The authorization policy provider class name.");
+    "(Deprecated) Advanced: The authorization policy provider class name.");
 DEFINE_string(authorized_proxy_user_config, "",
     "Specifies the set of authorized proxy users (users who can impersonate other "
     "users during authorization) and whom they are allowed to impersonate. "
@@ -82,11 +86,10 @@ Frontend::Frontend() {
       jni_env->NewStringUTF(FLAGS_authorization_policy_file.c_str());
   jstring server_name =
       jni_env->NewStringUTF(FLAGS_server_name.c_str());
-  jstring policy_provider_class_name =
-      jni_env->NewStringUTF(FLAGS_authorization_policy_provider_class.c_str());
-
+  jstring sentry_config =
+      jni_env->NewStringUTF(FLAGS_sentry_config.c_str());
   jobject fe = jni_env->NewObject(fe_class_, fe_ctor_, lazy, server_name,
-      policy_file_path, policy_provider_class_name, FlagToTLogLevel(FLAGS_v),
+      policy_file_path, sentry_config, FlagToTLogLevel(FLAGS_v),
       FlagToTLogLevel(FLAGS_non_impala_java_vlog));
   EXIT_IF_EXC(jni_env);
   EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));

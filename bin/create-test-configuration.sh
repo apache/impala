@@ -71,6 +71,11 @@ if [ $CREATE_METASTORE -eq 1 ]; then
        -f ${HIVE_HOME}/scripts/metastore/upgrade/postgres/hive-schema-0.12.0.postgres.sql
 fi
 
+set +e
+echo "Creating Sentry Policy Server DB"
+createdb -U hiveuser sentry_policy
+set -e
+
 function generate_config {
   # Search for strings like ${FOO}, if FOO is defined in the environment then replace
   # "${FOO}" with the environment value.
@@ -95,6 +100,9 @@ generate_config hbase-site.xml.template hbase-site.xml
 
 echo "Generating authorization policy file"
 generate_config authz-policy.ini.template authz-policy.ini
+
+echo "Generating sentry policy server config file"
+generate_config sentry-site.xml.template sentry-site.xml
 popd
 
 echo "Completed config generation"

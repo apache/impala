@@ -24,6 +24,7 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.SentryConfig;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Function;
@@ -47,6 +48,7 @@ import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.thrift.TUpdateCatalogRequest;
 import com.cloudera.impala.util.GlogAppender;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 /**
  * JNI-callable interface for the CatalogService. The main point is to serialize
@@ -68,15 +70,22 @@ public class JniCatalog {
   }
 
   public JniCatalog(boolean loadInBackground, int numMetadataLoadingThreads,
-      int impalaLogLevel, int otherLogLevel) throws InternalException {
+      String sentryServiceConfig, int impalaLogLevel, int otherLogLevel)
+      throws InternalException {
     Preconditions.checkArgument(numMetadataLoadingThreads > 0);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.
     GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
         TLogLevel.values()[otherLogLevel]);
 
+    // Check if the Sentry Service is configured. If so, create a configuration object.
+    SentryConfig sentryConfig = null;
+    if (!Strings.isNullOrEmpty(sentryServiceConfig)) {
+      sentryConfig = new SentryConfig(sentryServiceConfig);
+      sentryConfig.loadConfig();
+    }
     catalog_ = new CatalogServiceCatalog(loadInBackground,
-        numMetadataLoadingThreads, getServiceId());
+        numMetadataLoadingThreads, sentryConfig, getServiceId());
     try {
       catalog_.reset();
     } catch (CatalogException e) {

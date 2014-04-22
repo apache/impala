@@ -20,34 +20,40 @@ import java.net.MalformedURLException;
 import org.apache.hadoop.conf.Configuration;
 
 import com.cloudera.impala.common.FileSystemUtil;
-import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 /**
- * Class used to load a sentry-site.xml configuration file for the Sentry
- * Policy Server.
+ * Class used to load a sentry-site.xml configuration file.
  */
-public class SentryServiceConfig {
+public class SentryConfig {
   // Absolute path to the sentry-site.xml configuration file.
   private final String configFile_;
 
-  // The Sentry Service configuration. Valid only after calling loadConfig().
-  private Configuration config_;
+  // The Sentry configuration. Valid only after calling loadConfig().
+  private final Configuration config_;
 
-  public SentryServiceConfig(String configFilePath) {
-    Preconditions.checkNotNull(configFilePath);
+  public SentryConfig(String configFilePath) {
     configFile_ = configFilePath;
+    config_ = FileSystemUtil.getConfiguration();
   }
 
+  /**
+   * Initializes the Sentry configuration.
+   */
   public void loadConfig() {
-    config_ = FileSystemUtil.getConfiguration();
+    if (Strings.isNullOrEmpty(configFile_)) {
+      throw new IllegalArgumentException("A valid path to a sentry-site.xml config " +
+          "file must be set using --sentry_config to enable authorization.");
+    }
+
     File configFile = new File(configFile_);
     if (!configFile.exists()) {
-      throw new RuntimeException("Sentry Service configuration file does not exist: " +
+      throw new RuntimeException("Sentry configuration file does not exist: " +
           configFile_);
     }
 
     if (!configFile.canRead()) {
-      throw new RuntimeException("Cannot read Sentry Service configuration file: " +
+      throw new RuntimeException("Cannot read Sentry configuration file: " +
           configFile_);
     }
 
@@ -55,10 +61,10 @@ public class SentryServiceConfig {
     try {
       config_.addResource(configFile.toURI().toURL());
     } catch (MalformedURLException e) {
-      throw new RuntimeException("Invalid Sentry Service config file path: " +
-          configFile_, e);
+      throw new RuntimeException("Invalid Sentry config file path: " + configFile_, e);
     }
   }
 
   public Configuration getConfig() { return config_; }
+  public String getConfigFile() { return configFile_; }
 }

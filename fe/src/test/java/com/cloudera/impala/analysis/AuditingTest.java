@@ -18,7 +18,6 @@ import java.util.List;
 
 import junit.framework.Assert;
 
-import org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
@@ -276,7 +275,7 @@ public class AuditingTest extends AnalyzerTest {
     // The policy file doesn't exist so all operations will result in
     // an AuthorizationError
     AuthorizationConfig config = new AuthorizationConfig("server1", "/does/not/exist",
-        HadoopGroupResourceAuthorizationProvider.class.getName());
+        "");
     ImpaladCatalog catalog = new ImpaladTestCatalog(config);
     Analyzer analyzer = new Analyzer(catalog, TestUtils.createQueryContext());
 

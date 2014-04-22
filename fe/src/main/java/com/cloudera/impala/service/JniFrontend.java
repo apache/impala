@@ -102,17 +102,24 @@ public class JniFrontend {
    * Create a new instance of the Jni Frontend.
    */
   public JniFrontend(boolean lazy, String serverName, String authorizationPolicyFile,
-      String policyProviderClassName, int impalaLogLevel, int otherLogLevel)
+      String sentryConfigFile, int impalaLogLevel, int otherLogLevel)
       throws InternalException {
     GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
         TLogLevel.values()[otherLogLevel]);
 
     // Validate the authorization configuration before initializing the Frontend.
     // If there are any configuration problems Impala startup will fail.
-    AuthorizationConfig authorizationConfig = new AuthorizationConfig(serverName,
-        authorizationPolicyFile, policyProviderClassName);
-    authorizationConfig.validateConfig();
-    frontend_ = new Frontend(authorizationConfig);
+    AuthorizationConfig authConfig = new AuthorizationConfig(serverName,
+        authorizationPolicyFile, sentryConfigFile);
+    authConfig.validateConfig();
+    if (authConfig.isEnabled()) {
+      LOG.info("Authorization is 'ENABLED' using %s",
+          authConfig.isFileBasedPolicy() ? " file based policy from: " +
+          authConfig.getPolicyFile() : " using Sentry Policy Service.");
+    } else {
+      LOG.info("Authorization is 'DISABLED'.");
+    }
+    frontend_ = new Frontend(authConfig);
   }
 
   /**

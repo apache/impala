@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.testutil;
 
+import com.cloudera.impala.authorization.AuthorizationChecker;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
@@ -38,12 +39,14 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
   public ImpaladTestCatalog(AuthorizationConfig authzConfig) {
     super(authzConfig);
     CatalogServiceCatalog catalogServerCatalog =
-        CatalogServiceCatalog.createForTesting(false);
+        CatalogServiceTestCatalog.createWithAuth(authzConfig.getSentryConfig());
     // Bootstrap the catalog by adding all dbs, tables, and functions.
     for (String dbName: catalogServerCatalog.getDbNames(null)) {
       // Adding DB should include all tables/fns in that database.
       addDb(catalogServerCatalog.getDb(dbName));
     }
+    authPolicy_ = ((CatalogServiceTestCatalog) catalogServerCatalog).getAuthPolicy();
+    authzChecker_ = new AuthorizationChecker(authzConfig, authPolicy_);
     srcCatalog_ = catalogServerCatalog;
     setIsReady();
   }

@@ -16,6 +16,8 @@ package com.cloudera.impala.authorization;
 
 import java.util.List;
 
+import org.apache.sentry.core.model.db.DBModelAuthorizable;
+
 /*
  * Interface all authorizeable objects (Table, Db, Column, etc) must implement.
  */
@@ -28,7 +30,7 @@ public interface Authorizeable {
   * [Db] would return [Db]
   * [URI] would return [URI]
   */
-  public List<org.apache.sentry.core.model.db.DBModelAuthorizable> getHiveAuthorizeableHierarchy();
+  public List<DBModelAuthorizable> getHiveAuthorizeableHierarchy();
 
   // Returns the name of the object.
   public String getName();
