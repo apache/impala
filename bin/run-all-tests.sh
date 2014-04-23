@@ -63,7 +63,10 @@ do
   # Run backend tests.
   ${IMPALA_HOME}/bin/run-backend-tests.sh
 
-  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3
+  # Increase the admission controller max_requests to prevent builds failing due to
+  # queries not being closed.
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3\
+      --impalad_args=--default_pool_max_requests=500
 
   # Run some queries using run-workload to verify run-workload has not been broken.
   ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
