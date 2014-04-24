@@ -21,26 +21,24 @@ include "Types.thrift"
 
 // A result set column descriptor.
 struct TColumnDesc {
-  // the column name as given in the Create .. statement
-  1: required string name
+  // The column name as given in the Create .. statement. Always set.
+  1: optional string name
 
-  2: required Types.TColumnType type
+  // The column type. Always set.
+  2: optional Types.TColumnType type
 }
 
 // Metadata used to describe the schema (column names, types, comments)
 // of result sets.
 struct TTableSchema {
-  1: required list<TColumnDesc> cols
-}
-
-// A single row containing a number of column values.
-struct TRow {
-  1: required list<Data.TColumnValue> col_vals
+  // List of columns. Always set.
+  1: optional list<TColumnDesc> cols
 }
 
 // Serialized batch of rows returned by getNext().
 struct TRowBatch {
-  1: required list<TRow> rows
+  // Each TColumnData contains the data for an entire column. Always set.
+  1: optional list<Data.TColumnData> cols
 }
 
 // Comparison operators used in predicates.
@@ -55,27 +53,28 @@ enum TComparisonOp {
 // but they are not necessarily the same type, so the data source
 // implementation may need to do an implicit cast.
 struct TBinaryPredicate {
-  // Column on which the predicate is applied.
-  1: required TColumnDesc col
+  // Column on which the predicate is applied. Always set.
+  1: optional TColumnDesc col
 
-  // Comparison operator.
-  2: required TComparisonOp op
+  // Comparison operator. Always set.
+  2: optional TComparisonOp op
 
-  // Value on the right side of the binary predicate.
-  3: required Data.TColumnValue value
+  // Value on the right side of the binary predicate. Always set.
+  3: optional Data.TColumnValue value
 }
 
 // Parameters to getStats().
 struct TGetStatsParams {
-  // The name of the table.
-  1: required string table_name
+  // The name of the table. Always set.
+  1: optional string table_name
 
   // A string specified for the table that is passed to the external data source.
+  // Always set, may be an empty string.
   2: optional string init_string
 
   // A list of conjunctive (AND) clauses, each of which contains a list of
-  // disjunctive (OR) binary predicates.
-  3: required list<list<TBinaryPredicate>> predicates
+  // disjunctive (OR) binary predicates. Always set, may be an empty list.
+  3: optional list<list<TBinaryPredicate>> predicates
 }
 
 // Returned by getStats().
@@ -92,46 +91,51 @@ struct TGetStatsResult {
   // AND elements) that the library will be able to apply during the scan. Those
   // elements that aren’t referenced in accepted_conjuncts will be evaluated by
   // Impala itself.
-  3: list<i32> accepted_conjuncts
+  3: optional list<i32> accepted_conjuncts
 }
 
 // Parameters to open().
 struct TOpenParams {
-  // A unique identifier for the query.
-  1: required Types.TUniqueId query_id
+  // A unique identifier for the query. Always set.
+  1: optional Types.TUniqueId query_id
 
-  // The name of the table.
-  2: required string table_name
+  // The name of the table. Always set.
+  2: optional string table_name
 
   // A string specified for the table that is passed to the external data source.
-  3: required string init_string
+  // Always set, may be an empty string.
+  3: optional string init_string
 
-  // The authenticated user name.
-  4: required string authenticated_user_name
+  // The authenticated user name. Always set.
+  4: optional string authenticated_user_name
 
-  // The schema of the rows that the scan needs to return.
-  5: required TTableSchema row_schema
+  // The schema of the rows that the scan needs to return. Always set.
+  5: optional TTableSchema row_schema
 
   // The expected size of the row batches it returns in the subsequent getNext() calls.
-  6: required i32 batch_size
+  // Always set.
+  6: optional i32 batch_size
 
   // A representation of the scan predicates that were accepted in the preceding
-  // getStats() call.
-  7: required list<list<TBinaryPredicate>> predicates
+  // getStats() call. Always set.
+  7: optional list<list<TBinaryPredicate>> predicates
+
+  // The query limit, if specified.
+  8: optional i64 limit
 }
 
 // Returned by open().
 struct TOpenResult {
   1: required Status.TStatus status
 
-  // An opaque handle used in subsequent getNext()/close() calls.
+  // An opaque handle used in subsequent getNext()/close() calls. Required.
   2: optional string scan_handle
 }
 
 // Parameters to getNext()
 struct TGetNextParams {
-  // The opaque handle returned by the previous open() call.
-  1: required string scan_handle
+  // The opaque handle returned by the previous open() call. Always set.
+  1: optional string scan_handle
 }
 
 // Returned by getNext().
@@ -139,8 +143,8 @@ struct TGetNextResult {
   1: required Status.TStatus status
 
   // If true, reached the end of the result stream; subsequent calls to
-  // getNext() won’t return any more results
-  2: required bool eos
+  // getNext() won’t return any more results. Required.
+  2: optional bool eos
 
   // A batch of rows to return, if any exist. The number of rows in the batch
   // should be less than or equal to the batch_size specified in TOpenParams.
@@ -149,8 +153,8 @@ struct TGetNextResult {
 
 // Parameters to close()
 struct TCloseParams {
-  // The opaque handle returned by the previous open() call.
-  1: required string scan_handle
+  // The opaque handle returned by the previous open() call. Always set.
+  1: optional string scan_handle
 }
 
 // Returned by close().

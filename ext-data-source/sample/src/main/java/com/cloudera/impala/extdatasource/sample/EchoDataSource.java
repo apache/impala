@@ -14,8 +14,6 @@
 
 package com.cloudera.impala.extdatasource.sample;
 
-import java.util.List;
-
 import com.cloudera.impala.extdatasource.thrift.TCloseParams;
 import com.cloudera.impala.extdatasource.thrift.TCloseResult;
 import com.cloudera.impala.extdatasource.thrift.TGetNextParams;
@@ -24,10 +22,9 @@ import com.cloudera.impala.extdatasource.thrift.TGetStatsParams;
 import com.cloudera.impala.extdatasource.thrift.TGetStatsResult;
 import com.cloudera.impala.extdatasource.thrift.TOpenParams;
 import com.cloudera.impala.extdatasource.thrift.TOpenResult;
-import com.cloudera.impala.extdatasource.thrift.TRow;
 import com.cloudera.impala.extdatasource.thrift.TRowBatch;
 import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
-import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.thrift.TColumnData;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
 import com.google.common.collect.Lists;
@@ -43,8 +40,9 @@ public class EchoDataSource implements ExternalDataSource {
 
   @Override
   public TGetStatsResult getStats(TGetStatsParams params) {
-    List<Integer> acceptedPredicates = Lists.<Integer>newArrayList();
-    return new TGetStatsResult(STATUS_OK, acceptedPredicates).setNum_rows_estimate(1);
+    return new TGetStatsResult(STATUS_OK)
+      .setAccepted_conjuncts(Lists.<Integer>newArrayList())
+      .setNum_rows_estimate(1);
   }
 
   @Override
@@ -56,11 +54,12 @@ public class EchoDataSource implements ExternalDataSource {
   @Override
   public TGetNextResult getNext(TGetNextParams params) {
     boolean eos = true;
-    TGetNextResult result = new TGetNextResult(STATUS_OK, eos);
+    TGetNextResult result = new TGetNextResult(STATUS_OK).setEos(eos);
     TRowBatch rowBatch = new TRowBatch();
-    TRow row = new TRow();
-    row.addToCol_vals(new TColumnValue().setStringVal(initString_));
-    rowBatch.addToRows(row);
+    TColumnData colData = new TColumnData();
+    colData.addToIs_null(false);
+    colData.addToString_vals(initString_);
+    rowBatch.addToCols(colData);
     result.setRows(rowBatch);
     return result;
   }

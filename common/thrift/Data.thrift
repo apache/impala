@@ -53,6 +53,24 @@ struct TResultRow {
   1: list<TColumnValue> colVals
 }
 
+// A union over all possible return types for a column of data
+// Currently only used by ExternalDataSource types
+struct TColumnData {
+  // One element in the list for every row in the column indicating if there is
+  // a value in the vals list or a null.
+  1: required list<bool> is_null;
+
+  // Only one is set, only non-null values are set.
+  2: optional list<bool> bool_vals;
+  3: optional list<byte> byte_vals;
+  4: optional list<i16> short_vals;
+  5: optional list<i32> int_vals;
+  6: optional list<i64> long_vals;
+  7: optional list<double> double_vals;
+  8: optional list<string> string_vals;
+  9: optional list<binary> binary_vals;
+}
+
 struct TResultSetMetadata {
   1: required list<CatalogObjects.TColumn> columns
 }
