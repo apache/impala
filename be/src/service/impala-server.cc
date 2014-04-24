@@ -1331,6 +1331,13 @@ void ImpalaServer::CatalogUpdateCallback(
         update_req.__set_catalog_service_id(catalog_object.catalog.catalog_service_id);
         new_catalog_version = catalog_object.catalog_version;
       }
+
+      // Refresh the lib cache entries of any added functions
+      if (catalog_object.type == TCatalogObjectType::FUNCTION) {
+        DCHECK(catalog_object.__isset.fn);
+        LibCache::instance()->SetNeedsRefresh(catalog_object.fn.hdfs_location);
+      }
+
       update_req.updated_objects.push_back(catalog_object);
     }
 

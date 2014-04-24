@@ -39,6 +39,15 @@ Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* file
   return Status::OK;
 }
 
+Status GetLastModificationTime(const hdfsFS& connection, const char* filename,
+                               time_t* last_mod_time) {
+  hdfsFileInfo* info = hdfsGetPathInfo(connection, filename);
+  if (info == NULL) return Status(GetHdfsErrorMsg("Failed to get file info ", filename));
+  *last_mod_time = info->mLastMod;
+  hdfsFreeFileInfo(info, 1);
+  return Status::OK;
+}
+
 bool IsHiddenFile(const string& filename) {
   return !filename.empty() && (filename[0] == '.' || filename[0] == '_');
 }

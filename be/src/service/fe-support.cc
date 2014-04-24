@@ -103,20 +103,28 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
 // Does the symbol resolution, filling in the result in *result.
 static void ResolveSymbolLookup(const TSymbolLookupParams params,
     const vector<ColumnType>& arg_types, TSymbolLookupResult* result) {
-  DCHECK(params.fn_binary_type == TFunctionBinaryType::NATIVE ||
-         params.fn_binary_type == TFunctionBinaryType::IR ||
-         params.fn_binary_type == TFunctionBinaryType::BUILTIN);
-  // We use TYPE_SO for builtins, since LibCache does not resolve symbols for IR
-  // builtins. This is ok since builtins have the same symbol whether we run the IR or
-  // native versions.
-  LibCache::LibType type = params.fn_binary_type == TFunctionBinaryType::IR ?
-      LibCache::TYPE_IR : LibCache::TYPE_SO;
+  LibCache::LibType type;
+  if (params.fn_binary_type == TFunctionBinaryType::NATIVE ||
+      params.fn_binary_type == TFunctionBinaryType::BUILTIN) {
+    // We use TYPE_SO for builtins, since LibCache does not resolve symbols for IR
+    // builtins. This is ok since builtins have the same symbol whether we run the IR or
+    // native versions.
+    type = LibCache::TYPE_SO;
+  } else if (params.fn_binary_type == TFunctionBinaryType::IR) {
+    type = LibCache::TYPE_IR;
+  } else if (params.fn_binary_type == TFunctionBinaryType::HIVE) {
+    type = LibCache::TYPE_JAR;
+  } else {
+    DCHECK(false) << params.fn_binary_type;
+  }
 
+  // Builtin functions are loaded directly from the running process
   if (params.fn_binary_type != TFunctionBinaryType::BUILTIN) {
-    // Builtin functions are loaded directly from the running process
+    // Refresh the library if necessary since we're creating a new function
+    LibCache::instance()->SetNeedsRefresh(params.location);
     string dummy_local_path;
-    Status status =
-        LibCache::instance()->GetLocalLibPath(params.location, type, &dummy_local_path);
+    Status status = LibCache::instance()->GetLocalLibPath(
+        params.location, type, &dummy_local_path);
     if (!status.ok()) {
       result->__set_result_code(TSymbolLookupResultCode::BINARY_NOT_FOUND);
       result->__set_error_msg(status.GetErrorMsg());

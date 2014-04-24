@@ -30,6 +30,11 @@ std::string GetHdfsErrorMsg(const std::string& prefix, const std::string& file =
 // Return the size, in bytes, of a file from the hdfs connection.
 Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* filesize);
 
+// Returns the last modification time of 'filename' in seconds.
+// This should not be called in a fast path (e.g., running a UDF).
+Status GetLastModificationTime(const hdfsFS& connection, const char* filename,
+                               time_t* last_mod_time);
+
 bool IsHiddenFile(const std::string& filename);
 
 // Copy the file at 'src_path' from 'src_conn' to 'dst_path' in 'dst_conn'.

@@ -48,6 +48,10 @@ struct LibCache::LibCacheEntry {
   // the use_count goes to 0.
   bool should_remove;
 
+  // If true, we need to check if there is a newer version of the cached library in HDFS
+  // on next access.
+  bool check_needs_refresh;
+
   // The type of this file.
   LibType type;
 
@@ -56,6 +60,9 @@ struct LibCache::LibCacheEntry {
 
   // Status returned from copying this file from HDFS.
   Status copy_file_status;
+
+  // The last modification time of the HDFS file in seconds.
+  time_t last_mod_time;
 
   // Handle from dlopen.
   void* shared_object_handle;
@@ -71,7 +78,8 @@ struct LibCache::LibCacheEntry {
   // not trivial to walk an .so for the symbol table.
   boost::unordered_set<std::string> symbols;
 
-  LibCacheEntry() : use_count(0), should_remove(false), shared_object_handle(NULL) {}
+  LibCacheEntry() : use_count(0), should_remove(false), check_needs_refresh(false),
+                    shared_object_handle(NULL) {}
   ~LibCacheEntry();
 };
 
@@ -163,7 +171,7 @@ void LibCache::DecrementUseCount(LibCacheEntry* entry) {
   if (can_delete) delete entry;
 }
 
-Status LibCache::GetLocalLibPath(const string& hdfs_lib_file, LibType type, 
+Status LibCache::GetLocalLibPath(const string& hdfs_lib_file, LibType type,
                                  string* local_path) {
   unique_lock<mutex> lock;
   LibCacheEntry* entry = NULL;
@@ -193,6 +201,7 @@ Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
     }
     return Status::OK;
   } else if (type == TYPE_JAR) {
+    // TODO: figure out how to inspect contents of jars
     unique_lock<mutex> lock;
     LibCacheEntry* dummy_entry = NULL;
     return GetCacheEntry(hdfs_lib_file, type, &lock, &dummy_entry);
@@ -202,19 +211,34 @@ Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
   }
 }
 
-void LibCache::RemoveEntry(const std::string hdfs_lib_file) {
+void LibCache::SetNeedsRefresh(const string& hdfs_lib_file) {
   unique_lock<mutex> lib_cache_lock(lock_);
   LibMap::iterator it = lib_cache_.find(hdfs_lib_file);
   if (it == lib_cache_.end()) return;
-  VLOG(1) << "Removed lib cache entry: " << hdfs_lib_file;
-  unique_lock<mutex> entry_lock(it->second->lock);
-
-  // We have both locks now so no other thread can be updating lib_cache_
-  // or trying to get the entry.
-
-  // Get the entry before removing the iterator.
   LibCacheEntry* entry = it->second;
-  lib_cache_.erase(it);
+  lib_cache_lock.unlock();
+
+  unique_lock<mutex> entry_lock(entry->lock);
+  entry->check_needs_refresh = true;
+}
+
+void LibCache::RemoveEntry(const string& hdfs_lib_file) {
+  unique_lock<mutex> lib_cache_lock(lock_);
+  LibMap::iterator it = lib_cache_.find(hdfs_lib_file);
+  if (it == lib_cache_.end()) return;
+  RemoveEntryInternal(hdfs_lib_file, it);
+}
+
+void LibCache::RemoveEntryInternal(const string& hdfs_lib_file,
+                                   const LibMap::iterator& entry_iter) {
+  LibCacheEntry* entry = entry_iter->second;
+  VLOG(1) << "Removing lib cache entry: " << hdfs_lib_file
+          << ", local path: " << entry->local_path;
+  unique_lock<mutex> entry_lock(entry->lock);
+
+  // We have both locks so no other thread can be updating lib_cache_ or trying to get
+  // the entry.
+  lib_cache_.erase(entry_iter);
 
   entry->should_remove = true;
   DCHECK_GE(entry->use_count, 0);
@@ -248,10 +272,29 @@ void LibCache::DropCache() {
 Status LibCache::GetCacheEntry(const string& hdfs_lib_file, LibType type,
                                unique_lock<mutex>* entry_lock, LibCacheEntry** entry) {
   DCHECK(!hdfs_lib_file.empty());
+  *entry = NULL;
+
+  // Check if this file is already cached.
   unique_lock<mutex> lib_cache_lock(lock_);
   LibMap::iterator it = lib_cache_.find(hdfs_lib_file);
   if (it != lib_cache_.end()) {
     *entry = it->second;
+    if ((*entry)->check_needs_refresh) {
+      // Check if file has been modified since loading the cached copy. If so, remove the
+      // cached entry and create a new one.
+      (*entry)->check_needs_refresh = false;
+      time_t last_mod_time;
+      hdfsFS hdfs_conn = HdfsFsCache::instance()->GetDefaultConnection();
+      RETURN_IF_ERROR(
+          GetLastModificationTime(hdfs_conn, hdfs_lib_file.c_str(), &last_mod_time));
+      if ((*entry)->last_mod_time < last_mod_time) {
+        RemoveEntryInternal(hdfs_lib_file, it);
+        *entry = NULL;
+      }
+    }
+  }
+
+  if (*entry != NULL) {
     // Release the lib_cache_ lock. This guarantees other threads looking at other
     // libs can continue.
     lib_cache_lock.unlock();
@@ -263,6 +306,7 @@ Status LibCache::GetCacheEntry(const string& hdfs_lib_file, LibType type,
     DCHECK(!(*entry)->local_path.empty());
     return Status::OK;
   }
+
   // Entry didn't exist. Add the entry then release lock_ (so other libraries
   // can be accessed).
   *entry = new LibCacheEntry();
@@ -275,19 +319,29 @@ Status LibCache::GetCacheEntry(const string& hdfs_lib_file, LibType type,
   lib_cache_[hdfs_lib_file] = *entry;
   lib_cache_lock.unlock();
 
-  VLOG(1) << "Added lib cache entry: " << hdfs_lib_file;
-
   // At this point we have the entry lock but not the lib cache lock.
   DCHECK(*entry != NULL);
   (*entry)->type = type;
 
   // Copy the file
   (*entry)->local_path = MakeLocalPath(hdfs_lib_file, FLAGS_local_library_dir);
+  VLOG(1) << "Adding lib cache entry: " << hdfs_lib_file
+          << ", local path: " << (*entry)->local_path;
+
   hdfsFS hdfs_conn = HdfsFsCache::instance()->GetDefaultConnection();
   hdfsFS local_conn = HdfsFsCache::instance()->GetLocalConnection();
+
+  // Note: the file can be updated between getting last_mod_time and copying the file to
+  // local_path. This can only result in the file unnecessarily being refreshed, and does
+  // not affect correctness.
+  (*entry)->copy_file_status = GetLastModificationTime(
+      hdfs_conn, hdfs_lib_file.c_str(), &(*entry)->last_mod_time);
+  RETURN_IF_ERROR((*entry)->copy_file_status);
+
   (*entry)->copy_file_status = CopyHdfsFile(
       hdfs_conn, hdfs_lib_file, local_conn, (*entry)->local_path);
   RETURN_IF_ERROR((*entry)->copy_file_status);
+
   if (type == TYPE_SO) {
     // dlopen the local library
     RETURN_IF_ERROR(

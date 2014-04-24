@@ -318,13 +318,6 @@ public class Function implements CatalogObject {
       }
       throw new AnalysisException("Could not find symbol ''");
     }
-    if (binaryType_ == TFunctionBinaryType.HIVE) {
-      // TODO: add this when hive udfs go in.
-      return symbol;
-    }
-    Preconditions.checkState(binaryType_ == TFunctionBinaryType.NATIVE ||
-        binaryType_ == TFunctionBinaryType.IR ||
-        binaryType_ == TFunctionBinaryType.BUILTIN);
 
     TSymbolLookupParams lookup = new TSymbolLookupParams();
     // Builtin functions do not have an external library, they are loaded directly from

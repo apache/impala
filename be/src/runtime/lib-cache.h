@@ -91,11 +91,16 @@ class LibCache {
   Status GetSoFunctionPtr(const std::string& hdfs_lib_file, const std::string& symbol,
                           void** fn_ptr, LibCacheEntry** entry);
 
+  // Marks the entry for 'hdfs_lib_file' as needing to be refreshed if the file in HDFS is
+  // newer than the local cached copied. The refresh will occur the next time the entry is
+  // accessed.
+  void SetNeedsRefresh(const std::string& hdfs_lib_file);
+
   // See comment in GetSoFunctionPtr().
   void DecrementUseCount(LibCacheEntry* entry);
 
   // Removes the cache entry for 'hdfs_lib_file'
-  void RemoveEntry(const std::string hdfs_lib_file);
+  void RemoveEntry(const std::string& hdfs_lib_file);
 
   // Removes all cached entries.
   void DropCache();
@@ -140,6 +145,11 @@ class LibCache {
   // (including the filename) of the file we're going to copy to the local FS, and
   // 'local_dir' is the local directory prefix of the returned path.
   std::string MakeLocalPath(const std::string& hdfs_path, const std::string& local_dir);
+
+  // Implementation to remove an entry from the cache.
+  // lock_ must be held. The entry's lock should not be held.
+  void RemoveEntryInternal(const std::string& hdfs_lib_file,
+                           const LibMap::iterator& entry_iterator);
 };
 
 }

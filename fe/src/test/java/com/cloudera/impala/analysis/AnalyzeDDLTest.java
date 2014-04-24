@@ -854,7 +854,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create function foo() RETURNS int LOCATION " +
         "'/test-warehouse/libTestUdfs.SO' " +
         "SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'");
-    AnalyzesOk("create function foo() RETURNS int LOCATION '/binary.JAR' SYMBOL='a'");
+    AnalyzesOk("create function foo() RETURNS int LOCATION " +
+        "'/test-warehouse/hive-exec.jar' SYMBOL='a'");
 
     AnalyzesOk("create function foo() RETURNS decimal" + udfSuffix);
     AnalyzesOk("create function foo() RETURNS decimal(38,10)" + udfSuffix);
@@ -909,6 +910,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Try with symbols missing in binary and symbols
     AnalysisError("create function foo() RETURNS int LOCATION '/blah.so' " +
         "SYMBOL='ab'", "Could not load binary: /blah.so");
+    AnalysisError("create function foo() RETURNS int LOCATION '/binary.JAR' SYMBOL='a'",
+        "Could not load binary: /binary.JAR");
     AnalysisError("create function foo() RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " +
         "SYMBOL='b'", "Could not find function b() in: " + hdfsPath);
