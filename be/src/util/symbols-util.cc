@@ -235,9 +235,6 @@ string SymbolsUtil::ManglePrepareOrCloseFunction(const string& fn_name) {
   // next time we see the same token, we output the index instead.
   int seq_id = 0;
 
-  // Sequence id for the impala_udf namespace token
-  int impala_udf_seq_id = -1;
-
   stringstream ss;
   ss << MANGLE_PREFIX;
   if (name_tokens.size() > 1) {

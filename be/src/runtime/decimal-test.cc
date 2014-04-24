@@ -238,7 +238,7 @@ TEST(DecimalArithmetic, Divide) {
   bool is_nan;
   Decimal8Value r = x.Divide<int64_t>(ColumnType::CreateDecimalType(10, 0),
       Decimal4Value(0), ColumnType::CreateDecimalType(2,0), 4, &is_nan);
-  EXPECT_TRUE(is_nan);
+  EXPECT_TRUE(is_nan) << "Expected NaN, got: " << r;
 }
 
 template<typename T>
