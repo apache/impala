@@ -369,6 +369,20 @@ class Statements(object):
   def __is_empty(self):
     return not (self.create or self.load or self.load_base)
 
+def eval_section(section_str):
+  """section_str should be the contents of a section (i.e. a string). If section_str
+  starts with `, evaluates section_str as a shell command and returns the
+  output. Otherwise returns section_str."""
+  if not section_str.startswith('`'): return section_str
+  cmd = section_str[1:]
+  # Use bash explicitly instead of setting shell=True so we get more advanced shell
+  # features (e.g. "for i in {1..n}")
+  p = subprocess.Popen(['/bin/bash', '-c', cmd], stdout=subprocess.PIPE)
+  stdout, stderr = p.communicate()
+  if stderr: print stderr
+  assert p.returncode == 0
+  return stdout.strip()
+
 def generate_statements(output_name, test_vectors, sections,
                         schema_include_constraints, schema_exclude_constraints):
   # TODO: This method has become very unwieldy. It has to be re-factored sooner than
@@ -388,19 +402,37 @@ def generate_statements(output_name, test_vectors, sections,
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
     for section in sections:
+      table_name = section['BASE_TABLE_NAME']
+      db_suffix = build_db_suffix(file_format, codec, compression_type)
+      db_name = '{0}{1}'.format(data_set, options.scale_factor)
+      db = '{0}{1}'.format(db_name, db_suffix)
+
+      if table_names and (table_name.lower() not in table_names):
+        print 'Skipping table: %s.%s' % (db, table_name)
+        continue
+
+      if schema_include_constraints[table_name.lower()] and \
+         table_format not in schema_include_constraints[table_name.lower()]:
+        print 'Skipping \'%s.%s\' due to include constraint match' % (db, table_name)
+        continue
+
+      if schema_exclude_constraints[table_name.lower()] and\
+         table_format in schema_exclude_constraints[table_name.lower()]:
+        print 'Skipping \'%s.%s\' due to exclude constraint match' % (db, table_name)
+        continue
+
       alter = section.get('ALTER')
       create = section['CREATE']
       create_hive = section['CREATE_HIVE']
       insert = section['DEPENDENT_LOAD']
-      load = section['LOAD']
+      load = eval_section(section['LOAD'])
       # For some datasets we may want to use a different load strategy when running local
       # tests versus tests against large scale factors. The most common reason is to
       # reduce he number of partitions for the local test environment
       if not options.scale_factor and section['LOAD_LOCAL']:
         load = section['LOAD_LOCAL']
 
-      base_table_name = section['BASE_TABLE_NAME']
-      columns = section['COLUMNS']
+      columns = eval_section(section['COLUMNS'])
       partition_columns = section['PARTITION_COLUMNS']
       row_format = section['ROW_FORMAT']
 
@@ -412,9 +444,6 @@ def generate_statements(output_name, test_vectors, sections,
       # TODO: Rename the ALTER section to ALTER_TABLE_ADD_PARTITION
       force_reload = options.force_reload or (partition_columns and not alter)
 
-      table_name = base_table_name
-      db_suffix = build_db_suffix(file_format, codec, compression_type)
-      db_name = '{0}{1}'.format(data_set, options.scale_factor)
       hdfs_location = '{0}.{1}{2}'.format(db_name, table_name, db_suffix)
       # hdfs file names for hive-benchmark and functional datasets are stored
       # directly under /test-warehouse
@@ -425,7 +454,6 @@ def generate_statements(output_name, test_vectors, sections,
       # hive does not allow hyphenated table names.
       if data_set == 'hive-benchmark':
         db_name = '{0}{1}'.format('hivebenchmark', options.scale_factor)
-      db = '{0}{1}'.format(db_name, db_suffix)
       data_path = os.path.join(options.hive_warehouse_dir, hdfs_location)
 
       # Empty tables (tables with no "LOAD" sections) are assumed to be used for insert
@@ -438,20 +466,6 @@ def generate_statements(output_name, test_vectors, sections,
         create_file_format = file_format
         if file_format not in IMPALA_SUPPORTED_INSERT_FORMATS:
           create_file_format = 'text'
-
-      if table_names and (table_name.lower() not in table_names):
-        print 'Skipping table: %s.%s' % (db, table_name)
-        continue
-
-      if schema_include_constraints[table_name.lower()] and \
-         table_format not in schema_include_constraints[table_name.lower()]:
-        print 'Skipping \'%s.%s\' due to include constraint match' % (db, table_name)
-        continue
-
-      if schema_exclude_constraints[base_table_name.lower()] and\
-         table_format in schema_exclude_constraints[base_table_name.lower()]:
-        print 'Skipping \'%s.%s\' due to exclude constraint match' % (db, table_name)
-        continue
 
       output = impala_output
       if create_hive or file_format == 'hbase':

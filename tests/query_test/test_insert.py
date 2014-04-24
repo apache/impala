@@ -4,6 +4,7 @@
 #
 import logging
 import pytest
+from testdata.common import widetable
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
@@ -57,6 +58,63 @@ class TestInsertQueries(ImpalaTestSuite):
   def test_insert_overwrite(self, vector):
     self.run_test_case('QueryTest/insert_overwrite', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+
+class TestInsertWideTable(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInsertWideTable, cls).add_test_dimensions()
+
+    # Only vary codegen
+    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+        cluster_sizes=[0], disable_codegen_options=[True, False], batch_sizes=[0]))
+
+    # Inserts only supported on text and parquet
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format == 'parquet' or \
+        v.get_value('table_format').file_format == 'text')
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').compression_codec == 'none')
+
+    # Don't run on core. This test is very slow (IMPALA-864) and we are unlikely to
+    # regress here.
+    if cls.exploration_strategy() == 'core':
+      cls.TestMatrix.add_constraint(lambda v: False);
+
+  def test_insert_wide_table(self, vector):
+    table_format = vector.get_value('table_format')
+
+    # Text can't handle as many columns as Parquet (codegen takes forever)
+    num_cols = 1000 if table_format.file_format == 'text' else 2000
+
+    db_name = QueryTestSectionReader.get_db_name(vector.get_value('table_format'))
+    table_name = db_name + ".insert_widetable"
+    if vector.get_value('exec_option')['disable_codegen']:
+      table_name += "_codegen_disabled"
+    self.client.execute("drop table if exists " + table_name)
+
+    col_descs = widetable.get_columns(num_cols)
+    create_stmt = "CREATE TABLE " + table_name + "(" + ','.join(col_descs) + ")"
+    if vector.get_value('table_format').file_format == 'parquet':
+      create_stmt += " stored as parquet"
+    self.client.execute(create_stmt)
+
+    # Get a single row of data
+    col_vals = widetable.get_data(num_cols, 1, quote_strings=True)[0]
+    insert_stmt = "INSERT INTO " + table_name + " VALUES(" + col_vals + ")"
+    self.client.execute(insert_stmt)
+
+    result = self.client.execute("select count(*) from " + table_name)
+    assert result.data == ["1"]
+
+    result = self.client.execute("select * from " + table_name)
+    types = parse_column_types(result.schema)
+    expected = QueryTestResult([col_vals], types, order_matters=False)
+    actual = QueryTestResult(parse_result_rows(result), types, order_matters=False)
+    assert expected == actual
 
 class TestUnsupportedInsertFormats(ImpalaTestSuite):
   @classmethod

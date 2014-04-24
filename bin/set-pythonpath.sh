@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # set the python path for test modules and beeswax
-PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py
+PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$IMPALA_HOME/testdata/
 
 # There should be just a single version of python that created the
 # site-packages directory.

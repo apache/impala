@@ -17,6 +17,23 @@
 using namespace std;
 using namespace impala;
 
+// This function is not inlined because it can potentially cause LLVM to crash (see
+// http://llvm.org/bugs/show_bug.cgi?id=19315), and inlining does not appear to have any
+// performance impact.
+int64_t ReadWriteUtil::ReadZLong(uint8_t** buf) {
+  uint64_t zlong = 0;
+  int shift = 0;
+  bool more;
+  do {
+    DCHECK_LE(shift, 64);
+    zlong |= static_cast<uint64_t>(**buf & 0x7f) << shift;
+    shift += 7;
+    more = (**buf & 0x80) != 0;
+    ++(*buf);
+  } while (more);
+  return (zlong >> 1) ^ -(zlong & 1);
+}
+
 int ReadWriteUtil::PutZInt(int32_t integer, uint8_t* buf) {
   // Move the sign bit to the first bit.
   uint32_t uinteger = (integer << 1) ^ (integer >> 31);

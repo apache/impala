@@ -169,20 +169,6 @@ inline int32_t ReadWriteUtil::ReadZInt(uint8_t** buf) {
   return static_cast<int32_t>(zlong);
 }
 
-inline int64_t ReadWriteUtil::ReadZLong(uint8_t** buf) {
-  uint64_t zlong = 0;
-  int shift = 0;
-  bool more;
-  do {
-    DCHECK_LE(shift, 64);
-    zlong |= static_cast<uint64_t>(**buf & 0x7f) << shift;
-    shift += 7;
-    more = (**buf & 0x80) != 0;
-    ++(*buf);
-  } while (more);
-  return (zlong >> 1) ^ -(zlong & 1);
-}
-
 template <class T>
 inline bool ReadWriteUtil::Read(uint8_t** buf, int* buf_len, T* val, Status* status) {
   int val_len = sizeof(T);

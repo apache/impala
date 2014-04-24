@@ -1250,3 +1250,46 @@ delimited fields terminated by ','
 -- TODO: Beeline on CDH4 doesn't understand decimal with precision and scale so can't
 -- do the data load. This is done in testdata/bin/create_load_data for now.
 -- Fix this by allowing an "hdfs put" as the load command.
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+widetable_250_cols
+---- COLUMNS
+`${IMPALA_HOME}/testdata/common/widetable.py --get_columns -n 250
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+select * from functional.{table_name};
+---- LOAD
+`${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 250 -o /tmp/widetable_data.csv
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+widetable_500_cols
+---- COLUMNS
+`${IMPALA_HOME}/testdata/common/widetable.py --get_columns -n 500
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+select * from functional.{table_name};
+---- LOAD
+`${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 500 -o /tmp/widetable_data.csv
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+widetable_1000_cols
+---- COLUMNS
+`${IMPALA_HOME}/testdata/common/widetable.py --get_columns -n 1000
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+select * from functional.{table_name};
+---- LOAD
+`${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 1000 -o /tmp/widetable_data.csv
+====
