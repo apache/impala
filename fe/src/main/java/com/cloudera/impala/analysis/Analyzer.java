@@ -1728,18 +1728,14 @@ public class Analyzer {
           continue;
         }
 
-        // value transfer is not legal if the receiving slot is in an enclosed
-        // scope of the source slot and the receiving slot's block has a limit
-        Analyzer innerBlock = globalState_.blockBySlot.get(innerSlot);
-        Analyzer outerBlock = globalState_.blockBySlot.get(outerSlot);
+        // value transfer is always legal because the outer and inner slot must come from
+        // the same block; transitive value transfers into inline views with a limit are
+        // prevented because the inline view's aux predicates won't transfer values into
+        // the inline view's block (handled in the 'tableRef == null' case above)
         if (tblRef.getJoinOp() == JoinOperator.LEFT_OUTER_JOIN) {
-          if (!(outerBlock.hasLimit_ && outerBlock.ancestors_.contains(innerBlock))) {
-            valueTransfers.add(new Pair<SlotId, SlotId>(outerSlot, innerSlot));
-          }
+          valueTransfers.add(new Pair<SlotId, SlotId>(outerSlot, innerSlot));
         } else if (tblRef.getJoinOp() == JoinOperator.RIGHT_OUTER_JOIN) {
-          if (!(innerBlock.hasLimit_ && innerBlock.ancestors_.contains(outerBlock))) {
-            valueTransfers.add(new Pair<SlotId, SlotId>(innerSlot, outerSlot));
-          }
+          valueTransfers.add(new Pair<SlotId, SlotId>(innerSlot, outerSlot));
         }
       }
     }
