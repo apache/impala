@@ -61,11 +61,27 @@ public class WithClause implements ParseNode {
   }
 
   /**
-   * Enforces scoping rules, and ensures that there are no recursive table references.
+   * Analysis of the top-level WITH-clause. Calls analyzeWithClause() to do the actual
+   * analysis work. We distinguish the analysis of the top-level WITH-clause
+   * from nested WITH-clauses so that we can fully-qualify the true base table refs.
    */
   @Override
   public void analyze(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
+    analyzeWithClause(analyzer);
+    // Fully qualify the names of true base tables to produce correct toSql().
+    for (BaseTableRef baseTblRef: unresolvedTableRefs_) {
+      baseTblRef.disableWithViewReplacement();
+      baseTblRef.setFullyQualifiedTableName(analyzer);
+    }
+  }
+
+  /**
+   * Enforces scoping rules, and ensures that there are no recursive table references.
+   * Nested WITH clauses should call this method instead of analyze().
+   */
+  private void analyzeWithClause(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
     unresolvedTableRefs_.clear();
     analyzeWithClause(analyzer, this, unresolvedTableRefs_);
 
@@ -93,7 +109,7 @@ public class WithClause implements ParseNode {
     if (stmt.hasWithClause()) {
       // Create a new analyzer to establish a new scope.
       Analyzer newAnalyzer = new Analyzer(analyzer, analyzer.getUser());
-      stmt.getWithClause().analyze(newAnalyzer);
+      stmt.getWithClause().analyzeWithClause(newAnalyzer);
       return newAnalyzer;
     }
     // Since withClause was not set we remain in the same scope.
@@ -172,7 +188,7 @@ public class WithClause implements ParseNode {
 
     // Create a new child analyzer to register views into.
     Analyzer tmpAnalyzer = new Analyzer(analyzer, analyzer.getUser());
-    for (ViewRef view : withClause.views_) {
+    for (ViewRef view: withClause.views_) {
 
       // Gather all unresolved table references from all child scopes
       // of the view's query statement.
@@ -201,16 +217,10 @@ public class WithClause implements ParseNode {
     }
   }
 
-  public ArrayList<ViewRef> getViews() {
-    return views_;
-  }
-
+  public ArrayList<ViewRef> getViews() { return views_; }
+  public Analyzer getAnalyzer() { return analyzer_; }
   public ArrayList<BaseTableRef> getUnresolvedTableRefs() {
     return unresolvedTableRefs_;
-  }
-
-  public Analyzer getAnalyzer() {
-    return analyzer_;
   }
 
   @Override

@@ -1,14 +1,14 @@
-# limit in subquery
 ---- QUERY
+# limit in subquery
 select count(*) from (select * from alltypessmall limit 10) a
 ---- TYPES
 BIGINT
 ---- RESULTS
 10
 ====
+---- QUERY
 # order by/limit in subquery, followed by addititional selection predicate;
 # predicate is not applied in subquery
----- QUERY
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypessmall order by id limit 10) a
 where bool_col = true
@@ -21,9 +21,9 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 6,true,6,6,6,60,6.599999904632568,60.6,'01/01/09','6',2009-01-01 00:06:00.150000000,2009,1
 8,true,8,8,8,80,8.800000190734863,80.8,'01/01/09','8',2009-01-01 00:08:00.280000000,2009,1
 ====
+---- QUERY
 # order by/limit in subquery, followed by addititional selection predicate;
 # variant w/ join
----- QUERY
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from (
     select a.* from alltypessmall a join alltypessmall using (id)

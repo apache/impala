@@ -122,6 +122,8 @@ public class ViewRef extends InlineViewRef {
       super.analyze(analyzer);
       return;
     }
+    // Fully qualify the view name for correct toSql().
+    origTblRef_.setFullyQualifiedTableName(analyzer);
 
     // At this point we have established that the analyzer's user has privileges to
     // access this view. If the user does not have privileges on the view's definition

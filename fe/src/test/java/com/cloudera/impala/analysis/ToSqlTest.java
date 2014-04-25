@@ -31,10 +31,10 @@ public class ToSqlTest extends AnalyzerTest {
   private final String[] joinTypes_ = new String[] {"INNER JOIN", "LEFT OUTER JOIN",
       "RIGHT OUTER JOIN", "FULL OUTER JOIN", "LEFT SEMI JOIN"};
 
-  private static AnalysisContext.AnalysisResult analyze(String query) {
+  private static AnalysisContext.AnalysisResult analyze(String query, String defaultDb) {
     try {
-      AnalysisContext analysisCtxt =
-          new AnalysisContext(catalog_, TestUtils.createQueryContext());
+      AnalysisContext analysisCtxt = new AnalysisContext(catalog_,
+          TestUtils.createQueryContext(defaultDb, System.getProperty("user.name")));
       analysisCtxt.analyze(query);
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.getAnalysisResult();
       Preconditions.checkNotNull(analysisResult.getStmt());
@@ -47,7 +47,11 @@ public class ToSqlTest extends AnalyzerTest {
   }
 
   private void testToSql(String query, String expected) {
-    AnalysisContext.AnalysisResult analysisResult = analyze(query);
+    testToSql(query, System.getProperty("user.name"), expected);
+  }
+
+  private void testToSql(String query, String defaultDb, String expected) {
+    AnalysisContext.AnalysisResult analysisResult = analyze(query, defaultDb);
     String actual = analysisResult.getStmt().toSql();
     if (!actual.equals(expected)) {
       String msg = "Expected: " + expected + "\n  Actual: " + actual + "\n";
@@ -55,7 +59,7 @@ public class ToSqlTest extends AnalyzerTest {
       fail(msg);
     }
     // Try to parse and analyze the resulting SQL to ensure its validity.
-    AnalyzesOk(actual);
+    AnalyzesOk(actual, createAnalyzer(defaultDb));
   }
 
   private void runTestTemplate(String sql, String expectedSql, String[]... testDims) {
@@ -75,26 +79,26 @@ public class ToSqlTest extends AnalyzerTest {
     }
   }
 
- @Test
- public void selectListTest() {
-   testToSql("select 1234, 1234.0, 1234.0 + 1, 1234.0 + 1.0, 1 + 1, \"abc\" " +
-       "from functional.alltypes",
-       "SELECT 1234, 1234.0, 1234.0 + 1.0, 1234.0 + 1.0, 1 + 1, 'abc' " +
-       "FROM functional.alltypes");
-   // Test aliases.
-   testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l " +
-       "from functional.alltypes",
-       "SELECT 1234 i, 1234.0 j, (1234.0 + 1.0) k, (1234.0 + 1.0) l " +
-       "FROM functional.alltypes");
-   // Test select without from.
-   testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l",
-       "SELECT 1234 i, 1234.0 j, (1234.0 + 1.0) k, (1234.0 + 1.0) l");
-   // Test select without from.
-   testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null " +
-       "from functional.alltypes",
-       "SELECT NULL, 1234 < 5678, 1234.0 < 5678.0, 1234 < NULL " +
-       "FROM functional.alltypes");
- }
+  @Test
+  public void selectListTest() {
+    testToSql("select 1234, 1234.0, 1234.0 + 1, 1234.0 + 1.0, 1 + 1, \"abc\" " +
+        "from functional.alltypes",
+        "SELECT 1234, 1234.0, 1234.0 + 1.0, 1234.0 + 1.0, 1 + 1, 'abc' " +
+        "FROM functional.alltypes");
+    // Test aliases.
+    testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l " +
+        "from functional.alltypes",
+        "SELECT 1234 i, 1234.0 j, (1234.0 + 1.0) k, (1234.0 + 1.0) l " +
+        "FROM functional.alltypes");
+    // Test select without from.
+    testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l",
+        "SELECT 1234 i, 1234.0 j, (1234.0 + 1.0) k, (1234.0 + 1.0) l");
+    // Test select without from.
+    testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null " +
+        "from functional.alltypes",
+        "SELECT NULL, 1234 < 5678, 1234.0 < 5678.0, 1234 < NULL " +
+        "FROM functional.alltypes");
+  }
 
   /**
    * Tests quoting of identifiers for view compatibility with Hive,
@@ -154,6 +158,33 @@ public class ToSqlTest extends AnalyzerTest {
     testToSql("select id from functional.alltypes " +
         "where 5 not in (smallint_col, int_col)",
         "SELECT id FROM functional.alltypes WHERE 5 NOT IN (smallint_col, int_col)");
+  }
+
+  @Test
+  public void tableRefTest() {
+    String db = "functional";
+    String[] tableRefs = new String[] {"alltypes", "alltypes_view"};
+    // Run tests on tables and catalog views.
+    for (String tbl: tableRefs) {
+      // Fully-qualified table/view ref without an alias.
+      testToSql(String.format("select * from %s.%s", db, tbl),
+          String.format("SELECT * FROM %s.%s", db, tbl));
+      // Fully-qualified table/view ref with alias.
+      testToSql(String.format("select * from %s.%s a", db, tbl),
+          String.format("SELECT * FROM %s.%s a", db, tbl));
+      // Fully-qualified table/view ref with an alias that needs quoting.
+      testToSql(String.format("select * from %s.%s `table`", db, tbl),
+          String.format("SELECT * FROM %s.%s `table`", db, tbl));
+      // Unqualified table/view name is fully qualified in toSql().
+      // Regression tests for IMPALA-962.
+      testToSql(String.format("select * from %s", tbl), db,
+          String.format("SELECT * FROM %s.%s", db, tbl));
+      testToSql(String.format("select * from (select * from %s) t", tbl), db,
+          String.format("SELECT * FROM (SELECT * FROM %s.%s) t", db, tbl));
+      testToSql(String.format("with t as (select * from %s) select * from t", tbl),
+          "functional",
+          String.format("WITH t AS (SELECT * FROM %s.%s) SELECT * FROM t", db, tbl));
+    }
   }
 
   // Test the toSql() output of joins in a standalone select block.

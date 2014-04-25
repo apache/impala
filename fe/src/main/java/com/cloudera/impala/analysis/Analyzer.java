@@ -1464,6 +1464,14 @@ public class Analyzer {
   public String getTargetDbName(FunctionName fnName) {
     return fnName.isFullyQualified() ? fnName.getDb() : getDefaultDb();
   }
+  /**
+   * Returns a the fully-qualified table name of tableName. If tableName
+   * is already fully qualified, returns tableName.
+   */
+  public TableName getFullyQualifiedTableName(TableName tableName) {
+    if (tableName.isFullyQualified()) return tableName;
+    return new TableName(getDefaultDb(), tableName.getTbl());
+  }
 
   public void setIsExplain(boolean isExplain) { globalState_.isExplain = isExplain; }
   public boolean isExplain() { return globalState_.isExplain; }

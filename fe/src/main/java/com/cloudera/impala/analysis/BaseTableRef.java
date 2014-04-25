@@ -31,7 +31,7 @@ import com.google.common.base.Preconditions;
  * of abstract TableRefs in a SelectStmt and replace them with Views or BaseTableRefs.
  */
 public class BaseTableRef extends TableRef {
-  private final TableName name_;
+  private TableName name_;
 
   // Indicates whether this table should be considered for view replacement
   // from WITH-clause views. Used to distinguish non-fully-qualified references
@@ -62,12 +62,20 @@ public class BaseTableRef extends TableRef {
   public TableName getName() { return name_; }
 
   /**
+   * Replaces name_ with the fully-qualified table name.
+   */
+  public void setFullyQualifiedTableName(Analyzer analyzer) {
+    name_ = analyzer.getFullyQualifiedTableName(name_);
+  }
+
+  /**
    * Register this table ref and then analyze the Join clause.
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     Preconditions.checkNotNull(getPrivilegeRequirement());
+    setFullyQualifiedTableName(analyzer);
     desc_ = analyzer.registerBaseTableRef(this);
     isAnalyzed_ = true;  // true that we have assigned desc
     try {
