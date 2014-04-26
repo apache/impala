@@ -31,6 +31,16 @@ class UdfBuiltins {
   static DoubleVal Pi(FunctionContext* context);
   static StringVal Lower(FunctionContext* context, const StringVal& str);
 
+  static IntVal MaxInt(FunctionContext* context);
+  static TinyIntVal MaxTinyInt(FunctionContext* context);
+  static SmallIntVal MaxSmallInt(FunctionContext* context);
+  static BigIntVal MaxBigInt(FunctionContext* context);
+  static IntVal MinInt(FunctionContext* context);
+  static TinyIntVal MinTinyInt(FunctionContext* context);
+  static SmallIntVal MinSmallInt(FunctionContext* context);
+  static BigIntVal MinBigInt(FunctionContext* context);
+
+
   // Rounds (truncating down) a Timestamp to the specified unit.
   //    Units:
   //    CC, SCC : One greater than the first two digits of

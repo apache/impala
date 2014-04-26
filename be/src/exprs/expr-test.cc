@@ -3197,6 +3197,16 @@ TEST_F(ExprTest, UdfInterfaceBuiltins) {
   TestValue("udf_pi()", TYPE_DOUBLE, M_PI);
   TestValue("udf_abs(-1)", TYPE_DOUBLE, 1.0);
   TestStringValue("udf_lower('Hello_WORLD')", "hello_world");
+
+  TestValue("max_tinyint()", TYPE_TINYINT, numeric_limits<int8_t>::max());
+  TestValue("max_smallint()", TYPE_SMALLINT, numeric_limits<int16_t>::max());
+  TestValue("max_int()", TYPE_INT, numeric_limits<int32_t>::max());
+  TestValue("max_bigint()", TYPE_BIGINT, numeric_limits<int64_t>::max());
+
+  TestValue("min_tinyint()", TYPE_TINYINT, numeric_limits<int8_t>::min());
+  TestValue("min_smallint()", TYPE_SMALLINT, numeric_limits<int16_t>::min());
+  TestValue("min_int()", TYPE_INT, numeric_limits<int32_t>::min());
+  TestValue("min_bigint()", TYPE_BIGINT, numeric_limits<int64_t>::min());
 }
 
 }

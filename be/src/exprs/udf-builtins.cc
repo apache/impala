@@ -45,6 +45,38 @@ StringVal UdfBuiltins::Lower(FunctionContext* context, const StringVal& v) {
   return result;
 }
 
+IntVal UdfBuiltins::MaxInt(FunctionContext* context) {
+  return IntVal(numeric_limits<int32_t>::max());
+}
+
+TinyIntVal UdfBuiltins::MaxTinyInt(FunctionContext* context) {
+  return TinyIntVal(numeric_limits<int8_t>::max());
+}
+
+SmallIntVal UdfBuiltins::MaxSmallInt(FunctionContext* context) {
+  return SmallIntVal(numeric_limits<int16_t>::max());
+}
+
+BigIntVal UdfBuiltins::MaxBigInt(FunctionContext* context) {
+  return BigIntVal(numeric_limits<int64_t>::max());
+}
+
+IntVal UdfBuiltins::MinInt(FunctionContext* context) {
+  return IntVal(numeric_limits<int32_t>::min());
+}
+
+TinyIntVal UdfBuiltins::MinTinyInt(FunctionContext* context) {
+  return TinyIntVal(numeric_limits<int8_t>::min());
+}
+
+SmallIntVal UdfBuiltins::MinSmallInt(FunctionContext* context) {
+  return SmallIntVal(numeric_limits<int16_t>::min());
+}
+
+BigIntVal UdfBuiltins::MinBigInt(FunctionContext* context) {
+  return BigIntVal(numeric_limits<int64_t>::min());
+}
+
 // The units which can be used when Truncating a Timestamp
 struct TruncUnit {
   enum Type {
