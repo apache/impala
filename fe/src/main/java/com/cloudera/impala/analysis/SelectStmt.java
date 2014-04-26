@@ -113,12 +113,14 @@ public class SelectStmt extends QueryStmt {
       AuthorizationException {
     super.analyze(analyzer);
 
-    // Replace BaseTableRefs with ViewRefs.
-    substituteViews(analyzer, tableRefs_);
-
-    // start out with table refs to establish aliases
+    // Start out with table refs to establish aliases.
     TableRef leftTblRef = null;  // the one to the left of tblRef
-    for (TableRef tblRef: tableRefs_) {
+    for (int i = 0; i < tableRefs_.size(); ++i) {
+      // Resolve and replace non-InlineViewRef table refs with a BaseTableRef or ViewRef.
+      TableRef tblRef = tableRefs_.get(i);
+      tblRef = analyzer.resolveTableRef(tblRef);
+      Preconditions.checkNotNull(tblRef);
+      tableRefs_.set(i, tblRef);
       tblRef.setLeftTblRef(leftTblRef);
       try {
         tblRef.analyze(analyzer);
@@ -228,33 +230,6 @@ public class SelectStmt extends QueryStmt {
           analyzer.getUnassignedConjuncts(aggInfo_.getOutputTupleId().asList(), false));
       materializeSlots(analyzer, havingConjuncts);
       aggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
-    }
-  }
-
-  /**
-   * Replaces BaseTableRefs in tblRefs whose alias matches a view registered in
-   * the given analyzer or its parent analyzers with a clone of the matching inline view.
-   * The cloned inline view inherits the context-dependent attributes such as the
-   * on-clause, join hints, etc. from the original BaseTableRef.
-   *
-   * Matches views from the inside out, i.e., we first look
-   * in this analyzer then in the parentAnalyzer then and its parent, etc.,
-   * and finally consult the catalog for matching views (the global scope).
-   *
-   * This method is used for substituting views from WITH clauses
-   * and views from the catalog.
-   */
-  public void substituteViews(Analyzer analyzer, List<TableRef> tblRefs)
-      throws AuthorizationException, AnalysisException {
-    for (int i = 0; i < tblRefs.size(); ++i) {
-      if (!(tblRefs.get(i) instanceof BaseTableRef)) continue;
-      BaseTableRef tblRef = (BaseTableRef) tblRefs.get(i);
-      ViewRef viewDefinition = analyzer.findViewDefinition(tblRef, true);
-      if (viewDefinition == null) continue;
-      // Instantiate the view to replace the original BaseTableRef.
-      ViewRef viewRef = viewDefinition.instantiate(tblRef);
-      viewRef.getViewStmt().setIsExplain(isExplain_);
-      tblRefs.set(i, viewRef);
     }
   }
 
@@ -726,7 +701,7 @@ public class SelectStmt extends QueryStmt {
 
   private ArrayList<TableRef> cloneTableRefs() {
     ArrayList<TableRef> clone = Lists.newArrayList();
-    for (TableRef tblRef : tableRefs_) {
+    for (TableRef tblRef: tableRefs_) {
       clone.add(tblRef.clone());
     }
     return clone;
@@ -735,9 +710,9 @@ public class SelectStmt extends QueryStmt {
   @Override
   public QueryStmt clone() {
     SelectStmt selectClone = new SelectStmt(selectList_.clone(), cloneTableRefs(),
-        (whereClause_ != null) ? whereClause_.clone() : null,
-        (groupingExprs_ != null) ? Expr.cloneList(groupingExprs_) : null,
-        (havingClause_ != null) ? havingClause_.clone() : null,
+        (whereClause_ != null) ? whereClause_.reset().clone() : null,
+        (groupingExprs_ != null) ? Expr.cloneList(Expr.resetList(groupingExprs_)) : null,
+        (havingClause_ != null) ? havingClause_.reset().clone() : null,
         cloneOrderByElements(),
         (limitElement_ != null) ? limitElement_.clone() : null);
     selectClone.setWithClause(cloneWithClause());

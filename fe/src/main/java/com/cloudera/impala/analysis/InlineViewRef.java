@@ -20,11 +20,13 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.InlineView;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -35,10 +37,15 @@ import com.google.common.collect.Lists;
 
 
 /**
- * Inline view is a query statement with an alias
+ * An inline view is a query statement with an alias. Inline views can be parsed directly
+ * from a query string or represent a reference to a local or catalog view.
  */
 public class InlineViewRef extends TableRef {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
+
+  // Catalog or local view that is referenced.
+  // Null for inline views parsed directly from a query string.
+  private final View view_;
 
   // The select or union statement of the inline view
   protected final QueryStmt queryStmt_;
@@ -60,14 +67,23 @@ public class InlineViewRef extends TableRef {
   protected final ExprSubstitutionMap baseTblSmap_ = new ExprSubstitutionMap();
 
   /**
-   * Constructor with alias and inline view select statement
-   * @param alias inline view alias
-   * @param inlineViewStmt the select statement of the inline view
+   * C'tor for creating inline views parsed directly from the a query string.
    */
-  public InlineViewRef(TableName name, String alias, QueryStmt queryStmt) {
-    super(name, alias);
+  public InlineViewRef(String alias, QueryStmt queryStmt) {
+    super(null, alias);
     Preconditions.checkNotNull(queryStmt);
-    this.queryStmt_ = queryStmt;
+    queryStmt_ = queryStmt;
+    view_ = null;
+  }
+
+  /**
+   * C'tor for creating inline views that replace a local or catalog view ref.
+   */
+  public InlineViewRef(View view, TableRef origTblRef) {
+    super(view.getTableName(), origTblRef.getExplicitAlias());
+    queryStmt_ = view.getQueryStmt().clone();
+    view_ = view;
+    setJoinAttrs(origTblRef);
   }
 
   /**
@@ -76,7 +92,8 @@ public class InlineViewRef extends TableRef {
   public InlineViewRef(InlineViewRef other) {
     super(other);
     Preconditions.checkNotNull(other.queryStmt_);
-    this.queryStmt_ = other.queryStmt_.clone();
+    queryStmt_ = other.queryStmt_.clone();
+    view_ = other.view_;
   }
 
   /**
@@ -88,6 +105,30 @@ public class InlineViewRef extends TableRef {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    // Catalog views refs require special analysis for authorization.
+    // TODO: Find a better way to handle authorization of views and view definitions
+    // without the need for analyzeAsUser().
+    if (view_ != null && !view_.isLocalView()) {
+      // At this point we have established that the analyzer's user has privileges to
+      // access this view. If the user does not have privileges on the view's definition
+      // then we report a generic authorization exception so as not to reveal
+      // privileged information (e.g., the existence of a table).
+      if (analyzer.isExplain()) {
+        try {
+          analyzeAsUser(analyzer, analyzer.getUser(), true);
+        } catch (AuthorizationException e) {
+          throw new AuthorizationException(
+              String.format("User '%s' does not have privileges to " +
+                  "EXPLAIN this statement.", analyzer.getUser().getName()));
+        }
+        return;
+      }
+      // Use the super user to circumvent authorization checking during the
+      // analysis of this view's defining queryStmt.
+      analyzeAsUser(analyzer, ImpalaInternalAdminUser.getInstance(), true);
+      return;
+    }
+
     analyzeAsUser(analyzer, analyzer.getUser(), analyzer.useHiveColLabels());
   }
 
@@ -132,11 +173,7 @@ public class InlineViewRef extends TableRef {
     LOG.info("inline view " + getAlias() + " baseTblSmap: " + baseTblSmap_.debugString());
 
     // Now do the remaining join analysis
-    try {
-      analyzeJoin(analyzer);
-    } catch (InternalException e) {
-      throw new AnalysisException(e.getMessage(), e);
-    }
+    analyzeJoin(analyzer);
   }
 
   /**
@@ -146,7 +183,7 @@ public class InlineViewRef extends TableRef {
   @Override
   public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
       throws AnalysisException {
-    InlineView inlineView = createDummyTable();
+    InlineView inlineView = (view_ != null) ? new InlineView(view_) : new InlineView(alias_);
     for (int i = 0; i < queryStmt_.getColLabels().size(); ++i) {
       // inline view select statement has been analyzed. Col label should be filled.
       Expr selectItemExpr = queryStmt_.getResultExprs().get(i);
@@ -171,13 +208,6 @@ public class InlineViewRef extends TableRef {
   }
 
   /**
-   * Creates a fake catalog table for the inline view.
-   * TODO: Clean up resolution and replacement of view/table refs and remove this
-   * function.
-   */
-  protected InlineView createDummyTable() { return new InlineView(alias_); }
-
-  /**
    * Makes each rhs expr in baseTblSmap_ nullable, if necessary by wrapping as follows:
    * IF(TupleIsNull(), NULL, rhs expr)
    * Should be called only if this inline view is on the nullable side of an outer join.
@@ -187,14 +217,18 @@ public class InlineViewRef extends TableRef {
    * For example, constant exprs need to be wrapped or an expr such as
    * 'case slotref is null then 1 else 2 end'
    */
-  protected void makeOutputNullable(Analyzer analyzer)
-      throws AnalysisException, InternalException, AuthorizationException {
-    makeOutputNullableHelper(analyzer, smap_);
-    makeOutputNullableHelper(analyzer, baseTblSmap_);
+  protected void makeOutputNullable(Analyzer analyzer) {
+    try {
+      makeOutputNullableHelper(analyzer, smap_);
+      makeOutputNullableHelper(analyzer, baseTblSmap_);
+    } catch (Exception e) {
+      // should never happen
+      throw new IllegalStateException(e);
+    }
   }
 
   protected void makeOutputNullableHelper(Analyzer analyzer, ExprSubstitutionMap smap)
-      throws AnalysisException, InternalException, AuthorizationException {
+      throws InternalException, AuthorizationException, AnalysisException {
     // Gather all unique rhs SlotRefs into rhsSlotRefs
     List<SlotRef> rhsSlotRefs = Lists.newArrayList();
     TreeNode.collect(smap.getRhs(), Predicates.instanceOf(SlotRef.class), rhsSlotRefs);
@@ -225,7 +259,8 @@ public class InlineViewRef extends TableRef {
    * false otherwise.
    */
   private boolean requiresNullWrapping(Analyzer analyzer, Expr expr,
-      ExprSubstitutionMap nullSMap) throws InternalException, AuthorizationException {
+      ExprSubstitutionMap nullSMap) throws InternalException, AuthorizationException,
+      AnalysisException {
     // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
     // then do not try to execute it.
     // TODO: return true in this case?
@@ -237,13 +272,7 @@ public class InlineViewRef extends TableRef {
         new IsNullPredicate(expr.substitute(nullSMap, analyzer), true);
     Preconditions.checkState(isNotNullLiteralPred.isConstant());
     // analyze to insert casts, etc.
-    try {
-      isNotNullLiteralPred.analyze(analyzer);
-    } catch (AnalysisException e) {
-      // this should never happen
-      throw new InternalException(
-          "couldn't analyze predicate " + isNotNullLiteralPred.toSql(), e);
-    }
+    isNotNullLiteralPred.analyze(analyzer);
     return FeSupport.EvalPredicate(isNotNullLiteralPred, analyzer.getQueryCtx());
   }
 
@@ -270,8 +299,7 @@ public class InlineViewRef extends TableRef {
   }
 
   public QueryStmt getViewStmt() { return queryStmt_; }
-  @Override
-  public String getAlias() { return alias_; }
+
   @Override
   public TableRef clone() { return new InlineViewRef(this); }
 
@@ -279,7 +307,11 @@ public class InlineViewRef extends TableRef {
   protected String tableRefToSql() {
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
     // This is needed for view compatibility between Impala and Hive.
-    String aliasSql = ToSqlUtils.getIdentSql(alias_);
+    String aliasSql = (alias_ == null) ? null : ToSqlUtils.getIdentSql(alias_);
+    if (view_ != null) {
+      return view_.getTableName().toSql() + (aliasSql == null ? "" : " " + aliasSql);
+    }
+    Preconditions.checkNotNull(aliasSql);
     return "(" + queryStmt_.toSql() + ") " + aliasSql;
   }
 }

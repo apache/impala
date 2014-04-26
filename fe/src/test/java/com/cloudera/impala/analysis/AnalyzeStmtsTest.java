@@ -1188,23 +1188,23 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   @Test
   public void TestWithClause() throws AnalysisException {
     // Single view in WITH clause.
-    AnalyzesOk("with t as (select int_col x, bigint_col y from functional.alltypes)" +
+    AnalyzesOk("with t as (select int_col x, bigint_col y from functional.alltypes) " +
         "select x, y from t");
     // Multiple views in WITH clause. Only one view is used.
-    AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes)," +
+    AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes), " +
         "t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30)), " +
         "t4 as (select 4 x, 40 y union all select 5, 50), " +
         "t5 as (select * from (values(6 x, 60 y)) as a) " +
         "select x, y from t3");
     // Multiple views in WITH clause. All views used in a union.
-    AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes)," +
+    AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes), " +
         "t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30)), " +
         "t4 as (select 4 x, 40 y union all select 5, 50), " +
         "t5 as (select * from (values(6 x, 60 y)) as a) " +
         "select * from t1 union all select * from t2 union all select * from t3 " +
         "union all select * from t4 union all select * from t5");
     // Multiple views in WITH clause. All views used in a join.
-    AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes)," +
+    AnalyzesOk("with t1 as (select int_col x, bigint_col y from functional.alltypes), " +
         "t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30)), " +
         "t4 as (select 4 x, 40 y union all select 5, 50), " +
         "t5 as (select * from (values(6 x, 60 y)) as a) " +
@@ -1303,7 +1303,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "insert into functional.alltypes partition(year, month) " +
         "with t1 as (select * from functional.alltypessmall) select * from t1",
         "Duplicate table alias: 't1");
-    // Aliases conflict because t1 from the inline view is used.
+    // Check that aliases from WITH-clause views conflict with other table aliases.
     AnalysisError("with t1 as (select 1 x), t2 as (select 2 y)" +
         "select * from functional.alltypes as t1 inner join t1",
         "Duplicate table alias: 't1'");
@@ -1322,43 +1322,38 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("with t1 as (select 'a' x) insert into t1 values('b' x)",
         "Table does not exist: default.t1");
 
-    // Recursive table references are not allowed.
-    AnalysisError("with t as (select int_col x, bigint_col y from t) " +
+    // The inner alltypes_view gets resolved to the catalog view.
+    AnalyzesOk("with alltypes_view as (select int_col x from alltypes_view) " +
+        "select x from alltypes_view",
+        createAnalyzer("functional"));
+    // The inner 't' get resolved to a non-existent base table.
+    AnalysisError("with t as (select int_col x, bigint_col y from t1) " +
         "select x, y from t",
-        "Unsupported recursive reference to table 't' in WITH clause.");
+        "Table does not exist: default.t1");
     AnalysisError("with t as (select 1 as x, 2 as y union all select * from t) " +
         "select x, y from t",
-        "Unsupported recursive reference to table 't' in WITH clause.");
+        "Table does not exist: default.t");
     AnalysisError("with t as (select a.* from (select * from t) as a) " +
         "select x, y from t",
-        "Unsupported recursive reference to table 't' in WITH clause.");
-    // Recursive table reference is still recognized as such if a name from
-    // a view in the catalog is used.
-    AnalysisError("with alltypes_view as (select int_col x from alltypes_view) " +
-        "select x from alltypes_view",
-        createAnalyzer("functional"),
-        "Unsupported recursive reference to table 'alltypes_view' in WITH clause.");
-    // Recursion in nested WITH clause.
+        "Table does not exist: default.t");
+    // The inner 't1' in a nested WITH clause gets resolved to a non-existent base table.
     AnalysisError("with t1 as (with t2 as (select * from t1) select * from t2) " +
         "select * from t1 ",
-        "Unsupported recursive reference to table 't1' in WITH clause.");
-    // Recursion in nested WITH clause inside a subquery.
+        "Table does not exist: default.t1");
     AnalysisError("with t1 as " +
         "(select * from (with t2 as (select * from t1) select * from t2) t3) " +
         "select * from t1",
-        "Unsupported recursive reference to table 't1' in WITH clause.");
-    // Recursion with a union's WITH clause.
+        "Table does not exist: default.t1");
+    // The inner 't1' in the gets resolved to a non-existent base table.
     AnalysisError("with t1 as " +
         "(with t2 as (select * from t1) select * from t2 union all select * from t2)" +
         "select * from t1",
-        "Unsupported recursive reference to table 't1' in WITH clause.");
-    // Recursion with a union operand's WITH clause.
+        "Table does not exist: default.t1");
     AnalysisError("with t1 as " +
         "(select 'x', 'y' union all (with t2 as (select * from t1) select * from t2))" +
         "select * from t1",
-        "Unsupported recursive reference to table 't1' in WITH clause.");
-    // Recursion is prevented because a view definition may only reference
-    // views to its left.
+        "Table does not exist: default.t1");
+    // The 't2' inside 't1's definition gets resolved to a non-existent base table.
     AnalysisError("with t1 as (select int_col x, bigint_col y from t2), " +
         "t2 as (select int_col x, bigint_col y from t1) select x, y from t1",
         "Table does not exist: default.t2");
@@ -2025,8 +2020,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Also check TableRefs.
     testNumberOfMembers(TableRef.class, 12);
     testNumberOfMembers(BaseTableRef.class, 1);
-    testNumberOfMembers(InlineViewRef.class, 6);
-    testNumberOfMembers(ViewRef.class, 2);
+    testNumberOfMembers(InlineViewRef.class, 7);
   }
 
   @SuppressWarnings("rawtypes")

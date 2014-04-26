@@ -48,8 +48,8 @@ class LimitElement {
    * Copy c'tor used in clone().
    */
   protected LimitElement(LimitElement other) {
-    limitExpr_ = (other.limitExpr_ == null) ? null : other.limitExpr_.clone();
-    offsetExpr_ = (other.offsetExpr_ == null) ? null : other.offsetExpr_.clone();
+    limitExpr_ = (other.limitExpr_ == null) ? null : other.limitExpr_.reset().clone();
+    offsetExpr_ = (other.offsetExpr_ == null) ? null : other.offsetExpr_.reset().clone();
     limit_ = other.limit_;
     offset_ = other.offset_;
     isAnalyzed_ = other.isAnalyzed_;

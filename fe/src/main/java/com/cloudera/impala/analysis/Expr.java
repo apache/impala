@@ -621,8 +621,28 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   /**
    * Resets the internal state of this expr produced by analyze().
+   * Only modifies this expr, and not its child exprs.
    */
   protected void resetAnalysisState() { isAnalyzed_ = false; }
+
+  /**
+   * Resets the internal analysis state of this expr tree. Removes implicit casts.
+   */
+  public Expr reset() {
+    if (isImplicitCast()) return getChild(0).reset();
+    for (int i = 0; i < children_.size(); ++i) {
+      children_.set(i, children_.get(i).reset());
+    }
+    resetAnalysisState();
+    return this;
+  }
+
+  public static ArrayList<Expr> resetList(ArrayList<Expr> l) {
+    for (int i = 0; i < l.size(); ++i) {
+      l.set(i, l.get(i).reset());
+    }
+    return l;
+  }
 
   /**
    * Creates a deep copy of this expr including its analysis state. The method is

@@ -15,8 +15,8 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.ColumnType;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.RowFormat;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
@@ -310,12 +310,10 @@ nonterminal ArrayList<CaseWhenClause> case_when_clause_list;
 nonterminal FunctionParams function_params;
 nonterminal SlotRef column_ref;
 nonterminal ArrayList<TableRef> from_clause, table_ref_list;
-nonterminal ArrayList<ViewRef> with_table_ref_list;
-nonterminal WithClause with_clause;
+nonterminal WithClause opt_with_clause;
+nonterminal ArrayList<View> with_view_def_list;
+nonterminal View with_view_def;
 nonterminal TableRef table_ref;
-nonterminal BaseTableRef base_table_ref;
-nonterminal InlineViewRef inline_view_ref;
-nonterminal ViewRef with_table_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal ArrayList<String> opt_plan_hints;
@@ -375,7 +373,7 @@ nonterminal HashMap properties_map;
 nonterminal String db_or_schema_kw;
 nonterminal String dbs_or_schemas_kw;
 // Used to simplify commands where KW_COLUMN is optional
-nonterminal String optional_kw_column;
+nonterminal String opt_kw_column;
 // Used to simplify commands where KW_TABLE is optional
 nonterminal String opt_kw_table;
 nonterminal Boolean overwrite_val;
@@ -515,17 +513,17 @@ reset_metadata_stmt ::=
 explain_stmt ::=
   KW_EXPLAIN query_stmt:query
   {:
-     query.setIsExplain(true);
+     query.setIsExplain();
      RESULT = query;
   :}
   | KW_EXPLAIN insert_stmt:insert
   {:
-     insert.setIsExplain(true);
+     insert.setIsExplain();
      RESULT = insert;
   :}
   | KW_EXPLAIN create_tbl_as_select_stmt:ctas_stmt
   {:
-     ctas_stmt.setIsExplain(true);
+     ctas_stmt.setIsExplain();
      RESULT = ctas_stmt;
   :}
   ;
@@ -534,18 +532,18 @@ explain_stmt ::=
 // tbl(col1,...) etc) and the PARTITION clause. If the column permutation is present, the
 // query statement clause is optional as well.
 insert_stmt ::=
-  with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table LPAREN
+  opt_with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table LPAREN
   opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
   opt_query_stmt:query
   {: RESULT = new InsertStmt(w, table, true, list, hints, query, col_perm); :}
-  | with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table
+  | opt_with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table
   partition_clause:list opt_plan_hints:hints query_stmt:query
   {: RESULT = new InsertStmt(w, table, true, list, hints, query, null); :}
-  | with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table LPAREN
+  | opt_with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table LPAREN
   opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
   opt_query_stmt:query
   {: RESULT = new InsertStmt(w, table, false, list, hints, query, col_perm); :}
-  | with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table
+  | opt_with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table
   partition_clause:list opt_plan_hints:hints query_stmt:query
   {: RESULT = new InsertStmt(w, table, false, list, hints, query, null); :}
   ;
@@ -579,9 +577,9 @@ alter_tbl_stmt ::=
     RESULT = new AlterTableAddPartitionStmt(table, partition,
         location, if_not_exists, cache_op);
   :}
-  | KW_ALTER KW_TABLE table_name:table KW_DROP optional_kw_column IDENT:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_DROP opt_kw_column IDENT:col_name
   {: RESULT = new AlterTableDropColStmt(table, col_name); :}
-  | KW_ALTER KW_TABLE table_name:table KW_CHANGE optional_kw_column IDENT:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_CHANGE opt_kw_column IDENT:col_name
     column_def:col_def
   {: RESULT = new AlterTableChangeColStmt(table, col_name, col_def); :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
@@ -616,7 +614,7 @@ table_property_type ::=
   {: RESULT = TTablePropertyType.SERDE_PROPERTY; :}
   ;
 
-optional_kw_column ::=
+opt_kw_column ::=
   KW_COLUMN
   | /* empty */
   ;
@@ -1172,7 +1170,7 @@ create_function_arg_key ::=
 // even if the union has order by and limit.
 // ORDER BY and LIMIT bind to the preceding select statement by default.
 query_stmt ::=
-  with_clause:w union_operand_list:operands
+  opt_with_clause:w union_operand_list:operands
   {:
     QueryStmt queryStmt = null;
     if (operands.size() == 1) {
@@ -1183,37 +1181,37 @@ query_stmt ::=
     queryStmt.setWithClause(w);
     RESULT = queryStmt;
   :}
-  | with_clause:w union_with_order_by_or_limit:union
+  | opt_with_clause:w union_with_order_by_or_limit:union
   {:
     union.setWithClause(w);
     RESULT = union;
   :}
   ;
 
-with_clause ::=
-  KW_WITH with_table_ref_list:list
+opt_with_clause ::=
+  KW_WITH with_view_def_list:list
   {: RESULT = new WithClause(list); :}
   | /* empty */
   {: RESULT = null; :}
   ;
 
-with_table_ref ::=
+with_view_def ::=
   IDENT:alias KW_AS LPAREN query_stmt:query RPAREN
-  {: RESULT = new ViewRef(alias, query); :}
+  {: RESULT = new View(alias, query); :}
   | STRING_LITERAL:alias KW_AS LPAREN query_stmt:query RPAREN
-  {: RESULT = new ViewRef(alias, query); :}
+  {: RESULT = new View(alias, query); :}
   ;
 
-with_table_ref_list ::=
-  with_table_ref:t
+with_view_def_list ::=
+  with_view_def:v
   {:
-    ArrayList<ViewRef> list = new ArrayList<ViewRef>();
-    list.add(t);
+    ArrayList<View> list = new ArrayList<View>();
+    list.add(v);
     RESULT = list;
   :}
-  | with_table_ref_list:list COMMA with_table_ref:t
+  | with_view_def_list:list COMMA with_view_def:v
   {:
-    list.add(t);
+    list.add(v);
     RESULT = list;
   :}
   ;
@@ -1560,22 +1558,12 @@ table_ref_list ::=
   ;
 
 table_ref ::=
-  base_table_ref:b
-  {: RESULT = b; :}
-  | inline_view_ref:s
-  {: RESULT = s; :}
-  ;
-
-inline_view_ref ::=
-  LPAREN query_stmt:query RPAREN alias_clause:alias
-  {: RESULT = new InlineViewRef(null, alias, query); :}
-  ;
-
-base_table_ref ::=
   table_name:name alias_clause:alias
-  {: RESULT = new BaseTableRef(name, alias); :}
+  {: RESULT = new TableRef(name, alias); :}
   | table_name:name
-  {: RESULT = new BaseTableRef(name, null); :}
+  {: RESULT = new TableRef(name, null); :}
+  | LPAREN query_stmt:query RPAREN alias_clause:alias
+  {: RESULT = new InlineViewRef(alias, query); :}
   ;
 
 join_operator ::=

@@ -21,7 +21,7 @@ import com.cloudera.impala.common.AnalysisException;
  * Base class for all Impala SQL statements.
  */
 abstract class StatementBase implements ParseNode {
-  // True if this Stmt is top level of an explain stmt.
+  // True if this Stmt is the top level of an explain stmt.
   protected boolean isExplain_ = false;
 
   /**
@@ -33,7 +33,7 @@ abstract class StatementBase implements ParseNode {
    */
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
-    analyzer.setIsExplain(isExplain_);
+    if (isExplain_) analyzer.setIsExplain();
   }
 
   /**
@@ -41,6 +41,6 @@ abstract class StatementBase implements ParseNode {
    * @see com.cloudera.impala.parser.ParseNode#toSql()
    */
   public String toSql() { return ""; }
-  public void setIsExplain(boolean isExplain) { this.isExplain_ = isExplain; }
+  public void setIsExplain() { isExplain_ = true; }
   public boolean isExplain() { return isExplain_; }
 }

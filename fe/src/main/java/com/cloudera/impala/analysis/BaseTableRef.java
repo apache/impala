@@ -14,40 +14,30 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.List;
-
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 
 /**
- * Represents an actual table, such as an HBase table or a Hive table,
- * or an unresolved reference to a view in the catalog or from a WITH clause.
- *
- * TODO: Parsing can no longer determine whether an identifier in a FROM clause
- * should represent a base table or a view. Clean up parsing/analysis of TableRefs
- * and the replacement of views, e.g., analysis should go through the list
- * of abstract TableRefs in a SelectStmt and replace them with Views or BaseTableRefs.
+ * Represents a reference to an actual table, such as an Hdfs or HBase table.
+ * BaseTableRefs are instantiated as a result of table resolution during analysis
+ * of a SelectStmt.
  */
 public class BaseTableRef extends TableRef {
-  // Indicates whether this table should be considered for view replacement
-  // from WITH-clause views. Used to distinguish non-fully-qualified references
-  // to catalog entries (base table or view) from WITH-clause views.
-  private boolean allowWithViewReplacement_ = true;
+  private final Table table_;
 
-  public BaseTableRef(TableName name, String alias) {
-    super(name, alias);
+  public BaseTableRef(TableRef tableRef, Table table) {
+    super(tableRef);
+    table_ = table;
   }
 
   /**
    * C'tor for cloning.
    */
-  public BaseTableRef(BaseTableRef other) {
+  private BaseTableRef(BaseTableRef other) {
     super(other);
-    this.allowWithViewReplacement_ = other.allowWithViewReplacement_;
+    table_ = other.table_;
   }
 
   /**
@@ -60,56 +50,18 @@ public class BaseTableRef extends TableRef {
     setFullyQualifiedTableName(analyzer);
     desc_ = analyzer.registerTableRef(this);
     isAnalyzed_ = true;  // true that we have assigned desc
-    try {
-      analyzeJoin(analyzer);
-    } catch (InternalException e) {
-      throw new AnalysisException(e.getMessage(), e);
-    }
+    analyzeJoin(analyzer);
   }
 
   @Override
   public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
     TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor();
-    Table tbl = analyzer.getTable(name_, getPrivilegeRequirement(), true);
-    // Views should have been substituted already.
-    Preconditions.checkState(!(tbl instanceof View),
-        String.format("View %s has not been properly substituted.", tbl.getFullName()));
-    result.setTable(tbl);
+    result.setTable(table_);
     return result;
   }
 
   @Override
-  public List<TupleId> getMaterializedTupleIds() {
-    // This function should only be called after analyze().
-    Preconditions.checkState(isAnalyzed_);
-    Preconditions.checkState(desc_ != null);
-    return desc_.getId().asList();
-  }
-
-  @Override
-  protected String tableRefToSql() {
-    // Enclose the alias in quotes if Hive cannot parse it without quotes.
-    // This is needed for view compatibility between Impala and Hive.
-    String aliasSql = null;
-    if (alias_ != null) aliasSql = ToSqlUtils.getIdentSql(alias_);
-    return name_.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
-  }
-
-  public String debugString() {
-    return tableRefToSql();
-  }
-
-  @Override
-  public TableRef clone() {
-    return new BaseTableRef(this);
-  }
-
-  /**
-   * Disable/enable WITH-clause view replacement for this table.
-   * See comment on allowWithViewReplacement.
-   */
-  public void disableWithViewReplacement() { allowWithViewReplacement_ = false; }
-  public void enableWithViewReplacement() { allowWithViewReplacement_ = true; }
-  public boolean isReplaceableByWithView() { return allowWithViewReplacement_; }
+  public TableRef clone() { return new BaseTableRef(this); }
+  public String debugString() { return tableRefToSql(); }
 }

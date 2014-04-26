@@ -43,7 +43,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   // Corresponds to Hive's viewOriginalText.
   protected String originalViewDef_;
 
-  // Query statement (as SQL string) that defines the ViewRef for view substitution.
+  // Query statement (as SQL string) that defines the View for view substitution.
   // It is a transformation of the original view definition, e.g., to enforce the
   // columnDefs even if the original view definition has explicit column aliases.
   // If column definitions were given, then this "expanded" view definition

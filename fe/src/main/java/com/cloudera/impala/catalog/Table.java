@@ -53,7 +53,7 @@ public abstract class Table implements CatalogObject {
   // concurrency bugs. Currently used to serialize calls to "getTable()" due to HIVE-5457.
   private static final Object metastoreAccessLock_ = new Object();
   private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
-  private final org.apache.hadoop.hive.metastore.api.Table msTable_;
+  protected final org.apache.hadoop.hive.metastore.api.Table msTable_;
 
   protected final TableId id_;
   protected final Db db_;
@@ -296,7 +296,9 @@ public abstract class Table implements CatalogObject {
   public Db getDb() { return db_; }
   public String getName() { return name_; }
   public String getFullName() { return (db_ != null ? db_.getName() + "." : "") + name_; }
-  public TableName getTableName() { return new TableName(db_.getName(), name_); }
+  public TableName getTableName() {
+    return new TableName(db_ != null ? db_.getName() : null, name_);
+  }
   public String getOwner() { return owner_; }
   public ArrayList<Column> getColumns() { return colsByPos_; }
 

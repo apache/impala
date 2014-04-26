@@ -83,9 +83,6 @@ public class InsertStmt extends StatementBase {
   // Set in analyze(). Exprs corresponding to the partitionKeyValues,
   private final List<Expr> partitionKeyExprs_ = new ArrayList<Expr>();
 
-  // True if this InsertStmt is the top level query from an EXPLAIN <query>
-  private boolean isExplain_ = false;
-
   // True to force re-partitioning before the table sink, false to prevent it. Set in
   // analyze() based on planHints_. Null if no explicit hint was given (the planner
   // should decide whether to re-partition or not).
@@ -135,6 +132,7 @@ public class InsertStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
+    if (isExplain_) analyzer.setIsExplain();
     analyzer.setIsInsertStmt(true);
     try {
       if (withClause_ != null) withClause_.analyze(analyzer);
@@ -143,9 +141,6 @@ public class InsertStmt extends StatementBase {
       // of missing tables can be collected before failing analyze().
       if (analyzer.getMissingTbls().isEmpty()) throw e;
     }
-
-    analyzer.setIsExplain(isExplain_);
-    if (queryStmt_ != null) queryStmt_.setIsExplain(isExplain_);
 
     List<Expr> selectListExprs = null;
     if (!needsGeneratedQueryStatement_) {
@@ -639,9 +634,4 @@ public class InsertStmt extends StatementBase {
     }
     return strBuilder.toString();
   }
-
-  @Override
-  public void setIsExplain(boolean isExplain) { isExplain_ = isExplain; }
-  @Override
-  public boolean isExplain() { return isExplain_; }
 }

@@ -33,8 +33,11 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.HBaseTable;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
@@ -201,8 +204,8 @@ public class Analyzer {
   // (ancestors[0] contains the immediate parent, etc.).
   private final ArrayList<Analyzer> ancestors_;
 
-  // map from lowercase table alias to a view definition of a WITH clause.
-  private final Map<String, ViewRef> withClauseViews_ = Maps.newHashMap();
+  // map from lowercase table alias to a view definition in this analyzer's scope
+  private final Map<String, View> localViews_ = Maps.newHashMap();
 
   // Map from lowercase table alias to descriptor. Tables without an explicit alias
   // are assigned two implicit aliases: the unqualified and fully-qualified table name.
@@ -262,60 +265,14 @@ public class Analyzer {
   }
 
   /**
-   * Searches the hierarchy of analyzers bottom-up for a registered view
-   * whose alias matches the table name of the given BaseTableRef. Returns the
-   * ViewRef from the innermost scope (analyzer).
-   * If no such registered view was found, also searches for views from the catalog
-   * if seachCatalog is true.
-   * Returns null if no matching views were found.
-   *
-   * This method may trigger a metadata load for finding views registered
-   * in the metastore, if seachCatalog is true.
-   */
-  public ViewRef findViewDefinition(BaseTableRef ref, boolean searchCatalog)
-      throws AuthorizationException, AnalysisException {
-    // Do not consider views from the WITH clause if the table name is fully qualified,
-    // or if WITH-clause view matching was explicitly disabled.
-    if (!ref.getName().isFullyQualified() && ref.isReplaceableByWithView()) {
-      Analyzer analyzer = this;
-      do {
-        String baseTableName = ref.getName().getTbl().toLowerCase();
-        ViewRef view = analyzer.withClauseViews_.get(baseTableName);
-        if (view != null) return view;
-        analyzer = (analyzer.ancestors_.isEmpty() ? null : analyzer.ancestors_.get(0));
-      } while (analyzer != null);
-    }
-    if (!searchCatalog) return null;
-
-    // Consult the catalog for a matching view.
-    Table tbl = null;
-    try {
-      // Skip audit tracking for this request since it is only to determine if the
-      // catalog contains the specified table/view.
-      tbl = getTable(ref.getName(), ref.getPrivilegeRequirement(), false);
-    } catch (AnalysisException e) {
-      // Swallow this analysis exception to allow detection and proper error
-      // reporting of recursive references in WITH-clause views.
-      // Non-existent tables/databases will be detected when analyzing tbl.
-      return null;
-    }
-    Preconditions.checkNotNull(tbl);
-    if (tbl instanceof View) {
-      View viewTbl = (View) tbl;
-      Preconditions.checkNotNull(viewTbl.getViewDef());
-      return viewTbl.getViewDef();
-    }
-    return null;
-  }
-
-  /**
-   * Adds view to this analyzer's withClauseViews. Throws an exception if a view
+   * Registers a local view definition with this analyzer. Throws an exception if a view
    * definition with the same alias has already been registered.
    */
-  public void registerWithClauseView(ViewRef ref) throws AnalysisException {
-    if (withClauseViews_.put(ref.getAlias().toLowerCase(), ref) != null) {
+  public void registerLocalView(View view) throws AnalysisException {
+    Preconditions.checkState(view.isLocalView());
+    if (localViews_.put(view.getName().toLowerCase(), view) != null) {
       throw new AnalysisException(
-          String.format("Duplicate table alias: '%s'", ref.getAlias()));
+          String.format("Duplicate table alias: '%s'", view.getName()));
     }
   }
 
@@ -353,7 +310,7 @@ public class Analyzer {
         }
       }
     }
-
+    // Delegate creation of the tuple descriptor to the concrete table ref.
     TupleDescriptor result = ref.createTupleDescriptor(this);
     result.setAlias(ref.getAlias(), ref.hasExplicitAlias());
     // Register explicit or fully-qualified implicit alias.
@@ -364,6 +321,39 @@ public class Analyzer {
       aliasMap_.put(unqualifiedAlias, result);
     }
     return result;
+  }
+
+  /**
+   * Resolves the given table ref into a corresponding BaseTableRef or ViewRef. Returns
+   * the new resolved table ref or the given table ref if it is already resolved.
+   */
+  public TableRef resolveTableRef(TableRef tableRef)
+      throws AnalysisException, AuthorizationException {
+    // Return the table if it is already resolved.
+    if (tableRef.isResolved()) return tableRef;
+    TableName tableName = tableRef.getName();
+    // Try to find a matching local view.
+    if (!tableName.isFullyQualified()) {
+      // Searches the hierarchy of analyzers bottom-up for a registered local view with
+      // a matching alias.
+      String viewAlias = tableName.getTbl().toLowerCase();
+      Analyzer analyzer = this;
+      do {
+        View localView = analyzer.localViews_.get(viewAlias);
+        if (localView != null) return new InlineViewRef(localView, tableRef);
+        analyzer = (analyzer.ancestors_.isEmpty() ? null : analyzer.ancestors_.get(0));
+      } while (analyzer != null);
+    }
+    // Try to find a matching table or view from the catalog.
+    Table table = getTable(tableRef.getName(), tableRef.getPrivilegeRequirement());
+    if (table instanceof View) {
+      return new InlineViewRef((View) table, tableRef);
+    } else {
+      // The table must be a base table.
+      Preconditions.checkState(table instanceof HdfsTable ||
+          table instanceof HBaseTable || table instanceof DataSourceTable);
+      return new BaseTableRef(tableRef, table);
+    }
   }
 
   /**
@@ -1393,7 +1383,6 @@ public class Analyzer {
     return compatibleType;
   }
 
-  public Map<String, ViewRef> getWithClauseViews() { return withClauseViews_; }
   public String getDefaultDb() { return globalState_.queryCtx.session.database; }
   public User getUser() { return user_; }
   public TQueryCtx getQueryCtx() { return globalState_.queryCtx; }
@@ -1517,16 +1506,17 @@ public class Analyzer {
   public String getTargetDbName(FunctionName fnName) {
     return fnName.isFullyQualified() ? fnName.getDb() : getDefaultDb();
   }
+
   /**
    * Returns a the fully-qualified table name of tableName. If tableName
    * is already fully qualified, returns tableName.
    */
-  public TableName getFullyQualifiedTableName(TableName tableName) {
+  public TableName getFqTableName(TableName tableName) {
     if (tableName.isFullyQualified()) return tableName;
     return new TableName(getDefaultDb(), tableName.getTbl());
   }
 
-  public void setIsExplain(boolean isExplain) { globalState_.isExplain = isExplain; }
+  public void setIsExplain() { globalState_.isExplain = true; }
   public void setIsInsertStmt(boolean isInsertStmt) {
     globalState_.isInsertStmt = isInsertStmt;
   }
@@ -1553,6 +1543,8 @@ public class Analyzer {
   public boolean hasValueTransfer(SlotId a, SlotId b) {
     return globalState_.valueTransferGraph.hasValueTransfer(a, b);
   }
+
+  public Map<String, View> getLocalViews() { return localViews_; }
 
   /**
    * Add a warning that will be displayed to the user.

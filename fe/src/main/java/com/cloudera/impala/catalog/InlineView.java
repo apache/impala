@@ -22,10 +22,10 @@ import com.google.common.base.Preconditions;
 
 /**
  * A fake catalog representation of an inline view that is similar to a table.
- * Inline views originating directly from the query or from WITH-clause views can only
+ * Inline views originating directly from the query or from a local view can only
  * be referenced by their explicit alias, so their table name is the alias. Inline views
- * instantiated from a catalog view have a real table name. Giving such fake tables
- * a real table name is important to resolve their implicit aliases properly.
+ * instantiated from a catalog view have a db and a table name such that we can generate
+ * unqualified and fully-qualified implicit aliases.
  * Fake tables for inline views do not have an id, msTbl or an owner and cannot be
  * converted to Thrift.
  */
@@ -40,7 +40,7 @@ public class InlineView extends Table {
   }
 
   /**
-   * C'tor for inline views with a real table name instantiated from a catalog view.
+   * C'tor for inline views instantiated from a local or catalog view.
    */
   public InlineView(Table tbl) {
     super(null, null, tbl.getDb(), tbl.getName(), null);

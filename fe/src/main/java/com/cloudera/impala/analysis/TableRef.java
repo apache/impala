@@ -22,18 +22,21 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 /**
- * An abstract representation of a table reference. The actual table reference could be
- * an inline view, or a base table, such as Hive table or HBase table. This abstract
- * representation of table also contains the JOIN specification.
+ * Superclass of all table references, including references to inline views, catalog or
+ * local views, or base tables (Hdfs, HBase or DataSource tables). Contains the join
+ * specification. An instance of a TableRef (and not a subclass thereof) represents
+ * an unresolved table reference that must be resolved during analysis. All resolved
+ * table references are subclasses of TableRef.
  */
-public abstract class TableRef implements ParseNode {
+public class TableRef implements ParseNode {
+  // Table or view name that is fully qualified in analyze().
+  // Equivalent to alias_ for local view refs.
   protected TableName name_;
   protected final String alias_;
 
@@ -59,22 +62,12 @@ public abstract class TableRef implements ParseNode {
   // analysis output
   protected TupleDescriptor desc_;
 
-  public TableRef(TableName name, String alias) {
+  public TableRef(TableName tableName, String alias) {
     super();
-    Preconditions.checkArgument(name == null || !name.toString().isEmpty());
-    Preconditions.checkArgument(alias == null || !alias.isEmpty());
-    this.name_ = name;
-    this.alias_ = alias;
+    name_ = tableName;
+    alias_ = alias;
     isAnalyzed_ = false;
   }
-
-  /**
-   * Creates and returns a empty TupleDescriptor registered with the analyzer. The
-   * returned tuple descriptor must have its source table set via descTbl.setTable()).
-   * This method is called from the analyzer when registering this table reference.
-   */
-  public abstract TupleDescriptor createTupleDescriptor(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException;
 
   /**
    * C'tor for cloning.
@@ -88,13 +81,67 @@ public abstract class TableRef implements ParseNode {
         (other.joinHints_ != null) ? Lists.newArrayList(other.joinHints_) : null;
     this.usingColNames_ =
         (other.usingColNames_ != null) ? Lists.newArrayList(other.usingColNames_) : null;
-    this.onClause_ = (other.onClause_ != null) ? other.onClause_.clone() : null;
+    this.onClause_ = (other.onClause_ != null) ? other.onClause_.reset().clone() : null;
     isAnalyzed_ = false;
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException,
+      AuthorizationException {
+    throw new AnalysisException("Unresolved table reference: " + tableRefToSql());
+  }
+
+  /**
+   * Creates and returns a empty TupleDescriptor registered with the analyzer. The
+   * returned tuple descriptor must have its source table set via descTbl.setTable()).
+   * This method is called from the analyzer when registering this table reference.
+   */
+  public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
+    throw new AnalysisException("Unresolved table reference: " + tableRefToSql());
+  }
+
+  /**
+   * Set this table's context-dependent join attributes from the given table.
+   * Does not clone the attributes.
+   */
+  protected void setJoinAttrs(TableRef other) {
+    this.joinOp_ = other.joinOp_;
+    this.joinHints_ = other.joinHints_;
+    this.onClause_ = other.onClause_;
+    this.usingColNames_ = other.usingColNames_;
   }
 
   public JoinOperator getJoinOp() {
     // if it's not explicitly set, we're doing an inner join
     return (joinOp_ == null ? JoinOperator.INNER_JOIN : joinOp_);
+  }
+
+  public TableName getName() { return name_; }
+
+  /**
+   * Replaces name_ with the fully-qualified table name.
+   */
+  protected void setFullyQualifiedTableName(Analyzer analyzer) {
+    name_ = analyzer.getFqTableName(name_);
+  }
+
+  /**
+   * Returns true if this table ref has an explicit alias.
+   */
+  public boolean hasExplicitAlias() { return alias_ != null; }
+
+  /**
+   * Return alias by which this table is referenced in select block.
+   */
+  public String getAlias() {
+    if (alias_ == null) return name_.toString().toLowerCase();
+    return alias_;
+  }
+
+  public TableName getAliasAsName() {
+    if (alias_ != null) return new TableName(null, alias_);
+    return name_;
   }
 
   public ArrayList<String> getJoinHints() { return joinHints_; }
@@ -111,6 +158,7 @@ public abstract class TableRef implements ParseNode {
   public boolean isBroadcastJoin() { return isBroadcastJoin_; }
   public boolean isPartitionedJoin() { return isPartitionedJoin_; }
   public List<TupleId> getOnClauseTupleIds() { return onClauseTupleIds_; }
+  public boolean isResolved() { return !getClass().equals(TableRef.class); }
 
   /**
    * This method should only be called after the TableRef has been analyzed.
@@ -132,11 +180,12 @@ public abstract class TableRef implements ParseNode {
     return desc_.getId();
   }
 
-  /**
-   * Return the list of of materialized tuple ids from the TableRef.
-   * This method should only be called after the TableRef has been analyzed.
-   */
-  abstract public List<TupleId> getMaterializedTupleIds();
+  public List<TupleId> getMaterializedTupleIds() {
+    // This function should only be called after analyze().
+    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkNotNull(desc_);
+    return desc_.getId().asList();
+  }
 
   /**
    * Return the list of tuple ids materialized by the full sequence of
@@ -202,7 +251,7 @@ public abstract class TableRef implements ParseNode {
    * and the TupleDescriptor (desc) of this table has been created.
    */
   public void analyzeJoin(Analyzer analyzer)
-      throws AnalysisException, InternalException, AuthorizationException {
+      throws AnalysisException, AuthorizationException {
     Preconditions.checkState(desc_ != null);
     analyzeJoinHints();
     if (joinOp_ == JoinOperator.CROSS_JOIN) {
@@ -213,7 +262,7 @@ public abstract class TableRef implements ParseNode {
     if (usingColNames_ != null) {
       Preconditions.checkState(joinOp_ != JoinOperator.CROSS_JOIN);
       // Turn USING clause into equivalent ON clause.
-      Preconditions.checkState(onClause_ == null);
+      onClause_ = null;
       for (String colName: usingColNames_) {
         // check whether colName exists both for our table and the one
         // to the left of us
@@ -311,10 +360,13 @@ public abstract class TableRef implements ParseNode {
     }
   }
 
-  /**
-   * Return the table ref presentation to be used in the toSql string
-   */
-  abstract protected String tableRefToSql();
+  protected String tableRefToSql() {
+    // Enclose the alias in quotes if Hive cannot parse it without quotes.
+    // This is needed for view compatibility between Impala and Hive.
+    String aliasSql = null;
+    if (alias_ != null) aliasSql = ToSqlUtils.getIdentSql(alias_);
+    return name_.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
+  }
 
   @Override
   public String toSql() {
@@ -335,49 +387,10 @@ public abstract class TableRef implements ParseNode {
   }
 
   /**
-   * Returns the name of the table referred to. Before analysis, the table name
-   * may not be fully qualified. If the table name is unqualified, the current
-   * default database from the analyzer will be used as the db name.
-   */
-  public TableName getName() { return name_; }
-
-  /**
-   * Replaces name_ with the fully-qualified table name.
-   */
-  public void setFullyQualifiedTableName(Analyzer analyzer) {
-    name_ = analyzer.getFullyQualifiedTableName(name_);
-  }
-
-  /**
-   * Returns true if this table ref has an explicit table alias.
-   */
-  public boolean hasExplicitAlias() { return alias_ != null; }
-
-  /**
-   * Return the explicit alias of this table ref if one was given, otherwise the
-   * fully-qualified table name.
-   */
-  public String getAlias() {
-    if (alias_ == null) {
-      return name_.toString().toLowerCase();
-    } else {
-      return alias_;
-    }
-  }
-
-  public TableName getAliasAsName() {
-    if (alias_ != null) {
-      return new TableName(null, alias_);
-    } else {
-      return name_;
-    }
-  }
-
-  @Override
-  public abstract TableRef clone();
-
-  /**
    * Gets the privilege requirement. This is always SELECT for TableRefs.
    */
   public Privilege getPrivilegeRequirement() { return Privilege.SELECT; }
+
+  @Override
+  public TableRef clone() { return new TableRef(this); }
 }
