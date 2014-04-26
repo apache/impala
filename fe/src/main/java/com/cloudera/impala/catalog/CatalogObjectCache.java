@@ -84,6 +84,13 @@ public class CatalogObjectCache<T extends CatalogObject> {
   }
 
   /**
+   * Returns all the known object values.
+   */
+  public List<T> getValues() {
+    return Lists.newArrayList(metadataCache_.values());
+  }
+
+  /**
    * Returns true if the metadataCache_ contains a key with the given name.
    */
   public boolean contains(String name) {

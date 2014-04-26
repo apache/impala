@@ -49,6 +49,8 @@ import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.DataSourceTable;
+import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
@@ -1515,9 +1517,15 @@ public class Planner {
           (HdfsTable)tblRef.getTable());
       scanNode.init(analyzer);
       return scanNode;
-    } else {
+    } else if (tblRef.getTable() instanceof DataSourceTable) {
+      scanNode = new DataSourceScanNode(nodeIdGenerator_.getNextId(), tblRef.getDesc());
+      scanNode.init(analyzer);
+      return scanNode;
+    } else if (tblRef.getTable() instanceof HBaseTable) {
       // HBase table
       scanNode = new HBaseScanNode(nodeIdGenerator_.getNextId(), tblRef.getDesc());
+    } else {
+      throw new InternalException("Invalid table ref class: " + tblRef.getClass());
     }
     // TODO: move this to HBaseScanNode.init();
     Preconditions.checkState(scanNode instanceof HBaseScanNode);

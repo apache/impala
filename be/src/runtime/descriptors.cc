@@ -76,12 +76,16 @@ TableDescriptor::TableDescriptor(const TTableDescriptor& tdesc)
     database_(tdesc.dbName),
     id_(tdesc.id),
     num_cols_(tdesc.numCols),
-    num_clustering_cols_(tdesc.numClusteringCols) {
+    num_clustering_cols_(tdesc.numClusteringCols),
+    col_names_(tdesc.colNames) {
 }
 
 string TableDescriptor::DebugString() const {
   stringstream out;
   out << "#cols=" << num_cols_ << " #clustering_cols=" << num_clustering_cols_;
+  out << " col_names=[";
+  out << join(col_names_, ":");
+  out << "]";
   return out.str();
 }
 
@@ -132,7 +136,6 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc,
     ObjectPool* pool)
   : TableDescriptor(tdesc),
     hdfs_base_dir_(tdesc.hdfsTable.hdfsBaseDir),
-    col_names_(tdesc.hdfsTable.colNames),
     null_partition_key_value_(tdesc.hdfsTable.nullPartitionKeyValue),
     null_column_value_(tdesc.hdfsTable.nullColumnValue),
     object_pool_(pool) {
@@ -149,12 +152,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc,
 string HdfsTableDescriptor::DebugString() const {
   stringstream out;
   out << "HdfsTable(" << TableDescriptor::DebugString()
-      << " hdfs_base_dir='" << hdfs_base_dir_ << "'"
-      << " col_names=[";
-
-  out << join(col_names_, ":");
-
-  out << "]";
+      << " hdfs_base_dir='" << hdfs_base_dir_ << "'";
   out << " partitions=[";
   vector<string> partition_strings;
   map<int64_t, HdfsPartitionDescriptor*>::const_iterator it;

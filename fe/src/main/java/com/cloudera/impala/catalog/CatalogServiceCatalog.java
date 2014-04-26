@@ -189,10 +189,16 @@ public class CatalogServiceCatalog extends Catalog {
         for (Function fn: db.getFunctions(null, new PatternMatcher())) {
           TCatalogObject function = new TCatalogObject(TCatalogObjectType.FUNCTION,
               fn.getCatalogVersion());
-          function.setType(TCatalogObjectType.FUNCTION);
           function.setFn(fn.toThrift());
           resp.addToObjects(function);
         }
+      }
+
+      for (DataSource dataSource: getDataSources()) {
+        TCatalogObject catalogObj = new TCatalogObject(TCatalogObjectType.DATA_SOURCE,
+            dataSource.getCatalogVersion());
+        catalogObj.setData_source(dataSource.toThrift());
+        resp.addToObjects(catalogObj);
       }
 
       // Each update should contain a single "TCatalog" object which is used to
@@ -460,6 +466,28 @@ public class CatalogServiceCatalog extends Catalog {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Adds a data source to the catalog, incrementing the catalog version. Returns true
+   * if the add was successful, false otherwise.
+   */
+  @Override
+  public boolean addDataSource(DataSource dataSource) {
+    if (dataSources_.add(dataSource)) {
+      dataSource.setCatalogVersion(incrementAndGetCatalogVersion());
+      return true;
+    }
+    return false;
+  }
+
+  @Override
+  public DataSource removeDataSource(String dataSourceName) {
+    DataSource dataSource = dataSources_.remove(dataSourceName);
+    if (dataSource != null) {
+      dataSource.setCatalogVersion(incrementAndGetCatalogVersion());
+    }
+    return dataSource;
   }
 
   /**

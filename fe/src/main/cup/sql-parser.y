@@ -199,25 +199,25 @@ parser code {:
 
 // List of keywords. Please keep them sorted alphabetically.
 terminal
-  KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN,
-  KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR,
-  KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS,
-  KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED,
-  KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END,
-  KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT,
-  KW_FINALIZE_FN, KW_FIRST, KW_FLOAT, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
-  KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER,
-  KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE,
-  KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION,
-  KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR,
-  KW_ORDER, KW_OUTER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE, KW_PARTITION,
-  KW_PARTITIONED, KW_PARTITIONS, KW_PREPARE_FN, KW_RCFILE, KW_REFRESH, KW_REGEXP,
-  KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA, KW_SCHEMAS,
-  KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET,
-  KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING, KW_SYMBOL, KW_TABLE,
-  KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP,
-  KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING,
-  KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_API_VERSION, KW_AS, KW_ASC, KW_AVRO,
+  KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CASE, KW_CAST, KW_CHANGE,
+  KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE,
+  KW_CREATE, KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME,
+  KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE,
+  KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE,
+  KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT, KW_FORMAT, KW_FORMATTED,
+  KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_HAVING, KW_IF, KW_IN,
+  KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
+  KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES,
+  KW_LOAD, KW_LOCATION, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET,
+  KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE,
+  KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PREPARE_FN, KW_PRODUCED, KW_RCFILE,
+  KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW,
+  KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
+  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_SOURCE, KW_STORED, KW_STRAIGHT_JOIN,
+  KW_STRING, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED,
+  KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNION,
+  KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
   DIVIDE, MOD, ADD, SUBTRACT;
@@ -322,12 +322,15 @@ nonterminal CreateTableAsSelectStmt create_tbl_as_select_stmt;
 nonterminal CreateTableLikeStmt create_tbl_like_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal CreateViewStmt create_view_stmt;
+nonterminal CreateDataSrcStmt create_data_src_stmt;
+nonterminal DropDataSrcStmt drop_data_src_stmt;
 nonterminal ColumnDesc column_def, view_column_def;
 nonterminal ArrayList<ColumnDesc> column_def_list, view_column_def_list;
 nonterminal ArrayList<ColumnDesc> partition_column_defs, view_column_defs;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal String comment_val;
 nonterminal Boolean external_val;
+nonterminal String opt_init_string_val;
 nonterminal THdfsFileFormat file_format_val;
 nonterminal THdfsFileFormat file_format_create_table_val;
 nonterminal Boolean if_exists_val;
@@ -429,6 +432,8 @@ stmt ::=
   {: RESULT = create_tbl; :}
   | create_view_stmt:create_view
   {: RESULT = create_view; :}
+  | create_data_src_stmt:create_data_src
+  {: RESULT = create_data_src; :}
   | create_db_stmt:create_db
   {: RESULT = create_db; :}
   | create_udf_stmt:create_udf
@@ -441,6 +446,8 @@ stmt ::=
   {: RESULT = drop_tbl; :}
   | drop_function_stmt:drop_function
   {: RESULT = drop_function; :}
+  | drop_data_src_stmt:drop_data_src
+  {: RESULT = drop_data_src; :}
   | explain_stmt:explain
   {: RESULT = explain; :}
   | load_stmt: load
@@ -627,6 +634,17 @@ create_tbl_stmt ::=
     RESULT = new CreateTableStmt(table, col_defs, partition_col_defs, external, comment,
         row_format, file_format, location, if_not_exists, tbl_props, serde_props);
   :}
+  | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+    table_name:table LPAREN column_def_list:col_defs RPAREN
+    KW_PRODUCED KW_BY KW_DATA KW_SOURCE IDENT:data_src_name
+    opt_init_string_val:init_string comment_val:comment
+  {:
+    // Need external_val in the grammar to avoid shift/reduce conflict with other
+    // CREATE TABLE statements.
+    if (external) parser.parseError("external", SqlParserSymbols.KW_EXTERNAL);
+    RESULT = new CreateTableDataSrcStmt(table, col_defs, data_src_name, init_string,
+        comment, if_not_exists);
+  :}
   ;
 
 create_udf_stmt ::=
@@ -664,6 +682,13 @@ comment_val ::=
 location_val ::=
   KW_LOCATION STRING_LITERAL:location
   {: RESULT = new HdfsUri(location); :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+opt_init_string_val ::=
+  LPAREN STRING_LITERAL:init_string RPAREN
+  {: RESULT = init_string; :}
   | /* empty */
   {: RESULT = null; :}
   ;
@@ -800,6 +825,17 @@ create_view_stmt ::=
   :}
   ;
 
+create_data_src_stmt ::=
+  KW_CREATE KW_DATA KW_SOURCE if_not_exists_val:if_not_exists IDENT:data_src_name
+  KW_LOCATION STRING_LITERAL:location
+  KW_CLASS STRING_LITERAL:class_name
+  KW_API_VERSION STRING_LITERAL:api_version
+  {:
+    RESULT = new CreateDataSrcStmt(data_src_name, new HdfsUri(location), class_name,
+        api_version, if_not_exists);
+  :}
+  ;
+
 view_column_defs ::=
   LPAREN view_column_def_list:view_col_defs RPAREN
   {: RESULT = view_col_defs; :}
@@ -855,6 +891,11 @@ drop_function_stmt ::=
       if_exists_val:if_exists function_name:fn_name
   function_def_args:fn_args
   {: RESULT = new DropFunctionStmt(fn_name, fn_args, if_exists); :}
+  ;
+
+drop_data_src_stmt ::=
+  KW_DROP KW_DATA KW_SOURCE if_exists_val:if_exists IDENT:data_src_name
+  {: RESULT = new DropDataSrcStmt(data_src_name, if_exists); :}
   ;
 
 db_or_schema_kw ::=

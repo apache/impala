@@ -25,6 +25,7 @@ import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
+import com.cloudera.impala.extdatasource.thrift.TComparisonOp;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Objects;
@@ -39,24 +40,27 @@ public class BinaryPredicate extends Predicate {
   private final static Logger LOG = LoggerFactory.getLogger(BinaryPredicate.class);
 
   public enum Operator {
-    EQ("=", "eq"),
-    NE("!=", "ne"),
-    LE("<=", "le"),
-    GE(">=", "ge"),
-    LT("<", "lt"),
-    GT(">", "gt");
+    EQ("=", "eq", TComparisonOp.EQ),
+    NE("!=", "ne", TComparisonOp.NE),
+    LE("<=", "le", TComparisonOp.LE),
+    GE(">=", "ge", TComparisonOp.GE),
+    LT("<", "lt", TComparisonOp.LT),
+    GT(">", "gt", TComparisonOp.GT);
 
-    private final String description;
-    private final String name;
+    private final String description_;
+    private final String name_;
+    private final TComparisonOp thriftOp_;
 
-    private Operator(String description, String name) {
-      this.description = description;
-      this.name = name;
+    private Operator(String description, String name, TComparisonOp thriftOp) {
+      this.description_ = description;
+      this.name_ = name;
+      this.thriftOp_ = thriftOp;
     }
 
     @Override
-    public String toString() { return description; }
-    public String getName() { return name; }
+    public String toString() { return description_; }
+    public String getName() { return name_; }
+    public TComparisonOp getThriftOp() { return thriftOp_; }
   }
 
   public static void initBuiltins(Db db) {

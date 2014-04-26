@@ -409,6 +409,20 @@ struct TExecRequest {
   8: optional list<TAccessEvent> access_events
 }
 
+// Parameters to FeSupport.cacheJar().
+struct TCacheJarParams {
+  // HDFS URI for the jar
+  1: required string hdfs_location
+}
+
+// Result from FeSupport.cacheJar().
+struct TCacheJarResult {
+  1: required Status.TStatus status
+
+  // Local path for the jar. Set only if status is OK.
+  2: optional string local_path
+}
+
 // A UDF may include optional prepare and close functions in addition the main evaluation
 // function. This enum distinguishes between these when doing a symbol lookup.
 enum TSymbolType {

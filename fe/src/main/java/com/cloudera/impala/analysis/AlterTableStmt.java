@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
@@ -70,6 +71,11 @@ public abstract class AlterTableStmt extends StatementBase {
     if (table_ instanceof View) {
       throw new AnalysisException(String.format(
           "ALTER TABLE not allowed on a view: %s", table_.getFullName()));
+    }
+    if (table_ instanceof DataSourceTable) {
+      throw new AnalysisException(String.format(
+          "ALTER TABLE not allowed on a table produced by a data source: %s",
+          table_.getFullName()));
     }
   }
 }

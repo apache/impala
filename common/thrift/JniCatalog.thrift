@@ -36,6 +36,8 @@ enum TDdlType {
   DROP_TABLE,
   DROP_VIEW,
   DROP_FUNCTION,
+  CREATE_DATA_SOURCE,
+  DROP_DATA_SOURCE
 }
 
 // Types of ALTER TABLE commands supported.
@@ -68,6 +70,24 @@ struct TCreateDbParams {
 
   // Do not throw an error if a database of the same name already exists.
   4: optional bool if_not_exists
+}
+
+// Parameters of CREATE DATA SOURCE commands
+struct TCreateDataSourceParams {
+  // Data source to create
+  1: required CatalogObjects.TDataSource data_source
+
+  // Do not throw an error if a data source of the same name already exists.
+  2: optional bool if_not_exists
+}
+
+// Parameters of DROP DATA SOURCE command
+struct TDropDataSourceParams {
+  // Name of the data source to drop
+  1: required string data_source
+
+  // If true, no error is raised if the target data source does not exist
+  2: optional bool if_exists
 }
 
 // Parameters of CREATE FUNCTION commands

@@ -41,6 +41,7 @@ import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TDataSource;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TTable;
@@ -491,6 +492,9 @@ public class ImpaladCatalog extends Catalog {
       case FUNCTION:
         addFunction(catalogObject.getFn(), catalogObject.getCatalog_version());
         break;
+      case DATA_SOURCE:
+        addDataSource(catalogObject.getData_source(), catalogObject.getCatalog_version());
+        break;
       default:
         throw new IllegalStateException(
             "Unexpected TCatalogObjectType: " + catalogObject.getType());
@@ -528,6 +532,9 @@ public class ImpaladCatalog extends Catalog {
         break;
       case FUNCTION:
         removeFunction(catalogObject.getFn(), dropCatalogVersion);
+        break;
+      case DATA_SOURCE:
+        removeDataSource(catalogObject.getData_source(), dropCatalogVersion);
         break;
       default:
         throw new IllegalStateException(
@@ -576,6 +583,16 @@ public class ImpaladCatalog extends Catalog {
         existingFn.getCatalogVersion() < catalogVersion) {
       db.addFunction(function);
     }
+  }
+
+  private void addDataSource(TDataSource thrift, long catalogVersion) {
+    DataSource dataSource = DataSource.fromThrift(thrift);
+    dataSource.setCatalogVersion(catalogVersion);
+    addDataSource(dataSource);
+  }
+
+  private void removeDataSource(TDataSource thrift, long dropCatalogVersion) {
+    removeDataSource(thrift.getName());
   }
 
   private void removeDb(TDatabase thriftDb, long dropCatalogVersion) {

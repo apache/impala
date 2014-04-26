@@ -53,6 +53,7 @@ import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnNotFoundException;
 import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HBaseTable;
@@ -86,6 +87,7 @@ import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnStats;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.thrift.TCreateDataSourceParams;
 import com.cloudera.impala.thrift.TCreateDbParams;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
@@ -94,6 +96,7 @@ import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.TDatabase;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlExecResponse;
+import com.cloudera.impala.thrift.TDropDataSourceParams;
 import com.cloudera.impala.thrift.TDropDbParams;
 import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
@@ -181,6 +184,9 @@ public class CatalogOpExecutor {
       case CREATE_FUNCTION:
         createFunction(ddlRequest.getCreate_fn_params(), response);
         break;
+      case CREATE_DATA_SOURCE:
+        createDataSource(ddlRequest.getCreate_data_source_params(), response);
+        break;
       case COMPUTE_STATS:
         Preconditions.checkState(false, "Compute stats should trigger an ALTER TABLE.");
         break;
@@ -193,6 +199,9 @@ public class CatalogOpExecutor {
         break;
       case DROP_FUNCTION:
         dropFunction(ddlRequest.getDrop_fn_params(), response);
+        break;
+      case DROP_DATA_SOURCE:
+        dropDataSource(ddlRequest.getDrop_data_source_params(), response);
         break;
       default: throw new IllegalStateException("Unexpected DDL exec request type: " +
           ddlRequest.ddl_type);
@@ -591,6 +600,52 @@ public class CatalogOpExecutor {
     addedObject.setCatalog_version(fn.getCatalogVersion());
     resp.result.setUpdated_catalog_object(addedObject);
     resp.result.setVersion(fn.getCatalogVersion());
+  }
+
+  private void createDataSource(TCreateDataSourceParams params, TDdlExecResponse resp)
+      throws AlreadyExistsException {
+    if (LOG.isDebugEnabled()) { LOG.debug("Adding DATA SOURCE: " + params.toString()); }
+    DataSource dataSource = DataSource.fromThrift(params.getData_source());
+    if (catalog_.getDataSource(dataSource.getName()) != null) {
+      if (!params.if_not_exists) {
+        throw new AlreadyExistsException("Data source " + dataSource.getName() +
+            " already exists.");
+      }
+      // The user specified IF NOT EXISTS and the data source exists, just
+      // return the current catalog version.
+      resp.result.setVersion(catalog_.getCatalogVersion());
+      return;
+    }
+    catalog_.addDataSource(dataSource);
+    TCatalogObject addedObject = new TCatalogObject();
+    addedObject.setType(TCatalogObjectType.DATA_SOURCE);
+    addedObject.setData_source(dataSource.toThrift());
+    addedObject.setCatalog_version(dataSource.getCatalogVersion());
+    resp.result.setUpdated_catalog_object(addedObject);
+    resp.result.setVersion(dataSource.getCatalogVersion());
+  }
+
+  private void dropDataSource(TDropDataSourceParams params, TDdlExecResponse resp)
+      throws NoSuchObjectException {
+    if (LOG.isDebugEnabled()) { LOG.debug("Drop DATA SOURCE: " + params.toString()); }
+    DataSource dataSource = catalog_.getDataSource(params.getData_source());
+    if (dataSource == null) {
+      if (!params.if_exists) {
+        throw new NoSuchObjectException("Data source " + params.getData_source() +
+            " does not exists.");
+      }
+      // The user specified IF EXISTS and the data source didn't exist, just
+      // return the current catalog version.
+      resp.result.setVersion(catalog_.getCatalogVersion());
+      return;
+    }
+    catalog_.removeDataSource(params.getData_source());
+    TCatalogObject removedObject = new TCatalogObject();
+    removedObject.setType(TCatalogObjectType.DATA_SOURCE);
+    removedObject.setData_source(dataSource.toThrift());
+    removedObject.setCatalog_version(dataSource.getCatalogVersion());
+    resp.result.setRemoved_catalog_object(removedObject);
+    resp.result.setVersion(dataSource.getCatalogVersion());
   }
 
   /**

@@ -24,6 +24,7 @@ namespace java com.cloudera.impala.thrift
 include "CatalogObjects.thrift"
 include "Exprs.thrift"
 include "Types.thrift"
+include "ExternalDataSource.thrift"
 
 enum TPlanNodeType {
   HDFS_SCAN_NODE,
@@ -34,7 +35,8 @@ enum TPlanNodeType {
   EXCHANGE_NODE,
   MERGE_NODE,
   SELECT_NODE,
-  CROSS_JOIN_NODE
+  CROSS_JOIN_NODE,
+  DATA_SOURCE_NODE
 }
 
 // phases of an execution node
@@ -99,6 +101,19 @@ struct TScanRange {
 
 struct THdfsScanNode {
   1: required Types.TTupleId tuple_id
+}
+
+struct TDataSourceScanNode {
+  1: required Types.TTupleId tuple_id
+
+  // The external data source to scan
+  2: required CatalogObjects.TDataSource data_source
+
+  // Init string for the table passed to the data source. May be an empty string.
+  3: required string init_string
+
+  // Scan predicates in conjunctive normal form that were accepted by the data source.
+  4: required list<list<ExternalDataSource.TBinaryPredicate>> accepted_predicates
 }
 
 struct THBaseFilter {
@@ -215,6 +230,7 @@ struct TPlanNode {
   // one field per PlanNode subclass
   9: optional THdfsScanNode hdfs_scan_node
   10: optional THBaseScanNode hbase_scan_node
+  16: optional TDataSourceScanNode data_source_node
   11: optional THashJoinNode hash_join_node
   12: optional TAggregationNode agg_node
   13: optional TSortNode sort_node

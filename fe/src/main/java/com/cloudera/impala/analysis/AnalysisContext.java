@@ -57,6 +57,7 @@ public class AnalysisContext {
       return stmt_ instanceof DropTableOrViewStmt;
     }
     public boolean isDropFunctionStmt() { return stmt_ instanceof DropFunctionStmt; }
+    public boolean isDropDataSrcStmt() { return stmt_ instanceof DropDataSrcStmt; }
     public boolean isCreateTableLikeStmt() {
       return stmt_ instanceof CreateTableLikeStmt;
     }
@@ -68,6 +69,7 @@ public class AnalysisContext {
     public boolean isCreateDbStmt() { return stmt_ instanceof CreateDbStmt; }
     public boolean isCreateUdfStmt() { return stmt_ instanceof CreateUdfStmt; }
     public boolean isCreateUdaStmt() { return stmt_ instanceof CreateUdaStmt; }
+    public boolean isCreateDataSrcStmt() { return stmt_ instanceof CreateDataSrcStmt; }
     public boolean isLoadDataStmt() { return stmt_ instanceof LoadDataStmt; }
     public boolean isUseStmt() { return stmt_ instanceof UseStmt; }
     public boolean isShowTablesStmt() { return stmt_ instanceof ShowTablesStmt; }
@@ -88,7 +90,8 @@ public class AnalysisContext {
           isDropDbStmt() || isDropTableOrViewStmt() || isResetMetadataStmt() ||
           isAlterTableStmt() || isAlterViewStmt() || isComputeStatsStmt() ||
           isCreateUdfStmt() || isCreateUdaStmt() || isShowFunctionsStmt() ||
-          isDropFunctionStmt() || isCreateTableAsSelectStmt();
+          isDropFunctionStmt() || isCreateTableAsSelectStmt() ||
+          isCreateDataSrcStmt() || isDropDataSrcStmt();
     }
 
     public boolean isDmlStmt() {

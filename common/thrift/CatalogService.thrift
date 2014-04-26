@@ -85,6 +85,12 @@ struct TDdlExecRequest {
 
   // Parameters for COMPUTE STATS
   13: optional JniCatalog.TComputeStatsParams compute_stats_params
+
+  // Parameters for CREATE DATA SOURCE
+  14: optional JniCatalog.TCreateDataSourceParams create_data_source_params
+
+  // Parameters for DROP DATA SOURCE
+  15: optional JniCatalog.TDropDataSourceParams drop_data_source_params
 }
 
 // Response from executing a TDdlExecRequest

@@ -78,6 +78,9 @@ public abstract class Catalog {
   // Cache of the DB containing the builtins.
   private static Db builtinsDb_;
 
+  // Cache of data sources.
+  protected final CatalogObjectCache<DataSource> dataSources_;
+
   /**
    * Creates a new instance of a Catalog. If initMetastoreClientPool is true, will
    * also add META_STORE_CLIENT_POOL_SIZE clients to metastoreClientPool_.
@@ -86,6 +89,7 @@ public abstract class Catalog {
     if (initMetastoreClientPool) {
       metaStoreClientPool_.addClients(META_STORE_CLIENT_POOL_SIZE);
     }
+    dataSources_ = new CatalogObjectCache<DataSource>();
     initBuiltins();
   }
 
@@ -175,6 +179,39 @@ public abstract class Catalog {
   public boolean containsTable(String dbName, String tableName) {
     Db db = getDb(dbName);
     return (db == null) ? false : db.containsTable(tableName);
+  }
+
+  /**
+   * Adds a data source to the in-memory map of data sources. It is not
+   * persisted to the metastore.
+   * @return true if this item was added or false if the existing value was preserved.
+   */
+  public boolean addDataSource(DataSource dataSource) {
+    return dataSources_.add(dataSource);
+  }
+
+  /**
+   * Removes a data source from the in-memory map of data sources.
+   * @return the item that was removed if it existed in the cache, null otherwise.
+   */
+  public DataSource removeDataSource(String dataSourceName) {
+    Preconditions.checkNotNull(dataSourceName);
+    return dataSources_.remove(dataSourceName.toLowerCase());
+  }
+
+  /**
+   * Gets the specified data source.
+   */
+  public DataSource getDataSource(String dataSourceName) {
+    Preconditions.checkNotNull(dataSourceName);
+    return dataSources_.get(dataSourceName.toLowerCase());
+  }
+
+  /**
+   * Gets a list of all data sources.
+   */
+  public List<DataSource> getDataSources() {
+    return dataSources_.getValues();
   }
 
   /**

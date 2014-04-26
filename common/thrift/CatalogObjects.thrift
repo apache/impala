@@ -32,12 +32,14 @@ enum TCatalogObjectType {
   TABLE,
   VIEW,
   FUNCTION,
+  DATA_SOURCE
 }
 
 enum TTableType {
   HDFS_TABLE,
   HBASE_TABLE,
   VIEW,
+  DATA_SOURCE_TABLE
 }
 
 enum THdfsFileFormat {
@@ -201,9 +203,7 @@ struct THdfsPartition {
 struct THdfsTable {
   1: required string hdfsBaseDir
 
-  // Names of the columns, including clustering columns.  As in other
-  // places, the clustering columns come before the non-clustering
-  // columns.  This includes non-materialized columns.
+  // Deprecated. Use TTableDescriptor.colNames.
   2: required list<string> colNames;
 
   // The string used to represent NULL partition keys.
@@ -232,6 +232,30 @@ struct THBaseTable {
   // Column i is binary encoded if binary_encoded[i] is true. Otherwise, column i is
   // text encoded.
   4: optional list<bool> binary_encoded
+}
+
+// Represents an external data source
+struct TDataSource {
+  // Name of the data source
+  1: required string name
+
+  // HDFS URI of the library
+  2: required string hdfs_location
+
+  // Class name of the data source implementing the ExternalDataSource interface.
+  3: required string class_name
+
+  // Version of the ExternalDataSource interface. Currently only 'V1' exists.
+  4: required string api_version
+}
+
+// Represents a table scanned by an external data source.
+struct TDataSourceTable {
+  // The data source that will scan this table.
+  1: required TDataSource data_source
+
+  // Init string for the table passed to the data source. May be an empty string.
+  2: required string init_string
 }
 
 // Represents a table or view.
@@ -275,6 +299,9 @@ struct TTable {
   // The Hive Metastore representation of this table. May not be set if there were
   // errors loading the table metadata
   12: optional hive_metastore.Table metastore_table
+
+  // Set iff this is a table from an external data source
+  13: optional TDataSourceTable data_source_table
 }
 
 // Represents a database.
@@ -311,4 +338,7 @@ struct TCatalogObject {
 
   // Set iff object type is FUNCTION
   6: optional Types.TFunction fn
+
+  // Set iff object type is DATA SOURCE
+  7: optional TDataSource data_source
 }

@@ -20,10 +20,14 @@ import java.util.ArrayList;
 
 import junit.framework.Assert;
 
+import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.DataSource;
+import com.cloudera.impala.catalog.DataSourceTable;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
 
@@ -109,6 +113,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
       AnalysisError("alter table functional.alltypes_view " + kw +
           " partition(year=2050, month=10)",
           "ALTER TABLE not allowed on a view: functional.alltypes_view");
+      AnalysisError("alter table functional.alltypes_datasource " + kw +
+          " partition(year=2050, month=10)",
+          "ALTER TABLE not allowed on a table produced by a data source: " +
+          "functional.alltypes_datasource");
     }
 
     // IF NOT EXISTS properly checks for partition existence
@@ -174,6 +182,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table functional.alltypes_view " +
         "add columns (c1 string comment 'hi')",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE produced by a data source.
+    AnalysisError("alter table functional.alltypes_datasource " +
+        "add columns (c1 string comment 'hi')",
+        "ALTER TABLE not allowed on a table produced by a data source: " +
+        "functional.alltypes_datasource");
 
     // Cannot ALTER TABLE ADD/REPLACE COLUMNS on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes add columns (i int)",
@@ -204,6 +217,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view drop column int_col",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE produced by a data source.
+    AnalysisError("alter table functional.alltypes_datasource drop column int_col",
+        "ALTER TABLE not allowed on a table produced by a data source: " +
+        "functional.alltypes_datasource");
 
     // Cannot ALTER TABLE DROP COLUMN on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes drop column int_col",
@@ -245,6 +262,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table functional.alltypes_view " +
         "change column int_col int_col2 int",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE produced by a data source.
+    AnalysisError("alter table functional.alltypes_datasource " +
+        "change column int_col int_col2 int",
+        "ALTER TABLE not allowed on a table produced by a data source: " +
+        "functional.alltypes_datasource");
 
     // Cannot ALTER TABLE CHANGE COLUMN on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes CHANGE COLUMN int_col i int",
@@ -353,6 +375,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view set fileformat sequencefile",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE produced by a data source.
+    AnalysisError("alter table functional.alltypes_datasource set fileformat parquet",
+        "ALTER TABLE not allowed on a table produced by a data source: " +
+        "functional.alltypes_datasource");
 
     // Cannot ALTER TABLE SET on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes set tblproperties('a'='b')",
@@ -389,6 +415,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // It should be okay to rename an HBase table.
     AnalyzesOk("alter table functional_hbase.alltypes rename to new_alltypes");
+
+    // It should be okay to rename a table produced by a data source.
+    AnalyzesOk("alter table functional.alltypes_datasource rename to new_datasrc_tbl");
   }
 
   @Test
@@ -565,6 +594,33 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestCreateDataSource() {
+    final String DATA_SOURCE_NAME = "TestDataSource1";
+    final DataSource DATA_SOURCE = new DataSource(DATA_SOURCE_NAME, new Path("/foo.jar"),
+        "foo.Bar", "V1");
+    catalog_.addDataSource(DATA_SOURCE);
+    AnalyzesOk("CREATE DATA SOURCE IF NOT EXISTS " + DATA_SOURCE_NAME +
+        " LOCATION '/foo.jar' CLASS 'foo.Bar' API_VERSION 'V1'");
+    AnalyzesOk("CREATE DATA SOURCE IF NOT EXISTS " + DATA_SOURCE_NAME.toLowerCase() +
+        " LOCATION '/foo.jar' CLASS 'foo.Bar' API_VERSION 'V1'");
+    AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/' CLASS '' API_VERSION 'v1'");
+    AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/foo.jar' CLASS 'com.bar.Foo' " +
+        "API_VERSION 'V1'");
+    AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/FOO.jar' CLASS 'COM.BAR.FOO' " +
+        "API_VERSION 'v1'");
+    AnalyzesOk("CREATE DATA SOURCE foo LOCATION \"/foo.jar\" CLASS \"com.bar.Foo\" " +
+        "API_VERSION \"V1\"");
+    AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/x/foo@hi_^!#.jar' " +
+        "CLASS 'com.bar.Foo' API_VERSION 'V1'");
+
+    AnalysisError("CREATE DATA SOURCE " + DATA_SOURCE_NAME + " LOCATION '/foo.jar' " +
+        "CLASS 'foo.Bar' API_VERSION 'V1'",
+        "Data source already exists: " + DATA_SOURCE_NAME.toLowerCase());
+    AnalysisError("CREATE DATA SOURCE foo LOCATION '/foo.jar' " +
+        "CLASS 'foo.Bar' API_VERSION 'V2'", "Invalid API version: 'V2'");
+  }
+
+  @Test
   public void TestCreateDb() throws AnalysisException {
     AnalyzesOk("create database some_new_database");
     AnalysisError("create database functional", "Database already exists: functional");
@@ -732,6 +788,34 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'file://test-warehouse/new_table' must point to an HDFS file system.");
     AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'  '", "URI path cannot be empty.");
+
+    // Create table PRODUCED BY DATA SOURCE
+    final String DATA_SOURCE_NAME = "TestDataSource1";
+    catalog_.addDataSource(new DataSource(DATA_SOURCE_NAME, new Path("/foo.jar"),
+        "foo.Bar", "V1"));
+    AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
+        DATA_SOURCE_NAME);
+    AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
+        DATA_SOURCE_NAME.toLowerCase());
+    AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
+        DATA_SOURCE_NAME + "(\"\")");
+    AnalyzesOk("CREATE TABLE DataSrcTable1 (a tinyint, b smallint, c int, d bigint, " +
+        "e float, f double, g boolean, h string) PRODUCED BY DATA SOURCE " +
+        DATA_SOURCE_NAME);
+    AnalysisError("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
+        "not_a_data_src(\"\")", "Data source does not exist");
+    for (ColumnType columnType: ColumnType.getSupportedTypes()) {
+      PrimitiveType type = columnType.getPrimitiveType();
+      if (DataSourceTable.isSupportedPrimitiveType(type) || columnType.isNull()) continue;
+      String typeSpec = type.name();
+      if (type == PrimitiveType.CHAR || type == PrimitiveType.DECIMAL) {
+        typeSpec += "(10)";
+      }
+      AnalysisError("CREATE TABLE DataSrcTable1 (x " + typeSpec + ") PRODUCED " +
+          "BY DATA SOURCE " + DATA_SOURCE_NAME,
+          "Tables produced by an external data source do not support the column type: " +
+          type.name());
+    }
   }
 
   @Test

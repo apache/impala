@@ -37,8 +37,11 @@ struct TTableDescriptor {
   2: required CatalogObjects.TTableType tableType
   3: required i32 numCols
   4: required i32 numClusteringCols
+  // Names of the columns. Clustering columns come first.
+  10: optional list<string> colNames;
   5: optional CatalogObjects.THdfsTable hdfsTable
   6: optional CatalogObjects.THBaseTable hbaseTable
+  9: optional CatalogObjects.TDataSourceTable dataSourceTable
 
   // Unqualified name of table
   7: required string tableName;

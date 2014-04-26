@@ -1,0 +1,40 @@
+# Test implicit and explicit casts. Binary predicates containing an explicit cast
+# cannot be offered to the data source.
+select * from functional.alltypes_datasource
+where tinyint_col < 256 and
+      float_col != 0 and
+      cast(int_col as bigint) < 10
+---- PLAN
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+data source predicates: tinyint_col < 256
+predicates: float_col != 0.0, CAST(int_col AS BIGINT) < 10
+====
+# The first four predicates are in a form that can be offered to the data source
+# and the first and third will be accepted (it accepts every other conjunct).
+# The second and fourth will be evaluated by Impala. The negated predicates,
+# i.e. NOT <PREDICATE>, are not in a form able to be offered to the data source,
+# so they will always be evaluated by Impala.
+select * from functional.alltypes_datasource
+where 10 > int_col and
+      5 > double_col and
+      string_col != "Foo" and
+      string_col != "Bar" and
+      not true = bool_col and
+      not 5.0 = double_col
+---- PLAN
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+data source predicates: 10 > int_col, string_col != 'Foo'
+predicates: 5.0 > double_col, string_col != 'Bar', NOT TRUE = bool_col, NOT 5.0 = double_col
+====
+# The 3rd predicate is not in a form that can be offered to the data source so
+# the 4th will be offered and accepted instead.
+select * from functional.alltypes_datasource
+where int_col < 10 and
+      double_col > 5 and
+      string_col in ("Foo", "Bar") and
+      bool_col != false
+---- PLAN
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+data source predicates: int_col < 10, bool_col != FALSE
+predicates: double_col > 5.0, string_col IN ('Foo', 'Bar')
+====

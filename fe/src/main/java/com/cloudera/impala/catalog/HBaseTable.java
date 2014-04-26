@@ -492,6 +492,7 @@ public class HBaseTable extends Table {
         new TTableDescriptor(id_.asInt(), TTableType.HBASE_TABLE, colsByPos_.size(),
             numClusteringCols_, hbaseTableName_, db_.getName());
     tableDescriptor.setHbaseTable(getTHBaseTable());
+    tableDescriptor.setColNames(getColumnNames());
     return tableDescriptor;
   }
 

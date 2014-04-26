@@ -28,13 +28,14 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TCacheJarParams;
+import com.cloudera.impala.thrift.TCacheJarResult;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
 import com.cloudera.impala.thrift.TPrioritizeLoadResponse;
-import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TQueryContext;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TSymbolLookupParams;
@@ -66,11 +67,49 @@ public class FeSupport {
   // Returns a serialized TSymbolLookupResult
   public native static byte[] NativeLookupSymbol(byte[] thriftSymbolLookup);
 
+  // Returns a serialized TCacheJarResult
+  public native static byte[] NativeCacheJar(byte[] thriftCacheJar);
+
   // Does an RPCs to the Catalog Server to prioritize the metadata loading of a
   // one or more catalog objects. To keep our kerberos configuration consolidated,
   // we make make all RPCs in the BE layer instead of calling the Catalog Server
   // using Java Thrift bindings.
   public native static byte[] NativePrioritizeLoad(byte[] thriftReq);
+
+  /**
+   * Locally caches the jar at the specified HDFS location.
+   *
+   * @param hdfsLocation The path to the jar in HDFS
+   * @return The result of the call to cache the jar, includes a status and the local
+   *         path of the cached jar if the operation was successful.
+   */
+  public static TCacheJarResult CacheJar(String hdfsLocation) throws InternalException {
+    Preconditions.checkNotNull(hdfsLocation);
+    TCacheJarParams params = new TCacheJarParams(hdfsLocation);
+    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
+    byte[] result;
+    try {
+      result = CacheJar(serializer.serialize(params));
+      Preconditions.checkNotNull(result);
+      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+      TCacheJarResult thriftResult = new TCacheJarResult();
+      deserializer.deserialize(thriftResult, result);
+      return thriftResult;
+    } catch (TException e) {
+      // this should never happen
+      throw new InternalException(
+          "Couldn't cache jar at HDFS location " + hdfsLocation, e);
+    }
+  }
+
+  private static byte[] CacheJar(byte[] thriftParams) {
+    try {
+      return NativeCacheJar(thriftParams);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return NativeCacheJar(thriftParams);
+  }
 
   public static TColumnValue EvalConstExpr(Expr expr, TQueryContext queryCtxt)
       throws InternalException {

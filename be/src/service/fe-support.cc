@@ -202,6 +202,26 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
 
 extern "C"
 JNIEXPORT jbyteArray JNICALL
+Java_com_cloudera_impala_service_FeSupport_NativeCacheJar(
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
+  TCacheJarParams params;
+  DeserializeThriftMsg(env, thrift_struct, &params);
+
+  TCacheJarResult result;
+  string local_path;
+  Status status = LibCache::instance()->GetLocalLibPath(params.hdfs_location,
+      LibCache::TYPE_JAR, &local_path);
+  status.ToThrift(&result.status);
+  if (status.ok()) result.__set_local_path(local_path);
+
+  jbyteArray result_bytes = NULL;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
+                     JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
+extern "C"
+JNIEXPORT jbyteArray JNICALL
 Java_com_cloudera_impala_service_FeSupport_NativeLookupSymbol(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TSymbolLookupParams lookup;
@@ -258,6 +278,10 @@ static JNINativeMethod native_methods[] = {
   {
     (char*)"NativeEvalConstExpr", (char*)"([B[B)[B",
     (void*)::Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr
+  },
+  {
+    (char*)"NativeCacheJar", (char*)"([B)[B",
+    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeCacheJar
   },
   {
     (char*)"NativeLookupSymbol", (char*)"([B)[B",

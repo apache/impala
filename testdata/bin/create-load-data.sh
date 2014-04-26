@@ -35,6 +35,9 @@ set -u
 IMPALAD_LOG_DIR=${IMPALA_TEST_CLUSTER_LOG_DIR}/data_loading
 mkdir -p ${IMPALAD_LOG_DIR}
 
+# Copy the test data source library into HDFS
+${IMPALA_HOME}/testdata/bin/copy-data-sources.sh
+
 # Load the data set
 pushd ${IMPALA_HOME}/bin
 ./start-impala-cluster.py -s 3 --wait_for_cluster --log_dir=${IMPALAD_LOG_DIR}
@@ -42,6 +45,8 @@ pushd ${IMPALA_HOME}/bin
 python -u ./load-data.py --workloads functional-query --exploration_strategy exhaustive
 python -u ./load-data.py --workloads tpcds --exploration_strategy core
 python -u ./load-data.py --workloads tpch --exploration_strategy core
+# Load the test data source and table
+./impala-shell.sh -f ${IMPALA_HOME}/testdata/bin/create-data-source-table.sql
 # Load all the auxiliary workloads (if any exist)
 if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
   python -u ./load-data.py --workloads all --workload_dir=${IMPALA_AUX_WORKLOAD_DIR}\

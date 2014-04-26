@@ -18,12 +18,6 @@
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
-  <parent>
-    <groupId>com.cloudera</groupId>
-    <artifactId>parent</artifactId>
-    <version>1.0</version>
-  </parent>
   <groupId>com.cloudera.impala</groupId>
   <artifactId>impala-frontend</artifactId>
   <version>0.1-SNAPSHOT</version>
@@ -42,9 +36,15 @@
     <sentry.version>${env.IMPALA_SENTRY_VERSION}</sentry.version>
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
     <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>
+    <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>com.cloudera.impala</groupId>
+      <artifactId>impala-data-source-api</artifactId>
+      <version>${impala.extdatasrc.api.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>

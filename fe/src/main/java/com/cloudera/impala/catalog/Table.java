@@ -181,6 +181,12 @@ public abstract class Table implements CatalogObject {
       table = new View(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (msTbl.getSd().getInputFormat().equals(HBaseTable.getInputFormat())) {
       table = new HBaseTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    } else if (DataSourceTable.isDataSourceTable(msTbl)) {
+      // It's important to check if this is a DataSourceTable before HdfsTable because
+      // DataSourceTables are still represented by HDFS tables in the metastore but
+      // have a special table property to indicate that Impala should use an external
+      // data source.
+      table = new DataSourceTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (HdfsFileFormat.isHdfsFormatClass(msTbl.getSd().getInputFormat())) {
       table = new HdfsTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     }
@@ -320,6 +326,17 @@ public abstract class Table implements CatalogObject {
   public String getFullName() { return (db_ != null ? db_.getName() + "." : "") + name_; }
   public String getOwner() { return owner_; }
   public ArrayList<Column> getColumns() { return colsByPos_; }
+
+  /**
+   * Returns a list of the column names ordered by position.
+   */
+  public List<String> getColumnNames() {
+    List<String> colNames = Lists.<String>newArrayList();
+    for (Column col: colsByPos_) {
+      colNames.add(col.getName());
+    }
+    return colNames;
+  }
 
   /**
    * Subclasses should override this if they provide a storage handler class. Currently

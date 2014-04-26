@@ -33,8 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
+import com.cloudera.impala.analysis.CreateDataSrcStmt;
 import com.cloudera.impala.analysis.CreateUdaStmt;
 import com.cloudera.impala.analysis.CreateUdfStmt;
+import com.cloudera.impala.analysis.DropDataSrcStmt;
 import com.cloudera.impala.analysis.DropFunctionStmt;
 import com.cloudera.impala.analysis.DropTableOrViewStmt;
 import com.cloudera.impala.analysis.InsertStmt;
@@ -50,6 +52,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
@@ -260,6 +263,14 @@ public class Frontend {
       req.setCreate_fn_params(stmt.toThrift());
       ddl.setDdl_params(req);
       metadata.setColumns(Collections.<TColumn>emptyList());
+    } else if (analysis.isCreateDataSrcStmt()) {
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.CREATE_DATA_SOURCE);
+      CreateDataSrcStmt stmt = (CreateDataSrcStmt)analysis.getStmt();
+      req.setCreate_data_source_params(stmt.toThrift());
+      ddl.setDdl_params(req);
+      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isComputeStatsStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -288,6 +299,14 @@ public class Frontend {
       req.setDdl_type(TDdlType.DROP_FUNCTION);
       DropFunctionStmt stmt = (DropFunctionStmt)analysis.getStmt();
       req.setDrop_fn_params(stmt.toThrift());
+      ddl.setDdl_params(req);
+      metadata.setColumns(Collections.<TColumn>emptyList());
+    } else if (analysis.isDropDataSrcStmt()) {
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.DROP_DATA_SOURCE);
+      DropDataSrcStmt stmt = (DropDataSrcStmt)analysis.getStmt();
+      req.setDrop_data_source_params(stmt.toThrift());
       ddl.setDdl_params(req);
       metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isResetMetadataStmt()) {
@@ -424,9 +443,12 @@ public class Frontend {
         ImpalaInternalAdminUser.getInstance(), Privilege.ALL);
     if (table instanceof HdfsTable) {
       return ((HdfsTable) table).getTableStats();
-    } else {
-      Preconditions.checkState(table instanceof HBaseTable);
+    } else if (table instanceof HBaseTable) {
       return ((HBaseTable) table).getTableStats();
+    } else if (table instanceof DataSourceTable) {
+      return ((DataSourceTable) table).getTableStats();
+    } else {
+      throw new InternalException("Invalid table class: " + table.getClass());
     }
   }
 

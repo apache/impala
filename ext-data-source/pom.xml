@@ -20,11 +20,6 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <groupId>com.cloudera</groupId>
-    <artifactId>impala</artifactId>
-    <version>0.1-SNAPSHOT</version>
-  </parent>
   <groupId>com.cloudera.impala</groupId>
   <artifactId>impala-data-source</artifactId>
   <name>Cloudera Impala External Data Source</name>
@@ -34,6 +29,7 @@
   <modules>
     <module>api</module>
     <module>sample</module>
+    <module>test</module>
   </modules>
 
 </project>

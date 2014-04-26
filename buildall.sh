@@ -163,6 +163,11 @@ fi
 # option to clean everything first
 if [ $CLEAN_ACTION -eq 1 ]
 then
+  # clean the external data source project
+  cd ${IMPALA_HOME}/ext-data-source
+  rm -rf api/generated-sources/*
+  mvn clean
+
   # clean fe
   # don't use git clean because we need to retain Eclipse conf files
   cd $IMPALA_FE_DIR

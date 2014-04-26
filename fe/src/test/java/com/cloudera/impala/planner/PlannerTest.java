@@ -455,6 +455,11 @@ public class PlannerTest {
   }
 
   @Test
+  public void testDataSourceTables() {
+    runPlannerTestFile("data-source-tables");
+  }
+
+  @Test
   public void testDdl() {
     runPlannerTestFile("ddl");
   }
