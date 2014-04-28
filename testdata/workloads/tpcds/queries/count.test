@@ -1,61 +1,61 @@
 ====
----- QUERY : TPCDS-COUNT-CUSTOMER
+---- QUERY: TPCDS-COUNT-CUSTOMER
 select count(*) from customer
 ---- RESULTS
 100000
 ---- TYPES
 BIGINT
 ====
----- QUERY : TPCDS-COUNT-CUSTOMER_ADDRESS
+---- QUERY: TPCDS-COUNT-CUSTOMER_ADDRESS
 select count(*) from customer_address;
 ---- RESULTS
 50000
 ---- TYPES
 BIGINT
 ====
----- QUERY : TPCDS-COUNT-CUSTOMER_DEMOGRAPHICS
+---- QUERY: TPCDS-COUNT-CUSTOMER_DEMOGRAPHICS
 select count(*) from customer_demographics;
 ---- RESULTS
 1920800
 ---- TYPES
 BIGINT
 ====
----- QUERY : TPCDS-COUNT-DATE_DIM
+---- QUERY: TPCDS-COUNT-DATE_DIM
 select count(*) from date_dim;
 ---- RESULTS
 73049
 ---- TYPES
 BIGINT
 ====
----- QUERY : TPCDS-COUNT-HOUSEHOLD_DEMOGRAPHICS
+---- QUERY: TPCDS-COUNT-HOUSEHOLD_DEMOGRAPHICS
 select count(*) from household_demographics;
 ---- RESULTS
 7200
 ---- TYPES
 BIGINT
 ====
----- QUERY : TPCDS-COUNT-ITEM
+---- QUERY: TPCDS-COUNT-ITEM
 select count(*) from item;
 ---- RESULTS
 18000
 ---- TYPES
 BIGINT
 ====
----- QUERY : TPCDS-COUNT-PROMOTION
+---- QUERY: TPCDS-COUNT-PROMOTION
 select count(*) from promotion;
 ---- RESULTS
 300
 ---- TYPES
 BIGINT
 ====
----- QUERY : TPCDS-COUNT-STORE
+---- QUERY: TPCDS-COUNT-STORE
 select count(*) from store;
 ---- RESULTS
 12
 ---- TYPES
 BIGINT
 ====
----- QUERY : TPCDS-COUNT-TIME_DIM
+---- QUERY: TPCDS-COUNT-TIME_DIM
 select count(*) from time_dim;
 ---- RESULTS
 86400

@@ -69,7 +69,6 @@ order by
   s_store_name 
 limit 100
 ---- RESULTS
-
 ---- TYPES
-STRING, DOUBLE
+STRING, DECIMAL
 ====

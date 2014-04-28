@@ -2,4 +2,29 @@
 # Allows for defining constraints on which file formats to generate for an individual
 # table. The table name should match the base table name defined in the schema template
 # file.
+# stores_sales_unpartitioned is only used as an intermediate table.
 table_name:store_sales_unpartitioned, constraint:restrict_to, table_format:text/none/none
+# We can load everything but avro.
+# avro/none
+table_name:customer_demographics, constraint:exclude, table_format:avro/none/none
+table_name:date_dim, constraint:exclude, table_format:avro/none/none
+table_name:time_dim, constraint:exclude, table_format:avro/none/none
+table_name:item, constraint:exclude, table_format:avro/none/none
+table_name:store, constraint:exclude, table_format:avro/none/none
+table_name:customer, constraint:exclude, table_format:avro/none/none
+table_name:promotion, constraint:exclude, table_format:avro/none/none
+table_name:household_demographics, constraint:exclude, table_format:avro/none/none
+table_name:customer_address, constraint:exclude, table_format:avro/none/none
+table_name:store_sales, constraint:exclude, table_format:avro/none/none
+
+# avro/snap
+table_name:customer_demographics, constraint:exclude, table_format:avro/snap/none
+table_name:date_dim, constraint:exclude, table_format:avro/snap/none
+table_name:time_dim, constraint:exclude, table_format:avro/snap/none
+table_name:item, constraint:exclude, table_format:avro/snap/none
+table_name:store, constraint:exclude, table_format:avro/snap/none
+table_name:customer, constraint:exclude, table_format:avro/snap/none
+table_name:promotion, constraint:exclude, table_format:avro/snap/none
+table_name:household_demographics, constraint:exclude, table_format:avro/snap/none
+table_name:customer_address, constraint:exclude, table_format:avro/snap/none
+table_name:store_sales, constraint:exclude, table_format:avro/snap/none

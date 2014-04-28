@@ -4,8 +4,10 @@
 #
 import logging
 import pytest
-from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import (create_single_exec_option_dimension,
+    is_supported_insert_format)
+from tests.common.test_vector import TestMatrix
 
 class TestTpcdsQuery(ImpalaTestSuite):
   @classmethod
@@ -17,7 +19,7 @@ class TestTpcdsQuery(ImpalaTestSuite):
     super(TestTpcdsQuery, cls).add_test_dimensions()
     # Cut down on the execution time for these tests
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format not in ['rc', 'hbase'] and\
+        v.get_value('table_format').file_format not in ['rc', 'hbase', 'avro'] and\
         v.get_value('table_format').compression_codec in ['none', 'snap'] and\
         v.get_value('table_format').compression_type != 'record')
     cls.TestMatrix.add_constraint(lambda v:\

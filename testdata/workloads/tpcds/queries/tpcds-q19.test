@@ -31,71 +31,71 @@ limit 100
 ---- RESULTS
 6011008,'amalgbrand #8',84,'eseeing',NULL
 2002002,'importoimporto #2',242,'ableeseable',NULL
-9006005,'corpmaxi #5',839,'n stprieing',8147.2001953125
-4003002,'exportiedu pack #2',207,'ationbarable',7984.699996948242
-7006006,'corpbrand #6',878,'eingationeing',6619.1201171875
-8013005,'exportimaxi #5',87,'ationeing',5974.64013671875
-7016007,'corpnameless #7',288,'eingeingable',5847.83984375
-1003001,'exportiamalg #1',151,'oughtantiought',4869.720001220703
-7004003,'edu packbrand #3',431,'oughtpriese',4859.860015869141
-2002001,'importoimporto #1',723,'priableation',4701
-10002005,'importounivamalg #5',485,'antieingese',4197.47998046875
-6008002,'namelesscorp #2',328,'eingablepri',4034.429931640625
-2001001,'amalgimporto #1',233,'pripriable',3632
-6016006,'corpbrand #6',965,'anticallyn st',3468.6298828125
-4001001,'amalgedu pack #1',167,'ationcallyought',3324.719970703125
-10008003,'namelessunivamalg #3',453,'priantiese',3322.89990234375
-1001002,'amalgamalg #2',268,'eingcallyable',3173.580078125
+9006005,'corpmaxi #5',839,'n stprieing',8147.20
+4003002,'exportiedu pack #2',207,'ationbarable',7984.70
+7006006,'corpbrand #6',878,'eingationeing',6619.12
+8013005,'exportimaxi #5',87,'ationeing',5974.64
+7016007,'corpnameless #7',288,'eingeingable',5847.84
+1003001,'exportiamalg #1',151,'oughtantiought',4869.72
+7004003,'edu packbrand #3',431,'oughtpriese',4859.86
+2002001,'importoimporto #1',723,'priableation',4701.00
+10002005,'importounivamalg #5',485,'antieingese',4197.48
+6008002,'namelesscorp #2',328,'eingablepri',4034.43
+2001001,'amalgimporto #1',233,'pripriable',3632.00
+6016006,'corpbrand #6',965,'anticallyn st',3468.63
+4001001,'amalgedu pack #1',167,'ationcallyought',3324.72
+10008003,'namelessunivamalg #3',453,'priantiese',3322.90
+1001002,'amalgamalg #2',268,'eingcallyable',3173.58
 7010003,'univnameless #3',203,'pribarable',3009.25
-5003001,'exportischolar #1',954,'eseantin st',2837.4599609375
-8001001,'amalgnameless #1',329,'n stablepri',2431
-8004005,'edu packnameless #5',172,'ableationought',2282.650039672852
-10005006,'scholarunivamalg #6',263,'pricallyable',2193.569946289062
-5003002,'exportischolar #2',88,'eingeing',2162.39990234375
-7012009,'importonameless #9',269,'n stcallyable',2032.550048828125
-4001001,'amalgedu pack #1',284,'eseeingable',2008.5400390625
-8005007,'scholarnameless #7',206,'callybarable',1948.660034179688
-2004001,'edu packimporto #1',166,'callycallyought',1887.42004776001
-3003001,'exportiexporti #1',550,'barantianti',1741.88005065918
-7010007,'univnameless #7',873,'priationeing',1552.4599609375
-2002002,'importoimporto #2',312,'ableoughtpri',1490.47998046875
-8010009,'univmaxi #9',135,'antipriought',1394.809936523438
-10008016,'namelessunivamalg #16',543,'prieseanti',1287.77001953125
-3001001,'amalgexporti #1',18,'eingought',1280.160034179688
-9011011,'amalgunivamalg #11',751,'oughtantiation',1258.599975585938
-7002009,'importobrand #9',177,'ationationought',1183.839965820312
-3003001,'exportiexporti #1',757,'ationantiation',1150.920043945312
-7006007,'corpbrand #7',189,'n steingought',967.5999755859375
-5002001,'importoscholar #1',69,'n stcally',900.1600189208984
-9014011,'edu packunivamalg #11',15,'antiought',867.8900146484375
-5001001,'amalgscholar #1',125,'antiableought',784.5200309753418
-3002002,'importoexporti #2',52,'ableanti',714.4199829101562
-8005003,'scholarnameless #3',159,'n stantiought',648.9400024414062
-7009002,'maxibrand #2',233,'pripriable',642.719970703125
-6004005,'edu packcorp #5',139,'n stpriought',589.5999755859375
-5004001,'edu packscholar #1',111,'oughtoughtought',497.2999877929688
-7014005,'edu packnameless #5',142,'ableeseought',469.7999877929688
-1003002,'exportiamalg #2',19,'n stought',435.8299865722656
-1002001,'importoamalg #1',876,'callyationeing',423.1799926757812
-5003001,'exportischolar #1',491,'oughtn stese',413.1000061035156
-4002001,'importoedu pack #1',534,'eseprianti',396.5
-2001001,'amalgimporto #1',685,'antieingcally',394.4200134277344
-5003001,'exportischolar #1',887,'ationeingeing',319.2000122070312
-4003001,'exportiedu pack #1',505,'antibaranti',257.5700073242188
-8006007,'corpnameless #7',602,'ablebarcally',257.1400146484375
-1001001,'amalgamalg #1',135,'antipriought',236.1000061035156
-5004001,'edu packscholar #1',158,'eingantiought',217.1399993896484
-4001001,'amalgedu pack #1',613,'prioughtcally',214.3500061035156
-3004002,'edu packexporti #2',83,'prieing',150.6600036621094
-1002001,'importoamalg #1',884,'eseeingeing',120.120002746582
+5003001,'exportischolar #1',954,'eseantin st',2837.46
+8001001,'amalgnameless #1',329,'n stablepri',2431.00
+8004005,'edu packnameless #5',172,'ableationought',2282.65
+10005006,'scholarunivamalg #6',263,'pricallyable',2193.57
+5003002,'exportischolar #2',88,'eingeing',2162.40
+7012009,'importonameless #9',269,'n stcallyable',2032.55
+4001001,'amalgedu pack #1',284,'eseeingable',2008.54
+8005007,'scholarnameless #7',206,'callybarable',1948.66
+2004001,'edu packimporto #1',166,'callycallyought',1887.42
+3003001,'exportiexporti #1',550,'barantianti',1741.88
+7010007,'univnameless #7',873,'priationeing',1552.46
+2002002,'importoimporto #2',312,'ableoughtpri',1490.48
+8010009,'univmaxi #9',135,'antipriought',1394.81
+10008016,'namelessunivamalg #16',543,'prieseanti',1287.77
+3001001,'amalgexporti #1',18,'eingought',1280.16
+9011011,'amalgunivamalg #11',751,'oughtantiation',1258.60
+7002009,'importobrand #9',177,'ationationought',1183.84
+3003001,'exportiexporti #1',757,'ationantiation',1150.92
+7006007,'corpbrand #7',189,'n steingought',967.60
+5002001,'importoscholar #1',69,'n stcally',900.16
+9014011,'edu packunivamalg #11',15,'antiought',867.89
+5001001,'amalgscholar #1',125,'antiableought',784.52
+3002002,'importoexporti #2',52,'ableanti',714.42
+8005003,'scholarnameless #3',159,'n stantiought',648.94
+7009002,'maxibrand #2',233,'pripriable',642.72
+6004005,'edu packcorp #5',139,'n stpriought',589.60
+5004001,'edu packscholar #1',111,'oughtoughtought',497.30
+7014005,'edu packnameless #5',142,'ableeseought',469.80
+1003002,'exportiamalg #2',19,'n stought',435.83
+1002001,'importoamalg #1',876,'callyationeing',423.18
+5003001,'exportischolar #1',491,'oughtn stese',413.10
+4002001,'importoedu pack #1',534,'eseprianti',396.50
+2001001,'amalgimporto #1',685,'antieingcally',394.42
+5003001,'exportischolar #1',887,'ationeingeing',319.20
+4003001,'exportiedu pack #1',505,'antibaranti',257.57
+8006007,'corpnameless #7',602,'ablebarcally',257.14
+1001001,'amalgamalg #1',135,'antipriought',236.10
+5004001,'edu packscholar #1',158,'eingantiought',217.14
+4001001,'amalgedu pack #1',613,'prioughtcally',214.35
+3004002,'edu packexporti #2',83,'prieing',150.66
+1002001,'importoamalg #1',884,'eseeingeing',120.12
 5002002,'importoscholar #2',544,'eseeseanti',95.75
-2001001,'amalgimporto #1',129,'n stableought',92.69999694824219
-8007003,'brandnameless #3',309,'n stbarpri',79.83000183105469
-9015005,'scholarunivamalg #5',54,'eseanti',63.93999862670898
-1001001,'amalgamalg #1',180,'bareingought',31.78000068664551
-7010009,'univnameless #9',9,'n st',30.23999977111816
-5004002,'edu packscholar #2',306,'callybarpri',28
-6006003,'corpcorp #3',548,'eingeseanti',5.699999809265137
+2001001,'amalgimporto #1',129,'n stableought',92.70
+8007003,'brandnameless #3',309,'n stbarpri',79.83
+9015005,'scholarunivamalg #5',54,'eseanti',63.94
+1001001,'amalgamalg #1',180,'bareingought',31.78
+7010009,'univnameless #9',9,'n st',30.24
+5004002,'edu packscholar #2',306,'callybarpri',28.00
+6006003,'corpcorp #3',548,'eingeseanti',5.70
 ---- TYPES
-INT, STRING, INT, STRING, DOUBLE
+INT, STRING, INT, STRING, DECIMAL
 ====
