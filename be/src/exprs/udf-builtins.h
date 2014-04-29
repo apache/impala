@@ -40,6 +40,8 @@ class UdfBuiltins {
   static SmallIntVal MinSmallInt(FunctionContext* context);
   static BigIntVal MinBigInt(FunctionContext* context);
 
+  static BooleanVal IsNan(FunctionContext* context, const DoubleVal& val);
+  static BooleanVal IsInf(FunctionContext* context, const DoubleVal& val);
 
   // Rounds (truncating down) a Timestamp to the specified unit.
   //    Units:

@@ -77,12 +77,25 @@ void TestBoolValue(const char* s, bool exp_val, StringParser::ParseResult exp_re
 // Compare Impala's float conversion function against strtod.
 template<typename T>
 void TestFloatValue(const string& s, StringParser::ParseResult exp_result) {
-  T exp_val = 0;
-  if (exp_result == StringParser::PARSE_SUCCESS) exp_val = strtod(s.c_str(), NULL);
   StringParser::ParseResult result;
   T val = StringParser::StringToFloat<T>(s.data(), s.length(), &result);
   EXPECT_EQ(exp_result, result);
-  if (exp_result == StringParser::PARSE_SUCCESS) EXPECT_EQ(exp_val, val);
+
+  if (exp_result == StringParser::PARSE_SUCCESS && result == exp_result) {
+    T exp_val = strtod(s.c_str(), NULL);
+    EXPECT_EQ(exp_val, val);
+  }
+}
+
+template<typename T>
+void TestFloatValueIsNan(const string& s, StringParser::ParseResult exp_result) {
+  StringParser::ParseResult result;
+  T val = StringParser::StringToFloat<T>(s.data(), s.length(), &result);
+  EXPECT_EQ(exp_result, result);
+
+  if (exp_result == StringParser::PARSE_SUCCESS && result == exp_result) {
+    EXPECT_TRUE(isnan(val));
+  }
 }
 
 // Tests conversion of s to double and float with +/- prefixing (and no prefix) and with
@@ -346,6 +359,24 @@ TEST(StringToFloat, Basic) {
   TestFloatValue<double>(double_min, StringParser::PARSE_SUCCESS);
   TestFloatValue<double>(double_max, StringParser::PARSE_SUCCESS);
 
+  // Non-finite values
+  TestAllFloatVariants("INFinity", StringParser::PARSE_SUCCESS);
+  TestAllFloatVariants("infinity", StringParser::PARSE_SUCCESS);
+  TestAllFloatVariants("inf", StringParser::PARSE_SUCCESS);
+
+  TestFloatValueIsNan<float>("nan", StringParser::PARSE_SUCCESS);
+  TestFloatValueIsNan<double>("nan", StringParser::PARSE_SUCCESS);
+  TestFloatValueIsNan<float>("NaN", StringParser::PARSE_SUCCESS);
+  TestFloatValueIsNan<double>("NaN", StringParser::PARSE_SUCCESS);
+  TestFloatValueIsNan<float>("nana", StringParser::PARSE_SUCCESS);
+  TestFloatValueIsNan<double>("nana", StringParser::PARSE_SUCCESS);
+  TestFloatValueIsNan<float>("naN", StringParser::PARSE_SUCCESS);
+  TestFloatValueIsNan<double>("naN", StringParser::PARSE_SUCCESS);
+
+  TestFloatValueIsNan<float>("n aN", StringParser::PARSE_FAILURE);
+  TestFloatValueIsNan<float>("nnaN", StringParser::PARSE_FAILURE);
+
+
   // Overflow.
   TestFloatValue<float>(float_max + "11111", StringParser::PARSE_OVERFLOW);
   TestFloatValue<double>(double_max + "11111", StringParser::PARSE_OVERFLOW);
@@ -362,6 +393,10 @@ TEST(StringToFloat, Basic) {
   TestAllFloatVariants("456.789e10x", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("456.789e10   sdfs ", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("1e10   sdfs", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("in", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("in finity", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("na", StringParser::PARSE_FAILURE);
+  TestAllFloatVariants("ThisIsANaN", StringParser::PARSE_FAILURE);
 }
 
 TEST(StringToFloat, InvalidLeadingTrailing) {

@@ -116,6 +116,8 @@ def compare_float(x, y, epsilon):
   # floating point spec defines nan != nan.
   if math.isnan(x) and math.isnan(y):
     return True
+  if math.isinf(x) or math.isinf(y):
+    return x == y
   return abs(x - y) <= epsilon
 
 # Represents a column in a row
@@ -139,15 +141,13 @@ class ResultColumn(object):
     # Make sure the column types are the same
     if self.column_type != other.column_type:
       return False
-
     # Check equality based on a supplied regex if one was given.
     if self.regex is not None:
       return self.regex.match(other.value)
     if other.regex is not None:
       return other.regex.match(self.value)
 
-    if (self.value == 'NULL' or other.value == 'NULL') or \
-       ('inf' in self.value or 'inf' in other.value):
+    if (self.value == 'NULL' or other.value == 'NULL'):
       return self.value == other.value
     elif self.column_type == 'float':
       return compare_float(float(self.value), float(other.value), 10e-5)

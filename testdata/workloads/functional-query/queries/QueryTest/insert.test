@@ -48,7 +48,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- QUERY
 # insert into unpartitioned table
 insert into table alltypesnopart_insert
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=04
@@ -68,8 +68,8 @@ bigint
 ---- QUERY
 # static partition overwrite
 insert overwrite table alltypesinsert
-partition (year=2009, month=4) 
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+partition (year=2009, month=4)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=4
@@ -117,8 +117,8 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- QUERY
 # static partition insert$TABLE, test creation of partitions
 insert into table alltypesinsert
-partition (year=2009, month=4) 
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+partition (year=2009, month=4)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=4
@@ -139,8 +139,8 @@ bigint
 ---- QUERY
 # partially dynamic partition overwrite
 insert overwrite table alltypesinsert
-partition (year=2009, month) 
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+partition (year=2009, month)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, month
 from alltypessmall
 where year=2009 and month>1 and month<=4
@@ -239,8 +239,8 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- QUERY
 # partially dynamic partition insert$TABLE, check partition creation
 insert into table alltypesinsert
-partition (year=2009, month) 
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+partition (year=2009, month)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, month
 from alltypessmall
 where year=2009 and month>=1 and month<4
@@ -263,8 +263,8 @@ bigint
 ---- QUERY
 # fully dynamic partition overwrite
 insert overwrite table alltypesinsert
-partition (year, month) 
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+partition (year, month)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from alltypessmall
 ---- SETUP
@@ -388,8 +388,8 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- QUERY
 # fully dynamic partition insert$TABLE, check partition creation
 insert into table alltypesinsert
-partition (year, month) 
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+partition (year, month)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from alltypessmall
 ---- SETUP
@@ -502,7 +502,7 @@ SELECT "value4",NULL FROM alltypessmall LIMIT 1;
 s2=__HIVE_DEFAULT_PARTITION__/: 1
 ====
 ---- QUERY
-# select with empty partition key as predicate should return nothing, because "" is 
+# select with empty partition key as predicate should return nothing, because "" is
 # mapped to NULL
 SELECT * FROM insert_string_partitioned WHERE s2 = "";
 ---- TYPES
@@ -535,7 +535,7 @@ year=2010/month=4/: 25
 # static partition insert from a constant select
 insert into alltypesinsert
 partition(year=2010, month=4)
-select 100, false, 1, 1, 1, 10, 
+select 100, false, 1, 1, 1, 10,
 10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp)
 ---- SETUP
 RESET alltypesinsert
@@ -545,8 +545,8 @@ year=2010/month=4/: 1
 ---- QUERY
 # dynamic partition insert from a constant select
 insert into table alltypesinsert
-partition (year, month) 
-select 200, true, 2, 2, 2, 20, 
+partition (year, month)
+select 200, true, 2, 2, 2, 20,
 20.0, 20.0, "02/01/09", "1", cast("2009-02-01 00:02:00" as timestamp), 2010, 4
 ---- RESULTS
 year=2010/month=4/: 1
@@ -631,7 +631,7 @@ from alltypessmall limit 10
 : 10
 ====
 ---- QUERY
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypesnopart_insert
 ---- TYPES
@@ -647,4 +647,26 @@ NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
 NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
 NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
 NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
+====
+---- QUERY
+insert overwrite alltypesnopart_insert(float_col, double_col)
+values(CAST(1/0 AS FLOAT), 1/0), (CAST(-1/0 AS FLOAT), -1/0),
+      (CAST(0/0 AS FLOAT), 0/0), (CAST(-sqrt(-1) AS FLOAT), -sqrt(-1))
+---- SETUP
+RESET alltypesinsert
+---- RESULTS
+: 4
+====
+---- QUERY
+# Results have to be cast to strings, because nan == f is always false for all f
+# (even nan), so the results check would otherwise always fail.
+select CAST(float_col AS string), CAST(double_col AS string) from alltypesnopart_insert
+order by float_col, double_col limit 10;
+---- TYPES
+STRING, STRING
+---- RESULTS
+'nan','nan'
+'nan','nan'
+'-inf','-inf'
+'inf','inf'
 ====

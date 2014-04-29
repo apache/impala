@@ -325,6 +325,29 @@ class StringParser {
         decimal = true;
       } else if (s[i] == 'e' || s[i] == 'E') {
         break;
+      } else if (s[i] == 'i' || s[i] == 'I') {
+        if (len > i + 2 && (s[i+1] == 'n' || s[i+1] == 'N') &&
+            (s[i+2] == 'f' || s[i+2] == 'F')) {
+          // Note: Hive writes inf as Infinity, at least for text. We'll be a little loose
+          // here and interpret any column with inf as a prefix as infinity rather than
+          // checking every remaining byte.
+          *result = PARSE_SUCCESS;
+          return negative ? -INFINITY : INFINITY;
+        } else {
+          // Starts with 'i', but isn't inf...
+          *result = PARSE_FAILURE;
+          return 0;
+        }
+      } else if (s[i] == 'n' || s[i] == 'N') {
+        if (len > i + 2 && (s[i+1] == 'a' || s[i+1] == 'A') &&
+            (s[i+2] == 'n' || s[i+2] == 'N')) {
+          *result = PARSE_SUCCESS;
+          return negative ? -NAN : NAN;
+        } else {
+          // Starts with 'n', but isn't NaN...
+          *result = PARSE_FAILURE;
+          return 0;
+        }
       } else {
         if ((UNLIKELY(i == first || !isAllWhitespace(s + i, len - i)))) {
           // Reject the string because either the first char was not a digit, "," or "e",

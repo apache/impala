@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # Based on Aggregation Queries
-select int_col, sum(float_col) 
+select int_col, sum(float_col)
 from functional_hbase.alltypessmall
 where id < 5
 group by 1
@@ -16,9 +16,9 @@ INT, DOUBLE
 ====
 ---- QUERY
 # Run query without order by
-select tinyint_col, count(*) 
-from alltypesagg 
-group by 1 
+select tinyint_col, count(*)
+from alltypesagg
+group by 1
 limit 10
 ---- RESULTS
 5,1000
@@ -36,9 +36,9 @@ TINYINT, BIGINT
 ====
 ---- QUERY
 # Same query order by asc first col
-select tinyint_col, count(*) 
-from alltypesagg 
-group by 1 
+select tinyint_col, count(*)
+from alltypesagg
+group by 1
 order by 1
 limit 10
 ---- RESULTS
@@ -194,10 +194,10 @@ NULL,'NULL',NULL,NULL,1009,'Name9',94615
 BIGINT, STRING, INT, INT, BIGINT, STRING, INT
 ====
 ---- QUERY
-# order by multiple cols with nulls 
-select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg 
-where day = 1 
+# order by multiple cols with nulls
+select tinyint_col % 3, smallint_col % 3, count(*)
+from alltypesagg
+where day = 1
 group by 1, 2
 order by 1, 2
 limit 20
@@ -219,9 +219,9 @@ NULL,NULL,10
 TINYINT, SMALLINT, BIGINT
 ====
 ---- QUERY
-select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg 
-where day = 1 
+select tinyint_col % 3, smallint_col % 3, count(*)
+from alltypesagg
+where day = 1
 group by 1, 2
 order by 1, 2 desc
 limit 20
@@ -243,9 +243,9 @@ NULL,0,30
 TINYINT, SMALLINT, BIGINT
 ====
 ---- QUERY
-select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg 
-where day = 1 
+select tinyint_col % 3, smallint_col % 3, count(*)
+from alltypesagg
+where day = 1
 group by 1, 2
 order by 1 desc, 2
 limit 20
@@ -267,9 +267,9 @@ NULL,NULL,10
 TINYINT, SMALLINT, BIGINT
 ====
 ---- QUERY
-select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg 
-where day = 1 
+select tinyint_col % 3, smallint_col % 3, count(*)
+from alltypesagg
+where day = 1
 group by 1, 2
 order by 1 desc, 2 desc
 limit 20
@@ -441,7 +441,7 @@ limit 10
 SMALLINT, INT, TINYINT, INT, INT, FLOAT, STRING
 ====
 ---- QUERY
-# Order by a column that is not in the select list 
+# Order by a column that is not in the select list
 # Query with ordering column in select list
 # Don't include date_string_col, it comes back in random order.
 select int_col, tinyint_col
@@ -504,8 +504,8 @@ TINYINT
 ====
 ---- QUERY
 # Order by many exprs
-select year, month, count(*) 
-from alltypes 
+select year, month, count(*)
+from alltypes
 group by 1, 2
 order by 1, 2
 limit 100
@@ -703,7 +703,7 @@ INT
 # All select list items have an implicit alias. Test that the order by column ref
 # "int_col" is correctly aliased to t1.int_col, and therefore it is not an
 # ambiguous reference.
-select t1.int_col from alltypessmall t1, alltypessmall t2 where t1.id = t2.id 
+select t1.int_col from alltypessmall t1, alltypessmall t2 where t1.id = t2.id
 order by int_col
 limit 2
 ---- RESULTS
@@ -741,9 +741,9 @@ TIMESTAMP, TIMESTAMP, INT
 ====
 ---- QUERY
 # Test of order by with NULL tuple rows (from an outer join)
-select t1.id, t1.int_col, t2.id, t2.int_col 
-from alltypesagg t1 
-left outer join alltypessmall t2 
+select t1.id, t1.int_col, t2.id, t2.int_col
+from alltypesagg t1
+left outer join alltypessmall t2
   on (t1.int_col = t2.int_col)
 order by t1.id,t2.id limit 10
 ---- TYPES
@@ -762,7 +762,7 @@ int,int,int,int
 ====
 ---- QUERY
 # Test limit 0 from sub query
-select sum(a.int_col) from 
+select sum(a.int_col) from
   (select int_col from functional.alltypes order by int_col limit 0) a
 ---- TYPES
 bigint
@@ -770,34 +770,36 @@ bigint
 NULL
 ====
 ---- QUERY
-# Test queries with divide by 0
-select if(id % 2 = 0, cast(id/3 as int), -id) / if(id > 4 or id = 0, 0, 1) as v 
-from alltypestiny order by v desc limit 100;
+# Test queries with divide by 0 (cast to string to avoid nan != nan issues)
+select cast(if(id % 2 = 0, cast(id/3 as int), -id) / if(id > 4 or id = 0, 0, 1) as string)
+from alltypestiny order by
+if(id % 2 = 0, cast(id/3 as int), -id) / if(id > 4 or id = 0, 0, 1) desc limit 100;
 ---- TYPES
-DOUBLE
+STRING
 ---- RESULTS
-inf
-1
-0
--1
--3
--inf
--inf
--nan
+'inf'
+'1'
+'0'
+'-1'
+'-3'
+'-inf'
+'-inf'
+'nan'
 ====
 ---- QUERY
-# Test queries with divide by 0
-select if(id % 2 = 0, cast(id/3 as int), -id) / if(id > 4 or id = 0, 0, 1) as v 
-from alltypestiny order by v asc limit 100;
+# Test queries with divide by 0 (cast to string to avoid nan != nan issues)
+select CAST(if(id % 2 = 0, cast(id/3 as int), -id) / if(id > 4 or id = 0, 0, 1) as STRING)
+from alltypestiny order by
+if(id % 2 = 0, cast(id/3 as int), -id) / if(id > 4 or id = 0, 0, 1) asc limit 100;
 ---- TYPES
-DOUBLE
+STRING
 ---- RESULTS
--nan
--inf
--inf
--3
--1
-0
-1
-inf
+'nan'
+'-inf'
+'-inf'
+'-3'
+'-1'
+'0'
+'1'
+'inf'
 ====

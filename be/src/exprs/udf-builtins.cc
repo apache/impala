@@ -17,8 +17,9 @@
 #include "util/bit-util.h"
 
 #include <ctype.h>
-#include <math.h>
 #include <gutil/strings/substitute.h>
+#include <math.h>
+
 
 using namespace std;
 using namespace boost::gregorian;
@@ -75,6 +76,16 @@ SmallIntVal UdfBuiltins::MinSmallInt(FunctionContext* context) {
 
 BigIntVal UdfBuiltins::MinBigInt(FunctionContext* context) {
   return BigIntVal(numeric_limits<int64_t>::min());
+}
+
+BooleanVal UdfBuiltins::IsNan(FunctionContext* context, const DoubleVal& val) {
+  if (val.is_null) return BooleanVal(false);
+  return BooleanVal(isnan(val.val));
+}
+
+BooleanVal UdfBuiltins::IsInf(FunctionContext* context, const DoubleVal& val) {
+  if (val.is_null) return BooleanVal(false);
+  return BooleanVal(isinf(val.val));
 }
 
 // The units which can be used when Truncating a Timestamp

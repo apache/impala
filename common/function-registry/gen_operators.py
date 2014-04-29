@@ -145,6 +145,22 @@ void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   return &e->result_.${result_field};\n\
 }\n\n")
 
+
+# Special case for float types to string that deals properly with nan
+# (lexical_cast<string>(nan) returns "-nan" which is nonsensical).
+float_types_to_string = Template("\
+void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
+  Expr* op = e->children()[0];\n\
+  ${native_type1}* val = reinterpret_cast<${native_type1}*>(op->GetValue(row));\n\
+  if (val == NULL) return NULL;\n\
+  if (isnan(*val)) {\n\
+    e->result_.SetStringVal(string(\"nan\"));\n\
+  } else {\n\
+    e->result_.SetStringVal(lexical_cast<string>(*val));\n\
+  }\n\
+  return &e->result_.${result_field};\n\
+}\n\n")
+
 case = Template("\
 void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   CaseExpr* expr = static_cast<CaseExpr*>(e);\n\
@@ -216,7 +232,7 @@ types = {
   'FLOAT_TYPES'   : ['FLOAT', 'DOUBLE'],
   'NUMERIC_TYPES' : ['TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
   'NATIVE_TYPES'  : ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
-  'STRCAST_TYPES' : ['BOOLEAN', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
+  'STRCAST_TYPES' : ['BOOLEAN', 'SMALLINT', 'INT', 'BIGINT'],
   'ALL_TYPES'     : ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT',\
                      'DOUBLE', 'STRING', 'TIMESTAMP'],
   'MAX_TYPES'     : ['BIGINT', 'DOUBLE'],
@@ -268,6 +284,7 @@ functions = [
   ['Cast', ['FLOAT_TYPES'], [['STRING'], ['FLOAT_TYPES']], string_to_float ],
   ['Cast', ['STRING'], [['STRCAST_TYPES'], ['STRING']], numeric_to_string ],
   ['Cast', ['STRING'], [['TINYINT'], ['STRING']], tinyint_to_string ],
+  ['Cast', ['STRING'], [['FLOAT_TYPES'], ['STRING']], float_types_to_string ],
   ['Cast', ['NATIVE_TYPES'], [['TIMESTAMP'], ['NATIVE_TYPES']]],
   ['Cast', ['STRING'], [['TIMESTAMP'], ['STRING']], numeric_to_string ],
   ['Cast', ['TIMESTAMP'], [['STRING'], ['TIMESTAMP']], string_to_timestamp],

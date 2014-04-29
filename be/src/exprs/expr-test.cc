@@ -288,6 +288,24 @@ class ExprTest : public testing::Test {
       TestComparison(lexical_cast<string>(numeric_limits<T>::min()),
                    lexical_cast<string>(numeric_limits<T>::max() + 1), true);
     }
+
+    // Compare nan: not equal to, larger than or smaller than anything, including itself
+    TestValue(lexical_cast<string>(t_min) + " < 0/0", TYPE_BOOLEAN, false);
+    TestValue(lexical_cast<string>(t_min) + " > 0/0", TYPE_BOOLEAN, false);
+    TestValue(lexical_cast<string>(t_min) + " = 0/0", TYPE_BOOLEAN, false);
+    TestValue(lexical_cast<string>(t_max) + " < 0/0", TYPE_BOOLEAN, false);
+    TestValue(lexical_cast<string>(t_max) + " > 0/0", TYPE_BOOLEAN, false);
+    TestValue(lexical_cast<string>(t_max) + " = 0/0", TYPE_BOOLEAN, false);
+    TestValue("0/0 < 0/0", TYPE_BOOLEAN, false);
+    TestValue("0/0 > 0/0", TYPE_BOOLEAN, false);
+    TestValue("0/0 = 0/0", TYPE_BOOLEAN, false);
+
+    // Compare inf: larger than everything except nan (or smaller, for -inf)
+    TestValue(lexical_cast<string>(t_max) + " < 1/0", TYPE_BOOLEAN, true);
+    TestValue(lexical_cast<string>(t_min) + " > -1/0", TYPE_BOOLEAN, true);
+    TestValue("1/0 = 1/0", TYPE_BOOLEAN, true);
+    TestValue("1/0 < 0/0", TYPE_BOOLEAN, false);
+    TestValue("0/0 < 1/0", TYPE_BOOLEAN, false);
   }
 
   void TestStringComparisons() {
@@ -1756,6 +1774,31 @@ TEST_F(ExprTest, UtilityFunctions) {
 
   // Test NULL input returns NULL
   TestIsNull("fnv_hash(NULL)", TYPE_BIGINT);
+}
+
+TEST_F(ExprTest, NonFiniteFloats) {
+  TestValue("is_inf(0.0)", TYPE_BOOLEAN, false);
+  TestValue("is_inf(-1/0)", TYPE_BOOLEAN, true);
+  TestValue("is_inf(1/0)", TYPE_BOOLEAN, true);
+  TestValue("is_inf(0/0)", TYPE_BOOLEAN, false);
+  TestValue("is_inf(NULL)", TYPE_BOOLEAN, false);
+  TestValue("is_nan(NULL)", TYPE_BOOLEAN, false);
+
+  TestValue("is_nan(0.0)", TYPE_BOOLEAN, false);
+  TestValue("is_nan(1/0)", TYPE_BOOLEAN, false);
+  TestValue("is_nan(0/0)", TYPE_BOOLEAN, true);
+
+  TestCast("1/0", numeric_limits<double>::infinity());
+  TestCast("CAST(1/0 AS FLOAT)", numeric_limits<float>::infinity());
+  TestValue("CAST('inf' AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
+  TestValue("CAST('inf' AS DOUBLE)", TYPE_DOUBLE, numeric_limits<double>::infinity());
+  TestValue("CAST('Infinity' AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
+  TestValue("CAST('-Infinity' AS DOUBLE)", TYPE_DOUBLE,
+      -numeric_limits<double>::infinity());
+
+  // NaN != NaN, so we have to wrap the value in a string
+  TestStringValue("CAST(CAST('nan' AS FLOAT) AS STRING)", string("nan"));
+  TestStringValue("CAST(CAST('nan' AS DOUBLE) AS STRING)", string("nan"));
 }
 
 TEST_F(ExprTest, MathTrigonometricFunctions) {
