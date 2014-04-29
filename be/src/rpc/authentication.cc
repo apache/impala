@@ -67,6 +67,8 @@ DEFINE_bool(enable_ldap_auth, false,
 DEFINE_string(ldap_uri, "", "The URI of the LDAP server to authenticate users against");
 DEFINE_bool(ldap_tls, false, "If true, use the secure TLS protocol to connect to the LDAP"
     " server");
+DEFINE_string(ldap_ca_certificate, "", "The full path to the certificate file used to"
+    " authenticate the LDAP server's certificate for SSL / TLS connections.");
 DEFINE_bool(ldap_manual_config, false, "(Advanced) If true, use a custom SASL config file"
     " to configure access to an LDAP server.");
 
@@ -129,9 +131,9 @@ static int SaslLogCallback(void* context, int level,  const char* message) {
 //
 // Note that this method uses ldap_simple_bind_s(), which does *not* provide any security
 // to the connection between Impala and the LDAP server. You must either set --ldap_tls,
-// or --ldap_manual_config; the former uses TLS to secure the transport, the latter allows
-// users to write a standard SASL configuration file for custom setups and will bypass
-// this method.
+// or have a URI which has "ldaps://" as the scheme in order to get a secure connection.
+// Use --ldap_ca_certificate to specify the location of the certificate used to confirm
+// the authenticity of the LDAP server certificate.
 int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
     const char *pass, unsigned passlen, struct propctx *propctx) {
   LDAP* ld;
@@ -145,6 +147,7 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
   // Force the LDAP version to 3 to make sure TLS is supported.
   int ldap_ver = 3;
   ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &ldap_ver);
+
   if (FLAGS_ldap_tls) {
     int tls_rc = ldap_start_tls_s(ld, NULL, NULL);
     if (tls_rc != LDAP_SUCCESS) {
@@ -153,13 +156,17 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
       ldap_unbind(ld);
       return SASL_FAIL;
     }
+    LOG(INFO) << "Started TLS connection with LDAP server: " << FLAGS_ldap_uri;
   }
 
   string pass_str(pass, passlen);
   rc = ldap_simple_bind_s(ld, user, pass_str.c_str());
   // Free ld
   ldap_unbind(ld);
-  if (rc != LDAP_SUCCESS) return SASL_FAIL;
+  if (rc != LDAP_SUCCESS) {
+    LOG(WARNING) << "LDAP bind failed: " << ldap_err2string(rc);
+    return SASL_FAIL;
+  }
 
   return SASL_OK;
 }
@@ -492,6 +499,26 @@ Status LdapAuthProvider::Start() {
   sasl_callbacks_[4].proc = (int (*)())&SaslLdapCheckPass;
   sasl_callbacks_[4].context = NULL;
   sasl_callbacks_[sasl_callbacks_.size() - 1].id = SASL_CB_LIST_END;
+
+  if (!FLAGS_ldap_ca_certificate.empty()) {
+    int set_rc = ldap_set_option(NULL, LDAP_OPT_X_TLS_CACERTFILE,
+        FLAGS_ldap_ca_certificate.c_str());
+    if (set_rc != LDAP_SUCCESS) {
+      return Status(Substitute("Could not set location of LDAP server cert: $0",
+          ldap_err2string(set_rc)));
+    }
+  } else {
+    LOG(INFO) << "No certificate file specified for LDAP, will not check certificate for"
+              <<" authentication";
+    int val = LDAP_OPT_X_TLS_ALLOW;
+    int set_rc = ldap_set_option(NULL, LDAP_OPT_X_TLS_REQUIRE_CERT,
+        reinterpret_cast<void*>(&val));
+    if (set_rc != LDAP_SUCCESS) {
+      return Status(Substitute(
+          "Could not disable certificate requirement for LDAP server: $0",
+          ldap_err2string(set_rc)));
+    }
+  }
 
   return Status::OK;
 }
