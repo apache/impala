@@ -272,6 +272,9 @@ void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   const string kinit_cmd = Substitute("kinit -r $0m -c $1 -k -t $2 $3 2>&1",
       ticket_lifetime_mins, credential_cache_, keytab_path_, principal_);
 
+  // Pass the custom credentials cache to the kinit renewal command.
+  const string kinit_renewal_cmd = Substitute("kinit -R -c $0 2>&1", credential_cache_);
+
   bool first_time = true;
   int failures_since_renewal = 0;
   while (true) {
@@ -302,7 +305,7 @@ void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
       // roll-over o a new second, avoiding a race between grant and renewal.
       SleepForMs(1500);
       string krenew_output;
-      if (RunShellProcess("kinit -R", &krenew_output)) {
+      if (RunShellProcess(kinit_renewal_cmd, &krenew_output)) {
         LOG(INFO) << "Successfully renewed Keberos ticket";
       } else {
         // We couldn't renew the ticket so just report the error. Existing connections
