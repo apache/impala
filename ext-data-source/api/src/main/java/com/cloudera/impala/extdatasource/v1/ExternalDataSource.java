@@ -18,13 +18,13 @@ import com.cloudera.impala.extdatasource.thrift.TCloseParams;
 import com.cloudera.impala.extdatasource.thrift.TCloseResult;
 import com.cloudera.impala.extdatasource.thrift.TGetNextParams;
 import com.cloudera.impala.extdatasource.thrift.TGetNextResult;
-import com.cloudera.impala.extdatasource.thrift.TGetStatsParams;
-import com.cloudera.impala.extdatasource.thrift.TGetStatsResult;
 import com.cloudera.impala.extdatasource.thrift.TOpenParams;
 import com.cloudera.impala.extdatasource.thrift.TOpenResult;
+import com.cloudera.impala.extdatasource.thrift.TPrepareParams;
+import com.cloudera.impala.extdatasource.thrift.TPrepareResult;
 
 /**
- * Defines an external data source. Called by Impala during planning (getStats() only)
+ * Defines an external data source. Called by Impala during planning (prepare() only)
  * and during query execution (open(), getNext(), and close()).
  * TODO: Add javadocs
  */
@@ -37,9 +37,9 @@ public interface ExternalDataSource {
    *  2) to accept or reject predicates that are present in the query; accepted
    *     predicates are then handed over to the library when the scan is initiated with
    *     the Open() call.
-   * If getStats() fails, query planning will return with an error.
+   * If prepare() fails, query planning will return with an error.
    */
-  TGetStatsResult getStats(TGetStatsParams params);
+  TPrepareResult prepare(TPrepareParams params);
 
   /**
    * Starts a scan. Called during query execution before any calls to getNext().
@@ -56,7 +56,7 @@ public interface ExternalDataSource {
    * this same handle and the implementation is free to release all related resources.
    * Can be called at any point after open() has been called, even if the scan itself
    * hasn't finished (TGetNextResult.eos was not set to true).
-   * Should always be called once unless getStats() fails.
+   * Should always be called once unless prepare() fails.
    */
   TCloseResult close(TCloseParams params);
 }

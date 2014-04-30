@@ -18,10 +18,10 @@ import com.cloudera.impala.extdatasource.thrift.TCloseParams;
 import com.cloudera.impala.extdatasource.thrift.TCloseResult;
 import com.cloudera.impala.extdatasource.thrift.TGetNextParams;
 import com.cloudera.impala.extdatasource.thrift.TGetNextResult;
-import com.cloudera.impala.extdatasource.thrift.TGetStatsParams;
-import com.cloudera.impala.extdatasource.thrift.TGetStatsResult;
 import com.cloudera.impala.extdatasource.thrift.TOpenParams;
 import com.cloudera.impala.extdatasource.thrift.TOpenResult;
+import com.cloudera.impala.extdatasource.thrift.TPrepareParams;
+import com.cloudera.impala.extdatasource.thrift.TPrepareResult;
 import com.cloudera.impala.extdatasource.thrift.TRowBatch;
 import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
 import com.cloudera.impala.thrift.TColumnData;
@@ -39,8 +39,8 @@ public class EchoDataSource implements ExternalDataSource {
   private String initString_;
 
   @Override
-  public TGetStatsResult getStats(TGetStatsParams params) {
-    return new TGetStatsResult(STATUS_OK)
+  public TPrepareResult prepare(TPrepareParams params) {
+    return new TPrepareResult(STATUS_OK)
       .setAccepted_conjuncts(Lists.<Integer>newArrayList())
       .setNum_rows_estimate(1);
   }
@@ -60,6 +60,7 @@ public class EchoDataSource implements ExternalDataSource {
     colData.addToIs_null(false);
     colData.addToString_vals(initString_);
     rowBatch.addToCols(colData);
+    rowBatch.setNum_rows(1);
     result.setRows(rowBatch);
     return result;
   }

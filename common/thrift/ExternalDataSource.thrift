@@ -39,6 +39,13 @@ struct TTableSchema {
 struct TRowBatch {
   // Each TColumnData contains the data for an entire column. Always set.
   1: optional list<Data.TColumnData> cols
+
+  // The number of rows returned. For count(*) queries, there may not be
+  // any materialized columns so cols will be an empty list and this value
+  // will indicate how many rows are returned. When there are materialized
+  // columns, this number should be the same as the size of each
+  // TColumnData.is_null list.
+  2: optional i64 num_rows
 }
 
 // Comparison operators used in predicates.
@@ -48,7 +55,7 @@ enum TComparisonOp {
 
 // Binary predicates that can be pushed to the external data source and
 // are of the form <col> <op> <val>. Sources can choose to accept or reject
-// predicates via the return value of getStats(), see TGetStatsResult.
+// predicates via the return value of prepare(), see TPrepareResult.
 // The column and the value are guaranteed to be type compatible in Impala,
 // but they are not necessarily the same type, so the data source
 // implementation may need to do an implicit cast.
@@ -63,8 +70,8 @@ struct TBinaryPredicate {
   3: optional Data.TColumnValue value
 }
 
-// Parameters to getStats().
-struct TGetStatsParams {
+// Parameters to prepare().
+struct TPrepareParams {
   // The name of the table. Always set.
   1: optional string table_name
 
@@ -77,8 +84,8 @@ struct TGetStatsParams {
   3: optional list<list<TBinaryPredicate>> predicates
 }
 
-// Returned by getStats().
-struct TGetStatsResult {
+// Returned by prepare().
+struct TPrepareResult {
   1: required Status.TStatus status
 
   // Estimate of the total number of rows returned when applying the predicates indicated
@@ -86,7 +93,7 @@ struct TGetStatsResult {
   // this statistic.
   2: optional i64 num_rows_estimate
 
-  // Accepted conjuncts. References the 'predicates' parameter in the getStats()
+  // Accepted conjuncts. References the 'predicates' parameter in the prepare()
   // call. It contains the 0-based indices of the top-level list elements (the
   // AND elements) that the library will be able to apply during the scan. Those
   // elements that aren’t referenced in accepted_conjuncts will be evaluated by
@@ -117,7 +124,7 @@ struct TOpenParams {
   6: optional i32 batch_size
 
   // A representation of the scan predicates that were accepted in the preceding
-  // getStats() call. Always set.
+  // prepare() call. Always set.
   7: optional list<list<TBinaryPredicate>> predicates
 
   // The query limit, if specified.
