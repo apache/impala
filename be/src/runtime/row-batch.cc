@@ -122,7 +122,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
 
       vector<SlotDescriptor*>::const_iterator slot = (*desc)->string_slots().begin();
       for (; slot != (*desc)->string_slots().end(); ++slot) {
-        DCHECK_EQ((*slot)->type(), TYPE_STRING);
+        DCHECK((*slot)->type() == TYPE_STRING || (*slot)->type() == TYPE_VARCHAR);
         StringValue* string_val = t->GetStringSlot((*slot)->tuple_offset());
         int offset = reinterpret_cast<intptr_t>(string_val->ptr) + tuple_ptrs_size_;
         string_val->ptr = reinterpret_cast<char*>(tuple_data_pool_->GetDataPtr(offset));
@@ -286,7 +286,7 @@ int RowBatch::TotalByteSize() {
       result += (*desc)->byte_size();
       vector<SlotDescriptor*>::const_iterator slot = (*desc)->string_slots().begin();
       for (; slot != (*desc)->string_slots().end(); ++slot) {
-        DCHECK_EQ((*slot)->type(), TYPE_STRING);
+        DCHECK((*slot)->type() == TYPE_STRING || (*slot)->type() == TYPE_VARCHAR);
         if (tuple->IsNull((*slot)->null_indicator_offset())) continue;
         StringValue* string_val = tuple->GetStringSlot((*slot)->tuple_offset());
         result += string_val->len;

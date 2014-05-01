@@ -105,7 +105,7 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_pa
     object_pool_(pool) {
 
   for (int i = 0; i < thrift_partition.partitionKeyExprs.size(); ++i) {
-    ExprContext* ctx; 
+    ExprContext* ctx;
     // TODO: Move to dedicated Init method and treat Status return correctly
     Status status = Expr::CreateExprTree(object_pool_,
         thrift_partition.partitionKeyExprs[i], &ctx);
@@ -223,7 +223,7 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   slots_.push_back(slot);
-  if (slot->type().type == TYPE_STRING && slot->is_materialized()) {
+  if (slot->type().IsStringType() && slot->is_materialized()) {
     string_slots_.push_back(slot);
   }
   if (slot->is_materialized()) ++num_materialized_slots_;

@@ -62,7 +62,7 @@ DoubleVal NullLiteral::GetDoubleVal(ExprContext* context, TupleRow* row) {
 }
 
 StringVal NullLiteral::GetStringVal(ExprContext* context, TupleRow* row) {
-  DCHECK_EQ(type_.type, TYPE_STRING) << type_;
+  DCHECK(type_.IsStringType()) << type_;
   return StringVal::null();
 }
 

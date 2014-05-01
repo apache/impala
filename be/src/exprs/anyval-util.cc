@@ -36,7 +36,9 @@ AnyVal* CreateAnyVal(const ColumnType& type) {
     case TYPE_BIGINT: return new BigIntVal;
     case TYPE_FLOAT: return new FloatVal;
     case TYPE_DOUBLE: return new DoubleVal;
-    case TYPE_STRING: return new StringVal;
+    case TYPE_STRING:
+    case TYPE_VARCHAR:
+      return new StringVal;
     case TYPE_TIMESTAMP: return new TimestampVal;
     case TYPE_DECIMAL: return new DecimalVal;
     default:
@@ -72,6 +74,10 @@ FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& typ
     case TYPE_TIMESTAMP:
       out.type = FunctionContext::TYPE_TIMESTAMP;
       break;
+    case TYPE_VARCHAR:
+      out.type = FunctionContext::TYPE_VARCHAR;
+      out.len = type.len;
+      break;
     case TYPE_STRING:
       out.type = FunctionContext::TYPE_STRING;
       break;
@@ -100,9 +106,12 @@ ColumnType AnyValUtil::TypeDescToColumnType(const FunctionContext::TypeDesc& typ
     case FunctionContext::TYPE_DOUBLE: return ColumnType(TYPE_DOUBLE);
     case FunctionContext::TYPE_TIMESTAMP: return ColumnType(TYPE_TIMESTAMP);
     case FunctionContext::TYPE_STRING: return ColumnType(TYPE_STRING);
-    case FunctionContext::TYPE_FIXED_BUFFER: return ColumnType(TYPE_CHAR);
     case FunctionContext::TYPE_DECIMAL:
       return ColumnType::CreateDecimalType(type.precision, type.scale);
+    case FunctionContext::TYPE_FIXED_BUFFER:
+      return ColumnType::CreateCharType(type.len);
+    case FunctionContext::TYPE_VARCHAR:
+      return ColumnType::CreateVarcharType(type.len);
     default:
       DCHECK(false) << "Unknown type: " << type.type;
       return ColumnType(INVALID_TYPE);

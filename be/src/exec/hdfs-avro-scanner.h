@@ -234,8 +234,11 @@ class HdfsAvroScanner : public BaseSequenceScanner {
       PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
   void ReadAvroDouble(
       PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
-  void ReadAvroString(
-      PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+  void ReadAvroVarchar(
+      PrimitiveType type, int max_len, uint8_t** data, bool write_slot, void* slot,
+      MemPool* pool);
+  void ReadAvroString( PrimitiveType type, uint8_t** data, bool write_slot, void* slot,
+      MemPool* pool);
 
   // Same as the above functions, except takes the size of the decimal slot (i.e. 4, 8, or
   // 16) instead of the type (which should be TYPE_DECIMAL). The slot size is passed

@@ -534,7 +534,8 @@ public class MetadataOp {
           ptype.equals(PrimitiveType.DATE) ||
           ptype.equals(PrimitiveType.DATETIME) ||
           ptype.equals(PrimitiveType.DECIMAL) ||
-          ptype.equals(PrimitiveType.CHAR)) {
+          ptype.equals(PrimitiveType.CHAR) ||
+          ptype.equals(PrimitiveType.VARCHAR)) {
         continue;
       }
       Type type = ScalarType.createType(ptype);

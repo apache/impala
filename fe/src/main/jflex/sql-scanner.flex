@@ -202,6 +202,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("use", new Integer(SqlParserSymbols.KW_USE));
     keywordMap.put("using", new Integer(SqlParserSymbols.KW_USING));
     keywordMap.put("values", new Integer(SqlParserSymbols.KW_VALUES));
+    keywordMap.put("varchar", new Integer(SqlParserSymbols.KW_VARCHAR));
     keywordMap.put("view", new Integer(SqlParserSymbols.KW_VIEW));
     keywordMap.put("when", new Integer(SqlParserSymbols.KW_WHEN));
     keywordMap.put("where", new Integer(SqlParserSymbols.KW_WHERE));

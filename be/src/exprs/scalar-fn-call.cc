@@ -581,7 +581,7 @@ DoubleVal ScalarFnCall::GetDoubleVal(ExprContext* context, TupleRow* row) {
 }
 
 StringVal ScalarFnCall::GetStringVal(ExprContext* context, TupleRow* row) {
-  DCHECK_EQ(type_.type, TYPE_STRING);
+  DCHECK(type_.IsStringType());
   DCHECK(context != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEvalStringVal(context, row);
   StringWrapper fn = reinterpret_cast<StringWrapper>(scalar_fn_wrapper_);

@@ -47,6 +47,7 @@ Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& type) {
     case TYPE_DOUBLE: // { i8, double }
       return StructType::get(cg->tinyint_type(), cg->double_type(), NULL);
     case TYPE_STRING: // { i64, i8* }
+    case TYPE_VARCHAR: // { i64, i8* }
       return StructType::get(cg->bigint_type(), cg->ptr_type(), NULL);
     case TYPE_TIMESTAMP: // { i64, i64 }
       return StructType::get(cg->bigint_type(), cg->bigint_type(), NULL);
@@ -88,6 +89,7 @@ Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type) {
       result = cg->GetType(LLVM_DOUBLEVAL_NAME);
       break;
     case TYPE_STRING:
+    case TYPE_VARCHAR:
       result = cg->GetType(LLVM_STRINGVAL_NAME);
       break;
     case TYPE_TIMESTAMP:
@@ -180,6 +182,7 @@ Value* CodegenAnyVal::GetIsNull(const char* name) {
       return builder_->CreateTrunc(is_null_i8, codegen_->boolean_type(), name);
     }
     case TYPE_STRING:
+    case TYPE_VARCHAR:
     case TYPE_TIMESTAMP: {
       // Lowered type is of form { i64, *}. Get the first byte of the i64 value.
       Value* v = builder_->CreateExtractValue(value_, 0);
@@ -220,6 +223,7 @@ void CodegenAnyVal::SetIsNull(Value* is_null) {
       break;
     }
     case TYPE_STRING:
+    case TYPE_VARCHAR:
     case TYPE_TIMESTAMP: {
       // Lowered type is of the form { i64, * }. Set the first byte of the i64 value to
       // 'is_null'
@@ -248,7 +252,9 @@ void CodegenAnyVal::SetIsNull(Value* is_null) {
 
 Value* CodegenAnyVal::GetVal(const char* name) {
   DCHECK(type_.type != TYPE_STRING)
-      << "Use GetPtr and GetLen for TimestampVals";
+      << "Use GetPtr and GetLen for StringVal";
+  DCHECK(type_.type != TYPE_VARCHAR)
+      << "Use GetPtr and GetLen for Varchar";
   DCHECK(type_.type != TYPE_TIMESTAMP)
       << "Use GetDate and GetTimeOfDay for TimestampVals";
   switch(type_.type) {
@@ -291,6 +297,7 @@ Value* CodegenAnyVal::GetVal(const char* name) {
 
 void CodegenAnyVal::SetVal(Value* val) {
   DCHECK(type_.type != TYPE_STRING) << "Use SetPtr and SetLen for StringVals";
+  DCHECK(type_.type != TYPE_VARCHAR) << "Use SetPtr and SetLen for StringVals";
   DCHECK(type_.type != TYPE_TIMESTAMP)
       << "Use SetDate and SetTimeOfDay for TimestampVals";
   switch(type_.type) {
@@ -375,26 +382,26 @@ void CodegenAnyVal::SetVal(double val) {
 
 Value* CodegenAnyVal::GetPtr() {
   // Set the second pointer value to 'ptr'.
-  DCHECK_EQ(type_.type, TYPE_STRING);
+  DCHECK(type_.type == TYPE_STRING || type_.type == TYPE_VARCHAR);
   return builder_->CreateExtractValue(value_, 1, name_);
 }
 
 Value* CodegenAnyVal::GetLen() {
   // Get the high bytes of the first value.
-  DCHECK_EQ(type_.type, TYPE_STRING);
+  DCHECK(type_.type == TYPE_STRING || type_.type == TYPE_VARCHAR);
   Value* v = builder_->CreateExtractValue(value_, 0);
   return GetHighBits(32, v);
 }
 
 void CodegenAnyVal::SetPtr(Value* ptr) {
   // Set the second pointer value to 'ptr'.
-  DCHECK_EQ(type_.type, TYPE_STRING);
+  DCHECK(type_.type == TYPE_STRING || type_.type == TYPE_VARCHAR);
   value_ = builder_->CreateInsertValue(value_, ptr, 1, name_);
 }
 
 void CodegenAnyVal::SetLen(Value* len) {
   // Set the high bytes of the first value to 'len'.
-  DCHECK_EQ(type_.type, TYPE_STRING);
+  DCHECK(type_.type == TYPE_STRING || type_.type == TYPE_VARCHAR);
   Value* v = builder_->CreateExtractValue(value_, 0);
   v = SetHighBits(32, len, v);
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
@@ -445,7 +452,8 @@ void CodegenAnyVal::SetFromRawValue(Value* raw_val) {
       << endl << LlvmCodeGen::Print(raw_val)
       << endl << type_ << " => " << LlvmCodeGen::Print(codegen_->GetType(type_));
   switch (type_.type) {
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR:  {
       // Convert StringValue to StringVal
       SetPtr(builder_->CreateExtractValue(raw_val, 0, "ptr"));
       SetLen(builder_->CreateExtractValue(raw_val, 1, "len"));
@@ -491,7 +499,8 @@ Value* CodegenAnyVal::ToNativeValue() {
   Type* raw_type = codegen_->GetType(type_);
   Value* raw_val = Constant::getNullValue(raw_type);
   switch (type_.type) {
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       // Convert StringVal to StringValue
       raw_val = builder_->CreateInsertValue(raw_val, GetPtr(), 0);
       raw_val = builder_->CreateInsertValue(raw_val, GetLen(), 1);
@@ -669,7 +678,9 @@ AnyVal* CreateAnyVal(ObjectPool* pool, const ColumnType& type) {
     case TYPE_BIGINT: return pool->Add(new BigIntVal);
     case TYPE_FLOAT: return pool->Add(new FloatVal);
     case TYPE_DOUBLE: return pool->Add(new DoubleVal);
-    case TYPE_STRING: return pool->Add(new StringVal);
+    case TYPE_STRING:
+    case TYPE_VARCHAR:
+      return pool->Add(new StringVal);
     case TYPE_TIMESTAMP: return pool->Add(new TimestampVal);
     case TYPE_DECIMAL: return pool->Add(new DecimalVal);
     default:

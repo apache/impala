@@ -37,6 +37,9 @@ public class ScalarType extends Type {
   public static final int DEFAULT_PRECISION = 9;
   public static final int DEFAULT_SCALE = 0; // SQL standard
 
+  // Longest supported VARCHAR. Chosen to match Oracle.
+  static final int MAX_VARCHAR_LENGTH = 32672;
+
   // Hive, mysql, sql server standard.
   public static final int MAX_PRECISION = 38;
   public static final int MAX_SCALE = MAX_PRECISION;
@@ -57,6 +60,7 @@ public class ScalarType extends Type {
       case FLOAT: return FLOAT;
       case DOUBLE: return DOUBLE;
       case STRING: return STRING;
+      case VARCHAR: return createVarcharType();
       case BINARY: return BINARY;
       case TIMESTAMP: return TIMESTAMP;
       case DATE: return DATE;
@@ -100,15 +104,41 @@ public class ScalarType extends Type {
     return type;
   }
 
+  public static ScalarType createVarcharType(int len) {
+    // length checked in analysis
+    ScalarType type = new ScalarType(PrimitiveType.VARCHAR);
+    type.len_ = len;
+    return type;
+  }
+
+  public static ScalarType createVarcharType() {
+    return DEFAULT_VARCHAR;
+  }
+
   @Override
   public void analyze() throws AnalysisException {
     if (isAnalyzed_) return;
     Preconditions.checkState(type_ != PrimitiveType.INVALID_TYPE);
     switch (type_) {
-      case CHAR: {
+      case CHAR:
+      case VARCHAR: {
+        String name;
+        if (type_ == PrimitiveType.VARCHAR) {
+          name = "Varchar";
+        } else if (type_ == PrimitiveType.CHAR) {
+          name = "Char";
+        } else {
+          Preconditions.checkState(false);
+          return;
+        }
+
         if (len_ <= 0) {
-          throw new AnalysisException("Char size must be > 0. Size was set to: " +
-              len_ + ".");
+          throw new AnalysisException(name +
+              " size must be > 0. Size was set to: " + len_ + ".");
+        }
+        if (len_ > MAX_VARCHAR_LENGTH) {
+          throw new AnalysisException(name +
+              " size must be <= 32672. Size was set to: " + len_ + ".");
         }
         break;
       }
@@ -136,6 +166,9 @@ public class ScalarType extends Type {
       return "CHAR(" + len_ + ")";
     } else  if (type_ == PrimitiveType.DECIMAL) {
       return "DECIMAL(" + precision_ + "," + scale_ + ")";
+    } else if (type_ == PrimitiveType.VARCHAR) {
+      if (isWildcardVarchar()) return "VARCHAR(*)";
+      return "VARCHAR(" + len_ + ")";
     }
     return type_.toString();
   }
@@ -144,7 +177,9 @@ public class ScalarType extends Type {
   public String toSql() {
     switch(type_) {
       case BINARY: return type_.toString();
-      case CHAR: return type_.toString() + "(" + len_ + ")";
+      case VARCHAR:
+      case CHAR:
+         return type_.toString() + "(" + len_ + ")";
       case DECIMAL:
         return String.format("%s(%s,%s)", type_.toString(), precision_, scale_);
       default: return type_.toString();
@@ -156,6 +191,7 @@ public class ScalarType extends Type {
     TTypeNode node = new TTypeNode();
     container.types.add(node);
     switch(type_) {
+      case VARCHAR:
       case CHAR: {
         node.setType(TTypeNodeType.SCALAR);
         TScalarType scalarType = new TScalarType();
@@ -208,6 +244,11 @@ public class ScalarType extends Type {
   @Override
   public boolean isWildcardDecimal() {
     return type_ == PrimitiveType.DECIMAL && precision_ == -1 && scale_ == -1;
+  }
+
+  @Override
+  public boolean isWildcardVarchar() {
+    return type_ == PrimitiveType.VARCHAR && len_ == -1;
   }
 
   /**
@@ -273,6 +314,10 @@ public class ScalarType extends Type {
     if (equals(t)) return true;
     if (!t.isScalarType()) return false;
     ScalarType scalarType = (ScalarType) t;
+    if (type_ == PrimitiveType.VARCHAR && scalarType.isWildcardVarchar()) {
+      Preconditions.checkState(!isWildcardVarchar());
+      return true;
+    }
     if (isDecimal() && scalarType.isWildcardDecimal()) {
       Preconditions.checkState(!isWildcardDecimal());
       return true;
@@ -286,6 +331,7 @@ public class ScalarType extends Type {
     ScalarType other = (ScalarType)o;
     if (type_ != other.type_) return false;
     if (type_ == PrimitiveType.CHAR) return len_ == other.len_;
+    if (type_ == PrimitiveType.VARCHAR) return len_ == other.len_;
     if (type_ == PrimitiveType.DECIMAL) {
       return precision_ == other.precision_ && scale_ == other.scale_;
     }
@@ -357,6 +403,10 @@ public class ScalarType extends Type {
       ScalarType t2) {
     if (!t1.isValid() || !t2.isValid()) return INVALID;
     if (t1.equals(t2)) return t1;
+
+    if (t1.type_ == PrimitiveType.VARCHAR && t2.type_ == PrimitiveType.VARCHAR) {
+      return createVarcharType(Math.max(t1.len_, t2.len_));
+    }
 
     if (t1.isDecimal() || t2.isDecimal()) {
       if (t1.isNull()) return t2;

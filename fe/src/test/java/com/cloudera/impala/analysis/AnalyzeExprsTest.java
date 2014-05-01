@@ -212,7 +212,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Invalid type cast of CAST(1 AS TIMESTAMP) from TIMESTAMP to DECIMAL(9,0)");
 
     for (Type type: Type.getSupportedTypes()) {
-      if (type.isNull() || type.isDecimal() || type.isBoolean() || type.isDateType()) {
+      if (type.isNull() || type.isDecimal() || type.isBoolean() || type.isDateType()
+          || type.getPrimitiveType() == PrimitiveType.VARCHAR) {
         continue;
       }
       AnalyzesOk("select cast(1.1 as " + type + ")");
@@ -300,6 +301,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // Cast decimal to string
     AnalyzesOk("select cast(cast('1.234' as decimal) as string)");
+
+    // Cast to / from VARCHAR
+    AnalyzesOk("select cast('helloworld' as VARCHAR(3))");
+    AnalyzesOk("select cast(cast('helloworld' as VARCHAR(3)) as string)");
+    AnalyzesOk("select cast(cast('3.0' as VARCHAR(5)) as float)");
   }
 
   /**
@@ -313,6 +319,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
        // Cannot cast to NULL_TYPE
       if (type.isNull()) continue;
       if (type.isDecimal()) type = Type.DEFAULT_DECIMAL;
+      if (type.getPrimitiveType() == PrimitiveType.VARCHAR) {
+        type = ScalarType.createVarcharType(1);
+      }
       checkExprType("select cast(null as " + type + ")", type);
     }
   }

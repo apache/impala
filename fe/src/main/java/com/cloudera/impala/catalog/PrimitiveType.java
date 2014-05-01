@@ -38,6 +38,8 @@ public enum PrimitiveType {
   // 8-byte pointer and 4-byte length indicator (12 bytes total).
   // Aligning to 8 bytes so 16 total.
   STRING("STRING", 16, TPrimitiveType.STRING),
+  VARCHAR("VARCHAR", 16, TPrimitiveType.VARCHAR),
+
   // Unsupported scalar type.
   BINARY("BINARY", -1, TPrimitiveType.BINARY),
 
@@ -74,6 +76,7 @@ public enum PrimitiveType {
       case FLOAT: return FLOAT;
       case DOUBLE: return DOUBLE;
       case STRING: return STRING;
+      case VARCHAR: return VARCHAR;
       case TIMESTAMP: return TIMESTAMP;
       case CHAR: return CHAR;
       case DECIMAL: return DECIMAL;

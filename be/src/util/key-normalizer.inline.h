@@ -121,7 +121,8 @@ inline bool KeyNormalizer::WriteNormalizedKey(const ColumnType& type, bool is_as
       NormalizeTimestamp(value, dst, is_asc);
       break;
 
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       StringValue* string_val = reinterpret_cast<StringValue*>(value);
 
       // Copy the string over, with an additional NULL at the end.

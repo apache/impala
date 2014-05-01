@@ -246,7 +246,7 @@ public class Db implements CatalogObject {
   public void addBuiltin(Function fn) {
     Preconditions.checkState(isSystemDb());
     Preconditions.checkState(fn != null);
-    Preconditions.checkState(getFunction(fn, CompareMode.IS_INDISTINGUISHABLE) == null);
+    Preconditions.checkState(getFunction(fn, CompareMode.IS_IDENTICAL) == null);
     addFunction(fn);
   }
 

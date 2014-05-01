@@ -88,7 +88,7 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
       for (int j = 0; j < num_non_partition_cols; ++j) {
         void* value = output_expr_ctxs_[j]->GetValue(current_row);
         if (value != NULL) {
-          if (output_expr_ctxs_[j]->root()->type().type == TYPE_STRING) {
+          if (output_expr_ctxs_[j]->root()->type().IsStringType()) {
             PrintEscaped(reinterpret_cast<const StringValue*>(value));
           } else {
             output_expr_ctxs_[j]->PrintValue(value, &rowbatch_stringstream_);

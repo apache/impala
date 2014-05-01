@@ -234,6 +234,7 @@ inline void AggFnEvaluator::SetOutputSlot(const AnyVal* src, Tuple* dst) {
       *reinterpret_cast<double*>(slot) = reinterpret_cast<const DoubleVal*>(src)->val;
       return;
     case TYPE_STRING:
+    case TYPE_VARCHAR:
       *reinterpret_cast<StringValue*>(slot) =
           StringValue::FromStringVal(*reinterpret_cast<const StringVal*>(src));
       return;
@@ -410,7 +411,8 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* tuple, void* fn) {
       SetOutputSlot(&v, tuple);
       break;
     }
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       typedef StringVal(*Fn)(FunctionContext*, AnyVal*);
       StringVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_output_val_);
       SetOutputSlot(&v, tuple);

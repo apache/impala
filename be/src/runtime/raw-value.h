@@ -129,6 +129,7 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
       return *reinterpret_cast<const double*>(v1)
           == *reinterpret_cast<const double*>(v2);
     case TYPE_STRING:
+    case TYPE_VARCHAR:
       string_value1 = reinterpret_cast<const StringValue*>(v1);
       string_value2 = reinterpret_cast<const StringValue*>(v2);
       return string_value1->Eq(*string_value2);
@@ -166,7 +167,8 @@ inline uint32_t RawValue::GetHashValue(const void* v, const ColumnType& type,
   if (v == NULL) return HashCombine32(0, seed);
 
   switch (type.type) {
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
       return HashUtil::Hash(string_value->ptr, string_value->len, seed);
     }
@@ -192,7 +194,8 @@ inline uint32_t RawValue::GetHashValueFnv(const void* v, const ColumnType& type,
   if (v == NULL) return HashCombine32(0, seed);
 
   switch (type.type ) {
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
       return HashUtil::FnvHash64to32(string_value->ptr, string_value->len, seed);
     }
@@ -276,8 +279,10 @@ inline void RawValue::PrintValue(const void* value, const ColumnType& type, int 
         }
       }
       break;
+    case TYPE_VARCHAR:
     case TYPE_STRING:
       string_val = reinterpret_cast<const StringValue*>(value);
+      if (type.type == TYPE_VARCHAR) DCHECK(string_val->len <= type.len);
       stream->write(string_val->ptr, string_val->len);
       break;
     case TYPE_TIMESTAMP:

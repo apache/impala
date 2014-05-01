@@ -86,6 +86,7 @@ class ParquetPlainEncoder {
   static int ByteSize(const ColumnType& t) {
     switch (t.type) {
       case TYPE_STRING:
+      case TYPE_VARCHAR:
         return -1;
       case TYPE_TINYINT:
       case TYPE_SMALLINT:
@@ -262,7 +263,10 @@ inline int ParquetPlainEncoder::Decode(
     uint8_t* buffer, int fixed_len_size, StringValue* v) {
   memcpy(&v->len, buffer, sizeof(int32_t));
   v->ptr = reinterpret_cast<char*>(buffer) + sizeof(int32_t);
-  return ByteSize(*v);
+  int bytesize = ByteSize(*v);
+  if (fixed_len_size > 0) v->len = std::min(v->len, fixed_len_size);
+  // we still read bytesize bytes, even if we truncate
+  return bytesize;
 }
 
 // Write decimals as big endian (byte comparable) to benefit from common prefixes.

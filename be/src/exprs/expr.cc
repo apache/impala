@@ -280,7 +280,7 @@ int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
   // Collect all the byte sizes and sort them
   for (int i = 0; i < exprs.size(); ++i) {
     data[i].expr_idx = i;
-    if (exprs[i]->type().type == TYPE_STRING) {
+    if (exprs[i]->type().type == TYPE_STRING || exprs[i]->type().type == TYPE_VARCHAR) {
       data[i].byte_size = 16;
       data[i].variable_length = true;
     } else {
@@ -513,7 +513,8 @@ AnyVal* Expr::GetConstVal(ExprContext* context) {
       constant_val_.reset(new DoubleVal(GetDoubleVal(context, NULL)));
       break;
     }
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       constant_val_.reset(new StringVal(GetStringVal(context, NULL)));
       break;
     }

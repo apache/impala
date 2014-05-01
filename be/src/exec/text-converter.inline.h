@@ -50,6 +50,9 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
 
   // Parse the raw-text data. Translate the text string to internal format.
   switch (slot_desc->type().type) {
+    case TYPE_VARCHAR:
+      len = std::min(len, slot_desc->type().len);
+      // fall through into TYPE_STRING
     case TYPE_STRING: {
       StringValue* str_slot = reinterpret_cast<StringValue*>(slot);
       str_slot->ptr = const_cast<char*>(data);

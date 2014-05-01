@@ -244,7 +244,7 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   Value* len = NULL;
   Value* time_of_day = NULL;
   Value* date = NULL;
-  if (type_.type == TYPE_STRING) {
+  if (type_.IsStringType()) {
     Value* ptr_ptr = builder.CreateStructGEP(val_ptr, 0, "ptr_ptr");
     ptr = builder.CreateLoad(ptr_ptr, "ptr");
     Value* len_ptr = builder.CreateStructGEP(val_ptr, 1, "len_ptr");
@@ -278,7 +278,7 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   // *Val. The optimizer does a better job when there is a phi node for each value, rather
   // than having get_slot_block generate an AnyVal and having a single phi node over that.
   // TODO: revisit this code, can possibly be simplified
-  if (type() == TYPE_STRING) {
+  if (type() == TYPE_STRING || type() == TYPE_VARCHAR) {
     DCHECK(ptr != NULL);
     DCHECK(len != NULL);
     PHINode* ptr_phi = builder.CreatePHI(ptr->getType(), 2, "ptr_phi");
@@ -412,7 +412,7 @@ DoubleVal SlotRef::GetDoubleVal(ExprContext* context, TupleRow* row) {
 }
 
 StringVal SlotRef::GetStringVal(ExprContext* context, TupleRow* row) {
-  DCHECK_EQ(type_.type, TYPE_STRING);
+  DCHECK(type_.IsStringType());
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return StringVal::null();
   StringValue* sv = reinterpret_cast<StringValue*>(t->GetSlot(slot_offset_));

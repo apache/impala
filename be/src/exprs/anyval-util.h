@@ -21,6 +21,7 @@
 #include "util/hash-util.h"
 
 using namespace impala_udf;
+using namespace std;
 
 namespace impala {
 
@@ -148,7 +149,9 @@ class AnyValUtil {
       case TYPE_BIGINT: return sizeof(BigIntVal);
       case TYPE_FLOAT: return sizeof(FloatVal);
       case TYPE_DOUBLE: return sizeof(DoubleVal);
-      case TYPE_STRING: return sizeof(StringVal);
+      case TYPE_STRING:
+      case TYPE_VARCHAR:
+        return sizeof(StringVal);
       case TYPE_TIMESTAMP: return sizeof(TimestampVal);
       case TYPE_DECIMAL: return sizeof(DecimalVal);
       default:
@@ -162,7 +165,15 @@ class AnyValUtil {
   }
 
   static StringVal FromString(FunctionContext* ctx, const std::string& s) {
-    return FromBuffer(ctx, s.c_str(), s.size());
+    StringVal val = FromBuffer(ctx, s.c_str(), s.size());
+    return val;
+  }
+
+  static void TruncateIfNecessary(const ColumnType& type, StringVal *val) {
+    if (type.type == TYPE_VARCHAR) {
+      DCHECK(type.len >= 0);
+      val->len = min(val->len, type.len);
+    }
   }
 
   static StringVal FromBuffer(FunctionContext* ctx, const char* ptr, int len) {
@@ -206,8 +217,14 @@ class AnyValUtil {
         reinterpret_cast<DoubleVal*>(dst)->val = *reinterpret_cast<const double*>(slot);
         return;
       case TYPE_STRING:
+      case TYPE_VARCHAR:
         reinterpret_cast<const StringValue*>(slot)->ToStringVal(
             reinterpret_cast<StringVal*>(dst));
+        if (type.type == TYPE_VARCHAR) {
+          StringVal* sv = reinterpret_cast<StringVal*>(dst);
+          DCHECK(type.len >= 0);
+          DCHECK_LE(sv->len, type.len);
+        }
         return;
       case TYPE_TIMESTAMP:
         reinterpret_cast<const TimestampValue*>(slot)->ToTimestampVal(

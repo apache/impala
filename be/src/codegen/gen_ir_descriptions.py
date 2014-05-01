@@ -77,6 +77,7 @@ ir_functions = [
   ["READ_AVRO_FLOAT", "ReadAvroFloat"],
   ["READ_AVRO_DOUBLE", "ReadAvroDouble"],
   ["READ_AVRO_STRING", "ReadAvroString"],
+  ["READ_AVRO_VARCHAR", "ReadAvroVarchar"],
   ["HDFS_SCANNER_WRITE_ALIGNED_TUPLES", "WriteAlignedTuples"],
   ["HDFS_SCANNER_GET_CONJUNCT_CTX", "GetConjunctCtx"],
   ["STRING_TO_BOOL", "IrStringToBool"],
@@ -85,7 +86,7 @@ ir_functions = [
   ["STRING_TO_INT32", "IrStringToInt32"],
   ["STRING_TO_INT64", "IrStringToInt64"],
   ["STRING_TO_FLOAT", "IrStringToFloat"],
-  ["STRING_TO_DOUBLE", "IrStringToDouble"],  
+  ["STRING_TO_DOUBLE", "IrStringToDouble"],
   ["IS_NULL_STRING", "IrIsNullString"],
   ["GENERIC_IS_NULL_STRING", "IrGenericIsNullString"],
 ]

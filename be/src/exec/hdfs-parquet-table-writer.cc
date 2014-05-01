@@ -686,6 +686,7 @@ Status HdfsParquetTableWriter::Init() {
         writer = new ColumnWriter<TimestampValue>(
             this, output_expr_ctxs_[i], codec);
         break;
+      case TYPE_VARCHAR:
       case TYPE_STRING:
         writer = new ColumnWriter<StringValue>(
             this, output_expr_ctxs_[i], codec);

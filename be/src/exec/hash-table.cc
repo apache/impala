@@ -159,7 +159,7 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
     LlvmCodeGen::LlvmBuilder* builder, Value* dst, const ColumnType& type) {
   int64_t fvn_seed = HashUtil::FNV_SEED;
 
-  if (type.type == TYPE_STRING) {
+  if (type.type == TYPE_STRING || type.type == TYPE_VARCHAR) {
     Value* dst_ptr = builder->CreateStructGEP(dst, 0, "string_ptr");
     Value* dst_len = builder->CreateStructGEP(dst, 1, "string_len");
     Value* null_len = codegen->GetIntConstant(TYPE_INT, fvn_seed);
@@ -338,7 +338,8 @@ uint32_t HashTable::HashVariableLenRow() {
 
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     // non-string and null slots are already part of expr_values_buffer
-    if (build_expr_ctxs_[i]->root()->type().type != TYPE_STRING) continue;
+    if (build_expr_ctxs_[i]->root()->type().type != TYPE_STRING
+        && build_expr_ctxs_[i]->root()->type().type != TYPE_VARCHAR) continue;
 
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
     if (expr_value_null_bits_[i]) {
@@ -416,7 +417,8 @@ Function* HashTable::CodegenHashCurrentRow(RuntimeState* state) {
 
     // Hash string slots
     for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
-      if (build_expr_ctxs_[i]->root()->type().type != TYPE_STRING) continue;
+      if (build_expr_ctxs_[i]->root()->type().type != TYPE_STRING
+          && build_expr_ctxs_[i]->root()->type().type != TYPE_VARCHAR) continue;
 
       BasicBlock* null_block = NULL;
       BasicBlock* not_null_block = NULL;

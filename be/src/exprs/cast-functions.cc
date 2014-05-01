@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This is a generated file, DO NOT EDIT.
-// To add new functions, see impala/common/function-registry/gen_opcodes.py
-
 #include "exprs/cast-functions.h"
 
 #include <boost/lexical_cast.hpp>
@@ -104,7 +101,10 @@ CAST_FROM_STRING(DoubleVal, double, StringToFloat)
 #define CAST_TO_STRING(num_type) \
   StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const num_type& val) { \
     if (val.is_null) return StringVal::null(); \
-    return AnyValUtil::FromString(ctx, lexical_cast<string>(val.val)); \
+    ColumnType rtype = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType()); \
+    StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(val.val)); \
+    AnyValUtil::TruncateIfNecessary(rtype, &sv); \
+    return sv; \
   }
 
 CAST_TO_STRING(BooleanVal);
@@ -118,7 +118,10 @@ CAST_TO_STRING(BigIntVal);
   StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const float_type& val) { \
     if (val.is_null) return StringVal::null(); \
     if (isnan(val.val)) return StringVal("nan"); \
-    return AnyValUtil::FromString(ctx, lexical_cast<string>(val.val)); \
+    ColumnType rtype = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType()); \
+    StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(val.val)); \
+    AnyValUtil::TruncateIfNecessary(rtype, &sv); \
+    return sv; \
   }
 
 CAST_FLOAT_TO_STRING(FloatVal);
@@ -129,13 +132,29 @@ CAST_FLOAT_TO_STRING(DoubleVal);
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TinyIntVal& val) {
   if (val.is_null) return StringVal::null();
   int64_t tmp_val = val.val;
-  return AnyValUtil::FromString(ctx, lexical_cast<string>(tmp_val));
+  ColumnType rtype = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType());
+  StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(tmp_val));
+  AnyValUtil::TruncateIfNecessary(rtype, &sv);
+  return sv;
 }
 
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TimestampVal& val) {
   if (val.is_null) return StringVal::null();
   TimestampValue tv = TimestampValue::FromTimestampVal(val);
-  return AnyValUtil::FromString(ctx, lexical_cast<string>(tv));
+  ColumnType rtype = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType());
+  StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(tv));
+  AnyValUtil::TruncateIfNecessary(rtype, &sv);
+  return sv;
+}
+
+StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const StringVal& val) {
+  if (val.is_null) return StringVal::null();
+  StringVal sv;
+  ColumnType type = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType());
+  sv.ptr = val.ptr;
+  sv.len = val.len;
+  AnyValUtil::TruncateIfNecessary(type, &sv);
+  return sv;
 }
 
 #define CAST_FROM_TIMESTAMP(to_type) \

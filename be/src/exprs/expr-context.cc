@@ -166,6 +166,7 @@ void ExprContext::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) 
       col_val->__isset.string_val = true;
       break;
     case TYPE_STRING:
+    case TYPE_VARCHAR:
       string_val = reinterpret_cast<StringValue*>(value);
       tmp.assign(static_cast<char*>(string_val->ptr), string_val->len);
       col_val->string_val.swap(tmp);
@@ -230,6 +231,7 @@ void* ExprContext::GetValue(Expr* e, TupleRow* row) {
       return &result_.double_val;
     }
     case TYPE_STRING:
+    case TYPE_VARCHAR:
     case TYPE_CHAR: {
       impala_udf::StringVal v = e->GetStringVal(this, row);
       if (v.is_null) return NULL;

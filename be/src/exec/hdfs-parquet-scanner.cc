@@ -261,6 +261,8 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
     DCHECK_NE(desc->type().type, TYPE_BOOLEAN);
     if (desc->type().type == TYPE_DECIMAL) {
       fixed_len_size_ = ParquetPlainEncoder::DecimalSize(desc->type());
+    } else if (desc->type().type == TYPE_VARCHAR) {
+      fixed_len_size_ = desc->type().len;
     } else {
       fixed_len_size_ = -1;
     }
@@ -321,8 +323,8 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
 
   scoped_ptr<DictDecoder<T> > dict_decoder_;
 
-  // The size of this column with plain encoding for FIXED_LEN_BYTE_ARRAY. Unused
-  // otherwise.
+  // The size of this column with plain encoding for FIXED_LEN_BYTE_ARRAY, or
+  // the max length for VARCHAR columns. Unused otherwise.
   int fixed_len_size_;
 };
 
@@ -427,6 +429,7 @@ HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(
       reader = new ColumnReader<TimestampValue>(this, desc, file_idx);
       break;
     case TYPE_STRING:
+    case TYPE_VARCHAR:
       reader = new ColumnReader<StringValue>(this, desc, file_idx);
       break;
     case TYPE_DECIMAL:
@@ -1054,7 +1057,7 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     RETURN_IF_ERROR(column_readers_[i]->Reset(&schema_element,
         &col_chunk.meta_data, stream));
 
-    if (scan_node_->materialized_slots()[i]->type().type != TYPE_STRING ||
+    if (!scan_node_->materialized_slots()[i]->type().IsStringType() ||
         col_chunk.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED) {
       // Non-string types are always compact.  Compressed columns don't reference data
       // in the io buffers after tuple materialization.  In both cases, we can set compact

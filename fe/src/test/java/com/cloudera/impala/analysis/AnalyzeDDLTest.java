@@ -854,6 +854,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table new_table (i int) PARTITIONED BY (d decimal(40,1))",
         "Decimal precision must be <= 38.");
 
+    AnalyzesOk("create table new_table(s1 varchar(1), s2 varchar(32672))");
+    AnalysisError("create table new_table(s1 varchar(0))",
+        "Varchar size must be > 0. Size was set to: 0.");
+    AnalysisError("create table new_table(s1 varchar(32673))",
+        "Varchar size must be <= 32672. Size was set to: 32673.");
+    AnalyzesOk("create table new_table (i int) PARTITIONED BY (s varchar(3))");
+
     // Note: Backslashes need to be escaped twice - once for Java and once for Impala.
     // For example, if this were a real query the value '\' would be stored in the
     // metastore for the ESCAPED BY field.
@@ -954,7 +961,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
       PrimitiveType type = t.getPrimitiveType();
       if (DataSourceTable.isSupportedPrimitiveType(type) || t.isNull()) continue;
       String typeSpec = type.name();
-      if (type == PrimitiveType.CHAR || type == PrimitiveType.DECIMAL) {
+      if (type == PrimitiveType.CHAR || type == PrimitiveType.DECIMAL ||
+          type == PrimitiveType.VARCHAR) {
         typeSpec += "(10)";
       }
       AnalysisError("CREATE TABLE DataSrcTable1 (x " + typeSpec + ") PRODUCED " +

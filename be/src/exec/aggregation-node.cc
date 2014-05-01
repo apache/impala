@@ -294,6 +294,7 @@ Tuple* AggregationNode::ConstructAggTuple() {
     // TODO: remove when we don't use the irbuilder for codegen here.
     // This optimization no longer applies with AnyVal
     if ((*slot_desc)->type().type != TYPE_STRING &&
+        (*slot_desc)->type().type != TYPE_VARCHAR &&
         (*slot_desc)->type().type != TYPE_TIMESTAMP &&
         (*slot_desc)->type().type != TYPE_CHAR &&
         (*slot_desc)->type().type != TYPE_DECIMAL) {
@@ -630,7 +631,8 @@ Function* AggregationNode::CodegenUpdateAggTuple(RuntimeState* state) {
     if (slot_desc->type().type == TYPE_TIMESTAMP || slot_desc->type().type == TYPE_CHAR ||
         (evaluator->agg_op() != AggFnEvaluator::NDV &&
          (slot_desc->type().type == TYPE_DECIMAL ||
-          slot_desc->type().type == TYPE_STRING))) {
+          slot_desc->type().type == TYPE_STRING ||
+          slot_desc->type().type == TYPE_VARCHAR))) {
       VLOG_QUERY << "Could not codegen UpdateAggTuple because "
                  << "string, char, timestamp and decimal are not yet supported.";
       return NULL;

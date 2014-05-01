@@ -14,6 +14,7 @@
 
 #include "exec/hdfs-avro-scanner.h"
 #include "exec/read-write-util.h"
+#include <algorithm>
 
 using namespace impala;
 
@@ -113,11 +114,30 @@ void HdfsAvroScanner::ReadAvroDouble(PrimitiveType type, uint8_t** data, bool wr
   *data += 8;
 }
 
-void HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data, bool write_slot,
-                                     void* slot, MemPool* pool) {
+void HdfsAvroScanner::ReadAvroVarchar(PrimitiveType type, int max_len, uint8_t** data,
+                                     bool write_slot, void* slot, MemPool* pool) {
   int64_t len = ReadWriteUtil::ReadZLong(data);
   if (write_slot) {
-    DCHECK_EQ(type, TYPE_STRING);
+    DCHECK(type == TYPE_VARCHAR);
+    StringValue* sv = reinterpret_cast<StringValue*>(slot);
+    int str_len = std::min(static_cast<int>(len), max_len);
+    DCHECK(str_len >= 0);
+    sv->len = str_len;
+    if (scan_node_->requires_compaction()) {
+      sv->ptr = reinterpret_cast<char*>(pool->Allocate(str_len));
+      memcpy(sv->ptr, *data, str_len);
+    } else {
+      sv->ptr = reinterpret_cast<char*>(*data);
+    }
+  }
+  *data += len;
+}
+
+void HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data,
+                                     bool write_slot, void* slot, MemPool* pool) {
+  int64_t len = ReadWriteUtil::ReadZLong(data);
+  if (write_slot) {
+    DCHECK(type == TYPE_STRING);
     StringValue* sv = reinterpret_cast<StringValue*>(slot);
     sv->len = len;
     if (scan_node_->requires_compaction()) {

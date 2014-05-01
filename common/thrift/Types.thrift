@@ -39,7 +39,8 @@ enum TPrimitiveType {
   BINARY,
   DECIMAL,
   // CHAR(n). Currently only supported in UDAs
-  CHAR
+  CHAR,
+  VARCHAR
 }
 
 enum TTypeNodeType {
@@ -52,7 +53,7 @@ enum TTypeNodeType {
 struct TScalarType {
   1: required TPrimitiveType type
 
-  // Only set for CHAR
+  // Only set if type == CHAR or type == VARCHAR
   2: optional i32 len
 
   // Only set for DECIMAL

@@ -73,7 +73,8 @@ DescriptorTbl* DescriptorTblBuilder::Build() {
 
       int byte_size = slot_types[j].GetByteSize();
       if (byte_size == 0) {
-        DCHECK(slot_types[j].type == TYPE_STRING); // can only handle strings right now
+        // can only handle strings right now
+        DCHECK(slot_types[j].type == TYPE_STRING || slot_types[j].type == TYPE_VARCHAR);
         byte_size = 16;
       }
       byte_offset += byte_size;

@@ -107,6 +107,7 @@ AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, TupleRow* row) {
           break;
         case TYPE_TIMESTAMP:
         case TYPE_STRING:
+        case TYPE_VARCHAR:
           memcpy(input_ptr, v, 16);
           break;
         default:

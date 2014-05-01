@@ -137,6 +137,7 @@ static void AppendAnyValType(int namespace_id, const ColumnType& type, stringstr
       AppendMangledToken("DoubleVal", s);
       break;
     case TYPE_STRING:
+    case TYPE_VARCHAR:
       AppendMangledToken("StringVal", s);
       break;
     case TYPE_TIMESTAMP:

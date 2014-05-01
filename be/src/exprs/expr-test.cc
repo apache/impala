@@ -1561,6 +1561,12 @@ TEST_F(ExprTest, StringFunctions) {
   TestIsNull("find_in_set(NULL, 'abc,ad,,ade,cde')", TYPE_INT);
   TestIsNull("find_in_set('abc,def', NULL)", TYPE_INT);
   TestIsNull("find_in_set(NULL, NULL)", TYPE_INT);
+
+  TestStringValue("cast('HELLO' as VARCHAR(3))", "HEL");
+  TestStringValue("cast('HELLO' as VARCHAR(15))", "HELLO");
+  TestStringValue("lower(cast('HELLO' as VARCHAR(3)))", "hel");
+  TestStringValue("lower(cast(123456 as VARCHAR(3)))", "123");
+  TestIsNull("cast(NULL as VARCHAR(3))", TYPE_STRING);
 }
 
 TEST_F(ExprTest, StringRegexpFunctions) {

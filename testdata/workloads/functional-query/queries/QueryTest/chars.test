@@ -1,0 +1,36 @@
+====
+---- QUERY
+drop table if exists test_varchar_tmp
+====
+---- QUERY
+create table if not exists test_varchar_tmp (vc varchar(5))
+====
+---- QUERY
+insert into test_varchar_tmp values (cast("hello" as varchar(5)))
+====
+---- QUERY
+select * from test_varchar_tmp
+---- TYPES
+string
+---- RESULTS
+'hello'
+====
+---- QUERY
+insert into test_varchar_tmp values (cast("xyzzzzz12" as varchar(7)))
+---- CATCH
+would need to be cast to VARCHAR(5)
+====
+---- QUERY
+insert into test_varchar_tmp values (cast("hel" as varchar(4)))
+====
+---- QUERY
+select * from test_varchar_tmp
+---- TYPES
+string
+---- RESULTS
+'hello'
+'hel'
+====
+---- QUERY
+drop table if exists test_varchar_tmp
+====

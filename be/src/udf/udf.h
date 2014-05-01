@@ -64,6 +64,7 @@ class FunctionContext {
     TYPE_STRING,
     TYPE_FIXED_BUFFER,
     TYPE_DECIMAL,
+    TYPE_VARCHAR
   };
 
   struct TypeDesc {
@@ -72,6 +73,9 @@ class FunctionContext {
     // Only valid if type == TYPE_DECIMAL
     int precision;
     int scale;
+
+    // Only valid if type == TYPE_FIXED_BUFFER || type == TYPE_VARCHAR
+    int len;
   };
 
   struct UniqueId {

@@ -55,6 +55,7 @@ void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
       stream->write(chars, sizeof(double));
       break;
     case TYPE_STRING:
+    case TYPE_VARCHAR:
       string_val = reinterpret_cast<const StringValue*>(value);
       stream->write(static_cast<char*>(string_val->ptr), string_val->len);
       break;
@@ -92,6 +93,7 @@ void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
       *str = (val ? "true" : "false");
       return;
     case TYPE_STRING:
+    case TYPE_VARCHAR:
       string_val = reinterpret_cast<const StringValue*>(value);
       tmp.assign(static_cast<char*>(string_val->ptr), string_val->len);
       str->swap(tmp);
@@ -149,6 +151,7 @@ int RawValue::Compare(const void* v1, const void* v2, const ColumnType& type) {
       if (isnan(d2)) return 1;
       return d1 > d2 ? 1 : (d1 < d2 ? -1 : 0);
     case TYPE_STRING:
+    case TYPE_VARCHAR:
       string_value1 = reinterpret_cast<const StringValue*>(v1);
       string_value2 = reinterpret_cast<const StringValue*>(v2);
       return string_value1->Compare(*string_value2);
@@ -211,10 +214,12 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
       *reinterpret_cast<TimestampValue*>(dst) =
           *reinterpret_cast<const TimestampValue*>(value);
       break;
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       const StringValue* src = reinterpret_cast<const StringValue*>(value);
       StringValue* dest = reinterpret_cast<StringValue*>(dst);
       dest->len = src->len;
+      if (type.type == TYPE_VARCHAR) DCHECK_LE(dest->len, type.len);
       if (pool != NULL) {
         dest->ptr = reinterpret_cast<char*>(pool->Allocate(dest->len));
         memcpy(dest->ptr, src->ptr, dest->len);
