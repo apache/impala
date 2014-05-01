@@ -229,43 +229,36 @@ public class HBaseScanNode extends ScanNode {
   }
 
   // We convert predicates of the form <slotref> op <constant> where slotref is of
-  // type string to HBase filters.
-  // We remove the corresponding predicate from the conjuncts_, but we also explicitly
-  // materialize the referenced slots, otherwise our hbase scans don't return correct data.
+  // type string to HBase filters. All these predicates are also evaluated at
+  // the HBaseScanNode. To properly filter out NULL values HBaseScanNode treats all
+  // predicates as disjunctive, thereby requiring re-evaluation when there are multiple
+  // attributes. We explicitly materialize the referenced slots, otherwise our hbase
+  // scans don't return correct data.
   // TODO: expand this to generate nested filter lists for arbitrary conjunctions
   // and disjunctions.
   private void createHBaseFilters(Analyzer analyzer) {
-    for (SlotDescriptor slot: desc_.getSlots()) {
-      // TODO: Currently we can only push down predicates on string columns.
-      if (slot.getType().getPrimitiveType() != PrimitiveType.STRING) continue;
-      // List of predicates that cannot be pushed down as an HBase Filter.
-      List<Expr> remainingPreds = new ArrayList<Expr>();
-      for (Expr e: conjuncts_) {
-        if (!(e instanceof BinaryPredicate)) {
-          remainingPreds.add(e);
-          continue;
-        }
-        BinaryPredicate bp = (BinaryPredicate) e;
+    for (Expr e: conjuncts_) {
+      // We only consider binary predicates
+      if (!(e instanceof BinaryPredicate)) continue;
+      BinaryPredicate bp = (BinaryPredicate) e;
+      CompareFilter.CompareOp hbaseOp = impalaOpToHBaseOp(bp.getOp());
+      // Ignore unsupported ops
+      if (hbaseOp == null) continue;
+
+      for (SlotDescriptor slot: desc_.getSlots()) {
+        // Only push down predicates on string columns
+        if (slot.getType().getPrimitiveType() != PrimitiveType.STRING) continue;
+
         Expr bindingExpr = bp.getSlotBinding(slot.getId());
-        if (bindingExpr == null || !(bindingExpr instanceof StringLiteral)) {
-          remainingPreds.add(e);
-          continue;
-        }
-        CompareFilter.CompareOp hbaseOp = impalaOpToHBaseOp(bp.getOp());
-        // Currently unsupported op, leave it as a predicate.
-        if (hbaseOp == null) {
-          remainingPreds.add(e);
-          continue;
-        }
+        if (bindingExpr == null || !(bindingExpr instanceof StringLiteral)) continue;
+
         StringLiteral literal = (StringLiteral) bindingExpr;
         HBaseColumn col = (HBaseColumn) slot.getColumn();
         filters_.add(new THBaseFilter(
             col.getColumnFamily(), col.getColumnQualifier(),
             (byte) hbaseOp.ordinal(), literal.getValue()));
-
         analyzer.materializeSlots(Lists.newArrayList(e));
       }
-      conjuncts_ = remainingPreds;
     }
   }
 

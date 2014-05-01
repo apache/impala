@@ -236,6 +236,7 @@ select * from functional_hbase.alltypessmall where string_col = '4'
 ---- PLAN
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col EQUAL '4'
+   predicates: string_col = '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -246,12 +247,14 @@ NODE 0:
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col EQUAL '4'
+   predicates: string_col = '4'
 ====
 # test all comparison ops
 select * from functional_hbase.alltypessmall where string_col != '4'
 ---- PLAN
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col NOT_EQUAL '4'
+   predicates: string_col != '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -262,11 +265,13 @@ NODE 0:
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col NOT_EQUAL '4'
+   predicates: string_col != '4'
 ====
 select * from functional_hbase.alltypessmall where string_col < '4'
 ---- PLAN
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col LESS '4'
+   predicates: string_col < '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -277,11 +282,13 @@ NODE 0:
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col LESS '4'
+   predicates: string_col < '4'
 ====
 select * from functional_hbase.alltypessmall where string_col > '4'
 ---- PLAN
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col GREATER '4'
+   predicates: string_col > '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -292,11 +299,13 @@ NODE 0:
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col GREATER '4'
+   predicates: string_col > '4'
 ====
 select * from functional_hbase.alltypessmall where string_col <= '4'
 ---- PLAN
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col LESS_OR_EQUAL '4'
+   predicates: string_col <= '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -307,11 +316,13 @@ NODE 0:
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col LESS_OR_EQUAL '4'
+   predicates: string_col <= '4'
 ====
 select * from functional_hbase.alltypessmall where string_col >= '4'
 ---- PLAN
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col GREATER_OR_EQUAL '4'
+   predicates: string_col >= '4'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -322,6 +333,7 @@ NODE 0:
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col GREATER_OR_EQUAL '4'
+   predicates: string_col >= '4'
 ====
 # test multiple filters
 select * from functional_hbase.alltypessmall
@@ -329,9 +341,10 @@ where string_col >= '4' and string_col != '2' and date_string_col = '04/03/09'
 ---- PLAN
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters:
-  d:date_string_col EQUAL '04/03/09'
   d:string_col GREATER_OR_EQUAL '4'
   d:string_col NOT_EQUAL '2'
+  d:date_string_col EQUAL '04/03/09'
+   predicates: string_col >= '4', string_col != '2', date_string_col = '04/03/09'
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -342,16 +355,17 @@ NODE 0:
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters:
-  d:date_string_col EQUAL '04/03/09'
   d:string_col GREATER_OR_EQUAL '4'
   d:string_col NOT_EQUAL '2'
+  d:date_string_col EQUAL '04/03/09'
+   predicates: string_col >= '4', string_col != '2', date_string_col = '04/03/09'
 ====
 # mix of predicates and functional_hbase. filters
 select * from functional_hbase.alltypessmall where string_col = '4' and tinyint_col = 5
 ---- PLAN
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col EQUAL '4'
-   predicates: tinyint_col = 5
+   predicates: string_col = '4', tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
@@ -362,7 +376,7 @@ NODE 0:
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col EQUAL '4'
-   predicates: tinyint_col = 5
+   predicates: string_col = '4', tinyint_col = 5
 ====
 # mix of predicates, functional_hbase. filters and start/stop keys
 select * from functional_hbase.stringids
@@ -372,7 +386,7 @@ where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
    start key: 4
    stop key: 5\0
    hbase filters: d:string_col EQUAL '4'
-   predicates: tinyint_col = 5
+   predicates: string_col = '4', tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
@@ -383,7 +397,7 @@ NODE 0:
    start key: 4
    stop key: 5\0
    hbase filters: d:string_col EQUAL '4'
-   predicates: tinyint_col = 5
+   predicates: string_col = '4', tinyint_col = 5
 ====
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
 select * from functional_hbase.alltypessmall where cast(string_col as int) >= 4
@@ -446,7 +460,7 @@ where string_col = '4' and tinyint_col = 5
    start key: 4
    stop key: 5\0
    hbase filters: d:string_col EQUAL '4'
-   predicates: tinyint_col = 5
+   predicates: string_col = '4', tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
@@ -457,7 +471,7 @@ NODE 0:
    start key: 4
    stop key: 5\0
    hbase filters: d:string_col EQUAL '4'
-   predicates: tinyint_col = 5
+   predicates: string_col = '4', tinyint_col = 5
 ====
 # IMP-1188 - row key predicate is null.
 select * from functional_hbase.stringids where id = null
@@ -494,4 +508,135 @@ NODE 0:
 |
 00:SCAN HBASE [functional_hbase.stringids]
    predicates: CAST(id AS INT) < 5
+====
+# The following test cases test plan generation for queries executed against HBase
+# and have 'IS NULL/IS NOT NULL' predicates as well as conjunctive predicates.
+# (IMPALA-642)
+#
+# HBase scan query with an 'IS NULL' predicate
+select * from functional_hbase.alltypesagg
+where bigint_col is null
+---- PLAN
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NULL
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NULL
+====
+# HBase scan query with projection and an 'IS NULL' predicate on one of the
+# projected columns
+select bigint_col, day from functional_hbase.alltypesagg
+where bigint_col is null
+---- PLAN
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NULL
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NULL
+====
+# HBase scan query with 'IS NOT NULL' predicate
+select * from functional_hbase.alltypesagg
+where bigint_col is not null
+---- PLAN
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NOT NULL
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NOT NULL
+====
+# HBase scan query with conjunctive predicates one of which is an 'IS NULL'
+select * from functional_hbase.alltypesagg
+where bigint_col is null and day = 1
+---- PLAN
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NULL, day = 1
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NULL, day = 1
+====
+# HBase scan query with conjunctive predicates one of which is an 'IS NOT NULL'
+select * from functional_hbase.alltypesagg
+where bigint_col is not null and bool_col = true
+---- PLAN
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NOT NULL, bool_col = TRUE
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col IS NOT NULL, bool_col = TRUE
+====
+# HBase scan query with an aggregation and a single predicate
+select count(*) from functional_hbase.alltypesagg
+where bigint_col = 10
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col = 10
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
+---- DISTRIBUTEDPLAN
+03:AGGREGATE [MERGE FINALIZE]
+|  output: sum(count(*))
+|
+02:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col = 10
+====
+# HBase scan query with an aggregation and conjunctive predicates
+select count(*) from functional_hbase.alltypesagg
+where bigint_col = 10 and day = 1
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HBASE [functional_hbase.alltypesagg]
+   predicates: bigint_col = 10, day = 1
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE port=60201 <unbounded>:3
+  HBASE KEYRANGE port=60202 3:7
+  HBASE KEYRANGE port=60203 7:<unbounded>
 ====
