@@ -199,7 +199,7 @@ void* HdfsScanNode::GetFileMetadata(const string& filename) {
   return it->second;
 }
 
-Function* HdfsScanNode::GetCodegenFn(THdfsFileFormat::type type) {
+void* HdfsScanNode::GetCodegenFn(THdfsFileFormat::type type) {
   CodegendFnMap::iterator it = codegend_fn_map_.find(type);
   if (it == codegend_fn_map_.end()) return NULL;
   if (codegend_conjuncts_thread_safe_) {
@@ -210,14 +210,14 @@ Function* HdfsScanNode::GetCodegenFn(THdfsFileFormat::type type) {
     // If all the codegen'd fn's are used, return NULL.  This disables codegen for
     // this scanner.
     if (it->second.empty()) return NULL;
-    Function* fn = it->second.front();
+    void* fn = it->second.front();
     it->second.pop_front();
     DCHECK(fn != NULL);
     return fn;
   }
 }
 
-void HdfsScanNode::ReleaseCodegenFn(THdfsFileFormat::type type, Function* fn) {
+void HdfsScanNode::ReleaseCodegenFn(THdfsFileFormat::type type, void* fn) {
   if (fn == NULL) return;
   if (codegend_conjuncts_thread_safe_) return;
 
@@ -1059,7 +1059,9 @@ Status HdfsScanNode::CreateConjunctsCopies(THdfsFileFormat::type format) {
         fn = NULL;
     }
     if (fn != NULL) {
-      codegend_fn_map_[format].push_back(fn);
+      // This pointer will be updated to the JIT'd function in FinalizeModule().
+      codegend_fn_map_[format].push_back(NULL);
+      runtime_state_->codegen()->AddFunctionToJit(fn, &codegend_fn_map_[format].back());
     } else {
       break;
     }

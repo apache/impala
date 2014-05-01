@@ -53,20 +53,20 @@ using namespace std;
 //                      = n / e
 //                      = 367
 
-// Machine Info: Intel(R) Core(TM) i7-4770 CPU @ 3.40GHz
+// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // Int Hash:             Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                            Fnv               102.6                  1X
-//                          Boost               269.8               2.63X
-//                            Crc               502.1              4.895X
-//                        Codegen               420.4              4.098X
-//
+//                            Fnv               76.46                  1X
+//                          Boost               203.7              2.665X
+//                            Crc               305.3              3.993X
+//                        Codegen               703.4              9.199X
+
 // Mixed Hash:           Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                           Fnv               78.43                  1X
-//                         Boost                 115              1.467X
-//                           Crc               330.3              4.212X
-//                       Codegen               165.6              2.112X
+//                            Fnv               55.51                  1X
+//                          Boost               82.86              1.493X
+//                            Crc               215.1              3.874X
+//                        Codegen               219.8              3.959X
 
 typedef uint32_t (*CodegenHashFn)(int rows, char* data, int32_t* results);
 
@@ -371,10 +371,18 @@ int main(int argc, char **argv) {
   codegen->EnableOptimizations(true);
 
   Function* hash_ints = CodegenCrcHash(codegen.get(), false);
-  void* jitted_hash_ints = codegen->JitFunction(hash_ints);
+  void* jitted_hash_ints;
+  codegen->AddFunctionToJit(hash_ints, &jitted_hash_ints);
 
   Function* hash_mixed = CodegenCrcHash(codegen.get(), true);
-  void* jitted_hash_mixed = codegen->JitFunction(hash_mixed);
+  void* jitted_hash_mixed;
+  codegen->AddFunctionToJit(hash_mixed, &jitted_hash_mixed);
+
+  status = codegen->FinalizeModule();
+  if (!status.ok()) {
+    cout << "Could not compile module: " << status.GetErrorMsg();
+    return -1;
+  }
 
   // Test a tuple consisting of just 4 int cols.  This is representative of
   // group by queries.  The test is hardcoded to know it will only be int cols

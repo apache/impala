@@ -147,11 +147,11 @@ class HdfsScanNode : public ScanNode {
   }
 
   // Returns the per format codegen'd function.  Scanners call this to get the
-  // codegen function to use.  Returns NULL if codegen should not be used.
-  llvm::Function* GetCodegenFn(THdfsFileFormat::type);
+  // codegen'd function to use.  Returns NULL if codegen should not be used.
+  void* GetCodegenFn(THdfsFileFormat::type);
 
   // Each call to GetCodegenFn() must call ReleaseCodegenFn().
-  void ReleaseCodegenFn(THdfsFileFormat::type type, llvm::Function* fn);
+  void ReleaseCodegenFn(THdfsFileFormat::type type, void* fn);
 
   // Returns a prepared copy of the query's conjunct exprs. Scanners use the conjunct
   // exprs directly when they cannot use a codegen'd function.
@@ -318,7 +318,7 @@ class HdfsScanNode : public ScanNode {
   // is based on the maximum number of parallel scan ranges possible, which is in turn
   // based on the number of cpu cores.
   boost::mutex codgend_fn_map_lock_;
-  typedef std::map<THdfsFileFormat::type, std::list<llvm::Function*> > CodegendFnMap;
+  typedef std::map<THdfsFileFormat::type, std::list<void*> > CodegendFnMap;
   CodegendFnMap codegend_fn_map_;
 
   // All conjunct copies that are created, including codegen'd and noncodegen'd

@@ -54,7 +54,6 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
       context_(NULL),
       conjuncts_(NULL),
       num_conjuncts_(0),
-      codegen_fn_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
       tuple_(NULL),
       batch_(NULL),
@@ -64,7 +63,7 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
 }
 
 HdfsScanner::~HdfsScanner() {
-  DCHECK(codegen_fn_ == NULL);
+  DCHECK(write_tuples_fn_ == NULL);
   DCHECK(batch_ == NULL);
   DCHECK(conjuncts_ == NULL);
 }
@@ -89,12 +88,6 @@ void HdfsScanner::Close() {
 
 Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
     THdfsFileFormat::type type, const string& scanner_name) {
-  codegen_fn_ = scan_node_->GetCodegenFn(type);
-
-  if (codegen_fn_ == NULL) {
-    scan_node_->IncNumScannersCodegenDisabled();
-    return Status::OK;
-  }
   if (!scan_node_->tuple_desc()->string_slots().empty() &&
         ((partition->escape_char() != '\0') || scan_node_->requires_compaction())) {
     // Cannot use codegen if there are strings slots and we need to
@@ -103,8 +96,11 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
     return Status::OK;
   }
 
-  write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(
-      state_->codegen()->JitFunction(codegen_fn_));
+  write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(scan_node_->GetCodegenFn(type));
+  if (write_tuples_fn_ == NULL) {
+    scan_node_->IncNumScannersCodegenDisabled();
+    return Status::OK;
+  }
   VLOG(2) << scanner_name << "(node_id=" << scan_node_->id()
           << ") using llvm codegend functions.";
   scan_node_->IncNumScannersCodegenEnabled();

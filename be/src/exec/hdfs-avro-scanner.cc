@@ -79,6 +79,7 @@ HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state)
 }
 
 HdfsAvroScanner::~HdfsAvroScanner() {
+  DCHECK(codegend_decode_avro_data_ == NULL);
 }
 
 Function* HdfsAvroScanner::Codegen(HdfsScanNode* node, const vector<Expr*>& conjuncts) {
@@ -90,6 +91,8 @@ Function* HdfsAvroScanner::Codegen(HdfsScanNode* node, const vector<Expr*>& conj
 }
 
 void HdfsAvroScanner::Close() {
+  scan_node_->ReleaseCodegenFn(
+      THdfsFileFormat::AVRO, reinterpret_cast<void*>(codegend_decode_avro_data_));
   codegend_decode_avro_data_ = NULL;
   BaseSequenceScanner::Close();
 }
@@ -479,17 +482,15 @@ Status HdfsAvroScanner::InitNewRange() {
   }
 
   if (avro_header_->use_codegend_decode_avro_data) {
-    codegen_fn_ = scan_node_->GetCodegenFn(THdfsFileFormat::AVRO);
-    if (codegen_fn_ != NULL) {
-      codegend_decode_avro_data_ = reinterpret_cast<DecodeAvroDataFn>(
-          state_->codegen()->JitFunction(codegen_fn_));
-    }
-    VLOG(2) << "HdfsAvroScanner (node_id=" << scan_node_->id()
-            << ") using llvm codegend functions.";
-    scan_node_->IncNumScannersCodegenEnabled();
+    codegend_decode_avro_data_ = reinterpret_cast<DecodeAvroDataFn>(
+        scan_node_->GetCodegenFn(THdfsFileFormat::AVRO));
   }
   if (codegend_decode_avro_data_ == NULL) {
     scan_node_->IncNumScannersCodegenDisabled();
+  } else {
+    VLOG(2) << "HdfsAvroScanner (node_id=" << scan_node_->id()
+            << ") using llvm codegend functions.";
+    scan_node_->IncNumScannersCodegenEnabled();
   }
 
   return Status::OK;

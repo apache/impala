@@ -242,7 +242,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
 void PlanFragmentExecutor::OptimizeLlvmModule() {
   if (runtime_state_->codegen() == NULL) return;
-  Status status = runtime_state_->codegen()->OptimizeModule();
+  Status status = runtime_state_->codegen()->FinalizeModule();
   if (!status.ok()) {
     stringstream ss;
     ss << "Error with codegen for this query: " << status.GetErrorMsg();

@@ -89,8 +89,8 @@ void BaseSequenceScanner::Close() {
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
   }
-  scan_node_->ReleaseCodegenFn(file_format(), codegen_fn_);
-  codegen_fn_ = NULL;
+  scan_node_->ReleaseCodegenFn(file_format(), reinterpret_cast<void*>(write_tuples_fn_));
+  write_tuples_fn_ = NULL;
   HdfsScanner::Close();
 }
 

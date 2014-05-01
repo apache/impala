@@ -68,6 +68,11 @@ class LlvmCodeGenTest : public testing:: Test {
   static void ClearHashFns(LlvmCodeGen* codegen) {
     codegen->ClearHashFns();
   }
+
+  static void* JitFunction(
+      LlvmCodeGen* codegen, Function* function, int* scratch_size = NULL) {
+    return codegen->JitFunction(function, scratch_size);
+  }
 };
 
 // Simple test to just make and destroy llvmcodegen objects.  LLVM 
@@ -167,7 +172,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   EXPECT_EQ(loop->arg_size(), 1);
 
   int scratch_size;
-  void* original_loop = codegen->JitFunction(loop, &scratch_size);
+  void* original_loop = LlvmCodeGenTest::JitFunction(codegen.get(), loop, &scratch_size);
   EXPECT_EQ(scratch_size, 0);
   EXPECT_TRUE(original_loop != NULL);
   
@@ -195,7 +200,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   EXPECT_TRUE(codegen->VerifyFunction(jitted_loop));
 
   // Part4: Call the new loop and verify results
-  void* new_loop = codegen->JitFunction(jitted_loop, &scratch_size);
+  void* new_loop = LlvmCodeGenTest::JitFunction(codegen.get(), jitted_loop, &scratch_size);
   EXPECT_EQ(scratch_size, 0);
   EXPECT_TRUE(new_loop != NULL);
 
@@ -214,7 +219,8 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   EXPECT_TRUE(codegen->VerifyFunction(jitted_loop2));
 
   // Part6: Call new loop
-  void* new_loop2 = codegen->JitFunction(jitted_loop2, &scratch_size);
+  void* new_loop2 =
+      LlvmCodeGenTest::JitFunction(codegen.get(), jitted_loop2, &scratch_size);
   EXPECT_EQ(scratch_size, 0);
   EXPECT_TRUE(new_loop2 != NULL);
 
@@ -293,7 +299,7 @@ TEST_F(LlvmCodeGenTest, StringValue) {
   EXPECT_TRUE(codegen->VerifyFunction(string_test_fn));
 
   // Jit compile function
-  void* jitted_fn = codegen->JitFunction(string_test_fn);
+  void* jitted_fn = LlvmCodeGenTest::JitFunction(codegen.get(), string_test_fn);
   EXPECT_TRUE(jitted_fn != NULL);
 
   // Call IR function
@@ -340,7 +346,7 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
   fn = codegen->FinalizeFunction(fn);
   ASSERT_TRUE(fn != NULL);
 
-  void* jitted_fn = codegen->JitFunction(fn);
+  void* jitted_fn = LlvmCodeGenTest::JitFunction(codegen.get(), fn);
   ASSERT_TRUE(jitted_fn != NULL);
   
   typedef void (*TestMemcpyFn)(char*, char*, int64_t);
@@ -405,7 +411,7 @@ TEST_F(LlvmCodeGenTest, HashTest) {
     fn_fixed = codegen->FinalizeFunction(fn_fixed);
     ASSERT_TRUE(fn_fixed != NULL);
 
-    void* jitted_fn = codegen->JitFunction(fn_fixed);
+    void* jitted_fn = LlvmCodeGenTest::JitFunction(codegen.get(), fn_fixed);
     ASSERT_TRUE(jitted_fn != NULL);
 
     typedef uint32_t (*TestHashFn)();

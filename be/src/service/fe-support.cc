@@ -89,7 +89,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
                      JniUtil::internal_exc_class(), result_bytes);
 
   // Optimize the module so any UDF functions are jit'd
-  if (state.codegen() != NULL) state.codegen()->OptimizeModule();
+  if (state.codegen() != NULL) state.codegen()->FinalizeModule();
 
   THROW_IF_ERROR_RET(e->Open(&state), env, JniUtil::internal_exc_class(), result_bytes);
   TColumnValue val;

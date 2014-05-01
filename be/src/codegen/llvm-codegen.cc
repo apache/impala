@@ -36,6 +36,7 @@
 #include "llvm/Transforms/IPO.h"
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "common/logging.h"
@@ -51,10 +52,10 @@ using namespace llvm;
 using namespace std;
 
 DEFINE_bool(dump_ir, false, "if true, output IR after optimization passes");
-DEFINE_string(unopt_module_output, "",
-              "if set, saves the unoptimized generated IR to the output file.");
-DEFINE_string(opt_module_output, "",
-              "if set, saves the optimized generated IR to the output file.");
+DEFINE_string(unopt_module, "",
+              "if set, saves the unoptimized generated IR to the specified file.");
+DEFINE_string(opt_module, "",
+              "if set, saves the optimized generated IR to the specified file.");
 DECLARE_string(local_library_dir);
 
 namespace impala {
@@ -328,7 +329,7 @@ PointerType* LlvmCodeGen::GetPtrType(const string& name) {
 
 // Llvm doesn't let you create a PointerValue from a c-side ptr.  Instead
 // cast it to an int and then to 'type'.
-Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, void* ptr) {
+Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, const void* ptr) {
   Constant* const_int = ConstantInt::get(Type::getInt64Ty(context()), (int64_t)ptr);
   return ConstantExpr::getIntToPtr(const_int, type);
 }
@@ -388,6 +389,7 @@ bool LlvmCodeGen::VerifyFunction(Function* fn) {
   // Verify the function is valid. Adapted from the pre-verifier function pass.
   for (Function::iterator i = fn->begin(), e = fn->end(); i != e; ++i) {
     if (i->empty() || !i->back().isTerminator()) {
+      LOG(ERROR) << "Basic block must end with terminator: \n" << Print(&(*i));
       is_corrupt_ = true;
       break;
     }
@@ -446,12 +448,7 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
   DCHECK(new_fn != NULL);
 
   if (!update_in_place) {
-    // Clone the function and add it to the module
-    ValueToValueMapTy dummy_vmap;
-    Function* new_caller = llvm::CloneFunction(caller, dummy_vmap, false);
-    new_caller->copyAttributesFrom(caller);
-    module_->getFunctionList().push_back(new_caller);
-    caller = new_caller;
+    caller = CloneFunction(caller);
   } else if (jitted_functions_.find(caller) != jitted_functions_.end()) {
     // This function is already dynamically linked, unlink it.
     execution_engine_->freeMachineCodeForFunction(caller);
@@ -482,6 +479,15 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
   }
 
   return caller;
+}
+
+Function* LlvmCodeGen::CloneFunction(Function* fn) {
+  ValueToValueMapTy dummy_vmap;
+  // CloneFunction() automatically gives the new function a unique name
+  Function* fn_clone = llvm::CloneFunction(fn, dummy_vmap, false);
+  fn_clone->copyAttributesFrom(fn);
+  module_->getFunctionList().push_back(fn_clone);
+  return fn_clone;
 }
 
 // TODO: revisit this.  Inlining all call sites might not be the right call.  We
@@ -540,14 +546,14 @@ Function* LlvmCodeGen::FinalizeFunction(Function* function) {
   return function;
 }
 
-Status LlvmCodeGen::OptimizeModule() {
+Status LlvmCodeGen::FinalizeModule() {
   DCHECK(!is_compiled_);
   is_compiled_ = true;
 
-  if (FLAGS_unopt_module_output.size() != 0) {
-    fstream f(FLAGS_unopt_module_output.c_str(), fstream::out | fstream::trunc);
+  if (FLAGS_unopt_module.size() != 0) {
+    fstream f(FLAGS_unopt_module.c_str(), fstream::out | fstream::trunc);
     if (f.fail()) {
-      LOG(ERROR) << "Could not save IR to: " << FLAGS_unopt_module_output;
+      LOG(ERROR) << "Could not save IR to: " << FLAGS_unopt_module;
     } else {
       f << GetIR(true);
       f.close();
@@ -557,8 +563,28 @@ Status LlvmCodeGen::OptimizeModule() {
   if (is_corrupt_) return Status("Module is corrupt.");
   SCOPED_TIMER(profile_.total_time_counter());
   SCOPED_TIMER(compile_timer_);
-  if (!optimizations_enabled_) return Status::OK;
 
+  if (optimizations_enabled_) OptimizeModule();
+
+  // JIT compile all codegen'd functions
+  for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
+    *fns_to_jit_compile_[i].second = JitFunction(fns_to_jit_compile_[i].first);
+  }
+
+  if (FLAGS_opt_module.size() != 0) {
+    fstream f(FLAGS_opt_module.c_str(), fstream::out | fstream::trunc);
+    if (f.fail()) {
+      LOG(ERROR) << "Could not save IR to: " << FLAGS_opt_module;
+    } else {
+      f << GetIR(true);
+      f.close();
+    }
+  }
+
+  return Status::OK;
+}
+
+void LlvmCodeGen::OptimizeModule() {
   // This pass manager will construct optimizations passes that are "typical" for
   // c/c++ programs.  We're relying on llvm to pick the best passes for us.
   // TODO: we can likely muck with this to get better compile speeds or write
@@ -573,42 +599,41 @@ Status LlvmCodeGen::OptimizeModule() {
   pass_builder.SizeLevel = 0;
   pass_builder.Inliner = createFunctionInliningPass() ;
 
-  scoped_ptr<FunctionPassManager> function_passes(new FunctionPassManager(module_));
-  pass_builder.populateFunctionPassManager(*function_passes);
-  function_passes->doInitialization();
-  for (Module::iterator it = module_->begin(), end = module_->end(); it != end ; ++it) {
-    if (!it->isDeclaration()) function_passes->run(*it);
-  }
-  function_passes->doFinalization() ;
-
-  scoped_ptr<PassManager> module_passes(new PassManager());
-
-  // Specifying the data layout is necessary for some optimizations (e.g. removing many of
-  // the loads/stores produced by structs).
+  // Specifying the data layout is necessary for some optimizations (e.g. removing many
+  // of the loads/stores produced by structs).
   const string& data_layout_str = module_->getDataLayout();
-  DataLayout* data_layout = new DataLayout(data_layout_str);
-  // Tranfers ownership of data_layout to module_passes
-  module_passes->add(data_layout);
+  DCHECK(!data_layout_str.empty());
 
-  pass_builder.populateModulePassManager(*module_passes);
-  module_passes->run(*module_);
-
-  // Now that the module is optimized, it is safe to call jit fn.
+  // Before running any other optimization passes, run the internalize pass, giving it
+  // the names of all functions registered by AddFunctionToJit(), followed by the
+  // global dead code elimination pass. This causes all functions not registered to be
+  // JIT'd to be marked as internal, and any internal functions that are not used are
+  // deleted by DCE pass. This greatly decreases compile time by removing unused code.
+  vector<const char*> exported_fn_names;
   for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
-    *fns_to_jit_compile_[i].second = JitFunction(fns_to_jit_compile_[i].first);
+    exported_fn_names.push_back(fns_to_jit_compile_[i].first->getName().data());
   }
+  scoped_ptr<PassManager> module_pass_manager(new PassManager());
+  module_pass_manager->add(new DataLayout(data_layout_str));
+  module_pass_manager->add(createInternalizePass(exported_fn_names));
+  module_pass_manager->add(createGlobalDCEPass());
+  module_pass_manager->run(*module_);
 
-  if (FLAGS_opt_module_output.size() != 0) {
-    fstream f(FLAGS_opt_module_output.c_str(), fstream::out | fstream::trunc);
-    if (f.fail()) {
-      LOG(ERROR) << "Could not save IR to: " << FLAGS_opt_module_output;
-    } else {
-      f << GetIR(true);
-      f.close();
-    }
+  // Create and run function pass manager
+  scoped_ptr<FunctionPassManager> fn_pass_manager(new FunctionPassManager(module_));
+  fn_pass_manager->add(new DataLayout(data_layout_str));
+  pass_builder.populateFunctionPassManager(*fn_pass_manager);
+  fn_pass_manager->doInitialization();
+  for (Module::iterator it = module_->begin(), end = module_->end(); it != end ; ++it) {
+    if (!it->isDeclaration()) fn_pass_manager->run(*it);
   }
+  fn_pass_manager->doFinalization();
 
-  return Status::OK;
+  // Create and run module pass manager
+  module_pass_manager.reset(new PassManager());
+  module_pass_manager->add(new DataLayout(data_layout_str));
+  pass_builder.populateModulePassManager(*module_pass_manager);
+  module_pass_manager->run(*module_);
 }
 
 void LlvmCodeGen::AddFunctionToJit(Function* fn, void** result) {
@@ -996,6 +1021,18 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     // Don't bother with optimizations without crc hash instruction
     return GetFunction(IRFunction::HASH_FNV);
   }
+}
+
+void LlvmCodeGen::ReplaceInstWithValue(Instruction* from, Value* to) {
+  BasicBlock::iterator iter(from);
+  llvm::ReplaceInstWithValue(from->getParent()->getInstList(), iter, to);
+}
+
+Argument* LlvmCodeGen::GetArgument(Function* fn, int i) {
+  DCHECK_LE(i, fn->arg_size());
+  Function::arg_iterator iter = fn->arg_begin();
+  for (int j = 0; j < i; ++j) ++iter;
+  return iter;
 }
 
 }

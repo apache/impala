@@ -25,12 +25,13 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_set.hpp>
 
+#include <llvm/Analysis/Verifier.h>
 #include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
-#include <llvm/Analysis/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
 
 #include "exprs/expr.h"
 #include "impala-ir/impala-ir-functions.h"
@@ -86,12 +87,11 @@ class SubExprElimination;
 // module or none at all (but this class will not validate the module).
 //
 // This class is mostly not threadsafe.  During the Prepare() phase of the fragment
-// execution, nodes should codegen functions.
-// Afterward, OptimizeModule() should be called at which point all codegened functions
-// are optimized.
-// Subsequently, nodes can get at the jit compiled function pointer (typically during the
-// Open() call).  Getting the jit compiled function (JitFunction()) is the only thread
-// safe function.
+// execution, nodes should codegen functions, and register those functions with
+// AddFunctionToJit().
+// Afterward, FinalizeModule() should be called at which point all codegened functions
+// are optimized. After FinalizeModule() returns, all function pointers registered with
+// AddFunctionToJit() will be pointing to the appropriate JIT'd function.
 //
 // Currently, each query will create and initialize one of these
 // objects.  This requires loading and parsing the cross compiled modules.
@@ -228,10 +228,10 @@ class LlvmCodeGen {
     return it->second;
   }
 
-  // Optimize the entire module.  LLVM is more built for running its optimization
-  // passes over the entire module (all the functions) rather than individual
-  // functions.
-  Status OptimizeModule();
+  // Optimize and compile the module. This should be called after all functions to JIT
+  // have been added to the module via AddFunctionToJit(). If optimizations_enabled_ is
+  // false, the module will not be optimized before compilation.
+  Status FinalizeModule();
 
   // Replaces all instructions that call 'target_name' with a call instruction
   // to the new_fn.  Returns the modified function.
@@ -255,6 +255,16 @@ class LlvmCodeGen {
   llvm::Function* ReplaceCallSites(llvm::Function* caller, bool update_in_place,
       llvm::Function* new_fn, const std::string& target_name, int* num_replaced);
 
+  // Returns a copy of fn. The copy is added to the module.
+  llvm::Function* CloneFunction(llvm::Function* fn);
+
+  // Replace all uses of the instruction 'from' with the value 'to', and delete
+  // 'from'. This is a wrapper around llvm::ReplaceInstWithValue().
+  void ReplaceInstWithValue(llvm::Instruction* from, llvm::Value* to);
+
+  // Returns the i-th argument of fn.
+  llvm::Argument* GetArgument(llvm::Function* fn, int i);
+
   // Verify and optimize function.  This should be called at the end for each codegen'd
   // function.  If the function does not verify, it will delete the function and return
   // NULL, otherwise, it will optimize and return the function object.
@@ -270,7 +280,7 @@ class LlvmCodeGen {
   // passes as well as some custom heuristics.  This should be called for all
   // functions which call Exprs.  The exprs will be inlined as much as possible,
   // and will do basic sub expression elimination.
-  // This should be called before OptimizeModule for functions that want to remove
+  // This should be called before FinalizeModule for functions that want to remove
   // redundant exprs.  This should be called at the highest level possible to
   // maximize the number of redundant exprs that can be found.
   // TODO: we need to spend more time to output better IR.  Asking llvm to
@@ -279,23 +289,16 @@ class LlvmCodeGen {
   // with the llvm optimization passes.
   llvm::Function* OptimizeFunctionWithExprs(llvm::Function* fn);
 
-  // Jit compile the function.  This will run optimization passes and verify
-  // the function.  The result is a function pointer that is dynamically linked
-  // into the process.
-  // Returns NULL if the function is invalid.
-  // scratch_size will be set to the buffer size required to call the function
-  // scratch_size is the total size from all LlvmCodeGen::GetScratchBuffer
-  // calls (with some additional bytes for alignment)
-  // This function is thread safe.
-  void* JitFunction(llvm::Function* function, int* scratch_size = NULL);
-
-  // Adds the function to be automatically jit compiled after the module is
-  // optimized. That is, after OptimizeModule(), this will do
-  // *result_fn_ptr = JitFunction(fn);
-  // This is useful since it is not valid to call JitFunction() before every
-  // part of the query has finished adding their IR and it's convenient to
-  // not have to rewalk the objects. This provides the same behavior as walking
-  // each of those objects and calling JitFunction().
+  // Adds the function to be automatically jit compiled after the module is optimized.
+  // That is, after FinalizeModule(), this will do *result_fn_ptr = JitFunction(fn);
+  //
+  // This is useful since it is not valid to call JitFunction() before every part of the
+  // query has finished adding their IR and it's convenient to not have to rewalk the
+  // objects. This provides the same behavior as walking each of those objects and calling
+  // JitFunction().
+  //
+  // In addition, any functions not registered with AddFunctionToJit() are marked as
+  // internal in FinalizeModule() and may be removed as part of optimization.
   void AddFunctionToJit(llvm::Function* fn, void** result_fn_ptr);
 
   // Verfies the function if the verfier is enabled.  Returns false if function
@@ -305,6 +308,14 @@ class LlvmCodeGen {
   // This will generate a printf call instruction to output 'message' at the
   // builder's insert point.  Only for debugging.
   void CodegenDebugTrace(LlvmBuilder* builder, const char* message);
+
+  // Returns the string representation of a llvm::Value* or llvm::Type*
+  template <typename T> static std::string Print(T* value_or_type) {
+    std::string str;
+    llvm::raw_string_ostream stream(str);
+    value_or_type->print(stream);
+    return str;
+  }
 
   // Returns the libc function, adding it to the module if it has not already been.
   llvm::Function* GetLibCFunction(FnPrototype* prototype);
@@ -350,7 +361,7 @@ class LlvmCodeGen {
 
   // Create a llvm pointer value from 'ptr'.  This is used to pass pointers between
   // c-code and code-generated IR.  The resulting value will be of 'type'.
-  llvm::Value* CastPtrToLlvmPtr(llvm::Type* type, void* ptr);
+  llvm::Value* CastPtrToLlvmPtr(llvm::Type* type, const void* ptr);
 
   // Returns the constant 'val' of 'type'
   llvm::Value* GetIntConstant(const ColumnType& type, int64_t val);
@@ -362,11 +373,12 @@ class LlvmCodeGen {
 
   // Simple wrappers to reduce code verbosity
   llvm::Type* boolean_type() { return GetType(TYPE_BOOLEAN); }
-  llvm::Type* double_type() { return GetType(TYPE_DOUBLE); }
   llvm::Type* tinyint_type() { return GetType(TYPE_TINYINT); }
   llvm::Type* smallint_type() { return GetType(TYPE_SMALLINT); }
   llvm::Type* int_type() { return GetType(TYPE_INT); }
   llvm::Type* bigint_type() { return GetType(TYPE_BIGINT); }
+  llvm::Type* float_type() { return GetType(TYPE_FLOAT); }
+  llvm::Type* double_type() { return GetType(TYPE_DOUBLE); }
   llvm::Type* string_val_type() { return string_val_type_; }
   llvm::PointerType* ptr_type() { return ptr_type_; }
   llvm::Type* void_type() { return void_type_; }
@@ -419,6 +431,25 @@ class LlvmCodeGen {
   // Load the intrinsics impala needs.  This is a one time initialization.
   // Values are stored in 'llvm_intrinsics_'
   Status LoadIntrinsics();
+
+  // Get the function pointer to the JIT'd version of function.
+  // The result is a function pointer that is dynamically linked into the process.
+  // Returns NULL if the function is invalid.
+  // Note that this will compile, but not optimize, function if necessary.
+  //
+  // scratch_size will be set to the buffer size required to call the function.
+  // scratch_size is the total size from all LlvmCodeGen::GetScratchBuffer calls (with
+  // some additional bytes for alignment).
+  // This function is thread safe.
+  //
+  // This function shouldn't be called after calling FinalizeModule(). Instead use
+  // AddFunctionToJit() to register a function pointer. This is because FinalizeModule()
+  // may remove any functions not registered in AddFunctionToJit(). As such, this
+  // function is mostly useful for tests that do not call FinalizeModule() at all.
+  void* JitFunction(llvm::Function* function, int* scratch_size = NULL);
+
+  // Optimizes the module. This includes pruning the module of any unused functions.
+  void OptimizeModule();
 
   // Clears generated hash fns.  This is only used for testing.
   void ClearHashFns();
@@ -502,7 +533,7 @@ class LlvmCodeGen {
   // twice, which causes symbol collision errors.
   std::set<std::string> linked_modules_;
 
-  // The vector of functions to automatically JIT compile after OptimizeModule().
+  // The vector of functions to automatically JIT compile after FinalizeModule().
   std::vector<std::pair<llvm::Function*, void**> > fns_to_jit_compile_;
 
   // Debug utility that will insert a printf-like function into the generated

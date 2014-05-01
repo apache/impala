@@ -151,9 +151,6 @@ class HdfsScanner {
   // Cache of conjuncts_->size()
   int num_conjuncts_;
 
-  // Codegen fn to use.  NULL if codegen is not enabled for this scanner.
-  llvm::Function* codegen_fn_;
-
   // A partially materialized tuple with only partition key slots set.
   // The non-partition key slots are set to NULL.  The template tuple
   // must be copied into tuple_ before any of the other slots are
@@ -203,7 +200,6 @@ class HdfsScanner {
   WriteTuplesFn write_tuples_fn_;
 
   // Initializes write_tuples_fn_ to the jitted function if codegen is possible.
-  // Also sets codegen_fn_.
   // - partition - partition descriptor for this scanner/scan range
   // - type - type for this scanner
   // - scanner_name - debug string name for this scanner (e.g. HdfsTextScanner)
