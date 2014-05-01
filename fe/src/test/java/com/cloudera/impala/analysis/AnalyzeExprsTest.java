@@ -1273,7 +1273,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestDecimalType() throws AnalysisException {
+  public void TestDecimalCast() throws AnalysisException {
     AnalyzesOk("select cast(1 as decimal)");
     AnalyzesOk("select cast(1 as decimal(1))");
     AnalyzesOk("select cast(1 as decimal(38))");
@@ -1288,6 +1288,36 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Decimal precision must be <= 38.");
     AnalysisError("select cast(1 as decimal(1, 2))",
         "Decimal scale (2) must be <= precision (1).");
+  }
+
+  @Test
+  public void TestDecimalFunctions() throws AnalysisException {
+    AnalyzesOk("select abs(cast(1 as decimal))");
+    AnalyzesOk("select abs(cast(-1.1 as decimal(10,3)))");
+
+    AnalyzesOk("select floor(cast(-1.1 as decimal(10,3)))");
+    AnalyzesOk("select ceil(cast(1.123 as decimal(10,3)))");
+
+    AnalyzesOk("select round(cast(1.123 as decimal(10,3)))");
+    AnalyzesOk("select round(cast(1.123 as decimal(10,3)), 0)");
+    AnalyzesOk("select round(cast(1.123 as decimal(10,3)), 2)");
+    AnalyzesOk("select round(cast(1.123 as decimal(10,3)), 5)");
+    AnalyzesOk("select round(cast(1.123 as decimal(10,3)), -2)");
+
+    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)))");
+    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), 0)");
+    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), 2)");
+    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), 5)");
+    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), -1)");
+
+    AnalysisError("select round(cast(1.123 as decimal(10,3)), 5.1)",
+        "No matching function with signature: round(DECIMAL(10,3), DOUBLE)");
+    AnalysisError("select round(cast(1.123 as decimal(10,3)), 40)",
+        "Cannot round/truncate to scales greater than 38.");
+    AnalysisError("select truncate(cast(1.123 as decimal(10,3)), 40)",
+        "Cannot round/truncate to scales greater than 38.");
+    AnalysisError("select round(cast(1.123 as decimal(10,3)), NULL)",
+        "round() cannot be called with a NULL second argument.");
   }
 
   /**

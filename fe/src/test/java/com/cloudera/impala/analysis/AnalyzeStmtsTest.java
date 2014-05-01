@@ -459,6 +459,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes group by 1");
     AnalyzesOk("select year(timestamp_col), count(*) " +
         "from functional.alltypes group by year(timestamp_col)");
+
+    AnalyzesOk("select round(c1) from functional.decimal_tiny");
+    AnalyzesOk("select round(c1, 2) from functional.decimal_tiny");
+    AnalysisError("select round(c1, cast(c3 as int)) from functional.decimal_tiny",
+        "round() must be called with a constant second argument.");
+    AnalysisError("select truncate(c1, cast(c3 as int)) from functional.decimal_tiny",
+        "truncate() must be called with a constant second argument.");
   }
 
   void addTestUda(String name, ColumnType retType, ColumnType... argTypes) {

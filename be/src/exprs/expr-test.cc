@@ -129,21 +129,22 @@ class ExprTest : public testing::Test {
     default_type_strs_[TYPE_TIMESTAMP] = default_timestamp_str_;
   }
 
-  void GetValue(const string& expr, PrimitiveType expr_type, void** interpreted_value) {
+  void GetValue(const string& expr, const ColumnType& expr_type,
+      void** interpreted_value) {
     string stmt = "select " + expr;
     vector<FieldSchema> result_types;
     Status status = executor_->Exec(stmt, &result_types);
     ASSERT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetErrorMsg();
     string result_row;
     ASSERT_TRUE(executor_->FetchResult(&result_row).ok()) << expr;
-    EXPECT_EQ(TypeToOdbcString(expr_type), result_types[0].type) << expr;
+    EXPECT_EQ(TypeToOdbcString(expr_type.type), result_types[0].type) << expr;
     *interpreted_value = ConvertValue(expr_type, result_row);
   }
 
-  void* ConvertValue(PrimitiveType type, const string& value) {
+  void* ConvertValue(const ColumnType& type, const string& value) {
     StringParser::ParseResult result;
     if (value.compare("NULL") == 0) return NULL;
-    switch (type) {
+    switch (type.type) {
       case TYPE_STRING:
         // Float and double get conversion errors so leave them as strings.
         // We convert the expected result to string.
@@ -174,11 +175,27 @@ class ExprTest : public testing::Test {
       case TYPE_TIMESTAMP:
         expr_value_.timestamp_val = TimestampValue(&value[0], value.size());
         return &expr_value_.timestamp_val;
+      case TYPE_DECIMAL:
+        switch (type.GetByteSize()) {
+          case 4:
+            expr_value_.decimal4_val = StringParser::StringToDecimal<int32_t>(
+                &value[0], value.size(), type, &result);
+            return &expr_value_.decimal4_val;
+          case 8:
+            expr_value_.decimal8_val = StringParser::StringToDecimal<int64_t>(
+                &value[0], value.size(), type, &result);
+            return &expr_value_.decimal8_val;
+          case 16:
+            expr_value_.decimal16_val = StringParser::StringToDecimal<int128_t>(
+                &value[0], value.size(), type, &result);
+            return &expr_value_.decimal16_val;
+          default:
+            DCHECK(false) << type;
+        }
       default:
         DCHECK(false) << type;
     }
     return NULL;
-
   }
 
   void TestStringValue(const string& expr, const string& expected_result) {
@@ -204,13 +221,26 @@ class ExprTest : public testing::Test {
     EXPECT_FALSE(result->NotADateTime());
   }
 
-  template <class T> void TestValue(const string& expr, PrimitiveType expr_type,
+  // Decimals don't work with TestValue.
+  // TODO: figure out what operators need to be implemented to work with EXPECT_EQ
+  template <typename T>
+  void TestDecimalValue(const string& expr, const T& expected_result,
+      const ColumnType& expected_type) {
+    T* result = NULL;
+    GetValue(expr, expected_type, reinterpret_cast<void**>(&result));
+    EXPECT_EQ(result->value(), expected_result.value()) << expr
+        << ": values did not match. Expected: "
+        << expected_result.ToString(expected_type)
+        << " Actual: " << result->ToString(expected_type);
+  }
+
+  template <class T> void TestValue(const string& expr, const ColumnType& expr_type,
                                     const T& expected_result) {
     void* result;
     GetValue(expr, expr_type, &result);
 
     string expected_str;
-    switch (expr_type) {
+    switch (expr_type.type) {
       case TYPE_BOOLEAN:
         EXPECT_EQ(*reinterpret_cast<bool*>(result), expected_result) << expr;
         break;
@@ -239,11 +269,11 @@ class ExprTest : public testing::Test {
         EXPECT_EQ(*reinterpret_cast<string*>(result), expected_str) << expr;
         break;
       default:
-        ASSERT_TRUE(false) << "invalid TestValue() type: " << TypeToString(expr_type);
+        ASSERT_TRUE(false) << "invalid TestValue() type: " << expr_type;
     }
   }
 
-  void TestIsNull(const string& expr, PrimitiveType expr_type) {
+  void TestIsNull(const string& expr, const ColumnType& expr_type) {
     void* result;
     GetValue(expr, expr_type, &result);
     EXPECT_TRUE(result == NULL);
@@ -464,7 +494,7 @@ class ExprTest : public testing::Test {
     }
   }
 
-  template <typename T> void TestFixedPointLimits(PrimitiveType type) {
+  template <typename T> void TestFixedPointLimits(const ColumnType& type) {
     // cast to non-char type first, otherwise we might end up interpreting
     // the min/max as an ascii value
     int64_t t_min = numeric_limits<T>::min();
@@ -473,7 +503,7 @@ class ExprTest : public testing::Test {
     TestValue(lexical_cast<string>(t_max), type, numeric_limits<T>::max());
   }
 
-  template <typename T> void TestFloatingPointLimits(PrimitiveType type) {
+  template <typename T> void TestFloatingPointLimits(const ColumnType& type) {
     // numeric_limits<>::min() is the smallest positive value
     TestValue(lexical_cast<string>(numeric_limits<T>::min()), type,
               numeric_limits<T>::min());
@@ -491,7 +521,7 @@ class ExprTest : public testing::Test {
   // We have "--" as a comment element in our lexer,
   // so subtraction of a negative value will be ignored without " ".
   template <typename LeftOp, typename RightOp, typename Result>
-  void TestFixedResultTypeOps(LeftOp a, RightOp b, PrimitiveType expected_type) {
+  void TestFixedResultTypeOps(LeftOp a, RightOp b, const ColumnType& expected_type) {
     Result cast_a = static_cast<Result>(a);
     Result cast_b = static_cast<Result>(b);
     string a_str = lexical_cast<string>(cast_a);
@@ -510,7 +540,8 @@ class ExprTest : public testing::Test {
   // BITNOT, INT_DIVIDE, MOD.
   // As a convention we use RightOp as the higher resolution type.
   template <typename LeftOp, typename RightOp>
-  void TestVariableResultTypeIntOps(LeftOp a, RightOp b, PrimitiveType expected_type) {
+  void TestVariableResultTypeIntOps(LeftOp a, RightOp b,
+      const ColumnType& expected_type) {
     RightOp cast_a = static_cast<RightOp>(a);
     RightOp cast_b = static_cast<RightOp>(b);
     string a_str = lexical_cast<string>(static_cast<int64_t>(a));
@@ -528,7 +559,7 @@ class ExprTest : public testing::Test {
   // ADD, SUBTRACT, MULTIPLY, DIVIDE.
   // We need CastType to make lexical_cast work properly for low-resolution types.
   template <typename NonNullOp, typename CastType>
-  void TestNullOperandFixedResultTypeOps(NonNullOp op, PrimitiveType expected_type) {
+  void TestNullOperandFixedResultTypeOps(NonNullOp op, const ColumnType& expected_type) {
     CastType cast_op = static_cast<CastType>(op);
     string op_str = lexical_cast<string>(cast_op);
     // NULL as right operand.
@@ -547,7 +578,7 @@ class ExprTest : public testing::Test {
   // BITAND, BITOR, BITXOR, INT_DIVIDE, MOD.
   template <typename NonNullOp>
   void TestNullOperandVariableResultTypeIntOps(NonNullOp op,
-      PrimitiveType expected_type) {
+      const ColumnType& expected_type) {
     string op_str = lexical_cast<string>(static_cast<int64_t>(op));
     // NULL as right operand.
     TestIsNull(op_str + " & NULL", expected_type);
@@ -3231,6 +3262,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   }
 }
 
+// TODO: is there an easy way to templatize/parametrize these tests?
 TEST_F(ExprTest, DecimalFunctions) {
   TestValue("precision(cast (1 as decimal(10,2)))", TYPE_INT, 10);
   TestValue("scale(cast(1 as decimal(10,2)))", TYPE_INT, 2);
@@ -3245,6 +3277,290 @@ TEST_F(ExprTest, DecimalFunctions) {
   TestValue("precision(1 + 1)", TYPE_INT, 5);
   TestValue("scale(1 + 1)", TYPE_INT, 0);
   TestValue("precision(1 + 1)", TYPE_INT, 5);
+
+  TestValue("scale(cast(NULL as decimal(10, 2)))", TYPE_INT, 2);
+
+  // Test result scale/precision from round()/truncate()
+  TestValue("scale(round(cast(\"123.456\" as decimal(6, 3)), 3))", TYPE_INT, 3);
+  TestValue("precision(round(cast(\"123.456\" as decimal(6, 3)), 3))", TYPE_INT, 6);
+
+  TestValue("scale(truncate(cast(\"123.456\" as decimal(6, 3)), 1))", TYPE_INT, 1);
+  TestValue("precision(truncate(cast(\"123.456\" as decimal(6, 3)), 1))", TYPE_INT, 4);
+
+  TestValue("scale(round(cast(\"123.456\" as decimal(6, 3)), -2))", TYPE_INT, 0);
+  TestValue("precision(round(cast(\"123.456\" as decimal(6, 3)), -2))", TYPE_INT, 3);
+
+  TestValue("scale(truncate(cast(\"123.456\" as decimal(6, 3)), 10))", TYPE_INT, 10);
+  TestValue("precision(truncate(cast(\"123.456\" as decimal(6, 3)), 10))", TYPE_INT, 13);
+
+  TestValue("scale(round(cast(\"123.456\" as decimal(6, 3)), -10))", TYPE_INT, 0);
+  TestValue("precision(round(cast(\"123.456\" as decimal(6, 3)), -10))", TYPE_INT, 3);
+
+  // Abs()
+  TestDecimalValue("abs(cast('0' as decimal(2,0)))", Decimal4Value(0),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("abs(cast('1.1' as decimal(2,1)))", Decimal4Value(11),
+      ColumnType::CreateDecimalType(2,1));
+  TestDecimalValue("abs(cast('-1.23' as decimal(5,2)))", Decimal4Value(123),
+      ColumnType::CreateDecimalType(5,2));
+  TestDecimalValue("abs(cast('0' as decimal(12,0)))", Decimal8Value(0),
+      ColumnType::CreateDecimalType(12, 0));
+  TestDecimalValue("abs(cast('1.1' as decimal(12,1)))", Decimal8Value(11),
+      ColumnType::CreateDecimalType(12,1));
+  TestDecimalValue("abs(cast('-1.23' as decimal(12,2)))", Decimal8Value(123),
+      ColumnType::CreateDecimalType(12,2));
+  TestDecimalValue("abs(cast('0' as decimal(32,0)))", Decimal16Value(0),
+      ColumnType::CreateDecimalType(32, 0));
+  TestDecimalValue("abs(cast('1.1' as decimal(32,1)))", Decimal8Value(11),
+      ColumnType::CreateDecimalType(32,1));
+  TestDecimalValue("abs(cast('-1.23' as decimal(32,2)))", Decimal8Value(123),
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("abs(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
+
+  // Tests take a while and at this point we've cycled through each type. No reason
+  // to keep testing the codegen path.
+  if (!disable_codegen_) return;
+
+  // In these tests we iterate through the underlying decimal types and alternate
+  // between positive and negative values.
+
+  // Ceil()
+  TestDecimalValue("ceil(cast('0' as decimal(6,5)))", Decimal4Value(0),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("ceil(cast('3.14159' as decimal(6,5)))", Decimal4Value(4),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("ceil(cast('-3.14159' as decimal(6,5)))", Decimal4Value(-3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("ceil(cast('3' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("ceil(cast('3.14159' as decimal(13,5)))", Decimal8Value(4),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("ceil(cast('-3.14159' as decimal(13,5)))", Decimal8Value(-3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("ceil(cast('3' as decimal(13,5)))", Decimal8Value(3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("ceil(cast('3.14159' as decimal(33,5)))", Decimal16Value(4),
+      ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("ceil(cast('-3.14159' as decimal(33,5)))", Decimal16Value(-3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("ceil(cast('3' as decimal(33,5)))", Decimal16Value(3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestIsNull("ceil(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
+
+  // Floor()
+  TestDecimalValue("floor(cast('3.14159' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("floor(cast('-3.14159' as decimal(6,5)))", Decimal4Value(-4),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("floor(cast('3' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("floor(cast('3.14159' as decimal(13,5)))", Decimal8Value(3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("floor(cast('-3.14159' as decimal(13,5)))", Decimal8Value(-4),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("floor(cast('3' as decimal(13,5)))", Decimal8Value(3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("floor(cast('3.14159' as decimal(33,5)))", Decimal16Value(3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("floor(cast('-3.14159' as decimal(33,5)))", Decimal16Value(-4),
+      ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("floor(cast('3' as decimal(33,5)))", Decimal16Value(3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestIsNull("floor(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
+
+  // Round()
+  TestDecimalValue("round(cast('3.14159' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("round(cast('-3.14159' as decimal(6,5)))", Decimal4Value(-3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("round(cast('3' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("round(cast('3.14159' as decimal(13,5)))", Decimal8Value(3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("round(cast('-3.14159' as decimal(13,5)))", Decimal8Value(-3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("round(cast('3' as decimal(13,5)))", Decimal8Value(3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("round(cast('3.14159' as decimal(33,5)))", Decimal16Value(3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("round(cast('-3.14159' as decimal(33,5)))", Decimal16Value(-3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("round(cast('3' as decimal(33,5)))", Decimal16Value(3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestIsNull("round(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
+
+  // Truncate()
+  TestDecimalValue("truncate(cast('3.54159' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("truncate(cast('-3.54159' as decimal(6,5)))", Decimal4Value(-3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("truncate(cast('3' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("truncate(cast('3.54159' as decimal(13,5)))", Decimal8Value(3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("truncate(cast('-3.54159' as decimal(13,5)))", Decimal8Value(-3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("truncate(cast('3' as decimal(13,5)))", Decimal8Value(3),
+      ColumnType::CreateDecimalType(13, 0));
+  TestDecimalValue("truncate(cast('3.54159' as decimal(33,5)))", Decimal16Value(3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("truncate(cast('-3.54159' as decimal(33,5)))", Decimal16Value(-3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("truncate(cast('3' as decimal(33,5)))", Decimal16Value(3),
+      ColumnType::CreateDecimalType(33, 0));
+  TestIsNull("truncate(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
+
+  // RoundTo()
+  TestIsNull("round(cast(NULL as decimal(2,0)), 1)", ColumnType::CreateDecimalType(2,0));
+
+  TestDecimalValue("round(cast('3.1615' as decimal(6,4)), 0)", Decimal4Value(3),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("round(cast('-3.1615' as decimal(6,4)), 1)", Decimal4Value(-32),
+      ColumnType::CreateDecimalType(3, 1));
+  TestDecimalValue("round(cast('3.1615' as decimal(6,4)), 2)", Decimal4Value(316),
+      ColumnType::CreateDecimalType(4, 2));
+  TestDecimalValue("round(cast('3.1615' as decimal(6,4)), 3)", Decimal4Value(3162),
+      ColumnType::CreateDecimalType(5, 3));
+  TestDecimalValue("round(cast('-3.1615' as decimal(6,4)), 3)", Decimal4Value(-3162),
+      ColumnType::CreateDecimalType(5, 3));
+  TestDecimalValue("round(cast('3.1615' as decimal(6,4)), 4)", Decimal4Value(31615),
+      ColumnType::CreateDecimalType(6, 4));
+  TestDecimalValue("round(cast('-3.1615' as decimal(6,4)), 5)", Decimal4Value(-316150),
+      ColumnType::CreateDecimalType(7, 5));
+  TestDecimalValue("round(cast('175.0' as decimal(6,1)), 0)", Decimal4Value(175),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("round(cast('-175.0' as decimal(6,1)), -1)", Decimal4Value(-180),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("round(cast('175.0' as decimal(6,1)), -2)", Decimal4Value(200),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("round(cast('-175.0' as decimal(6,1)), -3)", Decimal4Value(0),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("round(cast('175.0' as decimal(6,1)), -4)", Decimal4Value(0),
+      ColumnType::CreateDecimalType(6, 0));
+
+  TestDecimalValue("round(cast('-3.1615' as decimal(16,4)), 0)", Decimal8Value(-3),
+      ColumnType::CreateDecimalType(12, 0));
+  TestDecimalValue("round(cast('3.1615' as decimal(16,4)), 1)", Decimal8Value(32),
+      ColumnType::CreateDecimalType(13, 1));
+  TestDecimalValue("round(cast('-3.1615' as decimal(16,4)), 2)", Decimal8Value(-316),
+      ColumnType::CreateDecimalType(14, 2));
+  TestDecimalValue("round(cast('3.1615' as decimal(16,4)), 3)", Decimal8Value(3162),
+      ColumnType::CreateDecimalType(15, 3));
+  TestDecimalValue("round(cast('-3.1615' as decimal(16,4)), 3)", Decimal8Value(-3162),
+      ColumnType::CreateDecimalType(15, 3));
+  TestDecimalValue("round(cast('-3.1615' as decimal(16,4)), 4)", Decimal8Value(-31615),
+      ColumnType::CreateDecimalType(16, 4));
+  TestDecimalValue("round(cast('3.1615' as decimal(16,4)), 5)", Decimal8Value(316150),
+      ColumnType::CreateDecimalType(17, 5));
+
+  TestDecimalValue("round(cast('-175.0' as decimal(15,1)), 0)", Decimal8Value(-175),
+      ColumnType::CreateDecimalType(15, 0));
+  TestDecimalValue("round(cast('175.0' as decimal(15,1)), -1)", Decimal8Value(180),
+      ColumnType::CreateDecimalType(15, 0));
+  TestDecimalValue("round(cast('-175.0' as decimal(15,1)), -2)", Decimal8Value(-200),
+      ColumnType::CreateDecimalType(15, 0));
+  TestDecimalValue("round(cast('175.0' as decimal(15,1)), -3)", Decimal8Value(0),
+      ColumnType::CreateDecimalType(15, 0));
+  TestDecimalValue("round(cast('-175.0' as decimal(15,1)), -4)", Decimal8Value(0),
+      ColumnType::CreateDecimalType(15, 0));
+
+  TestDecimalValue("round(cast('3.1615' as decimal(32,4)), 0)", Decimal16Value(3),
+      ColumnType::CreateDecimalType(32, 0));
+  TestDecimalValue("round(cast('-3.1615' as decimal(32,4)), 1)", Decimal16Value(-32),
+      ColumnType::CreateDecimalType(33, 1));
+  TestDecimalValue("round(cast('3.1615' as decimal(32,4)), 2)", Decimal16Value(316),
+      ColumnType::CreateDecimalType(34, 2));
+  TestDecimalValue("round(cast('3.1615' as decimal(32,4)), 3)", Decimal16Value(3162),
+      ColumnType::CreateDecimalType(35, 3));
+  TestDecimalValue("round(cast('-3.1615' as decimal(32,4)), 3)", Decimal16Value(-3162),
+      ColumnType::CreateDecimalType(36, 3));
+  TestDecimalValue("round(cast('3.1615' as decimal(32,4)), 4)", Decimal16Value(31615),
+      ColumnType::CreateDecimalType(37, 4));
+  TestDecimalValue("round(cast('-3.1615' as decimal(32,5)), 5)", Decimal16Value(-316150),
+      ColumnType::CreateDecimalType(38, 5));
+  TestDecimalValue("round(cast('-175.0' as decimal(35,1)), 0)", Decimal16Value(-175),
+      ColumnType::CreateDecimalType(35, 0));
+  TestDecimalValue("round(cast('175.0' as decimal(35,1)), -1)", Decimal16Value(180),
+      ColumnType::CreateDecimalType(35, 0));
+  TestDecimalValue("round(cast('-175.0' as decimal(35,1)), -2)", Decimal16Value(-200),
+      ColumnType::CreateDecimalType(35, 0));
+  TestDecimalValue("round(cast('175.0' as decimal(35,1)), -3)", Decimal16Value(0),
+      ColumnType::CreateDecimalType(35, 0));
+  TestDecimalValue("round(cast('-175.0' as decimal(35,1)), -4)", Decimal16Value(0),
+      ColumnType::CreateDecimalType(35, 0));
+
+  // TruncateTo()
+  TestIsNull("truncate(cast(NULL as decimal(2,0)), 1)",
+      ColumnType::CreateDecimalType(2,0));
+
+  TestDecimalValue("truncate(cast('-3.1615' as decimal(6,4)), 0)", Decimal4Value(-3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("truncate(cast('3.1615' as decimal(6,4)), 1)", Decimal4Value(31),
+      ColumnType::CreateDecimalType(6, 1));
+  TestDecimalValue("truncate(cast('-3.1615' as decimal(6,4)), 2)", Decimal4Value(-316),
+      ColumnType::CreateDecimalType(6, 2));
+  TestDecimalValue("truncate(cast('3.1615' as decimal(6,4)), 3)", Decimal4Value(3161),
+      ColumnType::CreateDecimalType(6, 3));
+  TestDecimalValue("truncate(cast('-3.1615' as decimal(6,4)), 4)", Decimal4Value(-31615),
+      ColumnType::CreateDecimalType(6, 4));
+  TestDecimalValue("truncate(cast('3.1615' as decimal(6,4)), 5)", Decimal4Value(316150),
+      ColumnType::CreateDecimalType(7, 5));
+  TestDecimalValue("truncate(cast('175.0' as decimal(6,1)), 0)", Decimal4Value(175),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("truncate(cast('-175.0' as decimal(6,1)), -1)", Decimal4Value(-170),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("truncate(cast('175.0' as decimal(6,1)), -2)", Decimal4Value(100),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("truncate(cast('-175.0' as decimal(6,1)), -3)", Decimal4Value(0),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("truncate(cast('175.0' as decimal(6,1)), -4)", Decimal4Value(0),
+      ColumnType::CreateDecimalType(6, 0));
+
+  TestDecimalValue("truncate(cast('-3.1615' as decimal(16,4)), 0)", Decimal8Value(-3),
+      ColumnType::CreateDecimalType(12, 0));
+  TestDecimalValue("truncate(cast('3.1615' as decimal(16,4)), 1)", Decimal8Value(31),
+      ColumnType::CreateDecimalType(13, 1));
+  TestDecimalValue("truncate(cast('-3.1615' as decimal(16,4)), 2)", Decimal8Value(-316),
+      ColumnType::CreateDecimalType(14, 2));
+  TestDecimalValue("truncate(cast('3.1615' as decimal(16,4)), 3)", Decimal8Value(3161),
+      ColumnType::CreateDecimalType(15, 3));
+  TestDecimalValue("truncate(cast('3.1615' as decimal(16,4)), 4)",
+      Decimal8Value(31615), ColumnType::CreateDecimalType(16, 4));
+  TestDecimalValue("truncate(cast('-3.1615' as decimal(16,4)), 5)",
+      Decimal8Value(-316150), ColumnType::CreateDecimalType(17, 5));
+  TestDecimalValue("truncate(cast('-175.0' as decimal(15,1)), 0)", Decimal8Value(-175),
+      ColumnType::CreateDecimalType(15, 0));
+  TestDecimalValue("truncate(cast('175.0' as decimal(15,1)), -1)", Decimal8Value(170),
+      ColumnType::CreateDecimalType(15, 0));
+  TestDecimalValue("truncate(cast('-175.0' as decimal(15,1)), -2)", Decimal8Value(-100),
+      ColumnType::CreateDecimalType(15, 0));
+  TestDecimalValue("truncate(cast('175.0' as decimal(15,1)), -3)", Decimal8Value(0),
+      ColumnType::CreateDecimalType(15, 0));
+  TestDecimalValue("truncate(cast('-175.0' as decimal(15,1)), -4)", Decimal8Value(0),
+      ColumnType::CreateDecimalType(15, 0));
+
+  TestDecimalValue("truncate(cast('-3.1615' as decimal(32,4)), 0)",
+      Decimal16Value(-3), ColumnType::CreateDecimalType(28, 0));
+  TestDecimalValue("truncate(cast('3.1615' as decimal(32,4)), 1)",
+      Decimal16Value(31), ColumnType::CreateDecimalType(29, 1));
+  TestDecimalValue("truncate(cast('-3.1615' as decimal(32,4)), 2)",
+      Decimal16Value(-316), ColumnType::CreateDecimalType(30, 2));
+  TestDecimalValue("truncate(cast('3.1615' as decimal(32,4)), 3)",
+      Decimal16Value(3161), ColumnType::CreateDecimalType(31, 3));
+  TestDecimalValue("truncate(cast('-3.1615' as decimal(32,4)), 4)",
+      Decimal16Value(-31615), ColumnType::CreateDecimalType(32, 4));
+  TestDecimalValue("truncate(cast('3.1615' as decimal(32,4)), 5)",
+      Decimal16Value(316150), ColumnType::CreateDecimalType(33, 5));
+  TestDecimalValue("truncate(cast('-175.0' as decimal(35,1)), 0)",
+      Decimal16Value(-175), ColumnType::CreateDecimalType(35, 0));
+  TestDecimalValue("truncate(cast('175.0' as decimal(35,1)), -1)",
+      Decimal16Value(170), ColumnType::CreateDecimalType(35, 0));
+  TestDecimalValue("truncate(cast('-175.0' as decimal(35,1)), -2)",
+      Decimal16Value(-100), ColumnType::CreateDecimalType(35, 0));
+  TestDecimalValue("truncate(cast('175.0' as decimal(35,1)), -3)",
+      Decimal16Value(0), ColumnType::CreateDecimalType(35, 0));
+  TestDecimalValue("truncate(cast('-175.0' as decimal(35,1)), -4)",
+      Decimal16Value(0), ColumnType::CreateDecimalType(35, 0));
 }
 
 TEST_F(ExprTest, UdfInterfaceBuiltins) {

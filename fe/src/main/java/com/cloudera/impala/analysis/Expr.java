@@ -799,6 +799,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * @return true if this expr is either a null literal or a cast from
+   * a null literal.
+   */
+  public boolean isNullLiteral() {
+    if (this instanceof NullLiteral) return true;
+    if (!(this instanceof CastExpr)) return false;
+    Preconditions.checkState(children_.size() == 1);
+    return children_.get(0).isNullLiteral();
+  }
+
+  /**
    * Checks whether this expr returns a boolean type or NULL type.
    * If not, throws an AnalysisException with an appropriate error message using
    * 'name' as a prefix. For example, 'name' could be "WHERE clause".

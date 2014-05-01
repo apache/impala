@@ -143,7 +143,7 @@ class DecimalValue {
       // Check overflow.
       if (!*overflow && is_negative() == other.is_negative()) {
         // Can only overflow if the signs are the same
-        *overflow = DecimalUtil::MAX_UNSCALED_DECIMAL - Abs(x) < Abs(y);
+        *overflow = DecimalUtil::MAX_UNSCALED_DECIMAL - abs(x) < abs(y);
         // TODO: faster to return here? We don't care at all about the perf on
         // the overflow case but what makes the normal path faster?
       }
@@ -176,7 +176,7 @@ class DecimalValue {
     }
     if (sizeof(RESULT_T) == 16) {
       // Check overflow
-      *overflow = DecimalUtil::MAX_UNSCALED_DECIMAL / Abs(y) < Abs(x);
+      *overflow = DecimalUtil::MAX_UNSCALED_DECIMAL / abs(y) < abs(x);
     }
     RESULT_T result = x * y;
     int delta_scale = this_type.scale + other_type.scale - result_scale;
@@ -281,7 +281,7 @@ class DecimalValue {
 
   // Returns the value of the decimal after the decimal point.
   const T fractional_part(const ColumnType& t) const {
-    return Abs(value()) % DecimalUtil::GetScaleMultiplier<T>(t.scale);
+    return abs(value()) % DecimalUtil::GetScaleMultiplier<T>(t.scale);
   }
 
   // Returns an approximate double for this decimal.
@@ -294,6 +294,8 @@ class DecimalValue {
   }
 
   std::string ToString(const ColumnType& type) const;
+
+  DecimalValue<T> Abs() const { return DecimalValue<T>(abs(value_)); }
 
  private:
   T value_;
@@ -313,14 +315,14 @@ class DecimalValue {
       *y_scaled = y.value();
     } else if (delta_scale > 0) {
       if (sizeof(RESULT_T) == 16 &&
-          DecimalUtil::MAX_UNSCALED_DECIMAL / scale_factor < Abs(y.value())) {
+          DecimalUtil::MAX_UNSCALED_DECIMAL / scale_factor < abs(y.value())) {
         return true;
       }
       *x_scaled = x.value();
       *y_scaled = y.value() * scale_factor;
     } else {
       if (sizeof(RESULT_T) == 16 &&
-          DecimalUtil::MAX_UNSCALED_DECIMAL / scale_factor < Abs(x.value())) {
+          DecimalUtil::MAX_UNSCALED_DECIMAL / scale_factor < abs(x.value())) {
         return true;
       }
       *x_scaled = x.value() * scale_factor;

@@ -25,6 +25,16 @@ class DecimalFunctions {
  public:
   static void* Precision(Expr* e, TupleRow* row);
   static void* Scale(Expr* e, TupleRow* row);
+
+  static void* Abs(Expr* e, TupleRow* row);
+  static void* Ceil(Expr* e, TupleRow* row);
+  static void* Floor(Expr* e, TupleRow* row);
+
+  static void* Round(Expr* e, TupleRow* row);
+  static void* RoundTo(Expr* e, TupleRow* row);
+
+  static void* Truncate(Expr* e, TupleRow* row);
+  static void* TruncateTo(Expr* e, TupleRow* row);
 };
 
 }

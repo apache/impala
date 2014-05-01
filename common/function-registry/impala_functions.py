@@ -467,12 +467,13 @@ functions = [
   # high precisions. Do we need them? It's unclear if other databases do the same.
   [['precision'], 'INT', ['DECIMAL'], symbol('DecimalFunctions', 'Precision')],
   [['scale'], 'INT', ['DECIMAL'], symbol('DecimalFunctions', 'Scale')],
-  [['abs'], 'DECIMAL', ['DECIMAL'], ""],
-  [['ceil'], 'DECIMAL', ['DECIMAL'], ""],
-  [['floor'], 'DECIMAL', ['DECIMAL'], ""],
-  [['round'], 'DECIMAL', ['DECIMAL'], ""],
-  [['round'], 'DECIMAL', ['DECIMAL', 'INT'], ""],
-  [['truncate'], 'DECIMAL', ['DECIMAL', 'INT'], ""],
+  [['abs'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Abs')],
+  [['ceil', 'ceiling'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Ceil')],
+  [['floor'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Floor')],
+  [['round'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Round')],
+  [['round'], 'DECIMAL', ['DECIMAL', 'INT'], symbol('DecimalFunctions', 'RoundTo')],
+  [['truncate'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Truncate')],
+  [['truncate'], 'DECIMAL', ['DECIMAL', 'INT'], symbol('DecimalFunctions', 'TruncateTo')],
 ]
 
 # These functions are implemented against the UDF interface.

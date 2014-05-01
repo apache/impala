@@ -30,6 +30,7 @@ class RuntimeState;
 
 class FunctionCall: public Expr {
  protected:
+  friend class DecimalFunctions;
   friend class Expr;
   friend class StringFunctions;
   friend class TimestampFunctions;
@@ -48,21 +49,29 @@ class FunctionCall: public Expr {
   // Returns false when an invalid format is specified. NULL may also be passed to
   // indicate that a generic date/time context is required.
   bool SetDateTimeFormatCtx(StringValue* fmt);
+
   // Format context returned is intentionally mutable, as dynamic formats may be used
   // which require a place to store parsed tokens.
   DateTimeFormatContext* const GetDateTimeFormatCtx() {
     return date_time_format_ctx_.get();
   }
 
+  int scale() const { return scale_; }
+
  private:
   // Used in regexp string functions to avoid re-compiling
   // a constant regexp for every function invocation.
   boost::scoped_ptr<boost::regex> regex_;
+
   // To avoid copying constant replace strings in regexp_replace.
   boost::scoped_ptr<std::string> replace_str_;
+
   // Used in timestamp date/time parsing with custom formats to avoid
   // parsing for every function invocation.
   boost::scoped_ptr<DateTimeFormatContext> date_time_format_ctx_;
+
+  // Desired result scale for round/truncate.
+  int scale_;
 };
 
 }

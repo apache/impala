@@ -27,7 +27,7 @@ using namespace boost;
 namespace impala {
 
 FunctionCall::FunctionCall(const TExprNode& node)
-  : Expr(node), regex_(NULL) {
+  : Expr(node), regex_(NULL), scale_(0) {
 }
 
 Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
@@ -59,6 +59,14 @@ Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc)
       if (fmt != NULL && fmt->len > 0) SetDateTimeFormatCtx(fmt);
     } else {
       SetDateTimeFormatCtx(NULL);
+    }
+  } else if (name == "truncate" || name == "round") {
+    // round/truncate() for decimal take an optional second argument.
+    if (type().type == TYPE_DECIMAL && children_.size() == 2) {
+      DCHECK(children_[1]->IsConstant());
+      int32_t* scale = reinterpret_cast<int32_t*>(children_[1]->GetValue(NULL));
+      DCHECK(scale != NULL) << DebugString();
+      scale_ = *scale;
     }
   }
   return Status::OK;

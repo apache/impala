@@ -64,6 +64,7 @@ public class ColumnType {
 
   // Hive, mysql, sql server standard.
   public static final int MAX_PRECISION = 38;
+  public static final int MAX_SCALE = MAX_PRECISION;
 
   // Static constant types for simple types that don't require additional information.
   public static final ColumnType INVALID = new ColumnType(PrimitiveType.INVALID_TYPE);

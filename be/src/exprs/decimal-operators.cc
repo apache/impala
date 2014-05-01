@@ -274,24 +274,124 @@ CAST_DECIMAL_TO_INT(Cast_decimal_long, int64_t, bigint_val)
 CAST_DECIMAL_TO_FLOAT(Cast_decimal_float, float, float_val)
 CAST_DECIMAL_TO_FLOAT(Cast_decimal_double, double, double_val)
 
-void* DecimalOperators::Cast_decimal_decimal(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
+void* DecimalOperators::RoundDecimalNegativeScale(Expr* e, TupleRow* row,
+    const DecimalRoundOp& op, int rounding_scale) {
+  DCHECK_GT(rounding_scale, 0);
+  DCHECK_EQ(e->GetNumChildren(), 2);
   Expr* c = e->GetChild(0);
   void* v = c->GetValue(row);
   if (v == NULL) return NULL;
 
+  // Switch on the parent type. 'result' holds the value prior to rounding.
+  void* result = NULL;
+
+  // Switch on the child type.
   switch (c->type().GetByteSize()) {
     case 4:
-      return SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal4Value*>(v));
+      result = SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal4Value*>(v));
+      break;
     case 8:
-      return SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal8Value*>(v));
+      result = SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal8Value*>(v));
+      break;
     case 16:
-      return SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal16Value*>(v));
+      result = SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal16Value*>(v));
+      break;
     default:
+      DCHECK(false);
       return NULL;
   }
 
-  return NULL;
+  // We've done the cast portion of the computation. Now round it.
+  switch (e->type().GetByteSize()) {
+    case 4: {
+      Decimal4Value* r = reinterpret_cast<Decimal4Value*>(result);
+      int32_t base = DecimalUtil::GetScaleMultiplier<int32_t>(rounding_scale);
+      int32_t d = RoundDelta(*r, 0, -rounding_scale, op);
+      r->value() -= (r->value() % base);
+      r->value() += d * base;
+      break;
+    }
+    case 8: {
+      Decimal8Value* r = reinterpret_cast<Decimal8Value*>(result);
+      int64_t base = DecimalUtil::GetScaleMultiplier<int64_t>(rounding_scale);
+      int64_t d = RoundDelta(*r, 0, -rounding_scale, op);
+      r->value() -= (r->value() % base);
+      r->value() += d * base;
+      break;
+    }
+    case 16: {
+      Decimal16Value* r = reinterpret_cast<Decimal16Value*>(result);
+      int128_t base = DecimalUtil::GetScaleMultiplier<int128_t>(rounding_scale);
+      int128_t d = RoundDelta(*r, 0, -rounding_scale, op);
+      r->value() -= (r->value() % base);
+      r->value() += d * base;
+      break;
+    }
+    default:
+      DCHECK(false);
+      return NULL;
+  }
+
+  return result;
+}
+
+void* DecimalOperators::RoundDecimal(Expr* e, TupleRow* row,
+    const DecimalRoundOp& op) {
+  DCHECK_GE(e->GetNumChildren(), 1);
+  Expr* c = e->GetChild(0);
+  void* v = c->GetValue(row);
+  if (v == NULL) return NULL;
+
+  // Switch on the child type.
+  void* result = NULL;
+  int delta = 0;
+  switch (c->type().GetByteSize()) {
+    case 4:
+      result = SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal4Value*>(v));
+      delta = RoundDelta(*reinterpret_cast<Decimal4Value*>(v),
+          c->type().scale, e->type().scale, op);
+      break;
+    case 8:
+      result = SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal8Value*>(v));
+      delta = RoundDelta(*reinterpret_cast<Decimal8Value*>(v),
+          c->type().scale, e->type().scale, op);
+      break;
+    case 16:
+      result = SetDecimalVal(e, c->type(), *reinterpret_cast<Decimal16Value*>(v));
+      delta = RoundDelta(*reinterpret_cast<Decimal16Value*>(v),
+          c->type().scale, e->type().scale, op);
+      break;
+    default:
+      DCHECK(false);
+      return NULL;
+  }
+
+  // At this point result is the first part of the round operation. It has just
+  // done the cast.
+  DCHECK(result != NULL);
+  if (delta == 0) return result;
+
+  // Switch on the parent type. The value in 'result' is before the rounding has
+  // occurred.
+  switch (e->type().GetByteSize()) {
+    case 4:
+      reinterpret_cast<Decimal4Value*>(result)->value() += delta;
+      break;
+    case 8:
+      reinterpret_cast<Decimal8Value*>(result)->value() += delta;
+      break;
+    case 16:
+      reinterpret_cast<Decimal16Value*>(result)->value() += delta;
+      break;
+  }
+  return result;
+}
+
+// Cast is just RoundDecimal(TRUNCATE).
+// TODO: how we handle cast to a smaller scale is an implementation detail in the spec.
+// We could also choose to cast by doing ROUND.
+void* DecimalOperators::Cast_decimal_decimal(Expr* e, TupleRow* row) {
+  return RoundDecimal(e, row, TRUNCATE);
 }
 
 void* DecimalOperators::Cast_StringValue_decimal(Expr* e, TupleRow* row) {

@@ -23,6 +23,7 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
@@ -165,6 +166,85 @@ public class FunctionCallExpr extends Expr {
         fnName_, params_.isStar() ? "*" : Joiner.on(", ").join(argTypes));
   }
 
+  /**
+   * Builtins that return decimals are specified as the wildcard decimal(decimal(*,*))
+   * and the specific decimal can only be determined based on the inputs. We currently
+   * don't have a mechanism to specify this with the UDF interface. Until we add
+   * that (i.e. allowing UDFs to participate in the planning phase), we will
+   * manually resolve the wildcard types for the few functions that need it.
+   * This can only be called for functions that return wildcard decimals and the first
+   * argument is a wildcard decimal.
+   * TODO: this prevents UDFs from using wildcard decimals and is in general not scalable.
+   * We should add a prepare_fn() to UDFs for doing this.
+   */
+  private ColumnType resolveDecimalReturnType(Analyzer analyzer)
+      throws AnalysisException {
+    Preconditions.checkState(type_.isWildcardDecimal());
+    Preconditions.checkState(fn_.getBinaryType() == TFunctionBinaryType.BUILTIN);
+    Preconditions.checkState(children_.size() > 0);
+    ColumnType childType = children_.get(0).type_;
+    Preconditions.checkState(childType.isDecimal() && !childType.isWildcardDecimal());
+    ColumnType returnType = childType;
+
+    if (fnName_.getFunction().equalsIgnoreCase("sum")) {
+      returnType = childType.getMaxResolutionType();
+    } else if (fnName_.getFunction().equalsIgnoreCase("ceil") ||
+               fnName_.getFunction().equalsIgnoreCase("ceiling") ||
+               fnName_.getFunction().equals("floor")) {
+      // These functions just return with scale 0.
+      returnType = ColumnType.createDecimalType(
+          childType.decimalPrecision() - childType.decimalScale(), 0);
+    } else if (fnName_.getFunction().equalsIgnoreCase("truncate") ||
+               fnName_.getFunction().equalsIgnoreCase("round")) {
+      int resultScale = 0;
+      if (children_.size() > 1) {
+        // The second argument to these functions is the desired scale, otherwise
+        // the default is 0.
+        Preconditions.checkState(children_.size() == 2);
+        if (children_.get(1).isNullLiteral()) {
+          throw new AnalysisException(fnName_.getFunction() +
+              "() cannot be called with a NULL second argument.");
+        }
+
+        Preconditions.checkState(
+            children_.get(1).type_.getPrimitiveType() == PrimitiveType.INT);
+        if (!children_.get(1).isConstant()) {
+          // We don't allow calling truncate or round with a non-constant second
+          // (desired scale) argument. e.g. select round(col1, col2). This would
+          // mean we don't know the scale of the resulting type and would need some
+          // kind of dynamic type handling which is not yet possible. This seems like
+          // a reasonable restriction.
+          throw new AnalysisException(fnName_.getFunction() +
+              "() must be called with a constant second argument.");
+        }
+        IntLiteral scaleLiteral =
+            (IntLiteral)LiteralExpr.create(children_.get(1), analyzer.getQueryContext());
+        resultScale = (int)scaleLiteral.getValue();
+        if (Math.abs(resultScale) > ColumnType.MAX_SCALE) {
+          throw new AnalysisException("Cannot round/truncate to scales greater than " +
+              ColumnType.MAX_SCALE + ".");
+        }
+      }
+      if (resultScale < 0) {
+        // Round/Truncate to a negative scale means to round to the digit before
+        // the decimal e.g. round(1234.56, -2) would be 1200.
+        // The resulting scale is always 0.
+        // TODO: there is an optimization here to replace this call with the literal 0
+        // if the scale is greater than the original precision.
+        // e.g. round(decimal(4,*), -5) will always be 0.
+        int resultPrecision = childType.decimalPrecision() - childType.decimalScale();
+        returnType = ColumnType.createDecimalTypeInternal(resultPrecision, 0);
+      } else {
+        // deltaScale can be negative meaning the new digits should be 0's.
+        int deltaScale = childType.decimalScale() - resultScale;
+        returnType = ColumnType.createDecimalTypeInternal(
+            childType.decimalPrecision() - deltaScale, resultScale);
+      }
+    }
+    Preconditions.checkState(returnType.isDecimal() && !returnType.isWildcardDecimal());
+    return returnType;
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
@@ -264,16 +344,7 @@ public class FunctionCallExpr extends Expr {
     castForFunctionCall();
     type_ = fn_.getReturnType();
     if (type_.isDecimal() && type_.isWildcardDecimal()) {
-      // TODO: we specify decimal(*,*) for some builtins. It would be nice to expose
-      // this mechanism (where the function can at planning type resolve types).
-      Preconditions.checkState(fn_.getBinaryType() == TFunctionBinaryType.BUILTIN);
-      Preconditions.checkState(children_.size() > 0);
-      if (fnName_.getFunction().equalsIgnoreCase("sum")) {
-        type_ = children_.get(0).type_.getMaxResolutionType();
-      } else {
-        type_ = children_.get(0).type_;
-      }
-      Preconditions.checkState(type_.isDecimal() && !type_.isWildcardDecimal());
+      type_ = resolveDecimalReturnType(analyzer);
     }
   }
 }
