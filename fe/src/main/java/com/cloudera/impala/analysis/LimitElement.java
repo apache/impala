@@ -139,10 +139,14 @@ class LimitElement {
       throw new AnalysisException("Failed to evaluate expr: " + expr.toSql(), e);
     }
     long value;
-    if (val.isSetLongVal()) {
-      value = val.getLongVal();
-    } else if (val.isSetIntVal()) {
-      value = val.getIntVal();
+    if (val.isSetLong_val()) {
+      value = val.getLong_val();
+    } else if (val.isSetInt_val()) {
+      value = val.getInt_val();
+    } else if (val.isSetShort_val()) {
+      value = val.getShort_val();
+    } else if (val.isSetByte_val()) {
+      value = val.getByte_val();
     } else {
       throw new AnalysisException(name + " expression evaluates to NULL: " +
           expr.toSql());

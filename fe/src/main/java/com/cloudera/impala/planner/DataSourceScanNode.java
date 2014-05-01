@@ -107,18 +107,20 @@ public class DataSourceScanNode extends ScanNode {
     TPrimitiveType colType = expr.getType().toThrift().getType();
     switch (colType) {
     case BOOLEAN:
-      return new TColumnValue().setBoolVal(((BoolLiteral) expr).getValue());
+      return new TColumnValue().setBool_val(((BoolLiteral) expr).getValue());
     case TINYINT:
+      return new TColumnValue().setByte_val((byte) ((IntLiteral) expr).getValue());
     case SMALLINT:
+      return new TColumnValue().setShort_val((short) ((IntLiteral) expr).getValue());
     case INT:
-      return new TColumnValue().setIntVal((int) ((IntLiteral) expr).getValue());
+      return new TColumnValue().setInt_val((int) ((IntLiteral) expr).getValue());
     case BIGINT:
-      return new TColumnValue().setLongVal(((IntLiteral) expr).getValue());
+      return new TColumnValue().setLong_val(((IntLiteral) expr).getValue());
     case FLOAT:
     case DOUBLE:
-      return new TColumnValue().setDoubleVal(((FloatLiteral) expr).getValue());
+      return new TColumnValue().setDouble_val(((FloatLiteral) expr).getValue());
     case STRING:
-      return new TColumnValue().setStringVal(((StringLiteral) expr).getValue());
+      return new TColumnValue().setString_val(((StringLiteral) expr).getValue());
     case DECIMAL:
     case DATE:
     case DATETIME:

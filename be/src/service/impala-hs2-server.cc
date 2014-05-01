@@ -840,42 +840,42 @@ void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col
   switch (type.type) {
     case TPrimitiveType::BOOLEAN:
       hs2_col_val->__isset.boolVal = true;
-      hs2_col_val->boolVal.value = col_val.boolVal;
-      hs2_col_val->boolVal.__isset.value = col_val.__isset.boolVal;
+      hs2_col_val->boolVal.value = col_val.bool_val;
+      hs2_col_val->boolVal.__isset.value = col_val.__isset.bool_val;
       break;
     case TPrimitiveType::TINYINT:
       hs2_col_val->__isset.byteVal = true;
-      hs2_col_val->byteVal.value = col_val.intVal;
-      hs2_col_val->byteVal.__isset.value = col_val.__isset.intVal;
+      hs2_col_val->byteVal.value = col_val.byte_val;
+      hs2_col_val->byteVal.__isset.value = col_val.__isset.byte_val;
       break;
     case TPrimitiveType::SMALLINT:
       hs2_col_val->__isset.i16Val = true;
-      hs2_col_val->i16Val.value = col_val.intVal;
-      hs2_col_val->i16Val.__isset.value = col_val.__isset.intVal;
+      hs2_col_val->i16Val.value = col_val.short_val;
+      hs2_col_val->i16Val.__isset.value = col_val.__isset.short_val;
       break;
     case TPrimitiveType::INT:
       hs2_col_val->__isset.i32Val = true;
-      hs2_col_val->i32Val.value = col_val.intVal;
-      hs2_col_val->i32Val.__isset.value = col_val.__isset.intVal;
+      hs2_col_val->i32Val.value = col_val.int_val;
+      hs2_col_val->i32Val.__isset.value = col_val.__isset.int_val;
       break;
     case TPrimitiveType::BIGINT:
       hs2_col_val->__isset.i64Val = true;
-      hs2_col_val->i64Val.value = col_val.longVal;
-      hs2_col_val->i64Val.__isset.value = col_val.__isset.longVal;
+      hs2_col_val->i64Val.value = col_val.long_val;
+      hs2_col_val->i64Val.__isset.value = col_val.__isset.long_val;
       break;
     case TPrimitiveType::FLOAT:
     case TPrimitiveType::DOUBLE:
       hs2_col_val->__isset.doubleVal = true;
-      hs2_col_val->doubleVal.value = col_val.doubleVal;
-      hs2_col_val->doubleVal.__isset.value = col_val.__isset.doubleVal;
+      hs2_col_val->doubleVal.value = col_val.double_val;
+      hs2_col_val->doubleVal.__isset.value = col_val.__isset.double_val;
       break;
     case TPrimitiveType::STRING:
     case TPrimitiveType::TIMESTAMP:
       // HiveServer2 requires timestamp to be presented as string.
       hs2_col_val->__isset.stringVal = true;
-      hs2_col_val->stringVal.__isset.value = col_val.__isset.stringVal;
-      if (col_val.__isset.stringVal) {
-        hs2_col_val->stringVal.value = col_val.stringVal;
+      hs2_col_val->stringVal.__isset.value = col_val.__isset.string_val;
+      if (col_val.__isset.string_val) {
+        hs2_col_val->stringVal.value = col_val.string_val;
       }
       break;
     default:
@@ -890,7 +890,7 @@ void ImpalaServer::ExprValueToHiveServer2TColumnValue(const void* value,
   bool not_null = (value != NULL);
   switch (type.type) {
     case TPrimitiveType::NULL_TYPE:
-      // Set NULLs in the boolVal.
+      // Set NULLs in the bool_val.
       hs2_col_val->__isset.boolVal = true;
       hs2_col_val->boolVal.__isset.value = false;
       break;

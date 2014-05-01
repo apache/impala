@@ -584,7 +584,7 @@ public class MetadataOp {
   public static TColumnValue createTColumnValue(String val) {
     TColumnValue colVal = new TColumnValue();
     if (val != null) {
-      colVal.setStringVal(val);
+      colVal.setString_val(val);
     }
     return colVal;
   }
@@ -592,7 +592,7 @@ public class MetadataOp {
   public static TColumnValue createTColumnValue(Integer val) {
     TColumnValue colVal = new TColumnValue();
     if (val != null) {
-      colVal.setIntVal(val.intValue());
+      colVal.setInt_val(val.intValue());
     }
     return colVal;
   }
@@ -600,7 +600,7 @@ public class MetadataOp {
   public static TColumnValue createTColumnValue(Boolean val) {
     TColumnValue colVal = new TColumnValue();
     if (val != null) {
-      colVal.setBoolVal(val);
+      colVal.setBool_val(val);
     }
     return colVal;
   }

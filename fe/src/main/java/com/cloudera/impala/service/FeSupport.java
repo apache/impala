@@ -171,7 +171,7 @@ public class FeSupport {
     Preconditions.checkState(pred.getType().isBoolean());
     TColumnValue val = EvalConstExpr(pred, queryCtxt);
     // Return false if pred evaluated to false or NULL. True otherwise.
-    return val.isSetBoolVal() && val.boolVal;
+    return val.isBool_val() && val.bool_val;
   }
 
   private static byte[] PrioritizeLoad(byte[] thriftReq) {

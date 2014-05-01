@@ -147,12 +147,12 @@ public class HBaseScanNode extends ScanNode {
             rowRange.getLowerBound().getType().equals(ColumnType.STRING));
         TColumnValue val = FeSupport.EvalConstExpr(rowRange.getLowerBound(),
             analyzer.getQueryContext());
-        if (!val.isSetStringVal()) {
+        if (!val.isSetString_val()) {
           // lower bound is null.
           isEmpty_ = true;
           return;
         } else {
-          startKey_ = convertToBytes(val.getStringVal(),
+          startKey_ = convertToBytes(val.getString_val(),
               !rowRange.getLowerBoundInclusive());
         }
       }
@@ -162,12 +162,12 @@ public class HBaseScanNode extends ScanNode {
             rowRange.getUpperBound().getType().equals(ColumnType.STRING));
         TColumnValue val = FeSupport.EvalConstExpr(rowRange.getUpperBound(),
             analyzer.getQueryContext());
-        if (!val.isSetStringVal()) {
+        if (!val.isSetString_val()) {
           // upper bound is null.
           isEmpty_ = true;
           return;
         } else {
-          stopKey_ = convertToBytes(val.getStringVal(),
+          stopKey_ = convertToBytes(val.getString_val(),
               rowRange.getUpperBoundInclusive());
         }
       }

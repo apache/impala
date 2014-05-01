@@ -406,7 +406,7 @@ public class CatalogOpExecutor {
     resultSet.setSchema(new TResultSetMetadata(Lists.newArrayList(
         new TColumn("summary", ColumnType.STRING.toThrift()))));
     TColumnValue resultColVal = new TColumnValue();
-    resultColVal.setStringVal("Updated " + numTargetedPartitions + " partition(s) and " +
+    resultColVal.setString_val("Updated " + numTargetedPartitions + " partition(s) and " +
         numUpdatedColumns + " column(s).");
     TResultRow resultRow = new TResultRow();
     resultRow.setColVals(Lists.newArrayList(resultColVal));

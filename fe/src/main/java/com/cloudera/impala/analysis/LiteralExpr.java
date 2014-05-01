@@ -106,21 +106,32 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         result = new NullLiteral();
         break;
       case BOOLEAN:
-        if (val.isSetBoolVal()) result = new BoolLiteral(val.boolVal);
+        if (val.isBool_val()) result = new BoolLiteral(val.bool_val);
         break;
       case TINYINT:
+        if (val.isSetByte_val()) {
+          result = new IntLiteral(BigInteger.valueOf(val.byte_val));
+        }
+        break;
       case SMALLINT:
+        if (val.isSetShort_val()) {
+          result = new IntLiteral(BigInteger.valueOf(val.short_val));
+        }
+        break;
       case INT:
+        if (val.isSetInt_val()) result = new IntLiteral(BigInteger.valueOf(val.int_val));
+        break;
       case BIGINT:
-        if (val.isSetIntVal()) result = new IntLiteral(BigInteger.valueOf(val.intVal));
-        if (val.isSetLongVal()) result = new IntLiteral(BigInteger.valueOf(val.longVal));
+        if (val.isSetLong_val()) {
+          result = new IntLiteral(BigInteger.valueOf(val.long_val));
+        }
         break;
       case FLOAT:
       case DOUBLE:
-        if (val.isSetDoubleVal()) result = new FloatLiteral(val.doubleVal);
+        if (val.isSetDouble_val()) result = new FloatLiteral(val.double_val);
         break;
       case STRING:
-        if (val.isSetStringVal()) result = new StringLiteral(val.stringVal);
+        if (val.isSetString_val()) result = new StringLiteral(val.string_val);
         break;
       case DATE:
       case DATETIME:

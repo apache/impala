@@ -26,28 +26,28 @@ public class TResultRowBuilder {
 
   public TResultRowBuilder add(long val) {
     TColumnValue colVal = new TColumnValue();
-    colVal.setLongVal(val);
+    colVal.setLong_val(val);
     row_.addToColVals(colVal);
     return this;
   }
 
   public TResultRowBuilder add(double val) {
     TColumnValue colVal = new TColumnValue();
-    colVal.setDoubleVal(val);
+    colVal.setDouble_val(val);
     row_.addToColVals(colVal);
     return this;
   }
 
   public TResultRowBuilder add(String val) {
     TColumnValue colVal = new TColumnValue();
-    colVal.setStringVal(val);
+    colVal.setString_val(val);
     row_.addToColVals(colVal);
     return this;
   }
 
   public TResultRowBuilder addBytes(long val) {
     TColumnValue colVal = new TColumnValue();
-    colVal.setStringVal(PrintUtils.printBytes(val));
+    colVal.setString_val(PrintUtils.printBytes(val));
     row_.addToColVals(colVal);
     return this;
   }

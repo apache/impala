@@ -429,8 +429,8 @@ int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
 void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   void* value = GetValue(row);
   if (as_ascii) {
-    RawValue::PrintValue(value, type(), output_scale_, &col_val->stringVal);
-    col_val->__isset.stringVal = true;
+    RawValue::PrintValue(value, type(), output_scale_, &col_val->string_val);
+    col_val->__isset.string_val = true;
     return;
   }
   if (value == NULL) return;
@@ -439,42 +439,35 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   string tmp;
   switch (type_.type) {
     case TYPE_BOOLEAN:
-      col_val->boolVal = *reinterpret_cast<bool*>(value);
-      col_val->__isset.boolVal = true;
+      col_val->__set_bool_val(*reinterpret_cast<bool*>(value));
       break;
     case TYPE_TINYINT:
-      col_val->intVal = *reinterpret_cast<int8_t*>(value);
-      col_val->__isset.intVal = true;
+      col_val->__set_byte_val(*reinterpret_cast<int8_t*>(value));
       break;
     case TYPE_SMALLINT:
-      col_val->intVal = *reinterpret_cast<int16_t*>(value);
-      col_val->__isset.intVal = true;
+      col_val->__set_short_val(*reinterpret_cast<int16_t*>(value));
       break;
     case TYPE_INT:
-      col_val->intVal = *reinterpret_cast<int32_t*>(value);
-      col_val->__isset.intVal = true;
+      col_val->__set_int_val(*reinterpret_cast<int32_t*>(value));
       break;
     case TYPE_BIGINT:
-      col_val->longVal = *reinterpret_cast<int64_t*>(value);
-      col_val->__isset.longVal = true;
+      col_val->__set_long_val(*reinterpret_cast<int64_t*>(value));
       break;
     case TYPE_FLOAT:
-      col_val->doubleVal = *reinterpret_cast<float*>(value);
-      col_val->__isset.doubleVal = true;
+      col_val->__set_double_val(*reinterpret_cast<float*>(value));
       break;
     case TYPE_DOUBLE:
-      col_val->doubleVal = *reinterpret_cast<double*>(value);
-      col_val->__isset.doubleVal = true;
+      col_val->__set_double_val(*reinterpret_cast<double*>(value));
       break;
     case TYPE_STRING:
       string_val = reinterpret_cast<StringValue*>(value);
       tmp.assign(static_cast<char*>(string_val->ptr), string_val->len);
-      col_val->stringVal.swap(tmp);
-      col_val->__isset.stringVal = true;
+      col_val->string_val.swap(tmp);
+      col_val->__isset.string_val = true;
       break;
     case TYPE_TIMESTAMP:
-      RawValue::PrintValue(value, type(), output_scale_, &col_val->stringVal);
-      col_val->__isset.stringVal = true;
+      RawValue::PrintValue(value, type(), output_scale_, &col_val->string_val);
+      col_val->__isset.string_val = true;
       break;
     default:
       DCHECK(false) << "bad GetValue() type: " << type_.DebugString();

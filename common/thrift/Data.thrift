@@ -41,12 +41,14 @@ struct TRowBatch {
 
 // this is a union over all possible return types
 struct TColumnValue {
-  // TODO: use <type>_val instead of camelcase
-  1: optional bool boolVal
-  2: optional i32 intVal
-  3: optional i64 longVal
-  4: optional double doubleVal
-  5: optional string stringVal
+  1: optional bool bool_val
+  6: optional byte byte_val
+  7: optional i16 short_val
+  2: optional i32 int_val
+  3: optional i64 long_val
+  4: optional double double_val
+  5: optional string string_val
+  8: optional binary binary_val
 }
 
 struct TResultRow {

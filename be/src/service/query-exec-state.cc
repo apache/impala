@@ -723,7 +723,7 @@ void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& results) {
   for (int i = 0; i < results.size(); ++i) {
     (*request_result_set_.get())[i].__isset.colVals = true;
     (*request_result_set_.get())[i].colVals.resize(1);
-    (*request_result_set_.get())[i].colVals[0].__set_stringVal(results[i]);
+    (*request_result_set_.get())[i].colVals[0].__set_string_val(results[i]);
   }
 }
 
@@ -736,8 +736,8 @@ void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& col1,
   for (int i = 0; i < col1.size(); ++i) {
     (*request_result_set_.get())[i].__isset.colVals = true;
     (*request_result_set_.get())[i].colVals.resize(2);
-    (*request_result_set_.get())[i].colVals[0].__set_stringVal(col1[i]);
-    (*request_result_set_.get())[i].colVals[1].__set_stringVal(col2[i]);
+    (*request_result_set_.get())[i].colVals[0].__set_string_val(col1[i]);
+    (*request_result_set_.get())[i].colVals[1].__set_string_val(col2[i]);
   }
 }
 

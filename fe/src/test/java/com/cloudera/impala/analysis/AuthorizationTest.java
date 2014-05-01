@@ -898,13 +898,13 @@ public class AuthorizationTest {
     TResultSet resp = fe_.execHiveServer2MetadataOp(req);
     assertEquals(4, resp.rows.size());
     assertEquals("alltypes",
-        resp.rows.get(0).colVals.get(2).stringVal.toLowerCase());
+        resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
     assertEquals(
-        "alltypesagg", resp.rows.get(1).colVals.get(2).stringVal.toLowerCase());
+        "alltypesagg", resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
     assertEquals(
-        "complex_view", resp.rows.get(2).colVals.get(2).stringVal.toLowerCase());
+        "complex_view", resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
     assertEquals(
-        "view_view", resp.rows.get(3).colVals.get(2).stringVal.toLowerCase());
+        "view_view", resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
   }
 
   @Test
@@ -921,7 +921,7 @@ public class AuthorizationTest {
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(expectedDbs.get(i),
-          resp.rows.get(i).colVals.get(0).stringVal.toLowerCase());
+          resp.rows.get(i).colVals.get(0).string_val.toLowerCase());
     }
   }
 

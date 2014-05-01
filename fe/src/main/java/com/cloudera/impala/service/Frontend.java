@@ -372,7 +372,7 @@ public class Frontend {
     String loadMsg = String.format(
         "Loaded %d file(s). Total files in destination location: %d",
         filesLoaded, FileSystemUtil.getTotalNumVisibleFiles(destPath));
-    col.setStringVal(loadMsg);
+    col.setString_val(loadMsg);
     response.setLoad_summary(new TResultRow(Lists.newArrayList(col)));
     return response;
   }
@@ -747,7 +747,7 @@ public class Frontend {
     explainResult.results = Lists.newArrayList();
     for (int i = 0; i < explainStringArray.length; ++i) {
       TColumnValue col = new TColumnValue();
-      col.setStringVal(explainStringArray[i]);
+      col.setString_val(explainStringArray[i]);
       TResultRow row = new TResultRow(Lists.newArrayList(col));
       explainResult.results.add(row);
     }
