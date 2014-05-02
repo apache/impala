@@ -26,25 +26,28 @@
 // Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // Add:                  Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                     int128_CPP           1.895e+04                  1X
-//                   int128_Boost                2819             0.1488X
-//                          int64           2.571e+04              1.357X
-//                  int128_Base1B           1.089e+04             0.5746X
-//                        doubles           3.246e+04              1.713X
+//                     int128_CPP            1.87e+04                  1X
+//                   int128_Boost                2842             0.1519X
+//                      int96_CPP                1289            0.06891X
+//                          int64           2.381e+04              1.273X
+//                  int128_Base1B            1.08e+04             0.5775X
+//                        doubles           2.559e+04              1.368X
 //
 // Multiply:             Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                     int128_CPP           1.232e+04                  1X
-//                   int128_Boost                4207             0.3415X
-//                          int64           2.566e+04              2.083X
-//                        doubles            2.52e+04              2.046X
+//                     int128_CPP           1.263e+04                  1X
+//                   int128_Boost                4418             0.3497X
+//                      int96_CPP                1220            0.09656X
+//                          int64           2.913e+04              2.306X
+//                        doubles           2.282e+04              1.806X
 //
 // Divide:               Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                     int128_CPP                1731                  1X
-//                   int128_Boost                1102             0.6366X
-//                          int64                2988              1.726X
-//                         double                4563              2.636X
+//                     int128_CPP                1696                  1X
+//                   int128_Boost                1112             0.6558X
+//                      int96_CPP               561.7             0.3313X
+//                          int64                2788              1.644X
+//                         double                4565              2.692X
 
 using namespace std;
 using namespace impala;
@@ -98,6 +101,57 @@ struct BaseInt128 {
   }
 };
 
+// Prototype for int96 by doing the arithmetic as casts to int128. Minimal
+// implementation to run benchmark.
+struct int96 {
+ public:
+   int96() {
+   }
+
+   int96(__int128_t t) {
+     memcpy(data, reinterpret_cast<uint8_t*>(&t), 12);
+   }
+
+   __int128_t to_int128() const {
+     __int128_t r;
+     // Fill in upper bits and bit shift down to sign extend
+     memcpy(reinterpret_cast<uint8_t*>(&r) + 4, data, 12);
+     r >>= 4;
+     return r;
+   }
+
+   int96& operator+=(const int96& v) {
+     __int128_t x = to_int128();
+     __int128_t y = v.to_int128();
+     __int128_t r = x + y;
+     *this = int96(r);
+     return *this;
+   }
+
+   int96& operator*=(const int96& v) {
+     __int128_t x = to_int128();
+     __int128_t y = v.to_int128();
+     __int128_t r = x * y;
+     *this = int96(r);
+     return *this;
+   }
+
+   int96 operator/(const int96& v) const {
+     __int128_t x = to_int128();
+     __int128_t y = v.to_int128();
+     __int128_t r = x / y;
+     return int96(r);
+   }
+
+   int96 operator-() const {
+     return int96(-to_int128());
+   }
+
+ private:
+   // First (little endian) 12 bytes of int128_t
+   uint8_t data[12];
+};
+
 typedef BaseInt128<1000000000> Base1BInt128;
 
 struct TestData {
@@ -110,6 +164,10 @@ struct TestData {
   vector<__int128_t> cpp_add_ints;
   vector<__int128_t> cpp_mult_ints;
   __int128_t cpp_result;
+
+  vector<int96> cpp96_add_ints;
+  vector<int96> cpp96_mult_ints;
+  int96 cpp96_result;
 
   vector<int64_t> int64_ints;
   int64_t int64_result;
@@ -128,15 +186,22 @@ void InitTestData(TestData* data, int n) {
     data->boost_mult_ints.push_back(boost::multiprecision::int128_t(i + 1));
     data->cpp_add_ints.push_back(__int128_t(i + 1));
     data->cpp_mult_ints.push_back(__int128_t(i + 1));
+    data->cpp96_add_ints.push_back(__int128_t(i + 1));
+    data->cpp96_mult_ints.push_back(__int128_t(i + 1));
+
     if (i % 2 == 0) {
       data->boost_add_ints[i] *= numeric_limits<int64_t>::max();
       data->cpp_add_ints[i] *= numeric_limits<int64_t>::max();
+      data->cpp96_add_ints[i] *= numeric_limits<int64_t>::max();
     }
     if (i % 4 == 0) {
       data->boost_add_ints[i] = -data->boost_add_ints[i];
       data->cpp_add_ints[i] = -data->cpp_add_ints[i];
+      data->cpp96_add_ints[i] = -data->cpp96_add_ints[i];
+
       data->boost_mult_ints[i] = -data->boost_mult_ints[i];
       data->cpp_mult_ints[i] = -data->cpp_mult_ints[i];
+      data->cpp96_mult_ints[i] = -data->cpp96_mult_ints[i];
     }
 
     data->int64_ints.push_back(i + 1);
@@ -180,17 +245,20 @@ void InitTestData(TestData* data, int n) {
 
 TEST_ADD(TestBoostAdd, boost_result, boost_add_ints);
 TEST_ADD(TestCppAdd, cpp_result, cpp_add_ints);
+TEST_ADD(TestCpp96Add, cpp96_result, cpp96_add_ints);
 TEST_ADD(TestBaseBillionAdd, base1b_result, base1b_ints);
 TEST_ADD(TestInt64Add, int64_result, int64_ints);
 TEST_ADD(TestDoubleAdd, double_result, doubles);
 
 TEST_MULTIPLY(TestBoostMultiply, boost_result, boost_mult_ints);
 TEST_MULTIPLY(TestCppMultiply, cpp_result, cpp_mult_ints);
+TEST_MULTIPLY(TestCpp96Multiply, cpp96_result, cpp96_mult_ints);
 TEST_MULTIPLY(TestInt64Multiply, int64_result, int64_ints);
 TEST_MULTIPLY(TestDoubleMultiply, double_result, doubles);
 
 TEST_DIVIDE(TestBoostDivide, boost_result, boost_mult_ints);
 TEST_DIVIDE(TestCppDivide, cpp_result, cpp_mult_ints);
+TEST_DIVIDE(TestCpp96Divide, cpp96_result, cpp96_mult_ints);
 TEST_DIVIDE(TestInt64Divide, int64_result, int64_ints);
 TEST_DIVIDE(TestDoubleDivide, double_result, doubles);
 
@@ -204,6 +272,7 @@ int main(int argc, char** argv) {
   Benchmark add_suite("Add");
   add_suite.AddBenchmark("int128_CPP", TestCppAdd, &data);
   add_suite.AddBenchmark("int128_Boost", TestBoostAdd, &data);
+  add_suite.AddBenchmark("int96_CPP", TestCpp96Add, &data);
   add_suite.AddBenchmark("int64", TestInt64Add, &data);
   add_suite.AddBenchmark("int128_Base1B", TestBaseBillionAdd, &data);
   add_suite.AddBenchmark("doubles", TestDoubleAdd, &data);
@@ -212,6 +281,7 @@ int main(int argc, char** argv) {
   Benchmark multiply_suite("Multiply");
   multiply_suite.AddBenchmark("int128_CPP", TestCppMultiply, &data);
   multiply_suite.AddBenchmark("int128_Boost", TestBoostMultiply, &data);
+  multiply_suite.AddBenchmark("int96_CPP", TestCpp96Multiply, &data);
   multiply_suite.AddBenchmark("int64", TestInt64Multiply, &data);
   multiply_suite.AddBenchmark("doubles", TestDoubleMultiply, &data);
   cout << multiply_suite.Measure() << endl;
@@ -219,6 +289,7 @@ int main(int argc, char** argv) {
   Benchmark divide_suite("Divide");
   divide_suite.AddBenchmark("int128_CPP", TestCppDivide, &data);
   divide_suite.AddBenchmark("int128_Boost", TestBoostDivide, &data);
+  divide_suite.AddBenchmark("int96_CPP", TestCpp96Divide, &data);
   divide_suite.AddBenchmark("int64", TestInt64Divide, &data);
   divide_suite.AddBenchmark("double", TestDoubleDivide, &data);
   cout << divide_suite.Measure() << endl;
