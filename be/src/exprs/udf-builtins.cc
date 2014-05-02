@@ -17,9 +17,12 @@
 #include "util/bit-util.h"
 
 #include <ctype.h>
-#include <gutil/strings/substitute.h>
 #include <math.h>
+#include <string>
+#include <sstream>
+#include <iostream>
 
+#include <gutil/strings/substitute.h>
 
 using namespace std;
 using namespace boost::gregorian;
@@ -409,6 +412,108 @@ void UdfBuiltins::ExtractClose(FunctionContext* ctx,
     ctx->Free(reinterpret_cast<uint8_t*>(state));
     ctx->SetFunctionState(scope, NULL);
   }
+}
+
+
+bool ValidateMADlibVector(FunctionContext* context, const StringVal& arr) {
+  if (arr.ptr == NULL) {
+    context->SetError("MADlib vector is null");
+    return false;
+  }
+  if (arr.len % 8 != 0) {
+    context->SetError(Substitute("MADlib vector of incorrect length $0,"
+                                 " expected multiple of 8", arr.len).c_str());
+    return false;
+  }
+  return true;
+}
+
+StringVal UdfBuiltins::ToVector(FunctionContext* context, int n, const DoubleVal* vals) {
+  StringVal s(context, n * sizeof(double));
+  double* darr = reinterpret_cast<double*>(s.ptr);
+  for (int i = 0; i < n; ++i) {
+    if (vals[i].is_null) {
+      context->SetError(Substitute("madlib vector entry $0 is NULL", i).c_str());
+      return StringVal::null();
+    }
+    darr[i] = vals[i].val;
+  }
+  return s;
+}
+
+StringVal UdfBuiltins::PrintVector(FunctionContext* context, const StringVal& arr) {
+  if (!ValidateMADlibVector(context, arr)) return StringVal::null();
+  double* darr = reinterpret_cast<double*>(arr.ptr);
+  int len = arr.len / sizeof(double);
+  stringstream ss;
+  ss << "<";
+  for (int i = 0; i < len; ++i) {
+    if (i != 0) ss << ", ";
+    ss << darr[i];
+  }
+  ss << ">";
+  const string& str = ss.str();
+  StringVal result(context, str.size());
+  memcpy(result.ptr, str.c_str(), str.size());
+  return result;
+}
+
+DoubleVal UdfBuiltins::VectorGet(FunctionContext* context, const BigIntVal& index,
+                                 const StringVal& arr) {
+  if (!ValidateMADlibVector(context, arr)) return DoubleVal::null();
+  if (index.is_null) return DoubleVal::null();
+  uint64_t i = index.val;
+  uint64_t len = arr.len / sizeof(double);
+  if (index.val < 0 || len <= i) return DoubleVal::null();
+  double* darr = reinterpret_cast<double*>(arr.ptr);
+  return DoubleVal(darr[i]);
+}
+
+void InplaceDoubleEncode(double* arr, uint64_t len) {
+  for (uint64_t i = 0; i < len; ++i) {
+    char* hex = reinterpret_cast<char*>(&arr[i]);
+    // cast to float so we have 4 bytes to encode but 8 bytes of space
+    float float_val = arr[i];
+    uint32_t float_as_int = *reinterpret_cast<int32_t*>(&float_val);
+    for (int k = 0; k < 8; ++k) {
+      // This is a simple hex encoding, 'a' becomes 0, 'b' is 1, ...
+      // This isn't a complicated encoding, but it is simple to debug and is
+      // a temporary solution until we have nested types
+      hex[k] = 'a' + ((float_as_int >> (4*k)) & 0xF);
+    }
+  }
+}
+
+// Inplace conversion from a printable ascii encoding to a double*
+void InplaceDoubleDecode(char* arr, uint64_t len) {
+  for (uint64_t i = 0; i < len; i += 8) {
+    double* dub = reinterpret_cast<double*>(&arr[i]);
+    // cast to float so we have 4 bytes to encode but 8 bytes of space
+    int32_t float_as_int = 0;
+    for (int k = 7; k >= 0; --k) {
+      float_as_int = (float_as_int <<4) | ((arr[i+k] - 'a') & 0xF);
+    }
+    float* float_ptr = reinterpret_cast<float*>(&float_as_int);
+    *dub = *float_ptr;
+  }
+}
+
+StringVal UdfBuiltins::EncodeVector(FunctionContext* context, const StringVal& arr) {
+  if (arr.is_null) return StringVal::null();
+  double* darr = reinterpret_cast<double*>(arr.ptr);
+  int len = arr.len / sizeof(double);
+  StringVal result(context, arr.len);
+  memcpy(result.ptr, darr, arr.len);
+  InplaceDoubleEncode(reinterpret_cast<double*>(result.ptr), len);
+  return result;
+}
+
+StringVal UdfBuiltins::DecodeVector(FunctionContext* context, const StringVal& arr) {
+  if (arr.is_null) return StringVal::null();
+  StringVal result(context, arr.len);
+  memcpy(result.ptr, arr.ptr, arr.len);
+  InplaceDoubleDecode(reinterpret_cast<char*>(result.ptr), arr.len);
+  return result;
 }
 
 } // namespace impala

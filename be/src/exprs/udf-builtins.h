@@ -77,6 +77,28 @@ class UdfBuiltins {
                              FunctionContext::FunctionStateScope scope);
   static void ExtractClose(FunctionContext* context,
                            FunctionContext::FunctionStateScope scope);
+
+  // Converts a set of doubles to double[] stored as a StringVal
+  // Stored as a StringVal with each double value encoded in IEEE back to back
+  // The returned StringVal ptr can be casted to a double*
+  static StringVal ToVector(FunctionContext* context, int n, const DoubleVal* values);
+
+  // Converts a double[] stored as a StringVal into a human readable string
+  static StringVal PrintVector(FunctionContext* context, const StringVal& arr);
+
+  // Returns the n-th (0-indexed) element of a double[] stored as a StringVal
+  static DoubleVal VectorGet(FunctionContext* context, const BigIntVal& n,
+                            const StringVal& arr);
+
+  // Converts a double[] stored as a StringVal to an printable ascii encoding
+  // MADlib operates on binary strings but the Impala shell is not friendly to
+  // binary data. We offer these functions to the user to allow them to
+  // copy-paste vectors to/from the impala shell.
+  // Note: this loses precision (converts from double to float)
+  static StringVal EncodeVector(FunctionContext* context, const StringVal& arr);
+
+  // Converts a printable ascii encoding of a vector to a double[] stored as a StringVal
+  static StringVal DecodeVector(FunctionContext* context, const StringVal& arr);
 };
 
 } // namespace impala

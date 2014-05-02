@@ -3860,7 +3860,26 @@ TEST_F(ExprTest, UdfInterfaceBuiltins) {
   TestValue("min_bigint()", TYPE_BIGINT, numeric_limits<int64_t>::min());
 }
 
+TEST_F(ExprTest, MADlib) {
+  TestStringValue("madlib_encode_vector(madlib_vector(1.0, 2.0, 3.0))",
+                  "aaaaaipdaaaaaaaeaaaaaeae");
+  TestStringValue("madlib_print_vector(madlib_vector(1, 2, 3))", "<1, 2, 3>");
+  TestStringValue(
+    "madlib_encode_vector(madlib_decode_vector(madlib_encode_vector("
+      "madlib_vector(1.0, 2.0, 3.0))))",
+    "aaaaaipdaaaaaaaeaaaaaeae");
+  TestValue("madlib_vector_get(0, madlib_vector(1.0, 2.0, 3.0))", TYPE_DOUBLE, 1.0);
+  TestValue("madlib_vector_get(1, madlib_vector(1.0, 2.0, 3.0))", TYPE_DOUBLE, 2.0);
+  TestValue("madlib_vector_get(2, madlib_vector(1.0, 2.0, 3.0))", TYPE_DOUBLE, 3.0);
+  TestIsNull("madlib_vector_get(3, madlib_vector(1.0, 2.0, 3.0))", TYPE_DOUBLE);
+  TestIsNull("madlib_vector_get(-1, madlib_vector(1.0, 2.0, 3.0))", TYPE_DOUBLE);
+  TestValue(
+    "madlib_vector_get(2, madlib_decode_vector(madlib_encode_vector("
+      "madlib_vector(1.0, 2.0, 3.0))))",
+    TYPE_DOUBLE, 3.0);
 }
+
+} // namespace impala
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

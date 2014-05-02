@@ -525,4 +525,15 @@ udf_functions = [
    '_ZN6impala11UdfBuiltins7ExtractEPN10impala_udf15FunctionContextERKNS1_12TimestampValERKNS1_9StringValE',
    '_ZN6impala11UdfBuiltins14ExtractPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
    '_ZN6impala11UdfBuiltins12ExtractCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
+
+  [['madlib_encode_vector'], 'STRING', ['STRING'],
+    '_ZN6impala11UdfBuiltins12EncodeVectorEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['madlib_decode_vector'], 'STRING', ['STRING'],
+    '_ZN6impala11UdfBuiltins12DecodeVectorEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['madlib_print_vector'], 'STRING', ['STRING'],
+    '_ZN6impala11UdfBuiltins11PrintVectorEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['madlib_vector'], 'STRING', ['DOUBLE', '...'],
+    '_ZN6impala11UdfBuiltins8ToVectorEPN10impala_udf15FunctionContextEiPKNS1_9DoubleValE'],
+  [['madlib_vector_get'], 'DOUBLE', ['BIGINT', 'STRING'],
+    '_ZN6impala11UdfBuiltins9VectorGetEPN10impala_udf15FunctionContextERKNS1_9BigIntValERKNS1_9StringValE'],
 ]
