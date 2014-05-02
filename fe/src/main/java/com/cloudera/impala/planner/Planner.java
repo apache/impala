@@ -1458,8 +1458,10 @@ public class Planner {
       List<Expr> viewPredicates = Expr.cloneList(preds, inlineViewRef.getSmap());
 
       // "migrate" conjuncts_ by marking them as assigned and re-registering them with
-      // new ids
-      analyzer.markConjunctsAssigned(viewPredicates);
+      // new ids.
+      // Mark pre-substitution conjuncts as assigned, since the ids of the new exprs may
+      // have changed.
+      analyzer.markConjunctsAssigned(preds);
       analyzer.registerConjuncts(viewPredicates);
     }
 

@@ -392,3 +392,17 @@ select * from functional.alltypes_parens
    partitions=1/24 size=19.95KB
    predicates: (int_col < 100 OR bool_col = FALSE)
 ====
+# Tests that slotrefs are correctly marked as assigned inside an inline view where
+# possible (see IMPALA-923)
+select bool_col FROM ( SELECT bool_col FROM functional.alltypes t ) t WHERE t.bool_col
+---- PLAN
+00:SCAN HDFS [functional.alltypes t]
+  partitions=24/24 size=478.45KB
+  predicates: bool_col
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [PARTITION=UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes t]
+   partitions=24/24 size=478.45KB
+   predicates: bool_col
+====
