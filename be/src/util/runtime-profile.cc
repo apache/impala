@@ -60,16 +60,16 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
     local_time_percent_(0),
     local_time_ns_(0) {
   Counter* total_time_counter;
+  Counter* total_async_timer;
   if (!is_averaged_profile) {
     total_time_counter = &counter_total_time_;
+    total_async_timer = &total_async_timer_;
   } else {
     total_time_counter = pool->Add(new AveragedCounter(TCounterType::TIME_NS));
+    total_async_timer = pool->Add(new AveragedCounter(TCounterType::TIME_NS));
   }
-
   counter_map_[TOTAL_TIME_COUNTER_NAME] = total_time_counter;
-  if (!is_averaged_profile) {
-    AddCounter(ASYNC_TIME_COUNTER_NAME, TCounterType::TIME_NS);
-  }
+  counter_map_[ASYNC_TIME_COUNTER_NAME] = total_async_timer;
 }
 
 RuntimeProfile::~RuntimeProfile() {
