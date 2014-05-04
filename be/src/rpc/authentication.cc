@@ -53,7 +53,6 @@ using namespace boost::random;
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
 DECLARE_string(be_principal);
-DECLARE_string(krb_credential_cache);
 
 DEFINE_int32(kerberos_reinit_interval, 60,
     "Interval, in minutes, between kerberos ticket renewals. Each renewal will request "
@@ -271,7 +270,6 @@ static int SaslGetPath(void* context, const char** path) {
 void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   // Minumum lifetime to request for each ticket renewal.
   static const int MIN_TICKET_LIFETIME_IN_MINS = 1440;
-  LOG(INFO) << "Kerberos credential cache: " << credential_cache_;
 
   // Set the ticket lifetime to an arbitrarily large value or 2x the renewal interval,
   // whichever is larger. The KDC will automatically fall back to using the maximum
@@ -283,8 +281,8 @@ void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   // Pass the path to the key file and the principal. Make the ticket renewable.
   // Calling kinit -R ensures the ticket makes it to the cache, and should be a separate
   // call to kinit.
-  const string kinit_cmd = Substitute("kinit -r $0m -c $1 -k -t $2 $3 2>&1",
-      ticket_lifetime_mins, credential_cache_, keytab_path_, principal_);
+  const string kinit_cmd = Substitute("kinit -r $0m -k -t $1 $2 2>&1",
+      ticket_lifetime_mins, keytab_path_, principal_);
 
   bool first_time = true;
   int failures_since_renewal = 0;
@@ -367,9 +365,9 @@ Status InitAuth(const string& appname) {
 }
 
 KerberosAuthProvider::KerberosAuthProvider(const string& principal,
-    const string& keytab_path, const string& credential_cache_path, bool needs_kinit)
-    : principal_(principal), keytab_path_(keytab_path),
-      credential_cache_(credential_cache_path),needs_kinit_(needs_kinit) {
+    const string& keytab_path, bool needs_kinit)
+    : principal_(principal), keytab_path_(keytab_path), needs_kinit_(needs_kinit) {
+
 }
 
 Status KerberosAuthProvider::Start() {
@@ -560,11 +558,6 @@ Status NoAuthProvider::WrapClientTransport(const string& hostname,
 }
 
 Status AuthManager::Init() {
-  if (FLAGS_krb_credential_cache.empty()) {
-    FLAGS_krb_credential_cache = Substitute("/tmp/krb5_impala_$0_$1",
-        google::ProgramInvocationShortName(), getpid());
-  }
-
   // Client-side uses LDAP if enabled, else Kerberos if FLAGS_principal is set, otherwise
   // a NoAuthProvider.
   if (FLAGS_enable_ldap_auth) {
@@ -574,8 +567,8 @@ Status AuthManager::Init() {
     int rc = sasl_auxprop_add_plugin(IMPALA_AUXPROP_PLUGIN.c_str(), &ImpalaAuxpropInit);
     if (rc != SASL_OK) return Status(sasl_errstring(rc, NULL, NULL));
   } else if (!FLAGS_principal.empty()) {
-    client_auth_provider_.reset(new KerberosAuthProvider(FLAGS_principal,
-            FLAGS_keytab_file, FLAGS_krb_credential_cache, false));
+    client_auth_provider_.reset(
+        new KerberosAuthProvider(FLAGS_principal, FLAGS_keytab_file, false));
   } else {
     client_auth_provider_.reset(new NoAuthProvider());
   }
@@ -587,8 +580,8 @@ Status AuthManager::Init() {
 
     // Should init as this principal as well, in order to allow connections to other
     // backend services.
-    server_auth_provider_.reset(new KerberosAuthProvider(FLAGS_be_principal,
-            FLAGS_keytab_file, FLAGS_krb_credential_cache, true));
+    server_auth_provider_.reset(
+        new KerberosAuthProvider(FLAGS_be_principal, FLAGS_keytab_file, true));
   } else {
     server_auth_provider_.reset(new NoAuthProvider());
   }

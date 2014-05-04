@@ -61,7 +61,7 @@ class KerberosAuthProvider : public AuthProvider {
   // If needs_kinit is true, this auth provider will also attempt to obtain credentials
   // for the supplied principal.
   KerberosAuthProvider(const std::string& principal, const std::string& keytab_path,
-      const std::string& credential_cache_path, bool should_kinit);
+      bool should_kinit);
 
   // Runs Kinit in a separate thread.
   virtual Status Start();
@@ -99,13 +99,6 @@ class KerberosAuthProvider : public AuthProvider {
 
   // Principal's hostname, derived from principal string.
   std::string hostname_;
-
-  // Absolute path to file used to store cached credentials. Kerberos will, by default,
-  // use /tmp/krb5_<uid>, but there is a strong chance that this will conflict with other
-  // sessions from the same user. In fact, the catalog service can establish two sessions
-  // in its own process (one from Java, one from here). For this reason, we should always
-  // try to use a unique credential cache.
-  std::string credential_cache_;
 
   // True if tickets for this principal should be obtained.
   bool needs_kinit_;
