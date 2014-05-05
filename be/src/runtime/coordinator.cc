@@ -228,11 +228,13 @@ Coordinator::Coordinator(ExecEnv* exec_env)
     has_called_wait_(false),
     returned_all_results_(false),
     executor_(NULL), // Set in Prepare()
+    query_mem_tracker_(), // Set in Exec()
     num_remaining_backends_(0),
     obj_pool_(new ObjectPool()) {
 }
 
 Coordinator::~Coordinator() {
+  query_mem_tracker_.reset();
 }
 
 TExecNodePhase::type GetExecNodePhase(const string& key) {
@@ -337,6 +339,21 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
         runtime_state()->obj_pool(), request.fragments[0].output_exprs, output_exprs));
     RETURN_IF_ERROR(Expr::Prepare(*output_exprs, runtime_state(), row_desc()));
   } else {
+    // The coordinator instance may require a query mem tracker even if there is no
+    // coordinator fragment. For example, result-caching tracks memory via the query mem
+    // tracker.
+    // If there is a fragment, the fragment executor created above initializes the query
+    // mem tracker. If not, the query mem tracker is created here.
+    int64_t query_limit = -1;
+    if (query_ctxt_.request.query_options.__isset.mem_limit &&
+        query_ctxt_.request.query_options.mem_limit > 0) {
+      query_limit = query_ctxt_.request.query_options.mem_limit;
+    }
+    MemTracker* pool_tracker = MemTracker::GetRequestPoolMemTracker(
+        schedule.request_pool(), exec_env_->process_mem_tracker());
+    query_mem_tracker_ =
+        MemTracker::GetQueryMemTracker(query_id_, query_limit, pool_tracker, NULL);
+
     executor_.reset(NULL);
   }
 
@@ -1223,6 +1240,11 @@ const RowDescriptor& Coordinator::row_desc() const {
 
 RuntimeState* Coordinator::runtime_state() {
   return executor_.get() == NULL ? NULL : executor_->runtime_state();
+}
+
+MemTracker* Coordinator::query_mem_tracker() {
+  return executor_.get() == NULL ? query_mem_tracker_.get() :
+      executor_->runtime_state()->query_mem_tracker();
 }
 
 bool Coordinator::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update) {

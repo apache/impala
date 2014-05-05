@@ -325,3 +325,24 @@ class TestFetchFirst(HS2TestSuite):
     # FETCH_NEXT asking for 100 rows. There are only 20 remaining rows.
     self.fetch(execute_statement_resp.operationHandle,
                TCLIService.TFetchOrientation.FETCH_NEXT, 100, 20)
+
+  @pytest.mark.execute_serially
+  @needs_session
+  def test_parallel_insert(self):
+    """Tests parallel inserts with result set caching on.
+    Parallel inserts have a coordinator instance but no coordinator
+    fragment, so the query mem tracker is initialized differently.
+    (IMPALA-963)
+    """
+    self.client.set_configuration({'sync_ddl': 1})
+    self.client.execute("create database %s" % self.TEST_DB)
+    self.client.execute("create table %s.orderclone like tpch.orders" % self.TEST_DB)
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.confOverlay = dict()
+    execute_statement_req.confOverlay[self.IMPALA_RESULT_CACHING_OPT] = "10"
+    execute_statement_req.statement = ("insert overwrite %s.orderclone "
+                                      "select * from tpch.orders "
+                                      "where o_orderkey < 0" % self.TEST_DB)
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)

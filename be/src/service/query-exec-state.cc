@@ -602,7 +602,7 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     }
     int64_t delta_bytes =
         fetched_rows->BytesSize(num_rows_fetched_from_cache, fetched_rows->size());
-    MemTracker* query_mem_tracker = coord_->runtime_state()->query_mem_tracker();
+    MemTracker* query_mem_tracker = coord_->query_mem_tracker();
     // Count the cached rows towards the mem limit.
     if (!query_mem_tracker->TryConsume(delta_bytes)) {
       return coord_->runtime_state()->SetMemLimitExceeded(
@@ -839,7 +839,8 @@ void ImpalaServer::QueryExecState::ClearResultCache() {
   int64_t total_bytes = result_cache_->BytesSize();
   ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES->Increment(-total_bytes);
   if (coord_ != NULL) {
-    coord_->runtime_state()->query_mem_tracker()->Release(total_bytes);
+    DCHECK_NOTNULL(coord_->query_mem_tracker());
+    coord_->query_mem_tracker()->Release(total_bytes);
   }
   result_cache_.reset(NULL);
 }

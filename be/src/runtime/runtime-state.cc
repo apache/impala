@@ -137,16 +137,6 @@ Status RuntimeState::InitMemTrackers(const TUniqueId& query_id,
           query_resource_mgr());
   instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1,
       runtime_profile()->name(), query_mem_tracker_.get()));
-  if (query_bytes_limit != -1) {
-    if (query_bytes_limit > MemInfo::physical_mem()) {
-      LOG(WARNING) << "Memory limit "
-                   << PrettyPrinter::Print(query_bytes_limit, TCounterType::BYTES)
-                   << " exceeds physical memory of "
-                   << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
-    }
-    VLOG_QUERY << "Using query memory limit: "
-               << PrettyPrinter::Print(query_bytes_limit, TCounterType::BYTES);
-  }
 
   // TODO: this is a stopgap until we implement ExprContext
   udf_mem_tracker_.reset(

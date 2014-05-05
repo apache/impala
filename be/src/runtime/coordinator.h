@@ -140,6 +140,10 @@ class Coordinator {
   RuntimeState* runtime_state();
   const RowDescriptor& row_desc() const;
 
+  // Only valid after Exec(). Returns runtime_state()->query_mem_tracker() if there
+  // is a coordinator fragment, or query_mem_tracker_ (initialized in Exec()) otherwise.
+  MemTracker* query_mem_tracker();
+
   // Get cumulative profile aggregated over all fragments of the query.
   // This is a snapshot of the current state of execution and will change in
   // the future if not all fragments have finished execution.
@@ -230,6 +234,12 @@ class Coordinator {
 
   // execution state of coordinator fragment
   boost::scoped_ptr<PlanFragmentExecutor> executor_;
+
+  // Query mem tracker for this coordinator initialized in Exec(). Only valid if there
+  // is no coordinator fragment (i.e. executor_ == NULL). If executor_ is not NULL,
+  // this->runtime_state()->query_mem_tracker() returns the query mem tracker.
+  // (See this->query_mem_tracker())
+  boost::shared_ptr<MemTracker> query_mem_tracker_;
 
   // owned by plan root, which resides in runtime_state_'s pool
   const RowDescriptor* row_desc_;

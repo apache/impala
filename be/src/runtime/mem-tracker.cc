@@ -21,6 +21,7 @@
 #include "resourcebroker/resource-broker.h"
 #include "statestore/query-resource-mgr.h"
 #include "util/debug-util.h"
+#include "util/mem-info.h"
 #include "util/uid-util.h"
 
 using namespace boost;
@@ -142,6 +143,17 @@ MemTracker* MemTracker::GetRequestPoolMemTracker(const string& pool_name,
 shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
     const TUniqueId& id, int64_t byte_limit, MemTracker* parent,
     QueryResourceMgr* res_mgr) {
+  if (byte_limit != -1) {
+    if (byte_limit > MemInfo::physical_mem()) {
+      LOG(WARNING) << "Memory limit "
+                   << PrettyPrinter::Print(byte_limit, TCounterType::BYTES)
+                   << " exceeds physical memory of "
+                   << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
+    }
+    VLOG_QUERY << "Using query memory limit: "
+               << PrettyPrinter::Print(byte_limit, TCounterType::BYTES);
+  }
+
   lock_guard<mutex> l(static_mem_trackers_lock_);
   RequestTrackersMap::iterator it = request_to_mem_trackers_.find(id);
   if (it != request_to_mem_trackers_.end()) {
