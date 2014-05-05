@@ -69,6 +69,8 @@ DEFINE_bool(ldap_tls, false, "If true, use the secure TLS protocol to connect to
     " server");
 DEFINE_string(ldap_ca_certificate, "", "The full path to the certificate file used to"
     " authenticate the LDAP server's certificate for SSL / TLS connections.");
+DEFINE_bool(ldap_allow_anonymous_binds, false, "(Advanced) If true, LDAP authentication "
+    "with a blank password (an 'anonymous bind') is allowed by Impala.");
 DEFINE_bool(ldap_manual_config, false, "(Advanced) If true, use a custom SASL config file"
     " to configure access to an LDAP server.");
 
@@ -136,6 +138,11 @@ static int SaslLogCallback(void* context, int level,  const char* message) {
 // the authenticity of the LDAP server certificate.
 int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
     const char *pass, unsigned passlen, struct propctx *propctx) {
+  if (passlen == 0 && !FLAGS_ldap_allow_anonymous_binds) {
+    // Disable anonymous binds.
+    return SASL_FAIL;
+  }
+
   LDAP* ld;
   int rc = ldap_initialize(&ld, FLAGS_ldap_uri.c_str());
   if (rc != LDAP_SUCCESS) {
