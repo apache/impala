@@ -72,6 +72,7 @@ import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
+import com.cloudera.impala.util.AvroSchemaParser;
 import com.cloudera.impala.util.FSPermissionChecker;
 import com.cloudera.impala.util.MetaStoreUtil;
 import com.cloudera.impala.util.TAccessLevelUtil;
@@ -762,7 +763,33 @@ public class HdfsTable extends Table {
       List<FieldSchema> tblFields = Lists.newArrayList();
       String inputFormat = msTbl.getSd().getInputFormat();
       if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
-        tblFields.addAll(client.getFields(db_.getName(), name_));
+        // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
+        // taking precedence.
+        List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
+        schemaSearchLocations.add(
+            getMetaStoreTable().getSd().getSerdeInfo().getParameters());
+        schemaSearchLocations.add(getMetaStoreTable().getParameters());
+
+        avroSchema_ =
+            HdfsTable.getAvroSchema(schemaSearchLocations, getFullName(), true);
+        String serdeLib = msTbl.getSd().getSerdeInfo().getSerializationLib();
+        if (serdeLib == null ||
+            serdeLib.equals("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe")) {
+          // If the SerDe library is null or set to LazySimpleSerDe or is null, it
+          // indicates there is an issue with the table metadata since Avro table need a
+          // non-native serde. Instead of failing to load the table, fall back to
+          // using the fields from the storage descriptor (same as Hive).
+          tblFields.addAll(msTbl.getSd().getCols());
+        } else {
+          // Load the fields from the Avro schema.
+          for (Column parsedCol: AvroSchemaParser.parse(avroSchema_)) {
+            FieldSchema fs = new FieldSchema();
+            fs.setName(parsedCol.getName());
+            fs.setType(parsedCol.getType().toString());
+            fs.setComment("from deserializer");
+            tblFields.add(fs);
+          }
+        }
       } else {
         tblFields.addAll(msTbl.getSd().getCols());
       }
@@ -860,17 +887,6 @@ public class HdfsTable extends Table {
           p.setNumRows(numRows_);
         }
       }
-
-      // populate Avro schema if necessary
-      if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
-        // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
-        // taking precedence.
-        List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
-        schemaSearchLocations.add(
-            getMetaStoreTable().getSd().getSerdeInfo().getParameters());
-        schemaSearchLocations.add(getMetaStoreTable().getParameters());
-        avroSchema_ = HdfsTable.getAvroSchema(schemaSearchLocations, getFullName(), true);
-      }
     } catch (TableLoadingException e) {
       throw e;
     } catch (Exception e) {
@@ -907,7 +923,8 @@ public class HdfsTable extends Table {
     }
 
     if (url == null || url.equals(AvroSerdeUtils.SCHEMA_NONE)) {
-      throw new TableLoadingException("No Avro schema provided for table: " + tableName);
+      throw new TableLoadingException(String.format("No Avro schema provided in " +
+          "SERDEPROPERTIES or TBLPROPERTIES for table: %s ", tableName));
     }
 
     if (!url.toLowerCase().startsWith("hdfs://") &&

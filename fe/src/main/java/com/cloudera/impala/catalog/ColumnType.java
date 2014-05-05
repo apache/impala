@@ -14,9 +14,15 @@
 
 package com.cloudera.impala.catalog;
 
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+
+import com.cloudera.impala.analysis.CreateTableStmt;
+import com.cloudera.impala.analysis.SqlParser;
+import com.cloudera.impala.analysis.SqlScanner;
 import com.cloudera.impala.analysis.TypesUtil;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumnType;
@@ -492,6 +498,40 @@ public class ColumnType {
     } else {
       return createType(type);
     }
+  }
+
+  /*
+   * Gets the ColumnType from the given FieldSchema by using Impala's SqlParser.
+   * Returns null if the FieldSchema could not be parsed.
+   * The type can either be:
+   *   - Supported by Impala, in which case the type is returned.
+   *   - A type Impala understands but is not yet implemented (e.g. date), the type is
+   *     returned but type.IsSupported() returns false.
+   *   - A type Impala can't understand at all in which case null is returned.
+   */
+  public static ColumnType parseColumnType(FieldSchema fs) {
+    // Wrap the type string in a CREATE TABLE stmt and use Impala's Parser
+    // to get the ColumnType.
+    // Pick a table name that can't be used.
+    String stmt = String.format("CREATE TABLE $DUMMY ($DUMMY %s)", fs.getType());
+    SqlScanner input = new SqlScanner(new StringReader(stmt));
+    SqlParser parser = new SqlParser(input);
+    CreateTableStmt createTableStmt;
+    try {
+      Object o = parser.parse().value;
+      if (!(o instanceof CreateTableStmt)) {
+        // Should never get here.
+        throw new IllegalStateException("Couldn't parse create table stmt.");
+      }
+      createTableStmt = (CreateTableStmt) o;
+      if (createTableStmt.getColumnDescs().isEmpty()) {
+        // Should never get here.
+        throw new IllegalStateException("Invalid create table stmt.");
+      }
+    } catch (Exception e) {
+      return null;
+    }
+    return createTableStmt.getColumnDescs().get(0).getColType();
   }
 
   /**

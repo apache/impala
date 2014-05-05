@@ -749,22 +749,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table new_table (i int) PARTITIONED BY (d datetime)",
         "Type 'DATETIME' is not supported as partition-column type in column: d");
 
-    // Analysis of Avro schemas
-    AnalyzesOk("create table foo_avro (i int) with serdeproperties ('avro.schema.url'=" +
-        "'hdfs://schema.avsc') stored as avro");
-    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
-        "('avro.schema.url'='hdfs://schema.avsc')");
-    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
-        "('avro.schema.literal'='{\"name\": \"my_record\"}')");
-    AnalysisError("create table foo_avro (i int) stored as avro",
-        "No Avro schema provided for table: default.foo");
-    AnalysisError("create table foo_avro (i int) stored as avro tblproperties ('a'='b')",
-        "No Avro schema provided for table: default.foo");
-    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
-        "('avro.schema.url'='schema.avsc')", "avro.schema.url must be of form " +
-        "\"http://path/to/schema/file\" or \"hdfs://namenode:port/path/to/schema/file" +
-        "\", got schema.avsc");
-
     // Invalid database name.
     AnalysisError("create table `???`.new_table (x int) PARTITIONED BY (y int)",
         "Invalid database name: ???");
@@ -816,6 +800,96 @@ public class AnalyzeDDLTest extends AnalyzerTest {
           "Tables produced by an external data source do not support the column type: " +
           type.name());
     }
+  }
+
+  @Test
+  public void TestCreateAvroTest() {
+    // Analysis of Avro schemas
+    AnalyzesOk("create table foo_avro (i int) with serdeproperties ('avro.schema.url'=" +
+        "'hdfs://localhost:20500/test-warehouse/avro_schemas/functional/" +
+        "alltypes.json') stored as avro");
+    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.url'='hdfs://localhost:20500/test-warehouse/avro_schemas/" +
+        "functional/alltypes.json')");
+    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}]}')");
+
+    // No Avro schema specified for Avro format table.
+    AnalysisError("create table foo_avro (i int) stored as avro",
+        "Error loading Avro schema: No Avro schema provided in SERDEPROPERTIES or " +
+        "TBLPROPERTIES for table: default.foo_avro");
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties ('a'='b')",
+        "Error loading Avro schema: No Avro schema provided in SERDEPROPERTIES or " +
+        "TBLPROPERTIES for table: default.foo_avro");
+    // Invalid schema URL
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.url'='schema.avsc')", "Error loading Avro schema: " +
+        "avro.schema.url must be of form \"http://path/to/schema/file\" or " +
+        "\"hdfs://namenode:port/path/to/schema/file\", got schema.avsc");
+
+    // Decimal parsing
+    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\":\"value\",\"type\":{\"type\":\"bytes\", " +
+        "\"logicalType\":\"decimal\",\"precision\":5,\"scale\":2}}]}')");
+    // Scale not required (defaults to zero).
+    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\":\"value\",\"type\":{\"type\":\"bytes\", " +
+        "\"logicalType\":\"decimal\",\"precision\":5}}]}')");
+    // Precision is always required
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\":\"value\",\"type\":{\"type\":\"bytes\", " +
+        "\"logicalType\":\"decimal\",\"scale\":5}}]}')",
+        "Error parsing Avro schema for table 'default.foo_avro': " +
+        "No 'precision' property specified for 'decimal' logicalType");
+    // Precision/Scale must be positive integers
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\":\"value\",\"type\":{\"type\":\"bytes\", " +
+        "\"logicalType\":\"decimal\",\"scale\":5, \"precision\":-20}}]}')",
+        "Error parsing Avro schema for table 'default.foo_avro': " +
+        "Invalid decimal 'precision' property value: -20");
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\":\"value\",\"type\":{\"type\":\"bytes\", " +
+        "\"logicalType\":\"decimal\",\"scale\":-1, \"precision\":20}}]}')",
+        "Error parsing Avro schema for table 'default.foo_avro': " +
+        "Invalid decimal 'scale' property value: -1");
+
+    // Invalid schema (bad JSON - missing opening bracket for "field" array)
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": {\"name\": \"string1\", \"type\": \"string\"}]}')",
+        "Error parsing Avro schema for table 'default.foo_avro': " +
+        "org.codehaus.jackson.JsonParseException: Unexpected close marker ']': "+
+        "expected '}'");
+
+    // Unsupported types
+    // Array
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}," +
+        "{\"name\": \"list1\", \"type\": {\"type\":\"array\", \"items\": \"int\"}}]}')",
+        "Error parsing Avro schema for table 'default.foo_avro': " +
+        "Unsupported type 'array' of column 'list1'");
+    // Map
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}," +
+        "{\"name\": \"map1\", \"type\": {\"type\":\"map\", \"values\": \"int\"}}]}')",
+        "Error parsing Avro schema for table 'default.foo_avro': " +
+        "Unsupported type 'map' of column 'map1'");
+
+    // Union
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}," +
+        "{\"name\": \"union1\", \"type\": [\"float\", \"boolean\"]}]}')",
+        "Error parsing Avro schema for table 'default.foo_avro': " +
+        "Unsupported type 'union' of column 'union1'");
   }
 
   @Test

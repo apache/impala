@@ -31,7 +31,9 @@ import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateTableParams;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TTableName;
+import com.cloudera.impala.util.AvroSchemaParser;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -206,13 +208,28 @@ public class CreateTableStmt extends StatementBase {
       // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
       // taking precedence.
       List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
+      String fullTblName = dbName_ + "." + tableName_.getTbl();
       schemaSearchLocations.add(serdeProperties_);
       schemaSearchLocations.add(tblProperties_);
+      String avroSchema = null;
       try {
-        HdfsTable.getAvroSchema(schemaSearchLocations,
-            dbName_ + "." + tableName_.getTbl(), false);
+        avroSchema = HdfsTable.getAvroSchema(schemaSearchLocations,
+            dbName_ + "." + tableName_.getTbl(), true);
       } catch (TableLoadingException e) {
-        throw new AnalysisException(e.getMessage(), e);
+        throw new AnalysisException("Error loading Avro schema: " + e.getMessage(), e);
+      }
+
+      if (Strings.isNullOrEmpty(avroSchema)) {
+        throw new AnalysisException("Avro schema is null or empty: " + fullTblName);
+      }
+
+      try {
+        // Ignore the return value, we just want to check if the Avro schema is invalid.
+        AvroSchemaParser.parse(avroSchema);
+      } catch (Exception e) {
+        throw new AnalysisException(String.format(
+            "Error parsing Avro schema for table '%s': %s", fullTblName,
+            e.getMessage()));
       }
     }
   }
