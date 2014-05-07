@@ -65,6 +65,8 @@ class ExecNode {
   // Performs any preparatory work prior to calling GetNext().
   // Caller must not be holding any io buffers. This will cause deadlock.
   // If overridden in subclass, must first call superclass's Open().
+  // If a parent exec node adds slot filters (see RuntimeState::AddBitmapFilter()),
+  // they need to be added before calling Open() on the child that will consume them.
   virtual Status Open(RuntimeState* state);
 
   // Retrieves rows and returns them via row_batch. Sets eos to true

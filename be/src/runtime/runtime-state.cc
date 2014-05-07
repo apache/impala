@@ -26,6 +26,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/data-stream-recvr.h"
+#include "util/bitmap.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -58,7 +59,8 @@ RuntimeState::RuntimeState(const TUniqueId& query_id,
     cgroup_(cgroup),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
     is_cancelled_(false),
-    query_resource_mgr_(NULL) {
+    query_resource_mgr_(NULL),
+    root_node_id_(-1) {
   Status status = Init(fragment_instance_id, exec_env);
   DCHECK(status.ok()) << status.GetErrorMsg();
 }
@@ -73,7 +75,8 @@ RuntimeState::RuntimeState(const TQueryContext& query_ctxt)
     exec_env_(ExecEnv::GetInstance()),
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false),
-    query_resource_mgr_(NULL) {
+    query_resource_mgr_(NULL),
+    root_node_id_(-1) {
   query_ctxt_.request.query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
 }
 
@@ -217,7 +220,7 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
     int64_t failed_allocation_size) {
   DCHECK_GE(failed_allocation_size, 0);
   {
-    boost::lock_guard<boost::mutex> l(query_status_lock_);
+    lock_guard<mutex> l(query_status_lock_);
     if (query_status_.ok()) {
       query_status_ = Status::MEM_LIMIT_EXCEEDED;
     } else {
@@ -255,9 +258,24 @@ Status RuntimeState::CheckQueryState() {
   // TODO: it would be nice if this also checked for cancellation, but doing so breaks
   // cases where we use Status::CANCELLED to indicate that the limit was reached.
   if (instance_mem_tracker_->AnyLimitExceeded()) return SetMemLimitExceeded();
-  boost::lock_guard<boost::mutex> l(query_status_lock_);
+  lock_guard<mutex> l(query_status_lock_);
   return query_status_;
 }
 
+void RuntimeState::AddBitmapFilter(SlotId slot, const Bitmap* bitmap) {
+  lock_guard<mutex> l(bitmap_lock_);
+  if (bitmap != NULL) {
+    Bitmap* existing_bitmap = NULL;
+    if (slot_bitmap_filters_.find(slot) != slot_bitmap_filters_.end()) {
+      existing_bitmap = slot_bitmap_filters_[slot];
+    } else {
+      existing_bitmap = obj_pool_->Add(new Bitmap(slot_filter_bitmap_size()));
+      existing_bitmap->SetAllBits(true);
+      slot_bitmap_filters_[slot] = existing_bitmap;
+    }
+    DCHECK(existing_bitmap != NULL);
+    existing_bitmap->And(bitmap);
+  }
+}
 
 }

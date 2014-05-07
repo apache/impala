@@ -519,7 +519,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Returns true if stats-related variables are valid.
    */
   protected boolean hasValidStats() {
-    return (numNodes_ == -1 || numNodes_ >= 0) && (cardinality_ == -1 || cardinality_ >= 0);
+    return (numNodes_ == -1 || numNodes_ >= 0) &&
+           (cardinality_ == -1 || cardinality_ >= 0);
   }
 
   /**

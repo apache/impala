@@ -41,6 +41,7 @@
 
 namespace impala {
 
+class Bitmap;
 class DescriptorTbl;
 class ObjectPool;
 class Status;
@@ -129,6 +130,33 @@ class RuntimeState {
   PartitionRowCount* num_appended_rows() { return &num_appended_rows_; }
   PartitionInsertStats* insert_stats() { return &insert_stats_; }
   std::vector<DiskIoMgr::ReaderContext*>* reader_contexts() { return &reader_contexts_; }
+  void set_fragment_root_id(PlanNodeId id) {
+    DCHECK_EQ(root_node_id_, -1) << "Should not set this twice.";
+    root_node_id_ = id;
+  }
+
+  // The seed value to use when hashing tuples.
+  // See comment on root_node_id_.
+  uint32_t fragment_hash_seed() const { return root_node_id_; }
+
+  // Size to use when building bitmap filters. This is a prime number which reduces
+  // collisions and the resulting bitmap is just under 4Kb.
+  // Having all bitmaps be the same size allows us to combine (i.e. AND) bitmaps.
+  uint32_t slot_filter_bitmap_size() const { return 32213; }
+
+  // Adds a bitmap filter on slot 'slot'. If hash(slot) % bitmap.Size() is false, this
+  // value can be filtered out. Multiple bitmap filters can be added to a single slot.
+  // Thread safe.
+  void AddBitmapFilter(SlotId slot, const Bitmap* bitmap);
+
+  // Returns bitmap filter on 'slot'. Returns NULL if there are no bitmap filters on this
+  // slot.
+  // It is not safe to concurrently call AddBitmapFilter() and GetBitmapFilter().
+  // All calls to AddBitmapFilter() should happen before.
+  const Bitmap* GetBitmapFilter(SlotId slot) {
+    if (slot_bitmap_filters_.find(slot) == slot_bitmap_filters_.end()) return NULL;
+    return slot_bitmap_filters_[slot];
+  }
 
   // Returns runtime state profile
   RuntimeProfile* runtime_profile() { return &profile_; }
@@ -335,6 +363,22 @@ class RuntimeState {
 
   // Reader contexts that need to be closed when the fragment is closed.
   std::vector<DiskIoMgr::ReaderContext*> reader_contexts_;
+
+  // This is the node id of the root node for this plan fragment. This is used as the
+  // hash seed and has two useful properties:
+  // 1) It is the same for all exec nodes in a fragment, so the resulting hash values
+  // can be shared (i.e. for slot_bitmap_filters_).
+  // 2) It is different between different fragments, so we do not run into hash
+  // collisions after data partitioning (across fragments). See IMPALA-219 for more
+  // details.
+  PlanNodeId root_node_id_;
+
+  // Lock protecting slot_bitmap_filters_
+  boost::mutex bitmap_lock_;
+
+  // Bitmap filter on the hash for 'SlotId'. If bitmap[hash(slot]] is unset, this
+  // value can be filtered out. These filters are generated during the query execution.
+  boost::unordered_map<SlotId, Bitmap*> slot_bitmap_filters_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

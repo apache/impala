@@ -111,6 +111,41 @@ bool HashTable::EvalRow(TupleRow* row, const vector<Expr*>& exprs) {
   return has_null;
 }
 
+void HashTable::AddBitmapFilters() {
+  DCHECK_EQ(build_exprs_.size(), probe_exprs_.size());
+  vector<pair<SlotId, Bitmap*> > bitmaps;
+  bitmaps.resize(probe_exprs_.size());
+  for (int i = 0; i < build_exprs_.size(); ++i) {
+    if (probe_exprs_[i]->is_slotref()) {
+      bitmaps[i].first = reinterpret_cast<SlotRef*>(probe_exprs_[i])->slot_id();
+      bitmaps[i].second = new Bitmap(state_->slot_filter_bitmap_size());
+    } else {
+      bitmaps[i].second = NULL;
+    }
+  }
+
+  // Walk the build table and generate a bitmap for each probe side slot.
+  HashTable::Iterator iter = Begin();
+  while (iter != End()) {
+    TupleRow* row = iter.GetRow();
+    for (int i = 0; i < build_exprs_.size(); ++i) {
+      if (bitmaps[i].second == NULL) continue;
+      void* e = build_exprs_[i]->GetValue(row);
+      uint32_t h = RawValue::GetHashValue(e, build_exprs_[i]->type(), initial_seed_);
+      bitmaps[i].second->Set<true>(h, true);
+    }
+    iter.Next<false>();
+  }
+
+  // Add all the bitmaps to the runtime state.
+  for (int i = 0; i < bitmaps.size(); ++i) {
+    if (bitmaps[i].second == NULL) continue;
+    state_->AddBitmapFilter(bitmaps[i].first, bitmaps[i].second);
+    VLOG(2) << "Bitmap filter added on slot: " << bitmaps[i].first;
+    delete bitmaps[i].second;
+  }
+}
+
 // Helper function to store a value into the results buffer if the expr
 // evaluated to NULL.  We don't want (NULL, 1) to hash to the same as (0,1) so
 // we'll pick a more random value.

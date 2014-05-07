@@ -81,6 +81,10 @@ class BlockingJoinNode : public ExecNode {
   // This should be the same size as the left child tuple row.
   int result_tuple_row_size_;
 
+  // If true, this node can add filters to the left child node after processing
+  // the entire build side.
+  bool can_add_left_child_filters_;
+
   RuntimeProfile::Counter* build_timer_;   // time to prepare build side
   RuntimeProfile::Counter* left_child_timer_;   // time to process left child batch
   RuntimeProfile::Counter* build_row_counter_;   // num build rows

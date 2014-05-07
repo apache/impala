@@ -30,6 +30,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "runtime/string-value.h"
+#include "util/bitmap.h"
 #include "util/bit-util.h"
 #include "util/decompress.h"
 #include "util/debug-util.h"
@@ -139,15 +140,22 @@ class HdfsParquetScanner::BaseColumnReader {
     return PARQUET_TO_IMPALA_CODEC[metadata_->codec];
   }
 
-  // Read the next value into tuple for this column.  Returns
-  // false if there are no more values in the file.
+  // Read the next value into tuple for this column.  Returns false if there are no
+  // more values in the file.
+  // *conjuncts_failed is an in/out parameter. If false, it means this row has already
+  // been filtered out (i.e. ReadValue is really a SkipValue()) and should be set to
+  // true if ReadValue() can filter out this row.
   // TODO: this is the function that needs to be codegen'd (e.g. CodegenReadValue())
   // The codegened functions from all the materialized cols will then be combined
   // into one function.
   // TODO: another option is to materialize col by col for the entire row batch in
   // one call.  e.g. MaterializeCol would write out 1024 values.  Our row batches
   // are currently dense so we'll need to figure out something there.
-  bool ReadValue(MemPool* pool, Tuple* tuple);
+  bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_failed);
+
+  // TODO: Some encodings might benefit a lot from a SkipValues(int num_rows) if
+  // we know this row can be skipped. This could be very useful with stats and big
+  // sections can be skipped. Implement that when we can benefit from it.
 
  protected:
   friend class HdfsParquetScanner;
@@ -189,6 +197,19 @@ class HdfsParquetScanner::BaseColumnReader {
   // The number of values seen so far. Updated per data page.
   int64_t num_values_read_;
 
+  // Cache of the bitmap_filter_ (if any) for this slot.
+  const Bitmap* bitmap_filter_;
+  // Cache of hash_seed_ to use with bitmap_filter_.
+  uint32_t hash_seed_;
+
+  // Bitmap filters are optional (i.e. they can be ignored and the results will be
+  // correct). Keep track of stats to determine if the filter is not effective. If
+  // the number of rows filtered out is too low, this is not worth the cost.
+  // TODO: this should be cost based taking into account how much we save when we
+  // filter a row.
+  int64_t rows_returned_;
+  int64_t bitmap_filter_rows_rejected_;
+
   BaseColumnReader(HdfsParquetScanner* parent, const SlotDescriptor* desc, int file_idx)
     : parent_(parent),
       desc_(desc),
@@ -199,6 +220,11 @@ class HdfsParquetScanner::BaseColumnReader {
       decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())),
       num_buffered_values_(0),
       num_values_read_(0) {
+    RuntimeState* state = parent_->scan_node_->runtime_state();
+    bitmap_filter_ = state->GetBitmapFilter(desc_->id());
+    hash_seed_ = state->fragment_hash_seed();
+    rows_returned_ = 0;
+    bitmap_filter_rows_rejected_ = 0;
   }
 
   // Read the next data page.  If a dictionary page is encountered, that will
@@ -222,7 +248,7 @@ class HdfsParquetScanner::BaseColumnReader {
   // Returns false if there was an error.
   // Subclass must implement this.
   // TODO: we need to remove this with codegen.
-  virtual bool ReadSlot(void* slot, MemPool* pool) = 0;
+  virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed) = 0;
 };
 
 // Per column type reader.
@@ -253,13 +279,21 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
       }
       dict_decoder_->SetData(data, size);
     }
+
+    // Check if we should disable the bitmap filter. We'll do this if the filter
+    // is not removing a lot of rows.
+    // TODO: how to pick the selectivity?
+    if (bitmap_filter_ != NULL && rows_returned_ > 10000 &&
+        bitmap_filter_rows_rejected_ < rows_returned_ * .1) {
+      bitmap_filter_ = NULL;
+    }
     return Status::OK;
   }
 
-  virtual bool ReadSlot(void* slot, MemPool* pool)  {
+  virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed)  {
     parquet::Encoding::type page_encoding =
         current_page_header_.data_page_header.encoding;
-    bool result;
+    bool result = true;
     if (page_encoding == parquet::Encoding::PLAIN_DICTIONARY) {
       result = dict_decoder_->GetValue(reinterpret_cast<T*>(slot));
     } else {
@@ -269,7 +303,12 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
       if (parent_->scan_node_->requires_compaction()) {
         CopySlot(reinterpret_cast<T*>(slot), pool);
       }
-      return true;
+    }
+    ++rows_returned_;
+    if (!*conjuncts_failed && bitmap_filter_ != NULL) {
+      uint32_t h = RawValue::GetHashValue(slot, desc_->type(), hash_seed_);
+      *conjuncts_failed = !bitmap_filter_->Get<true>(h);
+      ++bitmap_filter_rows_rejected_;
     }
     return result;
   }
@@ -314,7 +353,7 @@ class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColu
     return Status::OK;
   }
 
-  virtual bool ReadSlot(void* slot, MemPool* pool)  {
+  virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed)  {
     bool valid = bool_values_.GetValue(1, reinterpret_cast<bool*>(slot));
     if (!valid) parent_->parse_status_ = Status("Invalid bool column.");
     return valid;
@@ -626,7 +665,8 @@ inline int HdfsParquetScanner::BaseColumnReader::ReadDefinitionLevel() {
   return definition_level;
 }
 
-inline bool HdfsParquetScanner::BaseColumnReader::ReadValue(MemPool* pool, Tuple* tuple) {
+inline bool HdfsParquetScanner::BaseColumnReader::ReadValue(
+    MemPool* pool, Tuple* tuple, bool* conjuncts_failed) {
   if (num_buffered_values_ == 0) {
     parent_->assemble_rows_timer_.Stop();
     parent_->parse_status_ = ReadDataPage();
@@ -648,7 +688,7 @@ inline bool HdfsParquetScanner::BaseColumnReader::ReadValue(MemPool* pool, Tuple
   }
 
   DCHECK_EQ(definition_level, 1);
-  return ReadSlot(tuple->GetSlot(desc_->tuple_offset()), pool);
+  return ReadSlot(tuple->GetSlot(desc_->tuple_offset()), pool, conjuncts_failed);
 }
 
 Status HdfsParquetScanner::ProcessSplit() {
@@ -698,22 +738,23 @@ Status HdfsParquetScanner::AssembleRows() {
     int num_to_commit = 0;
 
     for (int i = 0; i < num_rows; ++i) {
+      bool conjuncts_failed = false;
       InitTuple(template_tuple_, tuple);
       for (int c = 0; c < column_readers_.size(); ++c) {
-        if (!column_readers_[c]->ReadValue(pool, tuple)) {
+        if (!column_readers_[c]->ReadValue(pool, tuple, &conjuncts_failed)) {
           assemble_rows_timer_.Stop();
           // This column is complete and has no more data.  This indicates
           // we are done with this row group.
           // For correctly formed files, this should be the first column we
           // are reading.
-          DCHECK(c == 0 || !parse_status_.ok()) << "c=" << c << " "
-              << parse_status_.GetErrorMsg();;
+          DCHECK(c == 0 || !parse_status_.ok())
+              << "c=" << c << " " << parse_status_.GetErrorMsg();;
           COUNTER_UPDATE(scan_node_->rows_read_counter(), i);
           RETURN_IF_ERROR(CommitRows(num_to_commit));
           return parse_status_;
         }
       }
-
+      if (conjuncts_failed) continue;
       row->SetTuple(scan_node_->tuple_idx(), tuple);
       if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, row)) {
         row = next_row(row);

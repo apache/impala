@@ -27,6 +27,8 @@
 #include "gen-cpp/PlanNodes_types.h"
 
 DECLARE_string(cgroup_hierarchy_path);
+DEFINE_bool(enable_probe_side_filtering, true,
+    "Enables pushing build side filters to probe side");
 
 using namespace boost;
 using namespace impala;
@@ -47,6 +49,8 @@ HashJoinNode::HashJoinNode(
   match_one_build_ = (join_op_ == TJoinOp::LEFT_SEMI_JOIN);
   match_all_build_ =
     (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
+  can_add_left_child_filters_ = tnode.hash_join_node.add_probe_filters;
+  can_add_left_child_filters_ &= FLAGS_enable_probe_side_filtering;
 }
 
 Status HashJoinNode::Init(const TPlanNode& tnode) {
@@ -87,7 +91,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   bool stores_nulls =
       join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
   hash_tbl_.reset(new HashTable(state, build_exprs_, probe_exprs_, build_tuple_size_,
-      stores_nulls, false, id(), mem_tracker()));
+      stores_nulls, false, state->fragment_hash_seed(), mem_tracker()));
 
   if (state->codegen_enabled()) {
     // Codegen for hashing rows
@@ -162,6 +166,20 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
     build_batch.Reset();
     DCHECK(!build_batch.AtCapacity());
     if (eos) break;
+  }
+
+  // We've finished constructing the build side. Set the bitmap of the build side values
+  // so that the probe side can use this as an additional predicate.
+  // We only do this if the build side is sufficiently small.
+  // TODO: better heuristic?
+  if (can_add_left_child_filters_) {
+    if (hash_tbl_->size() < state->slot_filter_bitmap_size()) {
+      AddRuntimeExecOption("Build-Side Filter Pushed Down");
+      hash_tbl_->AddBitmapFilters();
+    } else {
+      VLOG(2) << "Disabling probe filter push down because build table is too large: "
+              << hash_tbl_->size();
+    }
   }
   return Status::OK;
 }

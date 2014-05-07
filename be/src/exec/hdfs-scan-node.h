@@ -295,6 +295,10 @@ class HdfsScanNode : public ScanNode {
   typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*> > FileFormatsMap;
   FileFormatsMap per_type_files_;
 
+  // Set to true when the initial scan ranges are issued to the IoMgr. This happens
+  // on the first call to GetNext().
+  bool initial_ranges_issued_;
+
   // The estimated memory required to start up a new scanner thread. If the memory
   // left (due to limits) is less than this value, we won't start up optional
   // scanner threads.

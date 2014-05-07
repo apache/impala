@@ -163,6 +163,10 @@ struct THashJoinNode {
   // anything from the ON or USING clauses (but *not* the WHERE clause) that's not an
   // equi-join predicate
   3: optional list<Exprs.TExpr> other_join_conjuncts
+
+  // If true, this join node can (but may choose not to) generate slot filters
+  // after constructing the build side that can be applied to the probe side.
+  4: optional bool add_probe_filters
 }
 
 struct TAggregationNode {

@@ -20,6 +20,7 @@
 #include <boost/cstdint.hpp>
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
+#include "util/bitmap.h"
 #include "util/hash-util.h"
 #include "util/runtime-profile.h"
 
@@ -83,7 +84,7 @@ class HashTable {
   //  - num_build_tuples: number of Tuples in the build tuple row
   //  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
   //  - finds_nulls: if false, Find() returns End() for TupleRows with nulls
-  //                 even if stores_nulls is true
+  //      even if stores_nulls is true
   //  - num_buckets: number of buckets that the hash table should be initialized to
   //  - mem_tracker: if non-empty, all memory allocations for nodes and for buckets are
   //    tracked; the tracker must be valid until the d'tor is called
@@ -153,6 +154,14 @@ class HashTable {
   bool last_expr_value_null(int expr_idx) const {
     return expr_value_null_bits_[expr_idx];
   }
+
+  // Can be called after all insert calls to add bitmap filters for the probe
+  // side values.
+  // For each probe_expr_ that is a slot ref, generate a bitmap filter on that slot.
+  // These filters are added to the runtime state.
+  // The bitmap filter is similar to a Bloom filter in that has no false negatives
+  // but will have false positives.
+  void AddBitmapFilters();
 
   // Return beginning of hash table.  Advancing this iterator will traverse all
   // elements.
@@ -252,6 +261,8 @@ class HashTable {
   };
 
   struct Bucket {
+    // Index into nodes_ to the start of the values at this bucket. -1 if this
+    // bucket is empty.
     int64_t node_idx_;
 
     Bucket() {

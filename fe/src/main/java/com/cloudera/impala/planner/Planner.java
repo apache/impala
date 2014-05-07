@@ -170,7 +170,7 @@ public class Planner {
 
     LOG.debug("finalize plan fragments");
     for (PlanFragment fragment: fragments) {
-      fragment.finalize(analyzer, !queryOptions.allow_unsupported_formats);
+      fragment.finalize(analyzer);
     }
 
     Collections.reverse(fragments);

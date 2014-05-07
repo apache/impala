@@ -35,7 +35,8 @@ BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type 
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
     node_name_(node_name),
-    join_op_(join_op) {
+    join_op_(join_op),
+    can_add_left_child_filters_(false) {
 }
 
 Status BlockingJoinNode::Init(const TPlanNode& tnode) {
@@ -112,9 +113,8 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     Thread build_thread(node_name_, "build thread",
         bind(&BlockingJoinNode::BuildSideThread, this, state, &build_side_status));
     if (!state->cgroup().empty()) {
-      RETURN_IF_ERROR(
-          state->exec_env()->cgroups_mgr()->AssignThreadToCgroup(
-              build_thread, state->cgroup()));
+      RETURN_IF_ERROR(state->exec_env()->cgroups_mgr()->AssignThreadToCgroup(
+          build_thread, state->cgroup()));
     }
   } else {
     build_side_status.Set(ConstructBuildSide(state));
@@ -133,6 +133,7 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   child(1)->Close(state);
 
   RETURN_IF_ERROR(open_status);
+
   // Seed left child in preparation for GetNext().
   while (true) {
     RETURN_IF_ERROR(child(0)->GetNext(state, left_batch_.get(), &left_side_eos_));

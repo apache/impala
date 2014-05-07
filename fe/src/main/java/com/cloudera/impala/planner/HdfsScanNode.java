@@ -32,7 +32,6 @@ import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -328,14 +327,6 @@ public class HdfsScanNode extends ScanNode {
       output.append("\n");
     }
     return output.toString();
-  }
-
-  /**
-   * Raises NotImplementedException if any of the partitions uses an unsupported file
-   * format.  This is useful for experimental formats, which we currently don't have.
-   * Can only be called after finalize().
-   */
-  public void validateFileFormat() throws NotImplementedException {
   }
 
   @Override

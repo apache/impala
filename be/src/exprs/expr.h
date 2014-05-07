@@ -289,6 +289,7 @@ class Expr {
   int GetNumChildren() const { return children_.size(); }
 
   const ColumnType& type() const { return type_; }
+  bool is_slotref() const { return is_slotref_; }
 
   const std::vector<Expr*>& children() const { return children_; }
 
@@ -604,6 +605,7 @@ class SlotRef : public Expr {
   virtual std::string DebugString() const;
   virtual bool IsConstant() const { return false; }
   virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const;
+  const SlotId& slot_id() const { return slot_id_; }
 
   virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
 

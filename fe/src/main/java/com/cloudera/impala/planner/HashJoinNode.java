@@ -78,6 +78,11 @@ public class HashJoinNode extends PlanNode {
   // join conjuncts_ from the JOIN clause that aren't equi-join predicates
   private List<Expr> otherJoinConjuncts_;
 
+  // If true, this node can add filters for the probe side that can be generated
+  // after reading the build side. This can be very helpful if the join is selective and
+  // there are few build rows.
+  private boolean addProbeFilters_;
+
   public HashJoinNode(
       PlanNode outer, PlanNode inner, TableRef innerRef,
       List<Pair<Expr, Expr> > eqJoinConjuncts, List<Expr> otherJoinConjuncts) {
@@ -115,6 +120,7 @@ public class HashJoinNode extends PlanNode {
   public TableRef getInnerRef() { return innerRef_; }
   public DistributionMode getDistributionMode() { return distrMode_; }
   public void setDistributionMode(DistributionMode distrMode) { distrMode_ = distrMode; }
+  public void setAddProbeFilters(boolean b) { addProbeFilters_ = true; }
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
@@ -265,6 +271,7 @@ public class HashJoinNode extends PlanNode {
     for (Expr e: otherJoinConjuncts_) {
       msg.hash_join_node.addToOther_join_conjuncts(e.treeToThrift());
     }
+    msg.hash_join_node.setAdd_probe_filters(addProbeFilters_);
   }
 
   @Override

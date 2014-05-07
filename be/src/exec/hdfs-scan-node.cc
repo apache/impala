@@ -78,6 +78,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       reader_context_(NULL),
       tuple_desc_(NULL),
       unknown_disk_id_warned_(false),
+      initial_ranges_issued_(false),
       scanner_thread_bytes_required_(0),
       num_interpreted_conjuncts_copies_(0),
       num_partition_keys_(0),
@@ -100,6 +101,31 @@ HdfsScanNode::~HdfsScanNode() {
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+
+  if (!initial_ranges_issued_) {
+    // We do this in GetNext() to ensure that all execution time predicates have
+    // been generated (e.g. probe side bitmap filters).
+    // TODO: we could do dynamic partition pruning here as well.
+    initial_ranges_issued_ = true;
+    // Issue initial ranges for all file types.
+    RETURN_IF_ERROR(HdfsTextScanner::IssueInitialRanges(this,
+        per_type_files_[THdfsFileFormat::TEXT]));
+    RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
+        per_type_files_[THdfsFileFormat::SEQUENCE_FILE]));
+    RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
+        per_type_files_[THdfsFileFormat::RC_FILE]));
+    RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
+        per_type_files_[THdfsFileFormat::AVRO]));
+    RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
+          per_type_files_[THdfsFileFormat::PARQUET]));
+    if (!per_type_files_[THdfsFileFormat::LZO_TEXT].empty()) {
+      // This will dlopen the lzo binary and can fail if it is not present
+      RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,
+          this, per_type_files_[THdfsFileFormat::LZO_TEXT]));
+    }
+    if (progress_.done()) SetDone();
+  }
+
   Status status = GetNextInternal(state, row_batch, eos);
   if (status.IsMemLimitExceeded()) state->SetMemLimitExceeded();
   if (!status.ok() || *eos) StopAndFinalizeCounters();
@@ -582,24 +608,6 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   ss << "Splits complete (node=" << id() << "):";
   progress_ = ProgressUpdater(ss.str(), total_splits);
 
-  // Issue initial ranges for all file types.
-  RETURN_IF_ERROR(
-      HdfsTextScanner::IssueInitialRanges(this, per_type_files_[THdfsFileFormat::TEXT]));
-  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
-      per_type_files_[THdfsFileFormat::SEQUENCE_FILE]));
-  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
-      per_type_files_[THdfsFileFormat::RC_FILE]));
-  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
-      per_type_files_[THdfsFileFormat::AVRO]));
-  RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
-        per_type_files_[THdfsFileFormat::PARQUET]));
-  if (!per_type_files_[THdfsFileFormat::LZO_TEXT].empty()) {
-    // This will dlopen the lzo binary and can fail if it is not present
-    RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,
-        this, per_type_files_[THdfsFileFormat::LZO_TEXT]));
-  }
-
-  if (progress_.done()) SetDone();
   return Status::OK;
 }
 

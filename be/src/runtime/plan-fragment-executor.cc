@@ -174,6 +174,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   DCHECK(request.__isset.fragment);
   RETURN_IF_ERROR(
       ExecNode::CreateTree(obj_pool(), request.fragment.plan, *desc_tbl, &plan_));
+  runtime_state_->set_fragment_root_id(plan_->id());
 
   if (request.params.__isset.debug_node_id) {
     DCHECK(request.params.__isset.debug_action);
