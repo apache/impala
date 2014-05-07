@@ -180,7 +180,7 @@ Status StatestoreSubscriber::Start() {
     shared_ptr<TProcessor> processor(new StatestoreSubscriberProcessor(thrift_iface_));
     heartbeat_server_.reset(new ThriftServer("StatestoreSubscriber", processor,
         heartbeat_address_.port, NULL, NULL, 5));
-    heartbeat_server_->Start();
+    RETURN_IF_ERROR(heartbeat_server_->Start());
     LOG(INFO) << "Registering with statestore";
     status = Register();
     if (status.ok()) {

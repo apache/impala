@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 #include "common/init.h"
+#include "util/metrics.h"
+#include "statestore/statestore-subscriber.h"
 
 using namespace boost;
 using namespace std;
@@ -27,6 +29,9 @@ DECLARE_int32(state_store_port);
 namespace impala {
 
 TEST(StatestoreTest, SmokeTest) {
+  // All allocations done by 'new' to avoid problems shutting down Thrift servers
+  // gracefully.
+
   InProcessStatestore* statestore =
       new InProcessStatestore(FLAGS_state_store_port, FLAGS_webserver_port);
   ASSERT_TRUE(statestore->Start().ok());
@@ -34,6 +39,18 @@ TEST(StatestoreTest, SmokeTest) {
   InProcessStatestore* statestore_wont_start =
       new InProcessStatestore(FLAGS_state_store_port, FLAGS_webserver_port);
   ASSERT_FALSE(statestore_wont_start->Start().ok());
+
+  StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("sub1",
+      MakeNetworkAddress("localhost", 12345),
+      MakeNetworkAddress("localhost", FLAGS_state_store_port), new Metrics());
+  ASSERT_TRUE(sub_will_start->Start().ok());
+
+  // Confirm that a subscriber trying to use an in-use port will fail to start.
+  StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("sub2",
+      MakeNetworkAddress("localhost", 12345),
+      MakeNetworkAddress("localhost", FLAGS_state_store_port), new Metrics());
+  ASSERT_FALSE(sub_will_not_start->Start().ok());
+
 }
 
 }
