@@ -1,0 +1,61 @@
+====
+---- QUERY
+# Gets all types including a row with a NULL value. The predicate pushed to
+# the data source is not actually used, but the second predicate is
+# evaluated by Impala.
+select smallint_col, tinyint_col, int_col, bigint_col,
+       float_col, bool_col, double_col, string_col, timestamp_col
+from alltypes_datasource
+where float_col != 0 and
+      int_col >= 1990 limit 5
+---- RESULTS
+90,0,1990,19900,2189,true,1990,'NULL',1970-01-01 00:00:01.990000000
+91,1,1991,19910,2190.10009765625,false,1991,'1991',1970-01-01 00:00:01.991000000
+92,2,1992,19920,2191.199951171875,true,1992,'1992',1970-01-01 00:00:01.992000000
+93,3,1993,19930,2192.300048828125,false,1993,'1993',1970-01-01 00:00:01.993000000
+94,4,1994,19940,2193.39990234375,true,1994,'1994',1970-01-01 00:00:01.994000000
+---- TYPES
+SMALLINT, TINYINT, INT, BIGINT, FLOAT, BOOLEAN, DOUBLE, STRING, TIMESTAMP
+====
+---- QUERY
+# Project a subset of the columns
+select bigint_col, timestamp_col, double_col
+from alltypes_datasource
+where double_col != 0 and int_col >= 1990 limit 3
+---- RESULTS
+19900,1970-01-01 00:00:01.990000000,1990
+19910,1970-01-01 00:00:01.991000000,1991
+19920,1970-01-01 00:00:01.992000000,1992
+---- TYPES
+BIGINT, TIMESTAMP, DOUBLE
+====
+---- QUERY
+# count(*) with a predicate evaluated by Impala
+select count(*) from alltypes_datasource
+where float_col = 0 and
+      string_col is not NULL
+---- RESULTS
+4000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# count(*) with no predicates has no materialized slots
+select count(*) from alltypes_datasource
+---- RESULTS
+5000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test decimal values. The test data source returns very large and very small values.
+select * from decimal_datasource limit 5
+---- RESULTS
+-999999999,-9999999999,-9999999999.9999999999,-9.9999999999999999999999999999999999999,-99999.99999
+999999998,9999999998,9999999999.9999999998,9.9999999999999999999999999999999999998,99999.99998
+-999999997,-9999999997,-9999999999.9999999997,-9.9999999999999999999999999999999999997,-99999.99997
+999999996,9999999996,9999999999.9999999996,9.9999999999999999999999999999999999996,99999.99996
+-999999995,-9999999995,-9999999999.9999999995,-9.9999999999999999999999999999999999995,-99999.99995
+---- TYPES
+DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+====

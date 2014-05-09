@@ -28,8 +28,10 @@ add_library(Exec STATIC
   catalog-op-executor.cc
   cross-join-node.cc
   data-sink.cc
+  data-source-scan-node.cc
   delimited-text-parser.cc
   exec-node.cc
+  external-data-source-executor.cc
   exchange-node.cc
   hash-join-node.cc
   hash-join-node-ir.cc

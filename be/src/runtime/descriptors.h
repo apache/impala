@@ -272,6 +272,13 @@ class HBaseTableDescriptor : public TableDescriptor {
   std::vector<HBaseColumnDescriptor> cols_;
 };
 
+// Descriptor for a DataSourceTable
+class DataSourceTableDescriptor : public TableDescriptor {
+ public:
+  DataSourceTableDescriptor(const TTableDescriptor& tdesc) : TableDescriptor(tdesc) { }
+  virtual std::string DebugString() const;
+};
+
 class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }

@@ -27,6 +27,7 @@
 #include "exec/hash-join-node.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hbase-scan-node.h"
+#include "exec/data-source-scan-node.h"
 #include "exec/exchange-node.h"
 #include "exec/merge-node.h"
 #include "exec/cross-join-node.h"
@@ -238,6 +239,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       break;
     case TPlanNodeType::HBASE_SCAN_NODE:
       *node = pool->Add(new HBaseScanNode(pool, tnode, descs));
+      break;
+    case TPlanNodeType::DATA_SOURCE_NODE:
+      *node = pool->Add(new DataSourceScanNode(pool, tnode, descs));
       break;
     case TPlanNodeType::AGGREGATION_NODE:
       *node = pool->Add(new AggregationNode(pool, tnode, descs));

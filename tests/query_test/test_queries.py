@@ -46,6 +46,12 @@ class TestQueries(ImpalaTestSuite):
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/distinct-estimate', vector)
 
+  def test_data_source_tables(self, vector):
+    # Only need to test on a single format
+    if vector.get_value('table_format').file_format != 'text':
+      pytest.skip()
+    self.run_test_case('QueryTest/data-source-tables', vector)
+
   def test_scan_range(self, vector):
     self.run_test_case('QueryTest/hdfs-partitions', vector)
 

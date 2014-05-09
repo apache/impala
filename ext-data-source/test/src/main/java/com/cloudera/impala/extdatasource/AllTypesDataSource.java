@@ -14,14 +14,10 @@
 
 package com.cloudera.impala.extdatasource;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-
-import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 
 import com.cloudera.impala.extdatasource.thrift.TCloseParams;
 import com.cloudera.impala.extdatasource.thrift.TCloseResult;
@@ -34,12 +30,12 @@ import com.cloudera.impala.extdatasource.thrift.TPrepareParams;
 import com.cloudera.impala.extdatasource.thrift.TPrepareResult;
 import com.cloudera.impala.extdatasource.thrift.TRowBatch;
 import com.cloudera.impala.extdatasource.thrift.TTableSchema;
+import com.cloudera.impala.extdatasource.util.SerializationUtils;
 import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
 import com.cloudera.impala.thrift.TColumnData;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -186,7 +182,7 @@ public class AllTypesDataSource implements ExternalDataSource {
         case TIMESTAMP:
           colData.addToIs_null(false);
           colData.addToBinary_vals(
-            ByteBuffer.wrap(new TimestampWritable(new Timestamp(currRow_)).getBytes()));
+            SerializationUtils.encodeTimestamp(new Timestamp(currRow_)));
           break;
         case DECIMAL:
           colData.addToIs_null(false);
@@ -194,7 +190,7 @@ public class AllTypesDataSource implements ExternalDataSource {
           BigInteger val = maxUnscaled.subtract(BigInteger.valueOf(currRow_ + 1));
           val = val.mod(maxUnscaled);
           if (currRow_ % 2 == 0) val = val.negate();
-          colData.addToBinary_vals(ByteBuffer.wrap(val.toByteArray()));
+          colData.addToBinary_vals(SerializationUtils.encodeDecimal(new BigDecimal(val)));
           break;
         case BINARY:
         case CHAR:

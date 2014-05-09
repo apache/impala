@@ -132,6 +132,12 @@ string HdfsPartitionDescriptor::DebugString() const {
   return out.str();
 }
 
+string DataSourceTableDescriptor::DebugString() const {
+  stringstream out;
+  out << "DataSourceTable(" << TableDescriptor::DebugString() << ")";
+  return out.str();
+}
+
 HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc,
     ObjectPool* pool)
   : TableDescriptor(tdesc),
@@ -322,6 +328,9 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
         break;
       case TTableType::HBASE_TABLE:
         desc = pool->Add(new HBaseTableDescriptor(tdesc));
+        break;
+      case TTableType::DATA_SOURCE_TABLE:
+        desc = pool->Add(new DataSourceTableDescriptor(tdesc));
         break;
       default:
         DCHECK(false) << "invalid table type: " << tdesc.tableType;

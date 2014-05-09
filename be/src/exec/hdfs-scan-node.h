@@ -353,6 +353,7 @@ class HdfsScanNode : public ScanNode {
 
   // Vector containing slot descriptors for all materialized non-partition key
   // slots.  These descriptors are sorted in order of increasing col_pos
+  // TODO: Put this (with associated fields and logic) on ScanNode or ExecNode
   std::vector<SlotDescriptor*> materialized_slots_;
 
   // Vector containing slot descriptors for all materialized partition key slots
