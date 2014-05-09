@@ -81,6 +81,11 @@ class DecimalValue {
     return value_ > other.value_;
   }
 
+  DecimalValue& operator-() {
+    value_ = -value_;
+    return *this;
+  }
+
   // Compares this and other. Returns 0 if equal, < 0 if this < other and > 0 if
   // this > other.
   int Compare(const DecimalValue& other) const {
@@ -156,13 +161,20 @@ class DecimalValue {
     // This truncates the result to the output precision.
     // TODO: confirm with standard that truncate is okay.
     int scale_by = result_scale + other_type.scale - this_type.scale;
-    // Run at the highest precision int to avoid overflows. Divides lead to
+    // Use higher precision ints for intermediates to avoid overflows. Divides lead to
     // large numbers very quickly (and get eliminated by the int divide).
-    // TODO: consider int256_t to handle case for Decimal16Value
-    int128_t x = DecimalUtil::MultiplyByScale<RESULT_T>(value(), scale_by);
-    int128_t y = other.value();
-    int128_t r = x / y;
-    return DecimalValue<RESULT_T>(static_cast<RESULT_T>(r));
+    if (sizeof(T) == 16) {
+      int256_t x = DecimalUtil::MultiplyByScale<int256_t>(
+          ConvertToInt256(value()), scale_by);
+      int256_t y = ConvertToInt256(other.value());
+      int256_t r = x / y;
+      return DecimalValue<RESULT_T>(ConvertToInt128(r));
+    } else {
+      int128_t x = DecimalUtil::MultiplyByScale<RESULT_T>(value(), scale_by);
+      int128_t y = other.value();
+      int128_t r = x / y;
+      return DecimalValue<RESULT_T>(static_cast<RESULT_T>(r));
+    }
   }
 
   // is_nan is set to true if 'other' is 0. The value returned is undefined.

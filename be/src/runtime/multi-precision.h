@@ -33,6 +33,8 @@
 #include "boost_multiprecision/cpp_int.hpp"
 #include "boost_multiprecision/cpp_dec_float.hpp"
 
+#include <limits>
+
 namespace impala {
 
 // We use the c++ int128_t type. This is stored using 16 bytes and very performant.
@@ -65,6 +67,30 @@ inline int256_t ConvertToInt256(const int128_t& x) {
     v |= lo;
     return v;
   }
+}
+
+// Converts an int256_t to an int128_t.  int256_t does support convert_to<int128_t>() but
+// that produces an approximate int128_t which makes it unusable.
+// Instead, we'll construct it using convert_to<int64_t> which is exact.
+inline int128_t ConvertToInt128(int256_t x) {
+  bool negative = false;
+  if (x < 0) {
+    x = -x;
+    negative = true;
+  }
+
+  // Extract the values in base int64_t::max() and reconstruct the new value
+  // as an int128_t.
+  uint64_t base = std::numeric_limits<int64_t>::max();
+  int128_t result = 0;
+  int128_t scale = 1;
+  while (x != 0) {
+    uint64_t v = (x % base).convert_to<uint64_t>();
+    x /= base;
+    result += v * scale;
+    scale *= base;
+  }
+  return negative ? -result : result;
 }
 
 // Prints v in base 10.

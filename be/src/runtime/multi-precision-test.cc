@@ -57,6 +57,7 @@ TEST(MultiPrecisionIntTest, Conversion) {
   y = -numeric_limits<int64_t>::max();
   y *= 1000;
   EXPECT_TRUE(ConvertToInt256(x) == y);
+  EXPECT_TRUE(ConvertToInt128(ConvertToInt256(x)) == x);
 }
 
 // Simple example of adding and subtracting numbers that use more than

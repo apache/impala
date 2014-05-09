@@ -261,12 +261,29 @@ TEST(DecimalArithmetic, Divide) {
       }
     }
   }
-
   // Divide by 0
   bool is_nan;
   Decimal8Value r = x.Divide<int64_t>(ColumnType::CreateDecimalType(10, 0),
       Decimal4Value(0), ColumnType::CreateDecimalType(2,0), 4, &is_nan);
   EXPECT_TRUE(is_nan) << "Expected NaN, got: " << r;
+}
+
+TEST(DecimalArithmetic, DivideLargeScales) {
+  ColumnType t1 = ColumnType::CreateDecimalType(38, 8);
+  ColumnType t2 = ColumnType::CreateDecimalType(20, 0);
+  ColumnType t3 = GetResultType(t1, t2, DIVIDE);
+  StringParser::ParseResult result;
+  const char* data = "319391280635.61476055";
+  Decimal16Value x =
+      StringParser::StringToDecimal<int128_t>(data, strlen(data), t1, &result);
+  Decimal16Value y(10000);
+  bool is_nan;
+  Decimal16Value r = x.Divide<int128_t>(t1, y, t2, t3.scale, &is_nan);
+  VerifyToString(r, t3, "31939128.06356147605500000000000000000");
+
+  y = -y;
+  r = x.Divide<int128_t>(t1, y, t2, t3.scale, &is_nan);
+  VerifyToString(r, t3, "-31939128.06356147605500000000000000000");
 }
 
 template<typename T>
