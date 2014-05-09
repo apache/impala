@@ -3234,6 +3234,17 @@ TEST_F(ExprTest, ResultsLayoutTest) {
 TEST_F(ExprTest, DecimalFunctions) {
   TestValue("precision(cast (1 as decimal(10,2)))", TYPE_INT, 10);
   TestValue("scale(cast(1 as decimal(10,2)))", TYPE_INT, 2);
+
+  TestValue("precision(1)", TYPE_INT, 3);
+  TestValue("precision(cast(1 as smallint))", TYPE_INT, 5);
+  TestValue("precision(cast(123 as bigint))", TYPE_INT, 20);
+  TestValue("precision(cast(123 as float))", TYPE_INT, 38);
+  TestValue("scale(cast(123 as float))", TYPE_INT, 9);
+  TestValue("precision(123.45)", TYPE_INT, 38);
+  TestValue("scale(123.45)", TYPE_INT, 17);
+  TestValue("precision(1 + 1)", TYPE_INT, 5);
+  TestValue("scale(1 + 1)", TYPE_INT, 0);
+  TestValue("precision(1 + 1)", TYPE_INT, 5);
 }
 
 TEST_F(ExprTest, UdfInterfaceBuiltins) {

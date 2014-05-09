@@ -258,10 +258,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       Preconditions.checkState(!childType.isWildcardDecimal(),
           "Child expr should have been resolved.");
       if (result == null) {
-        result = childType;
+        result = childType.getMinResolutionDecimal();
       } else {
         result = ColumnType.getAssignmentCompatibleType(result, childType);
       }
+    }
+    if (result != null) {
+      Preconditions.checkState(result.isDecimal() && !result.isWildcardDecimal());
     }
     return result;
   }
