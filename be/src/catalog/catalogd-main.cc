@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
       "catalog.version", GetVersionString(true));
 
   CatalogServer catalog_server(metrics.get());
-  catalog_server.Start();
+  EXIT_IF_ERROR(catalog_server.Start());
   catalog_server.RegisterWebpages(webserver.get());
   shared_ptr<TProcessor> processor(
       new CatalogServiceProcessor(catalog_server.thrift_iface()));

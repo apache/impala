@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(CreateImpalaServer(&exec_env, FLAGS_beeswax_port, FLAGS_hs2_port,
       FLAGS_be_port, &beeswax_server, &hs2_server, &be_server, &server));
 
-  be_server->Start();
+  EXIT_IF_ERROR(be_server->Start());
 
   Status status = exec_env.StartServices();
   if (!status.ok()) {
