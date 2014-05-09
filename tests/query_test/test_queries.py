@@ -47,8 +47,10 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/distinct-estimate', vector)
 
   def test_data_source_tables(self, vector):
-    # Only need to test on a single format
-    if vector.get_value('table_format').file_format != 'text':
+    # The test table is only created in uncompressed text format, so the test only works
+    # on 'text/none'
+    table_format = vector.get_value('table_format')
+    if table_format.file_format != 'text' or table_format.compression_codec != 'none':
       pytest.skip()
     self.run_test_case('QueryTest/data-source-tables', vector)
 
