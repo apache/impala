@@ -45,8 +45,12 @@ class DecimalValue {
 
   // Returns the closest Decimal to 'd' of type 't', truncating digits that
   // cannot be represented.
+  // Returns false if 'd' overflows.
   static bool FromDouble(const ColumnType& t, double d, DecimalValue* result) {
-    // TODO: handle overflow.
+    // Check overflow.
+    T max_value = DecimalUtil::GetScaleMultiplier<T>(t.precision - t.scale);
+    if (abs(d) >= max_value) return false;
+
     // Multiply the double by the scale.
     d *= DecimalUtil::GetScaleMultiplier<double>(t.scale);
     // Truncate and just take the integer part.

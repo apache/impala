@@ -63,6 +63,34 @@ void StringToAllDecimals(const string& s, const ColumnType& t, int32_t val,
   VerifyParse(s, t, Decimal16Value(val), result);
 }
 
+TEST(DoubleToDecimal, Basic) {
+  ColumnType t1 = ColumnType::CreateDecimalType(9, 0);
+  ColumnType t2 = ColumnType::CreateDecimalType(10, 5);
+  ColumnType t3 = ColumnType::CreateDecimalType(10, 10);
+
+  Decimal4Value d4;
+  Decimal8Value d8;
+  Decimal16Value d16;
+
+  EXPECT_TRUE(Decimal4Value::FromDouble(t1, 1.1, &d4));
+  EXPECT_EQ(d4.value(), 1);
+  EXPECT_TRUE(Decimal8Value::FromDouble(t2, -100.1, &d8));
+  EXPECT_EQ(d8.value(), -10010000);
+  EXPECT_TRUE(Decimal16Value::FromDouble(t3, -.1, &d16));
+  EXPECT_EQ(d16.value(), -1000000000);
+
+  // Test overflow
+  EXPECT_TRUE(Decimal4Value::FromDouble(t1, 999999999.123, &d4));
+  EXPECT_FALSE(Decimal4Value::FromDouble(t1, 1234567890.1, &d4));
+  EXPECT_FALSE(Decimal8Value::FromDouble(t1, -1234567890.123, &d8));
+  EXPECT_TRUE(Decimal8Value::FromDouble(t2, 99999.1234567, &d8));
+  EXPECT_FALSE(Decimal8Value::FromDouble(t2, 100000.1, &d8));
+  EXPECT_FALSE(Decimal8Value::FromDouble(t2, -123456.123, &d8));
+  EXPECT_TRUE(Decimal16Value::FromDouble(t3, 0.1234, &d16));
+  EXPECT_FALSE(Decimal16Value::FromDouble(t3, 1.1, &d16));
+  EXPECT_FALSE(Decimal16Value::FromDouble(t3, -1.1, &d16));
+}
+
 TEST(StringToDecimal, Basic) {
   ColumnType t1 = ColumnType::CreateDecimalType(10, 0);
   ColumnType t2 = ColumnType::CreateDecimalType(10, 2);
