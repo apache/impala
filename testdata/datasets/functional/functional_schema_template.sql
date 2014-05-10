@@ -301,6 +301,41 @@ TBLPROPERTIES("hbase.table.name" = "functional_hbase.hbasealltypeserror");
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+hbasecolumnfamilies
+---- HBASE_COLUMN_FAMILIES
+0
+1
+2
+3
+d
+---- CREATE_HIVE
+-- Create an HBase table with multiple column families
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key,0:bool_col,1:tinyint_col,2:smallint_col,3:int_col,d:bigint_col,d:float_col,d:double_col,d:date_string_col,d:string_col,d:timestamp_col"
+)
+TBLPROPERTIES("hbase.table.name" = "functional_hbase.hbasecolumnfamilies");
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col,
+date_string_col, string_col, timestamp_col FROM functional.alltypestiny;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypeserrornonulls
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS  {db_name}{db_suffix}.{table_name} (

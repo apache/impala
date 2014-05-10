@@ -3,6 +3,7 @@
 # table. The table name should match the base table name defined in the schema template
 # file.
 table_name:stringids, constraint:restrict_to, table_format:hbase/none/none
+table_name:hbasecolumnfamilies, constraint:restrict_to, table_format:hbase/none/none
 table_name:insertalltypesagg, constraint:restrict_to, table_format:hbase/none/none
 table_name:alltypessmallbinary, constraint:restrict_to, table_format:hbase/none/none
 table_name:insertalltypesaggbinary, constraint:restrict_to, table_format:hbase/none/none

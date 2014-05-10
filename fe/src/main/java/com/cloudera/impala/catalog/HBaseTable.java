@@ -88,6 +88,9 @@ public class HBaseTable extends Table {
   private static final String HBASE_STORAGE_HANDLER =
       "org.apache.hadoop.hive.hbase.HBaseStorageHandler";
 
+  // Column family of HBase row key
+  private static final String ROW_KEY_COLUMN_FAMILY = ":key";
+
   // Keep the conf around
   private final static Configuration hbaseConf_ = HBaseConfiguration.create();
 
@@ -279,6 +282,9 @@ public class HBaseTable extends Table {
       // Populate tmp cols in the order they appear in the Hive metastore.
       // We will reorder the cols below.
       List<HBaseColumn> tmpCols = new ArrayList<HBaseColumn>();
+      // Store the key column separately.
+      // TODO: Change this to an ArrayList once we support composite row keys.
+      HBaseColumn keyCol = null;
       for (int i = 0; i < fieldSchemas.size(); ++i) {
         FieldSchema s = fieldSchemas.get(i);
         ColumnType t = ColumnType.INVALID;
@@ -291,20 +297,32 @@ public class HBaseTable extends Table {
         HBaseColumn col = new HBaseColumn(s.getName(), hbaseColumnFamilies.get(i),
             hbaseColumnQualifiers.get(i), hbaseColumnBinaryEncodings.get(i),
             t, s.getComment(), -1);
-        tmpCols.add(col);
         // Load column stats from the Hive metastore into col.
         loadColumnStats(col, client);
+        if (col.getColumnFamily().equals(ROW_KEY_COLUMN_FAMILY)) {
+          // Store the row key column separately from the rest
+          keyCol = col;
+        } else {
+          tmpCols.add(col);
+        }
       }
+      Preconditions.checkState(keyCol != null);
 
-      // HBase columns are ordered by columnFamily,columnQualifier,
+      // The backend assumes that the row key column is always first and
+      // that the remaining HBase columns are ordered by columnFamily,columnQualifier,
       // so the final position depends on the other mapped HBase columns.
       // Sort columns and update positions.
       Collections.sort(tmpCols);
       colsByPos_.clear();
       colsByName_.clear();
+
+      keyCol.setPosition(0);
+      colsByPos_.add(keyCol);
+      colsByName_.put(keyCol.getName(), keyCol);
+      // Update the positions of the remaining columns
       for (int i = 0; i < tmpCols.size(); ++i) {
         HBaseColumn col = tmpCols.get(i);
-        col.setPosition(i);
+        col.setPosition(i + 1);
         colsByPos_.add(col);
         colsByName_.put(col.getName(), col);
       }

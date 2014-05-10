@@ -335,13 +335,14 @@ def build_load_statement(load_template, db_name, db_suffix, table_name):
                                          impala_home = os.environ['IMPALA_HOME'])
   return load_template
 
-def build_hbase_create_stmt(db_name, table_name):
+def build_hbase_create_stmt(db_name, table_name, column_families):
   hbase_table_name = "{db_name}_hbase.{table_name}".format(db_name=db_name,
                                                            table_name=table_name)
   create_stmt = list()
   create_stmt.append("disable '%s'" % hbase_table_name)
   create_stmt.append("drop '%s'" % hbase_table_name)
-  create_stmt.append("create '%s', 'd'" % hbase_table_name)
+  column_families = ','.join(["'{0}'".format(cf) for cf in column_families.splitlines()])
+  create_stmt.append("create '%s', %s" % (hbase_table_name, column_families))
   return create_stmt
 
 def build_db_suffix(file_format, codec, compression_type):
@@ -524,7 +525,10 @@ def generate_statements(output_name, test_vectors, sections,
           db_suffix, create_file_format, create_codec, data_path))
       # HBASE create table
       if file_format == 'hbase':
-        hbase_output.create.extend(build_hbase_create_stmt(db_name, table_name))
+        # If the HBASE_COLUMN_FAMILIES section does not exist, default to 'd'
+        column_families = section.get('HBASE_COLUMN_FAMILIES', 'd')
+        hbase_output.create.extend(build_hbase_create_stmt(db_name, table_name,
+            column_families))
 
       # The ALTER statement in hive does not accept fully qualified table names so
       # insert a use statement. The ALTER statement is skipped for HBASE as it's
@@ -576,7 +580,7 @@ def generate_statements(output_name, test_vectors, sections,
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'DEPENDENT_LOAD', 'LOAD',
-                         'LOAD_LOCAL', 'ALTER']
+                         'LOAD_LOCAL', 'ALTER', 'HBASE_COLUMN_FAMILIES']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":
