@@ -46,6 +46,7 @@ static const StringVal DEFAULT_STRING_CONCAT_DELIM((uint8_t*)", ", 2);
 // Hyperloglog precision. Default taken from paper. Doesn't seem to matter very
 // much when between [6,12]
 const int HLL_PRECISION = 10;
+const int HLL_LEN = 1024; // 2^HLL_PRECISION
 
 void AggregateFunctions::InitNull(FunctionContext*, AnyVal* dst) {
   dst->is_null = true;
@@ -431,7 +432,7 @@ StringVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& 
 }
 
 void AggregateFunctions::HllInit(FunctionContext* ctx, StringVal* dst) {
-  int str_len = pow(2, HLL_PRECISION);
+  int str_len = HLL_LEN;
   dst->is_null = false;
   dst->ptr = ctx->Allocate(str_len);
   dst->len = str_len;
@@ -442,13 +443,13 @@ template <typename T>
 void AggregateFunctions::HllUpdate(FunctionContext* ctx, const T& src, StringVal* dst) {
   if (src.is_null) return;
   DCHECK(!dst->is_null);
-  DCHECK_EQ(dst->len, pow(2, HLL_PRECISION));
+  DCHECK_EQ(dst->len, HLL_LEN);
   uint64_t hash_value =
       AnyValUtil::Hash64(src, *ctx->GetArgType(0), HashUtil::FNV64_SEED);
   if (hash_value != 0) {
     // Use the lower bits to index into the number of streams and then
     // find the first 1 bit after the index bits.
-    int idx = hash_value % dst->len;
+    int idx = hash_value & (HLL_LEN - 1);
     uint8_t first_one_bit = __builtin_ctzl(hash_value >> HLL_PRECISION) + 1;
     dst->ptr[idx] = ::max(dst->ptr[idx], first_one_bit);
   }
@@ -458,8 +459,8 @@ void AggregateFunctions::HllMerge(FunctionContext* ctx, const StringVal& src,
     StringVal* dst) {
   DCHECK(!dst->is_null);
   DCHECK(!src.is_null);
-  DCHECK_EQ(dst->len, pow(2, HLL_PRECISION));
-  DCHECK_EQ(src.len, pow(2, HLL_PRECISION));
+  DCHECK_EQ(dst->len, HLL_LEN);
+  DCHECK_EQ(src.len, HLL_LEN);
   for (int i = 0; i < src.len; ++i) {
     dst->ptr[i] = ::max(dst->ptr[i], src.ptr[i]);
   }
@@ -467,9 +468,9 @@ void AggregateFunctions::HllMerge(FunctionContext* ctx, const StringVal& src,
 
 StringVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
   DCHECK(!src.is_null);
-  DCHECK_EQ(src.len, pow(2, HLL_PRECISION));
+  DCHECK_EQ(src.len, HLL_LEN);
 
-  const int num_streams = pow(2, HLL_PRECISION);
+  const int num_streams = HLL_LEN;
   // Empirical constants for the algorithm.
   float alpha = 0;
   if (num_streams == 16) {
