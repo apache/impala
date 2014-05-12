@@ -38,3 +38,24 @@ where int_col < 10 and
 data source predicates: int_col < 10, bool_col != FALSE
 predicates: double_col > 5.0, string_col IN ('Foo', 'Bar')
 ====
+# Tests that all predicates from the On-clause are applied (IMPALA-805)
+# and that slot equivalences are enforced at lowest possible plan node
+# for tables produced by a data source.
+select 1 from functional.alltypes_datasource a
+inner join functional.alltypes_datasource b
+# equivalence class
+on a.id = b.id and a.id = b.int_col and a.id = b.bigint_col
+and a.tinyint_col = b.id and a.smallint_col = b.id
+and a.int_col = b.id and a.bigint_col = b.id
+# redundant predicates to test minimal spanning tree of equivalent slots
+where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN DATA SOURCE [functional.alltypes_datasource b]
+|--predicates: b.id = b.int_col, b.id = b.bigint_col
+|
+00:SCAN DATA SOURCE [functional.alltypes_datasource a]
+predicates: a.tinyint_col = a.smallint_col, a.int_col = a.bigint_col, a.id = a.tinyint_col, a.id = a.int_col
+====

@@ -24,6 +24,7 @@ API_VERSION 'V1';
 
 DROP TABLE IF EXISTS alltypes_datasource;
 CREATE TABLE alltypes_datasource (
+  id INT,
   bool_col BOOLEAN,
   tinyint_col TINYINT,
   smallint_col SMALLINT,
