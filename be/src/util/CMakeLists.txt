@@ -29,6 +29,7 @@ add_library(Util
   codec.cc
   compress.cc
   cpu-info.cc
+  decimal-util.cc
   dynamic-util.cc
   debug-util.cc
   decompress.cc

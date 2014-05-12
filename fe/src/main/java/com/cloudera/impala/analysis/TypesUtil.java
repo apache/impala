@@ -27,8 +27,8 @@ public class TypesUtil {
 
   /**
    * [1-9] precision -> 4 bytes
-   * [10-19] precision -> 8 bytes
-   * [20-38] precision -> 16 bytes
+   * [10-18] precision -> 8 bytes
+   * [19-38] precision -> 16 bytes
    * TODO: Support 12 byte decimal?
    * For precision [20-28], we could support a 12 byte decimal but currently a 12
    * byte decimal in the BE is not implemented.
@@ -36,7 +36,7 @@ public class TypesUtil {
   public static int getDecimalSlotSize(ColumnType type) {
     Preconditions.checkState(type.isFullySpecifiedDecimal());
     if (type.decimalPrecision() <= 9) return 4;
-    if (type.decimalPrecision() <= 19) return 8;
+    if (type.decimalPrecision() <= 18) return 8;
     return 16;
   }
 

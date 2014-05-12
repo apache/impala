@@ -21,11 +21,18 @@
 #include <boost/cstdint.hpp>
 
 #include "runtime/types.h"
+#include "runtime/multi-precision.h"
 
 namespace impala {
 
 class DecimalUtil {
  public:
+  // Maximum absolute value of int128_t that we use. This is 38 digits of 9's.
+  static int128_t MAX_UNSCALED_DECIMAL;
+
+  // Initializes MAX_UNSCALED_DECIMAL. Must be called once before using it.
+  static void InitMaxUnscaledDecimal();
+
   // TODO: do we need to handle overflow here or at a higher abstraction.
   template<typename T>
   static T MultiplyByScale(const T& v, const ColumnType& t) {

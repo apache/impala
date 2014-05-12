@@ -93,6 +93,8 @@ inline int128_t ConvertToInt128(int256_t x) {
   return negative ? -result : result;
 }
 
+inline int128_t Abs(const int128_t& x) { return (x < 0) ? -x : x; }
+
 // Prints v in base 10.
 std::ostream& operator<<(std::ostream& os, const int128_t& val);
 

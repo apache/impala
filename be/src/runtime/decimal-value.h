@@ -32,6 +32,11 @@ namespace impala {
 // storage type, which must implement all operators (example of a storage type
 // is int32_t). The decimal does not store its precision and scale since we'd
 // like to keep the storage as small as possible.
+// Overflow handling: we only need to do overflow handling if the result type
+// is Decimal16Value. In all other cases, the planner should have promoted the
+// the computation to Decimal16Value if there is a chance of overflow based on the
+// precision and scale. To check for overflow, we check if the resulting value can
+// exceed the max (unscaled) value allowed by Decimal16Value (38 digits of 9's).
 template<typename T>
 class DecimalValue {
  public:
@@ -44,8 +49,8 @@ class DecimalValue {
   }
 
   // Returns the closest Decimal to 'd' of type 't', truncating digits that
-  // cannot be represented.
-  // Returns false if 'd' overflows.
+  // cannot be represented. Returns false if 'd' overflows and the value in
+  // *result is undefined.
   static bool FromDouble(const ColumnType& t, double d, DecimalValue* result) {
     // Check overflow.
     T max_value = DecimalUtil::GetScaleMultiplier<T>(t.precision - t.scale);
@@ -55,6 +60,16 @@ class DecimalValue {
     d *= DecimalUtil::GetScaleMultiplier<double>(t.scale);
     // Truncate and just take the integer part.
     *result = DecimalValue(static_cast<T>(d));
+    return true;
+  }
+
+  // Assigns *result as a decimal. Returns false if 'd' overflows
+  // and the value in *result is undefined.
+  static bool FromInt(const ColumnType& t, int64_t d, DecimalValue* result) {
+    // Check overflow. For scale 3, the max value is 10^3 - 1 = 999.
+    T max_value = DecimalUtil::GetScaleMultiplier<T>(t.precision - t.scale);
+    if (abs(d) >= max_value) return false;
+    result->value_ = DecimalUtil::MultiplyByScale<T>(d, t);
     return true;
   }
 
@@ -81,10 +96,11 @@ class DecimalValue {
     return value_ > other.value_;
   }
 
-  DecimalValue& operator-() {
-    value_ = -value_;
-    return *this;
+  DecimalValue operator-() const {
+    return DecimalValue(-value_);
   }
+
+  bool is_negative() const { return value_ < 0; }
 
   // Compares this and other. Returns 0 if equal, < 0 if this < other and > 0 if
   // this > other.
@@ -119,31 +135,59 @@ class DecimalValue {
   // RESULT_T needs to be larger than T to avoid overflow issues.
   template<typename RESULT_T>
   DecimalValue<RESULT_T> Add(const ColumnType& this_type, const DecimalValue& other,
-      const ColumnType& other_type, int result_scale) const {
+      const ColumnType& other_type, int result_scale, bool* overflow) const {
     DCHECK_EQ(result_scale, std::max(this_type.scale, other_type.scale));
     RESULT_T x, y;
-    AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
+    *overflow = AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
+    if (sizeof(RESULT_T) == 16) {
+      // Check overflow.
+      if (!*overflow && is_negative() == other.is_negative()) {
+        // Can only overflow if the signs are the same
+        *overflow = DecimalUtil::MAX_UNSCALED_DECIMAL - Abs(x) < Abs(y);
+        // TODO: faster to return here? We don't care at all about the perf on
+        // the overflow case but what makes the normal path faster?
+      }
+    } else {
+      DCHECK(!*overflow) << "Cannot overflow unless result is Decimal16Value";
+    }
     return DecimalValue<RESULT_T>(x + y);
   }
 
   template<typename RESULT_T>
   DecimalValue<RESULT_T> Subtract(const ColumnType& this_type, const DecimalValue& other,
-      const ColumnType& other_type, int result_scale) const {
-    DCHECK_EQ(result_scale, std::max(this_type.scale, other_type.scale));
-    RESULT_T x, y;
-    AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
-    return DecimalValue<RESULT_T>(x - y);
+      const ColumnType& other_type, int result_scale, bool* overflow) const {
+    return Add<RESULT_T>(this_type, -other, other_type, result_scale, overflow);
   }
 
   template<typename RESULT_T>
   DecimalValue<RESULT_T> Multiply(const ColumnType& this_type, const DecimalValue& other,
-      const ColumnType& other_type, int result_scale) const {
-    // We don't need to adjust by the scale since that is already handled by the FE
-    // when it computes the result decimal type.
-    DCHECK_EQ(result_scale, this_type.scale + other_type.scale);
+      const ColumnType& other_type, int result_scale, bool* overflow) const {
+    // In the non-overflow case, we don't need to adjust by the scale since
+    // that is already handled by the FE when it computes the result decimal type.
+    // e.g. 1.23 * .2 (scale 2, scale 1 respectively) is identical to:
+    // 123 * 2 with a resulting scale 3. We can do the multiply on the unscaled values.
+    // The result scale in this case is the sum of the input scales.
     RESULT_T x = value();
     RESULT_T y = other.value();
-    return DecimalValue<RESULT_T>(x * y);
+    if (x == 0 || y == 0) {
+      // Handle zero to avoid divide by zero in the overflow check below.
+      *overflow = false;
+      return DecimalValue<RESULT_T>(0);
+    }
+    if (sizeof(RESULT_T) == 16) {
+      // Check overflow
+      *overflow = DecimalUtil::MAX_UNSCALED_DECIMAL / Abs(y) < Abs(x);
+    }
+    RESULT_T result = x * y;
+    int delta_scale = this_type.scale + other_type.scale - result_scale;
+    if (UNLIKELY(delta_scale != 0)) {
+      // In this case, the required resulting scale is larger than the max we support.
+      // We cap the resulting scale to the max supported scale (e.g. truncate) in the FE.
+      // TODO: we could also return NULL.
+      DCHECK_GT(delta_scale, 0);
+      result /= DecimalUtil::GetScaleMultiplier<T>(delta_scale);
+    }
+    return DecimalValue<RESULT_T>(result);
   }
 
   // is_nan is set to true if 'other' is 0. The value returned is undefined.
@@ -237,8 +281,7 @@ class DecimalValue {
 
   // Returns the value of the decimal after the decimal point.
   const T fractional_part(const ColumnType& t) const {
-    T val_abs = value() < 0 ? -value() : value();
-    return val_abs % DecimalUtil::GetScaleMultiplier<T>(t.scale);
+    return Abs(value()) % DecimalUtil::GetScaleMultiplier<T>(t.scale);
   }
 
   // Returns an approximate double for this decimal.
@@ -257,23 +300,33 @@ class DecimalValue {
 
   // Returns in *x_val and *y_val, the adjusted values so that both
   // are at the same scale. The scale is the number of digits after the decimal.
+  // Returns true if the adjusted causes overflow in which case the values in
+  // x_scaled and y_scaled are undefined.
   template <typename RESULT_T>
-  static void AdjustToSameScale(const DecimalValue& x, const ColumnType& x_type,
+  static bool AdjustToSameScale(const DecimalValue& x, const ColumnType& x_type,
       const DecimalValue& y, const ColumnType& y_type,
       RESULT_T* x_scaled, RESULT_T* y_scaled) {
     int delta_scale = x_type.scale - y_type.scale;
+    RESULT_T scale_factor = DecimalUtil::GetScaleMultiplier<RESULT_T>(abs(delta_scale));
     if (delta_scale == 0) {
       *x_scaled = x.value();
       *y_scaled = y.value();
     } else if (delta_scale > 0) {
+      if (sizeof(RESULT_T) == 16 &&
+          DecimalUtil::MAX_UNSCALED_DECIMAL / scale_factor < Abs(y.value())) {
+        return true;
+      }
       *x_scaled = x.value();
-      *y_scaled =
-          DecimalUtil::MultiplyByScale<RESULT_T>(y.value(), delta_scale);
+      *y_scaled = y.value() * scale_factor;
     } else {
-      *x_scaled =
-          DecimalUtil::MultiplyByScale<RESULT_T>(x.value(), -delta_scale);
+      if (sizeof(RESULT_T) == 16 &&
+          DecimalUtil::MAX_UNSCALED_DECIMAL / scale_factor < Abs(x.value())) {
+        return true;
+      }
+      *x_scaled = x.value() * scale_factor;
       *y_scaled = y.value();
     }
+    return false;
   }
 };
 
@@ -332,7 +385,8 @@ template <>
 inline int Decimal4Value::Compare(const ColumnType& this_type,
     const Decimal4Value& other, const ColumnType& other_type) const {
   int64_t x, y;
-  AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
+  bool overflow = AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
+  DCHECK(!overflow) << "Overflow cannot happen with Decimal4Value";
   if (x == y) return 0;
   if (x < y) return -1;
   return 1;
@@ -341,7 +395,8 @@ template <>
 inline int Decimal8Value::Compare(const ColumnType& this_type,
     const Decimal8Value& other, const ColumnType& other_type) const {
   int128_t x, y;
-  AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
+  bool overflow = AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
+  DCHECK(!overflow) << "Overflow cannot happen with Decimal8Value";
   if (x == y) return 0;
   if (x < y) return -1;
   return 1;
@@ -368,6 +423,7 @@ inline std::string DecimalValue<T>::ToString(const ColumnType& type) const {
   T before = whole_part(type);
   T after = fractional_part(type);
   std::stringstream ss;
+  if (before == 0 && value() < 0) ss << "-";
   ss << before;
   if (type.scale > 0) {
     // Pad with trailing zeros up to the scale.

@@ -28,6 +28,7 @@
 #include "util/mem-info.h"
 #include "util/network-util.h"
 #include "util/os-info.h"
+#include "runtime/decimal-value.h"
 #include "runtime/exec-env.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
@@ -106,6 +107,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm, bool is_fe_
   DiskInfo::Init();
   MemInfo::Init();
   OsInfo::Init();
+  DecimalUtil::InitMaxUnscaledDecimal();
 
   FeTestInfo::Init(is_fe_tests);
 

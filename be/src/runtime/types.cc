@@ -125,10 +125,10 @@ TTypeId::type TypeToHiveServer2Type(PrimitiveType t) {
     case TYPE_TIMESTAMP: return TTypeId::TIMESTAMP_TYPE;
     case TYPE_STRING: return TTypeId::STRING_TYPE;
     case TYPE_BINARY: return TTypeId::BINARY_TYPE;
+    case TYPE_DECIMAL: return TTypeId::DECIMAL_TYPE;
     // TODO: update when hs2 has char(n)
     case TYPE_CHAR: return TTypeId::STRING_TYPE;
     default:
-      // Hive only supports DECIMAL from 0.11 so we are not including it here.
       // HiveServer2 does not have a type for invalid, date and datetime.
       DCHECK(false) << "bad TypeToTValueType() type: " << TypeToString(t);
       return TTypeId::STRING_TYPE;

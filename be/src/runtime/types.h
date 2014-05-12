@@ -63,6 +63,10 @@ struct ColumnType {
   // Only set if type == TYPE_DECIMAL
   int precision, scale;
 
+  // Must be kept in sync with FE's max precision/scale.
+  static const int MAX_PRECISION = 38;
+  static const int MAX_SCALE = MAX_PRECISION;
+
   ColumnType(PrimitiveType type = INVALID_TYPE)
     : type(type), len(-1), precision(-1), scale(-1) {
     DCHECK_NE(type, TYPE_CHAR);
@@ -78,6 +82,8 @@ struct ColumnType {
   }
 
   static ColumnType CreateDecimalType(int precision, int scale) {
+    DCHECK_LE(precision, MAX_PRECISION);
+    DCHECK_LE(scale, MAX_SCALE);
     DCHECK_GE(precision, 0);
     DCHECK_LE(scale, precision);
     ColumnType ret;
@@ -173,7 +179,7 @@ struct ColumnType {
   static inline int GetDecimalByteSize(int precision) {
     DCHECK_GT(precision, 0);
     if (precision <= 9) return 4;
-    if (precision <= 19) return 8;
+    if (precision <= 18) return 8;
     return 16;
   }
 

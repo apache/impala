@@ -30,7 +30,6 @@ namespace impala {
 // Compare decimal result against double.
 static const double MAX_ERROR = 0.0001;
 
-
 template <typename T>
 void VerifyEquals(const DecimalValue<T>& t1, const DecimalValue<T>& t2) {
   if (t1 != t2) {
@@ -61,6 +60,26 @@ void StringToAllDecimals(const string& s, const ColumnType& t, int32_t val,
   VerifyParse(s, t, Decimal4Value(val), result);
   VerifyParse(s, t, Decimal8Value(val), result);
   VerifyParse(s, t, Decimal16Value(val), result);
+}
+
+TEST(IntToDecimal, Basic) {
+  Decimal16Value d16;
+  bool success;
+
+  success = Decimal16Value::FromInt(ColumnType::CreateDecimalType(27, 18), -25559, &d16);
+  EXPECT_TRUE(success);
+  VerifyToString(d16, ColumnType::CreateDecimalType(27, 18), "-25559.000000000000000000");
+
+  success = Decimal16Value::FromInt(ColumnType::CreateDecimalType(36, 29), 32130, &d16);
+  EXPECT_TRUE(success);
+  VerifyToString(d16, ColumnType::CreateDecimalType(36, 29),
+      "32130.00000000000000000000000000000");
+
+  success = Decimal16Value::FromInt(ColumnType::CreateDecimalType(38, 38), 1, &d16);
+  EXPECT_TRUE(!success);
+
+  // Smaller decimal types can't overflow here since the FE should never generate
+  // that.
 }
 
 TEST(DoubleToDecimal, Basic) {
@@ -159,6 +178,196 @@ TEST(StringToDecimal, LargeDecimals) {
       Decimal16Value(12345678L), StringParser::PARSE_OVERFLOW);
   VerifyParse("1234.5678", t3,
       Decimal16Value(12345678L), StringParser::PARSE_UNDERFLOW);
+
+  // Test max unscaled value for each of the decimal types.
+  VerifyParse("999999999", ColumnType::CreateDecimalType(9, 0),
+      Decimal4Value(999999999), StringParser::PARSE_SUCCESS);
+  VerifyParse("99999.9999", ColumnType::CreateDecimalType(9, 4),
+      Decimal4Value(999999999), StringParser::PARSE_SUCCESS);
+  VerifyParse("0.999999999", ColumnType::CreateDecimalType(9, 9),
+      Decimal4Value(999999999), StringParser::PARSE_SUCCESS);
+  VerifyParse("-999999999", ColumnType::CreateDecimalType(9, 0),
+      Decimal4Value(-999999999), StringParser::PARSE_SUCCESS);
+  VerifyParse("-99999.9999", ColumnType::CreateDecimalType(9, 4),
+      Decimal4Value(-999999999), StringParser::PARSE_SUCCESS);
+  VerifyParse("-0.999999999", ColumnType::CreateDecimalType(9, 9),
+      Decimal4Value(-999999999), StringParser::PARSE_SUCCESS);
+  VerifyParse("1000000000", ColumnType::CreateDecimalType(9, 0),
+      Decimal4Value(0), StringParser::PARSE_OVERFLOW);
+  VerifyParse("-1000000000", ColumnType::CreateDecimalType(9, 0),
+      Decimal4Value(0), StringParser::PARSE_OVERFLOW);
+
+  VerifyParse("999999999999999999", ColumnType::CreateDecimalType(18, 0),
+      Decimal8Value(999999999999999999ll), StringParser::PARSE_SUCCESS);
+  VerifyParse("999999.999999999999", ColumnType::CreateDecimalType(18, 12),
+      Decimal8Value(999999999999999999ll), StringParser::PARSE_SUCCESS);
+  VerifyParse(".999999999999999999", ColumnType::CreateDecimalType(18, 18),
+      Decimal8Value(999999999999999999ll), StringParser::PARSE_SUCCESS);
+  VerifyParse("-999999999999999999", ColumnType::CreateDecimalType(18, 0),
+      Decimal8Value(-999999999999999999ll), StringParser::PARSE_SUCCESS);
+  VerifyParse("-999999.999999999999", ColumnType::CreateDecimalType(18, 12),
+      Decimal8Value(-999999999999999999ll), StringParser::PARSE_SUCCESS);
+  VerifyParse("-.999999999999999999", ColumnType::CreateDecimalType(18, 18),
+      Decimal8Value(-999999999999999999ll), StringParser::PARSE_SUCCESS);
+  VerifyParse("1000000000000000000", ColumnType::CreateDecimalType(18, 0),
+      Decimal8Value(0), StringParser::PARSE_OVERFLOW);
+  VerifyParse("01000000000000000000", ColumnType::CreateDecimalType(18, 0),
+      Decimal8Value(0), StringParser::PARSE_OVERFLOW);
+
+  int128_t result = DecimalUtil::MAX_UNSCALED_DECIMAL;
+  VerifyParse("99999999999999999999999999999999999999",
+      ColumnType::CreateDecimalType(38, 0),
+      Decimal16Value(result), StringParser::PARSE_SUCCESS);
+  VerifyParse("999999999999999999999999999999999.99999",
+      ColumnType::CreateDecimalType(38, 5),
+      Decimal16Value(result), StringParser::PARSE_SUCCESS);
+  VerifyParse(".99999999999999999999999999999999999999",
+      ColumnType::CreateDecimalType(38, 38),
+      Decimal16Value(result), StringParser::PARSE_SUCCESS);
+  VerifyParse("-99999999999999999999999999999999999999",
+      ColumnType::CreateDecimalType(38, 0),
+      Decimal16Value(-result), StringParser::PARSE_SUCCESS);
+  VerifyParse("-999999999999999999999999999999999.99999",
+      ColumnType::CreateDecimalType(38, 5),
+      Decimal16Value(-result), StringParser::PARSE_SUCCESS);
+  VerifyParse("-.99999999999999999999999999999999999999",
+      ColumnType::CreateDecimalType(38, 38),
+      Decimal16Value(-result), StringParser::PARSE_SUCCESS);
+  VerifyParse("100000000000000000000000000000000000000",
+      ColumnType::CreateDecimalType(38, 0),
+      Decimal16Value(0), StringParser::PARSE_OVERFLOW);
+  VerifyParse("-100000000000000000000000000000000000000",
+      ColumnType::CreateDecimalType(38, 0),
+      Decimal16Value(0), StringParser::PARSE_OVERFLOW);
+}
+
+TEST(DecimalTest, Overflow) {
+  bool overflow;
+  ColumnType t1 = ColumnType::CreateDecimalType(38, 0);
+
+  Decimal16Value result;
+  Decimal16Value d_max(DecimalUtil::MAX_UNSCALED_DECIMAL);
+  Decimal16Value two(2);
+  Decimal16Value one(1);
+  Decimal16Value zero(0);
+
+  // Adding same sign
+  d_max.Add<int128_t>(t1, one, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+  one.Add<int128_t>(t1, d_max, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+  d_max.Add<int128_t>(t1, d_max, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+  result = d_max.Add<int128_t>(t1, zero, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == d_max.value());
+
+  // Subtracting same sign
+  result = d_max.Subtract<int128_t>(t1, one, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == d_max.value() - 1);
+  result = one.Subtract<int128_t>(t1, d_max, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == -(d_max.value() - 1));
+  result = d_max.Subtract<int128_t>(t1, d_max, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == 0);
+  result = d_max.Subtract<int128_t>(t1, zero, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == d_max.value());
+
+  // Adding different sign
+  result = d_max.Add<int128_t>(t1, -one, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == d_max.value() - 1);
+  result = one.Add<int128_t>(t1, -d_max, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == -(d_max.value() - 1));
+  result = d_max.Add<int128_t>(t1, -d_max, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == 0);
+  result = d_max.Add<int128_t>(t1, -zero, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == d_max.value());
+
+  // Subtracting different sign
+  d_max.Subtract<int128_t>(t1, -one, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+  one.Subtract<int128_t>(t1, -d_max, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+  d_max.Subtract<int128_t>(t1, -d_max, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+  result = d_max.Subtract<int128_t>(t1, -zero, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == d_max.value());
+
+  // Multiply
+  result = d_max.Multiply<int128_t>(t1, one, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == d_max.value());
+  result = d_max.Multiply<int128_t>(t1, -one, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == -d_max.value());
+  result = d_max.Multiply<int128_t>(t1, two, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+  result = d_max.Multiply<int128_t>(t1, -two, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+  result = d_max.Multiply<int128_t>(t1, d_max, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+  result = d_max.Multiply<int128_t>(t1, -d_max, t1, 0, &overflow);
+  EXPECT_TRUE(overflow);
+
+  // Multiply by 0
+  result = zero.Multiply<int128_t>(t1, one, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == 0);
+  result = one.Multiply<int128_t>(t1, zero, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == 0);
+  result = zero.Multiply<int128_t>(t1, zero, t1, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_TRUE(result.value() == 0);
+
+  // Adding any value with scale to (38, 0) will overflow if the most significant
+  // digit is set.
+  ColumnType t2 = ColumnType::CreateDecimalType(1, 1);
+  result = d_max.Add<int128_t>(t1, zero, t2, 1, &overflow);
+  EXPECT_TRUE(overflow);
+
+  // Add 37 9's (with scale 0)
+  Decimal16Value d3(DecimalUtil::MAX_UNSCALED_DECIMAL / 10);
+  result = d3.Add<int128_t>(t1, zero, t2, 1, &overflow);
+  EXPECT_TRUE(!overflow);
+  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 9);
+  result = d3.Add<int128_t>(t1, one, t2, 1, &overflow);
+  EXPECT_TRUE(!overflow);
+  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 8);
+}
+
+// Overflow cases only need to test with Decimal16Value with max precision. In
+// the other cases, the planner should have casted the values to this precision.
+// Add/Subtract/Mod cannot overflow the scale. With division, we always handle the case
+// where the result scale needs to be adjusted.
+TEST(DecimalTest, MultiplyScaleOverflow) {
+  bool overflow;
+  Decimal16Value x(1);
+  Decimal16Value y(3);
+  ColumnType max_scale = ColumnType::CreateDecimalType(38, 38);
+
+  // x = 0.<37 zeroes>1. y = 0.<37 zeroes>3 The result should be 0.<74 zeroes>3.
+  // Since this can't be  represented, the result will truncate to 0.
+  Decimal16Value result = x.Multiply<int128_t>(max_scale, y, max_scale, 38, &overflow);
+  EXPECT_TRUE(result.value() == 0);
+  EXPECT_FALSE(overflow);
+
+  ColumnType scale_1 = ColumnType::CreateDecimalType(1, 1);
+  ColumnType scale_37 = ColumnType::CreateDecimalType(38, 37);
+  // x = 0.<36 zeroes>1, y = 0.3
+  // The result should be 0.<37 zeroes>11, which would require scale = 39.
+  // The truncated version should 0.<37 zeroes>3.
+  result = x.Multiply<int128_t>(scale_37, y, scale_1, 38, &overflow);
+  EXPECT_TRUE(result.value() == 3);
+  EXPECT_FALSE(overflow);
 }
 
 enum Op {
@@ -184,7 +393,8 @@ ColumnType GetResultType(const ColumnType& t1, const ColumnType& t2, Op op) {
           t1.precision + t2.precision + 1, t1.scale + t2.scale);
     case DIVIDE:
       return ColumnType::CreateDecimalType(
-          t1.precision - t1.scale + t2.scale + max(4, t1.scale + t2.precision + 1),
+          min(38,
+            t1.precision - t1.scale + t2.scale + max(4, t1.scale + t2.precision + 1)),
           max(4, t1.scale + t2.precision + 1));
     case MOD:
       return ColumnType::CreateDecimalType(
@@ -197,8 +407,10 @@ ColumnType GetResultType(const ColumnType& t1, const ColumnType& t2, Op op) {
 }
 
 template<typename T>
-void VerifyFuzzyEquals(const T& actual, const ColumnType& t, double expected) {
+void VerifyFuzzyEquals(const T& actual, const ColumnType& t,
+    double expected, bool overflow) {
   double actual_d = actual.ToDouble(t);
+  EXPECT_FALSE(overflow);
   EXPECT_TRUE(fabs(actual_d - expected) < MAX_ERROR)
     << actual_d << " != " << expected;
 }
@@ -216,19 +428,20 @@ TEST(DecimalArithmetic, Basic) {
   double d2_double = d2.ToDouble(t2);
   double d3_double = d3.ToDouble(t2);
 
+  bool overflow;
   // TODO: what's the best way to author a bunch of tests like this?
-  VerifyFuzzyEquals(d1.Add<int64_t>(t1, d2, t2, t1_plus_2.scale),
-      t1_plus_2, d1_double + d2_double);
-  VerifyFuzzyEquals(d1.Add<int64_t>(t1, d3, t2, t1_plus_2.scale),
-      t1_plus_2, d1_double + d3_double);
-  VerifyFuzzyEquals(d1.Subtract<int64_t>(
-      t1, d2, t2, t1_plus_2.scale), t1_plus_2, d1_double - d2_double);
-  VerifyFuzzyEquals(d1.Subtract<int64_t>(
-      t1, d3, t2, t1_plus_2.scale), t1_plus_2, d1_double - d3_double);
-  VerifyFuzzyEquals(d1.Multiply<int128_t>(
-      t1, d2, t2, t1_times_2.scale), t1_times_2, d1_double * d2_double);
-  VerifyFuzzyEquals(d1.Multiply<int64_t>(
-      t1, d3, t2, t1_times_2.scale), t1_times_2, d1_double * d3_double);
+  VerifyFuzzyEquals(d1.Add<int64_t>(t1, d2, t2, t1_plus_2.scale, &overflow),
+      t1_plus_2, d1_double + d2_double, overflow);
+  VerifyFuzzyEquals(d1.Add<int64_t>(t1, d3, t2, t1_plus_2.scale, &overflow),
+      t1_plus_2, d1_double + d3_double, overflow);
+  VerifyFuzzyEquals(d1.Subtract<int64_t>(t1, d2, t2, t1_plus_2.scale, &overflow),
+      t1_plus_2, d1_double - d2_double, overflow);
+  VerifyFuzzyEquals(d1.Subtract<int64_t>(t1, d3, t2, t1_plus_2.scale, &overflow),
+      t1_plus_2, d1_double - d3_double, overflow);
+  VerifyFuzzyEquals(d1.Multiply<int128_t>(t1, d2, t2, t1_times_2.scale, &overflow),
+      t1_times_2, d1_double * d2_double, overflow);
+  VerifyFuzzyEquals(d1.Multiply<int64_t>(t1, d3, t2, t1_times_2.scale, &overflow),
+      t1_times_2, d1_double * d3_double, overflow);
 }
 
 TEST(DecimalArithmetic, Divide) {
@@ -324,10 +537,11 @@ TEST(DecimalArithmetic, RandTesting) {
 
     ColumnType add_t = GetResultType(t1, t2, ADD);
 
-    VerifyFuzzyEquals(dec1.Add<int64_t>(
-        t1, dec2, t2, add_t.scale), add_t, t1_d + t2_d);
-    VerifyFuzzyEquals(dec1.Subtract<int64_t>(
-        t1, dec2, t2, add_t.scale), add_t, t1_d - t2_d);
+    bool overflow = false;
+    VerifyFuzzyEquals(dec1.Add<int64_t>(t1, dec2, t2, add_t.scale, &overflow),
+        add_t, t1_d + t2_d, overflow);
+    VerifyFuzzyEquals(dec1.Subtract<int64_t>(t1, dec2, t2, add_t.scale, &overflow),
+        add_t, t1_d - t2_d, overflow);
 #if 0
     TODO: doubles are not precise enough for this
     ColumnType multiply_t = GetResultType(t1, t2, MULTIPLY);
@@ -352,5 +566,6 @@ TEST(DecimalArithmetic, RandTesting) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  impala::DecimalUtil::InitMaxUnscaledDecimal();
   return RUN_ALL_TESTS();
 }
