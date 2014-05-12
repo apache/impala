@@ -197,10 +197,6 @@ class TestHS2(HS2TestSuite):
 
   @needs_session
   def test_get_log(self):
-    # Test query that generates analysis warnings
-    log = self.get_log("compute stats functional.decimal_tbl")
-    assert "Decimal column stats not yet supported" in log
-
     # Test query that generates BE warnings
     log = self.get_log("select * from functional.alltypeserror")
     assert "Error converting column" in log

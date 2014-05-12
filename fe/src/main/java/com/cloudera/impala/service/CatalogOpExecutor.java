@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.service;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.DecimalColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
@@ -550,6 +552,16 @@ public class CatalogOpExecutor {
         double avgStrLen = colStats.getAvg_size();
         colStatsData.setStringStats(
             new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndvs));
+        break;
+      case DECIMAL:
+        // TODO: Gather and set the min/max values stats as well. The planner
+        // currently does not rely on them.
+        org.apache.hadoop.hive.metastore.api.Decimal dummy =
+            new org.apache.hadoop.hive.metastore.api.Decimal();
+        dummy.setUnscaled(BigInteger.ZERO.toByteArray());
+        dummy.setScale((short)0);
+        colStatsData.setDecimalStats(
+            new DecimalColumnStatsData(dummy, dummy, numNulls, ndvs));
         break;
       default:
         return null;

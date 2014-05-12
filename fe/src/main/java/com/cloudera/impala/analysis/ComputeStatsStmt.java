@@ -26,7 +26,6 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
@@ -125,12 +124,6 @@ public class ComputeStatsStmt extends StatementBase {
       // Ignore columns with an invalid/unsupported type. For example, complex types in
       // an HBase-backed table will appear as invalid types.
       if (!ctype.isValid() || !ctype.isSupported()) continue;
-      // Skip decimal columns (see IMPALA-950)
-      if (ctype.getPrimitiveType() == PrimitiveType.DECIMAL) {
-        analyzer.addWarning("Decimal column stats not yet supported, skipping column '" +
-            c.getName() + "'");
-        continue;
-      }
       // NDV approximation function. Add explicit alias for later identification when
       // updating the Metastore.
       String colRefSql = ToSqlUtils.getIdentSql(c.getName());

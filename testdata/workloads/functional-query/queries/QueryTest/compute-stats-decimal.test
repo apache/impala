@@ -8,13 +8,7 @@ select * from functional.decimal_tbl;
 ---- QUERY
 compute stats compute_stats_db.decimal_tbl
 ---- RESULTS
-'Updated 1 partition(s) and 0 column(s).'
----- ERRORS
-Decimal column stats not yet supported, skipping column 'd1'
-Decimal column stats not yet supported, skipping column 'd2'
-Decimal column stats not yet supported, skipping column 'd3'
-Decimal column stats not yet supported, skipping column 'd4'
-Decimal column stats not yet supported, skipping column 'd5'
+'Updated 1 partition(s) and 5 column(s).'
 ====
 ---- QUERY
 show table stats compute_stats_db.decimal_tbl
@@ -31,11 +25,11 @@ show column stats compute_stats_db.decimal_tbl
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'d1','DECIMAL(9,0)',-1,-1,4,4
-'d2','DECIMAL(10,0)',-1,-1,8,8
-'d3','DECIMAL(20,10)',-1,-1,16,16
-'d4','DECIMAL(38,38)',-1,-1,16,16
-'d5','DECIMAL(10,5)',-1,-1,8,8
+'d1','DECIMAL(9,0)',4,0,4,4
+'d2','DECIMAL(10,0)',3,0,8,8
+'d3','DECIMAL(20,10)',5,0,16,16
+'d4','DECIMAL(38,38)',1,0,16,16
+'d5','DECIMAL(10,5)',5,0,8,8
 'd6','DECIMAL(9,0)',1,0,4,4
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
@@ -48,9 +42,7 @@ insert into compute_stats_db.mixed_types values (1, 2), (3, 4);
 ---- QUERY
 compute stats compute_stats_db.mixed_types
 ---- RESULTS
-'Updated 1 partition(s) and 1 column(s).'
----- ERRORS
-Decimal column stats not yet supported, skipping column 'b'
+'Updated 1 partition(s) and 2 column(s).'
 ====
 ---- QUERY
 show table stats compute_stats_db.mixed_types
@@ -67,7 +59,7 @@ show column stats compute_stats_db.mixed_types
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
 'a','INT',2,0,4,4
-'b','DECIMAL(10,0)',-1,-1,8,8
+'b','DECIMAL(10,0)',2,0,8,8
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
