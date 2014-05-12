@@ -338,6 +338,7 @@ void DataSourceScanNode::Close(RuntimeState* state) {
   PeriodicCounterUpdater::StopTimeSeriesCounter(bytes_read_timeseries_counter_);
   input_batch_.reset();
   TCloseParams params;
+  params.__set_scan_handle(scan_handle_);
   TCloseResult result;
   Status status = data_source_executor_->Close(params, &result);
   state->LogError(status); // logs the error if status != OK

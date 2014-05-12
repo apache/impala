@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.UUID;
 
 import com.cloudera.impala.extdatasource.thrift.TCloseParams;
 import com.cloudera.impala.extdatasource.thrift.TCloseResult;
@@ -61,6 +62,7 @@ public class AllTypesDataSource implements ExternalDataSource {
   private int batchSize_;
   private TTableSchema schema_;
   private DataSourceState state_;
+  private String scanHandle_;
 
   // Enumerates the states of the data source.
   private enum DataSourceState {
@@ -100,7 +102,8 @@ public class AllTypesDataSource implements ExternalDataSource {
     state_ = DataSourceState.OPENED;
     batchSize_ = INITIAL_BATCH_SIZE;
     schema_ = params.getRow_schema();
-    return new TOpenResult(STATUS_OK).setScan_handle(String.valueOf(System.nanoTime()));
+    scanHandle_ = UUID.randomUUID().toString();
+    return new TOpenResult(STATUS_OK).setScan_handle(scanHandle_);
   }
 
   /**
@@ -112,6 +115,7 @@ public class AllTypesDataSource implements ExternalDataSource {
   @Override
   public TGetNextResult getNext(TGetNextParams params) {
     Preconditions.checkState(state_ == DataSourceState.OPENED);
+    Preconditions.checkArgument(params.getScan_handle().equals(scanHandle_));
     if (eos_) return new TGetNextResult(STATUS_OK).setEos(eos_);
 
     List<TColumnData> cols = Lists.newArrayList();
@@ -209,6 +213,7 @@ public class AllTypesDataSource implements ExternalDataSource {
   @Override
   public TCloseResult close(TCloseParams params) {
     Preconditions.checkState(state_ == DataSourceState.OPENED);
+    Preconditions.checkArgument(params.getScan_handle().equals(scanHandle_));
     state_ = DataSourceState.CLOSED;
     return new TCloseResult(STATUS_OK);
   }
