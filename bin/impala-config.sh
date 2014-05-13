@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 # Source this file from the $IMPALA_HOME directory to
 # setup your environment. If $IMPALA_HOME is undefined
 # this script will set it to the current working directory.
@@ -53,7 +52,6 @@ if [ -z $IMPALA_HOME ]; then
 fi
 
 export CDH_MAJOR_VERSION=5
-
 export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
 export IMPALA_AUX_TEST_HOME=${IMPALA_AUX_TEST_HOME-~/impala-auxiliary-tests}
@@ -135,6 +133,7 @@ export IMPALA_BUILD_THREADS=`nproc`
 # TODO: figure out how to turn this off only the stuff that can't run with it.
 #LIBHDFS_OPTS="-Xcheck:jni -Xcheck:nabounds"
 # - Points to the location of libbackend.so.
+LIBHDFS_OPTS="${LIBHDFS_OPTS:-}"
 LIBHDFS_OPTS="${LIBHDFS_OPTS} -Djava.library.path=${HADOOP_HOME}/lib/native/"
 # READER BEWARE: This always points to the debug build.
 # TODO: Consider having cmake scripts change this value depending on
@@ -151,14 +150,17 @@ LIB_JAVA=`find ${JAVA_HOME}/   -name libjava.so | head -1`
 LIB_JSIG=`find ${JAVA_HOME}/   -name libjsig.so | head -1`
 LIB_JVM=` find ${JAVA_HOME}/   -name libjvm.so  | head -1`
 LIB_HDFS=`find ${HADOOP_HOME}/ -name libhdfs.so | head -1`
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`:`dirname ${LIB_HDFS}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$IMPALA_LZO/build"
 export LD_LIBRARY_PATH
+LD_PRELOAD="${LD_PRELOAD-}"
 export LD_PRELOAD="${LD_PRELOAD}:${LIB_JSIG}"
 
+CLASSPATH="${CLASSPATH-}"
 CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/src/test/resources:$CLASSPATH
