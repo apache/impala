@@ -49,4 +49,6 @@ echo " --> Starting Hive Server and Metastore Service"
 $IMPALA_HOME/testdata/bin/run-hive-server.sh\
     &>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-hive-server.log
 
-
+echo " --> Starting the Sentry Policy Server"
+$IMPALA_HOME/testdata/bin/run-sentry-service.sh\
+    &>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-sentry-service.log
