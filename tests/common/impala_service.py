@@ -26,6 +26,7 @@ import urllib
 from collections import defaultdict
 from HTMLParser import HTMLParser
 from tests.common.impala_connection import ImpalaConnection, create_connection
+from tests.common.impala_connection import create_ldap_connection
 from time import sleep, time
 
 logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
@@ -167,6 +168,12 @@ class ImpaladService(BaseImpalaService):
   def create_beeswax_client(self, use_kerberos=False):
     """Creates a new beeswax client connection to the impalad"""
     client = create_connection('%s:%d' % (self.hostname, self.beeswax_port), use_kerberos)
+    client.connect()
+    return client
+
+  def create_ldap_beeswax_client(self, user, password):
+    client = create_ldap_connection('%s:%d' % (self.hostname, self.beeswax_port),
+                                    user=user, password=password)
     client.connect()
     return client
 

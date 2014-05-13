@@ -116,8 +116,8 @@ class ImpalaConnection(object):
 
 # Represents a connection to Impala using the Beeswax API.
 class BeeswaxConnection(ImpalaConnection):
-  def __init__(self, host_port, use_kerberos=False):
-    self.__beeswax_client = ImpalaBeeswaxClient(host_port, use_kerberos)
+  def __init__(self, host_port, use_kerberos=False, user=None, password=None):
+    self.__beeswax_client = ImpalaBeeswaxClient(host_port, use_kerberos, user, password)
     self.__host_port = host_port
     self.QUERY_STATES = self.__beeswax_client.query_states
 
@@ -192,3 +192,6 @@ class BeeswaxConnection(ImpalaConnection):
 def create_connection(host_port, use_kerberos=False):
   # TODO: Support HS2 connections.
   return BeeswaxConnection(host_port=host_port, use_kerberos=use_kerberos)
+
+def create_ldap_connection(host_port, user, password):
+  return BeeswaxConnection(host_port=host_port, user=user, password=password)

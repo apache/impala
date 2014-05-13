@@ -82,12 +82,14 @@ class ImpalaBeeswaxClient(object):
   # Regex applied to all tokens of a query to detect the query type.
   INSERT_REGEX = re.compile("^insert$", re.I)
 
-  def __init__(self, impalad, use_kerberos=False):
+  def __init__(self, impalad, use_kerberos=False, user=None, password=None):
     self.connected = False
     self.impalad = impalad
     self.imp_service = None
     self.transport = None
     self.use_kerberos = use_kerberos
+    self.user, self.password = user, password
+    self.use_ldap = (self.user is not None)
     self.__query_options = {}
     self.query_states = QueryState._NAMES_TO_VALUES
 
@@ -138,8 +140,11 @@ class ImpalaBeeswaxClient(object):
     trans_type = 'buffered'
     if self.use_kerberos:
       trans_type = 'kerberos'
+    elif self.use_ldap:
+      trans_type = 'plain_sasl'
     return create_transport(host=self.impalad[0], port=int(self.impalad[1]),
-                            service='impala', transport_type=trans_type)
+                            service='impala', transport_type=trans_type, user=self.user,
+                            password=self.password)
 
   def execute(self, query_string):
     """Re-directs the query to its appropriate handler, returns QueryResult"""
