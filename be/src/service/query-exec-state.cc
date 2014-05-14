@@ -311,7 +311,6 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   }
   schedule_.reset(new QuerySchedule(query_id_, query_exec_request,
           exec_request_.query_options, &summary_profile_, query_events_));
-
   coord_.reset(new Coordinator(exec_env_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());
   summary_profile_.AddInfoString("Request Pool", schedule_->request_pool());

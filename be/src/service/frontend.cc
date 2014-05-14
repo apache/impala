@@ -51,7 +51,8 @@ Frontend::Frontend() {
     {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
-    {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_config_id_},
+    {"getHadoopConfig", "([B)[B", &get_hadoop_config_id_},
+    {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_configs_id_},
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
     {"updateCatalogCache", "([B)[B", &update_catalog_cache_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
@@ -192,7 +193,7 @@ Status Frontend::RenderHadoopConfigs(bool as_text, stringstream* output) {
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
   jstring java_string = static_cast<jstring>(jni_env->CallObjectMethod(
-      fe_, get_hadoop_config_id_, as_text));
+      fe_, get_hadoop_configs_id_, as_text));
   RETURN_ERROR_IF_EXC(jni_env);
   jboolean is_copy;
   const char *str = jni_env->GetStringUTFChars(java_string, &is_copy);
@@ -201,6 +202,11 @@ Status Frontend::RenderHadoopConfigs(bool as_text, stringstream* output) {
   jni_env->ReleaseStringUTFChars(java_string, str);
   RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
+}
+
+Status Frontend::GetHadoopConfig(const TGetHadoopConfigRequest& request,
+    TGetHadoopConfigResponse* response) {
+  return JniUtil::CallJniMethod(fe_, get_hadoop_config_id_, request, response);
 }
 
 Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) {

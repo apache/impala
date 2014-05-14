@@ -575,3 +575,13 @@ struct TGetJvmMetricsResponse {
   // 'total'
   1: required list<TJvmMemoryPool> memory_pools
 }
+
+struct TGetHadoopConfigRequest {
+  // The value of the <name> in the config <property>
+  1: required string name
+}
+
+struct TGetHadoopConfigResponse {
+  // The corresponding value if one exists
+  1: optional string value
+}

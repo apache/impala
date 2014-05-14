@@ -80,7 +80,7 @@ void ImpalaServer::RegisterWebserverCallbacks(Webserver* webserver) {
 
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
     stringstream* output) {
-  frontend_->RenderHadoopConfigs(args.find("raw") != args.end(), output);
+  exec_env_->frontend()->RenderHadoopConfigs(args.find("raw") != args.end(), output);
 }
 
 // We expect the query id to be passed as one parameter, 'query_id'.
@@ -329,7 +329,7 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
   // TODO: This is an almost exact copy of CatalogServer::CatalogPathHandler(). Merge the
   // two and deal with the different ways to get tables and databases.
   TGetDbsResult get_dbs_result;
-  Status status = frontend_->GetDbNames(NULL, NULL, &get_dbs_result);
+  Status status = exec_env_->frontend()->GetDbNames(NULL, NULL, &get_dbs_result);
   if (!status.ok()) {
     (*output) << "Error: " << status.GetErrorMsg();
     return;
@@ -353,7 +353,8 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
           "<a href='catalog_objects?object_type=DATABASE&object_name=$0' id='$0'>"
           "<h3>$0</h3></a>", db);
       TGetTablesResult get_table_results;
-      Status status = frontend_->GetTableNames(db, NULL, NULL, &get_table_results);
+      Status status = exec_env_->frontend()->
+          GetTableNames(db, NULL, NULL, &get_table_results);
       if (!status.ok()) {
         (*output) << "Error: " << status.GetErrorMsg();
         continue;
@@ -378,7 +379,8 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
 
     BOOST_FOREACH(const string& db, db_names) {
       TGetTablesResult get_table_results;
-      Status status = frontend_->GetTableNames(db, NULL, NULL, &get_table_results);
+      Status status = exec_env_->frontend()->
+          GetTableNames(db, NULL, NULL, &get_table_results);
       if (!status.ok()) {
         (*output) << "Error: " << status.GetErrorMsg();
         continue;
@@ -408,7 +410,7 @@ void ImpalaServer::CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
 
     // Get the object and dump its contents.
     TCatalogObject result;
-    Status status = frontend_->GetCatalogObject(request, &result);
+    Status status = exec_env_->frontend()->GetCatalogObject(request, &result);
     if (status.ok()) {
       if (args.find("raw") == args.end()) {
         (*output) << "<pre>" << ThriftDebugString(result) << "</pre>";

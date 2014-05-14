@@ -106,8 +106,7 @@ ResourceBroker::ResourceBroker(const TNetworkAddress& llama_address,
         FLAGS_resource_broker_cnxn_retry_interval_ms,
         FLAGS_resource_broker_send_timeout,
         FLAGS_resource_broker_recv_timeout,
-        LLAMA_KERBEROS_SERVICE_NAME)),
-    is_mini_llama_(false) {
+        LLAMA_KERBEROS_SERVICE_NAME)) {
   DCHECK(metrics != NULL);
   reservation_rpc_time_metric_ =
       metrics->RegisterMetric(
@@ -657,17 +656,6 @@ Status ResourceBroker::RefreshLlamaNodes() {
   RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
   llama_nodes_ = llama_response.nodes;
   LOG(INFO) << "Llama Nodes [" << join(llama_nodes_, ", ") << "]";
-
-  // The Llama is a Mini Llama if all nodes know to it are on 127.0.0.1.
-  is_mini_llama_ = true;
-  for (int i = 0; i < llama_nodes_.size(); ++i) {
-    TNetworkAddress hostport = MakeNetworkAddress(llama_nodes_[i]);
-    if (hostport.hostname != "127.0.0.1") {
-      is_mini_llama_ = false;
-      break;
-    }
-  }
-  LOG(INFO) << "Resource broker is using Mini LLama: " << is_mini_llama_;
   return Status::OK;
 }
 

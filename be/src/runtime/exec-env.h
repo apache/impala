@@ -44,6 +44,7 @@ class ThreadResourceMgr;
 class CgroupsManager;
 class ImpalaServer;
 class RequestPoolService;
+class Frontend;
 
 // Execution environment for queries/plan fragments.
 // Contains all required global structures, and handles to
@@ -87,6 +88,7 @@ class ExecEnv {
   CgroupsMgr* cgroups_mgr() { return cgroups_mgr_.get(); }
   HdfsOpThreadPool* hdfs_op_thread_pool() { return hdfs_op_thread_pool_.get(); }
   ImpalaServer* impala_server() { return impala_server_; }
+  Frontend* frontend() { return frontend_.get(); };
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
@@ -105,6 +107,11 @@ class ExecEnv {
   // differently.
   bool is_fe_tests() { return is_fe_tests_; }
 
+  // Returns true if the Llama in use is pseudo-distributed, used for development
+  // purposes. The pseudo-distributed version has special requirements for specifying
+  // resource locations.
+  bool is_pseudo_distributed_llama() { return is_pseudo_distributed_llama_; }
+
  protected:
   // Leave protected so that subclasses can override
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
@@ -122,6 +129,7 @@ class ExecEnv {
   boost::scoped_ptr<CgroupsMgr> cgroups_mgr_;
   boost::scoped_ptr<HdfsOpThreadPool> hdfs_op_thread_pool_;
   boost::scoped_ptr<RequestPoolService> request_pool_service_;
+  boost::scoped_ptr<Frontend> frontend_;
 
   // Not owned by this class
   ImpalaServer* impala_server_;
@@ -132,6 +140,14 @@ class ExecEnv {
   static ExecEnv* exec_env_;
   TimezoneDatabase tz_database_;
   bool is_fe_tests_;
+
+  // True if the cluster has set 'yarn.scheduler.include-port-in-node-name' to true,
+  // indicating that this cluster is pseudo-distributed. Should not be true in real
+  // deployments.
+  bool is_pseudo_distributed_llama_;
+
+  // Initialise cgroups manager, detect test RM environment and init resource broker.
+  void InitRm();
 };
 
 } // namespace impala

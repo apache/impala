@@ -41,7 +41,7 @@ InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend
 
 void InProcessImpalaServer::SetCatalogInitialized() {
   DCHECK(impala_server_ != NULL) << "Call Start*() first.";
-  impala_server_->frontend()->SetCatalogInitialized();
+  exec_env_->frontend()->SetCatalogInitialized();
 }
 
 Status InProcessImpalaServer::StartWithClientServers(int beeswax_port, int hs2_port,

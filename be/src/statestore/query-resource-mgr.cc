@@ -40,14 +40,14 @@ DEFINE_double(max_vcore_oversubscription_ratio, 2.5, "(Advanced) The maximum rat
     " on a single node");
 
 ResourceResolver::ResourceResolver(const unordered_set<TNetworkAddress>& unique_hosts) {
-  ResourceBroker* broker = ExecEnv::GetInstance()->resource_broker();
-  is_mini_llama_ = (broker == NULL) ? false : broker->is_mini_llama();
-  if (is_mini_llama_) CreateMiniLlamaMapping(unique_hosts);
+  if (ExecEnv::GetInstance()->is_pseudo_distributed_llama()) {
+    CreateLocalLlamaNodeMapping(unique_hosts);
+  }
 }
 
 void ResourceResolver::GetResourceHostport(const TNetworkAddress& src,
     TNetworkAddress* dest) {
-  if (is_mini_llama_) {
+  if (ExecEnv::GetInstance()->is_pseudo_distributed_llama()) {
     *dest = impalad_to_dn_[src];
   } else {
     dest->hostname = src.hostname;
@@ -55,9 +55,9 @@ void ResourceResolver::GetResourceHostport(const TNetworkAddress& src,
   }
 }
 
-void ResourceResolver::CreateMiniLlamaMapping(
+void ResourceResolver::CreateLocalLlamaNodeMapping(
     const unordered_set<TNetworkAddress>& unique_hosts) {
-  DCHECK(is_mini_llama_);
+  DCHECK(ExecEnv::GetInstance()->is_pseudo_distributed_llama());
   const vector<string>& llama_nodes =
       ExecEnv::GetInstance()->resource_broker()->llama_nodes();
   DCHECK(!llama_nodes.empty());
@@ -66,6 +66,7 @@ void ResourceResolver::CreateMiniLlamaMapping(
     TNetworkAddress dn_hostport = MakeNetworkAddress(llama_nodes[llama_node_ix]);
     impalad_to_dn_[host] = dn_hostport;
     dn_to_impalad_[dn_hostport] = host;
+    LOG(INFO) << "Mapping Datanode " << dn_hostport << " to Impalad: " << host;
     // Round robin the registered Llama nodes.
     llama_node_ix = (llama_node_ix + 1) % llama_nodes.size();
   }

@@ -244,7 +244,8 @@ void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& que
   TQueryContext query_ctxt;
   RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctxt), SQLSTATE_GENERAL_ERROR);
 
-  RAISE_IF_ERROR(frontend_->GetExplainPlan(query_ctxt, &query_explanation.textual),
+  RAISE_IF_ERROR(
+      exec_env_->frontend()->GetExplainPlan(query_ctxt, &query_explanation.textual),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
   query_explanation.__isset.textual = true;
   VLOG_QUERY << "explain():\nstmt=" << query_ctxt.request.stmt

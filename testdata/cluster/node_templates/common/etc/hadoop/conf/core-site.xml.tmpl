@@ -26,4 +26,12 @@
     <name>hadoop.proxyuser.${USER}.groups</name>
     <value>*</value>
   </property>
+
+  <!-- Needed as long as multiple nodes are running on the same address. For Impala
+       testing only -->
+  <property>
+    <name>yarn.scheduler.include-port-in-node-name</name>
+    <value>true</value>
+  </property>
+
 </configuration>

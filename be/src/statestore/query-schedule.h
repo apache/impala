@@ -127,7 +127,6 @@ class QuerySchedule {
   const TUniqueId& query_id_;
   const TQueryExecRequest& request_;
   const TQueryOptions& query_options_;
-  bool is_mini_llama_;
   RuntimeProfile* summary_profile_;
   RuntimeProfile::EventSequence* query_events_;
 

@@ -88,8 +88,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
 
-  Frontend* frontend() { return frontend_.get(); }
-
   // ImpalaService rpcs: Beeswax API (implemented in impala-beeswax-server.cc)
   virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
   virtual void executeAndWait(beeswax::QueryHandle& query_handle,
@@ -677,9 +675,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // If audit event logging is enabled, wakes once every 5s to flush audit events to disk
   boost::scoped_ptr<Thread> audit_event_logger_flush_thread_;
-
-  // A Frontend proxy, used both for planning and for catalog requests.
-  boost::scoped_ptr<Frontend> frontend_;
 
   // global, per-server state
   ExecEnv* exec_env_;  // not owned

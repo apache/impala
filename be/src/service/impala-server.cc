@@ -201,9 +201,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   // Initialize default config
   InitializeConfigVariables();
 
-  frontend_.reset(new Frontend());
-
-  Status status = frontend_->ValidateSettings();
+  Status status = exec_env_->frontend()->ValidateSettings();
   if (!status.ok()) {
     LOG(ERROR) << status.GetErrorMsg();
     if (FLAGS_abort_on_config_error) {
@@ -526,7 +524,7 @@ Status ImpalaServer::ExecuteInternal(
   }
   *registered_exec_state = false;
 
-  exec_state->reset(new QueryExecState(query_ctxt, exec_env_, frontend_.get(),
+  exec_state->reset(new QueryExecState(query_ctxt, exec_env_, exec_env_->frontend(),
       this, session_state));
 
   (*exec_state)->query_events()->MarkEvent("Start execution");
@@ -553,7 +551,7 @@ Status ImpalaServer::ExecuteInternal(
     *registered_exec_state = true;
 
     RETURN_IF_ERROR((*exec_state)->UpdateQueryStatus(
-        frontend_->GetExecRequest(query_ctxt, &result)));
+        exec_env_->frontend()->GetExecRequest(query_ctxt, &result)));
     (*exec_state)->query_events()->MarkEvent("Planning finished");
     if (result.__isset.result_set_metadata) {
       (*exec_state)->set_result_metadata(result.result_set_metadata);
@@ -699,12 +697,12 @@ void ImpalaServer::Wait(shared_ptr<QueryExecState> exec_state) {
 
 Status ImpalaServer::UpdateCatalogMetrics() {
   TGetDbsResult db_names;
-  RETURN_IF_ERROR(frontend_->GetDbNames(NULL, NULL, &db_names));
+  RETURN_IF_ERROR(exec_env_->frontend()->GetDbNames(NULL, NULL, &db_names));
   ImpaladMetrics::CATALOG_NUM_DBS->Update(db_names.dbs.size());
   ImpaladMetrics::CATALOG_NUM_TABLES->Update(0L);
   BOOST_FOREACH(const string& db, db_names.dbs) {
     TGetTablesResult table_names;
-    RETURN_IF_ERROR(frontend_->GetTableNames(db, NULL, NULL, &table_names));
+    RETURN_IF_ERROR(exec_env_->frontend()->GetTableNames(db, NULL, NULL, &table_names));
     ImpaladMetrics::CATALOG_NUM_TABLES->Increment(table_names.tables.size());
   }
 
@@ -1361,7 +1359,8 @@ void ImpalaServer::CatalogUpdateCallback(
       update_req.removed_objects.push_back(catalog_object);
       if (catalog_object.type == TCatalogObjectType::FUNCTION) {
         TCatalogObject dropped_function;
-        if (frontend_->GetCatalogObject(catalog_object, &dropped_function).ok()) {
+        if (exec_env_->frontend()->GetCatalogObject(
+                catalog_object, &dropped_function).ok()) {
           // This function may have been dropped and re-created. To avoid removing the
           // re-created function's entry from the cache verify the existing function has a
           // catalog version <= the catalog version included in this statestore heartbeat.
@@ -1375,7 +1374,7 @@ void ImpalaServer::CatalogUpdateCallback(
 
     // Call the FE to apply the changes to the Impalad Catalog.
     TUpdateCatalogCacheResponse resp;
-    Status s = frontend_->UpdateCatalogCache(update_req, &resp);
+    Status s = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
     if (!s.ok()) {
       LOG(ERROR) << "There was an error processing the impalad catalog update. Requesting"
                  << " a full topic update to recover: " << s.GetErrorMsg();
@@ -1432,7 +1431,7 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
     }
      // Apply the changes to the local catalog cache.
     TUpdateCatalogCacheResponse resp;
-    Status status = frontend_->UpdateCatalogCache(update_req, &resp);
+    Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetErrorMsg();
     return status;
   } else {

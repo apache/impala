@@ -135,7 +135,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
       request.query_ctxt.request.query_options.mem_limit > 0) {
     bytes_limit = request.query_ctxt.request.query_options.mem_limit;
     VLOG_QUERY << "Using query memory limit from query options: "
-        << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
+               << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
   }
 
   DCHECK(!params.request_pool.empty());

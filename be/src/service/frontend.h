@@ -124,6 +124,12 @@ class Frontend {
   // as_text parameter, to the output stringstream.
   Status RenderHadoopConfigs(bool as_text, std::stringstream* output);
 
+  // Returns (in the output parameter) the value for the given config. The returned Thrift
+  // struct will indicate if the value was null or not found by not setting its 'value'
+  // field.
+  Status GetHadoopConfig(const TGetHadoopConfigRequest& request,
+      TGetHadoopConfigResponse* response);
+
   // Loads a single file or set of files into a table or partition. Saves the RPC
   // response in the TLoadDataResp output parameter. Returns OK if the operation
   // completed successfully.
@@ -145,7 +151,8 @@ class Frontend {
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
-  jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig()
+  jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig(byte[])
+  jmethodID get_hadoop_configs_id_;  // JniFrontend.getHadoopConfig(bool)
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames

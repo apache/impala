@@ -31,6 +31,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
 #include "scheduling/request-pool-service.h"
+#include "service/frontend.h"
 #include "statestore/simple-scheduler.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
@@ -94,6 +95,11 @@ DEFINE_int32(resource_broker_recv_timeout, 0, "Time to wait, in ms, "
     "for the underlying socket of an RPC to Llama to successfully receive data. "
     "A setting of 0 means the socket will wait indefinitely.");
 
+// The key for a variable set in Impala's test environment only, to allow the
+// resource-broker to correctly map node addresses into a form that Llama understand.
+const static string PSEUDO_DISTRIBUTED_CONFIG_KEY =
+    "yarn.scheduler.include-port-in-node-name";
+
 namespace impala {
 
 ExecEnv* ExecEnv::exec_env_ = NULL;
@@ -112,18 +118,12 @@ ExecEnv::ExecEnv()
     hdfs_op_thread_pool_(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
     request_pool_service_(new RequestPoolService()),
+    frontend_(new Frontend()),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()),
-    is_fe_tests_(false) {
-  if (FLAGS_enable_rm) {
-    TNetworkAddress llama_address =
-        MakeNetworkAddress(FLAGS_llama_host, FLAGS_llama_port);
-    TNetworkAddress llama_callback_address =
-        MakeNetworkAddress(FLAGS_hostname, FLAGS_llama_callback_port);
-    resource_broker_.reset(new ResourceBroker(llama_address, llama_callback_address,
-        metrics_.get()));
-    cgroups_mgr_.reset(new CgroupsMgr(metrics_.get()));
-  }
+    is_fe_tests_(false),
+    is_pseudo_distributed_llama_(false) {
+  if (FLAGS_enable_rm) InitRm();
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
   // a standalone single backend)
   if (FLAGS_use_statestore) {
@@ -164,18 +164,13 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     hdfs_op_thread_pool_(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
     request_pool_service_(new RequestPoolService()),
+    frontend_(new Frontend()),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     tz_database_(TimezoneDatabase()),
-    is_fe_tests_(false) {
-  if (FLAGS_enable_rm) {
-    TNetworkAddress llama_address =
-        MakeNetworkAddress(FLAGS_llama_host, FLAGS_llama_port);
-    TNetworkAddress llama_callback_address =
-        MakeNetworkAddress(hostname, FLAGS_llama_callback_port);
-    resource_broker_.reset(new ResourceBroker(llama_address, llama_callback_address,
-        metrics_.get()));
-    cgroups_mgr_.reset(new CgroupsMgr(metrics_.get()));
-  }
+    is_fe_tests_(false),
+    is_pseudo_distributed_llama_(false) {
+  if (FLAGS_enable_rm) InitRm();
+
   if (FLAGS_use_statestore && statestore_port > 0) {
     TNetworkAddress subscriber_address =
         MakeNetworkAddress(hostname, subscriber_port);
@@ -198,6 +193,30 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
   }
   if (exec_env_ == NULL) exec_env_ = this;
   if (FLAGS_enable_rm) resource_broker_->set_scheduler(scheduler_.get());
+}
+
+void ExecEnv::InitRm() {
+  TNetworkAddress llama_address =
+      MakeNetworkAddress(FLAGS_llama_host, FLAGS_llama_port);
+  TNetworkAddress llama_callback_address =
+      MakeNetworkAddress(FLAGS_hostname, FLAGS_llama_callback_port);
+  resource_broker_.reset(new ResourceBroker(llama_address, llama_callback_address,
+      metrics_.get()));
+  cgroups_mgr_.reset(new CgroupsMgr(metrics_.get()));
+
+  TGetHadoopConfigRequest config_request;
+  config_request.__set_name(PSEUDO_DISTRIBUTED_CONFIG_KEY);
+  TGetHadoopConfigResponse config_response;
+  frontend_->GetHadoopConfig(config_request, &config_response);
+  if (config_response.__isset.value) {
+    to_lower(config_response.value);
+    is_pseudo_distributed_llama_ = (config_response.value == "true");
+  } else {
+    is_pseudo_distributed_llama_ = false;
+  }
+  if (is_pseudo_distributed_llama_) {
+    LOG(INFO) << "Pseudo-distributed Llama cluster detected";
+  }
 }
 
 ExecEnv::~ExecEnv() {

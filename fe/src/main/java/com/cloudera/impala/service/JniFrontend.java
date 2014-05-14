@@ -65,6 +65,8 @@ import com.cloudera.impala.thrift.TGetDbsParams;
 import com.cloudera.impala.thrift.TGetDbsResult;
 import com.cloudera.impala.thrift.TGetFunctionsParams;
 import com.cloudera.impala.thrift.TGetFunctionsResult;
+import com.cloudera.impala.thrift.TGetHadoopConfigRequest;
+import com.cloudera.impala.thrift.TGetHadoopConfigResponse;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TLoadDataReq;
@@ -406,6 +408,24 @@ public class JniFrontend {
       output.append("</table>");
     }
     return output.toString();
+  }
+
+  /**
+   * Returns the corresponding config value for the given key as a serialized
+   * TGetHadoopConfigResponse. If the config value is null, the 'value' field in the
+   * thrift response object will not be set.
+   */
+  public byte[] getHadoopConfig(byte[] serializedRequest) throws ImpalaException {
+    TGetHadoopConfigRequest request = new TGetHadoopConfigRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
+    TGetHadoopConfigResponse result = new TGetHadoopConfigResponse();
+    result.setValue(CONF.get(request.getName()));
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
   }
 
   public class CdhVersion implements Comparable<CdhVersion> {

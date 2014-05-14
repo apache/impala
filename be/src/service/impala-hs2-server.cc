@@ -206,7 +206,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
       "N/A" : query_text_it->second;
   query_ctxt.request.stmt = query_text;
   exec_state.reset(new QueryExecState(query_ctxt, exec_env_,
-      frontend_.get(), this, session));
+      exec_env_->frontend(), this, session));
   Status register_status = RegisterQuery(session, exec_state);
   if (!register_status.ok()) {
     status->__set_statusCode(

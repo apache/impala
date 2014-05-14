@@ -58,11 +58,10 @@ class ResourceResolver {
   boost::unordered_map<TNetworkAddress, TNetworkAddress> impalad_to_dn_;
   boost::unordered_map<TNetworkAddress, TNetworkAddress> dn_to_impalad_;
 
-  // True if running against a MiniLlama, which has different rules for host resolution.
-  bool is_mini_llama_;
-
-  // Called only if is_mini_llama_ is set to populate impalad_to_dn_ and dn_to_impalad_
-  void CreateMiniLlamaMapping(const boost::unordered_set<TNetworkAddress>& unique_hosts);
+  // Called only in pseudo-distributed setups (i.e. testing only) to populate
+  // impalad_to_dn_ and dn_to_impalad_
+  void CreateLocalLlamaNodeMapping(
+      const boost::unordered_set<TNetworkAddress>& unique_hosts);
 };
 
 // Tracks all the state necessary to create expansion requests for all fragments of a
@@ -143,8 +142,8 @@ class QueryResourceMgr {
   TUniqueId query_id_;
 
   // Network address of the local service registered with Llama. Usually corresponds to
-  // <local-address>:0, unless a MiniLlama is being used (see
-  // ResourceResolver::CreateMiniLlamaMapping()).
+  // <local-address>:0, unless a pseudo-dstributed Llama is being used (see
+  // ResourceResolver::CreateLocalLlamaNodeMapping()).
   TNetworkAddress local_resource_location_;
 
   // Used to control shutdown of AcquireCpuResources().
