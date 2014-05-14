@@ -1,0 +1,40 @@
+====
+---- QUERY
+select * from avro_decimal_tbl
+---- RESULTS
+'Tom',234.79
+'Beck',77.34
+'Snow',55.71
+'Mary',4.33
+'Cluck',5.96
+'Tom',12.25
+'Mary',33.33
+'Tom',19.00
+'Beck',3.15
+'Beck',79.90
+---- TYPES
+STRING, DECIMAL
+====
+---- QUERY
+select name from avro_decimal_tbl
+---- RESULTS
+'Tom'
+'Beck'
+'Snow'
+'Mary'
+'Cluck'
+'Tom'
+'Mary'
+'Tom'
+'Beck'
+'Beck'
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from avro_decimal_tbl
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====

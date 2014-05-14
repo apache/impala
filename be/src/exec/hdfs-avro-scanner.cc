@@ -47,31 +47,33 @@ const string HdfsAvroScanner::AVRO_DEFLATE_CODEC("deflate");
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
-// Wrapper for avro_schema_t's that handles decrementing the ref count
-struct ScopedAvroSchemaT {
-  ScopedAvroSchemaT(avro_schema_t s = NULL) : schema(s) { }
+HdfsAvroScanner::ScopedAvroSchemaT::ScopedAvroSchemaT(const ScopedAvroSchemaT& other) {
+  schema = other.schema;
+  avro_schema_incref(schema);
+}
 
+HdfsAvroScanner::ScopedAvroSchemaT::~ScopedAvroSchemaT() {
   // avro_schema_decref can handle NULL
-  ~ScopedAvroSchemaT() { avro_schema_decref(schema); }
+  avro_schema_decref(schema);
+}
 
-  avro_schema_t operator->() const { return schema; }
-
-  ScopedAvroSchemaT& operator=(const avro_schema_t& s) {
-    if (LIKELY(s != schema)) {
-      avro_schema_decref(schema);
-      schema = s;
-    }
-    return *this;
+HdfsAvroScanner::ScopedAvroSchemaT& HdfsAvroScanner::ScopedAvroSchemaT::operator=(
+    const avro_schema_t& s) {
+  if (LIKELY(s != schema)) {
+    avro_schema_decref(schema);
+    schema = s;
   }
+  return *this;
+}
 
-  avro_schema_t schema;
-
- private:
-  // Disable copy constructor and assignment
-  ScopedAvroSchemaT(const ScopedAvroSchemaT&);
-  ScopedAvroSchemaT& operator=(const ScopedAvroSchemaT&);
-};
-
+HdfsAvroScanner::ScopedAvroSchemaT& HdfsAvroScanner::ScopedAvroSchemaT::operator=(
+    const ScopedAvroSchemaT& other) {
+  if (this == &other) return *this;
+  avro_schema_decref(schema);
+  schema = other.schema;
+  avro_schema_incref(schema);
+  return *this;
+}
 HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state)
   : BaseSequenceScanner(scan_node, state),
     avro_header_(NULL),
@@ -157,9 +159,10 @@ Status HdfsAvroScanner::ParseMetadata() {
       RETURN_IF_FALSE(stream_->ReadBytes(value_len, &value, &parse_status_));
 
       if (key == AVRO_SCHEMA_KEY) {
-        ScopedAvroSchemaT file_schema;
+        avro_schema_t raw_file_schema;
         int error = avro_schema_from_json_length(
-            reinterpret_cast<char*>(value), value_len, &file_schema.schema);
+            reinterpret_cast<char*>(value), value_len, &raw_file_schema);
+        ScopedAvroSchemaT file_schema(raw_file_schema);
         if (error != 0) {
           stringstream ss;
           ss << "Failed to parse file schema: " << avro_strerror();
@@ -168,21 +171,22 @@ Status HdfsAvroScanner::ParseMetadata() {
 
         const string& table_schema_str = scan_node_->hdfs_table()->avro_schema();
         DCHECK_GT(table_schema_str.size(), 0);
-        ScopedAvroSchemaT table_schema;
+        avro_schema_t raw_table_schema;
         error = avro_schema_from_json_length(
-            table_schema_str.c_str(), table_schema_str.size(), &table_schema.schema);
+            table_schema_str.c_str(), table_schema_str.size(), &raw_table_schema);
+        ScopedAvroSchemaT table_schema(raw_table_schema);
         if (error != 0) {
           stringstream ss;
           ss << "Failed to parse table schema: " << avro_strerror();
           return Status(ss.str());
         }
-        RETURN_IF_ERROR(ResolveSchemas(table_schema.schema, file_schema.schema));
+        RETURN_IF_ERROR(ResolveSchemas(table_schema.get(), file_schema.get()));
 
         // We currently codegen a function only for the table schema. If this file's
         // schema is different from the table schema, don't use the codegen'd function and
         // use the interpreted path instead.
         avro_header_->use_codegend_decode_avro_data =
-            avro_schema_equal(table_schema.schema, file_schema.schema);
+            avro_schema_equal(table_schema.get(), file_schema.get());
 
       } else if (key == AVRO_CODEC_KEY) {
         string avro_codec(reinterpret_cast<char*>(value), value_len);
@@ -258,11 +262,11 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
   DCHECK_GT(num_file_fields, 0);
   for (int i = 0; i < num_file_fields; ++i) {
     avro_datum_t file_field = avro_schema_record_field_get_by_index(file_schema, i);
-    SchemaElement element = ConvertSchemaNode(file_field);
-    if (element.type >= COMPLEX_TYPE) {
+    SchemaElement element = ConvertSchema(file_field);
+    if (is_avro_complex_type(element.schema.get())) {
       stringstream ss;
       ss << "Complex Avro data types (records, enums, arrays, maps, unions, and fixed) "
-         << "are not supported. Got type: " << element.type;
+         << "are not supported. Got type: " << avro_type_name(element.schema->type);
       return Status(ss.str());
     }
 
@@ -290,7 +294,7 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
 
       // Use element.type (rather than file_field->type) so that e.g. "[int, null]" is
       // treated as an int and not a union
-      RETURN_IF_ERROR(VerifyTypesMatch(slot_desc, element.type));
+      RETURN_IF_ERROR(VerifyTypesMatch(slot_desc, element.schema.get()));
 
       // Check that the corresponding table field type matches the declared column
       // type. This check is not strictly necessary since we won't use its default value
@@ -302,8 +306,8 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
       // table schema and store default values somewhere else)
       avro_schema_t table_field =
           avro_schema_record_field_get_by_index(table_schema, table_field_idx);
-      SchemaElement table_element = ConvertSchemaNode(table_field);
-      RETURN_IF_ERROR(VerifyTypesMatch(slot_desc, table_element.type));
+      SchemaElement table_element = ConvertSchema(table_field);
+      RETURN_IF_ERROR(VerifyTypesMatch(slot_desc, table_element.schema.get()));
     } else {
       element.slot_desc = NULL;
     }
@@ -324,7 +328,7 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
          << " is missing from file and does not have a default value";
       return Status(ss.str());
     }
-    RETURN_IF_ERROR(VerifyTypesMatch(slot_desc, default_value->type));
+    RETURN_IF_ERROR(VerifyTypesMatch(slot_desc, default_value));
 
     if (avro_header_->template_tuple == NULL) {
       avro_header_->template_tuple =
@@ -385,19 +389,23 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
   return Status::OK;
 }
 
-HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchemaNode(
-    const avro_schema_t& node) {
+HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchema(
+    const avro_schema_t& schema) {
   SchemaElement element;
-  element.type = node->type;
+  element.schema = schema;
+  // Increment the ref count of 'schema' on behalf of the ScopedAvroSchemaT it was
+  // assigned to. This allows 'schema' to outlive the scope it was passed in from (e.g.,
+  // a parent record schema).
+  avro_schema_incref(schema);
   element.null_union_position = -1;
 
   // Look for special case of [<primitive type>, "null"] union
-  if (element.type == AVRO_UNION) {
-    int num_fields = avro_schema_union_size(node);
+  if (element.schema->type == AVRO_UNION) {
+    int num_fields = avro_schema_union_size(schema);
     DCHECK_GT(num_fields, 0);
     if (num_fields == 2) {
-      avro_schema_t child0 = avro_schema_union_branch(node, 0);
-      avro_schema_t child1 = avro_schema_union_branch(node, 1);
+      avro_schema_t child0 = avro_schema_union_branch(schema, 0);
+      avro_schema_t child1 = avro_schema_union_branch(schema, 1);
       int null_position = -1;
       if (child0->type == AVRO_NULL) {
         null_position = 0;
@@ -407,12 +415,14 @@ HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchemaNode(
 
       if (null_position != -1) {
         avro_schema_t non_null_child = null_position == 0 ? child1 : child0;
-        SchemaElement child = ConvertSchemaNode(non_null_child);
+        SchemaElement child = ConvertSchema(non_null_child);
 
-        // node is a [<child>, "null"] union. If child is a primitive type (i.e., not a
-        // complex type nor a [<primitive type>, "null"] union itself), we treat this node
-        // as the same type as child except with null_union_position set appropriately.
-        if (child.type < COMPLEX_TYPE && child.null_union_position == -1) {
+        // 'schema' is a [<child>, "null"] union. If child is a primitive type (i.e.,
+        // not a complex type nor a [<primitive type>, "null"] union itself), we treat
+        // this node as the same type as child except with null_union_position set
+        // appropriately.
+        if (is_avro_primitive(child.schema.get()) &&
+            child.null_union_position == -1) {
           element = child;
           element.null_union_position = null_position;
         }
@@ -423,12 +433,32 @@ HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchemaNode(
   return element;
 }
 
-Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc,
-                                         avro_type_t avro_type) {
-  if (slot_desc->type().type == TYPE_DECIMAL) {
-    return Status("Decimal is not yet supported for avro tables.");
-  }
-  switch (avro_type) {
+ Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc,
+                                         avro_obj_t *schema) {
+  switch (schema->type) {
+    case AVRO_DECIMAL:
+      if (slot_desc->type().type != TYPE_DECIMAL) break;
+      if (slot_desc->type().scale != avro_schema_decimal_scale(schema)) {
+        const string& col_name =
+            scan_node_->hdfs_table()->col_names()[slot_desc->col_pos()];
+        stringstream ss;
+        ss << "File '" << stream_->filename() << "' column '" << col_name
+           << "' has a scale that does not match the table metadata scale."
+           << " File metadata scale: " << avro_schema_decimal_scale(schema)
+           << " Table metadata scale: " << slot_desc->type().scale;
+        return Status(ss.str());
+      }
+      if (slot_desc->type().precision != avro_schema_decimal_precision(schema)) {
+        const string& col_name =
+            scan_node_->hdfs_table()->col_names()[slot_desc->col_pos()];
+        stringstream ss;
+        ss << "File '" << stream_->filename() << "' column '" << col_name
+           << "' has a precision that does not match the table metadata precision."
+           << " File metadata precision: " << avro_schema_decimal_precision(schema)
+           << " Table metadata precision: " << slot_desc->type().precision;
+        return Status(ss.str());
+      }
+      return Status::OK;
     case AVRO_NULL:
       // All Impala types are nullable
       return Status::OK;
@@ -466,7 +496,7 @@ Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc,
   stringstream ss;
   ss << "Unresolvable column types (column " << slot_desc->col_pos() << "): "
      << "declared type = " << slot_desc->type() << ", "
-     << "Avro type = " << avro_type;
+     << "Avro type = " << avro_type_name(schema->type);
   return Status(ss.str());
 }
 
@@ -576,7 +606,7 @@ void HdfsAvroScanner::MaterializeTuple(MemPool* pool, uint8_t** data, Tuple* tup
       slot_type = slot_desc->type().type;
     }
 
-    avro_type_t type = element.type;
+    avro_type_t type = element.schema->type;
     if (element.null_union_position != -1
         && !ReadUnionType(element.null_union_position, data)) {
       type = AVRO_NULL;
@@ -602,9 +632,17 @@ void HdfsAvroScanner::MaterializeTuple(MemPool* pool, uint8_t** data, Tuple* tup
         ReadAvroDouble(slot_type, data, write_slot, slot, pool);
         break;
       case AVRO_STRING:
-      case AVRO_BYTES:
         ReadAvroString(slot_type, data, write_slot, slot, pool);
         break;
+      case AVRO_DECIMAL: {
+        int slot_byte_size = 0;
+        if (slot_desc != NULL) {
+          DCHECK_EQ(slot_type, TYPE_DECIMAL);
+          slot_byte_size = slot_desc->type().GetByteSize();
+        }
+        ReadAvroDecimal(slot_byte_size, data, write_slot, slot, pool);
+        break;
+      }
       default:
         DCHECK(false) << "Unsupported SchemaElement: " << type;
     }
@@ -666,16 +704,17 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
   // TODO: HdfsScanNode shouldn't codegen functions it doesn't need.
   if (table_schema_str.empty()) return NULL;
 
-  ScopedAvroSchemaT table_schema;
+  avro_schema_t raw_table_schema;
   int error = avro_schema_from_json_length(
-      table_schema_str.c_str(), table_schema_str.size(), &table_schema.schema);
+      table_schema_str.c_str(), table_schema_str.size(), &raw_table_schema);
+  ScopedAvroSchemaT table_schema(raw_table_schema);
   if (error != 0) {
     stringstream ss;
     ss << "Failed to parse table schema: " << avro_strerror();
     node->runtime_state()->LogError(ss.str());
     return NULL;
   }
-  int num_fields = avro_schema_record_size(table_schema.schema);
+  int num_fields = avro_schema_record_size(table_schema.get());
   DCHECK_GT(num_fields, 0);
 
   LLVMContext& context = codegen->context();
@@ -714,8 +753,8 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
   // result.
   for (int field_idx = 0; field_idx < num_fields; ++field_idx) {
     avro_datum_t field =
-        avro_schema_record_field_get_by_index(table_schema.schema, field_idx);
-    SchemaElement element = ConvertSchemaNode(field);
+        avro_schema_record_field_get_by_index(table_schema.get(), field_idx);
+    SchemaElement element = ConvertSchema(field);
     int col_idx = field_idx + node->num_partition_keys();
     int slot_idx = node->GetMaterializedSlotIdx(col_idx);
 
@@ -759,7 +798,7 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
     // Write read_field_block IR starting at the beginning of the block
     builder.SetInsertPoint(read_field_block, read_field_block->begin());
     Function* read_field_fn;
-    switch (element.type) {
+    switch (element.schema->type) {
       case AVRO_BOOLEAN:
         read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_BOOLEAN);
         break;
@@ -785,27 +824,27 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
         return NULL;
     }
 
+    // Call appropriate ReadAvro<Type> function
+    Value* write_slot_val = builder.getFalse();
+    Value* slot_type_val = builder.getInt32(0);
+    Value* opaque_slot_val = codegen->null_ptr_value();
     if (slot_idx != HdfsScanNode::SKIP_COLUMN) {
-      // Field corresponds to materialized column
+      // Field corresponds to a materialized column, fill in relevant arguments
+      write_slot_val = builder.getTrue();
       SlotDescriptor* slot_desc = node->materialized_slots()[slot_idx];
-      Value* slot_type_val = codegen->GetIntConstant(TYPE_INT, slot_desc->type().type);
-      Value* slot_val =
-          builder.CreateStructGEP(tuple_val, slot_desc->field_idx(), "slot");
-      Value* opaque_slot_val =
+      if (slot_desc->type().type == TYPE_DECIMAL) {
+        // ReadAvroDecimal() takes slot byte size instead of slot type
+        slot_type_val = builder.getInt32(slot_desc->type().GetByteSize());
+      } else {
+        slot_type_val = builder.getInt32(slot_desc->type().type);
+      }
+      Value* slot_val = builder.CreateStructGEP(tuple_val, slot_desc->field_idx(), "slot");
+      opaque_slot_val =
           builder.CreateBitCast(slot_val, codegen->ptr_type(), "opaque_slot");
-      Value* read_field_args[] =
-          {this_val, slot_type_val, data_val, codegen->true_value(),
-           opaque_slot_val, pool_val};
-      builder.CreateCall(read_field_fn, read_field_args);
-    } else {
-      // Field corresponds to an unmaterialized column
-      Value* dummy_slot_type_val = codegen->GetIntConstant(TYPE_INT, 0);
-      Value* dummy_slot_val = codegen->null_ptr_value();
-      Value* read_field_args[] =
-          {this_val, dummy_slot_type_val, data_val, codegen->false_value(),
-           dummy_slot_val, pool_val};
-      builder.CreateCall(read_field_fn, read_field_args);
     }
+    Value* read_field_args[] =
+        {this_val, slot_type_val, data_val, write_slot_val, opaque_slot_val, pool_val};
+    builder.CreateCall(read_field_fn, read_field_args);
   }
   builder.SetInsertPoint(&fn->back());
   builder.CreateRetVoid();

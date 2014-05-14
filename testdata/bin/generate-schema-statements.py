@@ -31,6 +31,7 @@ import math
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -245,11 +246,28 @@ def avro_schema(columns):
     # column_spec looks something like "col_name col_type COMMENT comment"
     # (comment may be omitted, we don't use it)
     name = column_spec.split()[0]
-    type = column_spec.split()[1]
-    assert type.upper() in HIVE_TO_AVRO_TYPE_MAP, "Cannot convert to Avro type: %s" % type
+
+    if "DECIMAL" in column_spec.upper():
+      if column_spec.split()[1].upper() == "DECIMAL":
+        # No scale and precision specified, use defaults
+        scale = 0
+        precision = 9
+      else:
+        # Parse out scale and precision from decimal type
+        m = re.search("DECIMAL\((?P<precision>.*),(?P<scale>.*)\)", column_spec.upper())
+        assert m, "Could not parse decimal column spec: " + column_spec
+        scale = int(m.group('scale'))
+        precision = int(m.group('precision'))
+      type = {"type": "bytes", "logicalType": "decimal", "precision": precision,
+              "scale": scale}
+    else:
+      hive_type = column_spec.split()[1]
+      type = HIVE_TO_AVRO_TYPE_MAP[hive_type.upper()]
+
     record["fields"].append(
       {'name': name,
-       'type': [HIVE_TO_AVRO_TYPE_MAP[type.upper()], "null"]}) # all columns nullable
+       'type': [type, "null"]}) # all columns nullable
+
   return json.dumps(record)
 
 def build_compression_codec_statement(codec, compression_type, file_format):
@@ -424,7 +442,7 @@ def generate_statements(output_name, test_vectors, sections,
       alter = section.get('ALTER')
       create = section['CREATE']
       create_hive = section['CREATE_HIVE']
-      insert = section['DEPENDENT_LOAD']
+      insert = eval_section(section['DEPENDENT_LOAD'])
       load = eval_section(section['LOAD'])
       # For some datasets we may want to use a different load strategy when running local
       # tests versus tests against large scale factors. The most common reason is to
@@ -461,7 +479,7 @@ def generate_statements(output_name, test_vectors, sections,
       # HBASE we need to create these tables with a supported insert format.
       create_file_format = file_format
       create_codec = codec
-      if not load and not insert:
+      if not (section['LOAD'] or section['LOAD_LOCAL'] or section['DEPENDENT_LOAD']):
         create_codec = 'none'
         create_file_format = file_format
         if file_format not in IMPALA_SUPPORTED_INSERT_FORMATS:

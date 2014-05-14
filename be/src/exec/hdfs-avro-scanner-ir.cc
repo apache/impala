@@ -129,3 +129,40 @@ void HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data, bool wr
   }
   *data += len;
 }
+
+void HdfsAvroScanner::ReadAvroDecimal(int slot_byte_size, uint8_t** data,
+                                      bool write_slot, void* slot, MemPool* pool) {
+  int64_t len = ReadWriteUtil::ReadZLong(data);
+  if (write_slot) {
+    // Decimals are encoded as big-endian integers. Copy the decimal into the most
+    // significant bytes and then shift down to the correct position to sign-extend the
+    // decimal.
+    DCHECK_LE(len, slot_byte_size);
+    int bytes_to_fill = slot_byte_size - len;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    BitUtil::ByteSwap(reinterpret_cast<uint8_t*>(slot) + bytes_to_fill, *data, len);
+#else
+    memcpy(slot, *data, len);
+#endif
+    switch (slot_byte_size) {
+      case 4: {
+        int32_t* decimal = reinterpret_cast<int32_t*>(slot);
+        *decimal >>= bytes_to_fill * 8;
+        break;
+      }
+      case 8: {
+        int64_t* decimal = reinterpret_cast<int64_t*>(slot);
+        *decimal >>= bytes_to_fill * 8;
+        break;
+      }
+      case 16: {
+        int128_t* decimal = reinterpret_cast<int128_t*>(slot);
+        *decimal >>= bytes_to_fill * 8;
+        break;
+      }
+      default:
+        DCHECK(false) << "Decimal slots can't be this size: " << slot_byte_size;
+    }
+  }
+  *data += len;
+}

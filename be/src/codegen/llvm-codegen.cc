@@ -307,6 +307,8 @@ Type* LlvmCodeGen::GetType(const ColumnType& type) {
       return string_val_type_;
     case TYPE_TIMESTAMP:
       return timestamp_val_type_;
+    case TYPE_DECIMAL:
+      return Type::getIntNTy(context(), type.GetByteSize() * 8);
     default:
       DCHECK(false) << "Invalid type: " << type;
       return NULL;

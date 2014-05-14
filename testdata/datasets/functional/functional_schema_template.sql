@@ -1297,3 +1297,14 @@ select * from functional.{table_name};
 ---- LOAD
 `${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 1000 -o /tmp/widetable_data.csv
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+avro_decimal_tbl
+---- COLUMNS
+name STRING
+value DECIMAL(5,2)
+---- DEPENDENT_LOAD
+LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/data/avro_decimal_tbl.avro'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====

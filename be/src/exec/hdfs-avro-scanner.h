@@ -103,20 +103,36 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   }
 
  private:
-  // All types >= COMPLEX_TYPE are complex (nested) types
-  static const avro_type_t COMPLEX_TYPE = AVRO_RECORD;
+  // Wrapper for avro_schema_t's that handles decrementing the ref count
+  struct ScopedAvroSchemaT {
+    ScopedAvroSchemaT(avro_schema_t s = NULL) : schema(s) { }
+    ScopedAvroSchemaT(const ScopedAvroSchemaT&);
+
+    ~ScopedAvroSchemaT();
+
+    ScopedAvroSchemaT& operator=(const ScopedAvroSchemaT&);
+    ScopedAvroSchemaT& operator=(const avro_schema_t& s);
+
+    avro_schema_t operator->() const { return schema; }
+    avro_schema_t get() const { return schema; }
+
+   private:
+    // If not NULL, this owns a reference to schema
+    avro_schema_t schema;
+  };
 
   struct SchemaElement {
-    avro_type_t type;
+    // The record field schema from the file.
+    ScopedAvroSchemaT schema;
 
     // Complex types, e.g. records, may have nested child types
     std::vector<SchemaElement> children;
 
-    // Avro supports nullable types via unions of the form [<type>, "null"]. We
-    // special case nullable primitives by storing which position "null"
-    // occupies in the union and setting type to the primitive, rather than
-    // UNION. null_union_position is set to 0 or 1 accordingly if this type is a
-    // union between a primitive type and "null", and -1 otherwise.
+    // Avro supports nullable types via unions of the form [<type>, "null"]. We special
+    // case nullable primitives by storing which position "null" occupies in the union and
+    // setting field_schema to the non-null type's schema, rather than the union schema.
+    // null_union_position is set to 0 or 1 accordingly if this type is a union between a
+    // primitive type and "null", and -1 otherwise.
     int null_union_position;
 
     // The slot descriptor corresponding to this element. NULL if this element does not
@@ -165,12 +181,12 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   Status ResolveSchemas(const avro_schema_t& table_root,
                         const avro_schema_t& file_root);
 
-  // Utility function that maps the Avro library's type representation to our
-  // own. Used to convert a ValidSchema to a vector of SchemaElements.
-  static SchemaElement ConvertSchemaNode(const avro_schema_t& node);
+  // Utility function that maps the Avro library's type representation to our own.
+  static SchemaElement ConvertSchema(const avro_schema_t& field_schema);
 
-  // Returns Status::OK iff a value of avro_type can be used to populate slot_desc.
-  Status VerifyTypesMatch(SlotDescriptor* slot_desc, avro_type_t avro_type);
+  // Returns Status::OK iff a value with the given schema can be used to populate
+  // slot_desc. 'schema' can be either a avro_schema_t or avro_datum_t.
+  Status VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t *schema);
 
   // Decodes records and copies the data into tuples.
   // Returns the number of tuples to be committed.
@@ -218,6 +234,14 @@ class HdfsAvroScanner : public BaseSequenceScanner {
       PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
   void ReadAvroString(
       PrimitiveType type, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
+
+  // Same as the above functions, except takes the size of the decimal slot (i.e. 4, 8, or
+  // 16) instead of the type (which should be TYPE_DECIMAL). The slot size is passed
+  // explicitly, rather than passing a ColumnType, so we can easily pass in a constant in
+  // the codegen'd MaterializeTuple() function. If 'write_slot' is false, 'slot_byte_size'
+  // is ignored.
+  void ReadAvroDecimal(
+      int slot_byte_size, uint8_t** data, bool write_slot, void* slot, MemPool* pool);
 
   // Reads and advances 'data' past the union branch index and returns true if the
   // corresponding element is non-null. 'null_union_position' must be 0 or 1.
