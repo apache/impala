@@ -149,6 +149,14 @@ ResourceBroker::ResourceBroker(const vector<TNetworkAddress>& llama_addresses,
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
           "resource-broker.expansion-requests-timedout", 0);
 
+  allocated_memory_metric_ =
+      metrics->RegisterMetric(new Metrics::BytesMetric(
+          "resource-broker.memory-resources-in-use", 0L));
+
+  allocated_vcpus_metric_ =
+      metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
+          "resource-broker.vcpu-resources-in-use", 0);
+
   requests_released_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
           "resource-broker.requests-released", 0);
@@ -431,11 +439,7 @@ Status ResourceBroker::ReRegisterWithLlama(const llama::TLlamaAMGetNodesRequest&
 void ResourceBroker::ReservationFulfillment::GetResources(ResourceMap* resources,
     TUniqueId* reservation_id) {
   resources->clear();
-  // TODO: Llama returns a dump of all resources that we need to manually
-  // group by reservation id. Can Llama do the grouping for us?
   BOOST_FOREACH(const llama::TAllocatedResource& resource, allocated_resources_) {
-    // Ignore resources that don't belong to the given reservation id.
-    if (resource.reservation_id != reservation_id_) continue;
     TNetworkAddress host = MakeNetworkAddress(resource.location);
     (*resources)[host] = resource;
     VLOG_QUERY << "Getting allocated resource for reservation id "
@@ -443,6 +447,21 @@ void ResourceBroker::ReservationFulfillment::GetResources(ResourceMap* resources
   }
   (*reservation_id) << reservation_id_;
 }
+
+void ResourceBroker::ReservationFulfillment::SetResources(
+    const vector<llama::TAllocatedResource>& resources,
+    const llama::TUniqueId& reservation_id) {
+  // TODO: Llama returns a dump of all resources that we need to manually group by
+  // reservation id. Can Llama do the grouping for us?
+  reservation_id_ = reservation_id;
+  BOOST_FOREACH(const llama::TAllocatedResource& resource, resources) {
+    // Ignore resources that don't belong to the given reservation id.
+    if (resource.reservation_id == reservation_id_) {
+      allocated_resources_.push_back(resource);
+    }
+  }
+}
+
 
 bool ResourceBroker::WaitForNotification(const llama::TUniqueId& request_id,
     int64_t timeout, TUniqueId* reservation_id, ResourceMap* resources, bool* timed_out) {
@@ -465,12 +484,19 @@ bool ResourceBroker::WaitForNotification(const llama::TUniqueId& request_id,
 
   // Need to give up requests_lock_ before waiting
   bool request_granted = fulfillment->promise()->Get(timeout, timed_out);
-  fulfillment->GetResources(resources, reservation_id);
+  if (request_granted && !*timed_out) {
+    fulfillment->GetResources(resources, reservation_id);
+    BOOST_FOREACH(const ResourceMap::value_type& resource, *resources) {
+      allocated_memory_metric_->Increment(resource.second.memory_mb * 1024L * 1024L);
+      allocated_vcpus_metric_->Increment(resource.second.v_cpu_cores);
+    }
+  }
 
   // Remove the promise from the pending-requests map.
   {
     lock_guard<mutex> l(requests_lock_);
     pending_requests_.erase(request_id);
+    if (request_granted && !*timed_out) allocated_requests_[request_id] = fulfillment;
   }
 
   return request_granted;
@@ -597,6 +623,22 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
       &llama_request, &llama_response,reservation_rpc_time_metric_));
   RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
   requests_released_metric_->Increment(1);
+  {
+    lock_guard<mutex> l(requests_lock_);
+    FulfillmentMap::iterator it = allocated_requests_.find(llama_request.reservation_id);
+    DCHECK(it != allocated_requests_.end());
+    BOOST_FOREACH(const llama::TAllocatedResource& resource, it->second->resources()) {
+      DCHECK(resource.reservation_id == llama_request.reservation_id);
+      VLOG_QUERY << "Releasing "
+                 << PrettyPrinter::Print(resource.memory_mb * 1024L * 1024L,
+                                         TCounterType::BYTES)
+                 << " and " << resource.v_cpu_cores << " cores for "
+                 << llama_request.reservation_id;
+      allocated_memory_metric_->Increment(-resource.memory_mb * 1024L * 1024L);
+      allocated_vcpus_metric_->Increment(-resource.v_cpu_cores);
+    }
+    allocated_requests_.erase(it);
+  }
 
   VLOG_QUERY << "Released reservation with id " << request.reservation_id;
   return Status::OK;

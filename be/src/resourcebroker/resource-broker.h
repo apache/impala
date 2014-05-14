@@ -227,6 +227,11 @@ class ResourceBroker {
   // the timeout period.
   Metrics::PrimitiveMetric<int64_t>* expansion_requests_timedout_metric_;
 
+  // Total amount of memory currently allocated by Llama to this node
+  Metrics::BytesMetric* allocated_memory_metric_;
+
+  // Total number of vcpu cores currently allocated by Llama to this node
+  Metrics::PrimitiveMetric<int64_t>* allocated_vcpus_metric_;
 
   // Total number of fulfilled reservation requests that have been released.
   Metrics::PrimitiveMetric<int64_t>* requests_released_metric_;
@@ -272,10 +277,13 @@ class ResourceBroker {
     // TODO: Can we remove reservation_id?
     void GetResources(ResourceMap* resources, TUniqueId* reservation_id);
 
+    // Populates allocated_resources_ from all members of resources that match the given
+    // reservation id.
     void SetResources(const std::vector<llama::TAllocatedResource>& resources,
-        const llama::TUniqueId& id) {
-      allocated_resources_ = resources;
-      reservation_id_ = id;
+        const llama::TUniqueId& reservation_id);
+
+    const std::vector<llama::TAllocatedResource>& resources() const {
+      return allocated_resources_;
     }
 
    private:
@@ -291,7 +299,7 @@ class ResourceBroker {
     llama::TUniqueId reservation_id_;
   };
 
-  // Protects pending_requests_;
+  // Protects pending_requests_ and allocated_requests_
   boost::mutex requests_lock_;
 
   // Maps from the unique reservation id received from Llama as response to a reservation
@@ -299,6 +307,9 @@ class ResourceBroker {
   typedef boost::unordered_map<llama::TUniqueId,
                                boost::shared_ptr<ReservationFulfillment> > FulfillmentMap;
   FulfillmentMap pending_requests_;
+
+  // List of allocated requests that are in use by queries that are currently executing.
+  FulfillmentMap allocated_requests_;
 
   // Protects query_resource_mgrs_
   boost::mutex query_resource_mgrs_lock_;
