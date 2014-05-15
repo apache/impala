@@ -49,6 +49,7 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
+import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
@@ -58,6 +59,8 @@ import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
+import com.cloudera.impala.thrift.TGetDataSrcsParams;
+import com.cloudera.impala.thrift.TGetDataSrcsResult;
 import com.cloudera.impala.thrift.TGetDbsParams;
 import com.cloudera.impala.thrift.TGetDbsResult;
 import com.cloudera.impala.thrift.TGetFunctionsParams;
@@ -221,6 +224,32 @@ public class JniFrontend {
     TGetDbsResult result = new TGetDbsResult();
     result.setDbs(dbs);
 
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Returns a list of data sources matching an optional pattern.
+   * The argument is a serialized TGetDataSrcsResult object.
+   * The return type is a serialised TGetDataSrcsResult object.
+   * @see Frontend#getDataSrcs
+   */
+  public byte[] getDataSrcMetadata(byte[] thriftParams) throws ImpalaException {
+    TGetDataSrcsParams params = new TGetDataSrcsParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftParams);
+
+    TGetDataSrcsResult result = new TGetDataSrcsResult();
+    List<DataSource> dataSources = frontend_.getDataSrcs(params.pattern);
+    for (DataSource dataSource: dataSources) {
+      result.addToData_src_names(dataSource.getName());
+      result.addToLocations(dataSource.getLocation().toUri().getPath());
+      result.addToClass_names(dataSource.getClassName());
+      result.addToApi_versions(dataSource.getApiVersion());
+    }
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);

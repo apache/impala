@@ -197,6 +197,17 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       SetResultSet(db_names.dbs);
       return Status::OK;
     }
+    case TCatalogOpType::SHOW_DATA_SRCS: {
+      const TShowDataSrcsParams* params = &catalog_op.show_data_srcs_params;
+      TGetDataSrcsResult result;
+      const string* pattern =
+          params->__isset.show_pattern ? (&params->show_pattern) : NULL;
+      RETURN_IF_ERROR(
+          frontend_->GetDataSrcMetadata(pattern, &result));
+      SetResultSet(result.data_src_names, result.locations, result.class_names,
+          result.api_versions);
+      return Status::OK;
+    }
     case TCatalogOpType::SHOW_STATS: {
       const TShowStatsParams& params = catalog_op.show_stats_params;
       TResultSet response;
@@ -738,6 +749,24 @@ void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& col1,
     (*request_result_set_.get())[i].colVals.resize(2);
     (*request_result_set_.get())[i].colVals[0].__set_string_val(col1[i]);
     (*request_result_set_.get())[i].colVals[1].__set_string_val(col2[i]);
+  }
+}
+
+void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& col1,
+    const vector<string>& col2, const vector<string>& col3, const vector<string>& col4) {
+  DCHECK_EQ(col1.size(), col2.size());
+  DCHECK_EQ(col1.size(), col3.size());
+  DCHECK_EQ(col1.size(), col4.size());
+
+  request_result_set_.reset(new vector<TResultRow>);
+  request_result_set_->resize(col1.size());
+  for (int i = 0; i < col1.size(); ++i) {
+    (*request_result_set_.get())[i].__isset.colVals = true;
+    (*request_result_set_.get())[i].colVals.resize(4);
+    (*request_result_set_.get())[i].colVals[0].__set_string_val(col1[i]);
+    (*request_result_set_.get())[i].colVals[1].__set_string_val(col2[i]);
+    (*request_result_set_.get())[i].colVals[2].__set_string_val(col3[i]);
+    (*request_result_set_.get())[i].colVals[3].__set_string_val(col4[i]);
   }
 }
 

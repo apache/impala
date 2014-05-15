@@ -215,6 +215,31 @@ public abstract class Catalog {
   }
 
   /**
+   * Returns a list of data sources names that match pattern. See filterStringsByPattern
+   * for details of the pattern match semantics.
+   *
+   * pattern may be null (and thus matches everything).
+   */
+  public List<String> getDataSourceNames(String pattern) {
+    return filterStringsByPattern(dataSources_.getAllNames(), pattern);
+  }
+
+  /**
+   * Returns a list of data sources that match pattern. See filterStringsByPattern
+   * for details of the pattern match semantics.
+   *
+   * pattern may be null (and thus matches everything).
+   */
+  public List<DataSource> getDataSources(String pattern) {
+    List<String> names = filterStringsByPattern(dataSources_.getAllNames(), pattern);
+    List<DataSource> dataSources = Lists.newArrayListWithCapacity(names.size());
+    for (String name: names) {
+      dataSources.add(dataSources_.get(name));
+    }
+    return dataSources;
+  }
+
+  /**
    * Adds a function to the catalog.
    * Returns true if the function was successfully added.
    * Returns false if the function already exists.

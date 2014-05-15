@@ -74,6 +74,7 @@ public class AnalysisContext {
     public boolean isUseStmt() { return stmt_ instanceof UseStmt; }
     public boolean isShowTablesStmt() { return stmt_ instanceof ShowTablesStmt; }
     public boolean isShowDbsStmt() { return stmt_ instanceof ShowDbsStmt; }
+    public boolean isShowDataSrcsStmt() { return stmt_ instanceof ShowDataSrcsStmt; }
     public boolean isShowStatsStmt() { return stmt_ instanceof ShowStatsStmt; }
     public boolean isShowFunctionsStmt() { return stmt_ instanceof ShowFunctionsStmt; }
     public boolean isShowCreateTableStmt() {
@@ -84,14 +85,14 @@ public class AnalysisContext {
     public boolean isExplainStmt() { return stmt_.isExplain(); }
 
     public boolean isCatalogOp() {
-      return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isShowStatsStmt() ||
-          isShowCreateTableStmt() || isDescribeStmt() || isCreateTableLikeStmt() ||
-          isCreateTableStmt() || isCreateViewStmt() || isCreateDbStmt() ||
-          isDropDbStmt() || isDropTableOrViewStmt() || isResetMetadataStmt() ||
-          isAlterTableStmt() || isAlterViewStmt() || isComputeStatsStmt() ||
-          isCreateUdfStmt() || isCreateUdaStmt() || isShowFunctionsStmt() ||
-          isDropFunctionStmt() || isCreateTableAsSelectStmt() ||
-          isCreateDataSrcStmt() || isDropDataSrcStmt();
+      return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() ||
+          isShowDataSrcsStmt() || isShowStatsStmt() || isShowCreateTableStmt() ||
+          isDescribeStmt() || isCreateTableLikeStmt() || isCreateTableStmt() ||
+          isCreateViewStmt() || isCreateDbStmt() || isDropDbStmt() ||
+          isDropTableOrViewStmt() || isResetMetadataStmt() || isAlterTableStmt() ||
+          isAlterViewStmt() || isComputeStatsStmt() || isCreateUdfStmt() ||
+          isCreateUdaStmt() || isShowFunctionsStmt() || isDropFunctionStmt() ||
+          isCreateTableAsSelectStmt() || isCreateDataSrcStmt() || isDropDataSrcStmt();
     }
 
     public boolean isDmlStmt() {
@@ -195,6 +196,11 @@ public class AnalysisContext {
     public ShowDbsStmt getShowDbsStmt() {
       Preconditions.checkState(isShowDbsStmt());
       return (ShowDbsStmt) stmt_;
+    }
+
+    public ShowDataSrcsStmt getShowDataSrcsStmt() {
+      Preconditions.checkState(isShowDataSrcsStmt());
+      return (ShowDataSrcsStmt) stmt_;
     }
 
     public ShowStatsStmt getShowStatsStmt() {

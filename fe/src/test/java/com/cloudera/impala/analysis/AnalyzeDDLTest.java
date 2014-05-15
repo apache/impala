@@ -1371,6 +1371,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("show databases");
     AnalyzesOk("show databases like '*pattern'");
 
+    AnalyzesOk("show data sources");
+    AnalyzesOk("show data sources like '*pattern'");
+
     AnalyzesOk("show tables");
     AnalyzesOk("show tables like '*pattern'");
 

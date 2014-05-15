@@ -52,6 +52,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
@@ -172,6 +173,14 @@ public class Frontend {
       ddl.setShow_dbs_params(analysis.getShowDbsStmt().toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("name", ColumnType.STRING.toThrift())));
+    } else if (analysis.isShowDataSrcsStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_DATA_SRCS;
+      ddl.setShow_data_srcs_params(analysis.getShowDataSrcsStmt().toThrift());
+      metadata.setColumns(Arrays.asList(
+          new TColumn("name", ColumnType.STRING.toThrift()),
+          new TColumn("location", ColumnType.STRING.toThrift()),
+          new TColumn("class name", ColumnType.STRING.toThrift()),
+          new TColumn("api version", ColumnType.STRING.toThrift())));
     } else if (analysis.isShowStatsStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_STATS;
       ddl.setShow_stats_params(analysis.getShowStatsStmt().toThrift());
@@ -403,6 +412,14 @@ public class Frontend {
    */
   public List<String> getDbNames(String dbPattern, User user) {
     return impaladCatalog_.getDbNames(dbPattern, user);
+  }
+
+  /**
+   * Returns all data sources that match the pattern. If pattern is null,
+   * matches all data sources.
+   */
+  public List<DataSource> getDataSrcs(String pattern) {
+    return impaladCatalog_.getDataSources(pattern);
   }
 
   /**

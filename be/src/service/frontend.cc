@@ -58,6 +58,7 @@ Frontend::Frontend() {
     {"describeTable", "([B)[B", &describe_table_id_},
     {"showCreateTable", "([B)Ljava/lang/String;", &show_create_table_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
+    {"getDataSrcMetadata", "([B)[B", &get_data_src_metadata_id_},
     {"getStats", "([B)[B", &get_stats_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
@@ -119,6 +120,13 @@ Status Frontend::GetDbNames(const string* pattern, const TSessionState* session,
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);
   return JniUtil::CallJniMethod(fe_, get_db_names_id_, params, db_names);
+}
+
+Status Frontend::GetDataSrcMetadata(const string* pattern,
+    TGetDataSrcsResult* result) {
+  TGetDataSrcsParams params;
+  if (pattern != NULL) params.__set_pattern(*pattern);
+  return JniUtil::CallJniMethod(fe_, get_data_src_metadata_id_, params, result);
 }
 
 Status Frontend::GetStats(const TShowStatsParams& params,

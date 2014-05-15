@@ -319,9 +319,13 @@ class ImpalaServer::QueryExecState {
   Status UpdateCatalog();
 
   // Copies results into request_result_set_
+  // TODO: Have the FE return list<Data.TResultRow> so that this isn't necessary
   void SetResultSet(const std::vector<std::string>& results);
   void SetResultSet(const std::vector<std::string>& col1,
       const std::vector<std::string>& col2);
+  void SetResultSet(const std::vector<std::string>& col1,
+      const std::vector<std::string>& col2, const std::vector<std::string>& col3,
+      const std::vector<std::string>& col4);
 
   // Sets the result set for a CREATE TABLE AS SELECT statement. The results will not be
   // ready until all BEs complete execution. This can be called as part of Wait(),

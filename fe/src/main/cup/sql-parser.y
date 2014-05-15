@@ -214,10 +214,11 @@ terminal
   KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PREPARE_FN, KW_PRODUCED, KW_RCFILE,
   KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW,
   KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
-  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_SOURCE, KW_STORED, KW_STRAIGHT_JOIN,
-  KW_STRING, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED,
-  KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNION,
-  KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_SOURCE, KW_SOURCES, KW_STORED,
+  KW_STRAIGHT_JOIN, KW_STRING, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES,
+  KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO,
+  KW_TRUE, KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN,
+  KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
   DIVIDE, MOD, ADD, SUBTRACT;
@@ -324,6 +325,7 @@ nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal CreateViewStmt create_view_stmt;
 nonterminal CreateDataSrcStmt create_data_src_stmt;
 nonterminal DropDataSrcStmt drop_data_src_stmt;
+nonterminal ShowDataSrcsStmt show_data_srcs_stmt;
 nonterminal ColumnDesc column_def, view_column_def;
 nonterminal ArrayList<ColumnDesc> column_def_list, view_column_def_list;
 nonterminal ArrayList<ColumnDesc> partition_column_defs, view_column_defs;
@@ -414,6 +416,8 @@ stmt ::=
   {: RESULT = show_stats; :}
   | show_functions_stmt:show_functions
   {: RESULT = show_functions; :}
+  | show_data_srcs_stmt:show_data_srcs
+  {: RESULT = show_data_srcs; :}
   | show_create_tbl_stmt:show_create_tbl
   {: RESULT = show_create_tbl; :}
   | describe_stmt:describe
@@ -1279,6 +1283,13 @@ show_functions_stmt ::=
   | KW_SHOW opt_is_aggregate_fn:is_aggregate KW_FUNCTIONS KW_IN IDENT:db
       show_pattern:showPattern
   {: RESULT = new ShowFunctionsStmt(db, showPattern, is_aggregate); :}
+  ;
+
+show_data_srcs_stmt ::=
+  KW_SHOW KW_DATA KW_SOURCES
+  {: RESULT = new ShowDataSrcsStmt(); :}
+  | KW_SHOW KW_DATA KW_SOURCES show_pattern:showPattern
+  {: RESULT = new ShowDataSrcsStmt(showPattern); :}
   ;
 
 show_pattern ::=

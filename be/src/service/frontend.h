@@ -72,6 +72,12 @@ class Frontend {
   Status GetDbNames(const std::string* pattern, const TSessionState* session,
       TGetDbsResult* table_names);
 
+  // Return all data sources matching the optional argument 'pattern'.
+  // If pattern is NULL, match all data source names otherwise match only those that
+  // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
+  // and each pN may contain wildcards denoted by '*' which match all strings.
+  Status GetDataSrcMetadata(const std::string* pattern, TGetDataSrcsResult* result);
+
   // Call FE to get the table/column stats.
   Status GetStats(const TShowStatsParams& params, TResultSet* result);
 
@@ -146,6 +152,7 @@ class Frontend {
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID show_create_table_id_; // JniFrontend.showCreateTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
+  jmethodID get_data_src_metadata_id_; // JniFrontend.getDataSrcMetadata
   jmethodID get_stats_id_; // JniFrontend.getTableStats
   jmethodID get_functions_id_; // JniFrontend.getFunctions
   jmethodID get_catalog_object_id_; // JniFrontend.getCatalogObject

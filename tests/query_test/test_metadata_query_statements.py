@@ -10,6 +10,13 @@ from tests.common.impala_test_suite import *
 # TODO: For these tests to pass, all table metadata must be created exhaustively.
 # the tests should be modified to remove that requirement.
 class TestMetadataQueryStatements(ImpalaTestSuite):
+
+  CREATE_DATA_SRC_STMT = ("CREATE DATA SOURCE %s "
+      "LOCATION '/test-warehouse/data-sources/test-data-source.jar' "
+      "CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource' API_VERSION 'V1'")
+  DROP_DATA_SRC_STMT = "DROP DATA SOURCE IF EXISTS %s"
+  TEST_DATA_SRC_NAMES = ["show_test_ds1", "show_test_ds2"]
+
   @classmethod
   def get_workload(self):
     return 'functional-query'
@@ -24,13 +31,25 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
         sync_ddl=[0, 1]))
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
+  def drop_data_sources(self):
+    for name in self.TEST_DATA_SRC_NAMES:
+      self.client.execute(self.DROP_DATA_SRC_STMT % (name,))
+
+  def create_data_sources(self):
+    self.drop_data_sources()
+    for name in self.TEST_DATA_SRC_NAMES:
+      self.client.execute(self.CREATE_DATA_SRC_STMT % (name,))
+
   def setup_method(self, method):
     self.cleanup_db('hive_test_db')
+    self.drop_data_sources()
 
   def teardown_method(self, method):
     self.cleanup_db('hive_test_db')
+    self.drop_data_sources()
 
   def test_show(self, vector):
+    self.create_data_sources()
     self.run_test_case('QueryTest/show', vector)
 
   def test_show_stats(self, vector):

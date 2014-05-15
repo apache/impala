@@ -1191,6 +1191,12 @@ public class ParserTest {
     ParsesOk("SHOW SCHEMAS");
     ParsesOk("SHOW DATABASES LIKE 'pattern'");
     ParsesOk("SHOW SCHEMAS LIKE 'p*ttern'");
+    // Data sources
+    ParsesOk("SHOW DATA SOURCES");
+    ParsesOk("SHOW DATA SOURCES 'pattern'");
+    ParsesOk("SHOW DATA SOURCES LIKE 'pattern'");
+    ParsesOk("SHOW DATA SOURCES LIKE 'p*ttern'");
+    // Functions
     ParsesOk("SHOW FUNCTIONS");
     ParsesOk("SHOW FUNCTIONS LIKE 'pattern'");
     ParsesOk("SHOW FUNCTIONS LIKE 'p*ttern'");
@@ -1222,6 +1228,10 @@ public class ParserTest {
     ParserError("SHOW");
     // Malformed pattern (no quotes)
     ParserError("SHOW TABLES tablename");
+    // Invalid SHOW DATA SOURCE statements
+    ParserError("SHOW DATA");
+    ParserError("SHOW SOURCE");
+    ParserError("SHOW DATA SOURCE LIKE NotStrLiteral");
     ParserError("SHOW UNKNOWN FUNCTIONS");
     // Missing table/column qualifier.
     ParserError("SHOW STATS tbl");

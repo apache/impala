@@ -98,6 +98,21 @@ struct TGetDbsResult {
   1: list<string> dbs
 }
 
+// Arguments to getDataSrcsNames, which returns a list of data sources that match an
+// optional pattern
+struct TGetDataSrcsParams {
+  // If not set, match every data source
+  1: optional string pattern
+}
+
+// getDataSrcsNames returns a list of data source names
+struct TGetDataSrcsResult {
+  1: required list<string> data_src_names
+  2: required list<string> locations
+  3: required list<string> class_names
+  4: required list<string> api_versions
+}
+
 // Used by DESCRIBE <table> statements to control what information is returned and how to
 // format the output.
 enum TDescribeTableOutputStyle {
@@ -125,6 +140,13 @@ struct TDescribeTableParams {
 struct TDescribeTableResult {
   // Output from a DESCRIBE TABLE command.
   1: required list<Data.TResultRow> results
+}
+
+// Parameters for SHOW DATA SOURCES commands
+struct TShowDataSrcsParams {
+  // Optional pattern to match data source names. If not set, all data sources are
+  // returned.
+  1: optional string show_pattern
 }
 
 // Parameters for SHOW DATABASES commands
@@ -296,9 +318,12 @@ enum TCatalogOpType {
   SHOW_FUNCTIONS,
   RESET_METADATA,
   DDL,
-  SHOW_CREATE_TABLE
+  SHOW_CREATE_TABLE,
+  SHOW_DATA_SRCS
 }
 
+// TODO: Combine SHOW requests with a single struct that contains a field
+// indicating which type of show request it is.
 struct TCatalogOpRequest {
   1: required TCatalogOpType op_type
 
@@ -316,6 +341,9 @@ struct TCatalogOpRequest {
 
   // Parameters for SHOW FUNCTIONS
   6: optional TShowFunctionsParams show_fns_params
+
+  // Parameters for SHOW DATA SOURCES
+  11: optional TShowDataSrcsParams show_data_srcs_params
 
   // Parameters for DDL requests executed using the CatalogServer
   // such as CREATE, ALTER, and DROP. See CatalogService.TDdlExecRequest
