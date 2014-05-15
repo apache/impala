@@ -768,10 +768,15 @@ void HdfsScanNode::ScannerThread() {
       if (active_scanner_thread_counter_.value() > 1) {
         if (runtime_state_->resource_pool()->optional_exceeded() ||
             !EnoughMemoryForScannerThread(false)) {
-          // We can't break here. We need to update the counter and release the token
-          // with the lock held or else all threads might see
-          // active_scanner_thread_counter_.value > 1
+          // We can't break here. We need to update the counter with the lock held or else
+          // all threads might see active_scanner_thread_counter_.value > 1
           COUNTER_UPDATE(&active_scanner_thread_counter_, -1);
+          // Unlock before releasing the thread token to avoid deadlock in
+          // ThreadTokenAvailableCb().
+          l.unlock();
+          if (runtime_state_->query_resource_mgr() != NULL) {
+            runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(-1);
+          }
           runtime_state_->resource_pool()->ReleaseThreadToken(false);
           return;
         }
