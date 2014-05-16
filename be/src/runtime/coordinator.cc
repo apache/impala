@@ -336,8 +336,6 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
     RETURN_IF_ERROR(Expr::CreateExprTrees(
         runtime_state()->obj_pool(), request.fragments[0].output_exprs, output_exprs));
     RETURN_IF_ERROR(Expr::Prepare(*output_exprs, runtime_state(), row_desc()));
-    // Run optimization only after preparing the executor and the output exprs.
-    executor_->OptimizeLlvmModule();
   } else {
     executor_.reset(NULL);
   }

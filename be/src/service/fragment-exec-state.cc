@@ -41,7 +41,6 @@ Status ImpalaServer::FragmentExecState::Prepare(
     const TExecPlanFragmentParams& exec_params) {
   exec_params_ = exec_params;
   RETURN_IF_ERROR(executor_.Prepare(exec_params));
-  executor_.OptimizeLlvmModule();
   return Status::OK;
 }
 

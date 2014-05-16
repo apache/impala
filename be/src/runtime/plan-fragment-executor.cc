@@ -287,6 +287,8 @@ Status PlanFragmentExecutor::Open() {
     report_thread_active_ = true;
   }
 
+  OptimizeLlvmModule();
+
   Status status = OpenInternal();
   if (!status.ok() && !status.IsCancelled() && !status.IsMemLimitExceeded()) {
     // Log error message in addition to returning in Status. Queries that do not

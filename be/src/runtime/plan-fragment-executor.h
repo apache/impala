@@ -123,10 +123,6 @@ class PlanFragmentExecutor {
   // Releases the thread token for this fragment executor.
   void ReleaseThreadToken();
 
-  // Optimizes the code-generated functions in runtime_state_->llvm_codegen().
-  // Can be called exactly once. Logs the error status if optimization failed.
-  void OptimizeLlvmModule();
-
   // call these only after Prepare()
   RuntimeState* runtime_state() { return runtime_state_.get(); }
   const RowDescriptor& row_desc();
@@ -226,6 +222,14 @@ class PlanFragmentExecutor {
 
   // Called when the fragment execution is complete to finalize counters.
   void FragmentComplete();
+
+  // Optimizes the code-generated functions in runtime_state_->llvm_codegen().
+  // Must be called between plan_->Prepare() and plan_->Open().
+  // This is somewhat time consuming so we don't want it to do it in
+  // PlanFragmentExecutor()::Prepare() to allow starting plan fragments more
+  // quickly and in parallel (in a deep plan tree, the fragments are started
+  // in level order).
+  void OptimizeLlvmModule();
 
   // Executes Open() logic and returns resulting status. Does not set status_.
   // If this plan fragment has no sink, OpenInternal() does nothing.
