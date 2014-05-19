@@ -434,7 +434,7 @@ HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchema(
 }
 
  Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc,
-                                         avro_obj_t *schema) {
+                                          avro_obj_t* schema) {
   switch (schema->type) {
     case AVRO_DECIMAL:
       if (slot_desc->type().type != TYPE_DECIMAL) break;
@@ -838,7 +838,8 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
       } else {
         slot_type_val = builder.getInt32(slot_desc->type().type);
       }
-      Value* slot_val = builder.CreateStructGEP(tuple_val, slot_desc->field_idx(), "slot");
+      Value* slot_val =
+          builder.CreateStructGEP(tuple_val, slot_desc->field_idx(), "slot");
       opaque_slot_val =
           builder.CreateBitCast(slot_val, codegen->ptr_type(), "opaque_slot");
     }

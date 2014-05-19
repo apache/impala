@@ -121,6 +121,9 @@ class HdfsAvroScanner : public BaseSequenceScanner {
     avro_schema_t schema;
   };
 
+  // Internal representation of a field/column schema. The schema for a data file is a
+  // record with a field for each column. For a given file, we create a SchemaElement for
+  // each field of the record.
   struct SchemaElement {
     // The record field schema from the file.
     ScopedAvroSchemaT schema;
@@ -130,7 +133,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
 
     // Avro supports nullable types via unions of the form [<type>, "null"]. We special
     // case nullable primitives by storing which position "null" occupies in the union and
-    // setting field_schema to the non-null type's schema, rather than the union schema.
+    // setting 'schema' to the non-null type's schema, rather than the union schema.
     // null_union_position is set to 0 or 1 accordingly if this type is a union between a
     // primitive type and "null", and -1 otherwise.
     int null_union_position;
@@ -182,11 +185,11 @@ class HdfsAvroScanner : public BaseSequenceScanner {
                         const avro_schema_t& file_root);
 
   // Utility function that maps the Avro library's type representation to our own.
-  static SchemaElement ConvertSchema(const avro_schema_t& field_schema);
+  static SchemaElement ConvertSchema(const avro_schema_t& schema);
 
   // Returns Status::OK iff a value with the given schema can be used to populate
   // slot_desc. 'schema' can be either a avro_schema_t or avro_datum_t.
-  Status VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t *schema);
+  Status VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t* schema);
 
   // Decodes records and copies the data into tuples.
   // Returns the number of tuples to be committed.
