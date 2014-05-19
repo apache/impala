@@ -394,7 +394,9 @@ class ImpalaShell(cmd.Cmd):
       self.__print_options(self.set_query_options)
       return True
 
-    tokens = args.split("=")
+    # Remove any extra spaces surrounding the tokens.
+    # Allows queries that have spaces around the = sign.
+    tokens = [arg.strip() for arg in args.split("=")]
     if len(tokens) != 2:
       print_to_stderr("Error: SET <option>=<value>")
       return False

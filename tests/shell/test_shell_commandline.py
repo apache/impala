@@ -185,6 +185,20 @@ class TestImpalaShell(object):
     # with
     args = '-q "with t1 as (select 1) select * from t1"'
     run_impala_shell_cmd(args)
+    # set
+    # spaces around the = sign
+    args = '-q "set default_order_by_limit  =   10"'
+    run_impala_shell_cmd(args)
+    # no spaces around the = sign
+    args = '-q "set default_order_by_limit=10"'
+    run_impala_shell_cmd(args)
+    # Negative tests for set
+    # use : instead of =
+    args = '-q "set default_order_by_limit:10"'
+    run_impala_shell_cmd(args, expect_success=False)
+    # use 2 = signs
+    args = '-q "set default_order_by_limit=10=50"'
+    run_impala_shell_cmd(args, expect_success=False)
     # describe and desc should return the same result.
     args = '-q "describe %s.%s" -B' % (TEST_DB, TEST_TBL)
     result_describe = run_impala_shell_cmd(args)
