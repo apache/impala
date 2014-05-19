@@ -49,3 +49,11 @@ full outer join functional.alltypes_view t3 on t2.id+20 = t3.id
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Test that Impala can handle incorrect column metadata created by Hive (IMPALA-994).
+select * from functional.alltypes_hive_view where id = 0
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====

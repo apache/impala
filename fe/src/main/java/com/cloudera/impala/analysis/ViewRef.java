@@ -147,18 +147,6 @@ public class ViewRef extends InlineViewRef {
   }
 
   @Override
-  public TupleDescriptor createTupleDescriptor(DescriptorTable descTbl)
-      throws AnalysisException {
-    // Analyze WITH-clause view instantiations the same way as inline views.
-    if (!isCatalogView()) return super.createTupleDescriptor(descTbl);
-    TupleDescriptor result = descTbl.createTupleDescriptor();
-    result.setIsMaterialized(false);
-    // This tuple is backed by the original view table from the catalog.
-    result.setTable(table_);
-    return result;
-  }
-
-  @Override
   protected String tableRefToSql() {
     if (origTblRef_ != null) return origTblRef_.tableRefToSql();
     // Enclose the alias in quotes if Hive cannot parse it without quotes.

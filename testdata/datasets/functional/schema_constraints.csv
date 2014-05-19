@@ -58,6 +58,7 @@ table_name:nullformat_custom, constraint:exclude, table_format:parquet/none/none
 
 table_name:alltypes_view, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_view, constraint:restrict_to, table_format:seq/snap/block
+table_name:alltypes_hive_view, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_view_sub, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_view_sub, constraint:restrict_to, table_format:seq/snap/block
 table_name:alltypes_parens, constraint:restrict_to, table_format:text/none/none
