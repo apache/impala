@@ -34,9 +34,11 @@ import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExpr;
+import com.cloudera.impala.thrift.TExprBatch;
 import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
 import com.cloudera.impala.thrift.TPrioritizeLoadResponse;
 import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TSymbolLookupParams;
 import com.cloudera.impala.thrift.TSymbolLookupResult;
@@ -60,8 +62,8 @@ public class FeSupport {
   // when running FE tests.
   public native static void NativeFeTestInit();
 
-  // Returns a serialized TColumnValue.
-  public native static byte[] NativeEvalConstExpr(byte[] thriftExpr,
+  // Returns a serialized TResultRow
+  public native static byte[] NativeEvalConstExprs(byte[] thriftExprBatch,
       byte[] thriftQueryGlobals);
 
   // Returns a serialized TSymbolLookupResult
@@ -114,17 +116,19 @@ public class FeSupport {
   public static TColumnValue EvalConstExpr(Expr expr, TQueryContext queryCtxt)
       throws InternalException {
     Preconditions.checkState(expr.isConstant());
-    TExpr thriftExpr = expr.treeToThrift();
+    TExprBatch exprBatch = new TExprBatch();
+    exprBatch.addToExprs(expr.treeToThrift());
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     byte[] result;
     try {
-      result = EvalConstExpr(serializer.serialize(thriftExpr),
+      result = EvalConstExprs(serializer.serialize(exprBatch),
           serializer.serialize(queryCtxt));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
-      TColumnValue val = new TColumnValue();
+      TResultRow val = new TResultRow();
       deserializer.deserialize(val, result);
-      return val;
+      Preconditions.checkState(val.getColValsSize() == 1);
+      return val.getColVals().get(0);
     } catch (TException e) {
       // this should never happen
       throw new InternalException("couldn't execute expr " + expr.toSql(), e);
@@ -156,14 +160,14 @@ public class FeSupport {
     }
   }
 
-  private static byte[] EvalConstExpr(byte[] thriftExpr, byte[] thriftQueryContext) {
+  private static byte[] EvalConstExprs(byte[] thriftExprBatch,
+      byte[] thriftQueryContext) {
     try {
-      return NativeEvalConstExpr(thriftExpr, thriftQueryContext);
+      return NativeEvalConstExprs(thriftExprBatch, thriftQueryContext);
     } catch (UnsatisfiedLinkError e) {
-      // We should only get here in FE tests that dont run the BE.
       loadLibrary();
     }
-    return NativeEvalConstExpr(thriftExpr, thriftQueryContext);
+    return NativeEvalConstExprs(thriftExprBatch, thriftQueryContext);
   }
 
   public static boolean EvalPredicate(Expr pred, TQueryContext queryCtxt)
@@ -172,6 +176,41 @@ public class FeSupport {
     TColumnValue val = EvalConstExpr(pred, queryCtxt);
     // Return false if pred evaluated to false or NULL. True otherwise.
     return val.isBool_val() && val.bool_val;
+  }
+
+  /**
+   * Evaluate a batch of predicates in the BE. The results are stored in a
+   * TResultRow object, where each TColumnValue in it stores the result of
+   * a predicate evaluation.
+   *
+   * TODO: This function is currently used for improving the performance of
+   * partition pruning (see IMPALA-887), hence it only supports boolean
+   * exprs. In the future, we can extend it to support arbitrary constant exprs.
+   */
+  public static TResultRow EvalPredicateBatch(ArrayList<Expr> exprs,
+      TQueryContext queryCtxt) throws InternalException {
+    boolean[] results = new boolean[exprs.size()];
+    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
+    TExprBatch exprBatch = new TExprBatch();
+    for (Expr expr: exprs) {
+      // Make sure we only process boolean exprs.
+      Preconditions.checkState(expr.getType().isBoolean());
+      Preconditions.checkState(expr.isConstant());
+      exprBatch.addToExprs(expr.treeToThrift());
+    }
+    byte[] result;
+    try {
+      result = EvalConstExprs(serializer.serialize(exprBatch),
+          serializer.serialize(queryCtxt));
+      Preconditions.checkNotNull(result);
+      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+      TResultRow val = new TResultRow();
+      deserializer.deserialize(val, result);
+      return val;
+    } catch (TException e) {
+      // this should never happen
+      throw new InternalException("couldn't execute a batch of exprs.", e);
+    }
   }
 
   private static byte[] PrioritizeLoad(byte[] thriftReq) {

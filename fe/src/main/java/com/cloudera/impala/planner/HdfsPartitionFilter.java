@@ -16,6 +16,7 @@ package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,8 @@ import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
+import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.thrift.TResultRow;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -74,12 +77,37 @@ public class HdfsPartitionFilter {
   }
 
   /**
-   * Determines whether the filter predicate evaluates to 'true' for the given
-   * partition.
-   * Does this by substituting SlotRefs for the partition cols with the respective
-   * key values.
+   * Evaluate a filter against a batch of partitions and return the partition ids
+   * that pass the filter.
    */
-  public boolean isMatch(HdfsPartition partition, Analyzer analyzer)
+  public HashSet<Long> getMatchingPartitionIds(ArrayList<HdfsPartition> partitions,
+      Analyzer analyzer) throws InternalException, AuthorizationException {
+    HashSet<Long> result = new HashSet<Long>();
+    // List of predicates to evaluate
+    ArrayList<Expr> predicates = new ArrayList<Expr>(partitions.size());
+    long[] partitionIds = new long[partitions.size()];
+    int indx = 0;
+    for (HdfsPartition p: partitions) {
+      predicates.add(buildPartitionPredicate(p, analyzer));
+      partitionIds[indx++] = p.getId();
+    }
+    // Evaluate the predicates
+    TResultRow results = FeSupport.EvalPredicateBatch(predicates,
+        analyzer.getQueryContext());
+    Preconditions.checkState(results.getColValsSize() == partitions.size());
+    indx = 0;
+    for (TColumnValue val: results.getColVals()) {
+      if (val.isBool_val()) result.add(partitionIds[indx]);
+      ++indx;
+    }
+    return result;
+  }
+
+  /**
+   * Construct a predicate for a given partition by substituting the SlotRefs
+   * for the partition cols with the respective partition-key values.
+   */
+  private Expr buildPartitionPredicate(HdfsPartition partition, Analyzer analyzer)
       throws InternalException, AuthorizationException {
     // construct smap
     Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
@@ -89,8 +117,8 @@ public class HdfsPartitionFilter {
     }
 
     Expr literalPredicate = predicate_.clone(sMap);
-    LOG.trace(
-        "isMatch: " + literalPredicate.toSql() + " " + literalPredicate.debugString());
+    LOG.trace("buildPartitionPredicate: " + literalPredicate.toSql() + " " +
+        literalPredicate.debugString());
     Preconditions.checkState(literalPredicate.isConstant());
     // analyze to insert casts, etc.
     try {
@@ -100,12 +128,6 @@ public class HdfsPartitionFilter {
       throw new InternalException(
           "couldn't analyze predicate " + literalPredicate.toSql(), e);
     }
-
-    // call backend
-    if (!FeSupport.EvalPredicate(literalPredicate, analyzer.getQueryContext())) {
-      return false;
-    }
-
-    return true;
+    return literalPredicate;
   }
 }

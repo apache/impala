@@ -15,6 +15,8 @@
 package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 import org.apache.hadoop.fs.Path;
@@ -70,6 +72,9 @@ public class HdfsScanNode extends ScanNode {
   // among nodes. The factor of 1.2 means that a particular node may have 20% more
   // scan ranges than would have been estimated assuming a uniform distribution.
   private final static double SCAN_RANGE_SKEW_FACTOR = 1.2;
+
+  // Partition batch size used during partition pruning
+  private final static int PARTITION_PRUNING_BATCH_SIZE = 1024;
 
   private final HdfsTable tbl_;
 
@@ -128,7 +133,7 @@ public class HdfsScanNode extends ScanNode {
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
   }
 
-  /**
+ /**
    * Populate partitions_ based on all applicable conjuncts and remove
    * conjuncts used for filtering from conjuncts_.
    */
@@ -155,6 +160,17 @@ public class HdfsScanNode extends ScanNode {
     // filterConjuncts are applied implicitly via partition pruning
     conjuncts_.removeAll(filterConjuncts);
 
+    int partitionsCount = tbl_.getPartitions().size();
+    // Map of partition ids to partition objects
+    HashMap<Long, HdfsPartition> partitionMap =
+        new HashMap<Long, HdfsPartition>(partitionsCount);
+    // Set of valid partition ids. A partition is considered 'valid' if it
+    // passes all the partition filters. Initially, all the partitions are
+    // considered 'valid'.
+    HashSet<Long> validPartitionIds = new HashSet<Long>();
+    // TODO: To avoid generating too many objects, the first filter should
+    // iterate directly over the tbl_.getPartitions() and then store the ids that
+    // pass in validPartitionIds.
     for (HdfsPartition p: tbl_.getPartitions()) {
       // ignore partitions without data
       if (p.getFileDescriptors().size() == 0) continue;
@@ -162,14 +178,39 @@ public class HdfsScanNode extends ScanNode {
       Preconditions.checkState(
           p.getPartitionValues().size() == tbl_.getNumClusteringCols());
 
-      boolean isMatch = true;
-      for (HdfsPartitionFilter filter: partitionFilters) {
-        if (!filter.isMatch(p, analyzer)) {
-          isMatch = false;
-          break;
+      partitionMap.put(p.getId(), p);
+      validPartitionIds.add(p.getId());
+    }
+
+    // Set of partition ids that pass a filter.
+    HashSet<Long> matchingIds = new HashSet<Long>();
+    // Batch of partitions
+    ArrayList<HdfsPartition> partitionBatch = new ArrayList<HdfsPartition>();
+    // Identify the partitions that pass all filters.
+    for (HdfsPartitionFilter filter: partitionFilters) {
+      // Iterate through the currently valid partitions
+      for (Long id: validPartitionIds) {
+        // Add the partition to the current batch
+        partitionBatch.add(partitionMap.get(id));
+        if (partitionBatch.size() == PARTITION_PRUNING_BATCH_SIZE) {
+          // Batch is full. Evaluate the predicates of this batch in the BE.
+          matchingIds.addAll(filter.getMatchingPartitionIds(partitionBatch, analyzer));
+          partitionBatch.clear();
         }
       }
-      if (isMatch) partitions_.add(p);
+      // Check if there are any unprocessed partitions.
+      if (!partitionBatch.isEmpty()) {
+        matchingIds.addAll(filter.getMatchingPartitionIds(partitionBatch, analyzer));
+        partitionBatch.clear();
+      }
+      // Prune the partitions ids that didn't pass the filter
+      validPartitionIds.retainAll(matchingIds);
+      matchingIds.clear();
+    }
+
+    // Populate the list of valid partitions to process
+    for (Long id: validPartitionIds) {
+      partitions_.add(partitionMap.get(id));
     }
   }
 

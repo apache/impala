@@ -395,3 +395,12 @@ int,int
 ---- RESULTS
 1,NULL
 ====
+# Test applying a UDF on a partition column predicate (IMPALA-887)
+---- QUERY
+select * from functional.alltypestiny where identity(year) = 2009 and identity(month) = 1;
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====

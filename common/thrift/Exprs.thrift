@@ -123,3 +123,8 @@ struct TExpr {
   1: required list<TExprNode> nodes
 }
 
+// A list of TExprs
+struct TExprBatch {
+  1: required list<TExpr> exprs
+}
+

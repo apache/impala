@@ -460,3 +460,24 @@ NODE 0:
 00:SCAN HDFS [functional.alltypesaggmultifiles]
    partitions=2/10 size=145.97KB
 ====
+# Test partition pruning on a table that has a large number of partitions
+# (see IMPALA-887)
+#
+# Test single binary predicate on a partition column
+select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j = 1
+---- PLAN
+00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
+   partitions=1/1234 size=2B
+====
+# Test disjunctive predicate on a partition column
+select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j = 1 or j = 2
+---- PLAN
+00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
+   partitions=2/1234 size=4B
+====
+# Test conjunctive predicate on a partition column
+select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j = 1 and j = 2
+---- PLAN
+00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
+   partitions=0/1234 size=0B
+====

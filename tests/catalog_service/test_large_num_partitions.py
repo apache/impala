@@ -59,5 +59,23 @@ class TestLargeNumPartitions(ImpalaTestSuite):
     result = self.client.execute("show table stats %s" % full_tbl_name)
     assert len(result.data) == 1234 + 1
 
+  def test_predicates_on_partition_attributes(self, vector):
+    # Test predicate evaluation on partition columns for a table with more
+    # than 1024 partitions (see IMPALA-887)
+    full_tbl_name = 'scale_db.num_partitions_1234_blocks_per_partition_1'
+    # Binary predicate
+    result = self.client.execute("select * from %s where j = 1" % full_tbl_name)
+    assert len(result.data) == 1
+
+    # Compound predicate with OR
+    result = self.client.execute(
+        "select * from %s where j = 1 or j = 2" % full_tbl_name)
+    assert len(result.data) == 2
+
+    # Conjunction of binary predicates
+    result = self.client.execute(
+        "select * from %s where j = 1 and j = 2" % full_tbl_name)
+    assert len(result.data) == 0
+
     # TODO: Insert some data into an existing partition and validate it can be
     # read once IMPALA-624 is committed.

@@ -61,41 +61,61 @@ Java_com_cloudera_impala_service_FeSupport_NativeFeTestInit(
   exec_env->InitForFeTests();
 }
 
-// Requires JniUtil::Init() to have been called.
+// Evaluates a batch of const exprs and returns the results in a serialized
+// TResultRow, where each TColumnValue in the TResultRow stores the result of
+// a predicate evaluation. It requires JniUtil::Init() to have been
+// called.
 extern "C"
 JNIEXPORT jbyteArray JNICALL
-Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr(
-    JNIEnv* env, jclass caller_class, jbyteArray thrift_predicate_bytes,
+Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs(
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_expr_batch,
     jbyteArray thrift_query_ctx_bytes) {
-  ObjectPool obj_pool;
-  TExpr thrift_predicate;
-  DeserializeThriftMsg(env, thrift_predicate_bytes, &thrift_predicate);
+  jbyteArray result_bytes = NULL;
   TQueryContext query_ctx;
+  TExprBatch expr_batch;
+  JniLocalFrame jni_frame;
+  TResultRow expr_results;
+  ObjectPool obj_pool;
+
+  DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch);
   DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx);
   RuntimeState state(query_ctx);
-  jbyteArray result_bytes = NULL;
-  JniLocalFrame jni_frame;
-  Expr* e;
 
   THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
                      result_bytes);
   // Exprs can allocate memory so we need to set up the mem trackers before
   // preparing/running the exprs.
   THROW_IF_ERROR_RET(state.InitMemTrackers(TUniqueId(), NULL, -1), env,
-      JniUtil::internal_exc_class(), result_bytes);
-  THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, thrift_predicate, &e), env,
                      JniUtil::internal_exc_class(), result_bytes);
-  THROW_IF_ERROR_RET(Expr::Prepare(e, &state, RowDescriptor()), env,
-                     JniUtil::internal_exc_class(), result_bytes);
+
+  vector<TExpr>& exprs = expr_batch.exprs;
+  // Prepate the exprs
+  vector<Expr*> prepared_exprs;
+  for (vector<TExpr>::iterator it = exprs.begin(); it != exprs.end(); it++) {
+    Expr* e;
+    THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, *it, &e), env,
+                       JniUtil::internal_exc_class(), result_bytes);
+    THROW_IF_ERROR_RET(Expr::Prepare(e, &state, RowDescriptor()), env,
+                       JniUtil::internal_exc_class(), result_bytes);
+    prepared_exprs.push_back(e);
+  }
 
   // Optimize the module so any UDF functions are jit'd
   if (state.codegen() != NULL) state.codegen()->FinalizeModule();
 
-  THROW_IF_ERROR_RET(e->Open(&state), env, JniUtil::internal_exc_class(), result_bytes);
-  TColumnValue val;
-  e->GetValue(NULL, false, &val);
-  e->Close(&state);
-  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &val, &result_bytes), env,
+  vector<TColumnValue> results;
+  // Evaluate the exprs
+  for (vector<Expr*>::iterator it = prepared_exprs.begin();
+       it != prepared_exprs.end(); it++) {
+    TColumnValue val;
+    THROW_IF_ERROR_RET((*it)->Open(&state), env,
+                       JniUtil::internal_exc_class(), result_bytes);
+    (*it)->GetValue(NULL, false, &val);
+    (*it)->Close(&state);
+    results.push_back(val);
+  }
+  expr_results.__set_colVals(results);
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &expr_results, &result_bytes), env,
                      JniUtil::internal_exc_class(), result_bytes);
   return result_bytes;
 }
@@ -276,8 +296,8 @@ static JNINativeMethod native_methods[] = {
     (void*)::Java_com_cloudera_impala_service_FeSupport_NativeFeTestInit
   },
   {
-    (char*)"NativeEvalConstExpr", (char*)"([B[B)[B",
-    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExpr
+    (char*)"NativeEvalConstExprs", (char*)"([B[B)[B",
+    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs
   },
   {
     (char*)"NativeCacheJar", (char*)"([B)[B",
