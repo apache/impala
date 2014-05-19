@@ -23,8 +23,8 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.BoolLiteral;
 import com.cloudera.impala.analysis.CompoundPredicate;
+import com.cloudera.impala.analysis.DecimalLiteral;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.FloatLiteral;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.SlotRef;
@@ -119,7 +119,7 @@ public class DataSourceScanNode extends ScanNode {
       return new TColumnValue().setLong_val(((IntLiteral) expr).getValue());
     case FLOAT:
     case DOUBLE:
-      return new TColumnValue().setDouble_val(((FloatLiteral) expr).getValue());
+      return new TColumnValue().setDouble_val(((DecimalLiteral) expr).getDoubleValue());
     case STRING:
       return new TColumnValue().setString_val(((StringLiteral) expr).getValue());
     case DECIMAL:

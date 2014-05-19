@@ -25,7 +25,6 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
@@ -451,7 +450,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
               clusterCols.size(), exprNodes.size()));
 
       for (int i = 0; i < exprNodes.size(); ++i) {
-        literalExpr.add(TExprNodeToLiteralExpr(
+        literalExpr.add(LiteralExpr.fromThrift(
             exprNodes.get(i), clusterCols.get(i).getType()));
       }
     }
@@ -473,32 +472,6 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       partition.isMarkedCached_ = thriftPartition.isIs_marked_cached();
     }
     return partition;
-  }
-
-  private static LiteralExpr TExprNodeToLiteralExpr(TExprNode exprNode,
-      ColumnType primitiveType) {
-    try {
-      switch (exprNode.node_type) {
-        case FLOAT_LITERAL:
-          return (LiteralExpr) (LiteralExpr.create(Double.toString(
-              exprNode.float_literal.value), primitiveType).castTo(primitiveType));
-        case INT_LITERAL:
-          return (LiteralExpr) (LiteralExpr.create(Long.toString(
-              exprNode.int_literal.value), primitiveType).castTo(primitiveType));
-        case STRING_LITERAL:
-          return LiteralExpr.create(exprNode.string_literal.value, primitiveType);
-        case BOOL_LITERAL:
-          return LiteralExpr.create(Boolean.toString(exprNode.bool_literal.value),
-              primitiveType);
-        case NULL_LITERAL:
-          return new NullLiteral();
-        default:
-          throw new UnsupportedOperationException("Unsupported partition key type: " +
-              exprNode.node_type);
-      }
-    } catch (Exception e) {
-      throw new IllegalStateException("Error creating LiteralExpr: ", e);
-    }
   }
 
   public THdfsPartition toThrift(boolean includeFileDescriptorMetadata) {

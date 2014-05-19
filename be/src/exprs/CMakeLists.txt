@@ -33,6 +33,7 @@ add_library(Exprs
   conditional-functions.cc
   date-literal.cc
   decimal-functions.cc
+  decimal-literal.cc
   decimal-operators.cc
   expr.cc
   float-literal.cc

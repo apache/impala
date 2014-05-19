@@ -434,6 +434,7 @@ class Expr {
   friend class CastExpr;
   friend class ComputeFunctions;
   friend class DecimalFunctions;
+  friend class DecimalLliteral;
   friend class DecimalOperators;
   friend class MathFunctions;
   friend class StringFunctions;

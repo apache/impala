@@ -32,6 +32,7 @@
 #include "exprs/conditional-functions.h"
 #include "exprs/date-literal.h"
 #include "exprs/decimal-functions.h"
+#include "exprs/decimal-literal.h"
 #include "exprs/decimal-operators.h"
 #include "exprs/float-literal.h"
 #include "exprs/function-call.h"
@@ -295,6 +296,12 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       }
       *expr = pool->Add(new DateLiteral(texpr_node));
       return Status::OK;
+    case TExprNodeType::DECIMAL_LITERAL:
+      if (!texpr_node.__isset.decimal_literal) {
+        return Status("Decimal literal not set in thrift node");
+      }
+      *expr = pool->Add(new DecimalLiteral(texpr_node));
+      return Status::OK;
     case TExprNodeType::FLOAT_LITERAL:
       if (!texpr_node.__isset.float_literal) {
         return Status("Float literal not set in thrift node");
@@ -458,6 +465,25 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
       break;
     case TYPE_DOUBLE:
       col_val->__set_double_val(*reinterpret_cast<double*>(value));
+      break;
+    case TYPE_DECIMAL:
+      switch (type_.GetByteSize()) {
+        case 4:
+          col_val->string_val =
+              reinterpret_cast<Decimal4Value*>(value)->ToString(type_);
+          break;
+        case 8:
+          col_val->string_val =
+              reinterpret_cast<Decimal8Value*>(value)->ToString(type_);
+          break;
+        case 16:
+          col_val->string_val =
+              reinterpret_cast<Decimal16Value*>(value)->ToString(type_);
+          break;
+        default:
+          DCHECK(false) << "Bad Type: " << type_;
+      }
+      col_val->__isset.string_val = true;
       break;
     case TYPE_STRING:
       string_val = reinterpret_cast<StringValue*>(value);

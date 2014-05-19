@@ -471,9 +471,19 @@ functions = [
   [['ceil', 'ceiling'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Ceil')],
   [['floor'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Floor')],
   [['round'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Round')],
+  [['round'], 'DECIMAL', ['DECIMAL', 'TINYINT'], symbol('DecimalFunctions', 'RoundTo')],
+  [['round'], 'DECIMAL', ['DECIMAL', 'SMALLINT'], symbol('DecimalFunctions', 'RoundTo')],
   [['round'], 'DECIMAL', ['DECIMAL', 'INT'], symbol('DecimalFunctions', 'RoundTo')],
+  [['round'], 'DECIMAL', ['DECIMAL', 'BIGINT'], symbol('DecimalFunctions', 'RoundTo')],
   [['truncate'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Truncate')],
-  [['truncate'], 'DECIMAL', ['DECIMAL', 'INT'], symbol('DecimalFunctions', 'TruncateTo')],
+  [['truncate'], 'DECIMAL', ['DECIMAL', 'TINYINT'],
+      symbol('DecimalFunctions', 'TruncateTo')],
+  [['truncate'], 'DECIMAL', ['DECIMAL', 'SMALLINT'],
+      symbol('DecimalFunctions', 'TruncateTo')],
+  [['truncate'], 'DECIMAL', ['DECIMAL', 'INT'],
+      symbol('DecimalFunctions', 'TruncateTo')],
+  [['truncate'], 'DECIMAL', ['DECIMAL', 'BIGINT'],
+      symbol('DecimalFunctions', 'TruncateTo')],
 ]
 
 # These functions are implemented against the UDF interface.

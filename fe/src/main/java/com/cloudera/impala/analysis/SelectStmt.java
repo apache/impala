@@ -619,9 +619,7 @@ public class SelectStmt extends QueryStmt {
     ListIterator<Expr> i = exprs.listIterator();
     while (i.hasNext()) {
       Expr expr = i.next();
-      if (!(expr instanceof IntLiteral)) {
-        continue;
-      }
+      if (!(expr instanceof IntLiteral)) continue;
       long pos = ((IntLiteral) expr).getValue();
       if (pos < 1) {
         throw new AnalysisException(

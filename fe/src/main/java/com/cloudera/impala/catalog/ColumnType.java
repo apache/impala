@@ -273,7 +273,7 @@ public class ColumnType {
 
   public boolean isIntegerType() {
     return type_ == PrimitiveType.TINYINT || type_ == PrimitiveType.SMALLINT
-      || type_ == PrimitiveType.INT || type_ == PrimitiveType.BIGINT;
+        || type_ == PrimitiveType.INT || type_ == PrimitiveType.BIGINT;
   }
 
   public boolean isFixedLengthType() {
@@ -332,11 +332,23 @@ public class ColumnType {
       case TINYINT: return createDecimalType(3);
       case SMALLINT: return createDecimalType(5);
       case INT: return createDecimalType(10);
-      case BIGINT: return createDecimalType(20);
+      case BIGINT: return createDecimalType(19);
       case FLOAT: return createDecimalTypeInternal(MAX_PRECISION, 9);
       case DOUBLE: return createDecimalTypeInternal(MAX_PRECISION, 17);
     }
     return ColumnType.INVALID;
+  }
+
+  /* Returns true if this decimal type is a supertype of the other decimal type.
+   * e.g. (10,3) is a super type of (3,3) but (5,4) is not a supertype of (3,0).
+   * To be a super type of another decimal, the number of digits before and after
+   * the decimal point must be greater or equal.
+   */
+  public boolean isSupertypeOf(ColumnType o) {
+    Preconditions.checkState(isDecimal());
+    Preconditions.checkState(o.isDecimal());
+    if (isWildcardDecimal()) return true;
+    return scale_ >= o.scale_ && precision_ - scale_ >= o.precision_ - o.scale_;
   }
 
   /**
@@ -349,19 +361,21 @@ public class ColumnType {
     if (!t1.isValid() || !t2.isValid()) return INVALID;
     if (t1.equals(t2)) return t1;
 
-
     if (t1.isDecimal() || t2.isDecimal()) {
       if (t1.isNull()) return t2;
       if (t2.isNull()) return t1;
 
       // Allow casts between decimal and numeric types by converting
       // numeric types to the containing decimal type.
-      t1 = t1.getMinResolutionDecimal();
-      t2 = t2.getMinResolutionDecimal();
-      if (t1.isInvalid() || t2.isInvalid()) return ColumnType.INVALID;
-      Preconditions.checkState(t1.isDecimal());
-      Preconditions.checkState(t2.isDecimal());
-      return TypesUtil.getDecimalAssignmentCompatibleType(t1, t2);
+      ColumnType t1Decimal = t1.getMinResolutionDecimal();
+      ColumnType t2Decimal = t2.getMinResolutionDecimal();
+      if (t1Decimal.isInvalid() || t2Decimal.isInvalid()) return ColumnType.INVALID;
+      Preconditions.checkState(t1Decimal.isDecimal());
+      Preconditions.checkState(t2Decimal.isDecimal());
+
+      if (t1Decimal.isSupertypeOf(t2Decimal)) return t1;
+      if (t2Decimal.isSupertypeOf(t1Decimal)) return t2;
+      return TypesUtil.getDecimalAssignmentCompatibleType(t1Decimal, t2Decimal);
     }
 
     PrimitiveType smallerType =
@@ -379,7 +393,8 @@ public class ColumnType {
    * t1 to t2 results in no loss of precision).
    */
   public static boolean isImplicitlyCastable(ColumnType t1, ColumnType t2) {
-    return getAssignmentCompatibleType(t1, t2).matchesType(t2);
+    return getAssignmentCompatibleType(t1, t2).matchesType(t2) ||
+           getAssignmentCompatibleType(t2, t1).matchesType(t2);
   }
 
   /**
@@ -450,6 +465,7 @@ public class ColumnType {
     if (type_ == PrimitiveType.CHAR) {
       return "CHAR(" + len_ + ")";
     } else  if (type_ == PrimitiveType.DECIMAL) {
+      if (isWildcardDecimal()) return "DECIMAL(*,*)";
       return "DECIMAL(" + precision_ + "," + scale_ + ")";
     }
     return type_.toString();

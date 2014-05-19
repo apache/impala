@@ -236,7 +236,7 @@ bigint
 9980
 ====
 ---- QUERY
-select count(*) from alltypesagg where float_col > cast(1.1 as float) 
+select count(*) from alltypesagg where float_col > cast(1.1 as float)
 ---- TYPES
 bigint
 ---- RESULTS
@@ -337,7 +337,7 @@ bigint
 ====
 ---- QUERY
 # Type synonym check: DOUBLE = REAL
-select count(*) from alltypesagg where double_col >= 20.2 and cast(double_col as double) = cast(double_col as real) 
+select count(*) from alltypesagg where double_col >= 20.2 and cast(double_col as double) = cast(double_col as real)
 ---- TYPES
 bigint
 ---- RESULTS
@@ -373,7 +373,7 @@ bigint
 #540000,540000,5535000,5535000,55485000,55485000,60979499.99976754,60979499.99976754,111428999.9997675,111428999.9997676
 #====
 ## -
-#select 
+#select
 #-1 * SUM(tinyint_col) - SUM(smallint_col),
 #SUM(-1 * tinyint_col - smallint_col),
 #-1 * SUM(tinyint_col) - SUM(smallint_col) - SUM(int_col),
@@ -825,7 +825,7 @@ bigint
 ====
 ---- QUERY
 select count(*) from alltypesagg
-where 1 not in (tinyint_col, smallint_col, int_col, bigint_col) 
+where 1 not in (tinyint_col, smallint_col, int_col, bigint_col)
 ---- TYPES
 bigint
 ---- RESULTS
@@ -833,7 +833,7 @@ bigint
 ====
 ---- QUERY
 select count(*) from alltypesagg
-where 10.1 in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col) 
+where 10.1 in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col)
 ---- TYPES
 bigint
 ---- RESULTS
@@ -841,7 +841,7 @@ bigint
 ====
 ---- QUERY
 select count(*) from alltypesagg
-where 10.1 not in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col) 
+where 10.1 not in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col)
 ---- TYPES
 bigint
 ---- RESULTS
@@ -849,7 +849,7 @@ bigint
 ====
 ---- QUERY
 select count(*) from alltypesagg
-where '01/01/10' in (date_string_col, string_col, 'abc') 
+where '01/01/10' in (date_string_col, string_col, 'abc')
 ---- TYPES
 bigint
 ---- RESULTS
@@ -864,7 +864,7 @@ bigint
 9000
 ====
 ---- QUERY
-select count(*) from alltypesagg 
+select count(*) from alltypesagg
 where cast('2010-01-01 00:00:00' as timestamp) in (timestamp_col)
 ---- TYPES
 bigint
@@ -872,7 +872,7 @@ bigint
 1
 ====
 ---- QUERY
-select count(*) from alltypesagg 
+select count(*) from alltypesagg
 where cast('2010-01-01 00:00:00' as timestamp) not in (timestamp_col)
 ---- TYPES
 bigint
@@ -984,7 +984,7 @@ bigint
 ====
 ---- QUERY
 select count(*) from alltypesagg where timestamp_col
-between cast('2010-01-01 00:00:00' as timestamp) 
+between cast('2010-01-01 00:00:00' as timestamp)
 and cast('2010-01-01 01:40:00' as timestamp)
 ---- TYPES
 bigint
@@ -993,7 +993,7 @@ bigint
 ====
 ---- QUERY
 select count(*) from alltypesagg where timestamp_col
-not between cast('2010-01-01 00:00:00' as timestamp) 
+not between cast('2010-01-01 00:00:00' as timestamp)
 and cast('2010-01-01 01:40:00' as timestamp)
 ---- TYPES
 bigint
@@ -1018,7 +1018,7 @@ select now()
 ---- TYPES
 timestamp
 ---- RESULTS
-# Matches a single date of the form 'yyyy-MM-dd HH:mm:ss' 
+# Matches a single date of the form 'yyyy-MM-dd HH:mm:ss'
 # or 'yyyy-MM-dd HH:mm:ss.SSSSSS'
 row_regex: \d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?
 ====
@@ -1105,7 +1105,7 @@ timestamp,timestamp,timestamp,timestamp
 ====
 ---- QUERY
 # Add/sub weeks, non-function-call like version.
-select timestamp_col + interval 2 weeks,       
+select timestamp_col + interval 2 weeks,
        timestamp_col + interval 53 weeks,
        interval 2 weeks + timestamp_col,
        interval 53 weeks + timestamp_col,
@@ -1119,7 +1119,7 @@ timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
 ====
 ---- QUERY
 # Add/sub weeks, function-call like version.
-select date_add(timestamp_col, interval 2 weeks),       
+select date_add(timestamp_col, interval 2 weeks),
        date_add(timestamp_col, interval 53 weeks),
        date_sub(timestamp_col, interval 2 weeks),
        date_sub(timestamp_col, interval 53 weeks)
@@ -1131,9 +1131,9 @@ timestamp,timestamp,timestamp,timestamp
 ====
 ---- QUERY
 # Add/sub days, non-function-call like version.
-select timestamp_col + interval 10 days,       
+select timestamp_col + interval 10 days,
        timestamp_col + interval 10 days,
-       interval 10 days + timestamp_col,       
+       interval 10 days + timestamp_col,
        interval 10 days + timestamp_col,
        timestamp_col - interval 10 days,
        timestamp_col - interval 365 days
@@ -1284,7 +1284,7 @@ timestamp,timestamp
 ---- QUERY
 # Chaining of arithmetic operations (only non-function-call like version).
 select timestamp_col + interval 10 years + interval 2 months + interval 5 days,
-       interval 10 years + timestamp_col + interval 2 months + interval 5 days,       
+       interval 10 years + timestamp_col + interval 2 months + interval 5 days,
        timestamp_col + interval 10 years - interval 2 months + interval 5 days,
        interval 10 years + timestamp_col - interval 2 months + interval 5 days,
        timestamp_col - interval 10 years - interval 2 months - interval 5 days
@@ -1363,14 +1363,23 @@ bigint
 ---- RESULTS
 1000
 ====
----- QUERY
+#---- QUERY
 # Test rounding (IMPALA-266)
-select round(8.072, 3), round(8, 3), round(8.0719999999,3), round(8.072, 0),
-round(8.072, 4), 8, 8.0;
+# Disabled due to IMPALA-1018
+#select round(8.072, 3), round(8, 3), round(8.0719999999,3), round(8.072, 0),
+#round(8.072, 4), 8, 8.0;
+#---- TYPES
+#double, double, double, double, double, tinyint, decimal
+#---- RESULTS
+#8.072,8.000,8.072,8,8.0720,8,8
+#====
+---- QUERY
+select round(float_col, 3), round(float_col, 4) from functional.alltypestiny limit 2;
 ---- TYPES
-double, double, double, double, double, tinyint, float
+double,double
 ---- RESULTS
-8.072,8.000,8.072,8,8.0720,8,8
+0.000,0.0000
+1.100,1.1000
 ====
 ---- QUERY
 # Test a fix of codegen/non-codegen exprs(IMPALA-350)
@@ -1432,4 +1441,41 @@ string
 '1970-01-01 00:00:00'
 '01:01:01 02/1971/02'
 '1972||Mar||03||030303'
+====
+---- QUERY
+select 1.1 * 1.1 + cast(1.1 as float)
+---- TYPES
+double
+---- RESULTS
+2.310000023841858
+====
+---- QUERY
+select 1.1 * 1.1 + cast(1.1 as decimal(2,1))
+---- TYPES
+decimal
+---- RESULTS
+2.31
+====
+---- QUERY
+select 1.1 * 1.1 + 1.1
+---- TYPES
+decimal
+---- RESULTS
+2.31
+====
+---- QUERY
+select 1.1 * 1.1 + float_col from functional.alltypestiny limit 2;
+---- TYPES
+double
+---- RESULTS
+1.21
+2.310000023841858
+====
+---- QUERY
+select 1.1 * 1.1 + c3 from functional.decimal_tiny limit 2;
+---- TYPES
+decimal
+---- RESULTS
+1.21
+1.31
 ====

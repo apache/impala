@@ -125,6 +125,7 @@ public class SlotRef extends Expr {
     Objects.ToStringHelper toStrHelper = Objects.toStringHelper(this);
     String tblNameStr = (tblName_ == null ? "null" : tblName_.toString());
     toStrHelper.add("tblName", tblNameStr);
+    toStrHelper.add("type", type_);
     toStrHelper.add("col", col_);
     String idStr = (desc_ == null ? "null" : Integer.toString(desc_.getId().asInt()));
     toStrHelper.add("id", idStr);

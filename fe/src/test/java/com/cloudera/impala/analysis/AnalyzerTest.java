@@ -61,8 +61,9 @@ public class AnalyzerTest {
     typeToLiteralValue_.put(ColumnType.SMALLINT, (Byte.MAX_VALUE + 1) + "");
     typeToLiteralValue_.put(ColumnType.INT, (Short.MAX_VALUE + 1) + "");
     typeToLiteralValue_.put(ColumnType.BIGINT, ((long) Integer.MAX_VALUE + 1) + "");
-    typeToLiteralValue_.put(ColumnType.FLOAT, "1.0");
-    typeToLiteralValue_.put(ColumnType.DOUBLE, (Float.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(ColumnType.FLOAT, "cast(1.0 as float)");
+    typeToLiteralValue_.put(ColumnType.DOUBLE,
+        "cast(" + (Float.MAX_VALUE + 1) + " as double)");
     typeToLiteralValue_.put(ColumnType.TIMESTAMP,
         "cast('2012-12-21 00:00:00.000' as timestamp)");
     typeToLiteralValue_.put(ColumnType.STRING, "'Hello, World!'");
@@ -497,14 +498,14 @@ public class AnalyzerTest {
 
     // Analysis error from non-integral values
     AnalysisError("select * from functional.AllTypes limit 10.0",
-        "LIMIT expression must be an integer type but is 'FLOAT': 10.0");
+        "LIMIT expression must be an integer type but is 'DECIMAL(3,1)': 10.0");
     AnalysisError("select * from functional.AllTypes limit NOT FALSE",
         "LIMIT expression must be an integer type but is 'BOOLEAN': NOT FALSE");
     AnalysisError("select * from functional.AllTypes limit CAST(\"asdf\" AS INT)",
         "LIMIT expression evaluates to NULL: CAST('asdf' AS INT)");
     AnalysisError("select * from functional.AllTypes order by id limit 10 " +
         "OFFSET 10.0",
-        "OFFSET expression must be an integer type but is 'FLOAT': 10.0");
+        "OFFSET expression must be an integer type but is 'DECIMAL(3,1)': 10.0");
     AnalysisError("select * from functional.AllTypes order by id limit 10 " +
         "offset CAST('asdf' AS INT)",
         "OFFSET expression evaluates to NULL: CAST('asdf' AS INT)");

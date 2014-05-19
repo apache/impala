@@ -55,6 +55,8 @@ public class Function implements CatalogObject {
     // when matching a particular instantiation. That is, their fixed arguments
     // match exactly and the remaining varargs have the same type.
     // e.g. fn(int, int, int) and fn(int...)
+    // Argument types that are NULL are ignored when doing this comparison.
+    // e.g. fn(NULL, int) is indistinguishable from fn(int, int)
     IS_INDISTINGUISHABLE,
 
     // X is a supertype of Y if Y.arg[i] can be implicitly cast to X.arg[i]. If X has
@@ -207,6 +209,7 @@ public class Function implements CatalogObject {
     int minArgs = Math.min(o.argTypes_.length, this.argTypes_.length);
     // The first fully specified args must be identical.
     for (int i = 0; i < minArgs; ++i) {
+      if (o.argTypes_[i].isNull() || this.argTypes_[i].isNull()) continue;
       if (!o.argTypes_[i].matchesType(this.argTypes_[i])) return false;
     }
     if (o.argTypes_.length == this.argTypes_.length) return true;
@@ -215,10 +218,12 @@ public class Function implements CatalogObject {
       if (!o.getVarArgsType().matchesType(this.getVarArgsType())) return false;
       if (this.getNumArgs() > o.getNumArgs()) {
         for (int i = minArgs; i < this.getNumArgs(); ++i) {
+          if (this.argTypes_[i].isNull()) continue;
           if (!this.argTypes_[i].matchesType(o.getVarArgsType())) return false;
         }
       } else {
         for (int i = minArgs; i < o.getNumArgs(); ++i) {
+          if (o.argTypes_[i].isNull()) continue;
           if (!o.argTypes_[i].matchesType(this.getVarArgsType())) return false;
         }
       }
@@ -227,6 +232,7 @@ public class Function implements CatalogObject {
       // o has var args so check the remaining arguments from this
       if (o.getNumArgs() > minArgs) return false;
       for (int i = minArgs; i < this.getNumArgs(); ++i) {
+        if (this.argTypes_[i].isNull()) continue;
         if (!this.argTypes_[i].matchesType(o.getVarArgsType())) return false;
       }
       return true;
@@ -234,6 +240,7 @@ public class Function implements CatalogObject {
       // this has var args so check the remaining arguments from s
       if (this.getNumArgs() > minArgs) return false;
       for (int i = minArgs; i < o.getNumArgs(); ++i) {
+        if (o.argTypes_[i].isNull()) continue;
         if (!o.argTypes_[i].matchesType(this.getVarArgsType())) return false;
       }
       return true;

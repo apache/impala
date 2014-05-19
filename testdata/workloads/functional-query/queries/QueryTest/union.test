@@ -84,7 +84,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, 
 union all
 select 1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp), 2009,1
 ---- TYPES
-int, boolean, tinyint, smallint, int, bigint, double, double, string, string, timestamp, int, int
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
 0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
@@ -226,13 +226,13 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
 ====
 ---- QUERY
-# Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT, 
+# Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT,
 # first operand is nested
 (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
  union distinct
  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
 union all
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1  
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
@@ -262,7 +262,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
 ====
 ---- QUERY
-# Union unnesting: UNION ALL absorbs the children but not directly the operands 
+# Union unnesting: UNION ALL absorbs the children but not directly the operands
 # of a nested union with mixed ALL/DISTINCT, first operand is nested
 (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
  union distinct
@@ -284,7 +284,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
 ====
 ---- QUERY
-# Union unnesting: UNION ALL absorbs the children but not directly the operands 
+# Union unnesting: UNION ALL absorbs the children but not directly the operands
 # of a nested union with mixed ALL/DISTINCT, second operand is nested
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
 union all
@@ -306,7 +306,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
 ====
 ---- QUERY
-# Union unnesting: UNION ALL doesn't absorb the children of a nested union  
+# Union unnesting: UNION ALL doesn't absorb the children of a nested union
 # with mixed ALL/DISTINCT and limit, second operand is nested
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
 union all
@@ -336,7 +336,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
  order by 1 limit 3)
 union all
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1  
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
@@ -440,7 +440,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
  order by 1 limit 3)
 union distinct
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1  
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
@@ -456,7 +456,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
  order by 1 limit 3)
 union distinct
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1  
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
@@ -678,11 +678,11 @@ int, double, string
 ====
 ---- QUERY
 # Test UNION ALL on large tables with a few constant selects to excercise backend logic.
-select count(*) from (  
+select count(*) from (
   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypes
   union all
   select 0,true,0,0,0,0,cast(0 as float),0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp),2009,1
-  union all  
+  union all
   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypes
   union all
   select 1,false,1,1,1,10,cast(1.1 as float),10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp),2009,1
@@ -696,11 +696,11 @@ bigint
 ====
 ---- QUERY
 # Test UNION DISTINCT on large tables with a few constant selects to excercise backend logic.
-select count(*) from (  
+select count(*) from (
   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypes
   union distinct
   select 0,true,0,0,0,0,cast(0 as float),0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp),2009,1
-  union distinct  
+  union distinct
   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypes
   union distinct
   select 1,false,1,1,1,10,cast(1.1 as float),10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp),2009,1
@@ -714,16 +714,16 @@ bigint
 ====
 ---- QUERY
 # Test UNION DISTINCT on large table constant selects and values statements
-select count(*) from (  
+select count(*) from (
   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypes
   union distinct
   values(0,true,0,0,0,0,cast(0 as float),0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp),2009,1)
-  union distinct  
+  union distinct
   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypes
   union distinct
   select 1,false,1,1,1,10,cast(1.1 as float),10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp),2009,1
   union distinct
-  values(2,true,2,2,2,20,cast(2.2 as float),20.2,'01/01/09','2',cast('2009-01-01 00:02:00.10' as timestamp),2009,1)
+  values(2,true,2,2,2,20,cast(2.2 as float),cast(20.2 as double),'01/01/09','2',cast('2009-01-01 00:02:00.10' as timestamp),2009,1)
 ) x
 ---- TYPES
 bigint
@@ -732,13 +732,13 @@ bigint
 ====
 ---- QUERY
 # UNION ALL with only constant selects
-select 1, 'a', NULL, 10.0f
+select 1, 'a', NULL, 10.0
 union all
-select 2, 'b', NULL, 20.0f
+select 2, 'b', NULL, 20.0
 union all
-select 3, 'c', NULL, 30.0f
+select 3, 'c', NULL, 30.0
 ---- TYPES
-tinyint, string, null, float
+tinyint, string, null, decimal
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 1,'a',NULL,10.0
 2,'b',NULL,20.0
@@ -746,26 +746,26 @@ tinyint, string, null, float
 ====
 ---- QUERY
 # UNION DISTINCT with only constant selects
-select 1, 'a', NULL, 10.0f
+select 1, 'a', NULL, 10.0
 union distinct
-select 2, 'b', NULL, 20.0f
+select 2, 'b', NULL, 20.0
 union distinct
-select 1, 'a', NULL, 10.0f
+select 1, 'a', NULL, 10.0
 ---- TYPES
-tinyint, string, null, float
+tinyint, string, null, decimal
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 1,'a',NULL,10.0
 2,'b',NULL,20.0
 ====
 ---- QUERY
 # UNION ALL with values statements
-values(1, 'a', NULL, 10.0f)
+values(1, 'a', NULL, 10.0)
 union all
-values(2, 'b', NULL, 20.0f)
+values(2, 'b', NULL, 20.0)
 union all
-values(3, 'c', NULL, 30.0f)
+values(3, 'c', NULL, 30.0)
 ---- TYPES
-tinyint, string, null, float
+tinyint, string, null, decimal
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 1,'a',NULL,10.0
 2,'b',NULL,20.0
@@ -773,13 +773,13 @@ tinyint, string, null, float
 ====
 ---- QUERY
 # UNION DISTINCT with values statements
-values(1, 'a', NULL, 10.0f)
+values(1, 'a', NULL, 10.0)
 union distinct
-values(2, 'b', NULL, 20.0f)
+values(2, 'b', NULL, 20.0)
 union distinct
-values(1, 'a', NULL, 10.0f)
+values(1, 'a', NULL, 10.0)
 ---- TYPES
-tinyint, string, null, float
+tinyint, string, null, decimal
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 1,'a',NULL,10.0
 2,'b',NULL,20.0

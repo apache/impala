@@ -7,7 +7,7 @@ where tinyint_col < 256 and
 ---- PLAN
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
 data source predicates: tinyint_col < 256
-predicates: float_col != 0.0, CAST(int_col AS BIGINT) < 10
+predicates: float_col != 0, CAST(int_col AS BIGINT) < 10
 ====
 # The first four predicates are in a form that can be offered to the data source
 # and the first and third will be accepted (it accepts every other conjunct).
@@ -24,7 +24,7 @@ where 10 > int_col and
 ---- PLAN
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
 data source predicates: 10 > int_col, string_col != 'Foo'
-predicates: 5.0 > double_col, string_col != 'Bar', NOT TRUE = bool_col, NOT 5.0 = double_col
+predicates: 5 > double_col, string_col != 'Bar', NOT TRUE = bool_col, NOT 5.0 = double_col
 ====
 # The 3rd predicate is not in a form that can be offered to the data source so
 # the 4th will be offered and accepted instead.
@@ -36,7 +36,7 @@ where int_col < 10 and
 ---- PLAN
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
 data source predicates: int_col < 10, bool_col != FALSE
-predicates: double_col > 5.0, string_col IN ('Foo', 'Bar')
+predicates: double_col > 5, string_col IN ('Foo', 'Bar')
 ====
 # Tests that all predicates from the On-clause are applied (IMPALA-805)
 # and that slot equivalences are enforced at lowest possible plan node

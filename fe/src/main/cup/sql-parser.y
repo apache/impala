@@ -22,6 +22,7 @@ import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TTablePropertyType;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -228,7 +229,7 @@ terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
 terminal String NUMERIC_OVERFLOW;
 terminal BigInteger INTEGER_LITERAL;
-terminal Double FLOATINGPOINT_LITERAL;
+terminal BigDecimal DECIMAL_LITERAL;
 terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
 
@@ -1698,7 +1699,7 @@ sign_chain_expr ::=
     // integer literals require analysis to set their type, so the instance check below
     // is not equivalent to e.getType().isNumericType()
     if (e.isLiteral() &&
-       (e instanceof IntLiteral || e instanceof FloatLiteral)) {
+       (e instanceof IntLiteral || e instanceof DecimalLiteral)) {
       ((LiteralExpr)e).swapSign();
       RESULT = e;
     } else {
@@ -1811,8 +1812,8 @@ timestamp_arithmetic_expr ::=
 literal ::=
   INTEGER_LITERAL:l
   {: RESULT = new IntLiteral(l); :}
-  | FLOATINGPOINT_LITERAL:l
-  {: RESULT = new FloatLiteral(l); :}
+  | DECIMAL_LITERAL:l
+  {: RESULT = new DecimalLiteral(l); :}
   | STRING_LITERAL:l
   {: RESULT = new StringLiteral(l); :}
   | KW_TRUE

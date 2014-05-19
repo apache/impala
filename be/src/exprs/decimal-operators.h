@@ -39,6 +39,7 @@ class DecimalOperators {
   static void* Cast_double_decimal(Expr* e, TupleRow* row);
   static void* Cast_StringValue_decimal(Expr* e, TupleRow* row);
 
+  static void* Cast_decimal_bool(Expr* e, TupleRow* row);
   static void* Cast_decimal_char(Expr* e, TupleRow* row);
   static void* Cast_decimal_short(Expr* e, TupleRow* row);
   static void* Cast_decimal_int(Expr* e, TupleRow* row);
@@ -46,6 +47,7 @@ class DecimalOperators {
   static void* Cast_decimal_float(Expr* e, TupleRow* row);
   static void* Cast_decimal_double(Expr* e, TupleRow* row);
   static void* Cast_decimal_StringValue(Expr* e, TupleRow* row);
+  static void* Cast_decimal_TimestampValue(Expr* e, TupleRow* row);
 
   static void* Add_decimal_decimal(Expr* e, TupleRow* row);
   static void* Subtract_decimal_decimal(Expr* e, TupleRow* row);

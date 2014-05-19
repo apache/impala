@@ -49,7 +49,6 @@ import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.analysis.PartitionKeyValue;
@@ -565,10 +564,8 @@ public class HdfsTable extends Table {
           } else {
             ColumnType type = colsByPos_.get(keyValues.size()).getType();
             try {
-              Expr expr = LiteralExpr.create(partitionKey, type);
-              // Force the literal to be of type declared in the metadata.
-              expr = expr.castTo(type);
-              keyValues.add((LiteralExpr) expr);
+              LiteralExpr expr = LiteralExpr.create(partitionKey, type);
+              keyValues.add(expr);
             } catch (Exception ex) {
               LOG.warn("Failed to create literal expression of type: " + type, ex);
               throw new InvalidStorageDescriptorException(ex);

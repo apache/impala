@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import java.math.BigDecimal;
+
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
@@ -162,5 +164,43 @@ public class TypesUtil {
         throw new AnalysisException(
             "Operation '" + op + "' is not allowed for decimal types.");
     }
+  }
+
+  /**
+   * Computes the ColumnType that can represent 'v' with no loss of resolution.
+   * The scale/precision in BigDecimal is not compatible with SQL decimal semantics
+   * (much more like significant figures and exponent).
+   * Returns null if the value cannot be represented.
+   */
+  public static ColumnType computeDecimalType(BigDecimal v) {
+    // PlainString returns the string with no exponent. We walk it to compute
+    // the digits before and after.
+    // TODO: better way?
+    String str = v.toPlainString();
+    int digitsBefore = 0;
+    int digitsAfter = 0;
+    boolean decimalFound = false;
+    boolean leadingZeros = true;
+    for (int i = 0; i < str.length(); ++i) {
+      char c = str.charAt(i);
+      if (c == '-') continue;
+      if (c == '.') {
+        decimalFound = true;
+        continue;
+      }
+      if (decimalFound) {
+        ++digitsAfter;
+      } else {
+        // Strip out leading 0 before the decimal point. We want "0.1" to
+        // be parsed as ".1" (1 digit instead of 2).
+        if (c == '0' && leadingZeros) continue;
+        leadingZeros = false;
+        ++digitsBefore;
+      }
+    }
+    if (digitsAfter >= ColumnType.MAX_SCALE) return null;
+    if (digitsBefore + digitsAfter >= ColumnType.MAX_PRECISION) return null;
+    if (digitsBefore == 0 && digitsAfter == 0) digitsBefore = 1;
+    return ColumnType.createDecimalType(digitsBefore + digitsAfter, digitsAfter);
   }
 }

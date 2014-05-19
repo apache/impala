@@ -76,16 +76,6 @@ decimal
 1.0
 ====
 ---- QUERY
-select identity(cast(1 as decimal(20,1)));
----- TYPES
-decimal
----- RESULTS
-# The identity UDF has signature decimal(38,10) -> decimal(38,10), so the input is
-# promoted and the result has scale 10. The previous decimal test cases are not promoted
-# because there are identity UDFs that exactly match the input.
-1.0000000000
-====
----- QUERY
 select identity(cast(1 as decimal(38,10)));
 ---- TYPES
 decimal
@@ -146,7 +136,9 @@ string
 'eeeeeeee'
 ====
 ---- QUERY
-select identity(d1), identity(d3), identity(d5) from functional.decimal_tbl;
+select identity(d1),
+identity(cast(d3 as decimal(38,10))), identity(cast(d5 as decimal(38,10)))
+from functional.decimal_tbl;
 ---- TYPES
 decimal,decimal,decimal
 ---- RESULTS
@@ -343,7 +335,7 @@ int
 16
 ====
 ---- QUERY
-select var_sum(cast(1 as decimal(1,0)), cast(2 as decimal(1,0)), cast(3 as decimal(1,0)));
+select var_sum(cast(1 as decimal(4,2)), cast(2 as decimal(4,2)), cast(3 as decimal(4,2)));
 ---- TYPES
 decimal
 ---- RESULTS
@@ -352,8 +344,8 @@ decimal
 ---- QUERY
 # More complicated arguments
 select native_function_test.var_sum(
-    cast(1 as decimal(1,0)), cast(2 as decimal(2,1)),
-    cast(3 as decimal(2,1)) + cast("1.1" as decimal(2,1)));
+    cast(1 as decimal(4,2)), cast(2 as decimal(4,2)),
+    cast(3 as decimal(3,2)) + cast("1.1" as decimal(3,2)));
 ---- TYPES
 decimal
 ---- RESULTS

@@ -83,16 +83,16 @@ public class ToSqlTest extends AnalyzerTest {
   public void selectListTest() {
     testToSql("select 1234, 1234.0, 1234.0 + 1, 1234.0 + 1.0, 1 + 1, \"abc\" " +
         "from functional.alltypes",
-        "SELECT 1234, 1234.0, 1234.0 + 1.0, 1234.0 + 1.0, 1 + 1, 'abc' " +
+        "SELECT 1234, 1234.0, 1234.0 + 1, 1234.0 + 1.0, 1 + 1, 'abc' " +
         "FROM functional.alltypes");
     // Test aliases.
     testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l " +
         "from functional.alltypes",
-        "SELECT 1234 i, 1234.0 j, (1234.0 + 1.0) k, (1234.0 + 1.0) l " +
+        "SELECT 1234 i, 1234.0 j, (1234.0 + 1) k, (1234.0 + 1.0) l " +
         "FROM functional.alltypes");
     // Test select without from.
     testToSql("select 1234 i, 1234.0 as j, (1234.0 + 1) k, (1234.0 + 1.0) as l",
-        "SELECT 1234 i, 1234.0 j, (1234.0 + 1.0) k, (1234.0 + 1.0) l");
+        "SELECT 1234 i, 1234.0 j, (1234.0 + 1) k, (1234.0 + 1.0) l");
     // Test select without from.
     testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null " +
         "from functional.alltypes",
@@ -405,7 +405,7 @@ public class ToSqlTest extends AnalyzerTest {
         "SELECT t1.id, t2.id FROM " +
         "(SELECT id, string_col FROM functional.alltypes) t1, " +
         "(SELECT id, float_col FROM functional.alltypes) t2 " +
-        "WHERE t1.id = t2.id AND t1.string_col = 'abc' AND t2.float_col < 10.0");
+        "WHERE t1.id = t2.id AND t1.string_col = 'abc' AND t2.float_col < 10");
   }
 
   @Test
@@ -546,11 +546,11 @@ public class ToSqlTest extends AnalyzerTest {
     testToSql("select 1 * 1, (1 * 1), 2 / 2, (2 / 2), 3 % 3, (3 % 3), " +
         "4 DIV 4, (4 DIV 4), 5 + 5, (5 + 5), 6 - 6, (6 - 6), 7 & 7, (7 & 7), " +
         "8 | 8, (8 | 8), 9 ^ 9, (9 ^ 9), ~10, (~10)",
-        "SELECT 1 * 1, (1 * 1), 2.0 / 2.0, (2.0 / 2.0), 3 % 3, (3 % 3), " +
+        "SELECT 1 * 1, (1 * 1), 2 / 2, (2 / 2), 3 % 3, (3 % 3), " +
          "4 DIV 4, (4 DIV 4), 5 + 5, (5 + 5), 6 - 6, (6 - 6), 7 & 7, (7 & 7), " +
         "8 | 8, (8 | 8), 9 ^ 9, (9 ^ 9), ~10, (~10)");
     testToSql("select (((1 + 2) * (3 - 4) + 6) / 7)",
-        "SELECT (((1 + 2) * (3 - 4) + 6) / 7.0)");
+        "SELECT (((1 + 2) * (3 - 4) + 6) / 7)");
 
     // CaseExpr.
     // Single case without else clause. No case expr.

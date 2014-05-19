@@ -1273,13 +1273,17 @@ d2 DECIMAL(10, 0)
 d3 DECIMAL(20, 10)
 d4 DECIMAL(38, 38)
 d5 DECIMAL(10, 5)
+---- PARTITION_COLUMNS
+d6 DECIMAL(9, 0)
+---- ALTER
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(d6=1);
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/decimal_tbl && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/decimal_tbl.txt /test-warehouse/decimal_tbl/
+`hadoop fs -mkdir -p /test-warehouse/decimal_tbl/d6=1 && hadoop fs -put -f \
+${IMPALA_HOME}/testdata/data/decimal_tbl.txt /test-warehouse/decimal_tbl/d6=1/
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(d6)
 select * from functional.{table_name};
 ====
 ---- DATASET

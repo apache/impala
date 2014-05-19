@@ -22,6 +22,7 @@
 
 #include "runtime/types.h"
 #include "runtime/multi-precision.h"
+#include "util/bit-util.h"
 
 namespace impala {
 
@@ -54,6 +55,50 @@ class DecimalUtil {
       result *= 10;
     }
     return result;
+  }
+
+  // Write decimals as big endian (byte comparable) in fixed_len_size bytes.
+  template<typename T>
+  static inline void EncodeToFixedLenByteArray(
+      uint8_t* buffer, int fixed_len_size, const T& v) {
+    DCHECK_GT(fixed_len_size, 0);
+    DCHECK_LE(fixed_len_size, sizeof(T));
+    const int8_t* skipped_bytes_start = NULL;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    BitUtil::ByteSwap(buffer, &v, fixed_len_size);
+    skipped_bytes_start = reinterpret_cast<const int8_t*>(&v) + fixed_len_size;
+#else
+    memcpy(buffer, &v + sizeof(T) - fixed_len_size, fixed_len_size);
+    skipped_bytes_start = reinterpret_cast<const int8_t*>(&v);
+#endif
+
+#ifndef NDEBUG
+    // On debug, verify that the skipped bytes are what we expect.
+    for (int i = 0; i < sizeof(T) - fixed_len_size; ++i) {
+      DCHECK_EQ(skipped_bytes_start[i], v.value() < 0 ? -1 : 0);
+    }
+#endif
+  }
+
+  template<typename T>
+  static inline void DecodeFromFixedLenByteArray(
+      const uint8_t* buffer, int fixed_len_size, T* v) {
+    DCHECK_GT(fixed_len_size, 0);
+    DCHECK_LE(fixed_len_size, sizeof(T));
+    *v = 0;
+    // We need to sign extend val. For example, if the original value was
+    // -1, the original bytes were -1,-1,-1,-1. If we only wrote out 1 byte, after
+    // the encode step above, val would contain (-1, 0, 0, 0). We need to sign
+    // extend the remaining 3 bytes to get the original value.
+    // We do this by filling in the most significant bytes and (arithmetic) bit
+    // shifting down.
+    int bytes_to_fill = sizeof(T) - fixed_len_size;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    BitUtil::ByteSwap(reinterpret_cast<int8_t*>(v) + bytes_to_fill, buffer, fixed_len_size);
+#else
+    memcpy(v, buffer, fixed_len_size);
+#endif
+    v->value() >>= (bytes_to_fill * 8);
   }
 };
 

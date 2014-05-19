@@ -122,6 +122,7 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
       return &e->result_.decimal16_val;
     }
     default:
+      DCHECK(false);
       return NULL;
   }
 }
@@ -145,6 +146,7 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
       e->result_.decimal16_val = val.ScaleTo(val_type, e->type());
       return &e->result_.decimal16_val;
     default:
+      DCHECK(false);
       return NULL;
   }
 }
@@ -445,6 +447,53 @@ void* DecimalOperators::Cast_decimal_StringValue(Expr* e, TupleRow* row) {
   }
   e->result_.SetStringVal(result);
   return &e->result_.string_val;
+}
+
+void* DecimalOperators::Cast_decimal_TimestampValue(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  Expr* c = e->GetChild(0);
+  void* v = c->GetValue(row);
+  if (v == NULL) return NULL;
+  DCHECK_EQ(c->type().type, TYPE_DECIMAL);
+  switch (c->type().GetByteSize()) {
+    case 4:
+      e->result_.timestamp_val =
+          reinterpret_cast<Decimal4Value*>(v)->ToDouble(c->type());
+      break;
+    case 8:
+      e->result_.timestamp_val =
+          reinterpret_cast<Decimal8Value*>(v)->ToDouble(c->type());
+      break;
+    case 16:
+      e->result_.timestamp_val =
+          reinterpret_cast<Decimal16Value*>(v)->ToDouble(c->type());
+      break;
+    default:
+      return NULL;
+  }
+  return &e->result_.timestamp_val;
+}
+
+void* DecimalOperators::Cast_decimal_bool(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  Expr* c = e->GetChild(0);
+  void* v = c->GetValue(row);
+  if (v == NULL) return NULL;
+  DCHECK_EQ(c->type().type, TYPE_DECIMAL);
+  switch (c->type().GetByteSize()) {
+    case 4:
+      e->result_.bool_val = reinterpret_cast<Decimal4Value*>(v)->value() != 0;
+      break;
+    case 8:
+      e->result_.bool_val = reinterpret_cast<Decimal8Value*>(v)->value() != 0;
+      break;
+    case 16:
+      e->result_.bool_val = reinterpret_cast<Decimal16Value*>(v)->value() != 0;
+      break;
+    default:
+      return NULL;
+  }
+  return &e->result_.bool_val;
 }
 
 #define DECIMAL_ARITHMETIC_OP(FN_NAME, OP_FN) \

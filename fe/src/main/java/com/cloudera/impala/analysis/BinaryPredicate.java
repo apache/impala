@@ -125,6 +125,7 @@ public class BinaryPredicate extends Predicate {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
 
+    convertNumericLiteralsFromDecimal(analyzer);
     fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
         CompareMode.IS_SUPERTYPE_OF);
     if (fn_ == null) {

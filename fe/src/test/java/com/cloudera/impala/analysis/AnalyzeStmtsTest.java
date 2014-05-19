@@ -728,7 +728,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // arbitrary exprs not returning boolean
     AnalysisError("select count(*) from functional.alltypes " +
         "group by bool_col having 5 + 10 * 5.6",
-        "HAVING clause '5.0 + 10.0 * 5.6' requires return type 'BOOLEAN'. " +
+        "HAVING clause '5 + 10 * 5.6' requires return type 'BOOLEAN'. " +
         "Actual type is 'DOUBLE'.");
     AnalysisError("select count(*) from functional.alltypes " +
         "group by bool_col having int_col",

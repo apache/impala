@@ -270,6 +270,72 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Returns true if e is a CastExpr and the target type is a decimal.
+   */
+  private boolean isExplicitCastToDecimal(Expr e) {
+    if (!(e instanceof CastExpr)) return false;
+    CastExpr c = (CastExpr)e;
+    return !c.isImplicit() && c.getType().isDecimal();
+  }
+
+  /**
+   * Converts DecimalLiterals in the tree rooted at child to targetType and
+   * reanalyzes that subtree.
+   */
+  private void convertNumericLiteralsToFloat(Analyzer analyzer, Expr child,
+      ColumnType targetType) throws AnalysisException, AuthorizationException {
+    if (!targetType.isFloatingPointType() && !targetType.isIntegerType()) return;
+    if (targetType.isIntegerType()) targetType = ColumnType.DOUBLE;
+    List<DecimalLiteral> literals = Lists.newArrayList();
+    child.collectAll(Predicates.instanceOf(DecimalLiteral.class), literals);
+    for (DecimalLiteral l: literals) {
+      l.explicitlyCastToFloat(targetType);
+    }
+    child.reanalyze(analyzer);
+  }
+
+  /**
+   * Converts numeric literal in the expr tree rooted at this expr to return floating
+   * point types instead of decimals, if possible.
+   *
+   * Decimal has a higher processing cost than floating point and we should not pay
+   * the cost if the user does not require the accuracy. For example:
+   * "select float_col + 1.1" would start out with 1.1 as a decimal(2,1) and the
+   * float_col would be promoted to a high accuracy decimal. This function will identify
+   * this case and treat 1.1 as a float.
+   * In the case of "decimal_col + 1.1", 1.1 would remain a decimal.
+   * In the case of "float_col + cast(1.1 as decimal(2,1))", the result would be a
+   * decimal.
+   *
+   * Another way to think about it is that DecimalLiterals are analyzed as returning
+   * decimals (of the narrowest precision/scale) and we later convert them to a floating
+   * point type when it is consistent with the user's intent.
+   *
+   * TODO: another option is to do constant folding in the FE and then apply this rule.
+   */
+  protected void convertNumericLiteralsFromDecimal(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
+    Preconditions.checkState(this instanceof ArithmeticExpr ||
+        this instanceof BinaryPredicate);
+    Preconditions.checkState(children_.size() == 2);
+    ColumnType t0 = getChild(0).getType();
+    ColumnType t1 = getChild(1).getType();
+    boolean c0IsConstantDecimal = getChild(0).isConstant() && t0.isDecimal();
+    boolean c1IsConstantDecimal = getChild(1).isConstant() && t1.isDecimal();
+    if (c0IsConstantDecimal && c1IsConstantDecimal) return;
+    if (!c0IsConstantDecimal && !c1IsConstantDecimal) return;
+
+    // Only child(0) or child(1) is a const decimal. See if we can cast it to
+    // the type of the other child.
+    if (c0IsConstantDecimal && !isExplicitCastToDecimal(getChild(0))) {
+      convertNumericLiteralsToFloat(analyzer, getChild(0), t1);
+    }
+    if (c1IsConstantDecimal && !isExplicitCastToDecimal(getChild(1))) {
+      convertNumericLiteralsToFloat(analyzer, getChild(1), t0);
+    }
+  }
+
+  /**
    * Helper function: analyze list of exprs
    */
   public static void analyze(List<? extends Expr> exprs, Analyzer analyzer)

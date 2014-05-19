@@ -12,7 +12,7 @@ select * from functional.alltypesagg
 ---- RESULTS
 ====
 ---- QUERY
-# Create another simple view with 'if not exists' on a subset of 
+# Create another simple view with 'if not exists' on a subset of
 # alltypes' columns using custom column names and comments
 create view if not exists
 ddl_test_db.simple_view_sub (x, y comment 'hello', z) as
@@ -207,13 +207,13 @@ bigint,bigint
 ---- QUERY
 # Create a view on a constant select and try to query it.
 create view ddl_test_db.const_view
-as select 1, 'a', 10.0
+as select 1, 'a', cast(10.0 as float)
 ---- RESULTS
 ====
 ---- QUERY
 select * from ddl_test_db.const_view
 ---- RESULTS
-1,'a',10.0
+1,'a',10
 ---- TYPES
 tinyint,string,float
 ====

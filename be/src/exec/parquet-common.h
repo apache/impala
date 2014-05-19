@@ -270,88 +270,46 @@ inline int ParquetPlainEncoder::Decode(
 // that the value in the in-memory format has leading zeros or negative 1's.
 // For example, precision 2 fits in 1 byte. All decimals stored as Decimal4Value
 // will have 3 bytes of leading zeros, we will only store the interesting byte.
-template<typename T>
-inline int ParquetPlainEncoder::EncodeToFixedLenByteArray(
-    uint8_t* buffer, int fixed_len_size, const T& v) {
-  DCHECK_GT(fixed_len_size, 0);
-  DCHECK_LE(fixed_len_size, sizeof(T));
-  const int8_t* skipped_bytes_start = NULL;
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-  BitUtil::ByteSwap(buffer, &v, fixed_len_size);
-  skipped_bytes_start = reinterpret_cast<const int8_t*>(&v) + fixed_len_size;
-#else
-  memcpy(buffer, &v + sizeof(T) - fixed_len_size, fixed_len_size);
-  skipped_bytes_start = reinterpret_cast<const int8_t*>(&v);
-#endif
-
-#ifndef NDEBUG
-  // On debug, verify that the skipped bytes are what we expect.
-  for (int i = 0; i < sizeof(T) - fixed_len_size; ++i) {
-    DCHECK_EQ(skipped_bytes_start[i], v.value() < 0 ? -1 : 0);
-  }
-#endif
-  return fixed_len_size;
-}
-
-template<typename T>
-inline int ParquetPlainEncoder::DecodeFromFixedLenByteArray(
-    uint8_t* buffer, int fixed_len_size, T* v) {
-  DCHECK_GT(fixed_len_size, 0);
-  DCHECK_LE(fixed_len_size, sizeof(T));
-  *v = 0;
-  // We need to sign extend val. For example, if the original value was
-  // -1, the original bytes were -1,-1,-1,-1. If we only wrote out 1 byte, after
-  // the encode step above, val would contain (-1, 0, 0, 0). We need to sign
-  // extend the remaining 3 bytes to get the original value.
-  // We do this by filling in the most significant bytes and (arithmetic) bit
-  // shifting down.
-  int bytes_to_fill = sizeof(T) - fixed_len_size;
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-  BitUtil::ByteSwap(reinterpret_cast<int8_t*>(v) + bytes_to_fill, buffer, fixed_len_size);
-#else
-  memcpy(v, buffer, fixed_len_size);
-#endif
-  *v >>= (bytes_to_fill * 8);
-  return fixed_len_size;
-}
-
 template<>
 inline int ParquetPlainEncoder::Encode(
     uint8_t* buffer, int fixed_len_size, const Decimal4Value& v) {
-  return EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
+  DecimalUtil::EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
+  return fixed_len_size;
 }
 
 template<>
 inline int ParquetPlainEncoder::Encode(
     uint8_t* buffer, int fixed_len_size, const Decimal8Value& v) {
-  return EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
+  DecimalUtil::EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
+  return fixed_len_size;
 }
 
 template<>
 inline int ParquetPlainEncoder::Encode(
     uint8_t* buffer, int fixed_len_size, const Decimal16Value& v) {
-  return EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
+  DecimalUtil::EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
+  return fixed_len_size;
 }
 
 template<>
 inline int ParquetPlainEncoder::Decode(
     uint8_t* buffer, int fixed_len_size, Decimal4Value* v) {
-  return DecodeFromFixedLenByteArray(
-      buffer, fixed_len_size, reinterpret_cast<int32_t*>(v));
+  DecimalUtil::DecodeFromFixedLenByteArray(buffer, fixed_len_size, v);
+  return fixed_len_size;
 }
 
 template<>
 inline int ParquetPlainEncoder::Decode(
     uint8_t* buffer, int fixed_len_size, Decimal8Value* v) {
-  return DecodeFromFixedLenByteArray(
-      buffer, fixed_len_size, reinterpret_cast<int64_t*>(v));
+  DecimalUtil::DecodeFromFixedLenByteArray(buffer, fixed_len_size, v);
+  return fixed_len_size;
 }
 
 template<>
 inline int ParquetPlainEncoder::Decode(
     uint8_t* buffer, int fixed_len_size, Decimal16Value* v) {
-  return DecodeFromFixedLenByteArray(
-      buffer, fixed_len_size, reinterpret_cast<int128_t*>(v));
+  DecimalUtil::DecodeFromFixedLenByteArray(buffer, fixed_len_size, v);
+  return fixed_len_size;
 }
 
 }

@@ -33,6 +33,7 @@ public class ExprTest {
     testLiteralExprPositive("1.0", ColumnType.FLOAT);
     testLiteralExprPositive("1.0", ColumnType.DOUBLE);
     testLiteralExprPositive("ABC", ColumnType.STRING);
+    testLiteralExprPositive("1.1", ColumnType.createDecimalType(2, 1));
 
     // INVALID_TYPE should always fail
     testLiteralExprNegative("ABC", ColumnType.INVALID);
@@ -52,9 +53,6 @@ public class ExprTest {
     testLiteralExprNegative("2010-01-01", ColumnType.DATE);
     testLiteralExprNegative("2010-01-01", ColumnType.DATETIME);
     testLiteralExprNegative("2010-01-01", ColumnType.TIMESTAMP);
-
-    // No decimal literals.
-    testLiteralExprNegative("1.1", ColumnType.createDecimalType());
   }
 
   private void testLiteralExprPositive(String value, ColumnType type) {

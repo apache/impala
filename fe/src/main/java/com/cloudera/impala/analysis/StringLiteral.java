@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import java_cup.runtime.Symbol;
@@ -104,7 +105,7 @@ public class StringLiteral extends LiteralExpr {
     StringReader reader = new StringReader(value_);
     SqlScanner scanner = new SqlScanner(reader);
     // For distinguishing positive and negative numbers.
-    double multiplier = 1;
+    boolean negative = false;
     Symbol sym;
     try {
       // We allow simple chaining of MINUS to recognize negative numbers.
@@ -113,7 +114,7 @@ public class StringLiteral extends LiteralExpr {
       // This would require invoking the parser.
       sym = scanner.next_token();
       while (sym.sym == SqlParserSymbols.SUBTRACT) {
-        multiplier *= -1;
+        negative = !negative;
         sym = scanner.next_token();
       }
     } catch (IOException e) {
@@ -123,11 +124,14 @@ public class StringLiteral extends LiteralExpr {
       throw new AnalysisException("Number too large: " + value_);
     }
     if (sym.sym == SqlParserSymbols.INTEGER_LITERAL) {
-      Long val = (Long) sym.value;
-      return new IntLiteral(BigInteger.valueOf(val * (long)multiplier));
+      BigInteger val = (BigInteger) sym.value;
+      if (negative) val = val.negate();
+      return new IntLiteral(val);
     }
-    if (sym.sym == SqlParserSymbols.FLOATINGPOINT_LITERAL) {
-      return new FloatLiteral((Double) sym.value * multiplier);
+    if (sym.sym == SqlParserSymbols.DECIMAL_LITERAL) {
+      BigDecimal val = (BigDecimal) sym.value;
+      if (negative) val = val.negate();
+      return new DecimalLiteral(val);
     }
     // Symbol is not an integer or floating point literal.
     throw new AnalysisException(

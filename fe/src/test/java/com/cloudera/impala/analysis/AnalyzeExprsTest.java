@@ -76,7 +76,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Literal '9223372036854775808' exceeds maximum range of integers.");
 
     // Test floating-point types.
-    // TODO: Fix detecting the min resolution type for floating-point literals.
     testNumericLiteral(Float.toString(Float.MIN_VALUE), ColumnType.DOUBLE);
     testNumericLiteral(Float.toString(Float.MAX_VALUE), ColumnType.DOUBLE);
     testNumericLiteral("-" + Float.toString(Float.MIN_VALUE), ColumnType.DOUBLE);
@@ -85,6 +84,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testNumericLiteral(Double.toString(Double.MAX_VALUE), ColumnType.DOUBLE);
     testNumericLiteral("-" + Double.toString(Double.MIN_VALUE), ColumnType.DOUBLE);
     testNumericLiteral("-" + Double.toString(Double.MAX_VALUE), ColumnType.DOUBLE);
+
+    AnalysisError(String.format("select %s1", Double.toString(Double.MAX_VALUE)),
+      "Decimal literal '1.7976931348623157E+3081' exceeds maximum range of doubles.");
+    AnalysisError(String.format("select %s1", Double.toString(Double.MIN_VALUE)),
+      "Decimal literal '4.9E-3241' underflows minimum resolution of doubles.");
   }
 
   /**
@@ -167,15 +171,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   @Test
   public void TestDecimalCasts() throws AnalysisException {
-    String decimal = "cast('1.1' as decimal)";
-    AnalysisError("select cast(" + decimal + " as boolean)",
-        "Invalid type cast of CAST('1.1' AS DECIMAL(9,0)) " +
-        "from DECIMAL(9,0) to BOOLEAN");
+    AnalyzesOk("select cast(1.1 as boolean)");
+    AnalyzesOk("select cast(1.1 as timestamp)");
+
     AnalysisError("select cast(true as decimal)",
         "Invalid type cast of TRUE from BOOLEAN to DECIMAL(9,0)");
-    AnalysisError("select cast(" + decimal + " as timestamp)",
-        "Invalid type cast of CAST('1.1' AS DECIMAL(9,0)) " +
-        "from DECIMAL(9,0) to TIMESTAMP");
     AnalysisError("select cast(cast(1 as timestamp) as decimal)",
         "Invalid type cast of CAST(1 AS TIMESTAMP) from TIMESTAMP to DECIMAL(9,0)");
 
@@ -183,7 +183,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       if (type.isNull() || type.isDecimal() || type.isBoolean() || type.isDateType()) {
         continue;
       }
-      AnalyzesOk("select cast(" + decimal + " as " + type + ")");
+      AnalyzesOk("select cast(1.1 as " + type + ")");
       AnalyzesOk("select cast(cast(1 as " + type + ") as decimal)");
     }
 
@@ -191,7 +191,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     for (int precision = 1; precision <= ColumnType.MAX_PRECISION; ++precision) {
       for (int scale = 0; scale < precision; ++scale) {
         ColumnType t = ColumnType.createDecimalType(precision, scale);
-        AnalyzesOk("select cast(" + decimal + " as " + t + ")");
+        AnalyzesOk("select cast(1.1 as " + t + ")");
         AnalyzesOk("select cast(cast(1 as " + t + ") as decimal)");
       }
     }
@@ -616,30 +616,103 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         assertEquals(PrimitiveType.BOOLEAN, expr.getType().getPrimitiveType());
       }
     }
-
     checkCasts(expr);
     // The children's types must be NULL or equal to the requested opType.
     ColumnType child1Type = expr.getChild(0).getType();
     ColumnType child2Type = type1 == null ? null : expr.getChild(1).getType();
-    Assert.assertTrue(opType.equals(child1Type)
-        || opType.isNull() || child1Type.isNull());
+    Assert.assertTrue("opType= " + opType + " child1Type=" + child1Type,
+        opType.equals(child1Type) || opType.isNull() || child1Type.isNull());
     if (type1 != null) {
-      Assert.assertTrue(opType.equals(child2Type)
-          || opType.isNull() || child2Type.isNull());
+      Assert.assertTrue("opType= " + opType + " child2Type=" + child2Type,
+          opType.equals(child2Type) || opType.isNull() || child2Type.isNull());
     }
+  }
+
+  private void checkReturnType(String stmt, ColumnType resultType) {
+    SelectStmt select = (SelectStmt) AnalyzesOk(stmt);
+    ArrayList<Expr> selectListExprs = select.getResultExprs();
+    assertNotNull(selectListExprs);
+    assertEquals(selectListExprs.size(), 1);
+    // check the first expr in select list
+    Expr expr = selectListExprs.get(0);
+    assertEquals("Expected: " + resultType + " != " + expr.getType(),
+        resultType, expr.getType());
+  }
+
+  @Test
+  public void TestNumericLiteralTypeResolution() throws AnalysisException {
+    checkReturnType("select 1", ColumnType.TINYINT);
+    checkReturnType("select 1.1", ColumnType.createDecimalType(2,1));
+    checkReturnType("select 01.1", ColumnType.createDecimalType(2,1));
+    checkReturnType("select 1 + 1.1", ColumnType.DOUBLE);
+    checkReturnType("select 0.23 + 1.1", ColumnType.createDecimalType(4,2));
+
+    checkReturnType("select float_col + float_col from functional.alltypestiny",
+        ColumnType.DOUBLE);
+    checkReturnType("select int_col + int_col from functional.alltypestiny",
+        ColumnType.BIGINT);
+
+    // floating point + numeric literal = floating point
+    checkReturnType("select float_col + 1.1 from functional.alltypestiny",
+        ColumnType.DOUBLE);
+    // decimal + numeric literal = decimal
+    checkReturnType("select d1 + 1.1 from functional.decimal_tbl",
+        ColumnType.createDecimalType(11,1));
+    // int + numeric literal = floating point
+    checkReturnType("select int_col + 1.1 from functional.alltypestiny",
+        ColumnType.DOUBLE);
+
+    // Explicitly casting the literal to a decimal will override the behavior
+    checkReturnType("select int_col + cast(1.1 as decimal(2,1)) from "
+        + " functional.alltypestiny", ColumnType.createDecimalType(12,1));
+    checkReturnType("select float_col + cast(1.1 as decimal(2,1)) from "
+        + " functional.alltypestiny", ColumnType.createDecimalType(38,9));
+    checkReturnType("select float_col + cast(1.1*1.2+1.3 as decimal(2,1)) from "
+        + " functional.alltypestiny", ColumnType.createDecimalType(38,9));
+
+    // The location and complexity of the expr should not matter.
+    checkReturnType("select 1.0 + float_col + 1.1 from functional.alltypestiny",
+        ColumnType.DOUBLE);
+    checkReturnType("select 1.0 + 2.0 + float_col from functional.alltypestiny",
+        ColumnType.DOUBLE);
+    checkReturnType("select 1.0 + 2.0 + pi() * float_col from functional.alltypestiny",
+        ColumnType.DOUBLE);
+    checkReturnType("select 1.0 + d1 + 1.1 from functional.decimal_tbl",
+        ColumnType.createDecimalType(12,1));
+    checkReturnType("select 1.0 + 2.0 + d1 from functional.decimal_tbl",
+        ColumnType.createDecimalType(11,1));
+    checkReturnType("select 1.0 + 2.0 + pi()*d1 from functional.decimal_tbl",
+        ColumnType.createDecimalType(38,17));
+
+    // Test with multiple cols
+    checkReturnType("select double_col + 1.23 + float_col + 1.0 " +
+        " from functional.alltypestiny", ColumnType.DOUBLE);
+    checkReturnType("select double_col + 1.23 + float_col + 1.0 + int_col " +
+        " + bigint_col from functional.alltypestiny", ColumnType.DOUBLE);
+    checkReturnType("select d1 + 1.23 + d2 + 1.0 " +
+        " from functional.decimal_tbl", ColumnType.createDecimalType(14,2));
+
+    // Test with slot of both decimal and non-decimal
+    checkReturnType("select t1.int_col + t2.c1 from functional.alltypestiny t1 " +
+        " cross join functional.decimal_tiny t2", ColumnType.createDecimalType(15,4));
+    checkReturnType("select 1.1 + t1.int_col + t2.c1 from functional.alltypestiny t1 " +
+        " cross join functional.decimal_tiny t2", ColumnType.createDecimalType(38,17));
   }
 
   /**
    * Check that:
-   * - we don't cast literals (we should have simply converted the literal
+   * - we don't implicitly cast literals (we should have simply converted the literal
    *   to the target type)
    * - we don't do redundant casts (ie, we don't cast a bigint expr to a bigint)
    */
   private void checkCasts(Expr expr) {
     if (expr instanceof CastExpr) {
-      Assert.assertFalse(expr.getType() + " == " + expr.getChild(0).getType(),
-          expr.getType().equals(expr.getChild(0).getType()));
-      Assert.assertFalse(expr.getChild(0) instanceof LiteralExpr);
+      CastExpr cast = (CastExpr)expr;
+      if (cast.isImplicit()) {
+        Assert.assertFalse(expr.getType() + " == " + expr.getChild(0).getType(),
+            expr.getType().equals(expr.getChild(0).getType()));
+        Assert.assertFalse(expr.debugString(), expr.getChild(0) instanceof LiteralExpr);
+      }
     }
     for (Expr child: expr.getChildren()) {
       checkCasts(child);
@@ -672,7 +745,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   public void TestFixedPointArithmeticOps() throws AnalysisException {
     // negative tests, no floating point types allowed
     AnalysisError("select ~float_col from functional.alltypes",
-        "Bitwise operations only allowed on fixed-point types");
+        "Bitwise operations only allowed on integer types");
     AnalysisError("select float_col ^ int_col from functional.alltypes",
         "Invalid non-integer argument to operation '^'");
     AnalysisError("select float_col & int_col from functional.alltypes",
@@ -757,7 +830,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Non-function-call like version.
     AnalysisError("select timestamp_col + interval 5.2 years from functional.alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
-        "'timestamp_col + INTERVAL 5.2 years' returns type 'DOUBLE'. " +
+        "'timestamp_col + INTERVAL 5.2 years' returns type 'DECIMAL(2,1)'. " +
         "Expected an integer type.");
 
     // No implicit cast from STRING to integer types.
@@ -776,7 +849,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Reversed interval and timestamp using addition.
     AnalysisError("select interval 5.2 years + timestamp_col from functional.alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
-        "'INTERVAL 5.2 years + timestamp_col' returns type 'DOUBLE'. " +
+        "'INTERVAL 5.2 years + timestamp_col' returns type 'DECIMAL(2,1)'. " +
         "Expected an integer type.");
     // Cast from STRING to INT.
     AnalyzesOk("select interval cast('10' as int) years + timestamp_col " +
@@ -785,7 +858,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select date_add(timestamp_col, interval 5.2 years) " +
         "from functional.alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
-        "'DATE_ADD(timestamp_col, INTERVAL 5.2 years)' returns type 'DOUBLE'. " +
+        "'DATE_ADD(timestamp_col, INTERVAL 5.2 years)' returns type 'DECIMAL(2,1)'. " +
         "Expected an integer type.");
     // Cast from STRING to INT.
     AnalyzesOk("select date_add(timestamp_col, interval cast('10' as int) years) " +
@@ -826,6 +899,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Cannot pass '*' to scalar function.");
 
     // Call function that only accepts decimal
+    AnalyzesOk("select precision(1)");
     AnalyzesOk("select precision(cast('1.1' as decimal))");
     AnalyzesOk("select scale(1.1)");
     AnalysisError("select scale('1.1')",
@@ -1043,7 +1117,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "No matching function with signature: default.udf(TINYINT, STRING, TINYINT).");
 
     AnalysisError("select udf(1.1)",
-        "No matching function with signature: default.udf(DOUBLE)");
+        "No matching function with signature: default.udf(DECIMAL(2,1))");
 
     AnalyzesOk("select functional.udf(1.1)");
     AnalysisError("select functional.udf('Hello')",
@@ -1202,7 +1276,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(decimal_10_0 + " + cast(1 as int)",
         ColumnType.createDecimalType(11, 0));
     testDecimalExpr(decimal_10_0 + " + cast(1 as bigint)",
-        ColumnType.createDecimalType(21, 0));
+        ColumnType.createDecimalType(20, 0));
     testDecimalExpr(decimal_10_0 + " + cast(1 as float)",
         ColumnType.createDecimalType(38, 9));
     testDecimalExpr(decimal_10_0 + " + cast(1 as double)",
@@ -1262,7 +1336,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select d1 ^ d1 from functional.decimal_tbl",
         "Invalid non-integer argument to operation '^': d1 ^ d1");
     AnalysisError("select ~d1 from functional.decimal_tbl",
-        "Bitwise operations only allowed on fixed-point types: ~d1");
+        "Bitwise operations only allowed on integer types: ~d1");
 
     AnalyzesOk("select d3 = d4 from functional.decimal_tbl");
     AnalyzesOk("select d5 != d1 from functional.decimal_tbl");
@@ -1311,13 +1385,22 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), -1)");
 
     AnalysisError("select round(cast(1.123 as decimal(10,3)), 5.1)",
-        "No matching function with signature: round(DECIMAL(10,3), DOUBLE)");
-    AnalysisError("select round(cast(1.123 as decimal(10,3)), 40)",
+        "No matching function with signature: round(DECIMAL(10,3), DECIMAL(2,1))");
+    AnalysisError("select round(cast(1.123 as decimal(30,20)), 40)",
         "Cannot round/truncate to scales greater than 38.");
     AnalysisError("select truncate(cast(1.123 as decimal(10,3)), 40)",
         "Cannot round/truncate to scales greater than 38.");
     AnalysisError("select round(cast(1.123 as decimal(10,3)), NULL)",
         "round() cannot be called with a NULL second argument.");
+
+    testDecimalExpr("round(1.23)", ColumnType.createDecimalType(1, 0));
+    testDecimalExpr("round(1.23, 1)", ColumnType.createDecimalType(2, 1));
+    testDecimalExpr("round(1.23, 0)", ColumnType.createDecimalType(1, 0));
+    testDecimalExpr("round(1.23, 3)", ColumnType.createDecimalType(4, 3));
+    testDecimalExpr("round(1.23, -1)", ColumnType.createDecimalType(1, 0));
+    testDecimalExpr("round(1.23, -2)", ColumnType.createDecimalType(1, 0));
+    testDecimalExpr("round(cast(1.23 as decimal(3,2)), -2)",
+        ColumnType.createDecimalType(1, 0));
   }
 
   /**

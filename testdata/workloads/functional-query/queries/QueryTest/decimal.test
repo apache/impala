@@ -42,6 +42,20 @@ select sum(d1), sum(d2), sum(d3), sum(d4), sum(d5) from decimal_tbl
 decimal,decimal,decimal,decimal,decimal
 ====
 ---- QUERY
+select count(*), sum(d1), sum(d2), sum(d3), sum(d4), sum(d5) from decimal_tbl where d6 = 1
+---- RESULTS
+5,161111,3332,13717.2838257900,0.61728394500000000000000000000000000000,12361.02889
+---- TYPES
+bigint,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+select count(*), sum(d1), sum(d2), sum(d3), sum(d4), sum(d5) from decimal_tbl where d6 = 0
+---- RESULTS
+0,NULL,NULL,NULL,NULL,NULL
+---- TYPES
+bigint,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
 select c3, count(*) from decimal_tiny group by c3
 ---- RESULTS
 0.3,10

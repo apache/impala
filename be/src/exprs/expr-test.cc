@@ -61,6 +61,38 @@ namespace impala {
 ImpaladQueryExecutor* executor_;
 bool disable_codegen_;
 
+template <typename ORIGINAL_TYPE, typename VAL_TYPE>
+string LiteralToString(VAL_TYPE val) {
+  return lexical_cast<string>(val);
+}
+
+template<>
+string LiteralToString<float, float>(float val) {
+  stringstream ss;
+  ss << "cast("
+     << lexical_cast<string>(val)
+     << " as float)";
+  return ss.str();
+}
+
+template<>
+string LiteralToString<float, double>(double val) {
+  stringstream ss;
+  ss << "cast("
+     << lexical_cast<string>(val)
+     << " as float)";
+  return ss.str();
+}
+
+template<>
+string LiteralToString<double, double>(double val) {
+  stringstream ss;
+  ss << "cast("
+     << lexical_cast<string>(val)
+     << " as double)";
+  return ss.str();
+}
+
 class ExprTest : public testing::Test {
  protected:
   // Maps from enum value of primitive integer type to
@@ -118,12 +150,16 @@ class ExprTest : public testing::Test {
         lexical_cast<string>(min_int_values_[TYPE_INT]);
     default_type_strs_[TYPE_BIGINT] =
         lexical_cast<string>(min_int_values_[TYPE_BIGINT]);
-    // Don't use lexical case here because it results
+    // Don't use lexical cast here because it results
     // in a string 1.1000000000000001 that messes up the tests.
-    default_type_strs_[TYPE_FLOAT] =
-        lexical_cast<string>(min_float_values_[TYPE_FLOAT]);
-    default_type_strs_[TYPE_DOUBLE] =
-        lexical_cast<string>(min_float_values_[TYPE_DOUBLE]);
+    stringstream ss;
+    ss << "cast("
+       << lexical_cast<string>(min_float_values_[TYPE_FLOAT]) << " as float)";
+    default_type_strs_[TYPE_FLOAT] = ss.str();
+    ss.str("");
+    ss << "cast("
+       << lexical_cast<string>(min_float_values_[TYPE_FLOAT]) << " as double)";
+    default_type_strs_[TYPE_DOUBLE] = ss.str();
     default_type_strs_[TYPE_BOOLEAN] = default_bool_str_;
     default_type_strs_[TYPE_STRING] = default_string_str_;
     default_type_strs_[TYPE_TIMESTAMP] = default_timestamp_str_;
@@ -524,8 +560,8 @@ class ExprTest : public testing::Test {
   void TestFixedResultTypeOps(LeftOp a, RightOp b, const ColumnType& expected_type) {
     Result cast_a = static_cast<Result>(a);
     Result cast_b = static_cast<Result>(b);
-    string a_str = lexical_cast<string>(cast_a);
-    string b_str = lexical_cast<string>(cast_b);
+    string a_str = LiteralToString<Result>(cast_a);
+    string b_str = LiteralToString<Result>(cast_b);
     TestValue(a_str + " + " + b_str, expected_type,
         static_cast<Result>(cast_a + cast_b));
     TestValue(a_str + " - " + b_str, expected_type,
@@ -561,7 +597,7 @@ class ExprTest : public testing::Test {
   template <typename NonNullOp, typename CastType>
   void TestNullOperandFixedResultTypeOps(NonNullOp op, const ColumnType& expected_type) {
     CastType cast_op = static_cast<CastType>(op);
-    string op_str = lexical_cast<string>(cast_op);
+    string op_str = LiteralToString<CastType>(cast_op);
     // NULL as right operand.
     TestIsNull(op_str + " + NULL", expected_type);
     TestIsNull(op_str + " - NULL", expected_type);
@@ -1970,8 +2006,8 @@ TEST_F(ExprTest, MathConversionFunctions) {
 TEST_F(ExprTest, MathFunctions) {
   TestValue("pi()", TYPE_DOUBLE, M_PI);
   TestValue("e()", TYPE_DOUBLE, M_E);
-  TestValue("abs(-1.0)", TYPE_DOUBLE, 1.0);
-  TestValue("abs(1.0)", TYPE_DOUBLE, 1.0);
+  TestValue("abs(cast(-1.0 as double))", TYPE_DOUBLE, 1.0);
+  TestValue("abs(cast(1.0 as double))", TYPE_DOUBLE, 1.0);
   TestValue("sign(0.0)", TYPE_FLOAT, 0.0f);
   TestValue("sign(-0.0)", TYPE_FLOAT, 0.0f);
   TestValue("sign(+0.0)", TYPE_FLOAT, 0.0f);
@@ -2259,41 +2295,41 @@ TEST_F(ExprTest, MathFunctions) {
 }
 
 TEST_F(ExprTest, MathRoundingFunctions) {
-  TestValue("ceil(0.1)", TYPE_BIGINT, 1);
-  TestValue("ceil(-10.05)", TYPE_BIGINT, -10);
-  TestValue("ceiling(0.1)", TYPE_BIGINT, 1);
-  TestValue("ceiling(-10.05)", TYPE_BIGINT, -10);
-  TestValue("floor(0.1)", TYPE_BIGINT, 0);
-  TestValue("floor(-10.007)", TYPE_BIGINT, -11);
+  TestValue("ceil(cast(0.1 as double))", TYPE_BIGINT, 1);
+  TestValue("ceil(cast(-10.05 as double))", TYPE_BIGINT, -10);
+  TestValue("ceiling(cast(0.1 as double))", TYPE_BIGINT, 1);
+  TestValue("ceiling(cast(-10.05 as double))", TYPE_BIGINT, -10);
+  TestValue("floor(cast(0.1 as double))", TYPE_BIGINT, 0);
+  TestValue("floor(cast(-10.007 as double))", TYPE_BIGINT, -11);
 
-  TestValue("round(1.499999)", TYPE_BIGINT, 1);
-  TestValue("round(1.5)", TYPE_BIGINT, 2);
-  TestValue("round(1.500001)", TYPE_BIGINT, 2);
-  TestValue("round(-1.499999)", TYPE_BIGINT, -1);
-  TestValue("round(-1.5)", TYPE_BIGINT, -2);
-  TestValue("round(-1.500001)", TYPE_BIGINT, -2);
+  TestValue("round(cast(1.499999 as double))", TYPE_BIGINT, 1);
+  TestValue("round(cast(1.5 as double))", TYPE_BIGINT, 2);
+  TestValue("round(cast(1.500001 as double))", TYPE_BIGINT, 2);
+  TestValue("round(cast(-1.499999 as double))", TYPE_BIGINT, -1);
+  TestValue("round(cast(-1.5 as double))", TYPE_BIGINT, -2);
+  TestValue("round(cast(-1.500001 as double))", TYPE_BIGINT, -2);
 
-  TestValue("round(3.14159265, 0)", TYPE_DOUBLE, 3.0);
-  TestValue("round(3.14159265, 1)", TYPE_DOUBLE, 3.1);
-  TestValue("round(3.14159265, 2)", TYPE_DOUBLE, 3.14);
-  TestValue("round(3.14159265, 3)", TYPE_DOUBLE, 3.142);
-  TestValue("round(3.14159265, 4)", TYPE_DOUBLE, 3.1416);
-  TestValue("round(3.14159265, 5)", TYPE_DOUBLE, 3.14159);
-  TestValue("round(-3.14159265, 0)", TYPE_DOUBLE, -3.0);
-  TestValue("round(-3.14159265, 1)", TYPE_DOUBLE, -3.1);
-  TestValue("round(-3.14159265, 2)", TYPE_DOUBLE, -3.14);
-  TestValue("round(-3.14159265, 3)", TYPE_DOUBLE, -3.142);
-  TestValue("round(-3.14159265, 4)", TYPE_DOUBLE, -3.1416);
-  TestValue("round(-3.14159265, 5)", TYPE_DOUBLE, -3.14159);
+  TestValue("round(cast(3.14159265 as double), 0)", TYPE_DOUBLE, 3.0);
+  TestValue("round(cast(3.14159265 as double), 1)", TYPE_DOUBLE, 3.1);
+  TestValue("round(cast(3.14159265 as double), 2)", TYPE_DOUBLE, 3.14);
+  TestValue("round(cast(3.14159265 as double), 3)", TYPE_DOUBLE, 3.142);
+  TestValue("round(cast(3.14159265 as double), 4)", TYPE_DOUBLE, 3.1416);
+  TestValue("round(cast(3.14159265 as double), 5)", TYPE_DOUBLE, 3.14159);
+  TestValue("round(cast(-3.14159265 as double), 0)", TYPE_DOUBLE, -3.0);
+  TestValue("round(cast(-3.14159265 as double), 1)", TYPE_DOUBLE, -3.1);
+  TestValue("round(cast(-3.14159265 as double), 2)", TYPE_DOUBLE, -3.14);
+  TestValue("round(cast(-3.14159265 as double), 3)", TYPE_DOUBLE, -3.142);
+  TestValue("round(cast(-3.14159265 as double), 4)", TYPE_DOUBLE, -3.1416);
+  TestValue("round(cast(-3.14159265 as double), 5)", TYPE_DOUBLE, -3.14159);
 
   // NULL arguments.
-  TestIsNull("ceil(NULL)", TYPE_BIGINT);
-  TestIsNull("ceiling(NULL)", TYPE_BIGINT);
-  TestIsNull("floor(NULL)", TYPE_BIGINT);
-  TestIsNull("round(NULL)", TYPE_BIGINT);
-  TestIsNull("round(NULL, 1)", TYPE_DOUBLE);
-  TestIsNull("round(3.14159265, NULL)", TYPE_DOUBLE);
-  TestIsNull("round(NULL, NULL)", TYPE_DOUBLE);
+  TestIsNull("ceil(cast(NULL as double))", TYPE_BIGINT);
+  TestIsNull("ceiling(cast(NULL as double))", TYPE_BIGINT);
+  TestIsNull("floor(cast(NULL as double))", TYPE_BIGINT);
+  TestIsNull("round(cast(NULL as double))", TYPE_BIGINT);
+  TestIsNull("round(cast(NULL as double), 1)", TYPE_DOUBLE);
+  TestIsNull("round(cast(3.14159265 as double), NULL)", TYPE_DOUBLE);
+  TestIsNull("round(cast(NULL as double), NULL)", TYPE_DOUBLE);
 }
 
 TEST_F(ExprTest, UnaryOperators) {
@@ -2303,9 +2339,9 @@ TEST_F(ExprTest, UnaryOperators) {
   TestValue("+-1", TYPE_TINYINT, -1);
   TestValue("++1", TYPE_TINYINT, 1);
 
-  TestValue("+1.f", TYPE_FLOAT, 1.0f);
-  TestValue("+1.0", TYPE_FLOAT, 1.0f);
-  TestValue("-1.0", TYPE_FLOAT, -1.0f);
+  TestValue("+cast(1. as float)", TYPE_FLOAT, 1.0f);
+  TestValue("+cast(1.0 as float)", TYPE_FLOAT, 1.0f);
+  TestValue("-cast(1.0 as float)", TYPE_DOUBLE, -1.0);
 
   TestValue("1 - - - 1", TYPE_SMALLINT, 0);
 }
@@ -2906,8 +2942,8 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestValue("if(FALSE, FALSE, TRUE)", TYPE_BOOLEAN, true);
   TestValue("if(TRUE, 10, 20)", TYPE_TINYINT, 10);
   TestValue("if(FALSE, 10, 20)", TYPE_TINYINT, 20);
-  TestValue("if(TRUE, 5.5, 8.8)", TYPE_DOUBLE, 5.5);
-  TestValue("if(FALSE, 5.5, 8.8)", TYPE_DOUBLE, 8.8);
+  TestValue("if(TRUE, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 5.5);
+  TestValue("if(FALSE, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 8.8);
   TestStringValue("if(TRUE, 'abc', 'defgh')", "abc");
   TestStringValue("if(FALSE, 'abc', 'defgh')", "defgh");
   TimestampValue then_val(1293872461);
@@ -2927,10 +2963,10 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestValue("nullif(10, NULL)", TYPE_TINYINT, 10);
   TestIsNull("nullif(10, 10)", TYPE_TINYINT);
   TestValue("nullif(10, 20)", TYPE_TINYINT, 10);
-  TestIsNull("nullif(10.10, 10.10)", TYPE_DOUBLE);
-  TestValue("nullif(10.10, 20.20)", TYPE_DOUBLE, 10.10);
-  TestIsNull("nullif(NULL, 10.10)", TYPE_DOUBLE);
-  TestValue("nullif(10.10, NULL)", TYPE_DOUBLE, 10.10);
+  TestIsNull("nullif(cast(10.10 as double), cast(10.10 as double))", TYPE_DOUBLE);
+  TestValue("nullif(cast(10.10 as double), cast(20.20 as double))", TYPE_DOUBLE, 10.10);
+  TestIsNull("nullif(cast(NULL as double), 10.10)", TYPE_DOUBLE);
+  TestValue("nullif(cast(10.10 as double), NULL)", TYPE_DOUBLE, 10.10);
   TestIsNull("nullif('abc', 'abc')", TYPE_STRING);
   TestStringValue("nullif('abc', 'def')", "abc");
   TestIsNull("nullif(NULL, 'abc')", TYPE_STRING);
@@ -3269,11 +3305,13 @@ TEST_F(ExprTest, DecimalFunctions) {
 
   TestValue("precision(1)", TYPE_INT, 3);
   TestValue("precision(cast(1 as smallint))", TYPE_INT, 5);
-  TestValue("precision(cast(123 as bigint))", TYPE_INT, 20);
+  TestValue("precision(cast(123 as bigint))", TYPE_INT, 19);
   TestValue("precision(cast(123 as float))", TYPE_INT, 38);
   TestValue("scale(cast(123 as float))", TYPE_INT, 9);
-  TestValue("precision(123.45)", TYPE_INT, 38);
-  TestValue("scale(123.45)", TYPE_INT, 17);
+  TestValue("precision(cast(123.45 as double))", TYPE_INT, 38);
+  TestValue("scale(cast(123.45 as double))", TYPE_INT, 17);
+  TestValue("precision(123.45)", TYPE_INT, 5);
+  TestValue("scale(123.45)", TYPE_INT, 2);
   TestValue("precision(1 + 1)", TYPE_INT, 5);
   TestValue("scale(1 + 1)", TYPE_INT, 0);
   TestValue("precision(1 + 1)", TYPE_INT, 5);

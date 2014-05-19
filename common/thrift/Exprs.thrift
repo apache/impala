@@ -37,9 +37,9 @@ enum TExprNodeType {
   TUPLE_IS_NULL_PRED,
   FUNCTION_CALL,
   AGGREGATE_EXPR,
-
   // TODO: old style compute functions. this will be deprecated
   COMPUTE_FUNCTION_CALL,
+  DECIMAL_LITERAL,
 }
 
 struct TBoolLiteral {
@@ -53,6 +53,12 @@ struct TCaseExpr {
 
 struct TDateLiteral {
   1: required Types.TTimestamp value
+}
+
+struct TDecimalLiteral {
+  // Value of the unscaled decimal in two's complement big endian
+  // i.e. BigInteger.getBytes()
+  1: required binary value
 }
 
 struct TFloatLiteral {
@@ -115,6 +121,7 @@ struct TExprNode {
   15: optional TSlotRef slot_ref
   16: optional TStringLiteral string_literal
   17: optional TTupleIsNullPredicate tuple_is_null_pred
+  18: optional TDecimalLiteral decimal_literal
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

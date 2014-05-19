@@ -570,12 +570,9 @@ public class ParserTest {
     ParsesOk(String.format("select -%s", Double.toString(Double.MIN_VALUE)));
     ParsesOk(String.format("select -%s", Double.toString(Double.MAX_VALUE)));
 
-    // Java converts a float underflow to 0.0.
-    // Since there is no easy, reliable way to detect underflow,
-    // we don't consider it an error.
+    // Test overflow and underflow
     ParsesOk(String.format("select %s1", Double.toString(Double.MIN_VALUE)));
-    // java converts a float overflow to infinity, we consider it an error
-    ParserError(String.format("select %s1", Double.toString(Double.MAX_VALUE)));
+    ParsesOk(String.format("select %s1", Double.toString(Double.MAX_VALUE)));
   }
 
   @Test
@@ -658,30 +655,31 @@ public class ParserTest {
     ParsesOk("select a + + + 1 from t where a + + + 1", ArithmeticExpr.class);
 
     // float literals
-    ParsesOk("select +1.0 from t where +1.0", FloatLiteral.class);
-    ParsesOk("select +-1.0 from t where +-1.0", FloatLiteral.class);
+    ParsesOk("select +1.0 from t where +1.0", DecimalLiteral.class);
+    ParsesOk("select +-1.0 from t where +-1.0", DecimalLiteral.class);
     ParsesOk("select +1.-0 from t where +1.-0", ArithmeticExpr.class);
+
     // test scientific notation
-    ParsesOk("select 8e6 from t where 8e6", FloatLiteral.class);
-    ParsesOk("select +8e6 from t where +8e6", FloatLiteral.class);
-    ParsesOk("select 8e+6 from t where 8e+6", FloatLiteral.class);
-    ParsesOk("select -8e6 from t where -8e6", FloatLiteral.class);
-    ParsesOk("select 8e-6 from t where 8e-6", FloatLiteral.class);
-    ParsesOk("select -8e-6 from t where -8e-6", FloatLiteral.class);
+    ParsesOk("select 8e6 from t where 8e6", DecimalLiteral.class);
+    ParsesOk("select +8e6 from t where +8e6", DecimalLiteral.class);
+    ParsesOk("select 8e+6 from t where 8e+6", DecimalLiteral.class);
+    ParsesOk("select -8e6 from t where -8e6", DecimalLiteral.class);
+    ParsesOk("select 8e-6 from t where 8e-6", DecimalLiteral.class);
+    ParsesOk("select -8e-6 from t where -8e-6", DecimalLiteral.class);
     // with a decimal point
-    ParsesOk("select 4.5e2 from t where 4.5e2", FloatLiteral.class);
-    ParsesOk("select +4.5e2 from t where +4.5e2", FloatLiteral.class);
-    ParsesOk("select 4.5e+2 from t where 4.5e+2", FloatLiteral.class);
-    ParsesOk("select -4.5e2 from t where -4.5e2", FloatLiteral.class);
-    ParsesOk("select 4.5e-2 from t where 4.5e-2", FloatLiteral.class);
-    ParsesOk("select -4.5e-2 from t where -4.5e-2", FloatLiteral.class);
+    ParsesOk("select 4.5e2 from t where 4.5e2", DecimalLiteral.class);
+    ParsesOk("select +4.5e2 from t where +4.5e2", DecimalLiteral.class);
+    ParsesOk("select 4.5e+2 from t where 4.5e+2", DecimalLiteral.class);
+    ParsesOk("select -4.5e2 from t where -4.5e2", DecimalLiteral.class);
+    ParsesOk("select 4.5e-2 from t where 4.5e-2", DecimalLiteral.class);
+    ParsesOk("select -4.5e-2 from t where -4.5e-2", DecimalLiteral.class);
     // with a decimal point but without a number before the decimal
-    ParsesOk("select .7e9 from t where .7e9", FloatLiteral.class);
-    ParsesOk("select +.7e9 from t where +.7e9", FloatLiteral.class);
-    ParsesOk("select .7e+9 from t where .7e+9", FloatLiteral.class);
-    ParsesOk("select -.7e9 from t where -.7e9", FloatLiteral.class);
-    ParsesOk("select .7e-9 from t where .7e-9", FloatLiteral.class);
-    ParsesOk("select -.7e-9 from t where -.7e-9", FloatLiteral.class);
+    ParsesOk("select .7e9 from t where .7e9", DecimalLiteral.class);
+    ParsesOk("select +.7e9 from t where +.7e9", DecimalLiteral.class);
+    ParsesOk("select .7e+9 from t where .7e+9", DecimalLiteral.class);
+    ParsesOk("select -.7e9 from t where -.7e9", DecimalLiteral.class);
+    ParsesOk("select .7e-9 from t where .7e-9", DecimalLiteral.class);
+    ParsesOk("select -.7e-9 from t where -.7e-9", DecimalLiteral.class);
 
     // mixed signs
     ParsesOk("select -+-1 from t where -+-1", IntLiteral.class);

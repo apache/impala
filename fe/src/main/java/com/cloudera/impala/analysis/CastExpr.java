@@ -79,9 +79,7 @@ public class CastExpr extends Expr {
         // For some reason we don't allow string->bool.
         // TODO: revisit
         if (t1.isStringType() && t2.isBoolean()) continue;
-
-        // Disable casting from decimal to boolean and to timestamp
-        if (t1.isDecimal() && (t2.isBoolean() || t2.isDateType())) continue;
+        // Disable casting from boolean/timestamp to decimal
         if ((t1.isBoolean() || t1.isDateType()) && t2.isDecimal()) continue;
         db.addBuiltin(ScalarFunction.createBuiltinOperator(
             CAST_FN_NAME, Lists.newArrayList(t1, t2), t2));
@@ -130,6 +128,15 @@ public class CastExpr extends Expr {
 
   private void analyze() throws AnalysisException {
     targetType_.analyze();
+
+    if (children_.get(0) instanceof DecimalLiteral &&
+        targetType_.isFloatingPointType()) {
+      // Special case casting a decimal literal to a floating point number. The
+      // decimal literal can be interpreted as either and we want to avoid casts
+      // since that can result in loss of accuracy.
+      ((DecimalLiteral)children_.get(0)).explicitlyCastToFloat(targetType_);
+    }
+
     // Our cast fn currently takes two arguments. The first is the value to cast and the
     // second is a dummy of the type to cast to. We need this to be able to resolve the
     // proper function.
@@ -156,7 +163,8 @@ public class CastExpr extends Expr {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
           " from " + args[0] + " to " + args[1]);
     }
-    Preconditions.checkState(targetType_.matchesType(fn_.getReturnType()));
+    Preconditions.checkState(targetType_.matchesType(fn_.getReturnType()),
+        targetType_ + " != " + fn_.getReturnType());
     type_ = targetType_;
   }
 

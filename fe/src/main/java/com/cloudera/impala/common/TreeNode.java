@@ -53,6 +53,11 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
    */
   public <C extends TreeNode<NodeType>, D extends C> void collect(
       Predicate<? super C> predicate, List<D> matches) {
+    // TODO: the semantics of this function are very strange. contains()
+    // checks using .equals() on the nodes. In the case of literals, slotrefs
+    // and maybe others, two different tree node objects can be equal and
+    // this function would only return one of them. This is not intuitive.
+    // We rely on these semantics to not have duplicate nodes. Investigate this.
     if (predicate.apply((C) this) && !matches.contains(this)) {
       matches.add((D) this);
       return;
@@ -60,6 +65,22 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
 
     for (NodeType child: children_) {
       child.collect(predicate, matches);
+    }
+  }
+
+  /**
+   * Add all nodes in the tree that satisfy 'predicate' to the list 'matches'
+   * This node is checked first, followed by its children in order. All nodes
+   * that match in the subtree are added.
+   */
+  public <C extends TreeNode<NodeType>, D extends C> void collectAll(
+      Predicate<? super C> predicate, List<D> matches) {
+    if (predicate.apply((C) this)) {
+      matches.add((D) this);
+    }
+
+    for (NodeType child: children_) {
+      child.collectAll(predicate, matches);
     }
   }
 

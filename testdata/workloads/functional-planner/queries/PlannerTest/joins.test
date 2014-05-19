@@ -165,7 +165,7 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 ---- PLAN
 04:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: a.id = c.id, b.string_col = c.string_col
-|  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0.0, (b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000)
+|  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
 |
 |--02:SCAN HDFS [functional.alltypesaggnonulls c]
 |     partitions=2/10 size=148.10KB compact
@@ -185,7 +185,7 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 |
 04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: a.id = c.id, b.string_col = c.string_col
-|  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0.0, (b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000)
+|  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
 |
 |--08:EXCHANGE [PARTITION=HASH(c.id,c.string_col)]
 |  |

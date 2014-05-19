@@ -295,7 +295,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.tinyint_col = c.id
-|  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
+|  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
 |
 |--00:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 size=6.32KB compact
@@ -329,7 +329,7 @@ NODE 2:
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.tinyint_col = c.id
-|  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
+|  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -605,7 +605,7 @@ and   c2 > 10
 01:AGGREGATE [FINALIZE]
 |  output: count(*), sum(functional.alltypesagg.int_col), count(functional.alltypesagg.int_col)
 |  group by: functional.alltypesagg.int_col % 7
-|  having: sum(int_col) / count(int_col) > 500.0 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
+|  having: sum(int_col) / count(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=743.67KB
@@ -615,7 +615,7 @@ and   c2 > 10
 03:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*)), sum(sum(int_col)), sum(count(int_col))
 |  group by: int_col % 7
-|  having: sum(int_col) / count(int_col) > 500.0 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
+|  having: sum(int_col) / count(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
 |
 02:EXCHANGE [PARTITION=HASH(int_col % 7)]
 |
@@ -764,7 +764,7 @@ and x.int_col + x.float_col + CAST(c.string_col AS FLOAT) < 1000
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.tinyint_col = c.id
-|  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
+|  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
 |
 |--03:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 size=6.32KB compact
@@ -785,7 +785,7 @@ and x.int_col + x.float_col + CAST(c.string_col AS FLOAT) < 1000
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.tinyint_col = c.id
-|  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
+|  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
 |
 |--06:EXCHANGE [BROADCAST]
 |  |

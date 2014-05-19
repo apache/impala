@@ -154,7 +154,7 @@ where t.x > 10
 01:AGGREGATE [FINALIZE]
 |  output: sum(bigint_col), count(bigint_col)
 |  group by: int_col
-|  having: sum(bigint_col) / count(bigint_col) > 10.0
+|  having: sum(bigint_col) / count(bigint_col) > 10
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB

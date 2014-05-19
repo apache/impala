@@ -589,7 +589,7 @@ LIMIT 100
 |
 |--02:SCAN HDFS [tpcds.store s]
 |     partitions=1/1 size=3.08KB compact
-|     predicates: s_gmt_offset = -5.0
+|     predicates: s_gmt_offset = -5
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
@@ -626,7 +626,7 @@ LIMIT 100
 |  |
 |  02:SCAN HDFS [tpcds.store s]
 |     partitions=1/1 size=3.08KB
-|     predicates: s_gmt_offset = -5.0
+|     predicates: s_gmt_offset = -5
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
@@ -1818,7 +1818,7 @@ LIMIT 100
 |  |
 |  |--02:SCAN HDFS [tpcds.household_demographics hd]
 |  |     partitions=1/1 size=148.10KB compact
-|  |     predicates: (hd.hd_buy_potential = '>10000' OR hd.hd_buy_potential = 'unknown'), hd.hd_vehicle_count > 0, CASE WHEN hd.hd_vehicle_count > 0 THEN hd.hd_dep_count / hd.hd_vehicle_count ELSE NULL END > 1.0
+|  |     predicates: (hd.hd_buy_potential = '>10000' OR hd.hd_buy_potential = 'unknown'), hd.hd_vehicle_count > 0, CASE WHEN hd.hd_vehicle_count > 0 THEN hd.hd_dep_count / hd.hd_vehicle_count ELSE NULL END > 1
 |  |
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss.ss_sold_date_sk = d.d_date_sk
@@ -1873,7 +1873,7 @@ LIMIT 100
 |  |  |
 |  |  02:SCAN HDFS [tpcds.household_demographics hd]
 |  |     partitions=1/1 size=148.10KB
-|  |     predicates: (hd.hd_buy_potential = '>10000' OR hd.hd_buy_potential = 'unknown'), hd.hd_vehicle_count > 0, CASE WHEN hd.hd_vehicle_count > 0 THEN hd.hd_dep_count / hd.hd_vehicle_count ELSE NULL END > 1.0
+|  |     predicates: (hd.hd_buy_potential = '>10000' OR hd.hd_buy_potential = 'unknown'), hd.hd_vehicle_count > 0, CASE WHEN hd.hd_vehicle_count > 0 THEN hd.hd_dep_count / hd.hd_vehicle_count ELSE NULL END > 1
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss.ss_sold_date_sk = d.d_date_sk

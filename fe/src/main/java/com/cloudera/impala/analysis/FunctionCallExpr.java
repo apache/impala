@@ -23,7 +23,6 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
@@ -178,7 +177,7 @@ public class FunctionCallExpr extends Expr {
    * We should add a prepare_fn() to UDFs for doing this.
    */
   private ColumnType resolveDecimalReturnType(Analyzer analyzer)
-      throws AnalysisException {
+      throws AnalysisException, AuthorizationException {
     Preconditions.checkState(type_.isWildcardDecimal());
     Preconditions.checkState(fn_.getBinaryType() == TFunctionBinaryType.BUILTIN);
     Preconditions.checkState(children_.size() > 0);
@@ -206,8 +205,6 @@ public class FunctionCallExpr extends Expr {
               "() cannot be called with a NULL second argument.");
         }
 
-        Preconditions.checkState(
-            children_.get(1).type_.getPrimitiveType() == PrimitiveType.INT);
         if (!children_.get(1).isConstant()) {
           // We don't allow calling truncate or round with a non-constant second
           // (desired scale) argument. e.g. select round(col1, col2). This would
@@ -217,14 +214,16 @@ public class FunctionCallExpr extends Expr {
           throw new AnalysisException(fnName_.getFunction() +
               "() must be called with a constant second argument.");
         }
-        IntLiteral scaleLiteral =
-            (IntLiteral)LiteralExpr.create(children_.get(1), analyzer.getQueryContext());
+        IntLiteral scaleLiteral = (IntLiteral)LiteralExpr.create(
+            children_.get(1), analyzer.getQueryContext());
         resultScale = (int)scaleLiteral.getValue();
         if (Math.abs(resultScale) > ColumnType.MAX_SCALE) {
           throw new AnalysisException("Cannot round/truncate to scales greater than " +
               ColumnType.MAX_SCALE + ".");
         }
+        children_.set(1, scaleLiteral.uncheckedCastTo(ColumnType.INT));
       }
+
       if (resultScale < 0) {
         // Round/Truncate to a negative scale means to round to the digit before
         // the decimal e.g. round(1234.56, -2) would be 1200.

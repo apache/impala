@@ -639,6 +639,8 @@ public class InsertStmt extends StatementBase {
     return strBuilder.toString();
   }
 
+  @Override
   public void setIsExplain(boolean isExplain) { isExplain_ = isExplain; }
+  @Override
   public boolean isExplain() { return isExplain_; }
 }
