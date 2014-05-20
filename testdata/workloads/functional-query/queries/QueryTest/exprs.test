@@ -1,5 +1,14 @@
 ====
 ---- QUERY
+# Regression test for IMPALA-938
+select smallint_col, int_col, (cast("1970-01-01" as timestamp) + interval smallint_col days)
+from functional.alltypes where smallint_col = 1 limit 1
+---- TYPES
+smallint, int, timestamp
+---- RESULTS
+1,1,1970-01-02 00:00:00
+====
+---- QUERY
 # check that add_months alias is working
 select ADD_MONTHS(cast('2013-02-18 16:46:00.01' as timestamp), 1)
 ---- TYPES
