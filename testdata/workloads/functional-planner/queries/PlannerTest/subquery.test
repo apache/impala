@@ -1045,3 +1045,17 @@ inner join
 00:SCAN HDFS [functional.alltypessmall x]
    partitions=4/4 size=6.32KB
 ====
+# Tests that views correctly reanalyze cloned exprs. (IMPALA-984)
+select b.* from functional.decimal_tbl a left outer join
+  (select d1, d1 + NULL IS NULL x from functional.decimal_tbl) b
+on (a.d1 = b.d1)
+---- PLAN
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.d1 = d1
+|
+|--01:SCAN HDFS [functional.decimal_tbl]
+|     partitions=1/1 size=195B compact
+|
+00:SCAN HDFS [functional.decimal_tbl a]
+   partitions=1/1 size=195B
+====

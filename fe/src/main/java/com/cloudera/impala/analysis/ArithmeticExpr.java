@@ -138,7 +138,7 @@ public class ArithmeticExpr extends Expr {
   void castChild(int childIdx, ColumnType targetType) throws AnalysisException {
     ColumnType t = getChild(childIdx).getType();
     if (t.matchesType(targetType)) return;
-    if (targetType.isDecimal()) targetType = t.getMinResolutionDecimal();
+    if (targetType.isDecimal() && !t.isNull()) targetType = t.getMinResolutionDecimal();
     castChild(targetType, childIdx);
   }
 
@@ -158,6 +158,11 @@ public class ArithmeticExpr extends Expr {
     // bitnot is the only unary op, deal with it here
     if (op_ == Operator.BITNOT) {
       type_ = getChild(0).getType();
+      if (type_.isNull()) {
+        // Special case ~NULL to resolve to TYPE_INT.
+        type_ = ColumnType.INT;
+        castChild(0, type_);
+      }
       fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
           CompareMode.IS_SUPERTYPE_OF);
       if (fn_ == null) {
@@ -209,6 +214,14 @@ public class ArithmeticExpr extends Expr {
     if ((t1.isFloatingPointType() || t2.isFloatingPointType()) &&
         op_ == ArithmeticExpr.Operator.MOD) {
       fnName = "fmod";
+    }
+
+    // In this case, both the children are null types, so we'll just default to
+    // the INT version of the operator. This prevents the BE from seeing NULL_TYPE.
+    if (type_.isNull()) {
+      Preconditions.checkState(getChild(0).type_.isNull());
+      Preconditions.checkState(getChild(1).type_.isNull());
+      type_ = ColumnType.INT;
     }
 
     castChild(0, type_);

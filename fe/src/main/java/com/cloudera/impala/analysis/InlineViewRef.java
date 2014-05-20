@@ -227,7 +227,7 @@ public class InlineViewRef extends TableRef {
     Preconditions.checkState(isNotNullLiteralPred.isConstant());
     // analyze to insert casts, etc.
     try {
-      isNotNullLiteralPred.analyze(analyzer);
+      isNotNullLiteralPred.reanalyze(analyzer);
     } catch (AnalysisException e) {
       // this should never happen
       throw new InternalException(

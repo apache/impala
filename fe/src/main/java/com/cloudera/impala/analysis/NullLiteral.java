@@ -42,7 +42,7 @@ public class NullLiteral extends LiteralExpr {
 
   @Override
   public String debugString() {
-    return Objects.toStringHelper(this).toString();
+    return Objects.toStringHelper(this).addValue(super.debugString()).toString();
   }
 
   @Override

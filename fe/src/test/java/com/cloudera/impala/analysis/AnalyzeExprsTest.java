@@ -486,8 +486,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         ColumnType compatibleType =
             ColumnType.getAssignmentCompatibleType(type1, type2);
         ColumnType promotedType = compatibleType.getNextResolutionType();
+        boolean inputsNull = false;
         if (type1.isNull() && type2.isNull()) {
-          promotedType = compatibleType;
+          inputsNull = true;
+          promotedType = compatibleType = ColumnType.INT;
         }
 
         // +, -, *, %
@@ -510,9 +512,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
         // /
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.DIVIDE, null,
-            promotedType.isNull() ? promotedType : ColumnType.DOUBLE);
+            inputsNull ? promotedType : ColumnType.DOUBLE);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.DIVIDE, null,
-            promotedType.isNull() ? promotedType : ColumnType.DOUBLE);
+            inputsNull ? promotedType : ColumnType.DOUBLE);
 
         // div, &, |, ^ only for fixed-point types
         if ((!type1.isFixedPointType() && !type1.isNull())
@@ -542,7 +544,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         ColumnType.getIntegerTypes());
     fixedPointTypes.add(ColumnType.NULL);
     for (ColumnType type: fixedPointTypes) {
-      typeCastTest(null, type, false, ArithmeticExpr.Operator.BITNOT, null, type);
+      typeCastTest(null, type, false, ArithmeticExpr.Operator.BITNOT, null,
+          type.isNull() ? ColumnType.INT : type);
     }
   }
 
@@ -597,7 +600,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       queryStr = "select int_col from functional.alltypes " +
           "where " + op1 + " " + cmpOp.toString() + " " + op2;
     }
-    System.err.println(queryStr);
     SelectStmt select = (SelectStmt) AnalyzesOk(queryStr);
     Expr expr = null;
     if (arithmeticMode) {
