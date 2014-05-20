@@ -23,6 +23,7 @@ import org.apache.log4j.Logger;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
@@ -54,6 +55,10 @@ public class ComputeStatsStmt extends StatementBase {
 
   // Set during analysis.
   protected Table table_;
+
+  // The Null count is not currently being used in optimization or run-time,
+  // and compute stats runs 2x faster in many cases when not counting NULLs.
+  private static final boolean COUNT_NULLS = false;
 
   // Query for getting the per-partition row count and the total row count.
   // Set during analysis.
@@ -113,24 +118,35 @@ public class ComputeStatsStmt extends StatementBase {
     int startColIdx = (table_ instanceof HBaseTable) ? 0 : table_.getNumClusteringCols();
     for (int i = startColIdx; i < table_.getColumns().size(); ++i) {
       Column c = table_.getColumns().get(i);
+      ColumnType ctype = c.getType();
+
       // Ignore columns with an invalid/unsupported type. For example, complex types in
       // an HBase-backed table will appear as invalid types.
-      if (!c.getType().isValid() || !c.getType().isSupported()) continue;
+      if (!ctype.isValid() || !ctype.isSupported()) continue;
       // NDV approximation function. Add explicit alias for later identification when
       // updating the Metastore.
       String colRefSql = ToSqlUtils.getIdentSql(c.getName());
       columnStatsSelectList.add("NDV(" + colRefSql + ") AS " + colRefSql);
-      // Count the number of NULL values.
-      columnStatsSelectList.add("COUNT(IF(" + colRefSql + " IS NULL, 1, NULL))");
+
+      if (COUNT_NULLS) {
+        // Count the number of NULL values.
+        columnStatsSelectList.add("COUNT(IF(" + colRefSql + " IS NULL, 1, NULL))");
+      } else {
+        // Using -1 to indicate "unknown"
+        columnStatsSelectList.add("-1");
+      }
+
       // For STRING columns also compute the max and avg string length.
-      if (c.getType().isStringType()) {
+      if (ctype.isStringType()) {
         columnStatsSelectList.add("MAX(length(" + colRefSql + "))");
         columnStatsSelectList.add("AVG(length(" + colRefSql + "))");
       } else {
-        // For non-STRING columns use -1 as the max/avg length to avoid having to
+        // For non-STRING columns we use the fixed size of the type.
+        // We store the same information for all types to avoid having to
         // treat STRING columns specially in the BE CatalogOpExecutor.
-        columnStatsSelectList.add("CAST(-1 as INT)");
-        columnStatsSelectList.add("CAST(-1 as DOUBLE)");
+        Integer typeSize = ctype.getPrimitiveType().getSlotSize();
+        columnStatsSelectList.add(typeSize.toString());
+        columnStatsSelectList.add("CAST(" + typeSize.toString() + " as DOUBLE)");
       }
     }
     columnStatsQueryBuilder.append(Joiner.on(", ").join(columnStatsSelectList));

@@ -90,7 +90,7 @@ public class ColumnType {
   private static ArrayList<ColumnType> supportedTypes;
 
   static {
-    fixedSizeNumericTypes = Lists.newArrayList();
+    fixedSizeNumericTypes = Lists.newArrayListWithExpectedSize(6);
     fixedSizeNumericTypes.add(TINYINT);
     fixedSizeNumericTypes.add(SMALLINT);
     fixedSizeNumericTypes.add(INT);
@@ -98,13 +98,13 @@ public class ColumnType {
     fixedSizeNumericTypes.add(FLOAT);
     fixedSizeNumericTypes.add(DOUBLE);
 
-    integerTypes = Lists.newArrayList();
+    integerTypes = Lists.newArrayListWithExpectedSize(4);
     integerTypes.add(TINYINT);
     integerTypes.add(SMALLINT);
     integerTypes.add(INT);
     integerTypes.add(BIGINT);
 
-    numericTypes = Lists.newArrayList();
+    numericTypes = Lists.newArrayListWithExpectedSize(7);
     numericTypes.add(TINYINT);
     numericTypes.add(SMALLINT);
     numericTypes.add(INT);
@@ -113,7 +113,7 @@ public class ColumnType {
     numericTypes.add(DOUBLE);
     numericTypes.add(DECIMAL);
 
-    supportedTypes = Lists.newArrayList();
+    supportedTypes = Lists.newArrayListWithExpectedSize(11);
     supportedTypes.add(NULL);
     supportedTypes.add(BOOLEAN);
     supportedTypes.add(TINYINT);
@@ -168,7 +168,7 @@ public class ColumnType {
 
   public static ColumnType createDecimalType(int precision, int scale) {
     Preconditions.checkState(precision >= 0); // Enforced by parser
-    Preconditions.checkState(scale >= 0); // Encforced by parser.
+    Preconditions.checkState(scale >= 0); // Enforced by parser.
     ColumnType type = new ColumnType(PrimitiveType.DECIMAL);
     type.precision_ = precision;
     type.scale_ = scale;
