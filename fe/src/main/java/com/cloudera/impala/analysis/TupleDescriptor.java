@@ -122,18 +122,16 @@ public class TupleDescriptor {
     // populate slotsBySize; also compute avgSerializedSize
     int numNullableSlots = 0;
     for (SlotDescriptor d: slots_) {
+      if (!d.isMaterialized()) continue;
       ColumnStats stats = d.getStats();
-      // TODO: fix this, we don't need to serialize non-materialized slots
       if (stats.hasAvgSerializedSize()) {
         avgSerializedSize_ += d.getStats().getAvgSerializedSize();
       } else {
         // TODO: for computed slots, try to come up with stats estimates
         avgSerializedSize_ += d.getType().getSlotSize();
       }
-      if (d.isMaterialized()) {
-        slotsBySize.get(d.getType().getSlotSize()).add(d);
-        if (d.getIsNullable()) ++numNullableSlots;
-      }
+      slotsBySize.get(d.getType().getSlotSize()).add(d);
+      if (d.getIsNullable()) ++numNullableSlots;
     }
     // we shouldn't have anything of size 0
     Preconditions.checkState(slotsBySize.get(0).isEmpty());
@@ -155,6 +153,7 @@ public class TupleDescriptor {
       }
 
       for (SlotDescriptor d: slotsBySize.get(slotSize)) {
+        Preconditions.checkState(d.isMaterialized());
         d.setByteSize(slotSize);
         d.setByteOffset(offset);
         d.setSlotIdx(slotIdx++);

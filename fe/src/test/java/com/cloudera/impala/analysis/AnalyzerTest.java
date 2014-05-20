@@ -249,16 +249,19 @@ public class AnalyzerTest {
   public void TestMemLayout() throws AnalysisException, AuthorizationException {
     testSelectStar();
     testNonNullable();
-    TestMixedNullable();
+    testMixedNullable();
+    testNonMaterializedSlots();
   }
 
   private void testSelectStar() throws AnalysisException, AuthorizationException {
     AnalyzesOk("select * from functional.AllTypes");
     DescriptorTable descTbl = analyzer_.getDescTbl();
-    for (SlotDescriptor slotD : descTbl.getTupleDesc(new TupleId(0)).getSlots()) {
+    TupleDescriptor tupleD = descTbl.getTupleDesc(new TupleId(0));
+    for (SlotDescriptor slotD: tupleD.getSlots()) {
       slotD.setIsMaterialized(true);
     }
     descTbl.computeMemLayout();
+    Assert.assertEquals(97.0f, tupleD.getAvgSerializedSize());
     checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0);
     checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1);
     checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2);
@@ -271,7 +274,8 @@ public class AnalyzerTest {
     checkLayoutParams("functional.alltypes.double_col", 8, 40, 1, 1);
     int strSlotSize = PrimitiveType.STRING.getSlotSize();
     checkLayoutParams("functional.alltypes.date_string_col", strSlotSize, 48, 1, 2);
-    checkLayoutParams("functional.alltypes.string_col", strSlotSize, 48 + strSlotSize, 1, 3);
+    checkLayoutParams("functional.alltypes.string_col",
+        strSlotSize, 48 + strSlotSize, 1, 3);
   }
 
   private void testNonNullable() throws AnalysisException {
@@ -281,18 +285,18 @@ public class AnalyzerTest {
     // 8 - 15: count(*)
     AnalyzesOk("select count(int_col), count(*) from functional.AllTypes");
     DescriptorTable descTbl = analyzer_.getDescTbl();
-    com.cloudera.impala.analysis.TupleDescriptor aggDesc =
-        descTbl.getTupleDesc(new TupleId(1));
+    TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
     for (SlotDescriptor slotD: aggDesc.getSlots()) {
       slotD.setIsMaterialized(true);
     }
     descTbl.computeMemLayout();
-    Assert.assertEquals(aggDesc.getByteSize(), 16);
+    Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize());
+    Assert.assertEquals(16, aggDesc.getByteSize());
     checkLayoutParams(aggDesc.getSlots().get(0), 8, 0, 0, -1);
     checkLayoutParams(aggDesc.getSlots().get(1), 8, 8, 0, -1);
   }
 
-  private void TestMixedNullable() throws AnalysisException {
+  private void testMixedNullable() throws AnalysisException {
     // one slot is nullable, one is not. The layout should look like:
     // (byte range : data)
     // 0 : 1 nullable-byte (only 1 bit used)
@@ -301,15 +305,50 @@ public class AnalyzerTest {
     // 16 - 23: count(*)
     AnalyzesOk("select sum(int_col), count(*) from functional.AllTypes");
     DescriptorTable descTbl = analyzer_.getDescTbl();
-    com.cloudera.impala.analysis.TupleDescriptor aggDesc =
-        descTbl.getTupleDesc(new TupleId(1));
+    TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
     for (SlotDescriptor slotD: aggDesc.getSlots()) {
       slotD.setIsMaterialized(true);
     }
     descTbl.computeMemLayout();
-    Assert.assertEquals(aggDesc.getByteSize(), 24);
+    Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize());
+    Assert.assertEquals(24, aggDesc.getByteSize());
     checkLayoutParams(aggDesc.getSlots().get(0), 8, 8, 0, 0);
     checkLayoutParams(aggDesc.getSlots().get(1), 8, 16, 0, -1);
+  }
+
+  /**
+   * Tests that computeMemLayout() ignores non-materialized slots.
+   */
+  private void testNonMaterializedSlots() throws AnalysisException {
+    AnalyzesOk("select * from functional.alltypes");
+    DescriptorTable descTbl = analyzer_.getDescTbl();
+    TupleDescriptor tupleD = descTbl.getTupleDesc(new TupleId(0));
+    ArrayList<SlotDescriptor> slots = tupleD.getSlots();
+    for (SlotDescriptor slotD: slots) {
+      slotD.setIsMaterialized(true);
+    }
+    // Mark slots 0 (id), 7 (double_col), 9 (string_col) as non-materialized.
+    slots.get(0).setIsMaterialized(false);
+    slots.get(7).setIsMaterialized(false);
+    slots.get(9).setIsMaterialized(false);
+
+    descTbl.computeMemLayout();
+    Assert.assertEquals(68.0f, tupleD.getAvgSerializedSize());
+    // Check non-materialized slots.
+    checkLayoutParams("functional.alltypes.id", 0, -1, 0, 0);
+    checkLayoutParams("functional.alltypes.double_col", 0, -1, 0, 0);
+    checkLayoutParams("functional.alltypes.string_col", 0, -1, 0, 0);
+    // Check materialized slots.
+    checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0);
+    checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1);
+    checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2);
+    checkLayoutParams("functional.alltypes.int_col", 4, 8, 0, 3);
+    checkLayoutParams("functional.alltypes.float_col", 4, 12, 0, 4);
+    checkLayoutParams("functional.alltypes.year", 4, 16, 0, 5);
+    checkLayoutParams("functional.alltypes.month", 4, 20, 0, 6);
+    checkLayoutParams("functional.alltypes.bigint_col", 8, 24, 0, 7);
+    int strSlotSize = PrimitiveType.STRING.getSlotSize();
+    checkLayoutParams("functional.alltypes.date_string_col", strSlotSize, 32, 1, 0);
   }
 
   private void checkLayoutParams(SlotDescriptor d, int byteSize, int byteOffset,

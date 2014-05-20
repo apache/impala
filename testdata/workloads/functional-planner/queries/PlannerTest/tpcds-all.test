@@ -2074,14 +2074,14 @@ limit 100
 |     partitions=1/1 size=4.82MB compact
 |
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: store_sales.ss_cdemo_sk = customer_demographics.cd_demo_sk
+|  hash predicates: customer_demographics.cd_demo_sk = store_sales.ss_cdemo_sk
 |
-|--01:SCAN HDFS [tpcds.customer_demographics]
-|     partitions=1/1 size=76.92MB compact
-|     predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
+|--00:SCAN HDFS [tpcds.store_sales]
+|     partitions=23/120 size=4.32MB compact
 |
-00:SCAN HDFS [tpcds.store_sales]
-   partitions=23/120 size=4.32MB
+01:SCAN HDFS [tpcds.customer_demographics]
+   partitions=1/1 size=76.92MB
+   predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
 ---- DISTRIBUTEDPLAN
 16:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC
@@ -2119,18 +2119,18 @@ limit 100
 |     partitions=1/1 size=4.82MB
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: store_sales.ss_cdemo_sk = customer_demographics.cd_demo_sk
+|  hash predicates: customer_demographics.cd_demo_sk = store_sales.ss_cdemo_sk
 |
-|--10:EXCHANGE [PARTITION=HASH(customer_demographics.cd_demo_sk)]
+|--10:EXCHANGE [PARTITION=HASH(store_sales.ss_cdemo_sk)]
 |  |
-|  01:SCAN HDFS [tpcds.customer_demographics]
-|     partitions=1/1 size=76.92MB
-|     predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
+|  00:SCAN HDFS [tpcds.store_sales]
+|     partitions=23/120 size=4.32MB
 |
-09:EXCHANGE [PARTITION=HASH(store_sales.ss_cdemo_sk)]
+09:EXCHANGE [PARTITION=HASH(customer_demographics.cd_demo_sk)]
 |
-00:SCAN HDFS [tpcds.store_sales]
-   partitions=23/120 size=4.32MB
+01:SCAN HDFS [tpcds.customer_demographics]
+   partitions=1/1 size=76.92MB
+   predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
 ====
 # TPCDS-Q89
 select

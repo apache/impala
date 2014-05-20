@@ -78,25 +78,23 @@ from (select * from functional.alltypestiny) t1
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
 ---- DISTRIBUTEDPLAN
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+07:EXCHANGE [PARTITION=UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: coalesce(functional.alltypestiny.id, functional.alltypestiny.id) = t3.id
 |
-|--07:EXCHANGE [BROADCAST]
+|--06:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny t3]
 |     partitions=4/4 size=460B
 |
-03:HASH JOIN [INNER JOIN, PARTITIONED]
+03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypestiny.id = functional.alltypestiny.id
 |
-|--06:EXCHANGE [PARTITION=HASH(functional.alltypestiny.id)]
+|--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
-|
-05:EXCHANGE [PARTITION=HASH(functional.alltypestiny.id)]
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
