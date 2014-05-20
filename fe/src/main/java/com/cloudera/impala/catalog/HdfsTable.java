@@ -1099,14 +1099,14 @@ public class HdfsTable extends Table {
     resultSchema.addToColumns(new TColumn("#Rows", ColumnType.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("#Files", ColumnType.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("Size", ColumnType.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Bytes Cached", ColumnType.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Format", ColumnType.STRING.toThrift()));
-    resultSchema.addToColumns(
-        new TColumn("IsMarkedCached", ColumnType.BOOLEAN.toThrift()));
 
     // Pretty print partitions and their stats.
     ArrayList<HdfsPartition> orderedPartitions = Lists.newArrayList(partitions_);
     Collections.sort(orderedPartitions);
 
+    long totalCachedBytes = 0L;
     for (HdfsPartition p: orderedPartitions) {
       // Ignore dummy default partition.
       if (p.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) continue;
@@ -1117,11 +1117,27 @@ public class HdfsTable extends Table {
         rowBuilder.add(expr.getStringValue());
       }
 
-      // Add number of rows, files, bytes and the file format.
+      // Add number of rows, files, bytes, cache stats, and file format.
       rowBuilder.add(p.getNumRows()).add(p.getFileDescriptors().size())
-          .addBytes(p.getSize())
-          .add(p.getInputFormatDescriptor().getFileFormat().toString())
-          .add(Boolean.toString(p.isMarkedCached()));
+          .addBytes(p.getSize());
+      if (!p.isMarkedCached()) {
+        // Helps to differentiate partitions that have 0B cached versus partitions
+        // that are not marked as cached.
+        rowBuilder.add("NOT CACHED");
+      } else {
+        // Calculate the number the number of bytes that are cached.
+        long cachedBytes = 0L;
+        for (FileDescriptor fd: p.getFileDescriptors()) {
+          for (THdfsFileBlock fb: fd.getFileBlocks()) {
+            if (fb.getIs_replica_cached().contains(true)) {
+              cachedBytes += fb.getLength();
+            }
+          }
+        }
+        totalCachedBytes += cachedBytes;
+        rowBuilder.addBytes(cachedBytes);
+      }
+      rowBuilder.add(p.getInputFormatDescriptor().getFileFormat().toString());
       result.addToRows(rowBuilder.get());
     }
 
@@ -1135,8 +1151,8 @@ public class HdfsTable extends Table {
       }
 
       // Total num rows, files, and bytes (leave format empty).
-      rowBuilder.add(numRows_).add(numHdfsFiles_).addBytes(totalHdfsBytes_).add("")
-          .add("");
+      rowBuilder.add(numRows_).add(numHdfsFiles_).addBytes(totalHdfsBytes_)
+          .addBytes(totalCachedBytes).add("");
       result.addToRows(rowBuilder.get());
     }
     return result;

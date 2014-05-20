@@ -15,35 +15,35 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.alltypes
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT, ISMARKEDCACHED
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-2009,1,310,1,'24.56KB','TEXT',false
-2009,2,280,1,'22.27KB','TEXT',false
-2009,3,310,1,'24.67KB','TEXT',false
-2009,4,300,1,'24.06KB','TEXT',false
-2009,5,310,1,'24.97KB','TEXT',false
-2009,6,300,1,'24.16KB','TEXT',false
-2009,7,310,1,'24.97KB','TEXT',false
-2009,8,310,1,'24.97KB','TEXT',false
-2009,9,300,1,'24.16KB','TEXT',false
-2009,10,310,1,'24.97KB','TEXT',false
-2009,11,300,1,'24.16KB','TEXT',false
-2009,12,310,1,'24.97KB','TEXT',false
-2010,1,310,1,'24.97KB','TEXT',false
-2010,2,280,1,'22.54KB','TEXT',false
-2010,3,310,1,'24.97KB','TEXT',false
-2010,4,300,1,'24.16KB','TEXT',false
-2010,5,310,1,'24.97KB','TEXT',false
-2010,6,300,1,'24.16KB','TEXT',false
-2010,7,310,1,'24.97KB','TEXT',false
-2010,8,310,1,'24.97KB','TEXT',false
-2010,9,300,1,'24.16KB','TEXT',false
-2010,10,310,1,'24.97KB','TEXT',false
-2010,11,300,1,'24.16KB','TEXT',false
-2010,12,310,1,'24.97KB','TEXT',false
-Total,,7300,24,'586.84KB','',
+2009,1,310,1,'24.56KB','NOT CACHED','TEXT'
+2009,2,280,1,'22.27KB','NOT CACHED','TEXT'
+2009,3,310,1,'24.67KB','NOT CACHED','TEXT'
+2009,4,300,1,'24.06KB','NOT CACHED','TEXT'
+2009,5,310,1,'24.97KB','NOT CACHED','TEXT'
+2009,6,300,1,'24.16KB','NOT CACHED','TEXT'
+2009,7,310,1,'24.97KB','NOT CACHED','TEXT'
+2009,8,310,1,'24.97KB','NOT CACHED','TEXT'
+2009,9,300,1,'24.16KB','NOT CACHED','TEXT'
+2009,10,310,1,'24.97KB','NOT CACHED','TEXT'
+2009,11,300,1,'24.16KB','NOT CACHED','TEXT'
+2009,12,310,1,'24.97KB','NOT CACHED','TEXT'
+2010,1,310,1,'24.97KB','NOT CACHED','TEXT'
+2010,2,280,1,'22.54KB','NOT CACHED','TEXT'
+2010,3,310,1,'24.97KB','NOT CACHED','TEXT'
+2010,4,300,1,'24.16KB','NOT CACHED','TEXT'
+2010,5,310,1,'24.97KB','NOT CACHED','TEXT'
+2010,6,300,1,'24.16KB','NOT CACHED','TEXT'
+2010,7,310,1,'24.97KB','NOT CACHED','TEXT'
+2010,8,310,1,'24.97KB','NOT CACHED','TEXT'
+2010,9,300,1,'24.16KB','NOT CACHED','TEXT'
+2010,10,310,1,'24.97KB','NOT CACHED','TEXT'
+2010,11,300,1,'24.16KB','NOT CACHED','TEXT'
+2010,12,310,1,'24.97KB','NOT CACHED','TEXT'
+Total,,7300,24,'586.84KB','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypes
@@ -84,11 +84,11 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.alltypesnopart
 ---- LABELS
-#ROWS, #FILES, SIZE, FORMAT, ISMARKEDCACHED
+#ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-100,3,'7.73KB','TEXT',false
+100,3,'7.73KB','NOT CACHED','TEXT'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, BOOLEAN
+BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypesnopart
@@ -126,35 +126,35 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.alltypes_parquet
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT, ISMARKEDCACHED
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-2009,1,310,1,regex:.+KB,'PARQUET',false
-2009,2,280,1,regex:.+KB,'PARQUET',false
-2009,3,310,1,regex:.+KB,'PARQUET',false
-2009,4,300,1,regex:.+KB,'PARQUET',false
-2009,5,310,1,regex:.+KB,'PARQUET',false
-2009,6,300,1,regex:.+KB,'PARQUET',false
-2009,7,310,1,regex:.+KB,'PARQUET',false
-2009,8,310,1,regex:.+KB,'PARQUET',false
-2009,9,300,1,regex:.+KB,'PARQUET',false
-2009,10,310,1,regex:.+KB,'PARQUET',false
-2009,11,300,1,regex:.+KB,'PARQUET',false
-2009,12,310,1,regex:.+KB,'PARQUET',false
-2010,1,310,1,regex:.+KB,'PARQUET',false
-2010,2,280,1,regex:.+KB,'PARQUET',false
-2010,3,310,1,regex:.+KB,'PARQUET',false
-2010,4,300,1,regex:.+KB,'PARQUET',false
-2010,5,310,1,regex:.+KB,'PARQUET',false
-2010,6,300,1,regex:.+KB,'PARQUET',false
-2010,7,310,1,regex:.+KB,'PARQUET',false
-2010,8,310,1,regex:.+KB,'PARQUET',false
-2010,9,300,1,regex:.+KB,'PARQUET',false
-2010,10,310,1,regex:.+KB,'PARQUET',false
-2010,11,300,1,regex:.+KB,'PARQUET',false
-2010,12,310,1,regex:.+KB,'PARQUET',false
-Total,,7300,24,regex:.+KB,'',
+2009,1,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,2,280,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,3,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,4,300,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,5,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,6,300,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,7,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,8,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,9,300,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,10,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,11,300,1,regex:.+KB,'NOT CACHED','PARQUET'
+2009,12,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,1,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,2,280,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,3,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,4,300,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,5,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,6,300,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,7,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,8,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,9,300,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,10,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,11,300,1,regex:.+KB,'NOT CACHED','PARQUET'
+2010,12,310,1,regex:.+KB,'NOT CACHED','PARQUET'
+Total,,7300,24,regex:.+KB,'0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypes_parquet
@@ -281,11 +281,11 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.alltypes_empty
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT, ISMARKEDCACHED
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','',
+Total,,0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypes_empty
@@ -363,11 +363,11 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.avro_alltypes
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT, ISMARKEDCACHED
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','',
+Total,,0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_alltypes
@@ -401,11 +401,11 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.avro_alltypes_extra_coldef
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT, ISMARKEDCACHED
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','',
+Total,,0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_alltypes_extra_coldef
@@ -440,11 +440,11 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.avro_alltypes_missing_coldef
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT, ISMARKEDCACHED
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','',
+Total,,0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_alltypes_missing_coldef
@@ -477,11 +477,11 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.avro_alltypes_type_mismatch
 ---- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, FORMAT, ISMARKEDCACHED
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','',
+Total,,0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_alltypes_type_mismatch

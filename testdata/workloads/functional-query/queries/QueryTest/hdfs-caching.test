@@ -23,9 +23,9 @@ INT
 ---- QUERY
 show table stats cached_tbl_nopart
 ---- RESULTS
--1,1,'2B','TEXT',true
+-1,1,'2B',regex:.+B,'TEXT'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, BOOLEAN
+BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 alter table cached_tbl_nopart set uncached
@@ -33,9 +33,9 @@ alter table cached_tbl_nopart set uncached
 ---- QUERY
 show table stats cached_tbl_nopart
 ---- RESULTS
--1,1,'2B','TEXT',false
+-1,1,'2B','NOT CACHED','TEXT'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, BOOLEAN
+BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 create table cached_tbl_part (i int) partitioned by (j int) cached in 'testPool'
@@ -54,12 +54,12 @@ alter table cached_tbl_part add partition (j=2) cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-0,-1,0,'0B','TEXT',true
-1,-1,0,'0B','TEXT',false
-2,-1,0,'0B','TEXT',true
-Total,-1,0,'0B','',
+0,-1,0,'0B',regex:.+B,'TEXT'
+1,-1,0,'0B','NOT CACHED','TEXT'
+2,-1,0,'0B',regex:.+B,'TEXT'
+Total,-1,0,'0B',regex:.+B,''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # uncache one of the partitions
@@ -68,12 +68,12 @@ alter table cached_tbl_part partition (j=2) set uncached
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-0,-1,0,'0B','TEXT',true
-1,-1,0,'0B','TEXT',false
-2,-1,0,'0B','TEXT',false
-Total,-1,0,'0B','',
+0,-1,0,'0B',regex:.+B,'TEXT'
+1,-1,0,'0B','NOT CACHED','TEXT'
+2,-1,0,'0B','NOT CACHED','TEXT'
+Total,-1,0,'0B',regex:.+B,''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # Can uncache the same partition twice without an error.
@@ -82,12 +82,12 @@ alter table cached_tbl_part partition (j=2) set uncached
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-0,-1,0,'0B','TEXT',true
-1,-1,0,'0B','TEXT',false
-2,-1,0,'0B','TEXT',false
-Total,-1,0,'0B','',
+0,-1,0,'0B',regex:.+B,'TEXT'
+1,-1,0,'0B','NOT CACHED','TEXT'
+2,-1,0,'0B','NOT CACHED','TEXT'
+Total,-1,0,'0B',regex:.+B,''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # mark an uncached partition as cached
@@ -96,12 +96,12 @@ alter table cached_tbl_part partition (j=1) set cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-0,-1,0,'0B','TEXT',true
-1,-1,0,'0B','TEXT',true
-2,-1,0,'0B','TEXT',false
-Total,-1,0,'0B','',
+0,-1,0,'0B',regex:.+B,'TEXT'
+1,-1,0,'0B',regex:.+B,'TEXT'
+2,-1,0,'0B','NOT CACHED','TEXT'
+Total,-1,0,'0B',regex:.+B,''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # dynamic partition insert inherits table properties
@@ -113,14 +113,14 @@ j=4/: 1
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-0,-1,0,'0B','TEXT',true
-1,-1,0,'0B','TEXT',true
-2,-1,0,'0B','TEXT',false
-3,-1,1,'2B','TEXT',true
-4,-1,1,'2B','TEXT',true
-Total,-1,2,'4B','',
+0,-1,0,'0B',regex:.+B,'TEXT'
+1,-1,0,'0B',regex:.+B,'TEXT'
+2,-1,0,'0B','NOT CACHED','TEXT'
+3,-1,1,'2B',regex:.+B,'TEXT'
+4,-1,1,'2B',regex:.+B,'TEXT'
+Total,-1,2,'4B',regex:.+B,''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # Set uncached clears all cache requests
@@ -130,14 +130,14 @@ alter table cached_tbl_part set uncached
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-0,-1,0,'0B','TEXT',false
-1,-1,0,'0B','TEXT',false
-2,-1,0,'0B','TEXT',false
-3,-1,1,'2B','TEXT',false
-4,-1,1,'2B','TEXT',false
-Total,-1,2,'4B','',
+0,-1,0,'0B','NOT CACHED','TEXT'
+1,-1,0,'0B','NOT CACHED','TEXT'
+2,-1,0,'0B','NOT CACHED','TEXT'
+3,-1,1,'2B','NOT CACHED','TEXT'
+4,-1,1,'2B','NOT CACHED','TEXT'
+Total,-1,2,'4B',regex:.+B,''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # Can call set uncached multiple times on the same partitioned table
@@ -152,14 +152,14 @@ alter table cached_tbl_part set cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-0,-1,0,'0B','TEXT',true
-1,-1,0,'0B','TEXT',true
-2,-1,0,'0B','TEXT',true
-3,-1,1,'2B','TEXT',true
-4,-1,1,'2B','TEXT',true
-Total,-1,2,'4B','',
+0,-1,0,'0B',regex:.+B,'TEXT'
+1,-1,0,'0B',regex:.+B,'TEXT'
+2,-1,0,'0B',regex:.+B,'TEXT'
+3,-1,1,'2B',regex:.+B,'TEXT'
+4,-1,1,'2B',regex:.+B,'TEXT'
+Total,-1,2,'4B',regex:.+B,''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # Can call set cached multiple times on the same partitioned table.
@@ -169,12 +169,12 @@ alter table cached_tbl_part set cached in 'testPool'
 ---- QUERY
 show partitions cached_tbl_part
 ---- RESULTS
-0,-1,0,'0B','TEXT',true
-1,-1,0,'0B','TEXT',true
-2,-1,0,'0B','TEXT',true
-3,-1,1,'2B','TEXT',true
-4,-1,1,'2B','TEXT',true
-Total,-1,2,'4B','',
+0,-1,0,'0B',regex:.+B,'TEXT'
+1,-1,0,'0B',regex:.+B,'TEXT'
+2,-1,0,'0B',regex:.+B,'TEXT'
+3,-1,1,'2B',regex:.+B,'TEXT'
+4,-1,1,'2B',regex:.+B,'TEXT'
+Total,-1,2,'4B',regex:.+B,''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, BOOLEAN
+INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
