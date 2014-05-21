@@ -10,6 +10,32 @@ fi
 . ${IMPALA_HOME}/bin/impala-config.sh
 set -e
 
+BUILD=0
+
+# parse command line options
+for ARG in $*
+do
+  case "$ARG" in
+    -build)
+      BUILD=1
+      ;;
+    -help)
+      echo "copy-udfs-udas.sh [-build]"
+      echo "[-build] : Builds the files to be copied first."
+      exit
+      ;;
+  esac
+done
+
+if [ $BUILD -eq 1 ]
+then
+  pushd $IMPALA_HOME
+  make -j4 TestUdas TestUdfs test-udfs-ir udfsample udasample udf-sample-ir uda-sample-ir
+  cd $IMPALA_HOME/tests/test-hive-udfs
+  mvn compile
+  popd
+fi
+
 # Copy the test UDF/UDA libraries into HDFS
 # We copy:
 #   libTestUdas.so
