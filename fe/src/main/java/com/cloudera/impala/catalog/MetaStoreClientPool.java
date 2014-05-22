@@ -27,6 +27,14 @@ import com.google.common.base.Preconditions;
  * a new client is created and added to the pool. There is no size limit.
  */
 public class MetaStoreClientPool {
+  // Key for config option read from hive-site.xml
+  private static final String HIVE_METASTORE_CNXN_DELAY_MS_CONF =
+      "impala.catalog.metastore.cnxn.creation.delay.ms";
+  private static final int DEFAULT_HIVE_METASTORE_CNXN_DELAY_MS_CONF = 0;
+  // Number of milliseconds to sleep between creation of HMS connections. Used to debug
+  // IMPALA-825.
+  private final int clientCreationDelayMs_;
+
   private static final Logger LOG = Logger.getLogger(MetaStoreClientPool.class);
 
   private final ConcurrentLinkedQueue<MetaStoreClient> clientPool_ =
@@ -95,6 +103,8 @@ public class MetaStoreClientPool {
 
   public MetaStoreClientPool(int initialSize, HiveConf hiveConf) {
     this.hiveConf_ = hiveConf;
+    clientCreationDelayMs_ = hiveConf_.getInt(HIVE_METASTORE_CNXN_DELAY_MS_CONF,
+        DEFAULT_HIVE_METASTORE_CNXN_DELAY_MS_CONF);
     addClients(initialSize);
   }
 
@@ -122,13 +132,22 @@ public class MetaStoreClientPool {
 
     MetaStoreClient client = clientPool_.poll();
     // The pool was empty so create a new client and return that.
-    if (client == null) {
-      client = new MetaStoreClient(hiveConf_);
-    } else {
-      // TODO: Due to Hive Metastore bugs, there is leftover state from previous client
-      // connections so we are unable to reuse the same connection. For now simply
-      // reconnect each time. One possible culprit is HIVE-5181.
-      client = new MetaStoreClient(hiveConf_);
+    // Serialize client creation to defend against possible race conditions accessing
+    // local Kerberos state (see IMPALA-825).
+    synchronized (this) {
+      try {
+        Thread.sleep(clientCreationDelayMs_);
+      } catch (InterruptedException e) {
+        /* ignore */
+      }
+      if (client == null) {
+        client = new MetaStoreClient(hiveConf_);
+      } else {
+        // TODO: Due to Hive Metastore bugs, there is leftover state from previous client
+        // connections so we are unable to reuse the same connection. For now simply
+        // reconnect each time. One possible culprit is HIVE-5181.
+        client = new MetaStoreClient(hiveConf_);
+      }
     }
     client.markInUse();
     return client;
