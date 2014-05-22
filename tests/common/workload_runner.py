@@ -163,8 +163,12 @@ class WorkloadRunner(object):
     query_executor.run()
     results = query_executor.get_results()
     # If all the threads failed, do not call __get_median_exec_result
-    # and return an empty execution result.
-    if not results: return QueryExecResult()
+    # and return an empty execution result. If exit_on_error is True and a query failed,
+    # return a blank result. This is ok since we don't persist the error message in the
+    # backend db; Moreover, the exact error is always logged to the console.
+    if not results or\
+        exit_on_error and any(map(lambda x: not x.success, results)):
+      return QueryExecResult()
     return self.__get_median_exec_result(results)
 
   def __get_median_exec_result(self, results):
@@ -257,6 +261,8 @@ class WorkloadRunner(object):
         exec_result = self.run_query(executor_name, query, stop_on_query_error)
         if exec_result:
           self.__summary += "%s\n" % exec_result
+        if not exec_result.success and stop_on_query_error:
+          break
 
       hive_exec_result = QueryExecResult()
       if self.compare_with_hive or self.skip_impala:

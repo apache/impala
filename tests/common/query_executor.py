@@ -182,8 +182,9 @@ class QueryExecutor(object):
     """Create a thread for each client."""
     self.query_threads = []
     for i in xrange(self.num_clients):
-      self.query_threads.append(Thread(target=self.__run_query,
-        name=self.thread_name % i))
+      thread = Thread(target=self.__run_query, name=self.thread_name % i)
+      thread.daemon = True
+      self.query_threads.append(thread)
 
   def __update_results(self, result):
     """Thread safe update for results.
@@ -192,6 +193,7 @@ class QueryExecutor(object):
     """
     self.__result_list_lock.acquire()
     try:
+      self.__results.append(result)
       if not result.success:
         error_msg = "Error executing query %s, Error: %s." % (self.query.name,
             result.query_error)
@@ -199,8 +201,6 @@ class QueryExecutor(object):
           raise RuntimeError, error_msg + ' Aborting.'
         else:
           LOG.error(error_msg + ' Ignoring')
-      else:
-        self.__results.append(result)
     finally:
       self.__result_list_lock.release()
 
@@ -209,7 +209,8 @@ class QueryExecutor(object):
 
     Responsible for running the query and updating the results.
     """
-    result = self.query_exec_func(self.query, self.query_exec_options)
+    result = self.query_exec_func(self.query, self.query_exec_options,
+        exit_on_error=self.exit_on_error)
     result.executor_name = self.executor_name
     self.__update_results(result)
 
@@ -245,7 +246,7 @@ def establish_beeswax_connection(query, query_options):
   client.set_query_options(query_options.exec_options)
   return (True, client)
 
-def execute_using_impala_beeswax(query, query_options):
+def execute_using_impala_beeswax(query, query_options, exit_on_error=True):
   """Executes a query using beeswax.
 
   A new client is created per query, then destroyed. Returns QueryExecResult()
@@ -274,9 +275,9 @@ def execute_using_impala_beeswax(query, query_options):
       LOG.info("Iteration %d finished in %f(s)" % (i+1, result.time_taken))
     except Exception, e:
       LOG.error(e)
-      client.close_connection()
       exec_result.query_error = str(e)
-      return exec_result
+      # Return early if exit_on_error is True.
+      if exit_on_error: return exec_result
     if plugin_runner: plugin_runner.run_plugins_post(context=context, scope="Query")
     results.append(result)
   # We only need to print the results for a successfull run, not all.
@@ -329,7 +330,7 @@ def execute_shell_cmd(cmd):
   rc = p.returncode
   return rc, stdout, stderr
 
-def execute_using_hive(query, query_options):
+def execute_using_hive(query, query_options, exit_on_error=True):
   """Executes a query via hive"""
   query_string = (query.query_str + ';') * query_options.iterations
   if query.db:
@@ -355,7 +356,7 @@ def parse_hive_query_results(stdout, stderr, iterations):
   # TODO: Get hive results
   return create_exec_result(execution_times, iterations, None)
 
-def execute_using_jdbc(query, query_options):
+def execute_using_jdbc(query, query_options, exit_on_error=True):
   """Executes a query using JDBC"""
   query_string = (query.query_str + ';') * query_options.iterations
   if query.db:
