@@ -53,10 +53,10 @@ class BitWriter {
   // packed.  Returns false if there was not enough space. num_bits must be <= 32.
   bool PutValue(uint64_t v, int num_bits);
 
-  // Writes v to the next aligned byte using num_bits. If T is larger than num_bits, the
-  // extra high-order bits will be ignored. Returns false if there was not enough space.
+  // Writes v to the next aligned byte using num_bytes. If T is larger than num_bytes, the
+  // extra high-order bytes will be ignored. Returns false if there was not enough space.
   template<typename T>
-  bool PutAligned(T v, int num_bits);
+  bool PutAligned(T v, int num_bytes);
 
   // Write a Vlq encoded int to the buffer.  Returns false if there was not enough
   // room.  The value is written byte aligned.
@@ -125,7 +125,7 @@ class BitReader {
 
   // Maximum byte length of a vlq encoded int
   static const int MAX_VLQ_BYTE_LEN = 5;
- 
+
  private:
   uint8_t* buffer_;
   int max_bytes_;
