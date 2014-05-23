@@ -688,6 +688,73 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestCreateTableLikeFile() throws AnalysisException {
+    // check that we analyze all of the CREATE TABLE options
+    AnalyzesOk("create table if not exists newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/alltypestiny.parquet'");
+    AnalyzesOk("create table newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
+    AnalyzesOk("create table default.newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
+    AnalyzesOk("create table newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet' STORED AS PARQUET");
+    AnalyzesOk("create external table newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet' STORED AS PARQUET");
+    AnalyzesOk("create table if not exists functional.zipcode_incomes like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
+    AnalyzesOk("create table if not exists newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
+    AnalyzesOk("create table if not exists newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/decimal.parquet'");
+
+    // check we error in the same situations as standard create table
+    AnalysisError("create table functional.zipcode_incomes like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet'",
+        "Table already exists: functional.zipcode_incomes");
+    AnalysisError("create table database_DNE.newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet'",
+        "Database does not exist: database_DNE");
+
+    // check invalid paths
+    AnalysisError("create table if not exists functional.zipcode_incomes like parquet "
+        + "'/test-warehouse'",
+        "Cannot infer schema, path is not a file: hdfs://localhost:20500/test-warehouse");
+    AnalysisError("create table newtbl_DNE like parquet 'foobar'",
+        "URI path must be absolute: foobar");
+    AnalysisError("create table newtbl_DNE like parquet '/not/a/file/path'",
+        "Cannot infer schema, path is not a file: "
+        + "hdfs://localhost:20500/not/a/file/path");
+    AnalysisError("create table if not exists functional.zipcode_incomes like parquet "
+        + "'file://tmp/foobar'",
+        "URI location 'file://tmp/foobar' must point to an HDFS file system.");
+
+    // check valid paths with bad file contents
+    AnalysisError("create table database_DNE.newtbl_DNE like parquet "
+        + "'/test-warehouse/zipcode_incomes_rc/000000_0'",
+        "File is not a parquet file: "
+        + "hdfs://localhost:20500/test-warehouse/zipcode_incomes_rc/000000_0");
+
+    // this is a decimal file without annotations
+    AnalysisError("create table if not exists functional.zipcode_incomes like parquet "
+        + "'/test-warehouse/schemas/malformed_decimal_tiny.parquet'",
+        "Unsupported parquet type FIXED_LEN_BYTE_ARRAY for field c1");
+
+    // this has structures, maps, and arrays
+    AnalysisError("create table table_DNE like parquet "
+        + "'/test-warehouse/schemas/unsupported.parquet'",
+        "Unsupported parquet type for field strct");
+    AnalysisError("create table table_DNE like parquet "
+        + "'/test-warehouse/schemas/map.parquet'",
+        "Unsupported parquet type for field mp");
+    AnalysisError("create table table_DNE like parquet "
+        + "'/test-warehouse/schemas/array.parquet'",
+        "Unsupported parquet type for field lst");
+    AnalysisError("create table table_DNE like parquet "
+        + "'/test-warehouse/schemas/struct.parquet'",
+        "Unsupported parquet type for field strct");
+ }
+
+  @Test
   public void TestCreateTableAsSelect() throws AnalysisException {
     // Constant select.
     AnalyzesOk("create table newtbl as select 1+2, 'abc'");

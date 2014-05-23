@@ -27,6 +27,7 @@ import junit.framework.Assert;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -217,6 +218,16 @@ public class AuthorizationTest {
       AuthorizeableTable table = new AuthorizeableTable(dbName,
           "test_tbl_" + String.valueOf(i));
       sentryService.grantRolePrivilege(roleName, table, Privilege.SELECT);
+    }
+  }
+
+  @After
+  public void TestTPCHCleanup() throws AuthorizationException, AnalysisException {
+    // Failure to cleanup TPCH can cause:
+    // TestDropDatabase(com.cloudera.impala.analysis.AuthorizationTest):
+    // Cannot drop non-empty database: tpch
+    if (catalog_.getDb("tpch").numFunctions() != 0) {
+      fail("Failed to clean up functions in tpch.");
     }
   }
 
@@ -530,6 +541,12 @@ public class AuthorizationTest {
 
     AuthzError("create table _impala_builtins.tbl(i int)",
         "Cannot modify system database.");
+
+    // Check that create like file follows authorization rules for HDFS files
+    AuthzError("create table tpch.table_DNE like parquet "
+        + "'hdfs://localhost:20500/test-warehouse/alltypes'",
+        "User '%s' does not have privileges to access: "
+        + "hdfs://localhost:20500/test-warehouse/alltypes");
   }
 
   @Test
@@ -1195,6 +1212,18 @@ public class AuthorizationTest {
     AuthzOk(context, "select tpch.f()");
     AuthzOk(adminContext, "drop function tpch.f()");
     */
+
+    // TODO: if we add a function, we need to clean up.
+    // This try/finally is to clean up from add function commented out above
+    //try {
+    //} finally {
+      //Other tests don't expect tpch to contain functions
+      //Specifically, if these functions are not cleaned up, TestDropDatabase() will fail
+      //catalog_.removeFunction(new ScalarFunction(new FunctionName("default", "f"),
+          //new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+      //catalog_.removeFunction(new ScalarFunction(new FunctionName("tpch", "f"),
+          //new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+    //}
   }
 
   @Test

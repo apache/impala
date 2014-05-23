@@ -58,6 +58,26 @@ if [[ $? -eq 1 ]]; then
 fi
 set -e
 
+# Load schemas
+hadoop fs -rm -r -f /test-warehouse/schemas
+hadoop fs -mkdir /test-warehouse/schemas
+hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/zipcode_incomes.parquet \
+  /test-warehouse/schemas/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/unsupported.parquet \
+  /test-warehouse/schemas/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/map.parquet \
+  /test-warehouse/schemas/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/array.parquet \
+  /test-warehouse/schemas/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/struct.parquet \
+  /test-warehouse/schemas/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/alltypestiny.parquet \
+  /test-warehouse/schemas/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/malformed_decimal_tiny.parquet \
+  /test-warehouse/schemas/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/decimal.parquet \
+  /test-warehouse/schemas/
+
 # Load the data set
 pushd ${IMPALA_HOME}/bin
 ./start-impala-cluster.py -s 3 --wait_for_cluster --log_dir=${IMPALAD_LOG_DIR}

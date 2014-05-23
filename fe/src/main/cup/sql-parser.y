@@ -324,6 +324,7 @@ nonterminal DropTableOrViewStmt drop_tbl_or_view_stmt;
 nonterminal CreateDbStmt create_db_stmt;
 nonterminal CreateTableAsSelectStmt create_tbl_as_select_stmt;
 nonterminal CreateTableLikeStmt create_tbl_like_stmt;
+nonterminal CreateTableLikeFileStmt create_tbl_like_file_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal CreateViewStmt create_view_stmt;
 nonterminal CreateDataSrcStmt create_data_src_stmt;
@@ -436,6 +437,8 @@ stmt ::=
   {: RESULT = create_tbl_as_select; :}
   | create_tbl_like_stmt:create_tbl_like
   {: RESULT = create_tbl_like; :}
+  | create_tbl_like_file_stmt:create_tbl_like_file
+  {: RESULT = create_tbl_like_file; :}
   | create_tbl_stmt:create_tbl
   {: RESULT = create_tbl; :}
   | create_view_stmt:create_view
@@ -622,6 +625,20 @@ create_tbl_like_stmt ::=
   {:
     RESULT = new CreateTableLikeStmt(table, other_table, external, comment,
         null, location, if_not_exists);
+  :}
+  ;
+
+create_tbl_like_file_stmt ::=
+  KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+  table_name:table KW_LIKE file_format_val:schema_file_format
+  STRING_LITERAL:schema_location partition_column_defs:partition_col_defs
+  comment_val:comment row_format_val:row_format serde_properties:serde_props
+  file_format_create_table_val:file_format location_val:location cache_op_val:cache_op
+  tbl_properties:tbl_props
+  {:
+    RESULT = new CreateTableLikeFileStmt(table, schema_file_format,
+        new HdfsUri(schema_location), partition_col_defs, external, comment, row_format,
+        file_format, location, cache_op, if_not_exists, tbl_props, serde_props);
   :}
   ;
 

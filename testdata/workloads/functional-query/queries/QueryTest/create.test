@@ -1,5 +1,96 @@
 ====
 ---- QUERY
+drop table if exists ddl_test_db.temp_decimal_table
+---- RESULTS
+====
+---- QUERY
+create table ddl_test_db.temp_decimal_table like parquet
+'/test-warehouse/schemas/decimal.parquet'
+---- RESULTS
+====
+---- QUERY
+describe ddl_test_db.temp_decimal_table
+---- RESULTS
+'d32','decimal(3,2)','inferred from: required fixed_len_byte_array(16) d32 (DECIMAL(3,2))'
+'d11','decimal(1,1)','inferred from: required fixed_len_byte_array(16) d11 (DECIMAL(1,1))'
+'d1015','decimal(15,10)','inferred from: required fixed_len_byte_array(16) d1015 (DECIMAL(15,10))'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop table if exists ddl_test_db.temp_decimal_table
+---- RESULTS
+====
+---- QUERY
+create table ddl_test_db.test_like_file_create like parquet
+'/test-warehouse/schemas/zipcode_incomes.parquet'
+---- RESULTS
+====
+---- QUERY
+describe ddl_test_db.test_like_file_create
+---- RESULTS
+'id','string','inferred from: optional binary id'
+'zip','string','inferred from: optional binary zip'
+'description1','string','inferred from: optional binary description1'
+'description2','string','inferred from: optional binary description2'
+'income','int','inferred from: optional int32 income'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop table ddl_test_db.test_like_file_create
+---- RESULTS
+====
+---- QUERY
+create table if not exists ddl_test_db.test_like_file_create like parquet
+'/test-warehouse/schemas/alltypestiny.parquet'
+---- RESULTS
+====
+---- QUERY
+describe ddl_test_db.test_like_file_create
+---- RESULTS
+'id','int','inferred from: optional int32 id'
+'bool_col','boolean','inferred from: optional boolean bool_col'
+'tinyint_col','int','inferred from: optional int32 tinyint_col'
+'smallint_col','int','inferred from: optional int32 smallint_col'
+'int_col','int','inferred from: optional int32 int_col'
+'bigint_col','bigint','inferred from: optional int64 bigint_col'
+'float_col','float','inferred from: optional float float_col'
+'double_col','double','inferred from: optional double double_col'
+'date_string_col','string','inferred from: optional binary date_string_col'
+'string_col','string','inferred from: optional binary string_col'
+'timestamp_col','timestamp','inferred from: optional int96 timestamp_col'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+create table if not exists ddl_test_db.test_like_file_create like parquet
+'/test-warehouse/schemas/zipcode_incomes.parquet'
+---- RESULTS
+====
+---- QUERY
+# should not have changed since last statement was IF NOT EXISTS
+describe ddl_test_db.test_like_file_create
+---- RESULTS
+'id','int','inferred from: optional int32 id'
+'bool_col','boolean','inferred from: optional boolean bool_col'
+'tinyint_col','int','inferred from: optional int32 tinyint_col'
+'smallint_col','int','inferred from: optional int32 smallint_col'
+'int_col','int','inferred from: optional int32 int_col'
+'bigint_col','bigint','inferred from: optional int64 bigint_col'
+'float_col','float','inferred from: optional float float_col'
+'double_col','double','inferred from: optional double double_col'
+'date_string_col','string','inferred from: optional binary date_string_col'
+'string_col','string','inferred from: optional binary string_col'
+'timestamp_col','timestamp','inferred from: optional int96 timestamp_col'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop table ddl_test_db.test_like_file_create
+---- RESULTS
+====
+---- QUERY
 # It should show up now
 show databases like 'ddl_test_db'
 ---- RESULTS

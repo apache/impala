@@ -35,6 +35,7 @@
 
   <properties>
     <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
+    <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>
   </properties>
 
   <repositories>
@@ -76,6 +77,11 @@
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-service</artifactId>
       <version>${hive.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.twitter</groupId>
+      <artifactId>parquet-hadoop-bundle</artifactId>
+      <version>${parquet.version}</version>
     </dependency>
   </dependencies>
 

@@ -152,6 +152,11 @@ public class AuditingTest extends AnalyzerTest {
     Assert.assertEquals(accessEvents, Lists.newArrayList(
         new TAccessEvent("tpch.lineitem", TCatalogObjectType.TABLE, "VIEW_METADATA"),
         new TAccessEvent("tpch.new_lineitem", TCatalogObjectType.TABLE, "CREATE")));
+
+    accessEvents = AnalyzeAccessEvents("create table tpch.new_table like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
+    Assert.assertEquals(accessEvents, Lists.newArrayList(
+        new TAccessEvent("tpch.new_table", TCatalogObjectType.TABLE, "CREATE")));
   }
 
   @Test

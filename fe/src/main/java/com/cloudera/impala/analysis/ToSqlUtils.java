@@ -135,23 +135,26 @@ public class ToSqlUtils {
 
   /**
    * Returns a "CREATE TABLE" string that creates the table with the specified properties.
-   * The tableName and columnsSql must not be null.
+   * The tableName must not be null. If columnsSql is null, the schema syntax will
+   * not be generated.
    */
-  private static String getCreateTableSql(String dbName, String tableName,
+  public static String getCreateTableSql(String dbName, String tableName,
       String tableComment, List<String> columnsSql, List<String> partitionColumnsSql,
       Map<String, String> tblProperties, Map<String, String> serdeProperties,
       boolean isExternal, boolean ifNotExists, RowFormat rowFormat,
       HdfsFileFormat fileFormat, String storageHandlerClass, String location) {
     Preconditions.checkNotNull(tableName);
-    Preconditions.checkNotNull(columnsSql);
     StringBuilder sb = new StringBuilder("CREATE ");
     if (isExternal) sb.append("EXTERNAL ");
     sb.append("TABLE ");
     if (ifNotExists) sb.append("IF NOT EXISTS ");
     if (dbName != null) sb.append(dbName + ".");
-    sb.append(tableName + " (\n  ");
-    sb.append(Joiner.on(", \n  ").join(columnsSql));
-    sb.append("\n)\n");
+    if (columnsSql != null) {
+      sb.append(tableName + " (\n  ");
+      sb.append(Joiner.on(", \n  ").join(columnsSql));
+      sb.append("\n)");
+    }
+    sb.append("\n");
     if (tableComment != null) sb.append(" COMMENT '" + tableComment + "'\n");
 
     if (partitionColumnsSql != null && partitionColumnsSql.size() > 0) {
