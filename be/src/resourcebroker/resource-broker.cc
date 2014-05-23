@@ -51,14 +51,11 @@ DECLARE_int32(resource_broker_recv_timeout);
 
 static const string LLAMA_KERBEROS_SERVICE_NAME = "llama";
 
-// TODO: Refactor the Llama restart and thrift connect/reconnect/reopen logic into
-// a common place.
-
 namespace impala {
 
 // String to search for in Llama error messages to detect that Llama has restarted,
 // and hence the resource broker must re-register.
-const string LLAMA_RESTART_SEARCH_STRING = "Unknown handle";
+const string LLAMA_RESTART_SEARCH_STRING = "unknown handle";
 
 // Number of seconds to wait between Llama registration attempts.
 const int64_t LLAMA_REGISTRATION_WAIT_SECS = 3;
@@ -248,7 +245,9 @@ bool ResourceBroker::LlamaHasRestarted(const llama::TStatus& status) const {
   }
   // Check whether one of the error messages contains LLAMA_RESTART_SEARCH_STRING.
   for (int i = 0; i < status.error_msgs.size(); ++i) {
-    if (status.error_msgs[i].find(LLAMA_RESTART_SEARCH_STRING) != string::npos) {
+    string error_msg = status.error_msgs[i];
+    to_lower(error_msg);
+    if (error_msg.find(LLAMA_RESTART_SEARCH_STRING) != string::npos) {
       LOG(INFO) << "Assuming Llama restart from error message: " << status.error_msgs[i];
       return true;
     }
@@ -280,6 +279,107 @@ void ResourceBroker::CreateLlamaReleaseRequest(const TResourceBrokerReleaseReque
   dest.version = llama::TLlamaServiceVersion::V1;
   dest.am_handle = llama_handle_;
   dest.reservation_id << src.reservation_id;
+}
+
+template <typename LlamaReqType, typename LlamaRespType>
+Status ResourceBroker::LlamaRpc(LlamaReqType* request, LlamaRespType* response,
+    StatsMetric<double>* rpc_time_metric) {
+  int attempts = 0;
+  MonotonicStopWatch sw;
+  while (attempts < LLAMA_MAX_REQUEST_ATTEMPTS) {
+    ++attempts;
+    Status status;
+    ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
+        llama_address_, &status);
+    RETURN_IF_ERROR(status);
+
+    sw.Start();
+    try {
+      SendLlamaRpc(&llama_client, *request, response);
+    } catch (const TException& e) {
+      VLOG_RPC << "Retrying Llama RPC: " << e.what();
+      status = llama_client.Reopen();
+      if (!status.ok()) continue;
+      SendLlamaRpc(&llama_client, request, response);
+    }
+    if (rpc_time_metric != NULL) {
+      rpc_time_metric->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+    }
+
+    // Check whether Llama has been restarted. If so, re-register with it.
+    if (!LlamaHasRestarted(response->status)) break;
+    RETURN_IF_ERROR(HandleLlamaRestart(*request, response));
+    // Set the new Llama handle received from re-registering.
+    request->__set_am_handle(llama_handle_);
+    VLOG_RPC << "Retrying Llama RPC: " << request;
+  }
+  if (attempts >= LLAMA_MAX_REQUEST_ATTEMPTS) {
+    stringstream err;
+    err << "Request aborted after " << LLAMA_MAX_REQUEST_ATTEMPTS
+        << " attempts due to connectivity issues with Llama.";
+    return Status(err.str());
+  }
+  return Status::OK;
+}
+
+template <typename LlamaReqType, typename LlamaRespType>
+void ResourceBroker::SendLlamaRpc(
+    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
+    const LlamaReqType& request, LlamaRespType* response) {
+  DCHECK(false) << "SendLlamaRpc template function must be specialized.";
+}
+
+// Template specialization for the Llama GetNodes() RPC.
+template <>
+void ResourceBroker::SendLlamaRpc(
+    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
+    const llama::TLlamaAMGetNodesRequest& request,
+    llama::TLlamaAMGetNodesResponse* response) {
+  DCHECK(response != NULL);
+  (*llama_client)->GetNodes(*response, request);
+}
+
+// Template specialization for the Llama Reserve() RPC.
+template <>
+void ResourceBroker::SendLlamaRpc(
+    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
+    const llama::TLlamaAMReservationRequest& request,
+    llama::TLlamaAMReservationResponse* response) {
+  DCHECK(response != NULL);
+  (*llama_client)->Reserve(*response, request);
+}
+
+// Template specialization for the Llama Expand() RPC.
+template <>
+void ResourceBroker::SendLlamaRpc(
+    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
+    const llama::TLlamaAMReservationExpansionRequest& request,
+    llama::TLlamaAMReservationExpansionResponse* response) {
+  DCHECK(response != NULL);
+  (*llama_client)->Expand(*response, request);
+}
+
+// Template specialization for the Llama Release() RPC.
+template <>
+void ResourceBroker::SendLlamaRpc(
+    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
+    const llama::TLlamaAMReleaseRequest& request,
+    llama::TLlamaAMReleaseResponse* response) {
+  DCHECK(response != NULL);
+  (*llama_client)->Release(*response, request);
+}
+
+template <typename LlamaReqType, typename LlamaRespType>
+Status ResourceBroker::HandleLlamaRestart(
+    const LlamaReqType& request, LlamaRespType* response) {
+  return RegisterAndRefreshLlama();
+}
+
+template <>
+Status ResourceBroker::HandleLlamaRestart(
+    const llama::TLlamaAMGetNodesRequest& request,
+    llama::TLlamaAMGetNodesResponse* response) {
+  return RegisterWithLlama();
 }
 
 void ResourceBroker::ReservationFulfillment::GetResources(ResourceMap* resources,
@@ -341,38 +441,14 @@ Status ResourceBroker::Expand(const TResourceBrokerExpansionRequest& request,
   ll_request.expansion_of << request.reservation_id;
   ll_request.resource = request.resource;
 
-  int attempts = 0;
   MonotonicStopWatch sw;
-  while (attempts < LLAMA_MAX_REQUEST_ATTEMPTS) {
-    ++attempts;
-    Status status;
-    ClientConnection<llama::LlamaAMServiceClient>
-        llama_client(llama_client_cache_.get(), llama_address_, &status);
-    RETURN_IF_ERROR(status);
-
-    sw.Start();
-    try {
-      llama_client->Expand(ll_response, ll_request);
-    } catch (TTransportException& e) {
-      VLOG_RPC << "Retrying Expand: " << e.what();
-      status = llama_client.Reopen();
-      if (!status.ok()) return status;
-      llama_client->Expand(ll_response, ll_request);
-    }
-
-    expansion_rpc_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-
-    // Check whether Llama has been restarted. If so, re-register with it.
-    if (LlamaHasRestarted(ll_response.status)) {
-      RETURN_IF_ERROR(RegisterAndRefreshLlama());
-      // Set the new Llama handle received from re-registering.
-      ll_request.__set_am_handle(llama_handle_);
-      LOG(INFO) << "Retrying expansion request: " << request;
-      continue;
-    }
-    break;
+  sw.Start();
+  Status status = LlamaRpc(&ll_request, &ll_response, expansion_rpc_time_metric_);
+  // Check the status of the response.
+  if (!status.ok()) {
+    expansion_requests_failed_metric_->Increment(1);
+    return status;
   }
-
   Status request_status = LlamaStatusToImpalaStatus(ll_response.status);
   if (!request_status.ok()) {
     expansion_requests_failed_metric_->Increment(1);
@@ -416,42 +492,14 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
   llama::TLlamaAMReservationResponse llama_response;
   CreateLlamaReservationRequest(request, llama_request);
 
-  int attempts = 0;
   MonotonicStopWatch sw;
-  while (attempts < LLAMA_MAX_REQUEST_ATTEMPTS) {
-    ++attempts;
-    Status status;
-    ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
-        llama_address_, &status);
-    RETURN_IF_ERROR(status);
-
-    sw.Start();
-    try {
-      llama_client->Reserve(llama_response, llama_request);
-    } catch (const TException& e) {
-      VLOG_RPC << "Retrying Reserve: " << e.what();
-      status = llama_client.Reopen();
-      if (!status.ok()) continue;
-      llama_client->Reserve(llama_response, llama_request);
-    }
-    reservation_rpc_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-
-    // Check whether Llama has been restarted. If so, re-register with it.
-    if (LlamaHasRestarted(llama_response.status)) {
-      RETURN_IF_ERROR(RegisterAndRefreshLlama());
-      // Set the new Llama handle received from re-registering.
-      llama_request.__set_am_handle(llama_handle_);
-      LOG(INFO) << "Retrying reservation request: " << request;
-      continue;
-    }
-    break;
-  }
-  if (attempts >= LLAMA_MAX_REQUEST_ATTEMPTS) {
-    reservation_requests_failed_metric_->Increment(1);
-    return Status("Reservation request aborted due to connectivity issues with Llama.");
-  }
-
+  sw.Start();
+  Status status = LlamaRpc(&llama_request, &llama_response, reservation_rpc_time_metric_);
   // Check the status of the response.
+  if (!status.ok()) {
+    reservation_requests_failed_metric_->Increment(1);
+    return status;
+  }
   Status request_status = LlamaStatusToImpalaStatus(llama_response.status);
   if (!request_status.ok()) {
     reservation_requests_failed_metric_->Increment(1);
@@ -499,37 +547,8 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
   llama::TLlamaAMReleaseResponse llama_response;
   CreateLlamaReleaseRequest(request, llama_request);
 
-  int attempts = 0;
-  while (attempts < LLAMA_MAX_REQUEST_ATTEMPTS) {
-    ++attempts;
-    Status status;
-    ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
-        llama_address_, &status);
-    RETURN_IF_ERROR(status);
-    try {
-      llama_client->Release(llama_response, llama_request);
-    } catch (const TException& e) {
-      VLOG_RPC << "Retrying Release: " << e.what();
-      status = llama_client.Reopen();
-      if (!status.ok()) continue;
-      llama_client->Release(llama_response, llama_request);
-    }
-
-    // Check whether Llama has been restarted. If so, re-register with it.
-    if (LlamaHasRestarted(llama_response.status)) {
-      RETURN_IF_ERROR(RegisterAndRefreshLlama());
-      // Set the new Llama handle received from re-registering.
-      llama_request.__set_am_handle(llama_handle_);
-      LOG(INFO) << "Retrying release of reservation with id "
-                << request.reservation_id;
-      continue;
-    }
-    break;
-  }
-  if (attempts >= LLAMA_MAX_REQUEST_ATTEMPTS) {
-    return Status("Reservation release aborted due to connectivity issues with Llama.");
-  }
-
+  RETURN_IF_ERROR(LlamaRpc(
+      &llama_request, &llama_response,reservation_rpc_time_metric_));
   RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
   requests_released_metric_->Increment(1);
 
@@ -624,35 +643,7 @@ Status ResourceBroker::RefreshLlamaNodes() {
   llama_request.__set_version(llama::TLlamaServiceVersion::V1);
   llama::TLlamaAMGetNodesResponse llama_response;
 
-  int attempts = 0;
-  while (attempts < LLAMA_MAX_REQUEST_ATTEMPTS) {
-    ++attempts;
-    Status status;
-    ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
-        llama_address_, &status);
-    RETURN_IF_ERROR(status);
-    try {
-      llama_client->GetNodes(llama_response, llama_request);
-    } catch (const TException& e) {
-      VLOG_RPC << "Retrying GetNodes: " << e.what();
-      status = llama_client.Reopen();
-      if (!status.ok()) continue;
-      llama_client->GetNodes(llama_response, llama_request);
-    }
-    // Check whether Llama has been restarted. If so, re-register with it.
-    if (LlamaHasRestarted(llama_response.status)) {
-      RETURN_IF_ERROR(RegisterWithLlama());
-      // Set the new Llama handle received from re-registering.
-      llama_request.__set_am_handle(llama_handle_);
-      LOG(INFO) << "Retrying GetNodes";
-      continue;
-    }
-    break;
-  }
-  if (attempts >= LLAMA_MAX_REQUEST_ATTEMPTS) {
-    return Status("GetNodes request aborted due to connectivity issues with Llama.");
-  }
-
+  RETURN_IF_ERROR(LlamaRpc(&llama_request, &llama_response, NULL));
   RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
   llama_nodes_ = llama_response.nodes;
   LOG(INFO) << "Llama Nodes [" << join(llama_nodes_, ", ") << "]";

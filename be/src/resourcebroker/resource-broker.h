@@ -99,14 +99,26 @@ class ResourceBroker {
  private:
   typedef std::map<TNetworkAddress, llama::TAllocatedResource> ResourceMap;
 
+  // Registers this resource broker with the Llama. Returns a non-OK status if the
+  // registration failed.
+  Status RegisterWithLlama();
+
   // Registers this resource broker with the Llama and refreshes the Llama nodes
   // after a successful registration. Returns a non-OK status if the registration
   // or the node refresh failed.
   Status RegisterAndRefreshLlama();
 
-  // Registers this resource broker with the Llama. Returns a non-OK status is the
-  // registration failed.
-  Status RegisterWithLlama();
+  // TODO: Add comments before pushing changes once we agree on the high-level approach.
+  template <typename LlamaReqType, typename LlamaRespType>
+  Status LlamaRpc(LlamaReqType* request, LlamaRespType* response,
+      StatsMetric<double>* rpc_time_metric);
+
+  template <typename LlamaReqType, typename LlamaRespType>
+  void SendLlamaRpc(ClientConnection<llama::LlamaAMServiceClient>* llama_client,
+      const LlamaReqType& request, LlamaRespType* response);
+
+  template <typename LlamaReqType, typename LlamaRespType>
+  Status HandleLlamaRestart(const LlamaReqType& request, LlamaRespType* response);
 
   // Detects Llama restarts from the given return status of a Llama RPC.
   bool LlamaHasRestarted(const llama::TStatus& status) const;
