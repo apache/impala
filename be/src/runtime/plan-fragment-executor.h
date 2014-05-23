@@ -194,6 +194,12 @@ class PlanFragmentExecutor {
   // Stopwatch for this entire fragment. Started in Prepare(), stopped in Close().
   MonotonicStopWatch fragment_sw_;
 
+  // (Atomic) Flag that indicates whether a completed fragment report has been or will
+  // be fired. It is initialized to 0 and atomically swapped to 1 when a completed
+  // fragment report is about to be fired. Used for reducing the probability that a
+  // report is sent twice at the end of the fragment.
+  AtomicInt<int> completed_report_sent_;
+
   // Sampled memory usage at even time intervals.
   RuntimeProfile::TimeSeriesCounter* mem_usage_sampled_counter_;
 

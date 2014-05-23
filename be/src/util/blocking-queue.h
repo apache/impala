@@ -27,6 +27,9 @@ namespace impala {
 
 // Fixed capacity FIFO queue, where both BlockingGet and BlockingPut operations block
 // if the queue is empty or full, respectively.
+
+// TODO: Add some double-buffering so that readers do not block writers and vice versa.
+// Or, implement a mostly lock-free blocking queue.
 template <typename T>
 class BlockingQueue {
  public:

@@ -275,8 +275,6 @@ Status PlanFragmentExecutor::Open() {
       << runtime_state_->fragment_instance_id();
   // we need to start the profile-reporting thread before calling Open(), since it
   // may block
-  // TODO: if no report thread is started, make sure to send a final profile
-  // at end, otherwise the coordinator hangs in case we finish w/ an error
   if (!report_status_cb_.empty() && FLAGS_status_report_interval > 0) {
     unique_lock<mutex> l(report_thread_lock_);
     report_thread_.reset(
@@ -384,7 +382,11 @@ void PlanFragmentExecutor::ReportProfile() {
 
     if (!report_thread_active_)
       break;
-    SendReport(false);
+
+    if (completed_report_sent_.Read() == 0) {
+      // No complete fragment report has been sent.
+      SendReport(false);
+    }
   }
 
   VLOG_FILE << "exiting reporting thread: instance_id="
@@ -457,6 +459,10 @@ Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
 }
 
 void PlanFragmentExecutor::FragmentComplete() {
+  // Check the atomic flag. If it is set, then a fragment complete report has already
+  // been sent.
+  bool send_report = completed_report_sent_.Swap(0,1);
+
   fragment_sw_.Stop();
   int64_t cpu_and_wait_time = fragment_sw_.ElapsedTime();
   fragment_sw_ = MonotonicStopWatch();
@@ -471,12 +477,15 @@ void PlanFragmentExecutor::FragmentComplete() {
 
   ReleaseThreadToken();
   StopReportThread();
-  SendReport(true);
+  if (send_report) SendReport(true);
 }
 
 void PlanFragmentExecutor::UpdateStatus(const Status& status) {
   if (status.ok())
     return;
+
+  bool send_report = completed_report_sent_.Swap(0,1);
+
   {
     lock_guard<mutex> l(status_lock_);
     if (status_.ok()) {
@@ -484,8 +493,9 @@ void PlanFragmentExecutor::UpdateStatus(const Status& status) {
       status_ = status;
     }
   }
+
   StopReportThread();
-  SendReport(true);
+  if (send_report) SendReport(true);
 }
 
 void PlanFragmentExecutor::Cancel() {

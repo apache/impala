@@ -96,6 +96,11 @@ class AtomicInt {
     return AtomicInt<T>(prev);
   }
 
+  // Safe read of the value
+  T Read() {
+    return __sync_fetch_and_add(&value_, 0);
+  }
+
   // Increments by delta (i.e. += delta) and returns the new val
   T UpdateAndFetch(T delta) {
     return __sync_add_and_fetch(&value_, delta);
@@ -122,8 +127,15 @@ class AtomicInt {
     }
   }
 
+  // Returns true if the atomic compare-and-swap was successful
   bool Swap(T old_val, T new_val) {
     return __sync_bool_compare_and_swap(&value_, old_val, new_val);
+  }
+
+  // Returns the content of value_ before the operation.
+  // If returnValue == old_val, then the atomic compare-and-swap was successful.
+  T SwapVal(T old_val, T new_val) {
+    return __sync_val_compare_and_swap(&value_, old_val, new_val);
   }
 
  private:
