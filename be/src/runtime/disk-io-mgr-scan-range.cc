@@ -120,7 +120,7 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
   }
 
   DCHECK(reader_->Validate()) << endl << reader_->DebugString();
-  if (reader_->state_ == ReaderContext::Cancelled) {
+  if (reader_->state_ == RequestContext::Cancelled) {
     reader_->blocked_ranges_.Remove(this);
     Cancel(reader_->status_);
     (*buffer)->Return();
@@ -202,7 +202,8 @@ bool DiskIoMgr::ScanRange::Validate() {
 
 DiskIoMgr::ScanRange::ScanRange(int capacity)
   : ready_buffers_capacity_(capacity) {
-  Reset(NULL, -1, -1, -1, false);
+  request_type_ = RequestType::READ;
+  Reset("", -1, -1, -1, false);
 }
 
 DiskIoMgr::ScanRange::~ScanRange() {
@@ -225,7 +226,7 @@ void DiskIoMgr::ScanRange::Reset(const char* file, int64_t len, int64_t offset,
   hdfs_file_ = NULL;
 }
 
-void DiskIoMgr::ScanRange::InitInternal(DiskIoMgr* io_mgr, ReaderContext* reader) {
+void DiskIoMgr::ScanRange::InitInternal(DiskIoMgr* io_mgr, RequestContext* reader) {
   DCHECK(hdfs_file_ == NULL);
   io_mgr_ = io_mgr;
   reader_ = reader;
@@ -252,7 +253,7 @@ Status DiskIoMgr::ScanRange::Open() {
 
     // TODO: is there much overhead opening hdfs files?  Should we try to preserve
     // the handle across multiple scan ranges of a file?
-    hdfs_file_ = hdfsOpenFile(reader_->hdfs_connection_, file_, O_RDONLY, 0, 0, 0);
+    hdfs_file_ = hdfsOpenFile(reader_->hdfs_connection_, file(), O_RDONLY, 0, 0, 0);
     if (hdfs_file_ == NULL) {
       return Status(GetHdfsErrorMsg("Failed to open HDFS file ", file_));
     }
@@ -266,7 +267,7 @@ Status DiskIoMgr::ScanRange::Open() {
   } else {
     if (local_file_ != NULL) return Status::OK;
 
-    local_file_ = fopen(file_, "r");
+    local_file_ = fopen(file(), "r");
     if (local_file_ == NULL) {
       string error_msg = GetStrErrMsg();
       stringstream ss;

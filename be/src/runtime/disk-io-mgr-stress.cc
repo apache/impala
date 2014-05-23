@@ -54,7 +54,7 @@ string GenerateRandomData() {
 
 struct DiskIoMgrStress::Client {
   boost::mutex lock;
-  DiskIoMgr::ReaderContext* reader;
+  DiskIoMgr::RequestContext* reader;
   int file_idx;
   vector<DiskIoMgr::ScanRange*> scan_ranges;
   int abort_at_byte;
@@ -152,12 +152,12 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 
     // Unregister the old client and get a new one
     unique_lock<mutex> lock(client->lock);
-    io_mgr_->UnregisterReader(client->reader);
+    io_mgr_->UnregisterContext(client->reader);
     NewClient(client_id);
   }
 
   unique_lock<mutex> lock(client->lock);
-  io_mgr_->UnregisterReader(client->reader);
+  io_mgr_->UnregisterContext(client->reader);
   client->reader = NULL;
 }
 
@@ -168,7 +168,7 @@ void DiskIoMgrStress::CancelRandomReader() {
   int rand_client = rand() % num_clients_;
 
   unique_lock<mutex> lock(clients_[rand_client].lock);
-  io_mgr_->CancelReader(clients_[rand_client].reader);
+  io_mgr_->CancelContext(clients_[rand_client].reader);
 }
 
 void DiskIoMgrStress::Run(int sec) {
@@ -193,7 +193,7 @@ void DiskIoMgrStress::Run(int sec) {
 
   for (int i = 0; i < num_clients_; ++i) {
     unique_lock<mutex> lock(clients_[i].lock);
-    if (clients_[i].reader != NULL) io_mgr_->CancelReader(clients_[i].reader);
+    if (clients_[i].reader != NULL) io_mgr_->CancelContext(clients_[i].reader);
   }
 
   readers_.join_all();
@@ -233,7 +233,7 @@ void DiskIoMgrStress::NewClient(int i) {
     client.scan_ranges.push_back(range);
     assigned_len += range_len;
   }
-  Status status = io_mgr_->RegisterReader(NULL, &client.reader, NULL);
+  Status status = io_mgr_->RegisterContext(NULL, &client.reader, NULL);
   CHECK(status.ok());
   status = io_mgr_->AddScanRanges(client.reader, client.scan_ranges);
   CHECK(status.ok());

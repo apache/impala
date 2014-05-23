@@ -34,7 +34,7 @@ namespace impala {
 // unbuffered and thus cause performance to degrade.
 class StreamReader {
  public:
-  StreamReader(DiskIoMgr* io_mgr, DiskIoMgr::ReaderContext* reader,
+  StreamReader(DiskIoMgr* io_mgr, DiskIoMgr::RequestContext* reader,
       BufferPool* buffer_pool, const std::vector<Block*>& blocks,
       RuntimeProfile::Counter* blocks_read, RuntimeProfile::Counter* buffer_misses)
       : io_mgr_(io_mgr), reader_(reader), buffer_pool_(buffer_pool), blocks_(blocks),
@@ -108,7 +108,7 @@ class StreamReader {
   }
 
   DiskIoMgr* io_mgr_;
-  DiskIoMgr::ReaderContext* reader_;
+  DiskIoMgr::RequestContext* reader_;
   BufferPool* buffer_pool_;
   std::vector<Block*> blocks_;
   std::vector<Block*>::iterator blocks_iterator_;

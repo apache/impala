@@ -18,32 +18,46 @@ using namespace boost;
 using namespace impala;
 using namespace std;
 
-void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
+void DiskIoMgr::RequestContext::Cancel(const Status& status) {
   DCHECK(!status.ok());
 
+  // Callbacks are collected in this vector and invoked while no lock is held.
+  vector<WriteRange::WriteDoneCallback> write_callbacks;
+
   {
-    unique_lock<mutex> reader_lock(lock_);
+    lock_guard<mutex> lock(lock_);
     DCHECK(Validate()) << endl << DebugString();
 
     // Already being cancelled
-    if (state_ == ReaderContext::Cancelled) return;
+    if (state_ == RequestContext::Cancelled) return;
 
     DCHECK(status_.ok());
     status_ = status;
 
     // The reader will be put into a cancelled state until call cleanup is complete.
-    state_ = ReaderContext::Cancelled;
+    state_ = RequestContext::Cancelled;
 
     // Cancel all scan ranges for this reader. Each range could be one one of
     // four queues.
     for (int i = 0; i < disk_states_.size(); ++i) {
-      ReaderContext::PerDiskState& state = disk_states_[i];
-      ScanRange* range = NULL;
+      RequestContext::PerDiskState& state = disk_states_[i];
+      RequestRange* range = NULL;
       while ((range = state.in_flight_ranges()->Dequeue()) != NULL) {
-        range->Cancel(status);
+        if (range->request_type() == RequestType::READ) {
+          static_cast<ScanRange*>(range)->Cancel(status);
+        } else {
+          DCHECK(range->request_type() == RequestType::WRITE);
+          write_callbacks.push_back(static_cast<WriteRange*>(range)->callback_);
+        }
       }
-      while ((range = state.unstarted_ranges()->Dequeue()) != NULL) {
-        range->Cancel(status);
+
+      ScanRange* scan_range;
+      while ((scan_range = state.unstarted_scan_ranges()->Dequeue()) != NULL) {
+        scan_range->Cancel(status);
+      }
+      WriteRange* write_range;
+      while ((write_range = state.unstarted_write_ranges()->Dequeue()) != NULL) {
+        write_callbacks.push_back(write_range->callback_);
       }
     }
 
@@ -61,9 +75,13 @@ void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
     // Schedule reader on all disks. The disks will notice it is cancelled and do any
     // required cleanup
     for (int i = 0; i < disk_states_.size(); ++i) {
-      ReaderContext::PerDiskState& state = disk_states_[i];
-      state.ScheduleReader(this, i);
+      RequestContext::PerDiskState& state = disk_states_[i];
+      state.ScheduleContext(this, i);
     }
+  }
+
+  BOOST_FOREACH(const WriteRange::WriteDoneCallback& write_callback, write_callbacks) {
+    write_callback(status_);
   }
 
   // Signal reader and unblock the GetNext/Read thread.  That read will fail with
@@ -71,28 +89,45 @@ void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
   ready_to_start_ranges_cv_.notify_all();
 }
 
-void DiskIoMgr::ReaderContext::AddScanRange(
-    DiskIoMgr::ScanRange* range, bool schedule_immediately) {
+void DiskIoMgr::RequestContext::AddRequestRange(
+    DiskIoMgr::RequestRange* range, bool schedule_immediately) {
   // DCHECK(lock_.is_locked()); // TODO: boost should have this API
-  ReaderContext::PerDiskState& state = disk_states_[range->disk_id_];
+  RequestContext::PerDiskState& state = disk_states_[range->disk_id()];
   if (state.done()) {
     DCHECK_EQ(state.num_remaining_ranges(), 0);
     state.set_done(false);
     ++num_disks_with_ranges_;
   }
-  if (schedule_immediately) {
-    ScheduleScanRange(range);
+
+  bool schedule_context;
+  if (range->request_type() == RequestType::READ) {
+    DiskIoMgr::ScanRange* scan_range = static_cast<DiskIoMgr::ScanRange*>(range);
+    if (schedule_immediately) {
+      ScheduleScanRange(scan_range);
+    } else {
+      state.unstarted_scan_ranges()->Enqueue(scan_range);
+      ++num_unstarted_scan_ranges_;
+    }
+    // If next_scan_range_to_start is NULL, schedule this RequestContext so that it will
+    // be set. If it's not NULL, this context will be scheduled when GetNextRange() is
+    // invoked.
+    schedule_context = state.next_scan_range_to_start() == NULL;
   } else {
-    state.unstarted_ranges()->Enqueue(range);
+    DCHECK(range->request_type() == RequestType::WRITE);
+    DCHECK(!schedule_immediately);
+    DiskIoMgr::WriteRange* write_range = static_cast<DiskIoMgr::WriteRange*>(range);
+    state.unstarted_write_ranges()->Enqueue(write_range);
+
+    // ScheduleContext() has no effect if the context is already scheduled,
+    // so this is safe.
+    schedule_context = true;
   }
-  if (state.next_range_to_start() == NULL) {
-    state.ScheduleReader(this, range->disk_id());
-  }
+
+  if (schedule_context) state.ScheduleContext(this, range->disk_id());
   ++state.num_remaining_ranges();
-  if (!schedule_immediately) ++num_unstarted_ranges_;
 }
 
-DiskIoMgr::ReaderContext::ReaderContext(DiskIoMgr* parent, int num_disks)
+DiskIoMgr::RequestContext::RequestContext(DiskIoMgr* parent, int num_disks)
   : parent_(parent),
     bytes_read_counter_(NULL),
     read_timer_(NULL),
@@ -102,8 +137,8 @@ DiskIoMgr::ReaderContext::ReaderContext(DiskIoMgr* parent, int num_disks)
     disk_states_(num_disks) {
 }
 
-// Resets this object for a new reader
-void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemTracker* tracker) {
+// Resets this object.
+void DiskIoMgr::RequestContext::Reset(hdfsFS hdfs_connection, MemTracker* tracker) {
   DCHECK_EQ(state_, Inactive);
   status_ = Status::OK;
 
@@ -116,7 +151,7 @@ void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemTracker* tracker
   hdfs_connection_ = hdfs_connection;
   mem_tracker_ = tracker;
 
-  num_unstarted_ranges_ = 0;
+  num_unstarted_scan_ranges_ = 0;
   num_disks_with_ranges_ = 0;
   num_used_buffers_ = 0;
   num_buffers_in_reader_ = 0;
@@ -137,14 +172,14 @@ void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemTracker* tracker
   }
 }
 
-// Dumps out reader information.  Lock should be taken by caller
-string DiskIoMgr::ReaderContext::DebugString() const {
+// Dumps out request context information. Lock should be taken by caller
+string DiskIoMgr::RequestContext::DebugString() const {
   stringstream ss;
-  ss << endl << "  Reader: " << (void*)this << " (state=";
-  if (state_ == ReaderContext::Inactive) ss << "Inactive";
-  if (state_ == ReaderContext::Cancelled) ss << "Cancelled";
-  if (state_ == ReaderContext::Active) ss << "Active";
-  if (state_ != ReaderContext::Inactive) {
+  ss << endl << "  RequestContext: " << (void*)this << " (state=";
+  if (state_ == RequestContext::Inactive) ss << "Inactive";
+  if (state_ == RequestContext::Cancelled) ss << "Cancelled";
+  if (state_ == RequestContext::Active) ss << "Active";
+  if (state_ != RequestContext::Inactive) {
     ss << " status_=" << (status_.ok() ? "OK" : status_.GetErrorMsg())
        << " #ready_buffers=" << num_ready_buffers_
        << " #used_buffers=" << num_used_buffers_
@@ -158,21 +193,21 @@ string DiskIoMgr::ReaderContext::DebugString() const {
          << " done=" << disk_states_[i].done()
          << " #num_remaining_scan_ranges=" << disk_states_[i].num_remaining_ranges()
          << " #in_flight_ranges=" << disk_states_[i].in_flight_ranges()->size()
-         << " #unstarted_ranges=" << disk_states_[i].unstarted_ranges()->size()
-         << " #reading_threads=" << disk_states_[i].num_threads_in_read();
+         << " #unstarted_scan_ranges=" << disk_states_[i].unstarted_scan_ranges()->size()
+         << " #unstarted_write_ranges="
+         << disk_states_[i].unstarted_write_ranges()->size()
+         << " #reading_threads=" << disk_states_[i].num_threads_in_op();
     }
   }
   ss << ")";
   return ss.str();
 }
 
-bool DiskIoMgr::ReaderContext::Validate() const {
-  if (state_ == ReaderContext::Inactive) {
-    LOG(WARNING) << "state_ == ReaderContext::Inactive";
+bool DiskIoMgr::RequestContext::Validate() const {
+  if (state_ == RequestContext::Inactive) {
+    LOG(WARNING) << "state_ == RequestContext::Inactive";
     return false;
   }
-
-  int num_disks_with_ranges = 0;
 
   if (num_used_buffers_ < 0) {
     LOG(WARNING) << "num_used_buffers_ < 0: #used=" << num_used_buffers_;
@@ -188,11 +223,10 @@ bool DiskIoMgr::ReaderContext::Validate() const {
   for (int i = 0; i < disk_states_.size(); ++i) {
     const PerDiskState& state = disk_states_[i];
     bool on_queue = state.is_on_queue();
-    int num_reading_threads = state.num_threads_in_read();
+    int num_reading_threads = state.num_threads_in_op();
 
-    total_unstarted_ranges += state.unstarted_ranges()->size();
+    total_unstarted_ranges += state.unstarted_scan_ranges()->size();
 
-    if (state.num_remaining_ranges() > 0) ++num_disks_with_ranges;
     if (num_reading_threads < 0) {
       LOG(WARNING) << "disk_id=" << i
                    << "state.num_threads_in_read < 0: #threads="
@@ -200,13 +234,13 @@ bool DiskIoMgr::ReaderContext::Validate() const {
       return false;
     }
 
-    if (state_ != ReaderContext::Cancelled) {
-      if (state.unstarted_ranges()->size() + state.in_flight_ranges()->size() >
+    if (state_ != RequestContext::Cancelled) {
+      if (state.unstarted_scan_ranges()->size() + state.in_flight_ranges()->size() >
           state.num_remaining_ranges()) {
         LOG(WARNING) << "disk_id=" << i
                      << " state.unstarted_ranges.size() + state.in_flight_ranges.size()"
                      << " > state.num_remaining_ranges:"
-                     << " #unscheduled=" << state.unstarted_ranges()->size()
+                     << " #unscheduled=" << state.unstarted_scan_ranges()->size()
                      << " #in_flight=" << state.in_flight_ranges()->size()
                      << " #remaining=" << state.num_remaining_ranges();
         return false;
@@ -236,7 +270,7 @@ bool DiskIoMgr::ReaderContext::Validate() const {
                      << "Reader cancelled but has in flight ranges.";
         return false;
       }
-      if (!state.unstarted_ranges()->empty()) {
+      if (!state.unstarted_scan_ranges()->empty()) {
         LOG(WARNING) << "disk_id=" << i
                      << "Reader cancelled but has unstarted ranges.";
         return false;
@@ -251,10 +285,10 @@ bool DiskIoMgr::ReaderContext::Validate() const {
     }
   }
 
-  if (state_ != ReaderContext::Cancelled) {
-    if (total_unstarted_ranges != num_unstarted_ranges_) {
+  if (state_ != RequestContext::Cancelled) {
+    if (total_unstarted_ranges != num_unstarted_scan_ranges_) {
       LOG(WARNING) << "total_unstarted_ranges=" << total_unstarted_ranges
-                   << " sum_in_states=" << num_unstarted_ranges_;
+                   << " sum_in_states=" << num_unstarted_scan_ranges_;
       return false;
     }
   } else {
@@ -270,4 +304,3 @@ bool DiskIoMgr::ReaderContext::Validate() const {
 
   return true;
 }
-

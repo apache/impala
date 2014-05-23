@@ -52,19 +52,19 @@ class SorterTest : public testing::Test {
 
   ~SorterTest() {
     writer_->Cancel();
-    io_mgr_->UnregisterReader(reader_);
+    io_mgr_->UnregisterContext(reader_);
   }
 
   void Reset() {
     if (writer_.get() != NULL) writer_->Cancel();
-    if (io_mgr_.get() != NULL) io_mgr_->UnregisterReader(reader_);
+    if (io_mgr_.get() != NULL) io_mgr_->UnregisterContext(reader_);
 
     writer_.reset(new DiskWriter());
     writer_->Init();
     io_mgr_.reset(new DiskIoMgr());
     Status status = io_mgr_->Init(&mem_tracker_);
     DCHECK(status.ok());
-    status = io_mgr_->RegisterReader(NULL, &reader_);
+    status = io_mgr_->RegisterContext(NULL, &reader_);
     DCHECK(status.ok());
   }
 
@@ -443,7 +443,7 @@ class SorterTest : public testing::Test {
   MemTracker mem_tracker_;
   scoped_ptr<DiskWriter> writer_;
   scoped_ptr<DiskIoMgr> io_mgr_;
-  DiskIoMgr::ReaderContext* reader_;
+  DiskIoMgr::RequestContext* reader_;
   ThreadResourceMgr resource_mgr_;
   scoped_ptr<ThreadResourceMgr::ResourcePool> resource_pool_;
   RuntimeState runtime_state_;

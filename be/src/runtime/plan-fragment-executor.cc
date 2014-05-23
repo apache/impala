@@ -532,8 +532,8 @@ void PlanFragmentExecutor::Close() {
     }
     if (plan_ != NULL) plan_->Close(runtime_state_.get());
     if (sink_.get() != NULL) sink_->Close(runtime_state());
-    BOOST_FOREACH(DiskIoMgr::ReaderContext* reader, *runtime_state_->reader_contexts()) {
-      runtime_state_->io_mgr()->UnregisterReader(reader);
+    BOOST_FOREACH(DiskIoMgr::RequestContext* reader, *runtime_state_->reader_contexts()) {
+      runtime_state_->io_mgr()->UnregisterContext(reader);
     }
     exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
   }

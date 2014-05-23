@@ -52,7 +52,8 @@ class InternalQueue {
   InternalQueue() : head_(NULL), tail_(NULL), size_(0) {}
 
   // Enqueue node onto the queue's tail. This is O(1).
-  void Enqueue(T* node) {
+  void Enqueue(T* n) {
+    Node* node = (Node*)n;
     DCHECK(node->next == NULL);
     DCHECK(node->prev == NULL);
     DCHECK(node->parent_queue == NULL);
@@ -78,12 +79,12 @@ class InternalQueue {
   // Dequeues an element from the queue's head. Returns NULL if the queue
   // is empty. This is O(1).
   T* Dequeue() {
-    T* result = NULL;
+    Node* result = NULL;
     {
       ScopedSpinLock lock(&lock_);
       if (empty()) return NULL;
       --size_;
-      result = reinterpret_cast<T*>(head_);
+      result = head_;
       head_ = head_->next;
       if (head_ == NULL) {
         tail_ = NULL;
@@ -94,12 +95,13 @@ class InternalQueue {
     DCHECK(result != NULL);
     result->next = result->prev = NULL;
     result->parent_queue = NULL;
-    return result;
+    return reinterpret_cast<T*>(result);
   }
 
   // Removes 'node' from the queue. This is O(1). No-op if node is
   // not on the list.
-  void Remove(T* node) {
+  void Remove(T* n) {
+    Node* node = (Node*)n;
     if (node->parent_queue == NULL) return;
     DCHECK(node->parent_queue == this);
     {
@@ -153,7 +155,7 @@ class InternalQueue {
 
   // Returns if the target is on the queue. This is O(1) and intended to
   // be used for debugging.
-  bool Contains(Node* target) {
+  bool Contains(const T* target) const {
     return target->parent_queue == this;
   }
 

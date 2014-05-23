@@ -77,7 +77,7 @@ class Sorter {
   // TODO: Avoid using lhs/rhs when the exprs don't hold results internally
   Sorter(DiskWriter* writer,
       DiskIoMgr* io_mgr,
-      DiskIoMgr::ReaderContext* reader,
+      DiskIoMgr::RequestContext* reader,
       ThreadResourceMgr::ResourcePool* resource_pool,
       const TupleDescriptor& output_tuple_desc,
       const std::vector<Expr*>& output_slot_exprs,
@@ -230,7 +230,7 @@ class Sorter {
 
   DiskIoMgr* io_mgr_;
 
-  DiskIoMgr::ReaderContext* reader_;
+  DiskIoMgr::RequestContext* reader_;
 
   boost::scoped_ptr<SortedMerger> final_merger_;
 

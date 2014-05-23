@@ -43,7 +43,7 @@ namespace impala {
 Sorter::Sorter(
     DiskWriter* writer,
     DiskIoMgr* io_mgr,
-    DiskIoMgr::ReaderContext* reader,
+    DiskIoMgr::RequestContext* reader,
     ThreadResourceMgr::ResourcePool* resource_pool,
     const TupleDescriptor& output_tuple_desc,
     const vector<Expr*>& output_slot_exprs,

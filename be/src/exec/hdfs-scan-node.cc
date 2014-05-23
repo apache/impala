@@ -546,7 +546,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(Expr::Open(**it, state));
   }
 
-  RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterReader(
+  RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterContext(
       hdfs_connection_, &reader_context_, mem_tracker()));
 
   // Initialize HdfsScanNode specific counters
@@ -633,7 +633,7 @@ void HdfsScanNode::Close(RuntimeState* state) {
     state->reader_contexts()->push_back(reader_context_);
     // Need to wait for all the active scanner threads to finish to ensure there is no
     // more memory tracked by this scan node's mem tracker.
-    state->io_mgr()->WaitForDisksCompletion(reader_context_);
+    state->io_mgr()->CancelContext(reader_context_, true);
   }
 
   StopAndFinalizeCounters();
@@ -913,7 +913,7 @@ void HdfsScanNode::SetDone() {
     done_ = true;
   }
   if (reader_context_ != NULL) {
-    runtime_state_->io_mgr()->CancelReader(reader_context_);
+    runtime_state_->io_mgr()->CancelContext(reader_context_);
   }
   materialized_row_batches_->Shutdown();
 }

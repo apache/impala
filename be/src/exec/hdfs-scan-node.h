@@ -130,7 +130,7 @@ class HdfsScanNode : public ScanNode {
 
   RuntimeState* runtime_state() { return runtime_state_; }
 
-  DiskIoMgr::ReaderContext* reader_context() { return reader_context_; }
+  DiskIoMgr::RequestContext* reader_context() { return reader_context_; }
 
   const static int SKIP_COLUMN = -1;
 
@@ -274,7 +274,7 @@ class HdfsScanNode : public ScanNode {
   bool requires_compaction_;
 
   // ReaderContext object to use with the disk-io-mgr
-  DiskIoMgr::ReaderContext* reader_context_;
+  DiskIoMgr::RequestContext* reader_context_;
 
   // Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_;

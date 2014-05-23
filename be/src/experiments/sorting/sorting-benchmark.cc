@@ -579,12 +579,12 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
 
   MemTracker tracker;
   DiskIoMgr io_mgr;
-  DiskIoMgr::ReaderContext* reader;
+  DiskIoMgr::RequestContext* reader;
   DiskWriter writer;
   writer.Init();
   Status status = io_mgr.Init(&tracker);
   DCHECK(status.ok());
-  status = io_mgr.RegisterReader(NULL, &reader);
+  status = io_mgr.RegisterContext(NULL, &reader);
   DCHECK(status.ok());
 
   ThreadResourceMgr resource_mgr;
@@ -651,7 +651,7 @@ void TestImpala(TestData* data, Timer* timer, uint64_t num_rows, DescriptorTbl* 
   free(output_batch);
 
   writer.Cancel();
-  io_mgr.UnregisterReader(reader);
+  io_mgr.UnregisterContext(reader);
 
   sorter->profile()->PrettyPrint(&cout);
 
