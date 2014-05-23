@@ -96,6 +96,10 @@ public class HBaseTable extends Table {
 
   private HTable hTable_ = null;
 
+  // Cached column families. Used primarily for speeding up row stats estimation
+  // (see CDH-19292).
+  private HColumnDescriptor[] columnFamilies_ = null;
+
   protected HBaseTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
       Db db, String name, String owner) {
     super(id, msTbl, db, name, owner);
@@ -245,6 +249,7 @@ public class HBaseTable extends Table {
     try {
       hbaseTableName_ = getHBaseTableName(getMetaStoreTable());
       hTable_ = new HTable(hbaseConf_, hbaseTableName_);
+      columnFamilies_ = null;
       Map<String, String> serdeParams =
           getMetaStoreTable().getSd().getSerdeInfo().getParameters();
       String hbaseColumnsMapping = serdeParams.get(HBaseSerDe.HBASE_COLUMNS_MAPPING);
@@ -345,6 +350,7 @@ public class HBaseTable extends Table {
     try {
       hbaseTableName_ = getHBaseTableName(getMetaStoreTable());
       hTable_ = new HTable(hbaseConf_, hbaseTableName_);
+      columnFamilies_ = null;
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for HBase table from " +
           "thrift table: " + name_, e);
@@ -397,9 +403,11 @@ public class HBaseTable extends Table {
     try {
       // Check to see if things are compressed.
       // If they are we'll estimate a compression factor.
-      HColumnDescriptor[] families =
-          hTable_.getTableDescriptor().getColumnFamilies();
-      for (HColumnDescriptor desc: families) {
+      if (columnFamilies_ == null) {
+        columnFamilies_ = hTable_.getTableDescriptor().getColumnFamilies();
+      }
+      Preconditions.checkNotNull(columnFamilies_);
+      for (HColumnDescriptor desc: columnFamilies_) {
         isCompressed |= desc.getCompression() != Compression.Algorithm.NONE;
       }
 
