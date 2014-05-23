@@ -20,6 +20,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen")
 
 add_library(CodeGen
+  codegen-anyval.cc
   llvm-codegen.cc
   subexpr-elimination.cc
 )

@@ -16,12 +16,12 @@
 
 #include <thrift/protocol/TDebugProtocol.h>
 
+#include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
 #include "exprs/aggregate-functions.h"
-#include "exprs/anyval-util.h"
 #include "exprs/arithmetic-expr.h"
 #include "exprs/binary-predicate.h"
 #include "exprs/bool-literal.h"

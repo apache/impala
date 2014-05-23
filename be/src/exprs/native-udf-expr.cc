@@ -17,6 +17,7 @@
 #include <vector>
 #include <llvm/IR/Attributes.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exprs/anyval-util.h"
 #include "runtime/hdfs-fs-cache.h"
