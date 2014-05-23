@@ -1015,6 +1015,16 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create function foo() RETURNS int LOCATION " +
         "'/test-warehouse/hive-exec.jar' SYMBOL='a'");
 
+    // Test hive UDFs for unsupported types
+    AnalysisError("create function foo() RETURNS timestamp LOCATION '/a.jar'",
+        "Hive UDFs that use TIMESTAMP are not yet supported.");
+    AnalysisError("create function foo(timestamp) RETURNS int LOCATION '/a.jar'",
+        "Hive UDFs that use TIMESTAMP are not yet supported.");
+    AnalysisError("create function foo() RETURNS decimal LOCATION '/a.jar'",
+        "Hive UDFs that use DECIMAL are not yet supported.");
+    AnalysisError("create function foo(Decimal) RETURNS int LOCATION '/a.jar'",
+        "Hive UDFs that use DECIMAL are not yet supported.");
+
     AnalyzesOk("create function foo() RETURNS decimal" + udfSuffix);
     AnalyzesOk("create function foo() RETURNS decimal(38,10)" + udfSuffix);
     AnalyzesOk("create function foo(Decimal, decimal(10, 2)) RETURNS int" + udfSuffix);

@@ -56,12 +56,20 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     if (udf_.getBinaryType() == TFunctionBinaryType.HIVE) {
       if (udf_.getReturnType().getPrimitiveType() == PrimitiveType.TIMESTAMP) {
         throw new AnalysisException(
-            "Hive UDFs that use timestamp are not yet supported.");
+            "Hive UDFs that use TIMESTAMP are not yet supported.");
+      }
+      if (udf_.getReturnType().isDecimal()) {
+        throw new AnalysisException(
+            "Hive UDFs that use DECIMAL are not yet supported.");
       }
       for (int i = 0; i < udf_.getNumArgs(); ++i) {
         if (udf_.getArgs()[i].getPrimitiveType() == PrimitiveType.TIMESTAMP) {
           throw new AnalysisException(
-              "Hive UDFs that use timestamp are not yet supported.");
+              "Hive UDFs that use TIMESTAMP are not yet supported.");
+        }
+        if (udf_.getArgs()[i].isDecimal()) {
+          throw new AnalysisException(
+              "Hive UDFs that use DECIMAL are not yet supported.");
         }
       }
     }
