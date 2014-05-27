@@ -233,15 +233,18 @@ inline void AggFnEvaluator::SetAnyVal(const void* slot,
       switch (type.GetByteSize()) {
         case 4:
           reinterpret_cast<DecimalVal*>(dst)->val4 =
-              reinterpret_cast<const Decimal4Value*>(slot)->value();
+              *reinterpret_cast<const int32_t*>(slot);
           return;
         case 8:
           reinterpret_cast<DecimalVal*>(dst)->val8 =
-              reinterpret_cast<const Decimal8Value*>(slot)->value();
+              *reinterpret_cast<const int64_t*>(slot);
           return;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
         case 16:
-          reinterpret_cast<DecimalVal*>(dst)->val16 = reinterpret_cast<
-              const Decimal16Value*>(slot)->value();
+          memcpy(&reinterpret_cast<DecimalVal*>(dst)->val4, slot, type.GetByteSize());
+#else
+          DCHECK(false) << "Not implemented.";
+#endif
           return;
         default:
           break;
@@ -294,16 +297,24 @@ inline void AggFnEvaluator::SetOutputSlot(const AnyVal* src, Tuple* dst) {
     case TYPE_DECIMAL:
       switch (output_slot_desc_->type().GetByteSize()) {
         case 4:
-          *reinterpret_cast<Decimal4Value*>(slot) =
-              Decimal4Value(reinterpret_cast<const DecimalVal*>(src)->val4);
+          *reinterpret_cast<int32_t*>(slot) =
+              reinterpret_cast<const DecimalVal*>(src)->val4;
           return;
         case 8:
-          *reinterpret_cast<Decimal8Value*>(slot) =
-              Decimal8Value(reinterpret_cast<const DecimalVal*>(src)->val8);
+          *reinterpret_cast<int64_t*>(slot) =
+              reinterpret_cast<const DecimalVal*>(src)->val8;
           return;
         case 16:
-          *reinterpret_cast<Decimal16Value*>(slot) =
-              Decimal16Value(reinterpret_cast<const DecimalVal*>(src)->val16);
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+          // On little endian, &val4, &val8, &val16 are the same address.
+          // This code seems to trip up clang causing it to generate code that crashes.
+          // Be careful when modifying this. See IMPALA-959 for more details.
+          // I suspect an issue with xmm registers not reading from aligned memory.
+          memcpy(slot, &reinterpret_cast<const DecimalVal*>(src)->val4,
+              output_slot_desc_->type().GetByteSize());
+#else
+          DCHECK(false) << "Not implemented.";
+#endif
           return;
         default:
           break;

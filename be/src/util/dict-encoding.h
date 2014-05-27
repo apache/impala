@@ -224,6 +224,21 @@ inline bool DictDecoder<T>::GetValue(T* value) {
   return true;
 }
 
+template<>
+inline bool DictDecoder<Decimal16Value>::GetValue(Decimal16Value* value) {
+  DCHECK(data_decoder_.get() != NULL);
+  int index;
+  bool result = data_decoder_->Get(&index);
+  if (!result) return false;
+  if (index >= dict_.size()) return false;
+  // Workaround for IMPALA-959. Use memcpy instead of '=' so addresses
+  // do not need to be 16 byte aligned.
+  uint8_t* addr = reinterpret_cast<uint8_t*>(&dict_[0]);
+  addr = addr + index * sizeof(*value);
+  memcpy(value, addr, sizeof(*value));
+  return true;
+}
+
 template<typename T>
 inline void DictEncoder<T>::WriteDict(uint8_t* buffer) {
   BOOST_FOREACH(const T& value, dict_) {

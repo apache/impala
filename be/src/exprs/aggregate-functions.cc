@@ -60,8 +60,8 @@ void AggregateFunctions::InitZero(FunctionContext*, T* dst) {
 
 template<>
 void AggregateFunctions::InitZero(FunctionContext*, DecimalVal* dst) {
-  *dst = DecimalVal();
   dst->is_null = false;
+  dst->val16 = 0;
 }
 
 StringVal AggregateFunctions::StringValSerializeOrFinalize(
