@@ -38,10 +38,12 @@ class ResourceBrokerNotificationServiceClient;
 // The resource broker requests resources via the Llama's thrift interface and exposes
 // a thrift server for the Llama to notify it of granted/denied/preempted resource
 // reservations. The reserve/release API of the resource broker is blocking.
+// The resource broker is configured with a list of Llama addresses that
+// are cycled through for failover.
 // TODO: Implement NM notification service.
 class ResourceBroker {
  public:
-  ResourceBroker(const TNetworkAddress& llama_address,
+  ResourceBroker(const std::vector<TNetworkAddress>& llama_addresses,
       const TNetworkAddress& llama_callback_address, Metrics* metrics);
 
   // Register this resource broker with LLama and starts the Llama callback service.
@@ -99,26 +101,36 @@ class ResourceBroker {
  private:
   typedef std::map<TNetworkAddress, llama::TAllocatedResource> ResourceMap;
 
-  // Registers this resource broker with the Llama. Returns a non-OK status if the
-  // registration failed.
+  bool has_standby_llama() { return llama_addresses_.size() > 1; }
+
+  // Registers this resource broker with the Llama. Cycles through the list of
+  // Llama addresses to find the active Llama which is accepting requests (if any).
+  // Returns a non-OK status if registration with any of the Llama's did not succeed
+  // within FLAGS_llama_registration_timeout_s seconds.
+  // Registration with the Llama is idempotent with respect to the llama_client_id_
+  // (see comment on llama_client_id_ for details).
   Status RegisterWithLlama();
 
-  // Registers this resource broker with the Llama and refreshes the Llama nodes
-  // after a successful registration. Returns a non-OK status if the registration
-  // or the node refresh failed.
-  Status RegisterAndRefreshLlama();
-
-  // TODO: Add comments before pushing changes once we agree on the high-level approach.
+  // Issues the Llama RPC corresponding to the LlamaReqType and LlamaRespType.
+  // This function encapsulates the complex connect/rpc/retry logic for all Llama RPCs
+  // except Register(). If rpc_time_metric is non-NULL, the metric is updated upon
+  // success of the RPC. Returns a non-OK status if the RPC failed due to connectivity
+  // issues with the Llama. Returns OK if the RPC succeeded.
   template <typename LlamaReqType, typename LlamaRespType>
   Status LlamaRpc(LlamaReqType* request, LlamaRespType* response,
       StatsMetric<double>* rpc_time_metric);
 
+  // Sends the given Llama RPC request via the given client. This function must be
+  // specialized on the Llama request/response types. Throws a TException.
   template <typename LlamaReqType, typename LlamaRespType>
   void SendLlamaRpc(ClientConnection<llama::LlamaAMServiceClient>* llama_client,
       const LlamaReqType& request, LlamaRespType* response);
 
+  // Re-registers with Llama to recover from the Llama being unreachable. Handles both
+  // Llama restart and failover. This function is a template to allow specialization on
+  // the Llama request/response type.
   template <typename LlamaReqType, typename LlamaRespType>
-  Status HandleLlamaRestart(const LlamaReqType& request, LlamaRespType* response);
+  Status ReRegisterWithLlama(const LlamaReqType& request, LlamaRespType* response);
 
   // Detects Llama restarts from the given return status of a Llama RPC.
   bool LlamaHasRestarted(const llama::TStatus& status) const;
@@ -138,8 +150,12 @@ class ResourceBroker {
   bool WaitForNotification(const llama::TUniqueId& request_id, int64_t timeout,
       TUniqueId* reservation_id, ResourceMap* resources, bool* timed_out);
 
-  // Address where the Llama service is running on.
-  TNetworkAddress llama_address_;
+  // Llama availability group.
+  std::vector<TNetworkAddress> llama_addresses_;
+
+  // Indexes into llama_addresses_ indicating the currently active Llama.
+  // Protected by llama_registration_lock_.
+  int active_llama_addr_idx_;
 
   // Address of thrift server started in this resource broker to handle
   // Llama notifications.
@@ -148,6 +164,14 @@ class ResourceBroker {
   Metrics* metrics_;
 
   Scheduler* scheduler_;
+
+  // Address of the active Llama. A Llama is considered active once we have successfully
+  // registered with it. Set to "none" while registering with the Llama.
+  Metrics::StringMetric* active_llama_metric_;
+
+  // Llama handle received from the active Llama upon registration.
+  // Set to "none" while not registered with Llama.
+  Metrics::StringMetric* active_llama_handle_metric_;
 
   // Accumulated statistics on the time taken to RPC a reservation request and receive
   // an acknowledgement from Llama.
@@ -207,7 +231,12 @@ class ResourceBroker {
   // Total number of fulfilled reservation requests that have been released.
   Metrics::PrimitiveMetric<int64_t>* requests_released_metric_;
 
-  // Client id used to register with Llama. Set in Init().
+  // Client id used to register with Llama. Set in Init(). Used to communicate to Llama
+  // whether this Impalad has restarted. Registration with Llama is idempotent if the
+  // same llama_client_id_ is passed, i.e., the same Llama handle is returned and
+  // resource allocations are preserved. From Llama's perspective an unknown
+  // llama_client_id_ indicates a new registration and all resources allocated by this
+  // Impalad under a different llama_client_id_ are consider lost and will be released.
   boost::uuids::uuid llama_client_id_;
 
   // Thrift API implementation which proxies Llama notifications onto this ResourceBroker.
@@ -293,7 +322,6 @@ std::ostream& operator<<(std::ostream& os,
 
 std::ostream& operator<<(std::ostream& os,
     const TResourceBrokerExpansionResponse& expansion);
-
 }
 
 #endif

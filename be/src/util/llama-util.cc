@@ -54,6 +54,42 @@ ostream& operator<<(ostream& os, const TAllocatedResource& resource) {
   return os;
 }
 
+ostream& operator<<(ostream& os, const llama::TLlamaAMGetNodesRequest& request) {
+  os << "GetNodes Request(llama handle=" << request.am_handle << ")";
+  return os;
+}
+
+ostream& operator<<(ostream& os, const llama::TLlamaAMReservationRequest& request) {
+  os << "Reservation Request("
+     << "llama handle=" << request.am_handle << " "
+     << "queue=" << request.queue << " "
+     << "user=" << request.user << " "
+     << "gang=" << request.gang << " "
+     << "resources=[";
+  for (int i = 0; i < request.resources.size(); ++i) {
+    os << request.resources[i];
+    if (i + 1 != request.resources.size()) os << ",";
+  }
+  os << "])";
+  return os;
+}
+
+ostream& operator<<(ostream& os,
+    const llama::TLlamaAMReservationExpansionRequest& request) {
+  os << "Expansion Request("
+     << "llama handle=" << request.am_handle << " "
+     << "reservation id=" << request.expansion_of << " "
+     << "resource=" << request.resource << ")";
+  return os;
+}
+
+ostream& operator<<(ostream& os, const llama::TLlamaAMReleaseRequest& request) {
+  os << "Release Request("
+     << "llama handle=" << request.am_handle << " "
+     << "reservation id=" << request.reservation_id << ")";
+  return os;
+}
+
 llama::TUniqueId& operator<<(llama::TUniqueId& dest, const impala::TUniqueId& src) {
   dest.lo = src.lo;
   dest.hi = src.hi;

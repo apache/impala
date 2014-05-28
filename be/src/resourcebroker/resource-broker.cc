@@ -32,6 +32,7 @@
 #include "util/uid-util.h"
 #include "util/network-util.h"
 #include "util/llama-util.h"
+#include "util/time.h"
 #include "gen-cpp/ResourceBrokerService.h"
 #include "gen-cpp/Llama_types.h"
 
@@ -43,6 +44,10 @@ using namespace boost::uuids;
 
 using namespace ::apache::thrift::server;
 using namespace ::apache::thrift;
+
+DECLARE_int64(llama_registration_timeout_secs);
+DECLARE_int64(llama_registration_wait_secs);
+DECLARE_int64(llama_max_request_attempts);
 
 DECLARE_int32(resource_broker_cnxn_attempts);
 DECLARE_int32(resource_broker_cnxn_retry_interval_ms);
@@ -56,18 +61,6 @@ namespace impala {
 // String to search for in Llama error messages to detect that Llama has restarted,
 // and hence the resource broker must re-register.
 const string LLAMA_RESTART_SEARCH_STRING = "unknown handle";
-
-// Number of seconds to wait between Llama registration attempts.
-const int64_t LLAMA_REGISTRATION_WAIT_SECS = 3;
-
-// Maximum number of seconds that a any query will wait for (re-)registration with the
-// Llama before failing the query with an error.
-const int64_t LLAMA_REGISTRATION_TIMEOUT_SECS = 30;
-
-// Maximum number of times a reserve/release against the Llama is retried
-// if the Llama restarted while processing the request. If this maximum number of
-// attempts is exceeded, then the originating query fails with an error.
-const int64_t LLAMA_MAX_REQUEST_ATTEMPTS = 5;
 
 class LlamaNotificationThriftIf : public llama::LlamaNotificationServiceIf {
  public:
@@ -91,9 +84,10 @@ class LlamaNotificationThriftIf : public llama::LlamaNotificationServiceIf {
   ResourceBroker* resource_broker_;
 };
 
-ResourceBroker::ResourceBroker(const TNetworkAddress& llama_address,
+ResourceBroker::ResourceBroker(const vector<TNetworkAddress>& llama_addresses,
     const TNetworkAddress& llama_callback_address, Metrics* metrics) :
-    llama_address_(llama_address),
+    llama_addresses_(llama_addresses),
+    active_llama_addr_idx_(-1),
     llama_callback_address_(llama_callback_address),
     metrics_(metrics),
     scheduler_(NULL),
@@ -104,7 +98,13 @@ ResourceBroker::ResourceBroker(const TNetworkAddress& llama_address,
         FLAGS_resource_broker_send_timeout,
         FLAGS_resource_broker_recv_timeout,
         LLAMA_KERBEROS_SERVICE_NAME)) {
+  DCHECK_GT(llama_addresses_.size(), 0);
   DCHECK(metrics != NULL);
+  active_llama_metric_ = metrics->CreateAndRegisterPrimitiveMetric<string>(
+      "resource-broker.active-llama", "none");
+  active_llama_handle_metric_ = metrics->CreateAndRegisterPrimitiveMetric<string>(
+      "resource-broker.active-llama-handle", "none");
+
   reservation_rpc_time_metric_ =
       metrics->RegisterMetric(
           new StatsMetric<double>("resource-broker.reservation-request-rpc-time"));
@@ -149,7 +149,6 @@ ResourceBroker::ResourceBroker(const TNetworkAddress& llama_address,
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
           "resource-broker.expansion-requests-timedout", 0);
 
-
   requests_released_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
           "resource-broker.requests-released", 0);
@@ -168,11 +167,6 @@ Status ResourceBroker::Init() {
   // Generate client id for registration with Llama, and register with LLama.
   random_generator uuid_generator;
   llama_client_id_= uuid_generator();
-  RETURN_IF_ERROR(RegisterAndRefreshLlama());
-  return Status::OK;
-}
-
-Status ResourceBroker::RegisterAndRefreshLlama() {
   RETURN_IF_ERROR(RegisterWithLlama());
   RETURN_IF_ERROR(RefreshLlamaNodes());
   return Status::OK;
@@ -189,18 +183,22 @@ Status ResourceBroker::RegisterWithLlama() {
   lock_guard<mutex> l(llama_registration_lock_);
   if (llama_handle_ != current_llama_handle) return Status::OK;
 
-  bool needs_reopen = false;
+  active_llama_metric_->Update("none");
+  active_llama_handle_metric_->Update("none");
+
+  int llama_addr_idx = (active_llama_addr_idx_ + 1) % llama_addresses_.size();
   int64_t now = TimestampValue::local_time_micros().time_of_day().total_seconds();
-  while((now - start) < LLAMA_REGISTRATION_TIMEOUT_SECS) {
-    // Connect to the Llama.
-    Status status;
+  while (FLAGS_llama_registration_timeout_secs == -1 ||
+      (now - start) < FLAGS_llama_registration_timeout_secs) {
+    // Connect to the Llama at llama_address.
+    const TNetworkAddress& llama_address = llama_addresses_[llama_addr_idx];
+    // Client status will be ok if a Thrift connection could be successfully established
+    // for the returned client at some point in the past. Hence, there is no guarantee
+    // that the connection is still valid now and we must check for broken pipes, etc.
+    Status client_status;
     ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
-        llama_address_, &status);
-    if (needs_reopen) {
-      status = llama_client.Reopen();
-      needs_reopen = false;
-    }
-    if (status.ok()) {
+        llama_address, &client_status);
+    if (client_status.ok()) {
       // Register this resource broker with Llama.
       llama::TLlamaAMRegisterRequest request;
       request.__set_version(llama::TLlamaServiceVersion::V1);
@@ -212,30 +210,60 @@ Status ResourceBroker::RegisterWithLlama() {
       callback_address << llama_callback_address_;
       request.__set_notification_callback_service(callback_address);
       llama::TLlamaAMRegisterResponse response;
-      LOG(INFO) << "Registering Resource Broker with Llama at " << llama_address_;
+      LOG(INFO) << "Registering Resource Broker with Llama at " << llama_address;
+      bool rpc_success = false;
       try {
         llama_client->Register(response, request);
+        rpc_success = true;
+      } catch (const TException& e) {
+        client_status = llama_client.Reopen();
+        if (client_status.ok()) {
+          llama_client->Register(response, request);
+          rpc_success = true;
+        }
+      }
+      if (rpc_success) {
+        // TODO: Is there a period where an inactive Llama may respond to RPCs?
+        // If so, then we need to keep cycling through Llamas here and not
+        // return an error.
         RETURN_IF_ERROR(LlamaStatusToImpalaStatus(
             response.status, "Failed to register Resource Broker with Llama."));
+        LOG(INFO) << "Received Llama client handle " << response.am_handle
+                  << ((response.am_handle == llama_handle_) ? " (same as old)" : "");
         llama_handle_ = response.am_handle;
-        LOG(INFO) << "Received Llama client handle " << llama_handle_;
         break;
-      } catch (const TException& e) {
-        needs_reopen = true;
       }
     }
-    LOG(INFO) << "Failed to connect to Llama at " << llama_address_ << ".\n"
-              << "Error: " << status.GetErrorMsg() << "\n"
-              << "Retrying to connect in "
-              << LLAMA_REGISTRATION_WAIT_SECS << "s.";
-    // Sleep even if we just need to Reopen() the client to stagger re-registrations
-    // of multiple Impalads with the Llama in case the Llama went down and came back up.
-    usleep(LLAMA_REGISTRATION_WAIT_SECS * 1000 * 1000);
+    // Cycle through the list of Llama addresses for Llama failover.
+    llama_addr_idx = (llama_addr_idx + 1) % llama_addresses_.size();
+    LOG(INFO) << "Failed to connect to Llama at " << llama_address << "." << endl
+              << "Error: " << client_status.GetErrorMsg() << endl
+              << "Retrying to connect to Llama at "
+              << llama_addresses_[llama_addr_idx] << " in "
+              << FLAGS_llama_registration_wait_secs << "s.";
+    // Sleep to give Llama time to recover/failover before the next attempt.
+    SleepForMs(FLAGS_llama_registration_wait_secs * 1000);
     now = TimestampValue::local_time_micros().time_of_day().total_seconds();
   }
-  if ((now - start) >= LLAMA_REGISTRATION_TIMEOUT_SECS) {
+  DCHECK(FLAGS_llama_registration_timeout_secs != -1);
+  if ((now - start) >= FLAGS_llama_registration_timeout_secs) {
     return Status("Failed to (re-)register Resource Broker with Llama.");
   }
+
+  if (llama_addr_idx != active_llama_addr_idx_) {
+    // TODO: We've switched to a different Llama (failover). Cancel all queries
+    // coordinated by this Impalad to free up physical resources that are not
+    // accounted for anymore by Yarn.
+  }
+
+  // If we reached this point, (re-)registration was successful.
+  active_llama_addr_idx_ = llama_addr_idx;
+  stringstream hostport_ss;
+  hostport_ss << llama_addresses_[llama_addr_idx];
+  active_llama_metric_->Update(hostport_ss.str());
+  stringstream handle_ss;
+  handle_ss << llama_handle_;
+  active_llama_handle_metric_->Update(handle_ss.str());
   return Status::OK;
 }
 
@@ -256,7 +284,10 @@ bool ResourceBroker::LlamaHasRestarted(const llama::TStatus& status) const {
 }
 
 void ResourceBroker::Close() {
-  llama_client_cache_->CloseConnections(llama_address_);
+  // Close connections to all Llama addresses, not just the active one.
+  BOOST_FOREACH(const TNetworkAddress& llama_address, llama_addresses_) {
+    llama_client_cache_->CloseConnections(llama_address);
+  }
   llama_callback_server_->Join();
 }
 
@@ -286,36 +317,51 @@ Status ResourceBroker::LlamaRpc(LlamaReqType* request, LlamaRespType* response,
     StatsMetric<double>* rpc_time_metric) {
   int attempts = 0;
   MonotonicStopWatch sw;
-  while (attempts < LLAMA_MAX_REQUEST_ATTEMPTS) {
+  // Indicates whether to re-register with Llama before the next RPC attempt,
+  // e.g. because Llama has restarted or become unavailable.
+  bool register_with_llama = false;
+  while (attempts < FLAGS_llama_max_request_attempts) {
+    if (register_with_llama) {
+      RETURN_IF_ERROR(ReRegisterWithLlama(*request, response));
+      // Set the new Llama handle received from re-registering.
+      request->__set_am_handle(llama_handle_);
+      VLOG_RPC << "Retrying Llama RPC after re-registration: " << *request;
+      register_with_llama = false;
+    }
     ++attempts;
-    Status status;
+    Status rpc_status;
     ClientConnection<llama::LlamaAMServiceClient> llama_client(llama_client_cache_.get(),
-        llama_address_, &status);
-    RETURN_IF_ERROR(status);
+        llama_addresses_[active_llama_addr_idx_], &rpc_status);
+    if (!rpc_status.ok()) {
+      register_with_llama = true;
+      continue;
+    }
 
     sw.Start();
     try {
       SendLlamaRpc(&llama_client, *request, response);
     } catch (const TException& e) {
-      VLOG_RPC << "Retrying Llama RPC: " << e.what();
-      status = llama_client.Reopen();
-      if (!status.ok()) continue;
-      SendLlamaRpc(&llama_client, request, response);
+      VLOG_RPC << "Reopening Llama client due to: " << e.what();
+      rpc_status = llama_client.Reopen();
+      if (!rpc_status.ok()) {
+        register_with_llama = true;
+        continue;
+      }
+      VLOG_RPC << "Retrying Llama RPC: " << *request;
+      SendLlamaRpc(&llama_client, *request, response);
     }
     if (rpc_time_metric != NULL) {
       rpc_time_metric->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     }
 
     // Check whether Llama has been restarted. If so, re-register with it.
+    // Break out of the loop here upon success of the RPC.
     if (!LlamaHasRestarted(response->status)) break;
-    RETURN_IF_ERROR(HandleLlamaRestart(*request, response));
-    // Set the new Llama handle received from re-registering.
-    request->__set_am_handle(llama_handle_);
-    VLOG_RPC << "Retrying Llama RPC: " << request;
+    register_with_llama = true;
   }
-  if (attempts >= LLAMA_MAX_REQUEST_ATTEMPTS) {
+  if (attempts >= FLAGS_llama_max_request_attempts) {
     stringstream err;
-    err << "Request aborted after " << LLAMA_MAX_REQUEST_ATTEMPTS
+    err << "Request aborted after " << FLAGS_llama_max_request_attempts
         << " attempts due to connectivity issues with Llama.";
     return Status(err.str());
   }
@@ -370,14 +416,14 @@ void ResourceBroker::SendLlamaRpc(
 }
 
 template <typename LlamaReqType, typename LlamaRespType>
-Status ResourceBroker::HandleLlamaRestart(
-    const LlamaReqType& request, LlamaRespType* response) {
-  return RegisterAndRefreshLlama();
+Status ResourceBroker::ReRegisterWithLlama(const LlamaReqType& request,
+    LlamaRespType* response) {
+  RETURN_IF_ERROR(RegisterWithLlama());
+  return RefreshLlamaNodes();
 }
 
 template <>
-Status ResourceBroker::HandleLlamaRestart(
-    const llama::TLlamaAMGetNodesRequest& request,
+Status ResourceBroker::ReRegisterWithLlama(const llama::TLlamaAMGetNodesRequest& request,
     llama::TLlamaAMGetNodesResponse* response) {
   return RegisterWithLlama();
 }

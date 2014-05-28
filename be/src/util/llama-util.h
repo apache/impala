@@ -30,6 +30,15 @@ std::ostream& operator<<(std::ostream& os, const llama::TNetworkAddress& address
 std::ostream& operator<<(std::ostream& os, const llama::TResource& resource);
 std::ostream& operator<<(std::ostream& os, const llama::TAllocatedResource& resource);
 
+std::ostream& operator<<(std::ostream& os,
+    const llama::TLlamaAMGetNodesRequest& request);
+std::ostream& operator<<(std::ostream& os,
+    const llama::TLlamaAMReservationRequest& request);
+std::ostream& operator<<(std::ostream& os,
+    const llama::TLlamaAMReservationExpansionRequest& request);
+std::ostream& operator<<(std::ostream& os,
+    const llama::TLlamaAMReleaseRequest& request);
+
 // 'Assignment' operators to convert types between the llama and impala namespaces.
 llama::TUniqueId& operator<<(llama::TUniqueId& dest, const impala::TUniqueId& src);
 impala::TUniqueId& operator<<(impala::TUniqueId& dest, const llama::TUniqueId& src);

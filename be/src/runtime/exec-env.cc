@@ -74,17 +74,36 @@ DEFINE_bool(enable_rm, false, "Whether to enable resource management. If enabled
                               "-fair_scheduler_allocation_path is required.");
 DEFINE_int32(llama_callback_port, 28000,
              "Port where Llama notification callback should be started");
+// TODO: Deprecate llama_host and llama_port in favor of the new llama_hostports.
+// This needs to be coordinated with CM.
 DEFINE_string(llama_host, "127.0.0.1",
               "Host of Llama service that the resource broker should connect to");
 DEFINE_int32(llama_port, 15000,
              "Port of Llama service that the resource broker should connect to");
+DEFINE_string(llama_addresses, "127.0.0.1:15000",
+             "Llama availability group given as a comma-separated list of hostports.");
+DEFINE_int64(llama_registration_timeout_secs, 30,
+             "Maximum number of seconds that Impala will attempt to (re-)register "
+             "with Llama before aborting the triggering action with an error "
+             "(e.g. Impalad startup or a Llama RPC request). "
+             "A setting of -1 means try indefinitely.");
+DEFINE_int64(llama_registration_wait_secs, 3,
+             "Number of seconds to wait between attempts during Llama registration.");
+DEFINE_int64(llama_max_request_attempts, 5,
+             "Maximum number of times a non-registration Llama RPC request "
+             "(reserve/expand/release, etc.) is retried until the request is aborted. "
+             "An attempt is counted once Impala is registered with Llama, i.e., a "
+             "request survives at most llama_max_request_attempts-1 re-registrations.");
 DEFINE_string(cgroup_hierarchy_path, "", "If Resource Management is enabled, this must "
     "be set to the Impala-writeable root of the cgroups hierarchy into which execution "
     "threads are assigned.");
 DEFINE_string(staging_cgroup, "impala_staging", "Name of the cgroup that a query's "
     "execution threads are moved into once the query completes.");
 
-DEFINE_int32(resource_broker_cnxn_attempts, 10, "The number of times to retry an "
+// Use a low default value because the reconnection logic is performed manually
+// for the purpose of faster Llama failover (otherwise we may try to reconnect to the
+// inactive Llama for a long time).
+DEFINE_int32(resource_broker_cnxn_attempts, 1, "The number of times to retry an "
     "RPC connection to Llama. A setting of 0 means retry indefinitely");
 DEFINE_int32(resource_broker_cnxn_retry_interval_ms, 3000, "The interval, in ms, "
     "to wait between attempts to make an RPC connection to the Llama.");
@@ -196,11 +215,32 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
 }
 
 void ExecEnv::InitRm() {
-  TNetworkAddress llama_address =
-      MakeNetworkAddress(FLAGS_llama_host, FLAGS_llama_port);
+  // Unique addresses from FLAGS_llama_addresses and FLAGS_llama_host/FLAGS_llama_port.
+  vector<TNetworkAddress> llama_addresses;
+  vector<string> components;
+  split(components, FLAGS_llama_addresses, is_any_of(","), token_compress_on);
+  for (int i = 0; i < components.size(); ++i) {
+    to_lower(components[i]);
+    TNetworkAddress llama_address = MakeNetworkAddress(components[i]);
+    if (find(llama_addresses.begin(), llama_addresses.end(), llama_address)
+        == llama_addresses.end()) {
+      llama_addresses.push_back(llama_address);
+    }
+  }
+  // Add Llama hostport from deprecated flags (if it does not already exist).
+  to_lower(FLAGS_llama_host);
+  TNetworkAddress llama_address = MakeNetworkAddress(FLAGS_llama_host, FLAGS_llama_port);
+  if (find(llama_addresses.begin(), llama_addresses.end(), llama_address)
+      == llama_addresses.end()) {
+    llama_addresses.push_back(llama_address);
+  }
+  for (int i = 0; i < llama_addresses.size(); ++i) {
+    LOG(INFO) << "Llama address " << i << ": " << llama_addresses[i];
+  }
+
   TNetworkAddress llama_callback_address =
       MakeNetworkAddress(FLAGS_hostname, FLAGS_llama_callback_port);
-  resource_broker_.reset(new ResourceBroker(llama_address, llama_callback_address,
+  resource_broker_.reset(new ResourceBroker(llama_addresses, llama_callback_address,
       metrics_.get()));
   cgroups_mgr_.reset(new CgroupsMgr(metrics_.get()));
 
