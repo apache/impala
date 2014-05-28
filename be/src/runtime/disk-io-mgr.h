@@ -134,6 +134,9 @@ class MemTracker;
 // range (GetNextRange()) instead of when the ranges are issued. This guarantees that
 // there will be a CPU available to process the buffer and any throttling we do with
 // the number of scanner threads properly controls the amount of files we mlock.
+// With cached scan ranges, we cannot close the scan range until the cached buffer
+// is returned (HDFS does not allow this). We therefore need to defer the close until
+// the cached buffer is returned (BufferDescriptor::Return()).
 //
 // TODO: IoMgr should be able to request additional scan ranges from the coordinator
 // to help deal with stragglers.
@@ -219,6 +222,8 @@ class DiskIoMgr {
     // The initial queue capacity for this.  Specify -1 to use IoMgr default.
     ScanRange(int initial_capacity = -1);
 
+    virtual ~ScanRange();
+
     // Resets this scan range object with the scan range description.
     void Reset(const char* file, int64_t len,
         int64_t offset, int disk_id, bool try_cache, void* metadata = NULL);
@@ -259,8 +264,8 @@ class DiskIoMgr {
     // Returns true if this scan range has hit the queue capacity, false otherwise.
     bool EnqueueBuffer(BufferDescriptor* buffer);
 
-    // Cleanup any queued buffers (i.e. due to cancellation). This must
-    // be called with lock_ taken.
+    // Cleanup any queued buffers (i.e. due to cancellation). This cannot
+    // be called with any locks taken.
     void CleanupQueuedBuffers();
 
     // Validates the internal state of this range. lock_ must be taken
@@ -574,10 +579,10 @@ class DiskIoMgr {
   // the reader and disk queue state.
   void ReturnBuffer(BufferDescriptor* buffer);
 
-  // Returns a buffer to read into with size between *buffer_size and max_buffer_size_, and
-  // *buffer_size is set to the size of the buffer. If there is an appropriately-sized
-  // free buffer in the 'free_buffers_', that is returned, otherwise a new one is
-  // allocated. *buffer_size must be between 0 and max_buffer_size_.
+  // Returns a buffer to read into with size between *buffer_size and max_buffer_size_,
+  // and *buffer_size is set to the size of the buffer. If there is an
+  // appropriately-sized free buffer in the 'free_buffers_', that is returned, otherwise
+  // a new one is allocated. *buffer_size must be between 0 and max_buffer_size_.
   char* GetFreeBuffer(int64_t* buffer_size);
 
   // Garbage collect all unused io buffers. This is currently only triggered when the
@@ -590,6 +595,10 @@ class DiskIoMgr {
   // of 2, and buffer_size should be <= max_buffer_size_. These constraints will be met if
   // buffer was acquired via GetFreeBuffer() (which it should have been).
   void ReturnFreeBuffer(char* buffer, int64_t buffer_size);
+
+  // Returns the buffer in desc (cannot be NULL), sets buffer to NULL and clears the
+  // mem tracker.
+  void ReturnFreeBuffer(BufferDescriptor* desc);
 
   // Disk worker thread loop. This function reads the next range from the
   // disk queue if there are available buffers and places the read buffer

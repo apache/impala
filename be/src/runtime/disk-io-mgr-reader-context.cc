@@ -54,6 +54,9 @@ void DiskIoMgr::ReaderContext::Cancel(const Status& status) {
     while ((range = blocked_ranges_.Dequeue()) != NULL) {
       range->Cancel(status);
     }
+    while ((range = cached_ranges_.Dequeue()) != NULL) {
+      range->Cancel(status);
+    }
 
     // Schedule reader on all disks. The disks will notice it is cancelled and do any
     // required cleanup
@@ -127,6 +130,7 @@ void DiskIoMgr::ReaderContext::Reset(hdfsFS hdfs_connection, MemTracker* tracker
 
   DCHECK(ready_to_start_ranges_.empty());
   DCHECK(blocked_ranges_.empty());
+  DCHECK(cached_ranges_.empty());
 
   for (int i = 0; i < disk_states_.size(); ++i) {
     disk_states_[i].Reset();

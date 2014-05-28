@@ -547,28 +547,27 @@ void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
   DCHECK(buffer_desc != NULL);
   if (!buffer_desc->status_.ok()) DCHECK(buffer_desc->buffer_ == NULL);
 
-  // A NULL buffer means there was an error or the buffer desc is from a cached
-  // read. In either of those cases, we only need to return the descriptor object.
-  if (buffer_desc->scan_range_->cached_buffer_ != NULL) {
+  ReaderContext* reader = buffer_desc->reader_;
+  if (buffer_desc->buffer_ != NULL) {
+    if (buffer_desc->scan_range_->cached_buffer_ == NULL) {
+      // Not a cached buffer. Return the io buffer and update mem tracking.
+      ReturnFreeBuffer(buffer_desc);
+    }
     buffer_desc->buffer_ = NULL;
-    // Returning the cached buffer means we're done with the scan range. It is
-    // safe to close it (this is the only buffer that will be used for this range).
+    --num_buffers_in_readers_;
+    --reader->num_buffers_in_reader_;
+  } else {
+    // A NULL buffer means there was an error in which case there is no buffer
+    // to return.
+  }
+
+  if (buffer_desc->eosr_ || buffer_desc->scan_range_->is_cancelled_) {
+    // Need to close the scan range if returning the last buffer or the scan range
+    // has been cancelled (and the caller might never get the last buffer).
+    // Close() is idempotent so multiple cancelled buffers is okay.
     buffer_desc->scan_range_->Close();
   }
-
-  if (buffer_desc->buffer_ == NULL) {
-    ReturnBufferDesc(buffer_desc);
-    return;
-  }
-
-  ReaderContext* reader = buffer_desc->reader_;
-  ReturnFreeBuffer(buffer_desc->buffer_, buffer_desc->buffer_len_);
-  buffer_desc->SetMemTracker(NULL);
-  buffer_desc->buffer_ = NULL;
   ReturnBufferDesc(buffer_desc);
-
-  --num_buffers_in_readers_;
-  --reader->num_buffers_in_reader_;
 }
 
 void DiskIoMgr::ReturnBufferDesc(BufferDescriptor* desc) {
@@ -657,6 +656,12 @@ void DiskIoMgr::GcIoBuffers() {
   if (ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS != NULL) {
     ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->Update(0);
   }
+}
+
+void DiskIoMgr::ReturnFreeBuffer(BufferDescriptor* desc) {
+  ReturnFreeBuffer(desc->buffer_, desc->buffer_len_);
+  desc->SetMemTracker(NULL);
+  desc->buffer_ = NULL;
 }
 
 void DiskIoMgr::ReturnFreeBuffer(char* buffer, int64_t buffer_size) {
@@ -801,8 +806,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
   if (reader->state_ == ReaderContext::Cancelled) {
     state.DecrementReadThreadAndCheckDone(reader);
     DCHECK(reader->Validate()) << endl << reader->DebugString();
-    ReturnFreeBuffer(buffer->buffer_, buffer->buffer_len_);
-    buffer->SetMemTracker(NULL);
+    ReturnFreeBuffer(buffer);
     buffer->buffer_ = NULL;
     buffer->scan_range_->Cancel(reader->status_);
     // Enqueue the buffer to use the scan range's buffer cleanup path.
@@ -819,14 +823,11 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
   //  3. Middle of scan range
   if (!buffer->status_.ok()) {
     // Error case
-    ReturnFreeBuffer(buffer->buffer_, buffer->buffer_len_);
-    buffer->SetMemTracker(NULL);
-    buffer->buffer_ = NULL;
+    ReturnFreeBuffer(buffer);
     buffer->eosr_ = true;
     --state.num_remaining_ranges();
     buffer->scan_range_->Cancel(buffer->status_);
   } else if (buffer->eosr_) {
-    buffer->scan_range_->Close();
     --state.num_remaining_ranges();
   }
 

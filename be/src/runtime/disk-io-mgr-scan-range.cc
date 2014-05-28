@@ -86,7 +86,6 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
     }
 
     if (is_cancelled_) {
-      DCHECK(ready_buffers_.empty());
       DCHECK(!status_.ok());
       return status_;
     }
@@ -100,12 +99,10 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
 
   // Update tracking counters. The buffer has now moved from the IoMgr to the
   // caller.
-  if (cached_buffer_ == NULL) {
-    ++io_mgr_->num_buffers_in_readers_;
-    ++reader_->num_buffers_in_reader_;
-    --reader_->num_ready_buffers_;
-    --reader_->num_used_buffers_;
-  }
+  ++io_mgr_->num_buffers_in_readers_;
+  ++reader_->num_buffers_in_reader_;
+  --reader_->num_ready_buffers_;
+  --reader_->num_used_buffers_;
 
   Status status = (*buffer)->status_;
   if (!status.ok()) {
@@ -152,18 +149,15 @@ void DiskIoMgr::ScanRange::Cancel(const Status& status) {
     unique_lock<mutex> scan_range_lock(lock_);
     unique_lock<mutex> hdfs_lock(hdfs_lock_);
     DCHECK(Validate()) << DebugString();
-    if (is_cancelled_) {
-      DCHECK(ready_buffers_.empty());
-      return;
-    }
+    if (is_cancelled_) return;
     is_cancelled_ = true;
     status_ = status;
-    CleanupQueuedBuffers();
   }
   buffer_ready_cv_.notify_all();
+  CleanupQueuedBuffers();
 
   // For cached buffers, we can't close the range until the cached buffer is returned.
-  // Close is handled in DiskIoMgr::ReturnBuffer().
+  // Close() is called from DiskIoMgr::ReturnBuffer().
   if (cached_buffer_ == NULL) Close();
 }
 
@@ -173,6 +167,7 @@ void DiskIoMgr::ScanRange::CleanupQueuedBuffers() {
   reader_->num_buffers_in_reader_ += ready_buffers_.size();
   reader_->num_used_buffers_ -= ready_buffers_.size();
   reader_->num_ready_buffers_ -= ready_buffers_.size();
+
   while (!ready_buffers_.empty()) {
     BufferDescriptor* buffer = ready_buffers_.front();
     buffer->Return();
@@ -185,7 +180,8 @@ string DiskIoMgr::ScanRange::DebugString() const {
   ss << "file=" << file_ << " disk_id=" << disk_id_ << " offset=" << offset_
      << " len=" << len_ << " bytes_read=" << bytes_read_
      << " buffer_queue=" << ready_buffers_.size()
-     << " capacity=" << ready_buffers_capacity_;
+     << " capacity=" << ready_buffers_capacity_
+     << " hdfs_file=" << hdfs_file_;
   return ss.str();
 }
 
@@ -201,18 +197,17 @@ bool DiskIoMgr::ScanRange::Validate() {
                  << " eosr_queued_=" << eosr_queued_;
     return false;
   }
-  if (is_cancelled_ && !ready_buffers_.empty()) {
-    LOG(WARNING) << "Cancelling the reader must clean up queued buffers."
-                 << " is_cancelled_=" << is_cancelled_
-                 << " ready_buffers_.size()=" << ready_buffers_.size();
-    return false;
-  }
   return true;
 }
 
 DiskIoMgr::ScanRange::ScanRange(int capacity)
   : ready_buffers_capacity_(capacity) {
   Reset(NULL, -1, -1, -1, false);
+}
+
+DiskIoMgr::ScanRange::~ScanRange() {
+  DCHECK(hdfs_file_ == NULL) << "File was not closed.";
+  DCHECK(cached_buffer_ == NULL) << "Cached buffer was not released.";
 }
 
 void DiskIoMgr::ScanRange::Reset(const char* file, int64_t len, int64_t offset,
@@ -227,9 +222,11 @@ void DiskIoMgr::ScanRange::Reset(const char* file, int64_t len, int64_t offset,
   cached_buffer_ = NULL;
   io_mgr_ = NULL;
   reader_ = NULL;
+  hdfs_file_ = NULL;
 }
 
 void DiskIoMgr::ScanRange::InitInternal(DiskIoMgr* io_mgr, ReaderContext* reader) {
+  DCHECK(hdfs_file_ == NULL);
   io_mgr_ = io_mgr;
   reader_ = reader;
   local_file_ = NULL;
@@ -375,7 +372,7 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
   if (reader_->hdfs_connection_ == NULL) return Status::OK;
 
   {
-    unique_lock<mutex> scan_range_lock(lock_);
+    unique_lock<mutex> hdfs_lock(hdfs_lock_);
     if (is_cancelled_) return Status::CANCELLED;
 
     DCHECK(hdfs_file_ != NULL);
@@ -406,6 +403,7 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
     COUNTER_UPDATE(reader_->bytes_read_counter_, bytes_read);
   }
   *read_succeeded = true;
+  ++reader_->num_used_buffers_;
   return Status::OK;
 }
 

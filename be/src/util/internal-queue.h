@@ -23,8 +23,8 @@ namespace impala {
 
 // Thread safe fifo-queue. This is an internal queue, meaning the links to nodes
 // are maintained in the object itself. This is in contrast to the stl list which
-// allocates a wrapper Node object around the data. Since it's an internal queue, 
-// the list pointers are maintained in the Nodes which is memory owned by the user. 
+// allocates a wrapper Node object around the data. Since it's an internal queue,
+// the list pointers are maintained in the Nodes which is memory owned by the user.
 // The nodes cannot be deallocated while the queue has elements.
 // To use: subclass InternalQueue::Node.
 // The internal structure is a doubly-linked list.
@@ -38,10 +38,11 @@ class InternalQueue {
   struct Node {
    public:
     Node() : parent_queue(NULL), next(NULL), prev(NULL) {}
+    virtual ~Node() {}
 
    private:
     friend class InternalQueue;
-    
+
     // Pointer to the queue this Node is on. NULL if not on any queue.
     InternalQueue* parent_queue;
     Node* next;
@@ -103,7 +104,7 @@ class InternalQueue {
     DCHECK(node->parent_queue == this);
     {
       ScopedSpinLock lock(&lock_);
-      if (node->next == NULL && node->prev == NULL) { 
+      if (node->next == NULL && node->prev == NULL) {
         // Removing only node
         DCHECK(node == head_);
         DCHECK(tail_ == node);

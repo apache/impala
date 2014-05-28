@@ -68,11 +68,6 @@ do
   ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3\
       --impalad_args=--default_pool_max_requests=500
 
-  # TODO: Remove this and re-enable the call in create-load-data once IMPALA-1019
-  # is resolved.
-  ${IMPALA_HOME}/bin/impala-shell.sh -q \
-        "alter table functional.alltypestiny set uncached"
-
   # Run some queries using run-workload to verify run-workload has not been broken.
   ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
       --table_format=text/none --exec_options="disable_codegen:False"
@@ -83,11 +78,6 @@ do
   ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
       --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY
 
-  # TODO: Remove this and re-enable the call in create-load-data once IMPALA-1019
-  # is resolved.
-  ${IMPALA_HOME}/bin/impala-shell.sh -q \
-      "alter table functional.alltypestiny set cached in 'testPool'"
-
   # Run JUnit frontend tests
   # Requires a running impalad cluster because some tests (such as DataErrorTest and
   # JdbcTest) queries against an impala cluster.
@@ -96,11 +86,6 @@ do
   # tests to the new python framework.
   cd $IMPALA_FE_DIR
   mvn test
-
-  # TODO: Remove this and re-enable the call in create-load-data once IMPALA-1019
-  # is resolved.
-  ${IMPALA_HOME}/bin/impala-shell.sh -q \
-        "alter table functional.alltypestiny set uncached"
 
   # Run the JDBC tests with background loading disabled. This is interesting because
   # it requires loading missing table metadata.

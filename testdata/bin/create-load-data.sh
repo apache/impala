@@ -51,8 +51,7 @@ python -u ./load-data.py --workloads tpch --exploration_strategy core
 
 # Cache test tables
 ./impala-shell.sh -q "alter table tpch.nation set cached in 'testPool'"
-# Add this back once IMPALA-1019 is resolved.
-#./impala-shell.sh -q "alter table functional.alltypestiny set cached in 'testPool'"
+./impala-shell.sh -q "alter table functional.alltypestiny set cached in 'testPool'"
 
 # Load the test data source and table
 ./impala-shell.sh -f ${IMPALA_HOME}/testdata/bin/create-data-source-table.sql

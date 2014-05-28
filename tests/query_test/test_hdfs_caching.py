@@ -5,10 +5,13 @@
 import logging
 import pytest
 from copy import copy
+from subprocess import call
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.impala_test_suite import *
 from tests.common.test_vector import *
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.test_dimensions import create_exec_option_dimension
+from tests.util.shell_util import exec_process
 
 # End to end test that hdfs caching is working.
 class TestHdfsCaching(ImpalaTestSuite):
@@ -64,3 +67,58 @@ class TestHdfsCaching(ImpalaTestSuite):
         print "%d %d" % (cached_bytes_before[i], cached_bytes_after[i])
       assert(False)
 
+  def test_cache_cancellation(self, vector):
+    """ This query runs on some mix of cached and not cached tables. The query has
+        a limit so it exercises the cancellation paths. Regression test for
+        IMPALA-1019. """
+    num_iters = 100
+    query_string = """
+      with t1 as (select int_col x, bigint_col y from functional.alltypes limit 2),
+           t2 as (select int_col x, bigint_col y from functional.alltypestiny limit 2),
+           t3 as (select int_col x, bigint_col y from functional.alltypessmall limit 2)
+      select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x """
+
+    # Run this query for some iterations since it is timing dependent.
+    for x in xrange(1, num_iters):
+      result = self.execute_query(query_string)
+      assert(len(result.data) == 2)
+
+class TestHdfsCachingDdl(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestHdfsCachingDdl, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format == 'text' and \
+        v.get_value('table_format').compression_codec == 'none')
+
+  @pytest.mark.execute_serially
+  def test_caching_ddl(self, vector):
+    self.client.execute("drop table if exists functional.cached_tbl_part")
+    self.client.execute("drop table if exists functional.cached_tbl_nopart")
+
+    # Get the number of cache requests before starting the test
+    num_entries_pre = get_num_cache_requests()
+    self.run_test_case('QueryTest/hdfs-caching', vector)
+
+    # After running this test case we should be left with 6 cache requests.
+    # In this case, 1 for each table + 4 more for each cached partition.
+    assert num_entries_pre == get_num_cache_requests() - 6
+
+    self.client.execute("drop table functional.cached_tbl_part")
+    self.client.execute("drop table functional.cached_tbl_nopart")
+
+    # Dropping the tables should cleanup cache entries leaving us with the same
+    # total number of entries
+    assert num_entries_pre == get_num_cache_requests()
+
+def get_num_cache_requests():
+  """Returns the number of outstanding cache requests"""
+  rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -stats")
+  assert rc == 0, 'Error executing hdfs cacheadmin: %s %s' % (stdout, stderr)
+  return len(stdout.split('\n'))
