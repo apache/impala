@@ -82,7 +82,8 @@ namespace apache { namespace thrift { namespace transport {
     NegotiationStatus status = TSASL_INVALID;
     uint32_t resLength;
 
-    if (!transport_->isOpen()) {
+    // Only client should open the underlying transport.
+    if (isClient_ && !transport_->isOpen()) {
       transport_->open();
     }
 
