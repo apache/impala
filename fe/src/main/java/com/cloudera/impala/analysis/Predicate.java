@@ -77,4 +77,11 @@ public abstract class Predicate extends Expr {
   public Pair<SlotId, SlotId> getEqSlots() {
     return null;
   }
+
+  /**
+   * Returns the SlotRef bound by this Predicate.
+   */
+  public SlotRef getBoundSlot() {
+    return null;
+  }
 }

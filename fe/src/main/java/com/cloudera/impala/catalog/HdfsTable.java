@@ -22,10 +22,12 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -57,6 +59,7 @@ import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.FileSystemUtil;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -112,6 +115,25 @@ public class HdfsTable extends Table {
   private static boolean hasLoggedDiskIdFormatWarning_ = false;
 
   private final List<HdfsPartition> partitions_; // these are only non-empty partitions
+
+  // Array of sorted maps storing the association between partition values and
+  // partition ids. There is one sorted map per partition key.
+  private ArrayList<TreeMap<LiteralExpr, HashSet<Long>>> partitionValuesMap_ =
+      Lists.newArrayList();
+
+  // Array of partition id sets that correspond to partitions with null values
+  // in the partition keys; one set per partition key.
+  private ArrayList<HashSet<Long>> nullPartitionIds_ = Lists.newArrayList();
+
+  // Map of partition ids to HdfsPartitions. Used for speeding up partition
+  // pruning.
+  private HashMap<Long, HdfsPartition> partitionMap_ = Maps.newHashMap();
+
+  // Store all the partition ids of an HdfsTable.
+  private HashSet<Long> partitionIds_ = Sets.newHashSet();
+
+  // Flag to indicate if the HdfsTable has the partition metadata populated.
+  private boolean hasPartitionMd_ = false;
 
   // Contains a list of unique datanode TNetworkAddresses, each of which contains blocks
   // of 1 or more files in this table. The network addresses are stored using IP
@@ -354,6 +376,13 @@ public class HdfsTable extends Table {
   public List<HdfsPartition> getPartitions() { return partitions_; }
   public boolean isMarkedCached() { return isMarkedCached_; }
 
+  public HashMap<Long, HdfsPartition> getPartitionMap() { return partitionMap_; }
+  public HashSet<Long> getNullPartitionIds(int i) { return nullPartitionIds_.get(i); }
+  public HashSet<Long> getPartitionIds() { return partitionIds_; }
+  public TreeMap<LiteralExpr, HashSet<Long>> getPartitionValueMap(int i) {
+    return partitionValuesMap_.get(i);
+  }
+
   /**
    * Returns the value Hive is configured to use for NULL partition key values.
    * Set during load.
@@ -499,6 +528,51 @@ public class HdfsTable extends Table {
   }
 
   /**
+   * Populate the partition metadata of an HdfsTable.
+   */
+  public void populatePartitionMd() {
+    if (hasPartitionMd_) return;
+    for (int i = 0; i < numClusteringCols_; ++i) {
+      partitionValuesMap_.add(Maps.<LiteralExpr, HashSet<Long>>newTreeMap());
+      nullPartitionIds_.add(Sets.<Long>newHashSet());
+    }
+
+    for (HdfsPartition partition: partitions_) {
+      if (partition.getFileDescriptors().size() == 0) continue;
+      if (partition.getPartitionValues().size() != numClusteringCols_) continue;
+
+      partitionIds_.add(partition.getId());
+      partitionMap_.put(partition.getId(), partition);
+      for (int i = 0; i < partition.getPartitionValues().size(); ++i) {
+        LiteralExpr literal = partition.getPartitionValues().get(i);
+        // Store partitions with null partition values separately
+        if (literal instanceof NullLiteral) {
+          nullPartitionIds_.get(i).add(partition.getId());
+          continue;
+        }
+        HashSet<Long> partitionIds = partitionValuesMap_.get(i).get(literal);
+        if (partitionIds == null) {
+          partitionIds = Sets.newHashSet();
+          partitionValuesMap_.get(i).put(literal, partitionIds);
+        }
+        partitionIds.add(partition.getId());
+      }
+    }
+    hasPartitionMd_ = true;
+  }
+
+  /**
+   * Clear the partition metadata of an HdfsTable.
+   */
+  private void clearPartitionMd() {
+    partitionIds_.clear();
+    partitionMap_.clear();
+    partitionValuesMap_.clear();
+    nullPartitionIds_.clear();
+    hasPartitionMd_ = false;
+  }
+
+  /**
    * Create HdfsPartition objects corresponding to 'partitions'.
    *
    * If there are no partitions in the Hive metadata, a single partition is added with no
@@ -511,6 +585,7 @@ public class HdfsTable extends Table {
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       Map<String, List<FileDescriptor>> oldFileDescMap) throws IOException,
       CatalogException {
+    clearPartitionMd();
     partitions_.clear();
     hdfsBaseDir_ = msTbl.getSd().getLocation();
 
@@ -890,6 +965,7 @@ public class HdfsTable extends Table {
         }
       }
       loadPartitions(msPartitions, msTbl, oldFileDescMap);
+      populatePartitionMd();
 
       // load table stats
       numRows_ = getRowCount(msTbl.getParameters());
@@ -986,6 +1062,7 @@ public class HdfsTable extends Table {
     nullPartitionKeyValue_ = hdfsTable.nullPartitionKeyValue;
     hostList_ = hdfsTable.getNetwork_addresses();
     hostMap_.clear();
+    clearPartitionMd();
     for (int i = 0; i < hostList_.size(); ++i) {
       hostMap_.put(hostList_.get(i), i);
     }
@@ -1002,6 +1079,7 @@ public class HdfsTable extends Table {
     avroSchema_ = hdfsTable.isSetAvroSchema() ? hdfsTable.getAvroSchema() : null;
     isMarkedCached_ = HdfsCachingUtil.getCacheDirIdFromParams(
         getMetaStoreTable().getParameters()) != null;
+    populatePartitionMd();
   }
 
   @Override

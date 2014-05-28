@@ -37,6 +37,8 @@ public class IsNullPredicate extends Predicate {
     children_.add(e);
   }
 
+  public boolean isNotNull() { return isNotNull_; }
+
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) return false;
@@ -81,4 +83,19 @@ public class IsNullPredicate extends Predicate {
     msg.is_null_pred = new TIsNullPredicate(isNotNull_);
   }
 
+  /*
+   * If predicate is of the form "<SlotRef> IS [NOT] NULL", returns the
+   * SlotRef.
+   */
+  public SlotRef getBoundSlot() {
+    return getChild(0).unwrapSlotRef(true);
+  }
+
+  /**
+   * Negates an IsNullPredicate.
+   */
+  @Override
+  public Expr negate() {
+    return new IsNullPredicate(getChild(0), !isNotNull_);
+  }
 }

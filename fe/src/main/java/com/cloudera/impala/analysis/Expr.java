@@ -31,6 +31,7 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExpr;
@@ -984,5 +985,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     } else {
       return null;
     }
+  }
+
+  /**
+   * Negates a boolean Expr.
+   */
+  public Expr negate() {
+    Preconditions.checkState(type_.getPrimitiveType() == PrimitiveType.BOOLEAN);
+    return new CompoundPredicate(CompoundPredicate.Operator.NOT, this, null);
   }
 }

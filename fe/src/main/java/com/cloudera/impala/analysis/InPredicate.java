@@ -30,6 +30,8 @@ public class InPredicate extends Predicate {
   private final static Logger LOG = LoggerFactory.getLogger(InPredicate.class);
   private final boolean isNotIn_;
 
+  public boolean isNotIn() { return isNotIn_; }
+
   // First child is the comparison expr for which we
   // should check membership in the inList (the remaining children).
   public InPredicate(Expr compareExpr, List<Expr> inList, boolean isNotIn) {
@@ -75,5 +77,23 @@ public class InPredicate extends Predicate {
     }
     strBuilder.append(")");
     return strBuilder.toString();
+  }
+
+  /*
+   * If predicate is of the form "<SlotRef> [NOT] IN", returns the
+   * SlotRef.
+   */
+  @Override
+  public SlotRef getBoundSlot() {
+    return getChild(0).unwrapSlotRef(true);
+  }
+
+  /**
+   * Negates an InPredicate.
+   */
+  @Override
+  public Expr negate() {
+    return new InPredicate(getChild(0), children_.subList(1, children_.size()),
+        !isNotIn_);
   }
 }

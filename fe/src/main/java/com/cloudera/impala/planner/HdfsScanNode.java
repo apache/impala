@@ -14,26 +14,45 @@
 
 package com.cloudera.impala.planner;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NavigableMap;
+import java.util.Set;
+import java.util.TreeMap;
 
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.BetweenPredicate;
+import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.BinaryPredicate.Operator;
+import com.cloudera.impala.analysis.BoolLiteral;
+import com.cloudera.impala.analysis.CompoundPredicate;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.InPredicate;
+import com.cloudera.impala.analysis.IsNullPredicate;
+import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -51,6 +70,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Scan of a single single table. Currently limited to full-table scans.
@@ -75,6 +95,9 @@ public class HdfsScanNode extends ScanNode {
 
   // Partition batch size used during partition pruning
   private final static int PARTITION_PRUNING_BATCH_SIZE = 1024;
+
+  // Name of the function used to negate an Expr.
+  private final static String NEGATE_FN = "negate";
 
   private final HdfsTable tbl_;
 
@@ -133,7 +156,255 @@ public class HdfsScanNode extends ScanNode {
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
   }
 
- /**
+  /**
+   * Check if the PrimitiveType of an Expr is the same as the
+   * PrimitiveType of a SlotRef's column.
+   */
+  private boolean hasIdenticalType(SlotRef slot, Expr literal) {
+    Preconditions.checkNotNull(slot);
+    Preconditions.checkNotNull(literal);
+    Column slotCol = slot.getDesc().getColumn();
+    PrimitiveType slotType = slotCol.getType().getPrimitiveType();
+    PrimitiveType literalType = literal.getType().getPrimitiveType();
+    return slotType == literalType ? true : false;
+  }
+
+  /**
+   * Recursive function that checks if a given partition expr can be evaluated
+   * directly from the partition key values.
+   */
+  private boolean canEvalUsingPartitionMd(Expr expr) {
+    Preconditions.checkNotNull(expr);
+    if (expr instanceof BinaryPredicate) {
+      BinaryPredicate bp = (BinaryPredicate)expr;
+      SlotRef slot = bp.getBoundSlot();
+      if (slot == null) return false;
+      Expr bindingExpr = bp.getSlotBinding(slot.getSlotId());
+      if (bindingExpr == null || !(bindingExpr.isLiteral())) return false;
+      // Make sure the SlotRef column and the LiteralExpr have the same
+      // PrimitiveType. If not, the expr needs to be evaluated in the BE.
+      //
+      // TODO: If a cast is required to do the map lookup with a
+      // literal, execute the cast expr in the BE and then do the lookup instead
+      // of disabling this predicate altogether.
+      return hasIdenticalType(slot, bindingExpr);
+    } else if (expr instanceof CompoundPredicate) {
+      boolean res = canEvalUsingPartitionMd(expr.getChild(0));
+      if (expr.getChild(1) != null) {
+        res &= canEvalUsingPartitionMd(expr.getChild(1));
+      }
+      return res;
+    } else if (expr instanceof IsNullPredicate) {
+      // Check for SlotRef IS [NOT] NULL case
+      IsNullPredicate nullPredicate = (IsNullPredicate)expr;
+      return nullPredicate.getBoundSlot() != null;
+    } else if (expr instanceof InPredicate) {
+      // Check for SlotRef [NOT] IN (Literal, ... Literal) case
+      SlotRef slot = ((InPredicate)expr).getBoundSlot();
+      if (slot == null) return false;
+
+      for (int i = 1; i < expr.getChildren().size(); ++i) {
+        Expr rhs = expr.getChild(i);
+        if (!(rhs.isLiteral())) {
+          return false;
+        } else {
+          // Make sure the SlotRef column and the LiteralExpr have the same
+          // PrimitiveType. If not, the expr needs to be evaluated in the BE.
+          if (!hasIdenticalType(slot, rhs)) return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Evaluate a BinaryPredicate filter on a partition column and return the
+   * ids of the matching partitions. An empty set is returned if there
+   * are no matching partitions.
+   */
+  private HashSet<Long> evalBinaryPredicate(Expr expr) {
+    Preconditions.checkNotNull(expr);
+    Preconditions.checkState(expr instanceof BinaryPredicate);
+    HashSet<Long> matchingIds = Sets.newHashSet();
+    boolean isSlotOnLeft = true;
+    if (expr.getChild(0).isLiteral()) isSlotOnLeft = false;
+
+    // Get the operands
+    BinaryPredicate bp = (BinaryPredicate)expr;
+    SlotRef slot = bp.getBoundSlot();
+    Preconditions.checkNotNull(slot);
+    Expr bindingExpr = bp.getSlotBinding(slot.getSlotId());
+    Preconditions.checkNotNull(bindingExpr);
+    Preconditions.checkState(bindingExpr.isLiteral());
+    LiteralExpr literal = (LiteralExpr)bindingExpr;
+
+    // Get the partition column position and retrieve the associated partition
+    // value metadata.
+    int partitionPos = slot.getDesc().getColumn().getPosition();
+    TreeMap<LiteralExpr, HashSet<Long>> partitionValueMap =
+        tbl_.getPartitionValueMap(partitionPos);
+
+    // Compute the matching partition ids
+    Operator op = bp.getOp();
+    if (op == Operator.EQ) {
+      // Case: SlotRef = Literal
+      HashSet<Long> ids = partitionValueMap.get(literal);
+      if (ids != null) matchingIds.addAll(ids);
+      return matchingIds;
+    }
+    if (op == Operator.NE) {
+      // Case: SlotRef != Literal
+      matchingIds.addAll(tbl_.getPartitionIds());
+      HashSet<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
+      matchingIds.removeAll(nullIds);
+      HashSet<Long> ids = partitionValueMap.get(literal);
+      if (ids != null) matchingIds.removeAll(ids);
+      return matchingIds;
+    }
+
+    // Determine the partition key value range of this predicate.
+    NavigableMap<LiteralExpr, HashSet<Long>> rangeValueMap = null;
+    LiteralExpr firstKey = partitionValueMap.firstKey();
+    LiteralExpr lastKey = partitionValueMap.lastKey();
+    boolean upperInclusive = false;
+    boolean lowerInclusive = false;
+    LiteralExpr upperBoundKey = null;
+    LiteralExpr lowerBoundKey = null;
+
+    if (((op == Operator.LE || op == Operator.LT) && isSlotOnLeft) ||
+        ((op == Operator.GE || op == Operator.GT) && !isSlotOnLeft)) {
+      // Case: SlotRef <[=] Literal
+      if (literal.compareTo(firstKey) < 0) return Sets.newHashSet();
+      if (op == Operator.LE || op == Operator.GE) upperInclusive = true;
+
+      if (literal.compareTo(lastKey) <= 0) {
+        upperBoundKey = literal;
+      } else {
+        upperBoundKey = lastKey;
+        upperInclusive = true;
+      }
+      lowerBoundKey = firstKey;
+      lowerInclusive = true;
+    } else {
+      // Cases: SlotRef >[=] Literal
+      if (literal.compareTo(lastKey) > 0) return Sets.newHashSet();
+      if (op == Operator.GE || op == Operator.LE) lowerInclusive = true;
+
+      if (literal.compareTo(firstKey) >= 0) {
+        lowerBoundKey = literal;
+      } else {
+        lowerBoundKey = firstKey;
+        lowerInclusive = true;
+      }
+      upperBoundKey = lastKey;
+      upperInclusive = true;
+    }
+
+    // Retrieve the submap that corresponds to the computed partition key
+    // value range.
+    rangeValueMap = partitionValueMap.subMap(lowerBoundKey, lowerInclusive,
+        upperBoundKey, upperInclusive);
+    // Compute the matching partition ids
+    for (HashSet<Long> idSet: rangeValueMap.values()) {
+      if (idSet != null) matchingIds.addAll(idSet);
+    }
+    return matchingIds;
+  }
+
+  /**
+   * Evaluate an InPredicate filter on a partition column and return the ids of
+   * the matching partitions.
+   */
+  private HashSet<Long> evalInPredicate(Expr expr) {
+    Preconditions.checkNotNull(expr);
+    Preconditions.checkState(expr instanceof InPredicate);
+    InPredicate inPredicate = (InPredicate)expr;
+    HashSet<Long> matchingIds = Sets.newHashSet();
+    SlotRef slot = inPredicate.getBoundSlot();
+    Preconditions.checkNotNull(slot);
+    int partitionPos = slot.getDesc().getColumn().getPosition();
+    TreeMap<LiteralExpr, HashSet<Long>> partitionValueMap =
+        tbl_.getPartitionValueMap(partitionPos);
+
+    if (inPredicate.isNotIn()) {
+      // Case: SlotRef NOT IN (Literal, ..., Literal)
+      matchingIds.addAll(tbl_.getPartitionIds());
+      // Exclude partitions with null partition column values
+      HashSet<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
+      matchingIds.removeAll(nullIds);
+    }
+    // Compute the matching partition ids
+    for (int i = 1; i < inPredicate.getChildren().size(); ++i) {
+      LiteralExpr literal = (LiteralExpr)inPredicate.getChild(i);
+      HashSet<Long> idSet = partitionValueMap.get(literal);
+      if (idSet != null) {
+        if (inPredicate.isNotIn()) {
+          matchingIds.removeAll(idSet);
+        } else {
+          matchingIds.addAll(idSet);
+        }
+      }
+    }
+    return matchingIds;
+  }
+
+  /**
+   * Evaluate an IsNullPredicate on a partition column and return the ids of the
+   * matching partitions.
+   */
+  private HashSet<Long> evalIsNullPredicate(Expr expr) {
+    Preconditions.checkNotNull(expr);
+    Preconditions.checkState(expr instanceof IsNullPredicate);
+    HashSet<Long> matchingIds = Sets.newHashSet();
+    IsNullPredicate nullPredicate = (IsNullPredicate)expr;
+    SlotRef slot = nullPredicate.getBoundSlot();
+    Preconditions.checkNotNull(slot);
+    int partitionPos = slot.getDesc().getColumn().getPosition();
+    HashSet<Long> nullPartitionIds = tbl_.getNullPartitionIds(partitionPos);
+
+    if (nullPredicate.isNotNull()) {
+      matchingIds.addAll(tbl_.getPartitionIds());
+      matchingIds.removeAll(nullPartitionIds);
+    } else {
+      matchingIds.addAll(nullPartitionIds);
+    }
+    return matchingIds;
+  }
+
+  /**
+   * Evaluate a slot binding predicate on a partition key using the partition
+   * key values; return the matching partition ids. An empty set is returned
+   * if there are no matching partitions. This function can evaluate the following
+   * types of predicates: BinaryPredicate, CompoundPredicate, IsNullPredicate, and
+   * InPredicate.
+   */
+  private HashSet<Long> evalSlotBindingFilter(Expr expr) {
+    Preconditions.checkNotNull(expr);
+    if (expr instanceof BinaryPredicate) {
+      return evalBinaryPredicate(expr);
+    } else if (expr instanceof CompoundPredicate) {
+      HashSet<Long> leftChildIds = evalSlotBindingFilter(expr.getChild(0));
+      CompoundPredicate cp = (CompoundPredicate)expr;
+      // NOT operators have been eliminated
+      Preconditions.checkState(cp.getOp() != CompoundPredicate.Operator.NOT);
+      if (cp.getOp() == CompoundPredicate.Operator.AND) {
+        HashSet<Long> rightChildIds = evalSlotBindingFilter(expr.getChild(1));
+        leftChildIds.retainAll(rightChildIds);
+      } else if (cp.getOp() == CompoundPredicate.Operator.OR) {
+        HashSet<Long> rightChildIds = evalSlotBindingFilter(expr.getChild(1));
+        leftChildIds.addAll(rightChildIds);
+      }
+      return leftChildIds;
+    } else if (expr instanceof InPredicate) {
+      return evalInPredicate(expr);
+    } else if (expr instanceof IsNullPredicate) {
+      return evalIsNullPredicate(expr);
+    }
+    return null;
+  }
+
+  /**
    * Populate partitions_ based on all applicable conjuncts and remove
    * conjuncts used for filtering from conjuncts_.
    */
@@ -151,45 +422,103 @@ public class HdfsScanNode extends ScanNode {
     }
     List<HdfsPartitionFilter> partitionFilters = Lists.newArrayList();
     List<Expr> filterConjuncts = Lists.newArrayList();
-    for (Expr conjunct: conjuncts_) {
+    // Conjuncts that can be evaluated from the partition key values.
+    List<Expr> simpleFilterConjuncts = Lists.newArrayList();
+
+    // Simple predicates (e.g. binary predicates of the form
+    // <SlotRef> <op> <LiteralExpr>) can be used to derive lists
+    // of matching partition ids directly from the partition key values.
+    // Split conjuncts among those that can be evaluated from partition
+    // key values and those that need to be evaluated in the BE.
+    Iterator<Expr> it = conjuncts_.iterator();
+    while (it.hasNext()) {
+      Expr conjunct = it.next();
       if (conjunct.isBoundBySlotIds(partitionSlots)) {
-        partitionFilters.add(new HdfsPartitionFilter(conjunct, tbl_, analyzer));
-        filterConjuncts.add(conjunct);
+        if (canEvalUsingPartitionMd(conjunct)) {
+          simpleFilterConjuncts.add(pushNegationToOperands(conjunct));
+        } else {
+          partitionFilters.add(new HdfsPartitionFilter(conjunct, tbl_, analyzer));
+        }
+        it.remove();
       }
     }
-    // filterConjuncts are applied implicitly via partition pruning
-    conjuncts_.removeAll(filterConjuncts);
 
-    int partitionsCount = tbl_.getPartitions().size();
-    // Map of partition ids to partition objects
-    HashMap<Long, HdfsPartition> partitionMap =
-        new HashMap<Long, HdfsPartition>(partitionsCount);
-    // Set of valid partition ids. A partition is considered 'valid' if it
-    // passes all the partition filters. Initially, all the partitions are
-    // considered 'valid'.
-    HashSet<Long> validPartitionIds = new HashSet<Long>();
-    // TODO: To avoid generating too many objects, the first filter should
-    // iterate directly over the tbl_.getPartitions() and then store the ids that
-    // pass in validPartitionIds.
-    for (HdfsPartition p: tbl_.getPartitions()) {
-      // ignore partitions without data
-      if (p.getFileDescriptors().size() == 0) continue;
+    // Set of matching partition ids, i.e. partitions that pass all filters
+    HashSet<Long> matchingPartitionIds = null;
 
-      Preconditions.checkState(
-          p.getPartitionValues().size() == tbl_.getNumClusteringCols());
-
-      partitionMap.put(p.getId(), p);
-      validPartitionIds.add(p.getId());
+    // Evaluate the partition filters from the partition key values.
+    // The result is the intersection of the associated partition id sets.
+    for (Expr filter: simpleFilterConjuncts) {
+      // Evaluate the filter
+      HashSet<Long> matchingIds = evalSlotBindingFilter(filter);
+      if (matchingPartitionIds == null) {
+        matchingPartitionIds = matchingIds;
+      } else {
+        matchingPartitionIds.retainAll(matchingIds);
+      }
     }
 
-    // Set of partition ids that pass a filter.
-    HashSet<Long> matchingIds = new HashSet<Long>();
+    // Check if we need to initialize the set of valid partition ids.
+    if (simpleFilterConjuncts.size() == 0) {
+      Preconditions.checkState(matchingPartitionIds == null);
+      matchingPartitionIds = Sets.newHashSet(tbl_.getPartitionIds());
+    }
+
+    // Evaluate the 'complex' partition filters in the BE.
+    evalPartitionFiltersInBe(partitionFilters, matchingPartitionIds, analyzer);
+
+    // Populate the list of valid partitions to process
+    HashMap<Long, HdfsPartition> partitionMap = tbl_.getPartitionMap();
+    for (Long id: matchingPartitionIds) {
+      partitions_.add(partitionMap.get(id));
+    }
+  }
+
+  /**
+   * Pushes negation to the individual operands of a predicate
+   * tree rooted at 'root'.
+   */
+  private static Expr pushNegationToOperands(Expr root) {
+    Preconditions.checkNotNull(root);
+    if (root instanceof CompoundPredicate) {
+      if (((CompoundPredicate)root).getOp() == CompoundPredicate.Operator.NOT) {
+        try {
+          // Make sure we call function 'negate' only on classes that support it,
+          // otherwise we may recurse infinitely.
+          Method m = root.getChild(0).getClass().getMethod(NEGATE_FN);
+          return pushNegationToOperands(root.getChild(0).negate());
+        } catch (NoSuchMethodException e) {
+          // The 'negate' function is not implemented. Break the recursion.
+          return root;
+        }
+      } else {
+        Expr left = pushNegationToOperands(root.getChild(0));
+        Expr right = pushNegationToOperands(root.getChild(1));
+        return new CompoundPredicate(((CompoundPredicate)root).getOp(), left, right);
+      }
+    }
+    return root;
+  }
+
+  /**
+   * Evaluate a list of HdfsPartitionFilters in the BE. These are 'complex'
+   * filters that could not be evaluated from the partition key values.
+   */
+  private void evalPartitionFiltersInBe(List<HdfsPartitionFilter> filters,
+      HashSet<Long> matchingPartitionIds, Analyzer analyzer)
+      throws InternalException, AuthorizationException {
+    HashMap<Long, HdfsPartition> partitionMap = tbl_.getPartitionMap();
+    // Set of partition ids that pass a filter
+    HashSet<Long> matchingIds = Sets.newHashSet();
     // Batch of partitions
-    ArrayList<HdfsPartition> partitionBatch = new ArrayList<HdfsPartition>();
+    ArrayList<HdfsPartition> partitionBatch = Lists.newArrayList();
     // Identify the partitions that pass all filters.
-    for (HdfsPartitionFilter filter: partitionFilters) {
+    for (HdfsPartitionFilter filter: filters) {
       // Iterate through the currently valid partitions
-      for (Long id: validPartitionIds) {
+      for (Long id: matchingPartitionIds) {
+        HdfsPartition p = partitionMap.get(id);
+        Preconditions.checkState(
+            p.getPartitionValues().size() == tbl_.getNumClusteringCols());
         // Add the partition to the current batch
         partitionBatch.add(partitionMap.get(id));
         if (partitionBatch.size() == PARTITION_PRUNING_BATCH_SIZE) {
@@ -204,13 +533,8 @@ public class HdfsScanNode extends ScanNode {
         partitionBatch.clear();
       }
       // Prune the partitions ids that didn't pass the filter
-      validPartitionIds.retainAll(matchingIds);
+      matchingPartitionIds.retainAll(matchingIds);
       matchingIds.clear();
-    }
-
-    // Populate the list of valid partitions to process
-    for (Long id: validPartitionIds) {
-      partitions_.add(partitionMap.get(id));
     }
   }
 

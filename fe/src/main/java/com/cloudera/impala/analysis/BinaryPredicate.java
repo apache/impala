@@ -186,4 +186,44 @@ public class BinaryPredicate extends Predicate {
     if (rhs == null) return null;
     return new Pair<SlotId, SlotId>(lhs.getSlotId(), rhs.getSlotId());
   }
+
+  /**
+   * If predicate is of the form "<SlotRef> op <Expr>" or "<Expr> op <SlotRef>",
+   * returns the SlotRef, otherwise returns null.
+   */
+  @Override
+  public SlotRef getBoundSlot() {
+    SlotRef slotRef = getChild(0).unwrapSlotRef(true);
+    if (slotRef != null) return slotRef;
+    return getChild(1).unwrapSlotRef(true);
+  }
+
+  /**
+   * Negates a BinaryPredicate.
+   */
+  @Override
+  public Expr negate() {
+    Operator newOp = null;
+    switch (op_) {
+      case EQ:
+        newOp = Operator.NE;
+        break;
+      case NE:
+        newOp = Operator.EQ;
+        break;
+      case LT:
+        newOp = Operator.GE;
+        break;
+      case LE:
+        newOp = Operator.GT;
+        break;
+      case GE:
+        newOp = Operator.LT;
+        break;
+      case GT:
+        newOp = Operator.LE;
+        break;
+    }
+    return new BinaryPredicate(newOp, getChild(0), getChild(1));
+  }
 }
