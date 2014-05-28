@@ -28,7 +28,7 @@ ROW_REGEX_PREFIX = re.compile(ROW_REGEX_PREFIX_PATTERN, re.I)
 
 # Represents a single test result (row set)
 class QueryTestResult(object):
-  def __init__(self, result_list, column_types, order_matters):
+  def __init__(self, result_list, column_types, column_labels, order_matters):
     self.column_types = column_types
     self.result_list = result_list
     # The order of the result set might be different if running with multiple nodes.
@@ -36,7 +36,7 @@ class QueryTestResult(object):
     test_results = result_list
     if not order_matters:
       test_results = sorted(result_list)
-    self.rows = [ResultRow(row, column_types) for row in test_results]
+    self.rows = [ResultRow(row, column_types, column_labels) for row in test_results]
 
   def __eq__(self, other):
     if not isinstance(other, self.__class__):
@@ -52,8 +52,8 @@ class QueryTestResult(object):
 
 # Represents a row in a result set
 class ResultRow(object):
-  def __init__(self, row_string, column_types):
-    self.columns = self.__parse_row(row_string, column_types)
+  def __init__(self, row_string, column_types, column_labels):
+    self.columns = self.__parse_row(row_string, column_types, column_labels)
     self.row_string = row_string
     # If applicable, pre-compile the regex that actual row values (row_string)
     # should be matched against instead of self.columns.
@@ -64,7 +64,7 @@ class ResultRow(object):
       if self.regex is None:
         assert False, "Invalid row regex specification: %s" % self.row_string
 
-  def __parse_row(self, row_string, column_types):
+  def __parse_row(self, row_string, column_types, column_labels):
     """Parses a row string and build a list of ResultColumn objects"""
     column_values = list()
     if not row_string:
@@ -89,9 +89,24 @@ class ResultRow(object):
           continue
       assert current_column < len(column_types),\
           'Number of columns returned > the number of column types: %s' % column_types
-      column_values.append(ResultColumn(col_val, column_types[current_column]))
+      column_values.append(ResultColumn(col_val, column_types[current_column],
+          column_labels[current_column]))
       current_column = current_column + 1
     return column_values
+
+  def __getitem__(self, key):
+    """Allows accessing a column value using the column alias or the position of the
+    column in the result set. All values are returned as strings and an exception is
+    thrown if the column label or column position does not exist."""
+    if isinstance(key, basestring):
+      for col in self.columns:
+        if col.column_label == key.lower(): return col.value
+      raise IndexError, 'No column with label: ' + key
+    elif isinstance(key, int):
+      # If the key (column position) does not exist this will throw an IndexError when
+      # indexing into the self.columns
+      return str(self.columns[key])
+    raise TypeError, 'Unsupported indexing key type: ' + type(key)
 
   def __eq__(self, other):
     if not isinstance(other, self.__class__):
@@ -122,10 +137,11 @@ def compare_float(x, y, epsilon):
 
 # Represents a column in a row
 class ResultColumn(object):
-  def __init__(self, value, column_type):
+  def __init__(self, value, column_type, column_label):
     """Value of the column and the type (double, float, string, etc...)"""
     self.value = value
     self.column_type = column_type.lower()
+    self.column_label = column_label.lower()
     # If applicable, pre-compile the regex that actual column values
     # should be matched against instead of self.value.
     self.regex = None
@@ -204,9 +220,9 @@ def verify_errors(expected_errors, actual_errors):
   """Convert the errors to our test format, treating them as a single string column row
   set. This requires enclosing the data in single quotes."""
   expected = QueryTestResult(["'%s'" % l for l in expected_errors if l], ['STRING'],
-      order_matters=False)
+      ['DUMMY_LABEL'], order_matters=False)
   actual = QueryTestResult(["'%s'" % l for l in actual_errors if l], ['STRING'],
-      order_matters=False)
+      ['DUMMY_LABEL'], order_matters=False)
   VERIFIER_MAP['VERIFY_IS_EQUAL'](expected, actual)
 
 def apply_error_match_filter(error_list):
@@ -281,12 +297,16 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     expected_types = ['BIGINT']
     actual_types = ['BIGINT']
 
+  actual_labels = ['DUMMY_LABEL']
+  if exec_result and exec_result.schema:
+    actual_labels = parse_column_labels(exec_result.schema)
+
   if 'LABELS' in test_section:
+    assert actual_labels is not None
     # Distinguish between an empty list and a list with an empty string.
     expected_labels = list()
     if test_section.get('LABELS'):
       expected_labels = [c.strip().upper() for c in test_section['LABELS'].split(',')]
-    actual_labels = parse_column_labels(exec_result.schema)
     try:
       verify_results(expected_labels, actual_labels, order_matters=True)
     except AssertionError:
@@ -310,8 +330,10 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
   # then sort the actual and expected results before verification.
   if verifier and verifier.upper() == 'VERIFY_IS_EQUAL_SORTED':
     order_matters = False
-  expected = QueryTestResult(expected_results.split('\n'), expected_types, order_matters)
-  actual = QueryTestResult(parse_result_rows(exec_result), actual_types, order_matters)
+  expected = QueryTestResult(expected_results.split('\n'), expected_types,
+      actual_labels, order_matters)
+  actual = QueryTestResult(parse_result_rows(exec_result), actual_types,
+      actual_labels, order_matters)
   assert verifier in VERIFIER_MAP.keys(), "Unknown verifier: " + verifier
   try:
     VERIFIER_MAP[verifier](expected, actual)
@@ -331,7 +353,16 @@ def parse_column_types(schema):
 
 def parse_column_labels(schema):
   """Enumerates all field schemas and returns a list of column label strings"""
+  # This is an statement doesn't return a field schema (insert statement).
+  if schema is None or schema.fieldSchemas is None: return list()
   return [fs.name.upper() for fs in schema.fieldSchemas]
+
+def create_query_result(exec_result, order_matters=False):
+  """Creates query result in the test format from the result returned from a query"""
+  col_labels = parse_column_labels(exec_result.schema)
+  col_types = parse_column_types(exec_result.schema)
+  data = parse_result_rows(exec_result)
+  return QueryTestResult(data, col_types, col_labels, order_matters)
 
 def parse_result_rows(exec_result):
   """
@@ -347,7 +378,6 @@ def parse_result_rows(exec_result):
 
   result = list()
   col_types = parse_column_types(exec_result.schema)
-
   for row in exec_result.data:
     cols = row.split('\t')
     assert len(cols) == len(col_types)

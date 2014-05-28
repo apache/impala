@@ -176,8 +176,10 @@ class TestWideTable(ImpalaTestSuite):
     result = self.client.execute("select * from %s" % TABLE_NAME)
 
     types = parse_column_types(result.schema)
-    expected = QueryTestResult(expected_result, types, order_matters=False)
-    actual = QueryTestResult(parse_result_rows(result), types, order_matters=False)
+    labels = parse_column_labels(result.schema)
+    expected = QueryTestResult(expected_result, types, labels, order_matters=False)
+    actual = QueryTestResult(parse_result_rows(result), types, labels,
+        order_matters=False)
     assert expected == actual
 
 class TestParquet(ImpalaTestSuite):

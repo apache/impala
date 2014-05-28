@@ -112,8 +112,9 @@ class TestInsertWideTable(ImpalaTestSuite):
 
     result = self.client.execute("select * from " + table_name)
     types = parse_column_types(result.schema)
-    expected = QueryTestResult([col_vals], types, order_matters=False)
-    actual = QueryTestResult(parse_result_rows(result), types, order_matters=False)
+    labels = parse_column_labels(result.schema)
+    expected = QueryTestResult([col_vals], types, labels, order_matters=False)
+    actual = QueryTestResult(parse_result_rows(result), types, labels, order_matters=False)
     assert expected == actual
 
 class TestUnsupportedInsertFormats(ImpalaTestSuite):
