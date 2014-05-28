@@ -246,6 +246,10 @@ public class JniFrontend {
 
     TGetDataSrcsResult result = new TGetDataSrcsResult();
     List<DataSource> dataSources = frontend_.getDataSrcs(params.pattern);
+    result.setData_src_names(Lists.<String>newArrayListWithCapacity(dataSources.size()));
+    result.setLocations(Lists.<String>newArrayListWithCapacity(dataSources.size()));
+    result.setClass_names(Lists.<String>newArrayListWithCapacity(dataSources.size()));
+    result.setApi_versions(Lists.<String>newArrayListWithCapacity(dataSources.size()));
     for (DataSource dataSource: dataSources) {
       result.addToData_src_names(dataSource.getName());
       result.addToLocations(dataSource.getLocation().toUri().getPath());
