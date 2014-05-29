@@ -200,6 +200,7 @@ class TestUdfs(ImpalaTestSuite):
   create_udas_template = """
 drop function if exists {database}.test_count(int);
 drop function if exists {database}.hll(int);
+drop function if exists {database}.sum_small_decimal(decimal(9,2));
 
 create database if not exists {database};
 
@@ -208,6 +209,9 @@ location '{location}' update_fn='CountUpdate';
 
 create aggregate function {database}.hll(int) returns string
 location '{location}' update_fn='HllUpdate';
+
+create aggregate function {database}.sum_small_decimal(decimal(9,2))
+returns decimal(9,2) location '{location}' update_fn='SumSmallDecimalUpdate';
 """
 
   # Create test UDF functions in {database} from library {location}
@@ -221,13 +225,17 @@ drop function if exists {database}.identity(float);
 drop function if exists {database}.identity(double);
 drop function if exists {database}.identity(string);
 drop function if exists {database}.identity(timestamp);
+drop function if exists {database}.identity(decimal(9,0));
+drop function if exists {database}.identity(decimal(18,1));
+drop function if exists {database}.identity(decimal(38,10));
 drop function if exists {database}.all_types_fn(
-    string, boolean, tinyint, smallint, int, bigint, float, double);
+    string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0));
 drop function if exists {database}.no_args();
 drop function if exists {database}.var_and(boolean...);
 drop function if exists {database}.var_sum(int...);
 drop function if exists {database}.var_sum(double...);
 drop function if exists {database}.var_sum(string...);
+drop function if exists {database}.var_sum(decimal(4,2)...);
 drop function if exists {database}.var_sum_multiply(double, int...);
 drop function if exists {database}.constant_timestamp();
 drop function if exists {database}.validate_arg_type(string);
@@ -266,8 +274,20 @@ create function {database}.identity(timestamp) returns timestamp
 location '{location}'
 symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_12TimestampValE';
 
+create function {database}.identity(decimal(9,0)) returns decimal(9,0)
+location '{location}'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10DecimalValE';
+
+create function {database}.identity(decimal(18,1)) returns decimal(18,1)
+location '{location}'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10DecimalValE';
+
+create function {database}.identity(decimal(38,10)) returns decimal(38,10)
+location '{location}'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10DecimalValE';
+
 create function {database}.all_types_fn(
-    string, boolean, tinyint, smallint, int, bigint, float, double)
+    string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0))
 returns int
 location '{location}' symbol='AllTypes';
 
@@ -285,6 +305,9 @@ create function {database}.var_sum(double...) returns double
 location '{location}' symbol='VarSum';
 
 create function {database}.var_sum(string...) returns int
+location '{location}' symbol='VarSum';
+
+create function {database}.var_sum(decimal(4,2)...) returns decimal(18,2)
 location '{location}' symbol='VarSum';
 
 create function {database}.var_sum_multiply(double, int...) returns double

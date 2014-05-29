@@ -133,6 +133,9 @@ static void AppendAnyValType(int namespace_id, const ColumnType& type, stringstr
     case TYPE_TIMESTAMP:
       AppendMangledToken("TimestampVal", s);
       break;
+    case TYPE_DECIMAL:
+      AppendMangledToken("DecimalVal", s);
+      break;
     default:
       DCHECK(false) << "NYI: " << type.DebugString();
   }

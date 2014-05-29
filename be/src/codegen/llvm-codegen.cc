@@ -329,6 +329,10 @@ PointerType* LlvmCodeGen::GetPtrType(const string& name) {
   return PointerType::get(type, 0);
 }
 
+PointerType* LlvmCodeGen::GetPtrType(Type* type) {
+  return PointerType::get(type, 0);
+}
+
 // Llvm doesn't let you create a PointerValue from a c-side ptr.  Instead
 // cast it to an int and then to 'type'.
 Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, const void* ptr) {

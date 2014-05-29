@@ -104,3 +104,29 @@ void StringConcatMerge(FunctionContext* context, const StringVal& src, StringVal
 StringVal StringConcatFinalize(FunctionContext* context, const StringVal& val) {
   return val;
 }
+
+// ---------------------------------------------------------------------------
+// This is a sample of implementing the SUM aggregate function for decimals.
+// Example: select sum_small_decimal(dec_col) from table
+// It is different than the builtin sum since it can easily overflow but can
+// be faster for small tables.
+// ---------------------------------------------------------------------------
+void SumSmallDecimalInit(FunctionContext*, DecimalVal* val) {
+  val->is_null = true;
+  val->val4 = 0;
+}
+
+void SumSmallDecimalUpdate(FunctionContext* ctx,
+    const DecimalVal& src, DecimalVal* dst) {
+  assert(ctx->GetArgType(0)->scale == 2);
+  assert(ctx->GetArgType(0)->precision == 9);
+  if (src.is_null) return;
+  dst->is_null = false;
+  dst->val4 += src.val4;
+}
+
+void SumSmallDecimalMerge(FunctionContext*, const DecimalVal& src, DecimalVal* dst) {
+  if (src.is_null) return;
+  dst->is_null = false;
+  dst->val4 += src.val4;
+}

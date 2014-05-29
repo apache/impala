@@ -1197,7 +1197,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create function identity(string) RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
     AnalyzesOk("create function all_types_fn(string, boolean, tinyint, " +
-        "smallint, int, bigint, float, double) returns int " +
+        "smallint, int, bigint, float, double, decimal) returns int " +
         "location '/test-warehouse/libTestUdfs.so' symbol='AllTypes'");
 
     // Try creating functions with illegal function names.

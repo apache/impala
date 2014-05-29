@@ -62,6 +62,37 @@ select identity(now());
 timestamp
 ====
 ---- QUERY
+select identity(cast(1 as decimal(9,0)));
+---- TYPES
+decimal
+---- RESULTS
+1
+====
+---- QUERY
+select identity(cast(1 as decimal(18,1)));
+---- TYPES
+decimal
+---- RESULTS
+1.0
+====
+---- QUERY
+select identity(cast(1 as decimal(20,1)));
+---- TYPES
+decimal
+---- RESULTS
+# The identity UDF has signature decimal(38,10) -> decimal(38,10), so the input is
+# promoted and the result has scale 10. The previous decimal test cases are not promoted
+# because there are identity UDFs that exactly match the input.
+1.0000000000
+====
+---- QUERY
+select identity(cast(1 as decimal(38,10)));
+---- TYPES
+decimal
+---- RESULTS
+1.0000000000
+====
+---- QUERY
 select identity(NULL);
 ---- TYPES
 boolean
@@ -84,11 +115,11 @@ timestamp
 ====
 ---- QUERY
 # Test UDFs with different arguments
-select all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0);
+select all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0, cast(8 as decimal(2,0)));
 ---- TYPES
 int
 ---- RESULTS
-29
+37
 ====
 ---- QUERY
 select no_args();
@@ -115,6 +146,17 @@ string
 'eeeeeeee'
 ====
 ---- QUERY
+select identity(d1), identity(d3), identity(d5) from functional.decimal_tbl;
+---- TYPES
+decimal,decimal,decimal
+---- RESULTS
+1234,1.2345678900,12345.7890000000
+2345,12.3456789000,3.1410000000
+12345,123.4567890000,11.2200000000
+12345,1234.5678900000,0.1000000000
+132842,12345.6789000000,0.7788900000
+====
+---- QUERY
 select identity(bool_col), identity(tinyint_col),
        identity(smallint_col), identity(int_col),
        identity(bigint_col), identity(float_col),
@@ -136,16 +178,16 @@ false,1,1,1,10,1.100000023841858,10.1,'1',2009-03-01 00:01:00,2009
 ---- QUERY
 select sum(all_types_fn(
     string_col, bool_col, tinyint_col, smallint_col,
-    int_col, bigint_col, float_col, double_col))
+    int_col, bigint_col, float_col, double_col, cast(tinyint_col as decimal(2,0))))
 from functional.alltypes;
 ---- TYPES
 bigint
 ---- RESULTS
 # Verify with 'select sum(length(string_col)) + sum(cast(bool_col as int))
 #  + sum(tinyint_col) + sum(smallint_col) + sum(int_col) + sum(bigint_col)
-#  + sum(cast(float_col as bigint)) + sum(cast(double_col as bigint))
+#  + sum(cast(float_col as bigint)) + sum(cast(double_col as bigint)) + sum(tinyint_col)
 #  from functional.alltypes;'
-799350
+832200
 ====
 ---- QUERY
 select no_args() from functional.alltypes limit 1;
@@ -299,6 +341,23 @@ select var_sum("Hello", "World", "Foo", "Bar")
 int
 ---- RESULTS
 16
+====
+---- QUERY
+select var_sum(cast(1 as decimal(1,0)), cast(2 as decimal(1,0)), cast(3 as decimal(1,0)));
+---- TYPES
+decimal
+---- RESULTS
+6.00
+====
+---- QUERY
+# More complicated arguments
+select native_function_test.var_sum(
+    cast(1 as decimal(1,0)), cast(2 as decimal(2,1)),
+    cast(3 as decimal(2,1)) + cast("1.1" as decimal(2,1)));
+---- TYPES
+decimal
+---- RESULTS
+7.10
 ====
 ---- QUERY
 select tinyint_col, int_col, var_sum(tinyint_col, int_col)

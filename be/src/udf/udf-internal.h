@@ -30,27 +30,6 @@ class FreePool;
 class MemPool;
 class RuntimeState;
 
-// TODO: this needs to be moved to udf.h when we figure out the best way
-// to expose this.
-struct DecimalVal : public impala_udf::AnyVal {
-  union {
-    int32_t val4;
-    int64_t val8;
-    int128_t val16;
-  };
-
-  DecimalVal() : val16(0) {}
-  DecimalVal(int32_t v) : val4(v) {}
-  DecimalVal(int64_t v) : val8(v) {}
-  DecimalVal(int128_t v) : val16(v) {}
-
-  static DecimalVal null() {
-    DecimalVal result;
-    result.is_null = true;
-    return result;
-  }
-};
-
 // This class actually implements the interface of FunctionContext. This is split to
 // hide the details from the external header.
 // Note: The actual user code does not include this file.

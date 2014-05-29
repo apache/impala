@@ -37,13 +37,16 @@ StringVal Identity(FunctionContext* context, const StringVal& arg) { return arg;
 
 TimestampVal Identity(FunctionContext* context, const TimestampVal& arg) { return arg; }
 
+DecimalVal Identity(FunctionContext* context, const DecimalVal& arg) { return arg; }
+
 IntVal AllTypes(
     FunctionContext* context, const StringVal& string, const BooleanVal& boolean,
     const TinyIntVal& tiny_int, const SmallIntVal& small_int, const IntVal& int_val,
-    const BigIntVal& big_int, const FloatVal& float_val, const DoubleVal& double_val) {
+    const BigIntVal& big_int, const FloatVal& float_val, const DoubleVal& double_val,
+    const DecimalVal& decimal) {
   int result = string.len + boolean.val + tiny_int.val + small_int.val + int_val.val
                + big_int.val + static_cast<int64_t>(float_val.val)
-               + static_cast<int64_t>(double_val.val);
+               + static_cast<int64_t>(double_val.val) + decimal.val4;
   return IntVal(result);
 }
 
@@ -100,6 +103,24 @@ IntVal VarSum(FunctionContext* context, int n, const StringVal* args) {
     total_len += args[i].len;
   }
   return IntVal(total_len);
+}
+
+// Decimal4Value... => Decimal8Value
+DecimalVal VarSum(FunctionContext* context, int n, const DecimalVal* args) {
+  int64_t result = 0;
+  bool is_null = true;
+  for (int i = 0; i < n; ++i) {
+    const FunctionContext::TypeDesc* desc = context->GetArgType(i);
+    if (desc->type != FunctionContext::TYPE_DECIMAL || desc->precision > 9) {
+      context->SetError("VarSum() only accepts Decimal4Value (precison <= 9)");
+      return DecimalVal::null();
+    }
+    if (args[i].is_null) continue;
+    result += args[i].val4;
+    is_null = false;
+  }
+  if (is_null) return DecimalVal::null();
+  return DecimalVal(result);
 }
 
 DoubleVal VarSumMultiply(FunctionContext* context,

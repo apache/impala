@@ -148,6 +148,7 @@ class AnyValUtil {
       case TYPE_DOUBLE: return sizeof(DoubleVal);
       case TYPE_STRING: return sizeof(StringVal);
       case TYPE_TIMESTAMP: return sizeof(TimestampVal);
+      case TYPE_DECIMAL: return sizeof(DecimalVal);
       default:
         DCHECK(false) << t;
         return 0;

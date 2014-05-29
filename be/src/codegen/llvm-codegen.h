@@ -187,6 +187,9 @@ class LlvmCodeGen {
     std::vector<NamedVariable> args_;
   };
 
+  // Return a pointer type to 'type'
+  llvm::PointerType* GetPtrType(llvm::Type* type);
+
   // Returns llvm type for the column type
   llvm::Type* GetType(const ColumnType& type);
 

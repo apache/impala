@@ -48,9 +48,39 @@ namespace impala {
 // TYPE_TIMESTAMP/TimestampVal: { i64, i64 }
 class CodegenAnyVal {
  public:
+  static const char* LLVM_BOOLEANVAL_NAME;
+  static const char* LLVM_TINYINTVAL_NAME;
+  static const char* LLVM_SMALLINTVAL_NAME;
+  static const char* LLVM_INTVAL_NAME;
+  static const char* LLVM_BIGINTVAL_NAME;
+  static const char* LLVM_FLOATVAL_NAME;
+  static const char* LLVM_DOUBLEVAL_NAME;
+  static const char* LLVM_STRINGVAL_NAME;
+  static const char* LLVM_TIMESTAMPVAL_NAME;
+  static const char* LLVM_DECIMALVAL_NAME;
+
+  // Creates a call to 'fn', which should return a (lowered) *Val, and returns the result.
+  // This abstracts over the x64 calling convention, in particular for functions returning
+  // a DecimalVal, which pass the return value as an output argument.
+  //
+  // If 'result_ptr' is non-NULL, it should be a pointer to the lowered return type of
+  // 'fn' (e.g. if 'fn' returns a BooleanVal, 'result_ptr' should have type i16*). The
+  // result of calling 'fn' will be stored in 'result_ptr' and this function will return
+  // NULL. If 'result_ptr' is NULL, this function will return the result (note that the
+  // result will not be a pointer in this case).
+  //
+  // 'name' optionally specifies the name of the returned value.
+  static llvm::Value* CreateCall(LlvmCodeGen* cg, LlvmCodeGen::LlvmBuilder* builder,
+      llvm::Function* fn, llvm::ArrayRef<llvm::Value*> args, const std::string& name = "",
+      llvm::Value* result_ptr = NULL);
+
   // Returns the lowered AnyVal type associated with 'type'.
   // E.g.: TYPE_BOOLEAN (which corresponds to a BooleanVal) => i16
-  static llvm::Type* GetType(LlvmCodeGen* cg, const ColumnType& type);
+  static llvm::Type* GetLoweredType(LlvmCodeGen* cg, const ColumnType& type);
+
+  // Returns the unlowered AnyVal type associated with 'type'.
+  // E.g.: TYPE_BOOLEAN => %"struct.impala_udf::BooleanVal"
+  static llvm::Type* GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type);
 
   // Return the constant type-lowered value corresponding to a null *Val.
   // E.g.: passing TYPE_DOUBLE (corresponding to the lowered DoubleVal { i8, double })

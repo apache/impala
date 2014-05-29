@@ -14,6 +14,7 @@
 
 #include "exprs/anyval-util.h"
 
+using namespace std;
 using namespace llvm;
 using namespace impala_udf;
 

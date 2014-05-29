@@ -20,3 +20,10 @@ bigint
 ---- RESULTS
 9990
 ====
+---- QUERY
+select sum_small_decimal(c3) from functional.decimal_tiny;
+---- TYPES
+decimal
+---- RESULTS
+45.00
+====

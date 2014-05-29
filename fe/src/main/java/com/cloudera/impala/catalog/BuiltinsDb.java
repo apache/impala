@@ -72,7 +72,7 @@ public class BuiltinsDb extends Db {
         .put(ColumnType.TIMESTAMP,
             "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(ColumnType.DECIMAL,
-            "9HllUpdateINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PNS3_9StringValE")
+            "9HllUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
   private static final Map<ColumnType, String> PC_UPDATE_SYMBOL =
@@ -96,7 +96,7 @@ public class BuiltinsDb extends Db {
         .put(ColumnType.TIMESTAMP,
             "8PcUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
          .put(ColumnType.DECIMAL,
-            "8PcUpdateINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PNS3_9StringValE")
+            "8PcUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
     private static final Map<ColumnType, String> PCSA_UPDATE_SYMBOL =
@@ -120,7 +120,7 @@ public class BuiltinsDb extends Db {
           .put(ColumnType.TIMESTAMP,
               "10PcsaUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
           .put(ColumnType.DECIMAL,
-              "10PcsaUpdateINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PNS3_9StringValE")
+              "10PcsaUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
           .build();
 
   private static final Map<ColumnType, String> MIN_UPDATE_SYMBOL =
@@ -144,7 +144,7 @@ public class BuiltinsDb extends Db {
         .put(ColumnType.TIMESTAMP,
             "3MinIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(ColumnType.DECIMAL,
-            "3MinINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PS6_")
+            "3MinIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
   private static final Map<ColumnType, String> MAX_UPDATE_SYMBOL =
@@ -168,7 +168,7 @@ public class BuiltinsDb extends Db {
         .put(ColumnType.TIMESTAMP,
             "3MaxIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(ColumnType.DECIMAL,
-            "3MaxINS_10DecimalValEEEvPN10impala_udf15FunctionContextERKT_PS6_")
+            "3MaxIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
   private static final Map<ColumnType, String> STDDEV_UPDATE_SYMBOL =
@@ -337,8 +337,8 @@ public class BuiltinsDb extends Db {
     db.addBuiltin(AggregateFunction.createBuiltin(db, "sum",
         Lists.newArrayList(ColumnType.DECIMAL), ColumnType.DECIMAL, ColumnType.DECIMAL,
         initNull,
-        prefix + "9SumUpdateEPN10impala_udf15FunctionContextERKNS_10DecimalValEPS4_",
-        prefix + "8SumMergeEPN10impala_udf15FunctionContextERKNS_10DecimalValEPS4_",
+        prefix + "9SumUpdateEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPS4_",
+        prefix + "8SumMergeEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPS4_",
         null, null, false));
 
     for (ColumnType t: ColumnType.getNumericTypes()) {

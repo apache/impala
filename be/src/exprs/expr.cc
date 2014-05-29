@@ -964,7 +964,7 @@ Status Expr::GetWrapperIrComputeFunction(LlvmCodeGen* codegen, Function** fn) {
 
 Function* Expr::CreateIrFunctionPrototype(LlvmCodeGen* codegen, const string& name,
                                           Value* (*args)[2]) {
-  Type* return_type = CodegenAnyVal::GetType(codegen, type());
+  Type* return_type = CodegenAnyVal::GetLoweredType(codegen, type());
   LlvmCodeGen::FnPrototype prototype(codegen, name, return_type);
   // TODO: Placeholder for ExprContext argument
   prototype.AddArgument(LlvmCodeGen::NamedVariable("context", codegen->ptr_type()));
@@ -1056,6 +1056,26 @@ AnyVal* Expr::GetConstVal() {
         tv->ToTimestampVal(&v);
       }
       constant_val_.reset(new TimestampVal(v));
+      break;
+    }
+    case TYPE_DECIMAL: {
+      DecimalVal v = DecimalVal::null();
+      if (val != NULL) {
+        switch (type_.GetByteSize()) {
+          case 4:
+            v = DecimalVal(reinterpret_cast<Decimal4Value*>(val)->value());
+            break;
+          case 8:
+            v = DecimalVal(reinterpret_cast<Decimal8Value*>(val)->value());
+            break;
+          case 16:
+            v = DecimalVal(reinterpret_cast<Decimal16Value*>(val)->value());
+            break;
+          default:
+            DCHECK(false) << type_.GetByteSize();
+        }
+      }
+      constant_val_.reset(new DecimalVal(v));
       break;
     }
     default:

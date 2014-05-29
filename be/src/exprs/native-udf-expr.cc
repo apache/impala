@@ -14,6 +14,7 @@
 
 #include "exprs/native-udf-expr.h"
 
+#include <stdlib.h>
 #include <vector>
 #include <llvm/IR/Attributes.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -45,7 +46,7 @@ NativeUdfExpr::NativeUdfExpr(const TExprNode& node)
 }
 
 NativeUdfExpr::~NativeUdfExpr() {
-  delete[] varargs_input_;
+  free(varargs_input_);
 }
 
 typedef BooleanVal (*BooleanUdfWrapper)(int8_t*, TupleRow*);
@@ -57,6 +58,7 @@ typedef FloatVal (*FloatUdfWrapper)(int8_t*, TupleRow*);
 typedef DoubleVal (*DoubleUdfWrapper)(int8_t*, TupleRow*);
 typedef StringVal (*StringUdfWrapper)(int8_t*, TupleRow*);
 typedef TimestampVal (*TimestampUdfWrapper)(int8_t*, TupleRow*);
+typedef DecimalVal (*DecimalUdfWrapper)(int8_t*, TupleRow*);
 
 void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
   NativeUdfExpr* udf_expr = reinterpret_cast<NativeUdfExpr*>(e);
@@ -127,6 +129,25 @@ void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
       e->result_.timestamp_val = TimestampValue::FromTimestampVal(v);
       return &e->result_.timestamp_val;
     }
+    case TYPE_DECIMAL: {
+      DecimalUdfWrapper fn = reinterpret_cast<DecimalUdfWrapper>(udf_expr->udf_wrapper_);
+      DecimalVal v = fn(NULL, row);
+      if (v.is_null) return NULL;
+      switch (e->type().GetByteSize()) {
+        case 4:
+          e->result_.decimal4_val = v.val4;
+          return &e->result_.decimal4_val;
+        case 8:
+          e->result_.decimal8_val = v.val8;
+          return &e->result_.decimal8_val;
+        case 16:
+          e->result_.decimal16_val = v.val16;
+          return &e->result_.decimal16_val;
+        default:
+          DCHECK(false) << e->type().GetByteSize();
+      }
+      break;
+    }
     default:
       DCHECK(false) << "Type not implemented: " << e->type();
   }
@@ -192,6 +213,12 @@ AnyVal* NativeUdfExpr::GetConstVal() {
       constant_val_.reset(new TimestampVal(v));
       break;
     }
+    case TYPE_DECIMAL: {
+      DecimalUdfWrapper fn = reinterpret_cast<DecimalUdfWrapper>(udf_wrapper_);
+      DecimalVal v = fn(NULL, NULL);
+      constant_val_.reset(new DecimalVal(v));
+      break;
+    }
     default:
       DCHECK(false) << "Type not implemented: " << type();
   }
@@ -231,7 +258,9 @@ Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
     for (int i = vararg_start_idx_; i < GetNumChildren(); ++i) {
       var_args_buffer_size += AnyValUtil::AnyValSize(children_[i]->type());
     }
-    varargs_input_ = new uint8_t[var_args_buffer_size];
+    // UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
+    // that require 16-byte memory alignment.
+    varargs_input_ = reinterpret_cast<uint8_t*>(aligned_malloc(var_args_buffer_size, 16));
   }
 
   if (fn_.binary_type == TFunctionBinaryType::IR) {
@@ -349,15 +378,12 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
       codegen->GetPtrType("class.impala_udf::FunctionContext"), udf_context_.get()));
 
   // Call children to populate remaining arguments
-  llvm::Function::arg_iterator arg = udf->arg_begin();
-  ++arg; // Skip FunctionContext* arg
   int varargs_input_offset = 0;
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (vararg_start_idx_ == i) {
       // This is the start of the varargs, first add the number of args.
       udf_args.push_back(codegen->GetIntConstant(
           TYPE_INT, GetNumChildren() - vararg_start_idx_));
-      ++arg;
     }
 
     llvm::Function* child_fn;
@@ -372,39 +398,52 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
           children_[i]->GetWrapperIrComputeFunction(codegen, &child_fn));
     }
 
+    // Call 'child_fn', adding the result to either 'udf_args' or 'varargs_input_'
     DCHECK(child_fn != NULL);
-    llvm::Value* arg_val = builder.CreateCall(child_fn, args, "arg_val");
-
+    llvm::Type* lowered_arg_type =
+        CodegenAnyVal::GetLoweredType(codegen, children_[i]->type());
+    llvm::Value* arg_val_ptr;
+    llvm::Type* arg_val_ptr_type = codegen->GetPtrType(lowered_arg_type);
     if (vararg_start_idx_ == -1 || i < vararg_start_idx_) {
-      // Either no varargs or arguments before varargs begin.
-      llvm::Value* arg_ptr = builder.CreateAlloca(
-          child_fn->getReturnType(), 0, "arg_ptr");
-      builder.CreateStore(arg_val, arg_ptr);
+      // Either no varargs or arguments before varargs begin. Allocate space to store
+      // 'child_fn's result so we can pass the pointer to the UDF.
+      arg_val_ptr = builder.CreateAlloca(lowered_arg_type, 0, "arg_val_ptr");
+
+      if (children_[i]->type().type == TYPE_DECIMAL) {
+        // UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
+        // that require 16-byte memory alignment. LLVM uses 8-byte alignment by default,
+        // so explicitly set the alignment for DecimalVals.
+        llvm::cast<llvm::AllocaInst>(arg_val_ptr)->setAlignment(16);
+      }
 
       // The *Val type returned by child_fn will be likely be lowered to a simpler type,
-      // so we must cast arg_ptr to the actual *Val struct pointer type expected by the
-      // UDF.
-      llvm::Value* cast_arg_ptr =
-          builder.CreateBitCast(arg_ptr, arg->getType(), "cast_arg_ptr");
-      udf_args.push_back(cast_arg_ptr);
-      ++arg;
+      // so we must cast arg_val_ptr to the actual *Val struct pointer type expected by
+      // the UDF.
+      llvm::PointerType* arg_type = codegen->GetPtrType(
+          CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type()));
+      llvm::Value* cast_arg_val_ptr =
+          builder.CreateBitCast(arg_val_ptr, arg_type, "cast_arg_val_ptr");
+      udf_args.push_back(cast_arg_val_ptr);
     } else {
-      // Store the result of child(i) in varargs_input_ + varargs_input_offset
-      llvm::Type* arg_ptr_type = llvm::PointerType::get(arg_val->getType(), 0);
-      llvm::Value* arg_ptr = codegen->CastPtrToLlvmPtr(
-          arg_ptr_type, varargs_input_ + varargs_input_offset);
-      builder.CreateStore(arg_val, arg_ptr);
+      // Store the result of 'child_fn' in varargs_input_ + varargs_input_offset
+      arg_val_ptr = codegen->CastPtrToLlvmPtr(
+          arg_val_ptr_type, varargs_input_ + varargs_input_offset);
       varargs_input_offset += AnyValUtil::AnyValSize(children_[i]->type());
     }
+    CodegenAnyVal::CreateCall(codegen, &builder, child_fn, args, "arg_val", arg_val_ptr);
   }
 
   if (vararg_start_idx_ != -1) {
     // Add all the accumulated vararg inputs as one input argument.
-    udf_args.push_back(codegen->CastPtrToLlvmPtr(arg->getType(), varargs_input_));
+    DCHECK_GE(GetNumChildren(), 1);
+    llvm::PointerType* vararg_type = codegen->GetPtrType(
+        CodegenAnyVal::GetUnloweredType(codegen, children_.back()->type()));
+    udf_args.push_back(codegen->CastPtrToLlvmPtr(vararg_type, varargs_input_));
   }
 
   // Call UDF
-  llvm::Value* result_val = builder.CreateCall(udf, udf_args, "result");
+  llvm::Value* result_val =
+      CodegenAnyVal::CreateCall(codegen, &builder, udf, udf_args, "result");
   builder.CreateRet(result_val);
 
   (*fn)->addFnAttr(llvm::Attribute::AlwaysInline);
@@ -437,21 +476,29 @@ Status NativeUdfExpr::GetUdf(RuntimeState* state, llvm::Function** udf) {
 
     // Convert UDF function pointer to llvm::Function*
     // First generate the llvm::FunctionType* corresponding to the UDF.
-    llvm::Type* return_type = CodegenAnyVal::GetType(codegen, type());
+    llvm::Type* return_type = CodegenAnyVal::GetLoweredType(codegen, type());
     vector<llvm::Type*> arg_types;
+
+    if (type().type == TYPE_DECIMAL) {
+      // Per the x64 ABI, DecimalVals are returned via a DecmialVal* output argument
+      return_type = codegen->void_type();
+      arg_types.push_back(
+          codegen->GetPtrType(CodegenAnyVal::GetUnloweredType(codegen, type())));
+    }
+
     arg_types.push_back(codegen->GetPtrType("class.impala_udf::FunctionContext"));
     int num_fixed_args = vararg_start_idx_ >= 0 ? vararg_start_idx_ : children_.size();
     for (int i = 0; i < num_fixed_args; ++i) {
-      llvm::Type* child_return_type =
-          CodegenAnyVal::GetType(codegen, children_[i]->type());
-      arg_types.push_back(llvm::PointerType::get(child_return_type, 0));
+      llvm::Type* arg_type = codegen->GetPtrType(
+          CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type()));
+      arg_types.push_back(arg_type);
     }
 
     if (vararg_start_idx_ >= 0) {
-      llvm::Type* vararg_return_type =
-          CodegenAnyVal::GetType(codegen, children_[vararg_start_idx_]->type());
+      llvm::Type* vararg_type = codegen->GetPtrType(
+          CodegenAnyVal::GetUnloweredType(codegen, children_[vararg_start_idx_]->type()));
       arg_types.push_back(codegen->GetType(TYPE_INT));
-      arg_types.push_back(llvm::PointerType::get(vararg_return_type, 0));
+      arg_types.push_back(vararg_type);
     }
     llvm::FunctionType* udf_type = llvm::FunctionType::get(return_type, arg_types, false);
 
