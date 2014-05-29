@@ -128,10 +128,6 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   // Blocks until ConstructBuildSide has returned, after which the build side structures
   // are fully constructed.
   RETURN_IF_ERROR(build_side_status.Get());
-  // We can close the right child to release its resources because its input has been
-  // fully consumed.
-  child(1)->Close(state);
-
   RETURN_IF_ERROR(open_status);
 
   // Seed left child in preparation for GetNext().

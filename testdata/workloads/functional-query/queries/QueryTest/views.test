@@ -57,3 +57,15 @@ select * from functional.alltypes_hive_view where id = 0
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
+---- QUERY
+# Regression test for IMPALA-1010. This currently produces a bushy plan.
+select STRAIGHT_JOIN c.id, d.date_string_col from
+  alltypessmall d join [SHUFFLE] (select a.id as id, b.date_string_col from
+    alltypessmall a join [SHUFFLE] alltypessmall b on (a.id = b.id)) c on c.id = d.id
+  order by c.id limit 2
+---- RESULTS
+0,'01/01/09'
+1,'01/01/09'
+---- TYPES
+int, STRING
+====

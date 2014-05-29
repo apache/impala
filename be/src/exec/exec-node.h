@@ -95,6 +95,8 @@ class ExecNode {
   // closed (is_closed()), then close themselves, then call the base Close().
   // Nodes that are using tuples returned by a child may call Close() on their children
   // before their own Close() if the child node has returned eos.
+  // It is only safe to call Close() on the child node while the parent node is still
+  // returning rows if the parent node fully materializes the child's input.
   virtual void Close(RuntimeState* state);
 
   // Creates exec node tree from list of nodes contained in plan via depth-first
