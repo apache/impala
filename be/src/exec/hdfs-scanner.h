@@ -320,6 +320,7 @@ class HdfsScanner {
 
   // Initialize a tuple.
   // TODO: only copy over non-null slots.
+  // TODO: InitTuple is called frequently, avoid the if, perhaps via templatization.
   void InitTuple(Tuple* template_tuple, Tuple* tuple) {
     if (template_tuple != NULL) {
       memcpy(tuple, template_tuple, tuple_byte_size_);

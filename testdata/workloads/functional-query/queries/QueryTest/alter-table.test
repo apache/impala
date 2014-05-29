@@ -567,3 +567,111 @@ Total,,200,2,regex:.+KB,'0B',''
 ---- TYPES
 INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
+---- QUERY
+# IMPALA-1016: Testing scanning newly added columns
+DROP TABLE IF EXISTS imp1016
+====
+---- QUERY
+CREATE TABLE imp1016 (string1 string)
+---- RESULTS
+====
+---- QUERY
+INSERT INTO imp1016 VALUES ('test')
+---- RESULTS
+: 1
+====
+---- QUERY
+ALTER TABLE imp1016 ADD COLUMNS (string2 string)
+---- RESULTS
+====
+---- QUERY
+DESCRIBE imp1016
+---- RESULTS
+'string1','string',''
+'string2','string',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+SELECT * FROM imp1016
+---- RESULTS
+'test','NULL'
+---- TYPES
+string,string
+====
+---- QUERY
+SELECT string1 FROM imp1016
+---- RESULTS
+'test'
+---- TYPES
+string
+====
+---- QUERY
+SELECT string2 FROM imp1016
+---- RESULTS
+'NULL'
+---- TYPES
+string
+====
+---- QUERY
+SELECT COUNT(DISTINCT string1) FROM imp1016
+---- RESULTS
+1
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT COUNT(DISTINCT string2) FROM imp1016
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+# Create a larger table to test scanning newly added columns
+DROP TABLE IF EXISTS imp1016Large
+====
+---- QUERY
+CREATE TABLE imp1016Large (string1 string)
+---- RESULTS
+====
+---- QUERY
+# There is a codepath that operates on chunks of 1024 tuples, inserting
+# more than 1024 tuples
+INSERT INTO imp1016Large SELECT 'test' FROM functional.alltypes LIMIT 2000
+---- RESULTS
+: 2000
+====
+---- QUERY
+ALTER TABLE imp1016Large ADD COLUMNS (string2 string)
+---- RESULTS
+====
+---- QUERY
+DESCRIBE imp1016Large
+---- RESULTS
+'string1','string',''
+'string2','string',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+SELECT COUNT(string2) FROM imp1016Large
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT COUNT(*), COUNT(DISTINCT string1) FROM imp1016Large
+---- RESULTS
+2000,1
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+SELECT COUNT(*), COUNT(DISTINCT string2) FROM imp1016Large
+---- RESULTS
+2000,0
+---- TYPES
+bigint,bigint
+====

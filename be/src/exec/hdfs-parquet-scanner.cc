@@ -730,38 +730,65 @@ Status HdfsParquetScanner::ProcessSplit() {
 // specific to type and encoding and then inlined into AssembleRows().
 Status HdfsParquetScanner::AssembleRows() {
   assemble_rows_timer_.Start();
-  while (!scan_node_->ReachedLimit() && !context_->cancelled()) {
+  int64_t rows_read = 0;
+  int64_t rows_in_file = file_metadata_.num_rows;
+  while (!scan_node_->ReachedLimit() && !context_->cancelled() && 
+         rows_read < rows_in_file) {
     MemPool* pool;
     Tuple* tuple;
     TupleRow* row;
-    int num_rows = GetMemory(&pool, &tuple, &row);
-    int num_to_commit = 0;
+    int64_t num_rows = std::min(rows_in_file,
+                                static_cast<int64_t>(GetMemory(&pool, &tuple, &row)));
+    if (num_rows == 0) return parse_status_;
 
-    for (int i = 0; i < num_rows; ++i) {
-      bool conjuncts_failed = false;
-      InitTuple(template_tuple_, tuple);
-      for (int c = 0; c < column_readers_.size(); ++c) {
-        if (!column_readers_[c]->ReadValue(pool, tuple, &conjuncts_failed)) {
-          assemble_rows_timer_.Stop();
-          // This column is complete and has no more data.  This indicates
-          // we are done with this row group.
-          // For correctly formed files, this should be the first column we
-          // are reading.
-          DCHECK(c == 0 || !parse_status_.ok())
+    int num_to_commit = 0;
+    int num_column_readers = column_readers_.size();
+    if (num_column_readers > 0) {
+      for (int i = 0; i < num_rows; ++i) {
+        bool conjuncts_failed = false;
+        InitTuple(template_tuple_, tuple);
+        for (int c = 0; c < num_column_readers; ++c) {
+          if (!column_readers_[c]->ReadValue(pool, tuple, &conjuncts_failed)) {
+            assemble_rows_timer_.Stop();
+            // This column is complete and has no more data.  This indicates
+            // we are done with this row group.
+            // For correctly formed files, this should be the first column we
+            // are reading.
+            DCHECK(c == 0 || !parse_status_.ok())
               << "c=" << c << " " << parse_status_.GetErrorMsg();;
-          COUNTER_UPDATE(scan_node_->rows_read_counter(), i);
-          RETURN_IF_ERROR(CommitRows(num_to_commit));
-          return parse_status_;
+            COUNTER_UPDATE(scan_node_->rows_read_counter(), i);
+            RETURN_IF_ERROR(CommitRows(num_to_commit));
+            return parse_status_;
+          }
+        }
+        if (conjuncts_failed) continue;
+        row->SetTuple(scan_node_->tuple_idx(), tuple);
+        if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, row)) {
+          row = next_row(row);
+          tuple = next_tuple(tuple);
+          ++num_to_commit;
         }
       }
-      if (conjuncts_failed) continue;
+    } else {
+      // Special case when there is no data for the accessed column(s) in the file.
+      // This can happen, for example, due to schema evolution (alter table add column).
+      // Since all the tuples are same, evaluating conjuncts only for the first tuple.
+      InitTuple(template_tuple_, tuple);
       row->SetTuple(scan_node_->tuple_idx(), tuple);
       if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, row)) {
         row = next_row(row);
         tuple = next_tuple(tuple);
-        ++num_to_commit;
-      }
+
+        for (int i = 1; i < num_rows; ++i) {
+          InitTuple(template_tuple_, tuple);
+          row->SetTuple(scan_node_->tuple_idx(), tuple);
+          row = next_row(row);
+          tuple = next_tuple(tuple);
+        }
+        num_to_commit += num_rows;
+      } 
     }
+    rows_read += num_rows;
     COUNTER_UPDATE(scan_node_->rows_read_counter(), num_rows);
     RETURN_IF_ERROR(CommitRows(num_to_commit));
   }
