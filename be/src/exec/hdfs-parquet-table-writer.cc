@@ -695,8 +695,10 @@ Status HdfsParquetTableWriter::CreateSchema() {
     if (output_exprs_[i]->type().type == TYPE_DECIMAL) {
       // This column is type decimal. Update the file metadata to include the
       // additional fields:
-      //  1) type_length: the number of bytes used per decimal value in the data
-      //  2) precision/scale
+      //  1) converted_type: indicate this is really a decimal column.
+      //  2) type_length: the number of bytes used per decimal value in the data
+      //  3) precision/scale
+      node.__set_converted_type(ConvertedType::DECIMAL);
       node.__set_type_length(
           ParquetPlainEncoder::DecimalSize(output_exprs_[i]->type()));
       node.__set_scale(output_exprs_[i]->type().scale);

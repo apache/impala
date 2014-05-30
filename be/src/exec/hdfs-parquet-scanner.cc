@@ -808,7 +808,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
           tuple = next_tuple(tuple);
         }
         num_to_commit += num_rows;
-      } 
+      }
     }
     rows_read += num_rows;
     COUNTER_UPDATE(scan_node_->rows_read_counter(), num_rows);
@@ -1209,12 +1209,33 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   }
 
   // Check the decimal scale in the file matches the metastore scale and precision.
-  if (schema_element.__isset.scale || schema_element.__isset.precision) {
-    if (slot_desc->type().type != TYPE_DECIMAL) {
+  // We fail the query if the metadata makes it impossible for us to safely read
+  // the file. If we don't require the metadata, we will fail the query if
+  // abort_on_error is true, otherwise we will just log a warning.
+  bool is_converted_type_decimal = schema_element.__isset.converted_type &&
+      schema_element.converted_type == parquet::ConvertedType::DECIMAL;
+  if (slot_desc->type().type == TYPE_DECIMAL) {
+    // We require that the scale and byte length be set.
+    if (schema_element.type != parquet::Type::FIXED_LEN_BYTE_ARRAY) {
       stringstream ss;
       ss << "File '" << stream_->filename() << "' column '" << schema_element.name
-         << " has scale and precision set but the table metadata column type is not "
-         << " DECIMAL.";
+         << "' should be a decimal column encoded using FIXED_LEN_BYTE_ARRAY.";
+      return Status(ss.str());
+    }
+
+    if (!schema_element.__isset.type_length) {
+      stringstream ss;
+      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+         << "' does not have type_length set.";
+      return Status(ss.str());
+    }
+
+    int expected_len = ParquetPlainEncoder::DecimalSize(slot_desc->type());
+    if (schema_element.type_length != expected_len) {
+      stringstream ss;
+      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+         << "' has an invalid type length. Expecting: " << expected_len
+         << " len in file: " << schema_element.type_length;
       return Status(ss.str());
     }
 
@@ -1222,12 +1243,6 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
       stringstream ss;
       ss << "File '" << stream_->filename() << "' column '" << schema_element.name
          << "' does not have the scale set.";
-      return Status(ss.str());
-    }
-    if (!schema_element.__isset.precision) {
-      stringstream ss;
-      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
-         << "' does not have the precision set.";
       return Status(ss.str());
     }
 
@@ -1241,27 +1256,44 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
       return Status(ss.str());
     }
 
-    if (schema_element.precision != slot_desc->type().precision) {
-      // TODO: we could allow a mismatch and do a conversion at this step.
+    // The other decimal metadata should be there but we don't need it.
+    if (!schema_element.__isset.precision) {
       stringstream ss;
       ss << "File '" << stream_->filename() << "' column '" << schema_element.name
-         << "' has a precision that does not match the table metadata precision."
-         << " File metadata precision: " << schema_element.precision
-         << " Table metadata precision: " << slot_desc->type().precision;
-      return Status(ss.str());
+         << "' does not have the precision set.";
+      if (state_->abort_on_error()) return Status(ss.str());
+      state_->LogError(ss.str());
+    } else {
+      if (schema_element.precision != slot_desc->type().precision) {
+        // TODO: we could allow a mismatch and do a conversion at this step.
+        stringstream ss;
+        ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+          << "' has a precision that does not match the table metadata precision."
+          << " File metadata precision: " << schema_element.precision
+          << " Table metadata precision: " << slot_desc->type().precision;
+        if (state_->abort_on_error()) return Status(ss.str());
+        state_->LogError(ss.str());
+      }
     }
 
-    if (!schema_element.__isset.type_length) {
+    if (!is_converted_type_decimal) {
+      // TODO: is this validation useful? It is not required at all to read the data and
+      // might only serve to reject otherwise perfectly readable files.
       stringstream ss;
       ss << "File '" << stream_->filename() << "' column '" << schema_element.name
-         << "' does not have type_length set.";
-      return Status(ss.str());
+         << "' does not have converted type set to DECIMAL.";
+      if (state_->abort_on_error()) return Status(ss.str());
+      state_->LogError(ss.str());
     }
-  } else if (slot_desc->type().type == TYPE_DECIMAL) {
+  } else if (schema_element.__isset.scale || schema_element.__isset.precision ||
+      is_converted_type_decimal) {
     stringstream ss;
     ss << "File '" << stream_->filename() << "' column '" << schema_element.name
-       << "' should contain decimal data but the scale and precision are not specified.";
-    return Status(ss.str());
+       << "' contains decimal data but the table metadata has type " << slot_desc->type();
+    if (state_->abort_on_error()) return Status(ss.str());
+    state_->LogError(ss.str());
   }
+
   return Status::OK;
 }
+
