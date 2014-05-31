@@ -132,7 +132,7 @@ class HdfsParquetScanner : public HdfsScanner {
   // Reads data from all the columns (in parallel) and assembles rows into the context
   // object.
   // Returns when the entire row group is complete or an error occurred.
-  Status AssembleRows();
+  Status AssembleRows(int row_group_idx);
 
   // Process the file footer and parse file_metadata_.  This should be called with the
   // last FOOTER_SIZE bytes in context_.

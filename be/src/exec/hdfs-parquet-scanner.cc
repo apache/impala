@@ -720,7 +720,7 @@ Status HdfsParquetScanner::ProcessSplit() {
     CommitRows(0);
 
     RETURN_IF_ERROR(InitColumns(i));
-    RETURN_IF_ERROR(AssembleRows());
+    RETURN_IF_ERROR(AssembleRows(i));
   }
 
   return Status::OK;
@@ -728,21 +728,23 @@ Status HdfsParquetScanner::ProcessSplit() {
 
 // TODO: this needs to be codegen'd.  The ReadValue function needs to be codegen'd,
 // specific to type and encoding and then inlined into AssembleRows().
-Status HdfsParquetScanner::AssembleRows() {
+Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
   assemble_rows_timer_.Start();
+  // Read at most as many rows as stated in the metadata
+  int64_t expected_rows_in_group = file_metadata_.row_groups[row_group_idx].num_rows;
   int64_t rows_read = 0;
-  int64_t rows_in_file = file_metadata_.num_rows;
-  while (!scan_node_->ReachedLimit() && !context_->cancelled() && 
-         rows_read < rows_in_file) {
-    MemPool* pool;
-    Tuple* tuple;
+  bool reached_limit = scan_node_->ReachedLimit();
+  bool cancelled = context_->cancelled();
+  int num_column_readers = column_readers_.size();
+  MemPool* pool;
+  Tuple* tuple;
+
+  while (!reached_limit && !cancelled && rows_read < expected_rows_in_group) {
     TupleRow* row;
-    int64_t num_rows = std::min(rows_in_file,
+    int64_t num_rows = std::min(expected_rows_in_group - rows_read,
                                 static_cast<int64_t>(GetMemory(&pool, &tuple, &row)));
-    if (num_rows == 0) return parse_status_;
 
     int num_to_commit = 0;
-    int num_column_readers = column_readers_.size();
     if (num_column_readers > 0) {
       for (int i = 0; i < num_rows; ++i) {
         bool conjuncts_failed = false;
@@ -758,6 +760,24 @@ Status HdfsParquetScanner::AssembleRows() {
               << "c=" << c << " " << parse_status_.GetErrorMsg();;
             COUNTER_UPDATE(scan_node_->rows_read_counter(), i);
             RETURN_IF_ERROR(CommitRows(num_to_commit));
+
+            // If we reach this point, it means that we reached the end of file for
+            // this column. Test if the expected number of rows from metadata matches
+            // the actual number of rows in the file.
+            rows_read += i;
+            if (rows_read != expected_rows_in_group) {
+              HdfsParquetScanner::BaseColumnReader* reader = column_readers_[c];
+              DCHECK(reader->stream_ != NULL);
+              stringstream ss;
+              ss << "Metadata states that in group " << reader->stream_->filename()
+                 << "[" << row_group_idx << "] there are " << expected_rows_in_group
+                 << " rows, but only " << rows_read << " rows were read.";
+              if (scan_node_->runtime_state()->abort_on_error()) {
+                return Status(ss.str());
+              } else {
+                scan_node_->runtime_state()->LogError(ss.str());
+              }
+            }
             return parse_status_;
           }
         }
@@ -773,6 +793,7 @@ Status HdfsParquetScanner::AssembleRows() {
       // Special case when there is no data for the accessed column(s) in the file.
       // This can happen, for example, due to schema evolution (alter table add column).
       // Since all the tuples are same, evaluating conjuncts only for the first tuple.
+      DCHECK_GT(num_rows, 0);
       InitTuple(template_tuple_, tuple);
       row->SetTuple(scan_node_->tuple_idx(), tuple);
       if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, row)) {
@@ -791,6 +812,33 @@ Status HdfsParquetScanner::AssembleRows() {
     rows_read += num_rows;
     COUNTER_UPDATE(scan_node_->rows_read_counter(), num_rows);
     RETURN_IF_ERROR(CommitRows(num_to_commit));
+
+    reached_limit = scan_node_->ReachedLimit();
+    cancelled = context_->cancelled();
+  }
+
+  if (!reached_limit && !cancelled && (num_column_readers > 0)) {
+    // If we get to this point, it means that we have read as many rows as the metadata
+    // told us we should read. Attempt to read one more row and if that succeeds
+    // report the error.
+    DCHECK_EQ(rows_read, expected_rows_in_group);
+    InitTuple(template_tuple_, tuple);
+    bool conjuncts_failed = false;
+    if (column_readers_[0]->ReadValue(pool, tuple, &conjuncts_failed)) {
+      // If another tuple is successfully read, it means that there are still values
+      // in the file.
+      HdfsParquetScanner::BaseColumnReader* reader = column_readers_[0];
+      DCHECK(reader->stream_ != NULL);
+      stringstream ss;
+      ss << "Metadata states that in group " << reader->stream_->filename() << "["
+         << row_group_idx << "] there are " << expected_rows_in_group << " rows, but"
+         << " there is at least one more row in the file.";
+      if (scan_node_->runtime_state()->abort_on_error()) {
+        return Status(ss.str());
+      } else {
+        scan_node_->runtime_state()->LogError(ss.str());
+      }
+    }
   }
 
   assemble_rows_timer_.Stop();

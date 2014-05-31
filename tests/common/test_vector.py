@@ -30,9 +30,9 @@
 #
 # Finally, the TestMatrix also provides a way to add constraints to the vectors that
 # are generated. This is useful to filter out invalid combinations. These can be added
-# before calling 'generate_test_vectors'. The a constraint is a function that
+# before calling 'generate_test_vectors'. The constraint is a function that
 # accepts a TestVector object and returns true if the vector is valid, false otherwise.
-# For example, if we want to make sur 'bool' columns are not used with 'sum':
+# For example, if we want to make sure 'bool' columns are not used with 'sum':
 #
 # TestMatrix.add_constraint(lambda v:\
 #    not (v.get_value('col_type') == 'bool and v.get_value('agg_func') == 'sum'))
