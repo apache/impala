@@ -341,6 +341,10 @@ class LlvmCodeGen {
   // struct allocated.  The allocated variable is scoped to the function.
   // This is not related to GetScratchBuffer which is used for structs that are returned
   // to the caller.
+  //
+  // This should always be used instead of calling LlvmBuilder::CreateAlloca directly.
+  // LLVM doesn't optimize alloca's occuring in the middle of functions very well (e.g, an
+  // alloca may end up in a loop, potentially blowing the stack).
   llvm::AllocaInst* CreateEntryBlockAlloca(llvm::Function* f, const NamedVariable& var);
 
   // Utility to create two blocks in 'fn' for if/else codegen.  if_block and else_block

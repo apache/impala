@@ -45,9 +45,8 @@ class SlotDescriptor;
 // contain slots for all grouping and aggregation exprs (the grouping
 // slots precede the aggregation expr slots in the output tuple descriptor).
 //
-// TODO: for codegen, instead of hand written agg expr implementations, this class
-// should simply get it from the agg-expr, which in turn just returns a cross compiled
-// implementation.
+// TODO: codegen cross-compiled UDAs and get rid of handcrafted IR.
+// TODO: investigate high compile time for wide tables
 class AggregationNode : public ExecNode {
  public:
   AggregationNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);

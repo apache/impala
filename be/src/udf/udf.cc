@@ -82,6 +82,9 @@ using namespace impala;
 using namespace impala_udf;
 using namespace std;
 
+const char* FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME =
+    "class.impala_udf::FunctionContext";
+
 static const int MAX_WARNINGS = 1000;
 
 // Create a FunctionContext. The caller is responsible for calling delete on it.

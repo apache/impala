@@ -58,6 +58,7 @@ class AggFnEvaluator {
     MIN,
     MAX,
     SUM,
+    NDV,
     OTHER,
   };
 
@@ -80,6 +81,7 @@ class AggFnEvaluator {
   void Close(RuntimeState* state);
 
   AggregationOp agg_op() const { return agg_op_; }
+  impala_udf::FunctionContext* ctx() { return ctx_.get(); }
   const std::vector<Expr*>& input_exprs() const { return input_exprs_; }
   bool is_count_star() const {
     return agg_op_ == COUNT && input_exprs_.empty();

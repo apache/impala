@@ -14,8 +14,9 @@
 
 #include "exprs/anyval-util.h"
 
+#include "common/object-pool.h"
+
 using namespace std;
-using namespace llvm;
 using namespace impala_udf;
 
 namespace impala {

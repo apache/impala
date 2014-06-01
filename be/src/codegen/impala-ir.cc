@@ -22,9 +22,11 @@
 #include "exec/hash-join-node-ir.cc"
 #include "exec/hdfs-avro-scanner-ir.cc"
 #include "exec/hdfs-scanner-ir.cc"
+#include "exprs/aggregate-functions.cc"
 #include "exprs/expr-ir.cc"
 #include "exprs/udf-builtins.cc"
 #include "runtime/string-value-ir.cc"
+#include "udf/udf.cc"
 #include "util/hash-util-ir.cc"
 #else
 #error "This file should only be used for cross compiling to IR."

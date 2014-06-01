@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "codegen/codegen-anyval.h"
+#include "exprs/anyval-util.h"
 
 using namespace impala;
 using namespace impala_udf;
@@ -152,6 +153,25 @@ CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmCodeGen::LlvmBuilder* bui
   DCHECK_EQ(value_->getType(), value_type);
 }
 
+Value* CodegenAnyVal::GetIsNull() {
+  if (type_.type == TYPE_BIGINT || type_.type == TYPE_DOUBLE) {
+    // Lowered type is of form { i8, * }. Get the i8 value.
+    Value* is_null_i8 = builder_->CreateExtractValue(value_, 0, name_);
+    DCHECK(is_null_i8->getType() == codegen_->tinyint_type());
+    return builder_->CreateTrunc(is_null_i8, codegen_->boolean_type());
+  }
+
+  if (type_.type == TYPE_STRING || type_.type == TYPE_TIMESTAMP) {
+    // Lowered type is of form { i64, *}. Get the first byte of the i64 value.
+    Value* v = builder_->CreateExtractValue(value_, 0);
+    DCHECK(v->getType() == codegen_->bigint_type());
+    return builder_->CreateTrunc(v, codegen_->boolean_type());
+  }
+
+  // Lowered type is an integer. Get the first byte.
+  return builder_->CreateTrunc(value_, codegen_->boolean_type());
+}
+
 void CodegenAnyVal::SetIsNull(Value* is_null) {
   switch(type_.type) {
     case TYPE_BIGINT:
@@ -199,6 +219,48 @@ void CodegenAnyVal::SetIsNull(Value* is_null) {
   }
 }
 
+Value* CodegenAnyVal::GetVal(const char* name) {
+  DCHECK(type_.type != TYPE_STRING)
+      << "Use GetPtr and GetLen for TimestampVals";
+  DCHECK(type_.type != TYPE_TIMESTAMP)
+      << "Use GetDate and GetTimeOfDay for TimestampVals";
+  switch(type_.type) {
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT: {
+      // Lowered type is an integer. Get the high bytes.
+      int num_bits = type_.GetByteSize() * 8;
+      Value* val = GetHighBits(num_bits, value_, name);
+      if (type_.type == TYPE_BOOLEAN) {
+        // Return booleans as i1 (vs. i8)
+        val = builder_->CreateTrunc(val, builder_->getInt1Ty(), name);
+      }
+      return val;
+    }
+    case TYPE_FLOAT: {
+      // Same as above, but we must cast the value to a float.
+      Value* val = GetHighBits(32, value_);
+      return builder_->CreateBitCast(val, codegen_->float_type());
+    }
+    case TYPE_BIGINT:
+    case TYPE_DOUBLE:
+      // Lowered type is of form { i8, * }. Get the second value.
+      return builder_->CreateExtractValue(value_, 1, name);
+    case TYPE_DECIMAL: {
+      // Lowered type is of form { {i8}, [15 x i8], {i128} }. Get the i128 value and
+      // truncate it to the correct size. (The {i128} corresponds to the union of the
+      // different width int types.)
+      Value* val = builder_->CreateExtractValue(value_, 2, name);
+      return builder_->CreateTrunc(val, codegen_->GetType(type_), name);
+      break;
+    }
+    default:
+      DCHECK(false) << "Unsupported type: " << type_;
+      return NULL;
+  }
+}
+
 void CodegenAnyVal::SetVal(Value* val) {
   DCHECK(type_.type != TYPE_STRING) << "Use SetPtr and SetLen for StringVals";
   DCHECK(type_.type != TYPE_TIMESTAMP)
@@ -237,6 +299,19 @@ void CodegenAnyVal::SetVal(Value* val) {
   }
 }
 
+Value* CodegenAnyVal::GetPtr() {
+  // Set the second pointer value to 'ptr'.
+  DCHECK_EQ(type_.type, TYPE_STRING);
+  return builder_->CreateExtractValue(value_, 1, name_);
+}
+
+Value* CodegenAnyVal::GetLen() {
+  // Get the high bytes of the first value.
+  DCHECK_EQ(type_.type, TYPE_STRING);
+  Value* v = builder_->CreateExtractValue(value_, 0);
+  return GetHighBits(32, v);
+}
+
 void CodegenAnyVal::SetPtr(Value* ptr) {
   // Set the second pointer value to 'ptr'.
   DCHECK_EQ(type_.type, TYPE_STRING);
@@ -249,6 +324,19 @@ void CodegenAnyVal::SetLen(Value* len) {
   Value* v = builder_->CreateExtractValue(value_, 0);
   v = SetHighBits(32, len, v);
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
+}
+
+Value* CodegenAnyVal::GetTimeOfDay() {
+  // Get the second i64 value.
+  DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
+  return builder_->CreateExtractValue(value_, 1);
+}
+
+Value* CodegenAnyVal::GetDate() {
+  // Get the high bytes of the first value.
+  DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
+  Value* v = builder_->CreateExtractValue(value_, 0);
+  return GetHighBits(32, v);
 }
 
 void CodegenAnyVal::SetTimeOfDay(Value* time_of_day) {
@@ -268,28 +356,101 @@ void CodegenAnyVal::SetDate(Value* date) {
 void CodegenAnyVal::SetFromRawPtr(Value* raw_ptr) {
   Value* val_ptr =
       builder_->CreateBitCast(raw_ptr, codegen_->GetPtrType(type_), "val_ptr");
-  if (type_.type == TYPE_STRING) {
-    // Convert StringValue to StringVal
-    Value* ptr_ptr = builder_->CreateStructGEP(val_ptr, 0, "ptr_ptr");
-    SetPtr(builder_->CreateLoad(ptr_ptr, "ptr"));
-    Value* len_ptr = builder_->CreateStructGEP(val_ptr, 1, "len_ptr");
-    SetLen(builder_->CreateLoad(len_ptr, "len"));
-  } else if (type_.type == TYPE_TIMESTAMP) {
-    // Convert TimestampValue to TimestampVal
-    Value* time_of_day_ptr = builder_->CreateStructGEP(val_ptr, 0, "time_of_day_ptr");
-    // Cast boost::posix_time::time_duration to i64
-    Value* time_of_day_cast =
-        builder_->CreateBitCast(time_of_day_ptr, codegen_->GetPtrType(TYPE_BIGINT));
-    SetTimeOfDay(builder_->CreateLoad(time_of_day_cast, "time_of_day"));
-    Value* date_ptr = builder_->CreateStructGEP(val_ptr, 1, "date_ptr");
-    // Cast boost::gregorian::date to i32
-    Value* date_cast = builder_->CreateBitCast(date_ptr, codegen_->GetPtrType(TYPE_INT));
-    SetDate(builder_->CreateLoad(date_cast, "date"));
-  } else {
-    // val_ptr is a native type
-    Value* val = builder_->CreateLoad(val_ptr, "val");
-    SetVal(val);
+  Value* val = builder_->CreateLoad(val_ptr);
+  SetFromRawValue(val);
+}
+
+void CodegenAnyVal::SetFromRawValue(Value* raw_val) {
+  DCHECK_EQ(raw_val->getType(), codegen_->GetType(type_))
+      << endl << LlvmCodeGen::Print(raw_val)
+      << endl << type_ << " => " << LlvmCodeGen::Print(codegen_->GetType(type_));
+  switch (type_.type) {
+    case TYPE_STRING: {
+      // Convert StringValue to StringVal
+      SetPtr(builder_->CreateExtractValue(raw_val, 0, "ptr"));
+      SetLen(builder_->CreateExtractValue(raw_val, 1, "len"));
+      break;
+    }
+    case TYPE_TIMESTAMP: {
+      // Convert TimestampValue to TimestampVal
+      // TimestampValue has type
+      //   { boost::posix_time::time_duration, boost::gregorian::date }
+      // = { {{{i64}}}, {{i32}} }
+
+      // Extract time_of_day i64 from boost::posix_time::time_duration.
+      uint32_t time_of_day_idxs[] = {0, 0, 0, 0};
+      Value* time_of_day =
+          builder_->CreateExtractValue(raw_val, time_of_day_idxs, "time_of_day");
+      DCHECK(time_of_day->getType()->isIntegerTy(64));
+      SetTimeOfDay(time_of_day);
+      // Extract i32 from boost::gregorian::date
+      uint32_t date_idxs[] = {1, 0, 0};
+      Value* date = builder_->CreateExtractValue(raw_val, date_idxs, "date");
+      DCHECK(date->getType()->isIntegerTy(32));
+      SetDate(date);
+      break;
+    }
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+    case TYPE_DECIMAL:
+      // raw_val is a native type
+      SetVal(raw_val);
+      break;
+    default:
+      DCHECK(false) << "NYI: " << type_.DebugString();
+      break;
   }
+}
+
+Value* CodegenAnyVal::ToRawValue() {
+  Type* raw_type = codegen_->GetType(type_);
+  Value* raw_val = Constant::getNullValue(raw_type);
+  switch (type_.type) {
+    case TYPE_STRING: {
+      // Convert StringVal to StringValue
+      raw_val = builder_->CreateInsertValue(raw_val, GetPtr(), 0);
+      raw_val = builder_->CreateInsertValue(raw_val, GetLen(), 1);
+      break;
+    }
+    case TYPE_TIMESTAMP: {
+      // Convert TimestampVal to TimestampValue
+      // TimestampValue has type
+      //   { boost::posix_time::time_duration, boost::gregorian::date }
+      // = { {{{i64}}}, {{i32}} }
+      uint32_t time_of_day_idxs[] = {0, 0, 0, 0};
+      raw_val = builder_->CreateInsertValue(raw_val, GetTimeOfDay(), time_of_day_idxs);
+      uint32_t date_idxs[] = {1, 0, 0};
+      raw_val = builder_->CreateInsertValue(raw_val, GetDate(), date_idxs);
+      break;
+    }
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+    case TYPE_DECIMAL:
+      // raw_val is a native type
+      raw_val = GetVal();
+      break;
+    default:
+      DCHECK(false) << "NYI: " << type_.DebugString();
+      break;
+  }
+  return raw_val;
+}
+
+Value* CodegenAnyVal::GetHighBits(int num_bits, Value* v, const char* name) {
+  DCHECK_EQ(v->getType()->getIntegerBitWidth(), num_bits * 2);
+  Value* shifted = builder_->CreateAShr(v, num_bits);
+  return builder_->CreateTrunc(
+      shifted, IntegerType::get(codegen_->context(), num_bits));
 }
 
 // Example output: (num_bits = 8)

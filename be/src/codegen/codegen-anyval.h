@@ -113,6 +113,15 @@ class CodegenAnyVal {
   // Returns the current type-lowered value.
   llvm::Value* value() { return value_; }
 
+  // Gets the 'is_null' field of the *Val.
+  llvm::Value* GetIsNull();
+
+  // Get the 'val' field of the *Val. Do not call if this represents a StringVal or
+  // TimestampVal. If this represents a DecimalVal, returns 'val4', 'val8', or 'val16'
+  // depending on the precision of 'type_'.  The returned value will have variable name
+  // 'name'.
+  llvm::Value* GetVal(const char* name = "val");
+
   // Sets the 'is_null' field of the *Val.
   void SetIsNull(llvm::Value* is_null);
 
@@ -120,18 +129,34 @@ class CodegenAnyVal {
   // TimestampVal.
   void SetVal(llvm::Value* val);
 
+  // Getters for StringVals.
+  llvm::Value* GetPtr();
+  llvm::Value *GetLen();
+
   // Setters for StringVals.
   void SetPtr(llvm::Value* ptr);
   void SetLen(llvm::Value* len);
+
+  // Getters for TimestampVals.
+  llvm::Value* GetDate();
+  llvm::Value* GetTimeOfDay();
 
   // Setters for TimestampVals.
   void SetDate(llvm::Value* date);
   void SetTimeOfDay(llvm::Value* time_of_day);
 
+  // Set this *Val's value based on 'raw_val'. 'raw_val' should be a native type,
+  // StringValue, or TimestampValue.
+  void SetFromRawValue(llvm::Value* raw_val);
+
   // Set this *Val's value based on void* 'raw_ptr'. 'raw_ptr' should be a pointer to a
   // native type, StringValue, or TimestampValue (i.e. the value returned by an
   // interpreted compute fn).
   void SetFromRawPtr(llvm::Value* raw_ptr);
+
+  // Converts this *Val's value to a native type, StringValue, TimestampValue, etc.
+  // This should only be used if this *Val is not null.
+  llvm::Value* ToRawValue();
 
  private:
   ColumnType type_;
@@ -141,9 +166,13 @@ class CodegenAnyVal {
   LlvmCodeGen* codegen_;
   LlvmCodeGen::LlvmBuilder* builder_;
 
-  // Helper function for setting the top (most significant) half of a 'dst' to
-  // 'src'.
+  // Helper function for getting the top (most significant) half of 'v'.
+  // 'v' should have width = 'num_bits' * 2 and be an integer type.
+  llvm::Value* GetHighBits(int num_bits, llvm::Value* v, const char* name = "");
+
+  // Helper function for setting the top (most significant) half of a 'dst' to 'src'.
   // 'src' must have width <= 'num_bits' and 'dst' must have width = 'num_bits' * 2.
+  // Both 'dst' and 'src' should be integer types.
   llvm::Value* SetHighBits(int num_bits, llvm::Value* src, llvm::Value* dst,
                            const char* name = "");
 };

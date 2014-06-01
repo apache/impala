@@ -21,6 +21,7 @@
 
 #include <x86intrin.h>
 
+#include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/agg-fn-evaluator.h"
@@ -33,6 +34,7 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
+#include "udf/udf-internal.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
 
@@ -340,27 +342,97 @@ void AggregationNode::DebugString(int indentation_level, stringstream* out) cons
   *out << ")";
 }
 
+IRFunction::Type GetHllUpdateFunction(const ColumnType& type) {
+  switch (type.type) {
+    case TYPE_BOOLEAN: return IRFunction::HLL_UPDATE_BOOLEAN;
+    case TYPE_TINYINT: return IRFunction::HLL_UPDATE_TINYINT;
+    case TYPE_SMALLINT: return IRFunction::HLL_UPDATE_SMALLINT;
+    case TYPE_INT: return IRFunction::HLL_UPDATE_INT;
+    case TYPE_BIGINT: return IRFunction::HLL_UPDATE_BIGINT;
+    case TYPE_FLOAT: return IRFunction::HLL_UPDATE_FLOAT;
+    case TYPE_DOUBLE: return IRFunction::HLL_UPDATE_DOUBLE;
+    case TYPE_STRING: return IRFunction::HLL_UPDATE_STRING;
+    case TYPE_DECIMAL: return IRFunction::HLL_UPDATE_DECIMAL;
+    default:
+      DCHECK(false) << "Unsupported type: " << type;
+      return IRFunction::FN_END;
+  }
+}
+
 // IR Generation for updating a single aggregation slot. Signature is:
-// void UpdateSlot(AggTuple* agg_tuple, char** row)
+// void UpdateSlot(FunctionContext* fn_ctx, AggTuple* agg_tuple, char** row)
+//
 // The IR for sum(double_col) is:
-//  define void @UpdateSlot({ i8, double }* %agg_tuple, i8** %row) {
-//  entry:
-//    %src_null_ptr = alloca i1
-//    %src_value = call double @SlotRef(i8** %row, i8* null, i1* %src_null_ptr)
-//    %src_is_null = load i1* %src_null_ptr
-//    br i1 %src_is_null, label %ret, label %src_not_null
+//   define void @UpdateSlot(%"class.impala_udf::FunctionContext"* %fn_ctx,
+//                           { i8, double }* %agg_tuple, i8** %row) {
+//   entry:
+//     %src_null_ptr = alloca i1
+//     %src_value = call double @SlotRef(i8** %row, i8* null, i1* %src_null_ptr)
+//     %child_null = load i1* %src_null_ptr
+//     br i1 %child_null, label %ret, label %src_not_null
 //
-//  src_not_null:                                     ; preds = %entry
-//    %dst_slot_ptr = getelementptr inbounds { i8, double }* %agg_tuple, i32 0, i32 1
-//    call void @SetNotNull({ i8, double }* %agg_tuple)
-//    %dst_val = load double* %dst_slot_ptr
-//    %0 = fadd double %dst_val, %src_value
-//    store double %0, double* %dst_slot_ptr
-//    br label %ret
+//   src_not_null:                                     ; preds = %entry
+//     %dst_slot_ptr = getelementptr inbounds { i8, double }* %agg_tuple, i32 0, i32 1
+//     call void @SetNotNull({ i8, double }* %agg_tuple)
+//     %dst_val = load double* %dst_slot_ptr
+//     %0 = fadd double %dst_val, %src_value
+//     store double %0, double* %dst_slot_ptr
+//     br label %ret
 //
-//  ret:                                    ; preds = %src_not_null, %entry
-//    ret void
-//  }
+//   ret:                                              ; preds = %src_not_null, %entry
+//     ret void
+//   }
+//
+// The IR for ndv(double_col) is:
+//   define void @UpdateSlot(%"class.impala_udf::FunctionContext"* %fn_ctx,
+//                           { i8, %"struct.impala::StringValue" }* %agg_tuple,
+//                           i8** %row) {
+//   entry:
+//     %src_null_ptr = alloca i1
+//     %src_value = call double @SlotRef(i8** %row, i8* null, i1* %src_null_ptr)
+//     %child_null = load i1* %src_null_ptr
+//     br i1 %child_null, label %ret, label %src_not_null
+//
+//   src_not_null:                                     ; preds = %entry
+//     %dst_slot_ptr = getelementptr inbounds
+//                     { i8, %"struct.impala::StringValue" }* %agg_tuple, i32 0, i32 1
+//     call void @SetNotNull({ i8, %"struct.impala::StringValue" }* %agg_tuple)
+//     %dst_val = load %"struct.impala::StringValue"* %dst_slot_ptr
+//     %src_anyval = insertvalue { i8, double } zeroinitializer, double %src_value, 1
+//     %src_lowered_ptr = alloca { i8, double }
+//     store { i8, double } %src_anyval, { i8, double }* %src_lowered_ptr
+//     %src_unlowered_ptr = bitcast { i8, double }* %src_lowered_ptr to
+//                          %"struct.impala_udf::DoubleVal"*
+//     %ptr = extractvalue %"struct.impala::StringValue" %dst_val, 0
+//     %dst_stringval = insertvalue { i64, i8* } zeroinitializer, i8* %ptr, 1
+//     %len = extractvalue %"struct.impala::StringValue" %dst_val, 1
+//     %0 = extractvalue { i64, i8* } %dst_stringval, 0
+//     %1 = zext i32 %len to i64
+//     %2 = shl i64 %1, 32
+//     %3 = and i64 %0, 0
+//     %4 = or i64 %3, %2
+//     %dst_stringval1 = insertvalue { i64, i8* } %dst_stringval, i64 %4, 0
+//     %dst_lowered_ptr = alloca { i64, i8* }
+//     store { i64, i8* } %dst_stringval1, { i64, i8* }* %dst_lowered_ptr
+//     %dst_unlowered_ptr = bitcast { i64, i8* }* %dst_lowered_ptr to
+//                          %"struct.impala_udf::StringVal"*
+//     call void @HllUpdate(%"class.impala_udf::FunctionContext"* %fn_ctx,
+//                          %"struct.impala_udf::DoubleVal"* %src_unlowered_ptr,
+//                          %"struct.impala_udf::StringVal"* %dst_unlowered_ptr)
+//     %anyval_result = load { i64, i8* }* %dst_lowered_ptr
+//     %5 = extractvalue { i64, i8* } %anyval_result, 1
+//     %6 = insertvalue %"struct.impala::StringValue" zeroinitializer, i8* %5, 0
+//     %7 = extractvalue { i64, i8* } %anyval_result, 0
+//     %8 = ashr i64 %7, 32
+//     %9 = trunc i64 %8 to i32
+//     %10 = insertvalue %"struct.impala::StringValue" %6, i32 %9, 1
+//     store %"struct.impala::StringValue" %10,
+//           %"struct.impala::StringValue"* %dst_slot_ptr
+//     br label %ret
+//
+//   ret:                                              ; preds = %src_not_null, %entry
+//     ret void
+//   }
 llvm::Function* AggregationNode::CodegenUpdateSlot(
     LlvmCodeGen* codegen, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc) {
   int field_idx = slot_desc->field_idx();
@@ -368,18 +440,25 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
 
   LLVMContext& context = codegen->context();
 
+  PointerType* fn_ctx_type =
+      codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME);
   StructType* tuple_struct = agg_tuple_desc_->GenerateLlvmStruct(codegen);
-  PointerType* tuple_ptr = PointerType::get(tuple_struct, 0);
+  PointerType* tuple_ptr_type = PointerType::get(tuple_struct, 0);
   PointerType* ptr_type = codegen->ptr_type();
 
   // Create UpdateSlot prototype
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateSlot", codegen->void_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_tuple", tuple_ptr));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("fn_ctx", fn_ctx_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_tuple", tuple_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", PointerType::get(ptr_type, 0)));
 
   LlvmCodeGen::LlvmBuilder builder(context);
-  Value* args[2];
+  Value* args[3];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
+
+  Value* fn_ctx_arg = args[0];
+  Value* agg_tuple_arg = args[1];
+  Value* row_arg = args[2];
 
   LlvmCodeGen::NamedVariable null_var("src_null_ptr", codegen->boolean_type());
   Value* src_is_null_ptr = codegen->CreateEntryBlockAlloca(fn, null_var);
@@ -396,19 +475,19 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
   BasicBlock* src_not_null_block, *ret_block;
   codegen->CreateIfElseBlocks(fn, "src_not_null", "ret", &src_not_null_block, &ret_block);
 
-  Value* expr_args[] = { args[1], ConstantPointerNull::get(ptr_type), src_is_null_ptr };
+  Value* expr_args[] = { row_arg, ConstantPointerNull::get(ptr_type), src_is_null_ptr };
   Value* src_value = input_expr->CodegenGetValue(codegen, builder.GetInsertBlock(),
-      expr_args, ret_block, src_not_null_block);
+      expr_args, ret_block, src_not_null_block, "src_value");
 
   // Src slot is not null, update dst_slot
   builder.SetInsertPoint(src_not_null_block);
-  Value* dst_ptr = builder.CreateStructGEP(args[0], field_idx, "dst_slot_ptr");
+  Value* dst_ptr = builder.CreateStructGEP(agg_tuple_arg, field_idx, "dst_slot_ptr");
   Value* result = NULL;
 
   if (slot_desc->is_nullable()) {
     // Dst is NULL, just update dst slot to src slot and clear null bit
     Function* clear_null_fn = slot_desc->CodegenUpdateNull(codegen, tuple_struct, false);
-    builder.CreateCall(clear_null_fn, args[0]);
+    builder.CreateCall(clear_null_fn, agg_tuple_arg);
   }
 
   // Update the slot
@@ -437,6 +516,59 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
         result = builder.CreateAdd(dst_value, src_value);
       }
       break;
+    case AggFnEvaluator::NDV: {
+      DCHECK_EQ(slot_desc->type().type, TYPE_STRING);
+      IRFunction::Type ir_function_type = is_merge_ ? IRFunction::HLL_MERGE
+                                          : GetHllUpdateFunction(input_expr->type());
+      Function* hll_fn = codegen->GetFunction(ir_function_type);
+
+      // Convert src_value to *Val src_anyval. src_value is the returned value of a
+      // codegen'd expr compute function, so either is a native type or a StringVal*.
+      CodegenAnyVal src_anyval = CodegenAnyVal::GetNonNullVal(
+          codegen, &builder, input_expr->type(), "src_anyval");
+      if (src_value->getType()->isPointerTy()) {
+        DCHECK_EQ(src_value->getType(), codegen->GetPtrType(TYPE_STRING))
+            << endl << LlvmCodeGen::Print(src_value);
+        src_anyval.SetFromRawPtr(src_value);
+      } else {
+        src_anyval.SetFromRawValue(src_value);
+      }
+
+      // Create pointer to src_anyval to pass to HllUpdate() function. We must use the
+      // unlowered type.
+      Value* src_lowered_ptr = codegen->CreateEntryBlockAlloca(
+          fn, LlvmCodeGen::NamedVariable("src_lowered_ptr",
+                                         src_anyval.value()->getType()));
+      builder.CreateStore(src_anyval.value(), src_lowered_ptr);
+      Type* unlowered_ptr_type =
+          CodegenAnyVal::GetUnloweredType(codegen, input_expr->type())->getPointerTo();
+      Value* src_unlowered_ptr =
+          builder.CreateBitCast(src_lowered_ptr, unlowered_ptr_type, "src_unlowered_ptr");
+
+      // Create StringVal* intermediate argument from dst_value
+      CodegenAnyVal dst_stringval = CodegenAnyVal::GetNonNullVal(
+          codegen, &builder, TYPE_STRING, "dst_stringval");
+      dst_stringval.SetFromRawValue(dst_value);
+      // Create pointer to dst_stringval to pass to HllUpdate() function. We must use
+      // the unlowered type.
+      Value* dst_lowered_ptr = codegen->CreateEntryBlockAlloca(
+          fn, LlvmCodeGen::NamedVariable("dst_lowered_ptr",
+                                         dst_stringval.value()->getType()));
+      builder.CreateStore(dst_stringval.value(), dst_lowered_ptr);
+      unlowered_ptr_type =
+          codegen->GetPtrType(CodegenAnyVal::GetUnloweredType(codegen, TYPE_STRING));
+      Value* dst_unlowered_ptr =
+          builder.CreateBitCast(dst_lowered_ptr, unlowered_ptr_type, "dst_unlowered_ptr");
+
+      // Call 'hll_fn'
+      builder.CreateCall3(hll_fn, fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr);
+
+      // Convert StringVal intermediate 'dst_arg' back to StringValue
+      Value* anyval_result = builder.CreateLoad(dst_lowered_ptr, "anyval_result");
+      result = CodegenAnyVal(codegen, &builder, TYPE_STRING, anyval_result)
+               .ToRawValue();
+      break;
+    }
     default:
       DCHECK(false) << "bad aggregate operator: " << evaluator->agg_op();
   }
@@ -492,13 +624,15 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
     SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[j];
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
 
-    // string and timestamp aggregation currently not supported
-    if (slot_desc->type().type == TYPE_STRING ||
-        slot_desc->type().type == TYPE_TIMESTAMP ||
-        slot_desc->type().type == TYPE_CHAR ||
-        slot_desc->type().type == TYPE_DECIMAL) {
+    // Timestamp and char are never supported. NDV supports decimal and string but no
+    // other functions.
+    // TODO: the other aggregate functions might work with decimal as-is
+    if (slot_desc->type().type == TYPE_TIMESTAMP || slot_desc->type().type == TYPE_CHAR ||
+        (evaluator->agg_op() != AggFnEvaluator::NDV &&
+         (slot_desc->type().type == TYPE_DECIMAL ||
+          slot_desc->type().type == TYPE_STRING))) {
       VLOG_QUERY << "Could not codegen UpdateAggTuple because "
-                 << "string, char and timestamp aggregation is not yet supported.";
+                 << "string, char, timestamp and decimal are not yet supported.";
       return NULL;
     }
 
@@ -533,9 +667,7 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
   PointerType* agg_tuple_ptr_type = PointerType::get(agg_tuple_type, 0);
   PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
 
-  // Signature for UpdateAggTuple is
-  // void UpdateAggTuple(AggTuple* agg_tuple, char** row)
-  // This signature needs to match the non-codegen'd signature exactly.
+  // The signature needs to match the non-codegen'd signature exactly.
   PointerType* ptr_type = codegen->ptr_type();
   StructType* tuple_struct = agg_tuple_desc_->GenerateLlvmStruct(codegen);
   PointerType* tuple_ptr = PointerType::get(tuple_struct, 0);
@@ -575,7 +707,10 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
     } else {
       Function* update_slot_fn = CodegenUpdateSlot(codegen, evaluator, slot_desc);
       if (update_slot_fn == NULL) return NULL;
-      builder.CreateCall2(update_slot_fn, args[1], args[2]);
+      Value* fn_ctx_arg = codegen->CastPtrToLlvmPtr(
+          codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME),
+          evaluator->ctx());
+      builder.CreateCall3(update_slot_fn, fn_ctx_arg, args[1], args[2]);
     }
   }
   builder.CreateRetVoid();

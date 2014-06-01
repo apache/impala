@@ -16,13 +16,15 @@
 #ifndef IMPALA_EXPRS_ANYVAL_UTIL_H
 #define IMPALA_EXPRS_ANYVAL_UTIL_H
 
-#include "codegen/llvm-codegen.h"
+#include "runtime/timestamp-value.h"
 #include "udf/udf-internal.h"
 #include "util/hash-util.h"
 
 using namespace impala_udf;
 
 namespace impala {
+
+class ObjectPool;
 
 // Utilities for AnyVals
 class AnyValUtil {

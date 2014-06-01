@@ -375,7 +375,8 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
   // First argument is always FunctionContext*
   vector<llvm::Value*> udf_args;
   udf_args.push_back(codegen->CastPtrToLlvmPtr(
-      codegen->GetPtrType("class.impala_udf::FunctionContext"), udf_context_.get()));
+      codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME),
+      udf_context_.get()));
 
   // Call children to populate remaining arguments
   int varargs_input_offset = 0;

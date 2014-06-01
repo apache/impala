@@ -51,9 +51,11 @@ set(IR_DEPENDENT_FILES
   ../exec/aggregation-node-ir.cc
   ../exec/hash-join-node-ir.cc
   ../exec/hdfs-scanner-ir.cc
+  ../exprs/aggregate-functions.cc
   ../exprs/expr-ir.cc
   ../exprs/udf-builtins.cc
   ../runtime/string-value-ir.cc
+  ../udf/udf.cc
   ../util/hash-util-ir.cc
 )
 

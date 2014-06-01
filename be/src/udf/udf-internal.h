@@ -63,6 +63,8 @@ class FunctionContextImpl {
   bool debug() { return debug_; }
   bool closed() { return closed_; }
 
+  static const char* LLVM_FUNCTIONCONTEXT_NAME;
+
  private:
   friend class impala_udf::FunctionContext;
 
