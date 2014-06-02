@@ -205,6 +205,12 @@ bool RuntimeState::LogError(const string& error) {
 
 void RuntimeState::LogError(const Status& status) {
   if (status.ok()) return;
+  // Don't log cancelled or mem limit exceeded to the log.
+  // For cancelled, he error message is not useful ("Cancelled") and can happen due to
+  // a limit clause.
+  // For mem limit exceeded, the query will report it via SetMemLimitExceeded which
+  // makes the status error message redundant.
+  if (status.IsCancelled() || status.IsMemLimitExceeded()) return;
   LogError(status.GetErrorMsg());
 }
 
