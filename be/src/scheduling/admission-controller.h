@@ -276,15 +276,16 @@ class AdmissionController {
   // Dequeues and admits queued queries when notified by dequeue_cv_.
   void DequeueLoop();
 
-  // Returns true if the request can be admitted, i.e. admitting would not go over the
-  // limits for this pool.
-  bool CanAdmitRequest(const std::string& pool, const int64_t max_requests,
+  // Returns OK if the request can be admitted, i.e. admitting would not go over the
+  // limits for this pool. Otherwise, the error message specifies the reason the
+  // request can not be admitted immediately.
+  Status CanAdmitRequest(const std::string& pool, const int64_t max_requests,
       const int64_t mem_limit, const QuerySchedule& schedule, bool admit_from_queue);
 
-  // Returns true if this request must be rejected. error_msg returns the reason.
-  bool RejectRequest(const std::string& pool, const int64_t max_requests,
-      const int64_t mem_limit, const int64_t max_queued, const QuerySchedule& schedule,
-      std::string* error_msg);
+  // Returns an error status if this request must be rejected; the error message
+  // specifies the reason the request is rejected.
+  Status RejectRequest(const std::string& pool, const int64_t max_requests,
+      const int64_t mem_limit, const int64_t max_queued, const QuerySchedule& schedule);
 
   // Gets the metrics for a pool. The metrics are initialized if they don't already
   // exist. Returns NULL if there is no metrics system available.  Must hold

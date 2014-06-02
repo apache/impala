@@ -90,15 +90,34 @@ const string PROFILE_INFO_VAL_REJECTED = "Rejected";
 const string PROFILE_INFO_VAL_TIME_OUT = "Timed out (queued)";
 
 // Error status string formats
-// $0 = query_id, $1 = pool, $2 = rejection reason (see REASON_XXX below)
-const string STATUS_REJECTED = "Rejected query id=$0 from pool $1 : $2";
+// $0 = pool, $1 = rejection reason (see REASON_XXX below)
+const string STATUS_REJECTED = "Rejected query from pool $0 : $1";
 const string REASON_DISABLED_MEM_LIMIT = "disabled by mem limit set to 0";
 const string REASON_DISABLED_REQUESTS_LIMIT = "disabled by requests limit set to 0";
 const string REASON_QUEUE_FULL = "queue full, limit=$0, num_queued=$1";
 const string REASON_REQ_OVER_MEM_LIMIT =
-    "request memory estimate $0, greater than pool limit $1";
-// $0 = query_id, $1 = timeout in milliseconds
-const string STATUS_TIME_OUT = "Admission for query id=$0 exceeded timeout $1ms";
+    "request memory estimate $0 is greater than pool limit $1.\n\n"
+    "If the memory estimate appears to be too high, use the MEM_LIMIT query option to "
+    "override the memory estimates in admission decisions. Check the explain plan for "
+    "warnings about missing stats. Running COMPUTE STATS may help. You may also "
+    "consider using query hints to manually improve the plan.\n\n"
+    "See the Impala documentation for more details regarding the MEM_LIMIT query "
+    "option, table stats, and query hints. If the memory estimate is still too high, "
+    "consider modifying the query to reduce the memory impact or increasing the "
+    "available memory.";
+
+// Queue decision details
+// $0 = num running queries, $1 = num queries limit
+const string QUEUED_NUM_RUNNING = "number of running queries $0 is over limit $1";
+// $0 = query estimate, $1 = current pool memory estimate, $2 = pool memory limit
+const string QUEUED_MEM_LIMIT = "query memory estimate $0 plus current pool "
+    "memory estimate $1 is over pool memory limit $2";
+// $0 = queue size
+const string QUEUED_QUEUE_NOT_EMPTY = "queue is not empty (size $0); queued queries are "
+    "executed first";
+// $0 = timeout in milliseconds, $1 = queue detail
+const string STATUS_TIME_OUT = "Admission for query exceeded timeout $0ms. Queued "
+    "reason: $1";
 
 // Parses the pool name and backend_id from the topic key if it is valid.
 // Returns true if the topic key is valid and pool_name and backend_id are set.
@@ -189,31 +208,41 @@ Status AdmissionController::Init(StatestoreSubscriber* subscriber) {
   return status;
 }
 
-bool AdmissionController::CanAdmitRequest(const string& pool_name,
+Status AdmissionController::CanAdmitRequest(const string& pool_name,
     const int64_t max_requests, const int64_t mem_limit, const QuerySchedule& schedule,
     bool admit_from_queue) {
   const TPoolStats& total_stats = cluster_pool_stats_[pool_name];
   DCHECK_GE(total_stats.mem_usage, 0);
   DCHECK_GE(total_stats.mem_estimate, 0);
-  const int64_t cluster_estimated_memory = schedule.GetClusterMemoryEstimate() +
+  const int64_t query_total_estimated_mem = schedule.GetClusterMemoryEstimate();
+  const int64_t current_cluster_estimate_mem =
       max(total_stats.mem_usage, total_stats.mem_estimate);
+  // The estimated total memory footprint for the query cluster-wise after admitting
+  const int64_t cluster_estimated_memory = query_total_estimated_mem +
+      current_cluster_estimate_mem;
   DCHECK_GE(cluster_estimated_memory, 0);
 
   // Can't admit if:
   //  (a) Already over the maximum number of requests
   //  (b) Request will go over the mem limit
   //  (c) This is not admitting from the queue and there are already queued requests
-  if ((max_requests >= 0 && total_stats.num_running >= max_requests) ||
-      (mem_limit >= 0 && cluster_estimated_memory >= mem_limit) ||
-      (!admit_from_queue && total_stats.num_queued > 0)) {
-    return false;
+  if (max_requests >= 0 && total_stats.num_running >= max_requests) {
+    return Status(Substitute(QUEUED_NUM_RUNNING, total_stats.num_running, max_requests),
+        true);
+  } else if (mem_limit >= 0 && cluster_estimated_memory >= mem_limit) {
+    return Status(Substitute(QUEUED_MEM_LIMIT,
+        PrettyPrinter::Print(query_total_estimated_mem, TCounterType::BYTES),
+        PrettyPrinter::Print(current_cluster_estimate_mem, TCounterType::BYTES),
+        PrettyPrinter::Print(mem_limit, TCounterType::BYTES)), true);
+  } else if (!admit_from_queue && total_stats.num_queued > 0) {
+    return Status(Substitute(QUEUED_QUEUE_NOT_EMPTY, total_stats.num_queued), true);
   }
-  return true;
+  return Status::OK;
 }
 
-bool AdmissionController::RejectRequest(const string& pool_name,
+Status AdmissionController::RejectRequest(const string& pool_name,
     const int64_t max_requests, const int64_t mem_limit, const int64_t max_queued,
-    const QuerySchedule& schedule, string* error_msg) {
+    const QuerySchedule& schedule) {
   TPoolStats* total_stats = &cluster_pool_stats_[pool_name];
   const int64_t expected_mem_usage = schedule.GetClusterMemoryEstimate();
   string reject_reason;
@@ -228,11 +257,9 @@ bool AdmissionController::RejectRequest(const string& pool_name,
   } else if (total_stats->num_queued >= max_queued) {
     reject_reason = Substitute(REASON_QUEUE_FULL, max_queued, total_stats->num_queued);
   } else {
-    return false; // Not rejected
+    return Status::OK; // Not rejected
   }
-  *error_msg = Substitute(STATUS_REJECTED, PrintId(schedule.query_id()), pool_name,
-      reject_reason);
-  return true;
+  return Status(Substitute(STATUS_REJECTED, pool_name, reject_reason));
 }
 
 Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
@@ -245,6 +272,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
 
   // Note the queue_node will not exist in the queue when this method returns.
   QueueNode queue_node(*schedule);
+  Status admitStatus; // An error status specifies why query is not admitted
 
   schedule->query_events()->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
   ScopedEvent completedEvent(schedule->query_events(), QUERY_EVENT_COMPLETED_ADMISSION);
@@ -264,7 +292,8 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
                << PrettyPrinter::Print(cluster_mem_estimate, TCounterType::BYTES);
     VLOG_QUERY << "Stats: " << DebugPoolStats(pool_name, total_stats, local_stats);
 
-    if (CanAdmitRequest(pool_name, max_requests, mem_limit, *schedule, false)) {
+    admitStatus = CanAdmitRequest(pool_name, max_requests, mem_limit, *schedule, false);
+    if (admitStatus.ok()) {
       // Execute immediately
       pools_for_updates_.insert(pool_name);
       // The local and total stats get incremented together when we queue so if
@@ -288,15 +317,14 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
       return Status::OK;
     }
 
-    string error_msg; // detailed error message returned if rejected
-    if (RejectRequest(pool_name, max_requests, mem_limit, max_queued, *schedule,
-        &error_msg)) {
+    Status rejectStatus = RejectRequest(pool_name, max_requests, mem_limit, max_queued,
+        *schedule);
+    if (!rejectStatus.ok()) {
       schedule->set_is_admitted(false);
       schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
           PROFILE_INFO_VAL_REJECTED);
       if (pool_metrics != NULL) pool_metrics->local_rejected->Increment(1L);
-      VLOG_QUERY << error_msg;
-      return Status(error_msg);
+      return rejectStatus;
     }
 
     // We cannot immediately admit but do not need to reject, so queue the request
@@ -347,8 +375,8 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
       --local_stats->num_queued;
       --total_stats->num_queued;
       if (pool_metrics != NULL) pool_metrics->local_timed_out->Increment(1L);
-      return Status(Substitute(STATUS_TIME_OUT, PrintId(schedule->query_id()),
-            queue_wait_timeout_ms));
+      return Status(Substitute(STATUS_TIME_OUT, queue_wait_timeout_ms,
+            admitStatus.GetErrorMsg()));
     }
     // The dequeue thread updates the stats (to avoid a race condition) so we do
     // not change them here.
@@ -625,8 +653,11 @@ void AdmissionController::DequeueLoop() {
         DCHECK(queue_node != NULL);
         DCHECK(!queue_node->is_admitted.IsSet());
         const QuerySchedule& schedule = queue_node->schedule;
-        if (!CanAdmitRequest(pool_name, max_requests, mem_limit, schedule, true)) {
-          VLOG_RPC << "Could not dequeue query id=" << queue_node->schedule.query_id();
+        Status admitStatus = CanAdmitRequest(pool_name, max_requests, mem_limit,
+            schedule, true);
+        if (!admitStatus.ok()) {
+          VLOG_RPC << "Could not dequeue query id=" << queue_node->schedule.query_id()
+                   << " reason: " << admitStatus.GetErrorMsg();
           break;
         }
         queue.Dequeue();
