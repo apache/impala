@@ -1268,10 +1268,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError(
         "drop function functional.TestFn()", "Function does not exist: testfn()");
 
-    addTestFunction("udf_test", "TestFn", new ArrayList<ColumnType>(), false);
-    AnalysisError(
-        "drop database udf_test", "Cannot drop non-empty database: udf_test");
-
     AnalysisError("create function f() returns int " + udfSuffix +
         "init_fn='a'", "Optional argument 'INIT_FN' should not be set");
     AnalysisError("create function f() returns int " + udfSuffix +

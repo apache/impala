@@ -1,0 +1,21 @@
+====
+---- QUERY
+create database if not exists udf_test_errors;
+---- RESULTS
+====
+---- QUERY
+create function if not exists udf_test_errors.hive_pi() returns double
+location '/test-warehouse/hive-exec.jar'
+symbol='org.apache.hadoop.hive.ql.udf.UDFPI';
+---- RESULTS
+====
+---- QUERY
+drop database udf_test_errors;
+---- CATCH
+Cannot drop non-empty database: udf_test_errors
+====
+---- QUERY
+drop function udf_test_errors.hive_pi();
+drop database udf_test_errors;
+---- RESULTS
+====

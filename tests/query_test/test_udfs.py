@@ -42,6 +42,9 @@ class TestUdfs(ImpalaTestSuite):
     self.run_test_case('QueryTest/udf', vector, use_db=database)
     self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
 
+  def test_udf_errors(self, vector):
+    self.run_test_case('QueryTest/udf-errors', vector)
+
   def test_hive_udfs(self, vector):
     self.client.execute('create database if not exists udf_test')
     self.client.execute('create database if not exists uda_test')

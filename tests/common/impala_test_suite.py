@@ -183,10 +183,20 @@ class ImpalaTestSuite(BaseTestSuite):
       # TODO: consider supporting result verification of all queries in the future
       result = None
       target_impalad_client = choice(target_impalad_clients)
-      for query in query.split(';'):
-        result =\
-            self.execute_query_expect_success(target_impalad_client, query)
+      try:
+        for query in query.split(';'):
+          result = self.__execute_query(target_impalad_client, query)
+      except Exception as e:
+        if 'CATCH' in test_section:
+          assert test_section['CATCH'].strip() in str(e)
+          continue
+        raise
+
+      if 'CATCH' in test_section:
+        assert test_section['CATCH'].strip() == ''
+
       assert result is not None
+      assert result.success
 
       # Decode the results read back if the data is stored with a specific encoding.
       if encoding: result.data = [row.decode(encoding) for row in result.data]
