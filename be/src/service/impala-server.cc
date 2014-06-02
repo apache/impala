@@ -318,16 +318,13 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   writer.String("status");
   writer.String(exec_state.query_status().GetErrorMsg().c_str());
   writer.String("user");
-  // If do_as_user() is empty, the "user" field should be set to the connected user
-  // and "impersonator" field should be Null. Otherwise, the "user" should be set to
-  // the current do_as_user() and "impersonator" should be the connected user.
+  writer.String(exec_state.effective_user().c_str());
+  writer.String("impersonator");
   if (exec_state.do_as_user().empty()) {
-    writer.String(exec_state.connected_user().c_str());
-    writer.String("impersonator");
+    // If there is no do_as_user() is empty, the "impersonator" field should be Null.
     writer.Null();
   } else {
-    writer.String(exec_state.do_as_user().c_str());
-    writer.String("impersonator");
+    // Otherwise, the impersonator is the current connected user.
     writer.String(exec_state.connected_user().c_str());
   }
   writer.String("statement_type");
@@ -1593,7 +1590,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
 
   stmt = exec_state.sql_stmt();
   stmt_type = request.stmt_type;
-  user = exec_state.connected_user();
+  effective_user = exec_state.effective_user();
   default_db = exec_state.default_db();
   start_time = exec_state.start_time();
   end_time = exec_state.end_time();

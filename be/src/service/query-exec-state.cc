@@ -93,7 +93,9 @@ ImpalaServer::QueryExecState::QueryExecState(
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   summary_profile_.AddInfoString("Query Status", "OK");
   summary_profile_.AddInfoString("Impala Version", GetVersionString(/* compact */ true));
-  summary_profile_.AddInfoString("User", connected_user());
+  summary_profile_.AddInfoString("User", effective_user());
+  summary_profile_.AddInfoString("Connected User", connected_user());
+  summary_profile_.AddInfoString("Impersonated User", do_as_user());
   summary_profile_.AddInfoString("Network Address",
       lexical_cast<string>(session_->network_address));
   summary_profile_.AddInfoString("Default Db", default_db());

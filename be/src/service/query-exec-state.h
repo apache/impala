@@ -121,7 +121,15 @@ class ImpalaServer::QueryExecState {
   Status SetResultCache(QueryResultSet* cache, int64_t max_size);
 
   ImpalaServer::SessionState* session() const { return session_.get(); }
-  const std::string& connected_user() const { return query_ctxt_.session.connected_user; }
+  // Queries are run and authorized on behalf of the effective_user.
+  // When a do_as_user is specified (is not empty), the effective_user is set to the
+  // do_as_user. This is because the connected_user is acting as a "proxy user" for the
+  // do_as_user. When do_as_user is empty, the effective_user is always set to the
+  // connected_user.
+  const std::string& effective_user() const {
+    return do_as_user().empty() ? connected_user() : do_as_user();
+  }
+  const std::string& connected_user() const { return session_->connected_user; }
   const std::string& do_as_user() const { return session_->do_as_user; }
   TSessionType::type session_type() const { return query_ctxt_.session.session_type; }
   const TUniqueId& session_id() const { return query_ctxt_.session.session_id; }

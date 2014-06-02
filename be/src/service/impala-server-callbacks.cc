@@ -158,7 +158,7 @@ void ImpalaServer::InflightQueryIdsPathHandler(const Webserver::ArgumentMap& arg
 void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecord& record,
     bool render_end_time, bool render_cancel, stringstream* output) {
   (*output) << "<tr>"
-            << "<td>" << record.user << "</td>"
+            << "<td>" << record.effective_user << "</td>"
             << "<td>" << record.default_db << "</td>"
             << "<td>" << record.stmt << "</td>"
             << "<td>"
@@ -294,6 +294,7 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
             << "<tr><th>Session Type</th>"
             << "<th>Open Queries</th>"
             << "<th>User</th>"
+            << "<th>Impersonated User</th>"
             << "<th>Session ID</th>"
             << "<th>Network Address</th>"
             << "<th>Default Database</th>"
@@ -310,6 +311,7 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
               << "<td>" << PrintTSessionType(session.second->session_type) << "</td>"
               << "<td>" << session.second->inflight_queries.size() << "</td>"
               << "<td>" << session.second->connected_user << "</td>"
+              << "<td>" << session.second->do_as_user << "</td>"
               << "<td>" << session.first << "</td>"
               << "<td>" << session.second->network_address << "</td>"
               << "<td>" << session.second->database << "</td>"

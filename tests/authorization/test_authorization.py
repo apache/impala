@@ -28,6 +28,7 @@ from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
+from tests.hs2.hs2_test_suite import operation_id_to_query_id
 
 class TestAuthorization(CustomClusterTestSuite):
   AUDIT_LOG_DIR = tempfile.mkdtemp(dir=os.getenv('LOG_DIR'))
@@ -60,8 +61,10 @@ class TestAuthorization(CustomClusterTestSuite):
     # class citizen in our test framework.
     from tests.hs2.test_hs2 import TestHS2
     open_session_req = TCLIService.TOpenSessionReq()
+    # Connected user is 'hue'
     open_session_req.username = 'hue'
     open_session_req.configuration = dict()
+    # Impersonated user is the current user
     open_session_req.configuration['impala.doas.user'] = getuser()
     resp = self.hs2_client.OpenSession(open_session_req)
     TestHS2.check_response(resp)
@@ -86,13 +89,49 @@ class TestAuthorization(CustomClusterTestSuite):
 
     TestHS2.check_response(execute_statement_resp)
 
+    # Verify the correct user information is in the runtime profile
+    query_id = operation_id_to_query_id(
+        execute_statement_resp.operationHandle.operationId)
+    profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
+    self.__verify_profile_user_fields(profile_page, effective_user=getuser(),
+        impersonated_user=getuser(), connected_user='hue')
+
     # Try to impersonate as a user we are not authorized to impersonate.
     open_session_req.configuration['impala.doas.user'] = 'some_user'
     resp = self.hs2_client.OpenSession(open_session_req)
     assert 'User \'hue\' is not authorized to impersonate \'some_user\'' in str(resp)
 
+    # Create a new session which does not have a do_as_user.
+    open_session_req.username = 'hue'
+    open_session_req.configuration = dict()
+    resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(resp)
+
+    # Run a simple query, which should succeed.
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = resp.sessionHandle
+    execute_statement_req.statement = "select 1"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    # Verify the correct user information is in the runtime profile. Since there is
+    # no do_as_user the Impersonated User field should be empty.
+    query_id = operation_id_to_query_id(
+        execute_statement_resp.operationHandle.operationId)
+    profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
+    self.__verify_profile_user_fields(profile_page, effective_user='hue',
+        impersonated_user='', connected_user='hue')
+
     self.socket.close()
     self.socket = None
+
+  def __verify_profile_user_fields(self, profile_str, effective_user, connected_user,
+      impersonated_user):
+    """Verifies the given runtime profile string contains the specified values for
+    User, Connected User, and Impersonated User"""
+    assert '\n    User: %s\n' % effective_user in profile_str
+    assert '\n    Connected User: %s\n' % connected_user in profile_str
+    assert '\n    Impersonated User: %s\n' % impersonated_user in profile_str
 
   def __wait_for_audit_record(self, user, impersonator, timeout_secs=30):
     """Waits until an audit log record is found that contains the given user and

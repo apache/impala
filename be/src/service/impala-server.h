@@ -486,8 +486,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Query id
     TUniqueId id;
 
-    // User that ran the query
-    std::string user;
+    // Queries are run and authorized on behalf of the effective_user.
+    // If there is no impersonated user, this will be the connected user. Otherwise, it
+    // will be set to the impersonated user.
+    std::string effective_user;
 
     // default db for this query
     std::string default_db;
