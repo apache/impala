@@ -269,6 +269,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes) t",
         createAnalyzerUsingHiveColLabels(),
         "couldn't resolve column reference: '_c2'");
+
+    // Regression test for IMPALA-984.
+    AnalyzesOk("SELECT 1 " +
+        "FROM functional.decimal_tbl AS t1 LEFT JOIN " +
+          "(SELECT SUM(t1.d2) - SUM(t1.d3) as double_col_3, " +
+           "SUM(t1.d2) IS NULL " +
+          "FROM functional.decimal_tbl AS t1) AS t3 " +
+        "ON t3.double_col_3 = t1.d3");
   }
 
   @Test

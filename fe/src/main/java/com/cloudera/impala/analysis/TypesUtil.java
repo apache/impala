@@ -198,8 +198,8 @@ public class TypesUtil {
         ++digitsBefore;
       }
     }
-    if (digitsAfter >= ColumnType.MAX_SCALE) return null;
-    if (digitsBefore + digitsAfter >= ColumnType.MAX_PRECISION) return null;
+    if (digitsAfter > ColumnType.MAX_SCALE) return null;
+    if (digitsBefore + digitsAfter > ColumnType.MAX_PRECISION) return null;
     if (digitsBefore == 0 && digitsAfter == 0) digitsBefore = 1;
     return ColumnType.createDecimalType(digitsBefore + digitsAfter, digitsAfter);
   }

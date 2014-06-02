@@ -33,7 +33,6 @@ import com.cloudera.impala.thrift.TCacheJarResult;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprBatch;
 import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
 import com.cloudera.impala.thrift.TPrioritizeLoadResponse;
@@ -189,7 +188,6 @@ public class FeSupport {
    */
   public static TResultRow EvalPredicateBatch(ArrayList<Expr> exprs,
       TQueryContext queryCtxt) throws InternalException {
-    boolean[] results = new boolean[exprs.size()];
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     TExprBatch exprBatch = new TExprBatch();
     for (Expr expr: exprs) {

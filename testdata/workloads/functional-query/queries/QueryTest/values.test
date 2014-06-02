@@ -30,3 +30,43 @@ values((1+8, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c')) order by 1 desc l
 ---- TYPES
 SMALLINT, TINYINT, DECIMAL, STRING
 ====
+# Test literal casts by inserting into a table that requires a float.
+---- QUERY
+drop table if exists values_test_float_tbl;
+create table values_test_float_tbl(f float);
+insert into values_test_float_tbl values
+(1), (16), (1024), (65536), (1000000), (1.1), (98.6), (0.07), (33.333);
+select * from values_test_float_tbl;
+---- RESULTS
+1
+16
+1024
+65536
+1000000
+1.100000023841858
+98.59999847412109
+0.07
+33.33300018310547
+---- TYPES
+float
+====
+# Test literal casts by inserting into a table that requires a decimal.
+---- QUERY
+drop table if exists values_test_decimal_tbl;
+create table values_test_decimal_tbl(f decimal(20, 4));
+insert into values_test_decimal_tbl values
+(1), (16), (1024), (65536), (1000000), (1.1), (98.6), (0.07), (33.333);
+select * from values_test_decimal_tbl;
+---- RESULTS
+1.0000
+16.0000
+1024.0000
+65536.0000
+1000000.0000
+1.1000
+98.6000
+0.0700
+33.3330
+---- TYPES
+decimal
+====

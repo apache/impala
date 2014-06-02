@@ -33,6 +33,15 @@ import com.google.common.base.Preconditions;
  * parsed to this class. (e.g. "1.0")
  */
 public class DecimalLiteral extends LiteralExpr {
+  // Use the java BigDecimal (arbitrary scale/precision) to represent the value.
+  // This object has notions of precision and scale but they do *not* match what
+  // we need. BigDecima's precision is similar to significant figures and scale
+  // is the exponent.
+  // ".1" could be represented with an unscaled value = 1 and scale = 1 or
+  // unscaled value = 100 and scale = 3. Manipulating the value_ (e.g. multiplying
+  // it by 10) does not unnecessarily change the unscaled value. Special care
+  // needs to be taken when converting between the big decimals unscaled value
+  // and ours. (See getUnscaledValue()).
   private BigDecimal value_;
 
   // If true, this literal has been expicitly cast to a type and should not
@@ -41,10 +50,6 @@ public class DecimalLiteral extends LiteralExpr {
 
   public DecimalLiteral(BigDecimal value) {
     init(value);
-  }
-
-  public DecimalLiteral(BigInteger value) {
-    init(new BigDecimal(value));
   }
 
   public DecimalLiteral(String value, ColumnType t)
@@ -109,7 +114,7 @@ public class DecimalLiteral extends LiteralExpr {
       case DECIMAL:
         msg.node_type = TExprNodeType.DECIMAL_LITERAL;
         TDecimalLiteral literal = new TDecimalLiteral();
-        literal.setValue(value_.unscaledValue().toByteArray());
+        literal.setValue(getUnscaledValue().toByteArray());
         msg.decimal_literal = literal;
         break;
       default:
@@ -193,5 +198,17 @@ public class DecimalLiteral extends LiteralExpr {
   private void init(BigDecimal value) {
     isAnalyzed_ = false;
     value_ = value;
+  }
+
+  // Returns the unscaled value of this literal. BigDecimal doesn't treat scale
+  // the way we do. We need to pad it out with zeros or truncate as necessary.
+  private BigInteger getUnscaledValue() {
+    Preconditions.checkState(type_.isDecimal());
+    BigInteger result = value_.unscaledValue();
+    int valueScale = value_.scale();
+    // If valueScale is less than 0, it indicates the power of 10 to multiply the
+    // unscaled value. This path also handles this case by padding with zeros.
+    // e.g. unscaled value = 123, value scale = -2 means 12300.
+    return result.multiply(BigInteger.TEN.pow(type_.decimalScale() - valueScale));
   }
 }

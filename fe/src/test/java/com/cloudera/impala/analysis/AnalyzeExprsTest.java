@@ -89,6 +89,20 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       "Decimal literal '1.7976931348623157E+3081' exceeds maximum range of doubles.");
     AnalysisError(String.format("select %s1", Double.toString(Double.MIN_VALUE)),
       "Decimal literal '4.9E-3241' underflows minimum resolution of doubles.");
+
+    testNumericLiteral("0.99999999999999999999999999999999999999",
+        ColumnType.createDecimalType(38,38));
+    testNumericLiteral("99999999999999999999999999999999999999.",
+        ColumnType.createDecimalType(38,0));
+    testNumericLiteral("-0.99999999999999999999999999999999999999",
+        ColumnType.createDecimalType(38,38));
+    testNumericLiteral("-99999999999999999999999999999999999999.",
+        ColumnType.createDecimalType(38,0));
+    testNumericLiteral("999999999999999999999.99999999999999999",
+        ColumnType.createDecimalType(38,17));
+    testNumericLiteral("-999999999999999999.99999999999999999999",
+        ColumnType.createDecimalType(38,20));
+
   }
 
   /**
@@ -97,7 +111,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    */
   private void testNumericLiteral(String literal, ColumnType expectedType) {
     SelectStmt selectStmt = (SelectStmt) AnalyzesOk("select " + literal);
-    Assert.assertTrue(expectedType.equals(selectStmt.resultExprs_.get(0).getType()));
+    ColumnType actualType = selectStmt.resultExprs_.get(0).getType();
+    Assert.assertTrue("Expected Type: " + expectedType + " Actual type: " + actualType,
+        expectedType.equals(actualType));
   }
 
   @Test

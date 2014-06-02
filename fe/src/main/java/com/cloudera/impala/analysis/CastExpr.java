@@ -126,6 +126,15 @@ public class CastExpr extends Expr {
     analyze();
   }
 
+  @Override
+  public void unsetIsAnalyzed() {
+    // We need to reset noOp_ which is set in analyze(). This can be because
+    // this expr needs to be reanalyzed with the children replaced.
+    // TODO: this seems brittle. Revisit.
+    noOp_ = false;
+    super.unsetIsAnalyzed();
+  }
+
   private void analyze() throws AnalysisException {
     targetType_.analyze();
 

@@ -115,13 +115,7 @@ public class IntLiteral extends LiteralExpr {
       this.type_ = targetType;
       return this;
     } else if (targetType.isFloatingPointType() || targetType.isDecimal()) {
-      BigInteger val = value_;
-      if (targetType.isDecimal()) {
-        for (int i = 0; i < targetType.decimalScale(); ++i) {
-          val = val.multiply(BigInteger.TEN);
-        }
-      }
-      return new DecimalLiteral(val, targetType);
+      return new DecimalLiteral(value_, targetType);
     }
     Preconditions.checkState(false, "Unhandled case");
     return this;
