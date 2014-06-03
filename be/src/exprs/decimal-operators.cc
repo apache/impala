@@ -83,18 +83,22 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
     const Decimal4Value& val) {
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(val_type.type, TYPE_DECIMAL);
+  bool overflow;
   switch (e->type().GetByteSize()) {
     case 4:
-      e->result_.decimal4_val = val.ScaleTo(val_type, e->type());
+      e->result_.decimal4_val = val.ScaleTo(val_type, e->type(), &overflow);
+      if (overflow) return NULL;
       return &e->result_.decimal4_val;
     case 8: {
       Decimal8Value val8 = Decimal4ToDecimal8(val);
-      e->result_.decimal8_val = val8.ScaleTo(val_type, e->type());
+      e->result_.decimal8_val = val8.ScaleTo(val_type, e->type(), &overflow);
+      if (overflow) return NULL;
       return &e->result_.decimal8_val;
     }
     case 16: {
       Decimal16Value val16 = Decimal4ToDecimal16(val);
-      e->result_.decimal16_val = val16.ScaleTo(val_type, e->type());
+      e->result_.decimal16_val = val16.ScaleTo(val_type, e->type(), &overflow);
+      if (overflow) return NULL;
       return &e->result_.decimal16_val;
     }
     default:
@@ -107,18 +111,22 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
     const Decimal8Value& val) {
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(val_type.type, TYPE_DECIMAL);
+  bool overflow;
   switch (e->type().GetByteSize()) {
     case 4: {
       Decimal4Value val4 = Decimal8ToDecimal4(val);
-      e->result_.decimal4_val = val4.ScaleTo(val_type, e->type());
+      e->result_.decimal4_val = val4.ScaleTo(val_type, e->type(), &overflow);
+      if (overflow) return NULL;
       return &e->result_.decimal4_val;
     }
     case 8:
-      e->result_.decimal8_val = val.ScaleTo(val_type, e->type());
+      e->result_.decimal8_val = val.ScaleTo(val_type, e->type(), &overflow);
+      if (overflow) return NULL;
       return &e->result_.decimal8_val;
     case 16: {
       Decimal16Value val16 = Decimal8ToDecimal16(val);
-      e->result_.decimal16_val = val16.ScaleTo(val_type, e->type());
+      e->result_.decimal16_val = val16.ScaleTo(val_type, e->type(), &overflow);
+      if (overflow) return NULL;
       return &e->result_.decimal16_val;
     }
     default:
@@ -131,19 +139,23 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
     const Decimal16Value& val) {
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(val_type.type, TYPE_DECIMAL);
+  bool overflow;
   switch (e->type().GetByteSize()) {
     case 4: {
       Decimal4Value val4 = Decimal16ToDecimal4(val);
-      e->result_.decimal4_val = val4.ScaleTo(val_type, e->type());
+      e->result_.decimal4_val = val4.ScaleTo(val_type, e->type(), &overflow);
+      if (overflow) return NULL;
       return &e->result_.decimal4_val;
     }
     case 8: {
       Decimal8Value val8 = Decimal16ToDecimal8(val);
-      e->result_.decimal8_val = val8.ScaleTo(val_type, e->type());
+      e->result_.decimal8_val = val8.ScaleTo(val_type, e->type(), &overflow);
+      if (overflow) return NULL;
       return &e->result_.decimal8_val;
     }
     case 16:
-      e->result_.decimal16_val = val.ScaleTo(val_type, e->type());
+      e->result_.decimal16_val = val.ScaleTo(val_type, e->type(), &overflow);
+      if (overflow) return NULL;
       return &e->result_.decimal16_val;
     default:
       DCHECK(false);
@@ -303,6 +315,9 @@ void* DecimalOperators::RoundDecimalNegativeScale(Expr* e, TupleRow* row,
       return NULL;
   }
 
+  // This can return NULL if the value overflowed.
+  if (result == NULL) return result;
+
   // We've done the cast portion of the computation. Now round it.
   switch (e->type().GetByteSize()) {
     case 4: {
@@ -368,9 +383,11 @@ void* DecimalOperators::RoundDecimal(Expr* e, TupleRow* row,
       return NULL;
   }
 
+  // This can return NULL if the value overflowed.
+  if (result == NULL) return result;
+
   // At this point result is the first part of the round operation. It has just
   // done the cast.
-  DCHECK(result != NULL);
   if (delta == 0) return result;
 
   // Switch on the parent type. The value in 'result' is before the rounding has

@@ -115,14 +115,23 @@ class DecimalValue {
   // Returns a new decimal scaled by from src_type to dst_type.
   // e.g. If this value was 1100 at scale 3 and the dst_type had scale two, the
   // result would be 110. (In both cases representing the decimal 1.1).
-  DecimalValue ScaleTo(const ColumnType& src_type, const ColumnType& dst_type) const {
+  DecimalValue ScaleTo(const ColumnType& src_type, const ColumnType& dst_type,
+      bool* overflow) const {
     int delta_scale = src_type.scale - dst_type.scale;
-    if (delta_scale == 0) return *this;
-    if (delta_scale > 0) {
-      return DecimalValue(value() / DecimalUtil::GetScaleMultiplier<T>(delta_scale));
-    } else {
-      return DecimalValue(value() * DecimalUtil::GetScaleMultiplier<T>(-delta_scale));
+    T result = value();
+    T max_value = DecimalUtil::GetScaleMultiplier<T>(dst_type.precision);
+    if (delta_scale >= 0) {
+      if (delta_scale != 0) result /= DecimalUtil::GetScaleMultiplier<T>(delta_scale);
+      // Even if we are decreasing the absolute unscaled value, we can still overflow.
+      // This path is also used to convert between precisions so for example, converting
+      // from 100 as decimal(3,0) to decimal(2,0) should be considered an overflow.
+      *overflow = abs(result) >= max_value;
+    } else if (delta_scale < 0) {
+      T mult = DecimalUtil::GetScaleMultiplier<T>(-delta_scale);
+      *overflow = abs(result) >= max_value / mult;
+      result *= mult;
     }
+    return DecimalValue(result);
   }
 
   // Implementations of the basic arithmetic operators. In all these functions,

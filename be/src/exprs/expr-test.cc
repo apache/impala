@@ -3601,6 +3601,57 @@ TEST_F(ExprTest, DecimalFunctions) {
       Decimal16Value(0), ColumnType::CreateDecimalType(35, 0));
 }
 
+// Sanity check some overflow casting. We have a random test framework that covers
+// this more thoroughly.
+TEST_F(ExprTest, DecimalOverflowCasts) {
+  TestDecimalValue("cast(123.456 as decimal(6,3))",
+      Decimal4Value(123456), ColumnType::CreateDecimalType(6, 3));
+  TestDecimalValue("cast(-123.456 as decimal(6,1))",
+      Decimal4Value(-1234), ColumnType::CreateDecimalType(6, 1));
+  TestDecimalValue("cast(123.456 as decimal(6,0))",
+      Decimal4Value(123), ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("cast(-123.456 as decimal(3,0))",
+      Decimal4Value(-123), ColumnType::CreateDecimalType(3, 0));
+
+  TestDecimalValue("cast(123.4567890 as decimal(10,7))",
+      Decimal8Value(1234567890L), ColumnType::CreateDecimalType(10, 7));
+
+  // Overflow
+  TestIsNull("cast(123.456 as decimal(2,0))", ColumnType::CreateDecimalType(2, 0));
+  TestIsNull("cast(123.456 as decimal(2,1))", ColumnType::CreateDecimalType(2, 2));
+  TestIsNull("cast(123.456 as decimal(2,2))", ColumnType::CreateDecimalType(2, 2));
+  TestIsNull("cast(99.99 as decimal(2,2))", ColumnType::CreateDecimalType(2, 2));
+  TestDecimalValue("cast(99.99 as decimal(2,0))",
+      Decimal4Value(99), ColumnType::CreateDecimalType(2, 0));
+  TestIsNull("cast(-99.99 as decimal(2,2))", ColumnType::CreateDecimalType(2, 2));
+  TestDecimalValue("cast(-99.99 as decimal(3,1))",
+      Decimal4Value(-999), ColumnType::CreateDecimalType(3, 1));
+
+  TestDecimalValue("cast(999.99 as decimal(6,3))",
+      Decimal4Value(999990), ColumnType::CreateDecimalType(6, 3));
+  TestDecimalValue("cast(-999.99 as decimal(7,4))",
+      Decimal4Value(-9999900), ColumnType::CreateDecimalType(7, 4));
+  TestIsNull("cast(9990.99 as decimal(6,3))", ColumnType::CreateDecimalType(6, 3));
+  TestIsNull("cast(-9990.99 as decimal(7,4))", ColumnType::CreateDecimalType(7, 4));
+
+  TestDecimalValue("cast(123.4567890 as decimal(4, 1))",
+      Decimal4Value(1234), ColumnType::CreateDecimalType(4, 1));
+  TestDecimalValue("cast(-123.4567890 as decimal(5, 2))",
+      Decimal4Value(-12345), ColumnType::CreateDecimalType(5, 2));
+  TestIsNull("cast(123.4567890 as decimal(2, 1))", ColumnType::CreateDecimalType(2, 1));
+  TestIsNull("cast(123.4567890 as decimal(6, 5))", ColumnType::CreateDecimalType(6, 5));
+
+  TestDecimalValue("cast(pi() as decimal(1, 0))",
+      Decimal4Value(3), ColumnType::CreateDecimalType(1,0));
+  TestDecimalValue("cast(pi() as decimal(4, 1))",
+      Decimal4Value(31), ColumnType::CreateDecimalType(4,1));
+  TestDecimalValue("cast(pi() as decimal(30, 1))",
+      Decimal8Value(31), ColumnType::CreateDecimalType(30,1));
+  TestIsNull("cast(pi() as decimal(4, 4))", ColumnType::CreateDecimalType(4, 4));
+  TestIsNull("cast(pi() as decimal(11, 11))", ColumnType::CreateDecimalType(11, 11));
+  TestIsNull("cast(pi() as decimal(31, 31))", ColumnType::CreateDecimalType(31, 31));
+}
+
 TEST_F(ExprTest, UdfInterfaceBuiltins) {
   TestValue("udf_pi()", TYPE_DOUBLE, M_PI);
   TestValue("udf_abs(-1)", TYPE_DOUBLE, 1.0);
