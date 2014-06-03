@@ -171,9 +171,9 @@ class ImpaladService(BaseImpalaService):
     client.connect()
     return client
 
-  def create_ldap_beeswax_client(self, user, password):
+  def create_ldap_beeswax_client(self, user, password, use_ssl=False):
     client = create_ldap_connection('%s:%d' % (self.hostname, self.beeswax_port),
-                                    user=user, password=password)
+                                    user=user, password=password, use_ssl=use_ssl)
     client.connect()
     return client
 

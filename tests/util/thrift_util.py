@@ -20,15 +20,26 @@ from thrift.transport.TTransport import TBufferedTransport
 import getpass
 
 def create_transport(host, port, service, transport_type="buffered", user=None,
-                     password=None):
+                     password=None, use_ssl=False, ssl_cert=None):
   """
   Create a new Thrift Transport based on the requested type.
   Supported transport types:
   - buffered, returns simple buffered transport
   - plain_sasl, return a SASL transport with the PLAIN mechanism
   - kerberos, return a SASL transport with the GSSAPI mechanism
+
+  If use_ssl is True, the connection will use SSL, optionally using the file at ssl_cert
+  as the CA cert.
   """
-  sock = TSocket(host, int(port))
+  port = int(port)
+  if use_ssl:
+    from thrift.transport import TSSLSocket
+    if ssl_cert is None:
+      sock = TSSLSocket.TSSLSocket(host, port, validate=False)
+    else:
+      sock = TSSLSocket.TSSLSocket(host, port, validate=True, ca_certs=ssl_cert)
+  else:
+    sock = TSocket(host, port)
   if transport_type.lower() == "buffered":
     return TBufferedTransport(sock)
 
