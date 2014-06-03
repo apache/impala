@@ -803,3 +803,463 @@ STRING
 '1'
 'inf'
 ====
+---- QUERY
+# Taken from limit.test
+# With an offset of 0
+select * from alltypesagg order by id limit 10 offset 0
+---- RESULTS
+0,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/10','0',2010-01-01 00:00:00,2010,1,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/10','1',2010-01-01 00:01:00,2010,1,1
+2,true,2,2,2,20,2.200000047683716,20.2,'01/01/10','2',2010-01-01 00:02:00.100000000,2010,1,1
+3,false,3,3,3,30,3.299999952316284,30.3,'01/01/10','3',2010-01-01 00:03:00.300000000,2010,1,1
+4,true,4,4,4,40,4.400000095367432,40.4,'01/01/10','4',2010-01-01 00:04:00.600000000,2010,1,1
+5,false,5,5,5,50,5.5,50.5,'01/01/10','5',2010-01-01 00:05:00.100000000,2010,1,1
+6,true,6,6,6,60,6.599999904632568,60.59999999999999,'01/01/10','6',2010-01-01 00:06:00.150000000,2010,1,1
+7,false,7,7,7,70,7.699999809265137,70.7,'01/01/10','7',2010-01-01 00:07:00.210000000,2010,1,1
+8,true,8,8,8,80,8.800000190734863,80.8,'01/01/10','8',2010-01-01 00:08:00.280000000,2010,1,1
+9,false,9,9,9,90,9.899999618530273,90.89999999999999,'01/01/10','9',2010-01-01 00:09:00.360000000,2010,1,1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
+====
+---- QUERY
+# Taken from limit.test
+# With a non-zero offset
+select * from alltypesagg order by id limit 10 offset 5
+---- RESULTS
+5,false,5,5,5,50,5.5,50.5,'01/01/10','5',2010-01-01 00:05:00.100000000,2010,1,1
+6,true,6,6,6,60,6.599999904632568,60.59999999999999,'01/01/10','6',2010-01-01 00:06:00.150000000,2010,1,1
+7,false,7,7,7,70,7.699999809265137,70.7,'01/01/10','7',2010-01-01 00:07:00.210000000,2010,1,1
+8,true,8,8,8,80,8.800000190734863,80.8,'01/01/10','8',2010-01-01 00:08:00.280000000,2010,1,1
+9,false,9,9,9,90,9.899999618530273,90.89999999999999,'01/01/10','9',2010-01-01 00:09:00.360000000,2010,1,1
+10,true,NULL,10,10,100,11,101,'01/01/10','10',2010-01-01 00:10:00.450000000,2010,1,1
+11,false,1,11,11,110,12.10000038146973,111.1,'01/01/10','11',2010-01-01 00:11:00.550000000,2010,1,1
+12,true,2,12,12,120,13.19999980926514,121.2,'01/01/10','12',2010-01-01 00:12:00.660000000,2010,1,1
+13,false,3,13,13,130,14.30000019073486,131.3,'01/01/10','13',2010-01-01 00:13:00.780000000,2010,1,1
+14,true,4,14,14,140,15.39999961853027,141.4,'01/01/10','14',2010-01-01 00:14:00.910000000,2010,1,1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
+====
+---- QUERY
+# Taken from limit.test
+# With an offset that reduces the result size (limit is much bigger than number of rows)
+select id from functional.alltypessmall order by 1 limit 10000 offset 99;
+---- RESULTS
+99
+---- TYPES
+int
+====
+---- QUERY
+# Taken from limit.test
+# With an offset that is bigger than the number of rows
+select id from functional.alltypessmall order by 1 limit 1 offset 1000;
+---- RESULTS
+---- TYPES
+int
+====
+---- QUERY
+# Taken from limit.test
+# Offset within a subquery
+select x.id from (
+  select id from alltypesagg order by id limit 5 offset 5) x
+order by x.id
+limit 100 offset 4;
+---- RESULTS
+9
+---- TYPES
+int
+====
+---- QUERY
+# Taken from joins.test
+# cross join
+select t1.id, t2.id from alltypestiny t1 cross join alltypestiny t2
+where (t1.id < 3 and t2.id < 3)
+order by t1.id, t2.id limit 100
+---- TYPES
+int, int
+---- RESULTS
+0,0
+0,1
+0,2
+1,0
+1,1
+1,2
+2,0
+2,1
+2,2
+====
+---- QUERY
+# Taken from joins.test
+# cross join with nulls and constant table
+select id, tinyint_col, t1.c from functional.alltypesagg
+cross join (values(NULL c, 1, 2)) as t1
+order by tinyint_col nulls first, id, t1.c
+limit 6
+---- RESULTS
+0,NULL,NULL
+10,NULL,NULL
+20,NULL,NULL
+30,NULL,NULL
+40,NULL,NULL
+50,NULL,NULL
+---- TYPES
+int, tinyint, null
+====
+---- QUERY
+# check cross joins within a subquery
+# Taken from joins.test
+select t1.id as t1_id, t2_id, t3_id from alltypestiny t1
+cross join (select t2.id as t2_id, t3.id as t3_id from alltypestiny t2
+            cross join alltypestiny t3) t4
+where t1.id < 2 and t2_id < 2 and t3_id < 2
+order by t1.id, t2_id, t3_id
+limit 10
+---- RESULTS
+0,0,0
+0,0,1
+0,1,0
+0,1,1
+1,0,0
+1,0,1
+1,1,0
+1,1,1
+---- TYPES
+int, int, int
+====
+---- QUERY
+# join with three tables and then a cross join, extra where predicates, extra scan
+# predicates, nulls in joins cols (alltypesagg.tinyint_col contains nulls instead of
+# 0s)
+# Taken from joins.test
+select a.smallint_col, b.id, a.tinyint_col, c.id, a.int_col, b.float_col, c.string_col, d.id
+from alltypesagg a
+join alltypessmall b on (a.smallint_col = b.id)
+join alltypessmall c on (a.tinyint_col = c.id)
+cross join alltypestiny d
+where a.month=1
+and a.day=1
+and a.int_col > 899
+and b.float_col > 4.5
+and c.string_col < '4'
+and a.int_col + b.float_col + cast(c.string_col as float) < 1000
+and d.id < 2
+order by a.id, b.id, c.id, d.id
+limit 100
+---- RESULTS
+31,31,1,1,931,6.599999904632568,'1',0
+31,31,1,1,931,6.599999904632568,'1',1
+32,32,2,2,932,7.699999809265137,'2',0
+32,32,2,2,932,7.699999809265137,'2',1
+33,33,3,3,933,8.800000190734863,'3',0
+33,33,3,3,933,8.800000190734863,'3',1
+41,41,1,1,941,6.599999904632568,'1',0
+41,41,1,1,941,6.599999904632568,'1',1
+42,42,2,2,942,7.699999809265137,'2',0
+42,42,2,2,942,7.699999809265137,'2',1
+43,43,3,3,943,8.800000190734863,'3',0
+43,43,3,3,943,8.800000190734863,'3',1
+81,81,1,1,981,6.599999904632568,'1',0
+81,81,1,1,981,6.599999904632568,'1',1
+82,82,2,2,982,7.699999809265137,'2',0
+82,82,2,2,982,7.699999809265137,'2',1
+83,83,3,3,983,8.800000190734863,'3',0
+83,83,3,3,983,8.800000190734863,'3',1
+91,91,1,1,991,6.599999904632568,'1',0
+91,91,1,1,991,6.599999904632568,'1',1
+---- TYPES
+SMALLINT, INT, TINYINT, INT, INT, FLOAT, STRING, INT
+====
+---- QUERY
+# join against subquery with limit;
+# predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
+# Taken from subquery-limit.test
+select alltypes.id, a.id
+from alltypes
+  join (
+    select a.id, a.bool_col
+    from alltypessmall a join alltypessmall using (id)
+    order by a.id limit 10
+  ) a using (id)
+where a.bool_col = true
+order by
+  a.id
+limit 5
+---- TYPES
+INT, INT
+---- RESULTS
+0,0
+2,2
+4,4
+6,6
+8,8
+====
+---- QUERY
+# Mixed UNION ALL/DISTINCT but effectively only UNION DISTINCT, no nested unions,
+# with order by and limit
+# Taken from union.test
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+union distinct
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+order by 1 limit 3
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+# Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
+# Taken from union.test
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union distinct
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+union all
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+order by 1,2 limit 3
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+# Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
+# Taken from union.test
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union distinct
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+union all
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+order by 1,2 limit 4
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+# Complex union unnesting: Partially unnestable up to 2nd level
+# Taken from union.test
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union all
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+   union distinct
+     (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+      union all
+        (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+         union distinct
+         (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=3)
+         order by 1 limit 3)))
+order by 12, 13, 1
+limit 20
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+====
+---- QUERY
+# Complex union unnesting: Partially unnestable up to 1st level
+# Taken from union.test
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union distinct
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+   union distinct
+     (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+      union all
+        (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+         union distinct
+         (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=3)
+         order by 1 limit 3)))
+order by 12, 13, 1
+limit 20
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+====
+---- QUERY
+# Complex union unnesting: Multiple nested unions to test all rules in a single query
+# Taken from union.test
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union distinct
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+   union all
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+union distinct
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+   union all
+   (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=3)
+   order by 1 limit 3)
+union all
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=3
+   union all
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=4)
+union all
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=4
+   union all
+   (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=5)
+   order by 1 limit 3)
+order by 12, 13, 1
+limit 20
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+5,false,1,1,1,10,1.100000023841858,10.1,'03/01/09','1',2009-03-01 00:01:00,2009,3
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00,2009,4
+7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00,2009,4
+====
+---- QUERY
+# UNION ALL in subquery
+# Taken from union.test
+select x.id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+   union all
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1) x
+union all
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+order by 1 limit 5
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+# UNION DISTINCT in subquery
+# Taken from union.test
+select x.id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+   union distinct
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1) x
+union distinct
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+order by 1 limit 3
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+values(1+1, 2, 5.0, 'a') order by 1 limit 10
+---- RESULTS
+2,2,5.0,'a'
+---- TYPES
+SMALLINT, TINYINT, DECIMAL, STRING
+====
+---- QUERY
+values((1+8, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c')) order by 1 desc limit 2
+---- RESULTS
+9,2,5.0,'a'
+3,4,7.0,'c'
+---- TYPES
+SMALLINT, TINYINT, DECIMAL, STRING
+====
+---- QUERY
+# multiple levels of aggregation in a subquery
+# Taken from subquery.test
+select c1, c3, m2
+from (
+       select c1, c3, max(c2) m2
+       from (
+              select c1, c2, c3
+              from (
+                     select int_col c1, tinyint_col c2, max(id) c3
+                     from functional_hbase.alltypessmall
+                     group by 1, 2
+                     order by 1,2
+                     limit 5
+                   ) x
+             ) x2
+       group by c1, c3
+       limit 10
+     ) t
+where c1 > 0
+order by 2, 1 desc
+limit 3
+---- TYPES
+int, int, tinyint
+---- RESULTS
+1,96,1
+2,97,2
+3,98,3
+====
+---- QUERY
+# Basic test with a single with-clause view that references a virtual view.
+# Taken from with-clause.test
+with t as (select abc x, xyz y from functional.complex_view)
+select x, y from t order by y limit 10
+---- RESULTS
+2,'0'
+2,'1'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+# Multiple views in with-clause. All views are used in a union.
+# Taken from with-clause.test
+with t1 as (select int_col x, bigint_col y from functional.alltypestiny),
+t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
+select * from t1 union all select * from t2 union all (select * from t3) order by x limit 20
+---- RESULTS
+0,0
+0,0
+0,0
+0,0
+1,10
+1,10
+1,10
+1,10
+1,10
+2,20
+3,30
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# Self-join of with-clause table to make sure the join op is properly set
+# in the cloned inline-view instances.
+# Taken from with-clause.test
+with t as (select int_col x, bigint_col y from functional.alltypestiny order by id limit 2)
+select * from t t1 left outer join t t2 on t1.y = t2.x full outer join t t3 on t2.y = t3.x
+order by t1.x limit 10
+---- RESULTS
+0,0,0,0,0,0
+1,10,NULL,NULL,NULL,NULL
+NULL,NULL,NULL,NULL,1,10
+---- TYPES
+INT, BIGINT, INT, BIGINT, INT, BIGINT
+====

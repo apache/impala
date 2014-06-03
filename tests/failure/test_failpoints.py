@@ -30,7 +30,6 @@ join
 on (a.int_col = b.int_col)
 group by a.int_col
 order by int_sum
-limit 200
 """
 
 # TODO: Update to include INSERT when we support failpoints in the HDFS/Hbase sinks using

@@ -22,7 +22,7 @@ BIGINT, STRING
 ---- QUERY
 # Using a view in subquery.
 select t.* from (select * from functional.complex_view) t
-order by t.abc limit 10;
+order by t.abc, t.xyz desc limit 10;
 ---- RESULTS
 2,'1'
 2,'0'

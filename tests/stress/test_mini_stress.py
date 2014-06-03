@@ -33,11 +33,20 @@ class TestMiniStress(ImpalaTestSuite):
       cls.TestMatrix.add_constraint(lambda v:\
           v.get_value('exec_option')['batch_size'] != 1)
 
-
   @pytest.mark.stress
   def test_mini_stress(self, vector):
     for i in xrange(NUM_ITERATIONS):
       self.run_test_case('stress', vector)
+
+  @pytest.mark.stress
+  def test_sort_stress(self, vector):
+    if self.exploration_strategy() == 'core':
+      pytest.skip("Skipping sort stress tests for core")
+    if vector.get_value('table_format').file_format != 'parquet':
+      pytest.skip("skipping file format")
+    vector.get_value('exec_option')['disable_outermost_topn'] = 1
+    vector.get_value('exec_option')['mem_limit'] = "200m"
+    self.run_test_case('sort_stress', vector)
 
   @pytest.mark.skipif(True,
       reason="Skip until the race in the catalog server is resolved")

@@ -1,4 +1,4 @@
-file_format: text,seq
+file_format: text,seq, parquet
 dataset: tpch
 compression_codec: none,def,gzip,bzip,snap,lzo
 compression_type: none,block,record

@@ -68,6 +68,15 @@ class TestQueries(ImpalaTestSuite):
   def test_top_n(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
+    # QueryTest/top-n is also run in test_sort with disable_outermost_topn = 1
+    self.run_test_case('QueryTest/top-n', vector)
+
+  def test_sort(self, vector):
+    if vector.get_value('table_format').file_format == 'hbase':
+      pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
+    vector.get_value('exec_option')['disable_outermost_topn'] = 1
+    self.run_test_case('QueryTest/sort', vector)
+    # We can get the sort tests for free from the top-n file
     self.run_test_case('QueryTest/top-n', vector)
 
   def test_empty(self, vector):
