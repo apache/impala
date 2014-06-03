@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -479,7 +480,15 @@ public class Frontend {
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
-    return db.getFunctions(type, PatternMatcher.createHivePatternMatcher(fnPattern));
+    List<Function> fns = db.getFunctions(
+        type, PatternMatcher.createHivePatternMatcher(fnPattern));
+    Collections.sort(fns,
+        new Comparator<Function>() {
+          public int compare(Function f1, Function f2) {
+            return f1.signatureString().compareTo(f2.signatureString());
+          }
+        });
+    return fns;
   }
 
   /**
