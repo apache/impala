@@ -75,7 +75,7 @@ import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.cloudera.impala.util.AvroSchemaParser;
-import com.cloudera.impala.util.FSPermissionChecker;
+import com.cloudera.impala.util.FsPermissionChecker;
 import com.cloudera.impala.util.HdfsCachingUtil;
 import com.cloudera.impala.util.MetaStoreUtil;
 import com.cloudera.impala.util.TAccessLevelUtil;
@@ -690,18 +690,19 @@ public class HdfsTable extends Table {
    * that.
    */
   private TAccessLevel getAvailableAccessLevel(Path location) throws IOException {
-    FSPermissionChecker permissionChecker = FSPermissionChecker.getInstance();
-    // TODO: Consider moving the path-walking logic into FSPermissionChecker itself
+    FsPermissionChecker permissionChecker = FsPermissionChecker.getInstance();
     while (location != null) {
       if (DFS.exists(location)) {
-        if (permissionChecker.hasAccess(DFS, location, FsAction.READ_WRITE)) {
+        FsPermissionChecker.Permissions perms =
+            permissionChecker.getPermissions(DFS, location);
+        if (perms.canReadAndWrite()) {
           return TAccessLevel.READ_WRITE;
-        } else if (permissionChecker.hasAccess(DFS, location, FsAction.READ)) {
+        } else if (perms.canRead()) {
           LOG.debug(
               String.format("Impala does not have WRITE access to '%s' in table: %s",
               location, getFullName()));
           return TAccessLevel.READ_ONLY;
-        } else if (permissionChecker.hasAccess(DFS, location, FsAction.WRITE)) {
+        } else if (perms.canWrite()) {
           LOG.debug(String.format("Impala does not have READ access to '%s' in table: %s",
                   location, getFullName()));
           return TAccessLevel.WRITE_ONLY;
