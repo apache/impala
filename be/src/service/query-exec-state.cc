@@ -771,9 +771,9 @@ void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& col1,
 
 void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   DCHECK(ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT);
-  int total_num_rows_inserted = 0;
-  // There will only be rows inserted in the case a new table was created
-  // as part of this operation.
+  int64_t total_num_rows_inserted = 0;
+  // There will only be rows inserted in the case a new table was created as part of this
+  // operation.
   if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
     DCHECK(coord_.get());
     BOOST_FOREACH(const PartitionRowCount::value_type& p,
@@ -781,10 +781,9 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
       total_num_rows_inserted += p.second;
     }
   }
-  stringstream ss;
-  ss << "Inserted " << total_num_rows_inserted << " row(s)";
-  VLOG_QUERY << ss.str();
-  vector<string> results(1, ss.str());
+  const string& summary_msg = Substitute("Inserted $0 row(s)", total_num_rows_inserted);
+  VLOG_QUERY << summary_msg;
+  vector<string> results(1, summary_msg);
   SetResultSet(results);
 }
 
