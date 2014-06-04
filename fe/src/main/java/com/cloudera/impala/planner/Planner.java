@@ -1922,7 +1922,7 @@ public class Planner {
 
       // This plan node set might only have unpartitioned fragments.
       // Only set estimates if they are valid.
-      if (perHostMem > 0 && perHostVcores > 0) {
+      if (perHostMem >= 0 && perHostVcores >= 0) {
         this.perHostMem = perHostMem;
         this.perHostVcores = perHostVcores;
         return true;

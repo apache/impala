@@ -755,14 +755,16 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
         "terminated by '|'");
 
-    // TODO: add more tests
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (d decimal)");
+    AnalyzesOk("create table new_table (i int) PARTITIONED BY (d decimal(3,1))");
     AnalyzesOk("create table new_table(d1 decimal, d2 decimal(10), d3 decimal(5, 2))");
     AnalysisError("create table new_table(d1 decimal(1,10))",
         "Decimal scale (10) must be <= precision (1).");
     AnalysisError("create table new_table(d1 decimal(0,0))",
         "Decimal precision must be greater than 0.");
     AnalysisError("create table new_table(d1 decimal(49,0))",
+        "Decimal precision must be <= 38.");
+    AnalysisError("create table new_table (i int) PARTITIONED BY (d decimal(40,1))",
         "Decimal precision must be <= 38.");
 
     // Note: Backslashes need to be escaped twice - once for Java and once for Impala.

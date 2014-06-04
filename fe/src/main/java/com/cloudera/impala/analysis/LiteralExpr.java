@@ -85,25 +85,26 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   /**
    * Returns an analyzed literal from the thrift object.
    */
-  public static LiteralExpr fromThrift(TExprNode exprNode,
-      ColumnType primitiveType) {
+  public static LiteralExpr fromThrift(TExprNode exprNode, ColumnType colType) {
     try {
       switch (exprNode.node_type) {
         case FLOAT_LITERAL:
           return LiteralExpr.create(
-              Double.toString(exprNode.float_literal.value), primitiveType);
+              Double.toString(exprNode.float_literal.value), colType);
         case DECIMAL_LITERAL:
           byte[] bytes = exprNode.decimal_literal.getValue();
           BigDecimal val = new BigDecimal(new BigInteger(bytes));
-          return LiteralExpr.create(val.toString(), primitiveType);
+          // We store the decimal as the unscaled bytes. Need to adjust for the scale.
+          val = val.movePointLeft(colType.decimalScale());
+          return new DecimalLiteral(val, colType);
         case INT_LITERAL:
           return LiteralExpr.create(
-              Long.toString(exprNode.int_literal.value), primitiveType);
+              Long.toString(exprNode.int_literal.value), colType);
         case STRING_LITERAL:
-          return LiteralExpr.create(exprNode.string_literal.value, primitiveType);
+          return LiteralExpr.create(exprNode.string_literal.value, colType);
         case BOOL_LITERAL:
           return LiteralExpr.create(
-              Boolean.toString(exprNode.bool_literal.value), primitiveType);
+              Boolean.toString(exprNode.bool_literal.value), colType);
         case NULL_LITERAL:
           return new NullLiteral();
         default:
