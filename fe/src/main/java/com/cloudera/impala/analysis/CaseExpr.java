@@ -58,6 +58,15 @@ public class CaseExpr extends Expr {
     }
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected CaseExpr(CaseExpr other) {
+    super(other);
+    hasCaseExpr_ = other.hasCaseExpr_;
+    hasElseExpr_ = other.hasElseExpr_;
+  }
+
   public static void initBuiltins(Db db) {
     for (ColumnType t: ColumnType.getSupportedTypes()) {
       if (t.isNull()) continue;
@@ -201,4 +210,7 @@ public class CaseExpr extends Expr {
     }
     type_ = returnType;
   }
+
+  @Override
+  public Expr clone() { return new CaseExpr(this); }
 }

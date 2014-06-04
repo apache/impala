@@ -20,7 +20,7 @@ import java.util.List;
  * Return value of the grammar production that parses function
  * parameters. These parameters can be for scalar or aggregate functions.
  */
-class FunctionParams {
+class FunctionParams implements Cloneable {
   private final boolean isStar_;
   private boolean isDistinct_;
   private final List<Expr> exprs_;

@@ -91,7 +91,7 @@ class SelectListItem {
   @Override
   public SelectListItem clone() {
     if (isStar_) return createStarItem(tblName_);
-    return new SelectListItem(expr_.clone(null), alias_);
+    return new SelectListItem(expr_.clone(), alias_);
   }
 
 }

@@ -61,7 +61,7 @@ public class SelectStmt extends QueryStmt {
 
   // substitutes all exprs in this select block to reference base tables
   // directly
-  private Expr.SubstitutionMap baseTblSmap_ = new Expr.SubstitutionMap();
+  private ExprSubstitutionMap baseTblSmap_ = new ExprSubstitutionMap();
 
   SelectStmt(SelectList selectList,
              List<TableRef> tableRefList,
@@ -103,7 +103,7 @@ public class SelectStmt extends QueryStmt {
   public AggregateInfo getAggInfo() { return aggInfo_; }
   @Override
   public ArrayList<String> getColLabels() { return colLabels_; }
-  public Expr.SubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
+  public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
 
   /**
    * Creates resultExprs and baseTblResultExprs.
@@ -157,7 +157,7 @@ public class SelectStmt extends QueryStmt {
           // therefore is ambiguous.
           ambiguousAliasList_.add(aliasRef);
         }
-        aliasSmap_.addMapping(aliasRef, item.getExpr().clone(null));
+        aliasSmap_.put(aliasRef, item.getExpr().clone());
         colLabels_.add(label);
       }
     }
@@ -178,7 +178,6 @@ public class SelectStmt extends QueryStmt {
 
     // Remember the SQL string before inline-view expression substitution.
     sqlString_ = toSql();
-
     resolveInlineViewRefs(analyzer);
 
     if (aggInfo_ != null) LOG.debug("post-analysis " + aggInfo_.debugString());
@@ -188,7 +187,7 @@ public class SelectStmt extends QueryStmt {
    * Marks all unassigned join predicates as well as exprs in aggInfo and sortInfo.
    */
   @Override
-  public void materializeRequiredSlots(Analyzer analyzer) {
+  public void materializeRequiredSlots(Analyzer analyzer) throws InternalException {
     // Mark unassigned join predicates. Some predicates that must be evaluated by a join
     // can also be safely evaluated below the join (picked up by getBoundPredicates()).
     // Such predicates will be marked twice and that is ok.
@@ -199,7 +198,7 @@ public class SelectStmt extends QueryStmt {
       if (analyzer.evalByJoin(e)) unassignedJoinConjuncts.add(e);
     }
     List<Expr> baseTblJoinConjuncts =
-        Expr.cloneList(unassignedJoinConjuncts, baseTblSmap_);
+        Expr.substituteList(unassignedJoinConjuncts, baseTblSmap_, analyzer);
     materializeSlots(analyzer, baseTblJoinConjuncts);
 
     if (evaluateOrderBy_) {
@@ -263,16 +262,17 @@ public class SelectStmt extends QueryStmt {
     * Populates baseTblSmap_ with our combined inline view smap and creates
     * baseTblResultExprs.
     */
-  protected void resolveInlineViewRefs(Analyzer analyzer) {
+  protected void resolveInlineViewRefs(Analyzer analyzer)
+      throws AuthorizationException, AnalysisException {
     // Gather the inline view substitution maps from the enclosed inline views
     for (TableRef tblRef: tableRefs_) {
       if (tblRef instanceof InlineViewRef) {
         InlineViewRef inlineViewRef = (InlineViewRef) tblRef;
         baseTblSmap_ =
-            Expr.SubstitutionMap.combine(baseTblSmap_, inlineViewRef.getBaseTblSmap());
+            ExprSubstitutionMap.combine(baseTblSmap_, inlineViewRef.getBaseTblSmap());
       }
     }
-    baseTblResultExprs_ = Expr.cloneList(resultExprs_, baseTblSmap_);
+    baseTblResultExprs_ = Expr.trySubstituteList(resultExprs_, baseTblSmap_, analyzer);
     LOG.trace("baseTblSmap_: " + baseTblSmap_.debugString());
     LOG.trace("resultExprs: " + Expr.debugString(resultExprs_));
     LOG.trace("baseTblResultExprs: " + Expr.debugString(baseTblResultExprs_));
@@ -371,13 +371,13 @@ public class SelectStmt extends QueryStmt {
       // make a deep copy here, we don't want to modify the original
       // exprs during analysis (in case we need to print them later)
       groupingExprsCopy = Expr.cloneList(groupingExprs_);
-      substituteOrdinals(groupingExprsCopy, "GROUP BY");
+      substituteOrdinals(groupingExprsCopy, "GROUP BY", analyzer);
       Expr ambiguousAlias = getFirstAmbiguousAlias(groupingExprsCopy);
       if (ambiguousAlias != null) {
         throw new AnalysisException("Column " + ambiguousAlias.toSql() +
             " in group by clause is ambiguous");
       }
-      Expr.substituteList(groupingExprsCopy, aliasSmap_);
+      groupingExprsCopy = Expr.substituteList(groupingExprsCopy, aliasSmap_, analyzer);
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
         groupingExprsCopy.get(i).analyze(analyzer);
         if (groupingExprsCopy.get(i).contains(Expr.isAggregatePredicate())) {
@@ -392,13 +392,9 @@ public class SelectStmt extends QueryStmt {
     // analyze having clause
     if (havingClause_ != null) {
       // substitute aliases in place (ordinals not allowed in having clause)
-      havingPred_ = havingClause_.clone(aliasSmap_);
-      havingPred_.analyze(analyzer);
+      havingPred_ = havingClause_.substitute(aliasSmap_, analyzer);
       havingPred_.checkReturnsBool("HAVING clause", true);
     }
-
-    List<Expr> orderingExprs = null;
-    if (sortInfo_ != null) orderingExprs = sortInfo_.getOrderingExprs();
 
     // Collect the aggregate expressions from the SELECT, HAVING and ORDER BY clauses
     // of this statement.
@@ -414,8 +410,8 @@ public class SelectStmt extends QueryStmt {
     }
 
     // substitute AVG before constructing AggregateInfo
-    Expr.SubstitutionMap avgSMap = createAvgSMap(aggExprs, analyzer);
-    ArrayList<Expr> substitutedAggs = Expr.cloneList(aggExprs, avgSMap);
+    ExprSubstitutionMap avgSMap = createAvgSMap(aggExprs, analyzer);
+    ArrayList<Expr> substitutedAggs = Expr.substituteList(aggExprs, avgSMap, analyzer);
 
     ArrayList<FunctionCallExpr> nonAvgAggExprs = Lists.newArrayList();
     TreeNode.collect(substitutedAggs, Expr.isAggregatePredicate(), nonAvgAggExprs);
@@ -430,15 +426,15 @@ public class SelectStmt extends QueryStmt {
     // Therefore, COUNT([ALL]) is transformed into zeroifnull(COUNT([ALL]) if
     // i) There is no GROUP-BY clause, and
     // ii) Other DISTINCT aggregates are present.
-    Expr.SubstitutionMap countAllMap = createCountAllMap(nonAvgAggExprs, analyzer);
-    substitutedAggs = Expr.cloneList(nonAvgAggExprs, countAllMap);
+    ExprSubstitutionMap countAllMap = createCountAllMap(nonAvgAggExprs, analyzer);
+    substitutedAggs = Expr.substituteList(nonAvgAggExprs, countAllMap, analyzer);
     aggExprs.clear();
     TreeNode.collect(substitutedAggs, Expr.isAggregatePredicate(), aggExprs);
-
     try {
       createAggInfo(groupingExprsCopy, aggExprs, analyzer);
     } catch (InternalException e) {
-      throw new AnalysisException(e.getMessage(), e);
+      // should never happen
+      Preconditions.checkArgument(false);
     }
 
     // combine avg smap with the one that produces the final agg output
@@ -447,27 +443,27 @@ public class SelectStmt extends QueryStmt {
           ? aggInfo_.getSecondPhaseDistinctAggInfo()
           : aggInfo_;
 
-    Expr.SubstitutionMap combinedSMap =
-        Expr.SubstitutionMap.compose(
-            Expr.SubstitutionMap.compose(avgSMap, countAllMap),
-            finalAggInfo.getSMap());
+    ExprSubstitutionMap combinedSMap =
+        ExprSubstitutionMap.compose(
+            ExprSubstitutionMap.compose(avgSMap, countAllMap, analyzer),
+            finalAggInfo.getSMap(), analyzer);
     LOG.debug("combined smap: " + combinedSMap.debugString());
 
     // change select list, having and ordering exprs to point to agg output. We need
     // to reanalyze the exprs at this point.
     // TODO: substitute really needs to bundle the reanalysis.
-    Expr.substituteList(resultExprs_, combinedSMap);
-    Expr.reanalyze(resultExprs_, analyzer);
+    resultExprs_ = Expr.substituteList(resultExprs_, combinedSMap, analyzer);
     LOG.debug("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
     if (havingPred_ != null) {
-      havingPred_ = havingPred_.substitute(combinedSMap);
-      havingPred_.reanalyze(analyzer);
+      havingPred_ = havingPred_.substitute(combinedSMap, analyzer);
       analyzer.registerConjuncts(havingPred_, null, false);
       LOG.debug("post-agg havingPred: " + havingPred_.debugString());
     }
-    Expr.substituteList(orderingExprs, combinedSMap);
-    Expr.reanalyze(orderingExprs, analyzer);
-    LOG.debug("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
+    if (sortInfo_ != null) {
+      sortInfo_.substituteOrderingExprs(combinedSMap, analyzer);
+      LOG.debug("post-agg orderingExprs: " +
+          Expr.debugString(sortInfo_.getOrderingExprs()));
+    }
 
     // check that all post-agg exprs point to agg output
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
@@ -480,7 +476,7 @@ public class SelectStmt extends QueryStmt {
     }
     if (orderByElements_ != null) {
       for (int i = 0; i < orderByElements_.size(); ++i) {
-        if (!orderingExprs.get(i).isBound(finalAggInfo.getAggTupleId())) {
+        if (!sortInfo_.getOrderingExprs().get(i).isBound(finalAggInfo.getAggTupleId())) {
           throw new AnalysisException(
               "ORDER BY expression not produced by aggregation output "
               + "(missing from GROUP BY clause?): "
@@ -502,24 +498,27 @@ public class SelectStmt extends QueryStmt {
    * Build smap AVG -> SUM/COUNT;
    * assumes that select list and having clause have been analyzed.
    */
-  private Expr.SubstitutionMap createAvgSMap(
+  private ExprSubstitutionMap createAvgSMap(
       ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
-    Expr.SubstitutionMap result = new Expr.SubstitutionMap();
+    ExprSubstitutionMap result = new ExprSubstitutionMap();
     for (FunctionCallExpr aggExpr : aggExprs) {
       if (!aggExpr.getFnName().getFunction().equals("avg")) continue;
       // Transform avg(TIMESTAMP) to cast(avg(cast(TIMESTAMP as DOUBLE)) as TIMESTAMP)
       CastExpr inCastExpr = null;
       if (aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP) {
-        inCastExpr =
-            new CastExpr(ColumnType.DOUBLE, aggExpr.getChild(0).clone(null), false);
+        Expr aggExprClone = aggExpr.getChild(0).clone();
+        aggExprClone.analyze(analyzer);
+        inCastExpr = new CastExpr(ColumnType.DOUBLE, aggExprClone, false);
       }
 
       List<Expr> sumInputExprs =
           Lists.newArrayList(
               aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP ?
-              inCastExpr : aggExpr.getChild(0).clone(null));
-      List<Expr> countInputExpr = Lists.newArrayList(aggExpr.getChild(0).clone(null));
+              inCastExpr : aggExpr.getChild(0).clone());
+      Expr.analyze(sumInputExprs, analyzer);
+      List<Expr> countInputExpr = Lists.newArrayList(aggExpr.getChild(0).clone());
+      Expr.analyze(countInputExpr, analyzer);
 
       FunctionCallExpr sumExpr =
           new FunctionCallExpr("sum",
@@ -533,10 +532,10 @@ public class SelectStmt extends QueryStmt {
       if (aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP) {
         CastExpr outCastExpr = new CastExpr(ColumnType.TIMESTAMP, divExpr, false);
         outCastExpr.analyze(analyzer);
-        result.addMapping(aggExpr, outCastExpr);
+        result.put(aggExpr, outCastExpr);
       } else {
         divExpr.analyze(analyzer);
-        result.addMapping(aggExpr, divExpr);
+        result.put(aggExpr, divExpr);
       }
     }
     LOG.debug("avg smap: " + result.debugString());
@@ -550,10 +549,10 @@ public class SelectStmt extends QueryStmt {
    * This transformation is necessary for COUNT to correctly return 0 for empty
    * input relations.
    */
-  private Expr.SubstitutionMap createCountAllMap(
+  private ExprSubstitutionMap createCountAllMap(
       List<FunctionCallExpr> aggExprs, Analyzer analyzer)
       throws AuthorizationException, AnalysisException {
-    Expr.SubstitutionMap scalarCountAllMap = new Expr.SubstitutionMap();
+    ExprSubstitutionMap scalarCountAllMap = new ExprSubstitutionMap();
 
     if (groupingExprs_ != null && !groupingExprs_.isEmpty()) {
       // There are grouping expressions, so no substitution needs to be done.
@@ -580,13 +579,13 @@ public class SelectStmt extends QueryStmt {
 
     Iterable<FunctionCallExpr> countAllAggs =
         Iterables.filter(aggExprs, Predicates.and(isCountPred, isNotDistinctPred));
-    for (FunctionCallExpr countAllAgg : countAllAggs) {
+    for (FunctionCallExpr countAllAgg: countAllAggs) {
       // Replace COUNT(ALL) with zeroifnull(COUNT(ALL))
-      ArrayList<Expr> zeroIfNullParam = Lists.newArrayList(countAllAgg.clone(null));
+      ArrayList<Expr> zeroIfNullParam = Lists.newArrayList(countAllAgg.clone());
       FunctionCallExpr zeroIfNull =
           new FunctionCallExpr("zeroifnull", zeroIfNullParam);
       zeroIfNull.analyze(analyzer);
-      scalarCountAllMap.addMapping(countAllAgg, zeroIfNull);
+      scalarCountAllMap.put(countAllAgg, zeroIfNull);
     }
 
     return scalarCountAllMap;
@@ -597,15 +596,16 @@ public class SelectStmt extends QueryStmt {
    */
   private void createAggInfo(ArrayList<Expr> groupingExprs,
       ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
-      throws AnalysisException, InternalException, AuthorizationException {
+          throws AnalysisException, InternalException {
     if (selectList_.isDistinct()) {
        // Create aggInfo for SELECT DISTINCT ... stmt:
        // - all select list items turn into grouping exprs
        // - there are no aggregate exprs
       Preconditions.checkState(groupingExprs.isEmpty());
       Preconditions.checkState(aggExprs.isEmpty());
+      ArrayList<Expr> distinctGroupingExprs = Expr.cloneList(resultExprs_);
       aggInfo_ =
-          AggregateInfo.create(Expr.cloneList(resultExprs_), null, null, analyzer);
+          AggregateInfo.create(distinctGroupingExprs, null, null, analyzer);
     } else {
       aggInfo_ = AggregateInfo.create(groupingExprs, aggExprs, null, analyzer);
     }
@@ -616,14 +616,16 @@ public class SelectStmt extends QueryStmt {
    * expressions from select list
    */
   @Override
-  protected void substituteOrdinals(List<Expr> exprs, String errorPrefix)
-      throws AnalysisException {
+  protected void substituteOrdinals(List<Expr> exprs, String errorPrefix,
+      Analyzer analyzer) throws AnalysisException, AuthorizationException {
     // substitute ordinals
     ListIterator<Expr> i = exprs.listIterator();
     while (i.hasNext()) {
       Expr expr = i.next();
-      if (!(expr instanceof IntLiteral)) continue;
-      long pos = ((IntLiteral) expr).getValue();
+      if (!(expr instanceof NumericLiteral)) continue;
+      expr.analyze(analyzer);
+      if (!expr.getType().isIntegerType()) continue;
+      long pos = ((NumericLiteral) expr).getLongValue();
       if (pos < 1) {
         throw new AnalysisException(
             errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
@@ -639,7 +641,7 @@ public class SelectStmt extends QueryStmt {
             + expr.toSql());
       }
       // create copy to protect against accidentally shared state
-      i.set(selectList_.getItems().get((int)pos - 1).getExpr().clone(null));
+      i.set(selectList_.getItems().get((int)pos - 1).getExpr().clone());
     }
   }
 
@@ -733,11 +735,11 @@ public class SelectStmt extends QueryStmt {
   @Override
   public QueryStmt clone() {
     SelectStmt selectClone = new SelectStmt(selectList_.clone(), cloneTableRefs(),
-        (whereClause_ != null) ? whereClause_.clone(null) : null,
+        (whereClause_ != null) ? whereClause_.clone() : null,
         (groupingExprs_ != null) ? Expr.cloneList(groupingExprs_) : null,
-        (havingClause_ != null) ? havingClause_.clone(null) : null,
+        (havingClause_ != null) ? havingClause_.clone() : null,
         cloneOrderByElements(),
-        (limitElement_ != null) ? limitElement_.clone(null) : null);
+        (limitElement_ != null) ? limitElement_.clone() : null);
     selectClone.setWithClause(cloneWithClause());
     return selectClone;
   }

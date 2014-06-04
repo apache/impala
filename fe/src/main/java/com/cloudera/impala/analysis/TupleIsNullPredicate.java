@@ -20,6 +20,7 @@ import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TTupleIsNullPredicate;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Internal expr that returns true if all of the given tuples are NULL, otherwise false.
@@ -39,6 +40,14 @@ public class TupleIsNullPredicate extends Predicate {
     this.tupleIds_ = tupleIds;
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected TupleIsNullPredicate(TupleIsNullPredicate other) {
+    super(other);
+    tupleIds_ = Lists.newArrayList(other.tupleIds_);
+  }
+
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.TUPLE_IS_NULL_PRED;
@@ -51,4 +60,7 @@ public class TupleIsNullPredicate extends Predicate {
   @Override
   protected String toSqlImpl() { return "TupleIsNull()"; }
   public List<TupleId> getTupleIds() { return tupleIds_; }
+
+  @Override
+  public Expr clone() { return new TupleIsNullPredicate(this); }
 }

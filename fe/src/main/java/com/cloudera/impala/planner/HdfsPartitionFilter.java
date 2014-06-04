@@ -23,14 +23,13 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -81,7 +80,7 @@ public class HdfsPartitionFilter {
    * that pass the filter.
    */
   public HashSet<Long> getMatchingPartitionIds(ArrayList<HdfsPartition> partitions,
-      Analyzer analyzer) throws InternalException, AuthorizationException {
+      Analyzer analyzer) throws InternalException {
     HashSet<Long> result = new HashSet<Long>();
     // List of predicates to evaluate
     ArrayList<Expr> predicates = new ArrayList<Expr>(partitions.size());
@@ -108,26 +107,18 @@ public class HdfsPartitionFilter {
    * for the partition cols with the respective partition-key values.
    */
   private Expr buildPartitionPredicate(HdfsPartition partition, Analyzer analyzer)
-      throws InternalException, AuthorizationException {
+      throws InternalException {
     // construct smap
-    Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
+    ExprSubstitutionMap sMap = new ExprSubstitutionMap();
     for (int i = 0; i < refdKeys_.size(); ++i) {
-      sMap.addMapping(
+      sMap.put(
           lhsSlotRefs_.get(i), partition.getPartitionValues().get(refdKeys_.get(i)));
     }
 
-    Expr literalPredicate = predicate_.clone(sMap);
+    Expr literalPredicate = predicate_.substitute(sMap, analyzer);
     LOG.trace("buildPartitionPredicate: " + literalPredicate.toSql() + " " +
         literalPredicate.debugString());
     Preconditions.checkState(literalPredicate.isConstant());
-    // analyze to insert casts, etc.
-    try {
-      literalPredicate.reanalyze(analyzer);
-    } catch (AnalysisException e) {
-      // this should never happen
-      throw new InternalException(
-          "couldn't analyze predicate " + literalPredicate.toSql(), e);
-    }
     return literalPredicate;
   }
 }

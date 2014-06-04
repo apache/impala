@@ -79,7 +79,7 @@ public class ValuesStmt extends UnionStmt {
       operandClones.add(operand.clone());
     }
     ValuesStmt valuesClone = new ValuesStmt(operandClones, cloneOrderByElements(),
-        limitElement_ == null ? null : limitElement_.clone(null));
+        limitElement_ == null ? null : limitElement_.clone());
     valuesClone.setWithClause(cloneWithClause());
     return valuesClone;
   }

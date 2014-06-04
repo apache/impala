@@ -666,47 +666,47 @@ public class ParserTest {
   @Test
   public void TestLiteralExprs() {
     // negative integer literal
-    ParsesOk("select -1 from t where -1", IntLiteral.class);
-    ParsesOk("select - 1 from t where - 1", IntLiteral.class);
+    ParsesOk("select -1 from t where -1", NumericLiteral.class);
+    ParsesOk("select - 1 from t where - 1", NumericLiteral.class);
     ParsesOk("select a - - 1 from t where a - - 1", ArithmeticExpr.class);
     ParsesOk("select a - - - 1 from t where a - - - 1", ArithmeticExpr.class);
 
     // positive integer literal
-    ParsesOk("select +1 from t where +1", IntLiteral.class);
-    ParsesOk("select + 1 from t where + 1", IntLiteral.class);
+    ParsesOk("select +1 from t where +1", NumericLiteral.class);
+    ParsesOk("select + 1 from t where + 1", NumericLiteral.class);
     ParsesOk("select a + + 1 from t where a + + 1", ArithmeticExpr.class);
     ParsesOk("select a + + + 1 from t where a + + + 1", ArithmeticExpr.class);
 
     // float literals
-    ParsesOk("select +1.0 from t where +1.0", DecimalLiteral.class);
-    ParsesOk("select +-1.0 from t where +-1.0", DecimalLiteral.class);
+    ParsesOk("select +1.0 from t where +1.0", NumericLiteral.class);
+    ParsesOk("select +-1.0 from t where +-1.0", NumericLiteral.class);
     ParsesOk("select +1.-0 from t where +1.-0", ArithmeticExpr.class);
 
     // test scientific notation
-    ParsesOk("select 8e6 from t where 8e6", DecimalLiteral.class);
-    ParsesOk("select +8e6 from t where +8e6", DecimalLiteral.class);
-    ParsesOk("select 8e+6 from t where 8e+6", DecimalLiteral.class);
-    ParsesOk("select -8e6 from t where -8e6", DecimalLiteral.class);
-    ParsesOk("select 8e-6 from t where 8e-6", DecimalLiteral.class);
-    ParsesOk("select -8e-6 from t where -8e-6", DecimalLiteral.class);
+    ParsesOk("select 8e6 from t where 8e6", NumericLiteral.class);
+    ParsesOk("select +8e6 from t where +8e6", NumericLiteral.class);
+    ParsesOk("select 8e+6 from t where 8e+6", NumericLiteral.class);
+    ParsesOk("select -8e6 from t where -8e6", NumericLiteral.class);
+    ParsesOk("select 8e-6 from t where 8e-6", NumericLiteral.class);
+    ParsesOk("select -8e-6 from t where -8e-6", NumericLiteral.class);
     // with a decimal point
-    ParsesOk("select 4.5e2 from t where 4.5e2", DecimalLiteral.class);
-    ParsesOk("select +4.5e2 from t where +4.5e2", DecimalLiteral.class);
-    ParsesOk("select 4.5e+2 from t where 4.5e+2", DecimalLiteral.class);
-    ParsesOk("select -4.5e2 from t where -4.5e2", DecimalLiteral.class);
-    ParsesOk("select 4.5e-2 from t where 4.5e-2", DecimalLiteral.class);
-    ParsesOk("select -4.5e-2 from t where -4.5e-2", DecimalLiteral.class);
+    ParsesOk("select 4.5e2 from t where 4.5e2", NumericLiteral.class);
+    ParsesOk("select +4.5e2 from t where +4.5e2", NumericLiteral.class);
+    ParsesOk("select 4.5e+2 from t where 4.5e+2", NumericLiteral.class);
+    ParsesOk("select -4.5e2 from t where -4.5e2", NumericLiteral.class);
+    ParsesOk("select 4.5e-2 from t where 4.5e-2", NumericLiteral.class);
+    ParsesOk("select -4.5e-2 from t where -4.5e-2", NumericLiteral.class);
     // with a decimal point but without a number before the decimal
-    ParsesOk("select .7e9 from t where .7e9", DecimalLiteral.class);
-    ParsesOk("select +.7e9 from t where +.7e9", DecimalLiteral.class);
-    ParsesOk("select .7e+9 from t where .7e+9", DecimalLiteral.class);
-    ParsesOk("select -.7e9 from t where -.7e9", DecimalLiteral.class);
-    ParsesOk("select .7e-9 from t where .7e-9", DecimalLiteral.class);
-    ParsesOk("select -.7e-9 from t where -.7e-9", DecimalLiteral.class);
+    ParsesOk("select .7e9 from t where .7e9", NumericLiteral.class);
+    ParsesOk("select +.7e9 from t where +.7e9", NumericLiteral.class);
+    ParsesOk("select .7e+9 from t where .7e+9", NumericLiteral.class);
+    ParsesOk("select -.7e9 from t where -.7e9", NumericLiteral.class);
+    ParsesOk("select .7e-9 from t where .7e-9", NumericLiteral.class);
+    ParsesOk("select -.7e-9 from t where -.7e-9", NumericLiteral.class);
 
     // mixed signs
-    ParsesOk("select -+-1 from t where -+-1", IntLiteral.class);
-    ParsesOk("select - +- 1 from t where - +- 1", IntLiteral.class);
+    ParsesOk("select -+-1 from t where -+-1", NumericLiteral.class);
+    ParsesOk("select - +- 1 from t where - +- 1", NumericLiteral.class);
     ParsesOk("select 1 + -+ 1 from t where 1 + -+ 1", ArithmeticExpr.class);
 
     // Boolean literals

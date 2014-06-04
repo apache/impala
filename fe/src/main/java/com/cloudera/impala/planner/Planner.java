@@ -356,7 +356,7 @@ public class Planner {
 
     Preconditions.checkState(partitionHint == null || partitionHint);
     ExchangeNode exchNode = new ExchangeNode(nodeIdGenerator_.getNextId());
-    exchNode.addChild(inputFragment.getPlanRoot(), false);
+    exchNode.addChild(inputFragment.getPlanRoot(), false, analyzer);
     exchNode.init(analyzer);
     Preconditions.checkState(exchNode.hasValidStats());
     DataPartition partition =
@@ -379,7 +379,7 @@ public class Planner {
       throws InternalException, AuthorizationException {
     Preconditions.checkState(inputFragment.isPartitioned());
     ExchangeNode mergePlan = new ExchangeNode(nodeIdGenerator_.getNextId());
-    mergePlan.addChild(inputFragment.getPlanRoot(), false);
+    mergePlan.addChild(inputFragment.getPlanRoot(), false, analyzer);
     mergePlan.init(analyzer);
     Preconditions.checkState(mergePlan.hasValidStats());
     PlanFragment fragment = new PlanFragment(fragmentIdGenerator_.getNextId(), mergePlan,
@@ -457,8 +457,8 @@ public class Planner {
     List<Expr> rhsJoinExprs = Lists.newArrayList();
     for (Pair<Expr, Expr> pair: node.getEqJoinConjuncts()) {
       // no remapping necessary
-      lhsJoinExprs.add(pair.first.clone(null));
-      rhsJoinExprs.add(pair.second.clone(null));
+      lhsJoinExprs.add(pair.first.clone());
+      rhsJoinExprs.add(pair.second.clone());
     }
     boolean lhsHasCompatPartition = false;
     boolean rhsHasCompatPartition = false;
@@ -543,8 +543,8 @@ public class Planner {
       // first child to the lhs plan root. The second child of the join is an
       // ExchangeNode that is fed by the rhsInputFragment whose sink repartitions
       // its data by the rhs join exprs.
-      DataPartition rhsJoinPartition = new DataPartition(TPartitionType.HASH_PARTITIONED,
-          Expr.cloneList(rhsJoinExprs, null));
+      DataPartition rhsJoinPartition = new DataPartition(
+          TPartitionType.HASH_PARTITIONED, Expr.cloneList(rhsJoinExprs));
       if (lhsHasCompatPartition) {
         node.setChild(0, leftChildFragment.getPlanRoot());
         connectChildFragment(analyzer, node, 1, rightChildFragment);
@@ -554,8 +554,8 @@ public class Planner {
       }
 
       // Same as above but with rhs and lhs reversed.
-      DataPartition lhsJoinPartition = new DataPartition(TPartitionType.HASH_PARTITIONED,
-          Expr.cloneList(lhsJoinExprs, null));
+      DataPartition lhsJoinPartition = new DataPartition(
+          TPartitionType.HASH_PARTITIONED, Expr.cloneList(lhsJoinExprs));
       if (rhsHasCompatPartition) {
         node.setChild(1, rightChildFragment.getPlanRoot());
         connectChildFragment(analyzer, node, 0, leftChildFragment);
@@ -571,11 +571,11 @@ public class Planner {
       // on their respective join exprs.
       // The new fragment is hash-partitioned on the lhs input join exprs.
       ExchangeNode lhsExchange = new ExchangeNode(nodeIdGenerator_.getNextId());
-      lhsExchange.addChild(leftChildFragment.getPlanRoot(), false);
+      lhsExchange.addChild(leftChildFragment.getPlanRoot(), false, analyzer);
       lhsExchange.computeStats(null);
       node.setChild(0, lhsExchange);
       ExchangeNode rhsExchange = new ExchangeNode(nodeIdGenerator_.getNextId());
-      rhsExchange.addChild(rightChildFragment.getPlanRoot(), false);
+      rhsExchange.addChild(rightChildFragment.getPlanRoot(), false, analyzer);
       rhsExchange.computeStats(null);
       node.setChild(1, rhsExchange);
 
@@ -681,7 +681,7 @@ public class Planner {
   private void connectChildFragment(Analyzer analyzer, PlanNode node, int childIdx,
       PlanFragment childFragment) throws InternalException, AuthorizationException {
     ExchangeNode exchangeNode = new ExchangeNode(nodeIdGenerator_.getNextId());
-    exchangeNode.addChild(childFragment.getPlanRoot(), false);
+    exchangeNode.addChild(childFragment.getPlanRoot(), false, analyzer);
     exchangeNode.init(analyzer);
     node.setChild(childIdx, exchangeNode);
     childFragment.setDestination(exchangeNode);
@@ -701,7 +701,7 @@ public class Planner {
       Analyzer analyzer, PlanFragment childFragment, DataPartition parentPartition)
       throws InternalException, AuthorizationException {
     ExchangeNode exchangeNode = new ExchangeNode(nodeIdGenerator_.getNextId());
-    exchangeNode.addChild(childFragment.getPlanRoot(), false);
+    exchangeNode.addChild(childFragment.getPlanRoot(), false, analyzer);
     exchangeNode.init(analyzer);
     PlanFragment parentFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
         exchangeNode, parentPartition);
@@ -761,7 +761,7 @@ public class Planner {
         // process of turning exprs into executable exprs less ad-hoc; might even want to
         // introduce another mechanism that simply records a mapping of slots
         List<Expr> partitionExprs =
-            Expr.cloneList(groupingExprs, node.getAggInfo().getSMap());
+            Expr.substituteList(groupingExprs, node.getAggInfo().getSMap(), analyzer);
         parentPartition =
             new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
       } else {
@@ -795,7 +795,7 @@ public class Planner {
     // The first-phase aggregation node is already in the child fragment.
     Preconditions.checkState(node.getChild(0) == childFragment.getPlanRoot());
 
-    DataPartition mergePartition = null;
+    List<Expr> partitionExprs = null;
     if (hasGrouping) {
       // We need to do
       // - child fragment:
@@ -805,9 +805,7 @@ public class Planner {
       //   * phase 2 agg
       // The output partition exprs of the child are the (input) grouping exprs
       // of the parent.
-      List<Expr> partitionExprs = Expr.cloneList(groupingExprs, null);
-      mergePartition =
-          new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
+      partitionExprs = Expr.cloneList(groupingExprs);
     } else {
       // We need to do
       // - child fragment:
@@ -819,12 +817,11 @@ public class Planner {
       //   * merge agg of phase 2
       List<Expr> distinctExprs =
           ((AggregationNode)(node.getChild(0))).getAggInfo().getGroupingExprs();
-      List<Expr> partitionExprs =
-          Expr.cloneList(
-            distinctExprs, ((AggregationNode)(node.getChild(0))).getAggInfo().getSMap());
-      mergePartition =
-          new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
+      partitionExprs = Expr.substituteList(distinctExprs,
+          ((AggregationNode)(node.getChild(0))).getAggInfo().getSMap(), analyzer);
     }
+    DataPartition mergePartition =
+        new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
 
     // place a merge aggregation step for the 1st phase in a new fragment
     PlanFragment mergeFragment =
@@ -1356,7 +1353,8 @@ public class Planner {
       // create new predicates against the inline view's unresolved result exprs, not
       // the resolved result exprs, in order to avoid skipping scopes (and ignoring
       // limit clauses on the way)
-      List<Expr> viewPredicates = Expr.cloneList(preds, inlineViewRef.getSmap());
+      List<Expr> viewPredicates =
+          Expr.substituteList(preds, inlineViewRef.getSmap(), analyzer);
 
       // "migrate" conjuncts_ by marking them as assigned and re-registering them with
       // new ids.
@@ -1368,7 +1366,9 @@ public class Planner {
 
     // mark (fully resolve) slots referenced by remaining unassigned conjuncts_ as
     // materialized
-    analyzer.materializeSlots(Expr.cloneList(unassigned, inlineViewRef.getBaseTblSmap()));
+    List<Expr> substUnassigned =
+        Expr.substituteList(unassigned, inlineViewRef.getBaseTblSmap(), analyzer);
+    analyzer.materializeSlots(substUnassigned);
 
     // Turn a constant select into a UnionNode that materializes the exprs.
     // TODO: unify this with createConstantSelectPlan(), this is basically the
@@ -1665,12 +1665,10 @@ public class Planner {
     List<Expr> conjuncts =
         analyzer.getUnassignedConjuncts(unionStmt.getTupleId().asList(), false);
     for (UnionOperand op: unionStmt.getOperands()) {
-      List<Expr> opConjuncts = Expr.cloneList(conjuncts, op.getSmap());
+      List<Expr> opConjuncts = Expr.substituteList(conjuncts, op.getSmap(), analyzer);
       List<Expr> nonConstOpConjuncts = Lists.newArrayList();
       for (int i = 0; i < opConjuncts.size(); ++i) {
-        // analyze after expr substitution to insert casts, etc.
         Expr opConjunct = opConjuncts.get(i);
-        opConjunct.reanalyze(analyzer);
         if (!opConjunct.isConstant()) {
           nonConstOpConjuncts.add(opConjunct);
           continue;

@@ -27,6 +27,13 @@ public class NullLiteral extends LiteralExpr {
     type_ = ColumnType.NULL;
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected NullLiteral(NullLiteral other) {
+    super(other);
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
@@ -67,4 +74,7 @@ public class NullLiteral extends LiteralExpr {
     if (!(o instanceof NullLiteral)) return -1;
     return 0;
   }
+
+  @Override
+  public Expr clone() { return new NullLiteral(this); }
 }

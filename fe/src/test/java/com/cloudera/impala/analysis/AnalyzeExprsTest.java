@@ -55,25 +55,22 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     testNumericLiteral(Long.toString(Long.MIN_VALUE), ColumnType.BIGINT);
     testNumericLiteral(Long.toString(Long.MAX_VALUE), ColumnType.BIGINT);
-    AnalysisError(String.format("select - %s", Long.toString(Long.MIN_VALUE)),
-        "Literal '9223372036854775808' exceeds maximum range of integers.");
+    testNumericLiteral(Long.toString(Long.MIN_VALUE), ColumnType.BIGINT);
     testNumericLiteral("- " + Long.toString(Long.MAX_VALUE), ColumnType.BIGINT);
 
-    // Test overflow/underflow.
-    AnalysisError(String.format("select %s1", Long.toString(Long.MIN_VALUE)),
-        "Literal '-92233720368547758081' exceeds maximum range of integers.");
-    AnalysisError(String.format("select %s1", Long.toString(Long.MAX_VALUE)),
-        "Literal '92233720368547758071' exceeds maximum range of integers.");
+    // Result type is a decimal because Long can't hold the value.
+    testNumericLiteral(Long.toString(Long.MIN_VALUE) + "1",
+        ColumnType.createDecimalType(20, 0));
+    testNumericLiteral(Long.toString(Long.MIN_VALUE) + "1",
+        ColumnType.createDecimalType(20, 0));
     // Test min int64-1.
     BigInteger minMinusOne = BigInteger.valueOf(Long.MIN_VALUE);
     minMinusOne = minMinusOne.subtract(BigInteger.ONE);
-    AnalysisError(String.format("select %s", minMinusOne.toString()),
-        "Literal '-9223372036854775809' exceeds maximum range of integers.");
+    testNumericLiteral(minMinusOne.toString(), ColumnType.createDecimalType(19, 0));
     // Test max int64+1.
     BigInteger maxPlusOne = BigInteger.valueOf(Long.MAX_VALUE);
     maxPlusOne = maxPlusOne.add(BigInteger.ONE);
-    AnalysisError(String.format("select %s", maxPlusOne.toString()),
-        "Literal '9223372036854775808' exceeds maximum range of integers.");
+    testNumericLiteral(maxPlusOne.toString(), ColumnType.createDecimalType(19, 0));
 
     // Test floating-point types.
     testNumericLiteral(Float.toString(Float.MIN_VALUE), ColumnType.DOUBLE);
@@ -86,9 +83,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testNumericLiteral("-" + Double.toString(Double.MAX_VALUE), ColumnType.DOUBLE);
 
     AnalysisError(String.format("select %s1", Double.toString(Double.MAX_VALUE)),
-      "Decimal literal '1.7976931348623157E+3081' exceeds maximum range of doubles.");
+      "Numeric literal '1.7976931348623157E+3081' exceeds maximum range of doubles.");
     AnalysisError(String.format("select %s1", Double.toString(Double.MIN_VALUE)),
-      "Decimal literal '4.9E-3241' underflows minimum resolution of doubles.");
+      "Numeric literal '4.9E-3241' underflows minimum resolution of doubles.");
 
     testNumericLiteral("0.99999999999999999999999999999999999999",
         ColumnType.createDecimalType(38,38));
@@ -1179,8 +1176,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testInfixExprDepthLimit("select true", " and false");
     testInfixExprDepthLimit("select true", " or false");
 
-    // Arithmetic expr.
-    testInfixExprDepthLimit("select 1 ", " + 1");
+    // Arithmetic expr. Use a bigint value to avoid casts that make reasoning about the
+    // expr depth more difficult.
+    testInfixExprDepthLimit("select " + String.valueOf(Long.MAX_VALUE),
+        " + " + String.valueOf(Long.MAX_VALUE));
 
     // Function-call expr.
     testFuncExprDepthLimit("lower(", "'abc'", ")");
@@ -1437,7 +1436,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk(exprStr.toString());
     exprStr.append(repeatSuffix);
     AnalysisError(exprStr.toString(),
-        String.format("Exceeded the maximum depth of an expresison tree (%s).",
+        String.format("Exceeded the maximum depth of an expression tree (%s).",
         Expr.EXPR_DEPTH_LIMIT));
 
     // Test 10x the safe depth (already at 1x, append 9x).
@@ -1445,7 +1444,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       exprStr.append(repeatSuffix);
     }
     AnalysisError(exprStr.toString(),
-        String.format("Exceeded the maximum depth of an expresison tree (%s).",
+        String.format("Exceeded the maximum depth of an expression tree (%s).",
         Expr.EXPR_DEPTH_LIMIT));
   }
 
@@ -1459,12 +1458,12 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         Expr.EXPR_DEPTH_LIMIT - 1));
     AnalysisError("select " + getNestedFuncExpr(openFunc, baseArg, closeFunc,
         Expr.EXPR_DEPTH_LIMIT),
-        String.format("Exceeded the maximum depth of an expresison tree (%s).",
+        String.format("Exceeded the maximum depth of an expression tree (%s).",
         Expr.EXPR_DEPTH_LIMIT));
     // Test 10x the safe depth.
     AnalysisError("select " + getNestedFuncExpr(openFunc, baseArg, closeFunc,
         Expr.EXPR_DEPTH_LIMIT * 10),
-        String.format("Exceeded the maximum depth of an expresison tree (%s).",
+        String.format("Exceeded the maximum depth of an expression tree (%s).",
         Expr.EXPR_DEPTH_LIMIT));
   }
 

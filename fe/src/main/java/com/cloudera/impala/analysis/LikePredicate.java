@@ -72,11 +72,17 @@ public class LikePredicate extends Predicate {
     selectivity_ = 0.1;
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  public LikePredicate(LikePredicate other) {
+    super(other);
+    op_ = other.op_;
+  }
+
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
+    if (!super.equals(obj)) return false;
     return ((LikePredicate) obj).op_ == op_;
   }
 
@@ -123,4 +129,7 @@ public class LikePredicate extends Predicate {
       }
     }
   }
+
+  @Override
+  public Expr clone() { return new LikePredicate(this); }
 }

@@ -37,6 +37,14 @@ public class IsNullPredicate extends Predicate {
     children_.add(e);
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected IsNullPredicate(IsNullPredicate other) {
+    super(other);
+    isNotNull_ = other.isNotNull_;
+  }
+
   public boolean isNotNull() { return isNotNull_; }
 
   @Override
@@ -87,6 +95,7 @@ public class IsNullPredicate extends Predicate {
    * If predicate is of the form "<SlotRef> IS [NOT] NULL", returns the
    * SlotRef.
    */
+  @Override
   public SlotRef getBoundSlot() {
     return getChild(0).unwrapSlotRef(true);
   }
@@ -98,4 +107,7 @@ public class IsNullPredicate extends Predicate {
   public Expr negate() {
     return new IsNullPredicate(getChild(0), !isNotNull_);
   }
+
+  @Override
+  public Expr clone() { return new IsNullPredicate(this); }
 }

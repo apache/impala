@@ -58,7 +58,7 @@ public class ExchangeNode extends PlanNode {
     offset_ = 0;
   }
 
-  public void addChild(PlanNode node, boolean copyConjuncts) {
+  public void addChild(PlanNode node, boolean copyConjuncts, Analyzer analyzer) {
     // This ExchangeNode 'inherits' several parameters from its children.
     // Ensure that all children agree on them.
     if (!children_.isEmpty()) {
@@ -75,7 +75,7 @@ public class ExchangeNode extends PlanNode {
       nullableTupleIds_ = Sets.newHashSet(node.nullableTupleIds_);
       compactData_ = node.compactData_;
     }
-    if (copyConjuncts) conjuncts_.addAll(Expr.cloneList(node.conjuncts_, null));
+    if (copyConjuncts) conjuncts_.addAll(Expr.cloneList(node.conjuncts_));
     children_.add(node);
   }
 

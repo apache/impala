@@ -71,6 +71,16 @@ public class CastExpr extends Expr {
     }
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected CastExpr(CastExpr other) {
+    super(other);
+    targetType_ = other.targetType_;
+    isImplicit_ = other.isImplicit_;
+    noOp_ = other.noOp_;
+  }
+
   public static void initBuiltins(Db db) {
     for (ColumnType t1: ColumnType.getSupportedTypes()) {
       if (t1.isNull()) continue;
@@ -126,24 +136,15 @@ public class CastExpr extends Expr {
     analyze();
   }
 
-  @Override
-  public void unsetIsAnalyzed() {
-    // We need to reset noOp_ which is set in analyze(). This can be because
-    // this expr needs to be reanalyzed with the children replaced.
-    // TODO: this seems brittle. Revisit.
-    noOp_ = false;
-    super.unsetIsAnalyzed();
-  }
-
   private void analyze() throws AnalysisException {
     targetType_.analyze();
 
-    if (children_.get(0) instanceof DecimalLiteral &&
+    if (children_.get(0) instanceof NumericLiteral &&
         targetType_.isFloatingPointType()) {
       // Special case casting a decimal literal to a floating point number. The
       // decimal literal can be interpreted as either and we want to avoid casts
       // since that can result in loss of accuracy.
-      ((DecimalLiteral)children_.get(0)).explicitlyCastToFloat(targetType_);
+      ((NumericLiteral)children_.get(0)).explicitlyCastToFloat(targetType_);
     }
 
     // Our cast fn currently takes two arguments. The first is the value to cast and the
@@ -192,4 +193,20 @@ public class CastExpr extends Expr {
     }
   }
 
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) return true;
+    if (obj instanceof CastExpr) {
+      CastExpr other = (CastExpr) obj;
+      return isImplicit_ == other.isImplicit_
+          && targetType_.equals(other.targetType_)
+          && super.equals(obj);
+    }
+    // Ignore implicit casts when comparing expr trees.
+    if (isImplicit_) return getChild(0).equals(obj);
+    return false;
+  }
+
+  @Override
+  public Expr clone() { return new CastExpr(this); }
 }

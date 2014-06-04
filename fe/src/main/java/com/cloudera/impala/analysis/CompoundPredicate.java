@@ -77,6 +77,14 @@ public class CompoundPredicate extends Predicate {
     if (e2 != null) children_.add(e2);
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected CompoundPredicate(CompoundPredicate other) {
+    super(other);
+    op_ = other.op_;
+  }
+
   public Operator getOp() { return op_; }
 
   @Override
@@ -162,6 +170,7 @@ public class CompoundPredicate extends Predicate {
   /**
    * Negates a CompoundPredicate.
    */
+  @Override
   public Expr negate() {
     if (op_ == Operator.NOT) return getChild(0);
     Expr negatedLeft = getChild(0).negate();
@@ -169,4 +178,7 @@ public class CompoundPredicate extends Predicate {
     Operator newOp = (op_ == Operator.OR) ? Operator.AND : Operator.OR;
     return new CompoundPredicate(newOp, negatedLeft, negatedRight);
   }
+
+  @Override
+  public Expr clone() { return new CompoundPredicate(this); }
 }

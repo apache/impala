@@ -102,6 +102,18 @@ public class TimestampArithmeticExpr extends Expr {
     children_.add(e2);
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected TimestampArithmeticExpr(TimestampArithmeticExpr other) {
+    super(other);
+    funcName_ = other.funcName_;
+    op_ = other.op_;
+    timeUnitIdent_ = other.timeUnitIdent_;
+    timeUnit_ = other.timeUnit_;
+    intervalFirst_ = other.intervalFirst_;
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
@@ -195,4 +207,7 @@ public class TimestampArithmeticExpr extends Expr {
     }
     return strBuilder.toString();
   }
+
+  @Override
+  public Expr clone() { return new TimestampArithmeticExpr(this); }
 }

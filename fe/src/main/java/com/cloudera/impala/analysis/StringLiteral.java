@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 
 import java_cup.runtime.Symbol;
 
@@ -37,6 +36,14 @@ public class StringLiteral extends LiteralExpr {
   public StringLiteral(String value) {
     this.value_ = value;
     type_ = ColumnType.STRING;
+  }
+
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected StringLiteral(StringLiteral other) {
+    super(other);
+    value_ = other.value_;
   }
 
   @Override
@@ -124,14 +131,14 @@ public class StringLiteral extends LiteralExpr {
       throw new AnalysisException("Number too large: " + value_);
     }
     if (sym.sym == SqlParserSymbols.INTEGER_LITERAL) {
-      BigInteger val = (BigInteger) sym.value;
+      BigDecimal val = (BigDecimal) sym.value;
       if (negative) val = val.negate();
-      return new IntLiteral(val);
+      return new NumericLiteral(val);
     }
     if (sym.sym == SqlParserSymbols.DECIMAL_LITERAL) {
       BigDecimal val = (BigDecimal) sym.value;
       if (negative) val = val.negate();
-      return new DecimalLiteral(val);
+      return new NumericLiteral(val);
     }
     // Symbol is not an integer or floating point literal.
     throw new AnalysisException(
@@ -161,4 +168,7 @@ public class StringLiteral extends LiteralExpr {
     StringLiteral other = (StringLiteral) o;
     return value_.compareTo(other.getStringValue());
   }
+
+  @Override
+  public Expr clone() { return new StringLiteral(this); }
 }

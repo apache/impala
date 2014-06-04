@@ -22,6 +22,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -59,7 +60,7 @@ public abstract class QueryStmt extends StatementBase {
    * Map of expression substitutions for replacing aliases
    * in "order by" or "group by" clauses with their corresponding result expr.
    */
-  protected final Expr.SubstitutionMap aliasSmap_ = new Expr.SubstitutionMap();
+  protected final ExprSubstitutionMap aliasSmap_ = new ExprSubstitutionMap();
 
   /**
    * Select list item alias does not have to be unique.
@@ -128,18 +129,17 @@ public abstract class QueryStmt extends StatementBase {
     for (OrderByElement orderByElement: orderByElements_) {
       // create copies, we don't want to modify the original parse node, in case
       // we need to print it
-      orderingExprs.add(orderByElement.getExpr().clone(null));
+      orderingExprs.add(orderByElement.getExpr().clone());
       isAscOrder.add(Boolean.valueOf(orderByElement.getIsAsc()));
       nullsFirstParams.add(orderByElement.getNullsFirstParam());
     }
-    substituteOrdinals(orderingExprs, "ORDER BY");
+    substituteOrdinals(orderingExprs, "ORDER BY", analyzer);
     Expr ambiguousAlias = getFirstAmbiguousAlias(orderingExprs);
     if (ambiguousAlias != null) {
       throw new AnalysisException("Column " + ambiguousAlias.toSql() +
           " in order clause is ambiguous");
     }
-    Expr.substituteList(orderingExprs, aliasSmap_);
-    Expr.analyze(orderingExprs, analyzer);
+    orderingExprs = Expr.trySubstituteList(orderingExprs, aliasSmap_, analyzer);
 
     if (!analyzer.isRootAnalyzer() && hasOffset() && !hasLimit()) {
       throw new AnalysisException("Order-by with offset without limit not supported" +
@@ -184,8 +184,7 @@ public abstract class QueryStmt extends StatementBase {
    * TODO: We could do something more sophisticated than simply copying input
    * slotrefs - e.g. compute some order-by expressions.
    */
-  protected void createSortTupleInfo(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  protected void createSortTupleInfo(Analyzer analyzer) {
     Preconditions.checkState(evaluateOrderBy_);
 
     // sourceSlots contains the slots from the input row to materialize.
@@ -199,7 +198,7 @@ public abstract class QueryStmt extends StatementBase {
     sortTupleDesc.setIsMaterialized(true);
     // substOrderBy is the mapping from slot refs in the input row to slot refs in the
     // materialized sort tuple.
-    Expr.SubstitutionMap substOrderBy = new Expr.SubstitutionMap();
+    ExprSubstitutionMap substOrderBy = new ExprSubstitutionMap();
     for (SlotRef origSlotRef: sourceSlots) {
       SlotDescriptor origSlotDesc = origSlotRef.getDesc();
       SlotDescriptor materializedDesc = analyzer.addSlotDescriptor(sortTupleDesc);
@@ -212,14 +211,13 @@ public abstract class QueryStmt extends StatementBase {
       materializedDesc.setLabel(origSlotDesc.getLabel());
       materializedDesc.setStats(ColumnStats.fromExpr(origSlotRef));
       SlotRef cloneRef = new SlotRef(materializedDesc);
-      substOrderBy.addMapping(origSlotRef, cloneRef);
+      substOrderBy.put(origSlotRef, cloneRef);
       analyzer.createAuxEquivPredicate(cloneRef, origSlotRef);
       sortTupleExprs.add(origSlotRef);
     }
 
-    Expr.substituteList(resultExprs_, substOrderBy);
-    Expr.substituteList(sortInfo_.getOrderingExprs(), substOrderBy);
-
+    resultExprs_ = Expr.substituteList(resultExprs_, substOrderBy, analyzer);
+    sortInfo_.substituteOrderingExprs(substOrderBy, analyzer);
     sortInfo_.setMaterializedTupleInfo(sortTupleDesc, sortTupleExprs);
   }
 
@@ -229,9 +227,7 @@ public abstract class QueryStmt extends StatementBase {
    */
   protected Expr getFirstAmbiguousAlias(List<Expr> exprs) {
     for (Expr exp: exprs) {
-      if (ambiguousAliasList_.contains(exp)) {
-        return exp;
-      }
+      if (ambiguousAliasList_.contains(exp)) return exp;
     }
     return null;
   }
@@ -240,8 +236,8 @@ public abstract class QueryStmt extends StatementBase {
    * Substitute exprs of the form "<number>"  with the corresponding
    * expressions.
    */
-  protected abstract void substituteOrdinals(List<Expr> exprs, String errorPrefix)
-      throws AnalysisException;
+  protected abstract void substituteOrdinals(List<Expr> exprs, String errorPrefix,
+      Analyzer analyzer) throws AnalysisException, AuthorizationException;
 
   /**
    * UnionStmt and SelectStmt have different implementations.
@@ -278,7 +274,8 @@ public abstract class QueryStmt extends StatementBase {
    * This is called prior to plan tree generation and allows tuple-materializing
    * PlanNodes to compute their tuple's mem layout.
    */
-  public abstract void materializeRequiredSlots(Analyzer analyzer);
+  public abstract void materializeRequiredSlots(Analyzer analyzer)
+      throws InternalException;
 
   /**
    * Mark slots referenced in exprs as materialized.

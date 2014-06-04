@@ -14,9 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -54,7 +51,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // values guard against crashes due to stack overflows (IMPALA-432) and were
   // experimentally determined to be safe.
   public final static int EXPR_CHILDREN_LIMIT = 10000;
-  public final static int EXPR_DEPTH_LIMIT = 2000;
+  // The expr depth limit is mostly due to our recursive implementation of clone().
+  public final static int EXPR_DEPTH_LIMIT = 1500;
+
+  // to be used where we can't come up with a better estimate
+  protected static double DEFAULT_SELECTIVITY = 0.1;
 
   // isAggregatePredicate_ is a Predicate that returns true if an Expr is an aggregate.
   private final static com.google.common.base.Predicate<Expr> isAggregatePredicate_ =
@@ -88,9 +89,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // between 0 and 1 if valid: invalid: -1
   protected double selectivity_;
 
-  // to be used where we can't come up with a better estimate
-  protected static double DEFAULT_SELECTIVITY = 0.1;
-
   // estimated number of distinct values produced by Expr; invalid: -1
   // set during analysis
   protected long numDistinctValues_;
@@ -106,6 +104,22 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     numDistinctValues_ = -1;
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected Expr(Expr other) {
+    id_ = other.id_;
+    isAuxExpr_ = other.isAuxExpr_;
+    type_ = other.type_;
+    isAnalyzed_ = other.isAnalyzed_;
+    isWhereClauseConjunct_ = other.isWhereClauseConjunct_;
+    printSqlInParens_ = other.printSqlInParens_;
+    selectivity_ = other.selectivity_;
+    numDistinctValues_ = other.numDistinctValues_;
+    fn_ = other.fn_;
+    children_ = Expr.cloneList(other.children_);
+  }
+
   public ExprId getId() { return id_; }
   protected void setId(ExprId id) { this.id_ = id; }
   public ColumnType getType() { return type_; }
@@ -116,19 +130,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public void setIsWhereClauseConjunct() { isWhereClauseConjunct_ = true; }
   public boolean isAuxExpr() { return isAuxExpr_; }
   public void setIsAuxExpr() { isAuxExpr_ = true; }
-
-  /**
-   * Recursively set isAnalyzed to false for the entire Expr tree, except SlotRefs.
-   * TODO: clone() should do this automatically, but this blows up. Fix it.
-   */
-  public void unsetIsAnalyzed() {
-    // we don't want to re-analyze slotrefs
-    if (this instanceof SlotRef) return;
-    isAnalyzed_ = false;
-    for (Expr child: children_) {
-      child.unsetIsAnalyzed();
-    }
-  }
 
   /** Perform semantic analysis of node and all of its children.
    * Throws exception if any errors found.
@@ -151,7 +152,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       // Check the expr depth limit. Do not print the toSql() to not overflow the stack.
       if (analyzer.getCallDepth() > EXPR_DEPTH_LIMIT) {
         throw new AnalysisException(String.format("Exceeded the maximum depth of an " +
-            "expresison tree (%s).", EXPR_DEPTH_LIMIT));
+            "expression tree (%s).", EXPR_DEPTH_LIMIT));
       }
     }
     for (Expr child: children_) {
@@ -161,25 +162,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     computeNumDistinctValues();
 
     if (analyzer != null) analyzer.decrementCallDepth();
-  }
-
-  /**
-   * Calls unsetIsAnalyzed() and performs semantic analysis again. Re-analysis is useful
-   * after cloning and expr and/or substituting exprs to insert casts, etc, because the
-   * original expr will typically have been analyzed already.
-   */
-  public void reanalyze(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
-    unsetIsAnalyzed();
-    analyze(analyzer);
-  }
-
-  static public void reanalyze(List<Expr> exprs, Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
-    if (exprs == null) return;
-    for (Expr e: exprs) {
-      e.reanalyze(analyzer);
-    }
   }
 
   protected void computeNumDistinctValues() {
@@ -288,19 +270,22 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Converts DecimalLiterals in the tree rooted at child to targetType and
-   * reanalyzes that subtree.
+   * Returns a clone of child with all NumericLiterals in it explicitly
+   * cast to targetType.
    */
-  private void convertNumericLiteralsToFloat(Analyzer analyzer, Expr child,
+  private Expr convertNumericLiteralsToFloat(Analyzer analyzer, Expr child,
       ColumnType targetType) throws AnalysisException, AuthorizationException {
-    if (!targetType.isFloatingPointType() && !targetType.isIntegerType()) return;
+    if (!targetType.isFloatingPointType() && !targetType.isIntegerType()) return child;
     if (targetType.isIntegerType()) targetType = ColumnType.DOUBLE;
-    List<DecimalLiteral> literals = Lists.newArrayList();
-    child.collectAll(Predicates.instanceOf(DecimalLiteral.class), literals);
-    for (DecimalLiteral l: literals) {
-      l.explicitlyCastToFloat(targetType);
+    List<NumericLiteral> literals = Lists.newArrayList();
+    child.collectAll(Predicates.instanceOf(NumericLiteral.class), literals);
+    ExprSubstitutionMap smap = new ExprSubstitutionMap();
+    for (NumericLiteral l: literals) {
+      NumericLiteral castLiteral = (NumericLiteral) l.clone();
+      castLiteral.explicitlyCastToFloat(targetType);
+      smap.put(l, castLiteral);
     }
-    child.reanalyze(analyzer);
+    return child.substitute(smap, analyzer);
   }
 
   /**
@@ -337,10 +322,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     // Only child(0) or child(1) is a const decimal. See if we can cast it to
     // the type of the other child.
     if (c0IsConstantDecimal && !isExplicitCastToDecimal(getChild(0))) {
-      convertNumericLiteralsToFloat(analyzer, getChild(0), t1);
+      Expr c0 = convertNumericLiteralsToFloat(analyzer, getChild(0), t1);
+      setChild(0, c0);
     }
     if (c1IsConstantDecimal && !isExplicitCastToDecimal(getChild(1))) {
-      convertNumericLiteralsToFloat(analyzer, getChild(1), t0);
+      Expr c1 = convertNumericLiteralsToFloat(analyzer, getChild(1), t0);
+      setChild(1, c1);
     }
   }
 
@@ -349,6 +336,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static void analyze(List<? extends Expr> exprs, Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
+    if (exprs == null) return;
     for (Expr expr: exprs) {
       expr.analyze(analyzer);
     }
@@ -457,25 +445,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Creates a shallow copy of this Expr. If a deep copy is desired, use clone(null)
-   * instead of this method.
-   * This clone method takes advantage of having Java generate the field-by-field copy
-   * c'tors for the Expr subclasses.
-   * @see java.lang.Object#clone()
+   * Returns true if two expressions are equal. The equality comparison works on analyzed
+   * as well as unanalyzed exprs by ignoring implicit casts (see CastExpr.equals()).
    */
-  @Override
-  public Expr clone() {
-    try {
-      return (Expr) super.clone();
-    } catch (CloneNotSupportedException e) {
-      // all Expr subclasses should implement Cloneable
-      Writer w = new StringWriter();
-      PrintWriter pw = new PrintWriter(w);
-      e.printStackTrace(pw);
-      throw new UnsupportedOperationException(w.toString());
-    }
-  }
-
   @Override
   public boolean equals(Object obj) {
     if (obj == null) return false;
@@ -555,162 +527,87 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Map of expression substitutions (lhs[i] gets substituted with rhs[i]).
-   *
+   * Returns an analyzed clone of 'this' with exprs substituted according to smap.
+   * Removes implicit casts and analysis state while cloning/substituting exprs within
+   * this tree, such that the returned result has minimal implicit casts and types.
+   * Throws if analyzing the post-substitution expr tree failed.
    */
-  static public class SubstitutionMap {
-    private ArrayList<Expr> lhs;  // left-hand side
-    private ArrayList<Expr> rhs;  // right-hand side
-
-    public SubstitutionMap() {
-      this.lhs = Lists.newArrayList();
-      this.rhs = Lists.newArrayList();
-    }
-
-    ArrayList<Expr> getLhs() { return lhs; }
-    ArrayList<Expr> getRhs() { return rhs; }
-
-    public int size() { return lhs.size(); }
-
-    public void addMapping(Expr lhsExpr, Expr rhsExpr) {
-      lhs.add(lhsExpr);
-      rhs.add(rhsExpr);
-    }
-
-    /**
-     * Returns true if the smap contains a mapping for lhsExpr.
-     */
-    public boolean containsMappingFor(Expr lhsExpr) {
-      return lhs.contains(lhsExpr);
-    }
-
-    public String debugString() {
-      Preconditions.checkState(lhs.size() == rhs.size());
-      List<String> output = Lists.newArrayList();
-      for (int i = 0; i < lhs.size(); ++i) {
-        output.add(lhs.get(i).toSql() + ":" + rhs.get(i).toSql());
-        output.add("(" + lhs.get(i).debugString() + ":" + rhs.get(i).debugString() + ")");
-      }
-      return "smap(" + Joiner.on(" ").join(output) + ")";
-    }
-
-    /**
-     * Return a map  which is equivalent to applying f followed by g,
-     * i.e., g(f()).
-     * Always returns a non-null map.
-     */
-    public static SubstitutionMap compose(SubstitutionMap f, SubstitutionMap g) {
-      if (f == null && g == null) return new SubstitutionMap();
-      if (f == null) return g;
-      if (g == null) return f;
-      SubstitutionMap result = new SubstitutionMap();
-      // f's substitution targets need to be substituted via g
-      result.lhs = Expr.cloneList(f.lhs);
-      result.rhs = Expr.cloneList(f.rhs, g);
-      // substitution maps are cumulative: the combined map contains all
-      // substitutions from f and g.
-      for (int i = 0; i < g.lhs.size(); i++) {
-        // If f contains expr1->fn(expr2) and g contains expr2->expr3,
-        // then result must contain expr1->fn(expr3).
-        // The check before adding to result.lhs is to ensure that cases
-        // where expr2.equals(expr1) are handled correctly.
-        // For example f: count(*) -> zeroifnull(count(*))
-        // and g: count(*) -> slotref
-        // result.lhs must only have: count(*) -> zeroifnull(slotref) from f above,
-        // and not count(*) -> slotref from g as well.
-        if (!result.lhs.contains(g.lhs.get(i))) {
-          result.lhs.add(g.lhs.get(i).clone(null));
-          result.rhs.add(g.rhs.get(i).clone(null));
-        }
-      }
-
-      result.verify();
-      return result;
-    }
-
-    /**
-     * Create the union of f and g.
-     * Always returns a non-null map.
-     */
-    public static SubstitutionMap combine(SubstitutionMap f, SubstitutionMap g) {
-      if (f == null && g == null) return new SubstitutionMap();
-      if (f == null) return g;
-      if (g == null) return f;
-      SubstitutionMap result = new SubstitutionMap();
-      result.lhs = Lists.newArrayList(f.lhs);
-      result.lhs.addAll(g.lhs);
-      result.rhs = Lists.newArrayList(f.rhs);
-      result.rhs.addAll(g.rhs);
-      result.verify();
-      return result;
-    }
-
-    public void substituteLhs(SubstitutionMap lhsSmap) {
-      Expr.substituteList(lhs, lhsSmap);
-    }
-
-    private void verify() {
-      // check that we don't have duplicate entries, ie, that all lhs entries are
-      // unique
-      for (int i = 0; i < lhs.size(); ++i) {
-        for (int j = i + 1; j < lhs.size(); ++j) {
-          if (lhs.get(i).equals(lhs.get(j))) {
-            LOG.info("verify: smap=" + this.debugString());
-            Preconditions.checkState(false);
-          }
-        }
-      }
-    }
-
-    public void clear() {
-      lhs.clear();
-      rhs.clear();
-    }
-  }
-
-  /**
-   * Create a deep copy of 'this'. If smap is non-null,
-   * use it to substitute 'this' or its subnodes.
-   *
-   * Expr subclasses that add non-value-type members must override this.
-   */
-  public Expr clone(SubstitutionMap smap) {
-    if (smap != null) {
-      for (int i = 0; i < smap.lhs.size(); ++i) {
-        if (this.equals(smap.lhs.get(i))) {
-          return smap.rhs.get(i).clone(null);
-        }
-      }
-    }
-    Expr result = (Expr) this.clone();
-    result.children_ = Lists.newArrayList();
-    result.selectivity_ = selectivity_;
-    // the new expr hasn't been analyzed
-    // TODO: this blows up, fix it
-    //result.isAnalyzed = false;
-    result.isAnalyzed_ = isAnalyzed_;
-    result.isWhereClauseConjunct_ = isWhereClauseConjunct_;
-    result.numDistinctValues_ = numDistinctValues_;
-    for (Expr child: children_) {
-      result.children_.add(((Expr) child).clone(smap));
-    }
+  public Expr trySubstitute(ExprSubstitutionMap smap, Analyzer analyzer)
+      throws AuthorizationException, AnalysisException {
+    Expr result = clone();
+    result = result.substituteImpl(smap, analyzer);
+    result.analyze(analyzer);
     return result;
   }
 
   /**
-   * Create a deep copy of 'l'. Use smap to substitute the elements of l.
-   * The elements of the returned list are of type Expr (different from the
-   * elements of 'l' due to substitution).
+   * Returns an analyzed clone of 'this' with exprs substituted according to smap.
+   * Removes implicit casts and analysis state while cloning/substituting exprs within
+   * this tree, such that the returned result has minimal implicit casts and types.
+   * Expects the analysis of the post-substitution expr to succeed.
    */
-  public static ArrayList<Expr> cloneList(
-      Iterable<? extends Expr> l, SubstitutionMap smap) {
-    Preconditions.checkNotNull(l);
+  public Expr substitute(ExprSubstitutionMap smap, Analyzer analyzer) {
+    try {
+      return trySubstitute(smap, analyzer);
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed analysis after expr substitution.", e);
+    }
+  }
+
+  public static ArrayList<Expr> trySubstituteList(Iterable<? extends Expr> exprs,
+      ExprSubstitutionMap smap, Analyzer analyzer)
+          throws AuthorizationException, AnalysisException {
+    if (exprs == null) return null;
     ArrayList<Expr> result = new ArrayList<Expr>();
-    for (Expr element: l) {
-      result.add(element.clone(smap));
+    for (Expr e: exprs) {
+      result.add(e.trySubstitute(smap, analyzer));
     }
     return result;
   }
+
+  public static ArrayList<Expr> substituteList(Iterable<? extends Expr> exprs,
+      ExprSubstitutionMap smap, Analyzer analyzer) {
+    try {
+      return trySubstituteList(exprs, smap, analyzer);
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed analysis after expr substitution.", e);
+    }
+  }
+
+  /**
+   * Recursive method that performs the actual substitution for try/substitute() while
+   * removing implicit casts. Resets the analysis state in all non-SlotRef expressions.
+   * Exprs that have non-child exprs which should be affected by substitutions must
+   * override this method and apply the substitution to such exprs as well.
+   */
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
+    throws AuthorizationException, AnalysisException {
+    if (isImplicitCast()) return getChild(0).substituteImpl(smap, analyzer);
+    if (smap != null) {
+      Expr substExpr = smap.get(this);
+      if (substExpr != null) return substExpr.clone();
+    }
+    for (int i = 0; i < children_.size(); ++i) {
+      children_.set(i, children_.get(i).substituteImpl(smap, analyzer));
+    }
+    // SlotRefs must remain analyzed to support substitution across query blocks. All
+    // other exprs must be analyzed again after the substitution to add implicit casts
+    // and for resolving their correct function signature.
+    if (!(this instanceof SlotRef)) resetAnalysisState();
+    return this;
+  }
+
+  /**
+   * Resets the internal state of this expr produced by analyze().
+   */
+  protected void resetAnalysisState() { isAnalyzed_ = false; }
+
+  /**
+   * Creates a deep copy of this expr including its analysis state. The method is
+   * abstract in this class to force new Exprs to implement it.
+   */
+  @Override
+  public abstract Expr clone();
 
   /**
    * Create a deep copy of 'l'. The elements of the returned list are of the same
@@ -720,43 +617,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Preconditions.checkNotNull(l);
     ArrayList<C> result = new ArrayList<C>();
     for (Expr element: l) {
-      result.add((C) element.clone(null));
+      result.add((C) element.clone());
     }
     return result;
-  }
-
-  /**
-   * Returns true if the list contains an aggregate expr.
-   */
-  /**
-   * Return 'this' with all sub-exprs substituted according to
-   * smap. Ids of 'this' and its children are retained.
-   */
-  public Expr substitute(SubstitutionMap smap) {
-    Preconditions.checkNotNull(smap);
-    for (int i = 0; i < smap.lhs.size(); ++i) {
-      if (this.equals(smap.lhs.get(i))) {
-        Expr result = smap.rhs.get(i).clone(null);
-        if (id_ != null) result.id_ = id_;
-        return result;
-      }
-    }
-    for (int i = 0; i < children_.size(); ++i) {
-      children_.set(i, children_.get(i).substitute(smap));
-    }
-    return this;
-  }
-
-  /**
-   * Substitute sub-exprs in the input list according to smap.
-   */
-  public static void substituteList(
-      List<Expr> l, SubstitutionMap smap) {
-    if (l == null || smap == null) return;
-    ListIterator<Expr> it = l.listIterator();
-    while (it.hasNext()) {
-      it.set(it.next().substitute(smap));
-    }
   }
 
   /**
@@ -962,11 +825,15 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Returns child expr if this expr is an implicit cast, otherwise returns 'this'.
    */
   public Expr ignoreImplicitCast() {
-    if (this instanceof CastExpr) {
-      CastExpr cast = (CastExpr) this;
-      if (cast.isImplicit()) return cast.getChild(0).ignoreImplicitCast();
-    }
+    if (isImplicitCast()) return getChild(0).ignoreImplicitCast();
     return this;
+  }
+
+  /**
+   * Returns true if 'this' is an implicit cast expr.
+   */
+  public boolean isImplicitCast() {
+    return this instanceof CastExpr && ((CastExpr) this).isImplicit();
   }
 
   @Override

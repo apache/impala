@@ -24,10 +24,10 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprId;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.TreeNode;
@@ -96,7 +96,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected PlanFragment fragment_;
 
   // if set, needs to be applied by parent node to reference this node's output
-  protected Expr.SubstitutionMap baseTblSmap_;
+  protected ExprSubstitutionMap baseTblSmap_;
 
   // global state of planning wrt conjunct assignment; used by planner as a shortcut
   // to avoid having to pass assigned conjuncts back and forth
@@ -165,7 +165,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     tblRefIds_ = Lists.newArrayList(node.tblRefIds_);
     rowTupleIds_ = Lists.newArrayList(node.rowTupleIds_);
     nullableTupleIds_ = Sets.newHashSet(node.nullableTupleIds_);
-    conjuncts_ = Expr.cloneList(node.conjuncts_, null);
+    conjuncts_ = Expr.cloneList(node.conjuncts_);
     cardinality_ = -1;
     numNodes_ = -1;
     compactData_ = node.compactData_;
@@ -186,8 +186,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }
   public List<Expr> getConjuncts() { return conjuncts_; }
-  public Expr.SubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
-  public void setBaseTblSmap(Expr.SubstitutionMap sMap) { baseTblSmap_ = sMap; }
+  public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
+  public void setBaseTblSmap(ExprSubstitutionMap sMap) { baseTblSmap_ = sMap; }
   public Set<ExprId> getAssignedConjuncts() { return assignedConjuncts_; }
   public void setAssignedConjuncts(Set<ExprId> conjuncts) {
     assignedConjuncts_ = conjuncts;
@@ -412,10 +412,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * state required for toThrift().
    * This is called directly after construction.
    */
-  public void init(Analyzer analyzer) throws InternalException, AuthorizationException {
+  public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
     computeStats(analyzer);
-    createDefaultSmap();
+    createDefaultSmap(analyzer);
   }
 
   /**
@@ -430,13 +430,13 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   /**
    * Returns an smap that combines the childrens' smaps.
    */
-  protected Expr.SubstitutionMap getCombinedChildSmap() {
-    if (getChildren().size() == 0) return new Expr.SubstitutionMap();
+  protected ExprSubstitutionMap getCombinedChildSmap() {
+    if (getChildren().size() == 0) return new ExprSubstitutionMap();
     if (getChildren().size() == 1) return getChild(0).getBaseTblSmap();
-    Expr.SubstitutionMap result = Expr.SubstitutionMap.combine(
+    ExprSubstitutionMap result = ExprSubstitutionMap.combine(
         getChild(0).getBaseTblSmap(), getChild(1).getBaseTblSmap());
     for (int i = 2; i < getChildren().size(); ++i) {
-      result = Expr.SubstitutionMap.combine(result, getChild(i).getBaseTblSmap());
+      result = ExprSubstitutionMap.combine(result, getChild(i).getBaseTblSmap());
     }
     return result;
   }
@@ -445,10 +445,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Sets baseTblSmap to compose(existing smap, combined child smap). Also
    * substitutes conjuncts_ using the combined child smap.
    */
-  protected void createDefaultSmap() {
-    Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
-    baseTblSmap_ = Expr.SubstitutionMap.compose(baseTblSmap_, combinedChildSmap);
-    conjuncts_ = Expr.cloneList(conjuncts_, combinedChildSmap);
+  protected void createDefaultSmap(Analyzer analyzer) throws InternalException {
+    ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();
+    baseTblSmap_ =
+        ExprSubstitutionMap.compose(baseTblSmap_, combinedChildSmap, analyzer);
+    conjuncts_ = Expr.substituteList(conjuncts_, baseTblSmap_, analyzer);
   }
 
   /**

@@ -17,9 +17,9 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.junit.Test;
 
+import com.cloudera.impala.analysis.NumericLiteral;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
-import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.testutil.CatalogServiceTestCatalog;
@@ -284,13 +284,13 @@ public class CatalogTest {
       assertEquals(2, p.getPartitionValues().size());
 
       LiteralExpr key1Expr = p.getPartitionValues().get(0);
-      assertTrue(key1Expr instanceof IntLiteral);
-      long key1 = ((IntLiteral) key1Expr).getValue();
+      assertTrue(key1Expr instanceof NumericLiteral);
+      long key1 = ((NumericLiteral) key1Expr).getLongValue();
       assertTrue(key1 == 2009 || key1 == 2010);
 
       LiteralExpr key2Expr = p.getPartitionValues().get(1);
-      assertTrue(key2Expr instanceof IntLiteral);
-      long key2 = ((IntLiteral) key2Expr).getValue();
+      assertTrue(key2Expr instanceof NumericLiteral);
+      long key2 = ((NumericLiteral) key2Expr).getLongValue();
       assertTrue(key2 >= 1 && key2 <= 12);
 
       months.add(key1 * 100 + key2);

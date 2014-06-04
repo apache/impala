@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.TableRef;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.HashJoinNode.DistributionMode;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -58,7 +57,7 @@ public class CrossJoinNode extends PlanNode {
   public TableRef getInnerRef() { return innerRef_; }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException, AuthorizationException {
+  public void init(Analyzer analyzer) throws InternalException {
     super.init(analyzer);
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
   }

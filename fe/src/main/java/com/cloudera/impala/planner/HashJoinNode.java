@@ -20,7 +20,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotRef;
@@ -127,19 +129,22 @@ public class HashJoinNode extends PlanNode {
     assignConjuncts(analyzer);
 
     // Set smap to the combined childrens' smaps and apply that to all conjuncts_.
-    createDefaultSmap();
+    createDefaultSmap(analyzer);
 
     computeStats(analyzer);
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
 
-    Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
-    otherJoinConjuncts_ = Expr.cloneList(otherJoinConjuncts_, combinedChildSmap);
+    ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();
+    otherJoinConjuncts_ =
+        Expr.substituteList(otherJoinConjuncts_, combinedChildSmap, analyzer);
+
     List<Pair<Expr, Expr>> newEqJoinConjuncts = Lists.newArrayList();
     for (Pair<Expr, Expr> c: eqJoinConjuncts_) {
-      Pair<Expr, Expr> p =
-          new Pair(c.first.clone(combinedChildSmap), c.second.clone(combinedChildSmap));
-      newEqJoinConjuncts.add(
-          new Pair(c.first.clone(combinedChildSmap), c.second.clone(combinedChildSmap)));
+      Expr eqPred = new BinaryPredicate(BinaryPredicate.Operator.EQ, c.first, c.second);
+      eqPred = eqPred.substitute(combinedChildSmap, analyzer);
+      Preconditions.checkState(
+          eqPred.getChild(0).getType().matchesType(eqPred.getChild(1).getType()));
+      newEqJoinConjuncts.add(new Pair(eqPred.getChild(0), eqPred.getChild(1)));
     }
     eqJoinConjuncts_ = newEqJoinConjuncts;
   }

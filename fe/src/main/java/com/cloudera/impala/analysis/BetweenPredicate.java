@@ -48,6 +48,18 @@ public class BetweenPredicate extends Predicate {
     this.isNotBetween_ = isNotBetween;
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected BetweenPredicate(BetweenPredicate other) {
+    super(other);
+    isNotBetween_ = other.isNotBetween_;
+    originalChildren_ = Expr.cloneList(other.originalChildren_);
+    if (other.rewrittenPredicate_ != null) {
+      rewrittenPredicate_ = (CompoundPredicate) other.rewrittenPredicate_.clone();
+    }
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
@@ -110,9 +122,14 @@ public class BetweenPredicate extends Predicate {
    * Also substitute the exprs in originalChildren when cloning.
    */
   @Override
-  public Expr clone(SubstitutionMap sMap) {
-    BetweenPredicate clone = (BetweenPredicate) super.clone(sMap);
-    clone.originalChildren_ = Expr.cloneList(originalChildren_, sMap);
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
+      throws AuthorizationException, AnalysisException {
+    BetweenPredicate clone = (BetweenPredicate) super.substituteImpl(smap, analyzer);
+    Preconditions.checkNotNull(clone);
+    clone.originalChildren_ = Expr.substituteList(originalChildren_, smap, analyzer);
     return clone;
   }
+
+  @Override
+  public Expr clone() { return new BetweenPredicate(this); }
 }

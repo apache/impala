@@ -106,6 +106,11 @@ public class BinaryPredicate extends Predicate {
     children_.add(e2);
   }
 
+  protected BinaryPredicate(BinaryPredicate other) {
+    super(other);
+    op_ = other.op_;
+  }
+
   @Override
   public String toSqlImpl() {
     return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
@@ -238,4 +243,14 @@ public class BinaryPredicate extends Predicate {
     }
     return new BinaryPredicate(newOp, getChild(0), getChild(1));
   }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (!super.equals(obj)) return false;
+    BinaryPredicate other = (BinaryPredicate) obj;
+    return op_.equals(other.op_);
+  }
+
+  @Override
+  public Expr clone() { return new BinaryPredicate(this); }
 }

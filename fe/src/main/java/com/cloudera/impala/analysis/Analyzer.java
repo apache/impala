@@ -255,17 +255,6 @@ public class Analyzer {
   }
 
   /**
-   * Substitute analyzer's internal expressions (conjuncts) with the given substitution
-   * map
-   */
-  public void substitute(Expr.SubstitutionMap sMap) {
-    for (ExprId id: globalState_.conjuncts.keySet()) {
-      globalState_.conjuncts.put(
-          id, (Predicate) globalState_.conjuncts.get(id).substitute(sMap));
-    }
-  }
-
-  /**
    * Searches the hierarchy of analyzers bottom-up for a registered view
    * whose alias matches the table name of the given BaseTableRef. Returns the
    * ViewRef from the innermost scope (analyzer).
@@ -885,16 +874,14 @@ public class Analyzer {
         if (srcSids.containsAll(destSids)) {
           p = srcConjunct;
         } else {
-          Expr.SubstitutionMap smap = new Expr.SubstitutionMap();
+          ExprSubstitutionMap smap = new ExprSubstitutionMap();
           for (int i = 0; i < srcSids.size(); ++i) {
-            smap.addMapping(
+            smap.put(
                 new SlotRef(globalState_.descTbl.getSlotDesc(srcSids.get(i))),
                 new SlotRef(globalState_.descTbl.getSlotDesc(destSids.get(i))));
           }
-          p = srcConjunct.clone(smap);
           try {
-            // create casts if needed
-            p.reanalyze(this);
+            p = srcConjunct.trySubstitute(smap, this);
           } catch (ImpalaException exc) {
             // not an executable predicate; ignore
             continue;
@@ -1106,14 +1093,16 @@ public class Analyzer {
     List<SlotRef> slotRefs = Lists.newArrayList();
     p.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
 
-    // Map for substituting SlotRefs with NullLiterals.
-    Expr.SubstitutionMap nullSmap = new Expr.SubstitutionMap();
-    for (SlotRef slotRef: slotRefs) {
-      nullSmap.addMapping(slotRef.clone(null), new NullLiteral());
-    }
-    Expr nullTuplePred = p.clone(nullSmap);
+    Expr nullTuplePred = null;
     try {
-      nullTuplePred.reanalyze(this);
+      // Map for substituting SlotRefs with NullLiterals.
+      ExprSubstitutionMap nullSmap = new ExprSubstitutionMap();
+      NullLiteral nullLiteral = new NullLiteral();
+      nullLiteral.analyze(this);
+      for (SlotRef slotRef: slotRefs) {
+        nullSmap.put(slotRef.clone(), nullLiteral.clone());
+      }
+      nullTuplePred = p.substitute(nullSmap, this);
     } catch (Exception e) {
       Preconditions.checkState(false, "Failed to analyze generated predicate: "
           + nullTuplePred.toSql() + "." + e.getMessage());
@@ -1324,6 +1313,7 @@ public class Analyzer {
   public void materializeSlots(List<Expr> exprs) {
     List<SlotId> slotIds = Lists.newArrayList();
     for (Expr e: exprs) {
+      Preconditions.checkState(e.isAnalyzed_);
       e.getIds(null, slotIds);
     }
     globalState_.descTbl.markSlotsMaterialized(slotIds);

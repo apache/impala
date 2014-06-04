@@ -505,7 +505,9 @@ public class InsertStmt extends StatementBase {
         if (tblColumn.getPosition() >= numClusteringCols) {
           // Unmentioned non-clustering columns get NULL literals with the appropriate
           // target type because Parquet cannot handle NULL_TYPE (IMPALA-617).
-          resultExprs_.add(new NullLiteral().castTo(tblColumn.getType()));
+          Expr nullLiteral = new NullLiteral().castTo(tblColumn.getType());
+          nullLiteral.analyze(analyzer);
+          resultExprs_.add(nullLiteral);
         }
       }
     }

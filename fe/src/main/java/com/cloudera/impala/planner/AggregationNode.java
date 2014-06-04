@@ -24,8 +24,10 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.FunctionCallExpr;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
@@ -93,7 +95,7 @@ public class AggregationNode extends PlanNode {
   public boolean isBlockingNode() { return true; }
 
   @Override
-  public void init(Analyzer analyzer) {
+  public void init(Analyzer analyzer) throws InternalException {
     // TODO: It seems wrong that the 2nd phase agg has aggInfo_.isMerge() == true.
     // The reason for this is that the non-distinct aggregate functions need to use
     // the merge function in the BE (see toThrift() of this class). Clean this up.
@@ -132,8 +134,8 @@ public class AggregationNode extends PlanNode {
     // don't call createDefaultSMap(), it would point our conjuncts (= Having clause)
     // to our input; our conjuncts don't get substituted because they already
     // refer to our output
-    Expr.SubstitutionMap combinedChildSmap = getCombinedChildSmap();
-    aggInfo_.substitute(combinedChildSmap);
+    ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();
+    aggInfo_.substitute(combinedChildSmap, analyzer);
     baseTblSmap_ = aggInfo_.getSMap();
     // assert consistent aggregate expr and slot materialization
     aggInfo_.checkConsistency();

@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.analysis.Expr.SubstitutionMap;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -43,6 +42,17 @@ class LimitElement {
     isAnalyzed_ = false;
     limit_ = -1;
     offset_ = 0;
+  }
+
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected LimitElement(LimitElement other) {
+    limitExpr_ = (other.limitExpr_ == null) ? null : other.limitExpr_.clone();
+    offsetExpr_ = (other.offsetExpr_ == null) ? null : other.offsetExpr_.clone();
+    limit_ = other.limit_;
+    offset_ = other.offset_;
+    isAnalyzed_ = other.isAnalyzed_;
   }
 
   public Expr getLimitExpr() { return limitExpr_; }
@@ -118,13 +128,6 @@ class LimitElement {
     }
   }
 
-  public LimitElement clone(SubstitutionMap sMap) {
-    LimitElement e = new LimitElement(
-        limitExpr_ == null ? null : limitExpr_.clone(sMap),
-        offsetExpr_ == null ? null : offsetExpr_.clone(sMap));
-    return e;
-  }
-
   /**
    * Evaluations an expression to a non-zero integral value, returned as a long. Throws
    * if the expression cannot be evaluated, if the value evaluates to null, or if the
@@ -158,4 +161,7 @@ class LimitElement {
     }
     return value;
   }
+
+  @Override
+  public LimitElement clone() { return new LimitElement(this); }
 }

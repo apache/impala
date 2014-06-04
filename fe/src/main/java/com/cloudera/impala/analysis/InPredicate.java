@@ -40,6 +40,14 @@ public class InPredicate extends Predicate {
     this.isNotIn_ = isNotIn;
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected InPredicate(InPredicate other) {
+    super(other);
+    isNotIn_ = other.isNotIn_;
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
@@ -96,4 +104,7 @@ public class InPredicate extends Predicate {
     return new InPredicate(getChild(0), children_.subList(1, children_.size()),
         !isNotIn_);
   }
+
+  @Override
+  public Expr clone() { return new InPredicate(this); }
 }

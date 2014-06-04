@@ -20,7 +20,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -67,7 +66,7 @@ public class AggregateInfo {
   private final static Logger LOG = LoggerFactory.getLogger(AggregateInfo.class);
 
   // all exprs from Group By clause, duplicates removed
-  private final ArrayList<Expr> groupingExprs_;
+  private ArrayList<Expr> groupingExprs_;
 
   // all agg exprs from select block, duplicates removed
   private final ArrayList<FunctionCallExpr> aggregateExprs_;
@@ -84,7 +83,7 @@ public class AggregateInfo {
 
   // map from all grouping and aggregate exprs to a SlotRef referencing the corresp. slot
   // in the agg tuple
-  private Expr.SubstitutionMap aggTupleSMap_;
+  private ExprSubstitutionMap aggTupleSMap_;
 
   // created by createMergeAggInfo()
   private AggregateInfo mergeAggInfo_;
@@ -103,7 +102,7 @@ public class AggregateInfo {
   private AggregateInfo(ArrayList<Expr> groupingExprs,
       ArrayList<FunctionCallExpr> aggExprs, boolean isMerge)  {
     isMerge_ = isMerge;
-    aggTupleSMap_ = new Expr.SubstitutionMap();
+    aggTupleSMap_ = new ExprSubstitutionMap();
     groupingExprs_ =
         (groupingExprs != null
           ? Expr.cloneList(groupingExprs)
@@ -126,7 +125,7 @@ public class AggregateInfo {
   static public AggregateInfo create(
       ArrayList<Expr> groupingExprs, ArrayList<FunctionCallExpr> aggExprs,
       TupleDescriptor tupleDesc, Analyzer analyzer)
-      throws AnalysisException, InternalException, AuthorizationException {
+          throws AnalysisException, InternalException {
     Preconditions.checkState(
         (groupingExprs != null && !groupingExprs.isEmpty())
         || (aggExprs != null && !aggExprs.isEmpty()));
@@ -189,7 +188,7 @@ public class AggregateInfo {
   private void createDistinctAggInfo(
       ArrayList<Expr> origGroupingExprs,
       ArrayList<FunctionCallExpr> distinctAggExprs, Analyzer analyzer)
-      throws AnalysisException, InternalException, AuthorizationException {
+          throws AnalysisException, InternalException {
     Preconditions.checkState(!distinctAggExprs.isEmpty());
     // make sure that all DISTINCT params are the same;
     // ignore top-level implicit casts in the comparison, we might have inserted
@@ -228,7 +227,7 @@ public class AggregateInfo {
   public ArrayList<FunctionCallExpr> getAggregateExprs() { return aggregateExprs_; }
   public boolean isDistinctAgg() { return isDistinctAgg_; }
   public TupleId getAggTupleId() { return aggTupleDesc_.getId(); }
-  public Expr.SubstitutionMap getSMap() { return aggTupleSMap_; }
+  public ExprSubstitutionMap getSMap() { return aggTupleSMap_; }
   public AggregateInfo getMergeAggInfo() { return mergeAggInfo_; }
   public boolean isMerge() { return isMerge_; }
   public AggregateInfo getSecondPhaseDistinctAggInfo() {
@@ -290,22 +289,23 @@ public class AggregateInfo {
    *   * its smap needs to be recomputed to map exprs based on t2 to its own
    *     aggTupleDesc
    */
-  public void substitute(Expr.SubstitutionMap smap) {
-    Expr.substituteList(groupingExprs_, smap);
+  public void substitute(ExprSubstitutionMap smap, Analyzer analyzer)
+      throws InternalException {
+    groupingExprs_ = Expr.substituteList(groupingExprs_, smap, analyzer);
     LOG.trace("AggInfo: grouping_exprs=" + Expr.debugString(groupingExprs_));
 
     // The smap in this case should not substitute the aggs themselves, only
     // their subexpressions.
-    List<Expr> substitutedAggs = Expr.cloneList(aggregateExprs_, smap);
+    List<Expr> substitutedAggs = Expr.substituteList(aggregateExprs_, smap, analyzer);
     aggregateExprs_.clear();
-    for (Expr substitutedAgg : substitutedAggs) {
+    for (Expr substitutedAgg: substitutedAggs) {
       aggregateExprs_.add((FunctionCallExpr) substitutedAgg);
     }
 
     LOG.trace("AggInfo: agg_exprs=" + Expr.debugString(aggregateExprs_));
-    aggTupleSMap_.substituteLhs(smap);
+    aggTupleSMap_.substituteLhs(smap, analyzer);
     if (secondPhaseDistinctAggInfo_ != null) {
-      secondPhaseDistinctAggInfo_.substitute(smap);
+      secondPhaseDistinctAggInfo_.substitute(smap, analyzer);
     }
   }
 
@@ -320,14 +320,14 @@ public class AggregateInfo {
    * The returned AggregateInfo shares its descriptor and smap with the input info;
    * createAggTupleDesc() must not be called on it.
    */
-  private void createMergeAggInfo(Analyzer analyzer) throws
-      InternalException, AuthorizationException {
+  private void createMergeAggInfo(Analyzer analyzer) throws InternalException {
     Preconditions.checkState(mergeAggInfo_ == null);
     TupleDescriptor inputDesc = aggTupleDesc_;
     // construct grouping exprs
     ArrayList<Expr> groupingExprs = Lists.newArrayList();
     for (int i = 0; i < getGroupingExprs().size(); ++i) {
-      groupingExprs.add(new SlotRef(inputDesc.getSlots().get(i)));
+      SlotRef slotRef = new SlotRef(inputDesc.getSlots().get(i));
+      groupingExprs.add(slotRef);
     }
 
     // construct agg exprs
@@ -345,8 +345,9 @@ public class AggregateInfo {
         aggExpr = new FunctionCallExpr(inputExpr, new FunctionParams(aggExprParamList));
       }
       try {
+        aggExpr.setIsMergeAggFn();
         aggExpr.analyze(analyzer);
-      } catch (AnalysisException e) {
+      } catch (Exception e) {
         // we shouldn't see this
         throw new InternalException(
             "error constructing merge aggregation node: " + e.getMessage());
@@ -406,7 +407,7 @@ public class AggregateInfo {
   private void createSecondPhaseDistinctAggInfo(
       ArrayList<Expr> origGroupingExprs,
       ArrayList<FunctionCallExpr> distinctAggExprs, Analyzer analyzer)
-      throws InternalException, AuthorizationException {
+      throws AnalysisException, InternalException {
     Preconditions.checkState(secondPhaseDistinctAggInfo_ == null);
     Preconditions.checkState(!distinctAggExprs.isEmpty());
     TupleDescriptor inputDesc = aggTupleDesc_;
@@ -429,7 +430,7 @@ public class AggregateInfo {
         Preconditions.checkNotNull(ifExpr);
         try {
           ifExpr.analyze(analyzer);
-        } catch (AnalysisException e) {
+        } catch (Exception e) {
           throw new InternalException("Failed to analyze 'IF' function " +
               "in second phase count distinct aggregation.", e);
         }
@@ -465,6 +466,7 @@ public class AggregateInfo {
         // type. e.g. original expr takes bigint and returns bigint, but after
         // inserting the new aggexpr, it would be bigint -> string. string -> bigint.
         aggExpr = new FunctionCallExpr(inputExpr, new FunctionParams(aggExprParamList));
+        aggExpr.setIsMergeAggFn();
       }
       secondPhaseAggExprs.add(aggExpr);
     }
@@ -475,16 +477,17 @@ public class AggregateInfo {
       try {
         aggExpr.analyze(analyzer);
         Preconditions.checkState(aggExpr.isAggregateFunction());
-      } catch (AnalysisException e) {
+      } catch (Exception e) {
         // we shouldn't see this
         throw new InternalException(
             "error constructing merge aggregation node", e);
       }
     }
 
+    ArrayList<Expr> substGroupingExprs =
+        Expr.substituteList(origGroupingExprs, aggTupleSMap_, analyzer);
     secondPhaseDistinctAggInfo_ =
-        new AggregateInfo(
-          Expr.cloneList(origGroupingExprs, aggTupleSMap_), secondPhaseAggExprs, true);
+        new AggregateInfo(substGroupingExprs, secondPhaseAggExprs, true);
     secondPhaseDistinctAggInfo_.aggTupleDesc_ =
         secondPhaseDistinctAggInfo_.createAggTupleDesc(analyzer);
     secondPhaseDistinctAggInfo_.createSecondPhaseDistinctAggSMap(this, distinctAggExprs);
@@ -511,21 +514,21 @@ public class AggregateInfo {
     // original grouping exprs -> first m slots
     for (int i = 0; i < numOrigGroupingExprs; ++i, ++slotIdx) {
       Expr groupingExpr = inputAggInfo.getGroupingExprs().get(i);
-      aggTupleSMap_.addMapping(
-          groupingExpr.clone(null), new SlotRef(slotDescs.get(slotIdx)));
+      aggTupleSMap_.put(
+          groupingExpr.clone(), new SlotRef(slotDescs.get(slotIdx)));
     }
 
     // distinct agg exprs -> next n slots
     for (int i = 0; i < distinctAggExprs.size(); ++i, ++slotIdx) {
       Expr aggExpr = distinctAggExprs.get(i);
-      aggTupleSMap_.addMapping(
-          aggExpr.clone(null), (new SlotRef(slotDescs.get(slotIdx))));
+      aggTupleSMap_.put(
+          aggExpr.clone(), (new SlotRef(slotDescs.get(slotIdx))));
     }
 
     // remaining agg exprs -> remaining slots
     for (int i = 0; i < inputAggInfo.getAggregateExprs().size(); ++i, ++slotIdx) {
       Expr aggExpr = inputAggInfo.getAggregateExprs().get(i);
-      aggTupleSMap_.addMapping(aggExpr.clone(null), new SlotRef(slotDescs.get(slotIdx)));
+      aggTupleSMap_.put(aggExpr.clone(), new SlotRef(slotDescs.get(slotIdx)));
     }
   }
 
@@ -534,8 +537,7 @@ public class AggregateInfo {
    * Also creates and register auxiliary equality predicates between the grouping slots
    * and the grouping exprs.
    */
-  public TupleDescriptor createAggTupleDesc(Analyzer analyzer)
-      throws AuthorizationException {
+  public TupleDescriptor createAggTupleDesc(Analyzer analyzer) {
     LOG.trace("createAggTupleDesc()");
     TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor();
     List<Expr> exprs = Lists.newLinkedList();
@@ -559,7 +561,7 @@ public class AggregateInfo {
         // (which would actually be incorrect of the constant happens to be NULL)
         if (!expr.isConstant()) {
           analyzer.createAuxEquivPredicate(
-              new SlotRef(outputSlotDesc), expr.clone(null));
+              new SlotRef(outputSlotDesc), expr.clone());
         }
       } else {
         Preconditions.checkArgument(expr instanceof FunctionCallExpr);
@@ -568,7 +570,7 @@ public class AggregateInfo {
           outputSlotDesc.setIsNullable(false);
         }
       }
-      aggTupleSMap_.addMapping(expr.clone(null), new SlotRef(outputSlotDesc));
+      aggTupleSMap_.put(expr.clone(), new SlotRef(outputSlotDesc));
     }
     LOG.trace("aggtuple=" + result.debugString());
     LOG.trace("aggtuplesmap=" + aggTupleSMap_.debugString());
@@ -586,7 +588,8 @@ public class AggregateInfo {
    * Also computes materializedAggregateExprs.
    * This call must be idempotent because it may be called more than once for Union stmt.
    */
-  public void materializeRequiredSlots(Analyzer analyzer, Expr.SubstitutionMap smap) {
+  public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap)
+      throws InternalException {
     for (int i = 0; i < groupingExprs_.size(); ++i) {
       aggTupleDesc_.getSlots().get(i).setIsMaterialized(true);
     }
@@ -603,7 +606,7 @@ public class AggregateInfo {
       exprs.add(aggregateExprs_.get(i));
       materializedAggregateSlots_.add(i);
     }
-    List<Expr> resolvedExprs = Expr.cloneList(exprs, smap);
+    List<Expr> resolvedExprs = Expr.substituteList(exprs, smap, analyzer);
     analyzer.materializeSlots(resolvedExprs);
 
     if (isDistinctAgg_) {

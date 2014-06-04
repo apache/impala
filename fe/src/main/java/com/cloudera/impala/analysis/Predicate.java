@@ -28,6 +28,14 @@ public abstract class Predicate extends Expr {
     this.isEqJoinConjunct_ = false;
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected Predicate(Predicate other) {
+    super(other);
+    isEqJoinConjunct_ = other.isEqJoinConjunct_;
+  }
+
   public boolean isEqJoinConjunct() { return isEqJoinConjunct_; }
   public void setIsEqJoinConjunct(boolean v) { isEqJoinConjunct_ = v; }
 

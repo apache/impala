@@ -37,6 +37,11 @@ public class FunctionCallExpr extends Expr {
   private final FunctionName fnName_;
   private final FunctionParams params_;
 
+  // Indicates whether this is a merge aggregation function. This flag affects
+  // resetAnalysisState() which is used during expr substitution.
+  // TODO: Re-think how we generate the merge aggregation and remove this flag.
+  private boolean isMergeAggFn_ = false;
+
   public FunctionCallExpr(String functionName, List<Expr> params) {
     this(new FunctionName(functionName), new FunctionParams(false, params));
   }
@@ -47,7 +52,7 @@ public class FunctionCallExpr extends Expr {
 
   public FunctionCallExpr(FunctionName fnName, FunctionParams params) {
     super();
-    this.fnName_ = fnName;
+    fnName_ = fnName;
     params_ = params;
     if (params.exprs() != null) children_.addAll(params.exprs());
   }
@@ -72,6 +77,27 @@ public class FunctionCallExpr extends Expr {
     params_ = params;
     // Just inherit the function object from 'e'.
     if (params.exprs() != null) children_.addAll(params.exprs());
+  }
+
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected FunctionCallExpr(FunctionCallExpr other) {
+    super(other);
+    fnName_ = other.fnName_;
+    isMergeAggFn_ = other.isMergeAggFn_;
+    // No need to deep clone the params, its exprs are already in children_.
+    params_ = other.params_;
+  }
+
+  @Override
+  public void resetAnalysisState() {
+    isAnalyzed_ = false;
+    // Resolving merge agg functions after substitution may fail e.g., if the
+    // intermediate agg type is not the same as the output type. Preserve the original
+    // fn_ such that analyze() hits the special-case code for merge agg fns that
+    // handles this case.
+    if (!isMergeAggFn_) fn_ = null;
   }
 
   @Override
@@ -119,6 +145,7 @@ public class FunctionCallExpr extends Expr {
     return params_.isDistinct();
   }
 
+  public void setIsMergeAggFn() { isMergeAggFn_ = true; }
   public FunctionName getFnName() { return fnName_; }
 
   @Override
@@ -223,9 +250,9 @@ public class FunctionCallExpr extends Expr {
           throw new AnalysisException(fnName_.getFunction() +
               "() must be called with a constant second argument.");
         }
-        IntLiteral scaleLiteral = (IntLiteral)LiteralExpr.create(
+        NumericLiteral scaleLiteral = (NumericLiteral) LiteralExpr.create(
             children_.get(1), analyzer.getQueryCtx());
-        resultScale = (int)scaleLiteral.getValue();
+        resultScale = (int)scaleLiteral.getLongValue();
         if (Math.abs(resultScale) > ColumnType.MAX_SCALE) {
           throw new AnalysisException("Cannot round/truncate to scales greater than " +
               ColumnType.MAX_SCALE + ".");
@@ -355,4 +382,7 @@ public class FunctionCallExpr extends Expr {
       type_ = resolveDecimalReturnType(analyzer);
     }
   }
+
+  @Override
+  public Expr clone() { return new FunctionCallExpr(this); }
 }

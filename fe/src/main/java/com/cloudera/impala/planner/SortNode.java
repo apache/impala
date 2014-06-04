@@ -84,16 +84,17 @@ public class SortNode extends PlanNode {
     // Compute the memory layout for the generated tuple.
     computeMemLayout(analyzer);
     computeStats(analyzer);
-    createDefaultSmap();
+    createDefaultSmap(analyzer);
     List<SlotDescriptor> sortTupleSlots = info_.getSortTupleDescriptor().getSlots();
     List<Expr> slotExprs = info_.getSortTupleSlotExprs();
     Preconditions.checkState(sortTupleSlots.size() == slotExprs.size());
     baseTblMaterializedTupleExprs_ = Lists.newArrayList();
     for (int i = 0; i < slotExprs.size(); ++i) {
-      if (sortTupleSlots.get(i).isMaterialized()) {
-        baseTblMaterializedTupleExprs_.add(slotExprs.get(i).clone(baseTblSmap_));
-      }
+      if (!sortTupleSlots.get(i).isMaterialized()) continue;
+      baseTblMaterializedTupleExprs_.add(slotExprs.get(i));
     }
+    baseTblMaterializedTupleExprs_ =
+        Expr.substituteList(baseTblMaterializedTupleExprs_, baseTblSmap_, analyzer);
   }
 
   @Override

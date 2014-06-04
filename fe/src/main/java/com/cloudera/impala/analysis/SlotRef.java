@@ -76,6 +76,19 @@ public class SlotRef extends Expr {
     this.numDistinctValues_ = desc.getStats().getNumDistinctValues();
   }
 
+  /**
+   * C'tor for cloning.
+   */
+  private SlotRef(SlotRef other) {
+    super(other);
+    tblName_ = other.tblName_;
+    col_ = other.col_;
+    label_ = other.label_;
+    desc_ = other.desc_;
+    type_ = other.type_;
+    isAnalyzed_ = other.isAnalyzed_;
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
@@ -96,6 +109,7 @@ public class SlotRef extends Expr {
     type_.analyze();
     numDistinctValues_ = desc_.getStats().getNumDistinctValues();
     if (type_.isBoolean()) selectivity_ = DEFAULT_SELECTIVITY;
+    isAnalyzed_ = true;
   }
 
   @Override
@@ -177,7 +191,8 @@ public class SlotRef extends Expr {
     if (tupleIds != null) tupleIds.add(desc_.getParent().getId());
   }
 
-  public String getColumnName() {
-    return col_;
-  }
+  public String getColumnName() { return col_; }
+
+  @Override
+  public Expr clone() { return new SlotRef(this); }
 }

@@ -52,12 +52,12 @@ public class InlineViewRef extends TableRef {
   // Map inline view's output slots to the corresponding resultExpr of queryStmt.
   // Some rhs exprs are wrapped into IF(TupleIsNull(), NULL, expr) by calling
   // makeOutputNullable() if this inline view is a nullable side of an outer join.
-  protected final Expr.SubstitutionMap smap_ = new Expr.SubstitutionMap();
+  protected final ExprSubstitutionMap smap_ = new ExprSubstitutionMap();
 
   // Map inline view's output slots to the corresponding baseTblResultExpr of queryStmt.
   // Some rhs exprs are wrapped into IF(TupleIsNull(), NULL, expr) by calling
   // makeOutputNullable() if this inline view is a nullable side of an outer join.
-  protected final Expr.SubstitutionMap baseTblSmap_ = new Expr.SubstitutionMap();
+  protected final ExprSubstitutionMap baseTblSmap_ = new ExprSubstitutionMap();
 
   /**
    * Constructor with alias and inline view select statement
@@ -123,10 +123,10 @@ public class InlineViewRef extends TableRef {
       SlotDescriptor slotDesc = analyzer.registerColumnRef(getAliasAsName(), colName);
       slotDesc.setStats(ColumnStats.fromExpr(colExpr));
       SlotRef slotRef = new SlotRef(slotDesc);
-      smap_.addMapping(slotRef, colExpr);
-      baseTblSmap_.addMapping(slotRef, queryStmt_.getBaseTblResultExprs().get(i));
+      smap_.put(slotRef, colExpr);
+      baseTblSmap_.put(slotRef, queryStmt_.getBaseTblResultExprs().get(i));
 
-      analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), colExpr.clone(null));
+      analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), colExpr.clone());
     }
     LOG.info("inline view " + getAlias() + " smap: " + smap_.debugString());
     LOG.info("inline view " + getAlias() + " baseTblSmap: " + baseTblSmap_.debugString());
@@ -186,15 +186,17 @@ public class InlineViewRef extends TableRef {
     makeOutputNullableHelper(analyzer, baseTblSmap_);
   }
 
-  protected void makeOutputNullableHelper(Analyzer analyzer, Expr.SubstitutionMap smap)
+  protected void makeOutputNullableHelper(Analyzer analyzer, ExprSubstitutionMap smap)
       throws AnalysisException, InternalException, AuthorizationException {
     // Gather all unique rhs SlotRefs into rhsSlotRefs
     List<SlotRef> rhsSlotRefs = Lists.newArrayList();
     TreeNode.collect(smap.getRhs(), Predicates.instanceOf(SlotRef.class), rhsSlotRefs);
     // Map for substituting SlotRefs with NullLiterals.
-    Expr.SubstitutionMap nullSMap = new Expr.SubstitutionMap();
+    ExprSubstitutionMap nullSMap = new ExprSubstitutionMap();
+    NullLiteral nullLiteral = new NullLiteral();
+    nullLiteral.analyze(analyzer);
     for (SlotRef rhsSlotRef: rhsSlotRefs) {
-      nullSMap.addMapping(rhsSlotRef.clone(null), new NullLiteral());
+      nullSMap.put(rhsSlotRef.clone(), nullLiteral.clone());
     }
 
     // Make rhs exprs nullable if necessary.
@@ -216,7 +218,7 @@ public class InlineViewRef extends TableRef {
    * false otherwise.
    */
   private boolean requiresNullWrapping(Analyzer analyzer, Expr expr,
-      Expr.SubstitutionMap nullSMap) throws InternalException, AuthorizationException {
+      ExprSubstitutionMap nullSMap) throws InternalException, AuthorizationException {
     // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
     // then do not try to execute it.
     // TODO: return true in this case?
@@ -224,11 +226,12 @@ public class InlineViewRef extends TableRef {
 
     // Replace all SlotRefs in expr with NullLiterals, and wrap the result
     // with an IS NOT NULL predicate.
-    Expr isNotNullLiteralPred = new IsNullPredicate(expr.clone(nullSMap), true);
+    Expr isNotNullLiteralPred =
+        new IsNullPredicate(expr.substitute(nullSMap, analyzer), true);
     Preconditions.checkState(isNotNullLiteralPred.isConstant());
     // analyze to insert casts, etc.
     try {
-      isNotNullLiteralPred.reanalyze(analyzer);
+      isNotNullLiteralPred.analyze(analyzer);
     } catch (AnalysisException e) {
       // this should never happen
       throw new InternalException(
@@ -249,12 +252,12 @@ public class InlineViewRef extends TableRef {
     return inlineViewAnalyzer_;
   }
 
-  public Expr.SubstitutionMap getSmap() {
+  public ExprSubstitutionMap getSmap() {
     Preconditions.checkState(isAnalyzed_);
     return smap_;
   }
 
-  public Expr.SubstitutionMap getBaseTblSmap() {
+  public ExprSubstitutionMap getBaseTblSmap() {
     Preconditions.checkState(isAnalyzed_);
     return baseTblSmap_;
   }

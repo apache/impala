@@ -23,10 +23,9 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.BoolLiteral;
 import com.cloudera.impala.analysis.CompoundPredicate;
-import com.cloudera.impala.analysis.DecimalLiteral;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.analysis.NumericLiteral;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.StringLiteral;
 import com.cloudera.impala.analysis.TupleDescriptor;
@@ -111,16 +110,18 @@ public class DataSourceScanNode extends ScanNode {
     case BOOLEAN:
       return new TColumnValue().setBool_val(((BoolLiteral) expr).getValue());
     case TINYINT:
-      return new TColumnValue().setByte_val((byte) ((IntLiteral) expr).getValue());
+      return new TColumnValue().setByte_val(
+          (byte) ((NumericLiteral) expr).getLongValue());
     case SMALLINT:
-      return new TColumnValue().setShort_val((short) ((IntLiteral) expr).getValue());
+      return new TColumnValue().setShort_val(
+          (short) ((NumericLiteral) expr).getLongValue());
     case INT:
-      return new TColumnValue().setInt_val((int) ((IntLiteral) expr).getValue());
+      return new TColumnValue().setInt_val((int) ((NumericLiteral) expr).getLongValue());
     case BIGINT:
-      return new TColumnValue().setLong_val(((IntLiteral) expr).getValue());
+      return new TColumnValue().setLong_val(((NumericLiteral) expr).getLongValue());
     case FLOAT:
     case DOUBLE:
-      return new TColumnValue().setDouble_val(((DecimalLiteral) expr).getDoubleValue());
+      return new TColumnValue().setDouble_val(((NumericLiteral) expr).getDoubleValue());
     case STRING:
       return new TColumnValue().setString_val(((StringLiteral) expr).getValue());
     case DECIMAL:

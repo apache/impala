@@ -18,7 +18,7 @@ from tests.common.test_dimensions import create_uncompressed_text_dimension
 class TestExprLimits(ImpalaTestSuite):
   # Keep these in sync with Expr.java
   EXPR_CHILDREN_LIMIT = 10000;
-  EXPR_DEPTH_LIMIT = 2000;
+  EXPR_DEPTH_LIMIT = 1500;
 
   @classmethod
   def get_workload(self):

@@ -36,7 +36,13 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
 
   public LiteralExpr() {
     numDistinctValues_ = 1;
-    isAnalyzed_ = true;
+  }
+
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected LiteralExpr(LiteralExpr other) {
+    super(other);
   }
 
   /**
@@ -57,12 +63,10 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
       case SMALLINT:
       case INT:
       case BIGINT:
-        e = new IntLiteral(value);
-        break;
       case FLOAT:
       case DOUBLE:
       case DECIMAL:
-        e = new DecimalLiteral(value, type);
+        e = new NumericLiteral(value, type);
         break;
       case STRING:
         e = new StringLiteral(value);
@@ -87,30 +91,40 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
    */
   public static LiteralExpr fromThrift(TExprNode exprNode, ColumnType colType) {
     try {
+      LiteralExpr result = null;
       switch (exprNode.node_type) {
         case FLOAT_LITERAL:
-          return LiteralExpr.create(
+          result = LiteralExpr.create(
               Double.toString(exprNode.float_literal.value), colType);
+          break;
         case DECIMAL_LITERAL:
           byte[] bytes = exprNode.decimal_literal.getValue();
           BigDecimal val = new BigDecimal(new BigInteger(bytes));
           // We store the decimal as the unscaled bytes. Need to adjust for the scale.
           val = val.movePointLeft(colType.decimalScale());
-          return new DecimalLiteral(val, colType);
+          result = new NumericLiteral(val, colType);
+          break;
         case INT_LITERAL:
-          return LiteralExpr.create(
+          result = LiteralExpr.create(
               Long.toString(exprNode.int_literal.value), colType);
+          break;
         case STRING_LITERAL:
-          return LiteralExpr.create(exprNode.string_literal.value, colType);
+          result = LiteralExpr.create(exprNode.string_literal.value, colType);
+          break;
         case BOOL_LITERAL:
-          return LiteralExpr.create(
+          result =  LiteralExpr.create(
               Boolean.toString(exprNode.bool_literal.value), colType);
+          break;
         case NULL_LITERAL:
-          return new NullLiteral();
+          result = (LiteralExpr) new NullLiteral().castTo(colType);
+          break;
         default:
           throw new UnsupportedOperationException("Unsupported partition key type: " +
               exprNode.node_type);
       }
+      Preconditions.checkNotNull(result);
+      result.analyze(null);
+      return result;
     } catch (Exception e) {
       throw new IllegalStateException("Error creating LiteralExpr: ", e);
     }
@@ -157,33 +171,35 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         break;
       case TINYINT:
         if (val.isSetByte_val()) {
-          result = new IntLiteral(BigInteger.valueOf(val.byte_val));
+          result = new NumericLiteral(BigDecimal.valueOf(val.byte_val));
         }
         break;
       case SMALLINT:
         if (val.isSetShort_val()) {
-          result = new IntLiteral(BigInteger.valueOf(val.short_val));
+          result = new NumericLiteral(BigDecimal.valueOf(val.short_val));
         }
         break;
       case INT:
-        if (val.isSetInt_val()) result = new IntLiteral(BigInteger.valueOf(val.int_val));
+        if (val.isSetInt_val()) {
+          result = new NumericLiteral(BigDecimal.valueOf(val.int_val));
+        }
         break;
       case BIGINT:
         if (val.isSetLong_val()) {
-          result = new IntLiteral(BigInteger.valueOf(val.long_val));
+          result = new NumericLiteral(BigDecimal.valueOf(val.long_val));
         }
         break;
       case FLOAT:
       case DOUBLE:
         if (val.isSetDouble_val()) {
           result =
-              new DecimalLiteral(new BigDecimal(val.double_val), constExpr.getType());
+              new NumericLiteral(new BigDecimal(val.double_val), constExpr.getType());
         }
         break;
       case DECIMAL:
         if (val.isSetString_val()) {
           result =
-              new DecimalLiteral(new BigDecimal(val.string_val), constExpr.getType());
+              new NumericLiteral(new BigDecimal(val.string_val), constExpr.getType());
         }
         break;
       case STRING:

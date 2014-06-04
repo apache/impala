@@ -217,8 +217,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     tokenIdMap.put(new Integer(SqlParserSymbols.RPAREN), ")");
     tokenIdMap.put(new Integer(SqlParserSymbols.LBRACKET), "[");
     tokenIdMap.put(new Integer(SqlParserSymbols.RBRACKET), "]");
-    tokenIdMap.put(new Integer(SqlParserSymbols.DECIMAL_LITERAL),
-        "DECIMAL LITERAL");
+    tokenIdMap.put(new Integer(SqlParserSymbols.DECIMAL_LITERAL), "DECIMAL LITERAL");
     tokenIdMap.put(new Integer(SqlParserSymbols.INTEGER_LITERAL), "INTEGER LITERAL");
     tokenIdMap.put(new Integer(SqlParserSymbols.NOT), "!");
     tokenIdMap.put(new Integer(SqlParserSymbols.LESSTHAN), "<");
@@ -309,10 +308,12 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 "'" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 "`" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 
+// The rules for IntegerLiteral and DecimalLiteral are the same, but it is useful
+// to distinguish them, e.g., so the Parser can use integer literals without analysis.
 {IntegerLiteral} {
-  BigInteger val = null;
+  BigDecimal val = null;
   try {
-    val = new BigInteger(yytext());
+    val = new BigDecimal(yytext());
   } catch (NumberFormatException e) {
     return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
   }

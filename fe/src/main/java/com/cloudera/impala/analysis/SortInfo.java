@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
+import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -24,7 +25,7 @@ import com.google.common.collect.Lists;
  * This doesn't contain aliases or positional exprs.
  */
 public class SortInfo {
-  private final List<Expr> orderingExprs_;
+  private List<Expr> orderingExprs_;
   private final List<Boolean> isAscOrder_;
   // True if "NULLS FIRST", false if "NULLS LAST", null if not specified.
   private final List<Boolean> nullsFirstParams_;
@@ -72,7 +73,8 @@ public class SortInfo {
    * Materializes the slots referenced by the corresponding sortTupleSlotExpr after
    * applying the 'smap'.
    */
-  public void materializeRequiredSlots(Analyzer analyzer, Expr.SubstitutionMap smap) {
+  public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap)
+      throws InternalException {
     Preconditions.checkNotNull(sortTupleDesc_);
     Preconditions.checkNotNull(sortTupleSlotExprs_);
     Preconditions.checkState(sortTupleDesc_.getIsMaterialized());
@@ -84,7 +86,12 @@ public class SortInfo {
         materializedExprs.add(sortTupleSlotExprs_.get(i));
       }
     }
-    analyzer.materializeSlots(Expr.cloneList(materializedExprs, smap));
+    List<Expr> substMaterializedExprs =
+        Expr.substituteList(materializedExprs, smap, analyzer);
+    analyzer.materializeSlots(substMaterializedExprs);
   }
 
+  public void substituteOrderingExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    orderingExprs_ = Expr.substituteList(orderingExprs_, smap, analyzer);
+  }
 }

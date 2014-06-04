@@ -228,7 +228,7 @@ terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
 terminal String NUMERIC_OVERFLOW;
-terminal BigInteger INTEGER_LITERAL;
+terminal BigDecimal INTEGER_LITERAL;
 terminal BigDecimal DECIMAL_LITERAL;
 terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
@@ -1729,13 +1729,12 @@ sign_chain_expr ::=
     // integrate signs into literals
     // integer literals require analysis to set their type, so the instance check below
     // is not equivalent to e.getType().isNumericType()
-    if (e.isLiteral() &&
-       (e instanceof IntLiteral || e instanceof DecimalLiteral)) {
+    if (e.isLiteral() && e instanceof NumericLiteral) {
       ((LiteralExpr)e).swapSign();
       RESULT = e;
     } else {
       RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY,
-                                  new IntLiteral(BigInteger.valueOf(-1)), e);
+                                  new NumericLiteral(BigDecimal.valueOf(-1)), e);
     }
   :}
   | ADD expr:e
@@ -1842,9 +1841,9 @@ timestamp_arithmetic_expr ::=
 
 literal ::=
   INTEGER_LITERAL:l
-  {: RESULT = new IntLiteral(l); :}
+  {: RESULT = new NumericLiteral(l); :}
   | DECIMAL_LITERAL:l
-  {: RESULT = new DecimalLiteral(l); :}
+  {: RESULT = new NumericLiteral(l); :}
   | STRING_LITERAL:l
   {: RESULT = new StringLiteral(l); :}
   | KW_TRUE

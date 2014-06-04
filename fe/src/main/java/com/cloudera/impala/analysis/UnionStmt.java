@@ -60,7 +60,7 @@ public class UnionStmt extends QueryStmt {
     private Analyzer analyzer_;
 
     // map from UnionStmts result slots to our resultExprs; useful during plan generation
-    private final Expr.SubstitutionMap smap_ = new Expr.SubstitutionMap();
+    private final ExprSubstitutionMap smap_ = new ExprSubstitutionMap();
 
     // set if this operand is guaranteed to return an empty result set;
     // used in planning when assigning conjuncts
@@ -82,7 +82,7 @@ public class UnionStmt extends QueryStmt {
     // Used for propagating DISTINCT.
     public void setQualifier(Qualifier qualifier) { this.qualifier_ = qualifier; }
     public Analyzer getAnalyzer() { return analyzer_; }
-    public Expr.SubstitutionMap getSmap() { return smap_; }
+    public ExprSubstitutionMap getSmap() { return smap_; }
     public void drop() { isDropped_ = true; }
     public boolean isDropped() { return isDropped_; }
 
@@ -208,9 +208,9 @@ public class UnionStmt extends QueryStmt {
     createSortInfo(analyzer);
     toSqlString_ = toSql();
 
-    // fill distinct-/allOperands
     unnestOperands(analyzer);
     if (evaluateOrderBy_) createSortTupleInfo(analyzer);
+    baseTblResultExprs_ = resultExprs_;
   }
 
   /**
@@ -219,7 +219,7 @@ public class UnionStmt extends QueryStmt {
    * Calls materializeRequiredSlots() on the operands themselves.
    */
   @Override
-  public void materializeRequiredSlots(Analyzer analyzer) {
+  public void materializeRequiredSlots(Analyzer analyzer) throws InternalException {
     TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tupleId_);
     if (!distinctOperands_.isEmpty()) {
       // to keep things simple we materialize all grouping exprs = output slots,
@@ -305,7 +305,7 @@ public class UnionStmt extends QueryStmt {
     // create distinctAggInfo, if necessary
     if (!distinctOperands_.isEmpty()) {
       // Aggregate produces exactly the same tuple as the original union stmt.
-      ArrayList<Expr> groupingExprs = Expr.cloneList(resultExprs_, null);
+      ArrayList<Expr> groupingExprs = Expr.cloneList(resultExprs_);
       try {
         distinctAggInfo_ =
             AggregateInfo.create(groupingExprs, null,
@@ -330,10 +330,10 @@ public class UnionStmt extends QueryStmt {
     operand.getSmap().clear();
     for (int i = 0; i < tupleDesc.getSlots().size(); ++i) {
       SlotDescriptor outputSlot = tupleDesc.getSlots().get(i);
-      operand.getSmap().addMapping(
+      operand.getSmap().put(
           new SlotRef(outputSlot),
           // TODO: baseTblResultExprs?
-          operand.getQueryStmt().getResultExprs().get(i).clone(null));
+          operand.getQueryStmt().getResultExprs().get(i).clone());
     }
   }
 
@@ -441,7 +441,7 @@ public class UnionStmt extends QueryStmt {
         if (aliasSmap_.containsMappingFor(aliasRef)) {
           ambiguousAliasList_.add(aliasRef);
         } else {
-          aliasSmap_.addMapping(aliasRef, outputSlotRef);
+          aliasSmap_.put(aliasRef, outputSlotRef);
         }
       }
 
@@ -462,14 +462,16 @@ public class UnionStmt extends QueryStmt {
    * expressions from the resultExprs.
    */
   @Override
-  protected void substituteOrdinals(List<Expr> exprs, String errorPrefix)
-      throws AnalysisException {
+  protected void substituteOrdinals(List<Expr> exprs, String errorPrefix,
+      Analyzer analyzer) throws AnalysisException, AuthorizationException {
     // Substitute ordinals.
     ListIterator<Expr> i = exprs.listIterator();
     while (i.hasNext()) {
       Expr expr = i.next();
-      if (!(expr instanceof IntLiteral)) continue;
-      long pos = ((IntLiteral) expr).getValue();
+      if (!(expr instanceof NumericLiteral)) continue;
+      expr.analyze(analyzer);
+      if (!expr.getType().isIntegerType()) continue;
+      long pos = ((NumericLiteral) expr).getLongValue();
       if (pos < 1) {
         throw new AnalysisException(
             errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
@@ -480,13 +482,11 @@ public class UnionStmt extends QueryStmt {
             + expr.toSql());
       }
       // Create copy to protect against accidentally shared state.
-      i.set(resultExprs_.get((int) pos - 1).clone(null));
+      i.set(resultExprs_.get((int) pos - 1).clone());
     }
   }
 
-  public TupleId getTupleId() {
-    return tupleId_;
-  }
+  public TupleId getTupleId() { return tupleId_; }
 
   @Override
   public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
@@ -562,7 +562,7 @@ public class UnionStmt extends QueryStmt {
       operandClones.add(operand.clone());
     }
     UnionStmt unionClone = new UnionStmt(operandClones, cloneOrderByElements(),
-        limitElement_ == null ? null : limitElement_.clone(null));
+        limitElement_ == null ? null : limitElement_.clone());
     unionClone.setWithClause(cloneWithClause());
     return unionClone;
   }

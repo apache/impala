@@ -40,6 +40,14 @@ public class BoolLiteral extends LiteralExpr {
     }
   }
 
+  /**
+   * Copy c'tor used in clone.
+   */
+  protected BoolLiteral(BoolLiteral other) {
+    super(other);
+    value_ = other.value_;
+  }
+
   @Override
   public String debugString() {
     return Objects.toStringHelper(this)
@@ -90,4 +98,7 @@ public class BoolLiteral extends LiteralExpr {
     if (!value_ && other.getValue()) return -1;
     return 0;
   }
+
+  @Override
+  public Expr clone() { return new BoolLiteral(this); }
 }

@@ -68,6 +68,23 @@ class DateLiteral extends LiteralExpr {
     this.type_ = type;
   }
 
+  /**
+   * Copy c'tor used in clone().
+   */
+  protected DateLiteral(DateLiteral other) {
+    super(other);
+    if (other.value_ != null) {
+      value_ = (Timestamp) other.value_.clone();
+    } else {
+      value_ = null;
+    }
+    if (other.acceptedFormat_ != null) {
+      acceptedFormat_ = (SimpleDateFormat) other.acceptedFormat_.clone();
+    } else {
+      acceptedFormat_ = null;
+    }
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
@@ -108,4 +125,7 @@ class DateLiteral extends LiteralExpr {
   public int compareTo(LiteralExpr o) {
     throw new IllegalStateException("DateLiteral is not supported.");
   }
+
+  @Override
+  public Expr clone() { return new DateLiteral(this); }
 }
