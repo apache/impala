@@ -49,8 +49,12 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
       catalog_update_result_.reset(
           new TCatalogUpdateResult(exec_response_.get()->result));
       Status status(exec_response_->result.status);
-      if (status.ok() && request.ddl_params.ddl_type == TDdlType::DROP_FUNCTION) {
-        HandleDropFunction(request.ddl_params.drop_fn_params);
+      if (status.ok()) {
+        if (request.ddl_params.ddl_type == TDdlType::DROP_FUNCTION) {
+          HandleDropFunction(request.ddl_params.drop_fn_params);
+        } else if (request.ddl_params.ddl_type == TDdlType::DROP_DATA_SOURCE) {
+          HandleDropDataSource(request.ddl_params.drop_data_source_params);
+        }
       }
       return status;
     }
@@ -115,7 +119,7 @@ void CatalogOpExecutor::HandleDropFunction(const TDropFunctionParams& request) {
   Status status = fe_->GetCatalogObject(obj, &fn);
   if (!status.ok()) {
     // This can happen if the function was dropped by another impalad.
-    VLOG_QUERY << "Could not lookup catalog object: "
+    VLOG_QUERY << "Could not lookup function catalog object: "
                << apache::thrift::ThriftDebugString(request);
     return;
   }
@@ -125,6 +129,35 @@ void CatalogOpExecutor::HandleDropFunction(const TDropFunctionParams& request) {
   // gets applied *before* the result of a direct-DDL drop function command.
   if (fn.catalog_version <= catalog_update_result_->version) {
     LibCache::instance()->RemoveEntry(fn.fn.hdfs_location);
+  }
+}
+
+void CatalogOpExecutor::HandleDropDataSource(const TDropDataSourceParams& request) {
+  DCHECK(fe_ != NULL) << "FE tests should not be calling this";
+  // Can only be called after successfully processing a catalog update.
+  DCHECK(catalog_update_result_ != NULL);
+
+  // Lookup in the local catalog the metadata for the data source.
+  TCatalogObject obj;
+  obj.type = TCatalogObjectType::DATA_SOURCE;
+  obj.data_source.name = request.data_source;
+  obj.__isset.data_source = true;
+
+  TCatalogObject ds;
+  Status status = fe_->GetCatalogObject(obj, &ds);
+  if (!status.ok()) {
+    // This can happen if the data source was dropped by another impalad.
+    VLOG_QUERY << "Could not lookup data source catalog object: "
+               << apache::thrift::ThriftDebugString(request);
+    return;
+  }
+  // This data source may have been dropped and re-created. To avoid removing the
+  // re-created data source's entry from the cache verify the existing data source has a
+  // catalog version <= the dropped version. This may happen if the update from the
+  // statestore gets applied *before* the result of a direct-DDL drop data source
+  // command.
+  if (ds.catalog_version <= catalog_update_result_->version) {
+    LibCache::instance()->RemoveEntry(ds.data_source.hdfs_location);
   }
 }
 

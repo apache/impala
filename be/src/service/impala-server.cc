@@ -1330,20 +1330,24 @@ void ImpalaServer::CatalogUpdateCallback(
         new_catalog_version = catalog_object.catalog_version;
       }
 
-      // Refresh the lib cache entries of any added functions
+      // Refresh the lib cache entries of any added functions and data sources
       if (catalog_object.type == TCatalogObjectType::FUNCTION) {
         DCHECK(catalog_object.__isset.fn);
         LibCache::instance()->SetNeedsRefresh(catalog_object.fn.hdfs_location);
+      }
+      if (catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
+        DCHECK(catalog_object.__isset.data_source);
+        LibCache::instance()->SetNeedsRefresh(catalog_object.data_source.hdfs_location);
       }
 
       update_req.updated_objects.push_back(catalog_object);
     }
 
-    // We need to look up the dropped functions and remove them from the library
-    // cache. The data sent from the catalog service does not contain all the
-    // function metadata so we'll ask our local frontend for it. We need to do
-    // this before updating the catalog.
-    vector<TCatalogObject> dropped_functions;
+    // We need to look up the dropped functions and data sources and remove them
+    // from the library cache. The data sent from the catalog service does not
+    // contain all the function metadata so we'll ask our local frontend for it. We
+    // need to do this before updating the catalog.
+    vector<TCatalogObject> dropped_objects;
 
     // Process all Catalog deletions (dropped objects). We only know the keys (object
     // names) so must parse each key to determine the TCatalogObject.
@@ -1357,15 +1361,19 @@ void ImpalaServer::CatalogUpdateCallback(
         continue;
       }
       update_req.removed_objects.push_back(catalog_object);
-      if (catalog_object.type == TCatalogObjectType::FUNCTION) {
-        TCatalogObject dropped_function;
+      if (catalog_object.type == TCatalogObjectType::FUNCTION ||
+          catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
+        TCatalogObject dropped_object;
         if (exec_env_->frontend()->GetCatalogObject(
-                catalog_object, &dropped_function).ok()) {
-          // This function may have been dropped and re-created. To avoid removing the
-          // re-created function's entry from the cache verify the existing function has a
+                catalog_object, &dropped_object).ok()) {
+          // This object may have been dropped and re-created. To avoid removing the
+          // re-created object's entry from the cache verify the existing object has a
           // catalog version <= the catalog version included in this statestore heartbeat.
-          if (dropped_function.catalog_version <= new_catalog_version) {
-            dropped_functions.push_back(dropped_function);
+          if (dropped_object.catalog_version <= new_catalog_version) {
+            if (catalog_object.type == TCatalogObjectType::FUNCTION ||
+                catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
+              dropped_objects.push_back(dropped_object);
+            }
           }
         }
         // Nothing to do in error case.
@@ -1383,7 +1391,8 @@ void ImpalaServer::CatalogUpdateCallback(
       update.topic_name = CatalogServer::IMPALA_CATALOG_TOPIC;
       update.__set_from_version(0L);
       ImpaladMetrics::CATALOG_READY->Update(false);
-      // Dropped all cached lib files (this behaves as if all functions are dropped).
+      // Dropped all cached lib files (this behaves as if all functions and data
+      // sources are dropped).
       LibCache::instance()->DropCache();
     } else {
       {
@@ -1394,10 +1403,16 @@ void ImpalaServer::CatalogUpdateCallback(
       }
       ImpaladMetrics::CATALOG_READY->Update(new_catalog_version > 0);
       UpdateCatalogMetrics();
-      // Remove all dropped functions from the library cache.
+      // Remove all dropped objects from the library cache.
       // TODO: is this expensive? We'd like to process heartbeats promptly.
-      for (int i = 0; i < dropped_functions.size(); ++i) {
-        LibCache::instance()->RemoveEntry(dropped_functions[i].fn.hdfs_location);
+      BOOST_FOREACH(TCatalogObject& object, dropped_objects) {
+        if (object.type == TCatalogObjectType::FUNCTION) {
+          LibCache::instance()->RemoveEntry(object.fn.hdfs_location);
+        } else if (object.type == TCatalogObjectType::DATA_SOURCE) {
+          LibCache::instance()->RemoveEntry(object.data_source.hdfs_location);
+        } else {
+          DCHECK(false);
+        }
       }
     }
   }

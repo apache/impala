@@ -434,6 +434,17 @@ public abstract class Catalog {
         result.setFn(fn.toThrift());
         break;
       }
+      case DATA_SOURCE: {
+        String dataSrcName = objectDesc.getData_source().getName();
+        DataSource dataSrc = getDataSource(dataSrcName);
+        if (dataSrc == null) {
+          throw new CatalogException("Data source not found: " + dataSrcName);
+        }
+        result.setType(dataSrc.getCatalogObjectType());
+        result.setCatalog_version(dataSrc.getCatalogVersion());
+        result.setData_source(dataSrc.toThrift());
+        break;
+      }
       case HDFS_CACHE_POOL: {
         HdfsCachePool pool = getHdfsCachePool(objectDesc.getCache_pool().getPool_name());
         if (pool == null) {

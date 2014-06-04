@@ -92,9 +92,10 @@ class CatalogOpExecutor {
   ExecEnv* env_;
   Frontend* fe_;
 
-  // Handles additional BE work that needs to be done for drop function, in particular,
-  // clearing the local library cache for this function.
+  // Handles additional BE work that needs to be done for drop function and data source,
+  // in particular, clearing the local library cache for this function.
   void HandleDropFunction(const TDropFunctionParams&);
+  void HandleDropDataSource(const TDropDataSourceParams&);
 };
 
 }

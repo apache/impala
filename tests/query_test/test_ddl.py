@@ -27,7 +27,7 @@ from tests.common.impala_test_suite import *
 # Validates DDL statements (create, drop)
 class TestDdlStatements(ImpalaTestSuite):
   TEST_DBS = ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2',
-              'function_ddl_test', 'udf_test']
+              'function_ddl_test', 'udf_test', 'data_src_test']
 
   @classmethod
   def get_workload(self):
@@ -138,23 +138,50 @@ class TestDdlStatements(ImpalaTestSuite):
   def test_create_drop_function(self, vector):
     # This will create, run, and drop the same function repeatedly, exercising the
     # lib cache mechanism.
-    # TODO: it's hard to tell that the cache is working (i.e. if it did
-    # nothing to drop the cache, these tests would still pass). Testing
-    # that is a bit harder and requires us to update the udf binary in
-    # the middle.
     create_fn_stmt = """create function f() returns int
         location '/test-warehouse/libTestUdfs.so' symbol='NoArgs'"""
     select_stmt = """select f() from functional.alltypes limit 10"""
-    drop_fn_stmt = "drop function f()"
-    self.__create_db_synced('udf_test', vector)
+    drop_fn_stmt = "drop function %s f()"
+    self.create_drop_ddl(vector, "udf_test", [create_fn_stmt], [drop_fn_stmt],
+        select_stmt)
+
+  @pytest.mark.execute_serially
+  def test_create_drop_data_src(self, vector):
+    # This will create, run, and drop the same data source repeatedly, exercising
+    # the lib cache mechanism.
+    create_ds_stmt = """CREATE DATA SOURCE test_data_src
+        LOCATION '/test-warehouse/data-sources/test-data-source.jar'
+        CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource'
+        API_VERSION 'V1'"""
+    create_tbl_stmt = """CREATE TABLE data_src_tbl (x int)
+        PRODUCED BY DATA SOURCE test_data_src"""
+    drop_ds_stmt = "drop data source %s test_data_src"
+    drop_tbl_stmt = "drop table %s data_src_tbl"
+    select_stmt = "select * from data_src_tbl limit 1"
+
+    create_stmts = [create_ds_stmt, create_tbl_stmt]
+    drop_stmts = [drop_tbl_stmt, drop_ds_stmt]
+    self.create_drop_ddl(vector, "data_src_test", create_stmts, drop_stmts,
+        select_stmt)
+
+  def create_drop_ddl(self, vector, db_name, create_stmts, drop_stmts, select_stmt):
+    # Helper method to run CREATE/DROP DDL commands repeatedly and exercise the lib cache
+    # create_stmts is the list of CREATE statements to be executed in order drop_stmts is
+    # the list of DROP statements to be executed in order. Each statement should have a
+    # '%s' placeholder to insert "IF EXISTS" or "". The select_stmt is just a single
+    # statement to test after executing the CREATE statements.
+    # TODO: it's hard to tell that the cache is working (i.e. if it did nothing to drop
+    # the cache, these tests would still pass). Testing that is a bit harder and requires
+    # us to update the udf binary in the middle.
+    self.__create_db_synced(db_name, vector)
     self.client.set_configuration(vector.get_value('exec_option'))
 
-    self.client.execute("use udf_test")
-    self.client.execute("drop function if exists f()")
+    self.client.execute("use %s" % (db_name,))
+    for drop_stmt in drop_stmts: self.client.execute(drop_stmt % ("if exists"))
     for i in xrange(1, 10):
-      self.client.execute(create_fn_stmt)
+      for create_stmt in create_stmts: self.client.execute(create_stmt)
       self.client.execute(select_stmt)
-      self.client.execute(drop_fn_stmt)
+      for drop_stmt in drop_stmts: self.client.execute(drop_stmt % (""))
 
   @pytest.mark.execute_serially
   def test_create_alter_bulk_partition(self, vector):
