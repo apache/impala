@@ -32,11 +32,10 @@ namespace impala {
 // storage type, which must implement all operators (example of a storage type
 // is int32_t). The decimal does not store its precision and scale since we'd
 // like to keep the storage as small as possible.
-// Overflow handling: we only need to do overflow handling if the result type
-// is Decimal16Value. In all other cases, the planner should have promoted the
-// the computation to Decimal16Value if there is a chance of overflow based on the
-// precision and scale. To check for overflow, we check if the resulting value can
-// exceed the max (unscaled) value allowed by Decimal16Value (38 digits of 9's).
+// Overflow handling: anytime the value is assigned, we need to consider overflow.
+// Overflow is handled by an output return parameter. Functions should set this
+// to true if overflow occured and leave it *unchanged* otherwise (e.g. |= rather than =).
+// This allows the caller to not have to check overflow after every call.
 template<typename T>
 class DecimalValue {
  public:
@@ -49,28 +48,30 @@ class DecimalValue {
   }
 
   // Returns the closest Decimal to 'd' of type 't', truncating digits that
-  // cannot be represented. Returns false if 'd' overflows and the value in
-  // *result is undefined.
-  static bool FromDouble(const ColumnType& t, double d, DecimalValue* result) {
+  // cannot be represented.
+  static DecimalValue FromDouble(const ColumnType& t, double d, bool* overflow) {
     // Check overflow.
     T max_value = DecimalUtil::GetScaleMultiplier<T>(t.precision - t.scale);
-    if (abs(d) >= max_value) return false;
+    if (abs(d) >= max_value) {
+      *overflow = true;
+      return DecimalValue();
+    }
 
     // Multiply the double by the scale.
     d *= DecimalUtil::GetScaleMultiplier<double>(t.scale);
     // Truncate and just take the integer part.
-    *result = DecimalValue(static_cast<T>(d));
-    return true;
+    return DecimalValue(static_cast<T>(d));
   }
 
-  // Assigns *result as a decimal. Returns false if 'd' overflows
-  // and the value in *result is undefined.
-  static bool FromInt(const ColumnType& t, int64_t d, DecimalValue* result) {
+  // Assigns *result as a decimal.
+  static DecimalValue FromInt(const ColumnType& t, int64_t d, bool* overflow) {
     // Check overflow. For scale 3, the max value is 10^3 - 1 = 999.
     T max_value = DecimalUtil::GetScaleMultiplier<T>(t.precision - t.scale);
-    if (abs(d) >= max_value) return false;
-    result->value_ = DecimalUtil::MultiplyByScale<T>(d, t);
-    return true;
+    if (abs(d) >= max_value) {
+      *overflow = true;
+      return DecimalValue();
+    }
+    return DecimalValue(DecimalUtil::MultiplyByScale<T>(d, t));
   }
 
   // The overloaded operators assume that this and other have the same scale.
@@ -125,10 +126,10 @@ class DecimalValue {
       // Even if we are decreasing the absolute unscaled value, we can still overflow.
       // This path is also used to convert between precisions so for example, converting
       // from 100 as decimal(3,0) to decimal(2,0) should be considered an overflow.
-      *overflow = abs(result) >= max_value;
+      *overflow |= abs(result) >= max_value;
     } else if (delta_scale < 0) {
       T mult = DecimalUtil::GetScaleMultiplier<T>(-delta_scale);
-      *overflow = abs(result) >= max_value / mult;
+      *overflow |= abs(result) >= max_value / mult;
       result *= mult;
     }
     return DecimalValue(result);
@@ -147,12 +148,12 @@ class DecimalValue {
       const ColumnType& other_type, int result_scale, bool* overflow) const {
     DCHECK_EQ(result_scale, std::max(this_type.scale, other_type.scale));
     RESULT_T x, y;
-    *overflow = AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
+    *overflow |= AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
     if (sizeof(RESULT_T) == 16) {
       // Check overflow.
       if (!*overflow && is_negative() == other.is_negative()) {
         // Can only overflow if the signs are the same
-        *overflow = DecimalUtil::MAX_UNSCALED_DECIMAL - abs(x) < abs(y);
+        *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL - abs(x) < abs(y);
         // TODO: faster to return here? We don't care at all about the perf on
         // the overflow case but what makes the normal path faster?
       }
@@ -180,12 +181,11 @@ class DecimalValue {
     RESULT_T y = other.value();
     if (x == 0 || y == 0) {
       // Handle zero to avoid divide by zero in the overflow check below.
-      *overflow = false;
       return DecimalValue<RESULT_T>(0);
     }
     if (sizeof(RESULT_T) == 16) {
       // Check overflow
-      *overflow = DecimalUtil::MAX_UNSCALED_DECIMAL / abs(y) < abs(x);
+      *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL / abs(y) < abs(x);
     }
     RESULT_T result = x * y;
     int delta_scale = this_type.scale + other_type.scale - result_scale;
@@ -348,23 +348,27 @@ typedef DecimalValue<int64_t> Decimal8Value;
 typedef DecimalValue<int128_t> Decimal16Value;
 
 // Conversions from different decimal types to one another. This does not
-// alter the scale.
-inline Decimal8Value Decimal4ToDecimal8(const Decimal4Value& v) {
+// alter the scale. Checks for overflow. Although in some cases (going from Decimal4Value
+// to Decimal8Value) cannot overflow, the signature is the same to allow for templating.
+inline Decimal8Value Decimal4ToDecimal8(const Decimal4Value& v, bool* overflow) {
   return Decimal8Value(static_cast<int64_t>(v.value()));
 }
-inline Decimal16Value Decimal4ToDecimal16(const Decimal4Value& v) {
+inline Decimal16Value Decimal4ToDecimal16(const Decimal4Value& v, bool* overflow) {
   return Decimal16Value(static_cast<int128_t>(v.value()));
 }
-inline Decimal4Value Decimal8ToDecimal4(const Decimal8Value& v) {
+inline Decimal4Value Decimal8ToDecimal4(const Decimal8Value& v, bool* overflow) {
+  *overflow |= abs(v.value()) > std::numeric_limits<int32_t>::max();
   return Decimal4Value(static_cast<int32_t>(v.value()));
 }
-inline Decimal16Value Decimal8ToDecimal16(const Decimal8Value& v) {
+inline Decimal16Value Decimal8ToDecimal16(const Decimal8Value& v, bool* overflow) {
   return Decimal16Value(static_cast<int128_t>(v.value()));
 }
-inline Decimal4Value Decimal16ToDecimal4(const Decimal16Value& v) {
+inline Decimal4Value Decimal16ToDecimal4(const Decimal16Value& v, bool* overflow) {
+  *overflow |= abs(v.value()) > std::numeric_limits<int32_t>::max();
   return Decimal4Value(static_cast<int32_t>(v.value()));
 }
-inline Decimal8Value Decimal16ToDecimal8(const Decimal16Value& v) {
+inline Decimal8Value Decimal16ToDecimal8(const Decimal16Value& v, bool* overflow) {
+  *overflow |= abs(v.value()) > std::numeric_limits<int64_t>::max();
   return Decimal8Value(static_cast<int64_t>(v.value()));
 }
 

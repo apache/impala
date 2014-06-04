@@ -64,22 +64,23 @@ void StringToAllDecimals(const string& s, const ColumnType& t, int32_t val,
 
 TEST(IntToDecimal, Basic) {
   Decimal16Value d16;
-  bool success;
+  bool overflow;
 
-  success = Decimal16Value::FromInt(ColumnType::CreateDecimalType(27, 18), -25559, &d16);
-  EXPECT_TRUE(success);
+  d16 = Decimal16Value::FromInt(ColumnType::CreateDecimalType(27, 18), -25559, &overflow);
+  EXPECT_FALSE(overflow);
   VerifyToString(d16, ColumnType::CreateDecimalType(27, 18), "-25559.000000000000000000");
 
-  success = Decimal16Value::FromInt(ColumnType::CreateDecimalType(36, 29), 32130, &d16);
-  EXPECT_TRUE(success);
+  d16 = Decimal16Value::FromInt(ColumnType::CreateDecimalType(36, 29), 32130, &overflow);
+  EXPECT_FALSE(overflow);
   VerifyToString(d16, ColumnType::CreateDecimalType(36, 29),
       "32130.00000000000000000000000000000");
 
-  success = Decimal16Value::FromInt(ColumnType::CreateDecimalType(38, 38), 1, &d16);
-  EXPECT_TRUE(!success);
+  d16 = Decimal16Value::FromInt(ColumnType::CreateDecimalType(38, 38), 1, &overflow);
+  EXPECT_TRUE(overflow);
 
   // Smaller decimal types can't overflow here since the FE should never generate
   // that.
+  //NONG
 }
 
 TEST(DoubleToDecimal, Basic) {
@@ -91,23 +92,57 @@ TEST(DoubleToDecimal, Basic) {
   Decimal8Value d8;
   Decimal16Value d16;
 
-  EXPECT_TRUE(Decimal4Value::FromDouble(t1, 1.1, &d4));
+  bool overflow = false;
+  d4 = Decimal4Value::FromDouble(t1, 1.1, &overflow);
+  EXPECT_FALSE(overflow);
   EXPECT_EQ(d4.value(), 1);
-  EXPECT_TRUE(Decimal8Value::FromDouble(t2, -100.1, &d8));
+
+  overflow = false;
+  d8 = Decimal8Value::FromDouble(t2, -100.1, &overflow);
+  EXPECT_FALSE(overflow);
   EXPECT_EQ(d8.value(), -10010000);
-  EXPECT_TRUE(Decimal16Value::FromDouble(t3, -.1, &d16));
+
+  overflow = false;
+  d16 = Decimal16Value::FromDouble(t3, -.1, &overflow);
+  EXPECT_FALSE(overflow);
   EXPECT_EQ(d16.value(), -1000000000);
 
   // Test overflow
-  EXPECT_TRUE(Decimal4Value::FromDouble(t1, 999999999.123, &d4));
-  EXPECT_FALSE(Decimal4Value::FromDouble(t1, 1234567890.1, &d4));
-  EXPECT_FALSE(Decimal8Value::FromDouble(t1, -1234567890.123, &d8));
-  EXPECT_TRUE(Decimal8Value::FromDouble(t2, 99999.1234567, &d8));
-  EXPECT_FALSE(Decimal8Value::FromDouble(t2, 100000.1, &d8));
-  EXPECT_FALSE(Decimal8Value::FromDouble(t2, -123456.123, &d8));
-  EXPECT_TRUE(Decimal16Value::FromDouble(t3, 0.1234, &d16));
-  EXPECT_FALSE(Decimal16Value::FromDouble(t3, 1.1, &d16));
-  EXPECT_FALSE(Decimal16Value::FromDouble(t3, -1.1, &d16));
+  overflow = false;
+  Decimal4Value::FromDouble(t1, 999999999.123, &overflow);
+  EXPECT_FALSE(overflow);
+
+  overflow = false;
+  Decimal4Value::FromDouble(t1, 1234567890.1, &overflow);
+  EXPECT_TRUE(overflow);
+
+  overflow = false;
+  Decimal8Value::FromDouble(t1, -1234567890.123, &overflow);
+  EXPECT_TRUE(overflow);
+
+  overflow = false;
+  Decimal8Value::FromDouble(t2, 99999.1234567, &overflow);
+  EXPECT_FALSE(overflow);
+
+  overflow = false;
+  Decimal8Value::FromDouble(t2, 100000.1, &overflow);
+  EXPECT_TRUE(overflow);
+
+  overflow = false;
+  Decimal8Value::FromDouble(t2, -123456.123, &overflow);
+  EXPECT_TRUE(overflow);
+
+  overflow = false;
+  Decimal16Value::FromDouble(t3, 0.1234, &overflow);
+  EXPECT_FALSE(overflow);
+
+  overflow = false;
+  Decimal16Value::FromDouble(t3, 1.1, &overflow);
+  EXPECT_TRUE(overflow);
+
+  overflow = false;
+  Decimal16Value::FromDouble(t3, -1.1, &overflow);
+  EXPECT_TRUE(overflow);
 }
 
 TEST(StringToDecimal, Basic) {
@@ -242,7 +277,7 @@ TEST(StringToDecimal, LargeDecimals) {
 }
 
 TEST(DecimalTest, Overflow) {
-  bool overflow;
+  bool overflow = false;
   ColumnType t1 = ColumnType::CreateDecimalType(38, 0);
 
   Decimal16Value result;
@@ -252,78 +287,120 @@ TEST(DecimalTest, Overflow) {
   Decimal16Value zero(0);
 
   // Adding same sign
+  overflow = false;
   d_max.Add<int128_t>(t1, one, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
+
+  overflow = false;
   one.Add<int128_t>(t1, d_max, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
+
+  overflow = false;
   d_max.Add<int128_t>(t1, d_max, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
+
+  overflow = false;
   result = d_max.Add<int128_t>(t1, zero, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
 
   // Subtracting same sign
+  overflow = false;
   result = d_max.Subtract<int128_t>(t1, one, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
+
+  overflow = false;
   EXPECT_TRUE(result.value() == d_max.value() - 1);
   result = one.Subtract<int128_t>(t1, d_max, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
+
+  overflow = false;
   EXPECT_TRUE(result.value() == -(d_max.value() - 1));
   result = d_max.Subtract<int128_t>(t1, d_max, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
+
+  overflow = false;
   EXPECT_TRUE(result.value() == 0);
   result = d_max.Subtract<int128_t>(t1, zero, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
 
   // Adding different sign
+  overflow = false;
   result = d_max.Add<int128_t>(t1, -one, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value() - 1);
+
+  overflow = false;
   result = one.Add<int128_t>(t1, -d_max, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == -(d_max.value() - 1));
+
+  overflow = false;
   result = d_max.Add<int128_t>(t1, -d_max, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == 0);
+
+  overflow = false;
   result = d_max.Add<int128_t>(t1, -zero, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
 
   // Subtracting different sign
+  overflow = false;
   d_max.Subtract<int128_t>(t1, -one, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
   one.Subtract<int128_t>(t1, -d_max, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
+
+  overflow = false;
   d_max.Subtract<int128_t>(t1, -d_max, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
+
+  overflow = false;
   result = d_max.Subtract<int128_t>(t1, -zero, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
 
   // Multiply
+  overflow = false;
   result = d_max.Multiply<int128_t>(t1, one, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == d_max.value());
+
+  overflow = false;
   result = d_max.Multiply<int128_t>(t1, -one, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == -d_max.value());
+
+  overflow = false;
   result = d_max.Multiply<int128_t>(t1, two, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
+
+  overflow = false;
   result = d_max.Multiply<int128_t>(t1, -two, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
+
+  overflow = false;
   result = d_max.Multiply<int128_t>(t1, d_max, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
+
+  overflow = false;
   result = d_max.Multiply<int128_t>(t1, -d_max, t1, 0, &overflow);
   EXPECT_TRUE(overflow);
 
   // Multiply by 0
+  overflow = false;
   result = zero.Multiply<int128_t>(t1, one, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == 0);
+
+  overflow = false;
   result = one.Multiply<int128_t>(t1, zero, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == 0);
+
+  overflow = false;
   result = zero.Multiply<int128_t>(t1, zero, t1, 0, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_TRUE(result.value() == 0);
@@ -331,14 +408,18 @@ TEST(DecimalTest, Overflow) {
   // Adding any value with scale to (38, 0) will overflow if the most significant
   // digit is set.
   ColumnType t2 = ColumnType::CreateDecimalType(1, 1);
+  overflow = false;
   result = d_max.Add<int128_t>(t1, zero, t2, 1, &overflow);
   EXPECT_TRUE(overflow);
 
   // Add 37 9's (with scale 0)
   Decimal16Value d3(DecimalUtil::MAX_UNSCALED_DECIMAL / 10);
+  overflow = false;
   result = d3.Add<int128_t>(t1, zero, t2, 1, &overflow);
   EXPECT_TRUE(!overflow);
   EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 9);
+
+  overflow = false;
   result = d3.Add<int128_t>(t1, one, t2, 1, &overflow);
   EXPECT_TRUE(!overflow);
   EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 8);

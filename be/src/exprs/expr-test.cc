@@ -3824,6 +3824,15 @@ TEST_F(ExprTest, DecimalOverflowCasts) {
   TestIsNull("cast(pi() as decimal(4, 4))", ColumnType::CreateDecimalType(4, 4));
   TestIsNull("cast(pi() as decimal(11, 11))", ColumnType::CreateDecimalType(11, 11));
   TestIsNull("cast(pi() as decimal(31, 31))", ColumnType::CreateDecimalType(31, 31));
+
+  TestIsNull("cast(140573315541874605.4665184383287 as decimal(17, 13))",
+      ColumnType::CreateDecimalType(17, 13));
+  TestIsNull("cast(140573315541874605.4665184383287 as decimal(9, 3))",
+      ColumnType::CreateDecimalType(17, 13));
+
+  // value has 30 digits before the decimal, casting to 29 is an overflow.
+  TestIsNull("cast(99999999999999999999999999999.9 as decimal(29, 1))",
+      ColumnType::CreateDecimalType(29, 1));
 }
 
 TEST_F(ExprTest, UdfInterfaceBuiltins) {

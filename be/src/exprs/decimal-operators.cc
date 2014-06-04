@@ -30,22 +30,20 @@ namespace impala {
 
 inline void* DecimalOperators::SetDecimalVal(Expr* e, int64_t val) {
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
+  bool overflow = false;
   switch (e->type().GetByteSize()) {
     case 4:
-      if (Decimal4Value::FromInt(e->type(), val, &e->result_.decimal4_val)) {
-        return &e->result_.decimal4_val;
-      }
-      return NULL;
+      e->result_.decimal4_val = Decimal4Value::FromInt(e->type(), val, &overflow);
+      if (overflow) return NULL;
+      return &e->result_.decimal4_val;
     case 8:
-      if (Decimal8Value::FromInt(e->type(), val, &e->result_.decimal8_val)) {
-        return &e->result_.decimal8_val;
-      }
-      return NULL;
+      e->result_.decimal8_val = Decimal8Value::FromInt(e->type(), val, &overflow);
+      if (overflow) return NULL;
+      return &e->result_.decimal8_val;
     case 16:
-      if (Decimal16Value::FromInt(e->type(), val, &e->result_.decimal16_val)) {
-        return &e->result_.decimal16_val;
-      }
-      return NULL;
+      e->result_.decimal16_val = Decimal16Value::FromInt(e->type(), val, &overflow);
+      if (overflow) return NULL;
+      return &e->result_.decimal16_val;
     default:
       DCHECK(false);
       return NULL;
@@ -54,25 +52,20 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, int64_t val) {
 
 inline void* DecimalOperators::SetDecimalVal(Expr* e, double val) {
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
+  bool overflow = false;
   switch (e->type().GetByteSize()) {
     case 4:
-      if (Decimal4Value::FromDouble(e->type(), val, &e->result_.decimal4_val)) {
-        return &e->result_.decimal4_val;
-      } else {
-        return NULL;
-      }
+      e->result_.decimal4_val = Decimal4Value::FromDouble(e->type(), val, &overflow);
+      if (overflow) return NULL;
+      return &e->result_.decimal4_val;
     case 8:
-      if (Decimal8Value::FromDouble(e->type(), val, &e->result_.decimal8_val)) {
-        return &e->result_.decimal8_val;
-      } else {
-        return NULL;
-      }
+      e->result_.decimal8_val = Decimal8Value::FromDouble(e->type(), val, &overflow);
+      if (overflow) return NULL;
+      return &e->result_.decimal8_val;
     case 16:
-      if (Decimal16Value::FromDouble(e->type(), val, &e->result_.decimal16_val)) {
-        return &e->result_.decimal16_val;
-      } else {
-        return NULL;
-      }
+      e->result_.decimal16_val = Decimal16Value::FromDouble(e->type(), val, &overflow);
+      if (overflow) return NULL;
+      return &e->result_.decimal16_val;
     default:
       DCHECK(false);
       return NULL;
@@ -83,20 +76,20 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
     const Decimal4Value& val) {
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(val_type.type, TYPE_DECIMAL);
-  bool overflow;
+  bool overflow = false;
   switch (e->type().GetByteSize()) {
     case 4:
       e->result_.decimal4_val = val.ScaleTo(val_type, e->type(), &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal4_val;
     case 8: {
-      Decimal8Value val8 = Decimal4ToDecimal8(val);
+      Decimal8Value val8 = Decimal4ToDecimal8(val, &overflow);
       e->result_.decimal8_val = val8.ScaleTo(val_type, e->type(), &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal8_val;
     }
     case 16: {
-      Decimal16Value val16 = Decimal4ToDecimal16(val);
+      Decimal16Value val16 = Decimal4ToDecimal16(val, &overflow);
       e->result_.decimal16_val = val16.ScaleTo(val_type, e->type(), &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal16_val;
@@ -111,10 +104,10 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
     const Decimal8Value& val) {
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(val_type.type, TYPE_DECIMAL);
-  bool overflow;
+  bool overflow = false;
   switch (e->type().GetByteSize()) {
     case 4: {
-      Decimal4Value val4 = Decimal8ToDecimal4(val);
+      Decimal4Value val4 = Decimal8ToDecimal4(val, &overflow);
       e->result_.decimal4_val = val4.ScaleTo(val_type, e->type(), &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal4_val;
@@ -124,7 +117,7 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
       if (overflow) return NULL;
       return &e->result_.decimal8_val;
     case 16: {
-      Decimal16Value val16 = Decimal8ToDecimal16(val);
+      Decimal16Value val16 = Decimal8ToDecimal16(val, &overflow);
       e->result_.decimal16_val = val16.ScaleTo(val_type, e->type(), &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal16_val;
@@ -139,16 +132,16 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
     const Decimal16Value& val) {
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(val_type.type, TYPE_DECIMAL);
-  bool overflow;
+  bool overflow = false;
   switch (e->type().GetByteSize()) {
     case 4: {
-      Decimal4Value val4 = Decimal16ToDecimal4(val);
+      Decimal4Value val4 = Decimal16ToDecimal4(val, &overflow);
       e->result_.decimal4_val = val4.ScaleTo(val_type, e->type(), &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal4_val;
     }
     case 8: {
-      Decimal8Value val8 = Decimal16ToDecimal8(val);
+      Decimal8Value val8 = Decimal16ToDecimal8(val, &overflow);
       e->result_.decimal8_val = val8.ScaleTo(val_type, e->type(), &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal8_val;
@@ -163,12 +156,13 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
   }
 }
 
-static inline Decimal4Value GetDecimal4Val(void* v, const ColumnType& type) {
+static inline Decimal4Value GetDecimal4Val(void* v, const ColumnType& type,
+    bool* overflow) {
   DCHECK_EQ(type.type, TYPE_DECIMAL);
   switch (type.GetByteSize()) {
     case 4: return *reinterpret_cast<Decimal4Value*>(v);
-    case 8: return Decimal8ToDecimal4(*reinterpret_cast<Decimal8Value*>(v));
-    case 16: return Decimal16ToDecimal4(*reinterpret_cast<Decimal16Value*>(v));
+    case 8: return Decimal8ToDecimal4(*reinterpret_cast<Decimal8Value*>(v), overflow);
+    case 16: return Decimal16ToDecimal4(*reinterpret_cast<Decimal16Value*>(v), overflow);
     default:
       DCHECK(false);
       break;
@@ -176,12 +170,13 @@ static inline Decimal4Value GetDecimal4Val(void* v, const ColumnType& type) {
   return Decimal4Value();
 }
 
-static inline Decimal8Value GetDecimal8Val(void* v, const ColumnType& type) {
+static inline Decimal8Value GetDecimal8Val(void* v, const ColumnType& type,
+    bool* overflow) {
   DCHECK_EQ(type.type, TYPE_DECIMAL);
   switch (type.GetByteSize()) {
-    case 4: return Decimal4ToDecimal8(*reinterpret_cast<Decimal4Value*>(v));
+    case 4: return Decimal4ToDecimal8(*reinterpret_cast<Decimal4Value*>(v), overflow);
     case 8: return *reinterpret_cast<Decimal8Value*>(v);
-    case 16: return Decimal16ToDecimal8(*reinterpret_cast<Decimal16Value*>(v));
+    case 16: return Decimal16ToDecimal8(*reinterpret_cast<Decimal16Value*>(v), overflow);
     default:
       DCHECK(false);
       break;
@@ -189,11 +184,12 @@ static inline Decimal8Value GetDecimal8Val(void* v, const ColumnType& type) {
   return Decimal8Value();
 }
 
-static inline Decimal16Value GetDecimal16Val(void* v, const ColumnType& type) {
+static inline Decimal16Value GetDecimal16Val(void* v, const ColumnType& type,
+    bool* overflow) {
   DCHECK_EQ(type.type, TYPE_DECIMAL);
   switch (type.GetByteSize()) {
-    case 4: return Decimal4ToDecimal16(*reinterpret_cast<Decimal4Value*>(v));
-    case 8: return Decimal8ToDecimal16(*reinterpret_cast<Decimal8Value*>(v));
+    case 4: return Decimal4ToDecimal16(*reinterpret_cast<Decimal4Value*>(v), overflow);
+    case 8: return Decimal8ToDecimal16(*reinterpret_cast<Decimal8Value*>(v), overflow);
     case 16: return *reinterpret_cast<Decimal16Value*>(v);
     default:
       DCHECK(false);
@@ -526,24 +522,24 @@ void* DecimalOperators::Cast_decimal_bool(Expr* e, TupleRow* row) {
     bool overflow = false;\
     switch (e->type().GetByteSize()) {\
       case 4: {\
-        Decimal4Value x_val = GetDecimal4Val(x, c1->type());\
-        Decimal4Value y_val = GetDecimal4Val(y, c2->type());\
+        Decimal4Value x_val = GetDecimal4Val(x, c1->type(), &overflow);\
+        Decimal4Value y_val = GetDecimal4Val(y, c2->type(), &overflow);\
         e->result_.decimal4_val = x_val.OP_FN<int32_t>(\
             c1->type(), y_val, c2->type(), e->type().scale, &overflow);\
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value";\
         return &e->result_.decimal4_val;\
       }\
       case 8: {\
-        Decimal8Value x_val = GetDecimal8Val(x, c1->type());\
-        Decimal8Value y_val = GetDecimal8Val(y, c2->type());\
+        Decimal8Value x_val = GetDecimal8Val(x, c1->type(), &overflow);\
+        Decimal8Value y_val = GetDecimal8Val(y, c2->type(), &overflow);\
         e->result_.decimal8_val = x_val.OP_FN<int64_t>(\
             c1->type(), y_val, c2->type(), e->type().scale, &overflow);\
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value";\
         return &e->result_.decimal8_val;\
       }\
       case 16: {\
-        Decimal16Value x_val = GetDecimal16Val(x, c1->type());\
-        Decimal16Value y_val = GetDecimal16Val(y, c2->type());\
+        Decimal16Value x_val = GetDecimal16Val(x, c1->type(), &overflow);\
+        Decimal16Value y_val = GetDecimal16Val(y, c2->type(), &overflow);\
         e->result_.decimal16_val = x_val.OP_FN<int128_t>(\
             c1->type(), y_val, c2->type(), e->type().scale, &overflow);\
         if (overflow) return NULL;\
@@ -565,30 +561,33 @@ void* DecimalOperators::Cast_decimal_bool(Expr* e, TupleRow* row) {
     DCHECK_EQ(c1->type().type, TYPE_DECIMAL);\
     DCHECK_EQ(c2->type().type, TYPE_DECIMAL);\
     if (x == NULL || y == NULL) return NULL;\
+    bool overflow = false;\
     bool is_nan = false;\
     switch (e->type().GetByteSize()) {\
       case 4: {\
-        Decimal4Value x_val = GetDecimal4Val(x, c1->type());\
-        Decimal4Value y_val = GetDecimal4Val(y, c2->type());\
+        Decimal4Value x_val = GetDecimal4Val(x, c1->type(), &overflow);\
+        Decimal4Value y_val = GetDecimal4Val(y, c2->type(), &overflow);\
         e->result_.decimal4_val = x_val.OP_FN<int32_t>(\
             c1->type(), y_val, c2->type(), e->type().scale, &is_nan);\
+        DCHECK(!overflow) << "Cannot overflow except with Decimal16Value";\
         if (is_nan) return NULL;\
         return &e->result_.decimal4_val;\
       }\
       case 8: {\
-        Decimal8Value x_val = GetDecimal8Val(x, c1->type());\
-        Decimal8Value y_val = GetDecimal8Val(y, c2->type());\
+        Decimal8Value x_val = GetDecimal8Val(x, c1->type(), &overflow);\
+        Decimal8Value y_val = GetDecimal8Val(y, c2->type(), &overflow);\
         e->result_.decimal8_val = x_val.OP_FN<int64_t>(\
             c1->type(), y_val, c2->type(), e->type().scale, &is_nan);\
+        DCHECK(!overflow) << "Cannot overflow except with Decimal16Value";\
         if (is_nan) return NULL;\
         return &e->result_.decimal8_val;\
       }\
       case 16: {\
-        Decimal16Value x_val = GetDecimal16Val(x, c1->type());\
-        Decimal16Value y_val = GetDecimal16Val(y, c2->type());\
+        Decimal16Value x_val = GetDecimal16Val(x, c1->type(), &overflow);\
+        Decimal16Value y_val = GetDecimal16Val(y, c2->type(), &overflow);\
         e->result_.decimal16_val = x_val.OP_FN<int128_t>(\
             c1->type(), y_val, c2->type(), e->type().scale, &is_nan);\
-        if (is_nan) return NULL;\
+        if (is_nan || overflow) return NULL;\
         return &e->result_.decimal16_val;\
       }\
       default:\
@@ -606,24 +605,25 @@ void* DecimalOperators::Cast_decimal_bool(Expr* e, TupleRow* row) {
     DCHECK_EQ(c2->type().type, TYPE_DECIMAL);\
     void* x = c1->GetValue(row);\
     void* y = c2->GetValue(row);\
+    bool dummy = false;\
     if (x == NULL || y == NULL) return NULL;\
     int byte_size = ::max(c1->type().GetByteSize(), c2->type().GetByteSize());\
     switch (byte_size) {\
       case 4: {\
-        Decimal4Value x_val = GetDecimal4Val(x, c1->type());\
-        Decimal4Value y_val = GetDecimal4Val(y, c2->type());\
+        Decimal4Value x_val = GetDecimal4Val(x, c1->type(), &dummy);\
+        Decimal4Value y_val = GetDecimal4Val(y, c2->type(), &dummy);\
         e->result_.bool_val = x_val.OP_FN(c1->type(), y_val, c2->type());\
         return &e->result_.bool_val;\
       }\
       case 8: {\
-        Decimal8Value x_val = GetDecimal8Val(x, c1->type());\
-        Decimal8Value y_val = GetDecimal8Val(y, c2->type());\
+        Decimal8Value x_val = GetDecimal8Val(x, c1->type(), &dummy);\
+        Decimal8Value y_val = GetDecimal8Val(y, c2->type(), &dummy);\
         e->result_.bool_val = x_val.OP_FN(c1->type(), y_val, c2->type());\
         return &e->result_.bool_val;\
       }\
       case 16: {\
-        Decimal16Value x_val = GetDecimal16Val(x, c1->type());\
-        Decimal16Value y_val = GetDecimal16Val(y, c2->type());\
+        Decimal16Value x_val = GetDecimal16Val(x, c1->type(), &dummy);\
+        Decimal16Value y_val = GetDecimal16Val(y, c2->type(), &dummy);\
         e->result_.bool_val = x_val.OP_FN(c1->type(), y_val, c2->type());\
         return &e->result_.bool_val;\
       }\
