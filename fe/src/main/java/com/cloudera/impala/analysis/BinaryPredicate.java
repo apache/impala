@@ -61,6 +61,18 @@ public class BinaryPredicate extends Predicate {
     public String toString() { return description_; }
     public String getName() { return name_; }
     public TComparisonOp getThriftOp() { return thriftOp_; }
+
+    public Operator converse() {
+      switch (this) {
+        case EQ: return EQ;
+        case NE: return NE;
+        case LE: return GE;
+        case GE: return LE;
+        case LT: return GT;
+        case GT: return LT;
+        default: throw new IllegalStateException("Invalid operator");
+      }
+    }
   }
 
   public static void initBuiltins(Db db) {

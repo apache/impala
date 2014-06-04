@@ -33,15 +33,10 @@ CREATE TABLE alltypes_datasource (
   float_col FLOAT,
   double_col DOUBLE,
   timestamp_col TIMESTAMP,
-  string_col STRING)
+  string_col STRING,
+  dec_col1 DECIMAL(9,0),
+  dec_col2 DECIMAL(10,0),
+  dec_col3 DECIMAL(20,10),
+  dec_col4 DECIMAL(38,37),
+  dec_col5 DECIMAL(10,5))
 PRODUCED BY DATASOURCE AllTypesDataSource("TestInitString");
-
--- TODO: Remove table and move decimal cols into alltypes_datasource
-DROP TABLE IF EXISTS decimal_datasource;
-CREATE TABLE decimal_datasource (
-  d1 DECIMAL(9,0),
-  d2 DECIMAL(10,0),
-  d3 DECIMAL(20,10),
-  d4 DECIMAL(38,37),
-  d5 DECIMAL(10,5))
-PRODUCED BY DATASOURCE AllTypesDataSource;

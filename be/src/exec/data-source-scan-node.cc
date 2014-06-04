@@ -149,7 +149,16 @@ Status DataSourceScanNode::GetNextInputBatch() {
   params.__set_scan_handle(scan_handle_);
   RETURN_IF_ERROR(data_source_executor_->GetNext(params, input_batch_.get()));
   RETURN_IF_ERROR(Status(input_batch_->status));
-  return ValidateRowBatchSize();
+  RETURN_IF_ERROR(ValidateRowBatchSize());
+  if (!InputBatchHasNext() && !input_batch_->eos) {
+    // The data source should have set eos, but if it didn't we should just log a
+    // warning and continue as if it had.
+    VLOG_QUERY << "Data source " << data_src_node_.data_source.name << " returned no "
+      << "rows but did not set 'eos'. No more rows will be fetched from the "
+      << "data source.";
+    input_batch_->eos = true;
+  }
+  return Status::OK;
 }
 
 // Sets the decimal value in the slot. Inline method to avoid nested switch statements.

@@ -56,6 +56,7 @@ import com.cloudera.impala.thrift.TStatusCode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
@@ -191,10 +192,12 @@ public class DataSourceScanNode extends ScanNode {
 
     numRowsEstimate_ = prepareResult.getNum_rows_estimate();
     acceptedPredicates_ = Lists.newArrayList();
-    for (Integer acceptedIdx: prepareResult.getAccepted_conjuncts()) {
+    List<Integer> acceptedPredicatesIdx = prepareResult.isSetAccepted_conjuncts() ?
+        prepareResult.getAccepted_conjuncts() : ImmutableList.<Integer>of();
+    for (Integer acceptedIdx: acceptedPredicatesIdx) {
       acceptedPredicates_.add(offeredPredicates.get(acceptedIdx));
     }
-    removeAcceptedConjuncts(prepareResult.getAccepted_conjuncts(), conjunctsIdx);
+    removeAcceptedConjuncts(acceptedPredicatesIdx, conjunctsIdx);
   }
 
   /**
@@ -216,14 +219,17 @@ public class DataSourceScanNode extends ScanNode {
       if (conjunct.getChildren().size() != 2) return false;
       SlotRef slotRef = null;
       LiteralExpr literalExpr = null;
+      TComparisonOp op = null;
       if ((conjunct.getChild(0).unwrapSlotRef(true) instanceof SlotRef) &&
           (conjunct.getChild(1) instanceof LiteralExpr)) {
         slotRef = (SlotRef) conjunct.getChild(0).unwrapSlotRef(true);
         literalExpr = (LiteralExpr) conjunct.getChild(1);
+        op = ((BinaryPredicate) conjunct).getOp().getThriftOp();
       } else if ((conjunct.getChild(1).unwrapSlotRef(true) instanceof SlotRef) &&
                  (conjunct.getChild(0) instanceof LiteralExpr)) {
         slotRef = (SlotRef) conjunct.getChild(1).unwrapSlotRef(true);
         literalExpr = (LiteralExpr) conjunct.getChild(0);
+        op = ((BinaryPredicate) conjunct).getOp().converse().getThriftOp();
       } else {
         return false;
       }
@@ -233,7 +239,6 @@ public class DataSourceScanNode extends ScanNode {
 
       TColumnDesc col = new TColumnDesc().setName(slotRef.getColumnName())
           .setType(slotRef.getType().toThrift());
-      TComparisonOp op = ((BinaryPredicate) conjunct).getOp().getThriftOp();
       predicates.add(new TBinaryPredicate().setCol(col).setOp(op).setValue(val));
       return true;
     } else if (conjunct instanceof CompoundPredicate) {

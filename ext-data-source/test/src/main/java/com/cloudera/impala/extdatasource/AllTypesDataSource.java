@@ -20,6 +20,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
 
+import com.cloudera.impala.extdatasource.thrift.TBinaryPredicate;
 import com.cloudera.impala.extdatasource.thrift.TCloseParams;
 import com.cloudera.impala.extdatasource.thrift.TCloseResult;
 import com.cloudera.impala.extdatasource.thrift.TColumnDesc;
@@ -35,16 +36,19 @@ import com.cloudera.impala.extdatasource.util.SerializationUtils;
 import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
 import com.cloudera.impala.thrift.TColumnData;
 import com.cloudera.impala.thrift.TColumnType;
+import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 /**
- * Data source implementation for tests that:
- * (a) Accepts every other offered conjunct for testing planning, though
- *     predicates are not actually evaluated.
- * (b) Returns trivial data of all supported types for query tests.
+ * Data source implementation for tests that can:
+ * (a) Accepts every other offered conjunct for testing planning (though predicates are
+ *     not actually evaluated) and returns trivial data of all supported types for
+ *     query tests.
+ * (b) Validate the predicates offered by Impala.
  */
 public class AllTypesDataSource implements ExternalDataSource {
   // Total number of rows to return
@@ -63,6 +67,7 @@ public class AllTypesDataSource implements ExternalDataSource {
   private TTableSchema schema_;
   private DataSourceState state_;
   private String scanHandle_;
+  private String validatePredicatesResult_;
 
   // Enumerates the states of the data source.
   private enum DataSourceState {
@@ -85,12 +90,76 @@ public class AllTypesDataSource implements ExternalDataSource {
   public TPrepareResult prepare(TPrepareParams params) {
     Preconditions.checkState(state_ == DataSourceState.CREATED);
     List<Integer> accepted = Lists.newArrayList();
-    for (int i = 0; i < params.getPredicatesSize(); ++i) {
-      if (i % 2 == 0) accepted.add(i);
+    int numRowsReturned = 0;
+    if (validatePredicates(params.getPredicates())) {
+      // Indicate all predicates are applied because we return a dummy row with the
+      // result later to validate the result in tests. Impala shouldn't try to apply
+      // predicates to that dummy row.
+      for (int i = 0; i < params.getPredicatesSize(); ++i) accepted.add(i);
+      numRowsReturned = 1;
+    } else {
+      // Default behavior is to accept every other predicate. They are not actually
+      // applied, but we want to validate that Impala applies the correct predicates.
+      for (int i = 0; i < params.getPredicatesSize(); ++i) {
+        if (i % 2 == 0) accepted.add(i);
+      }
+      numRowsReturned = NUM_ROWS_RETURNED;
     }
     return new TPrepareResult(STATUS_OK)
       .setAccepted_conjuncts(accepted)
-      .setNum_rows_estimate(NUM_ROWS_RETURNED);
+      .setNum_rows_estimate(numRowsReturned);
+  }
+
+  /**
+   * If the predicate value (assuming STRING) starts with 'VALIDATE_PREDICATES##',
+   * we validate the TPrepareParams.predicates against predicates specified after the
+   * 'VALIDATE_PREDICATES##' and return true. The result of the validation is stored
+   * in validatePredicatesResult_.
+   *
+   * The expected predicates are specified in the form "{slot} {TComparisonOp} {val}",
+   * and conjunctive predicates are separated by '&&'.
+   *
+   * For example, the predicates_spec validates the predicates in the following query:
+   *    select * from table_name
+   *    where predicates_spec = 'x LT 1 && y GT 2' and
+   *          x < 1 and
+   *          2 > y;
+   *
+   * Current limitations:
+   *  - Disjunctive predicates are not supported (e.g. "expr1 or expr2")
+   *  - Only INT is supported
+   */
+  private boolean validatePredicates(List<List<TBinaryPredicate>> predicates) {
+    if (predicates == null || predicates.isEmpty()) return false;
+    TBinaryPredicate firstPredicate = predicates.get(0).get(0);
+    if (!firstPredicate.getValue().isSetString_val()) return false;
+    String colVal = firstPredicate.getValue().getString_val();
+    if (!colVal.toUpperCase().startsWith("VALIDATE_PREDICATES##")) return false;
+
+    String[] colValParts = colVal.split("##");
+    Preconditions.checkArgument(colValParts.length == 2);
+    String[] expectedPredicates = colValParts[1].split("&&");
+    Preconditions.checkArgument(expectedPredicates.length == predicates.size() - 1);
+
+    String result = "SUCCESS";
+    for (int i = 1; i < predicates.size(); ++i) {
+      String[] predicateParts = expectedPredicates[i - 1].trim().split(" ");
+      Preconditions.checkArgument(predicateParts.length == 3);
+      TBinaryPredicate predicate =
+          Iterables.getOnlyElement(predicates.get(i));
+      Preconditions.checkArgument(predicate.getValue().isSetInt_val());
+
+      String slotName = predicate.getCol().getName().toUpperCase();
+      int intVal = predicate.getValue().getInt_val();
+      if (!predicateParts[0].toUpperCase().equals(slotName) ||
+          !predicateParts[1].toUpperCase().equals(predicate.getOp().name()) ||
+          !predicateParts[2].equals(Integer.toString(intVal))) {
+        result = "Failed predicate, expected=" + expectedPredicates[i - 1].trim() +
+            " actual=" + predicate.toString();
+      }
+    }
+    validatePredicatesResult_ = result;
+    return true;
   }
 
   /**
@@ -102,21 +171,39 @@ public class AllTypesDataSource implements ExternalDataSource {
     state_ = DataSourceState.OPENED;
     batchSize_ = INITIAL_BATCH_SIZE;
     schema_ = params.getRow_schema();
+    // Need to check validatePredicates again because the call in Prepare() was from
+    // the frontend and used a different instance of this data source class.
+    if (validatePredicates(params.getPredicates())) {
+      // If validating predicates, only one STRING column should be selected.
+      Preconditions.checkArgument(schema_.getColsSize() == 1);
+      TColumnDesc firstCol = schema_.getCols().get(0);
+      Preconditions.checkArgument(firstCol.getType().getType() == TPrimitiveType.STRING);
+    }
     scanHandle_ = UUID.randomUUID().toString();
     return new TOpenResult(STATUS_OK).setScan_handle(scanHandle_);
   }
 
   /**
-   * Returns row batches with generated rows based on the row index. Called multiple
-   * times, so the current row is stored between calls. Each row batch is a different
-   * size (not necessarily the size specified by TOpenParams.batch_size to ensure
-   * that Impala can handle unexpected batch sizes.
+   * If validating predicates, returns a single row with the result of the validation.
+   * Otherwise returns row batches with generated rows based on the row index. Called
+   * multiple times, so the current row is stored between calls. Each row batch is a
+   * different size (not necessarily the size specified by TOpenParams.batch_size to
+   * ensure that Impala can handle unexpected batch sizes.
    */
   @Override
   public TGetNextResult getNext(TGetNextParams params) {
     Preconditions.checkState(state_ == DataSourceState.OPENED);
     Preconditions.checkArgument(params.getScan_handle().equals(scanHandle_));
     if (eos_) return new TGetNextResult(STATUS_OK).setEos(eos_);
+
+    if (validatePredicatesResult_ != null) {
+      TColumnData colData = new TColumnData();
+      colData.setIs_null(Lists.newArrayList(false));
+      colData.setString_vals(Lists.newArrayList(validatePredicatesResult_));
+      eos_ = true;
+      return new TGetNextResult(STATUS_OK).setEos(eos_)
+          .setRows(new TRowBatch().setCols(Lists.newArrayList(colData)).setNum_rows(1));
+    }
 
     List<TColumnData> cols = Lists.newArrayList();
     for (int i = 0; i < schema_.getColsSize(); ++i) {
