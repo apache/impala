@@ -29,6 +29,7 @@ class UtilityFunctions {
   template <int BYTE_SIZE>
   static void* FnvHash(Expr* e, TupleRow* row);
   static void* FnvHashString(Expr* e, TupleRow* row);
+  static void* FnvHashDecimal(Expr* e, TupleRow* row);
 
   // Implementation of the user() function. Returns the username of the user who executed
   // this function.

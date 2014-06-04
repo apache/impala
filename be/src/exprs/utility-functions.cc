@@ -43,6 +43,17 @@ void* UtilityFunctions::FnvHash(Expr* e, TupleRow* row) {
   return &e->result_.bigint_val;
 }
 
+// Note that this only hashes the unscaled value and not the scale or precision, so this
+// function is only valid when using over a single decimal type.
+void* UtilityFunctions::FnvHashDecimal(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  void* input_val = e->children()[0]->GetValue(row);
+  if (input_val == NULL) return NULL;
+  int byte_size = e->children()[0]->type().GetByteSize();
+  e->result_.bigint_val = HashUtil::FnvHash64(input_val, byte_size, HashUtil::FNV_SEED);
+  return &e->result_.bigint_val;
+}
+
 template void* UtilityFunctions::FnvHash<1>(Expr* e, TupleRow* row);
 template void* UtilityFunctions::FnvHash<2>(Expr* e, TupleRow* row);
 template void* UtilityFunctions::FnvHash<4>(Expr* e, TupleRow* row);

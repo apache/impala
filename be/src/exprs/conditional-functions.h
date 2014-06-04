@@ -27,17 +27,20 @@ class ConditionalFunctions {
  public:
   static void* IsNull(Expr* e, TupleRow* row);
   template <typename T> static void* NullIf(Expr* e, TupleRow* row);
+  static void* NullIfDecimal(Expr* e, TupleRow* row);
 
   // Return NULL if the numeric argument is zero, the argument otherwise.
   // Returns the same type as the argument.
   template <typename T> static void* NullIfZero(Expr* e, TupleRow* row);
+  static void* NullIfZeroDecimal(Expr* e, TupleRow* row);
 
   // Returns 0 if the argument is NULL, the argument otherwise. Returns the
   // same type as the argument.
   template <typename T> static void* ZeroIfNull(Expr* e, TupleRow* row);
+  static void* ZeroIfNullDecimal(Expr* e, TupleRow* row);
 
-  template <typename T> static void* IfFn(Expr* e, TupleRow* row);
-  template <typename T> static void* Coalesce(Expr* e, TupleRow* row);
+  static void* IfFn(Expr* e, TupleRow* row);
+  static void* Coalesce(Expr* e, TupleRow* row);
 
   // Compute function of case expr if its has_case_expr_ is false.
   static void* NoCaseComputeFn(Expr* e, TupleRow* row);

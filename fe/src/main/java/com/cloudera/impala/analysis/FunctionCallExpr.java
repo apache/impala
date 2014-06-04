@@ -181,8 +181,17 @@ public class FunctionCallExpr extends Expr {
     Preconditions.checkState(type_.isWildcardDecimal());
     Preconditions.checkState(fn_.getBinaryType() == TFunctionBinaryType.BUILTIN);
     Preconditions.checkState(children_.size() > 0);
-    ColumnType childType = children_.get(0).type_;
-    Preconditions.checkState(childType.isDecimal() && !childType.isWildcardDecimal());
+
+    // Find first decimal input (some functions, such as if(), begin with non-decimal
+    // arguments).
+    ColumnType childType = null;
+    for (Expr child : children_) {
+      if (child.type_.isDecimal()) {
+        childType = child.type_;
+        break;
+      }
+    }
+    Preconditions.checkState(childType != null && !childType.isWildcardDecimal());
     ColumnType returnType = childType;
 
     if (fnName_.getFunction().equalsIgnoreCase("sum")) {

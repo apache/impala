@@ -71,6 +71,21 @@ template<> inline void* ExprValue::Set(const StringValue& val) {
   return &string_val;
 }
 
+template<> inline void* ExprValue::Set(const Decimal4Value& val) {
+  decimal4_val = val;
+  return &decimal4_val;
+}
+
+template<> inline void* ExprValue::Set(const Decimal8Value& val) {
+  decimal8_val = val;
+  return &decimal8_val;
+}
+
+template<> inline void* ExprValue::Set(const Decimal16Value& val) {
+  decimal16_val = val;
+  return &decimal16_val;
+}
+
 // Specialized ExprValue getters for all types.
 template<> inline void* ExprValue::Get<bool>() { return &bool_val; }
 template<> inline void* ExprValue::Get<int8_t>() { return &tinyint_val; }

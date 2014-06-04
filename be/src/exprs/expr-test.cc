@@ -2134,23 +2134,24 @@ TEST_F(ExprTest, MathFunctions) {
   // templated function, so there is no need to run all tests with all types.
   // Test single value.
   TestValue("least(1)", TYPE_TINYINT, 1);
-  TestValue<float>("least(1.25)", TYPE_FLOAT, 1.25f);
+  TestValue<float>("least(cast(1.25 as float))", TYPE_FLOAT, 1.25f);
   // Test ordering
   TestValue("least(10, 20)", TYPE_TINYINT, 10);
   TestValue("least(20, 10)", TYPE_TINYINT, 10);
-  TestValue<float>("least(500.25, 300.25)", TYPE_FLOAT, 300.25f);
-  TestValue<float>("least(300.25, 500.25)", TYPE_FLOAT, 300.25f);
+  TestValue<float>("least(cast(500.25 as float), 300.25)", TYPE_FLOAT, 300.25f);
+  TestValue<float>("least(cast(300.25 as float), 500.25)", TYPE_FLOAT, 300.25f);
   // Test to make sure least value is found in a mixed order set
   TestValue("least(1, 3, 4, 0, 6)", TYPE_TINYINT, 0);
-  TestValue<float>("least(1.25, 3.25, 4.25, 0.25, 6.25)", TYPE_FLOAT, 0.25f);
+  TestValue<float>("least(cast(1.25 as float), 3.25, 4.25, 0.25, 6.25)",
+                   TYPE_FLOAT, 0.25f);
   // Test to make sure the least value is found from a list of duplicates
   TestValue("least(1, 1, 1, 1)", TYPE_TINYINT, 1);
-  TestValue<float>("least(1.0, 1.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
+  TestValue<float>("least(cast(1.0 as float), 1.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
   // Test repeating groups and ordering
   TestValue("least(2, 2, 1, 1)", TYPE_TINYINT, 1);
   TestValue("least(0, -2, 1)", TYPE_TINYINT, -2);
-  TestValue<float>("least(2.0, 2.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
-  TestValue<float>("least(0.0, -2.0, 1.0)", TYPE_FLOAT, -2.0f);
+  TestValue<float>("least(cast(2.0 as float), 2.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
+  TestValue<float>("least(cast(0.0 as float), -2.0, 1.0)", TYPE_FLOAT, -2.0f);
   // Test all int types.
   string val_list;
   val_list = "0";
@@ -2189,23 +2190,24 @@ TEST_F(ExprTest, MathFunctions) {
   // Tests to verify logic of greatest(). All types but STRING use the same
   // templated function, so there is no need to run all tests with all types.
   TestValue("greatest(1)", TYPE_TINYINT, 1);
-  TestValue<float>("greatest(1.25)", TYPE_FLOAT, 1.25f);
+  TestValue<float>("greatest(cast(1.25 as float))", TYPE_FLOAT, 1.25f);
   // Test ordering
   TestValue("greatest(10, 20)", TYPE_TINYINT, 20);
   TestValue("greatest(20, 10)", TYPE_TINYINT, 20);
-  TestValue<float>("greatest(500.25, 300.25)", TYPE_FLOAT, 500.25f);
-  TestValue<float>("greatest(300.25, 500.25)", TYPE_FLOAT, 500.25f);
+  TestValue<float>("greatest(cast(500.25 as float), 300.25)", TYPE_FLOAT, 500.25f);
+  TestValue<float>("greatest(cast(300.25 as float), 500.25)", TYPE_FLOAT, 500.25f);
   // Test to make sure least value is found in a mixed order set
   TestValue("greatest(1, 3, 4, 0, 6)", TYPE_TINYINT, 6);
-  TestValue<float>("greatest(1.25, 3.25, 4.25, 0.25, 6.25)", TYPE_FLOAT, 6.25f);
+  TestValue<float>("greatest(cast(1.25 as float), 3.25, 4.25, 0.25, 6.25)",
+                   TYPE_FLOAT, 6.25f);
   // Test to make sure the least value is found from a list of duplicates
   TestValue("greatest(1, 1, 1, 1)", TYPE_TINYINT, 1);
-  TestValue<float>("greatest(1.0, 1.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
+  TestValue<float>("greatest(cast(1.0 as float), 1.0, 1.0, 1.0)", TYPE_FLOAT, 1.0f);
   // Test repeating groups and ordering
   TestValue("greatest(2, 2, 1, 1)", TYPE_TINYINT, 2);
   TestValue("greatest(0, -2, 1)", TYPE_TINYINT, 1);
-  TestValue<float>("greatest(2.0, 2.0, 1.0, 1.0)", TYPE_FLOAT, 2.0f);
-  TestValue<float>("greatest(0.0, -2.0, 1.0)", TYPE_FLOAT, 1.0f);
+  TestValue<float>("greatest(cast(2.0 as float), 2.0, 1.0, 1.0)", TYPE_FLOAT, 2.0f);
+  TestValue<float>("greatest(cast(0.0 as float), -2.0, 1.0)", TYPE_FLOAT, 1.0f);
   // Test all int types.
   val_list = "0";
   BOOST_FOREACH(IntValMap::value_type& entry, min_int_values_) {
@@ -2215,7 +2217,8 @@ TEST_F(ExprTest, MathFunctions) {
     TestValue<int64_t>("greatest(" + val_list + ")", t, entry.second);
   }
   // Test double type.
-  TestValue<double>("greatest(0.0, cast(-2.0 as double), 1.0)", TYPE_DOUBLE, 1.0);
+  TestValue<double>("greatest(cast(0.0 as float), cast(-2.0 as double), 1.0)",
+                    TYPE_DOUBLE, 1.0);
   // Test timestamp param
   TestStringValue("cast(greatest(cast('2014-09-26 12:00:00' as timestamp), "
       "cast('2013-09-26 12:00:00' as timestamp)) as string)", "2014-09-26 12:00:00");
@@ -3358,6 +3361,177 @@ TEST_F(ExprTest, DecimalFunctions) {
   // Tests take a while and at this point we've cycled through each type. No reason
   // to keep testing the codegen path.
   if (!disable_codegen_) return;
+
+  // IsNull()
+  TestDecimalValue("isnull(cast('0' as decimal(2,0)), NULL)", Decimal4Value(0),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("isnull(cast('1.1' as decimal(18,1)), NULL)", Decimal8Value(11),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("isnull(cast('-1.23' as decimal(32,2)), NULL)", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(32,2));
+  TestDecimalValue("isnull(NULL, cast('0' as decimal(2,0)))", Decimal4Value(0),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("isnull(NULL, cast('1.1' as decimal(18,1)))", Decimal8Value(11),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("isnull(NULL, cast('-1.23' as decimal(32,2)))", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("isnull(cast(NULL as decimal(2,0)), NULL)",
+      ColumnType::CreateDecimalType(2,0));
+
+  // NullIf()
+  TestDecimalValue("isnull(cast('0' as decimal(2,0)), NULL)", Decimal4Value(0),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("isnull(cast('1.1' as decimal(18,1)), NULL)", Decimal8Value(11),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("isnull(cast('-1.23' as decimal(32,2)), NULL)", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(32,2));
+  TestDecimalValue("isnull(NULL, cast('0' as decimal(2,0)))", Decimal4Value(0),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("isnull(NULL, cast('1.1' as decimal(18,1)))", Decimal8Value(11),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("isnull(NULL, cast('-1.23' as decimal(32,2)))", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("isnull(cast(NULL as decimal(2,0)), NULL)",
+      ColumnType::CreateDecimalType(2,0));
+
+  // NullIfZero()
+  TestDecimalValue("nullifzero(cast('10' as decimal(2,0)))", Decimal4Value(10),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("nullifzero(cast('1.1' as decimal(18,1)))", Decimal8Value(11),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("nullifzero(cast('-1.23' as decimal(32,2)))", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("nullifzero(cast('0' as decimal(2,0)))",
+      ColumnType::CreateDecimalType(2, 0));
+  TestIsNull("nullifzero(cast('0' as decimal(18,1)))",
+      ColumnType::CreateDecimalType(18,1));
+  TestIsNull("nullifzero(cast('0' as decimal(32,2)))",
+      ColumnType::CreateDecimalType(32,2));
+
+  // IfFn()
+  TestDecimalValue("if(TRUE, cast('0' as decimal(2,0)), NULL)", Decimal4Value(0),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("if(TRUE, cast('1.1' as decimal(18,1)), NULL)", Decimal8Value(11),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("if(TRUE, cast('-1.23' as decimal(32,2)), NULL)", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(32,2));
+  TestDecimalValue("if(FALSE, NULL, cast('0' as decimal(2,0)))", Decimal4Value(0),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("if(FALSE, NULL, cast('1.1' as decimal(18,1)))", Decimal8Value(11),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("if(FALSE, NULL, cast('-1.23' as decimal(32,2)))", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("if(TRUE, cast(NULL as decimal(32,2)), NULL)",
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("if(FALSE, cast('-1.23' as decimal(32,2)), NULL)",
+      ColumnType::CreateDecimalType(32,2));
+
+  // ZeroIfNull()
+  TestDecimalValue("zeroifnull(cast('10' as decimal(2,0)))", Decimal4Value(10),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("zeroifnull(cast('1.1' as decimal(18,1)))", Decimal8Value(11),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("zeroifnull(cast('-1.23' as decimal(32,2)))", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(32,2));
+  TestDecimalValue("zeroifnull(cast(NULL as decimal(2,0)))", Decimal4Value(0),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("zeroifnull(cast(NULL as decimal(18,1)))", Decimal8Value(0),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("zeroifnull(cast(NULL as decimal(32,2)))", Decimal16Value(0),
+      ColumnType::CreateDecimalType(32,2));
+
+  // Coalesce()
+  TestDecimalValue("coalesce(NULL, cast('0' as decimal(2,0)))", Decimal4Value(0),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("coalesce(NULL, cast('0' as decimal(18,0)))", Decimal8Value(0),
+      ColumnType::CreateDecimalType(18, 0));
+  TestDecimalValue("coalesce(NULL, cast('1.1' as decimal(18,1)))", Decimal8Value(11),
+      ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("coalesce(NULL, cast('-1.23' as decimal(18,2)))", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(18,2));
+  TestDecimalValue("coalesce(NULL, cast('0' as decimal(32,0)))", Decimal16Value(0),
+      ColumnType::CreateDecimalType(32, 0));
+  TestDecimalValue("coalesce(NULL, cast('1.1' as decimal(32,1)))", Decimal8Value(11),
+      ColumnType::CreateDecimalType(32,1));
+  TestDecimalValue("coalesce(NULL, cast('-1.23' as decimal(32,2)))", Decimal8Value(-123),
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("coalesce(cast(NULL as decimal(2,0)), NULL)",
+      ColumnType::CreateDecimalType(2,0));
+
+  // Case
+  TestDecimalValue("case when true then cast('10' as decimal(2,0)) end",
+      Decimal4Value(10), ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("case when true then cast('1.1' as decimal(18,1)) end",
+      Decimal8Value(11), ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("case when true then cast('-1.23' as decimal(32,2)) end",
+      Decimal8Value(-123), ColumnType::CreateDecimalType(32,2));
+  TestDecimalValue("case when false then NULL else cast('10' as decimal(2,0)) end",
+      Decimal4Value(10), ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("case when false then NULL else cast('1.1' as decimal(18,1)) end",
+      Decimal8Value(11), ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("case when false then NULL else cast('-1.23' as decimal(32,2)) end",
+      Decimal8Value(-123), ColumnType::CreateDecimalType(32,2));
+
+
+  // Positive()
+  TestDecimalValue("positive(cast('10' as decimal(2,0)))",
+      Decimal4Value(10), ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("positive(cast('1.1' as decimal(18,1)))",
+      Decimal8Value(11), ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("positive(cast('-1.23' as decimal(32,2)))",
+      Decimal8Value(-123), ColumnType::CreateDecimalType(32,2));
+  TestIsNull("positive(cast(NULL as decimal(32,2)))", ColumnType::CreateDecimalType(32,2));
+
+  // Negative()
+  TestDecimalValue("negative(cast('10' as decimal(2,0)))",
+      Decimal4Value(-10), ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("negative(cast('1.1' as decimal(18,1)))",
+      Decimal8Value(-11), ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("negative(cast('-1.23' as decimal(32,2)))",
+      Decimal8Value(123), ColumnType::CreateDecimalType(32,2));
+  TestIsNull("negative(cast(NULL as decimal(32,2)))", ColumnType::CreateDecimalType(32,2));
+
+  // Least()
+  TestDecimalValue("least(cast('10' as decimal(2,0)), cast('-10' as decimal(2,0)))",
+      Decimal4Value(-10), ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("least(cast('1.1' as decimal(18,1)), cast('-1.1' as decimal(18,1)))",
+      Decimal8Value(-11), ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("least(cast('-1.23' as decimal(32,2)), cast('1.23' as decimal(32,2)))",
+      Decimal8Value(-123), ColumnType::CreateDecimalType(32,2));
+  TestIsNull("least(cast(NULL as decimal(32,2)), cast('1.23' as decimal(32,2)))",
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("least(cast('1.23' as decimal(32,2)), NULL)",
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("least(cast(NULl as decimal(32,2)), NULL)",
+      ColumnType::CreateDecimalType(32,2));
+
+  // Greatest()
+  TestDecimalValue("greatest(cast('10' as decimal(2,0)), cast('-10' as decimal(2,0)))",
+      Decimal4Value(10), ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("greatest(cast('1.1' as decimal(18,1)), cast('-1.1' as decimal(18,1)))",
+      Decimal8Value(11), ColumnType::CreateDecimalType(18,1));
+  TestDecimalValue("greatest(cast('-1.23' as decimal(32,2)), cast('1.23' as decimal(32,2)))",
+      Decimal8Value(123), ColumnType::CreateDecimalType(32,2));
+  TestIsNull("greatest(cast(NULL as decimal(32,2)), cast('1.23' as decimal(32,2)))",
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("greatest(cast('1.23' as decimal(32,2)), NULL)",
+      ColumnType::CreateDecimalType(32,2));
+  TestIsNull("greatest(cast(NULl as decimal(32,2)), NULL)",
+      ColumnType::CreateDecimalType(32,2));
+
+  Decimal4Value dec4(10);
+  // DecimalFunctions::FnvHash hashes both the unscaled value and scale
+  uint64_t expected = HashUtil::FnvHash64(&dec4, 4, HashUtil::FNV_SEED);
+  TestValue("fnv_hash(cast('10' as decimal(2,0)))", TYPE_BIGINT, expected);
+
+  Decimal8Value dec8 = Decimal8Value(11);
+  expected = HashUtil::FnvHash64(&dec8, 8, HashUtil::FNV_SEED);
+  TestValue("fnv_hash(cast('1.1' as decimal(18,1)))", TYPE_BIGINT, expected);
+
+  Decimal16Value dec16 = Decimal16Value(-123);
+  expected = HashUtil::FnvHash64(&dec16, 16, HashUtil::FNV_SEED);
+  TestValue("fnv_hash(cast('-1.23' as decimal(32,2)))", TYPE_BIGINT, expected);
+
 
   // In these tests we iterate through the underlying decimal types and alternate
   // between positive and negative values.

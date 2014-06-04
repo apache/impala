@@ -133,4 +133,3 @@ void* DecimalFunctions::TruncateTo(Expr* e, TupleRow* row) {
 }
 
 }
-

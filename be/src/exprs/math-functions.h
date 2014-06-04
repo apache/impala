@@ -65,10 +65,12 @@ class MathFunctions {
   static void* FmodDouble(Expr* e, TupleRow* row);
   static void* QuotientDouble(Expr* e, TupleRow* row);
   static void* QuotientBigInt(Expr* e, TupleRow* row);
-  template <typename T> static void* Positive(Expr* e, TupleRow* row);
+  static void* Positive(Expr* e, TupleRow* row);
   template <typename T> static void* Negative(Expr* e, TupleRow* row);
+  static void* NegativeDecimal(Expr* e, TupleRow* row);
   template <typename T, bool ISLEAST> static void* LeastGreatest(Expr* e, TupleRow* row);
   template <bool ISLEAST> static void* LeastGreatestString(Expr* e, TupleRow* row);
+  template <bool ISLEAST> static void* LeastGreatestDecimal(Expr* e, TupleRow* row);
 
  private:
   static const int32_t MIN_BASE = 2;

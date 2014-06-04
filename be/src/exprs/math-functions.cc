@@ -520,11 +520,9 @@ void* MathFunctions::FmodDouble(Expr* e, TupleRow* row) {
   return &e->result_.double_val;
 }
 
-template <typename T> void* MathFunctions::Positive(Expr* e, TupleRow* row) {
+void* MathFunctions::Positive(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
-  T* i = reinterpret_cast<T*>(e->children()[0]->GetValue(row));
-  if (i == NULL) return NULL;
-  return e->result_.Set(*i);
+  return e->children()[0]->GetValue(row);
 }
 
 template <typename T> void* MathFunctions::Negative(Expr* e, TupleRow* row) {
@@ -532,6 +530,23 @@ template <typename T> void* MathFunctions::Negative(Expr* e, TupleRow* row) {
   T* i = reinterpret_cast<T*>(e->children()[0]->GetValue(row));
   if (i == NULL) return NULL;
   return e->result_.Set(-*i);
+}
+
+void* MathFunctions::NegativeDecimal(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  void* i = e->children()[0]->GetValue(row);
+  if (i == NULL) return NULL;
+  switch (e->type().GetByteSize()) {
+    case 4:
+      return e->result_.Set(-*reinterpret_cast<Decimal4Value*>(i));
+    case 8:
+      return e->result_.Set(-*reinterpret_cast<Decimal8Value*>(i));
+    case 16:
+      return e->result_.Set(-*reinterpret_cast<Decimal16Value*>(i));
+    default:
+      DCHECK(false);
+      return NULL;
+  }
 }
 
 void* MathFunctions::QuotientDouble(Expr* e, TupleRow* row) {
@@ -590,12 +605,61 @@ void* MathFunctions::LeastGreatestString(Expr* e, TupleRow* row) {
   return &e->result_.string_val;
 }
 
-template void* MathFunctions::Positive<int8_t>(Expr* e, TupleRow* row);
-template void* MathFunctions::Positive<int16_t>(Expr* e, TupleRow* row);
-template void* MathFunctions::Positive<int32_t>(Expr* e, TupleRow* row);
-template void* MathFunctions::Positive<int64_t>(Expr* e, TupleRow* row);
-template void* MathFunctions::Positive<float>(Expr* e, TupleRow* row);
-template void* MathFunctions::Positive<double>(Expr* e, TupleRow* row);
+template <bool ISLEAST>
+void* MathFunctions::LeastGreatestDecimal(Expr* e, TupleRow* row) {
+  DCHECK_GT(e->GetNumChildren(), 0);
+  void* first_val = e->children()[0]->GetValue(row);
+  if (first_val == NULL) return NULL;
+  int num_children = e->GetNumChildren();
+  switch (e->type().GetByteSize()) {
+    case 4: {
+      Decimal4Value* val = reinterpret_cast<Decimal4Value*>(first_val);
+      Decimal4Value result_val = *val;
+      for (int i = 1; i < num_children; ++i) {
+        val = reinterpret_cast<Decimal4Value*>(e->children()[i]->GetValue(row));
+        if (val == NULL) return NULL;
+        if (ISLEAST) {
+          if (*val < result_val) result_val = *val;
+        } else {
+          if (*val > result_val) result_val = *val;
+        }
+      }
+      return e->result_.Set(result_val);
+    }
+    case 8: {
+      Decimal8Value* val = reinterpret_cast<Decimal8Value*>(first_val);
+      Decimal8Value result_val = *val;
+      for (int i = 1; i < num_children; ++i) {
+        val = reinterpret_cast<Decimal8Value*>(e->children()[i]->GetValue(row));
+        if (val == NULL) return NULL;
+        if (ISLEAST) {
+          if (*val < result_val) result_val = *val;
+        } else {
+          if (*val > result_val) result_val = *val;
+        }
+      }
+      return e->result_.Set(result_val);
+    }
+    case 16: {
+      Decimal16Value* val = reinterpret_cast<Decimal16Value*>(first_val);
+      Decimal16Value result_val = *val;
+      for (int i = 1; i < num_children; ++i) {
+        val = reinterpret_cast<Decimal16Value*>(e->children()[i]->GetValue(row));
+        if (val == NULL) return NULL;
+        if (ISLEAST) {
+          if (*val < result_val) result_val = *val;
+        } else {
+          if (*val > result_val) result_val = *val;
+        }
+      }
+      return e->result_.Set(result_val);
+    }
+    default:
+      DCHECK(false);
+      return NULL;
+  }
+}
+
 template void* MathFunctions::Negative<int8_t>(Expr* e, TupleRow* row);
 template void* MathFunctions::Negative<int16_t>(Expr* e, TupleRow* row);
 template void* MathFunctions::Negative<int32_t>(Expr* e, TupleRow* row);
@@ -618,6 +682,9 @@ template void* MathFunctions::LeastGreatest<float, false>(Expr* e, TupleRow* row
 template void* MathFunctions::LeastGreatest<double, false>(Expr* e, TupleRow* row);
 template void* MathFunctions::LeastGreatest<TimestampValue, false>(Expr* e, TupleRow* row);
 template void* MathFunctions::LeastGreatestString<false>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatestDecimal<true>(Expr* e, TupleRow* row);
+template void* MathFunctions::LeastGreatestDecimal<false>(Expr* e, TupleRow* row);
+
 
 }
 
