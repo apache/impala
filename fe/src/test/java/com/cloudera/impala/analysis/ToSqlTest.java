@@ -33,10 +33,10 @@ public class ToSqlTest extends AnalyzerTest {
 
   private static AnalysisContext.AnalysisResult analyze(String query, String defaultDb) {
     try {
-      AnalysisContext analysisCtxt = new AnalysisContext(catalog_,
+      AnalysisContext analysisCtx = new AnalysisContext(catalog_,
           TestUtils.createQueryContext(defaultDb, System.getProperty("user.name")));
-      analysisCtxt.analyze(query);
-      AnalysisContext.AnalysisResult analysisResult = analysisCtxt.getAnalysisResult();
+      analysisCtx.analyze(query);
+      AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
       Preconditions.checkNotNull(analysisResult.getStmt());
       return analysisResult;
     } catch (Exception e) {

@@ -135,7 +135,7 @@ class LimitElement {
       throws AnalysisException {
     TColumnValue val = null;
     try {
-      val = FeSupport.EvalConstExpr(expr, analyzer.getQueryContext());
+      val = FeSupport.EvalConstExpr(expr, analyzer.getQueryCtx());
     } catch (InternalException e) {
       throw new AnalysisException("Failed to evaluate expr: " + expr.toSql(), e);
     }

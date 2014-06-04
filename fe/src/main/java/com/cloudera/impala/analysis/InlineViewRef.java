@@ -234,7 +234,7 @@ public class InlineViewRef extends TableRef {
       throw new InternalException(
           "couldn't analyze predicate " + isNotNullLiteralPred.toSql(), e);
     }
-    return FeSupport.EvalPredicate(isNotNullLiteralPred, analyzer.getQueryContext());
+    return FeSupport.EvalPredicate(isNotNullLiteralPred, analyzer.getQueryCtx());
   }
 
   @Override

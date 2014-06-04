@@ -170,14 +170,14 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   RAISE_IF_ERROR(
       session_handle.WithSession(ThriftServer::GetThreadConnectionId(), &session),
       SQLSTATE_GENERAL_ERROR);
-  TQueryContext query_ctxt;
+  TQueryCtx query_ctx;
   // raise general error for request conversion error;
-  RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctxt), SQLSTATE_GENERAL_ERROR);
+  RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctx), SQLSTATE_GENERAL_ERROR);
 
   // raise Syntax error or access violation; it's likely to be syntax/analysis error
   // TODO: that may not be true; fix this
   shared_ptr<QueryExecState> exec_state;
-  RAISE_IF_ERROR(Execute(&query_ctxt, session, &exec_state),
+  RAISE_IF_ERROR(Execute(&query_ctx, session, &exec_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
@@ -198,9 +198,9 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   RAISE_IF_ERROR(
       session_handle.WithSession(ThriftServer::GetThreadConnectionId(), &session),
       SQLSTATE_GENERAL_ERROR);
-  TQueryContext query_ctxt;
+  TQueryCtx query_ctx;
   // raise general error for request conversion error;
-  RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctxt), SQLSTATE_GENERAL_ERROR);
+  RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctx), SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<QueryExecState> exec_state;
   DCHECK(session != NULL);  // The session should exist.
@@ -214,7 +214,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 
   // raise Syntax error or access violation; it's likely to be syntax/analysis error
   // TODO: that may not be true; fix this
-  RAISE_IF_ERROR(Execute(&query_ctxt, session, &exec_state),
+  RAISE_IF_ERROR(Execute(&query_ctx, session, &exec_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
@@ -241,14 +241,14 @@ void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& que
   RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
       SQLSTATE_GENERAL_ERROR);
 
-  TQueryContext query_ctxt;
-  RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctxt), SQLSTATE_GENERAL_ERROR);
+  TQueryCtx query_ctx;
+  RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctx), SQLSTATE_GENERAL_ERROR);
 
   RAISE_IF_ERROR(
-      exec_env_->frontend()->GetExplainPlan(query_ctxt, &query_explanation.textual),
+      exec_env_->frontend()->GetExplainPlan(query_ctx, &query_explanation.textual),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
   query_explanation.__isset.textual = true;
-  VLOG_QUERY << "explain():\nstmt=" << query_ctxt.request.stmt
+  VLOG_QUERY << "explain():\nstmt=" << query_ctx.request.stmt
              << "\nplan: " << query_explanation.textual;
 }
 
@@ -496,31 +496,31 @@ void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& req
 }
 
 Status ImpalaServer::QueryToTQueryContext(const Query& query,
-    TQueryContext* query_ctxt) {
-  query_ctxt->request.query_options = default_query_options_;
-  query_ctxt->request.stmt = query.query;
+    TQueryCtx* query_ctx) {
+  query_ctx->request.query_options = default_query_options_;
+  query_ctx->request.stmt = query.query;
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
     shared_ptr<SessionState> session;
     const TUniqueId& session_id = ThriftServer::GetThreadConnectionId();
     RETURN_IF_ERROR(GetSessionState(session_id, &session));
     DCHECK(session != NULL);
-    session->ToThrift(session_id, &query_ctxt->session);
+    session->ToThrift(session_id, &query_ctx->session);
     // The session is created when the client connects. Depending on the underlying
     // transport, the username may be known at that time. If the username hasn't been set
     // yet, set it now.
     lock_guard<mutex> l(session->lock);
     if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
-    query_ctxt->session.connected_user = session->connected_user;
+    query_ctx->session.connected_user = session->connected_user;
   }
 
   // Override default query options with Query.Configuration
   if (query.__isset.configuration) {
     BOOST_FOREACH(const string& option, query.configuration) {
-      RETURN_IF_ERROR(ParseQueryOptions(option, &query_ctxt->request.query_options));
+      RETURN_IF_ERROR(ParseQueryOptions(option, &query_ctx->request.query_options));
     }
     VLOG_QUERY << "TClientRequest.queryOptions: "
-               << ThriftDebugString(query_ctxt->request.query_options);
+               << ThriftDebugString(query_ctx->request.query_options);
   }
 
   return Status::OK;

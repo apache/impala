@@ -36,7 +36,7 @@ import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExprBatch;
 import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
 import com.cloudera.impala.thrift.TPrioritizeLoadResponse;
-import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TSymbolLookupParams;
@@ -112,7 +112,7 @@ public class FeSupport {
     return NativeCacheJar(thriftParams);
   }
 
-  public static TColumnValue EvalConstExpr(Expr expr, TQueryContext queryCtxt)
+  public static TColumnValue EvalConstExpr(Expr expr, TQueryCtx queryCtx)
       throws InternalException {
     Preconditions.checkState(expr.isConstant());
     TExprBatch exprBatch = new TExprBatch();
@@ -121,7 +121,7 @@ public class FeSupport {
     byte[] result;
     try {
       result = EvalConstExprs(serializer.serialize(exprBatch),
-          serializer.serialize(queryCtxt));
+          serializer.serialize(queryCtx));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
       TResultRow val = new TResultRow();
@@ -169,10 +169,10 @@ public class FeSupport {
     return NativeEvalConstExprs(thriftExprBatch, thriftQueryContext);
   }
 
-  public static boolean EvalPredicate(Expr pred, TQueryContext queryCtxt)
+  public static boolean EvalPredicate(Expr pred, TQueryCtx queryCtx)
       throws InternalException {
     Preconditions.checkState(pred.getType().isBoolean());
-    TColumnValue val = EvalConstExpr(pred, queryCtxt);
+    TColumnValue val = EvalConstExpr(pred, queryCtx);
     // Return false if pred evaluated to false or NULL. True otherwise.
     return val.isBool_val() && val.bool_val;
   }
@@ -187,7 +187,7 @@ public class FeSupport {
    * exprs. In the future, we can extend it to support arbitrary constant exprs.
    */
   public static TResultRow EvalPredicateBatch(ArrayList<Expr> exprs,
-      TQueryContext queryCtxt) throws InternalException {
+      TQueryCtx queryCtx) throws InternalException {
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     TExprBatch exprBatch = new TExprBatch();
     for (Expr expr: exprs) {
@@ -199,7 +199,7 @@ public class FeSupport {
     byte[] result;
     try {
       result = EvalConstExprs(serializer.serialize(exprBatch),
-          serializer.serialize(queryCtxt));
+          serializer.serialize(queryCtx));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
       TResultRow val = new TResultRow();

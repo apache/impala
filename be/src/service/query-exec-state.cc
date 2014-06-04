@@ -50,9 +50,9 @@ static const string PER_HOST_VCORES_KEY = "Estimated Per-Host VCores";
 static const string TABLES_MISSING_STATS_KEY = "Tables Missing Stats";
 
 ImpalaServer::QueryExecState::QueryExecState(
-    const TQueryContext& query_ctxt, ExecEnv* exec_env, Frontend* frontend,
+    const TQueryCtx& query_ctx, ExecEnv* exec_env, Frontend* frontend,
     ImpalaServer* server, shared_ptr<SessionState> session)
-  : query_ctxt_(query_ctxt),
+  : query_ctx_(query_ctx),
     last_active_time_(numeric_limits<int64_t>::max()),
     ref_count_(0L),
     exec_env_(exec_env),
@@ -77,14 +77,6 @@ ImpalaServer::QueryExecState::QueryExecState(
   query_events_->Start();
   profile_.AddChild(&summary_profile_);
 
-  // Creating a random_generator every time is not free, but
-  // benchmarks show it to be slightly cheaper than contending for a
-  // single generator under a lock (since random_generator is not
-  // thread-safe).
-  random_generator uuid_generator;
-  uuid query_uuid = uuid_generator();
-  UUIDToTUniqueId(query_uuid, &query_id_);
-
   profile_.set_name("Query (id=" + PrintId(query_id()) + ")");
   summary_profile_.AddInfoString("Session ID", PrintId(session_id()));
   summary_profile_.AddInfoString("Session Type", PrintTSessionType(session_type()));
@@ -100,7 +92,7 @@ ImpalaServer::QueryExecState::QueryExecState(
   summary_profile_.AddInfoString("Network Address",
       lexical_cast<string>(session_->network_address));
   summary_profile_.AddInfoString("Default Db", default_db());
-  summary_profile_.AddInfoString("Sql Statement", query_ctxt_.request.stmt);
+  summary_profile_.AddInfoString("Sql Statement", query_ctx_.request.stmt);
 }
 
 Status ImpalaServer::QueryExecState::SetResultCache(QueryResultSet* cache,
@@ -186,7 +178,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
           params->__isset.show_pattern ? &(params->show_pattern) : NULL;
       TGetTablesResult table_names;
       RETURN_IF_ERROR(frontend_->GetTableNames(params->db, table_name,
-          &query_ctxt_.session, &table_names));
+          &query_ctx_.session, &table_names));
       SetResultSet(table_names.tables);
       return Status::OK;
     }
@@ -196,7 +188,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       const string* db_pattern =
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(
-          frontend_->GetDbNames(db_pattern, &query_ctxt_.session, &db_names));
+          frontend_->GetDbNames(db_pattern, &query_ctx_.session, &db_names));
       SetResultSet(db_names.dbs);
       return Status::OK;
     }
@@ -226,7 +218,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       const string* fn_pattern =
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(frontend_->GetFunctions(
-          params->type, params->db, fn_pattern, &query_ctxt_.session, &functions));
+          params->type, params->db, fn_pattern, &query_ctx_.session, &functions));
       SetResultSet(functions.fn_ret_types, functions.fn_signatures);
       return Status::OK;
     }
@@ -278,10 +270,10 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     ss << query_exec_request.per_host_vcores;
     summary_profile_.AddInfoString(PER_HOST_VCORES_KEY, ss.str());
   }
-  if (query_exec_request.query_ctxt.__isset.tables_missing_stats &&
-      !query_exec_request.query_ctxt.tables_missing_stats.empty()) {
+  if (query_exec_request.query_ctx.__isset.tables_missing_stats &&
+      !query_exec_request.query_ctx.tables_missing_stats.empty()) {
     stringstream ss;
-    const vector<TTableName>& tbls = query_exec_request.query_ctxt.tables_missing_stats;
+    const vector<TTableName>& tbls = query_exec_request.query_ctx.tables_missing_stats;
     for (int i = 0; i < tbls.size(); ++i) {
       if (i != 0) ss << ",";
       ss << tbls[i].db_name << "." << tbls[i].table_name;
@@ -312,7 +304,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   if (FLAGS_enable_rm) {
     DCHECK(exec_env_->resource_broker() != NULL);
   }
-  schedule_.reset(new QuerySchedule(query_id_, query_exec_request,
+  schedule_.reset(new QuerySchedule(query_id(), query_exec_request,
       exec_request_.query_options, effective_user(), &summary_profile_, query_events_));
   coord_.reset(new Coordinator(exec_env_));
   Status status = exec_env_->scheduler()->Schedule(coord_.get(), schedule_.get());

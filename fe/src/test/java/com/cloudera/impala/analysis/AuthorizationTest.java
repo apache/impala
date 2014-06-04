@@ -53,7 +53,7 @@ import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpcode;
 import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TSessionState;
 import com.google.common.base.Preconditions;
@@ -82,7 +82,7 @@ public class AuthorizationTest {
 
   private final AuthorizationConfig authzConfig_;
   private final ImpaladCatalog catalog_;
-  private final TQueryContext queryCtxt_;
+  private final TQueryCtx queryCtx_;
   private final AnalysisContext analysisContext_;
   private final Frontend fe_;
   protected static final String SERVER_HOST = "localhost";
@@ -105,8 +105,8 @@ public class AuthorizationTest {
       isSetup_ = true;
     }
     catalog_ = new ImpaladTestCatalog(authzConfig_);
-    queryCtxt_ = TestUtils.createQueryContext(Catalog.DEFAULT_DB, USER.getName());
-    analysisContext_ = new AnalysisContext(catalog_, queryCtxt_);
+    queryCtx_ = TestUtils.createQueryContext(Catalog.DEFAULT_DB, USER.getName());
+    analysisContext_ = new AnalysisContext(catalog_, queryCtx_);
     fe_ = new Frontend(authzConfig_, new ImpaladTestCatalog(authzConfig_));
   }
 

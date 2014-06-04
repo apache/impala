@@ -24,7 +24,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TQueryCtx;
 import com.google.common.base.Preconditions;
 
 /**
@@ -33,14 +33,14 @@ import com.google.common.base.Preconditions;
 public class AnalysisContext {
   private final static Logger LOG = LoggerFactory.getLogger(AnalysisContext.class);
   private final ImpaladCatalog catalog_;
-  private final TQueryContext queryCtxt_;
+  private final TQueryCtx queryCtx_;
 
   // Set in analyze()
   private AnalysisResult analysisResult_;
 
-  public AnalysisContext(ImpaladCatalog catalog, TQueryContext queryCtxt) {
+  public AnalysisContext(ImpaladCatalog catalog, TQueryCtx queryCtx) {
     catalog_ = catalog;
-    queryCtxt_ = queryCtxt;
+    queryCtx_ = queryCtx;
   }
 
   static public class AnalysisResult {
@@ -242,7 +242,7 @@ public class AnalysisContext {
   public void analyze(String stmt) throws AnalysisException,
       AuthorizationException {
     analysisResult_ = new AnalysisResult();
-    analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtxt_);
+    analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_);
 
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);

@@ -47,36 +47,36 @@ using namespace boost::algorithm;
 
 namespace impala {
 
-RuntimeState::RuntimeState(const TUniqueId& query_id,
-    const TUniqueId& fragment_instance_id, const TQueryContext& query_ctxt,
+RuntimeState::RuntimeState(const TPlanFragmentInstanceCtx& fragment_instance_ctx,
     const string& cgroup, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     unreported_error_idx_(0),
-    query_ctxt_(query_ctxt),
-    now_(new TimestampValue(query_ctxt.now_string.c_str(),
-        query_ctxt.now_string.size())),
-    query_id_(query_id),
+    fragment_instance_ctx_(fragment_instance_ctx),
+    now_(new TimestampValue(fragment_instance_ctx_.query_ctx.now_string.c_str(),
+        fragment_instance_ctx_.query_ctx.now_string.size())),
     cgroup_(cgroup),
-    profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_instance_id)),
+    profile_(obj_pool_.get(),
+        "Fragment " + PrintId(fragment_instance_ctx_.fragment_instance_id)),
     is_cancelled_(false),
     query_resource_mgr_(NULL),
     root_node_id_(-1) {
-  Status status = Init(fragment_instance_id, exec_env);
+  Status status = Init(exec_env);
   DCHECK(status.ok()) << status.GetErrorMsg();
 }
 
-RuntimeState::RuntimeState(const TQueryContext& query_ctxt)
+RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
   : obj_pool_(new ObjectPool()),
     unreported_error_idx_(0),
-    query_ctxt_(query_ctxt),
-    now_(new TimestampValue(query_ctxt.now_string.c_str(),
-        query_ctxt.now_string.size())),
+    now_(new TimestampValue(query_ctx.now_string.c_str(),
+        query_ctx.now_string.size())),
     exec_env_(ExecEnv::GetInstance()),
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false),
     query_resource_mgr_(NULL),
     root_node_id_(-1) {
-  query_ctxt_.request.query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
+  fragment_instance_ctx_.__set_query_ctx(query_ctx);
+  fragment_instance_ctx_.query_ctx.request.query_options.__set_batch_size(
+      DEFAULT_BATCH_SIZE);
 }
 
 RuntimeState::~RuntimeState() {
@@ -95,10 +95,10 @@ RuntimeState::~RuntimeState() {
   query_mem_tracker_.reset();
 }
 
-Status RuntimeState::Init(const TUniqueId& fragment_instance_id, ExecEnv* exec_env) {
-  fragment_instance_id_ = fragment_instance_id;
+Status RuntimeState::Init(ExecEnv* exec_env) {
   exec_env_ = exec_env;
-  TQueryOptions& query_options = query_ctxt_.request.query_options;
+  TQueryOptions& query_options =
+      fragment_instance_ctx_.query_ctx.request.query_options;
   if (!query_options.disable_codegen) {
     RETURN_IF_ERROR(CreateCodegen());
   } else {
@@ -147,15 +147,6 @@ Status RuntimeState::InitMemTrackers(const TUniqueId& query_id,
   return Status::OK;
 }
 
-shared_ptr<DataStreamRecvr> RuntimeState::CreateRecvr(
-    const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
-    int buffer_size, RuntimeProfile* profile, bool is_merging) {
-  shared_ptr<DataStreamRecvr> recvr = exec_env_->stream_mgr()->CreateRecvr(this,
-      row_desc, fragment_instance_id_, dest_node_id, num_senders, buffer_size, profile,
-      is_merging);
-  return recvr;
-}
-
 void RuntimeState::set_now(const TimestampValue* now) {
   now_.reset(new TimestampValue(*now));
 }
@@ -194,8 +185,8 @@ void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors
 
 bool RuntimeState::LogError(const string& error) {
   lock_guard<mutex> l(error_log_lock_);
-  if (error_log_.size() < query_ctxt_.request.query_options.max_errors) {
-    VLOG_QUERY << "Error from query " << query_id_ << ": " << error;
+  if (error_log_.size() < query_options().max_errors) {
+    VLOG_QUERY << "Error from query " << query_id() << ": " << error;
     error_log_.push_back(error);
     return true;
   }
@@ -251,9 +242,9 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
   }
   LogError(ss.str());
   // Add warning about missing stats.
-  if (query_ctxt_.__isset.tables_missing_stats
-      && !query_ctxt_.tables_missing_stats.empty()) {
-    LogError(GetTablesMissingStatsWarning(query_ctxt_.tables_missing_stats));
+  if (query_ctx().__isset.tables_missing_stats
+      && !query_ctx().tables_missing_stats.empty()) {
+    LogError(GetTablesMissingStatsWarning(query_ctx().tables_missing_stats));
   }
   DCHECK(query_status_.IsMemLimitExceeded());
   return query_status_;

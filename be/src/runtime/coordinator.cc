@@ -300,7 +300,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
   stmt_type_ = request.stmt_type;
   query_id_ = schedule.query_id();
   desc_tbl_ = request.desc_tbl;
-  query_ctxt_ = request.query_ctxt;
+  query_ctx_ = request.query_ctx;
 
   query_profile_.reset(
       new RuntimeProfile(obj_pool(), "Execution Profile " + PrintId(query_id_)));
@@ -346,9 +346,9 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
     // If there is a fragment, the fragment executor created above initializes the query
     // mem tracker. If not, the query mem tracker is created here.
     int64_t query_limit = -1;
-    if (query_ctxt_.request.query_options.__isset.mem_limit &&
-        query_ctxt_.request.query_options.mem_limit > 0) {
-      query_limit = query_ctxt_.request.query_options.mem_limit;
+    if (query_ctx_.request.query_options.__isset.mem_limit &&
+        query_ctx_.request.query_options.mem_limit > 0) {
+      query_limit = query_ctx_.request.query_options.mem_limit;
     }
     MemTracker* pool_tracker = MemTracker::GetRequestPoolMemTracker(
         schedule.request_pool(), exec_env_->process_mem_tracker());
@@ -1509,8 +1509,6 @@ void Coordinator::SetExecPlanFragmentParams(
   rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
   rpc_params->__set_fragment(fragment);
   rpc_params->__set_desc_tbl(desc_tbl_);
-  rpc_params->params.__set_query_id(query_id_);
-  rpc_params->params.__set_fragment_instance_id(params.instance_ids[instance_idx]);
   TNetworkAddress exec_host = params.hosts[instance_idx];
   if (schedule.HasReservation()) {
     // The reservation has already have been validated at this point.
@@ -1536,11 +1534,15 @@ void Coordinator::SetExecPlanFragmentParams(
   rpc_params->params.__set_per_node_scan_ranges(scan_ranges);
   rpc_params->params.__set_per_exch_num_senders(params.per_exch_num_senders);
   rpc_params->params.__set_destinations(params.destinations);
-  rpc_params->__isset.params = true;
-  rpc_params->__set_coord(coord);
-  rpc_params->__set_backend_num(backend_num);
-  rpc_params->__set_query_ctxt(query_ctxt_);
   rpc_params->params.__set_sender_id(params.sender_id_base + instance_idx);
+  rpc_params->__isset.params = true;
+  rpc_params->fragment_instance_ctx.__set_query_ctx(query_ctx_);
+  rpc_params->fragment_instance_ctx.fragment_instance_id =
+      params.instance_ids[instance_idx];
+  rpc_params->fragment_instance_ctx.fragment_instance_idx = instance_idx;
+  rpc_params->fragment_instance_ctx.num_fragment_instances = params.instance_ids.size();
+  rpc_params->fragment_instance_ctx.backend_num = backend_num;
+  rpc_params->__isset.fragment_instance_ctx = true;
 }
 
 void Coordinator::PrintExecSummary(int indent_level, bool is_child_fragment,

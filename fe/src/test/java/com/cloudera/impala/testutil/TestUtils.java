@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TSessionState;
 import com.cloudera.impala.thrift.TSessionType;
@@ -180,23 +180,24 @@ public class TestUtils {
 
 
   /**
-   * Create a TQueryContext for executing FE tests.
+   * Create a TQueryCtx for executing FE tests.
    */
-  public static TQueryContext createQueryContext() {
+  public static TQueryCtx createQueryContext() {
     return createQueryContext(Catalog.DEFAULT_DB, System.getProperty("user.name"));
   }
 
   /**
-   * Create a TQueryContext for executing FE tests using the given default DB and user.
+   * Create a TQueryCtx for executing FE tests using the given default DB and user.
    */
-  public static TQueryContext createQueryContext(String defaultDb, String user) {
-    TQueryContext queryCtxt = new TQueryContext();
-    queryCtxt.setRequest(new TClientRequest("FeTests", new TQueryOptions()));
-    queryCtxt.setSession(new TSessionState(new TUniqueId(), TSessionType.BEESWAX,
+  public static TQueryCtx createQueryContext(String defaultDb, String user) {
+    TQueryCtx queryCtx = new TQueryCtx();
+    queryCtx.setRequest(new TClientRequest("FeTests", new TQueryOptions()));
+    queryCtx.setQuery_id(new TUniqueId());
+    queryCtx.setSession(new TSessionState(new TUniqueId(), TSessionType.BEESWAX,
         defaultDb, user, new TNetworkAddress("localhost", 0)));
     SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
-    queryCtxt.setNow_string(formatter.format(Calendar.getInstance().getTime()));
-    queryCtxt.setPid(1000);
-    return queryCtxt;
+    queryCtx.setNow_string(formatter.format(Calendar.getInstance().getTime()));
+    queryCtx.setPid(1000);
+    return queryCtx;
   }
 }

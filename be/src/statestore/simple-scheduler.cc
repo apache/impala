@@ -811,10 +811,10 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
         reservation_request, schedule->reservation());
     if (!status.ok()) {
       // Warn about missing table and/or column stats if necessary.
-      const TQueryContext& query_ctxt = schedule->request().query_ctxt;
-      if(query_ctxt.__isset.tables_missing_stats &&
-          !query_ctxt.tables_missing_stats.empty()) {
-        status.AddErrorMsg(GetTablesMissingStatsWarning(query_ctxt.tables_missing_stats));
+      const TQueryCtx& query_ctx = schedule->request().query_ctx;
+      if(query_ctx.__isset.tables_missing_stats &&
+          !query_ctx.tables_missing_stats.empty()) {
+        status.AddErrorMsg(GetTablesMissingStatsWarning(query_ctx.tables_missing_stats));
       }
       return status;
     }

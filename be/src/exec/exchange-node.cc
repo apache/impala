@@ -63,7 +63,8 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
   convert_row_batch_timer_ = ADD_TIMER(runtime_profile(), "ConvertRowBatchTime");
   // TODO: figure out appropriate buffer size
   DCHECK_GT(num_senders_, 0);
-  stream_recvr_ = state->CreateRecvr(input_row_desc_, id_, num_senders_,
+  stream_recvr_ = ExecEnv::GetInstance()->stream_mgr()->CreateRecvr(state,
+      input_row_desc_, state->fragment_instance_id(), id_, num_senders_,
       FLAGS_exchg_node_buffer_size_bytes, runtime_profile(), is_merging_);
   if (is_merging_) {
     RETURN_IF_ERROR(sort_exec_exprs_.Prepare(state, row_descriptor_, row_descriptor_));

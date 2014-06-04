@@ -73,10 +73,10 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
 Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   fragment_sw_.Start();
   const TPlanFragmentExecParams& params = request.params;
-  query_id_ = params.query_id;
+  query_id_ = request.fragment_instance_ctx.query_ctx.query_id;
 
   VLOG_QUERY << "Prepare(): query_id=" << PrintId(query_id_) << " instance_id="
-             << PrintId(params.fragment_instance_id);
+             << PrintId(request.fragment_instance_ctx.fragment_instance_id);
   VLOG(2) << "params:\n" << ThriftDebugString(params);
 
   if (request.__isset.reserved_resource) {
@@ -89,14 +89,14 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     cgroup = exec_env_->cgroups_mgr()->UniqueIdToCgroup(PrintId(query_id_, "_"));
   }
 
-  runtime_state_.reset(new RuntimeState(query_id_, params.fragment_instance_id,
-      request.query_ctxt, cgroup, exec_env_));
+  runtime_state_.reset(
+      new RuntimeState(request.fragment_instance_ctx, cgroup, exec_env_));
 
   // Register after setting runtime_state_ to ensure proper cleanup.
   if (FLAGS_enable_rm && !cgroup.empty() && request.__isset.reserved_resource) {
     bool is_first;
     RETURN_IF_ERROR(exec_env_->cgroups_mgr()->RegisterFragment(
-        params.fragment_instance_id, cgroup, &is_first));
+        request.fragment_instance_ctx.fragment_instance_id, cgroup, &is_first));
     // The first fragment using cgroup sets the cgroup's CPU shares based on the reserved
     // resource.
     if (is_first) {
@@ -131,9 +131,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
         static_cast<int64_t>(request.reserved_resource.memory_mb) * 1024L * 1024L;
     VLOG_QUERY << "Using query memory limit from resource reservation: "
         << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
-  } else if (request.query_ctxt.request.query_options.__isset.mem_limit &&
-      request.query_ctxt.request.query_options.mem_limit > 0) {
-    bytes_limit = request.query_ctxt.request.query_options.mem_limit;
+  } else if (runtime_state_->query_options().__isset.mem_limit &&
+      runtime_state_->query_options().mem_limit > 0) {
+    bytes_limit = runtime_state_->query_options().mem_limit;
     VLOG_QUERY << "Using query memory limit from query options: "
                << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
   }
@@ -167,8 +167,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   RETURN_IF_ERROR(
       DescriptorTbl::Create(obj_pool(), request.desc_tbl, &desc_tbl));
   runtime_state_->set_desc_tbl(desc_tbl);
-  VLOG_QUERY << "descriptor table for fragment=" << params.fragment_instance_id
-      << "\n" << desc_tbl->DebugString();
+  VLOG_QUERY << "descriptor table for fragment="
+             << request.fragment_instance_ctx.fragment_instance_id
+             << "\n" << desc_tbl->DebugString();
 
   // set up plan
   DCHECK(request.__isset.fragment);

@@ -69,11 +69,11 @@ typedef std::map<std::string, std::string> FileMoveMap;
 // query and shared across all execution nodes of that query.
 class RuntimeState {
  public:
-  RuntimeState(const TUniqueId& query_id, const TUniqueId& fragment_instance_id,
-      const TQueryContext& query_ctxt, const std::string& cgroup, ExecEnv* exec_env);
+  RuntimeState(const TPlanFragmentInstanceCtx& fragment_instance_ctx,
+      const std::string& cgroup, ExecEnv* exec_env);
 
   // RuntimeState for executing expr in fe-support.
-  RuntimeState(const TQueryContext& query_ctxt);
+  RuntimeState(const TQueryCtx& query_ctx);
 
   // Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
@@ -91,31 +91,39 @@ class RuntimeState {
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
   const TQueryOptions& query_options() const {
-    return query_ctxt_.request.query_options;
+    return query_ctx().request.query_options;
   }
-  int batch_size() const { return query_ctxt_.request.query_options.batch_size; }
+  int batch_size() const { return query_ctx().request.query_options.batch_size; }
   bool abort_on_error() const {
-    return query_ctxt_.request.query_options.abort_on_error;
+    return query_ctx().request.query_options.abort_on_error;
   }
-  int max_errors() const { return query_ctxt_.request.query_options.max_errors; }
-  const TQueryContext& query_ctxt() const { return query_ctxt_; }
+  bool abort_on_default_limit_exceeded() const {
+    return query_ctx().request.query_options.abort_on_default_limit_exceeded;
+  }
+  int max_errors() const { return query_options().max_errors; }
+  const TQueryCtx& query_ctx() const { return fragment_instance_ctx_.query_ctx; }
+  const TPlanFragmentInstanceCtx& fragment_ctx() const { return fragment_instance_ctx_; }
   const std::string& effective_user() const {
-    if (query_ctxt_.session.__isset.impersonated_user &&
-        !query_ctxt_.session.impersonated_user.empty()) {
+    if (query_ctx().session.__isset.impersonated_user &&
+        !query_ctx().session.impersonated_user.empty()) {
       return do_as_user();
     }
     return connected_user();
   }
-  const std::string& do_as_user() const { return query_ctxt_.session.impersonated_user; }
-  const std::string& connected_user() const { return query_ctxt_.session.connected_user; }
+  const std::string& do_as_user() const { return query_ctx().session.impersonated_user; }
+  const std::string& connected_user() const {
+    return query_ctx().session.connected_user;
+  }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
   const std::vector<std::string>& error_log() const { return error_log_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
   }
-  const TUniqueId& query_id() const { return query_id_; }
-  const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
+  const TUniqueId& query_id() const { return query_ctx().query_id; }
+  const TUniqueId& fragment_instance_id() const {
+    return fragment_instance_ctx_.fragment_instance_id;
+  }
   const std::string& cgroup() const { return cgroup_; }
   ExecEnv* exec_env() { return exec_env_; }
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
@@ -168,9 +176,7 @@ class RuntimeState {
   RuntimeProfile* runtime_profile() { return &profile_; }
 
   // Returns true if codegen is enabled for this query.
-  bool codegen_enabled() const {
-    return !query_ctxt_.request.query_options.disable_codegen;
-  }
+  bool codegen_enabled() const { return !query_options().disable_codegen; }
 
   // Returns CodeGen object.  Returns NULL if the codegen object has not been
   // created. If codegen is enabled for the query, the codegen object will be
@@ -191,14 +197,6 @@ class RuntimeState {
 
   MemPool* udf_pool() { return udf_pool_.get(); };
 
-  // Create and return a stream receiver for fragment_instance_id_
-  // from the data stream manager.
-  // Separate row-batch receiver queues are maintained for each sender instance if
-  // is_merging is true.
-  boost::shared_ptr<DataStreamRecvr> CreateRecvr(
-      const RowDescriptor& row_desc, PlanNodeId dest_node_id, int num_senders,
-      int buffer_size, RuntimeProfile* profile, bool is_merging);
-
   // Appends error to the error_log_ if there is space. Returns true if there was space
   // and the error was logged.
   bool LogError(const std::string& error);
@@ -209,7 +207,7 @@ class RuntimeState {
   // Returns true if the error log has not reached max_errors_.
   bool LogHasSpace() {
     boost::lock_guard<boost::mutex> l(error_log_lock_);
-    return error_log_.size() < query_ctxt_.request.query_options.max_errors;
+    return error_log_.size() < query_options().max_errors;
   }
 
   // Report that num_errors occurred while parsing file_name.
@@ -270,7 +268,7 @@ class RuntimeState {
 
  private:
   // Set per-fragment state.
-  Status Init(const TUniqueId& fragment_instance_id, ExecEnv* exec_env);
+  Status Init(ExecEnv* exec_env);
 
   static const int DEFAULT_BATCH_SIZE = 1024;
 
@@ -292,16 +290,13 @@ class RuntimeState {
   // Stores the number of parse errors per file.
   std::vector<std::pair<std::string, int> > file_errors_;
 
-  // Query-global parameters used for preparing exprs as now(), user(), etc. that should
-  // return a consistent result regardless which impalad is evaluating the expr.
-  TQueryContext query_ctxt_;
+  // Context of this fragment instance, including its unique id, the total number
+  // of fragment instances, the query context, the coordinator address, etc.
+  TPlanFragmentInstanceCtx fragment_instance_ctx_;
 
   // Query-global timestamp, e.g., for implementing now(). Set from query_globals_.
   // Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.
   boost::scoped_ptr<TimestampValue> now_;
-
-  TUniqueId query_id_;
-  TUniqueId fragment_instance_id_;
 
   // The Impala-internal cgroup into which execution threads are assigned.
   // If empty, no RM is enabled.

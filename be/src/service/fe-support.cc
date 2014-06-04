@@ -71,7 +71,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_expr_batch,
     jbyteArray thrift_query_ctx_bytes) {
   jbyteArray result_bytes = NULL;
-  TQueryContext query_ctx;
+  TQueryCtx query_ctx;
   TExprBatch expr_batch;
   JniLocalFrame jni_frame;
   TResultRow expr_results;

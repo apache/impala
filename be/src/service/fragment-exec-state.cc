@@ -60,19 +60,19 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
   Status exec_status = UpdateStatus(status);
 
   Status coord_status;
-  ImpalaInternalServiceConnection coord(client_cache_, coord_hostport_, &coord_status);
+  ImpalaInternalServiceConnection coord(client_cache_, coord_address(), &coord_status);
   if (!coord_status.ok()) {
     stringstream s;
-    s << "couldn't get a client for " << coord_hostport_;
+    s << "couldn't get a client for " << coord_address();
     UpdateStatus(Status(TStatusCode::INTERNAL_ERROR, s.str()));
     return;
   }
 
   TReportExecStatusParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
-  params.__set_query_id(query_id_);
-  params.__set_backend_num(backend_num_);
-  params.__set_fragment_instance_id(fragment_instance_id_);
+  params.__set_query_id(fragment_instance_ctx_.query_ctx.query_id);
+  params.__set_backend_num(fragment_instance_ctx_.backend_num);
+  params.__set_fragment_instance_id(fragment_instance_ctx_.fragment_instance_id);
   exec_status.SetTStatus(&params);
   params.__set_done(done);
   profile->ToThrift(&params.profile);
@@ -118,7 +118,7 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
     rpc_status = Status(res.status);
   } catch (TException& e) {
     stringstream msg;
-    msg << "ReportExecStatus() to " << coord_hostport_ << " failed:\n" << e.what();
+    msg << "ReportExecStatus() to " << coord_address() << " failed:\n" << e.what();
     VLOG_QUERY << msg.str();
     rpc_status = Status(TStatusCode::INTERNAL_ERROR, msg.str());
   }

@@ -25,7 +25,7 @@ import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpcode;
-import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.google.common.collect.Lists;
@@ -47,16 +47,16 @@ public class FrontendTest {
   @Test
   public void TestCatalogNotReady() throws ImpalaException {
     Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig());
-    TQueryContext queryCtxt = TestUtils.createQueryContext("default", "fake_user");
+    TQueryCtx queryCtx = TestUtils.createQueryContext("default", "fake_user");
 
     // Queries that do not touch catalog objects should succeed.
-    queryCtxt.request.setStmt("select 1");
-    fe.createExecRequest(queryCtxt, new StringBuilder());
+    queryCtx.request.setStmt("select 1");
+    fe.createExecRequest(queryCtx, new StringBuilder());
 
     // A query that touches a catalog object should fail.
-    queryCtxt.request.setStmt("show tables");
+    queryCtx.request.setStmt("show tables");
     try {
-      fe.createExecRequest(queryCtxt, new StringBuilder());
+      fe.createExecRequest(queryCtx, new StringBuilder());
       fail("Expected failure to due uninitialized catalog.");
     } catch (AnalysisException e) {
       assertEquals("This Impala daemon is not ready to accept user requests. " +

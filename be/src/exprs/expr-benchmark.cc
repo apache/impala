@@ -54,7 +54,7 @@ class Planner {
   }
 
   Status GeneratePlan(const string& stmt, TExecRequest* result) {
-    TQueryContext query_ctx;
+    TQueryCtx query_ctx;
     query_ctx.request.stmt = stmt;
     query_ctx.request.query_options = query_options_;
     query_ctx.__set_session(session_state_);

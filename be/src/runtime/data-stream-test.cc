@@ -88,7 +88,7 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
 class DataStreamTest : public testing::Test {
  protected:
   DataStreamTest()
-    : runtime_state_(TUniqueId(), TUniqueId(), TQueryContext(), "", &exec_env_),
+    : runtime_state_(TPlanFragmentInstanceCtx(), "", &exec_env_),
       next_val_(0) {
     // Intiialize Mem trackers for use by the data stream receiver.
     exec_env_.InitForFeTests();
@@ -438,7 +438,7 @@ class DataStreamTest : public testing::Test {
 
   void Sender(int sender_num, int channel_buffer_size,
               TPartitionType::type partition_type) {
-    RuntimeState state(TUniqueId(), TUniqueId(), TQueryContext(), "", &exec_env_);
+    RuntimeState state(TPlanFragmentInstanceCtx(), "", &exec_env_);
     state.set_desc_tbl(desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataStreamSink& sink =

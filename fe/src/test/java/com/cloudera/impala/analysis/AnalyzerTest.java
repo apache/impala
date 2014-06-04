@@ -42,7 +42,7 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TExpr;
-import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TQueryCtx;
 import com.google.common.base.Preconditions;
 
 public class AnalyzerTest {
@@ -71,9 +71,9 @@ public class AnalyzerTest {
   }
 
   protected Analyzer createAnalyzer(String defaultDb) {
-    TQueryContext queryCtxt =
+    TQueryCtx queryCtx =
         TestUtils.createQueryContext(defaultDb, System.getProperty("user.name"));
-    return new Analyzer(catalog_, queryCtxt);
+    return new Analyzer(catalog_, queryCtx);
   }
 
   protected Analyzer createAnalyzerUsingHiveColLabels() {

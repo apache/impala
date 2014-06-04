@@ -44,7 +44,7 @@ public class PartitionKeyValue {
     }
     if (value_ == null) return;
     value_.analyze(analyzer);
-    literalValue_ = LiteralExpr.create(value_, analyzer.getQueryContext());
+    literalValue_ = LiteralExpr.create(value_, analyzer.getQueryCtx());
   }
 
   public String getColName() { return colName_; }

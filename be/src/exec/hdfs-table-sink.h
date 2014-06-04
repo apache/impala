@@ -121,7 +121,7 @@ struct OutputPartition {
 // This is consistent with Hive's behavior.
 class HdfsTableSink : public DataSink {
  public:
-  HdfsTableSink(const RowDescriptor& row_desc, const TUniqueId& unique_id,
+  HdfsTableSink(const RowDescriptor& row_desc,
       const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink);
 
   // Prepares output_exprs and partition_key_exprs, and connects to HDFS.
@@ -242,8 +242,8 @@ class HdfsTableSink : public DataSink {
   // <hdfs_table_base_dir>/.impala_insert_staging/ during Prepare()
   std::string staging_dir_;
 
-  // string representation of c'tors unique_id. Used for per-partition Hdfs file names,
-  // and for tmp Hdfs directories. Set in Prepare();
+  // string representation of the unique fragment instance id. Used for per-partition
+  // Hdfs file names, and for tmp Hdfs directories. Set in Prepare();
   std::string unique_id_str_;
 
   // Hash table of generated output partitions.

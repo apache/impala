@@ -59,6 +59,7 @@
 #include "util/network-util.h"
 #include "util/parse-util.h"
 #include "util/string-parser.h"
+#include "util/uid-util.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -515,13 +516,13 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
 
 ImpalaServer::~ImpalaServer() {}
 
-Status ImpalaServer::Execute(TQueryContext* query_ctxt,
+Status ImpalaServer::Execute(TQueryCtx* query_ctx,
     shared_ptr<SessionState> session_state,
     shared_ptr<QueryExecState>* exec_state) {
-  PrepareQueryContext(query_ctxt);
+  PrepareQueryContext(query_ctx);
   bool registered_exec_state;
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
-  Status status = ExecuteInternal(*query_ctxt, session_state, &registered_exec_state,
+  Status status = ExecuteInternal(*query_ctx, session_state, &registered_exec_state,
       exec_state);
   if (!status.ok() && registered_exec_state) {
     UnregisterQuery((*exec_state)->query_id(), &status);
@@ -530,7 +531,7 @@ Status ImpalaServer::Execute(TQueryContext* query_ctxt,
 }
 
 Status ImpalaServer::ExecuteInternal(
-    const TQueryContext& query_ctxt,
+    const TQueryCtx& query_ctx,
     shared_ptr<SessionState> session_state,
     bool* registered_exec_state,
     shared_ptr<QueryExecState>* exec_state) {
@@ -540,7 +541,7 @@ Status ImpalaServer::ExecuteInternal(
   }
   *registered_exec_state = false;
 
-  exec_state->reset(new QueryExecState(query_ctxt, exec_env_, exec_env_->frontend(),
+  exec_state->reset(new QueryExecState(query_ctx, exec_env_, exec_env_->frontend(),
       this, session_state));
 
   (*exec_state)->query_events()->MarkEvent("Start execution");
@@ -567,7 +568,7 @@ Status ImpalaServer::ExecuteInternal(
     *registered_exec_state = true;
 
     RETURN_IF_ERROR((*exec_state)->UpdateQueryStatus(
-        exec_env_->frontend()->GetExecRequest(query_ctxt, &result)));
+        exec_env_->frontend()->GetExecRequest(query_ctx, &result)));
     (*exec_state)->query_events()->MarkEvent("Planning finished");
     if (result.__isset.result_set_metadata) {
       (*exec_state)->set_result_metadata(result.result_set_metadata);
@@ -599,9 +600,18 @@ Status ImpalaServer::ExecuteInternal(
   return Status::OK;
 }
 
-void ImpalaServer::PrepareQueryContext(TQueryContext* query_ctxt) {
-  query_ctxt->__set_pid(getpid());
-  query_ctxt->__set_now_string(TimestampValue::local_time_micros().DebugString());
+void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
+  query_ctx->__set_pid(getpid());
+  query_ctx->__set_now_string(TimestampValue::local_time_micros().DebugString());
+  query_ctx->__set_coord_address(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
+
+  // Creating a random_generator every time is not free, but
+  // benchmarks show it to be slightly cheaper than contending for a
+  // single generator under a lock (since random_generator is not
+  // thread-safe).
+  random_generator uuid_generator;
+  uuid query_uuid = uuid_generator();
+  UUIDToTUniqueId(query_uuid, &query_ctx->query_id);
 }
 
 Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
@@ -999,8 +1009,10 @@ inline shared_ptr<ImpalaServer::FragmentExecState> ImpalaServer::GetFragmentExec
 
 void ImpalaServer::ExecPlanFragment(
     TExecPlanFragmentResult& return_val, const TExecPlanFragmentParams& params) {
-  VLOG_QUERY << "ExecPlanFragment() instance_id=" << params.params.fragment_instance_id
-             << " coord=" << params.coord << " backend#=" << params.backend_num;
+  VLOG_QUERY << "ExecPlanFragment() instance_id="
+             << params.fragment_instance_ctx.fragment_instance_id
+             << " coord=" << params.fragment_instance_ctx.query_ctx.coord_address
+             << " backend#=" << params.fragment_instance_ctx.backend_num;
   StartPlanFragmentExecution(params).SetTStatus(&return_val);
 }
 
@@ -1083,11 +1095,8 @@ Status ImpalaServer::StartPlanFragmentExecution(
     return Status("missing sink in plan fragment");
   }
 
-  const TPlanFragmentExecParams& params = exec_params.params;
   shared_ptr<FragmentExecState> exec_state(
-      new FragmentExecState(
-        params.query_id, exec_params.backend_num, params.fragment_instance_id,
-        exec_env_, exec_params.coord));
+      new FragmentExecState(exec_params.fragment_instance_ctx, exec_env_));
   // Call Prepare() now, before registering the exec state, to avoid calling
   // exec_state->Cancel().
   // We might get an async cancellation, and the executor requires that Cancel() not
@@ -1097,7 +1106,8 @@ Status ImpalaServer::StartPlanFragmentExecution(
   {
     lock_guard<mutex> l(fragment_exec_state_map_lock_);
     // register exec_state before starting exec thread
-    fragment_exec_state_map_.insert(make_pair(params.fragment_instance_id, exec_state));
+    fragment_exec_state_map_.insert(
+        make_pair(exec_params.fragment_instance_ctx.fragment_instance_id, exec_state));
   }
 
   // execute plan fragment in new thread

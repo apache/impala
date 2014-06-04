@@ -49,7 +49,7 @@ import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.util.DisjointSet;
 import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Preconditions;
@@ -106,7 +106,7 @@ public class Analyzer {
   // state shared between all objects of an Analyzer tree
   private static class GlobalState {
     public final ImpaladCatalog catalog;
-    public final TQueryContext queryCtxt;
+    public final TQueryCtx queryCtx;
     public final DescriptorTable descTbl = new DescriptorTable();
     public final IdGenerator<ExprId> conjunctIdGenerator = ExprId.createGenerator();
 
@@ -172,9 +172,9 @@ public class Analyzer {
     private final List<Pair<SlotId, SlotId>> registeredValueTransfers =
         Lists.newArrayList();
 
-    public GlobalState(ImpaladCatalog catalog, TQueryContext queryCtxt) {
+    public GlobalState(ImpaladCatalog catalog, TQueryCtx queryCtx) {
       this.catalog = catalog;
-      this.queryCtxt = queryCtxt;
+      this.queryCtx = queryCtx;
     }
   };
 
@@ -198,10 +198,10 @@ public class Analyzer {
   // Tracks the all tables/views found during analysis that were missing metadata.
   private Set<TableName> missingTbls_ = new HashSet<TableName>();
 
-  public Analyzer(ImpaladCatalog catalog, TQueryContext queryCxt) {
+  public Analyzer(ImpaladCatalog catalog, TQueryCtx queryCtx) {
     this.ancestors_ = Lists.newArrayList();
-    this.globalState_ = new GlobalState(catalog, queryCxt);
-    user_ = new User(TSessionStateUtil.getEffectiveUser(queryCxt.session));
+    this.globalState_ = new GlobalState(catalog, queryCtx);
+    user_ = new User(TSessionStateUtil.getEffectiveUser(queryCtx.session));
   }
 
   /**
@@ -1087,7 +1087,7 @@ public class Analyzer {
           + nullTuplePred.toSql() + "." + e.getMessage());
     }
     try {
-      return FeSupport.EvalPredicate(nullTuplePred, getQueryContext());
+      return FeSupport.EvalPredicate(nullTuplePred, getQueryCtx());
     } catch (InternalException e) {
       Preconditions.checkState(false, "Failed to evaluate generated predicate: "
           + nullTuplePred.toSql() + "." + e.getMessage());
@@ -1353,9 +1353,9 @@ public class Analyzer {
   }
 
   public Map<String, ViewRef> getWithClauseViews() { return withClauseViews_; }
-  public String getDefaultDb() { return globalState_.queryCtxt.session.database; }
+  public String getDefaultDb() { return globalState_.queryCtx.session.database; }
   public User getUser() { return user_; }
-  public TQueryContext getQueryContext() { return globalState_.queryCtxt; }
+  public TQueryCtx getQueryCtx() { return globalState_.queryCtx; }
 
   /**
    * Returns a list of the successful catalog object access events. Does not include

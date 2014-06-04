@@ -28,17 +28,13 @@ namespace impala {
 // Execution state of a single plan fragment.
 class ImpalaServer::FragmentExecState {
  public:
-  FragmentExecState(const TUniqueId& query_id, int backend_num,
-                    const TUniqueId& fragment_instance_id, ExecEnv* exec_env,
-                    const TNetworkAddress& coord_hostport)
-    : query_id_(query_id),
-      backend_num_(backend_num),
-      fragment_instance_id_(fragment_instance_id),
+  FragmentExecState(const TPlanFragmentInstanceCtx& fragment_instance_ctx,
+      ExecEnv* exec_env)
+    : fragment_instance_ctx_(fragment_instance_ctx),
       executor_(exec_env, boost::bind<void>(
           boost::mem_fn(&ImpalaServer::FragmentExecState::ReportStatusCb),
               this, _1, _2, _3)),
-      client_cache_(exec_env->impalad_client_cache()),
-      coord_hostport_(coord_hostport) {
+      client_cache_(exec_env->impalad_client_cache()) {
   }
 
   // Calling the d'tor releases all memory and closes all data streams
@@ -55,23 +51,26 @@ class ImpalaServer::FragmentExecState {
   // Main loop of plan fragment execution. Blocks until execution finishes.
   void Exec();
 
-  const TUniqueId& query_id() const { return query_id_; }
-  const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
+  const TUniqueId& query_id() const {
+    return fragment_instance_ctx_.query_ctx.query_id;
+  }
+
+  const TUniqueId& fragment_instance_id() const {
+    return fragment_instance_ctx_.fragment_instance_id;
+  }
+
+  const TNetworkAddress& coord_address() const {
+    return fragment_instance_ctx_.query_ctx.coord_address;
+  }
 
   // Set the execution thread, taking ownership of the object.
   void set_exec_thread(Thread* exec_thread) { exec_thread_.reset(exec_thread); }
 
  private:
-  TUniqueId query_id_;
-  int backend_num_;
-  TUniqueId fragment_instance_id_;
+  TPlanFragmentInstanceCtx fragment_instance_ctx_;
   PlanFragmentExecutor executor_;
   ImpalaInternalServiceClientCache* client_cache_;
   TExecPlanFragmentParams exec_params_;
-
-  // initiating coordinator to which we occasionally need to report back
-  // (via its exported ImpalaInternalService)
-  const TNetworkAddress coord_hostport_;
 
   // the thread executing this plan fragment
   boost::scoped_ptr<Thread> exec_thread_;

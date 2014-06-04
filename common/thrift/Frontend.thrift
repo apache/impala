@@ -294,7 +294,7 @@ struct TQueryExecRequest {
   // Set if the query needs finalization after it executes
   6: optional TFinalizeParams finalize_params
 
-  7: required ImpalaInternalService.TQueryContext query_ctxt
+  7: required ImpalaInternalService.TQueryCtx query_ctx
 
   // The same as the output of 'explain <query>'
   8: optional string query_plan

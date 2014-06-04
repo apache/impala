@@ -93,7 +93,7 @@ public class HdfsPartitionFilter {
     }
     // Evaluate the predicates
     TResultRow results = FeSupport.EvalPredicateBatch(predicates,
-        analyzer.getQueryContext());
+        analyzer.getQueryCtx());
     Preconditions.checkState(results.getColValsSize() == partitions.size());
     indx = 0;
     for (TColumnValue val: results.getColVals()) {

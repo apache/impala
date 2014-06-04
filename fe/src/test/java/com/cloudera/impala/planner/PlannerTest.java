@@ -37,7 +37,7 @@ import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THdfsFileSplit;
-import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Joiner;
@@ -156,14 +156,14 @@ public class PlannerTest {
       throws CatalogException {
     String query = testCase.getQuery();
     LOG.info("running query " + query);
-    TQueryContext queryCtxt = TestUtils.createQueryContext(
+    TQueryCtx queryCtx = TestUtils.createQueryContext(
         dbName, System.getProperty("user.name"));
-    queryCtxt.request.query_options.setExplain_level(TExplainLevel.STANDARD);
-    queryCtxt.request.query_options.allow_unsupported_formats = true;
+    queryCtx.request.query_options.setExplain_level(TExplainLevel.STANDARD);
+    queryCtx.request.query_options.allow_unsupported_formats = true;
     // single-node plan and scan range locations
-    testSingleNodePlan(testCase, queryCtxt, errorLog, actualOutput);
+    testSingleNodePlan(testCase, queryCtx, errorLog, actualOutput);
     // distributed plan
-    testDistributedPlan(testCase, queryCtxt, errorLog, actualOutput);
+    testDistributedPlan(testCase, queryCtx, errorLog, actualOutput);
   }
 
   /**
@@ -171,15 +171,15 @@ public class PlannerTest {
    * as well as the scan range locations.
    * If testCase contains no expected single-node plan then this function is a no-op.
    */
-  private void testSingleNodePlan(TestCase testCase, TQueryContext queryCtxt,
+  private void testSingleNodePlan(TestCase testCase, TQueryCtx queryCtx,
       StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
     ArrayList<String> expectedPlan = testCase.getSectionContents(Section.PLAN);
     // Test case has no expected single-node plan. Do not test it.
     if (expectedPlan == null || expectedPlan.isEmpty()) return;
     String query = testCase.getQuery();
     String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
-    queryCtxt.request.getQuery_options().setNum_nodes(1);
-    queryCtxt.request.setStmt(query);
+    queryCtx.request.getQuery_options().setNum_nodes(1);
+    queryCtx.request.setStmt(query);
     boolean isImplemented = expectedErrorMsg == null;
     StringBuilder explainBuilder = new StringBuilder();
 
@@ -187,7 +187,7 @@ public class PlannerTest {
     String locationsStr = null;
     actualOutput.append(Section.PLAN.getHeader() + "\n");
     try {
-      execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
+      execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
       String explainStr = removeExplainHeader(explainBuilder.toString());
       actualOutput.append(explainStr);
       if (!isImplemented) {
@@ -274,7 +274,7 @@ public class PlannerTest {
   * Produces distributed plan for testCase and compares actual plan with expected plan.
   * If testCase contains no expected distributed plan then this function is a no-op.
   */
- private void testDistributedPlan(TestCase testCase, TQueryContext queryCtxt,
+ private void testDistributedPlan(TestCase testCase, TQueryCtx queryCtx,
      StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
    ArrayList<String> expectedPlan =
        testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
@@ -282,16 +282,16 @@ public class PlannerTest {
    if (expectedPlan == null || expectedPlan.isEmpty()) return;
    String query = testCase.getQuery();
    String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
-   queryCtxt.request.getQuery_options().setNum_nodes(
+   queryCtx.request.getQuery_options().setNum_nodes(
        ImpalaInternalServiceConstants.NUM_NODES_ALL);
-   queryCtxt.request.setStmt(query);
+   queryCtx.request.setStmt(query);
    boolean isImplemented = expectedErrorMsg == null;
    StringBuilder explainBuilder = new StringBuilder();
    actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
    TExecRequest execRequest = null;
    try {
      // distributed plan
-     execRequest = frontend_.createExecRequest(queryCtxt, explainBuilder);
+     execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
      String explainStr = removeExplainHeader(explainBuilder.toString());
      actualOutput.append(explainStr);
      if (!isImplemented) {

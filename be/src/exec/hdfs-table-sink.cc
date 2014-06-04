@@ -49,7 +49,7 @@ const static string& ROOT_PARTITION_KEY =
     g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
 
 HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
-    const TUniqueId& unique_id, const vector<TExpr>& select_list_texprs,
+    const vector<TExpr>& select_list_texprs,
     const TDataSink& tsink)
     :  row_desc_(row_desc),
        table_id_(tsink.table_sink.target_table_id),
@@ -57,7 +57,6 @@ HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
        partition_key_texprs_(tsink.table_sink.hdfs_table_sink.partition_key_exprs),
        overwrite_(tsink.table_sink.hdfs_table_sink.overwrite) {
   DCHECK(tsink.__isset.table_sink);
-  unique_id_str_ = PrintId(unique_id, "-");
 }
 
 OutputPartition::OutputPartition()
@@ -99,6 +98,7 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
 }
 
 Status HdfsTableSink::Prepare(RuntimeState* state) {
+  unique_id_str_ = PrintId(state->fragment_instance_id(), "-");
   runtime_profile_ = state->obj_pool()->Add(
       new RuntimeProfile(state->obj_pool(), "HdfsTableSink"));
   SCOPED_TIMER(runtime_profile_->total_time_counter());

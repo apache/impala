@@ -103,9 +103,12 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 
   // Evaluate and materialize the const expr lists exactly once.
   while (const_result_expr_idx_ < const_result_expr_lists_.size()) {
-    // Materialize expr results into row_batch.
-    EvalAndMaterializeExprs(const_result_expr_lists_[const_result_expr_idx_], true,
-        &tuple, row_batch);
+    // Only evaluate the const expr lists by the first fragment instance.
+    if (state->fragment_ctx().fragment_instance_idx == 0) {
+      // Materialize expr results into row_batch.
+      EvalAndMaterializeExprs(const_result_expr_lists_[const_result_expr_idx_], true,
+          &tuple, row_batch);
+    }
     ++const_result_expr_idx_;
     *eos = ReachedLimit();
     if (*eos || row_batch->AtCapacity()) return Status::OK;

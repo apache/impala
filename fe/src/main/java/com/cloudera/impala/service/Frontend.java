@@ -87,7 +87,7 @@ import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TPlanFragment;
-import com.cloudera.impala.thrift.TQueryContext;
+import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TResultRow;
@@ -391,9 +391,9 @@ public class Frontend {
    * Parses and plans a query in order to generate its explain string. This method does
    * not increase the query id counter.
    */
-  public String getExplainString(TQueryContext queryCtxt) throws ImpalaException {
+  public String getExplainString(TQueryCtx queryCtx) throws ImpalaException {
     StringBuilder stringBuilder = new StringBuilder();
-    createExecRequest(queryCtxt, stringBuilder);
+    createExecRequest(queryCtx, stringBuilder);
     return stringBuilder.toString();
   }
 
@@ -573,7 +573,7 @@ public class Frontend {
   }
 
   /**
-   * Analyzes the SQL statement included in queryCtxt and returns the AnalysisResult.
+   * Analyzes the SQL statement included in queryCtx and returns the AnalysisResult.
    * If a statement fails analysis because table/view metadata was not loaded, an
    * RPC to the CatalogServer will be executed to request loading the missing metadata
    * and analysis will be restarted once the required tables have been loaded
@@ -584,21 +584,21 @@ public class Frontend {
    * for a table to be loaded in event the table metadata was invalidated.
    * TODO: Also consider adding an overall timeout that fails analysis.
    */
-  private AnalysisContext.AnalysisResult analyzeStmt(TQueryContext queryCtxt)
+  private AnalysisContext.AnalysisResult analyzeStmt(TQueryCtx queryCtx)
       throws AnalysisException, InternalException, AuthorizationException {
-    AnalysisContext analysisCtxt = new AnalysisContext(impaladCatalog_, queryCtxt);
-    LOG.debug("analyze query " + queryCtxt.request.stmt);
+    AnalysisContext analysisCtx = new AnalysisContext(impaladCatalog_, queryCtx);
+    LOG.debug("analyze query " + queryCtx.request.stmt);
 
     // Run analysis in a loop until it either:
     // 1) Completes successfully
     // 2) Fails with an AnalysisException AND there are no missing tables.
     while (true) {
       try {
-        analysisCtxt.analyze(queryCtxt.request.stmt);
-        Preconditions.checkState(analysisCtxt.getAnalyzer().getMissingTbls().isEmpty());
-        return analysisCtxt.getAnalysisResult();
+        analysisCtx.analyze(queryCtx.request.stmt);
+        Preconditions.checkState(analysisCtx.getAnalyzer().getMissingTbls().isEmpty());
+        return analysisCtx.getAnalysisResult();
       } catch (AnalysisException e) {
-        Set<TableName> missingTbls = analysisCtxt.getAnalyzer().getMissingTbls();
+        Set<TableName> missingTbls = analysisCtx.getAnalyzer().getMissingTbls();
         // Only re-throw the AnalysisException if there were no missing tables.
         if (missingTbls.isEmpty()) throw e;
 
@@ -612,17 +612,17 @@ public class Frontend {
   }
 
   /**
-   * Create a populated TExecRequest corresponding to the supplied TQueryContext.
+   * Create a populated TExecRequest corresponding to the supplied TQueryCtx.
    */
   public TExecRequest createExecRequest(
-      TQueryContext queryCtxt, StringBuilder explainString)
+      TQueryCtx queryCtx, StringBuilder explainString)
       throws ImpalaException {
     // Analyze the statement
-    AnalysisContext.AnalysisResult analysisResult = analyzeStmt(queryCtxt);
+    AnalysisContext.AnalysisResult analysisResult = analyzeStmt(queryCtx);
     Preconditions.checkNotNull(analysisResult.getStmt());
 
     TExecRequest result = new TExecRequest();
-    result.setQuery_options(queryCtxt.request.getQuery_options());
+    result.setQuery_options(queryCtx.request.getQuery_options());
     result.setAccess_events(analysisResult.getAccessEvents());
     result.analysis_warnings = analysisResult.getAnalyzer().getWarnings();
 
@@ -649,7 +649,7 @@ public class Frontend {
     LOG.debug("create plan");
     Planner planner = new Planner();
     ArrayList<PlanFragment> fragments =
-        planner.createPlanFragments(analysisResult, queryCtxt.request.query_options);
+        planner.createPlanFragments(analysisResult, queryCtx.request.query_options);
     List<ScanNode> scanNodes = Lists.newArrayList();
     // map from fragment to its index in queryExecRequest.fragments; needed for
     // queryExecRequest.dest_fragment_idx
@@ -678,18 +678,18 @@ public class Frontend {
       queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
           scanNode.getScanRangeLocations(
-              queryCtxt.request.query_options.getMax_scan_range_length()));
+              queryCtx.request.query_options.getMax_scan_range_length()));
       if (scanNode.isTableMissingStats()) {
         tablesMissingStats.add(scanNode.getTupleDesc().getTableName().toThrift());
       }
     }
     for (TTableName tableName: tablesMissingStats) {
-      queryCtxt.addToTables_missing_stats(tableName);
+      queryCtx.addToTables_missing_stats(tableName);
     }
 
     // Compute resource requirements after scan range locations because the cost
     // estimates of scan nodes rely on them.
-    planner.computeResourceReqs(fragments, true, queryCtxt.request.query_options,
+    planner.computeResourceReqs(fragments, true, queryCtx.request.query_options,
         queryExecRequest);
 
     // The fragment at this point has all state set, serialize it to thrift.
@@ -700,14 +700,14 @@ public class Frontend {
 
     // Use VERBOSE by default for all non-explain statements.
     TExplainLevel explainLevel = TExplainLevel.VERBOSE;
-    if (queryCtxt.request.query_options.isSetExplain_level()) {
-      explainLevel = queryCtxt.request.query_options.getExplain_level();
+    if (queryCtx.request.query_options.isSetExplain_level()) {
+      explainLevel = queryCtx.request.query_options.getExplain_level();
     } else if (analysisResult.isExplainStmt()) {
       // Use the STANDARD by default for explain statements.
       explainLevel = TExplainLevel.STANDARD;
     }
     // Global query parameters to be set in each TPlanExecRequest.
-    queryExecRequest.setQuery_ctxt(queryCtxt);
+    queryExecRequest.setQuery_ctx(queryCtx);
 
     explainString.append(planner.getExplainString(fragments, queryExecRequest,
         explainLevel));
@@ -755,7 +755,7 @@ public class Frontend {
         finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
         finalizeParams.setTable_id(insertStmt.getTargetTable().getId().asInt());
         String db = insertStmt.getTargetTableName().getDb();
-        finalizeParams.setTable_db(db == null ? queryCtxt.session.database : db);
+        finalizeParams.setTable_db(db == null ? queryCtx.session.database : db);
         HdfsTable hdfsTable = (HdfsTable) insertStmt.getTargetTable();
         finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
         finalizeParams.setStaging_dir(

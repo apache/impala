@@ -193,9 +193,10 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
     return;
   }
-  TQueryContext query_ctxt;
-  session->ToThrift(session_id, &query_ctxt.session);
-  request->__set_session(query_ctxt.session);
+  TQueryCtx query_ctx;
+  PrepareQueryContext(&query_ctx);
+  session->ToThrift(session_id, &query_ctx.session);
+  request->__set_session(query_ctx.session);
 
   shared_ptr<QueryExecState> exec_state;
   // There is no user-supplied query text available because this metadata operation comes
@@ -204,8 +205,8 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
       _TMetadataOpcode_VALUES_TO_NAMES.find(request->opcode);
   const string& query_text = query_text_it == _TMetadataOpcode_VALUES_TO_NAMES.end() ?
       "N/A" : query_text_it->second;
-  query_ctxt.request.stmt = query_text;
-  exec_state.reset(new QueryExecState(query_ctxt, exec_env_,
+  query_ctx.request.stmt = query_text;
+  exec_state.reset(new QueryExecState(query_ctx, exec_env_,
       exec_env_->frontend(), this, session));
   Status register_status = RegisterQuery(session, exec_state);
   if (!register_status.ok()) {
@@ -216,8 +217,6 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     return;
   }
 
-  // start execution of metadata first;
-  PrepareQueryContext(&query_ctxt);
   Status exec_status = exec_state->Exec(*request);
   if (!exec_status.ok()) {
     status->__set_statusCode(
@@ -272,8 +271,8 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
 }
 
 Status ImpalaServer::TExecuteStatementReqToTQueryContext(
-    const TExecuteStatementReq execute_request, TQueryContext* query_ctxt) {
-  query_ctxt->request.stmt = execute_request.statement;
+    const TExecuteStatementReq execute_request, TQueryCtx* query_ctx) {
+  query_ctx->request.stmt = execute_request.statement;
   VLOG_QUERY << "TExecuteStatementReq: " << ThriftDebugString(execute_request);
   {
     shared_ptr<SessionState> session_state;
@@ -283,9 +282,9 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
         &session_id, &secret));
 
     RETURN_IF_ERROR(GetSessionState(session_id, &session_state));
-    session_state->ToThrift(session_id, &query_ctxt->session);
+    session_state->ToThrift(session_id, &query_ctx->session);
     lock_guard<mutex> l(session_state->lock);
-    query_ctxt->request.query_options = session_state->default_query_options;
+    query_ctx->request.query_options = session_state->default_query_options;
   }
 
   if (execute_request.__isset.confOverlay) {
@@ -293,10 +292,10 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     for (; conf_itr != execute_request.confOverlay.end(); ++conf_itr) {
       if (conf_itr->first == IMPALA_RESULT_CACHING_OPT) continue;
       RETURN_IF_ERROR(SetQueryOptions(conf_itr->first, conf_itr->second,
-          &query_ctxt->request.query_options));
+          &query_ctx->request.query_options));
     }
     VLOG_QUERY << "TClientRequest.queryOptions: "
-               << ThriftDebugString(query_ctxt->request.query_options);
+               << ThriftDebugString(query_ctx->request.query_options);
   }
   return Status::OK;
 }
@@ -431,8 +430,8 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
     const TExecuteStatementReq& request) {
   VLOG_QUERY << "ExecuteStatement(): request=" << ThriftDebugString(request);
 
-  TQueryContext query_ctxt;
-  Status status = TExecuteStatementReqToTQueryContext(request, &query_ctxt);
+  TQueryCtx query_ctx;
+  Status status = TExecuteStatementReqToTQueryContext(request, &query_ctx);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
   TUniqueId session_id;
@@ -466,7 +465,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
   }
 
   shared_ptr<QueryExecState> exec_state;
-  status = Execute(&query_ctxt, session, &exec_state);
+  status = Execute(&query_ctx, session, &exec_state);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
   // Optionally enable result caching on the QueryExecState.

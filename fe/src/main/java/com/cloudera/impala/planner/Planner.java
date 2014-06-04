@@ -195,10 +195,10 @@ public class Planner {
       hasHeader = true;
     }
     // Append warning about tables missing stats.
-    if (request.query_ctxt.isSetTables_missing_stats() &&
-        !request.query_ctxt.getTables_missing_stats().isEmpty()) {
+    if (request.query_ctx.isSetTables_missing_stats() &&
+        !request.query_ctx.getTables_missing_stats().isEmpty()) {
       List<String> tableNames = Lists.newArrayList();
-      for (TTableName tableName: request.query_ctxt.getTables_missing_stats()) {
+      for (TTableName tableName: request.query_ctx.getTables_missing_stats()) {
         tableNames.add(tableName.db_name + "." + tableName.table_name);
       }
       str.append("WARNING: The following tables are missing relevant table " +
@@ -1792,7 +1792,7 @@ public class Planner {
           continue;
         }
         // Evaluate constant conjunct and drop operand if it evals to false.
-        if (!FeSupport.EvalPredicate(opConjunct, analyzer.getQueryContext())) {
+        if (!FeSupport.EvalPredicate(opConjunct, analyzer.getQueryCtx())) {
           op.drop();
           break;
         }

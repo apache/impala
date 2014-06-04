@@ -54,7 +54,7 @@ class QueryExecStateCleaner;
 // will likely become obsolete. Remove all child-query related code from this class.
 class ImpalaServer::QueryExecState {
  public:
-  QueryExecState(const TQueryContext& query_ctxt, ExecEnv* exec_env, Frontend* frontend,
+  QueryExecState(const TQueryCtx& query_ctx, ExecEnv* exec_env, Frontend* frontend,
                  ImpalaServer* server,
                  boost::shared_ptr<ImpalaServer::SessionState> session);
 
@@ -129,18 +129,18 @@ class ImpalaServer::QueryExecState {
   const std::string& effective_user() const {
     return do_as_user().empty() ? connected_user() : do_as_user();
   }
-  const std::string& connected_user() const { return session_->connected_user; }
+  const std::string& connected_user() const { return query_ctx_.session.connected_user; }
   const std::string& do_as_user() const { return session_->do_as_user; }
-  TSessionType::type session_type() const { return query_ctxt_.session.session_type; }
-  const TUniqueId& session_id() const { return query_ctxt_.session.session_id; }
-  const std::string& default_db() const { return query_ctxt_.session.database; }
+  TSessionType::type session_type() const { return query_ctx_.session.session_type; }
+  const TUniqueId& session_id() const { return query_ctx_.session.session_id; }
+  const std::string& default_db() const { return query_ctx_.session.database; }
   bool eos() const { return eos_; }
   Coordinator* coord() const { return coord_.get(); }
   QuerySchedule* schedule() { return schedule_.get(); }
   int num_rows_fetched() const { return num_rows_fetched_; }
   bool returns_result_set() { return !result_metadata_.columns.empty(); }
   const TResultSetMetadata* result_metadata() { return &result_metadata_; }
-  const TUniqueId& query_id() const { return query_id_; }
+  const TUniqueId& query_id() const { return query_ctx_.query_id; }
   const TExecRequest& exec_request() const { return exec_request_; }
   TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
   TCatalogOpType::type catalog_op_type() const {
@@ -158,7 +158,7 @@ class ImpalaServer::QueryExecState {
   const RuntimeProfile& profile() const { return profile_; }
   const TimestampValue& start_time() const { return start_time_; }
   const TimestampValue& end_time() const { return end_time_; }
-  const std::string& sql_stmt() const { return query_ctxt_.request.stmt; }
+  const std::string& sql_stmt() const { return query_ctx_.request.stmt; }
 
   const std::vector<std::string>& GetAnalysisWarnings() const {
     return exec_request_.analysis_warnings;
@@ -179,8 +179,7 @@ class ImpalaServer::QueryExecState {
   RuntimeProfile* summary_profile() { return &summary_profile_; }
 
  private:
-  TUniqueId query_id_;
-  const TQueryContext query_ctxt_;
+  const TQueryCtx query_ctx_;
 
   // Ensures single-threaded execution of FetchRows(). Callers of FetchRows() are
   // responsible for acquiring this lock. To avoid deadlocks, callers must not hold lock_

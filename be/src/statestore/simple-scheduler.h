@@ -219,7 +219,7 @@ class SimpleScheduler : public Scheduler {
   void ComputeFragmentHosts(const TQueryExecRequest& exec_request,
       QuerySchedule* schedule);
 
-  // Returns the id of the leftmost node of any of the gives types in 'plan_root',
+  // Returns the id of the leftmost node of any of the given types in 'plan_root',
   // or INVALID_PLAN_NODE_ID if no such node present.
   PlanNodeId FindLeftmostNode(
       const TPlan& plan, const std::vector<TPlanNodeType::type>& types);

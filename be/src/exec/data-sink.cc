@@ -54,8 +54,7 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
       if (!thrift_sink.__isset.table_sink) return Status("Missing table sink.");
       switch (thrift_sink.table_sink.type) {
         case TTableSinkType::HDFS:
-          tmp_sink = new HdfsTableSink(
-              row_desc, params.fragment_instance_id, output_exprs, thrift_sink);
+          tmp_sink = new HdfsTableSink(row_desc, output_exprs, thrift_sink);
           sink->reset(tmp_sink);
           break;
         case TTableSinkType::HBASE:

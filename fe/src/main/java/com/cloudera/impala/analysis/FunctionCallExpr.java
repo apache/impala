@@ -224,7 +224,7 @@ public class FunctionCallExpr extends Expr {
               "() must be called with a constant second argument.");
         }
         IntLiteral scaleLiteral = (IntLiteral)LiteralExpr.create(
-            children_.get(1), analyzer.getQueryContext());
+            children_.get(1), analyzer.getQueryCtx());
         resultScale = (int)scaleLiteral.getValue();
         if (Math.abs(resultScale) > ColumnType.MAX_SCALE) {
           throw new AnalysisException("Cannot round/truncate to scales greater than " +

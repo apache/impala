@@ -124,22 +124,49 @@ struct TClientRequest {
 
 // Context of this query, including the client request, session state and
 // global query parameters needed for consistent expr evaluation (e.g., now()).
-struct TQueryContext {
+// TODO: Separate into FE/BE initialized vars.
+struct TQueryCtx {
   // Client request containing stmt to execute and query options.
   1: required TClientRequest request
 
+  // A globally unique id assigned to the entire query in the BE.
+  2: required Types.TUniqueId query_id
+
   // Session state including user.
-  2: required TSessionState session
+  3: required TSessionState session
 
   // String containing a timestamp set as the query submission time.
-  3: required string now_string
+  4: required string now_string
 
   // Process ID of the impalad to which the user is connected.
-  4: required i32 pid
+  5: required i32 pid
+
+  // Initiating coordinator.
+  // TODO: determine whether we can get this somehow via the Thrift rpc mechanism.
+  6: optional Types.TNetworkAddress coord_address
 
   // List of tables missing relevant table and/or column stats. Used for
   // populating query-profile fields consumed by CM as well as warning messages.
-  5: optional list<CatalogObjects.TTableName> tables_missing_stats
+  7: optional list<CatalogObjects.TTableName> tables_missing_stats
+}
+
+// Context of a fragment instance, including its unique id, the total number
+// of fragment instances, the query context, the coordinator address, etc.
+struct TPlanFragmentInstanceCtx {
+  // context of the query this fragment instance belongs to
+  1: required TQueryCtx query_ctx
+
+  // the globally unique fragment instance id
+  2: required Types.TUniqueId fragment_instance_id
+
+  // ordinal of this fragment instance, range [0, num_fragment_instances)
+  3: required i32 fragment_instance_idx
+
+  // total number of instances of this fragment
+  4: required i32 num_fragment_instances
+
+  // backend number assigned by coord to identify backend
+  5: required i32 backend_num
 }
 
 // A scan range plus the parameters needed to execute that scan.
@@ -161,37 +188,30 @@ struct TPlanFragmentDestination {
 // Parameters for a single execution instance of a particular TPlanFragment
 // TODO: for range partitioning, we also need to specify the range boundaries
 struct TPlanFragmentExecParams {
-  // a globally unique id assigned to the entire query
-  1: required Types.TUniqueId query_id
-
-  // a globally unique id assigned to this particular execution instance of
-  // a TPlanFragment
-  2: required Types.TUniqueId fragment_instance_id
-
   // initial scan ranges for each scan node in TPlanFragment.plan_tree
-  3: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
+  1: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
 
   // number of senders for ExchangeNodes contained in TPlanFragment.plan_tree;
   // needed to create a DataStreamRecvr
-  4: required map<Types.TPlanNodeId, i32> per_exch_num_senders
+  2: required map<Types.TPlanNodeId, i32> per_exch_num_senders
 
   // Output destinations, one per output partition.
   // The partitioning of the output is specified by
   // TPlanFragment.output_sink.output_partition.
   // The number of output partitions is destinations.size().
-  5: list<TPlanFragmentDestination> destinations
+  3: list<TPlanFragmentDestination> destinations
 
   // Debug options: perform some action in a particular phase of a particular node
-  6: optional Types.TPlanNodeId debug_node_id
-  7: optional PlanNodes.TExecNodePhase debug_phase
-  8: optional PlanNodes.TDebugAction debug_action
+  4: optional Types.TPlanNodeId debug_node_id
+  5: optional PlanNodes.TExecNodePhase debug_phase
+  6: optional PlanNodes.TDebugAction debug_action
 
   // The pool to which this request has been submitted. Used to update pool statistics
   // for admission control.
-  9: optional string request_pool;
+  7: optional string request_pool
 
   // Id of this fragment in its role as a sender.
-  10: optional i32 sender_id
+  8: optional i32 sender_id
 }
 
 // Service Protocol Details
@@ -215,25 +235,15 @@ struct TExecPlanFragmentParams {
   // required in V1
   4: optional TPlanFragmentExecParams params
 
-  // Initiating coordinator.
-  // TODO: determine whether we can get this somehow via the Thrift rpc mechanism.
-  // required in V1
-  5: optional Types.TNetworkAddress coord
-
-  // backend number assigned by coord to identify backend
-  // required in V1
-  6: optional i32 backend_num
-
-  // Context of this query, including query options, session state and
-  // global query parameters needed for consistent expr evaluation (e.g., now()).
-  // required in V1
-  7: optional TQueryContext query_ctxt
+  // Context of this fragment, including its instance id, the total number fragment
+  // instances, the query context, etc.
+  5: optional TPlanFragmentInstanceCtx fragment_instance_ctx
 
   // Resource reservation to run this plan fragment in.
-  8: optional Llama.TAllocatedResource reserved_resource
+  6: optional Llama.TAllocatedResource reserved_resource
 
   // Address of local node manager (used for expanding resource allocations)
-  9: optional Types.TNetworkAddress local_resource_address
+  7: optional Types.TNetworkAddress local_resource_address
 }
 
 struct TExecPlanFragmentResult {
@@ -289,7 +299,7 @@ struct TReportExecStatusParams {
   // required in V1
   2: optional Types.TUniqueId query_id
 
-  // passed into ExecPlanFragment() as TExecPlanFragmentParams.backend_num
+  // passed into ExecPlanFragment() as TPlanFragmentInstanceCtx.backend_num
   // required in V1
   3: optional i32 backend_num
 
