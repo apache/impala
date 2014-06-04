@@ -236,6 +236,7 @@ public class MetadataOp {
    * DbsTablesColumns.functions[i] contains the list of functions inside dbs[i] that
    * satisfy the "functionName" search pattern.
    *
+   * If functionName is not null, then only function metadata will be returned.
    * If tableName is null, then DbsTablesColumns.tableNames and DbsTablesColumns.columns
    * will not be populated.
    * If columns is null, then DbsTablesColumns.columns will not be populated.
@@ -262,43 +263,44 @@ public class MetadataOp {
 
       Db db = catalog.getDb(dbName, user, Privilege.ANY);
 
-      List<String> tableList = Lists.newArrayList();
-      List<List<Column>> tablesColumnsList = Lists.newArrayList();
-      for (String tabName: catalog.getTableNames(db.getName(), "*", user)) {
-        if (!tablePattern.matches(tabName)) continue;
-        tableList.add(tabName);
-        List<Column> columns = Lists.newArrayList();
-
-        Table table = null;
-        try {
-          table = catalog.getTable(dbName, tabName, user, Privilege.ANY);
-        } catch (TableLoadingException e) {
-          // Ignore exception (this table will be skipped).
-        }
-        if (table == null) continue;
-
-        // If the table is not yet loaded, the columns will be unknown. Add it
-        // to the set of missing tables.
-        if (!table.isLoaded()) {
-          result.missingTbls.add(new TableName(dbName, tabName));
-        } else {
-          for (Column column: table.getColumns()) {
-            String colName = column.getName();
-            if (!columnPattern.matches(colName)) continue;
-            columns.add(column);
-          }
-        }
-        tablesColumnsList.add(columns);
-      }
-
       if (functionName != null) {
+        // Get function metadata
         List<Function> fns = db.getFunctions(null, fnPattern);
         result.functions.add(fns);
-      }
+      } else {
+        // Get table metadata
+        List<String> tableList = Lists.newArrayList();
+        List<List<Column>> tablesColumnsList = Lists.newArrayList();
+        for (String tabName: catalog.getTableNames(db.getName(), "*", user)) {
+          if (!tablePattern.matches(tabName)) continue;
+          tableList.add(tabName);
+          List<Column> columns = Lists.newArrayList();
 
-      result.dbs.add(dbName);
-      result.tableNames.add(tableList);
-      result.columns.add(tablesColumnsList);
+          Table table = null;
+          try {
+            table = catalog.getTable(dbName, tabName, user, Privilege.ANY);
+          } catch (TableLoadingException e) {
+            // Ignore exception (this table will be skipped).
+          }
+          if (table == null) continue;
+
+          // If the table is not yet loaded, the columns will be unknown. Add it
+          // to the set of missing tables.
+          if (!table.isLoaded()) {
+            result.missingTbls.add(new TableName(dbName, tabName));
+          } else {
+            for (Column column: table.getColumns()) {
+              String colName = column.getName();
+              if (!columnPattern.matches(colName)) continue;
+              columns.add(column);
+            }
+          }
+          tablesColumnsList.add(columns);
+        }
+        result.dbs.add(dbName);
+        result.tableNames.add(tableList);
+        result.columns.add(tablesColumnsList);
+      }
     }
     return result;
   }
