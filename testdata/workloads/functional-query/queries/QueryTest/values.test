@@ -34,7 +34,7 @@ SMALLINT, TINYINT, DECIMAL, STRING
 ---- QUERY
 drop table if exists values_test_float_tbl;
 create table values_test_float_tbl(f float);
-insert into values_test_float_tbl values
+insert overwrite values_test_float_tbl values
 (1), (16), (1024), (65536), (1000000), (1.1), (98.6), (0.07), (33.333);
 select * from values_test_float_tbl;
 ---- RESULTS
@@ -54,7 +54,7 @@ float
 ---- QUERY
 drop table if exists values_test_decimal_tbl;
 create table values_test_decimal_tbl(f decimal(20, 4));
-insert into values_test_decimal_tbl values
+insert overwrite values_test_decimal_tbl values
 (1), (16), (1024), (65536), (1000000), (1.1), (98.6), (0.07), (33.333);
 select * from values_test_decimal_tbl;
 ---- RESULTS
