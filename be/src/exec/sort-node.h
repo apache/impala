@@ -66,11 +66,6 @@ class SortNode : public ExecNode {
   // enough memory for the sort.
   Status GetBlockMgrLimit(RuntimeState* state, int64_t* block_mgr_limit);
 
-  // Fraction of the memory remaining after child->Open() that this sort node can use.
-  // Memory is used by the buffered block manager and by the sorter (for temporary
-  // batches of rows).
-  double use_mem_fraction_;
-
   // Number of rows to skip.
   int64_t offset_;
   int64_t num_rows_skipped_;

@@ -107,6 +107,9 @@ class DataStreamTest : public testing::Test {
     broadcast_sink_.dest_node_id = DEST_NODE_ID;
     broadcast_sink_.output_partition.type = TPartitionType::UNPARTITIONED;
 
+    random_sink_.dest_node_id = DEST_NODE_ID;
+    random_sink_.output_partition.type = TPartitionType::RANDOM;
+
     hash_sink_.dest_node_id = DEST_NODE_ID;
     hash_sink_.output_partition.type = TPartitionType::HASH_PARTITIONED;
     // there's only one column to partition on
@@ -126,6 +129,17 @@ class DataStreamTest : public testing::Test {
     sender_info_.reserve(MAX_SENDERS);
     receiver_info_.reserve(MAX_RECEIVERS);
     StartBackend();
+  }
+
+  const TDataStreamSink& GetSink(TPartitionType::type partition_type) {
+    switch (partition_type) {
+      case TPartitionType::UNPARTITIONED: return broadcast_sink_;
+      case TPartitionType::RANDOM: return random_sink_;
+      case TPartitionType::HASH_PARTITIONED: return hash_sink_;
+      default: DCHECK(false) << "Unhandled sink type: " << partition_type;
+    }
+    // Should never reach this.
+    return broadcast_sink_;
   }
 
   virtual void TearDown() {
@@ -171,6 +185,7 @@ class DataStreamTest : public testing::Test {
 
   // sending node(s)
   TDataStreamSink broadcast_sink_;
+  TDataStreamSink random_sink_;
   TDataStreamSink hash_sink_;
   vector<TPlanFragmentDestination> dest_;
 
@@ -441,8 +456,7 @@ class DataStreamTest : public testing::Test {
     RuntimeState state(TPlanFragmentInstanceCtx(), "", &exec_env_);
     state.set_desc_tbl(desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
-    const TDataStreamSink& sink =
-        (partition_type == TPartitionType::UNPARTITIONED ? broadcast_sink_ : hash_sink_);
+    const TDataStreamSink& sink = GetSink(partition_type);
     DataStreamSender sender(
         &obj_pool_, sender_num, *row_desc_, sink, dest_, channel_buffer_size);
     EXPECT_TRUE(sender.Prepare(&state).ok());
@@ -519,7 +533,8 @@ TEST_F(DataStreamTest, Cancel) {
 TEST_F(DataStreamTest, BasicTest) {
   // TODO: also test that all client connections have been returned
   TPartitionType::type stream_types[] =
-      {TPartitionType::UNPARTITIONED, TPartitionType::HASH_PARTITIONED};
+      {TPartitionType::UNPARTITIONED, TPartitionType::RANDOM,
+          TPartitionType::HASH_PARTITIONED};
   int sender_nums[] = {1, 4};
   int receiver_nums[] = {1, 4};
   int buffer_sizes[] = {1024, 1024 * 1024};

@@ -218,7 +218,7 @@ where t1.id = t2.id and t2.int_col is not null
 order by int_col
 limit 10 offset 5
 ---- PLAN
-03:TOP-N [LIMIT=10]
+03:TOP-N [LIMIT=10 OFFSET=5]
 |  order by: int_col ASC
 |
 02:HASH JOIN [INNER JOIN]
@@ -271,7 +271,7 @@ select int_col, bigint_col from
    select * from functional.alltypessmall) t
 order by int_col desc limit 10 offset 5
 ---- PLAN
-03:TOP-N [LIMIT=10]
+03:TOP-N [LIMIT=10 OFFSET=5]
 |  order by: int_col DESC
 |
 00:MERGE
@@ -282,23 +282,18 @@ order by int_col desc limit 10 offset 5
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [UNPARTITIONED]
+04:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col DESC
 |  limit: 10
 |
-|--07:TOP-N [LIMIT=15]
-|  |  order by: int_col DESC
-|  |
-|  06:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
-|
 03:TOP-N [LIMIT=15]
 |  order by: int_col DESC
 |
-05:MERGE
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -310,7 +305,7 @@ select int_col, bigint_col from
    select * from functional.alltypessmall) t
 order by int_col desc limit 10 offset 5
 ---- PLAN
-04:TOP-N [LIMIT=10]
+04:TOP-N [LIMIT=10 OFFSET=5]
 |  order by: int_col DESC
 |
 03:AGGREGATE [FINALIZE]
@@ -324,7 +319,7 @@ order by int_col desc limit 10 offset 5
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-11:MERGING-EXCHANGE [UNPARTITIONED]
+07:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col DESC
 |  limit: 10
@@ -332,23 +327,18 @@ order by int_col desc limit 10 offset 5
 04:TOP-N [LIMIT=15]
 |  order by: int_col DESC
 |
-10:AGGREGATE [MERGE FINALIZE]
+06:AGGREGATE [MERGE FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-09:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
-|
-|--08:AGGREGATE
-|  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|  |
-|  07:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
 03:AGGREGATE
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-06:MERGE
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -399,14 +389,11 @@ order by int_col limit 10
 04:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
-|--06:MERGE
-|  |  limit: 10
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
-|
-05:MERGE
+00:MERGE
 |  limit: 10
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB

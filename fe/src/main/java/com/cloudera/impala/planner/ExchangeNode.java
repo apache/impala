@@ -68,7 +68,8 @@ public class ExchangeNode extends PlanNode {
       Preconditions.checkState(nullableTupleIds_.equals(node.nullableTupleIds_));
       Preconditions.checkState(compactData_ == node.compactData_);
     } else {
-      limit_ = node.limit_;
+      // Only apply the limit at the receiver if there are multiple senders.
+      if (node.getFragment().isPartitioned()) limit_ = node.limit_;
       tupleIds_ = Lists.newArrayList(node.tupleIds_);
       rowTupleIds_ = Lists.newArrayList(node.rowTupleIds_);
       nullableTupleIds_ = Sets.newHashSet(node.nullableTupleIds_);

@@ -510,6 +510,15 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
   num_interpreted_conjuncts_copies_ = interpreted_conjuncts_copies_.size();
 
+  return Status::OK;
+}
+
+// This function initiates the connection to hdfs and starts up the initial scanner
+// threads. The scanner subclasses are passed the initial splits.  Scanners are expected
+// to queue up a non-zero number of those splits to the io mgr (via the ScanNode).
+Status HdfsScanNode::Open(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Open(state));
+
   // We need at least one scanner thread to make progress. We need to make this
   // reservation before any ranges are issued.
   runtime_state_->resource_pool()->ReserveOptionalTokens(1);
@@ -526,15 +535,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
         bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this,
             runtime_state_->resource_pool()));
   }
-
-  return Status::OK;
-}
-
-// This function initiates the connection to hdfs and starts up the initial scanner
-// threads. The scanner subclasses are passed the initial splits.  Scanners are expected
-// to queue up a non-zero number of those splits to the io mgr (via the ScanNode).
-Status HdfsScanNode::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Open(state));
 
   if (file_descs_.empty()) {
     SetDone();

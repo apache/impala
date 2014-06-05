@@ -48,19 +48,19 @@ select * from t1 union all select * from t2 union all select * from t3
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-04:EXCHANGE [UNPARTITIONED]
+06:EXCHANGE [UNPARTITIONED]
 |
-|--07:MERGE
+00:MERGE
+|
+|--05:EXCHANGE [RANDOM]
 |  |
 |  03:MERGE
 |     constant-selects=2
 |
-|--06:MERGE
+|--04:EXCHANGE [RANDOM]
 |  |
 |  02:MERGE
 |     constant-selects=1
-|
-05:MERGE
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -368,22 +368,13 @@ with t1 as (values('a', 'b'))
 01:MERGE
    constant-selects=1
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: 'c' ASC
-|  limit: 1
-|
-|--07:TOP-N [LIMIT=1]
-|  |  order by: 'c' ASC
-|  |
-|  06:MERGE
-|  |
-|  02:MERGE
-|     constant-selects=1
-|
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
 |
-05:MERGE
+00:MERGE
+|
+|--02:MERGE
+|     constant-selects=1
 |
 01:MERGE
    constant-selects=1
@@ -404,22 +395,13 @@ with t1 as (values('a', 'b'))
 01:MERGE
    constant-selects=1
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: 'c' ASC
-|  limit: 1
-|
-|--07:TOP-N [LIMIT=1]
-|  |  order by: 'c' ASC
-|  |
-|  06:MERGE
-|  |
-|  02:MERGE
-|     constant-selects=1
-|
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
 |
-05:MERGE
+00:MERGE
+|
+|--02:MERGE
+|     constant-selects=1
 |
 01:MERGE
    constant-selects=1
@@ -462,14 +444,12 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=16
 |
-03:EXCHANGE [UNPARTITIONED]
+03:EXCHANGE [HASH(year,month)]
 |
-|--05:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypestiny]
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
-|
-04:MERGE
 |
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B

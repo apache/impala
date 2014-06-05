@@ -818,3 +818,151 @@ where a > b
 tinyint, tinyint
 ---- RESULTS
 ====
+---- QUERY
+# Test union merging only partitioned inputs.
+select id, bigint_col from functional.alltypestiny
+union all
+select sum(int_col), bigint_col from functional.alltypes
+  where year=2009 and month=2
+  group by bigint_col
+union all
+select a.id, a.bigint_col
+  from functional.alltypestiny a inner join functional.alltypestiny b
+  on (a.id = b.id)
+union all
+(select 1000, 2000)
+order by 1, 2
+---- TYPES
+bigint, bigint
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,0
+0,0
+0,0
+1,10
+1,10
+2,0
+2,0
+3,10
+3,10
+4,0
+4,0
+5,10
+5,10
+6,0
+6,0
+7,10
+7,10
+28,10
+56,20
+84,30
+112,40
+140,50
+168,60
+196,70
+224,80
+252,90
+1000,2000
+====
+---- QUERY
+# Test union merging only unpartitioned inputs.
+select id, bigint_col from functional.alltypestiny
+union all
+select sum(int_col), bigint_col from functional.alltypes
+  where year=2009 and month=2
+  group by bigint_col
+union all
+select a.id, a.bigint_col
+  from functional.alltypestiny a inner join functional.alltypestiny b
+  on (a.id = b.id)
+union all
+select 1000, 2000
+---- TYPES
+bigint, bigint
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,0
+0,0
+0,0
+1,10
+1,10
+2,0
+2,0
+3,10
+3,10
+4,0
+4,0
+5,10
+5,10
+6,0
+6,0
+7,10
+7,10
+28,10
+56,20
+84,30
+112,40
+140,50
+168,60
+196,70
+224,80
+252,90
+1000,2000
+====
+---- QUERY
+# Test union merging only unpartitioned inputs.
+select count(id), sum(bigint_col) from functional.alltypes
+union all
+select id, bigint_col from functional.alltypessmall order by id limit 10
+union all
+select id, bigint_col from functional.alltypestiny
+union all
+select sum(int_col), bigint_col from functional.alltypes
+  where year=2009 and month=2
+  group by bigint_col
+union all
+select a.id, a.bigint_col
+  from functional.alltypestiny a inner join functional.alltypestiny b
+  on (a.id = b.id)
+union all
+select 1000, 2000
+---- TYPES
+bigint, bigint
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,0
+0,0
+0,0
+0,0
+1,10
+1,10
+1,10
+2,0
+2,0
+2,20
+3,10
+3,10
+3,30
+4,0
+4,0
+4,40
+5,10
+5,10
+5,50
+6,0
+6,0
+6,60
+7,10
+7,10
+7,70
+8,80
+9,90
+28,10
+56,20
+84,30
+112,40
+140,50
+168,60
+196,70
+224,80
+252,90
+1000,2000
+7300,328500
+====

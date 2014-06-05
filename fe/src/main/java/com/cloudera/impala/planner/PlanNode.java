@@ -558,9 +558,4 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void computeCosts(TQueryOptions queryOptions) {
     perHostMemCost_ = 0;
   }
-
-  public PlanNode clone(PlanNodeId id) {
-    Preconditions.checkState(false, "Not implemented");
-    return null;
-  }
 }

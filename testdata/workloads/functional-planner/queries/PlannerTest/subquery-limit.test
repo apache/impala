@@ -98,7 +98,6 @@ where a.id < 5 limit 5
 |  limit: 5
 |
 |--08:EXCHANGE [BROADCAST]
-|  |  limit: 5
 |  |
 |  07:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: count(*) ASC
@@ -264,7 +263,6 @@ from functional.alltypes
 |  hash predicates: functional.alltypes.id = id
 |
 |--04:EXCHANGE [BROADCAST]
-|  |  limit: 10
 |  |
 |  03:EXCHANGE [UNPARTITIONED]
 |  |  limit: 10
@@ -300,7 +298,6 @@ from functional.alltypes
 |  hash predicates: functional.alltypes.id = id
 |
 |--05:EXCHANGE [BROADCAST]
-|  |  limit: 10
 |  |
 |  04:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: id ASC
@@ -358,7 +355,6 @@ limit 5
 |  hash predicates: functional.alltypes.id = a.id
 |
 |--08:EXCHANGE [BROADCAST]
-|  |  limit: 10
 |  |
 |  07:EXCHANGE [UNPARTITIONED]
 |  |  limit: 10
@@ -425,7 +421,6 @@ limit 5
 |  hash predicates: functional.alltypes.id = id
 |
 |--09:EXCHANGE [BROADCAST]
-|  |  limit: 10
 |  |
 |  08:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: int_col ASC
@@ -455,16 +450,16 @@ select x.id from (
 order by x.id
 limit 100 offset 4
 ---- PLAN
-02:TOP-N [LIMIT=100]
+02:TOP-N [LIMIT=100 OFFSET=4]
 |  order by: id ASC
 |
-01:TOP-N [LIMIT=5]
+01:TOP-N [LIMIT=5 OFFSET=5]
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-02:TOP-N [LIMIT=100]
+02:TOP-N [LIMIT=100 OFFSET=4]
 |  order by: id ASC
 |
 03:MERGING-EXCHANGE [UNPARTITIONED]

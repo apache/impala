@@ -96,6 +96,7 @@ public class PlanFragment {
    * different fragment.
    */
   private void setFragmentInPlanTree(PlanNode node) {
+    if (node == null) return;
     node.setFragment(this);
     if (!(node instanceof ExchangeNode)) {
       for (PlanNode child : node.getChildren()) {

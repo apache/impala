@@ -29,10 +29,6 @@ SortNode::SortNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
   : ExecNode(pool, tnode, descs),
     offset_(tnode.sort_node.__isset.offset ? tnode.sort_node.offset : 0),
     num_rows_skipped_(0) {
-  DCHECK(tnode.sort_node.__isset.use_mem_fraction);
-  use_mem_fraction_ = tnode.sort_node.use_mem_fraction;
-  DCHECK_GT(use_mem_fraction_, 0);
-  DCHECK_LE(use_mem_fraction_, 1.0);
 }
 
 SortNode::~SortNode() {
@@ -183,7 +179,7 @@ Status SortNode::GetBlockMgrLimit(RuntimeState* state, int64_t* block_mgr_limit)
     state->LogError(ss.str());
     return state->SetMemLimitExceeded(mem_tracker(), min_mem_required);
   } else {
-    mem_remaining = min<int64_t>(SORT_MEM_FRACTION * use_mem_fraction_ * mem_remaining,
+    mem_remaining = min<int64_t>(SORT_MEM_FRACTION * mem_remaining,
         mem_remaining - SORT_MEM_UNUSED);
     mem_remaining = max<int64_t>(mem_remaining, min_mem_required);
   }

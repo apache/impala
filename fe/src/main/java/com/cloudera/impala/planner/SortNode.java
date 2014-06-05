@@ -53,11 +53,6 @@ public class SortNode extends PlanNode {
   // The offset of the first row to return.
   protected long offset_;
 
-  // The fraction of the total memory available for sorts that this sort node is
-  // allowed to use. Only valid for full sorts (i.e. if !useTopN_). Is 1.0 if there
-  // is only one fragment containing a full sort node.
-  private double useMemFraction_;
-
   public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN,
       long offset) {
     super(id, Lists.newArrayList(info.getSortTupleDescriptor().getId()),
@@ -66,28 +61,11 @@ public class SortNode extends PlanNode {
     useTopN_ = useTopN;
     children_.add(input);
     offset_ = offset;
-    useMemFraction_ = 1;
-  }
-
-  /**
-   * Copy c'tor used in clone().
-   */
-  private SortNode(PlanNodeId id, SortNode src) {
-    super(id, src, getDisplayName(src.useTopN_, true));
-    info_ = src.info_;
-    useTopN_ = src.useTopN_;
-    offset_ = src.offset_;
-    baseTblMaterializedTupleExprs_ = src.baseTblMaterializedTupleExprs_;
-    useMemFraction_ = src.useMemFraction_;
   }
 
   public long getOffset() { return offset_; }
   public void setOffset(long offset) { offset_ = offset; }
-
-  public void setUseMemFraction(double useMemFraction) {
-    Preconditions.checkState(!useTopN_);
-    useMemFraction_ = useMemFraction;
-  }
+  public boolean hasOffset() { return offset_ > 0; }
 
   public boolean useTopN() { return useTopN_; }
 
@@ -149,11 +127,6 @@ public class SortNode extends PlanNode {
     sort_info.sort_tuple_slot_exprs = Expr.treesToThrift(baseTblMaterializedTupleExprs_);
     TSortNode sort_node = new TSortNode(sort_info, useTopN_);
     sort_node.setOffset(offset_);
-    if (!useTopN_) {
-      Preconditions.checkState(useMemFraction_ > 0.0);
-      Preconditions.checkState(useMemFraction_ <= 1.0);
-      sort_node.setUse_mem_fraction(useMemFraction_);
-    }
     msg.sort_node = sort_node;
   }
 
@@ -161,8 +134,8 @@ public class SortNode extends PlanNode {
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(String.format("%s%s:%s [LIMIT=%s]\n", prefix, id_.toString(),
-        displayName_, limit_));
+    output.append(String.format("%s%s:%s%s\n", prefix, id_.toString(),
+        displayName_, getNodeExplainDetail(detailLevel)));
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       output.append(detailPrefix + "order by: ");
       for (int i = 0; i < info_.getOrderingExprs().size(); ++i) {
@@ -180,6 +153,15 @@ public class SortNode extends PlanNode {
     return output.toString();
   }
 
+  private String getNodeExplainDetail(TExplainLevel detailLevel) {
+    if (!hasLimit()) return "";
+    if (hasOffset()) {
+      return String.format(" [LIMIT=%s OFFSET=%s]", limit_, offset_);
+    } else {
+      return String.format(" [LIMIT=%s]", limit_);
+    }
+  }
+
   @Override
   protected String getOffsetExplainString(String prefix) {
     return offset_ != 0 ? prefix + "offset: " + Long.toString(offset_) + "\n" : "";
@@ -190,9 +172,6 @@ public class SortNode extends PlanNode {
     Preconditions.checkState(hasValidStats());
     perHostMemCost_ = (long) Math.ceil((cardinality_ + offset_) * avgRowSize_);
   }
-
-  @Override
-  public PlanNode clone(PlanNodeId id) { return new SortNode(id, this); }
 
   private static String getDisplayName(boolean isTopN, boolean isMergeOnly) {
     if (isTopN) {

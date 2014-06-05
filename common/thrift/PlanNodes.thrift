@@ -202,8 +202,6 @@ struct TSortNode {
   2: required bool use_top_n;
   // This is the number of rows to skip before returning results
   3: optional i64 offset
-  // Fraction of remaining memory the sort can use.
-  4: optional double use_mem_fraction
 }
 
 struct TMergeNode {

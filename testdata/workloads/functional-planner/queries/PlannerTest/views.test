@@ -86,13 +86,11 @@ select * from functional.alltypes_view where id < 10
 ---- DISTRIBUTEDPLAN
 03:EXCHANGE [UNPARTITIONED]
 |
-|--05:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypes]
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 size=478.45KB
 |     predicates: functional.alltypes.id < 10
-|
-04:MERGE
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -162,7 +160,6 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  hash predicates: functional.alltypes.id = count(a.bigint_col)
 |
 |--13:EXCHANGE [BROADCAST]
-|  |  limit: 100
 |  |
 |  12:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: b.string_col ASC

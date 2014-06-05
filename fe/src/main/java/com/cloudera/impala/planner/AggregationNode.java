@@ -266,7 +266,4 @@ public class AggregationNode extends PlanNode {
     perHostMemCost_ += Math.max(perHostCardinality * avgRowSize_ *
         Planner.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
   }
-
-  @Override
-  public AggregationNode clone(PlanNodeId id) { return new AggregationNode(id, this); }
 }

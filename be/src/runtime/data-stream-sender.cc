@@ -92,11 +92,15 @@ class DataStreamSender::Channel {
   // to either SendBatch() or SendCurrentBatch()).
   Status GetSendStatus();
 
+  // Waits for the rpc thread pool to finish the current rpc.
+  void WaitForRpc();
+
   // Flush buffered rows and close channel.
   // Logs errors if any of the preceding rpcs failed.
   void Close(RuntimeState* state);
 
   int64_t num_data_bytes_sent() const { return num_data_bytes_sent_; }
+  TRowBatch* thrift_batch() { return &thrift_batch_; }
 
  private:
   DataStreamSender* parent_;
@@ -138,9 +142,6 @@ class DataStreamSender::Channel {
   // Called from a thread from the rpc_thread_ pool.
   void TransmitData(int thread_id, const TRowBatch*);
   void TransmitDataHelper(const TRowBatch*);
-
-  // Waits for the rpc thread pool to finish the current rpc.
-  void WaitForRpc();
 
   Status CloseInternal();
 };
@@ -264,12 +265,7 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
   // make sure there's no in-flight TransmitData() call that might still want to
   // access thrift_batch_
   WaitForRpc();
-  {
-    SCOPED_TIMER(parent_->serialize_batch_timer_);
-    int uncompressed_bytes = batch_->Serialize(&thrift_batch_);
-    COUNTER_UPDATE(parent_->bytes_sent_counter_, RowBatch::GetBatchSize(thrift_batch_));
-    COUNTER_UPDATE(parent_->uncompressed_bytes_counter_, uncompressed_bytes);
-  }
+  parent_->SerializeBatch(batch_.get(), &thrift_batch_);
   batch_->Reset();
   RETURN_IF_ERROR(SendBatch(&thrift_batch_));
   return Status::OK;
@@ -340,6 +336,7 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
   : sender_id_(sender_id),
     pool_(pool),
     row_desc_(row_desc),
+    current_channel_idx_(0),
     closed_(false),
     current_thrift_batch_(&thrift_batch1_),
     profile_(NULL),
@@ -349,8 +346,10 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
     dest_node_id_(sink.dest_node_id) {
   DCHECK_GT(destinations.size(), 0);
   DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
-      || sink.output_partition.type == TPartitionType::HASH_PARTITIONED);
+      || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
+      || sink.output_partition.type == TPartitionType::RANDOM);
   broadcast_ = sink.output_partition.type == TPartitionType::UNPARTITIONED;
+  random_ = sink.output_partition.type == TPartitionType::RANDOM;
   // TODO: use something like google3's linked_ptr here (scoped_ptr isn't copyable)
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
@@ -359,7 +358,7 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
                     sink.dest_node_id, per_channel_buffer_size));
   }
 
-  if (broadcast_) {
+  if (broadcast_ || random_) {
     // Randomize the order we open/transmit to channels to avoid thundering herd problems.
     srand(reinterpret_cast<uint64_t>(this));
     random_shuffle(channels_.begin(), channels_.end());
@@ -426,14 +425,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
-    VLOG_ROW << "serializing " << batch->num_rows() << " rows";
-    {
-      SCOPED_TIMER(serialize_batch_timer_);
-      int uncompressed_bytes = batch->Serialize(current_thrift_batch_);
-      COUNTER_UPDATE(bytes_sent_counter_, RowBatch::GetBatchSize(*current_thrift_batch_));
-      COUNTER_UPDATE(uncompressed_bytes_counter_, uncompressed_bytes);
-    }
-
+    SerializeBatch(batch, current_thrift_batch_);
     // SendBatch() will block if there are still in-flight rpcs (and those will
     // reference the previously written thrift batch)
     for (int i = 0; i < channels_.size(); ++i) {
@@ -441,6 +433,14 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
     }
     current_thrift_batch_ =
         (current_thrift_batch_ == &thrift_batch1_ ? &thrift_batch2_ : &thrift_batch1_);
+  } else if (random_) {
+    // Round-robin batches among channels. Wait for the current channel to finish its
+    // rpc before overwriting its batch.
+    Channel* current_channel = channels_[current_channel_idx_];
+    current_channel->WaitForRpc();
+    SerializeBatch(batch, current_channel->thrift_batch());
+    current_channel->SendBatch(current_channel->thrift_batch());
+    current_channel_idx_ = (current_channel_idx_ + 1) % channels_.size();
   } else {
     // hash-partition batch's rows across channels
     int num_channels = channels_.size();
@@ -471,6 +471,16 @@ void DataStreamSender::Close(RuntimeState* state) {
   }
   Expr::Close(partition_exprs_, state);
   closed_ = true;
+}
+
+void DataStreamSender::SerializeBatch(RowBatch* src, TRowBatch* dest) {
+  VLOG_ROW << "serializing " << src->num_rows() << " rows";
+  {
+    SCOPED_TIMER(serialize_batch_timer_);
+    int uncompressed_bytes = src->Serialize(dest);
+    COUNTER_UPDATE(bytes_sent_counter_, RowBatch::GetBatchSize(*dest));
+    COUNTER_UPDATE(uncompressed_bytes_counter_, uncompressed_bytes);
+  }
 }
 
 int64_t DataStreamSender::GetNumDataBytesSent() const {

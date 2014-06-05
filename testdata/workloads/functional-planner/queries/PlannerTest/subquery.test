@@ -35,7 +35,6 @@ where month = 1
 |  hash predicates: t2.int_col = int_col
 |
 |--08:EXCHANGE [BROADCAST]
-|  |  limit: 5
 |  |
 |  07:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: count(*) DESC
@@ -906,10 +905,8 @@ select * from
 ---- DISTRIBUTEDPLAN
 02:EXCHANGE [UNPARTITIONED]
 |
-|--04:MERGE
-|     constant-selects=1
-|
-03:MERGE
+00:MERGE
+|  constant-selects=1
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -927,12 +924,8 @@ where y < 10
    predicates: 11 < 10
    constant-selects=1
 ---- DISTRIBUTEDPLAN
-02:EXCHANGE [UNPARTITIONED]
-|
-|--04:MERGE
-|     constant-selects=2
-|
-03:MERGE
+00:MERGE
+|  constant-selects=2
 |
 01:MERGE
    predicates: 11 < 10
@@ -948,12 +941,8 @@ where y < 10
 |
 01:MERGE
 ---- DISTRIBUTEDPLAN
-02:EXCHANGE [UNPARTITIONED]
-|
-|--04:MERGE
-|     constant-selects=2
-|
-03:MERGE
+00:MERGE
+|  constant-selects=2
 |
 01:MERGE
 ====

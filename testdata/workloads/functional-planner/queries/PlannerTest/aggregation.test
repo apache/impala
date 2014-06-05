@@ -179,24 +179,19 @@ limit 10
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-09:AGGREGATE [MERGE FINALIZE]
+05:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*))
 |  limit: 10
 |
-08:EXCHANGE [UNPARTITIONED]
-|
-|--07:AGGREGATE
-|  |  output: count(*)
-|  |
-|  06:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
 |  output: count(*)
 |
-05:MERGE
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -222,30 +217,24 @@ limit 10
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-10:EXCHANGE [UNPARTITIONED]
+06:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
-09:AGGREGATE [MERGE FINALIZE]
+05:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*))
 |  group by: t.bigint_col
 |  limit: 10
 |
-08:EXCHANGE [HASH(t.bigint_col)]
-|
-|--07:AGGREGATE
-|  |  output: count(*)
-|  |  group by: bigint_col
-|  |
-|  06:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+04:EXCHANGE [HASH(t.bigint_col)]
 |
 03:AGGREGATE
 |  output: count(*)
 |  group by: bigint_col
 |
-05:MERGE
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -273,33 +262,28 @@ limit 10
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-12:AGGREGATE [MERGE FINALIZE]
+08:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(int_col))
 |
-11:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 04:AGGREGATE [MERGE]
 |  output: count(int_col)
 |  limit: 10
 |
-10:AGGREGATE [MERGE]
+06:AGGREGATE [MERGE]
 |  group by: int_col
 |
-09:EXCHANGE [HASH(int_col)]
-|
-|--08:AGGREGATE
-|  |  group by: int_col
-|  |
-|  07:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+05:EXCHANGE [HASH(int_col)]
 |
 03:AGGREGATE
 |  group by: int_col
 |
-06:MERGE
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -329,7 +313,7 @@ limit 10
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-11:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 04:AGGREGATE [MERGE FINALIZE]
@@ -337,23 +321,18 @@ limit 10
 |  group by: t.bigint_col
 |  limit: 10
 |
-10:AGGREGATE [MERGE]
+06:AGGREGATE [MERGE]
 |  group by: t.bigint_col, int_col
 |
-09:EXCHANGE [HASH(t.bigint_col)]
-|
-|--08:AGGREGATE
-|  |  group by: bigint_col, int_col
-|  |
-|  07:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+05:EXCHANGE [HASH(t.bigint_col)]
 |
 03:AGGREGATE
 |  group by: bigint_col, int_col
 |
-06:MERGE
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -382,36 +361,30 @@ limit 10
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-12:AGGREGATE [MERGE FINALIZE]
+08:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(int_col)), sum(sum(count(smallint_col)))
 |
-11:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 04:AGGREGATE [MERGE]
 |  output: count(int_col), sum(count(smallint_col))
 |  limit: 10
 |
-10:AGGREGATE [MERGE]
+06:AGGREGATE [MERGE]
 |  output: sum(count(smallint_col))
 |  group by: int_col
 |
-09:EXCHANGE [HASH(int_col)]
-|
-|--08:AGGREGATE
-|  |  output: count(smallint_col)
-|  |  group by: int_col
-|  |
-|  07:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+05:EXCHANGE [HASH(int_col)]
 |
 03:AGGREGATE
 |  output: count(smallint_col)
 |  group by: int_col
 |
-06:MERGE
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -442,7 +415,7 @@ limit 10
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-11:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 04:AGGREGATE [MERGE FINALIZE]
@@ -450,26 +423,20 @@ limit 10
 |  group by: t.bigint_col
 |  limit: 10
 |
-10:AGGREGATE [MERGE]
+06:AGGREGATE [MERGE]
 |  output: sum(count(smallint_col))
 |  group by: t.bigint_col, int_col
 |
-09:EXCHANGE [HASH(t.bigint_col)]
-|
-|--08:AGGREGATE
-|  |  output: count(smallint_col)
-|  |  group by: bigint_col, int_col
-|  |
-|  07:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+05:EXCHANGE [HASH(t.bigint_col)]
 |
 03:AGGREGATE
 |  output: count(smallint_col)
 |  group by: bigint_col, int_col
 |
-06:MERGE
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -503,7 +470,7 @@ limit 10
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-14:EXCHANGE [UNPARTITIONED]
+10:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 05:AGGREGATE [MERGE FINALIZE]
@@ -511,33 +478,28 @@ limit 10
 |  group by: t.bigint_col
 |  limit: 10
 |
-13:AGGREGATE [MERGE]
+09:AGGREGATE [MERGE]
 |  output: sum(count(smallint_col))
 |  group by: t.bigint_col, int_col
 |
-12:EXCHANGE [HASH(t.bigint_col)]
+08:EXCHANGE [HASH(t.bigint_col)]
 |
 04:AGGREGATE
 |  output: count(smallint_col)
 |  group by: bigint_col, int_col
 |
-11:AGGREGATE [MERGE FINALIZE]
+07:AGGREGATE [MERGE FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-10:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
-|
-|--09:AGGREGATE
-|  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|  |
-|  08:MERGE
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+06:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
 03:AGGREGATE
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-07:MERGE
+00:MERGE
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -586,14 +548,11 @@ select count(*) from
 04:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
-|--06:MERGE
-|  |  limit: 10
-|  |
-|  02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
-|
-05:MERGE
+00:MERGE
 |  limit: 10
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB

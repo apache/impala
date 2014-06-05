@@ -51,7 +51,8 @@ class DataStreamSender : public DataSink {
   // Per_channel_buffer_size is the buffer size allocated to each channel
   // and is specified in bytes.
   // The RowDescriptor must live until Close() is called.
-  // NOTE: supported partition types are UNPARTITIONED (broadcast) and HASH_PARTITIONED
+  // NOTE: supported partition types are UNPARTITIONED (broadcast), HASH_PARTITIONED,
+  // and RANDOM.
   DataStreamSender(ObjectPool* pool, int sender_id,
     const RowDescriptor& row_desc, const TDataStreamSink& sink,
     const std::vector<TPlanFragmentDestination>& destinations,
@@ -77,6 +78,9 @@ class DataStreamSender : public DataSink {
   // hosts. Further Send() calls are illegal after calling Close().
   virtual void Close(RuntimeState* state);
 
+  // Serializes the src batch into the dest thrift batch. Maintains metrics.
+  void SerializeBatch(RowBatch* src, TRowBatch* dest);
+
   // Return total number of bytes sent in TRowBatch.data. If batches are
   // broadcast to multiple receivers, they are counted once per receiver.
   int64_t GetNumDataBytesSent() const;
@@ -92,6 +96,9 @@ class DataStreamSender : public DataSink {
   ObjectPool* pool_;
   const RowDescriptor& row_desc_;
   bool broadcast_;  // if true, send all rows on all channels
+  bool random_; // if true, round-robins row batches among channels
+  int current_channel_idx_; // index of current channel to send to if random_ == true
+
   // If true, this sender has been closed. Not valid to call Send() anymore.
   bool closed_;
 

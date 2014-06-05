@@ -633,10 +633,11 @@ void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_re
     // set # of senders
     DCHECK(exec_request.fragments[i].output_sink.__isset.stream_sink);
     const TDataStreamSink& sink = exec_request.fragments[i].output_sink.stream_sink;
-    // we can only handle unpartitioned (= broadcast) and hash-partitioned
-    // output at the moment
+    // we can only handle unpartitioned (= broadcast), random-partitioned or
+    // hash-partitioned output at the moment
     DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
-           || sink.output_partition.type == TPartitionType::HASH_PARTITIONED);
+           || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
+           || sink.output_partition.type == TPartitionType::RANDOM);
     PlanNodeId exch_id = sink.dest_node_id;
     // we might have multiple fragments sending to this exchange node
     // (distributed MERGE), which is why we need to add up the #senders
