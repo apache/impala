@@ -1,17 +1,17 @@
 ====
----- QUERY : TPCH-Q1
+---- QUERY: TPCH-Q1
 # Q1 - Pricing Summary Report Query
-# Modifications: Remove ORDER BY, added ROUND() calls
 select
   l_returnflag,
   l_linestatus,
-  round(sum(l_quantity), 1),
-  round(sum(l_extendedprice), 1),
-  round(sum(l_extendedprice * (1 - l_discount)), 1),
-  round(sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), 1),
-  round(avg(l_quantity), 1),
-  round(avg(l_extendedprice), 1),
-  round(avg(l_discount), 1), count(1)
+  sum(l_quantity),
+  sum(l_extendedprice),
+  sum(l_extendedprice * (1 - l_discount)),
+  sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)),
+  avg(l_quantity),
+  avg(l_extendedprice),
+  avg(l_discount), 
+  count(1)
 from
   lineitem
 where
@@ -19,11 +19,14 @@ where
 group by
   l_returnflag,
   l_linestatus
----- TYPES
-string, string, double, double, double, double, double, double, double, bigint
+order by
+  l_returnflag,
+  l_linestatus;
 ---- RESULTS
-'A','F',37734107,56586554400.7,53758257134.9,55909065222.8,25.5,38273.1,0,1478493
-'N','F',991417,1487504710.4,1413082168.1,1469649223.2,25.5,38284.5,0.1,38854
-'N','O',74476040,111701729697.7,106118230307.6,110367043872.5,25.5,38249.1,0,2920374
-'R','F',37719753,56568041380.9,53741292684.6,55889619119.8,25.5,38250.9,0.1,1478870
+'A','F',37734107.00,56586554400.73,53758257134.8700,55909065222.827692,25.52,38273.12,0.04,1478493
+'N','F',991417.00,1487504710.38,1413082168.0541,1469649223.194375,25.51,38284.46,0.05,38854
+'N','O',74476040.00,111701729697.74,106118230307.6056,110367043872.497010,25.50,38249.11,0.04,2920374
+'R','F',37719753.00,56568041380.90,53741292684.6040,55889619119.831932,25.50,38250.85,0.05,1478870
+---- TYPES
+string, string, decimal, decimal, decimal, decimal, decimal, decimal, decimal, bigint
 ====

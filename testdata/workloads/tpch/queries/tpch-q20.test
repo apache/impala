@@ -1,5 +1,5 @@
 ====
----- QUERY : TPCH-Q20_QUERY_1
+---- QUERY: TPCH-Q20_QUERY_1
 # Q20 - Potential Part Promotion Query
 insert overwrite table q20_tmp1
 select distinct p_partkey
@@ -10,7 +10,7 @@ RESET q20_tmp1
 ---- RESULTS
 : 2127
 ====
----- QUERY : TPCH-Q20_QUERY_2
+---- QUERY: TPCH-Q20_QUERY_2
 insert overwrite table q20_tmp2
 select
   l_partkey,
@@ -28,7 +28,7 @@ RESET q20_tmp2
 ---- RESULTS
 : 543210
 ====
----- QUERY : TPCH-Q20_QUERY_3
+---- QUERY: TPCH-Q20_QUERY_3
 insert overwrite table q20_tmp3
 select
   ps_suppkey,
@@ -44,7 +44,7 @@ RESET q20_tmp3
 ---- RESULTS
 : 5843
 ====
----- QUERY : TPCH-Q20_QUERY_4
+---- QUERY: TPCH-Q20_QUERY_4
 # Modified to use subquery to work around IMP-127
 insert overwrite table q20_tmp4
 select ps_suppkey
@@ -56,8 +56,7 @@ RESET q20_tmp4
 ---- RESULTS
 : 4397
 ====
----- QUERY : TPCH-Q20_QUERY_5
-# Modifications: Added limit
+---- QUERY: TPCH-Q20_QUERY_5
 select
   s_name,
   s_address
@@ -68,10 +67,7 @@ from supplier s
 join q20_tmp4 t4
   on (s.s_suppkey = t4.ps_suppkey)
 order by
-  s_name
-limit 100
----- TYPES
-string, string
+  s_name;
 ---- RESULTS
 'Supplier#000000020','iybAE,RmTymrZVYaFZva2SH,j'
 'Supplier#000000091','YV45D7TkfdQanOOZ7q9QxkyGUapU1oOWU6q3'
@@ -173,4 +169,92 @@ string, string
 'Supplier#000005426','9Dz2OVT1q sb4BK71ljQ1XjPBYRPvO'
 'Supplier#000005465','63cYZenZBRZ613Q1FaoG0,smnC5zl9'
 'Supplier#000005484','saFdOR qW7AFY,3asPqiiAa11Mo22pCoN0BtPrKo'
+'Supplier#000005505','d2sbjG43KwMPX'
+'Supplier#000005506','On f5ypzoWgB'
+'Supplier#000005631','14TVrjlzo2SJEBYCDgpMwTlvwSqC'
+'Supplier#000005642','ZwKxAv3V40tW E8P7Qwu,zlu,kPsL'
+'Supplier#000005686','f2RBKec2T1NIi7yS M'
+'Supplier#000005730','5rkb0PSews HvxkL8JaD41UpnSF2cg8H1'
+'Supplier#000005736','2dq XTYhtYWSfp'
+'Supplier#000005737','dmEWcS32C3kx,d,B95 OmYn48'
+'Supplier#000005797',',o,OebwRbSDmVl9gN9fpWPCiqB UogvlSR'
+'Supplier#000005875','lK,sYiGzB94hSyHy9xvSZFbVQNCZe2LXZuGbS'
+'Supplier#000005974','REhR5jE,lLusQXvf54SwYySgsSSVFhu'
+'Supplier#000006059','4m0cv8MwJ9yX2vlwI Z'
+'Supplier#000006065','UiI2Cy3W4Tu5sLk LuvXLRy6KihlGv'
+'Supplier#000006093','KJNUg1odUT2wtCS2s6PrH3D6fd'
+'Supplier#000006099','aZilwQKYDTVPoK'
+'Supplier#000006109','rY5gbfh3dKHnylcQUTPGCwnbe'
+'Supplier#000006217','RVN23SYT9jenUeaWGXUd'
+'Supplier#000006297','73VRDOO56GUCyvc40oYJ'
+'Supplier#000006435','xIgE69XszYbnO4Eon7cHHO8y'
+'Supplier#000006463','7 wkdj2EO49iotley2kmIM ADpLSszGV3RNWj'
+'Supplier#000006478','bQYPnj9lpmW3U'
+'Supplier#000006521','b9 2zjHzxR'
+'Supplier#000006642','N,CUclSqRLJcS8zQ'
+'Supplier#000006659','iTLsnvD8D2GzWNUv kRInwRjk5rDeEmfup1'
+'Supplier#000006669','NQ4Yryj624p7K53'
+'Supplier#000006748','rC,2rEn8gKDIS5Q0dJEoiF'
+'Supplier#000006761','n4jhxGMqB5prD1HhpLvwrWStOLlla'
+'Supplier#000006808','HGd2Xo 9nEcHJhZvXjXxWKIpApT'
+'Supplier#000006858','fnlINT885vBBhsWwTGiZ0o22thwGY16h GHJj21'
+'Supplier#000006946','To6Slo0GJTqcIvD'
+'Supplier#000006949','mLxYUJhsGcLtKe ,GFirNu183AvT'
+'Supplier#000007072','2tRyX9M1a 4Rcm57s779F1ANG9jlpK'
+'Supplier#000007098','G3j8g0KC4OcbAu2OVoPHrXQWMCUdjq8wgCHOExu'
+'Supplier#000007132','xonvn0KAQIL3p8kYk HC1FSSDSUSTC'
+'Supplier#000007135','ls DoKV7V5ulfQy9V'
+'Supplier#000007147','Xzb16kC63wmLVYexUEgB0hXFvHkjT5iPpq'
+'Supplier#000007160','TqDGBULB3cTqIT6FKDvm9BS4e4v,zwYiQPb'
+'Supplier#000007169','tEc95D2moN9S84nd55O,dlnW'
+'Supplier#000007278','I2ae3rS7KVF8GVHtB'
+'Supplier#000007365','51xhROLvQMJ05DndtZWt'
+'Supplier#000007398','V8eE6oZ00OFNU,'
+'Supplier#000007402','4UVv58ery1rjmqSR5'
+'Supplier#000007448','yhhpWiJi7EJ6Q5VCaQ'
+'Supplier#000007458','BYuucapYkptZl6fnd2QaDyZmI9gR1Ih16e'
+'Supplier#000007477','9m9j0wfhWzCvVHxkU,PpAxwSH0h'
+'Supplier#000007509','q8,V6LJRoHJjHcOuSG7aLTMg'
+'Supplier#000007561','rMcFg2530VC'
+'Supplier#000007616','R IovIqzDi3,QHnaqZk1xS4hGAgelhP4yj'
+'Supplier#000007760','JsPE18PvcdFTK'
+'Supplier#000007801','69fi,U1r6enUb '
+'Supplier#000007865','5cDGCS,T6N'
+'Supplier#000007885','u3sicchh5ZpyTUpN1cJKNcAoabIWgY'
+'Supplier#000007926','ErzCF80K9Uy'
+'Supplier#000007998','LnASFBfYRFOo9d6d,asBvVq9Lo2P'
+'Supplier#000008090','eonbJZvoDFYBNUinYfp6yERIg'
+'Supplier#000008224','TWxt9f,LVER'
+'Supplier#000008231','IK7eGw Yj90sTdpsP,vcqWxLB'
+'Supplier#000008243','2AyePMkDqmzVzjGTizXthFLo8h EiudCMxOmIIG'
+'Supplier#000008323','75I18sZmASwm POeheRMdj9tmpyeQ,BfCXN5BIAb'
+'Supplier#000008366','h778cEj14BuW9OEKlvPTWq4iwASR6EBBXN7zeS8'
+'Supplier#000008532','Uc29q4,5xVdDOF87UZrxhr4xWS0ihEUXuh'
+'Supplier#000008595','MH0iB73GQ3z UW3O DbCbqmc'
+'Supplier#000008610','SgVgP90vP452sUNTgzL9zKwXHXAzV6tV'
+'Supplier#000008683','gLuGcugfpJSeGQARnaHNCaWnGaqsNnjyl20'
+'Supplier#000008705','aE,trRNdPx,4yinTD9O3DebDIp'
+'Supplier#000008742','HmPlQEzKCPEcTUL14,kKq'
+'Supplier#000008841','I 85Lu1sekbg2xrSIzm0'
+'Supplier#000008872','8D 45GgxJO2OwwYP9S4AaXJKvDwPfLM'
+'Supplier#000008879','rDSA,D9oPM,65NMWEFrmGKAu'
+'Supplier#000008967','2kwEHyMG 7FwozNImAUE6mH0hYtqYculJM'
+'Supplier#000008972','w2vF6 D5YZO3visPXsqVfLADTK'
+'Supplier#000009032','qK,trB6Sdy4Dz1BRUFNy'
+'Supplier#000009043','57OPvKH4qyXIZ7IzYeCaw11a5N1Ki9f1WWmVQ,'
+'Supplier#000009278','RqYTzgxj93CLX 0mcYfCENOefD'
+'Supplier#000009326','XmiC,uy36B9,fb0zhcjaagiXQutg'
+'Supplier#000009430','igRqmneFt '
+'Supplier#000009549','h3RVchUf8MzY46IzbZ0ng09'
+'Supplier#000009601','51m637bO,Rw5DnHWFUvLacRx9'
+'Supplier#000009709','rRnCbHYgDgl9PZYnyWKVYSUW0vKg'
+'Supplier#000009753','wLhVEcRmd7PkJF4FBnGK7Z'
+'Supplier#000009799',' 4wNjXGa4OKWl'
+'Supplier#000009811','E3iuyq7UnZxU7oPZIe2Gu6'
+'Supplier#000009812','APFRMy3lCbgFga53n5t9DxzFPQPgnjrGt32'
+'Supplier#000009846','57sNwJJ3PtBDu,hMPP5QvpcOcSNRXn3PypJJrh'
+'Supplier#000009899','7XdpAHrzr1t,UQFZE'
+'Supplier#000009974','7wJ,J5DKcxSU4Kp1cQLpbcAvB5AsvKT'
+---- TYPES
+string, string
 ====

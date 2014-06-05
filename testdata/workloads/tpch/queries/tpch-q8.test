@@ -1,12 +1,14 @@
 ====
----- QUERY : TPCH-Q8
+---- QUERY: TPCH-Q8
 # Q8 - National Market Share Query
 # Modifications: Got rid of subquery, converted select from multiple tables to joins,
-# added round() call
 select
   year(o_orderdate) as o_year,
-  round(sum(case when n2.n_name = 'BRAZIL' then l_extendedprice * (1 - l_discount)
-                 else 0 end) / sum(l_extendedprice * (1 - l_discount)), 5) as mkt_share
+  sum(case
+      when n2.n_name = 'BRAZIL'
+      then l_extendedprice * (1 - l_discount)
+      else 0
+      end) / sum(l_extendedprice * (1 - l_discount)) as mkt_share
 from lineitem l
   join orders o
     on (l_orderkey = o_orderkey)
@@ -31,10 +33,9 @@ group by
   o_year
 order by
   o_year
-limit 100
----- TYPES
-int, double
 ---- RESULTS
-1995,0.03444
-1996,0.04158
+1995,0.0344
+1996,0.0415
+---- TYPES
+int, decimal
 ====

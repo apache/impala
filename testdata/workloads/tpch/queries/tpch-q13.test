@@ -1,5 +1,5 @@
 ====
----- QUERY : TPCH-Q13
+---- QUERY: TPCH-Q13
 # Q13 - Customer Distribution Query
 select
   c_count,
@@ -19,7 +19,6 @@ group by
 order by
   custdist desc,
   c_count desc
-limit 100
 ---- RESULTS
 0,50005
 9,6641

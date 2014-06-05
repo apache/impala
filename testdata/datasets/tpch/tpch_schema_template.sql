@@ -10,10 +10,10 @@ L_ORDERKEY BIGINT
 L_PARTKEY BIGINT
 L_SUPPKEY BIGINT
 L_LINENUMBER INT
-L_QUANTITY DOUBLE
-L_EXTENDEDPRICE DOUBLE
-L_DISCOUNT DOUBLE
-L_TAX DOUBLE
+L_QUANTITY DECIMAL(12,2)
+L_EXTENDEDPRICE DECIMAL(12,2)
+L_DISCOUNT DECIMAL(12,2)
+L_TAX DECIMAL(12,2)
 L_RETURNFLAG STRING
 L_LINESTATUS STRING
 L_SHIPDATE STRING
@@ -42,7 +42,7 @@ P_BRAND STRING
 P_TYPE STRING
 P_SIZE INT
 P_CONTAINER STRING
-P_RETAILPRICE DOUBLE
+P_RETAILPRICE DECIMAL(12,2)
 P_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
@@ -60,7 +60,7 @@ partsupp
 PS_PARTKEY BIGINT
 PS_SUPPKEY BIGINT
 PS_AVAILQTY INT
-PS_SUPPLYCOST DOUBLE
+PS_SUPPLYCOST DECIMAL(12,2)
 PS_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
@@ -80,7 +80,7 @@ S_NAME STRING
 S_ADDRESS STRING
 S_NATIONKEY SMALLINT
 S_PHONE STRING
-S_ACCTBAL DOUBLE
+S_ACCTBAL DECIMAL(12,2)
 S_COMMENT STRING
 ---- ROW_FORMAT
 DELIMITED FIELDS TERMINATED BY '|'
@@ -131,7 +131,7 @@ orders
 O_ORDERKEY BIGINT
 O_CUSTKEY BIGINT
 O_ORDERSTATUS STRING
-O_TOTALPRICE DOUBLE
+O_TOTALPRICE DECIMAL(12,2)
 O_ORDERDATE STRING
 O_ORDERPRIORITY STRING
 O_CLERK STRING
@@ -155,7 +155,7 @@ C_NAME STRING
 C_ADDRESS STRING
 C_NATIONKEY SMALLINT
 C_PHONE STRING
-C_ACCTBAL DOUBLE
+C_ACCTBAL DECIMAL(12,2)
 C_MKTSEGMENT STRING
 C_COMMENT STRING
 ---- ROW_FORMAT
@@ -171,11 +171,11 @@ tpch
 ---- BASE_TABLE_NAME
 q2_minimum_cost_supplier_tmp1
 ---- COLUMNS
-s_acctbal double
+s_acctbal Decimal(12,2)
 s_name string
 n_name string
 p_partkey bigint
-ps_supplycost double
+ps_supplycost Decimal(12,2)
 p_mfgr string
 s_address string
 s_phone string
@@ -187,7 +187,7 @@ tpch
 q2_minimum_cost_supplier_tmp2
 ---- COLUMNS
 p_partkey bigint
-ps_min_supplycost double
+ps_min_supplycost Decimal(12,2)
 ====
 ---- DATASET
 tpch
@@ -205,14 +205,14 @@ tpch
 q11_part_tmp
 ---- COLUMNS
 ps_partkey bigint
-part_value double
+part_value Decimal(38,2)
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
 q11_sum_tmp
 ---- COLUMNS
-total_value double
+total_value Decimal(38, 2)
 ====
 ---- DATASET
 tpch
@@ -220,14 +220,14 @@ tpch
 revenue
 ---- COLUMNS
 supplier_no bigint
-total_revenue double
+total_revenue Decimal(38,4)
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
 max_revenue
 ---- COLUMNS
-max_revenue double
+max_revenue Decimal(38, 4)
 ====
 ---- DATASET
 tpch
@@ -249,18 +249,10 @@ ps_suppkey bigint
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-lineitem_tmp
----- COLUMNS
-t_partkey bigint
-t_avg_quantity double
-====
----- DATASET
-tpch
----- BASE_TABLE_NAME
 q18_tmp
 ---- COLUMNS
 l_orderkey bigint
-t_sum_quantity double
+t_sum_quantity Decimal(38, 2)
 ====
 ---- DATASET
 tpch
@@ -276,7 +268,7 @@ q20_tmp2
 ---- COLUMNS
 l_partkey bigint
 l_suppkey bigint
-sum_quantity double
+sum_quantity Decimal(38,3)
 ====
 ---- DATASET
 tpch
@@ -285,7 +277,7 @@ q20_tmp3
 ---- COLUMNS
 ps_suppkey bigint
 ps_availqty int
-sum_quantity double
+sum_quantity Decimal(38,3)
 ====
 ---- DATASET
 tpch
@@ -299,6 +291,6 @@ tpch
 ---- BASE_TABLE_NAME
 q22_customer_tmp1
 ---- COLUMNS
-avg_acctbal double
+avg_acctbal Decimal(38, 22)
 cust_name_char string
 ====

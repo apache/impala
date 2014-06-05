@@ -1,7 +1,7 @@
 ====
----- QUERY : TPCH-Q12
+---- QUERY: TPCH-Q12
 # Q12 - Shipping Mode and Order Priority Query
-# Modifications: Converted select from multiple tables to joins, added limit
+# Modifications: Converted select from multiple tables to joins
 select l_shipmode,
 sum(case
       when o_orderpriority ='1-URGENT' or
@@ -30,10 +30,9 @@ group by
   l_shipmode
 order by
   l_shipmode
-limit 10
----- TYPES
-string, bigint, bigint
 ---- RESULTS
 'MAIL',6202,9324
 'SHIP',6200,9262
+---- TYPES
+string, bigint, bigint
 ====

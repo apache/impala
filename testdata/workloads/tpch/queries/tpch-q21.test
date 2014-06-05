@@ -3,7 +3,7 @@
 # Q21 - Suppliers Who Kept Orders Waiting Query
 # Modifications: Converted 'EXISTS' into LEFT SEMI JOIN, converted
 # NOT EXISTS into LEFT OUTER JOIN, changed selectes from multiple tables to
-# joins, added limit
+# joins.
 select
   s_name,
   count(*) as numwait

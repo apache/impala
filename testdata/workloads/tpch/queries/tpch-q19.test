@@ -1,8 +1,7 @@
 ====
----- QUERY : TPCH-Q19
+---- QUERY: TPCH-Q19
 # Q19 - Discounted Revenue Query
-# Modifications: Added round() calls
-select round(sum(l_extendedprice * (1 - l_discount) ), 5) as revenue
+select sum(l_extendedprice * (1 - l_discount)) as revenue
 from lineitem l
 join part p
   on p.p_partkey = l.l_partkey
@@ -45,8 +44,8 @@ or
        l_shipmode = 'AIR REG')
   and l_shipinstruct = 'DELIVER IN PERSON'
 )
----- TYPES
-double
 ---- RESULTS
 3083843.0578
+---- TYPES
+decimal
 ====

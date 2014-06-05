@@ -152,7 +152,7 @@ WRITE TO HDFS [tpch.q2_minimum_cost_supplier_tmp2, OVERWRITE=true]
 |  group by: p_partkey
 |
 00:SCAN HDFS [tpch.q2_minimum_cost_supplier_tmp1]
-   partitions=1/1 size=108.41KB
+   partitions=1/1 size=107.06KB
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [tpch.q2_minimum_cost_supplier_tmp2, OVERWRITE=true]
 |  partitions=1
@@ -168,7 +168,7 @@ WRITE TO HDFS [tpch.q2_minimum_cost_supplier_tmp2, OVERWRITE=true]
 |  group by: p_partkey
 |
 00:SCAN HDFS [tpch.q2_minimum_cost_supplier_tmp1]
-   partitions=1/1 size=108.41KB
+   partitions=1/1 size=107.06KB
 ====
 # Modifications: Fully qualified name of p_partkey column in the ORDER BY clause
 select
@@ -197,10 +197,10 @@ limit 100
 |  hash predicates: t1.p_partkey = t2.p_partkey, t1.ps_supplycost = t2.ps_min_supplycost
 |
 |--01:SCAN HDFS [tpch.q2_minimum_cost_supplier_tmp2 t2]
-|     partitions=1/1 size=6.37KB compact
+|     partitions=1/1 size=5.98KB compact
 |
 00:SCAN HDFS [tpch.q2_minimum_cost_supplier_tmp1 t1]
-   partitions=1/1 size=108.41KB
+   partitions=1/1 size=107.06KB
 ---- DISTRIBUTEDPLAN
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
@@ -215,10 +215,10 @@ limit 100
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.q2_minimum_cost_supplier_tmp2 t2]
-|     partitions=1/1 size=6.37KB
+|     partitions=1/1 size=5.98KB
 |
 00:SCAN HDFS [tpch.q2_minimum_cost_supplier_tmp1 t1]
-   partitions=1/1 size=108.41KB
+   partitions=1/1 size=107.06KB
 ====
 # Q3 - Shipping Priority Query
 # Modifications: Added round() calls
@@ -1029,7 +1029,7 @@ WRITE TO HDFS [tpch.q11_sum_tmp, OVERWRITE=true]
 |  output: sum(part_value)
 |
 00:SCAN HDFS [tpch.q11_part_tmp]
-   partitions=1/1 size=509.47KB
+   partitions=1/1 size=497.31KB
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [tpch.q11_sum_tmp, OVERWRITE=true]
 |  partitions=1
@@ -1043,7 +1043,7 @@ WRITE TO HDFS [tpch.q11_sum_tmp, OVERWRITE=true]
 |  output: sum(part_value)
 |
 00:SCAN HDFS [tpch.q11_part_tmp]
-   partitions=1/1 size=509.47KB
+   partitions=1/1 size=497.31KB
 ====
 # Q12 - Shipping Mode and Order Priority Query
 # Modifications: Converted select from multiple tables to joins, added limit
@@ -1299,7 +1299,7 @@ WRITE TO HDFS [tpch.max_revenue, OVERWRITE=true]
 |  output: max(total_revenue)
 |
 00:SCAN HDFS [tpch.revenue]
-   partitions=1/1 size=137.60KB
+   partitions=1/1 size=166.89KB
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [tpch.max_revenue, OVERWRITE=true]
 |  partitions=1
@@ -1313,7 +1313,7 @@ WRITE TO HDFS [tpch.max_revenue, OVERWRITE=true]
 |  output: max(total_revenue)
 |
 00:SCAN HDFS [tpch.revenue]
-   partitions=1/1 size=137.60KB
+   partitions=1/1 size=166.89KB
 ====
 # Modifications - Added limit
 select
@@ -1337,13 +1337,13 @@ limit 100
 |  hash predicates: r.total_revenue = m.max_revenue
 |
 |--02:SCAN HDFS [tpch.max_revenue m]
-|     partitions=1/1 size=10B compact
+|     partitions=1/1 size=13B compact
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: s.s_suppkey = r.supplier_no
 |
 |--01:SCAN HDFS [tpch.revenue r]
-|     partitions=1/1 size=137.60KB compact
+|     partitions=1/1 size=166.89KB compact
 |
 00:SCAN HDFS [tpch.supplier s]
    partitions=1/1 size=1.33MB
@@ -1361,7 +1361,7 @@ limit 100
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpch.max_revenue m]
-|     partitions=1/1 size=10B
+|     partitions=1/1 size=13B
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s.s_suppkey = r.supplier_no
@@ -1369,7 +1369,7 @@ limit 100
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.revenue r]
-|     partitions=1/1 size=137.60KB
+|     partitions=1/1 size=166.89KB
 |
 00:SCAN HDFS [tpch.supplier s]
    partitions=1/1 size=1.33MB
@@ -1501,32 +1501,6 @@ insert overwrite table tpch.lineitem_tmp
 select l_partkey as t_partkey, 0.2 * avg(l_quantity) as t_avg_quantity
 from tpch.lineitem
 group by l_partkey
----- PLAN
-WRITE TO HDFS [tpch.lineitem_tmp, OVERWRITE=true]
-|  partitions=1
-|
-01:AGGREGATE [FINALIZE]
-|  output: sum(l_quantity), count(l_quantity)
-|  group by: l_partkey
-|
-00:SCAN HDFS [tpch.lineitem]
-   partitions=1/1 size=718.94MB
----- DISTRIBUTEDPLAN
-WRITE TO HDFS [tpch.lineitem_tmp, OVERWRITE=true]
-|  partitions=1
-|
-03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(l_quantity)), sum(count(l_quantity))
-|  group by: l_partkey
-|
-02:EXCHANGE [HASH(l_partkey)]
-|
-01:AGGREGATE
-|  output: sum(l_quantity), count(l_quantity)
-|  group by: l_partkey
-|
-00:SCAN HDFS [tpch.lineitem]
-   partitions=1/1 size=718.94MB
 ====
 # Modifications: Converted selects from multiple tables to joins,
 # added round() call, removed subquery
@@ -1541,54 +1515,7 @@ where
   p.p_container = 'MED BOX' and
   l.l_quantity < lt.t_avg_quantity
 ---- PLAN
-05:AGGREGATE [FINALIZE]
-|  output: sum(l_extendedprice)
-|
-04:HASH JOIN [INNER JOIN]
-|  hash predicates: p.p_partkey = lt.t_partkey
-|  other predicates: l.l_quantity < lt.t_avg_quantity
-|
-|--02:SCAN HDFS [tpch.lineitem_tmp lt]
-|     partitions=1/1 size=2.18MB compact
-|
-03:HASH JOIN [INNER JOIN]
-|  hash predicates: l.l_partkey = p.p_partkey
-|
-|--01:SCAN HDFS [tpch.part p]
-|     partitions=1/1 size=22.83MB compact
-|     predicates: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
-|
-00:SCAN HDFS [tpch.lineitem l]
-   partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-09:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(l_extendedprice))
-|
-08:EXCHANGE [UNPARTITIONED]
-|
-05:AGGREGATE
-|  output: sum(l_extendedprice)
-|
-04:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: p.p_partkey = lt.t_partkey
-|  other predicates: l.l_quantity < lt.t_avg_quantity
-|
-|--07:EXCHANGE [BROADCAST]
-|  |
-|  02:SCAN HDFS [tpch.lineitem_tmp lt]
-|     partitions=1/1 size=2.18MB
-|
-03:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l.l_partkey = p.p_partkey
-|
-|--06:EXCHANGE [BROADCAST]
-|  |
-|  01:SCAN HDFS [tpch.part p]
-|     partitions=1/1 size=22.83MB
-|     predicates: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
-|
-00:SCAN HDFS [tpch.lineitem l]
-   partitions=1/1 size=718.94MB
 ====
 # Q18 - Large Value Customer Query
 insert overwrite table tpch.q18_tmp
@@ -1660,7 +1587,7 @@ limit 100
 |  hash predicates: o.o_orderkey = t.l_orderkey
 |
 |--03:SCAN HDFS [tpch.q18_tmp t]
-|     partitions=1/1 size=16.13MB compact
+|     partitions=1/1 size=20.43MB compact
 |     predicates: t.t_sum_quantity > 300
 |
 05:HASH JOIN [INNER JOIN]
@@ -1701,7 +1628,7 @@ limit 100
 |--12:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpch.q18_tmp t]
-|     partitions=1/1 size=16.13MB
+|     partitions=1/1 size=20.43MB
 |     predicates: t.t_sum_quantity > 300
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1903,7 +1830,7 @@ WRITE TO HDFS [tpch.q20_tmp3, OVERWRITE=true]
 |  hash predicates: ps.ps_partkey = t2.l_partkey, ps.ps_suppkey = t2.l_suppkey
 |
 |--01:SCAN HDFS [tpch.q20_tmp2 t2]
-|     partitions=1/1 size=7.83MB compact
+|     partitions=1/1 size=9.38MB compact
 |
 00:SCAN HDFS [tpch.partsupp ps]
    partitions=1/1 size=112.71MB
@@ -1925,7 +1852,7 @@ WRITE TO HDFS [tpch.q20_tmp3, OVERWRITE=true]
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.q20_tmp2 t2]
-|     partitions=1/1 size=7.83MB
+|     partitions=1/1 size=9.38MB
 |
 00:SCAN HDFS [tpch.partsupp ps]
    partitions=1/1 size=112.71MB
@@ -1945,7 +1872,7 @@ WRITE TO HDFS [tpch.q20_tmp4, OVERWRITE=true]
 |  group by: ps_suppkey
 |
 00:SCAN HDFS [tpch.q20_tmp3]
-   partitions=1/1 size=77.49KB
+   partitions=1/1 size=94.49KB
    predicates: ps_availqty > sum_quantity
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [tpch.q20_tmp4, OVERWRITE=true]
@@ -1960,7 +1887,7 @@ WRITE TO HDFS [tpch.q20_tmp4, OVERWRITE=true]
 |  group by: ps_suppkey
 |
 00:SCAN HDFS [tpch.q20_tmp3]
-   partitions=1/1 size=77.49KB
+   partitions=1/1 size=94.49KB
    predicates: ps_availqty > sum_quantity
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_5
@@ -2269,7 +2196,7 @@ limit 100
 |  other predicates: c.c_acctbal > ct.avg_acctbal
 |
 |--01:SCAN HDFS [tpch.q22_customer_tmp1 ct]
-|     partitions=1/1 size=9B compact
+|     partitions=1/1 size=30B compact
 |
 00:SCAN HDFS [tpch.customer c]
    partitions=1/1 size=23.08MB
@@ -2310,7 +2237,7 @@ limit 100
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.q22_customer_tmp1 ct]
-|     partitions=1/1 size=9B
+|     partitions=1/1 size=30B
 |
 00:SCAN HDFS [tpch.customer c]
    partitions=1/1 size=23.08MB

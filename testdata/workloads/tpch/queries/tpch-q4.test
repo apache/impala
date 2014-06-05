@@ -1,9 +1,8 @@
 ====
----- QUERY : TPCH-Q4
+---- QUERY: TPCH-Q4
 # Q4 - Order Priority Checking Query
 # Modifications: Converted selects from multiple tables to joins,
-# rewrote 'exists' as an inner join + count(distinct), added
-# limit
+# rewrote 'exists' as an inner join + count(distinct).
 select
   o_orderpriority,
   count(distinct l_orderkey) as order_count
@@ -18,13 +17,12 @@ group by
   o_orderpriority
 order by
   o_orderpriority
-limit 10
----- TYPES
-string, bigint
 ---- RESULTS
 '1-URGENT',10594
 '2-HIGH',10476
 '3-MEDIUM',10410
 '4-NOT SPECIFIED',10556
 '5-LOW',10487
+---- TYPES
+string, bigint
 ====
