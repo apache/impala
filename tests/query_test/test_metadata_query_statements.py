@@ -31,26 +31,31 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
         sync_ddl=[0, 1]))
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  def drop_data_sources(self):
+  def __drop_data_sources(self):
     for name in self.TEST_DATA_SRC_NAMES:
       self.client.execute(self.DROP_DATA_SRC_STMT % (name,))
 
-  def create_data_sources(self):
-    self.drop_data_sources()
+  def __create_data_sources(self):
+    self.__drop_data_sources()
     for name in self.TEST_DATA_SRC_NAMES:
       self.client.execute(self.CREATE_DATA_SRC_STMT % (name,))
 
   def setup_method(self, method):
     self.cleanup_db('hive_test_db')
-    self.drop_data_sources()
 
   def teardown_method(self, method):
     self.cleanup_db('hive_test_db')
-    self.drop_data_sources()
 
   def test_show(self, vector):
-    self.create_data_sources()
     self.run_test_case('QueryTest/show', vector)
+
+  @pytest.mark.execute_serially
+  def test_show_data_sources(self, vector):
+    try:
+      self.__create_data_sources()
+      self.run_test_case('QueryTest/show-data-sources', vector)
+    finally:
+      self.__drop_data_sources()
 
   def test_show_stats(self, vector):
     self.run_test_case('QueryTest/show-stats', vector)
