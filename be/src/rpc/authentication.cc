@@ -72,6 +72,14 @@ DEFINE_bool(ldap_allow_anonymous_binds, false, "(Advanced) If true, LDAP authent
     "with a blank password (an 'anonymous bind') is allowed by Impala.");
 DEFINE_bool(ldap_manual_config, false, "(Advanced) If true, use a custom SASL config file"
     " to configure access to an LDAP server.");
+DEFINE_string(ldap_domain, "", "If set, Impala will try to bind to LDAP with a name of "
+    "the form <userid>@<ldap_domain>");
+DEFINE_string(ldap_baseDN, "", "If set, Impala will try to bind to LDAP with a name of "
+    "the form uid=<userid>,<ldap_baseDN>");
+DEFINE_string(ldap_bind_pattern, "", "If set, Impala will try to bind to LDAP with a name"
+     " of <ldap_bind_pattern>, but where the string #UID is replaced by the user ID. Use"
+     " to control the bind name precisely; do not set --ldap_domain or --ldap_baseDN with"
+     " this option");
 
 namespace impala {
 
@@ -166,13 +174,28 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
   }
 
   string pass_str(pass, passlen);
-  rc = ldap_simple_bind_s(ld, user, pass_str.c_str());
+
+  string user_str = user;
+  if (!FLAGS_ldap_domain.empty()) {
+    user_str = Substitute("$0@$1", user_str, FLAGS_ldap_domain);
+  } else if (!FLAGS_ldap_baseDN.empty()) {
+    user_str = Substitute("uid=$0,$1", user_str, FLAGS_ldap_baseDN);
+  } else if (!FLAGS_ldap_bind_pattern.empty()) {
+    user_str = FLAGS_ldap_bind_pattern;
+    replace_all(user_str, "#UID", user);
+  }
+
+  VLOG_QUERY << "Trying simple LDAP bind for: " << user_str;
+
+  rc = ldap_simple_bind_s(ld, user_str.c_str(), pass_str.c_str());
   // Free ld
   ldap_unbind(ld);
   if (rc != LDAP_SUCCESS) {
     LOG(WARNING) << "LDAP bind failed: " << ldap_err2string(rc);
     return SASL_FAIL;
   }
+
+  VLOG_QUERY << "LDAP bind successful";
 
   return SASL_OK;
 }
@@ -561,6 +584,21 @@ Status AuthManager::Init() {
   // Client-side uses LDAP if enabled, else Kerberos if FLAGS_principal is set, otherwise
   // a NoAuthProvider.
   if (FLAGS_enable_ldap_auth) {
+    const string err_msg = "--$0 and --$1 are mutually exclusive and should not be set"
+        " together";
+    if (!FLAGS_ldap_domain.empty()) {
+      if (!FLAGS_ldap_baseDN.empty()) {
+        return Status(Substitute(err_msg, "ldap_domain", "ldap_baseDN"));
+      }
+      if (!FLAGS_ldap_bind_pattern.empty()) {
+        return Status(Substitute(err_msg, "ldap_domain", "ldap_bind_pattern"));
+      }
+    } else if (!FLAGS_ldap_baseDN.empty()) {
+      if (!FLAGS_ldap_bind_pattern.empty()) {
+        return Status(Substitute(err_msg, "ldap_baseDN", "ldap_bind_pattern"));
+      }
+    }
+
     client_auth_provider_.reset(new LdapAuthProvider());
     // We only want to register the plugin once for the whole application, so don't
     // register inside the LdapAuthProvider() instructor.
