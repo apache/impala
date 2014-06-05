@@ -1083,7 +1083,7 @@ if __name__ == "__main__":
                     dest="kerberos_service_name", default='impala',
                     help="Service name of a kerberized impalad, default is 'impala'")
   parser.add_option("-V", "--verbose", dest="verbose", default=True, action="store_true",
-                    help="Enable verbose output")
+                    help="Verbose output, enabled by default")
   parser.add_option("-p", "--show_profiles", dest="show_profiles", default=False,
                     action="store_true",
                     help="Always display query profiles after execution")
