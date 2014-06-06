@@ -43,6 +43,8 @@ std::ostream& operator<<(std::ostream& os,
 llama::TUniqueId& operator<<(llama::TUniqueId& dest, const impala::TUniqueId& src);
 impala::TUniqueId& operator<<(impala::TUniqueId& dest, const llama::TUniqueId& src);
 
+bool operator==(const impala::TUniqueId& impala_id, const llama::TUniqueId& llama_id);
+
 llama::TNetworkAddress& operator<<(llama::TNetworkAddress& dest,
     const impala::TNetworkAddress& src);
 impala::TNetworkAddress& operator<<(impala::TNetworkAddress& dest,

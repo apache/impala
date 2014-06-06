@@ -533,16 +533,15 @@ Status ResourceBroker::Expand(const TResourceBrokerExpansionRequest& request,
       request.request_timeout, &reservation_id, &response->allocated_resources,
       &timed_out);
 
-  if (!timed_out) {
-    expansion_response_time_metric_->Update(
-        sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-  } else {
+  if (timed_out) {
     expansion_requests_timedout_metric_->Increment(1);
     stringstream error_msg;
     error_msg << "Resource expansion request exceeded timeout of "
-              << request.request_timeout << "ms.";
+        << request.request_timeout << "ms.";
     return Status(error_msg.str());
   }
+  expansion_response_time_metric_->Update(
+      sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
 
   if (!request_granted) {
     expansion_requests_rejected_metric_->Increment(1);
@@ -587,26 +586,28 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
       request.request_timeout, &reservation_id, &response->allocated_resources,
       &timed_out);
 
-  if (!timed_out) {
-    reservation_response_time_metric_->Update(
-        sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-  } else {
+  if (timed_out) {
     // Set the reservation_id to release it from Llama.
+    // WaitForNotification() does not set reservation_id if the request timed out.
+    reservation_id << llama_response.reservation_id;
     response->__set_reservation_id(reservation_id);
     reservation_requests_timedout_metric_->Increment(1);
     stringstream error_msg;
     error_msg << "Resource reservation request exceeded timeout of "
-              << request.request_timeout << "ms.";
+        << request.request_timeout << "ms.";
     return Status(error_msg.str());
   }
+  reservation_response_time_metric_->Update(
+      sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+
   if (!request_granted) {
     reservation_requests_rejected_metric_->Increment(1);
     return Status("Resource reservation request was rejected.");
   }
 
+  DCHECK_EQ(reservation_id, llama_response.reservation_id);
   response->__set_reservation_id(reservation_id);
-
-  VLOG_QUERY << "Fulfilled reservation with id: " << llama_response.reservation_id;
+  VLOG_QUERY << "Fulfilled reservation with id: " << reservation_id;
   reservation_requests_fulfilled_metric_->Increment(1);
   return Status::OK;
 }
@@ -626,18 +627,20 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
   {
     lock_guard<mutex> l(requests_lock_);
     FulfillmentMap::iterator it = allocated_requests_.find(llama_request.reservation_id);
-    DCHECK(it != allocated_requests_.end());
-    BOOST_FOREACH(const llama::TAllocatedResource& resource, it->second->resources()) {
-      DCHECK(resource.reservation_id == llama_request.reservation_id);
-      VLOG_QUERY << "Releasing "
-                 << PrettyPrinter::Print(resource.memory_mb * 1024L * 1024L,
-                                         TCounterType::BYTES)
-                 << " and " << resource.v_cpu_cores << " cores for "
-                 << llama_request.reservation_id;
-      allocated_memory_metric_->Increment(-resource.memory_mb * 1024L * 1024L);
-      allocated_vcpus_metric_->Increment(-resource.v_cpu_cores);
+    // There may be no allocated resources when releasing a request that timed out.
+    if (it != allocated_requests_.end()) {
+      BOOST_FOREACH(const llama::TAllocatedResource& resource, it->second->resources()) {
+        DCHECK(resource.reservation_id == llama_request.reservation_id);
+        VLOG_QUERY << "Releasing "
+                   << PrettyPrinter::Print(resource.memory_mb * 1024L * 1024L,
+                                           TCounterType::BYTES)
+                   << " and " << resource.v_cpu_cores << " cores for "
+                   << llama_request.reservation_id;
+        allocated_memory_metric_->Increment(-resource.memory_mb * 1024L * 1024L);
+        allocated_vcpus_metric_->Increment(-resource.v_cpu_cores);
+      }
+      allocated_requests_.erase(it);
     }
-    allocated_requests_.erase(it);
   }
 
   VLOG_QUERY << "Released reservation with id " << request.reservation_id;

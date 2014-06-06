@@ -102,6 +102,10 @@ impala::TUniqueId& operator<<(impala::TUniqueId& dest, const llama::TUniqueId& s
   return dest;
 }
 
+bool operator==(const impala::TUniqueId& impala_id, const llama::TUniqueId& llama_id) {
+  return impala_id.lo == llama_id.lo && impala_id.hi == llama_id.hi;
+}
+
 llama::TNetworkAddress& operator<<(llama::TNetworkAddress& dest,
     const impala::TNetworkAddress& src) {
   dest.hostname = src.hostname;
