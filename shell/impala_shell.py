@@ -620,7 +620,6 @@ class ImpalaShell(cmd.Cmd):
     while True:
       query_state = self.__get_query_state()
       if query_state == self.query_state["FINISHED"]:
-        self.__print_error_log()
         break
       elif query_state == self.query_state["EXCEPTION"]:
         if self.connected:
@@ -634,15 +633,22 @@ class ImpalaShell(cmd.Cmd):
       time.sleep(self.__get_sleep_interval(loop_start))
 
     if is_insert:
+      self.__print_error_log()
       return self.__close_insert(query, start_time)
     return self.__fetch(query, start_time)
 
-
   def __fetch(self, query, start_time):
+    """Wrapper around __fetch_internal that ensures that __print_error_log() and
+    __close_query() are called."""
+    result = self.__fetch_internal(query, start_time)
+    self.__print_error_log()
+    close_result = self.__close_query()
+    return result and close_result
+
+  def __fetch_internal(self, query, start_time):
     """Fetch all the results."""
     # impalad does not support the fetching of metadata for certain types of queries.
     if not self.__expect_result_metadata(query.query):
-      self.__close_query()
       return True
 
     # Results are ready, fetch them till they're done.
@@ -663,7 +669,6 @@ class ImpalaShell(cmd.Cmd):
     self.rpc_is_interruptable = True
     # If the user hit a Ctrl-C before rpc_is_interruptable is set, close the query.
     if self.is_interrupted.isSet():
-      self.__close_query()
       return False
     while True:
       # Fetch rows in batches of at most fetch_batch_size
@@ -677,8 +682,6 @@ class ImpalaShell(cmd.Cmd):
       # The query's already been closed, so there's no need to explicitly close it.
       if self.is_interrupted.isSet(): return False
       if status != RpcStatus.OK:
-        # The fetch failed, close the query.
-        self.__close_query()
         return False
 
       num_rows_fetched += len(result.data)
@@ -694,13 +697,10 @@ class ImpalaShell(cmd.Cmd):
     # execution time
     end_time = time.time()
     self.__print_runtime_profile_if_enabled()
-    # Even though the query completed successfully, there may have been errors
-    # encountered during execution
-    self.__print_error_log()
 
     self.__print_if_verbose(
       "Returned %d row(s) in %2.2fs" % (num_rows_fetched, end_time - start_time))
-    return self.__close_query()
+    return True
 
   def __close_insert(self, query, start_time):
     """Fetches the results of an INSERT query"""

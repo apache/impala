@@ -223,6 +223,26 @@ class TestImpalaShell(object):
     assert get_shell_cmd_result(p).rc == 0
     assert 0 == impalad.get_num_in_flight_queries()
 
+  @pytest.mark.execute_serially
+  def test_get_log_once(self):
+    """Test that get_log() is always called exactly once."""
+    # Query with fetch
+    args = '-q "select * from functional.alltypeserror"'
+    result = run_impala_shell_cmd(args)
+    assert result.stderr.count('ERRORS') == 1
+
+    # Insert query (doesn't fetch)
+    INSERT_TBL = "alltypes_get_log"
+    DROP_ARGS = '-q "drop table if exists %s.%s"' % (TEST_DB, INSERT_TBL)
+    run_impala_shell_cmd(DROP_ARGS)
+    args = '-q "create table %s.%s like functional.alltypeserror"' % (TEST_DB, INSERT_TBL)
+    run_impala_shell_cmd(args)
+    args = '-q "insert overwrite %s.%s partition(year, month)' \
+           'select * from functional.alltypeserror"' % (TEST_DB, INSERT_TBL)
+    result = run_impala_shell_cmd(args)
+    assert result.stderr.count('ERRORS') == 1
+    run_impala_shell_cmd(DROP_ARGS)
+
 class ImpalaShellResult(object):
   def __init__(self):
     self.rc = 0
@@ -233,8 +253,8 @@ class ImpalaShellResult(object):
 def run_impala_shell_cmd(shell_args, expect_success=True):
   """Runs the Impala shell on the commandline.
 
-  shell_args is a string which represents the commandline options.
-  returns the process return code, stdout and stderr.
+  'shell_args' is a string which represents the commandline options.
+  Returns a ImpalaShellResult.
   """
   cmd = "%s %s" % (SHELL_CMD, shell_args)
   p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE)
