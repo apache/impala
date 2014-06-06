@@ -60,7 +60,8 @@ class TestAggregation(ImpalaTestSuite):
 
   def test_aggregation(self, vector):
     data_type, agg_func = (vector.get_value('data_type'), vector.get_value('agg_func'))
-    query = 'select %s(%s_col) from alltypesagg' % (agg_func, data_type)
+    query = 'select %s(%s_col) from alltypesagg where day is not null' % (agg_func,
+        data_type)
     result = self.execute_scalar(query, vector.get_value('exec_option'),
                                  table_format=vector.get_value('table_format'))
     if 'int' in data_type:
@@ -70,5 +71,6 @@ class TestAggregation(ImpalaTestSuite):
     if vector.get_value('data_type') == 'timestamp' and\
        vector.get_value('agg_func') == 'avg':
       return
-    query = 'select %s(DISTINCT(%s_col)) from alltypesagg' % (agg_func, data_type)
+    query = 'select %s(DISTINCT(%s_col)) from alltypesagg where day is not null' % (
+        agg_func, data_type)
     result = self.execute_scalar(query, vector.get_value('exec_option'))

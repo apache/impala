@@ -4,7 +4,7 @@ insert into table insertalltypesagg
 select id, bigint_col, bool_col, date_string_col, day, double_col, float_col, 
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
-: 10000
+: 11000
 ====
 ---- QUERY
 select id, bool_col from insertalltypesagg 
@@ -22,7 +22,7 @@ insert into table insertalltypesagg
 select 9999999, bigint_col, false, date_string_col, day, double_col, float_col, 
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
-: 10000
+: 11000
 ====
 ---- QUERY
 select id, bool_col from insertalltypesagg 
@@ -64,7 +64,7 @@ insert into table insertalltypesaggbinary
 select id, bigint_col, bool_col, date_string_col, day, double_col, float_col, 
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
-: 10000
+: 11000
 ====
 ---- QUERY
 select count(*) from (
@@ -92,7 +92,7 @@ select count(*) from (
          (hb.timestamp_col is null and a.timestamp_col is null))
   ) x
 ---- RESULTS
-10000
+11000
 ---- TYPES
 BIGINT
 ====
@@ -112,7 +112,7 @@ insert into table insertalltypesaggbinary
 select 9999999, bigint_col, false, date_string_col, day, double_col, float_col, 
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
-: 10000
+: 11000
 ====
 ---- QUERY
 select id, bool_col from insertalltypesaggbinary 

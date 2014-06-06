@@ -2,23 +2,23 @@
 ---- QUERY
 # limit 0 on hdfs table
 select * from alltypesagg where day = 1 limit 0
+---- RESULTS
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
----- RESULTS
 ====
 ---- QUERY
 # limit 0 on hbase table
 select * from functional_hbase.alltypessmall where string_col = '4' limit 0
+---- RESULTS
 ---- TYPES
 int, bigint, boolean, string, double, float, int, int, smallint, string, timestamp, tinyint, int
----- RESULTS
 ====
 ---- QUERY
 # limit 0 with arithmetic expr
 select * from functional_hbase.alltypessmall where string_col = '4' limit 3 % 3
+---- RESULTS
 ---- TYPES
 int, bigint, boolean, string, double, float, int, int, smallint, string, timestamp, tinyint, int
----- RESULTS
 ====
 ---- QUERY
 # limit 0 on complex subquery join
@@ -42,15 +42,13 @@ and   x.float_col > 4.5
 and   c.string_col < '7'
 and   x.int_col + x.float_col + cast(c.string_col as float) < 1000
 limit 0
+---- RESULTS
 ---- TYPES
 smallint, int, tinyint, int, int, float, string
----- RESULTS
 ====
 ---- QUERY
 # We need to specify the day here, otherwise files get opened in random order
 select * from alltypesagg where day = 1 limit 10
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
 ---- RESULTS
 0,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/10','0',2010-01-01 00:00:00,2010,1,1
 1,false,1,1,1,10,1.100000023841858,10.1,'01/01/10','1',2010-01-01 00:01:00,2010,1,1
@@ -62,12 +60,12 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 7,false,7,7,7,70,7.699999809265137,70.7,'01/01/10','7',2010-01-01 00:07:00.210000000,2010,1,1
 8,true,8,8,8,80,8.800000190734863,80.8,'01/01/10','8',2010-01-01 00:08:00.280000000,2010,1,1
 9,false,9,9,9,90,9.899999618530273,90.90000000000001,'01/01/10','9',2010-01-01 00:09:00.360000000,2010,1,1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
 ====
 ---- QUERY
 # limit is applied after where clause
 select * from alltypesagg where tinyint_col is null and day = 1 limit 10
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
 ---- RESULTS
 0,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/10','0',2010-01-01 00:00:00,2010,1,1
 10,true,NULL,10,10,100,11,101,'01/01/10','10',2010-01-01 00:10:00.450000000,2010,1,1
@@ -79,91 +77,91 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 70,true,NULL,70,70,700,77,707,'01/01/10','70',2010-01-01 01:10:24.150000000,2010,1,1
 80,true,NULL,80,80,800,88,808,'01/01/10','80',2010-01-01 01:20:31.600000000,2010,1,1
 90,true,NULL,90,90,900,99,909,'01/01/10','90',2010-01-01 01:30:40.500000000,2010,1,1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
 ====
 ---- QUERY
 select tinyint_col, count(*) from alltypesagg group by 1
+---- RESULTS
+3,1000
+NULL,2000
+2,1000
+4,1000
+8,1000
+1,1000
+6,1000
+5,1000
+7,1000
+9,1000
 ---- TYPES
 tinyint, bigint
----- RESULTS
-1,1000
-2,1000
-3,1000
-4,1000
-5,1000
-6,1000
-7,1000
-8,1000
-9,1000
-NULL,1000
 ====
 ---- QUERY
 select tinyint_col, count(*) from alltypesagg group by 1 limit 10
+---- RESULTS
+3,1000
+NULL,2000
+2,1000
+4,1000
+8,1000
+1,1000
+6,1000
+5,1000
+7,1000
+9,1000
 ---- TYPES
 tinyint, bigint
----- RESULTS
-1,1000
-2,1000
-3,1000
-4,1000
-5,1000
-6,1000
-7,1000
-8,1000
-9,1000
-NULL,1000
 ====
 ---- QUERY
 # Test a more complex arithmetic expression
 select tinyint_col, count(*) from alltypesagg group by 1 limit ((2+3-0) * 2 % 100)
+---- RESULTS
+3,1000
+NULL,2000
+2,1000
+4,1000
+8,1000
+1,1000
+6,1000
+5,1000
+7,1000
+9,1000
 ---- TYPES
 tinyint, bigint
----- RESULTS
-1,1000
-2,1000
-3,1000
-4,1000
-5,1000
-6,1000
-7,1000
-8,1000
-9,1000
-NULL,1000
 ====
 ---- QUERY
 # limit and where clause don't interact
-select tinyint_col, count(*) from alltypesagg where smallint_col > 49 group by 1 
+select tinyint_col, count(*) from alltypesagg where smallint_col > 49 group by 1
 limit 10
+---- RESULTS
+3,500
+NULL,1000
+2,500
+4,500
+8,500
+1,500
+6,500
+5,500
+7,500
+9,500
 ---- TYPES
 tinyint, bigint
----- RESULTS
-1,500
-2,500
-3,500
-4,500
-5,500
-6,500
-7,500
-8,500
-9,500
-NULL,500
 ====
 ---- QUERY
 # limit is applied after having
-select tinyint_col, count(*) from alltypesagg group by 1 having tinyint_col > 5 
+select tinyint_col, count(*) from alltypesagg group by 1 having tinyint_col > 5
 limit 5
----- TYPES
-tinyint, bigint
 ---- RESULTS
 6,1000
 7,1000
 8,1000
 9,1000
+---- TYPES
+tinyint, bigint
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -176,14 +174,14 @@ bigint, string, int, int, bigint, string, int
 1006,'Name16',94616,5000,1006,'Name6',94613
 1006,'Name6',94616,15000,1006,'Name6',94613
 1006,'Name6',94616,5000,1006,'Name6',94613
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 # limit is applied to join
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
 limit 8
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -193,13 +191,13 @@ bigint, string, int, int, bigint, string, int
 1006,'Name16',94612,5000,1006,'Name6',94613
 1006,'Name16',94616,5000,1006,'Name6',94613
 1006,'Name6',94616,5000,1006,'Name6',94613
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 # limit is not pushed down past join
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -216,25 +214,26 @@ NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
 limit 5
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 # With an offset of 0
-select * from alltypesagg order by id limit 10 offset 0
+select * from alltypesagg where id != 0 and id != 10 order by id limit 10 offset 0
 ---- RESULTS
-0,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/10','0',2010-01-01 00:00:00,2010,1,1
 1,false,1,1,1,10,1.100000023841858,10.1,'01/01/10','1',2010-01-01 00:01:00,2010,1,1
 2,true,2,2,2,20,2.200000047683716,20.2,'01/01/10','2',2010-01-01 00:02:00.100000000,2010,1,1
 3,false,3,3,3,30,3.299999952316284,30.3,'01/01/10','3',2010-01-01 00:03:00.300000000,2010,1,1
@@ -244,23 +243,24 @@ select * from alltypesagg order by id limit 10 offset 0
 7,false,7,7,7,70,7.699999809265137,70.7,'01/01/10','7',2010-01-01 00:07:00.210000000,2010,1,1
 8,true,8,8,8,80,8.800000190734863,80.8,'01/01/10','8',2010-01-01 00:08:00.280000000,2010,1,1
 9,false,9,9,9,90,9.899999618530273,90.89999999999999,'01/01/10','9',2010-01-01 00:09:00.360000000,2010,1,1
+11,false,1,11,11,110,12.10000038146973,111.1,'01/01/10','11',2010-01-01 00:11:00.550000000,2010,1,1
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
 ====
 ---- QUERY
 # With a non-zero offset
-select * from alltypesagg order by id limit 10 offset 5
+select * from alltypesagg where id != 0 and id != 10 order by id limit 10 offset 5
 ---- RESULTS
-5,false,5,5,5,50,5.5,50.5,'01/01/10','5',2010-01-01 00:05:00.100000000,2010,1,1
 6,true,6,6,6,60,6.599999904632568,60.59999999999999,'01/01/10','6',2010-01-01 00:06:00.150000000,2010,1,1
 7,false,7,7,7,70,7.699999809265137,70.7,'01/01/10','7',2010-01-01 00:07:00.210000000,2010,1,1
 8,true,8,8,8,80,8.800000190734863,80.8,'01/01/10','8',2010-01-01 00:08:00.280000000,2010,1,1
 9,false,9,9,9,90,9.899999618530273,90.89999999999999,'01/01/10','9',2010-01-01 00:09:00.360000000,2010,1,1
-10,true,NULL,10,10,100,11,101,'01/01/10','10',2010-01-01 00:10:00.450000000,2010,1,1
 11,false,1,11,11,110,12.10000038146973,111.1,'01/01/10','11',2010-01-01 00:11:00.550000000,2010,1,1
 12,true,2,12,12,120,13.19999980926514,121.2,'01/01/10','12',2010-01-01 00:12:00.660000000,2010,1,1
 13,false,3,13,13,130,14.30000019073486,131.3,'01/01/10','13',2010-01-01 00:13:00.780000000,2010,1,1
 14,true,4,14,14,140,15.39999961853027,141.4,'01/01/10','14',2010-01-01 00:14:00.910000000,2010,1,1
+15,false,5,15,15,150,16.5,151.5,'01/01/10','15',2010-01-01 00:15:01.500000000,2010,1,1
+16,true,6,16,16,160,17.60000038146973,161.6,'01/01/10','16',2010-01-01 00:16:01.200000000,2010,1,1
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
 ====
@@ -286,7 +286,7 @@ select x.id from (
 order by x.id
 limit 100 offset 4;
 ---- RESULTS
-9
+8
 ---- TYPES
 int
 ====

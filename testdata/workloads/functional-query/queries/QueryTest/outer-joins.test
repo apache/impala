@@ -3,8 +3,6 @@
 # join cols aren't part of select list (and still get materialized)
 select j.test_name, d.name
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
----- TYPES
-string, string
 ---- RESULTS
 'Name1','Name1'
 'Name16','Name6'
@@ -17,13 +15,13 @@ string, string
 'Name5','Name5'
 'Name6','Name6'
 'Name6','Name6'
+---- TYPES
+string, string
 ====
 ---- QUERY
 # join on bigint
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -36,12 +34,12 @@ bigint, string, int, int, bigint, string, int
 1006,'Name16',94616,5000,1006,'Name6',94613
 1006,'Name6',94616,15000,1006,'Name6',94613
 1006,'Name6',94616,5000,1006,'Name6',94613
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j left outer join DimTbl d on (j.test_id = d.id)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -62,12 +60,12 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94612,5000,NULL,'NULL',NULL
 1106,'Name6',94616,15000,NULL,'NULL',NULL
 1106,'Name6',94616,5000,NULL,'NULL',NULL
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -84,12 +82,12 @@ NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j full outer join DimTbl d on (j.test_id = d.id)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -114,13 +112,13 @@ NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 # join on string
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_name = d.name)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -133,12 +131,12 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94612,5000,1006,'Name6',94613
 1106,'Name6',94616,15000,1006,'Name6',94613
 1106,'Name6',94616,5000,1006,'Name6',94613
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j left outer join DimTbl d on (j.test_name = d.name)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -159,12 +157,12 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94612,5000,1006,'Name6',94613
 1106,'Name6',94616,15000,1006,'Name6',94613
 1106,'Name6',94616,5000,1006,'Name6',94613
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_name = d.name)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -181,12 +179,12 @@ NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j full outer join DimTbl d on (j.test_name = d.name)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
@@ -211,13 +209,13 @@ NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 # join on int
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_zip = d.zip)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1001,'Name1',94611,5000,1002,'Name2',94611
@@ -241,12 +239,12 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94612,15000,1004,'Name4',94612
 1106,'Name6',94612,5000,1003,'Name3',94612
 1106,'Name6',94612,5000,1004,'Name4',94612
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j left outer join DimTbl d on (j.test_zip = d.zip)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1001,'Name1',94611,5000,1002,'Name2',94611
@@ -278,12 +276,12 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94612,5000,1004,'Name4',94612
 1106,'Name6',94616,15000,NULL,'NULL',NULL
 1106,'Name6',94616,5000,NULL,'NULL',NULL
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_zip = d.zip)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1001,'Name1',94611,5000,1002,'Name2',94611
@@ -313,12 +311,12 @@ NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 select j.*, d.*
 from JoinTbl j full outer join DimTbl d on (j.test_zip = d.zip)
----- TYPES
-bigint, string, int, int, bigint, string, int
 ---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1001,'Name1',94611,5000,1002,'Name2',94611
@@ -356,13 +354,13 @@ NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
+---- TYPES
+bigint, string, int, int, bigint, string, int
 ====
 ---- QUERY
 # semi-join on bigint
 select d.*
 from DimTbl d left semi join JoinTbl j on (d.id = j.test_id)
----- TYPES
-bigint, string, int
 ---- RESULTS
 1001,'Name1',94611
 1002,'Name2',94611
@@ -370,13 +368,13 @@ bigint, string, int
 1004,'Name4',94612
 1005,'Name5',94613
 1006,'Name6',94613
+---- TYPES
+bigint, string, int
 ====
 ---- QUERY
 # semi-join on string
 select d.*
 from DimTbl d left semi join JoinTbl j on (j.test_name = d.name)
----- TYPES
-bigint, string, int
 ---- RESULTS
 1001,'Name1',94611
 1002,'Name2',94611
@@ -384,39 +382,41 @@ bigint, string, int
 1004,'Name4',94612
 1005,'Name5',94613
 1006,'Name6',94613
+---- TYPES
+bigint, string, int
 ====
 ---- QUERY
 # semi-join on int
 select d.*
 from DimTbl d left semi join JoinTbl j on (j.test_zip = d.zip)
----- TYPES
-bigint, string, int
 ---- RESULTS
 1001,'Name1',94611
 1002,'Name2',94611
 1003,'Name3',94612
 1004,'Name4',94612
+---- TYPES
+bigint, string, int
 ====
 ---- QUERY
 # joins on empty tables
 select * from emptytable t1 full outer join emptytable t2 on (t1.field=t2.field)
+---- RESULTS
 ---- TYPES
 string, int, string, int
----- RESULTS
 ====
 ---- QUERY
 select count(*) from emptytable t1 right outer join greptiny t2 on (t1.field=t2.field)
----- TYPES
-bigint
 ---- RESULTS
 100
+---- TYPES
+bigint
 ====
 ---- QUERY
 select count(*) from greptiny t1 left outer join emptytable t2 on (t1.field=t2.field)
----- TYPES
-bigint
 ---- RESULTS
 100
+---- TYPES
+bigint
 ====
 ---- QUERY
 # test nested joins
@@ -426,8 +426,6 @@ from alltypesagg a join alltypesagg b on
 left outer join alltypessmall c on
 (c.id = a.id and a.month = c.id and a.month=c.month)
 where a.id < 10
----- TYPES
-int, int, int, int, int, int, int, int
 ---- RESULTS
 0,0,NULL,1,1,NULL,1,1
 1,1,1,1,1,1,1,1
@@ -439,6 +437,8 @@ int, int, int, int, int, int, int, int
 7,7,NULL,1,1,NULL,1,1
 8,8,NULL,1,1,NULL,1,1
 9,9,NULL,1,1,NULL,1,1
+---- TYPES
+int, int, int, int, int, int, int, int
 ====
 ---- QUERY
 # test full outer join where the RHS is empty and the LHS has a very low selectivity
@@ -450,10 +450,10 @@ FROM alltypes a
      ) b
      ON a.id=b.id AND a.id = 1
 ORDER BY ts2 DESC LIMIT 10;
----- TYPES
-string
 ---- RESULTS
 '1'
+---- TYPES
+string
 ====
 ---- QUERY
 # test nullable expressions from inline views in left outer join
@@ -461,8 +461,6 @@ select x.id, y.a, y.b, y.id from alltypestiny x left outer join
 (select 10 as a, case when id is null then 11 else 12 end as b, id from alltypestiny)
 y on x.id = (y.id % 2)
 order by x.id, y.id limit 100
----- TYPES
-int, tinyint, tinyint, int
 ---- RESULTS
 0,10,12,0
 0,10,12,2
@@ -478,6 +476,8 @@ int, tinyint, tinyint, int
 5,NULL,NULL,NULL
 6,NULL,NULL,NULL
 7,NULL,NULL,NULL
+---- TYPES
+int, tinyint, tinyint, int
 ====
 ---- QUERY
 # test nullable expressions from inline views in full outer join
@@ -486,8 +486,6 @@ select x.a, x.b, x.id, y.a, y.b, y.id from
 full outer join
 (select 20 as a, case when id is null then 21 else 22 end as b, id from alltypestiny) y on x.id = (y.id + 4)
 order by x.id, y.id limit 100
----- TYPES
-tinyint, tinyint, int, tinyint, tinyint, int
 ---- RESULTS
 10,12,0,NULL,NULL,NULL
 10,12,1,NULL,NULL,NULL
@@ -501,6 +499,8 @@ NULL,NULL,NULL,20,22,4
 NULL,NULL,NULL,20,22,5
 NULL,NULL,NULL,20,22,6
 NULL,NULL,NULL,20,22,7
+---- TYPES
+tinyint, tinyint, int, tinyint, tinyint, int
 ====
 ---- QUERY
 # test nullable expressions wrapped multiple times
@@ -513,12 +513,12 @@ select z.xa, z.xid, z.ya, z.yid, k.a, k.id from
 full outer join
 (select 30 as a, id from alltypestiny where id = 1) k on z.xid = (k.id + 3)
 order by z.xid, z.yid, k.id limit 100
----- TYPES
-tinyint, int, tinyint, int, tinyint, int
 ---- RESULTS
 10,1,NULL,NULL,NULL,NULL
 NULL,NULL,20,1,NULL,NULL
 NULL,NULL,NULL,NULL,30,1
+---- TYPES
+tinyint, int, tinyint, int, tinyint, int
 ====
 ---- QUERY
 # right outer join requires the join op to be partitioned, otherwise non-matches cause
@@ -527,10 +527,10 @@ select count(*)
 from functional.alltypesagg a
 right outer join functional.alltypestiny b on (a.tinyint_col = b.id)
 where a.tinyint_col is null
----- TYPES
-bigint
 ---- RESULTS
 1
+---- TYPES
+bigint
 ====
 ---- QUERY
 # same for full outer joins
@@ -538,10 +538,10 @@ select count(*)
 from functional.alltypesagg a
 full outer join functional.alltypestiny b on (a.tinyint_col = b.id)
 where a.tinyint_col is null
+---- RESULTS
+2001
 ---- TYPES
 bigint
----- RESULTS
-1001
 ====
 ---- QUERY
 # test multiple outer joins with an inline view to check that nullable tuples
@@ -555,12 +555,12 @@ select z.xid, z.yid, k.id from
 full outer join
 (select id from alltypestiny where id = 1) k on z.xid = (k.id + 3)
 order by z.xid, z.yid, k.id limit 100
----- TYPES
-int, int, int
 ---- RESULTS
 1,NULL,NULL
 NULL,1,NULL
 NULL,NULL,1
+---- TYPES
+int, int, int
 ====
 ---- QUERY
 # test that right outer join includes tuples from rhs
@@ -568,10 +568,10 @@ NULL,NULL,1
 select count(*) from functional.alltypesagg a
 right outer join functional.alltypesagg b on a.int_col = b.int_col
 where b.int_col is null
+---- RESULTS
+20
 ---- TYPES
 bigint
----- RESULTS
-10
 ====
 ---- QUERY
 # test that full outer join includes tuples from rhs
@@ -579,10 +579,10 @@ bigint
 select count(*) from functional.alltypesagg a
 full outer join functional.alltypesagg b on a.int_col = b.int_col
 where a.int_col is null or b.int_col is null
+---- RESULTS
+40
 ---- TYPES
 bigint
----- RESULTS
-20
 ====
 ---- QUERY
 # Regression test for IMPALA-676, which exposed a bug in our codegen subexpresssion
@@ -592,18 +592,16 @@ left outer join alltypesagg b
 on (a.id = b.id
   and (a.int_col = b.int_col + 10000 or (a.int_col is null and b.int_col is null)))
 where b.id is not null
+---- RESULTS
+40
 ---- TYPES
 bigint
----- RESULTS
-10
 ====
 ---- QUERY
 # Regression test for IMPALA-735.
 select distinct t1.tinyint_col from alltypesagg t1
 full outer join alltypesagg t2
 on t2.smallint_col = (t1.tinyint_col + 10000)
----- TYPES
-tinyint
 ---- RESULTS
 NULL
 1
@@ -615,6 +613,8 @@ NULL
 7
 8
 9
+---- TYPES
+tinyint
 ====
 ---- QUERY
 # Regression test for IMPALA-904. Tests correct execution of exprs from an outer-joined
@@ -623,8 +623,8 @@ NULL
 # a hashing data sink.
 select count(*) from functional.alltypestiny t1 left outer join [shuffle]
 (select zeroifnull(int_col) as id from functional.alltypessmall) t2 on (t1.id = t2.id)
----- TYPES
-bigint
 ---- RESULTS
 8
+---- TYPES
+bigint
 ====

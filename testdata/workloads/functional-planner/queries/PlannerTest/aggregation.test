@@ -7,7 +7,7 @@ from functional.alltypesagg
 |  output: count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col)
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 03:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*)), sum(count(tinyint_col)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col))
@@ -18,7 +18,7 @@ from functional.alltypesagg
 |  output: count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col)
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # with grouping
 select tinyint_col, bigint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
@@ -31,19 +31,7 @@ group by 2, 1
 |  group by: bigint_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
----- SCANRANGELOCATIONS
-NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
@@ -58,7 +46,7 @@ NODE 0:
 |  group by: bigint_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # avg substitution
 select avg(id)
@@ -103,7 +91,7 @@ having (int_col * int_col) < 0 limit 10
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |  limit: 10
@@ -119,7 +107,7 @@ having (int_col * int_col) < 0 limit 10
 |  group by: int_col + int_col, int_col * int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # Tests that a having predicate triggers slot materialization (IMPALA-846).
 select count(*) from

@@ -122,7 +122,7 @@ from
 |     predicates: b.string_col = '15'
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: a.tinyint_col = 15
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -132,8 +132,8 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -150,22 +150,12 @@ NODE 1:
 03:EXCHANGE [HASH(a.id,a.int_col)]
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: a.tinyint_col = 15
 ====
 # predicate pushdown
 select * from (select * from functional_hbase.alltypessmall) a where id < 5
 ---- PLAN
-00:SCAN HBASE [functional_hbase.alltypessmall]
-   predicates: functional_hbase.alltypessmall.id < 5
----- SCANRANGELOCATIONS
-NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
----- DISTRIBUTEDPLAN
-01:EXCHANGE [UNPARTITIONED]
-|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: functional_hbase.alltypessmall.id < 5
 ====
@@ -195,7 +185,7 @@ and b.id + 15 = 27
 |     predicates: functional.alltypessmall.string_col = '15', functional.alltypessmall.id + 15 = 27
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: functional.alltypesagg.tinyint_col = 15, functional.alltypesagg.id + 15 = 27
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
@@ -213,7 +203,7 @@ and b.id + 15 = 27
 03:EXCHANGE [HASH(id,int_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: functional.alltypesagg.tinyint_col = 15, functional.alltypesagg.id + 15 = 27
 ====
 # subquery join
@@ -243,7 +233,7 @@ and a.tinyint_col + b.tinyint_col < 15
 |     predicates: functional.alltypessmall.string_col = '15'
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: functional.alltypesagg.tinyint_col = 15
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -253,8 +243,8 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 NODE 1:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -271,7 +261,7 @@ NODE 1:
 03:EXCHANGE [HASH(id,int_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: functional.alltypesagg.tinyint_col = 15
 ====
 # complex join, having joined subquery on the rhs, and predicate
@@ -307,21 +297,21 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
 |     predicates: b.float_col > 4.5
 |
 01:SCAN HDFS [functional.alltypesagg a]
-   partitions=1/10 size=73.39KB
+   partitions=1/11 size=73.39KB
    predicates: a.int_col > 899
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
 NODE 2:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
@@ -345,7 +335,7 @@ NODE 2:
 |     predicates: b.float_col > 4.5
 |
 01:SCAN HDFS [functional.alltypesagg a]
-   partitions=1/10 size=73.39KB
+   partitions=1/11 size=73.39KB
    predicates: a.int_col > 899
 ====
 # with grouping
@@ -359,17 +349,18 @@ group by 1
 |  group by: functional.alltypesagg.tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0 0:72759
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ---- DISTRIBUTEDPLAN
@@ -386,7 +377,7 @@ NODE 0:
 |  group by: functional.alltypesagg.tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # with grouping
 select * from (
@@ -401,7 +392,7 @@ group by 1
 |  group by: tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
@@ -416,7 +407,7 @@ group by 1
 |  group by: tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 select c1, c2, c3
 from
@@ -604,7 +595,7 @@ and   c2 > 10
 |  having: sum(int_col) / count(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
@@ -620,7 +611,7 @@ and   c2 > 10
 |  group by: functional.alltypesagg.int_col % 7
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # subquery with left outer join
 select j.*, d.*
@@ -695,7 +686,7 @@ group by x.smallint_col
 |  |     partitions=4/4 size=6.32KB compact
 |  |
 |  01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=10/10 size=743.67KB compact
+|     partitions=11/11 size=814.73KB compact
 |
 00:SCAN HDFS [functional.alltypessmall c]
    partitions=4/4 size=6.32KB
@@ -726,7 +717,7 @@ group by x.smallint_col
 |  |     partitions=4/4 size=6.32KB
 |  |
 |  01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=10/10 size=743.67KB
+|     partitions=11/11 size=814.73KB
 |
 07:EXCHANGE [HASH(c.id)]
 |
@@ -774,7 +765,7 @@ and x.int_col + x.float_col + CAST(c.string_col AS FLOAT) < 1000
 |     predicates: b.float_col > 4.5
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=1/10 size=73.39KB
+   partitions=1/11 size=73.39KB
    predicates: a.int_col > 899
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
@@ -799,7 +790,7 @@ and x.int_col + x.float_col + CAST(c.string_col AS FLOAT) < 1000
 |     predicates: b.float_col > 4.5
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=1/10 size=73.39KB
+   partitions=1/11 size=73.39KB
    predicates: a.int_col > 899
 ====
 # complex join, having joined aggregate subquery on the rhs, and predicate
@@ -832,7 +823,7 @@ group by x.smallint_col
 |  |     partitions=4/4 size=6.32KB compact
 |  |
 |  01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=10/10 size=743.67KB
+|     partitions=11/11 size=814.73KB
 |
 00:SCAN HDFS [functional.alltypessmall c]
    partitions=4/4 size=6.32KB
@@ -873,7 +864,7 @@ group by x.smallint_col
 |  |     partitions=4/4 size=6.32KB
 |  |
 |  01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=10/10 size=743.67KB
+|     partitions=11/11 size=814.73KB
 |
 00:SCAN HDFS [functional.alltypessmall c]
    partitions=4/4 size=6.32KB

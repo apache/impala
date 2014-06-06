@@ -322,7 +322,7 @@ order by c.string_col desc, a.smallint_col
 |     predicates: b.float_col > 4.5
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=1/10 size=73.39KB
+   partitions=1/11 size=73.39KB
    predicates: a.int_col > 899
 ---- DISTRIBUTEDPLAN
 08:MERGING-EXCHANGE [UNPARTITIONED]
@@ -351,7 +351,7 @@ order by c.string_col desc, a.smallint_col
 |     predicates: b.float_col > 4.5
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=1/10 size=73.39KB
+   partitions=1/11 size=73.39KB
    predicates: a.int_col > 899
 ====
 # agg in ordering
@@ -368,7 +368,7 @@ order by avg(tinyint_col)
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(tinyint_col) / count(tinyint_col) ASC
@@ -387,7 +387,7 @@ order by avg(tinyint_col)
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # outer join
 select t1.id, t1.int_col, t2.id, t2.int_col
@@ -406,7 +406,7 @@ order by t1.id,t2.id
 |     partitions=4/4 size=6.32KB compact
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC, id ASC
@@ -423,7 +423,7 @@ order by t1.id,t2.id
 |     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # cross join
 select t1.id, t2.id from functional.alltypestiny t1 cross join functional.alltypestiny t2
@@ -1090,10 +1090,10 @@ order by bigint_col limit 10) A
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypesagg]
-|     partitions=10/10 size=743.67KB
+|     partitions=11/11 size=814.73KB
 |
 01:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bigint_col ASC
@@ -1105,8 +1105,8 @@ order by bigint_col limit 10) A
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypesagg]
-|     partitions=10/10 size=743.67KB
+|     partitions=11/11 size=814.73KB
 |
 01:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====

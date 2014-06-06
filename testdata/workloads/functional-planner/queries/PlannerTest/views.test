@@ -27,7 +27,7 @@ select * from functional.complex_view
 |     partitions=4/4 size=460B compact
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
    predicates: a.bigint_col < 50
 ---- DISTRIBUTEDPLAN
 08:MERGING-EXCHANGE [UNPARTITIONED]
@@ -57,7 +57,7 @@ select * from functional.complex_view
 |     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
    predicates: a.bigint_col < 50
 ====
 # Basic test with a view on a view
@@ -138,7 +138,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  |     partitions=4/4 size=460B compact
 |  |
 |  02:SCAN HDFS [functional.alltypesagg a]
-|     partitions=10/10 size=743.67KB
+|     partitions=11/11 size=814.73KB
 |     predicates: a.bigint_col < 50
 |
 00:SCAN HDFS [functional.alltypes]
@@ -188,7 +188,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  |     partitions=4/4 size=460B
 |  |
 |  02:SCAN HDFS [functional.alltypesagg a]
-|     partitions=10/10 size=743.67KB
+|     partitions=11/11 size=814.73KB
 |     predicates: a.bigint_col < 50
 |
 00:SCAN HDFS [functional.alltypes]

@@ -320,7 +320,7 @@ where a.tinyint_col is null
 |     partitions=4/4 size=460B compact
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -336,7 +336,7 @@ where a.tinyint_col is null
 03:EXCHANGE [HASH(a.tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # same for full outer joins
 select a.tinyint_col, b.id
@@ -352,7 +352,7 @@ where a.tinyint_col is null
 |     partitions=4/4 size=460B compact
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -368,5 +368,5 @@ where a.tinyint_col is null
 03:EXCHANGE [HASH(a.tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====

@@ -457,7 +457,7 @@ limit 100 offset 4
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 02:TOP-N [LIMIT=100 OFFSET=4]
 |  order by: id ASC
@@ -471,7 +471,7 @@ limit 100 offset 4
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # Test value transfers for outer-joined inline views with a limit.
 # Value transfer a.id->b.id is illegal due to the limit in b.

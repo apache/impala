@@ -2,8 +2,6 @@
 ---- QUERY
 select a.id, b.date_string_col from
   alltypessmall a join alltypessmall b on (a.id = b.id)
----- TYPES
-int, string
 ---- RESULTS
 0,'01/01/09'
 1,'01/01/09'
@@ -105,13 +103,13 @@ int, string
 97,'04/03/09'
 98,'04/03/09'
 99,'04/03/09'
+---- TYPES
+int, string
 ====
 ---- QUERY
 select c.id, d.date_string_col from
   alltypessmall d join (select a.id as id, b.date_string_col from
     alltypessmall a join alltypessmall b on (a.id = b.id)) c on c.id = d.id
----- TYPES
-int, string
 ---- RESULTS
 0,'01/01/09'
 1,'01/01/09'
@@ -213,13 +211,13 @@ int, string
 97,'04/03/09'
 98,'04/03/09'
 99,'04/03/09'
+---- TYPES
+int, string
 ====
 ---- QUERY
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
 0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
@@ -321,11 +319,11 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 97,false,2,2,2,20,2.200000047683716,20.2,'04/03/09','2',2009-04-03 00:22:00.910000000
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3',2009-04-03 00:23:00.930000000
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4',2009-04-03 00:24:00.960000000
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ====
 ---- QUERY
 select id from alltypessmall
----- TYPES
-int
 ---- RESULTS
 0
 1
@@ -427,12 +425,12 @@ int
 97
 98
 99
+---- TYPES
+int
 ====
 ---- QUERY
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col, timestamp_col, year, month from alltypessmall
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ---- RESULTS
 0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
 1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
@@ -534,11 +532,11 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 97,false,2,2,2,20,2.200000047683716,20.2,'04/03/09','2',2009-04-03 00:22:00.910000000,2009,4
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3',2009-04-03 00:23:00.930000000,2009,4
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4',2009-04-03 00:24:00.960000000,2009,4
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ====
 ---- QUERY
 select month, date_string_col, year from alltypessmall
----- TYPES
-int, string, int
 ---- RESULTS
 1,'01/01/09',2009
 1,'01/01/09',2009
@@ -640,39 +638,41 @@ int, string, int
 4,'04/03/09',2009
 4,'04/03/09',2009
 4,'04/03/09',2009
+---- TYPES
+int, string, int
 ====
 ---- QUERY
 select id from alltypessmall where id = 10
----- TYPES
-int
 ---- RESULTS
 10
+---- TYPES
+int
 ====
 ---- QUERY
 # partition key values are materialized correctly across file boundaries
 select day, month, year, string_col
 from alltypesagg
-where string_col = '0'
+where string_col = '1'
+---- RESULTS
+8,1,2010,'1'
+10,1,2010,'1'
+5,1,2010,'1'
+1,1,2010,'1'
+7,1,2010,'1'
+4,1,2010,'1'
+9,1,2010,'1'
+2,1,2010,'1'
+6,1,2010,'1'
+3,1,2010,'1'
 ---- TYPES
 int, int, int, string
----- RESULTS
-1,1,2010,'0'
-10,1,2010,'0'
-2,1,2010,'0'
-3,1,2010,'0'
-4,1,2010,'0'
-5,1,2010,'0'
-6,1,2010,'0'
-7,1,2010,'0'
-8,1,2010,'0'
-9,1,2010,'0'
 ====
 ---- QUERY
 # test that conjuncts are evaluated even if no columns are referenced
 select 1 from alltypestiny where 3 > 4
+---- RESULTS
 ---- TYPES
 tinyint
----- RESULTS
 ====
 ---- QUERY
 # Test that conjuncts are evaluated properly against partition columns if no other
@@ -680,50 +680,49 @@ tinyint
 # on partition pruning not kicking in due to the disjunction (IMPALA-505).
 select count(*) from alltypes
 where (year = 2009 and month = 1) or (year = 2009 and month = 2)
----- TYPES
-bigint
 ---- RESULTS
 590
+---- TYPES
+bigint
 ====
 ---- QUERY
 # Test multi files non-partitioned table (hdfs)
-select count(*) from AllTypesAggMultiFilesNoPart
----- TYPES
-bigint
+select count(distinct id) from AllTypesAggMultiFilesNoPart
 ---- RESULTS
 10000
+---- TYPES
+bigint
 ====
 ---- QUERY
 # Test multi files non-partitioned table (text)
-select count(*) from functional.AllTypesAggMultiFilesNoPart
----- TYPES
-bigint
+select count(distinct id) from functional.AllTypesAggMultiFilesNoPart
 ---- RESULTS
 10000
+---- TYPES
+bigint
 ====
 ---- QUERY
 # Select from old (pre-hive 9) rc file table
 SELECT * FROM functional_rc.old_rcfile_table
----- TYPES
-int, string
 ---- RESULTS
 1,'val_1'
 3,'val_3'
 4,'val_4'
 5,'val_5'
 10,'val_10'
+---- TYPES
+int, string
 ====
 ---- QUERY
 # Regression test for IMPALA-828.
 select cast(timestamp_col as timestamp) from alltypesagg
-where timestamp_col < cast('2010-01-01 00:05:20' as timestamp)
----- TYPES
-timestamp
+where timestamp_col < cast('2010-01-01 00:05:20' as timestamp) and timestamp_col >= cast('2010-01-01 00:01:00' as timestamp)
 ---- RESULTS
-2010-01-01 00:00:00
 2010-01-01 00:01:00
 2010-01-01 00:02:00.100000000
 2010-01-01 00:03:00.300000000
 2010-01-01 00:04:00.600000000
 2010-01-01 00:05:00.100000000
+---- TYPES
+timestamp
 ====

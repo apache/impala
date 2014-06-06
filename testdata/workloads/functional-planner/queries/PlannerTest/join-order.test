@@ -763,7 +763,7 @@ inner join functional.alltypestiny t6 on (t5.id = t6.id)
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypesagg t4]
-|     partitions=10/10 size=743.67KB compact
+|     partitions=11/11 size=814.73KB compact
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
@@ -809,7 +809,7 @@ right join functional.alltypestiny t6 on (t5.id = t6.id)
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypesagg t4]
-|     partitions=10/10 size=743.67KB compact
+|     partitions=11/11 size=814.73KB compact
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
@@ -861,7 +861,7 @@ inner join functional.alltypestiny t6 on (t5.id = t6.id)
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypesagg t3]
-|     partitions=10/10 size=743.67KB compact
+|     partitions=11/11 size=814.73KB compact
 |
 08:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t1.id = t2.id

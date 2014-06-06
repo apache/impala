@@ -226,7 +226,7 @@ BIGINT
 # show that the hdfs table has identical results
 select count(*) from functional.alltypesagg where smallint_col is null and string_col is not null
 ---- RESULTS
-100
+200
 ---- TYPES
 BIGINT
 ====
@@ -244,7 +244,7 @@ BIGINT
 # Compare this hdfs-equivalent query with the above one.
 select count(*) from functional.alltypesagg where smallint_col is null
 ---- RESULTS
-100
+200
 ---- TYPES
 BIGINT
 ====
@@ -310,7 +310,6 @@ TINYINT, BIGINT
 # test that conjuncts are evaluated even if no columns are referenced
 select 1 from functional.alltypestiny where 3 > 4
 ---- RESULTS
-
 ---- TYPES
 TINYINT
 ====

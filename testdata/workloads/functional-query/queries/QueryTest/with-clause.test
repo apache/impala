@@ -98,8 +98,7 @@ order by 1 desc nulls last limit 10) select * from t1;
 3,1000
 2,1000
 1,1000
-NULL,1000
+NULL,2000
 ---- TYPES
 TINYINT, BIGINT
 ====
-

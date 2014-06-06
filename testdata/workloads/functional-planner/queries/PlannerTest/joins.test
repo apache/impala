@@ -127,7 +127,7 @@ and a.tinyint_col + b.tinyint_col < 15
 |     predicates: b.string_col = '15'
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: a.tinyint_col = 15
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
@@ -145,7 +145,7 @@ and a.tinyint_col + b.tinyint_col < 15
 03:EXCHANGE [HASH(a.id,a.int_col)]
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: a.tinyint_col = 15
 ====
 # same as before, with 3 tables;
@@ -178,7 +178,7 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 |     predicates: b.string_col = '15'
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: a.tinyint_col = 15
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
@@ -206,7 +206,7 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 05:EXCHANGE [HASH(a.id,a.int_col)]
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: a.tinyint_col = 15
 ====
 # non-equi join predicate not supported
@@ -268,7 +268,7 @@ from functional.alltypesagg join functional_hbase.alltypessmall using (id, int_c
 |--01:SCAN HBASE [functional_hbase.alltypessmall]
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
@@ -280,7 +280,7 @@ from functional.alltypesagg join functional_hbase.alltypessmall using (id, int_c
 |  01:SCAN HBASE [functional_hbase.alltypessmall]
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # hbase-hdfs join with scan filtering
 select *
@@ -303,7 +303,7 @@ and a.tinyint_col + b.tinyint_col < 15
 |     predicates: b.tinyint_col = 5, b.tinyint_col > 123
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: a.tinyint_col = 15
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -329,7 +329,7 @@ NODE 1:
 |     predicates: b.tinyint_col = 5, b.tinyint_col > 123
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=5/10 size=372.38KB
+   partitions=5/11 size=372.38KB
    predicates: a.tinyint_col = 15
 ====
 # left join followed by right join and then aggregate
@@ -365,7 +365,7 @@ limit 5
 |  hash predicates: a.id = d.id
 |
 |--03:SCAN HDFS [functional.alltypesagg d]
-|     partitions=10/10 size=743.67KB compact
+|     partitions=11/11 size=814.73KB compact
 |
 05:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: b.id = c.id
@@ -380,7 +380,7 @@ limit 5
 |     partitions=4/4 size=6.32KB compact
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 10:TOP-N [LIMIT=5]
 |  order by: count(x.day) ASC
@@ -405,7 +405,7 @@ limit 5
 |--14:EXCHANGE [HASH(d.id)]
 |  |
 |  03:SCAN HDFS [functional.alltypesagg d]
-|     partitions=10/10 size=743.67KB
+|     partitions=11/11 size=814.73KB
 |
 05:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: b.id = c.id
@@ -426,7 +426,7 @@ limit 5
 |     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=10/10 size=743.67KB
+   partitions=11/11 size=814.73KB
 ====
 # join without "other join conjuncts"
 select * from functional.alltypessmall a, functional.alltypessmall b where a.id = b.id limit 1

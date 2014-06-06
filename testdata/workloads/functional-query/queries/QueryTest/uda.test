@@ -1,29 +1,29 @@
 ====
 ---- QUERY
 select hll(int_col) from functional.alltypestiny;
----- TYPES
-string
 ---- RESULTS
 '2'
+---- TYPES
+string
 ====
 ---- QUERY
 select test_count(int_col) from functional.alltypestiny;
----- TYPES
-bigint
 ---- RESULTS
 8
+---- TYPES
+bigint
 ====
 ---- QUERY
 select test_count(int_col) from functional.alltypesagg;
+---- RESULTS
+10980
 ---- TYPES
 bigint
----- RESULTS
-9990
 ====
 ---- QUERY
 select sum_small_decimal(c3) from functional.decimal_tiny;
----- TYPES
-decimal
 ---- RESULTS
 45.00
+---- TYPES
+decimal
 ====
