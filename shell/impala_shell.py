@@ -181,11 +181,17 @@ class ImpalaShell(cmd.Cmd):
     """
     self.readline = None
 
-  def __print_options(self, options):
-    if not options:
+  def __print_options(self, default_options, set_options):
+    # Prints the current query options
+    # with default values distinguished from set values by brackets []
+    if not default_options and not set_options:
       print '\tNo options available.'
     else:
-      print '\n'.join(["\t%s: %s" % (k, options[k]) for k in sorted(options.keys())])
+      for k in sorted(default_options.keys()):
+        if k in set_options.keys() and set_options[k] != default_options[k]:
+          print '\n'.join(["\t%s: %s" % (k, set_options[k])])
+        else:
+          print '\n'.join(["\t%s: [%s]" % (k, default_options[k])])
 
   def __options_to_string_list(self):
     return ["%s=%s" % (k,v) for (k,v) in self.set_query_options.iteritems()]
@@ -199,7 +205,7 @@ class ImpalaShell(cmd.Cmd):
     rpc_result = self.__do_rpc(lambda: get_default_query_options)
     options, status = rpc_result.get_results()
     if status != RpcStatus.OK:
-      print_to_stderr('Unable to retrive default query options')
+      print_to_stderr('Unable to retrieve default query options')
     for option in options:
       self.default_query_options[option.key.upper()] = option.value
 
@@ -388,10 +394,8 @@ class ImpalaShell(cmd.Cmd):
       print ("Connect to an impalad to view and set query options.")
       return True
     if len(args) == 0:
-      print "Default query options:"
-      self.__print_options(self.default_query_options)
-      print "Query options currently set:"
-      self.__print_options(self.set_query_options)
+      print "Query options (defaults shown in []):"
+      self.__print_options(self.default_query_options, self.set_query_options);
       return True
 
     # Remove any extra spaces surrounding the tokens.
@@ -402,9 +406,9 @@ class ImpalaShell(cmd.Cmd):
       return False
     option_upper = tokens[0].upper()
     if option_upper not in self.default_query_options.keys():
-      print "Unknown query option: %s" % (tokens[0],)
-      print "Available query options, with their default values are:"
-      self.__print_options(self.default_query_options)
+      print "Unknown query option: %s" % (tokens[0])
+      print "Available query options, with their values are (defaults shown in []):"
+      self.__print_options(self.default_query_options, self.set_query_options)
       return False
     self.set_query_options[option_upper] = tokens[1]
     self.__print_if_verbose('%s set to %s' % (option_upper, tokens[1]))

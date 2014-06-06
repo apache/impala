@@ -192,6 +192,16 @@ class TestImpalaShell(object):
     # no spaces around the = sign
     args = '-q "set default_order_by_limit=10"'
     run_impala_shell_cmd(args)
+    # test query options displayed
+    args = '-q "set"'
+    result_set = run_impala_shell_cmd(args)
+    assert 'MEM_LIMIT: [0]' in result_set.stdout
+    # test values displayed after setting value
+    args = '-q "set mem_limit=1g;set"'
+    result_set = run_impala_shell_cmd(args)
+    # single list means one instance of mem_limit in displayed output
+    assert 'MEM_LIMIT: 1g' in result_set.stdout
+    assert 'MEM_LIMIT: [0]' not in result_set.stdout
     # Negative tests for set
     # use : instead of =
     args = '-q "set default_order_by_limit:10"'
