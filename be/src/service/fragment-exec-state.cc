@@ -88,11 +88,8 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
     if (runtime_state->hdfs_files_to_move()->size() > 0) {
       insert_status.__set_files_to_move(*runtime_state->hdfs_files_to_move());
     }
-    if (runtime_state->num_appended_rows()->size() > 0) {
-      insert_status.__set_num_appended_rows(*runtime_state->num_appended_rows());
-    }
-    if (runtime_state->insert_stats()->size() > 0) {
-      insert_status.__set_insert_stats(*runtime_state->insert_stats());
+    if (runtime_state->per_partition_status()->size() > 0) {
+      insert_status.__set_per_partition_status(*runtime_state->per_partition_status());
     }
 
     params.__set_insert_exec_status(insert_status);

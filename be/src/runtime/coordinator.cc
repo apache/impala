@@ -574,18 +574,38 @@ Status Coordinator::FinalizeSuccessfulInsert() {
   // 1. If OVERWRITE, remove all the files in the target directory
   // 2. Create all the necessary partition directories.
   HdfsOperationSet partition_create_ops(&hdfs_connection);
-  BOOST_FOREACH(const PartitionRowCount::value_type& partition,
-      partition_row_counts_) {
+  DescriptorTbl* descriptor_table;
+  DescriptorTbl::Create(obj_pool(), desc_tbl_, &descriptor_table);
+  HdfsTableDescriptor* hdfs_table = static_cast<HdfsTableDescriptor*>(
+      descriptor_table->GetTableDescriptor(finalize_params_.table_id));
+  DCHECK(hdfs_table != NULL) << "INSERT target table not known in descriptor table: "
+                             << finalize_params_.table_id;
+
+  // Loop over all partitions that were updated by this insert, and create the set of
+  // filesystem operations required to create the correct partition structure on disk.
+  BOOST_FOREACH(const PartitionStatusMap::value_type& partition, per_partition_status_) {
     SCOPED_TIMER(ADD_CHILD_TIMER(query_profile_, "Overwrite/PartitionCreationTimer",
           "FinalizationTimer"));
+
+    // Look up the partition in the descriptor table.
     stringstream part_path_ss;
-    // Fully-qualified partition path
-    part_path_ss << finalize_params_.hdfs_base_dir << "/" << partition.first;
-    const string part_path = part_path_ss.str();
+    if (partition.second.id == -1) {
+      // If this is a non-existant partition, use the default partition location of
+      // <base_dir>/part_key_1=val/part_key_2=val/...
+      part_path_ss << finalize_params_.hdfs_base_dir << "/" << partition.first;
+    } else {
+      HdfsPartitionDescriptor* part = hdfs_table->GetPartition(partition.second.id);
+      DCHECK(part != NULL) << "Partition " << partition.second.id
+                           << " not known in descriptor table";
+      part_path_ss << part->location();
+    }
+    const string& part_path = part_path_ss.str();
+
+    // If this is an overwrite insert, we will need to delete any updated partitions
     if (finalize_params_.is_overwrite) {
       if (partition.first.empty()) {
         // If the root directory is written to, then the table must not be partitioned
-        DCHECK(partition_row_counts_.size() == 1);
+        DCHECK(per_partition_status_.size() == 1);
         // We need to be a little more careful, and only delete data files in the root
         // because the tmp directories the sink(s) wrote are there also.
         // So only delete files in the table directory - all files are treated as data
@@ -623,7 +643,9 @@ Status Coordinator::FinalizeSuccessfulInsert() {
       if (FLAGS_insert_inherit_permissions) {
         BuildPermissionCache(hdfs_connection, part_path, &permissions_cache);
       }
-      partition_create_ops.Add(CREATE_DIR, part_path);
+      if (hdfsExists(hdfs_connection, part_path.c_str()) == -1) {
+        partition_create_ops.Add(CREATE_DIR, part_path);
+      }
     }
   }
 
@@ -705,7 +727,6 @@ Status Coordinator::FinalizeSuccessfulInsert() {
     }
   }
 
-
   return Status::OK;
 }
 
@@ -770,12 +791,11 @@ Status Coordinator::Wait() {
       // No other backends should have updated these structures if the coordinator has a
       // fragment.  (Backends have a sink only if the coordinator does not)
       DCHECK_EQ(files_to_move_.size(), 0);
-      DCHECK_EQ(partition_row_counts_.size(), 0);
+      DCHECK_EQ(per_partition_status_.size(), 0);
 
       // Because there are no other updates, safe to copy the maps rather than merge them.
       files_to_move_ = *state->hdfs_files_to_move();
-      partition_row_counts_ = *state->num_appended_rows();
-      partition_insert_stats_ = *state->insert_stats();
+      per_partition_status_ = *state->per_partition_status();
     }
   } else {
     // Query finalization can only happen when all backends have reported
@@ -795,7 +815,7 @@ Status Coordinator::Wait() {
 
   if (stmt_type_ == TStmtType::DML) {
     query_profile_->AddInfoString("Insert Stats",
-        DataSink::OutputInsertStats(partition_insert_stats_, "\n"));
+        DataSink::OutputInsertStats(per_partition_status_, "\n"));
     // For DML queries, when Wait is done, the query is complete.  Report aggregate
     // query profiles at this point.
     // TODO: make sure ReportQuerySummary gets called on error
@@ -1167,19 +1187,17 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     lock_guard<mutex> l(lock_);
     // Merge in table update data (partitions written to, files to be moved as part of
     // finalization)
-
-    BOOST_FOREACH(const PartitionRowCount::value_type& partition,
-        params.insert_exec_status.num_appended_rows) {
-      partition_row_counts_[partition.first] += partition.second;
+    BOOST_FOREACH(const PartitionStatusMap::value_type& partition,
+        params.insert_exec_status.per_partition_status) {
+      TInsertPartitionStatus* status = &(per_partition_status_[partition.first]);
+      status->num_appended_rows += partition.second.num_appended_rows;
+      status->id = partition.second.id;
+      if (!status->__isset.stats) status->__set_stats(TInsertStats());
+      DataSink::MergeInsertStats(partition.second.stats, &status->stats);
     }
     files_to_move_.insert(
         params.insert_exec_status.files_to_move.begin(),
         params.insert_exec_status.files_to_move.end());
-
-    if (params.insert_exec_status.__isset.insert_stats) {
-      const PartitionInsertStats& stats = params.insert_exec_status.insert_stats;
-      DataSink::MergeInsertStats(stats, &partition_insert_stats_);
-    }
   }
 
   if (VLOG_FILE_IS_ON) {
@@ -1251,8 +1269,7 @@ bool Coordinator::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update) {
   // Assume we are called only after all fragments have completed
   DCHECK(has_called_wait_);
 
-  BOOST_FOREACH(const PartitionRowCount::value_type& partition,
-      partition_row_counts_) {
+  BOOST_FOREACH(const PartitionStatusMap::value_type& partition, per_partition_status_) {
     catalog_update->created_partitions.insert(partition.first);
   }
 

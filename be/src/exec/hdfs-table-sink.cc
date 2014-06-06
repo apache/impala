@@ -37,12 +37,16 @@
 #include <stdlib.h>
 
 #include "gen-cpp/Data_types.h"
+#include "gen-cpp/ImpalaInternalService_constants.h"
 
 using namespace std;
 using namespace strings;
 using namespace boost::posix_time;
 
 namespace impala {
+
+const static string& ROOT_PARTITION_KEY =
+    g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
 
 HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
     const TUniqueId& unique_id, const vector<TExpr>& select_list_texprs,
@@ -393,13 +397,16 @@ inline Status HdfsTableSink::GetOutputPartition(
       return status;
     }
 
-    // Save the partition name so that the coordinator can create partition
-    // directory structure if needed
-    if (overwrite_) {
-      DCHECK(state->num_appended_rows()->find(partition->partition_name) ==
-          state->num_appended_rows()->end());
-      (*state->num_appended_rows())[partition->partition_name] = 0L;
-    }
+    // Save the partition name so that the coordinator can create the partition directory
+    // structure if needed
+    DCHECK(state->per_partition_status()->find(partition->partition_name) ==
+        state->per_partition_status()->end());
+    TInsertPartitionStatus partition_status;
+    partition_status.__set_num_appended_rows(0L);
+    partition_status.__set_id(partition_descriptor->id());
+    partition_status.__set_stats(TInsertStats());
+    state->per_partition_status()->insert(
+        make_pair(partition->partition_name, partition_status));
 
     // Indicate that temporary directory is to be deleted after execution
     (*state->hdfs_files_to_move())[partition->tmp_hdfs_dir_name] = "";
@@ -420,7 +427,7 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   if (dynamic_partition_key_exprs_.empty()) {
     // If there are no dynamic keys just use an empty key.
     PartitionPair* partition_pair;
-    RETURN_IF_ERROR(GetOutputPartition(state, "", &partition_pair));
+    RETURN_IF_ERROR(GetOutputPartition(state, ROOT_PARTITION_KEY, &partition_pair));
     // Pass the row batch to the writer. If new_file is returned true then the current
     // file is finalized and a new file is opened.
     // The writer tracks where it is in the batch when it returns with new_file set.
@@ -481,11 +488,13 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
   RETURN_IF_ERROR(partition->writer->Finalize());
   // Track total number of appended rows per partition in runtime
   // state. partition->num_rows counts number of rows appended is per-file.
-  (*state->num_appended_rows())[partition->partition_name] += partition->num_rows;
+  PartitionStatusMap::iterator it =
+      state->per_partition_status()->find(partition->partition_name);
 
-  PartitionInsertStats stats;
-  stats[partition->partition_name] = partition->writer->stats();
-  DataSink::MergeInsertStats(stats, state->insert_stats());
+  // Should have been created in GetOutputPartition() when the partition was initialised.
+  DCHECK(it != state->per_partition_status()->end());
+  it->second.num_appended_rows += partition->num_rows;
+  DataSink::MergeInsertStats(partition->writer->stats(), &it->second.stats);
 
   ClosePartitionFile(state, partition);
   return Status::OK;

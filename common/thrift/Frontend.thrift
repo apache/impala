@@ -236,6 +236,10 @@ struct TFinalizeParams {
   // during an INSERT. For a query with id a:b, files are written to <staging_dir>/.a_b/,
   // and that entire directory is removed after the INSERT completes.
   5: optional string staging_dir
+
+  // Identifier for the target table in the query-wide descriptor table (see
+  // TDescriptorTable and TTableDescriptor).
+  6: optional i64 table_id;
 }
 
 // Request for a LOAD DATA statement. LOAD DATA is only supported for HDFS backed tables.

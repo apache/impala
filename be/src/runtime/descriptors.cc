@@ -98,9 +98,10 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_pa
     block_size_(thrift_partition.blockSize),
     location_(thrift_partition.location),
     compression_(thrift_partition.compression),
+    id_(thrift_partition.id),
     exprs_prepared_(false),
     file_format_(thrift_partition.fileFormat),
-    object_pool_(pool)  {
+    object_pool_(pool) {
 
   for (int i = 0; i < thrift_partition.partitionKeyExprs.size(); ++i) {
     Expr* expr;

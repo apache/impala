@@ -54,8 +54,8 @@ class DataStreamRecvr;
 // Counts how many rows an INSERT query has added to a particular partition
 // (partitions are identified by their partition keys: k1=v1/k2=v2
 // etc. Unpartitioned tables have a single 'default' partition which is
-// identified by the empty string.
-typedef std::map<std::string, int64_t> PartitionRowCount;
+// identified by ROOT_PARTITION_KEY.
+typedef std::map<std::string, TInsertPartitionStatus> PartitionStatusMap;
 
 // Stats per partition for insert queries. They key is the same as for PartitionRowCount
 typedef std::map<std::string, TInsertStats> PartitionInsertStats;
@@ -127,9 +127,8 @@ class RuntimeState {
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
-  PartitionRowCount* num_appended_rows() { return &num_appended_rows_; }
-  PartitionInsertStats* insert_stats() { return &insert_stats_; }
   std::vector<DiskIoMgr::RequestContext*>* reader_contexts() { return &reader_contexts_; }
+
   void set_fragment_root_id(PlanNodeId id) {
     DCHECK_EQ(root_node_id_, -1) << "Should not set this twice.";
     root_node_id_ = id;
@@ -157,6 +156,8 @@ class RuntimeState {
     if (slot_bitmap_filters_.find(slot) == slot_bitmap_filters_.end()) return NULL;
     return slot_bitmap_filters_[slot];
   }
+
+  PartitionStatusMap* per_partition_status() { return &per_partition_status_; }
 
   // Returns runtime state profile
   RuntimeProfile* runtime_profile() { return &profile_; }
@@ -316,11 +317,8 @@ class RuntimeState {
   // Mapping a filename to a blank destination causes it to be deleted.
   FileMoveMap hdfs_files_to_move_;
 
-  // Records the total number of appended rows per created Hdfs partition
-  PartitionRowCount num_appended_rows_;
-
-  // Insert stats per partition.
-  PartitionInsertStats insert_stats_;
+  // Records summary statistics for the results of inserts into Hdfs partitions.
+  PartitionStatusMap per_partition_status_;
 
   RuntimeProfile profile_;
 

@@ -61,13 +61,13 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
 
   @pytest.mark.execute_serially
   def test_insert_alter_partition_location(self):
-    """Test that inserts after changing the location of a partition work correctly"""
+    """Test that inserts after changing the location of a partition work correctly,
+    including the creation of a non-existant partition dir"""
     partition_dir = "tmp/test_insert_alter_partition_location"
 
     self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS "
                                       "functional.insert_alter_partition_location")
     self.hdfs_client.delete_file_dir(partition_dir, recursive=True)
-    self.hdfs_client.make_dir(partition_dir)
 
     self.execute_query_expect_success(self.client,
 "CREATE TABLE functional.insert_alter_partition_location (c int) PARTITIONED BY (p int)")
@@ -83,6 +83,7 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
 "SELECT COUNT(*) FROM functional.insert_alter_partition_location")
     assert int(result.get_data()) == 1
 
-    # Should have created exactly one file in the partition dir (not in a subdirectory)
+    # Should have created the partition dir, which should contain exactly one file (not in
+    # a subdirectory)
     ls = self.hdfs_client.list_dir(partition_dir)
     assert len(ls['FileStatuses']['FileStatus']) == 1

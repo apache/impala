@@ -685,36 +685,49 @@ public class HdfsTable extends Table {
 
   /**
    * Gets the AccessLevel that is available for Impala for this table based on the
-   * permissions Impala has on the given path. Throws an IOException of the
-   * location does not exist.
+   * permissions Impala has on the given path. If the path does not exist, recurses up the
+   * path until a existing parent directory is found, and inherit access permissions from
+   * that.
    */
   private TAccessLevel getAvailableAccessLevel(Path location) throws IOException {
-    FSPermissionChecker permisisonChecker = FSPermissionChecker.getInstance();
-    if (permisisonChecker.hasAccess(DFS, location, FsAction.READ_WRITE)) {
-      return TAccessLevel.READ_WRITE;
-    } else if (permisisonChecker.hasAccess(DFS, location, FsAction.READ)) {
-      LOG.debug(String.format("Impala does not have WRITE access to '%s' in table: %s",
-          location, getFullName()));
-      return TAccessLevel.READ_ONLY;
-    } else if (permisisonChecker.hasAccess(DFS, location, FsAction.WRITE)) {
-      LOG.debug(String.format("Impala does not have READ access to '%s' in table: %s",
-          location, getFullName()));
-      return TAccessLevel.WRITE_ONLY;
+    FSPermissionChecker permissionChecker = FSPermissionChecker.getInstance();
+    // TODO: Consider moving the path-walking logic into FSPermissionChecker itself
+    while (location != null) {
+      if (DFS.exists(location)) {
+        if (permissionChecker.hasAccess(DFS, location, FsAction.READ_WRITE)) {
+          return TAccessLevel.READ_WRITE;
+        } else if (permissionChecker.hasAccess(DFS, location, FsAction.READ)) {
+          LOG.debug(
+              String.format("Impala does not have WRITE access to '%s' in table: %s",
+              location, getFullName()));
+          return TAccessLevel.READ_ONLY;
+        } else if (permissionChecker.hasAccess(DFS, location, FsAction.WRITE)) {
+          LOG.debug(String.format("Impala does not have READ access to '%s' in table: %s",
+                  location, getFullName()));
+          return TAccessLevel.WRITE_ONLY;
+        }
+        LOG.debug(String.format("Impala does not have READ or WRITE access to " +
+                "'%s' in table: %s", location, getFullName()));
+        return TAccessLevel.NONE;
+      }
+      location = location.getParent();
     }
-    LOG.debug(String.format("Impala does not have READ or WRITE access to " +
-        "'%s' in table: %s", location, getFullName()));
+    // Should never get here.
+    Preconditions.checkNotNull(location, "Error: no path ancestor exists");
     return TAccessLevel.NONE;
   }
 
   /**
    * Adds a new HdfsPartition to the internal partition list, populating with file format
-   * information and file locations. If a partition contains no files, it's not added.
-   * For unchanged files (indicated by unchanged mtime), reuses the FileDescriptor from
-   * the oldFileDescMap. The one exception is if the partition is marked as cached in
-   * which case the block metadata cannot be reused. Otherwise, creates a new
-   * FileDescriptor for each modified or new file and adds it to newFileDescsMap. Both
-   * old and newFileDescMap are Maps of parent directory (partition location) to list of
-   * files (FileDescriptors) under that directory.
+   * information and file locations. Partitions may be empty, or may even not exist on the
+   * filesystem (a partitions' location may have been changed to a new path that is about
+   * to be created by an INSERT, for example).  For unchanged files (indicated by
+   * unchanged mtime), reuses the FileDescriptor from the oldFileDescMap. The one
+   * exception is if the partition is marked as cached in which case the block metadata
+   * cannot be reused. Otherwise, creates a new FileDescriptor for each modified or new
+   * file and adds it to newFileDescsMap. Both old and newFileDescMap are Maps of parent
+   * directory (partition location) to list of files (FileDescriptors) under that
+   * directory.
    * Returns new partition or null, if none was added.
    *
    * @throws InvalidStorageDescriptorException
@@ -796,16 +809,13 @@ public class HdfsTable extends Table {
         fileDescriptors.add(fd);
       }
 
-      HdfsPartition partition = new HdfsPartition(this, msPartition, partitionKeyExprs,
-          fileFormatDescriptor, fileDescriptors, getAvailableAccessLevel(partDirPath));
-      partitions_.add(partition);
       numHdfsFiles_ += fileDescriptors.size();
-      totalHdfsBytes_ += partition.getSize();
-      return partition;
-    } else {
-      LOG.warn("Path " + partDirPath + " does not exist for partition. Ignoring.");
-      return null;
     }
+    HdfsPartition partition = new HdfsPartition(this, msPartition, partitionKeyExprs,
+        fileFormatDescriptor, fileDescriptors, getAvailableAccessLevel(partDirPath));
+    partitions_.add(partition);
+    totalHdfsBytes_ += partition.getSize();
+    return partition;
   }
 
   private void addDefaultPartition(StorageDescriptor storageDescriptor)

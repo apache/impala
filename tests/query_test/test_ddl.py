@@ -1,5 +1,18 @@
 #!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 # Impala tests for DDL statements
 import logging
 import pytest
@@ -145,32 +158,42 @@ class TestDdlStatements(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_create_alter_bulk_partition(self, vector):
-    # Only run during exhaustive exploration strategy, this doesn't add a lot of extra
-    # coverage to the existing test cases and takes a couple minutes to execute.
-    if self.exploration_strategy() != 'exhaustive': pytest.skip()
+    # Change the scale depending on the exploration strategy, with 50 partitions this
+    # takes a few minutes to run, with 10 partitions it takes ~50s for two configurations.
+    num_parts = 50
+    if self.exploration_strategy() != 'exhaustive': num_parts = 10
 
     self.client.execute("use default")
     self.client.execute("drop table if exists foo_part")
     self.client.execute("create table foo_part(i int) partitioned by(j int, s string)")
 
-    # Add some partitions
-    for i in xrange(10):
+    # Add some partitions (first batch of two)
+    for i in xrange(num_parts / 5):
       start = time.time()
       self.client.execute("alter table foo_part add partition(j=%d, s='%s')" % (i, i))
       print 'ADD PARTITION #%d exec time: %s' % (i, time.time() - start)
 
     # Modify one of the partitions
-    self.client.execute("""alter table foo_part partition(j=5, s='5')
+    self.client.execute("""alter table foo_part partition(j=1, s='1')
         set fileformat parquetfile""")
 
+    # Alter one partition to a non-existent location twice (IMPALA-741)
+    self.hdfs_client.delete_file_dir("tmp/dont_exist1/", recursive=True)
+    self.hdfs_client.delete_file_dir("tmp/dont_exist2/", recursive=True)
+
+    self.execute_query_expect_success(self.client,
+        "alter table foo_part partition(j=1,s='1') set location '/tmp/dont_exist1'")
+    self.execute_query_expect_success(self.client,
+        "alter table foo_part partition(j=1,s='1') set location '/tmp/dont_exist2'")
+
     # Add some more partitions
-    for i in xrange(10, 50):
+    for i in xrange(num_parts / 5, num_parts):
       start = time.time()
       self.client.execute("alter table foo_part add partition(j=%d,s='%s')" % (i,i))
       print 'ADD PARTITION #%d exec time: %s' % (i, time.time() - start)
 
     # Insert data and verify it shows up.
-    self.client.execute("insert into table foo_part partition(j=5, s='5') select 1")
+    self.client.execute("insert into table foo_part partition(j=1, s='1') select 1")
     assert '1' == self.execute_scalar("select count(*) from foo_part")
     self.client.execute("drop table foo_part")
 

@@ -23,6 +23,7 @@
 #include "exec/exec-node.h"
 #include "exprs/expr.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/ImpalaInternalService_constants.h"
 #include "runtime/data-stream-sender.h"
 #include "util/container-util.h"
 
@@ -87,44 +88,37 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
   return Status::OK;
 }
 
-void DataSink::MergeInsertStats(const PartitionInsertStats& src,
-    PartitionInsertStats* dst) {
-  for (PartitionInsertStats::const_iterator src_it = src.begin();
-      src_it != src.end(); ++src_it) {
-    PartitionInsertStats::iterator dst_it = dst->find(src_it->first);
-    if (dst_it == dst->end()) {
-      (*dst)[src_it->first] = src_it->second;
+void DataSink::MergeInsertStats(const TInsertStats& src_stats,
+    TInsertStats* dst_stats) {
+  dst_stats->bytes_written += src_stats.bytes_written;
+  if (src_stats.__isset.parquet_stats) {
+    if (dst_stats->__isset.parquet_stats) {
+      MergeMapValues<string, int64_t>(src_stats.parquet_stats.per_column_size,
+          &dst_stats->parquet_stats.per_column_size);
     } else {
-      const TInsertStats& src_stats = src_it->second;
-      TInsertStats& dst_stats = dst_it->second;
-      dst_stats.bytes_written += src_stats.bytes_written;
-      if (src_stats.__isset.parquet_stats) {
-        if (dst_stats.__isset.parquet_stats) {
-          MergeMapValues<string, int64_t>(src_stats.parquet_stats.per_column_size,
-              &dst_stats.parquet_stats.per_column_size);
-        } else {
-          dst_stats.__set_parquet_stats(src_stats.parquet_stats);
-        }
-      }
+      dst_stats->__set_parquet_stats(src_stats.parquet_stats);
     }
   }
 }
 
-string DataSink::OutputInsertStats(const PartitionInsertStats& stats,
+string DataSink::OutputInsertStats(const PartitionStatusMap& stats,
     const string& prefix) {
   const char* indent = "  ";
   stringstream ss;
   ss << prefix;
-  for (PartitionInsertStats::const_iterator it = stats.begin();
-      it != stats.end(); ++it) {
-    if (it != stats.begin()) ss << endl;
+  bool first = true;
+  BOOST_FOREACH(const PartitionStatusMap::value_type& val, stats) {
+    if (!first) ss << endl;
+    first = false;
     ss << "Partition: ";
-    if (it->first.empty()) {
+
+    const string& partition_key = val.first;
+    if (partition_key == g_ImpalaInternalService_constants.ROOT_PARTITION_KEY) {
       ss << "Default" << endl;
     } else {
-      ss << it->first << endl;
+      ss << partition_key << endl;
     }
-    const TInsertStats& stats = it->second;
+    const TInsertStats& stats = val.second.stats;
     ss << indent << "BytesWritten: "
        << PrettyPrinter::Print(stats.bytes_written, TCounterType::BYTES);
     if (stats.__isset.parquet_stats) {

@@ -205,6 +205,10 @@ struct THdfsPartition {
   // True if this partition has been marked as cached (does not necessarily mean the
   // underlying data is cached).
   14: optional bool is_marked_cached
+
+  // Unique (in this table) id of this partition. If -1, the partition does not currently
+  // exist.
+  15: optional i64 id
 }
 
 struct THdfsTable {

@@ -152,7 +152,7 @@ class Coordinator {
   const TUniqueId& query_id() const { return query_id_; }
 
   // This is safe to call only after Wait()
-  const PartitionRowCount& partition_row_counts() { return partition_row_counts_; }
+  const PartitionStatusMap& per_partition_status() { return per_partition_status_; }
 
   // Gathers all updates to the catalog required once this query has completed execution.
   // Returns true if a catalog update is required, false otherwise.
@@ -273,13 +273,10 @@ class Coordinator {
   // taken from the coordinator fragment: only one of the two can legitimately produce
   // updates.
 
-  // The set of partitions that have been written to or updated, along with the number of
-  // rows written (may be 0). For unpartitioned tables, the empty string denotes the
-  // entire table.
-  PartitionRowCount partition_row_counts_;
-
-  // Per partition insert stats.
-  PartitionInsertStats partition_insert_stats_;
+  // The set of partitions that have been written to or updated by all backends, along
+  // with statistics such as the number of rows written (may be 0). For unpartitioned
+  // tables, the empty string denotes the entire table.
+  PartitionStatusMap per_partition_status_;
 
   // The set of files to move after an INSERT query has run, in (src, dest) form. An empty
   // string for the destination means that a file is to be deleted.

@@ -746,6 +746,7 @@ public class Frontend {
         TFinalizeParams finalizeParams = new TFinalizeParams();
         finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
         finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
+        finalizeParams.setTable_id(insertStmt.getTargetTable().getId().asInt());
         String db = insertStmt.getTargetTableName().getDb();
         finalizeParams.setTable_db(db == null ? queryCtxt.session.database : db);
         HdfsTable hdfsTable = (HdfsTable) insertStmt.getTargetTable();

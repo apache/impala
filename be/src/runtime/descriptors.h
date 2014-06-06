@@ -173,6 +173,7 @@ class HdfsPartitionDescriptor {
   int block_size() const { return block_size_; }
   const std::string& location() const { return location_; }
   THdfsCompression::type compression() const { return compression_; }
+  int64_t id() const { return id_; }
 
   // Calls Prepare() on all partition key exprs. Calls after the first are no-ops.
   // Note that because these exprs are always literals, they do not need to be opened or
@@ -189,6 +190,7 @@ class HdfsPartitionDescriptor {
   int block_size_;
   std::string location_;
   THdfsCompression::type compression_;
+  int64_t id_;
 
   // True if PrepareExprs has been called, to prevent repeating expensive codegen
   bool exprs_prepared_;

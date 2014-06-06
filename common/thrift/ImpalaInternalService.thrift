@@ -248,22 +248,33 @@ struct TInsertStats {
   2: optional TParquetInsertStats parquet_stats
 }
 
+const string ROOT_PARTITION_KEY = ''
+
+// Per-partition statistics and metadata resulting from INSERT queries.
+struct TInsertPartitionStatus {
+  // The id of the partition written to (may be -1 if the partition is created by this
+  // query). See THdfsTable.partitions.
+  1: optional i64 id
+
+  // The number of rows appended to this partition
+  2: optional i64 num_appended_rows
+
+  // Detailed statistics gathered by table writers for this partition
+  3: optional TInsertStats stats
+}
+
 // The results of an INSERT query, sent to the coordinator as part of
 // TReportExecStatusParams
 struct TInsertExecStatus {
-  // Number of rows appended by an INSERT, per-partition.
-  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the
-  // root in an unpartitioned table being the empty string.
-  // The target table name is recorded in the corresponding TQueryExecRequest
-  1: optional map<string, i64> num_appended_rows
-
   // A map from temporary absolute file path to final absolute destination. The
   // coordinator performs these updates after the query completes.
-  2: required map<string, string> files_to_move;
+  1: required map<string, string> files_to_move;
 
-  // Stats from running the insert, per-partition. The keys are coded the
-  // same way as with num_appended_rows.
-  3: optional map<string, TInsertStats> insert_stats
+  // Per-partition details, used in finalization and reporting.
+  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the
+  // root's key in an unpartitioned table being ROOT_PARTITION_KEY.
+  // The target table name is recorded in the corresponding TQueryExecRequest
+  2: optional map<string, TInsertPartitionStatus> per_partition_status
 }
 
 struct TReportExecStatusParams {

@@ -776,9 +776,8 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   // operation.
   if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
     DCHECK(coord_.get());
-    BOOST_FOREACH(const PartitionRowCount::value_type& p,
-        coord_->partition_row_counts()) {
-      total_num_rows_inserted += p.second;
+    BOOST_FOREACH(const PartitionStatusMap::value_type& p, coord_->per_partition_status()) {
+      total_num_rows_inserted += p.second.num_appended_rows;
     }
   }
   const string& summary_msg = Substitute("Inserted $0 row(s)", total_num_rows_inserted);

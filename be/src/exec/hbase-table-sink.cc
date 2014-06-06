@@ -18,10 +18,14 @@
 
 #include "common/logging.h"
 #include "exprs/expr.h"
+#include "gen-cpp/ImpalaInternalService_constants.h"
 
 using namespace std;
 
 namespace impala {
+
+const static string& ROOT_PARTITION_KEY =
+    g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
 
 HBaseTableSink::HBaseTableSink(const RowDescriptor& row_desc,
                                const vector<TExpr>& select_list_texprs,
@@ -60,7 +64,12 @@ Status HBaseTableSink::Prepare(RuntimeState* state) {
   // to zookeeper.
   RETURN_IF_ERROR(hbase_table_writer_->Init(state));
 
-  (*state->num_appended_rows())[""] = 0L;
+  // Add a 'root partition' status in which to collect insert statistics
+  TInsertPartitionStatus root_status;
+  root_status.__set_num_appended_rows(0L);
+  root_status.__set_stats(TInsertStats());
+  root_status.__set_id(-1L);
+  state->per_partition_status()->insert(make_pair(ROOT_PARTITION_KEY, root_status));
 
   return Status::OK;
 }
@@ -73,7 +82,8 @@ Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Since everything is set up just forward everything to the writer.
   RETURN_IF_ERROR(hbase_table_writer_->AppendRowBatch(batch));
-  (*state->num_appended_rows())[""] += batch->num_rows();
+  (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows +=
+      batch->num_rows();
   return Status::OK;
 }
 

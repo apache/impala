@@ -592,7 +592,12 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
       // need to revisit this, since that might lead us to insert a row without a
       // coordinator, depending on how we choose to drive the table sink.
       if (exec_state->coord() != NULL) {
-        insert_result->__set_rows_appended(exec_state->coord()->partition_row_counts());
+        BOOST_FOREACH(const PartitionStatusMap::value_type& v,
+            exec_state->coord()->per_partition_status()) {
+          const pair<string, TInsertPartitionStatus> partition_status = v;
+          insert_result->rows_appended[partition_status.first] =
+              partition_status.second.num_appended_rows;
+        }
       }
     }
   }

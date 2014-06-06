@@ -67,13 +67,13 @@ class DataSink {
   // Returns the runtime profile for the sink.
   virtual RuntimeProfile* profile() = 0;
 
-  // Merges two sets of partition stats. dst will be updated to contain all partitions
-  // in src. Partitions that are in both will have the stats added together.
-  static void MergeInsertStats(const PartitionInsertStats& src,
-      PartitionInsertStats* dst);
+  // Merges one update to the insert stats for a partition. dst_stats will have the
+  // combined stats of src_stats and dst_stats after this method returns.
+  static void MergeInsertStats(const TInsertStats& src_stats,
+      TInsertStats* dst_stats);
 
-  // Outputs the insert stats to a string
-  static std::string OutputInsertStats(const PartitionInsertStats& stats,
+  // Outputs the insert stats contained in the map of insert partition updates to a string
+  static std::string OutputInsertStats(const PartitionStatusMap& stats,
       const std::string& prefix = "");
 
  protected:
