@@ -657,24 +657,24 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     final DataSource DATA_SOURCE = new DataSource(DATA_SOURCE_NAME, new Path("/foo.jar"),
         "foo.Bar", "V1");
     catalog_.addDataSource(DATA_SOURCE);
-    AnalyzesOk("CREATE DATA SOURCE IF NOT EXISTS " + DATA_SOURCE_NAME +
+    AnalyzesOk("CREATE DATASOURCE IF NOT EXISTS " + DATA_SOURCE_NAME +
         " LOCATION '/foo.jar' CLASS 'foo.Bar' API_VERSION 'V1'");
-    AnalyzesOk("CREATE DATA SOURCE IF NOT EXISTS " + DATA_SOURCE_NAME.toLowerCase() +
+    AnalyzesOk("CREATE DATASOURCE IF NOT EXISTS " + DATA_SOURCE_NAME.toLowerCase() +
         " LOCATION '/foo.jar' CLASS 'foo.Bar' API_VERSION 'V1'");
-    AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/' CLASS '' API_VERSION 'v1'");
-    AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/foo.jar' CLASS 'com.bar.Foo' " +
+    AnalyzesOk("CREATE DATASOURCE foo LOCATION '/' CLASS '' API_VERSION 'v1'");
+    AnalyzesOk("CREATE DATASOURCE foo LOCATION '/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
-    AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/FOO.jar' CLASS 'COM.BAR.FOO' " +
+    AnalyzesOk("CREATE DATASOURCE foo LOCATION '/FOO.jar' CLASS 'COM.BAR.FOO' " +
         "API_VERSION 'v1'");
-    AnalyzesOk("CREATE DATA SOURCE foo LOCATION \"/foo.jar\" CLASS \"com.bar.Foo\" " +
+    AnalyzesOk("CREATE DATASOURCE foo LOCATION \"/foo.jar\" CLASS \"com.bar.Foo\" " +
         "API_VERSION \"V1\"");
-    AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/x/foo@hi_^!#.jar' " +
+    AnalyzesOk("CREATE DATASOURCE foo LOCATION '/x/foo@hi_^!#.jar' " +
         "CLASS 'com.bar.Foo' API_VERSION 'V1'");
 
-    AnalysisError("CREATE DATA SOURCE " + DATA_SOURCE_NAME + " LOCATION '/foo.jar' " +
+    AnalysisError("CREATE DATASOURCE " + DATA_SOURCE_NAME + " LOCATION '/foo.jar' " +
         "CLASS 'foo.Bar' API_VERSION 'V1'",
         "Data source already exists: " + DATA_SOURCE_NAME.toLowerCase());
-    AnalysisError("CREATE DATA SOURCE foo LOCATION '/foo.jar' " +
+    AnalysisError("CREATE DATASOURCE foo LOCATION '/foo.jar' " +
         "CLASS 'foo.Bar' API_VERSION 'V2'", "Invalid API version: 'V2'");
   }
 
@@ -848,20 +848,20 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'  '", "URI path cannot be empty.");
 
-    // Create table PRODUCED BY DATA SOURCE
+    // Create table PRODUCED BY DATASOURCE
     final String DATA_SOURCE_NAME = "TestDataSource1";
     catalog_.addDataSource(new DataSource(DATA_SOURCE_NAME, new Path("/foo.jar"),
         "foo.Bar", "V1"));
-    AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
+    AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATASOURCE " +
         DATA_SOURCE_NAME);
-    AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
+    AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATASOURCE " +
         DATA_SOURCE_NAME.toLowerCase());
-    AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
+    AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATASOURCE " +
         DATA_SOURCE_NAME + "(\"\")");
     AnalyzesOk("CREATE TABLE DataSrcTable1 (a tinyint, b smallint, c int, d bigint, " +
-        "e float, f double, g boolean, h string) PRODUCED BY DATA SOURCE " +
+        "e float, f double, g boolean, h string) PRODUCED BY DATASOURCE " +
         DATA_SOURCE_NAME);
-    AnalysisError("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
+    AnalysisError("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATASOURCE " +
         "not_a_data_src(\"\")", "Data source does not exist");
     for (ColumnType columnType: ColumnType.getSupportedTypes()) {
       PrimitiveType type = columnType.getPrimitiveType();
@@ -871,7 +871,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         typeSpec += "(10)";
       }
       AnalysisError("CREATE TABLE DataSrcTable1 (x " + typeSpec + ") PRODUCED " +
-          "BY DATA SOURCE " + DATA_SOURCE_NAME,
+          "BY DATASOURCE " + DATA_SOURCE_NAME,
           "Tables produced by an external data source do not support the column type: " +
           type.name());
     }
@@ -1456,8 +1456,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("show databases");
     AnalyzesOk("show databases like '*pattern'");
 
-    AnalyzesOk("show data sources");
-    AnalyzesOk("show data sources like '*pattern'");
+    AnalyzesOk("show datasources");
+    AnalyzesOk("show datasources like '*pattern'");
 
     AnalyzesOk("show tables");
     AnalyzesOk("show tables like '*pattern'");

@@ -16,8 +16,8 @@
 
 USE functional;
 
-DROP DATA SOURCE IF EXISTS AllTypesDataSource;
-CREATE DATA SOURCE AllTypesDataSource
+DROP DATASOURCE IF EXISTS AllTypesDataSource;
+CREATE DATASOURCE AllTypesDataSource
 LOCATION '/test-warehouse/data-sources/test-data-source.jar'
 CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource'
 API_VERSION 'V1';
@@ -34,8 +34,9 @@ CREATE TABLE alltypes_datasource (
   double_col DOUBLE,
   timestamp_col TIMESTAMP,
   string_col STRING)
-PRODUCED BY DATA SOURCE AllTypesDataSource("TestInitString");
+PRODUCED BY DATASOURCE AllTypesDataSource("TestInitString");
 
+-- TODO: Remove table and move decimal cols into alltypes_datasource
 DROP TABLE IF EXISTS decimal_datasource;
 CREATE TABLE decimal_datasource (
   d1 DECIMAL(9,0),
@@ -43,4 +44,4 @@ CREATE TABLE decimal_datasource (
   d3 DECIMAL(20,10),
   d4 DECIMAL(38,37),
   d5 DECIMAL(10,5))
-PRODUCED BY DATA SOURCE AllTypesDataSource;
+PRODUCED BY DATASOURCE AllTypesDataSource;

@@ -22,7 +22,7 @@ import com.cloudera.impala.thrift.TDropDataSourceParams;
 import com.google.common.base.Preconditions;
 
 /**
- * Represents a DROP DATA SOURCE statement.
+ * Represents a DROP DATASOURCE statement.
  */
 public class DropDataSrcStmt extends StatementBase {
 
@@ -48,7 +48,7 @@ public class DropDataSrcStmt extends StatementBase {
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder();
-    sb.append("DROP DATA SOURCE ");
+    sb.append("DROP DATASOURCE ");
     if (ifExists_) sb.append("IF EXISTS ");
     sb.append(dataSrcName_);
     return sb.toString();

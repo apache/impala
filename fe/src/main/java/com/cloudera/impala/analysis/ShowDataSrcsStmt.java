@@ -19,11 +19,11 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TShowDataSrcsParams;
 
 /**
- * Representation of a SHOW DATA SOURCES [pattern] statement.
+ * Representation of a SHOW DATASOURCES [pattern] statement.
  * Acceptable syntax:
  *
- * SHOW DATA SOURCES
- * SHOW DATA SOURCES LIKE 'pattern'
+ * SHOW DATASOURCES
+ * SHOW DATASOURCES LIKE 'pattern'
  * TODO: Refactor Show*Stmt to remove code duplication
  */
 public class ShowDataSrcsStmt extends StatementBase {
@@ -51,9 +51,9 @@ public class ShowDataSrcsStmt extends StatementBase {
   @Override
   public String toSql() {
     if (pattern_ == null) {
-      return "SHOW DATA SOURCES";
+      return "SHOW DATASOURCES";
     } else {
-      return "SHOW DATA SOURCES LIKE '" + pattern_ + "'";
+      return "SHOW DATASOURCES LIKE '" + pattern_ + "'";
     }
   }
 

@@ -1,7 +1,7 @@
 ====
 ---- QUERY
-# Test show data sources
-show data sources
+# Test show datasources
+show datasources
 ---- RESULTS: VERIFY_IS_SUBSET
 'show_test_ds1','/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
 'show_test_ds2','/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
@@ -11,7 +11,7 @@ NAME, LOCATION, CLASS NAME, API VERSION
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show data sources like 'show_test_ds*'
+show datasources like 'show_test_ds*'
 ---- RESULTS
 'show_test_ds1','/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
 'show_test_ds2','/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
@@ -21,7 +21,7 @@ NAME, LOCATION, CLASS NAME, API VERSION
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show data sources like 'show_test_ds1'
+show datasources like 'show_test_ds1'
 ---- RESULTS
 'show_test_ds1','/test-warehouse/data-sources/test-data-source.jar','com.cloudera.impala.extdatasource.AllTypesDataSource','V1'
 ---- LABELS
@@ -30,7 +30,7 @@ NAME, LOCATION, CLASS NAME, API VERSION
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-show data sources like 'not_a_data_src'
+show datasources like 'not_a_data_src'
 ---- RESULTS
 ---- LABELS
 NAME, LOCATION, CLASS NAME, API VERSION

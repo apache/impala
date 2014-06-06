@@ -26,7 +26,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 /**
- * Represents a CREATE DATA SOURCE statement.
+ * Represents a CREATE DATASOURCE statement.
  */
 public class CreateDataSrcStmt extends StatementBase {
   private final String dataSrcName_;
@@ -74,7 +74,7 @@ public class CreateDataSrcStmt extends StatementBase {
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder();
-    sb.append("CREATE DATA SOURCE ");
+    sb.append("CREATE DATASOURCE ");
     if (ifNotExists_) sb.append("IF NOT EXISTS ");
     sb.append(dataSrcName_);
     sb.append(" LOCATION '");
