@@ -21,6 +21,7 @@
 #include "common/init.h"
 #include "common/status.h"
 #include "rpc/authentication.h"
+#include "rpc/rpc-trace.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
 #include "runtime/mem-tracker.h"
@@ -65,6 +66,8 @@ int main(int argc, char** argv) {
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
   EXIT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true));
   StartThreadInstrumentation(metrics.get(), webserver.get());
+  InitRpcEventTracing(webserver.get());
+
   metrics->CreateAndRegisterPrimitiveMetric<string>(
       "catalog.version", GetVersionString(true));
 
@@ -73,6 +76,9 @@ int main(int argc, char** argv) {
   catalog_server.RegisterWebpages(webserver.get());
   shared_ptr<TProcessor> processor(
       new CatalogServiceProcessor(catalog_server.thrift_iface()));
+  shared_ptr<TProcessorEventHandler> event_handler(
+      new RpcEventHandler("catalog-server", metrics.get()));
+  processor->setEventHandler(event_handler);
 
   ThriftServer* server = new ThriftServer("CatalogService", processor,
       FLAGS_catalog_service_port, NULL, metrics.get(), 5);

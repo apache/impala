@@ -42,6 +42,7 @@
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-thread.h"
+#include "rpc/rpc-trace.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/exec-env.h"
@@ -1829,9 +1830,9 @@ void ImpalaServer::ExpireQueries() {
   }
 }
 
-Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
-    int be_port, ThriftServer** beeswax_server, ThriftServer** hs2_server,
-    ThriftServer** be_server, ImpalaServer** impala_server) {
+Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int be_port,
+    ThriftServer** beeswax_server, ThriftServer** hs2_server, ThriftServer** be_server,
+    ImpalaServer** impala_server) {
   DCHECK((beeswax_port == 0) == (beeswax_server == NULL));
   DCHECK((hs2_port == 0) == (hs2_server == NULL));
   DCHECK((be_port == 0) == (be_server == NULL));
@@ -1842,6 +1843,9 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     // Beeswax FE must be a TThreadPoolServer because ODBC and Hue only support
     // TThreadPoolServer.
     shared_ptr<TProcessor> beeswax_processor(new ImpalaServiceProcessor(handler));
+    shared_ptr<TProcessorEventHandler> event_handler(
+        new RpcEventHandler("beeswax", exec_env->metrics()));
+    beeswax_processor->setEventHandler(event_handler);
     *beeswax_server = new ThriftServer(BEESWAX_SERVER_NAME, beeswax_processor,
         beeswax_port, AuthManager::GetInstance()->GetClientFacingAuthProvider(),
         exec_env->metrics(), FLAGS_fe_service_threads, ThriftServer::ThreadPool);
@@ -1860,6 +1864,10 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     // HiveServer2 JDBC driver does not support non-blocking server.
     shared_ptr<TProcessor> hs2_fe_processor(
         new ImpalaHiveServer2ServiceProcessor(handler));
+    shared_ptr<TProcessorEventHandler> event_handler(
+        new RpcEventHandler("hs2", exec_env->metrics()));
+    hs2_fe_processor->setEventHandler(event_handler);
+
     *hs2_server = new ThriftServer(HS2_SERVER_NAME, hs2_fe_processor, hs2_port,
         AuthManager::GetInstance()->GetClientFacingAuthProvider(), exec_env->metrics(),
         FLAGS_fe_service_threads, ThriftServer::ThreadPool);
@@ -1876,6 +1884,10 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
 
   if (be_port != 0 && be_server != NULL) {
     shared_ptr<TProcessor> be_processor(new ImpalaInternalServiceProcessor(handler));
+    shared_ptr<TProcessorEventHandler> event_handler(
+        new RpcEventHandler("backend", exec_env->metrics()));
+    be_processor->setEventHandler(event_handler);
+
     *be_server = new ThriftServer("backend", be_processor, be_port, NULL,
         exec_env->metrics(), FLAGS_be_service_threads);
 

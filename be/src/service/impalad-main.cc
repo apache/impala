@@ -32,6 +32,7 @@
 #include "util/network-util.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
+#include "rpc/rpc-trace.h"
 #include "service/impala-server.h"
 #include "service/fe-support.h"
 #include "gen-cpp/ImpalaService.h"
@@ -62,6 +63,7 @@ int main(int argc, char** argv) {
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;
   StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver());
+  InitRpcEventTracing(exec_env.webserver());
 
   ThriftServer* beeswax_server = NULL;
   ThriftServer* hs2_server = NULL;

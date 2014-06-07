@@ -22,6 +22,7 @@
 #include "common/init.h"
 #include "common/logging.h"
 #include "common/status.h"
+#include "rpc/rpc-trace.h"
 #include "runtime/mem-tracker.h"
 #include "statestore/statestore.h"
 #include "util/debug-util.h"
@@ -60,6 +61,7 @@ int main(int argc, char** argv) {
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
   EXIT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false));
   StartThreadInstrumentation(metrics.get(), webserver.get());
+  InitRpcEventTracing(webserver.get());
   // TODO: Add a 'common metrics' method to add standard metrics to
   // both statestored and impalad
   metrics->CreateAndRegisterPrimitiveMetric<string>(
@@ -69,6 +71,9 @@ int main(int argc, char** argv) {
   statestore.RegisterWebpages(webserver.get());
   shared_ptr<TProcessor> processor(
       new StatestoreServiceProcessor(statestore.thrift_iface()));
+  shared_ptr<TProcessorEventHandler> event_handler(
+      new RpcEventHandler("statestore", metrics.get()));
+  processor->setEventHandler(event_handler);
 
   ThriftServer* server = new ThriftServer("StatestoreService", processor,
       FLAGS_state_store_port, NULL, metrics.get(), 5);

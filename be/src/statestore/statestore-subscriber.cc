@@ -27,6 +27,7 @@
 #include "common/status.h"
 #include "statestore/failure-detector.h"
 #include "gen-cpp/StatestoreService_types.h"
+#include "rpc/rpc-trace.h"
 #include "rpc/thrift-util.h"
 #include "util/time.h"
 #include "util/debug-util.h"
@@ -178,6 +179,10 @@ Status StatestoreSubscriber::Start() {
 
     // Backend must be started before registration
     shared_ptr<TProcessor> processor(new StatestoreSubscriberProcessor(thrift_iface_));
+    shared_ptr<TProcessorEventHandler> event_handler(
+        new RpcEventHandler("statestore-subscriber", metrics_));
+    processor->setEventHandler(event_handler);
+
     heartbeat_server_.reset(new ThriftServer("StatestoreSubscriber", processor,
         heartbeat_address_.port, NULL, NULL, 5));
     RETURN_IF_ERROR(heartbeat_server_->Start());
