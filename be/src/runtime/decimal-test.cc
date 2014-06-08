@@ -64,7 +64,7 @@ void StringToAllDecimals(const string& s, const ColumnType& t, int32_t val,
 
 TEST(IntToDecimal, Basic) {
   Decimal16Value d16;
-  bool overflow;
+  bool overflow = false;
 
   d16 = Decimal16Value::FromInt(ColumnType::CreateDecimalType(27, 18), -25559, &overflow);
   EXPECT_FALSE(overflow);
@@ -430,7 +430,7 @@ TEST(DecimalTest, Overflow) {
 // Add/Subtract/Mod cannot overflow the scale. With division, we always handle the case
 // where the result scale needs to be adjusted.
 TEST(DecimalTest, MultiplyScaleOverflow) {
-  bool overflow;
+  bool overflow = false;
   Decimal16Value x(1);
   Decimal16Value y(3);
   ColumnType max_scale = ColumnType::CreateDecimalType(38, 38);
@@ -509,7 +509,7 @@ TEST(DecimalArithmetic, Basic) {
   double d2_double = d2.ToDouble(t2);
   double d3_double = d3.ToDouble(t2);
 
-  bool overflow;
+  bool overflow = false;
   // TODO: what's the best way to author a bunch of tests like this?
   VerifyFuzzyEquals(d1.Add<int64_t>(t1, d2, t2, t1_plus_2.scale, &overflow),
       t1_plus_2, d1_double + d2_double, overflow);
