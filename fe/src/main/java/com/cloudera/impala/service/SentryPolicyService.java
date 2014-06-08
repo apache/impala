@@ -16,7 +16,6 @@ package com.cloudera.impala.service;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.sentry.SentryUserException;
@@ -37,7 +36,6 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  *  Wrapper around the SentryService APIs that are used by Impala and Impala tests.
@@ -53,7 +51,6 @@ public class SentryPolicyService {
 
   private final SentryConfig config_;
   private final String serverName_;
-  private final Set<String> userGroupNames = Sets.newHashSet();
   private final User user_ = new User(System.getProperty("user.name"));
 
   /**
@@ -95,9 +92,6 @@ public class SentryPolicyService {
   public SentryPolicyService(SentryConfig config, String serverName) {
     config_ = config;
     serverName_ = serverName;
-    // SENTRY-191: Sentry Service should not require passing group information since it
-    // is never actually used. For now, assume group name = user name.
-    userGroupNames.add(user_.getName());
   }
 
   /**
@@ -254,7 +248,7 @@ public class SentryPolicyService {
   public List<TSentryRole> listAllRoles() throws InternalException {
     SentryServiceClient client = getClient();
     try {
-      return Lists.newArrayList(client.get().listRoles(user_.getName(), userGroupNames));
+      return Lists.newArrayList(client.get().listRoles(user_.getName()));
     } catch (SentryUserException e) {
       throw new InternalException("Error listing roles: ", e);
     } finally {
