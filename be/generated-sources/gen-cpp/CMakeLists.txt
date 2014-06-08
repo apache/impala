@@ -50,6 +50,8 @@ set(SRC_FILES
   DataSinks_types.cpp
   Descriptors_constants.cpp
   Descriptors_types.cpp
+  ExecStats_constants.cpp
+  ExecStats_types.cpp
   Exprs_constants.cpp
   Exprs_types.cpp
   ExternalDataSource_constants.cpp

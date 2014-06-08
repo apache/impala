@@ -461,6 +461,18 @@ void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& 
   profile_output = ss.str();
 }
 
+void ImpalaServer::GetExecSummary(impala::TExecSummary& result,
+      const beeswax::QueryHandle& handle) {
+  ScopedSessionState session_handle(this);
+  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+      SQLSTATE_GENERAL_ERROR);
+  TUniqueId query_id;
+  QueryHandleToTUniqueId(handle, &query_id);
+  VLOG_RPC << "GetExecSummary(): query_id=" << PrintId(query_id);
+  Status status = GetExecSummary(query_id, &result);
+  if (!status.ok()) RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+}
+
 void ImpalaServer::PingImpalaService(TPingImpalaServiceResp& return_val) {
   ScopedSessionState session_handle(this);
   RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),

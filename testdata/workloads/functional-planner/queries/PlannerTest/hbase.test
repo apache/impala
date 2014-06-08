@@ -8,7 +8,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
 ====
@@ -25,7 +25,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: id < 5
@@ -43,7 +43,7 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=60202 5:5\0
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 5
@@ -62,7 +62,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 5\0:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 5\0
@@ -80,7 +80,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 5:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 5
@@ -98,7 +98,7 @@ NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:5
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    stop key: 5
@@ -116,7 +116,7 @@ NODE 0:
   HBASE KEYRANGE port=60201 <unbounded>:3
   HBASE KEYRANGE port=60202 3:5\0
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    stop key: 5\0
@@ -134,7 +134,7 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4\0
@@ -153,7 +153,7 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=60202 4:5
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4
@@ -172,7 +172,7 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=60202 4\0:5\0
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4\0
@@ -191,7 +191,7 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4
@@ -216,13 +216,13 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-04:EXCHANGE [PARTITION=UNPARTITIONED]
+04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*))
 |  group by: int_col
 |
-02:EXCHANGE [PARTITION=HASH(int_col)]
+02:EXCHANGE [HASH(int_col)]
 |
 01:AGGREGATE
 |  output: count(*)
@@ -243,7 +243,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col EQUAL '4'
@@ -261,7 +261,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col NOT_EQUAL '4'
@@ -278,7 +278,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col LESS '4'
@@ -295,7 +295,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col GREATER '4'
@@ -312,7 +312,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col LESS_OR_EQUAL '4'
@@ -329,7 +329,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col GREATER_OR_EQUAL '4'
@@ -351,7 +351,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters:
@@ -372,7 +372,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col EQUAL '4'
@@ -391,7 +391,7 @@ where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4
@@ -410,7 +410,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: CAST(string_col AS INT) >= 4
@@ -426,7 +426,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: string_col >= date_string_col
@@ -444,7 +444,7 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=60202 5:5\0
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 5
@@ -465,7 +465,7 @@ where string_col = '4' and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=60202 4:5\0
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4
@@ -478,7 +478,7 @@ select * from functional_hbase.stringids where id = null
 ---- PLAN
 empty scan node
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 empty scan node
 ====
@@ -487,7 +487,7 @@ select * from functional_hbase.stringids where id > 'b' and id < 'a'
 ---- PLAN
 empty scan node
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 empty scan node
 ====
@@ -504,7 +504,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
    predicates: CAST(id AS INT) < 5
@@ -525,7 +525,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NULL
@@ -543,7 +543,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NULL
@@ -560,7 +560,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NOT NULL
@@ -577,7 +577,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NULL, day = 1
@@ -594,7 +594,7 @@ NODE 0:
   HBASE KEYRANGE port=60202 3:7
   HBASE KEYRANGE port=60203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NOT NULL, bool_col = TRUE
@@ -617,7 +617,7 @@ NODE 0:
 03:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*))
 |
-02:EXCHANGE [PARTITION=UNPARTITIONED]
+02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)

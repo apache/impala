@@ -438,6 +438,22 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
   return Status::OK;
 }
 
+Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* result) {
+  // TODO: this is only populated when the query is done currently so only look
+  // in the log. We'll have to make it thread safe for in flight queries.
+  {
+    lock_guard<mutex> l(query_log_lock_);
+    QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
+    if (query_record == query_log_index_.end()) {
+      stringstream ss;
+      ss << "Query id " << PrintId(query_id) << " not found.";
+      return Status(ss.str());
+    }
+    *result = query_record->second->exec_summary;
+  }
+  return Status::OK;
+}
+
 void ImpalaServer::LogFileFlushThread() {
   while (true) {
     sleep(5);
@@ -481,6 +497,9 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
 
   if (FLAGS_query_log_size == 0) return;
   QueryStateRecord record(query, true, encoded_profile_str);
+  if (query.coord() != NULL) {
+    record.exec_summary = query.coord()->exec_summary();
+  }
   {
     lock_guard<mutex> l(query_log_lock_);
     // Add record to the beginning of the log, and to the lookup index.
@@ -651,9 +670,10 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id, const Status* caus
     exec_state->session()->inflight_queries.erase(query_id);
   }
 
-  ArchiveQuery(*exec_state);
-
   if (exec_state->coord() != NULL) {
+    const string exec_summary = exec_state->coord()->PrintExecSummary();
+    exec_state->summary_profile()->AddInfoString("ExecSummary", exec_summary);
+
     const unordered_set<TNetworkAddress>& unique_hosts =
         exec_state->schedule()->unique_hosts();
     if (!unique_hosts.empty()) {
@@ -671,6 +691,8 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id, const Status* caus
     }
   }
 
+
+  ArchiveQuery(*exec_state);
   return true;
 }
 

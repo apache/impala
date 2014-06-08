@@ -38,7 +38,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 06:AGGREGATE [MERGE FINALIZE]
 |  group by: a.int_col, a.string_col
 |
-05:EXCHANGE [PARTITION=HASH(a.int_col,a.string_col)]
+05:EXCHANGE [HASH(a.int_col,a.string_col)]
 |
 03:AGGREGATE
 |  group by: a.int_col, a.string_col

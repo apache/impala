@@ -172,6 +172,7 @@ class ImpalaServer::QueryExecState {
   }
 
   RuntimeProfile::EventSequence* query_events() { return query_events_; }
+  RuntimeProfile* summary_profile() { return &summary_profile_; }
 
  private:
   TUniqueId query_id_;

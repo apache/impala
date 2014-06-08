@@ -275,13 +275,18 @@ public class HashJoinNode extends PlanNode {
   }
 
   @Override
+  protected String getDisplayLabelDetail() {
+    StringBuilder output = new StringBuilder(joinOp_.toString());
+    if (distrMode_ != DistributionMode.NONE) output.append(", " + distrMode_.toString());
+    return output.toString();
+  }
+
+  @Override
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(String.format("%s%s:%s [%s", prefix, id_.toString(),
-        displayName_, joinOp_.toString()));
-    if (distrMode_ != DistributionMode.NONE) output.append(", " + distrMode_.toString());
-    output.append("]\n");
+    output.append(String.format("%s%s [%s]\n", prefix, getDisplayLabel(),
+        getDisplayLabelDetail()));
 
     if (detailLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
       output.append(detailPrefix + "hash predicates: ");

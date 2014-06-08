@@ -15,7 +15,9 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
+include "ExecStats.thrift"
 include "Status.thrift"
+include "Types.thrift"
 include "beeswax.thrift"
 include "cli_service.thrift"
 
@@ -196,6 +198,10 @@ service ImpalaService extends beeswax.BeeswaxService {
   // Client calls this RPC to verify that the server is an ImpalaService. Returns the
   // server version.
   TPingImpalaServiceResp PingImpalaService();
+
+  // Returns the summary of the current execution.
+  ExecStats.TExecSummary GetExecSummary(1:beeswax.QueryHandle handle)
+      throws(1:beeswax.QueryNotFoundException error, 2:beeswax.BeeswaxException error2);
 }
 
 // Impala HiveServer2 service

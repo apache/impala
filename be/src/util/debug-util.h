@@ -82,7 +82,9 @@ class PrettyPrinter {
  public:
   // Prints the 'value' in a human friendly format depending on the data type.
   // i.e. for bytes: 3145728 -> 3MB
-  static std::string Print(int64_t value, TCounterType::type type);
+  // If verbose is true, this also prints the raw value (before unit conversion) for
+  // types where this is applicable.
+  static std::string Print(int64_t value, TCounterType::type type, bool verbose = false);
 };
 
 }

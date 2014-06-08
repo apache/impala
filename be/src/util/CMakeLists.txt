@@ -65,6 +65,7 @@ add_library(Util
   url-parser.cc
   url-coding.cc
   llama-util.cc
+  table-printer.cc
 )
 
 add_library(Webserver STATIC

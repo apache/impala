@@ -5,7 +5,7 @@ select * from (select * from functional.alltypessmall) a where id < 5
    partitions=4/4 size=6.32KB
    predicates: functional.alltypessmall.id < 5
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 size=6.32KB
@@ -26,7 +26,7 @@ select * from (select * from functional.alltypessmall limit 10) a where id < 5 l
 |  predicates: functional.alltypessmall.id < 5
 |  limit: 5
 |
-02:EXCHANGE [PARTITION=UNPARTITIONED]
+02:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypessmall]
@@ -53,7 +53,7 @@ where id < 5 limit 5
 |  predicates: id < 5
 |  limit: 5
 |
-03:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+03:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |  limit: 10
 |
@@ -90,7 +90,7 @@ where a.id < 5 limit 5
    partitions=24/24 size=478.45KB
    predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
-09:EXCHANGE [PARTITION=UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |  limit: 5
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -100,7 +100,7 @@ where a.id < 5 limit 5
 |--08:EXCHANGE [BROADCAST]
 |  |  limit: 5
 |  |
-|  07:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  07:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: count(*) ASC
 |  |  limit: 5
 |  |
@@ -111,7 +111,7 @@ where a.id < 5 limit 5
 |  |  output: sum(count(*))
 |  |  group by: id
 |  |
-|  05:EXCHANGE [PARTITION=HASH(id)]
+|  05:EXCHANGE [HASH(id)]
 |  |
 |  02:AGGREGATE
 |  |  output: count(*)
@@ -150,7 +150,7 @@ where id < 5 limit 5
 |  predicates: a.id < 5
 |  limit: 5
 |
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
@@ -188,7 +188,7 @@ limit 5
 01:SELECT
 |  predicates: functional.alltypessmall.id < 5
 |
-03:EXCHANGE [PARTITION=UNPARTITIONED]
+03:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypessmall]
@@ -228,7 +228,7 @@ limit 5
 03:SELECT
 |  predicates: a.id < 5
 |
-06:EXCHANGE [PARTITION=UNPARTITIONED]
+06:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
@@ -258,7 +258,7 @@ from functional.alltypes
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = id
@@ -266,7 +266,7 @@ from functional.alltypes
 |--04:EXCHANGE [BROADCAST]
 |  |  limit: 10
 |  |
-|  03:EXCHANGE [PARTITION=UNPARTITIONED]
+|  03:EXCHANGE [UNPARTITIONED]
 |  |  limit: 10
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
@@ -294,7 +294,7 @@ from functional.alltypes
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-06:EXCHANGE [PARTITION=UNPARTITIONED]
+06:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = id
@@ -302,7 +302,7 @@ from functional.alltypes
 |--05:EXCHANGE [BROADCAST]
 |  |  limit: 10
 |  |
-|  04:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  04:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: id ASC
 |  |  limit: 10
 |  |
@@ -347,7 +347,7 @@ limit 5
    partitions=24/24 size=478.45KB
    predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
-09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |  limit: 5
 |
@@ -360,7 +360,7 @@ limit 5
 |--08:EXCHANGE [BROADCAST]
 |  |  limit: 10
 |  |
-|  07:EXCHANGE [PARTITION=UNPARTITIONED]
+|  07:EXCHANGE [UNPARTITIONED]
 |  |  limit: 10
 |  |
 |  03:HASH JOIN [INNER JOIN, BROADCAST]
@@ -414,7 +414,7 @@ limit 5
    partitions=24/24 size=478.45KB
    predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
-10:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+10:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |  limit: 5
 |
@@ -427,7 +427,7 @@ limit 5
 |--09:EXCHANGE [BROADCAST]
 |  |  limit: 10
 |  |
-|  08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  08:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: int_col ASC
 |  |  limit: 10
 |  |
@@ -467,7 +467,7 @@ limit 100 offset 4
 02:TOP-N [LIMIT=100]
 |  order by: id ASC
 |
-03:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+03:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: id ASC
 |  limit: 5

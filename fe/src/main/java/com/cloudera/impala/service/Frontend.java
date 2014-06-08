@@ -653,12 +653,12 @@ public class Frontend {
     // map from fragment to its index in queryExecRequest.fragments; needed for
     // queryExecRequest.dest_fragment_idx
     Map<PlanFragment, Integer> fragmentIdx = Maps.newHashMap();
-    for (PlanFragment fragment: fragments) {
-      TPlanFragment thriftFragment = fragment.toThrift();
-      queryExecRequest.addToFragments(thriftFragment);
+
+    for (int fragmentId = 0; fragmentId < fragments.size(); ++fragmentId) {
+      PlanFragment fragment = fragments.get(fragmentId);
       Preconditions.checkNotNull(fragment.getPlanRoot());
       fragment.getPlanRoot().collect(Predicates.instanceOf(ScanNode.class), scanNodes);
-      fragmentIdx.put(fragment, queryExecRequest.fragments.size() - 1);
+      fragmentIdx.put(fragment, fragmentId);
     }
 
     // set fragment destinations
@@ -690,6 +690,12 @@ public class Frontend {
     // estimates of scan nodes rely on them.
     planner.computeResourceReqs(fragments, true, queryCtxt.request.query_options,
         queryExecRequest);
+
+    // The fragment at this point has all state set, serialize it to thrift.
+    for (PlanFragment fragment: fragments) {
+      TPlanFragment thriftFragment = fragment.toThrift();
+      queryExecRequest.addToFragments(thriftFragment);
+    }
 
     // Use VERBOSE by default for all non-explain statements.
     TExplainLevel explainLevel = TExplainLevel.VERBOSE;

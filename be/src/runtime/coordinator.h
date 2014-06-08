@@ -60,6 +60,7 @@ class TRowBatch;
 class TPlanExecRequest;
 class TRuntimeProfileTree;
 class RuntimeProfile;
+class TablePrinter;
 
 // Query coordinator: handles execution of plan fragments on remote nodes, given
 // a TQueryExecRequest. As part of that, it handles all interactions with the
@@ -166,6 +167,11 @@ class Coordinator {
 
   // Returns query_status_.
   Status GetStatus();
+
+  const TExecSummary& exec_summary() const { return exec_summary_; }
+
+  // Print the exec summary as a formatted table.
+  std::string PrintExecSummary() const;
 
  private:
   class BackendExecState;
@@ -285,6 +291,12 @@ class Coordinator {
   // Object pool owned by the coordinator. Any executor will have its own pool.
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
+  // Execution summary for this query.
+  TExecSummary exec_summary_;
+
+  // A mapping of plan node ids to index into exec_summary_.nodes
+  boost::unordered_map<TPlanNodeId, int> plan_node_id_to_summary_map_;
+
   // Aggregate counters for the entire query.
   boost::scoped_ptr<RuntimeProfile> query_profile_;
 
@@ -394,6 +406,10 @@ class Coordinator {
   // Moves all temporary staging files to their final destinations.
   Status FinalizeSuccessfulInsert();
 
+  // Initializes the structures in runtime profile and exec_summary_. Must be
+  // called before RPCs to start remote fragments.
+  void InitExecProfile(const TQueryExecRequest& request);
+
   // Update fragment profile information from a backend exec state.
   // This is called repeatedly from UpdateFragmentExecStatus(),
   // and also at the end of the query from ReportQuerySummary().
@@ -410,6 +426,19 @@ class Coordinator {
   // a query -- remote fragments' profiles must not be updated while this is running.
   void ReportQuerySummary();
 
+  // Populates the summary execution stats from the profile. Can only be called when the
+  // query is done.
+  // TODO: we should be able to call this and get live updating stats.
+  void UpdateExecSummary(RuntimeProfile* profile);
+
+  // Helper function for PrintExecSummary() that walks the exec summary recursively.
+  // Output for this node is appended to *result. Each value in *result should contain
+  // the statistics for a single exec summary node.
+  // node_idx is an in/out parameter. It is called with the idx (into exec_summary_.nodes)
+  // for the current node and on return, will contain the id of the next node.
+  void PrintExecSummary(int indent_level, bool is_child_fragment, int* node_idx,
+      std::vector<std::vector<std::string> >* result) const;
+
   // Determines what the permissions of directories created by INSERT statements should be
   // if permission inheritance is enabled. Populates a map from all prefixes of path_str
   // (including the full path itself) which is a path in Hdfs, to pairs (does_not_exist,
@@ -422,7 +451,6 @@ class Coordinator {
   typedef boost::unordered_map<std::string, std::pair<bool, short> > PermissionCache;
   void PopulatePathPermissionCache(hdfsFS fs, const std::string& path_str,
       PermissionCache* permissions_cache);
-
 };
 
 }

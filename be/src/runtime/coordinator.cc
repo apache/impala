@@ -53,6 +53,7 @@
 #include "util/container-util.h"
 #include "util/network-util.h"
 #include "util/llama-util.h"
+#include "util/table-printer.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Frontend_types.h"
@@ -295,19 +296,19 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
     finalize_params_ = request.finalize_params;
   }
 
+  VLOG_QUERY << "Exec() query_id=" << schedule.query_id();
   stmt_type_ = request.stmt_type;
-
   query_id_ = schedule.query_id();
-  VLOG_QUERY << "Exec() query_id=" << query_id_;
   desc_tbl_ = request.desc_tbl;
   query_ctxt_ = request.query_ctxt;
 
   query_profile_.reset(
       new RuntimeProfile(obj_pool(), "Execution Profile " + PrintId(query_id_)));
+  finalization_timer_ = ADD_TIMER(query_profile_, "FinalizationTimer");
+
   SCOPED_TIMER(query_profile_->total_time_counter());
 
   vector<FragmentExecParams>* fragment_exec_params = schedule.exec_params();
-
   TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
 
   // to keep things simple, make async Cancel() calls wait until plan fragment
@@ -357,49 +358,8 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
     executor_.reset(NULL);
   }
 
-  // register coordinator's fragment profile now, before those of the backends,
-  // so it shows up at the top
-  finalization_timer_ = ADD_TIMER(query_profile_, "FinalizationTimer");
-
-  if (executor_.get() != NULL) {
-    query_profile_->AddChild(executor_->profile());
-    executor_->profile()->set_name("Coordinator Fragment");
-    CollectScanNodeCounters(executor_->profile(), &coordinator_counters_);
-  }
-
-  // Initialize per fragment profile data
-  fragment_profiles_.resize(request.fragments.size());
-  for (int i = 0; i < request.fragments.size(); ++i) {
-    fragment_profiles_[i].num_instances = 0;
-
-    // Special case fragment idx 0 if there is a coordinator. There is only one
-    // instance of this profile so the average is just the coordinator profile.
-    if (i == 0 && has_coordinator_fragment) {
-      fragment_profiles_[i].averaged_profile = executor_->profile();
-      continue;
-    }
-    stringstream ss;
-    ss << "Averaged Fragment " << i;
-    fragment_profiles_[i].averaged_profile =
-        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str(), true));
-    // Insert the avg profiles in ascending fragment number order. If
-    // there is a coordinator fragment, it's been placed in
-    // fragment_profiles_[0].averaged_profile, ensuring that this code
-    // will put the first averaged profile immediately after it. If
-    // there is no coordinator fragment, the first averaged profile
-    // will be inserted as the first child of query_profile_, and then
-    // all other averaged fragments will follow.
-    query_profile_->AddChild(fragment_profiles_[i].averaged_profile, true,
-        (i > 0) ? fragment_profiles_[i-1].averaged_profile : NULL);
-
-    ss.str("");
-    ss << "Fragment " << i;
-    fragment_profiles_[i].root_profile =
-        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
-    // Note: we don't start the wall timer here for the fragment
-    // profile; it's uninteresting and misleading.
-    query_profile_->AddChild(fragment_profiles_[i].root_profile);
-  }
+  // Initialize the execution profile structures.
+  InitExecProfile(request);
 
   DebugOptions debug_options;
   ProcessQueryOptions(schedule.query_options(), &debug_options);
@@ -467,7 +427,6 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
   stringstream ss;
   ss << "Query " << query_id_;
   progress_ = ProgressUpdater(ss.str(), schedule.num_scan_ranges());
-  progress_.set_logging_level(1);
 
   return Status::OK;
 }
@@ -908,6 +867,92 @@ void Coordinator::PrintBackendInfo() {
   }
 }
 
+void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
+  // Initialize the structure to collect execution summary of every plan node.
+  exec_summary_.__isset.nodes = true;
+  for (int i = 0; i < request.fragments.size(); ++i) {
+    if (!request.fragments[i].__isset.plan) continue;
+    const TPlan& plan = request.fragments[i].plan;
+    int fragment_first_node_idx = exec_summary_.nodes.size();
+
+    for (int j = 0; j < plan.nodes.size(); ++j) {
+      stringstream node_label;
+      node_label << plan.nodes[j].node_id << ":"
+                 << PrintPlanNodeType(plan.nodes[j].node_type);
+
+      TPlanNodeExecSummary node;
+      node.node_id = plan.nodes[j].node_id;
+      node.fragment_id = i;
+      node.label = plan.nodes[j].label;
+      node.label_detail = plan.nodes[j].label_detail;
+      node.num_children = plan.nodes[j].num_children;
+
+      if (plan.nodes[j].__isset.estimated_stats) {
+        node.__set_estimated_stats(plan.nodes[j].estimated_stats);
+      }
+
+      plan_node_id_to_summary_map_[plan.nodes[j].node_id] = exec_summary_.nodes.size();
+      exec_summary_.nodes.push_back(node);
+    }
+
+    if (request.fragments[i].__isset.output_sink &&
+        request.fragments[i].output_sink.type == TDataSinkType::DATA_STREAM_SINK) {
+      const TDataStreamSink& sink = request.fragments[i].output_sink.stream_sink;
+      int exch_idx = plan_node_id_to_summary_map_[sink.dest_node_id];
+      if (sink.output_partition.type == TPartitionType::UNPARTITIONED) {
+        exec_summary_.nodes[exch_idx].is_broadcast = true;
+      }
+      exec_summary_.__isset.exch_to_sender_map = true;
+      exec_summary_.exch_to_sender_map[exch_idx] = fragment_first_node_idx;
+    }
+  }
+
+  if (executor_.get() != NULL) {
+    // register coordinator's fragment profile now, before those of the backends,
+    // so it shows up at the top
+    query_profile_->AddChild(executor_->profile());
+    executor_->profile()->set_name("Coordinator Fragment");
+    CollectScanNodeCounters(executor_->profile(), &coordinator_counters_);
+  }
+
+  // Initialize the runtime profile structure. This adds the per fragment average
+  // profiles followed by the per fragment instance profiles.
+  bool has_coordinator_fragment =
+      request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
+  fragment_profiles_.resize(request.fragments.size());
+  for (int i = 0; i < request.fragments.size(); ++i) {
+    fragment_profiles_[i].num_instances = 0;
+
+    // Special case fragment idx 0 if there is a coordinator. There is only one
+    // instance of this profile so the average is just the coordinator profile.
+    if (i == 0 && has_coordinator_fragment) {
+      fragment_profiles_[i].averaged_profile = executor_->profile();
+      continue;
+    }
+    stringstream ss;
+    ss << "Averaged Fragment " << i;
+    fragment_profiles_[i].averaged_profile =
+        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str(), true));
+    // Insert the avg profiles in ascending fragment number order. If
+    // there is a coordinator fragment, it's been placed in
+    // fragment_profiles_[0].averaged_profile, ensuring that this code
+    // will put the first averaged profile immediately after it. If
+    // there is no coordinator fragment, the first averaged profile
+    // will be inserted as the first child of query_profile_, and then
+    // all other averaged fragments will follow.
+    query_profile_->AddChild(fragment_profiles_[i].averaged_profile, true,
+        (i > 0) ? fragment_profiles_[i-1].averaged_profile : NULL);
+
+    ss.str("");
+    ss << "Fragment " << i;
+    fragment_profiles_[i].root_profile =
+        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
+    // Note: we don't start the wall timer here for the fragment
+    // profile; it's uninteresting and misleading.
+    query_profile_->AddChild(fragment_profiles_[i].root_profile);
+  }
+}
+
 void Coordinator::CollectScanNodeCounters(RuntimeProfile* profile,
     FragmentInstanceCounters* counters) {
   vector<RuntimeProfile*> children;
@@ -1315,6 +1360,33 @@ void Coordinator::ComputeFragmentSummaryStats(BackendExecState* backend_exec_sta
   data.root_profile->AddChild(backend_exec_state->profile);
 }
 
+void Coordinator::UpdateExecSummary(RuntimeProfile* profile) {
+  vector<RuntimeProfile*> children;
+  profile->GetAllChildren(&children);
+
+  for (int j = 0; j < children.size(); ++j) {
+    int id = ExecNode::GetNodeIdFromProfile(children[j]);
+    if (id == -1) continue;
+
+    TPlanNodeExecSummary& exec_summary =
+        exec_summary_.nodes[plan_node_id_to_summary_map_[id]];
+    TExecStats stats;
+
+    RuntimeProfile::Counter* rows_counter = children[j]->GetCounter("RowsReturned");
+    RuntimeProfile::Counter* mem_counter = children[j]->GetCounter("PeakMemoryUsage");
+    if (rows_counter != NULL) stats.__set_cardinality(rows_counter->value());
+    if (mem_counter != NULL) stats.__set_memory_used(mem_counter->value());
+    stats.__set_latency_ns(children[j]->local_time());
+    // TODO: we don't track cpu time per node now. Do that.
+    exec_summary.__isset.exec_stats = true;
+
+    // TODO: we can't call UpdateExecSummary until the query is complete because
+    // we just keep appending to exec_summary.exec_stats. We already maintain
+    // fragment instance so this shouldn't be hard to fix.
+    exec_summary.exec_stats.push_back(stats);
+  }
+}
+
 // This function appends summary information to the query_profile_ before
 // outputting it to VLOG.  It adds:
 //   1. Averaged remote fragment profiles (TODO: add outliers)
@@ -1329,7 +1401,10 @@ void Coordinator::ReportQuerySummary() {
 
   // The fragment has finished executing.  Update the profile to compute the
   // fraction of time spent in each node.
-  if (executor_.get() != NULL) executor_->profile()->ComputeTimeInProfile();
+  if (executor_.get() != NULL) {
+    executor_->profile()->ComputeTimeInProfile();
+    UpdateExecSummary(executor_->profile());
+  }
 
   if (!backend_exec_states_.empty()) {
     // Average all remote fragments for each fragment.
@@ -1337,6 +1412,7 @@ void Coordinator::ReportQuerySummary() {
       backend_exec_states_[i]->profile->ComputeTimeInProfile();
       UpdateAverageProfile(backend_exec_states_[i]);
       ComputeFragmentSummaryStats(backend_exec_states_[i]);
+      UpdateExecSummary(backend_exec_states_[i]->profile);
     }
 
     InstanceComparator comparator;
@@ -1465,6 +1541,99 @@ void Coordinator::SetExecPlanFragmentParams(
   rpc_params->__set_backend_num(backend_num);
   rpc_params->__set_query_ctxt(query_ctxt_);
   rpc_params->params.__set_sender_id(params.sender_id_base + instance_idx);
+}
+
+void Coordinator::PrintExecSummary(int indent_level, bool is_child_fragment,
+    int* node_idx, vector<vector<string> >* result) const {
+  const TPlanNodeExecSummary& node = exec_summary_.nodes[*node_idx];
+  const TExecStats& est_stats = node.estimated_stats;
+
+  TExecStats agg_stats;
+  TExecStats max_stats;
+
+#define COMPUTE_MAX_SUM_STATS(NAME)\
+  agg_stats.NAME += node.exec_stats[i].NAME;\
+  max_stats.NAME = std::max(max_stats.NAME, node.exec_stats[i].NAME)
+
+  // Compute avg and max of each stat.
+  for (int i = 0; i < node.exec_stats.size(); ++i) {
+    COMPUTE_MAX_SUM_STATS(latency_ns);
+    COMPUTE_MAX_SUM_STATS(cpu_time_ns);
+    COMPUTE_MAX_SUM_STATS(cardinality);
+    COMPUTE_MAX_SUM_STATS(memory_used);
+  }
+
+  int64_t avg_time = node.exec_stats.size() == 0 ? 0 :
+      agg_stats.latency_ns / node.exec_stats.size();
+
+  // Print the level to indicate nesting with "|--"
+  stringstream label_ss;
+  if (indent_level != 0) {
+    label_ss << "|";
+  }
+  for (int i = 0; i < indent_level; ++i) {
+    label_ss << (is_child_fragment ? "  " : "--");
+  }
+  label_ss << node.label;
+
+  vector<string> row;
+  row.push_back(label_ss.str());
+  row.push_back(lexical_cast<string>(node.exec_stats.size())); // Num instances
+  row.push_back(PrettyPrinter::Print(avg_time, TCounterType::TIME_NS));
+  row.push_back(PrettyPrinter::Print(max_stats.latency_ns, TCounterType::TIME_NS));
+  row.push_back(PrettyPrinter::Print(
+      node.is_broadcast ? max_stats.cardinality : agg_stats.cardinality,
+      TCounterType::UNIT));
+  row.push_back(PrettyPrinter::Print(est_stats.cardinality, TCounterType::UNIT));
+  row.push_back(PrettyPrinter::Print(max_stats.memory_used, TCounterType::BYTES));
+  row.push_back(PrettyPrinter::Print(est_stats.memory_used, TCounterType::BYTES));
+  row.push_back(node.label_detail);
+  result->push_back(row);
+
+  map<int, int>::const_iterator child_fragment_idx_it =
+      exec_summary_.exch_to_sender_map.find(*node_idx);
+  if (child_fragment_idx_it != exec_summary_.exch_to_sender_map.end()) {
+    DCHECK_EQ(node.num_children, 0);
+    int child_fragment_id = child_fragment_idx_it->second;
+    PrintExecSummary(indent_level, true, &child_fragment_id, result);
+  }
+  ++*node_idx;
+  if (node.num_children == 0) return;
+
+  // Print the non-left children to the stream first.
+  vector<vector<string> > child0_result;
+  PrintExecSummary(indent_level, false, node_idx, &child0_result);
+
+  for (int i = 1; i < node.num_children; ++i) {
+    PrintExecSummary(indent_level + 1, false, node_idx, result);
+  }
+  for (int i = 0; i < child0_result.size(); ++i) {
+    result->push_back(child0_result[i]);
+  }
+}
+
+string Coordinator::PrintExecSummary() const {
+  TablePrinter printer;
+  printer.set_max_output_width(30);
+  printer.AddColumn("Operator", true);
+  printer.AddColumn("#Hosts", false);
+  printer.AddColumn("Avg Time", false);
+  printer.AddColumn("Max Time", false);
+  printer.AddColumn("#Rows", false);
+  printer.AddColumn("Est. #Rows", false);
+  printer.AddColumn("Peak Mem", false);
+  printer.AddColumn("Est. Peak Mem", false);
+  printer.AddColumn("Detail", true);
+
+  vector<vector<string> > rows;
+  int node_idx = 0;
+  PrintExecSummary(0, false, &node_idx, &rows);
+  for (int i = 0; i < rows.size(); ++i) {
+    printer.AddRow(rows[i]);
+  }
+  string summary_str = printer.ToString("\n");
+  VLOG_QUERY << "Summary query_id=" << query_id_ << summary_str;
+  return summary_str;
 }
 
 }

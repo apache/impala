@@ -31,6 +31,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.TreeNode;
+import com.cloudera.impala.thrift.TExecStats;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -245,6 +246,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected void setDisplayName(String s) { displayName_ = s; }
 
+  final protected String getDisplayLabel() {
+    return String.format("%s:%s", id_.toString(), displayName_);
+  }
+
+  /**
+   * Subclasses can override to provide a node specific detail string that
+   * is displayed to the user.
+   * e.g. scan can return the table name.
+   */
+  protected String getDisplayLabelDetail() { return ""; }
+
   /**
    * Generate the explain plan tree. The plan will be in the form of:
    *
@@ -361,6 +373,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     TPlanNode msg = new TPlanNode();
     msg.node_id = id_.asInt();
     msg.limit = limit_;
+
+    TExecStats estimatedStats = new TExecStats();
+    estimatedStats.setCardinality(cardinality_);
+    estimatedStats.setMemory_used(perHostMemCost_);
+    msg.setLabel(getDisplayLabel());
+    msg.setLabel_detail(getDisplayLabelDetail());
+    msg.setEstimated_stats(estimatedStats);
+
     for (TupleId tid: rowTupleIds_) {
       msg.addToRow_tuples(tid.asInt());
       msg.addToNullable_tuples(nullableTupleIds_.contains(tid));

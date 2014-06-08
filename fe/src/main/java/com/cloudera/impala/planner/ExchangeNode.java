@@ -130,8 +130,8 @@ public class ExchangeNode extends PlanNode {
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(String.format("%s%s:%s [%s]\n", prefix, id_.toString(), displayName_,
-        getPartitionExplainString()));
+    output.append(String.format("%s%s [%s]\n", prefix,
+        getDisplayLabel(), getDisplayLabelDetail()));
 
     if (offset_ > 0) {
       output.append(detailPrefix + "offset: ").append(offset_).append("\n");
@@ -154,7 +154,8 @@ public class ExchangeNode extends PlanNode {
     return output.toString();
   }
 
-  public String getPartitionExplainString() {
+  @Override
+  protected String getDisplayLabelDetail() {
     // For the non-fragmented explain levels, print the data partition
     // of the data stream sink that sends to this exchange node.
     Preconditions.checkState(!children_.isEmpty());

@@ -128,6 +128,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   virtual void GetRuntimeProfile(std::string& profile_output,
       const beeswax::QueryHandle& query_id);
 
+  // TODO: Need to implement HiveServer2 version of GetExecSummary
+  virtual void GetExecSummary(impala::TExecSummary& result,
+      const beeswax::QueryHandle& query_id);
+
   // Performs a full catalog metadata reset, invalidating all table and database metadata.
   virtual void ResetCatalog(impala::TStatus& status);
 
@@ -391,6 +395,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status GetRuntimeProfileStr(const TUniqueId& query_id, bool base64_encoded,
       std::stringstream* output);
 
+  // Returns the exec summary for this query.
+  Status GetExecSummary(const TUniqueId& query_id, TExecSummary* result);
+
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
   void RenderHadoopConfigs(const Webserver::ArgumentMap& args, std::stringstream* output);
 
@@ -517,6 +524,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // Start and end time of the query
     TimestampValue start_time, end_time;
+
+    // Summary of execution for this query.
+    TExecSummary exec_summary;
 
     // Initialise from an exec_state. If copy_profile is true, print the query
     // profile to a string and copy that into this.profile (which is expensive),

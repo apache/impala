@@ -87,7 +87,7 @@ public class DataPartition {
 
   public String getExplainString() {
     StringBuilder str = new StringBuilder();
-    str.append("PARTITION=" + getPartitionShortName(type_));;
+    str.append(getPartitionShortName(type_));
     if (!partitionExprs_.isEmpty()) {
       List<String> strings = Lists.newArrayList();
       for (Expr expr: partitionExprs_) {

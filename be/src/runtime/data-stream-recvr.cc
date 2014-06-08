@@ -309,7 +309,7 @@ DataStreamRecvr::DataStreamRecvr(DataStreamMgr* stream_mgr, MemTracker* parent_t
       ADD_TIMER(profile_, "DeserializeRowBatchTimer");
   buffer_full_wall_timer_ = ADD_TIMER(profile_, "SendersBlockedTimer");
   buffer_full_total_timer_ = ADD_TIMER(profile_, "SendersBlockedTotalTimer(*)");
-  data_arrival_timer_ = ADD_TIMER(profile_, "DataArrivalWaitTime");
+  data_arrival_timer_ = profile_->inactive_timer();
   first_batch_wait_total_timer_ = ADD_TIMER(profile_, "FirstBatchArrivalWaitTime");
 }
 

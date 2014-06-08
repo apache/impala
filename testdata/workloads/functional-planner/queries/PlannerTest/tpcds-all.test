@@ -64,7 +64,7 @@ limit 100
 03:SCAN HDFS [tpcds.customer_address]
    partitions=1/1 size=5.25MB
 ---- DISTRIBUTEDPLAN
-18:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |  limit: 100
 |
@@ -75,7 +75,7 @@ limit 100
 |  output: sum(sum(ss_ext_sales_price))
 |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
 |
-16:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
+16:EXCHANGE [HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
 |
 09:AGGREGATE
 |  output: sum(ss_ext_sales_price)
@@ -110,12 +110,12 @@ limit 100
 05:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
 |
-|--12:EXCHANGE [PARTITION=HASH(customer.c_current_addr_sk)]
+|--12:EXCHANGE [HASH(customer.c_current_addr_sk)]
 |  |
 |  02:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 size=12.60MB
 |
-11:EXCHANGE [PARTITION=HASH(customer_address.ca_address_sk)]
+11:EXCHANGE [HASH(customer_address.ca_address_sk)]
 |
 03:SCAN HDFS [tpcds.customer_address]
    partitions=1/1 size=5.25MB
@@ -188,7 +188,7 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-17:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_item_id ASC, s_state ASC
 |  limit: 100
 |
@@ -199,7 +199,7 @@ LIMIT 100
 |  output: sum(sum(ss_quantity)), sum(count(ss_quantity)), sum(sum(ss_list_price)), sum(count(ss_list_price)), sum(sum(ss_coupon_amt)), sum(count(ss_coupon_amt)), sum(sum(ss_sales_price)), sum(count(ss_sales_price))
 |  group by: i_item_id, s_state
 |
-15:EXCHANGE [PARTITION=HASH(i_item_id,s_state)]
+15:EXCHANGE [HASH(i_item_id,s_state)]
 |
 09:AGGREGATE
 |  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
@@ -322,7 +322,7 @@ limit 1000
 08:SCAN HDFS [tpcds.customer]
    partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-17:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
 |  limit: 1000
 |
@@ -339,7 +339,7 @@ limit 1000
 |  |  group by: ss_ticket_number, ss_customer_sk
 |  |  having: count(*) >= 15, count(*) <= 20
 |  |
-|  14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk)]
+|  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |  |
 |  07:AGGREGATE
 |  |  output: count(*)
@@ -421,7 +421,7 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=10/120 size=3.76MB
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: year(ss_date) ASC, sum(ss_ext_sales_price) DESC, item.i_brand_id ASC
 |  limit: 100
 |
@@ -432,7 +432,7 @@ limit 100
 |  output: sum(sum(ss_ext_sales_price))
 |  group by: year(ss_date), item.i_brand, item.i_brand_id
 |
-06:EXCHANGE [PARTITION=HASH(year(ss_date),item.i_brand,item.i_brand_id)]
+06:EXCHANGE [HASH(year(ss_date),item.i_brand,item.i_brand_id)]
 |
 03:AGGREGATE
 |  output: sum(ss_ext_sales_price)
@@ -500,7 +500,7 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(ss_ext_sales_price) DESC, d.d_year ASC, i.i_category_id ASC, i.i_category ASC
 |  limit: 100
 |
@@ -511,7 +511,7 @@ LIMIT 100
 |  output: sum(sum(ss_ext_sales_price))
 |  group by: d.d_year, i.i_category_id, i.i_category
 |
-09:EXCHANGE [PARTITION=HASH(d.d_year,i.i_category_id,i.i_category)]
+09:EXCHANGE [HASH(d.d_year,i.i_category_id,i.i_category)]
 |
 05:AGGREGATE
 |  output: sum(ss_ext_sales_price)
@@ -596,7 +596,7 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_store_name ASC, s_store_id ASC, sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
 |  limit: 100
 |
@@ -607,7 +607,7 @@ LIMIT 100
 |  output: sum(sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
 |  group by: s_store_name, s_store_id
 |
-09:EXCHANGE [PARTITION=HASH(s_store_name,s_store_id)]
+09:EXCHANGE [HASH(s_store_name,s_store_id)]
 |
 05:AGGREGATE
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
@@ -735,7 +735,7 @@ LIMIT 400
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-23:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+23:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, ca_city ASC, bought_city ASC, ss_ticket_number ASC
 |  limit: 400
 |
@@ -763,7 +763,7 @@ LIMIT 400
 |  output: sum(sum(ss_coupon_amt)), sum(sum(ss_net_profit))
 |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
 |
-19:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)]
+19:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)]
 |
 09:AGGREGATE
 |  output: sum(ss_coupon_amt), sum(ss_net_profit)
@@ -856,7 +856,7 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: d.d_year ASC, sum(ss_ext_sales_price) DESC, i.i_brand_id ASC
 |  limit: 100
 |
@@ -867,7 +867,7 @@ LIMIT 100
 |  output: sum(sum(ss_ext_sales_price))
 |  group by: d.d_year, i.i_brand, i.i_brand_id
 |
-09:EXCHANGE [PARTITION=HASH(d.d_year,i.i_brand,i.i_brand_id)]
+09:EXCHANGE [HASH(d.d_year,i.i_brand,i.i_brand_id)]
 |
 05:AGGREGATE
 |  output: sum(ss_ext_sales_price)
@@ -957,7 +957,7 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=24/120 size=4.60MB
 ---- DISTRIBUTEDPLAN
-14:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+14:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum_sales ASC, i_manufact_id ASC
 |  limit: 100
 |
@@ -968,7 +968,7 @@ limit 100
 |  output: sum(sum(ss_sales_price))
 |  group by: i_manufact_id, d_qoy
 |
-12:EXCHANGE [PARTITION=HASH(i_manufact_id,d_qoy)]
+12:EXCHANGE [HASH(i_manufact_id,d_qoy)]
 |
 07:AGGREGATE
 |  output: sum(ss_sales_price)
@@ -1048,7 +1048,7 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand_id ASC
 |  limit: 100
 |
@@ -1059,7 +1059,7 @@ LIMIT 100
 |  output: sum(sum(ss_ext_sales_price))
 |  group by: i_brand, i_brand_id
 |
-09:EXCHANGE [PARTITION=HASH(i_brand,i_brand_id)]
+09:EXCHANGE [HASH(i_brand,i_brand_id)]
 |
 05:AGGREGATE
 |  output: sum(ss_ext_sales_price)
@@ -1235,7 +1235,7 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-32:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+32:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_store_name1 ASC, s_store_id1 ASC, d_week_seq1 ASC
 |  limit: 100
 |
@@ -1245,7 +1245,7 @@ limit 100
 16:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: s_store_id = s_store_id, d_week_seq = d_week_seq - 52
 |
-|--31:EXCHANGE [PARTITION=HASH(s_store_id,d_week_seq - 52)]
+|--31:EXCHANGE [HASH(s_store_id,d_week_seq - 52)]
 |  |
 |  15:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: d_week_seq = d.d_week_seq
@@ -1268,7 +1268,7 @@ limit 100
 |  |  output: sum(sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
 |  |  group by: d_week_seq, ss_store_sk
 |  |
-|  26:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
+|  26:EXCHANGE [HASH(d_week_seq,ss_store_sk)]
 |  |
 |  11:AGGREGATE
 |  |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
@@ -1277,17 +1277,17 @@ limit 100
 |  10:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
 |  |
-|  |--25:EXCHANGE [PARTITION=HASH(date_dim.d_date_sk)]
+|  |--25:EXCHANGE [HASH(date_dim.d_date_sk)]
 |  |  |
 |  |  09:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 size=9.84MB
 |  |
-|  24:EXCHANGE [PARTITION=HASH(store_sales.ss_sold_date_sk)]
+|  24:EXCHANGE [HASH(store_sales.ss_sold_date_sk)]
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 size=22.71MB
 |
-30:EXCHANGE [PARTITION=HASH(s_store_id,d_week_seq)]
+30:EXCHANGE [HASH(s_store_id,d_week_seq)]
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: d_week_seq = d.d_week_seq
@@ -1310,7 +1310,7 @@ limit 100
 |  output: sum(sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END)), sum(sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END))
 |  group by: d_week_seq, ss_store_sk
 |
-20:EXCHANGE [PARTITION=HASH(d_week_seq,ss_store_sk)]
+20:EXCHANGE [HASH(d_week_seq,ss_store_sk)]
 |
 03:AGGREGATE
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
@@ -1319,12 +1319,12 @@ limit 100
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
 |
-|--19:EXCHANGE [PARTITION=HASH(date_dim.d_date_sk)]
+|--19:EXCHANGE [HASH(date_dim.d_date_sk)]
 |  |
 |  01:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 size=9.84MB
 |
-18:EXCHANGE [PARTITION=HASH(store_sales.ss_sold_date_sk)]
+18:EXCHANGE [HASH(store_sales.ss_sold_date_sk)]
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 size=22.71MB
@@ -1392,7 +1392,7 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=24/120 size=4.60MB
 ---- DISTRIBUTEDPLAN
-14:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+14:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_manager_id ASC, sum_sales ASC
 |  limit: 100
 |
@@ -1403,7 +1403,7 @@ limit 100
 |  output: sum(sum(ss_sales_price))
 |  group by: i_manager_id, d_moy
 |
-12:EXCHANGE [PARTITION=HASH(i_manager_id,d_moy)]
+12:EXCHANGE [HASH(i_manager_id,d_moy)]
 |
 07:AGGREGATE
 |  output: sum(ss_sales_price)
@@ -1524,7 +1524,7 @@ limit 100
 02:SCAN HDFS [tpcds.item]
    partitions=1/1 size=4.82MB
 ---- DISTRIBUTEDPLAN
-20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_store_name ASC, i_item_desc ASC
 |  limit: 100
 |
@@ -1541,7 +1541,7 @@ limit 100
 |  |  output: sum(sum(revenue)), sum(count(revenue))
 |  |  group by: ss_store_sk
 |  |
-|  17:EXCHANGE [PARTITION=HASH(ss_store_sk)]
+|  17:EXCHANGE [HASH(ss_store_sk)]
 |  |
 |  06:AGGREGATE
 |  |  output: sum(sum(ss_sales_price)), count(sum(ss_sales_price))
@@ -1551,7 +1551,7 @@ limit 100
 |  |  output: sum(sum(ss_sales_price))
 |  |  group by: ss_store_sk, ss_item_sk
 |  |
-|  15:EXCHANGE [PARTITION=HASH(ss_store_sk,ss_item_sk)]
+|  15:EXCHANGE [HASH(ss_store_sk,ss_item_sk)]
 |  |
 |  05:AGGREGATE
 |  |  output: sum(ss_sales_price)
@@ -1577,7 +1577,7 @@ limit 100
 |  |  output: sum(sum(ss_sales_price))
 |  |  group by: ss_store_sk, ss_item_sk
 |  |
-|  11:EXCHANGE [PARTITION=HASH(ss_store_sk,ss_item_sk)]
+|  11:EXCHANGE [HASH(ss_store_sk,ss_item_sk)]
 |  |
 |  01:AGGREGATE
 |  |  output: sum(ss_sales_price)
@@ -1676,7 +1676,7 @@ limit 100
 08:SCAN HDFS [tpcds.customer]
    partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-21:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+21:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_last_name ASC, ss_ticket_number ASC
 |  limit: 100
 |
@@ -1687,13 +1687,13 @@ limit 100
 |  hash predicates: customer.c_customer_sk = ss_customer_sk
 |  other predicates: current_addr.ca_city != ca_city
 |
-|--20:EXCHANGE [PARTITION=HASH(ss_customer_sk)]
+|--20:EXCHANGE [HASH(ss_customer_sk)]
 |  |
 |  18:AGGREGATE [MERGE FINALIZE]
 |  |  output: sum(sum(ss_ext_sales_price)), sum(sum(ss_ext_list_price)), sum(sum(ss_ext_tax))
 |  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
 |  |
-|  17:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)]
+|  17:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)]
 |  |
 |  07:AGGREGATE
 |  |  output: sum(ss_ext_sales_price), sum(ss_ext_list_price), sum(ss_ext_tax)
@@ -1728,7 +1728,7 @@ limit 100
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=36/120 size=6.70MB
 |
-19:EXCHANGE [PARTITION=HASH(customer.c_customer_sk)]
+19:EXCHANGE [HASH(customer.c_customer_sk)]
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: customer.c_current_addr_sk = current_addr.ca_address_sk
@@ -1819,7 +1819,7 @@ LIMIT 100
 08:SCAN HDFS [tpcds.customer c]
    partitions=1/1 size=12.60MB
 ---- DISTRIBUTEDPLAN
-17:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cnt DESC
 |  limit: 100
 |
@@ -1836,7 +1836,7 @@ LIMIT 100
 |  |  group by: ss_ticket_number, ss_customer_sk
 |  |  having: count(*) >= 1, count(*) <= 5
 |  |
-|  14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk)]
+|  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
 |  |
 |  07:AGGREGATE
 |  |  output: count(*)
@@ -1955,7 +1955,7 @@ LIMIT 100
 00:SCAN HDFS [tpcds.store_sales ss]
    partitions=120/120 size=22.71MB
 ---- DISTRIBUTEDPLAN
-17:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
 |  limit: 100
 |
@@ -1974,7 +1974,7 @@ LIMIT 100
 |  output: sum(sum(ss_coupon_amt)), sum(sum(ss_net_profit))
 |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, s_city
 |
-14:EXCHANGE [PARTITION=HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,s_city)]
+14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,s_city)]
 |
 07:AGGREGATE
 |  output: sum(ss_coupon_amt), sum(ss_net_profit)
@@ -2065,7 +2065,7 @@ limit 100
    partitions=1/1 size=76.92MB
    predicates: cd_gender = 'F', cd_marital_status = 'W', cd_education_status = 'Primary'
 ---- DISTRIBUTEDPLAN
-15:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+15:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_item_id ASC
 |  limit: 100
 |
@@ -2076,7 +2076,7 @@ limit 100
 |  output: sum(sum(ss_quantity)), sum(count(ss_quantity)), sum(sum(ss_list_price)), sum(count(ss_list_price)), sum(sum(ss_coupon_amt)), sum(count(ss_coupon_amt)), sum(sum(ss_sales_price)), sum(count(ss_sales_price))
 |  group by: i_item_id
 |
-13:EXCHANGE [PARTITION=HASH(i_item_id)]
+13:EXCHANGE [HASH(i_item_id)]
 |
 07:AGGREGATE
 |  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
@@ -2102,12 +2102,12 @@ limit 100
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: customer_demographics.cd_demo_sk = store_sales.ss_cdemo_sk
 |
-|--10:EXCHANGE [PARTITION=HASH(store_sales.ss_cdemo_sk)]
+|--10:EXCHANGE [HASH(store_sales.ss_cdemo_sk)]
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=23/120 size=4.19MB
 |
-09:EXCHANGE [PARTITION=HASH(customer_demographics.cd_demo_sk)]
+09:EXCHANGE [HASH(customer_demographics.cd_demo_sk)]
 |
 01:SCAN HDFS [tpcds.customer_demographics]
    partitions=1/1 size=76.92MB
@@ -2182,7 +2182,7 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=24/120 size=4.43MB
 ---- DISTRIBUTEDPLAN
-14:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+14:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum_sales ASC, s_store_name ASC, i_category ASC
 |  limit: 100
 |
@@ -2193,7 +2193,7 @@ limit 100
 |  output: sum(sum(ss_sales_price))
 |  group by: i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
 |
-12:EXCHANGE [PARTITION=HASH(i_category,i_class,i_brand,s_store_name,s_company_name,d_moy)]
+12:EXCHANGE [HASH(i_category,i_class,i_brand,s_store_name,s_company_name,d_moy)]
 |
 07:AGGREGATE
 |  output: sum(ss_sales_price)
@@ -2339,7 +2339,7 @@ limit 100
 00:SCAN HDFS [tpcds.store_sales]
    partitions=7/120 size=1.09MB
 ---- DISTRIBUTEDPLAN
-20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_store_name ASC
 |  limit: 100
 |
@@ -2350,7 +2350,7 @@ limit 100
 |  output: sum(sum(ss_net_profit))
 |  group by: s_store_name
 |
-18:EXCHANGE [PARTITION=HASH(s_store_name)]
+18:EXCHANGE [HASH(s_store_name)]
 |
 10:AGGREGATE
 |  output: sum(ss_net_profit)
@@ -2364,7 +2364,7 @@ limit 100
 |  07:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
 |  |  hash predicates: substr(ca_zip, 1, 5) = substr(ca_zip, 1, 5)
 |  |
-|  |--16:EXCHANGE [PARTITION=HASH(substr(ca_zip, 1, 5))]
+|  |--16:EXCHANGE [HASH(substr(ca_zip, 1, 5))]
 |  |  |
 |  |  06:SCAN HDFS [tpcds.customer_address]
 |  |     partitions=1/1 size=5.25MB
@@ -2375,7 +2375,7 @@ limit 100
 |  |  group by: substr(ca_zip, 1, 5)
 |  |  having: count(*) > 10
 |  |
-|  14:EXCHANGE [PARTITION=HASH(substr(ca_zip, 1, 5))]
+|  14:EXCHANGE [HASH(substr(ca_zip, 1, 5))]
 |  |
 |  05:AGGREGATE
 |  |  output: count(*)
@@ -2450,7 +2450,7 @@ WHERE
 12:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*))
 |
-11:EXCHANGE [PARTITION=UNPARTITIONED]
+11:EXCHANGE [UNPARTITIONED]
 |
 07:AGGREGATE
 |  output: count(*)
@@ -2526,7 +2526,7 @@ limit 1000
    partitions=1/1 size=4.82MB
    predicates: i_category IN ('Jewelry', 'Sports', 'Books')
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_category ASC, i_class ASC, i_item_desc ASC
 |  limit: 1000
 |
@@ -2537,7 +2537,7 @@ limit 1000
 |  output: sum(sum(ss_ext_sales_price))
 |  group by: i_item_desc, i_category, i_class, i_current_price
 |
-06:EXCHANGE [PARTITION=HASH(i_item_desc,i_category,i_class,i_current_price)]
+06:EXCHANGE [HASH(i_item_desc,i_category,i_class,i_current_price)]
 |
 03:AGGREGATE
 |  output: sum(ss_ext_sales_price)

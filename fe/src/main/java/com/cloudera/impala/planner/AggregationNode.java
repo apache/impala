@@ -202,7 +202,8 @@ public class AggregationNode extends PlanNode {
     }
   }
 
-  private String getDisplayNameDetail() {
+  @Override
+  protected String getDisplayLabelDetail() {
     if (aggInfo_.isMerge() || needsFinalize_) {
       if (aggInfo_.isMerge() && needsFinalize_) {
         return "MERGE FINALIZE";
@@ -219,8 +220,8 @@ public class AggregationNode extends PlanNode {
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    String nameDetail = getDisplayNameDetail();
-    output.append(String.format("%s%s:%s", prefix, id_.toString(), displayName_));
+    String nameDetail = getDisplayLabelDetail();
+    output.append(String.format("%s%s", prefix, getDisplayLabel()));
     if (nameDetail != null) output.append(" [" + nameDetail + "]");
     output.append("\n");
 

@@ -8,7 +8,7 @@ order by name offset 5
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-02:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+02:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: name ASC
 |
@@ -28,7 +28,7 @@ order by name
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-02:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+02:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: name ASC
 |
 01:SORT [LIMIT=-1]
@@ -54,7 +54,7 @@ order by 2 desc
    partitions=1/1 size=0B
    predicates: name LIKE 'm%'
 ---- DISTRIBUTEDPLAN
-05:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(*) DESC
 |
 02:SORT [LIMIT=-1]
@@ -64,7 +64,7 @@ order by 2 desc
 |  output: sum(count(*))
 |  group by: zip
 |
-03:EXCHANGE [PARTITION=HASH(zip)]
+03:EXCHANGE [HASH(zip)]
 |
 01:AGGREGATE
 |  output: count(*)
@@ -90,7 +90,7 @@ order by 2
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: id < 5
 ---- DISTRIBUTEDPLAN
-05:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(float_col) ASC
 |
 02:SORT [LIMIT=-1]
@@ -100,7 +100,7 @@ order by 2
 |  output: sum(sum(float_col))
 |  group by: int_col
 |
-03:EXCHANGE [PARTITION=HASH(int_col)]
+03:EXCHANGE [HASH(int_col)]
 |
 01:AGGREGATE
 |  output: sum(float_col)
@@ -123,7 +123,7 @@ order by 2,3 desc
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
 ---- DISTRIBUTEDPLAN
-05:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(float_col) ASC, min(float_col) DESC
 |
 02:SORT [LIMIT=-1]
@@ -133,7 +133,7 @@ order by 2,3 desc
 |  output: sum(sum(float_col)), min(min(float_col))
 |  group by: int_col
 |
-03:EXCHANGE [PARTITION=HASH(int_col)]
+03:EXCHANGE [HASH(int_col)]
 |
 01:AGGREGATE
 |  output: sum(float_col), min(float_col)
@@ -150,7 +150,7 @@ select int_col as id from functional.alltypessmall order by id
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-02:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+02:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC
 |
 01:SORT [LIMIT=-1]
@@ -168,7 +168,7 @@ select int_col as id from functional.alltypessmall order by functional.alltypess
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-02:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+02:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |
 01:SORT [LIMIT=-1]
@@ -195,7 +195,7 @@ order by int_col desc offset 5
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+08:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col DESC
 |
@@ -236,7 +236,7 @@ order by int_col desc offset 5
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+11:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col DESC
 |
@@ -246,7 +246,7 @@ order by int_col desc offset 5
 10:AGGREGATE [MERGE FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-09:EXCHANGE [PARTITION=HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
+09:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
 |--08:AGGREGATE
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
@@ -281,7 +281,7 @@ order by j.test_id, j.test_name, j.test_zip, j.alltypes_id, d.name
 00:SCAN HDFS [functional.jointbl j]
    partitions=1/1 size=433B
 ---- DISTRIBUTEDPLAN
-06:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+06:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: test_id ASC, test_name ASC, test_zip ASC, alltypes_id ASC, name ASC
 |
 03:SORT [LIMIT=-1]
@@ -290,12 +290,12 @@ order by j.test_id, j.test_name, j.test_zip, j.alltypes_id, d.name
 02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: j.test_id = d.id
 |
-|--05:EXCHANGE [PARTITION=HASH(d.id)]
+|--05:EXCHANGE [HASH(d.id)]
 |  |
 |  01:SCAN HDFS [functional.dimtbl d]
 |     partitions=1/1 size=171B
 |
-04:EXCHANGE [PARTITION=HASH(j.test_id)]
+04:EXCHANGE [HASH(j.test_id)]
 |
 00:SCAN HDFS [functional.jointbl j]
    partitions=1/1 size=433B
@@ -335,7 +335,7 @@ order by c.string_col desc, a.smallint_col
    partitions=1/10 size=73.39KB
    predicates: a.int_col > 899
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: string_col DESC, smallint_col ASC
 |
 05:SORT [LIMIT=-1]
@@ -380,7 +380,7 @@ order by avg(tinyint_col)
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-05:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(tinyint_col) / count(tinyint_col) ASC
 |
 02:SORT [LIMIT=-1]
@@ -390,7 +390,7 @@ order by avg(tinyint_col)
 |  output: sum(count(*)), sum(sum(tinyint_col)), sum(count(tinyint_col))
 |  group by: int_col
 |
-03:EXCHANGE [PARTITION=HASH(int_col)]
+03:EXCHANGE [HASH(int_col)]
 |
 01:AGGREGATE
 |  output: count(*), sum(tinyint_col), count(tinyint_col)
@@ -418,7 +418,7 @@ order by t1.id,t2.id
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-05:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC, id ASC
 |
 03:SORT [LIMIT=-1]
@@ -453,7 +453,7 @@ order by t1.id, t2.id
    partitions=4/4 size=460B
    predicates: t1.id < 3
 ---- DISTRIBUTEDPLAN
-05:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC, id ASC
 |
 03:SORT [LIMIT=-1]
@@ -501,7 +501,7 @@ order by 1
 01:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 size=115B
 ---- DISTRIBUTEDPLAN
-17:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |
 06:SORT [LIMIT=-1]
@@ -510,7 +510,7 @@ order by 1
 16:AGGREGATE [MERGE FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-15:EXCHANGE [PARTITION=HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
+15:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
 |--14:AGGREGATE
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
@@ -575,7 +575,7 @@ order by 1,2
 05:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 size=115B
 ---- DISTRIBUTEDPLAN
-20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC, bool_col ASC
 |
 |--19:SORT [LIMIT=-1]
@@ -586,7 +586,7 @@ order by 1,2
 |  13:AGGREGATE [MERGE FINALIZE]
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  |
-|  12:EXCHANGE [PARTITION=HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
+|  12:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |  |
 |  |--11:AGGREGATE
 |  |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
@@ -688,7 +688,7 @@ order by 12, 13, 1
 10:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 size=115B
 ---- DISTRIBUTEDPLAN
-45:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+45:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: year ASC, month ASC, id ASC
 |
 |--44:SORT [LIMIT=-1]
@@ -699,14 +699,14 @@ order by 12, 13, 1
 |  36:AGGREGATE [MERGE FINALIZE]
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  |
-|  35:EXCHANGE [PARTITION=HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
+|  35:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |  |
 |  |--34:AGGREGATE
 |  |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  |  |
 |  |  31:MERGE
 |  |  |
-|  |  26:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  |  26:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  |  order by: id ASC
 |  |  |  limit: 3
 |  |  |
@@ -755,7 +755,7 @@ order by 12, 13, 1
 |  |
 |  40:MERGE
 |  |
-|  21:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  21:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: id ASC
 |  |  limit: 3
 |  |
@@ -807,7 +807,7 @@ order by int_col
 02:SORT [LIMIT=-1]
 |  order by: int_col ASC
 |
-03:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+03:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bigint_col ASC
 |  limit: 10
 |
@@ -841,7 +841,7 @@ order by int_col
 04:SORT [LIMIT=-1]
 |  order by: int_col ASC
 |
-09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bigint_col ASC
 |  limit: 10
 |
@@ -867,7 +867,7 @@ select * from (select * from functional.alltypes order by bigint_col) A
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -885,7 +885,7 @@ select * from functional.alltypessmall order by bigint_col
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-03:EXCHANGE [PARTITION=UNPARTITIONED]
+03:EXCHANGE [UNPARTITIONED]
 |
 |--05:MERGE
 |  |
@@ -913,7 +913,7 @@ select * from functional.alltypes
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bigint_col ASC
 |
 |--07:SORT [LIMIT=-1]
@@ -961,7 +961,7 @@ order by int_col offset 5
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-18:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col ASC
 |
@@ -971,14 +971,14 @@ order by int_col offset 5
 17:AGGREGATE [MERGE FINALIZE]
 |  group by: int_col
 |
-16:EXCHANGE [PARTITION=HASH(int_col)]
+16:EXCHANGE [HASH(int_col)]
 |
 |--15:AGGREGATE
 |  |  group by: int_col
 |  |
 |  13:MERGE
 |  |
-|  09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  09:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  offset: 5
 |  |  order by: int_col ASC
 |  |  limit: 10
@@ -994,7 +994,7 @@ order by int_col offset 5
 |  |
 |  12:MERGE
 |  |
-|  08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  08:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: int_col ASC
 |  |  limit: 10
 |  |
@@ -1084,7 +1084,7 @@ order by x
 07:SELECT
 |  predicates: smallint_col < 5
 |
-20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bigint_col ASC
 |  limit: 100
 |
@@ -1093,7 +1093,7 @@ order by x
 |  |
 |  18:MERGE
 |  |
-|  15:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+|  15:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: int_col ASC
 |  |  limit: 100
 |  |
@@ -1103,7 +1103,7 @@ order by x
 |  14:AGGREGATE [MERGE FINALIZE]
 |  |  group by: float_col, bigint_col, int_col, tinyint_col, smallint_col, id
 |  |
-|  13:EXCHANGE [PARTITION=HASH(float_col,bigint_col,int_col,tinyint_col,smallint_col,id)]
+|  13:EXCHANGE [HASH(float_col,bigint_col,int_col,tinyint_col,smallint_col,id)]
 |  |
 |  04:AGGREGATE
 |  |  group by: float_col, bigint_col, int_col, tinyint_col, smallint_col, id
@@ -1116,7 +1116,7 @@ order by x
 |
 17:MERGE
 |
-12:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+12:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: tinyint_col ASC
 |  limit: 100
 |
@@ -1145,7 +1145,7 @@ order by bigint_col limit 10) A
 01:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bigint_col ASC
 |  limit: 10
 |

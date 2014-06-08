@@ -10,7 +10,7 @@ select distinctpc(l_orderkey) from tpch.lineitem
 03:AGGREGATE [MERGE FINALIZE]
 |  output: distinctpc(distinctpc(l_orderkey))
 |
-02:EXCHANGE [PARTITION=UNPARTITIONED]
+02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: distinctpc(l_orderkey)
@@ -34,7 +34,7 @@ select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 06:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(l_orderkey)), distinctpc(distinctpc(distinctpc(l_orderkey)))
 |
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE]
 |  output: count(l_orderkey), distinctpc(distinctpc(l_orderkey))
@@ -43,7 +43,7 @@ select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 |  output: distinctpc(distinctpc(l_orderkey))
 |  group by: l_orderkey
 |
-03:EXCHANGE [PARTITION=HASH(l_orderkey)]
+03:EXCHANGE [HASH(l_orderkey)]
 |
 01:AGGREGATE
 |  output: distinctpc(l_orderkey)

@@ -8,12 +8,12 @@ from functional.testtbl
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-04:EXCHANGE [PARTITION=UNPARTITIONED]
+04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [MERGE FINALIZE]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
-02:EXCHANGE [PARTITION=HASH(functional.testtbl.id,functional.testtbl.name,functional.testtbl.zip)]
+02:EXCHANGE [HASH(functional.testtbl.id,functional.testtbl.name,functional.testtbl.zip)]
 |
 01:AGGREGATE
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
@@ -31,12 +31,12 @@ from functional.testtbl
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-04:EXCHANGE [PARTITION=UNPARTITIONED]
+04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [MERGE FINALIZE]
 |  group by: id, zip
 |
-02:EXCHANGE [PARTITION=HASH(id,zip)]
+02:EXCHANGE [HASH(id,zip)]
 |
 01:AGGREGATE
 |  group by: id, zip
@@ -60,7 +60,7 @@ from functional.testtbl
 06:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(if(id IS NULL, NULL, zip)))
 |
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE]
 |  output: count(if(id IS NULL, NULL, zip))
@@ -68,7 +68,7 @@ from functional.testtbl
 04:AGGREGATE [MERGE]
 |  group by: id, zip
 |
-03:EXCHANGE [PARTITION=HASH(id,zip)]
+03:EXCHANGE [HASH(id,zip)]
 |
 01:AGGREGATE
 |  group by: id, zip
@@ -91,7 +91,7 @@ group by 1
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE FINALIZE]
 |  output: count(if(int_col IS NULL, NULL, bigint_col))
@@ -100,7 +100,7 @@ group by 1
 04:AGGREGATE [MERGE]
 |  group by: tinyint_col, int_col, bigint_col
 |
-03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+03:EXCHANGE [HASH(tinyint_col)]
 |
 01:AGGREGATE
 |  group by: tinyint_col, int_col, bigint_col
@@ -123,7 +123,7 @@ group by 1
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE FINALIZE]
 |  output: count(int_col), sum(int_col)
@@ -132,7 +132,7 @@ group by 1
 04:AGGREGATE [MERGE]
 |  group by: tinyint_col, int_col
 |
-03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+03:EXCHANGE [HASH(tinyint_col)]
 |
 01:AGGREGATE
 |  group by: tinyint_col, int_col
@@ -157,7 +157,7 @@ from functional.alltypesagg group by 1
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE FINALIZE]
 |  output: count(int_col), min(min(smallint_col)), max(max(string_col))
@@ -167,7 +167,7 @@ from functional.alltypesagg group by 1
 |  output: min(min(smallint_col)), max(max(string_col))
 |  group by: tinyint_col, int_col
 |
-03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+03:EXCHANGE [HASH(tinyint_col)]
 |
 01:AGGREGATE
 |  output: min(smallint_col), max(string_col)
@@ -192,7 +192,7 @@ from functional.alltypesagg group by 1
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/10 size=743.67KB
 ---- DISTRIBUTEDPLAN
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE FINALIZE]
 |  output: count(int_col), sum(int_col), sum(count(*)), sum(sum(int_col)), min(min(smallint_col)), max(max(bigint_col))
@@ -202,7 +202,7 @@ from functional.alltypesagg group by 1
 |  output: sum(count(*)), sum(sum(int_col)), min(min(smallint_col)), max(max(bigint_col))
 |  group by: tinyint_col, int_col
 |
-03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+03:EXCHANGE [HASH(tinyint_col)]
 |
 01:AGGREGATE
 |  output: count(*), sum(int_col), min(smallint_col), max(bigint_col)
@@ -242,12 +242,12 @@ select t1.c, t2.c from
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: count(int_col) = count(bigint_col)
 |
-|--15:EXCHANGE [PARTITION=UNPARTITIONED]
+|--15:EXCHANGE [UNPARTITIONED]
 |  |
 |  14:AGGREGATE [MERGE FINALIZE]
 |  |  output: sum(count(bigint_col))
 |  |
-|  13:EXCHANGE [PARTITION=UNPARTITIONED]
+|  13:EXCHANGE [UNPARTITIONED]
 |  |
 |  05:AGGREGATE [MERGE]
 |  |  output: count(bigint_col)
@@ -255,7 +255,7 @@ select t1.c, t2.c from
 |  12:AGGREGATE [MERGE]
 |  |  group by: bigint_col
 |  |
-|  11:EXCHANGE [PARTITION=HASH(bigint_col)]
+|  11:EXCHANGE [HASH(bigint_col)]
 |  |
 |  04:AGGREGATE
 |  |  group by: bigint_col
@@ -266,7 +266,7 @@ select t1.c, t2.c from
 10:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(int_col))
 |
-09:EXCHANGE [PARTITION=UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE]
 |  output: count(int_col)
@@ -274,7 +274,7 @@ select t1.c, t2.c from
 08:AGGREGATE [MERGE]
 |  group by: int_col
 |
-07:EXCHANGE [PARTITION=HASH(int_col)]
+07:EXCHANGE [HASH(int_col)]
 |
 01:AGGREGATE
 |  group by: int_col
@@ -306,7 +306,7 @@ having count(bigint_col) > 0
 |  output: sum(count(tinyint_col)), sum(sum(count(bigint_col)))
 |  having: zeroifnull(sum(count(bigint_col))) > 0
 |
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE]
 |  output: count(tinyint_col), sum(count(bigint_col))
@@ -315,7 +315,7 @@ having count(bigint_col) > 0
 |  output: sum(count(bigint_col))
 |  group by: tinyint_col
 |
-03:EXCHANGE [PARTITION=HASH(tinyint_col)]
+03:EXCHANGE [HASH(tinyint_col)]
 |
 01:AGGREGATE
 |  output: count(bigint_col)
@@ -344,7 +344,7 @@ where t.x is not null
 |  output: sum(count(1))
 |  having: count(1) IS NOT NULL
 |
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE]
 |  output: count(1)
@@ -352,7 +352,7 @@ where t.x is not null
 04:AGGREGATE [MERGE]
 |  group by: 1
 |
-03:EXCHANGE [PARTITION=HASH(1)]
+03:EXCHANGE [HASH(1)]
 |
 01:AGGREGATE
 |  group by: 1
@@ -381,7 +381,7 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 |  output: sum(count(1)), sum(sum(count(1)))
 |  having: count(1) > 0, count(1) + zeroifnull(sum(count(1))) > 10, zeroifnull(sum(count(1))) > 1
 |
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [MERGE]
 |  output: count(1), sum(count(1))
@@ -390,7 +390,7 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 |  output: sum(count(1))
 |  group by: 1
 |
-03:EXCHANGE [PARTITION=HASH(1)]
+03:EXCHANGE [HASH(1)]
 |
 01:AGGREGATE
 |  output: count(1)

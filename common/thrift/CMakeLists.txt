@@ -115,6 +115,7 @@ set (SRC_FILES
   DataSinks.thrift
   Data.thrift
   Descriptors.thrift
+  ExecStats.thrift
   Frontend.thrift
   Exprs.thrift
   ExternalDataSource.thrift

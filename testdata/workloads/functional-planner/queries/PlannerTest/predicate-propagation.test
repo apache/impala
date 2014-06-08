@@ -106,7 +106,7 @@ where a.string_col = 'a' and b.string_col = 'b'
    partitions=24/24 size=478.45KB
    predicates: functional.alltypes.string_col = 'a'
 ---- DISTRIBUTEDPLAN
-04:EXCHANGE [PARTITION=UNPARTITIONED]
+04:EXCHANGE [UNPARTITIONED]
 |
 02:CROSS JOIN [BROADCAST]
 |
@@ -214,7 +214,7 @@ NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [PARTITION=UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: b.smallint_col = c.int_col, b.id = c.id, b.year = c.year, b.month = c.month
@@ -277,7 +277,7 @@ NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [PARTITION=UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypessmall.smallint_col = functional.alltypestiny.int_col, functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month
@@ -345,7 +345,7 @@ NODE 0:
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
 ---- DISTRIBUTEDPLAN
-04:EXCHANGE [PARTITION=UNPARTITIONED]
+04:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
@@ -389,19 +389,19 @@ where b.year = 2009 and b.tinyint_col = 7 and b.id is null and a.id = 17 and a.i
    partitions=1/4 size=1.57KB
    predicates: a.tinyint_col = 7, a.id = 17
 ---- DISTRIBUTEDPLAN
-05:EXCHANGE [PARTITION=UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: a.tinyint_col = b.tinyint_col, a.id = b.id, a.year = b.year, a.month = b.month
 |  other predicates: a.id = 17, a.int_col IS NULL
 |
-|--04:EXCHANGE [PARTITION=HASH(b.tinyint_col,b.id,b.year,b.month)]
+|--04:EXCHANGE [HASH(b.tinyint_col,b.id,b.year,b.month)]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=12/24 size=238.68KB
 |     predicates: b.tinyint_col = 7, b.id IS NULL
 |
-03:EXCHANGE [PARTITION=HASH(a.tinyint_col,a.id,a.year,a.month)]
+03:EXCHANGE [HASH(a.tinyint_col,a.id,a.year,a.month)]
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=1/4 size=1.57KB
@@ -444,7 +444,7 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [PARTITION=UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
@@ -456,7 +456,7 @@ NODE 1:
 |  |  group by: year, month, id, int_col
 |  |  having: count(*) + 1 = 17
 |  |
-|  04:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
+|  04:EXCHANGE [HASH(year,month,id,int_col)]
 |  |
 |  02:AGGREGATE
 |  |  output: count(*)
@@ -503,7 +503,7 @@ where a.id = b.id and
    partitions=2/24 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [PARTITION=UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
 03:CROSS JOIN [BROADCAST]
 |  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
@@ -515,7 +515,7 @@ where a.id = b.id and
 |  |  group by: year, month, id, int_col
 |  |  having: count(*) + 1 = 17
 |  |
-|  04:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
+|  04:EXCHANGE [HASH(year,month,id,int_col)]
 |  |
 |  02:AGGREGATE
 |  |  output: count(*)
@@ -572,7 +572,7 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ---- DISTRIBUTEDPLAN
-09:EXCHANGE [PARTITION=UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
@@ -582,7 +582,7 @@ NODE 1:
 |  03:SELECT
 |  |  predicates: count(*) + 1 = 17
 |  |
-|  07:EXCHANGE [PARTITION=UNPARTITIONED]
+|  07:EXCHANGE [UNPARTITIONED]
 |  |  limit: 5
 |  |
 |  06:AGGREGATE [MERGE FINALIZE]
@@ -590,7 +590,7 @@ NODE 1:
 |  |  group by: year, month, id, int_col
 |  |  limit: 5
 |  |
-|  05:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
+|  05:EXCHANGE [HASH(year,month,id,int_col)]
 |  |
 |  02:AGGREGATE
 |  |  output: count(*)
@@ -641,7 +641,7 @@ where a.year = 2009 and
    partitions=2/24 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ---- DISTRIBUTEDPLAN
-09:EXCHANGE [PARTITION=UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |
 04:CROSS JOIN [BROADCAST]
 |  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
@@ -651,7 +651,7 @@ where a.year = 2009 and
 |  03:SELECT
 |  |  predicates: count(*) + 1 = 17
 |  |
-|  07:EXCHANGE [PARTITION=UNPARTITIONED]
+|  07:EXCHANGE [UNPARTITIONED]
 |  |  limit: 5
 |  |
 |  06:AGGREGATE [MERGE FINALIZE]
@@ -659,7 +659,7 @@ where a.year = 2009 and
 |  |  group by: year, month, id, int_col
 |  |  limit: 5
 |  |
-|  05:EXCHANGE [PARTITION=HASH(year,month,id,int_col)]
+|  05:EXCHANGE [HASH(year,month,id,int_col)]
 |  |
 |  02:AGGREGATE
 |  |  output: count(*)

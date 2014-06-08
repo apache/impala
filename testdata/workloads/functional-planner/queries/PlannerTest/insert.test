@@ -87,7 +87,7 @@ NODE 0:
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
-01:EXCHANGE [PARTITION=HASH(year,month)]
+01:EXCHANGE [HASH(year,month)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 size=40.07KB
@@ -110,7 +110,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
 |
-01:EXCHANGE [PARTITION=HASH(year,month)]
+01:EXCHANGE [HASH(year,month)]
 |
 00:SCAN HDFS [functional_seq_snap.alltypes]
    partitions=2/24 size=11.34KB
@@ -147,7 +147,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |  output: min(min(id)), min(min(bool_col)), min(min(tinyint_col)), min(min(smallint_col)), min(min(int_col)), min(min(bigint_col)), min(min(float_col)), min(min(double_col)), min(min(date_string_col)), min(min(string_col)), min(min(timestamp_col))
 |  group by: year, month
 |
-02:EXCHANGE [PARTITION=HASH(year,month)]
+02:EXCHANGE [HASH(year,month)]
 |
 01:AGGREGATE
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
@@ -177,7 +177,7 @@ NODE 0:
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,month)]
 |  partitions=12
 |
-01:EXCHANGE [PARTITION=HASH(month)]
+01:EXCHANGE [HASH(month)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 size=40.07KB
@@ -214,7 +214,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |  output: min(min(id)), min(min(bool_col)), min(min(tinyint_col)), min(min(smallint_col)), min(min(int_col)), min(min(bigint_col)), min(min(float_col)), min(min(double_col)), min(min(date_string_col)), min(min(string_col)), min(min(timestamp_col))
 |  group by: month
 |
-02:EXCHANGE [PARTITION=HASH(month)]
+02:EXCHANGE [HASH(month)]
 |
 01:AGGREGATE
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
@@ -265,7 +265,7 @@ NODE 0:
 WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
@@ -370,7 +370,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |  output: sum(count(int_col))
 |  group by: string_col
 |
-02:EXCHANGE [PARTITION=HASH(string_col)]
+02:EXCHANGE [HASH(string_col)]
 |
 01:AGGREGATE
 |  output: count(int_col)
@@ -409,7 +409,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 04:AGGREGATE [MERGE]
 |  group by: string_col, int_col
 |
-03:EXCHANGE [PARTITION=HASH(string_col)]
+03:EXCHANGE [HASH(string_col)]
 |
 01:AGGREGATE
 |  group by: string_col, int_col
@@ -426,7 +426,7 @@ select * from functional.alltypes
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
 |  partitions=24
 |
-01:EXCHANGE [PARTITION=HASH(functional.alltypes.year,functional.alltypes.month)]
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -464,7 +464,7 @@ from functional.alltypes
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,1)]
 |  partitions=2
 |
-01:EXCHANGE [PARTITION=HASH(year)]
+01:EXCHANGE [HASH(year)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB

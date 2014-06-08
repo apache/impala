@@ -41,7 +41,7 @@ public class DataStreamSink extends DataSink {
     output.append(
         String.format("%sDATASTREAM SINK [FRAGMENT=%s, EXCHANGE=%s, %s]",
         prefix, exchNode_.getFragment().getId().toString(),
-        exchNode_.getId().toString(), exchNode_.getPartitionExplainString()));
+        exchNode_.getId().toString(), exchNode_.getDisplayLabelDetail()));
     return output.toString();
   }
 

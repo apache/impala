@@ -21,7 +21,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NavigableMap;
-import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.hadoop.fs.Path;
@@ -29,16 +28,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.BetweenPredicate;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.BinaryPredicate.Operator;
-import com.cloudera.impala.analysis.BoolLiteral;
 import com.cloudera.impala.analysis.CompoundPredicate;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InPredicate;
 import com.cloudera.impala.analysis.IsNullPredicate;
 import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
@@ -51,8 +47,6 @@ import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -655,17 +649,23 @@ public class HdfsScanNode extends ScanNode {
   }
 
   @Override
+  protected String getDisplayLabelDetail() {
+    HdfsTable table = (HdfsTable) desc_.getTable();
+    String result = table.getFullName();
+    if (!table.getFullName().equalsIgnoreCase(desc_.getAlias()) &&
+        !table.getName().equalsIgnoreCase(desc_.getAlias())) {
+      result = result + " " + desc_.getAlias();
+    }
+    return result;
+  }
+
+  @Override
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     HdfsTable table = (HdfsTable) desc_.getTable();
-    String aliasStr = "";
-    if (!table.getFullName().equalsIgnoreCase(desc_.getAlias()) &&
-        !table.getName().equalsIgnoreCase(desc_.getAlias())) {
-      aliasStr = " " + desc_.getAlias();
-    }
-    output.append(String.format("%s%s:%s [%s%s", prefix, id_.toString(),
-        displayName_, table.getFullName(), aliasStr));
+    output.append(String.format("%s%s [%s", prefix, getDisplayLabel(),
+        getDisplayLabelDetail()));
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() &&
         fragment_.isPartitioned()) {
       output.append(", " + fragment_.getDataPartition().getExplainString());

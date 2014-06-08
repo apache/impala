@@ -4,7 +4,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -16,7 +16,7 @@ select x, y from t
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [PARTITION=UNPARTITIONED]
+01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -48,7 +48,7 @@ select * from t1 union all select * from t2 union all select * from t3
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-04:EXCHANGE [PARTITION=UNPARTITIONED]
+04:EXCHANGE [UNPARTITIONED]
 |
 |--07:MERGE
 |  |
@@ -86,7 +86,7 @@ select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [PARTITION=UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
@@ -158,7 +158,7 @@ limit 3
 |  group by: int_col, max(id)
 |  limit: 10
 |
-08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC, tinyint_col ASC
 |  limit: 5
 |
@@ -169,7 +169,7 @@ limit 3
 |  output: max(max(id))
 |  group by: int_col, tinyint_col
 |
-06:EXCHANGE [PARTITION=HASH(int_col,tinyint_col)]
+06:EXCHANGE [HASH(int_col,tinyint_col)]
 |
 01:AGGREGATE
 |  output: max(id)
@@ -198,12 +198,12 @@ select * from t t1 inner join t t2 on (t1.x = t2.x) inner join t t3 on (t2.x = t
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
 ---- DISTRIBUTEDPLAN
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |
-|--07:EXCHANGE [PARTITION=HASH(int_col)]
+|--07:EXCHANGE [HASH(int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
@@ -211,12 +211,12 @@ select * from t t1 inner join t t2 on (t1.x = t2.x) inner join t t3 on (t2.x = t
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |
-|--06:EXCHANGE [PARTITION=HASH(int_col)]
+|--06:EXCHANGE [HASH(int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
 |
-05:EXCHANGE [PARTITION=HASH(int_col)]
+05:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
@@ -241,12 +241,12 @@ select * from t t1 inner join t t2 using(x) inner join t t3 using(x)
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
 ---- DISTRIBUTEDPLAN
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |
-|--07:EXCHANGE [PARTITION=HASH(int_col)]
+|--07:EXCHANGE [HASH(int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
@@ -254,12 +254,12 @@ select * from t t1 inner join t t2 using(x) inner join t t3 using(x)
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |
-|--06:EXCHANGE [PARTITION=HASH(int_col)]
+|--06:EXCHANGE [HASH(int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
 |
-05:EXCHANGE [PARTITION=HASH(int_col)]
+05:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
@@ -284,12 +284,12 @@ select * from t t1 left outer join t t2 using(x) full outer join t t3 using(x)
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
 ---- DISTRIBUTEDPLAN
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |
-|--07:EXCHANGE [PARTITION=HASH(int_col)]
+|--07:EXCHANGE [HASH(int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
@@ -297,12 +297,12 @@ select * from t t1 left outer join t t2 using(x) full outer join t t3 using(x)
 03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |
-|--06:EXCHANGE [PARTITION=HASH(int_col)]
+|--06:EXCHANGE [HASH(int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
 |
-05:EXCHANGE [PARTITION=HASH(int_col)]
+05:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
@@ -329,17 +329,17 @@ select * from t t1 inner join [broadcast] t t2 using(x) inner join [shuffle] t t
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
 ---- DISTRIBUTEDPLAN
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
 |
-|--07:EXCHANGE [PARTITION=HASH(int_col)]
+|--07:EXCHANGE [HASH(int_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
 |
-06:EXCHANGE [PARTITION=HASH(int_col)]
+06:EXCHANGE [HASH(int_col)]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
@@ -368,7 +368,7 @@ with t1 as (values('a', 'b'))
 01:MERGE
    constant-selects=1
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: 'c' ASC
 |  limit: 1
 |
@@ -404,7 +404,7 @@ with t1 as (values('a', 'b'))
 01:MERGE
    constant-selects=1
 ---- DISTRIBUTEDPLAN
-08:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: 'c' ASC
 |  limit: 1
 |
@@ -437,7 +437,7 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(funct
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(functional.alltypestiny.year,functional.alltypestiny.month)]
 |  partitions=4
 |
-01:EXCHANGE [PARTITION=HASH(functional.alltypestiny.year,functional.alltypestiny.month)]
+01:EXCHANGE [HASH(functional.alltypestiny.year,functional.alltypestiny.month)]
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
@@ -462,7 +462,7 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=16
 |
-03:EXCHANGE [PARTITION=UNPARTITIONED]
+03:EXCHANGE [UNPARTITIONED]
 |
 |--05:MERGE
 |  |

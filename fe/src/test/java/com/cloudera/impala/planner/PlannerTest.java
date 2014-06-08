@@ -9,6 +9,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -240,7 +241,30 @@ public class PlannerTest {
             + query + "\n" + result);
       }
       actualOutput.append(Section.SCANRANGELOCATIONS.getHeader() + "\n");
-      actualOutput.append(locationsStr);
+      // Print the locations out sorted since the order is random and messed up
+      // the diffs. The values in locationStr contains "Node X" labels as well
+      // as paths.
+      ArrayList<String> locations = Lists.newArrayList(locationsStr.split("\n"));
+      ArrayList<String> perNodeLocations = Lists.newArrayList();
+
+      for (int i = 0; i < locations.size(); ++i) {
+        if (locations.get(i).startsWith("NODE")) {
+          if (!perNodeLocations.isEmpty()) {
+            Collections.sort(perNodeLocations);
+            actualOutput.append(Joiner.on("\n").join(perNodeLocations)).append("\n");
+            perNodeLocations.clear();
+          }
+          actualOutput.append(locations.get(i)).append("\n");
+        } else {
+          perNodeLocations.add(locations.get(i));
+        }
+      }
+
+      if (!perNodeLocations.isEmpty()) {
+        Collections.sort(perNodeLocations);
+        actualOutput.append(Joiner.on("\n").join(perNodeLocations)).append("\n");
+      }
+
       // TODO: check that scan range locations are identical in both cases
     }
   }

@@ -46,6 +46,7 @@ static const string THREAD_INVOLUNTARY_CONTEXT_SWITCHES = "InvoluntaryContextSwi
 static const string ROOT_COUNTER = "";
 
 const string RuntimeProfile::TOTAL_TIME_COUNTER_NAME = "TotalTime";
+const string RuntimeProfile::INACTIVE_TIME_COUNTER_NAME = "InactiveTotalTime";
 const string RuntimeProfile::ASYNC_TIME_COUNTER_NAME = "AsyncTotalTime";
 
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
@@ -57,19 +58,24 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
     is_averaged_profile_(is_averaged_profile),
     counter_total_time_(TCounterType::TIME_NS),
     total_async_timer_(TCounterType::TIME_NS),
+    inactive_timer_(TCounterType::TIME_NS),
     local_time_percent_(0),
     local_time_ns_(0) {
   Counter* total_time_counter;
   Counter* total_async_timer;
+  Counter* inactive_timer;
   if (!is_averaged_profile) {
     total_time_counter = &counter_total_time_;
     total_async_timer = &total_async_timer_;
+    inactive_timer = &inactive_timer_;
   } else {
     total_time_counter = pool->Add(new AveragedCounter(TCounterType::TIME_NS));
     total_async_timer = pool->Add(new AveragedCounter(TCounterType::TIME_NS));
+    inactive_timer = pool->Add(new AveragedCounter(TCounterType::TIME_NS));
   }
   counter_map_[TOTAL_TIME_COUNTER_NAME] = total_time_counter;
   counter_map_[ASYNC_TIME_COUNTER_NAME] = total_async_timer;
+  counter_map_[INACTIVE_TIME_COUNTER_NAME] = inactive_timer;
 }
 
 RuntimeProfile::~RuntimeProfile() {
@@ -155,6 +161,7 @@ void RuntimeProfile::UpdateAverage(RuntimeProfile* other) {
          src_iter != other->counter_map_.end(); ++src_iter) {
 
       // Ignore this counter for averages.
+      if (src_iter->first == INACTIVE_TIME_COUNTER_NAME) continue;
       if (src_iter->first == ASYNC_TIME_COUNTER_NAME) continue;
 
       dst_iter = counter_map_.find(src_iter->first);
@@ -342,6 +349,7 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
   local_time_ns_ = total_time_counter()->value() - total_child_time;
   if (!is_averaged_profile_) {
     local_time_ns_ += total_async_timer()->value();
+    local_time_ns_ -= inactive_timer()->value();
   }
 
   // Counters have some margin, set to 0 if it was negative.
@@ -811,7 +819,7 @@ void RuntimeProfile::PrintChildCounters(const string& prefix,
       CounterMap::const_iterator iter = counter_map.find(child_counter);
       if (iter == counter_map.end()) continue;
       stream << prefix << "   - " << iter->first << ": "
-             << PrettyPrinter::Print(iter->second->value(), iter->second->type())
+             << PrettyPrinter::Print(iter->second->value(), iter->second->type(), true)
              << endl;
       RuntimeProfile::PrintChildCounters(prefix + "  ", child_counter, counter_map,
           child_counter_map, s);

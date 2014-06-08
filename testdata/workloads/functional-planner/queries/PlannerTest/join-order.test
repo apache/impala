@@ -48,7 +48,7 @@ limit 10
    partitions=1/1 size=718.94MB
    predicates: l_shipdate > '1995-03-15'
 ---- DISTRIBUTEDPLAN
-11:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
 |  limit: 10
 |
@@ -59,7 +59,7 @@ limit 10
 |  output: sum(sum(l_extendedprice * (1 - l_discount)))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
-09:EXCHANGE [PARTITION=HASH(l_orderkey,o_orderdate,o_shippriority)]
+09:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
 |
 05:AGGREGATE
 |  output: sum(l_extendedprice * (1 - l_discount))
@@ -137,7 +137,7 @@ limit 10
    partitions=1/1 size=23.08MB
    predicates: c.c_mktsegment = 'BUILDING'
 ---- DISTRIBUTEDPLAN
-13:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+13:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
 |  limit: 10
 |
@@ -148,7 +148,7 @@ limit 10
 |  output: sum(sum(l_extendedprice * (1 - l_discount)))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
-11:EXCHANGE [PARTITION=HASH(l_orderkey,o_orderdate,o_shippriority)]
+11:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
 |
 05:AGGREGATE
 |  output: sum(l_extendedprice * (1 - l_discount))
@@ -157,24 +157,24 @@ limit 10
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: o.o_orderkey = l.l_orderkey
 |
-|--10:EXCHANGE [PARTITION=HASH(l.l_orderkey)]
+|--10:EXCHANGE [HASH(l.l_orderkey)]
 |  |
 |  02:SCAN HDFS [tpch.lineitem l]
 |     partitions=1/1 size=718.94MB
 |     predicates: l_shipdate > '1995-03-15'
 |
-09:EXCHANGE [PARTITION=HASH(o.o_orderkey)]
+09:EXCHANGE [HASH(o.o_orderkey)]
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: c.c_custkey = o.o_custkey
 |
-|--08:EXCHANGE [PARTITION=HASH(o.o_custkey)]
+|--08:EXCHANGE [HASH(o.o_custkey)]
 |  |
 |  01:SCAN HDFS [tpch.orders o]
 |     partitions=1/1 size=162.56MB
 |     predicates: o_orderdate < '1995-03-15'
 |
-07:EXCHANGE [PARTITION=HASH(c.c_custkey)]
+07:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN HDFS [tpch.customer c]
    partitions=1/1 size=23.08MB
@@ -249,7 +249,7 @@ limit 100
 02:SCAN HDFS [tpch.lineitem l]
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-20:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC
 |  limit: 100
 |
@@ -260,7 +260,7 @@ limit 100
 |  output: sum(sum(l_extendedprice * (1 - l_discount)))
 |  group by: n_name
 |
-18:EXCHANGE [PARTITION=HASH(n_name)]
+18:EXCHANGE [HASH(n_name)]
 |
 11:AGGREGATE
 |  output: sum(l_extendedprice * (1 - l_discount))
@@ -366,7 +366,7 @@ where
 02:SCAN HDFS [tpch.partsupp ps]
    partitions=1/1 size=112.71MB
 ---- DISTRIBUTEDPLAN
-13:EXCHANGE [PARTITION=UNPARTITIONED]
+13:EXCHANGE [UNPARTITIONED]
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: n.n_regionkey = r.r_regionkey
@@ -441,7 +441,7 @@ limit 10
    partitions=1/1 size=162.56MB
    predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
 ---- DISTRIBUTEDPLAN
-09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: o_orderpriority ASC
 |  limit: 10
 |
@@ -452,7 +452,7 @@ limit 10
 |  output: sum(count(*))
 |  group by: o_orderpriority
 |
-07:EXCHANGE [PARTITION=HASH(o_orderpriority)]
+07:EXCHANGE [HASH(o_orderpriority)]
 |
 03:AGGREGATE
 |  output: count(*)
@@ -461,13 +461,13 @@ limit 10
 02:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
 |  hash predicates: o_orderkey = l_orderkey
 |
-|--06:EXCHANGE [PARTITION=HASH(l_orderkey)]
+|--06:EXCHANGE [HASH(l_orderkey)]
 |  |
 |  01:SCAN HDFS [tpch.lineitem]
 |     partitions=1/1 size=718.94MB
 |     predicates: l_commitdate < l_receiptdate
 |
-05:EXCHANGE [PARTITION=HASH(o_orderkey)]
+05:EXCHANGE [HASH(o_orderkey)]
 |
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
@@ -497,7 +497,7 @@ order by o_orderpriority limit 10
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
 ---- DISTRIBUTEDPLAN
-09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: o_orderpriority ASC
 |  limit: 10
 |
@@ -508,7 +508,7 @@ order by o_orderpriority limit 10
 |  output: sum(count(*))
 |  group by: o_orderpriority
 |
-07:EXCHANGE [PARTITION=HASH(o_orderpriority)]
+07:EXCHANGE [HASH(o_orderpriority)]
 |
 03:AGGREGATE
 |  output: count(*)
@@ -517,12 +517,12 @@ order by o_orderpriority limit 10
 02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: o_orderkey = l_orderkey
 |
-|--06:EXCHANGE [PARTITION=HASH(l_orderkey)]
+|--06:EXCHANGE [HASH(l_orderkey)]
 |  |
 |  01:SCAN HDFS [tpch.lineitem]
 |     partitions=1/1 size=718.94MB
 |
-05:EXCHANGE [PARTITION=HASH(o_orderkey)]
+05:EXCHANGE [HASH(o_orderkey)]
 |
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
@@ -551,7 +551,7 @@ order by o_orderpriority limit 10
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
 ---- DISTRIBUTEDPLAN
-09:MERGING-EXCHANGE [PARTITION=UNPARTITIONED]
+09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: o_orderpriority ASC
 |  limit: 10
 |
@@ -562,7 +562,7 @@ order by o_orderpriority limit 10
 |  output: sum(count(*))
 |  group by: o_orderpriority
 |
-07:EXCHANGE [PARTITION=HASH(o_orderpriority)]
+07:EXCHANGE [HASH(o_orderpriority)]
 |
 03:AGGREGATE
 |  output: count(*)
@@ -571,12 +571,12 @@ order by o_orderpriority limit 10
 02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: o_orderkey = l_orderkey
 |
-|--06:EXCHANGE [PARTITION=HASH(l_orderkey)]
+|--06:EXCHANGE [HASH(l_orderkey)]
 |  |
 |  01:SCAN HDFS [tpch.lineitem]
 |     partitions=1/1 size=718.94MB
 |
-05:EXCHANGE [PARTITION=HASH(o_orderkey)]
+05:EXCHANGE [HASH(o_orderkey)]
 |
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
@@ -611,7 +611,7 @@ where n_name = 'x'
 10:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*))
 |
-09:EXCHANGE [PARTITION=UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |
 05:AGGREGATE
 |  output: count(*)
@@ -628,12 +628,12 @@ where n_name = 'x'
 03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
 |  hash predicates: c_custkey = o_custkey
 |
-|--07:EXCHANGE [PARTITION=HASH(o_custkey)]
+|--07:EXCHANGE [HASH(o_custkey)]
 |  |
 |  01:SCAN HDFS [tpch.orders]
 |     partitions=1/1 size=162.56MB
 |
-06:EXCHANGE [PARTITION=HASH(c_custkey)]
+06:EXCHANGE [HASH(c_custkey)]
 |
 00:SCAN HDFS [tpch.customer]
    partitions=1/1 size=23.08MB
@@ -667,7 +667,7 @@ where n_name = 'x'
 09:AGGREGATE [MERGE FINALIZE]
 |  output: sum(count(*))
 |
-08:EXCHANGE [PARTITION=UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
 |
 05:AGGREGATE
 |  output: count(*)
@@ -713,7 +713,7 @@ where alltypes.id = alltypestiny.id and alltypes.id = alltypessmall.id
 01:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [PARTITION=UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
 04:CROSS JOIN [BROADCAST]
 |  predicates: alltypes.id = alltypestiny.id, alltypes.id = alltypessmall.id

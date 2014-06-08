@@ -261,7 +261,7 @@ static void PrintTimeMS(int64_t value, stringstream* ss) {
   }
 }
 
-string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
+string PrettyPrinter::Print(int64_t value, TCounterType::type type, bool verbose) {
   stringstream ss;
   ss.flags(ios::fixed);
   switch (type) {
@@ -271,7 +271,8 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
       if (unit.empty()) {
         ss << value;
       } else {
-        ss << setprecision(PRECISION) << output << unit << " (" << value << ")";
+        ss << setprecision(PRECISION) << output << unit;
+        if (verbose) ss << " (" << value << ")";
       }
       break;
     }
@@ -322,6 +323,7 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
         ss << "0";
       } else {
         ss << setprecision(PRECISION) << output << " " << unit;
+        if (verbose) ss << " (" << value << ")";
       }
       break;
     }
