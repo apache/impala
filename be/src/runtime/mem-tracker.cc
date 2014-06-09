@@ -15,6 +15,7 @@
 #include "runtime/mem-tracker.h"
 
 #include <boost/algorithm/string/join.hpp>
+#include <google/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 
 #include "runtime/exec-env.h"
@@ -34,6 +35,8 @@ const string MemTracker::COUNTER_NAME = "PeakMemoryUsage";
 MemTracker::RequestTrackersMap MemTracker::request_to_mem_trackers_;
 MemTracker::PoolTrackersMap MemTracker::pool_to_mem_trackers_;
 mutex MemTracker::static_mem_trackers_lock_;
+
+AtomicInt<int64_t> MemTracker::released_memory_since_gc_;
 
 // Name for request pool MemTrackers. '$0' is replaced with the pool name.
 const string REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT = "RequestPool=$0";
@@ -266,6 +269,15 @@ bool MemTracker::GcMemory(int64_t max_consumption) {
     bytes_freed_by_last_gc_metric_->Update(pre_gc_consumption - consumption());
   }
   return consumption() > max_consumption;
+}
+
+void MemTracker::GcTcmalloc() {
+#ifndef ADDRESS_SANITIZER
+  released_memory_since_gc_ = 0;
+  MallocExtension::instance()->ReleaseFreeMemory();
+#else
+  // Nothing to do if not using tcmalloc.
+#endif
 }
 
 bool MemTracker::ExpandLimit(int64_t bytes) {

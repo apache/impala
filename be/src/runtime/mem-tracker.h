@@ -103,6 +103,11 @@ class MemTracker {
 
   // Increases consumption of this tracker and its ancestors by 'bytes'.
   void Consume(int64_t bytes) {
+    if (bytes < 0) {
+      Release(-bytes);
+      return;
+    }
+
     if (consumption_metric_ != NULL) {
       DCHECK(parent_ == NULL);
       consumption_->Set(consumption_metric_->value());
@@ -172,6 +177,15 @@ class MemTracker {
 
   // Decreases consumption of this tracker and its ancestors by 'bytes'.
   void Release(int64_t bytes) {
+    if (bytes < 0) {
+      Consume(-bytes);
+      return;
+    }
+
+    if (UNLIKELY(released_memory_since_gc_.UpdateAndFetch(bytes)) > GC_RELEASE_SIZE) {
+      GcTcmalloc();
+    }
+
     if (consumption_metric_ != NULL) {
       DCHECK(parent_ == NULL);
       consumption_->Set(consumption_metric_->value());
@@ -277,10 +291,40 @@ class MemTracker {
   // gc_lock. Updates metrics if initialized.
   bool GcMemory(int64_t max_consumption);
 
+  // Called when the total release memory is larger than GC_RELEASE_SIZE.
+  // TcMalloc holds onto released memory and very slowly (if ever) releases it back to
+  // the OS. This is problematic since it is memory we are not constantly tracking which
+  // can cause us to go way over mem limits.
+  void GcTcmalloc();
+
   // Set the resource mgr to allow expansion of limits (if NULL, no expansion is possible)
   void SetQueryResourceMgr(QueryResourceMgr* context) {
     query_resource_mgr_ = context;
   }
+
+  // Walks the MemTracker hierarchy and populates all_trackers_ and
+  // limit_trackers_
+  void Init();
+
+  // Adds tracker to child_trackers_
+  void AddChildTracker(MemTracker* tracker);
+
+  // Logs the stack of the current consume/release. Used for debugging only.
+  void LogUpdate(bool is_consume, int64_t bytes) const;
+
+  static std::string LogUsage(const std::string& prefix,
+      const std::list<MemTracker*>& trackers);
+
+  // Size, in bytes, that is considered a large value for Release() (or Consume() with
+  // a negative value). If tcmalloc is used, this can trigger it to GC.
+  // A higher value will make us call into tcmalloc less often (and therefore more
+  // efficient). A lower value will mean our memory overhead is lower.
+  // TODO: this is a stopgap.
+  static const int64_t GC_RELEASE_SIZE = 128 * 1024L * 1024L;
+
+  // Total amount of memory from calls to Release() since the last GC. If this
+  // is greater than GC_RELEASE_SIZE, this will trigger a tcmalloc gc.
+  static AtomicInt<int64_t> released_memory_since_gc_;
 
   // Lock to protect GcMemory(). This prevents many GCs from occurring at once.
   SpinLock gc_lock_;
@@ -355,19 +399,6 @@ class MemTracker {
   // If non-NULL, contains all the information required to expand resource reservations if
   // required.
   QueryResourceMgr* query_resource_mgr_;
-
-  // Walks the MemTracker hierarchy and populates all_trackers_ and
-  // limit_trackers_
-  void Init();
-
-  // Adds tracker to child_trackers_
-  void AddChildTracker(MemTracker* tracker);
-
-  // Logs the stack of the current consume/release. Used for debugging only.
-  void LogUpdate(bool is_consume, int64_t bytes) const;
-
-  static std::string LogUsage(const std::string& prefix,
-      const std::list<MemTracker*>& trackers);
 
   // The number of times the GcFunctions were called.
   Metrics::IntMetric* num_gcs_metric_;
