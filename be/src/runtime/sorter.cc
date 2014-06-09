@@ -238,14 +238,14 @@ class Sorter::TupleSorter {
 Sorter::Run::Run(Sorter* parent, TupleDescriptor* sort_tuple_desc,
     bool materialize_slots)
   : sorter_(parent),
-    is_sorted_(false),
-    is_pinned_(true),
     sort_tuple_desc_(sort_tuple_desc),
     sort_tuple_size_(sort_tuple_desc->byte_size()),
-    materialize_slots_(materialize_slots),
+    block_size_(parent->block_mgr_->block_size()),
     has_var_len_slots_(sort_tuple_desc->string_slots().size() > 0),
     max_blocks_in_unsorted_run_(parent->block_mgr_->max_available_buffers() - 1),
-    block_size_(parent->block_mgr_->block_size()),
+    materialize_slots_(materialize_slots),
+    is_sorted_(false),
+    is_pinned_(true),
     num_tuples_(0) {
 }
 
@@ -265,7 +265,6 @@ template <bool has_var_len_data>
 Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processed) {
   *num_processed = 0;
   BufferedBlockMgr::Block* cur_fixed_len_block = fixed_len_blocks_.back();
-  BufferedBlockMgr::Block* new_block;
 
   DCHECK_EQ(materialize_slots_, !is_sorted_);
   if (!materialize_slots_) {
@@ -615,9 +614,9 @@ void Sorter::Run::CopyVarLenDataConvertOffset(char* dest, int64_t offset,
 // Sorter::TupleSorter methods.
 Sorter::TupleSorter::TupleSorter(const LessThanComparator& comp, int64_t block_size,
     int tuple_size)
-  : less_than_comp_(comp),
-    tuple_size_(tuple_size),
-    block_capacity_(block_size / tuple_size) {
+  : tuple_size_(tuple_size),
+    block_capacity_(block_size / tuple_size),
+    less_than_comp_(comp) {
   temp_tuple_buffer_ = new uint8_t[tuple_size];
   temp_tuple_ = reinterpret_cast<Tuple*>(temp_tuple_buffer_);
   swap_buffer_ = new uint8_t[tuple_size];
@@ -723,13 +722,13 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
     const vector<Expr*>& slot_materialize_exprs, BufferedBlockMgr* block_mgr,
     RowDescriptor* output_row_desc, MemTracker* mem_tracker, RuntimeProfile* profile,
     int merge_batch_size)
-  : block_mgr_(block_mgr),
-    output_row_desc_(output_row_desc),
-    mem_tracker_(mem_tracker),
-    profile_(profile),
-    sort_tuple_slot_exprs_(slot_materialize_exprs),
+  : merge_batch_size_(merge_batch_size),
     compare_less_than_(compare_less_than),
-    merge_batch_size_(merge_batch_size) {
+    block_mgr_(block_mgr),
+    output_row_desc_(output_row_desc),
+    sort_tuple_slot_exprs_(slot_materialize_exprs),
+    mem_tracker_(mem_tracker),
+    profile_(profile) {
   TupleDescriptor* sort_tuple_desc = output_row_desc->tuple_descriptors()[0];
   has_var_len_slots_ = sort_tuple_desc->string_slots().size() > 0;
   in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than, block_mgr->block_size(),

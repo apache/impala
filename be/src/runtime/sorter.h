@@ -143,6 +143,10 @@ class Sorter {
   // during a merge.
   const int merge_batch_size_;
 
+  // In memory sorter and less-than comparator.
+  TupleRowComparator compare_less_than_;
+  boost::scoped_ptr<TupleSorter> in_mem_tuple_sorter_;
+
   // Block manager object used to allocate, pin and release runs. Not owned by Sorter.
   BufferedBlockMgr* block_mgr_;
 
@@ -170,14 +174,12 @@ class Sorter {
   // Mem tracker for batches created during merge. Not owned by Sorter.
   MemTracker* mem_tracker_;
 
-  // In memory sorter and less-than comparator.
-  TupleRowComparator compare_less_than_;
-  boost::scoped_ptr<TupleSorter> in_mem_tuple_sorter_;
-
   // Merger object (intermediate or final) currently used to produce sorted runs.
   // Only one merge is performed at a time. Will never be used if the input fits in
   // memory.
   boost::scoped_ptr<SortedRunMerger> merger_;
+
+  // Pool of owned Run objects.
   ObjectPool obj_pool_;
 
   // Runtime profile and counters for this sorter instance.

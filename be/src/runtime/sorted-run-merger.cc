@@ -36,8 +36,8 @@ class SortedRunMerger::BatchedRowSupplier {
   // Construct an instance from a sorted input run.
   BatchedRowSupplier(SortedRunMerger* parent, const RunBatchSupplier& sorted_run)
     : sorted_run_(sorted_run),
-      input_row_batch_index_(-1),
       input_row_batch_(NULL),
+      input_row_batch_index_(-1),
       parent_(parent) {
   }
 
@@ -118,9 +118,9 @@ void SortedRunMerger::Heapify(int parent_index) {
 
 SortedRunMerger::SortedRunMerger(const TupleRowComparator& compare_less_than,
     RowDescriptor* row_desc, RuntimeProfile* profile, bool deep_copy_input)
-  : input_row_desc_(row_desc),
-    deep_copy_input_(deep_copy_input),
-    compare_less_than_(compare_less_than) {
+  : compare_less_than_(compare_less_than),
+    input_row_desc_(row_desc),
+    deep_copy_input_(deep_copy_input) {
   get_next_timer_ = ADD_TIMER(profile, "MergeGetNext");
   get_next_batch_timer_ = ADD_TIMER(profile, "MergeGetNextBatch");
 }

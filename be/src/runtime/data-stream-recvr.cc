@@ -284,9 +284,9 @@ DataStreamRecvr::DataStreamRecvr(DataStreamMgr* stream_mgr, MemTracker* parent_t
   : mgr_(stream_mgr),
     fragment_instance_id_(fragment_instance_id),
     dest_node_id_(dest_node_id),
-    is_merging_(is_merging),
-    row_desc_(row_desc),
     total_buffer_limit_(total_buffer_limit),
+    row_desc_(row_desc),
+    is_merging_(is_merging),
     num_buffered_bytes_(0),
     profile_(profile) {
   mem_tracker_.reset(new MemTracker(-1, "DataStreamRecvr", parent_tracker));

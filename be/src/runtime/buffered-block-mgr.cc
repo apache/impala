@@ -29,8 +29,8 @@ namespace impala {
 BufferedBlockMgr::Block::Block(BufferedBlockMgr* block_mgr)
   : buffer_desc_(NULL),
     block_mgr_(block_mgr),
-    valid_data_len_(0),
     write_range_(NULL),
+    valid_data_len_(0),
     unpinned_blocks_it_(block_mgr->unpinned_blocks_.end()) {
 }
 
@@ -159,10 +159,10 @@ void BufferedBlockMgr::Close() {
 
 BufferedBlockMgr::BufferedBlockMgr(DiskIoMgr* io_mgr, MemTracker* parent,
     int64_t mem_limit, int64_t block_size)
-  : io_mgr_(io_mgr),
-    block_size_(block_size),
+  : block_size_(block_size),
     block_write_threshold_(TmpFileMgr::num_tmp_devices()),
     num_outstanding_writes_(0),
+    io_mgr_(io_mgr),
     closed_(false) {
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(new MemTracker(mem_limit, "Block Manager", parent));

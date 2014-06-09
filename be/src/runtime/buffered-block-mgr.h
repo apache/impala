@@ -151,6 +151,13 @@ class BufferedBlockMgr {
     // Debug helper method to print the state of a block.
     std::string DebugString() const;
 
+    // Pointer to the buffer associated with the block. NULL if the block is not in
+    // memory and cannot be changed while the block is pinned or being written.
+    BufferDescriptor* buffer_desc_;
+
+    // Parent block manager object. Responsible for maintaining the state of the block.
+    BufferedBlockMgr* block_mgr_;
+
     // WriteRange object representing the on-disk location used to persist a block.
     // Is created the first time a block is persisted, and retained until the block
     // object is destroyed. The file location and offset in write_range_ are valid
@@ -158,13 +165,6 @@ class BufferedBlockMgr {
     // write_range_ are only valid while the block is being written.
     // write_range_ instance is owned by the block manager.
     DiskIoMgr::WriteRange* write_range_;
-
-    // Parent block manager object. Responsible for maintaining the state of the block.
-    BufferedBlockMgr* block_mgr_;
-
-    // Pointer to the buffer associated with the block. NULL if the block is not in
-    // memory and cannot be changed while the block is pinned or being written.
-    BufferDescriptor* buffer_desc_;
 
     // Length of valid (i.e. allocated) data within the block.
     int64_t valid_data_len_;

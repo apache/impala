@@ -127,15 +127,15 @@ class DataStreamRecvr {
   // exceeds this value
   int total_buffer_limit_;
 
-  // total number of bytes held across all sender queues.
-  AtomicInt<int> num_buffered_bytes_;
-
   // Row schema, copied from the caller of CreateRecvr().
   RowDescriptor row_desc_;
 
   // True if this reciver merges incoming rows from different senders. Per-sender
   // row batch queues are maintained in this case.
   bool is_merging_;
+
+  // total number of bytes held across all sender queues.
+  AtomicInt<int> num_buffered_bytes_;
 
   // Memtracker for batches in the sender queue(s).
   boost::scoped_ptr<MemTracker> mem_tracker_;
