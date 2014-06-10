@@ -346,7 +346,16 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
     // If there is a fragment, the fragment executor created above initializes the query
     // mem tracker. If not, the query mem tracker is created here.
     int64_t query_limit = -1;
-    if (query_ctx_.request.query_options.__isset.mem_limit &&
+    if (schedule.HasReservation()) {
+      TNetworkAddress resource_addr;
+      schedule.GetResourceHostport(coord, &resource_addr);
+      map<TNetworkAddress, llama::TAllocatedResource>::const_iterator it =
+          schedule.reservation()->allocated_resources.find(resource_addr);
+      if (it != schedule.reservation()->allocated_resources.end()) {
+        query_limit = it->second.memory_mb * 1024L * 1024L;
+      }
+    }
+    if (query_limit == -1 && query_ctx_.request.query_options.__isset.mem_limit &&
         query_ctx_.request.query_options.mem_limit > 0) {
       query_limit = query_ctx_.request.query_options.mem_limit;
     }
