@@ -64,6 +64,11 @@ class RuntimeState {
     assert(false);
   }
 
+  bool abort_on_error() {
+    assert(false);
+    return false;
+  }
+
   bool LogError(const std::string& error) {
     assert(false);
     return false;
@@ -117,41 +122,39 @@ FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
 }
 
 void FunctionContextImpl::Close() {
+  stringstream error_ss;
   if (!allocations_.empty()) {
     int bytes = 0;
     for (map<uint8_t*, int>::iterator i = allocations_.begin();
          i != allocations_.end(); ++i) {
       bytes += i->second;
     }
-    stringstream ss;
-    ss << bytes << " bytes leaked via FunctionContext::Allocate()";
-    context_->SetError(ss.str().c_str());
-#ifndef IMPALA_UDF_SDK_BUILD
-    // TODO: this is a stopgap because setting the error in Close() causes it to not be
-    // displayed in the shell.
-    LOG(WARNING) << ss.str();
-#endif
+    error_ss << bytes << " bytes leaked via FunctionContext::Allocate()";
+    allocations_.clear();
   }
-  allocations_.clear();
-
-  FreeLocalAllocations();
 
   if (external_bytes_tracked_ > 0) {
-    stringstream ss;
-    ss << external_bytes_tracked_
-       << " bytes leaked via FunctionContext::TrackAllocation()";
-    context_->SetError(ss.str().c_str());
-#ifndef IMPALA_UDF_SDK_BUILD
-    // TODO: this is a stopgap because setting the error in Close() causes it to not be
-    // displayed in the shell.
-    LOG(WARNING) << ss.str();
-#endif
+    if (!error_ss.str().empty()) error_ss << ", ";
+    error_ss << external_bytes_tracked_
+             << " bytes leaked via FunctionContext::TrackAllocation()";
+    // This isn't ideal because the memory is still leaked, but don't track it so our
+    // accounting stays sane.
+    // TODO: we need to modify the memtrackers to allow leaked user-allocated memory.
+    context_->Free(external_bytes_tracked_);
   }
-  // This isn't ideal because the memory is still leaked, but don't track it so our
-  // accounting stays sane.
-  // TODO: we need to modify the memtrackers to allow leaked user-allocated memory.
-  context_->Free(external_bytes_tracked_);
 
+  if (!error_ss.str().empty()) {
+    // Treat memory leaks as errors in the SDK build so they trigger test failures, but
+    // don't blow up actual queries due to leaks (unless abort_on_error is true).
+    if (state_ == NULL || state_->abort_on_error()) {
+      context_->SetError(error_ss.str().c_str());
+    } else {
+      context_->AddWarning(error_ss.str().c_str());
+    }
+  }
+
+  // Local allocations cannot be leaked (at least not by the UDF)
+  FreeLocalAllocations();
   closed_ = true;
 }
 

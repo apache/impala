@@ -259,19 +259,16 @@ TEST(UdfTest, TestVarArgs) {
 }
 
 TEST(UdfTest, MemTest) {
-  scoped_ptr<BigIntVal> bytes_arg(new BigIntVal(1000));
-  vector<AnyVal*> constant_args;
-  constant_args.push_back(bytes_arg.get());
+  BigIntVal bytes_arg(1000);
 
   EXPECT_TRUE((UdfTestHarness::ValidateUdf<BigIntVal, BigIntVal>(
-      ::MemTest, *bytes_arg, *bytes_arg, ::MemTestPrepare, ::MemTestClose,
-      constant_args)));
+      ::MemTest, bytes_arg, bytes_arg, ::MemTestPrepare, ::MemTestClose)));
 
   EXPECT_FALSE((UdfTestHarness::ValidateUdf<BigIntVal, BigIntVal>(
-      ::MemTest, *bytes_arg, *bytes_arg, ::MemTestPrepare, NULL, constant_args)));
+      ::MemTest, bytes_arg, bytes_arg, ::MemTestPrepare, NULL)));
 
   EXPECT_FALSE((UdfTestHarness::ValidateUdf<BigIntVal, BigIntVal>(
-      ::DoubleFreeTest, *bytes_arg, *bytes_arg)));
+      ::DoubleFreeTest, bytes_arg, bytes_arg)));
 
 }
 

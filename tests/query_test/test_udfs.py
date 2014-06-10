@@ -245,6 +245,8 @@ drop function if exists {database}.validate_arg_type(string);
 drop function if exists {database}.count_rows();
 drop function if exists {database}.constant_arg(int);
 drop function if exists {database}.validate_open(int);
+drop function if exists {database}.mem_test(bigint);
+drop function if exists {database}.mem_test_leaks(bigint);
 
 create database if not exists {database};
 
@@ -332,4 +334,12 @@ location '{location}' symbol='ConstantArg' prepare_fn='ConstantArgPrepare' close
 create function {database}.validate_open(int) returns boolean
 location '{location}' symbol='ValidateOpen'
 prepare_fn='ValidateOpenPrepare' close_fn='ValidateOpenClose';
+
+create function {database}.mem_test(bigint) returns bigint
+location '{location}' symbol='MemTest'
+prepare_fn='MemTestPrepare' close_fn='MemTestClose';
+
+create function {database}.mem_test_leaks(bigint) returns bigint
+location '{location}' symbol='MemTest'
+prepare_fn='MemTestPrepare';
 """

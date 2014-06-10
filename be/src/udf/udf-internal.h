@@ -91,6 +91,7 @@ class FunctionContextImpl {
 
   // Allocations made and still owned by the user function.
   std::map<uint8_t*, int> allocations_;
+  // Allocations owned by Impala.
   std::vector<uint8_t*> local_allocations_;
 
   // The function state accessed via FunctionContext::Get/SetFunctionState()

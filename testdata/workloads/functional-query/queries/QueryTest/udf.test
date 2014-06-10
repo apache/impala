@@ -455,3 +455,20 @@ select * from functional.alltypestiny where identity(year) = 2009 and identity(m
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
+---- QUERY
+select mem_test(100);
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+---- QUERY
+select mem_test_leaks(100);
+---- TYPES
+bigint
+---- RESULTS
+100
+---- ERRORS
+# TODO: this should print a warning, but we can't retrieve errors from the runtime state
+# log if they're added while the query is closing.
+====
