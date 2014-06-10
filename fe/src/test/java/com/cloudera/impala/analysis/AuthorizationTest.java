@@ -47,7 +47,6 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.Frontend;
-import com.cloudera.impala.service.SentryPolicyService;
 import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
@@ -56,6 +55,7 @@ import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TSessionState;
+import com.cloudera.impala.util.SentryPolicyService;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

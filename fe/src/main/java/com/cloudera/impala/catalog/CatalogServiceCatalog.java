@@ -42,7 +42,6 @@ import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.service.SentryPolicyService;
 import com.cloudera.impala.thrift.TCatalog;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -52,6 +51,7 @@ import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.util.PatternMatcher;
+import com.cloudera.impala.util.SentryPolicyService;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -136,8 +136,6 @@ public class CatalogServiceCatalog extends Catalog {
     cachePoolReader_.scheduleAtFixedRate(new CachePoolReader(), 0, 1, TimeUnit.MINUTES);
     if (sentryConfig != null) {
       sentryPolicyService_ = new SentryPolicyService(sentryConfig, null);
-      AuthorizationPolicyReader policyReader = new AuthorizationPolicyReader();
-      policyReader.run();
       policyReader_.scheduleAtFixedRate(new AuthorizationPolicyReader(), 0, 60,
           TimeUnit.SECONDS);
     } else {
@@ -451,6 +449,17 @@ public class CatalogServiceCatalog extends Catalog {
    * Resets this catalog instance by clearing all cached table and database metadata.
    */
   public void reset() throws CatalogException {
+    // First update the policy metadata.
+    if (sentryPolicyService_ != null) {
+      // Sentry Service is enabled.
+      try {
+        // Update the authorization policy, waiting for the result to complete.
+        policyReader_.submit(new AuthorizationPolicyReader()).get();
+      } catch (Exception e) {
+        throw new CatalogException("Error updating authorization policy: ", e);
+      }
+    }
+
     catalogLock_.writeLock().lock();
     try {
       nextTableId_.set(0);

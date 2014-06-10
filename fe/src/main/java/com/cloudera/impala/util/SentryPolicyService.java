@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.cloudera.impala.service;
+package com.cloudera.impala.util;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.sentry.SentryUserException;
 import org.apache.sentry.provider.db.SentryAlreadyExistsException;
@@ -39,41 +38,42 @@ import com.google.common.collect.Lists;
 
 /**
  *  Wrapper around the SentryService APIs that are used by Impala and Impala tests.
- *  NOTE: Currently the RPCs require passing user/group information. This will be
- *  fixed in SENTRY-191, but for now we pass bogus values.
  */
 public class SentryPolicyService {
   private final static Logger LOG = LoggerFactory.getLogger(SentryPolicyService.class);
-
-  // Queue of clients.
-  private final LinkedBlockingQueue<SentryServiceClient> clientPool_ =
-      new LinkedBlockingQueue<SentryServiceClient>();
 
   private final SentryConfig config_;
   private final String serverName_;
   private final User user_ = new User(System.getProperty("user.name"));
 
   /**
-   * Wrapper around a SentryPolicyServiceClient. Handles creating clients and releasing
-   * them back to the clientPool_.
+   * Wrapper around a SentryPolicyServiceClient.
+   * TODO: When SENTRY-296 is resolved we can more easily cache connections instead of
+   * opening a new connection for each request.
    */
   class SentryServiceClient {
     private final SentryPolicyServiceClient client_;
 
     /**
-     * Creates a new Sentry Service thrift client.
+     * Creates and opens a new Sentry Service thrift client.
      */
-    public SentryServiceClient() throws InternalException { client_ = createClient(); }
+    public SentryServiceClient() throws InternalException {
+      client_ = createClient();
+    }
 
     /**
      * Get the underlying SentryPolicyServiceClient.
      */
-    public SentryPolicyServiceClient get() { return client_; }
+    public SentryPolicyServiceClient get() {
+      return client_;
+    }
 
     /**
-     * Returns this client back to the connection pool.
+     * Returns this client back to the connection pool. Can be called multiple times.
      */
-    public void release() { clientPool_.add(this); }
+    public void close() {
+      client_.close();
+    }
 
     /**
      * Creates a new client to the SentryService.
@@ -103,7 +103,7 @@ public class SentryPolicyService {
    */
   public void dropRole(String roleName, boolean ifExists) throws InternalException {
     LOG.trace("Dropping role: " + roleName);
-    SentryServiceClient client = getClient();
+    SentryServiceClient client = new SentryServiceClient();
     try {
       if (ifExists) {
         client.get().dropRoleIfExists(user_.getName(), roleName);
@@ -113,7 +113,7 @@ public class SentryPolicyService {
     } catch (SentryUserException e) {
       throw new InternalException("Error dropping role: ", e);
     } finally {
-      client.release();
+      client.close();
     }
   }
 
@@ -127,7 +127,7 @@ public class SentryPolicyService {
   public void createRole(String roleName, boolean ifNotExists)
       throws InternalException {
     LOG.trace("Creating role: " + roleName);
-    SentryServiceClient client = getClient();
+    SentryServiceClient client = new SentryServiceClient();
     try {
       client.get().createRole(user_.getName(), roleName);
     } catch (SentryAlreadyExistsException e) {
@@ -136,7 +136,7 @@ public class SentryPolicyService {
     } catch (SentryUserException e) {
       throw new InternalException("Error creating role: ", e);
     } finally {
-      client.release();
+      client.close();
     }
   }
 
@@ -151,13 +151,13 @@ public class SentryPolicyService {
       throws InternalException {
     LOG.trace(String.format("Granting role '%s' to group '%s'", roleName, groupName));
 
-    SentryServiceClient client = getClient();
+    SentryServiceClient client = new SentryServiceClient();
     try {
       client.get().grantRoleToGroup(user_.getName(), groupName, roleName);
     } catch (SentryUserException e) {
       throw new InternalException("Error granting role to group: ", e);
     } finally {
-      client.release();
+      client.close();
     }
   }
 
@@ -174,7 +174,7 @@ public class SentryPolicyService {
     LOG.trace(String.format("Granting role '%s' privilege '%s' on '%s'", roleName,
         privilege.toString(), authorizeable.getName()));
 
-    SentryServiceClient client = getClient();
+    SentryServiceClient client = new SentryServiceClient();
     try {
       if (authorizeable instanceof AuthorizeableDb) {
         AuthorizeableDb db = (AuthorizeableDb) authorizeable;
@@ -217,7 +217,7 @@ public class SentryPolicyService {
             authorizeable.getClass().getName());
       }
     } finally {
-      client.release();
+      client.close();
     }
   }
 
@@ -232,13 +232,13 @@ public class SentryPolicyService {
       throws InternalException {
     LOG.trace(String.format("Revoking role '%s' from group '%s'", roleName, groupName));
 
-    SentryServiceClient client = getClient();
+    SentryServiceClient client = new SentryServiceClient();
     try {
       client.get().revokeRoleFromGroup(user_.getName(), groupName, roleName);
     } catch (SentryUserException e) {
       throw new InternalException("Error revoking role from group: ", e);
     } finally {
-      client.release();
+      client.close();
     }
   }
 
@@ -246,13 +246,13 @@ public class SentryPolicyService {
    * Lists all roles.
    */
   public List<TSentryRole> listAllRoles() throws InternalException {
-    SentryServiceClient client = getClient();
+    SentryServiceClient client = new SentryServiceClient();
     try {
       return Lists.newArrayList(client.get().listRoles(user_.getName()));
     } catch (SentryUserException e) {
       throw new InternalException("Error listing roles: ", e);
     } finally {
-      client.release();
+      client.close();
     }
   }
 
@@ -261,25 +261,14 @@ public class SentryPolicyService {
    */
   public List<TSentryPrivilege> listRolePrivileges(String roleName)
       throws InternalException {
-    SentryServiceClient client = getClient();
+    SentryServiceClient client = new SentryServiceClient();
     try {
       return Lists.newArrayList(client.get().listAllPrivilegesByRoleName(user_.getName(),
           roleName));
     } catch (SentryUserException e) {
       throw new InternalException("Error listing privileges by role name: ", e);
     } finally {
-      client.release();
+      client.close();
     }
-  }
-
-  /**
-   * Gets a client from the pool. If the pool is empty a new client is created.
-   * Throws an "InternalException" if there is an error creating the client.
-   */
-  private SentryServiceClient getClient() throws InternalException {
-    SentryServiceClient client = clientPool_.poll();
-    // The pool was empty, create a new client.
-    if (client == null) client = new SentryServiceClient();
-    return client;
   }
 }
