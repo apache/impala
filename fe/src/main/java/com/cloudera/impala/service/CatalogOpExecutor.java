@@ -63,6 +63,8 @@ import com.cloudera.impala.catalog.IncompleteTable;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.InlineView;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.common.ImpalaException;
@@ -918,6 +920,11 @@ public class CatalogOpExecutor {
     tbl.getSd().setLocation(params.getLocation());
     if (fileFormat != null) {
       setStorageDescriptorFileFormat(tbl.getSd(), fileFormat);
+    } else if (fileFormat == null && srcTable instanceof View) {
+      // Here, source table is a view which has no input format. So to be
+      // consistent with CREATE TABLE, default input format is assumed to be
+      // TEXT unless otherwise specified.
+      setStorageDescriptorFileFormat(tbl.getSd(), THdfsFileFormat.TEXT);
     }
     // Set the row count of this table to unknown.
     tbl.putToParameters(StatsSetupConst.ROW_COUNT, "-1");

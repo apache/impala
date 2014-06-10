@@ -156,6 +156,60 @@ stored as parquet
 ---- RESULTS
 ====
 ---- QUERY
+# CREATE TABLE LIKE on a view
+create table like_view like functional.view_view
+---- RESULTS
+====
+---- QUERY
+describe like_view
+---- RESULTS
+'id','int',''
+'bool_col','boolean',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'date_string_col','string',''
+'string_col','string',''
+'timestamp_col','timestamp',''
+'year','int',''
+'month','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+show table stats like_view
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
+---- RESULTS
+-1,0,'0B','NOT CACHED','TEXT'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+drop table like_view
+---- RESULTS
+====
+---- QUERY
+create table like_view_parquet like functional.view_view stored as parquet
+---- RESULTS
+====
+---- QUERY
+show table stats like_view_parquet
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
+---- RESULTS
+-1,0,'0B','NOT CACHED','PARQUET'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+drop table like_view_parquet
+---- RESULTS
+====
+---- QUERY
 # Make sure no data exists for this table
 select count(*) from alltypes_test
 ---- RESULTS

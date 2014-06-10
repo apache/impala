@@ -742,6 +742,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create table functional.new_table (i int)");
     AnalyzesOk("create table if not exists functional.alltypes (i int)");
     AnalyzesOk("create table if not exists functional.new_tbl like functional.alltypes");
+    AnalyzesOk("create table functional.like_view like functional.view_view");
     AnalyzesOk(
         "create table if not exists functional.alltypes like functional.alltypes");
     AnalysisError("create table functional.alltypes like functional.alltypes",

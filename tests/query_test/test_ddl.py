@@ -106,7 +106,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.__create_db_synced('ddl_test_db', vector)
     self.run_test_case('QueryTest/create', vector, use_db='ddl_test_db',
         multiple_impalad=self.__use_multiple_impalad(vector))
-
+  
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
