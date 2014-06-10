@@ -39,6 +39,8 @@ BUILD_SASL=0
 BUILD_LDAP=0
 BUILD_SNAPPY=0
 BUILD_PPROF=0
+BUILD_CDH4EXTRAS=0
+BUILD_LZ4=0
 
 for ARG in $*
 do
@@ -81,6 +83,10 @@ do
     -snappy)
       BUILD_ALL=0
       BUILD_SNAPPY=1
+      ;;
+    -lz4)
+      BUILD_ALL=0
+      BUILD_LZ4=1
       ;;
     -pprof)
       BUILD_ALL=0
@@ -184,6 +190,13 @@ if [ $BUILD_ALL -eq 1 ] || [ $BUILD_SNAPPY -eq 1 ]; then
   build_preamble $IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION} Snappy
   ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build
   make install
+fi
+
+# Build Lz4
+if [ $BUILD_ALL -eq 1 ] || [ $BUILD_LZ4 -eq 1 ]; then
+   build_preamble $IMPALA_HOME/thirdparty/lz4 Lz4
+   cmake .
+   make
 fi
 
 # Build re2

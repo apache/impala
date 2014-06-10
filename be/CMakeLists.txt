@@ -202,6 +202,7 @@ set (IMPALA_LINK_LIBS
   -Wl,--end-group
 # Below are all external dependencies.  They should some after the impala libs.
   ${SNAPPY_STATIC_LIB}
+  ${LZ4_STATIC_LIB}
   ${RE2_STATIC_LIB}
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}

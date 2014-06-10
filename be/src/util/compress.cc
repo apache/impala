@@ -20,6 +20,7 @@
 #include <zlib.h>
 #include <bzlib.h>
 #include <snappy.h>
+#include <lz4.h>
 
 using namespace std;
 using namespace boost;
@@ -87,8 +88,7 @@ Status GzipCompressor::Compress(int input_length, uint8_t* input,
 }
 
 Status GzipCompressor::ProcessBlock(bool output_preallocated,
-                                    int input_length, uint8_t* input,
-                                    int* output_length, uint8_t** output) {
+    int input_length, uint8_t* input, int* output_length, uint8_t** output) {
   int max_compressed_len = MaxOutputLen(input_length);
   if (!output_preallocated) {
     if (!reuse_buffer_ || buffer_length_ < max_compressed_len || out_buffer_ == NULL) {
@@ -116,13 +116,11 @@ int BzipCompressor::MaxOutputLen(int input_len, const uint8_t* input) {
 }
 
 Status BzipCompressor::ProcessBlock(bool output_preallocated,
-                                    int input_length, uint8_t* input,
-                                    int *output_length, uint8_t** output) {
+    int input_length, uint8_t* input, int *output_length, uint8_t** output) {
   // The bz2 library does not allow input to be NULL, even when input_length is 0. This
   // should be OK because we do not write any file formats that support bzip compression.
   DCHECK(input != NULL);
 
-  // If length is set then the output has been allocated.
   if (output_preallocated) {
     buffer_length_ = *output_length;
     out_buffer_ = *output;
@@ -175,8 +173,7 @@ int SnappyBlockCompressor::MaxOutputLen(int input_len, const uint8_t* input) {
 }
 
 Status SnappyBlockCompressor::ProcessBlock(bool output_preallocated,
-                                           int input_length, uint8_t* input,
-                                           int *output_length, uint8_t** output) {
+    int input_length, uint8_t* input, int *output_length, uint8_t** output) {
   // Hadoop uses a block compression scheme on top of snappy.  First there is
   // an integer which is the size of the decompressed data followed by a
   // sequence of compressed blocks each preceded with an integer size.
@@ -226,9 +223,8 @@ int SnappyCompressor::MaxOutputLen(int input_len, const uint8_t* input) {
   return snappy::MaxCompressedLength(input_len);
 }
 
-Status SnappyCompressor::ProcessBlock(bool output_preallocated,
-                                      int input_length, uint8_t* input,
-                                      int* output_length, uint8_t** output) {
+Status SnappyCompressor::ProcessBlock(bool output_preallocated, int input_length,
+    uint8_t* input, int* output_length, uint8_t** output) {
   int max_compressed_len = MaxOutputLen(input_length);
   if (output_preallocated && *output_length < max_compressed_len) {
     return Status("SnappyCompressor::ProcessBlock: output length too small");
@@ -248,5 +244,22 @@ Status SnappyCompressor::ProcessBlock(bool output_preallocated,
       static_cast<size_t>(input_length),
       reinterpret_cast<char*>(*output), &out_len);
   *output_length = out_len;
+  return Status::OK;
+}
+
+Lz4Compressor::Lz4Compressor(MemPool* mem_pool, bool reuse_buffer)
+  : Codec(mem_pool, reuse_buffer) {
+}
+
+int Lz4Compressor::MaxOutputLen(int input_len, const uint8_t* input) {
+  return LZ4_compressBound(input_len);
+}
+
+Status Lz4Compressor::ProcessBlock(bool output_preallocated, int input_length,
+    uint8_t* input, int* output_length, uint8_t** output) {
+  CHECK(output_preallocated) << "Output was not allocated for Lz4 Codec";
+  if (input_length == 0) return Status::OK;
+  *output_length = LZ4_compress(reinterpret_cast<const char*>(input),
+                       reinterpret_cast<char*>(*output), input_length);
   return Status::OK;
 }

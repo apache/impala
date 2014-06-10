@@ -110,6 +110,9 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse,
     case THdfsCompression::SNAPPY:
       *compressor = new SnappyCompressor(mem_pool, reuse);
       break;
+    case THdfsCompression::LZ4:
+      *compressor = new Lz4Compressor(mem_pool, reuse);
+      break;
     default: {
       stringstream ss;
       ss << "Unsupported codec: " << format;
@@ -169,6 +172,9 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
       break;
     case THdfsCompression::SNAPPY:
       *decompressor = new SnappyDecompressor(mem_pool, reuse);
+      break;
+    case THdfsCompression::LZ4:
+      *decompressor = new Lz4Decompressor(mem_pool, reuse);
       break;
     default: {
       stringstream ss;

@@ -133,6 +133,14 @@ set_target_properties(snappy PROPERTIES IMPORTED_LOCATION "${SNAPPY_STATIC_LIB}"
 message(STATUS "Snappy include dir: " ${SNAPPY_INCLUDE_DIR})
 message(STATUS "Snappy library: " "${SNAPPY_STATIC_LIB}")
 
+find_package(Lz4 REQUIRED)
+include_directories(SYSTEM ${LZ4_INCLUDE_DIR})
+set(LIBS ${LIBS} ${LZ4_LIBRARIES})
+add_library(lz4 STATIC IMPORTED)
+set_target_properties(lz4 PROPERTIES IMPORTED_LOCATION "${LZ4_STATIC_LIB}")
+message(STATUS "Lz4 include dir: " ${LZ4_INCLUDE_DIR})
+message(STATUS "Lz4 library: " "${LZ4_STATIC_LIB}")
+
 # find re2 headers and libs
 find_package(Re2 REQUIRED)
 include_directories(SYSTEM ${RE2_INCLUDE_DIR})

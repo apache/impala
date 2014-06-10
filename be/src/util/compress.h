@@ -57,12 +57,12 @@ class GzipCompressor : public Codec {
   // These are magic numbers from zlib.h.  Not clear why they are not defined there.
   const static int WINDOW_BITS = 15;    // Maximum window size
   const static int GZIP_CODEC = 16;     // Output Gzip.
-  
+
   // Compresses 'input' into 'output'.  Output must be preallocated and
   // at least big enough.
   // *output_length should be called with the length of the output buffer and on return
   // is the length of the output.
-  Status Compress(int input_length, uint8_t* input, 
+  Status Compress(int input_length, uint8_t* input,
       int* output_length, uint8_t* output);
 };
 
@@ -105,6 +105,24 @@ class SnappyCompressor : public Codec {
  private:
   friend class Codec;
   SnappyCompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
+  virtual Status Init() { return Status::OK; }
+};
+
+// Lz4 is a compression codec with similar compression ratios as snappy
+// but much faster decompression. This compressor is not able to compress
+// unless the output buffer is allocated and will cause an error if
+// asked to do so.
+class Lz4Compressor : public Codec {
+ public:
+  virtual ~Lz4Compressor() { }
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
+                              int* output_length, uint8_t** output);
+
+ private:
+  friend class Codec;
+  Lz4Compressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual Status Init() { return Status::OK; }
 };
 

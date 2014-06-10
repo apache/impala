@@ -62,7 +62,8 @@ enum THdfsCompression {
   BZIP2,
   SNAPPY,
   SNAPPY_BLOCKED, // Used by sequence and rc files but not stored in the metadata.
-  LZO
+  LZO,
+  LZ4
 }
 
 // The table property type.

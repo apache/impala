@@ -54,12 +54,21 @@ class DecompressorTest : public ::testing::Test {
     EXPECT_TRUE(
         Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor).ok());
 
-    CompressAndDecompress(compressor.get(), decompressor.get(), sizeof(input_), input_);
-    if (format != THdfsCompression::BZIP2) {
-      CompressAndDecompress(compressor.get(), decompressor.get(), 0, NULL);
+    // LZ4 is not implemented to work without an allocated output
+    if(format == THdfsCompression::LZ4) {
+      CompressAndDecompressNoOutputAllocated(compressor.get(), decompressor.get(),
+          sizeof(input_), input_);
+      CompressAndDecompressNoOutputAllocated(compressor.get(), decompressor.get(),
+          0, NULL);
     } else {
-      // bzip does not allow NULL input
-      CompressAndDecompress(compressor.get(), decompressor.get(), 0, input_);
+      CompressAndDecompress(compressor.get(), decompressor.get(), sizeof(input_),
+          input_);
+      if (format != THdfsCompression::BZIP2) {
+        CompressAndDecompress(compressor.get(), decompressor.get(), 0, NULL);
+      } else {
+        // bzip does not allow NULL input
+        CompressAndDecompress(compressor.get(), decompressor.get(), 0, input_);
+      }
     }
 
     compressor->Close();
@@ -67,17 +76,17 @@ class DecompressorTest : public ::testing::Test {
   }
 
   void CompressAndDecompress(Codec* compressor, Codec* decompressor,
-                             int input_len, uint8_t* input) {
+      int input_len, uint8_t* input) {
     // Non-preallocated output buffers
     uint8_t* compressed;
     int compressed_length;
     EXPECT_TRUE(compressor->ProcessBlock(false, input_len,
-          input, &compressed_length, &compressed).ok());
+        input, &compressed_length, &compressed).ok());
     uint8_t* output;
     int output_len;
     EXPECT_TRUE(
         decompressor->ProcessBlock(false, compressed_length,
-            compressed, &output_len, &output).ok());
+        compressed, &output_len, &output).ok());
 
     EXPECT_EQ(output_len, input_len);
     EXPECT_EQ(memcmp(input, output, input_len), 0);
@@ -91,16 +100,37 @@ class DecompressorTest : public ::testing::Test {
       uint8_t* compressed = mem_pool_.Allocate(max_compressed_length);
       compressed_length = max_compressed_length;
       EXPECT_TRUE(compressor->ProcessBlock(true, input_len,
-            input, &compressed_length, &compressed).ok());
+          input, &compressed_length, &compressed).ok());
     }
 
     output_len = decompressor->MaxOutputLen(compressed_length, compressed);
-    if (output_len == -1) {
-      output_len = input_len;
-    }
+    if (output_len == -1) output_len = input_len;
     output = mem_pool_.Allocate(output_len);
+
     EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length,
-          compressed, &output_len, &output).ok());
+        compressed, &output_len, &output).ok());
+
+    EXPECT_EQ(output_len, input_len);
+    EXPECT_EQ(memcmp(input, output, input_len), 0);
+  }
+
+ // Only tests compressors and decompressors with allocated output.
+  void CompressAndDecompressNoOutputAllocated(Codec* compressor,
+      Codec* decompressor, int input_len, uint8_t* input) {
+    // Preallocated output buffers for compressor
+    int max_compressed_length = compressor->MaxOutputLen(input_len, input);
+    uint8_t* compressed = mem_pool_.Allocate(max_compressed_length);
+    int compressed_length = max_compressed_length;
+
+    EXPECT_TRUE(compressor->ProcessBlock(true, input_len,
+        input, &compressed_length, &compressed).ok());
+
+    int output_len = decompressor->MaxOutputLen(compressed_length, compressed);
+    if (output_len == -1) output_len = input_len;
+    uint8_t* output = mem_pool_.Allocate(output_len);
+
+    EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length,
+        compressed, &output_len, &output).ok());
 
     EXPECT_EQ(output_len, input_len);
     EXPECT_EQ(memcmp(input, output, input_len), 0);
@@ -115,6 +145,14 @@ TEST_F(DecompressorTest, Default) {
   RunTest(THdfsCompression::DEFAULT);
 }
 
+TEST_F(DecompressorTest, Snappy) {
+  RunTest(THdfsCompression::SNAPPY);
+}
+
+TEST_F(DecompressorTest, LZ4) {
+  RunTest(THdfsCompression::LZ4);
+}
+
 TEST_F(DecompressorTest, Gzip) {
   RunTest(THdfsCompression::GZIP);
 }
@@ -127,10 +165,6 @@ TEST_F(DecompressorTest, Bzip) {
   RunTest(THdfsCompression::BZIP2);
 }
 
-TEST_F(DecompressorTest, Snappy) {
-  RunTest(THdfsCompression::SNAPPY);
-}
-
 TEST_F(DecompressorTest, SnappyBlocked) {
   RunTest(THdfsCompression::SNAPPY_BLOCKED);
 }
@@ -141,4 +175,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

@@ -75,7 +75,23 @@ class SnappyDecompressor : public Codec {
   friend class Codec;
   SnappyDecompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
   virtual Status Init() { return Status::OK; }
+};
 
+// Lz4 is a compression codec with similar compression ratios as snappy but much faster 
+// decompression. This decompressor is not able to decompress unless the output buffer
+// is allocated and will cause an error if asked to do so.
+class Lz4Decompressor : public Codec {
+ public:
+  virtual ~Lz4Decompressor() { }
+  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
+  virtual Status ProcessBlock(bool output_preallocated,
+                              int input_length, uint8_t* input,
+                              int* output_length, uint8_t** output);
+
+ private:
+  friend class Codec;
+  Lz4Decompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
+  virtual Status Init() { return Status::OK; }
 };
 
 class SnappyBlockDecompressor : public Codec {
