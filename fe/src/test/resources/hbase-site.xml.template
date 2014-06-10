@@ -48,6 +48,6 @@
   </property>
   <property>
     <name>hbase.rpc.timeout</name>
-    <value>3000</value>
+    <value>30000</value>
   </property>
 </configuration>
