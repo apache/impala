@@ -182,6 +182,10 @@ class BeeswaxConnection(ImpalaConnection):
     """Invalidate the Impalad catalog"""
     return self.execute("invalidate metadata")
 
+  def invalidate_table(self, table_name):
+    """Invalidate a specific table from the catalog"""
+    return self.execute("invalidate metadata %s" % (table_name))
+
   def refresh_table(self, db_name, table_name):
     """Refresh a specific table from the catalog"""
     return self.execute("refresh %s.%s" % (db_name, table_name))

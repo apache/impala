@@ -47,20 +47,16 @@ class TestViewCompatibility(ImpalaTestSuite):
     # don't use any exec options, running exactly once is fine
     cls.TestMatrix.clear_dimension('exec_option')
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and\
-        v.get_value('table_format').compression_codec == 'none')
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
     # cleanup and create a fresh test database
     self.cleanup_db(self.TEST_DB_NAME)
-    self.client.refresh()
     self.execute_query("create database %s" % (self.TEST_DB_NAME))
 
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)
 
-  @pytest.mark.execute_serially
   def test_view_compatibility(self, vector):
     self.__run_view_compat_test_case('QueryTest/views-compatibility', vector)
 
@@ -82,8 +78,6 @@ class TestViewCompatibility(ImpalaTestSuite):
                                          self.VALID_SECTION_NAMES)
 
     for test_section in sections:
-      self.client.refresh()
-
       # validate the test
       test_case = ViewCompatTestCase(test_section, test_file_name, self.TEST_DB_NAME)
 
@@ -91,10 +85,11 @@ class TestViewCompatibility(ImpalaTestSuite):
       self.__exec_in_hive(test_case.get_create_view_sql('HIVE'),\
                           test_case.get_create_view_sql('HIVE'),\
                           test_case.get_create_exp_res())
+      self.client.invalidate_table(test_case.hive_view_name)
+
       self.__exec_in_impala(test_case.get_create_view_sql('IMPALA'),\
                             test_case.get_create_view_sql('IMPALA'),\
                             test_case.get_create_exp_res())
-      self.client.refresh()
 
       # explain a simple query on the view created by Hive in Hive and Impala
       if test_case.has_query_hive_section():
@@ -119,9 +114,10 @@ class TestViewCompatibility(ImpalaTestSuite):
       # drop the views without checking success or failure
       self.__exec_in_hive(test_case.get_drop_view_sql('HIVE'),\
                           test_case.get_create_view_sql('HIVE'), None)
+      self.client.invalidate_table(test_case.hive_view_name)
+
       self.__exec_in_impala(test_case.get_drop_view_sql('IMPALA'),\
                             test_case.get_create_view_sql('IMPALA'), None)
-      self.client.refresh()
 
   def __exec_in_hive(self, sql_str, create_view_sql, exp_res):
     hive_ret = call(['hive', '-e', sql_str])

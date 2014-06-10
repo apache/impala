@@ -1,7 +1,7 @@
 ====
 ---- CREATE_VIEW
 # Simple view without removing/renaming any columns.
-create view test as select * from functional.alltypes
+create view test as select * from functional.alltypessmall
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=SUCCESS
@@ -14,7 +14,7 @@ HIVE=SUCCESS
 ---- CREATE_VIEW
 # Simple view some columns renamed.
 create view test (abc, xyz) as
-select string_col, timestamp_col from functional.alltypes
+select string_col, timestamp_col from functional.alltypessmall
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=SUCCESS
@@ -28,7 +28,7 @@ HIVE=SUCCESS
 # View with aggregates and group by.
 create view test (c, a, g) as
 select count(string_col) as x, avg(bigint_col) as y, int_col
-from functional.alltypes group by int_col
+from functional.alltypessmall group by int_col
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=SUCCESS
@@ -43,7 +43,7 @@ HIVE=SUCCESS
 # (non-SlotRef exprs use auto-generated column names)
 create view test as
 select int_col % 3, trim(string_col), float_col * 10
-from functional.alltypes
+from functional.alltypessmall
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=SUCCESS
@@ -58,7 +58,7 @@ HIVE=SUCCESS
 # (non-SlotRef exprs use auto-generated column names)
 create view test (a, b, c) as
 select int_col % 3, trim(string_col), float_col * 10
-from functional.alltypes
+from functional.alltypessmall
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=SUCCESS
@@ -114,9 +114,9 @@ HIVE=FAILURE
 # Hive cannot parse the unquoted identifiers starting with "_",
 # so the view creation should fail.
 create view test as
-select _c0, _c1, _c2 from 
+select _c0, _c1, _c2 from
 (select int_col % 3 AS _c0, trim(string_col) AS _c1, float_col * 10 AS _c2
-from functional.alltypes) t
+from functional.alltypessmall) t
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=FAILURE
@@ -131,9 +131,9 @@ HIVE=SUCCESS
 # so Hive's view creation should fail but it should be able to parse
 # Impala's view.
 create view test as
-select int_col, string_col, float_col from 
+select int_col, string_col, float_col from
 (select int_col, string_col, float_col
-from functional.alltypes) as t
+from functional.alltypessmall) as t
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=FAILURE
@@ -145,9 +145,9 @@ HIVE=SUCCESS
 # Same test as above, except without the "AS" to make the view creation
 # in Hive succeed. Both Impala and Hive should be able to parse the view.
 create view test as
-select int_col, string_col, float_col from 
+select int_col, string_col, float_col from
 (select int_col, string_col, float_col
-from functional.alltypes) t
+from functional.alltypessmall) t
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=SUCCESS
@@ -165,7 +165,7 @@ create view test (a, b, c) as
 select count(t1.int_col), avg(t2.float_col), t1.string_col from
 (select id, int_col, string_col from functional.alltypesagg where id < 10) t1
 inner join
-(select id, float_col, string_col from functional.alltypes where id < 5) t2
+(select id, float_col, string_col from functional.alltypessmall where id < 5) t2
 on t1.id = t2.id
 where t1.int_col % 2 = 0 and t2.float_col is not null
 group by t1.string_col having count(t2.float_col) > 2
@@ -184,7 +184,7 @@ create view test (a, b, c) as
 select count(t1.int_col), avg(t2.float_col), t1.string_col as scol from
 (select id, int_col, string_col from functional.alltypesagg where id < 10) t1
 inner join
-(select id, float_col, string_col from functional.alltypes where id < 5) t2
+(select id, float_col, string_col from functional.alltypessmall where id < 5) t2
 on t1.id = t2.id
 where t1.int_col % 2 = 0 and t2.float_col is not null
 group by t1.string_col having count(t2.float_col) > 2
@@ -202,7 +202,7 @@ HIVE=SUCCESS
 # Test that identifiers requiring quotes have quotes in
 # their view definition and are parseable by both Hive and Impala.
 create view test (abc, xyz) as
-select string_col as `^^^`, int_col as `???` from functional.alltypes
+select string_col as `^^^`, int_col as `???` from functional.alltypessmall
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=SUCCESS
@@ -215,7 +215,7 @@ HIVE=SUCCESS
 ---- CREATE_VIEW
 # A view that uses a Hive-specfic SQL construct (SORT BY)
 # is expected to work only in Hive (and fail gracefully in Impala).
-create view test as select int_col from functional.alltypes sort by int_col
+create view test as select int_col from functional.alltypessmall sort by int_col
 ---- CREATE_VIEW_RESULTS
 IMPALA=FAILURE
 HIVE=SUCCESS
