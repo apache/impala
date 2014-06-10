@@ -98,6 +98,7 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
         v.get_value('table_format').compression_codec == 'none')
 
   @pytest.mark.execute_serially
+  @pytest.mark.xfail(run=False, reason="IMPALA-1037. This test is flaky")
   def test_caching_ddl(self, vector):
     self.client.execute("drop table if exists functional.cached_tbl_part")
     self.client.execute("drop table if exists functional.cached_tbl_nopart")
