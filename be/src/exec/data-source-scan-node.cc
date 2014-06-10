@@ -109,7 +109,7 @@ Status DataSourceScanNode::Open(RuntimeState* state) {
   params.__set_query_id(state->query_id());
   params.__set_table_name(tuple_desc_->table_desc()->name());
   params.__set_init_string(data_src_node_.init_string);
-  params.__set_authenticated_user_name(state->connected_user());
+  params.__set_authenticated_user_name(state->effective_user());
   params.__set_row_schema(row_schema);
   params.__set_batch_size(FLAGS_data_source_batch_size);
   params.__set_predicates(data_src_node_.accepted_predicates);

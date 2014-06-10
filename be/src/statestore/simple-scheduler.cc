@@ -777,17 +777,14 @@ Status SimpleScheduler::GetRequestPool(const string& user,
 }
 
 Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
-  // TODO: Should this take impersonation into account?
-  const TQueryContext& query_ctxt = schedule->request().query_ctxt;
-  if (query_ctxt.session.connected_user.empty()) {
+  if (schedule->effective_user().empty()) {
     if (FLAGS_require_username) return Status(ERROR_USER_NOT_SPECIFIED);
     // Fall back to a 'default' user if not set so that queries can still run.
     VLOG(2) << "No user specified: using user=default";
   }
-  const string& user = query_ctxt.session.connected_user.empty() ?
-      DEFAULT_USER : query_ctxt.session.connected_user;
-  VLOG(3) << "user='" << user << "', session.connected_user='"
-          << query_ctxt.session.connected_user << "'";
+  const string& user =
+    schedule->effective_user().empty() ? DEFAULT_USER : schedule->effective_user();
+  VLOG(3) << "user='" << user << "'";
   string pool;
   RETURN_IF_ERROR(GetRequestPool(user, schedule->query_options(), &pool));
   schedule->set_request_pool(pool);
@@ -814,6 +811,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
         reservation_request, schedule->reservation());
     if (!status.ok()) {
       // Warn about missing table and/or column stats if necessary.
+      const TQueryContext& query_ctxt = schedule->request().query_ctxt;
       if(query_ctxt.__isset.tables_missing_stats &&
           !query_ctxt.tables_missing_stats.empty()) {
         status.AddErrorMsg(GetTablesMissingStatsWarning(query_ctxt.tables_missing_stats));

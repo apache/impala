@@ -99,6 +99,14 @@ class RuntimeState {
   }
   int max_errors() const { return query_ctxt_.request.query_options.max_errors; }
   const TQueryContext& query_ctxt() const { return query_ctxt_; }
+  const std::string& effective_user() const {
+    if (query_ctxt_.session.__isset.impersonated_user &&
+        !query_ctxt_.session.impersonated_user.empty()) {
+      return do_as_user();
+    }
+    return connected_user();
+  }
+  const std::string& do_as_user() const { return query_ctxt_.session.impersonated_user; }
   const std::string& connected_user() const { return query_ctxt_.session.connected_user; }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
