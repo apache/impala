@@ -58,6 +58,8 @@ export IMPALA_AUX_TEST_HOME=${IMPALA_AUX_TEST_HOME-~/impala-auxiliary-tests}
 
 # Directory where local cluster logs will go when running tests or loading data
 export IMPALA_TEST_CLUSTER_LOG_DIR=${IMPALA_HOME}/cluster_logs
+# Reduce the concurrency for local tests to half the number of cores in the system.
+export NUM_CONCURRENT_TESTS=${NUM_CONCURRENT_TESTS-$(($(nproc) / 2))}
 
 export IMPALA_GFLAGS_VERSION=2.0
 export IMPALA_GPERFTOOLS_VERSION=2.0
