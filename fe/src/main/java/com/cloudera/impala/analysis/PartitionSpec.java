@@ -133,9 +133,9 @@ public class PartitionSpec implements ParseNode {
       ColumnType compatibleType =
           ColumnType.getAssignmentCompatibleType(colType, literalType);
       if (!compatibleType.isValid()) {
-        throw new AnalysisException(String.format("Target table not compatible.\n" +
-            "Incompatible types '%s' and '%s' in column '%s'", colType.toString(),
-            literalType.toString(), pk.getColName()));
+        throw new AnalysisException(String.format("Value of partition spec (column=%s) "
+            + "has incompatible type: '%s'. Expected type: '%s'.",
+            pk.getColName(), literalType, colType));
       }
       // Check for loss of precision with the partition value
       if (!compatibleType.equals(colType)) {

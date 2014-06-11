@@ -92,8 +92,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
       AnalysisError(
           "alter table functional.insert_string_partitioned " + kw +
           " partition(s2=1234)",
-          "Target table not compatible.\nIncompatible types 'STRING' and 'SMALLINT' " +
-          "in column 's2'");
+          "Value of partition spec (column=s2) has incompatible type: 'SMALLINT'. " +
+          "Expected type: 'STRING'.");
 
       // Loss of precision
       AnalysisError(
