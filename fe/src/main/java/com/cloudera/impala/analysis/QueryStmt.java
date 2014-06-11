@@ -20,6 +20,7 @@ import java.util.Set;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
@@ -191,6 +192,7 @@ public abstract class QueryStmt extends StatementBase {
         materializedDesc.setType(origSlotDesc.getType());
       }
       materializedDesc.setLabel(origSlotDesc.getLabel());
+      materializedDesc.setStats(ColumnStats.fromExpr(origSlotRef));
       SlotRef cloneRef = new SlotRef(materializedDesc);
       substOrderBy.addMapping(origSlotRef, cloneRef);
       analyzer.createAuxEquivPredicate(cloneRef, origSlotRef);

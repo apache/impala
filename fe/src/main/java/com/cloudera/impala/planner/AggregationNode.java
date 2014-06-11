@@ -263,9 +263,6 @@ public class AggregationNode extends PlanNode {
     if (cardinality_ != -1) {
       perHostCardinality = Math.min(perHostCardinality, cardinality_);
     }
-    // take HAVING predicate into account
-    perHostCardinality =
-        Math.round((double) perHostCardinality * computeSelectivity());
     perHostMemCost_ += Math.max(perHostCardinality * avgRowSize_ *
         Planner.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
   }

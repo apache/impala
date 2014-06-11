@@ -86,7 +86,12 @@ public class ColumnStats {
     stats.setNumDistinctValues(expr.getNumDistinctValues());
     SlotRef slotRef = expr.unwrapSlotRef(false);
     if (slotRef == null) return stats;
-    stats.numNulls_ = slotRef.getDesc().getStats().getNumNulls();
+    ColumnStats slotStats = slotRef.getDesc().getStats();
+    if (slotStats == null) return stats;
+    stats.numNulls_ = slotStats.getNumNulls();
+    stats.avgSerializedSize_ = slotStats.getAvgSerializedSize();
+    stats.avgSize_ = slotStats.getAvgSize();
+    stats.maxSize_ = slotStats.getMaxSize();
     return stats;
   }
 
