@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <sstream>
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
@@ -20,6 +19,7 @@
 #include <boost/uuid/random_generator.hpp>
 #include <boost/filesystem.hpp>
 #include <gutil/strings/substitute.h>
+#include <gutil/strings/join.h>
 
 #include "runtime/tmp-file-mgr.h"
 #include "util/debug-util.h"
@@ -37,6 +37,7 @@ using namespace strings;
 namespace impala {
 
 const string TMP_SUB_DIR_NAME = "impala-scratch";
+const uint64_t AVAILABLE_SPACE_THRESHOLD_MB = 1024;
 bool TmpFileMgr::initialized_;
 vector<string> TmpFileMgr::tmp_dirs_;
 
@@ -45,30 +46,40 @@ Status TmpFileMgr::Init() {
   string tmp_dirs_spec = FLAGS_scratch_dirs;
   vector<string> all_tmp_dirs;
   split(all_tmp_dirs, tmp_dirs_spec, is_any_of(","), token_compress_on);
-  int num_disks = DiskInfo::num_disks();
-  vector<bool> is_tmp_dir_on_disk(num_disks, false);
+  vector<bool> is_tmp_dir_on_disk(DiskInfo::num_disks(), false);
 
   // For each tmp directory, find the disk it is on,
   // so additional tmp directories on the same disk can be skipped.
   for (int i = 0; i < all_tmp_dirs.size(); ++i) {
-    // Find the disk id of the enclosing directory.
     path tmp_path(trim_right_copy_if(all_tmp_dirs[i], is_any_of("/")));
+    // tmp_path must be a writable directory.
+    RETURN_IF_ERROR(FileSystemUtil::VerifyIsDirectory(tmp_path.string()));
+    // Find the disk id of tmp_path. Add the scratch directory if there isn't another
+    // directory on the same disk (or if we don't know which disk it is on).
     int disk_id = DiskInfo::disk_id(tmp_path.c_str());
-    if (!is_tmp_dir_on_disk[disk_id]) {
-      is_tmp_dir_on_disk[disk_id] = true;
+    if (disk_id < 0 || !is_tmp_dir_on_disk[disk_id]) {
+      uint64_t available_space;
+      RETURN_IF_ERROR(FileSystemUtil::GetSpaceAvailable(tmp_path.string(),
+          &available_space));
+      if (available_space < AVAILABLE_SPACE_THRESHOLD_MB * 1024 * 1024) {
+        LOG(WARNING) << "Filesystem containing scratch directory " << tmp_path
+                      << " has less than " << AVAILABLE_SPACE_THRESHOLD_MB
+                      << "MB available.";
+      }
+      if (disk_id >= 0) is_tmp_dir_on_disk[disk_id] = true;
       path create_dir_path(tmp_path / TMP_SUB_DIR_NAME);
       tmp_dirs_.push_back(create_dir_path.string());
     }
   }
   initialized_ = true;
-  RETURN_IF_ERROR(FileSystemUtil::CreateDirectories(tmp_dirs_));
-
-  stringstream ss;
-  BOOST_FOREACH(string tmp_dir, tmp_dirs_) {
-    ss << " " << tmp_dir;
+  Status status = FileSystemUtil::CreateDirectories(tmp_dirs_);
+  if (status.ok()) {
+    LOG (INFO) << "Created the following scratch dirs:" << JoinStrings(tmp_dirs_, " ");
+  } else {
+    // Attempt to remove the directories created. Ignore any errors.
+    FileSystemUtil::RemovePaths(tmp_dirs_);
   }
-  LOG (INFO) << "Created the following scratch dirs:" << ss.str();
-  return Status::OK;
+  return status;
 }
 
 Status TmpFileMgr::GetFile(int tmp_device_id, const TUniqueId& query_id,

@@ -311,7 +311,7 @@ class DiskIoMgr::RequestContext {
     }
 
     // We need to have a memory barrier to prevent this load from being reordered
-    // with num_threads_in_read(), since these variables are set without the reader
+    // with num_threads_in_op(), since these variables are set without the reader
     // lock taken
     bool is_on_queue() const {
       bool b = is_on_queue_;

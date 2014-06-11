@@ -48,6 +48,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/lib-cache.h"
 #include "runtime/timestamp-value.h"
+#include "runtime/tmp-file-mgr.h"
 #include "service/fragment-exec-state.h"
 #include "service/query-exec-state.h"
 #include "statestore/simple-scheduler.h"
@@ -208,6 +209,16 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     LOG(ERROR) << status.GetErrorMsg();
     if (FLAGS_abort_on_config_error) {
       LOG(ERROR) << "Aborting Impala Server startup due to improper configuration";
+      exit(1);
+    }
+  }
+
+  status = TmpFileMgr::Init();
+  if (!status.ok()) {
+    LOG(ERROR) << status.GetErrorMsg();
+    if (FLAGS_abort_on_config_error) {
+      LOG(ERROR) << "Aborting Impala Server startup due to improperly "
+                  << "configured scratch directories.";
       exit(1);
     }
   }

@@ -320,6 +320,7 @@ TEST_F(BufferedBlockMgrTest, Random) {
 
 int main(int argc, char **argv) {
   impala::InitCommonRuntime(argc, argv, true);
+  impala::TmpFileMgr::Init();
   impala::LlvmCodeGen::InitializeLlvm();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

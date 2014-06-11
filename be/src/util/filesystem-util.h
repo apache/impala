@@ -37,6 +37,15 @@ class FileSystemUtil {
 
   // Remove the specified paths and their enclosing files/directories.
   static Status RemovePaths(const std::vector<std::string>& directories);
+
+  // Verify that the specified path is an existing directory.
+  // Returns Status::OK if it is, or a runtime error with a message otherwise.
+  static Status VerifyIsDirectory(const std::string& directory_path);
+
+  // Returns the space available on the file system containing 'directory_path'
+  // in 'available_bytes'
+  static Status GetSpaceAvailable(const std::string& directory_path,
+      uint64_t* available_bytes);
 };
 
 }

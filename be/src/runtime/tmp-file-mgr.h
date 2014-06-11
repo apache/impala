@@ -51,6 +51,10 @@ class TmpFileMgr {
     // directory.
     const static std::string TMP_SUB_DIR_NAME;
 
+    // Space (in MB) that must ideally be available for writing on a scratch
+    // directory. A warning is issued if available space is less than this threshold.
+    const static uint64_t AVAILABLE_SPACE_THRESHOLD_MB;
+
     File(const std::string& path);
 
     // Path of the physical file in the filesystem.
@@ -68,7 +72,7 @@ class TmpFileMgr {
   };
 
   // Creates the tmp directories configured by CM. If multiple directories are specified
-  // per disk, only one is created and used.
+  // per disk, only one is created and used. Must be called after DiskInfo::Init().
   static Status Init();
 
   // Return a new File handle with a unique path for a fragment instance. The file path

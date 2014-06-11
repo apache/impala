@@ -246,10 +246,17 @@ Status BufferedBlockMgr::WriteUnpinnedBlocks() {
       next_block_index_ = (next_block_index_ + 1) % tmp_files_.size();
       int64_t file_offset;
       RETURN_IF_ERROR(tmp_file.AllocateSpace(block_size_, &file_offset));
+      // Assign a valid disk id to the write range if the tmp file was not assigned one.
+      int disk_id = tmp_file.disk_id();
+      if (disk_id < 0) {
+        static unsigned int next_disk_id = 0;
+        disk_id = (++next_disk_id) % io_mgr_->num_disks();
+      }
+      disk_id %= io_mgr_->num_disks();
       DiskIoMgr::WriteRange::WriteDoneCallback callback =
           bind(mem_fn(&BufferedBlockMgr::WriteComplete), this, block_to_write, _1);
       block_to_write->write_range_ = obj_pool_.Add(new DiskIoMgr::WriteRange(
-          tmp_file.path(), file_offset, tmp_file.disk_id(), callback));
+          tmp_file.path(), file_offset, disk_id, callback));
     }
 
     block_to_write->write_range_->SetData(block_to_write->buffer(),
