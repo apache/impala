@@ -94,7 +94,10 @@ Status CatalogOpExecutor::ExecComputeStats(
 
   // Fill the alteration request based on the child-query results.
   SetTableStats(tbl_stats_schema, tbl_stats_data, &update_stats_params);
-  SetColumnStats(col_stats_schema, col_stats_data, &update_stats_params);
+  // col_stats_schema and col_stats_data will be empty if there was no column stats query.
+  if (!col_stats_schema.columns.empty()) {
+    SetColumnStats(col_stats_schema, col_stats_data, &update_stats_params);
+  }
 
   // Execute the 'alter table update stats' request.
   RETURN_IF_ERROR(Exec(catalog_op_req));

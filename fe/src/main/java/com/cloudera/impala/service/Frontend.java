@@ -624,6 +624,7 @@ public class Frontend {
     TExecRequest result = new TExecRequest();
     result.setQuery_options(queryCtxt.request.getQuery_options());
     result.setAccess_events(analysisResult.getAccessEvents());
+    result.analysis_warnings = analysisResult.getAnalyzer().getWarnings();
 
     if (analysisResult.isCatalogOp()) {
       result.stmt_type = TStmtType.DDL;

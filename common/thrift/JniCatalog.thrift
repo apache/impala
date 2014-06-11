@@ -384,8 +384,9 @@ struct TComputeStatsParams {
   // Query for gathering per-partition row count.
   2: required string tbl_stats_query
 
-  // Query for gethering per-column NDVs and number of NULLs.
-  3: required string col_stats_query
+  // Query for gathering per-column NDVs and number of NULLs.
+  // Not set if there are no columns we can compute stats for.
+  3: optional string col_stats_query
 }
 
 // Parameters of DROP DATABASE commands

@@ -384,14 +384,18 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
   stringstream error_log_ss;
   // If the query status is !ok, include the status error message at the top of the log.
   if (!exec_state->query_status().ok()) {
-    error_log_ss << exec_state->query_status().GetErrorMsg();
-    log = error_log_ss.str();
+    error_log_ss << exec_state->query_status().GetErrorMsg() << "\n";
   }
+
+  // Add warnings from analysis
+  error_log_ss << join(exec_state->GetAnalysisWarnings(), "\n");
+
+  // Add warnings from execution
   if (exec_state->coord() != NULL) {
     if (!exec_state->query_status().ok()) error_log_ss << "\n\n";
     error_log_ss << exec_state->coord()->GetErrorLog();
-    log = error_log_ss.str();
   }
+  log = error_log_ss.str();
 }
 
 void ImpalaServer::get_default_configuration(vector<ConfigVariable> &configurations,

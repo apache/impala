@@ -43,6 +43,8 @@ class TestComputeStats(ImpalaTestSuite):
 
   def test_compute_stats(self, vector):
     self.run_test_case('QueryTest/compute-stats', vector)
+    # Test compute stats on decimal columns separately so we can vary between CDH4/5
+    self.run_test_case('QueryTest/compute-stats-decimal', vector)
     # To cut down on test execution time, only run the compute stats test against many
     # partitions if performing an exhaustive test run.
     if self.exploration_strategy() != 'exhaustive': return

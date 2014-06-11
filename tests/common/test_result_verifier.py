@@ -255,7 +255,7 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     return
 
   if 'ERRORS' in test_section:
-    expected_errors = test_section['ERRORS'].split('\n')
+    expected_errors = remove_comments(test_section['ERRORS']).split('\n')
     actual_errors = apply_error_match_filter(exec_result.log.split('\n'))
     try:
       verify_errors(expected_errors, actual_errors)

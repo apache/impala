@@ -160,6 +160,10 @@ class ImpalaServer::QueryExecState {
   const TimestampValue& end_time() const { return end_time_; }
   const std::string& sql_stmt() const { return query_ctxt_.request.stmt; }
 
+  const std::vector<std::string>& GetAnalysisWarnings() const {
+    return exec_request_.analysis_warnings;
+  }
+
   inline int64_t last_active() const {
     boost::lock_guard<boost::mutex> l(expiration_data_lock_);
     return last_active_time_;

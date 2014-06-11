@@ -26,6 +26,7 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
@@ -123,6 +124,12 @@ public class ComputeStatsStmt extends StatementBase {
       // Ignore columns with an invalid/unsupported type. For example, complex types in
       // an HBase-backed table will appear as invalid types.
       if (!ctype.isValid() || !ctype.isSupported()) continue;
+      // Skip decimal columns (see IMPALA-950)
+      if (ctype.getPrimitiveType() == PrimitiveType.DECIMAL) {
+        analyzer.addWarning("Decimal column stats not yet supported, skipping column '" +
+            c.getName() + "'");
+        continue;
+      }
       // NDV approximation function. Add explicit alias for later identification when
       // updating the Metastore.
       String colRefSql = ToSqlUtils.getIdentSql(c.getName());
@@ -149,6 +156,13 @@ public class ComputeStatsStmt extends StatementBase {
         columnStatsSelectList.add("CAST(" + typeSize.toString() + " as DOUBLE)");
       }
     }
+
+    if (columnStatsSelectList.size() == 0) {
+      // Table doesn't have any columns that we can compute stats for
+      columnStatsQueryStr_ = null;
+      return;
+    }
+
     columnStatsQueryBuilder.append(Joiner.on(", ").join(columnStatsSelectList));
     columnStatsQueryBuilder.append(" FROM " + table_.getFullName());
     columnStatsQueryStr_ = columnStatsQueryBuilder.toString();
@@ -232,7 +246,11 @@ public class ComputeStatsStmt extends StatementBase {
     TComputeStatsParams params = new TComputeStatsParams();
     params.setTable_name(new TTableName(table_.getDb().getName(), table_.getName()));
     params.setTbl_stats_query(tableStatsQueryStr_);
-    params.setCol_stats_query(columnStatsQueryStr_);
+    if (columnStatsQueryStr_ != null) {
+      params.setCol_stats_query(columnStatsQueryStr_);
+    } else {
+      params.setCol_stats_queryIsSet(false);
+    }
     return params;
   }
 }

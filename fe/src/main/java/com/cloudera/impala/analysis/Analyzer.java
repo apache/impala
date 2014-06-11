@@ -154,6 +154,10 @@ public class Analyzer {
     // accesses to catalog objects
     public List<TAccessEvent> accessEvents = Lists.newArrayList();
 
+    // Tracks all warnings (e.g. non-fatal errors) that were generated during analysis.
+    // These are passed to the backend and eventually propagated to the shell.
+    public final List<String> warnings = Lists.newArrayList();
+
     // map from equivalence class id to the list of its member slots
     private final Map<EquivalenceClassId, ArrayList<SlotId>> equivClassMembers =
         Maps.newHashMap();
@@ -192,8 +196,7 @@ public class Analyzer {
   private final Map<String, SlotDescriptor> slotRefMap_ = Maps.newHashMap();
 
   // Tracks the all tables/views found during analysis that were missing metadata.
-  Set<TableName> missingTbls_ = new HashSet<TableName>();
-  public Set<TableName> getMissingTbls() { return missingTbls_; }
+  private Set<TableName> missingTbls_ = new HashSet<TableName>();
 
   public Analyzer(ImpaladCatalog catalog, TQueryContext queryCxt) {
     this.ancestors_ = Lists.newArrayList();
@@ -215,6 +218,9 @@ public class Analyzer {
     Preconditions.checkNotNull(user);
     this.user_ = user;
   }
+
+  public Set<TableName> getMissingTbls() { return missingTbls_; }
+  public List<String> getWarnings() { return globalState_.warnings; }
 
   /**
    * Substitute analyzer's internal expressions (conjuncts) with the given substitution
@@ -1500,6 +1506,13 @@ public class Analyzer {
 
   public boolean hasValueTransfer(SlotId a, SlotId b) {
     return globalState_.valueTransferGraph.hasValueTransfer(a, b);
+  }
+
+  /**
+   * Add a warning that will be displayed to the user.
+   */
+  public void addWarning(String msg) {
+    globalState_.warnings.add(msg);
   }
 
   /**

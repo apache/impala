@@ -34,6 +34,7 @@ using namespace boost;
 using namespace boost::uuids;
 using namespace beeswax;
 using namespace strings;
+using namespace apache::hive::service::cli::thrift;
 
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
@@ -365,8 +366,10 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
     // Add child queries for computing table and column stats.
     child_queries_.push_back(
         ChildQuery(compute_stats_params.tbl_stats_query, this, parent_server_));
-    child_queries_.push_back(
-        ChildQuery(compute_stats_params.col_stats_query, this, parent_server_));
+    if (compute_stats_params.__isset.col_stats_query) {
+      child_queries_.push_back(
+          ChildQuery(compute_stats_params.col_stats_query, this, parent_server_));
+    }
     ExecChildQueriesAsync();
     return Status::OK;
   }
@@ -806,14 +809,25 @@ void ImpalaServer::QueryExecState::MarkActive() {
 }
 
 Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats() {
-  DCHECK(child_queries_.size() == 2);
+  DCHECK_GE(child_queries_.size(), 1);
+  DCHECK_LE(child_queries_.size(), 2);
   catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_));
+
+  // If there was no column stats query, pass in empty thrift structures to
+  // ExecComputeStats(). Otherwise pass in the column stats result.
+  TTableSchema col_stats_schema;
+  TRowSet col_stats_data;
+  if (child_queries_.size() > 1) {
+    col_stats_schema = child_queries_[1].result_schema();
+    col_stats_data = child_queries_[1].result_data();
+  }
+
   Status status = catalog_op_executor_->ExecComputeStats(
       exec_request_.catalog_op_request.ddl_params.compute_stats_params,
       child_queries_[0].result_schema(),
       child_queries_[0].result_data(),
-      child_queries_[1].result_schema(),
-      child_queries_[1].result_data());
+      col_stats_schema,
+      col_stats_data);
   {
     lock_guard<mutex> l(lock_);
     RETURN_IF_ERROR(UpdateQueryStatus(status));

@@ -1,0 +1,73 @@
+====
+---- QUERY
+# test compute stats on a partitioned decimal text table
+create table compute_stats_db.decimal_tbl like functional.decimal_tbl;
+insert into compute_stats_db.decimal_tbl partition(d6)
+select * from functional.decimal_tbl;
+====
+---- QUERY
+compute stats compute_stats_db.decimal_tbl
+---- RESULTS
+'Updated 1 partition(s) and 0 column(s).'
+---- ERRORS
+Decimal column stats not yet supported, skipping column 'd1'
+Decimal column stats not yet supported, skipping column 'd2'
+Decimal column stats not yet supported, skipping column 'd3'
+Decimal column stats not yet supported, skipping column 'd4'
+Decimal column stats not yet supported, skipping column 'd5'
+====
+---- QUERY
+show table stats compute_stats_db.decimal_tbl
+---- LABELS
+d6, #Rows, #Files, Size, Bytes Cached, Format
+---- RESULTS
+1,5,1,'375B','NOT CACHED','TEXT'
+Total,5,1,'375B','0B',''
+---- TYPES
+DECIMAL, BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.decimal_tbl
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'d1','DECIMAL(9,0)',-1,-1,4,4
+'d2','DECIMAL(10,0)',-1,-1,8,8
+'d3','DECIMAL(20,10)',-1,-1,16,16
+'d4','DECIMAL(38,38)',-1,-1,16,16
+'d5','DECIMAL(10,5)',-1,-1,8,8
+'d6','DECIMAL(9,0)',1,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# test compute stats on a mixed-type parquet table
+create table compute_stats_db.mixed_types(a int, b decimal(10,0)) stored as parquet;
+insert into compute_stats_db.mixed_types values (1, 2), (3, 4);
+====
+---- QUERY
+compute stats compute_stats_db.mixed_types
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- ERRORS
+Decimal column stats not yet supported, skipping column 'b'
+====
+---- QUERY
+show table stats compute_stats_db.mixed_types
+---- LABELS
+#Rows, #Files, Size, Bytes Cached, Format
+---- RESULTS
+2,1,regex:.+B,'NOT CACHED','PARQUET'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.mixed_types
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'a','INT',2,0,4,4
+'b','DECIMAL(10,0)',-1,-1,8,8
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====

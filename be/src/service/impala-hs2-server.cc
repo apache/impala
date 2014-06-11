@@ -820,18 +820,22 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = exec_state->session_id();
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
-      SQLSTATE_GENERAL_ERROR);
+                      SQLSTATE_GENERAL_ERROR);
 
+  stringstream ss;
   if (exec_state->coord() != NULL) {
-    // Report progress and all errors
-    // Hue parses the progress string to do progress indication.
-    stringstream ss;
+    // Report progress
     ss << exec_state->coord()->progress().ToString() << "\n";
-    ss << exec_state->coord()->GetErrorLog();
-    return_val.log = ss.str();
-    return_val.status.__set_statusCode(
-        apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
   }
+  // Report analysis errors
+  ss << join(exec_state->GetAnalysisWarnings(), "\n");
+  if (exec_state->coord() != NULL) {
+    // Report execution errors
+    ss << exec_state->coord()->GetErrorLog();
+  }
+  return_val.log = ss.str();
+  return_val.status.__set_statusCode(
+      apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 }
 
 void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col_val,

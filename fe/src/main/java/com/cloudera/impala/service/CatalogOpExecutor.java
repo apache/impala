@@ -349,8 +349,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableUpdateStats(TAlterTableUpdateStatsParams params,
       TDdlExecResponse resp) throws ImpalaException {
-    Preconditions.checkState(params.isSetColumn_stats() && params.isSetPartition_stats()
-        && params.isSetTable_stats());
+    Preconditions.checkState(params.isSetPartition_stats() && params.isSetTable_stats());
 
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
@@ -375,7 +374,7 @@ public class CatalogOpExecutor {
 
     MetaStoreClient msClient = catalog_.getMetaStoreClient();
     int numTargetedPartitions;
-    int numUpdatedColumns;
+    int numUpdatedColumns = 0;
     try {
         // Update the table and partition row counts based on the query results.
         List<org.apache.hadoop.hive.metastore.api.Partition> modifiedParts =
@@ -383,9 +382,12 @@ public class CatalogOpExecutor {
         numTargetedPartitions = updateTableStats(table, params, msTbl, msPartitions,
             modifiedParts);
 
-        // Create Hive column stats from the query results.
-        ColumnStatistics colStats = createHiveColStats(params.getColumn_stats(), table);
-        numUpdatedColumns = colStats.getStatsObjSize();
+        ColumnStatistics colStats = null;
+        if (params.isSetColumn_stats()) {
+          // Create Hive column stats from the query results.
+          colStats = createHiveColStats(params.getColumn_stats(), table);
+          numUpdatedColumns = colStats.getStatsObjSize();
+        }
 
         // Update partitions in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'. This
         // reduces the time spent in a single update and helps avoid metastore client
@@ -408,12 +410,14 @@ public class CatalogOpExecutor {
         }
 
         synchronized (metastoreDdlLock_) {
-          // Update column stats.
-          try {
-            msClient.getHiveClient().updateTableColumnStatistics(colStats);
-          } catch (Exception e) {
-            throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
-                "updateTableColumnStatistics"), e);
+          if (colStats != null) {
+            // Update column stats.
+            try {
+              msClient.getHiveClient().updateTableColumnStatistics(colStats);
+            } catch (Exception e) {
+              throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
+                  "updateTableColumnStatistics"), e);
+            }
           }
           // Update the table stats. Apply the table alteration last to ensure the
           // lastDdlTime is as accurate as possible.
