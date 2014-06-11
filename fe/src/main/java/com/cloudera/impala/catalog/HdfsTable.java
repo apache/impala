@@ -38,7 +38,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.VolumeId;
-import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -59,7 +58,6 @@ import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.FileSystemUtil;
-import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -118,19 +116,19 @@ public class HdfsTable extends Table {
 
   // Array of sorted maps storing the association between partition values and
   // partition ids. There is one sorted map per partition key.
-  private ArrayList<TreeMap<LiteralExpr, HashSet<Long>>> partitionValuesMap_ =
+  private final ArrayList<TreeMap<LiteralExpr, HashSet<Long>>> partitionValuesMap_ =
       Lists.newArrayList();
 
   // Array of partition id sets that correspond to partitions with null values
   // in the partition keys; one set per partition key.
-  private ArrayList<HashSet<Long>> nullPartitionIds_ = Lists.newArrayList();
+  private final ArrayList<HashSet<Long>> nullPartitionIds_ = Lists.newArrayList();
 
   // Map of partition ids to HdfsPartitions. Used for speeding up partition
   // pruning.
-  private HashMap<Long, HdfsPartition> partitionMap_ = Maps.newHashMap();
+  private final HashMap<Long, HdfsPartition> partitionMap_ = Maps.newHashMap();
 
   // Store all the partition ids of an HdfsTable.
-  private HashSet<Long> partitionIds_ = Sets.newHashSet();
+  private final HashSet<Long> partitionIds_ = Sets.newHashSet();
 
   // Flag to indicate if the HdfsTable has the partition metadata populated.
   private boolean hasPartitionMd_ = false;
@@ -579,6 +577,10 @@ public class HdfsTable extends Table {
    * partition keys.
    *
    * For files that have not been changed, reuses file descriptors from oldFileDescMap.
+   *
+   * TODO: If any partition fails to load, the entire table will fail to load. Instead,
+   * we should consider skipping partitions that cannot be loaded and raise a warning
+   * whenever the table is accessed.
    */
   private void loadPartitions(
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
@@ -730,17 +732,14 @@ public class HdfsTable extends Table {
    * directory (partition location) to list of files (FileDescriptors) under that
    * directory.
    * Returns new partition or null, if none was added.
-   *
-   * @throws InvalidStorageDescriptorException
-   *           if the supplied storage descriptor contains
-   *           metadata that Impala can't understand.
+   * TODO: All thrown exceptions should be derived from CatalogException.
    */
   private HdfsPartition addPartition(StorageDescriptor storageDescriptor,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyExprs,
       Map<String, List<FileDescriptor>> oldFileDescMap,
       Map<String, List<FileDescriptor>> newFileDescMap)
-      throws IOException, InvalidStorageDescriptorException {
+      throws IOException, InvalidStorageDescriptorException, CatalogException {
     HdfsStorageDescriptor fileFormatDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
     Path partDirPath = new Path(storageDescriptor.getLocation());
@@ -814,6 +813,7 @@ public class HdfsTable extends Table {
     }
     HdfsPartition partition = new HdfsPartition(this, msPartition, partitionKeyExprs,
         fileFormatDescriptor, fileDescriptors, getAvailableAccessLevel(partDirPath));
+    partition.checkWellFormed();
     partitions_.add(partition);
     totalHdfsBytes_ += partition.getSize();
     return partition;

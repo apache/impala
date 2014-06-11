@@ -475,6 +475,21 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     return partition;
   }
 
+  /**
+   * Checks that this partition's metadata is well formed. This does not necessarily
+   * mean the partition is supported by Impala.
+   * Throws a CatalogException if there are any errors in the partition metadata.
+   */
+  public void checkWellFormed() throws CatalogException {
+    try {
+      // Validate all the partition key/values to ensure you can convert them toThrift()
+      Expr.treesToThrift(getPartitionValues());
+    } catch (Exception e) {
+      throw new CatalogException("Partition (" + getPartitionName() +
+          ") has invalid partition column values: ", e);
+    }
+  }
+
   public THdfsPartition toThrift(boolean includeFileDescriptorMetadata) {
     List<TExpr> thriftExprs = Expr.treesToThrift(getPartitionValues());
 

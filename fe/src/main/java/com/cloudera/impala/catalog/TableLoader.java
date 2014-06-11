@@ -94,9 +94,9 @@ public class TableLoader {
           TableId.createInvalidId(), db, tblName, tableDoesNotExist);
     } catch (Exception e) {
       table = IncompleteTable.createFailedMetadataLoadTable(
-            catalog_.getNextTableId(), db, tblName, new TableLoadingException(
-            "Failed to load metadata for table: " + fullTblName + ". Running " +
-            "'invalidate metadata " + fullTblName + "' may resolve this problem.", e));
+          catalog_.getNextTableId(), db, tblName, new TableLoadingException(
+          "Failed to load metadata for table: " + fullTblName + ". Running " +
+          "'invalidate metadata " + fullTblName + "' may resolve this problem.", e));
     } finally {
       if (msClient != null) msClient.release();
     }
