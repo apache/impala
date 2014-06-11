@@ -37,6 +37,7 @@ from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
+from ExecStats.ttypes import TExecStats
 from ImpalaService.ImpalaService import TPingImpalaServiceResp
 from Status.ttypes import TStatus, TStatusCode
 from thrift_sasl import TSaslClientTransport
@@ -379,6 +380,136 @@ class ImpalaShell(cmd.Cmd):
       return True
     else:
       return False
+
+  def __build_summary_table(self, summary, idx, is_fragment_root, indent_level, output):
+    """Direct translation of Coordinator::PrintExecSummary() to recursively build a list
+    of rows of summary statistics, one per exec node
+
+    summary: the TExecSummary object that contains all the summary data
+
+    idx: the index of the node to print
+
+    is_fragment_root: true if the node to print is the root of a fragment (and therefore
+    feeds into an exchange)
+
+    indent_level: the number of spaces to print before writing the node's label, to give
+    the appearance of a tree. The 0th child of a node has the same indent_level as its
+    parent. All other children have an indent_level of one greater than their parent.
+
+    output: the list of rows into which to append the rows produced for this node and its
+    children.
+
+    Returns the index of the next exec node in summary.exec_nodes that should be
+    processed, used internally to this method only.
+    """
+    attrs = ["latency_ns", "cpu_time_ns", "cardinality", "memory_used"]
+
+    # Initialise aggregate and maximum stats
+    agg_stats, max_stats = TExecStats(), TExecStats()
+    for attr in attrs:
+      setattr(agg_stats, attr, 0)
+      setattr(max_stats, attr, 0)
+
+    node = summary.nodes[idx]
+    for stats in node.exec_stats:
+      for attr in attrs:
+        val = getattr(stats, attr)
+        if val is not None:
+          setattr(agg_stats, attr, getattr(agg_stats, attr) + val)
+          setattr(max_stats, attr, max(getattr(max_stats, attr), val))
+
+    if len(node.exec_stats) > 0:
+      avg_time = agg_stats.latency_ns / len(node.exec_stats)
+    else:
+      avg_time = 0
+
+    # If the node is a broadcast-receiving exchange node, the cardinality of rows produced
+    # is the max over all instances (which should all have received the same number of
+    # rows). Otherwise, the cardinality is the sum over all instances which process
+    # disjoint partitions.
+    if node.is_broadcast and is_fragment_root:
+      cardinality = max_stats.cardinality
+    else:
+      cardinality = agg_stats.cardinality
+
+    est_stats = node.estimated_stats
+    label_prefix = ""
+    if indent_level > 0:
+      label_prefix = "|"
+      if is_fragment_root:
+        label_prefix += "  " * indent_level
+      else:
+        label_prefix += "--" * indent_level
+
+    def prettyprint(val, units, divisor):
+      for unit in units:
+        if val < divisor:
+          if unit == units[0]:
+            return "%d%s" % (val, unit)
+          else:
+            return "%3.2f%s" % (val, unit)
+        val /= divisor
+
+    def prettyprint_bytes(byte_val):
+      return prettyprint(byte_val, [' B', ' KB', ' MB', ' GB', ' TB'], 1024.0)
+
+    def prettyprint_units(unit_val):
+      return prettyprint(unit_val, ["", "K", "M", "B"], 1000.0)
+
+    def prettyprint_time(time_val):
+      return prettyprint(time_val, ["ns", "us", "ms", "s"], 1000.0)
+
+    row = [ label_prefix + node.label,
+            len(node.exec_stats),
+            prettyprint_time(avg_time),
+            prettyprint_time(max_stats.latency_ns),
+            prettyprint_units(cardinality),
+            prettyprint_units(est_stats.cardinality),
+            prettyprint_bytes(max_stats.memory_used),
+            prettyprint_bytes(est_stats.memory_used),
+            node.label_detail ]
+
+    output.append(row)
+    try:
+      sender_idx = summary.exch_to_sender_map[idx]
+      # This is an exchange node, so the sender is a fragment root, and should be printed
+      # next.
+      self.__build_summary_table(summary, sender_idx, True, indent_level, output)
+    except KeyError:
+      pass
+
+    idx += 1
+    if node.num_children > 0:
+      first_child_output = []
+      idx = \
+        self.__build_summary_table(summary, idx, False, indent_level, first_child_output)
+      for child_idx in xrange(1, node.num_children):
+        # All other children are indented (we only have 0, 1 or 2 children for every exec
+        # node at the moment)
+        idx = self.__build_summary_table(summary, idx, False, indent_level + 1, output)
+      output += first_child_output
+    return idx
+
+  def do_summary(self, args):
+    if not self.connected:
+      print_to_stderr("Must be connected to an Impala demon to retrieve query summaries")
+      return True
+    summary = self.__get_summary()
+    if summary is None:
+      print_to_stderr("Could not retrieve summary for query.")
+      return True
+    if summary.nodes is None:
+      print_to_stderr("Summary not available")
+      return True
+    output = []
+    table = self.__construct_table_header(["Operator", "#Hosts", "Avg Time", "Max Time",
+                                           "#Rows", "Est. #Rows", "Peak Mem",
+                                           "Est. Peak Mem", "Detail"])
+    self.__build_summary_table(summary, 0, False, 0, output)
+    formatter = PrettyOutputFormatter(table)
+    self.output_stream = OutputStream(formatter, filename=self.output_file)
+    self.output_stream.write(output)
+    return True
 
   def do_set(self, args):
     """Set or display query options.
@@ -868,6 +999,15 @@ class ImpalaShell(cmd.Cmd):
     profile, status = rpc_result.get_results()
     if status == RpcStatus.OK and profile:
       return profile
+
+  def __get_summary(self):
+    """Calls GetExecSummary() for the last query handle"""
+    rpc_result = self.__do_rpc(
+      lambda: self.imp_service.GetExecSummary(self.last_query_handle))
+    summary, status = rpc_result.get_results()
+    if status == RpcStatus.OK and summary:
+      return summary
+    return None
 
   def __do_rpc(self, rpc):
     """Creates a child thread which executes the provided callable.

@@ -217,6 +217,20 @@ class TestImpalaShell(object):
     assert result_describe.stdout == result_desc.stdout
 
   @pytest.mark.execute_serially
+  def test_summary(self):
+    args = "-q 'select count(*) from functional.alltypes; summary;'"
+    result_set = run_impala_shell_cmd(args)
+    assert "03:AGGREGATE" in result_set.stdout
+
+    args = "-q 'summary;'"
+    result_set = run_impala_shell_cmd(args)
+    assert "Could not retrieve summary for query" in result_set.stderr
+
+    args = "-q 'show tables; summary;'"
+    result_set = run_impala_shell_cmd(args)
+    assert "Summary not available" in result_set.stderr
+
+  @pytest.mark.execute_serially
   def test_queries_closed(self):
     """Regression test for IMPALA-897"""
     args = '-f %s/test_close_queries.sql --quiet -B' % QUERY_FILE_PATH

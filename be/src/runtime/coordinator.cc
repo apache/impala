@@ -884,7 +884,7 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
       node.node_id = plan.nodes[j].node_id;
       node.fragment_id = i;
       node.label = plan.nodes[j].label;
-      node.label_detail = plan.nodes[j].label_detail;
+      node.__set_label_detail(plan.nodes[j].label_detail);
       node.num_children = plan.nodes[j].num_children;
 
       if (plan.nodes[j].__isset.estimated_stats) {
@@ -900,7 +900,7 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
       const TDataStreamSink& sink = request.fragments[i].output_sink.stream_sink;
       int exch_idx = plan_node_id_to_summary_map_[sink.dest_node_id];
       if (sink.output_partition.type == TPartitionType::UNPARTITIONED) {
-        exec_summary_.nodes[exch_idx].is_broadcast = true;
+        exec_summary_.nodes[exch_idx].__set_is_broadcast(true);
       }
       exec_summary_.__isset.exch_to_sender_map = true;
       exec_summary_.exch_to_sender_map[exch_idx] = fragment_first_node_idx;
