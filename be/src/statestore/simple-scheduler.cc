@@ -678,6 +678,41 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
       continue;
     }
 
+    // MergeNodes are special because they can consume multiple partitioned inputs,
+    // as well as execute multiple scans in the same fragment.
+    // Fragments containing a MergeNode are executed on the union of hosts of all
+    // scans in the fragment as well as the hosts of all its input fragments (s.t.
+    // a MergeNode with partitioned joins or grouping aggregates as children runs on
+    // at least as many hosts as the input to those children).
+    if (ContainsNode(fragment.plan, TPlanNodeType::MERGE_NODE)) {
+      vector<TPlanNodeId> scan_nodes;
+      FindNodes(fragment.plan, scan_node_types, &scan_nodes);
+      vector<TPlanNodeId> exch_nodes;
+      FindNodes(fragment.plan,
+          vector<TPlanNodeType::type>(1, TPlanNodeType::EXCHANGE_NODE),
+          &exch_nodes);
+
+      // Add hosts of scan nodes.
+      vector<TNetworkAddress> scan_hosts;
+      for (int j = 0; j < scan_nodes.size(); ++j) {
+        GetScanHosts(scan_nodes[j], exec_request, params, &scan_hosts);
+      }
+      unordered_set<TNetworkAddress> hosts(scan_hosts.begin(), scan_hosts.end());
+
+      // Add hosts of input fragments.
+      for (int j = 0; j < exch_nodes.size(); ++j) {
+        int input_fragment_idx = FindSenderFragment(exch_nodes[j], i, exec_request);
+        const vector<TNetworkAddress>& input_fragment_hosts =
+            (*fragment_exec_params)[input_fragment_idx].hosts;
+        hosts.insert(input_fragment_hosts.begin(), input_fragment_hosts.end());
+      }
+      DCHECK(!hosts.empty()) << "no hosts for fragment " << i << " with a MergeNode";
+
+      // Set unique hosts in the fragment's params.
+      params.hosts.assign(hosts.begin(), hosts.end());
+      continue;
+    }
+
     PlanNodeId leftmost_scan_id = FindLeftmostNode(fragment.plan, scan_node_types);
     if (leftmost_scan_id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
       // there is no leftmost scan; we assign the same hosts as those of our
@@ -692,29 +727,16 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
       continue;
     }
 
-    map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator entry =
-        exec_request.per_node_scan_ranges.find(leftmost_scan_id);
-    if (entry == exec_request.per_node_scan_ranges.end() || entry->second.empty()) {
-      // this scan node doesn't have any scan ranges; run it on the coordinator
-      // TODO: we'll need to revisit this strategy once we can partition joins
-      // (in which case this fragment might be executing a right outer join
-      // with a large build table)
-      params.hosts.push_back(coord);
-      continue;
-    }
-
-    // Get the list of impalad host from scan_range_assignment_
-    BOOST_FOREACH(const FragmentScanRangeAssignment::value_type& scan_range_assignment,
-        params.scan_range_assignment) {
-      params.hosts.push_back(scan_range_assignment.first);
-      unique_hosts.insert(scan_range_assignment.first);
-    }
+    // This fragment is executed on those hosts that have scan ranges
+    // for the leftmost scan.
+    GetScanHosts(leftmost_scan_id, exec_request, params, &params.hosts);
+    unique_hosts.insert(params.hosts.begin(), params.hosts.end());
   }
   schedule->SetUniqueHosts(unique_hosts);
 }
 
 PlanNodeId SimpleScheduler::FindLeftmostNode(
-    const TPlan& plan, const std::vector<TPlanNodeType::type>& types) {
+    const TPlan& plan, const vector<TPlanNodeType::type>& types) {
   // the first node with num_children == 0 is the leftmost node
   int node_idx = 0;
   while (node_idx < plan.nodes.size() && plan.nodes[node_idx].num_children != 0) {
@@ -731,6 +753,46 @@ PlanNodeId SimpleScheduler::FindLeftmostNode(
   return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
 }
 
+bool SimpleScheduler::ContainsNode(const TPlan& plan, TPlanNodeType::type type) {
+  for (int i = 0; i < plan.nodes.size(); ++i) {
+    if (plan.nodes[i].node_type == type) return true;
+  }
+  return false;
+}
+
+void SimpleScheduler::FindNodes(const TPlan& plan,
+    const vector<TPlanNodeType::type>& types, vector<TPlanNodeId>* results) {
+  for (int i = 0; i < plan.nodes.size(); ++i) {
+    for (int j = 0; j < types.size(); ++j) {
+      if (plan.nodes[i].node_type == types[j]) {
+        results->push_back(plan.nodes[i].node_id);
+        break;
+      }
+    }
+  }
+}
+
+void SimpleScheduler::GetScanHosts(TPlanNodeId scan_id,
+    const TQueryExecRequest& exec_request, const FragmentExecParams& params,
+    vector<TNetworkAddress>* scan_hosts) {
+  map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator entry =
+      exec_request.per_node_scan_ranges.find(scan_id);
+  if (entry == exec_request.per_node_scan_ranges.end() || entry->second.empty()) {
+    // this scan node doesn't have any scan ranges; run it on the coordinator
+    // TODO: we'll need to revisit this strategy once we can partition joins
+    // (in which case this fragment might be executing a right outer join
+    // with a large build table)
+    scan_hosts->push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
+    return;
+  }
+
+  // Get the list of impalad host from scan_range_assignment_
+  BOOST_FOREACH(const FragmentScanRangeAssignment::value_type& scan_range_assignment,
+      params.scan_range_assignment) {
+    scan_hosts->push_back(scan_range_assignment.first);
+  }
+}
+
 int SimpleScheduler::FindLeftmostInputFragment(
     int fragment_idx, const TQueryExecRequest& exec_request) {
   // find the leftmost node, which we expect to be an exchage node
@@ -741,8 +803,12 @@ int SimpleScheduler::FindLeftmostInputFragment(
   if (exch_id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
     return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
   }
-
   // find the fragment that sends to this exchange node
+  return FindSenderFragment(exch_id, fragment_idx, exec_request);
+}
+
+int SimpleScheduler::FindSenderFragment(TPlanNodeId exch_id, int fragment_idx,
+    const TQueryExecRequest& exec_request) {
   for (int i = 0; i < exec_request.dest_fragment_idx.size(); ++i) {
     if (exec_request.dest_fragment_idx[i] != fragment_idx) continue;
     const TPlanFragment& input_fragment = exec_request.fragments[i + 1];

@@ -219,16 +219,32 @@ class SimpleScheduler : public Scheduler {
   void ComputeFragmentHosts(const TQueryExecRequest& exec_request,
       QuerySchedule* schedule);
 
-  // Returns the id of the leftmost node of any of the given types in 'plan_root',
+  // Returns the id of the leftmost node of any of the given types in 'plan',
   // or INVALID_PLAN_NODE_ID if no such node present.
   PlanNodeId FindLeftmostNode(
       const TPlan& plan, const std::vector<TPlanNodeType::type>& types);
 
-  // Returns index (w/in exec_request.fragments) of fragment that sends its output
+  // Returns the index (w/in exec_request.fragments) of fragment that sends its output
   // to exec_request.fragment[fragment_idx]'s leftmost ExchangeNode.
   // Returns INVALID_PLAN_NODE_ID if the leftmost node is not an exchange node.
   int FindLeftmostInputFragment(
       int fragment_idx, const TQueryExecRequest& exec_request);
+
+  // Adds all hosts the given scan is executed on to scan_hosts.
+  void GetScanHosts(TPlanNodeId scan_id, const TQueryExecRequest& exec_request,
+      const FragmentExecParams& params, std::vector<TNetworkAddress>* scan_hosts);
+
+  // Returns true if 'plan' contains a node of the given type.
+  bool ContainsNode(const TPlan& plan, TPlanNodeType::type type);
+
+  // Returns all ids of nodes in 'plan' of any of the given types.
+  void FindNodes(const TPlan& plan,
+      const std::vector<TPlanNodeType::type>& types, std::vector<TPlanNodeId>* results);
+
+  // Returns the index (w/in exec_request.fragments) of fragment that sends its output
+  // to the given exchange in the given fragment index.
+  int FindSenderFragment(TPlanNodeId exch_id, int fragment_idx,
+      const TQueryExecRequest& exec_request);
 };
 
 }
