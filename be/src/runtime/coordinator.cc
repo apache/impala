@@ -1613,6 +1613,9 @@ void Coordinator::PrintExecSummary(int indent_level, bool is_child_fragment,
 }
 
 string Coordinator::PrintExecSummary() const {
+  // Bail if InitExecProfile() has not been called.
+  if (!exec_summary_.__isset.nodes) return "";
+
   TablePrinter printer;
   printer.set_max_output_width(30);
   printer.AddColumn("Operator", true);
