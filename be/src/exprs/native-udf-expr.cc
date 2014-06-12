@@ -62,6 +62,7 @@ typedef DecimalVal (*DecimalUdfWrapper)(int8_t*, TupleRow*);
 
 void* NativeUdfExpr::ComputeFn(Expr* e, TupleRow* row) {
   NativeUdfExpr* udf_expr = reinterpret_cast<NativeUdfExpr*>(e);
+  DCHECK(udf_expr->udf_wrapper_ != NULL);
   switch (e->type().type) {
     case TYPE_BOOLEAN: {
       BooleanUdfWrapper fn = reinterpret_cast<BooleanUdfWrapper>(udf_expr->udf_wrapper_);

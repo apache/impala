@@ -124,11 +124,11 @@ class HdfsTableSink : public DataSink {
   HdfsTableSink(const RowDescriptor& row_desc, const TUniqueId& unique_id,
       const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink);
 
-  // Prepares output_exprs and partition_key_exprs.
-  // Also, connects to Hdfs, and prepares the single output partition for static inserts.
+  // Prepares output_exprs and partition_key_exprs, and connects to HDFS.
   virtual Status Prepare(RuntimeState* state);
 
-  // Opens output_exprs adn partition_key_exprs.
+  // Opens output_exprs and partition_key_exprs, prepares the single output partition for
+  // static inserts, and populates partition_descriptor_map_.
   virtual Status Open(RuntimeState* state);
 
   // Append all rows in batch to the temporary Hdfs files corresponding to partitions.

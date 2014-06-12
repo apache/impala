@@ -87,6 +87,14 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   DCHECK_GE(output_exprs_.size(),
       table_desc_->num_cols() - table_desc_->num_clustering_cols()) << DebugString();
 
+  // Prepare literal partition key exprs
+  BOOST_FOREACH(
+      const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
+      table_desc_->partition_descriptors()) {
+    HdfsPartitionDescriptor* partition = id_to_desc.second;
+    RETURN_IF_ERROR(partition->PrepareExprs(state));
+  }
+
   return Status::OK;
 }
 
@@ -120,12 +128,33 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
   staging_dir_ = Substitute("$0/.impala_insert_staging/$1/", table_desc_->hdfs_base_dir(),
       PrintId(state->query_id(), "_"));
 
-  PrepareExprs(state);
+  RETURN_IF_ERROR(PrepareExprs(state));
 
-  // Get file format for default partition in table descriptor, and
-  // build a map from partition key values to partition descriptor for
-  // multiple output format support. The map is keyed on the
-  // concatenation of the non-constant keys of the PARTITION clause of
+  hdfs_connection_ = HdfsFsCache::instance()->GetDefaultConnection();
+  if (hdfs_connection_ == NULL) {
+    return Status(GetHdfsErrorMsg("Failed to connect to HDFS."));
+  }
+
+  mem_tracker_.reset(
+      new MemTracker(profile(), -1, profile()->name(), state->instance_mem_tracker()));
+
+  rows_inserted_counter_ =
+      ADD_COUNTER(profile(), "RowsInserted", TCounterType::UNIT);
+  bytes_written_counter_ =
+      ADD_COUNTER(profile(), "BytesWritten", TCounterType::BYTES);
+  encode_timer_ = ADD_TIMER(profile(), "EncodeTimer");
+  hdfs_write_timer_ = ADD_TIMER(profile(), "HdfsWriteTimer");
+
+  return Status::OK;
+}
+
+Status HdfsTableSink::Open(RuntimeState* state) {
+  RETURN_IF_ERROR(Expr::Open(output_exprs_, state));
+  RETURN_IF_ERROR(Expr::Open(partition_key_exprs_, state));
+
+  // Get file format for default partition in table descriptor, and build a map from
+  // partition key values to partition descriptor for multiple output format support. The
+  // map is keyed on the concatenation of the non-constant keys of the PARTITION clause of
   // the INSERT statement.
   BOOST_FOREACH(
       const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
@@ -145,7 +174,6 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
       // Only relevant partitions are remembered in partition_descriptor_map_.
       bool relevant_partition = true;
       HdfsPartitionDescriptor* partition = id_to_desc.second;
-      partition->PrepareExprs(state);
       DCHECK_EQ(partition->partition_key_values().size(), partition_key_exprs_.size());
       vector<Expr*> dynamic_partition_key_values;
       for (size_t i = 0; i < partition_key_exprs_.size(); ++i) {
@@ -185,32 +213,10 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
       }
     }
   }
-
   if (default_partition_ == NULL) {
     return Status("No default partition found for HdfsTextTableSink");
   }
-
-  hdfs_connection_ = HdfsFsCache::instance()->GetDefaultConnection();
-  if (hdfs_connection_ == NULL) {
-    return Status(GetHdfsErrorMsg("Failed to connect to HDFS."));
-  }
-
-  mem_tracker_.reset(
-      new MemTracker(profile(), -1, profile()->name(), state->instance_mem_tracker()));
-
-  rows_inserted_counter_ =
-      ADD_COUNTER(profile(), "RowsInserted", TCounterType::UNIT);
-  bytes_written_counter_ =
-      ADD_COUNTER(profile(), "BytesWritten", TCounterType::BYTES);
-  encode_timer_ = ADD_TIMER(profile(), "EncodeTimer");
-  hdfs_write_timer_ = ADD_TIMER(profile(), "HdfsWriteTimer");
-
   return Status::OK;
-}
-
-Status HdfsTableSink::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(Expr::Open(output_exprs_, state));
-  return Expr::Open(partition_key_exprs_, state);
 }
 
 void HdfsTableSink::BuildHdfsFileNames(
