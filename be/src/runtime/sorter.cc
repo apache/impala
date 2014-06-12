@@ -15,6 +15,7 @@
 #include "runtime/sorter.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
 #include "util/runtime-profile.h"
 
@@ -180,24 +181,25 @@ class Sorter::Run {
 // Sorts a sequence of tuples from a run in place using a provided tuple comparator.
 // Quick sort is used for sequences of tuples larger that 16 elements, and
 // insertion sort is used for smaller sequences.
+// The TupleSorter is initialized with a RuntimeState instance to check for
+// cancellation during an in-memory sort.
 class Sorter::TupleSorter {
  public:
   typedef function<bool (Tuple*, Tuple*)> LessThanComparator;
 
   TupleSorter(const LessThanComparator& less_than_comp, int64_t block_size,
-      int tuple_size);
+      int tuple_size, RuntimeState* state);
 
   ~TupleSorter();
 
   // Performs a quicksort for tuples in the range [0, num_tuples)
   // followed by an insertion sort to finish smaller blocks.
+  // Returns early if stste_->is_cancelled() is true. No status
+  // is returned - the caller must check for cancellation.
   void Sort(Run* run, int64_t num_tuples);
 
  private:
   static const int INSERTION_THRESHOLD = 16;
-
-  // The run to be sorted.
-  Run* run_;
 
   // Size of the tuples in memory.
   const int tuple_size_;
@@ -206,7 +208,13 @@ class Sorter::TupleSorter {
   const int block_capacity_;
 
   // Comparator that returns true if lhs < rhs.
-  LessThanComparator less_than_comp_;
+  const LessThanComparator less_than_comp_;
+
+  // Runtime state instance to check for cancellation. Not owned.
+  RuntimeState* const state_;
+
+  // The run to be sorted.
+  Run* run_;
 
   // Temporarily allocated space to copy and swap tuples (Both are used in Partition()).
   // temp_tuple_ points to temp_tuple_buffer_. Owned by this TupleSorter instance.
@@ -221,10 +229,12 @@ class Sorter::TupleSorter {
   // groups around the pivot tuple - i.e. tuples in first group are <= the pivot, and
   // tuples in the second group are >= pivot. Tuples are swapped in place to create the
   // groups and the index to the first element in the second group is returned.
+  // Checks state_->is_cancelled() and returns early with an invalid result if true.
   int64_t Partition(int64_t first, int64_t last, Tuple* pivot);
 
   // Performs a quicksort of rows in the range [first, last).
   // followed by insertion sort for smaller groups of elements.
+  // Checks state_->is_cancelled() and returns early if true.
   void SortHelper(int64_t first, int64_t last);
 
   // Swaps left and right tuples using the swap buffer.
@@ -418,7 +428,7 @@ Status Sorter::Run::PrepareRead() {
   num_tuples_returned_ = 0;
 
   buffered_batch_.reset(new RowBatch(*sorter_->output_row_desc_,
-      sorter_->merge_batch_size_, sorter_->mem_tracker_));
+      sorter_->state_->batch_size(), sorter_->mem_tracker_));
 
   // If the run is pinned, merge is not invoked, so buffered_batch_ is not needed
   // and the individual blocks do not need to be pinned.
@@ -613,10 +623,11 @@ void Sorter::Run::CopyVarLenDataConvertOffset(char* dest, int64_t offset,
 
 // Sorter::TupleSorter methods.
 Sorter::TupleSorter::TupleSorter(const LessThanComparator& comp, int64_t block_size,
-    int tuple_size)
+    int tuple_size, RuntimeState* state)
   : tuple_size_(tuple_size),
     block_capacity_(block_size / tuple_size),
-    less_than_comp_(comp) {
+    less_than_comp_(comp),
+    state_(state) {
   temp_tuple_buffer_ = new uint8_t[tuple_size];
   temp_tuple_ = reinterpret_cast<Tuple*>(temp_tuple_buffer_);
   swap_buffer_ = new uint8_t[tuple_size];
@@ -662,7 +673,7 @@ void Sorter::TupleSorter::InsertionSort(int64_t first, int64_t last) {
 int64_t Sorter::TupleSorter::Partition(int64_t first, int64_t last, Tuple* pivot) {
   // Copy pivot into temp_tuple since it points to a tuple within [first, last).
   memcpy(temp_tuple_, pivot, tuple_size_);
-  while (true) {
+  while (!state_->is_cancelled()) {
     // Search for the first and last out-of-place elements, and swap them.
     Tuple* first_tuple = GetTuple(first);
     while (less_than_comp_(first_tuple, temp_tuple_)) {
@@ -689,6 +700,7 @@ int64_t Sorter::TupleSorter::Partition(int64_t first, int64_t last, Tuple* pivot
 }
 
 void Sorter::TupleSorter::SortHelper(int64_t first, int64_t last) {
+  if (UNLIKELY(state_->is_cancelled())) return;
   // Use insertion sort for smaller sequences.
   while (last - first > INSERTION_THRESHOLD) {
     Tuple* pivot = GetTuple(first + (last - first)/2);
@@ -697,6 +709,7 @@ void Sorter::TupleSorter::SortHelper(int64_t first, int64_t last) {
     int64_t cut = Partition(first, last, pivot);
     SortHelper(cut, last);
     last = cut;
+    if (UNLIKELY(state_->is_cancelled())) return;
   }
 
   InsertionSort(first, last);
@@ -721,8 +734,8 @@ inline Tuple* Sorter::TupleSorter::GetTuple(int64_t index) {
 Sorter::Sorter(const TupleRowComparator& compare_less_than,
     const vector<Expr*>& slot_materialize_exprs, BufferedBlockMgr* block_mgr,
     RowDescriptor* output_row_desc, MemTracker* mem_tracker, RuntimeProfile* profile,
-    int merge_batch_size)
-  : merge_batch_size_(merge_batch_size),
+    RuntimeState* state)
+  : state_(state),
     compare_less_than_(compare_less_than),
     block_mgr_(block_mgr),
     output_row_desc_(output_row_desc),
@@ -732,7 +745,7 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
   TupleDescriptor* sort_tuple_desc = output_row_desc->tuple_descriptors()[0];
   has_var_len_slots_ = sort_tuple_desc->string_slots().size() > 0;
   in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than, block_mgr->block_size(),
-      sort_tuple_desc->byte_size()));
+      sort_tuple_desc->byte_size(), state));
 
   num_runs_counter_ = ADD_COUNTER(profile_, "NumRuns", TCounterType::UNIT);
   num_merges_counter_ = ADD_COUNTER(profile_, "NumMerges", TCounterType::UNIT);
@@ -845,6 +858,7 @@ Status Sorter::SortRun() {
   {
     SCOPED_TIMER(in_mem_sort_timer_);
     in_mem_tuple_sorter_->Sort(unsorted_run_, unsorted_run_->num_tuples_);
+    RETURN_IF_CANCELLED(state_);
   }
   sorted_runs_.push_back(unsorted_run_);
   return Status::OK;
@@ -893,7 +907,7 @@ Status Sorter::MergeIntermediateRuns() {
     int num_runs_to_merge = min<int>(max_runs_per_intermediate_merge,
         sorted_runs_.size() - max_runs_per_intermediate_merge);
     CreateMerger(num_runs_to_merge);
-    RowBatch intermediate_merge_batch(*output_row_desc_, merge_batch_size_,
+    RowBatch intermediate_merge_batch(*output_row_desc_, state_->batch_size(),
         mem_tracker_);
     // merged_run is the new sorted run that is produced by the intermediate merge.
     Run* merged_run = obj_pool_.Add(
@@ -904,6 +918,7 @@ Status Sorter::MergeIntermediateRuns() {
     while (!eos) {
       // Copy rows into the new run until done.
       int num_copied;
+      RETURN_IF_CANCELLED(state_);
       RETURN_IF_ERROR(merger_->GetNext(&intermediate_merge_batch, &eos));
       Status ret_status;
       if (has_var_len_slots_) {

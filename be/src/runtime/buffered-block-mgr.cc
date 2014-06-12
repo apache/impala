@@ -498,7 +498,7 @@ string BufferedBlockMgr::DebugString() const {
 
 void BufferedBlockMgr::InitCounters(RuntimeProfile* profile) {
   mem_limit_counter_ = ADD_COUNTER(profile, "MemoryLimit", TCounterType::UNIT);
-  mem_limit_counter_->Set(mem_tracker_->SpareCapacity());
+  mem_limit_counter_->Set(static_cast<int64_t>(all_buffers_.size()) * block_size_);
   block_size_counter_ = ADD_COUNTER(profile, "BlockSize", TCounterType::UNIT);
   block_size_counter_->Set(block_size_);
   created_block_counter_ = ADD_COUNTER(profile, "NumCreatedBlocks", TCounterType::UNIT);

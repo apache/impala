@@ -88,7 +88,7 @@ class Sorter {
   Sorter(const TupleRowComparator& compare_less_than,
       const std::vector<Expr*>& sort_tuple_slot_exprs, BufferedBlockMgr* block_mgr,
       RowDescriptor* output_row_desc, MemTracker* mem_tracker, RuntimeProfile* profile,
-      int merge_batch_size);
+      RuntimeState* state);
 
   ~Sorter();
 
@@ -139,9 +139,8 @@ class Sorter {
   // blocks at the end of the run. Updates the sort bytes counter if necessary.
   Status SortRun();
 
-  // Size of the row batch (in rows) used for the input and output batches created
-  // during a merge.
-  const int merge_batch_size_;
+  // Runtime state instance used to check for cancellation. Not owned.
+  RuntimeState* const state_;
 
   // In memory sorter and less-than comparator.
   TupleRowComparator compare_less_than_;

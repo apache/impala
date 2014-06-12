@@ -70,7 +70,7 @@ Status SortNode::Open(RuntimeState* state) {
       sort_exec_exprs_.rhs_ordering_exprs(), is_asc_order_, nulls_first_);
   sorter_.reset(new Sorter(less_than, sort_exec_exprs_.sort_tuple_slot_exprs(),
       block_mgr_.get(), &row_descriptor_, mem_tracker(), runtime_profile(),
-      state->batch_size()));
+      state));
 
   // The child has been opened and the sorter created. Sort the input.
   // The final merge is done on-demand as rows are requested in GetNext().
