@@ -58,6 +58,9 @@ class DataStreamRecvr::SenderQueue {
   // incoming batches will be dropped.
   void Cancel();
 
+  // Must be called once to cleanup any queued resources.
+  void Close();
+
   // Returns the current batch from this queue being processed by a consumer.
   RowBatch* current_batch() const { return current_batch_.get(); }
 
@@ -235,7 +238,9 @@ void DataStreamRecvr::SenderQueue::Cancel() {
   data_removal__cv_.notify_all();
   PeriodicCounterUpdater::StopTimeSeriesCounter(
       recvr_->bytes_received_time_series_counter_);
+}
 
+void DataStreamRecvr::SenderQueue::Close() {
   // Delete any batches queued in batch_queue_
   for (RowBatchQueue::iterator it = batch_queue_.begin();
       it != batch_queue_.end(); ++it) {
@@ -243,14 +248,6 @@ void DataStreamRecvr::SenderQueue::Cancel() {
   }
 
   current_batch_.reset();
-}
-
-void DataStreamRecvr::Close() {
-  // Remove this receiver from the DataStreamMgr that created it.
-  // TODO: log error msg
-  mgr_->DeregisterRecvr(fragment_instance_id(), dest_node_id());
-  mgr_ = NULL;
-  merger_.reset();
 }
 
 Status DataStreamRecvr::CreateMerger(const TupleRowComparator& less_than) {
@@ -333,6 +330,17 @@ void DataStreamRecvr::CancelStream() {
   for (int i = 0; i < sender_queues_.size(); ++i) {
     sender_queues_[i]->Cancel();
   }
+}
+
+void DataStreamRecvr::Close() {
+  for (int i = 0; i < sender_queues_.size(); ++i) {
+    sender_queues_[i]->Close();
+  }
+  // Remove this receiver from the DataStreamMgr that created it.
+  // TODO: log error msg
+  mgr_->DeregisterRecvr(fragment_instance_id(), dest_node_id());
+  mgr_ = NULL;
+  merger_.reset();
 }
 
 DataStreamRecvr::~DataStreamRecvr() {
