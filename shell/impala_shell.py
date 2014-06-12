@@ -475,7 +475,8 @@ class ImpalaShell(cmd.Cmd):
       # This is an exchange node, so the sender is a fragment root, and should be printed
       # next.
       self.__build_summary_table(summary, sender_idx, True, indent_level, output)
-    except KeyError:
+    except (KeyError, TypeError):
+      # Fall through if idx not in map, or if exch_to_sender_map itself is not set
       pass
 
     idx += 1

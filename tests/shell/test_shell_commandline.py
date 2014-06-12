@@ -230,6 +230,11 @@ class TestImpalaShell(object):
     result_set = run_impala_shell_cmd(args)
     assert "Summary not available" in result_set.stderr
 
+    # Test queries without an exchange
+    args = "-q 'select 1; summary;'"
+    result_set = run_impala_shell_cmd(args)
+    assert "00:MERGE" in result_set.stdout
+
   @pytest.mark.execute_serially
   def test_queries_closed(self):
     """Regression test for IMPALA-897"""
