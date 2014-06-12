@@ -15,6 +15,7 @@
 import shlex
 from subprocess import call
 from tests.common.test_vector import *
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import *
 
 # The purpose of view compatibility testing is to check whether views created in Hive
@@ -85,7 +86,12 @@ class TestViewCompatibility(ImpalaTestSuite):
       self.__exec_in_hive(test_case.get_create_view_sql('HIVE'),\
                           test_case.get_create_view_sql('HIVE'),\
                           test_case.get_create_exp_res())
-      self.client.invalidate_table(test_case.hive_view_name)
+      # The table may or may not have been created in Hive. And so, "invalidate metadata"
+      # may throw an exception.
+      try:
+        self.client.invalidate_table(test_case.hive_view_name)
+      except ImpalaBeeswaxException as e:
+        assert "TableNotFoundException" in str(e)
 
       self.__exec_in_impala(test_case.get_create_view_sql('IMPALA'),\
                             test_case.get_create_view_sql('IMPALA'),\
@@ -114,7 +120,10 @@ class TestViewCompatibility(ImpalaTestSuite):
       # drop the views without checking success or failure
       self.__exec_in_hive(test_case.get_drop_view_sql('HIVE'),\
                           test_case.get_create_view_sql('HIVE'), None)
-      self.client.invalidate_table(test_case.hive_view_name)
+      try:
+        self.client.invalidate_table(test_case.hive_view_name)
+      except ImpalaBeeswaxException as e:
+        assert "TableNotFoundException" in str(e)
 
       self.__exec_in_impala(test_case.get_drop_view_sql('IMPALA'),\
                             test_case.get_create_view_sql('IMPALA'), None)

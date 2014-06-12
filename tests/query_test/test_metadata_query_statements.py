@@ -3,6 +3,7 @@
 # Impala tests for queries that query metadata and set session settings
 import logging
 import pytest
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from subprocess import call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
@@ -96,7 +97,13 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     call(["hive", "-e", "CREATE DATABASE %s" % db_name])
 
     # Run 'invalidate metadata <table name>' when the parent database does not exist.
-    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
+    try:
+      self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
+      assert 0, 'Expected to fail'
+    except ImpalaBeeswaxException as e:
+      assert "TableNotFoundException: Table not found: %s.%s"\
+          % (db_name, tbl_name) in str(e)
+
     result = self.client.execute("show databases")
     assert db_name not in result.data
 
@@ -152,7 +159,13 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     assert int(result) == 5
 
     # Run 'invalidate metadata <table name>' when no table exists with that name.
-    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name + '2'))
+    try:
+      self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name + '2'))
+      assert 0, 'Expected to fail'
+    except ImpalaBeeswaxException as e:
+      assert "TableNotFoundException: Table not found: %s.%s"\
+          % (db_name, tbl_name + '2') in str(e)
+
     result = self.client.execute("show tables in %s" % db_name);
     assert len(result.data) == 1
     assert tbl_name in result.data
@@ -174,7 +187,13 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
 
     # Should be able to call invalidate multiple times on the same table when the table
     # does not exist.
-    self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
+    try:
+      self.client.execute("invalidate metadata %s.%s"  % (db_name, tbl_name))
+      assert 0, 'Expected to fail'
+    except ImpalaBeeswaxException as e:
+      assert "TableNotFoundException: Table not found: %s.%s"\
+          % (db_name, tbl_name) in str(e)
+
     result = self.client.execute("show tables in %s" % db_name)
     assert tbl_name + '2' in result.data
     assert tbl_name not in result.data

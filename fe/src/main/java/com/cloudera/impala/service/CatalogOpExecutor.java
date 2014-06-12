@@ -1821,6 +1821,11 @@ public class CatalogOpExecutor {
           } else {
             resp.getResult().setUpdated_catalog_object(thriftTable);
           }
+        } else {
+          // Table does not exist in the meta store and Impala catalog, throw error.
+          throw new TableNotFoundException("Table not found: " +
+              req.getTable_name().getDb_name() + "."
+              + req.getTable_name().getTable_name());
         }
         resp.getResult().setVersion(thriftTable.getCatalog_version());
       } else {
