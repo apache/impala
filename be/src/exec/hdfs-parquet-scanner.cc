@@ -737,12 +737,13 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
   bool cancelled = context_->cancelled();
   int num_column_readers = column_readers_.size();
   MemPool* pool;
-  Tuple* tuple;
 
   while (!reached_limit && !cancelled && rows_read < expected_rows_in_group) {
+    Tuple* tuple;
     TupleRow* row;
-    int64_t num_rows = std::min(expected_rows_in_group - rows_read,
-                                static_cast<int64_t>(GetMemory(&pool, &tuple, &row)));
+    int64_t row_mem_limit = static_cast<int64_t>(GetMemory(&pool, &tuple, &row));
+    int64_t expected_rows_to_read = expected_rows_in_group - rows_read;
+    int64_t num_rows = std::min(expected_rows_to_read, row_mem_limit);
 
     int num_to_commit = 0;
     if (num_column_readers > 0) {
@@ -819,12 +820,14 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
 
   if (!reached_limit && !cancelled && (num_column_readers > 0)) {
     // If we get to this point, it means that we have read as many rows as the metadata
-    // told us we should read. Attempt to read one more row and if that succeeds
-    // report the error.
+    // told us we should read. Attempt to read one more row and if that succeeds report
+    // the error.
     DCHECK_EQ(rows_read, expected_rows_in_group);
-    InitTuple(template_tuple_, tuple);
+    uint8_t dummy_tuple_mem[tuple_byte_size_];
+    Tuple* dummy_tuple = reinterpret_cast<Tuple*>(&dummy_tuple_mem);
+    InitTuple(template_tuple_, dummy_tuple);
     bool conjuncts_failed = false;
-    if (column_readers_[0]->ReadValue(pool, tuple, &conjuncts_failed)) {
+    if (column_readers_[0]->ReadValue(pool, dummy_tuple, &conjuncts_failed)) {
       // If another tuple is successfully read, it means that there are still values
       // in the file.
       HdfsParquetScanner::BaseColumnReader* reader = column_readers_[0];
