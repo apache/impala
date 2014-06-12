@@ -50,18 +50,8 @@ SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 #   -O3: Enable all compiler optimizations
 #   -g: Enable symbols for profiler tools
 #   -DNDEBUG: Turn off dchecks/asserts/debug only code.
-# For profile guided optimization (PGO) builds, in addition to the flags for release
-# builds:
-#   1. Build first with CMAKE_BUILD_TYPE_PROFILE_GEN:
-#     -fprofile-generate: Indicates compiler should insert profile guided optimization
-#      events
-#   2. Run the benchmarks (generates *.gcda profiling data).
-#   3. Build again with CMAKE_BUILD_TYPE_PROFILE_BUILD
-#     -fprofile-use: Compiler will use the profile outputs for optimizations
 SET(CXX_FLAGS_DEBUG "-g -ggdb")
 SET(CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG")
-SET(CXX_FLAGS_PROFILE_GEN "${CXX_FLAGS_RELEASE} -fprofile-generate")
-SET(CXX_FLAGS_PROFILE_BUILD "${CXX_FLAGS_RELEASE} -fprofile-use")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
     "-O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
 
@@ -77,10 +67,6 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_DEBUG})
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_RELEASE})
-elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "PROFILE_GEN")
-  SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_PROFILE_GEN})
-elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "PROFILE_BUILD")
-  SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_PROFILE_BUILD})
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_DEBUG")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_DEBUG} ${CXX_COVERAGE_FLAGS}")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_RELEASE")

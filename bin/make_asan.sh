@@ -13,10 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-TARGET_BUILD_TYPE=Address_Sanitizer
-
-cd $IMPALA_HOME
-rm -f ./CMakeCache.txt
-cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
-$IMPALA_HOME/bin/make_impala.sh -clean $*
+$IMPALA_HOME/bin/make_impala.sh -clean -build_type=Address_Sanitizer $*

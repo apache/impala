@@ -13,26 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-TARGET_BUILD_TYPE=Debug
-
-# parse command line options
-for ARG in $*
-do
-  case "$ARG" in
-    -codecoverage)
-      TARGET_BUILD_TYPE=CODE_COVERAGE_DEBUG
-      ;;
-    -notests)
-      ;;
-    -help)
-      echo "make_debug.sh [-codecoverage]"
-      echo "[-codecoverage] : build with 'gcov' code coverage instrumentation at the cost of performance"
-      exit
-      ;;
-  esac
-done
-
-rm -f ./CMakeCache.txt
-cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
-$IMPALA_HOME/bin/make_impala.sh -clean $*
+$IMPALA_HOME/bin/make_impala.sh -clean -build_type=Debug $*

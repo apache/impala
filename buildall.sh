@@ -205,13 +205,8 @@ else
   ${IMPALA_HOME}/bin/create-test-configuration.sh
 fi
 
-# Generate all the make files from root.
-cd ${IMPALA_HOME}
-rm -f CMakeCache.txt
-cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
-
 # build common and backend
-$IMPALA_HOME/bin/make_impala.sh $*
+$IMPALA_HOME/bin/make_impala.sh -build_type=${TARGET_BUILD_TYPE} $*
 
 if [ -e $IMPALA_LZO ]
 then

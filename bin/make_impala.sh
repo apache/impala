@@ -23,6 +23,7 @@ set -e
 
 BUILD_TESTS=1
 CLEAN=0
+TARGET_BUILD_TYPE=${TARGET_BUILD_TYPE:-""}
 
 # parse command line options
 for ARG in $*
@@ -34,8 +35,13 @@ do
     -clean)
       CLEAN=1
       ;;
+    -build_type=*)
+      TARGET_BUILD_TYPE="${ARG#*=}"
+      ;;
     -help)
-      echo "make_impala.sh [-notests -clean]"
+      echo "make_impala.sh [-build_type=<build type> -notests -clean]"
+      echo "[-build_type] : Target build type. Examples: Debug, Release, Address_sanitizer."
+      echo "                If omitted, the last build target is built incrementally"
       echo "[-notests] : Omits building the tests."
       echo "[-clean] : Cleans previous build artifacts."
       exit
@@ -43,7 +49,23 @@ do
   esac
 done
 
-if [ $CLEAN -eq 1 ] 
+echo "********************************************************************************"
+echo " Building Impala "
+if [ "x${TARGET_BUILD_TYPE}" != "x" ];
+then
+  echo " Build type: ${TARGET_BUILD_TYPE} "
+fi
+echo "********************************************************************************"
+
+cd ${IMPALA_HOME}
+
+if [ "x${TARGET_BUILD_TYPE}" != "x" ];
+then
+    rm -f ./CMakeCache.txt
+    cmake -DCMAKE_BUILD_TYPE=${TARGET_BUILD_TYPE}
+fi
+
+if [ $CLEAN -eq 1 ]
 then
   make clean
   rm -f $IMPALA_HOME/llvm-ir/impala-nosse.ll
@@ -70,4 +92,3 @@ else
   make -j${IMPALA_BUILD_THREADS:-4} impalad
   make -j${IMPALA_BUILD_THREADS:-4} statestored catalogd fesupport loggingsupport ImpalaUdf
 fi
-
