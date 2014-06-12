@@ -102,7 +102,7 @@ string BufferedBlockMgr::Block::DebugString() const {
 // BufferedBlockMgr methods.
 BufferedBlockMgr* BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
       RuntimeProfile* profile, int64_t mem_limit, int64_t block_size) {
-  BufferedBlockMgr* block_mgr = new BufferedBlockMgr(state->io_mgr(), parent, mem_limit,
+  BufferedBlockMgr* block_mgr = new BufferedBlockMgr(state, parent, mem_limit,
       block_size);
 
   // Initialize the tmp files and the initial file to use.
@@ -119,6 +119,11 @@ BufferedBlockMgr* BufferedBlockMgr::Create(RuntimeState* state, MemTracker* pare
 }
 
 Status BufferedBlockMgr::GetFreeBlock(Block** block) {
+  {
+    lock_guard<mutex> lock(lock_);
+    if (is_cancelled_) return Status::CANCELLED;
+  }
+
   Block* new_block;
   if (unused_blocks_.empty()) {
     new_block = obj_pool_.Add(new Block(this));
@@ -140,30 +145,50 @@ Status BufferedBlockMgr::GetFreeBlock(Block** block) {
 }
 
 void BufferedBlockMgr::Close() {
-  if (closed_) return;
-  closed_ = true;
-  io_mgr_->UnregisterContext(io_request_context_);
-  // Delete tmp files.
-  BOOST_FOREACH(TmpFileMgr::File& file, tmp_files_) {
-    file.Remove();
+  DiskIoMgr::RequestContext* unregister_context = NULL;
+  {
+    lock_guard<mutex> lock(lock_);
+    is_cancelled_ = true;
+    unregister_context = io_request_context_;
+    io_request_context_ = NULL;
   }
-  tmp_files_.clear();
 
-  // Free memory resources.
-  buffer_pool_->FreeAll();
-  buffer_pool_.reset();
-  DCHECK_EQ(mem_tracker_->consumption(), 0);
-  mem_tracker_->UnregisterFromParent();
-  mem_tracker_.reset();
+  // Relinquish the lock before unregistering since WriteComplete() may be called
+  // on UnregisterContext() for outstanding writes. UnregisterContext() is called
+  // before any resources are cleaned up to ensure that memory buffers remain valid
+  // for any in-progress writes.
+  if (unregister_context != NULL) {
+    io_mgr_->UnregisterContext(unregister_context);
+  }
+
+  {
+    lock_guard<mutex> lock(lock_);
+    DCHECK(io_request_context_ == NULL);
+    // Delete tmp files.
+    BOOST_FOREACH(TmpFileMgr::File& file, tmp_files_) {
+      file.Remove();
+    }
+    tmp_files_.clear();
+
+    // Free memory resources.
+    if (buffer_pool_ != NULL) {
+      buffer_pool_->FreeAll();
+      buffer_pool_.reset();
+      DCHECK_EQ(mem_tracker_->consumption(), 0);
+      mem_tracker_->UnregisterFromParent();
+      mem_tracker_.reset();
+    }
+  }
 }
 
-BufferedBlockMgr::BufferedBlockMgr(DiskIoMgr* io_mgr, MemTracker* parent,
+BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
     int64_t mem_limit, int64_t block_size)
   : block_size_(block_size),
     block_write_threshold_(TmpFileMgr::num_tmp_devices()),
     num_outstanding_writes_(0),
-    io_mgr_(io_mgr),
-    closed_(false) {
+    io_mgr_(state->io_mgr()),
+    is_cancelled_(false),
+    state_(state) {
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(new MemTracker(mem_limit, "Block Manager", parent));
   buffer_pool_.reset(new MemPool(mem_tracker_.get(), block_size));
@@ -178,7 +203,7 @@ BufferedBlockMgr::BufferedBlockMgr(DiskIoMgr* io_mgr, MemTracker* parent,
     all_buffers_.push_back(buffer_desc);
   }
 
-  io_mgr->RegisterContext(NULL, &io_request_context_);
+  state->io_mgr()->RegisterContext(NULL, &io_request_context_);
 }
 
 Status BufferedBlockMgr::PinBlock(Block* block) {
@@ -213,7 +238,7 @@ Status BufferedBlockMgr::PinBlock(Block* block) {
 
 Status BufferedBlockMgr::UnpinBlock(Block* block) {
   lock_guard<mutex> unpinned_lock(lock_);
-  if (closed_) return Status::CANCELLED;
+  if (is_cancelled_) return Status::CANCELLED;
   DCHECK(block->is_pinned_) << "Unpin for unpinned block.";
   DCHECK(!block->is_deleted_) << "Unpin for deleted block.";
   DCHECK(Validate()) << endl << DebugString();
@@ -280,10 +305,18 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   lock_guard<mutex> lock(lock_);
   DCHECK(Validate()) << endl << DebugString();
   --num_outstanding_writes_;
-  if (closed_) return;
   DCHECK(block->in_write_) << "WriteComplete() for block not in write."
                            << endl << block->DebugString();
   block->in_write_ = false;
+  if (is_cancelled_) return;
+  // Check for an error. Set cancelled and wake up waiting threads if an error occurred.
+  if (!write_status.ok()) {
+    state_->LogError(write_status);
+    is_cancelled_ = true;
+    buffer_available_cv_.notify_all();
+    return;
+  }
+
   // If the block was re-pinned when it was in the IOMgr queue, don't free it.
   if (block->is_pinned_) {
     // The number of outstanding writes has decreased but the number of free buffers
@@ -295,17 +328,12 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   free_buffers_.Enqueue(block->buffer_desc_);
   if (block->is_deleted_) ReturnUnusedBlock(block);
   DCHECK(Validate()) << endl << DebugString();
-  if (write_status.ok()) {
-    buffer_available_cv_.notify_one();
-  } else {
-    Close();
-    buffer_available_cv_.notify_all();
-  }
+  buffer_available_cv_.notify_one();
 }
 
 Status BufferedBlockMgr::DeleteBlock(Block* block) {
   lock_guard<mutex> lock(lock_);
-  if (closed_) return Status::CANCELLED;
+  if (is_cancelled_) return Status::CANCELLED;
   // For now, only pinned blocks can be deleted.
   DCHECK(block->is_pinned_);
 
@@ -333,7 +361,7 @@ void BufferedBlockMgr::ReturnUnusedBlock(Block* block) {
 
 Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
   unique_lock<mutex> l(lock_);
-  if (closed_) return Status::CANCELLED;
+  if (is_cancelled_) return Status::CANCELLED;
   DCHECK(!block->is_pinned_ && !block->is_deleted_) << "GetBufferForBlock() "
                                                     << endl << block->DebugString();
   DCHECK(Validate()) << endl << DebugString();
@@ -342,7 +370,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     // The block is in memory. It may be in 3 states
     // 1) In the unpinned list. The buffer will not be in the free list.
     // 2) Or, in_write_ = true. The buffer will not be in the free list.
-    // 3) Or, the buffer is free, but hasn;t yet been reassigned to a different block.
+    // 3) Or, the buffer is free, but hasn't yet been reassigned to a different block.
     DCHECK((block->unpinned_blocks_it_ != unpinned_blocks_.end()) ||
         free_buffers_.Contains(block->buffer_desc_) || block->in_write_);
     if (block->unpinned_blocks_it_ != unpinned_blocks_.end()) {
@@ -364,7 +392,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     while (free_buffers_.empty()) {
       SCOPED_TIMER(buffer_wait_timer_);
       buffer_available_cv_.wait(l);
-      if (closed_) return Status::CANCELLED;
+      if (is_cancelled_) return Status::CANCELLED;
     }
     BufferDescriptor* buffer = free_buffers_.Dequeue();
     // Check if the buffer was assigned to a different block
@@ -446,7 +474,9 @@ bool BufferedBlockMgr::Validate() const {
     }
   }
 
-  if (!unpinned_blocks_.empty() &&
+  // Check if we're writing blocks when the number of free buffers falls below
+  // threshold. We don't write blocks after cancellation.
+  if (!is_cancelled_ && !unpinned_blocks_.empty() &&
       (free_buffers_.size() + num_outstanding_writes_ < block_write_threshold_)) {
     LOG (WARNING) << "Missed writing unpinned blocks";
     return false;

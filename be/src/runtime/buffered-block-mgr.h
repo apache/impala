@@ -56,10 +56,10 @@ class RuntimeState;
 //   immediately released and its on-disk location (if any) reused.
 //
 // Close() frees all memory and disk space and is called when a query is closed or
-// cancelled.
+// cancelled. Close() is idempotent.
 //
-// The block manager itself is thread safe, but a single block cannot be pinned
-// and used by multiple clients.
+// The block manager is thread safe with the following caveat:
+//   A single block cannot be pinned and used simultaneously by multiple clients.
 // TODO: When a block is read from disk, data is copied from the IOMgr buffer to the
 // block manager's buffer. This should be avoided in the common case where these buffers
 // are of the same size.
@@ -199,7 +199,7 @@ class BufferedBlockMgr {
   // Return a free pinned block. Waits for a free buffer if none are available.
   Status GetFreeBlock(Block** block);
 
-  // Release all resources associated with this block manager.
+  // Release all resources associated with this block manager. Is idempotent.
   void Close();
 
   // The maximum number of buffers that can be simultaneously pinned by clients
@@ -224,7 +224,7 @@ class BufferedBlockMgr {
     }
   }; // struct BufferDescriptor
 
-  BufferedBlockMgr(DiskIoMgr* io_mgr, MemTracker* parent, int64_t mem_limit,
+  BufferedBlockMgr(RuntimeState* state, MemTracker* parent, int64_t mem_limit,
       int64_t block_size);
 
   // Initialize the counters to track the block manager behavior.
@@ -250,7 +250,7 @@ class BufferedBlockMgr {
   Status WriteUnpinnedBlocks();
 
   // Callback used by DiskIoMgr to indicate a block write has completed.
-  // write_status is the status of the write. The block manager is closed if
+  // write_status is the status of the write. is_cancelled_ is set to true if
   // write_status is not Status::OK. Returns the block's buffer to the free buffers
   // list if it is no longer pinned. Returns the block itself to the free blocks list
   // if it has been deleted.
@@ -322,8 +322,13 @@ class BufferedBlockMgr {
   // Memory pool from which buffers are allocated.
   boost::scoped_ptr<MemPool> buffer_pool_;
 
-  // True if Close() has been called.
-  bool closed_;
+  // If true, the block manager is cancelled and all API calls return
+  // Status::CANCELLED. Set to true on Close() or if there was an error writing a block.
+  bool is_cancelled_;
+
+  // Runtime state objects with which this instance is initialized. Used for logging
+  // errors. Not owned.
+  RuntimeState* state_;
 
   // Counters and timers to track behavior.
   // These have a fixed value for the lifetime of the manager and show memory usage.

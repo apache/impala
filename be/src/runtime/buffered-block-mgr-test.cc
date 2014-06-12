@@ -15,6 +15,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/bind.hpp>
 #include <boost/thread/thread.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <gtest/gtest.h>
@@ -30,12 +31,18 @@
 #include "util/disk-info.h"
 #include "util/cpu-info.h"
 #include "util/promise.h"
+#include "util/time.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
 using namespace boost;
+using namespace boost::filesystem;
 using namespace std;
+
+// Note: This is the default scratch dir created by impala.
+// FLAGS_scratch_dirs + TmpFileMgr::TMP_SUB_DIR_NAME.
+const string SCRATCH_DIR = "/tmp/impala-scratch";
 
 namespace impala {
 
@@ -226,17 +233,64 @@ TEST_F(BufferedBlockMgrTest, Close) {
   EXPECT_TRUE(status.IsCancelled());
 }
 
-// Test that randomly issues GetFreeBlock(), Pin(), Unpin() and Delete() calls.
-// All calls made are legal - error conditions are not tested.
+// Test that the block manager behaves correctly after a write error
+// Delete the scratch directory before an operation that would cause a write
+// and test that subsequent API calls return 'CANCELLED' correctly.
+TEST_F(BufferedBlockMgrTest, WriteError) {
+  int max_num_buffers = 2;
+  const int write_wait_millis = 500;
+  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  int available_buffers = block_mgr->max_available_buffers();
+  RuntimeProfile* profile = runtime_state_->runtime_profile();
+  RuntimeProfile::Counter* writes_outstanding = profile->GetCounter("WritesOutstanding");
+  vector<BufferedBlockMgr::Block*> blocks;
+  AllocateBlocks(block_mgr.get(), available_buffers + 1, &blocks);
+  // Unpin a block, forcing a write.
+  Status status = blocks[0]->Unpin();
+  EXPECT_TRUE(status.ok());
+  // Wait for the write to go through.
+  SleepForMs(write_wait_millis);
+  EXPECT_TRUE(writes_outstanding->value() == 0);
+
+  // Empty the scratch directory.
+  int num_files = 0;
+  directory_iterator dir_it(SCRATCH_DIR);
+  for (; dir_it != directory_iterator(); ++dir_it) {
+    ++num_files;
+    remove_all(dir_it->path());
+  }
+  EXPECT_TRUE(num_files > 0);
+  status = blocks[1]->Unpin();
+  EXPECT_TRUE(status.ok());
+  // Allocate one more block, forcing a write and causing an error.
+  AllocateBlocks(block_mgr.get(), 1, &blocks);
+  // Wait for the write to go through.
+  SleepForMs(write_wait_millis);
+  EXPECT_TRUE(writes_outstanding->value() == 0);
+
+  // Subsequent calls should fail.
+  status = blocks[2]->Delete();
+  EXPECT_TRUE(status.IsCancelled());
+  BufferedBlockMgr::Block* new_block;
+  status = block_mgr->GetFreeBlock(&new_block);
+  EXPECT_TRUE(status.IsCancelled());
+  block_mgr->Close();
+}
+
+// Test that randomly issues GetFreeBlock(), Pin(), Unpin(), Delete() and Close()
+// calls. All calls made are legal - error conditions are not expected until the
+// first call to Close().
 TEST_F(BufferedBlockMgrTest, Random) {
   const int num_buffers = 10;
   const int num_iterations = 100000;
+  const int iters_before_close = num_iterations - 5000;
+  bool close_called = false;
   unordered_map<BufferedBlockMgr::Block*, int> pinned_block_map;
   vector<pair<BufferedBlockMgr::Block*, int32_t> > pinned_blocks;
   unordered_map<BufferedBlockMgr::Block*, int> unpinned_block_map;
   vector<pair<BufferedBlockMgr::Block*, int32_t> > unpinned_blocks;
 
-  typedef enum { Pin, New, Unpin, Delete } ApiFunction;
+  typedef enum { Pin, New, Unpin, Delete, Close } ApiFunction;
   ApiFunction api_function;
   scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(num_buffers));
   pinned_blocks.reserve(num_buffers);
@@ -244,7 +298,9 @@ TEST_F(BufferedBlockMgrTest, Random) {
   Status status;
   for (int i = 0; i < num_iterations; ++i) {
     if ((i % 20000) == 0) LOG (ERROR) << " Iteration " << i << endl;
-    if (pinned_blocks.size() == 0 && unpinned_blocks.size() == 0) {
+    if (i > iters_before_close && (rand() % 5 == 0)) {
+      api_function = Close;
+    } else if (pinned_blocks.size() == 0 && unpinned_blocks.size() == 0) {
       api_function = New;
     } else if (pinned_blocks.size() == 0) {
       // Pin or New. Can't unpin or delete.
@@ -266,6 +322,10 @@ TEST_F(BufferedBlockMgrTest, Random) {
     switch (api_function) {
       case New:
         status = block_mgr->GetFreeBlock(&new_block);
+        if (close_called) {
+          EXPECT_TRUE(status.IsCancelled());
+          continue;
+        }
         EXPECT_TRUE(status.ok());
         data = new_block->Allocate<int32_t>(sizeof(int32_t));
         *data = rand();
@@ -278,6 +338,10 @@ TEST_F(BufferedBlockMgrTest, Random) {
         rand_pick = rand() % unpinned_blocks.size();
         block_data = unpinned_blocks[rand_pick];
         status = block_data.first->Pin();
+        if (close_called) {
+          EXPECT_TRUE(status.IsCancelled());
+          continue;
+        }
         EXPECT_TRUE(status.ok());
         ValidateBlock(block_data.first, block_data.second);
         unpinned_blocks[rand_pick] = unpinned_blocks.back();
@@ -291,6 +355,10 @@ TEST_F(BufferedBlockMgrTest, Random) {
         rand_pick = rand() % pinned_blocks.size();
         block_data = pinned_blocks[rand_pick];
         status = block_data.first->Unpin();
+        if (close_called) {
+          EXPECT_TRUE(status.IsCancelled());
+          continue;
+        }
         EXPECT_TRUE(status.ok());
         pinned_blocks[rand_pick] = pinned_blocks.back();
         pinned_blocks.pop_back();
@@ -304,10 +372,18 @@ TEST_F(BufferedBlockMgrTest, Random) {
         rand_pick = rand() % pinned_blocks.size();
         block_data = pinned_blocks[rand_pick];
         status = block_data.first->Delete();
+        if (close_called) {
+          EXPECT_TRUE(status.IsCancelled());
+          continue;
+        }
         EXPECT_TRUE(status.ok());
         pinned_blocks[rand_pick] = pinned_blocks.back();
         pinned_blocks.pop_back();
         pinned_block_map[pinned_blocks[rand_pick].first] = rand_pick;
+        break;
+      case Close:
+        block_mgr->Close();
+        close_called = true;
         break;
     } // end switch (apiFunction)
   } // end for ()
@@ -319,9 +395,9 @@ TEST_F(BufferedBlockMgrTest, Random) {
 }
 
 int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true);
   impala::TmpFileMgr::Init();
   impala::LlvmCodeGen::InitializeLlvm();
-  ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
