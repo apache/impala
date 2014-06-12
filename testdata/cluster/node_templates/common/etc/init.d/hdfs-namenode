@@ -10,6 +10,9 @@ function start {
     hdfs namenode -format 1</dev/null
   fi
   do_start hdfs namenode
+
+  # Wait for the name node to exit safe mode
+  hdfs dfsadmin -safemode wait
 }
 
 $1
