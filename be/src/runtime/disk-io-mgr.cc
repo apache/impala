@@ -941,6 +941,16 @@ void DiskIoMgr::ReadRange(DiskQueue* disk_queue, RequestContext* reader,
   if (!enough_memory) {
     RequestContext::PerDiskState& state = reader->disk_states_[disk_queue->disk_id];
     unique_lock<mutex> reader_lock(reader->lock_);
+
+    // Just grabbed the reader lock, check for cancellation.
+    if (reader->state_ == RequestContext::Cancelled) {
+      DCHECK(reader->Validate()) << endl << reader->DebugString();
+      state.DecrementRequestThreadAndCheckDone(reader);
+      range->Cancel(reader->status_);
+      DCHECK(reader->Validate()) << endl << reader->DebugString();
+      return;
+    }
+
     if (!range->ready_buffers_.empty()) {
       // We have memory pressure and this range doesn't need another buffer
       // (it already has one queued). Skip this range and pick it up later.
