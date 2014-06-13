@@ -144,8 +144,8 @@ public class TestRequestPoolService {
     createPoolService(ALLOCATION_FILE_GROUP_RULE, LLAMA_CONFIG_FILE);
     TResolveRequestPoolResult result = poolService_.resolveRequestPool(
         new TResolveRequestPoolParams("userA", "root.NOT_A_POOL"));
-    Assert.assertEquals("", result.getResolved_pool());
-    Assert.assertEquals(false, result.has_access);
+    Assert.assertEquals(false, result.isSetResolved_pool());
+    Assert.assertEquals(false, result.isSetHas_access());
     Assert.assertEquals(TStatusCode.INTERNAL_ERROR, result.getStatus().getStatus_code());
 
     String expectedMessage = "Failed to resolve user 'userA' to a pool while " +

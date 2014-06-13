@@ -388,11 +388,13 @@ struct TResolveRequestPoolParams {
 
 // Returned by RequestPoolService.resolveRequestPool()
 struct TResolveRequestPoolResult {
-  // Actual pool to use, as determined by the pool allocation policy.
-  1: required string resolved_pool
+  // Actual pool to use, as determined by the pool allocation policy. Not set
+  // if no pool was resolved.
+  1: optional string resolved_pool
 
-  // True if the user has access to submit requests to the resolved_pool.
-  2: required bool has_access
+  // True if the user has access to submit requests to the resolved_pool. Not set
+  // if no pool was resolved.
+  2: optional bool has_access
 
   3: optional Status.TStatus status
 }

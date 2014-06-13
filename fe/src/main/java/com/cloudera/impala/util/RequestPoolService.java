@@ -293,10 +293,15 @@ public class RequestPoolService {
           requestedPool, user, errorMessage), ex);
     }
     if (pool == null) {
-      result.setResolved_pool("");
-      result.setHas_access(false);
-      result.setStatus(
-          new TStatus(TStatusCode.INTERNAL_ERROR, Lists.newArrayList(errorMessage)));
+      if (errorMessage == null) {
+        // This occurs when assignToPool returns null (not an error), i.e. if the pool
+        // cannot be resolved according to the policy.
+        result.setStatus(new TStatus(TStatusCode.OK, Lists.<String>newArrayList()));
+      } else {
+        // If Yarn throws an exception, return an error status.
+        result.setStatus(
+            new TStatus(TStatusCode.INTERNAL_ERROR, Lists.newArrayList(errorMessage)));
+      }
     } else {
       result.setResolved_pool(pool);
       result.setHas_access(hasAccess(pool, user));

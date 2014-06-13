@@ -4,6 +4,8 @@
 
 import pytest
 import threading
+import re
+
 from time import sleep, time
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -83,6 +85,53 @@ def metric_key(pool_name, metric_name):
   return "admission-controller.%s.%s" % (pool_name, metric_name)
 
 class TestAdmissionController(CustomClusterTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestAdmissionController, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    # There's no reason to test this on other file formats/compression codecs right now
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+
+  def __check_pool_rejected(self, client, pool, expected_error_re):
+    try:
+      client.set_configuration({'request_pool': pool})
+      client.execute("select 1")
+      assert False, "Query should return error"
+    except ImpalaBeeswaxException as e:
+      assert re.search(expected_error_re, str(e))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_config_args(),
+      statestored_args=_STATESTORED_ARGS)
+  def test_set_request_pool(self, vector):
+    """Tests setting the REQUEST_POOL with the pool placement policy configured
+    to require a specific pool (IMPALA-1050)."""
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    try:
+      for pool in ['', 'not_a_pool_name']:
+        expected_error =\
+            "No mapping found for request from user '\w+' with requested pool '%s'"\
+            % (pool)
+        self.__check_pool_rejected(client, pool, expected_error)
+
+      # Check rejected if user does not have access.
+      expected_error = "Request from user '\w+' with requested pool 'root.queueC' "\
+          "denied access to assigned pool 'root.queueC'"
+      self.__check_pool_rejected(client, 'root.queueC', expected_error)
+
+      # Also try setting a valid pool
+      client.set_configuration({'request_pool': 'root.queueB'})
+      client.execute("select 1") # Query should execute in queueB
+    finally:
+      client.close()
+
+class TestAdmissionControllerStress(TestAdmissionController):
   """Submits a number of queries (parameterized) with some delay between submissions
   (parameterized) and the ability to submit to one impalad or many in a round-robin
   fashion. The queries are set with the WAIT debug action so that we have more control
@@ -117,12 +166,7 @@ class TestAdmissionController(CustomClusterTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestAdmissionController, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-
-    # There's no reason to test this on other file formats/compression codecs right now
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
-
+    super(TestAdmissionControllerStress, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(TestDimension('num_queries', *NUM_QUERIES))
     cls.TestMatrix.add_dimension(
         TestDimension('round_robin_submission', *ROUND_ROBIN_SUBMISSION))
