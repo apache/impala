@@ -114,6 +114,17 @@ public class Analyzer {
     // analysis.
     public boolean isExplain;
 
+    // True if we are analyzing an insert statement.
+    // TODO: The use of this flag is temporary. When analyzing a query statement, we need
+    // to distinguish between a top-level SELECT and an INSERT INTO SELECT to know
+    // whether to evaluate an order-by without limit. The correct way to do this would be
+    // to analyze the query statement in the INSERT INTO SELECT with a new analyzer that
+    // is the child of the INSERT statement's analyzer. This is also the right thing to do
+    // with respect to scoping WITH CLAUSE aliases before the INSERT and SELECT clauses,
+    // but that leads to problems with recursive references for queries of the form:
+    // with t1 as (...) insert into with t1 as (select * from t1) select * from t1.
+    public boolean isInsertStmt = false;
+
     // whether to use Hive's auto-generated column labels
     public boolean useHiveColLabels = false;
 
@@ -1486,7 +1497,12 @@ public class Analyzer {
   }
 
   public void setIsExplain(boolean isExplain) { globalState_.isExplain = isExplain; }
+  public void setIsInsertStmt(boolean isInsertStmt) {
+    globalState_.isInsertStmt = isInsertStmt;
+  }
+
   public boolean isExplain() { return globalState_.isExplain; }
+  public boolean isInsertStmt() { return globalState_.isInsertStmt; }
   public void setUseHiveColLabels(boolean useHiveColLabels) {
     globalState_.useHiveColLabels = useHiveColLabels;
   }

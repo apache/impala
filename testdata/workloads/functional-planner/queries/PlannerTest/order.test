@@ -861,18 +861,71 @@ order by int_col
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
-# ignore sort with no limit in subqueries
-select * from (select * from functional.alltypes order by bigint_col) A
+# ignore order by with no limit in subqueries and with clause
+with B as (select * from functional.alltypes order by int_col)
+select * from
+(select * from functional.alltypes order by bigint_col) A
+join B on (A.string_col = B.string_col)
 ---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypes.string_col = functional.alltypes.string_col
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB compact
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-01:EXCHANGE [UNPARTITIONED]
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: functional.alltypes.string_col = functional.alltypes.string_col
+|
+|--04:EXCHANGE [HASH(functional.alltypes.string_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|
+03:EXCHANGE [HASH(functional.alltypes.string_col)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
-# ignore sort with no limit in union operand
+# ignore order by with no limit in insert
+insert into functional.alltypes partition(year, month)
+select * from functional.alltypes order by int_col
+---- PLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# ignore order by with no limit in CTAS
+create table functional.alltypescopy as
+select * from functional.alltypes order by bigint_col
+---- PLAN
+WRITE TO HDFS [functional.alltypescopy, OVERWRITE=false]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypescopy, OVERWRITE=false]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# ignore order by with no limit in union operand
 select * from functional.alltypes
    union all
 select * from functional.alltypessmall order by bigint_col
