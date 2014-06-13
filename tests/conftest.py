@@ -48,6 +48,10 @@ def pytest_addoption(parser):
                    "Override the test vectors and run only using the specified table "\
                    "formats. Ex. --table_formats=seq/snap/block,text/none")
 
+  parser.addoption("--scale_factor", dest="scale_factor", default=None, help=\
+                   "If running on a cluster, specify the scale factor"\
+                   "Ex. --scale_factor=500gb")
+
   parser.addoption("--hive_service_name", dest="hive_service_name",
                    default="Hive Metastore Server", help="The principal service name "\
                    "for the hive metastore client when using kerberos.")

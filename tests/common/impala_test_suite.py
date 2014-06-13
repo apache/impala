@@ -161,7 +161,8 @@ class ImpalaTestSuite(BaseTestSuite):
     # Change the database to reflect the file_format, compression codec etc, or the
     # user specified database for all targeted impalad.
     for impalad_client in target_impalad_clients:
-      ImpalaTestSuite.change_database(impalad_client, table_format_info, use_db)
+      ImpalaTestSuite.change_database(impalad_client,
+          table_format_info, use_db, pytest.config.option.scale_factor)
       impalad_client.set_configuration(exec_options)
 
     sections = self.load_query_test_file(self.get_workload(), test_file_name,
@@ -238,10 +239,12 @@ class ImpalaTestSuite(BaseTestSuite):
         assert False, 'Unsupported setup command: %s' % row
 
   @classmethod
-  def change_database(cls, impala_client, table_format=None, db_name=None):
+  def change_database(cls, impala_client, table_format=None,
+      db_name=None, scale_factor=None):
     if db_name == None:
       assert table_format != None
-      db_name =  QueryTestSectionReader.get_db_name(table_format)
+      db_name = QueryTestSectionReader.get_db_name(table_format,
+          scale_factor if scale_factor else '')
     query = 'use %s' % db_name
     # Clear the exec_options before executing a USE statement.
     # The USE statement should not fail for negative exec_option tests.
