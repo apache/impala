@@ -1547,6 +1547,7 @@ void Coordinator::SetExecPlanFragmentParams(
 
 void Coordinator::PrintExecSummary(int indent_level, bool is_child_fragment,
     int* node_idx, vector<vector<string> >* result) const {
+  DCHECK_LT(*node_idx, exec_summary_.nodes.size());
   const TPlanNodeExecSummary& node = exec_summary_.nodes[*node_idx];
   const TExecStats& est_stats = node.estimated_stats;
 
