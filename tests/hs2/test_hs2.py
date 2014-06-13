@@ -174,3 +174,40 @@ class TestHS2(HS2TestSuite):
     # Test fix for IMPALA-619
     assert "Sql Statement: GET_SCHEMAS" in profile_page
     assert "Query Type: DDL" in profile_page
+
+  @needs_session
+  def test_get_log(self):
+    # Test query that generates analysis warnings
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "compute stats functional.decimal_tbl"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    get_log_req = TCLIService.TGetLogReq()
+    get_log_req.operationHandle = execute_statement_resp.operationHandle
+    get_log_resp = self.hs2_client.GetLog(get_log_req)
+    TestHS2.check_response(get_log_resp)
+
+    assert "Decimal column stats not yet supported" in get_log_resp.log
+
+    # Test query that generates BE warnings
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "select * from functional.alltypeserror"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    # Fetch results to make sure errors are generated
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+    fetch_results_req.maxRows = 100
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    TestHS2.check_response(fetch_results_resp)
+
+    get_log_req = TCLIService.TGetLogReq()
+    get_log_req.operationHandle = execute_statement_resp.operationHandle
+    get_log_resp = self.hs2_client.GetLog(get_log_req)
+    TestHS2.check_response(get_log_resp)
+
+    assert "Error converting column" in get_log_resp.log
