@@ -396,6 +396,9 @@ class TestAdmissionControllerStress(TestAdmissionController):
           # it is possible that teardown() cancels this query before we call fetch(). In
           # that case a different exception is thrown and we handle it gracefully.
           client.fetch(query, self.query_handle)
+          # The cancelled query may occasionally return with an OK status (IMPALA-1047).
+          self.query_state = 'COMPLETED'
+          self.query_handle = None
         except ImpalaBeeswaxException as e:
           if "Cancelled" in str(e):
             LOG.debug("Query %s completed", self.query_num)
