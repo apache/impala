@@ -122,6 +122,14 @@ void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args
   replace_all(tmp, "\n", tags.line_break);
   (*output) << tmp << tags.end_pre_tag;
 #endif
+
+  if (args.find("detailed") != args.end()) {
+    // Dump all mem trackers.
+    (*output) << tags.pre_tag
+              << "Detailed usage: " << endl
+              << mem_tracker->LogUsage()
+              << tags.end_pre_tag;
+  }
 }
 
 void impala::AddDefaultPathHandlers(

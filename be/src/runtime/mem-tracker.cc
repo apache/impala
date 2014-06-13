@@ -170,7 +170,8 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
   } else {
     // First time this id registered, make a new object.  Give a shared ptr to
     // the caller and put a weak ptr in the map.
-    shared_ptr<MemTracker> tracker(new MemTracker(byte_limit, "Query Limit", parent));
+    shared_ptr<MemTracker> tracker(new MemTracker(byte_limit,
+        Substitute("Query($0) Limit", lexical_cast<string>(id)), parent));
     tracker->auto_unregister_ = true;
     tracker->query_id_ = id;
     request_to_mem_trackers_[id] = tracker;
