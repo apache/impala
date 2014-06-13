@@ -24,6 +24,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.service.BackendConfig;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -170,7 +171,33 @@ public class SortNode extends PlanNode {
   @Override
   public void computeCosts(TQueryOptions queryOptions) {
     Preconditions.checkState(hasValidStats());
-    perHostMemCost_ = (long) Math.ceil((cardinality_ + offset_) * avgRowSize_);
+    if (useTopN_) {
+      perHostMemCost_ = (long) Math.ceil((cardinality_ + offset_) * avgRowSize_);
+      return;
+    }
+
+    // For an external sort, set the memory cost to be what is required for a 2-phase
+    // sort. If the input to be sorted would take up N blocks in memory, then the
+    // memory required for a 2-phase sort is sqrt(N) blocks. A single run would be of
+    // size sqrt(N) blocks, and we could merge sqrt(N) such runs with sqrt(N) blocks
+    // of memory.
+    double fullInputSize = getChild(0).cardinality_ * avgRowSize_;
+    boolean hasVarLenSlots = false;
+    for (SlotDescriptor slotDesc: info_.getSortTupleDescriptor().getSlots()) {
+      if (slotDesc.isMaterialized() && !slotDesc.getType().isFixedLengthType()) {
+        hasVarLenSlots = true;
+        break;
+      }
+    }
+
+    // The block size used by the sorter is the same as the configured I/O read size.
+    long blockSize = BackendConfig.INSTANCE.getReadSize();
+    // The external sorter writes fixed-len and var-len data in separate sequences of
+    // blocks on disk and reads from both sequences when merging. This effectively
+    // doubles the block size when there are var-len columns present.
+    if (hasVarLenSlots) blockSize *= 2;
+    double numInputBlocks = Math.ceil(fullInputSize / blockSize);
+    perHostMemCost_ = blockSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
   }
 
   private static String getDisplayName(boolean isTopN, boolean isMergeOnly) {
