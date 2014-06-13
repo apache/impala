@@ -40,5 +40,5 @@ impala_shell_defaults = {
             'ssl': False,
             'ca_cert': None,
             'config_file': os.path.expanduser("~/.impalarc"),
-            'strict_unicode': True
+            'strict_unicode': False
             }

@@ -14,11 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import shlex
+
 import os
-from subprocess import Popen, PIPE
 import pytest
-from impala_shell_results import get_shell_cmd_result
+import shlex
+import signal
+
+from impala_shell_results import get_shell_cmd_result, cancellation_helper
+from subprocess import Popen, PIPE
+from time import sleep
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 
@@ -35,14 +39,28 @@ class TestImpalaShellInteractive(object):
     assert "could not match input" in result.stderr
     # test escaped quotes within quotes
     result = run_impala_shell_interactive("select 'ab\\'c';")
-    assert "Returned 1 row(s)" in result.stderr
+    assert "Fetched 1 row(s)" in result.stderr
     result = run_impala_shell_interactive("select \"ab\\\"c\";")
-    assert "Returned 1 row(s)" in result.stderr
+    assert "Fetched 1 row(s)" in result.stderr
+
+  @pytest.mark.execute_serially
+  def test_cancellation(self):
+    command = "select sleep(10000);"
+    p = Popen(shlex.split(SHELL_CMD), shell=True, stdout=PIPE, stdin=PIPE, stderr=PIPE)
+    p.stdin.write(command + "\n")
+    p.stdin.flush()
+    sleep(1)
+    # iterate through all processes with psutil
+    shell_pid = cancellation_helper()
+    sleep(2)
+    os.kill(shell_pid, signal.SIGINT)
+    result = get_shell_cmd_result(p)
+    assert "Cancelling Query" in result.stderr
 
 def run_impala_shell_interactive(command, shell_args=''):
   """Runs a command in the Impala shell interactively."""
   cmd = "%s %s" % (SHELL_CMD, shell_args)
-  p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stdin=PIPE, stderr=PIPE)
+  p = Popen(shlex.split(cmd), shell=True, stdout=PIPE, stdin=PIPE, stderr=PIPE)
   p.stdin.write(command + "\n")
   p.stdin.flush()
   return get_shell_cmd_result(p)

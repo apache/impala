@@ -17,8 +17,9 @@
 import os
 import pytest
 import shlex
+import signal
 
-from impala_shell_results import get_shell_cmd_result
+from impala_shell_results import get_shell_cmd_result, cancellation_helper
 from subprocess import Popen, PIPE, call
 from tests.common.impala_cluster import ImpalaCluster
 from time import sleep
@@ -272,6 +273,23 @@ class TestImpalaShell(object):
     assert get_shell_cmd_result(p).rc == 0
     assert 0 == impalad.get_num_in_flight_queries()
 
+
+  @pytest.mark.execute_serially
+  def test_cancellation(self):
+    """Test cancellation (Ctrl+C event)"""
+    args = '-q "select sleep(10000)"'
+    cmd = "%s %s" % (SHELL_CMD, args)
+
+    p = Popen(shlex.split(cmd), shell=False, stderr=PIPE, stdout=PIPE)
+    sleep(1)
+    # iterate through all processes with psutil
+    shell_pid = cancellation_helper(args)
+    sleep(2)
+    os.kill(shell_pid, signal.SIGINT)
+    result = get_shell_cmd_result(p)
+
+    assert "Cancelling Query" in result.stderr, result.stderr
+
   @pytest.mark.execute_serially
   def test_get_log_once(self):
     """Test that get_log() is always called exactly once."""
@@ -323,12 +341,6 @@ class TestImpalaShell(object):
       # bad formatting of config file
       args = '--config_file=%s/bad_impalarc' % QUERY_FILE_PATH
       run_impala_shell_cmd(args, expect_success=False)
-
-class ImpalaShellResult(object):
-  def __init__(self):
-    self.rc = 0
-    self.stdout = str()
-    self.stderr = str()
 
 def run_impala_shell_cmd(shell_args, expect_success=True):
   """Runs the Impala shell on the commandline.
