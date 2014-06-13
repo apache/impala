@@ -911,7 +911,9 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
     // register coordinator's fragment profile now, before those of the backends,
     // so it shows up at the top
     query_profile_->AddChild(executor_->profile());
-    executor_->profile()->set_name("Coordinator Fragment");
+    stringstream ss;
+    ss << "Coordinator Fragment " << request.fragments[0].display_name;
+    executor_->profile()->set_name(ss.str());
     CollectScanNodeCounters(executor_->profile(), &coordinator_counters_);
   }
 
@@ -930,7 +932,7 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
       continue;
     }
     stringstream ss;
-    ss << "Averaged Fragment " << i;
+    ss << "Averaged Fragment " << request.fragments[i].display_name;
     fragment_profiles_[i].averaged_profile =
         obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str(), true));
     // Insert the avg profiles in ascending fragment number order. If
@@ -944,7 +946,7 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
         (i > 0) ? fragment_profiles_[i-1].averaged_profile : NULL);
 
     ss.str("");
-    ss << "Fragment " << i;
+    ss << "Fragment " << request.fragments[i].display_name;
     fragment_profiles_[i].root_profile =
         obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
     // Note: we don't start the wall timer here for the fragment

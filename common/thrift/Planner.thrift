@@ -28,6 +28,9 @@ include "Partitions.thrift"
 // plan fragment, including how to produce and how to partition its output.
 // It leaves out node-specific parameters neede for the actual execution.
 struct TPlanFragment {
+  // display name to be shown in the runtime profile; unique within a query
+  1: required string display_name
+
   // no plan or descriptor table: query without From clause
   2: optional PlanNodes.TPlan plan
 
