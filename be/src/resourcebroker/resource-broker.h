@@ -63,7 +63,7 @@ class ResourceBroker {
   Status Expand(const TResourceBrokerExpansionRequest& request,
       TResourceBrokerExpansionResponse* response);
 
-  // Releases resources from Llama.
+  // Releases resources acquired from Llama.
   Status Release(const TResourceBrokerReleaseRequest& request,
       TResourceBrokerReleaseResponse* response);
 
@@ -143,12 +143,13 @@ class ResourceBroker {
   void CreateLlamaReleaseRequest(const TResourceBrokerReleaseRequest& src,
       llama::TLlamaAMReleaseRequest& dest);
 
+  class PendingRequest;
   // Wait for a reservation or expansion request to be fulfilled by the Llama via an async
   // call into LlamaNotificationThriftIf::AMNotification(), or for a timeout to occur (in
   // which case *timed_out is set to true). If the request is fulfilled, resources and
   // reservation_id are populated.
-  bool WaitForNotification(const llama::TUniqueId& request_id, int64_t timeout,
-      TUniqueId* reservation_id, ResourceMap* resources, bool* timed_out);
+  bool WaitForNotification(int64_t timeout, ResourceMap* resources, bool* timed_out,
+      PendingRequest* reservation);
 
   // Llama availability group.
   std::vector<TNetworkAddress> llama_addresses_;
@@ -261,30 +262,43 @@ class ResourceBroker {
   // List of nodes registered with Llama. Set in RefreshLlamaNodes().
   std::vector<std::string> llama_nodes_;
 
-  // Used to coordinate between AMNotification() and WaitForNotification(). Either method
-  // might create this object (if it's the first to look up a reservation in
-  // pending_requests_). Callers of Reserve() and Expand() are blocked (via
-  // WaitForNotification()), on a ReservationFulfillment's promise().
-  class ReservationFulfillment {
+  // A PendingRequest tracks a single reservation or expansion request that is in flight
+  // to Llama. A new PendingRequest is created in either Expand() or Reserve(), and its
+  // promise() is blocked on there until a response is received for that request from
+  // Llama via AMNotification(), or until a timeout occurs.
+  //
+  // Every request has a unique request_id which is assigned by the resource broker. Each
+  // request is also associated with exactly one reservation, via reservation_id(). This
+  // allows us to track which resources belong to which reservation, and to make sure that
+  // all are correctly accounted for when the reservation is released. Each reservation ID
+  // will belong to exactly one reservation request, and 0 or more expansion requests.
+  class PendingRequest {
    public:
+    PendingRequest(const llama::TUniqueId& reservation_id,
+        const llama::TUniqueId& request_id, bool is_expansion)
+        : reservation_id_(reservation_id), request_id_(request_id),
+          is_expansion_(is_expansion) {
+      DCHECK(is_expansion || reservation_id == request_id);
+    }
+
     // Promise is set to true if the reservation or expansion request was granted, false
-    // if it was rejected by Yarn.
+    // if it was rejected by Yarn. When promise()->Get() returns true,
+    // allocated_resources_ will be populated and it will be safe to call GetResources().
     Promise<bool>* promise() { return &promise_; }
 
     // Called by WaitForNotification() to populate a map of resources once the
     // corresponding request has returned successfully (and promise() therefore has
     // returned true).
-    // TODO: Can we remove reservation_id?
-    void GetResources(ResourceMap* resources, TUniqueId* reservation_id);
+    void GetResources(ResourceMap* resources);
 
     // Populates allocated_resources_ from all members of resources that match the given
-    // reservation id.
-    void SetResources(const std::vector<llama::TAllocatedResource>& resources,
-        const llama::TUniqueId& reservation_id);
+    // reservation id. Called in AMNotification().
+    void SetResources(const std::vector<llama::TAllocatedResource>& resources);
 
-    const std::vector<llama::TAllocatedResource>& resources() const {
-      return allocated_resources_;
-    }
+    const llama::TUniqueId& request_id() const { return request_id_; }
+    const llama::TUniqueId& reservation_id() const { return reservation_id_; }
+
+    bool is_expansion() const { return is_expansion_; }
 
    private:
     // Promise object that WaitForNotification() waits on and AMNotification() signals.
@@ -295,26 +309,69 @@ class ResourceBroker {
     // deliberate, since the original copy may go out of scope).
     std::vector<llama::TAllocatedResource> allocated_resources_;
 
-    // The ID for this reservation
+    // The ID for the reservation associated with this request. There is always exactly
+    // one reservation associated with every request.
     llama::TUniqueId reservation_id_;
+
+    // The unique ID for this request. If this is a reservation request, request_id_ ==
+    // reservation_id_, otherwise this is generated during Expand().
+    llama::TUniqueId request_id_;
+
+    // True if this is an expansion request, false if it is a reservation request
+    bool is_expansion_;
   };
 
-  // Protects pending_requests_ and allocated_requests_
-  boost::mutex requests_lock_;
+  // Protects pending_requests_
+  boost::mutex pending_requests_lock_;
 
-  // Maps from the unique reservation id received from Llama as response to a reservation
-  // request to a structure that contains the results of the reservation request.
-  typedef boost::unordered_map<llama::TUniqueId,
-                               boost::shared_ptr<ReservationFulfillment> > FulfillmentMap;
-  FulfillmentMap pending_requests_;
+  // Map from unique request ID provided to Llama (for both reservation and expansion
+  // requests) to PendingRequest object used to coordinate when a response is received
+  // from Llama.
+  typedef boost::unordered_map<llama::TUniqueId, PendingRequest*> PendingRequestMap;
+  PendingRequestMap pending_requests_;
 
-  // List of allocated requests that are in use by queries that are currently executing.
-  FulfillmentMap allocated_requests_;
+  // An AllocatedRequest tracks resources allocated in response to one reservation or
+  // expansion request.
+  class AllocatedRequest {
+   public:
+    AllocatedRequest(const llama::TUniqueId& reservation_id,
+        uint64_t memory_mb, uint32_t vcpus, bool is_expansion)
+        : reservation_id_(reservation_id), memory_mb_(memory_mb), vcpus_(vcpus),
+          is_expansion_(is_expansion) { }
+
+    const llama::TUniqueId reservation_id() const { return reservation_id_; }
+    uint64_t memory_mb() const { return memory_mb_; }
+    uint32_t vcpus() const { return vcpus_; }
+    bool is_expansion() const { return is_expansion_; }
+
+   private:
+    // The reservation ID for this request. Expansions all share the same reservation ID.
+    llama::TUniqueId reservation_id_;
+
+    // The total memory allocated to this request
+    uint64_t memory_mb_;
+
+    // The number of VCPUs allocated to this request
+    uint32_t vcpus_;
+
+    // True if this is an expansion request, false if it is a reservation request
+    bool is_expansion_;
+  };
+
+  // Protectes allocated_requests_
+  boost::mutex allocated_requests_lock_;
+
+  // Map from reservation ID to all satisfied requests - reservation and expansion -
+  // associated with that reservation. Used only for bookkeeping so that Impala can report
+  // on the current resource usage.
+  typedef boost::unordered_map<llama::TUniqueId, std::vector<AllocatedRequest> >
+      AllocatedRequestMap;
+  AllocatedRequestMap allocated_requests_;
 
   // Protects query_resource_mgrs_
   boost::mutex query_resource_mgrs_lock_;
   typedef boost::unordered_map<TUniqueId, std::pair<int32_t, QueryResourceMgr*> >
-        QueryResourceMgrsMap;
+      QueryResourceMgrsMap;
 
   // Map from query ID to a (ref_count, QueryResourceMgr*) pair, i.e. one QueryResourceMgr
   // per query. The refererence count is always non-zero - once it hits zero the entry in

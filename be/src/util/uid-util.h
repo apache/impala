@@ -36,6 +36,14 @@ namespace impala {
     memcpy(&(unique_id->hi), &uuid.data[0], 8);
     memcpy(&(unique_id->lo), &uuid.data[8], 8);
   }
+
+  template <typename F, typename T>
+  inline T CastTUniqueId(const F& from) {
+    T to;
+    to.hi = from.hi;
+    to.lo = from.lo;
+    return to;
+  }
 }
 
 #endif

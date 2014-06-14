@@ -104,6 +104,7 @@ struct TLlamaAMReservationRequest {
   4: optional string               queue;
   5: required list<TResource>      resources;
   6: required bool                 gang;
+  7: optional TUniqueId            reservation_id;
 }
 
 struct TLlamaAMReservationResponse {
@@ -116,11 +117,12 @@ struct TLlamaAMReservationExpansionRequest {
   2: required TUniqueId            am_handle;
   3: required TUniqueId            expansion_of;
   4: required TResource            resource;
+  5: optional TUniqueId            expansion_id;
 }
 
 struct TLlamaAMReservationExpansionResponse {
   1: required TStatus   status;
-  2: optional TUniqueId reservation_id;
+  2: optional TUniqueId expansion_id;
 }
 
 struct TLlamaAMReleaseRequest {
