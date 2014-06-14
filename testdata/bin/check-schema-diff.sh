@@ -1,0 +1,27 @@
+#!/bin/bash
+# Copyright 2012 Cloudera Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Check if a reference githash exists in hdfs; If it does, diff the directories that
+# contain the schemas against the current HEAD.
+# This script exits with 0 and 1 as the returncodes
+#  - 0 implies that the schema diff is emppty, or that a reference githash was not found.
+#  - 1 implies that the schemas have changed.
+set -ex
+# If /test-warehouse/githash.txt does not exist, exit with a 0
+hdfs dfs -test -e  /test-warehouse/githash.txt || { exit 0; }
+GIT_HASH=$(echo $(hdfs dfs -cat /test-warehouse/githash.txt))
+# Check whether a non-empty diff exists.
+# TODO: Make this more granular (on the level of a dataset)
+git diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/datasets

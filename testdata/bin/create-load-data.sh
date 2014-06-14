@@ -1,5 +1,17 @@
 #!/bin/bash
-# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+# Copyright 2012 Cloudera Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
 # This script can be executed in two ways:
 # 1) Without any command line parameters - A normal data load will happen where data is
@@ -12,12 +24,8 @@
 # For more information look at testdata/bin/load-test-warehouse-snapshot.sh and
 # bin/load-data.py
 
-if [ x${JAVA_HOME} == x ]; then
-  echo JAVA_HOME not set
-  exit 1
-fi
 . ${IMPALA_HOME}/bin/impala-config.sh
-set -e
+set -ex
 
 # Setup for HDFS caching
 ${IMPALA_HOME}/testdata/bin/setup-hdfs-caching.sh
@@ -41,13 +49,23 @@ mkdir -p ${IMPALAD_LOG_DIR}
 # Copy the test data source library into HDFS
 ${IMPALA_HOME}/testdata/bin/copy-data-sources.sh
 
+# If a schema change is detected, force load the data.
+set +e
+LOAD_DATA_ARGS=""
+${IMPALA_HOME}/testdata/bin/check-schema-diff.sh
+if [[ $? -eq 1 ]]; then
+  LOAD_DATA_ARGS="--force"
+fi
+set -e
+
 # Load the data set
 pushd ${IMPALA_HOME}/bin
 ./start-impala-cluster.py -s 3 --wait_for_cluster --log_dir=${IMPALAD_LOG_DIR}
 # Use unbuffered logging by executing these data loading steps with 'python -u'
-python -u ./load-data.py --workloads functional-query --exploration_strategy exhaustive
-python -u ./load-data.py --workloads tpcds --exploration_strategy core
-python -u ./load-data.py --workloads tpch --exploration_strategy core
+python -u ./load-data.py --workloads functional-query --exploration_strategy exhaustive \
+  ${LOAD_DATA_ARGS}
+python -u ./load-data.py --workloads tpcds --exploration_strategy core ${LOAD_DATA_ARGS}
+python -u ./load-data.py --workloads tpch --exploration_strategy core ${LOAD_DATA_ARGS}
 
 # Cache test tables
 ./impala-shell.sh -q "alter table tpch.nation set cached in 'testPool'"
