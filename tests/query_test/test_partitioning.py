@@ -102,3 +102,4 @@ class TestPartitioning(ImpalaTestSuite):
     except ImpalaBeeswaxException, e:
       assert 'AnalysisException: INSERT into table with BOOLEAN partition column (%s) '\
           'is not supported: %s.%s' % ('b', db_name, tbl_name) in str(e)
+

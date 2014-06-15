@@ -171,7 +171,7 @@ public class HdfsStorageDescriptor {
   /**
    * Thrown when constructing an HdfsStorageDescriptor from an invalid/unsupported
    * metastore storage descriptor.
-   * TODO: Should we have different exception types for unsupported vs invalid metadata?
+   * TODO: Get rid of this class.
    */
   public static class InvalidStorageDescriptorException extends CatalogException {
     // Mandatory since Exception implements Serialisable
@@ -179,6 +179,9 @@ public class HdfsStorageDescriptor {
     public InvalidStorageDescriptorException(String s) { super(s); }
     public InvalidStorageDescriptorException(Exception ex) {
       super(ex.getMessage(), ex);
+    }
+    public InvalidStorageDescriptorException(String msg, Throwable cause) {
+      super(msg, cause);
     }
   }
 

@@ -35,7 +35,7 @@ import com.google.common.base.Preconditions;
 public class DecimalLiteral extends LiteralExpr {
   // Use the java BigDecimal (arbitrary scale/precision) to represent the value.
   // This object has notions of precision and scale but they do *not* match what
-  // we need. BigDecima's precision is similar to significant figures and scale
+  // we need. BigDecimal's precision is similar to significant figures and scale
   // is the exponent.
   // ".1" could be represented with an unscaled value = 1 and scale = 1 or
   // unscaled value = 100 and scale = 3. Manipulating the value_ (e.g. multiplying
@@ -62,6 +62,16 @@ public class DecimalLiteral extends LiteralExpr {
     }
     init(val);
     this.analyze(null);
+    if (type_.isDecimal() && t.isDecimal()) {
+      // Verify that the input decimal value is consistent with the specified
+      // column type.
+      if (!t.isSupertypeOf(type_)) {
+        StringBuilder errMsg = new StringBuilder();
+        errMsg.append("invalid ").append(t);
+        errMsg.append(" value: " + value);
+        throw new AnalysisException(errMsg.toString());
+      }
+    }
     if (t.isFloatingPointType()) explicitlyCastToFloat(t);
   }
 

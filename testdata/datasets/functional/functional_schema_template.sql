@@ -1289,6 +1289,42 @@ select * from functional.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+invalid_decimal_part_tbl1
+---- COLUMNS
+c1 INT
+---- PARTITION_COLUMNS
+d1 DECIMAL(4,2)
+---- LOAD
+-- To test reading from a partitioned table with invalid decimal partition values (see IMPALA-1040).
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(d1="str_value") select int_col from functional.alltypestiny;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+invalid_decimal_part_tbl2
+---- COLUMNS
+c1 INT
+---- PARTITION_COLUMNS
+d1 DECIMAL(4,2)
+---- LOAD
+-- To test reading from a partitioned table with invalid decimal partition values (see IMPALA-1040).
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(d1=3.141) select int_col from functional.alltypestiny;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+invalid_decimal_part_tbl3
+---- COLUMNS
+c1 INT
+---- PARTITION_COLUMNS
+d1 DECIMAL(4,2)
+---- LOAD
+-- To test reading from a partitioned table with invalid decimal partition values (see IMPALA-1040).
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(d1=314.1) select int_col from functional.alltypestiny;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 decimal_tiny
 ---- COLUMNS
 c1 DECIMAL(10, 4)

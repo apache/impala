@@ -300,6 +300,26 @@ public class CatalogTest {
     assertEquals(months.size(), 24);
   }
 
+  @Test
+  public void TestInvalidDecimalPartitions() throws CatalogException {
+    // Test reading the metadata of a partitioned table that has invalid
+    // decimal partition key values.
+    Table table = catalog_.getOrLoadTable("functional", "invalid_decimal_part_tbl1");
+    assertTrue(table instanceof IncompleteTable);
+    IncompleteTable incompleteTable = (IncompleteTable) table;
+    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
+
+    table = catalog_.getOrLoadTable("functional", "invalid_decimal_part_tbl2");
+    assertTrue(table instanceof IncompleteTable);
+    incompleteTable = (IncompleteTable) table;
+    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
+
+    table = catalog_.getOrLoadTable("functional", "invalid_decimal_part_tbl3");
+    assertTrue(table instanceof IncompleteTable);
+    incompleteTable = (IncompleteTable) table;
+    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
+  }
+
   // TODO: All Hive-stats related tests are temporarily disabled because of an unknown,
   // sporadic issue causing stats of some columns to be absent in Jenkins runs.
   // Investigate this issue further.

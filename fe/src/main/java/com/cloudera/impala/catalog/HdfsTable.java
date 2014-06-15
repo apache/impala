@@ -56,7 +56,6 @@ import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.catalog.HdfsPartition.BlockReplica;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
-import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
@@ -645,7 +644,8 @@ public class HdfsTable extends Table {
               keyValues.add(expr);
             } catch (Exception ex) {
               LOG.warn("Failed to create literal expression of type: " + type, ex);
-              throw new InvalidStorageDescriptorException(ex);
+              throw new CatalogException("Invalid partition key value of type: " + type,
+                  ex);
             }
           }
           ++i;
@@ -732,14 +732,17 @@ public class HdfsTable extends Table {
    * directory (partition location) to list of files (FileDescriptors) under that
    * directory.
    * Returns new partition or null, if none was added.
-   * TODO: All thrown exceptions should be derived from CatalogException.
+   *
+   * @throws CatalogException
+   *    if the supplied storage descriptor contains metadata that Impala can't
+   *    understand.
    */
   private HdfsPartition addPartition(StorageDescriptor storageDescriptor,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyExprs,
       Map<String, List<FileDescriptor>> oldFileDescMap,
       Map<String, List<FileDescriptor>> newFileDescMap)
-      throws IOException, InvalidStorageDescriptorException, CatalogException {
+      throws IOException, CatalogException {
     HdfsStorageDescriptor fileFormatDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
     Path partDirPath = new Path(storageDescriptor.getLocation());
@@ -820,7 +823,7 @@ public class HdfsTable extends Table {
   }
 
   private void addDefaultPartition(StorageDescriptor storageDescriptor)
-      throws InvalidStorageDescriptorException {
+      throws CatalogException {
     // Default partition has no files and is not referred to by scan nodes. Data sinks
     // refer to this to understand how to create new partitions
     HdfsStorageDescriptor hdfsStorageDescriptor =

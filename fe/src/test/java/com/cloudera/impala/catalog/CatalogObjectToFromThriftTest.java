@@ -26,6 +26,7 @@ import org.junit.Test;
 
 import com.cloudera.impala.testutil.CatalogServiceTestCatalog;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
@@ -218,18 +219,15 @@ public class CatalogObjectToFromThriftTest {
         hdfsTable.getPartitions().get(hdfsTable.getPartitions().size() - 1);
 
     // Create a dummy partition with an invalid decimal type.
-    HdfsPartition dummyPart = new HdfsPartition(hdfsTable, part.getMetaStorePartition(),
+    try {
+      HdfsPartition dummyPart = new HdfsPartition(hdfsTable, part.getMetaStorePartition(),
         Lists.newArrayList(LiteralExpr.create("1.1", ColumnType.createDecimalType(1, 0)),
             LiteralExpr.create("1.1", ColumnType.createDecimalType(1, 0))),
         null, Lists.<HdfsPartition.FileDescriptor>newArrayList(),
         TAccessLevel.READ_WRITE);
-    try {
-      dummyPart.checkWellFormed();
       fail("Expected metadata to be malformed.");
-    } catch (CatalogException e) {
-      Assert.assertTrue(e.getMessage().contains("Partition (year=1.1/month=1.1) " +
-          "has invalid partition column values: "));
-      Assert.assertTrue(e.getCause() instanceof ArithmeticException);
+    } catch (AnalysisException e) {
+      Assert.assertTrue(e.getMessage().contains("invalid DECIMAL(1,0) value: 1.1"));
     }
   }
 
