@@ -1185,10 +1185,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testFuncExprDepthLimit("lower(", "'abc'", ")");
 
     // UDF.
-    catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
+    ScalarFunction udf = new ScalarFunction(new FunctionName("default", "udf"),
         Lists.newArrayList(ColumnType.INT),
-        ColumnType.INT, new HdfsUri(""), null, null, null));
-    testFuncExprDepthLimit("udf(", "1", ")");
+        ColumnType.INT, new HdfsUri(""), null, null, null);
+    catalog_.addFunction(udf);
+    try {
+      testFuncExprDepthLimit("udf(", "1", ")");
+    } finally {
+      catalog_.removeFunction(udf);
+    }
 
     // Timestamp arithmetic expr.
     testFuncExprDepthLimit("date_add(", "now()", ", interval 1 day)");
