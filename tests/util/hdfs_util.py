@@ -29,8 +29,21 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
     response = requests.put(uri, allow_redirects=True)
     if not response.status_code == httplib.OK:
       _raise_pywebhdfs_exception(response.status_code, response.text)
-
     return True
+
+  def setacl(self, path, acls):
+    uri = self._create_uri(path, "SETACL", aclspec=acls)
+    response = requests.put(uri, allow_redirects=True)
+    if not response.status_code == httplib.OK:
+      _raise_pywebhdfs_exception(response.status_code, response.text)
+    return True
+
+  def getacl(self, path):
+    uri = self._create_uri(path, "GETACLSTATUS")
+    response = requests.get(uri, allow_redirects=True)
+    if not response.status_code == httplib.OK:
+      _raise_pywebhdfs_exception(response.status_code, response.text)
+    return response.json()
 
 class HdfsConfig(object):
   """Reads an XML configuration file (produced by a mini-cluster) into a dictionary

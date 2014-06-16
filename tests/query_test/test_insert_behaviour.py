@@ -87,3 +87,59 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     # a subdirectory)
     ls = self.hdfs_client.list_dir(partition_dir)
     assert len(ls['FileStatuses']['FileStatus']) == 1
+
+  @pytest.mark.execute_serially
+  def test_insert_inherit_acls(self):
+    """Check that ACLs are inherited when we create new partitions"""
+
+    ROOT_ACL = "default:group:dummy_group:rwx"
+    TEST_ACL = "default:group:impala_test_users:r-x"
+    def check_has_acls(part, acl=TEST_ACL):
+      path = "test-warehouse/functional.db/insert_inherit_acls/" + part
+      result = self.hdfs_client.getacl(path)
+      assert acl in result['AclStatus']['entries']
+
+    # Add a spurious ACL to functional.db directory
+    self.hdfs_client.setacl("test-warehouse/functional.db", ROOT_ACL)
+
+    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS"
+                                      " functional.insert_inherit_acls")
+    self.execute_query_expect_success(self.client, "CREATE TABLE "
+                                      "functional.insert_inherit_acls (col int)"
+                                      " PARTITIONED BY (p1 int, p2 int, p3 int)")
+
+    # Check that table creation inherited the ACL
+    check_has_acls("", ROOT_ACL)
+
+    self.execute_query_expect_success(self.client, "ALTER TABLE "
+                                      "functional.insert_inherit_acls ADD PARTITION"
+                                      "(p1=1, p2=1, p3=1)")
+
+    check_has_acls("p1=1", ROOT_ACL)
+    check_has_acls("p1=1/p2=1", ROOT_ACL)
+    check_has_acls("p1=1/p2=1/p3=1", ROOT_ACL)
+
+    self.hdfs_client.setacl(
+      "test-warehouse/functional.db/insert_inherit_acls/p1=1/", TEST_ACL)
+
+    self.execute_query_expect_success(self.client, "INSERT INTO "
+                                      "functional.insert_inherit_acls "
+                                      "PARTITION(p1=1, p2=2, p3=2) VALUES(1)")
+
+    check_has_acls("p1=1/p2=2/")
+    check_has_acls("p1=1/p2=2/p3=2")
+
+    # Check that SETACL didn't cascade down to children (which is more to do with HDFS
+    # than Impala, but worth asserting here)
+    check_has_acls("p1=1/p2=1", ROOT_ACL)
+    check_has_acls("p1=1/p2=1/p3=1", ROOT_ACL)
+
+    # Change ACLs on p1=1,p2=2 and create a new leaf at p3=30
+    self.hdfs_client.setacl(
+      "test-warehouse/functional.db/insert_inherit_acls/p1=1/p2=2/",
+      "default:group:new_leaf_group:-w-")
+
+    self.execute_query_expect_success(self.client, "INSERT INTO "
+                                      "functional.insert_inherit_acls "
+                                      "PARTITION(p1=1, p2=2, p3=30) VALUES(1)")
+    check_has_acls("p1=1/p2=2/p3=30", "default:group:new_leaf_group:-w-")
