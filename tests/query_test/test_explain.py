@@ -4,6 +4,7 @@
 #
 import logging
 import pytest
+import re
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 
@@ -52,3 +53,35 @@ class TestExplain(ImpalaTestSuite):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 3
     self.run_test_case('QueryTest/explain-level3', vector)
+
+  def test_explain_validate_cardinality_estimates(self, vector):
+    # Tests that the cardinality estimates are correct for partitioned tables.
+    # TODO Cardinality estimation tests should eventually be part of the planner tests.
+    # TODO Remove this test
+    db_name = 'functional'
+    tbl_name = 'alltypes'
+
+    def check_cardinality(query_result, expected_cardinality):
+      regex = re.compile('tuple-ids=\d+ row-size=\d+B cardinality=(\d+)')
+      for res in query_result:
+        m = regex.match(res.strip())
+        if m:
+          assert len(m.groups()) == 1
+          # The cardinality should be zero.
+          assert m.groups()[0] == expected_cardinality
+
+    # All partitions are filtered out, cardinality should be 0.
+    result = self.execute_query("explain select * from %s.%s where year = 1900" % (
+        db_name, tbl_name), query_options={'explain_level':3})
+    check_cardinality(result.data, '0')
+
+    # Half of the partitions are filtered out, cardinality should be 3650.
+    result = self.execute_query("explain select * from %s.%s where year = 2010" % (
+        db_name, tbl_name), query_options={'explain_level':3})
+    check_cardinality(result.data, '3650')
+
+    # None of the partitions are filtered out, cardinality should be 7300.
+    result = self.execute_query("explain select * from %s.%s" % (db_name, tbl_name),
+        query_options={'explain_level':3})
+    check_cardinality(result.data, '7300')
+

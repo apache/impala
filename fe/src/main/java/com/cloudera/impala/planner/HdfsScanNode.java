@@ -555,9 +555,12 @@ public class HdfsScanNode extends ScanNode {
         }
         totalBytes_ += p.getSize();
       }
-      // if none of the partitions knew its number of rows, we fall back on
-      // the table stats
-      if (!hasValidPartitionCardinality) cardinality_ = tbl_.getNumRows();
+
+      if (!partitions_.isEmpty() && !hasValidPartitionCardinality) {
+        // if none of the partitions knew its number of rows, we fall back on
+        // the table stats
+        cardinality_ = tbl_.getNumRows();
+      }
     }
 
     Preconditions.checkState(cardinality_ >= 0 || cardinality_ == -1);
@@ -570,7 +573,7 @@ public class HdfsScanNode extends ScanNode {
     LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
 
     // TODO: take actual partitions into account
-    numNodes_ = tbl_.getNumNodes();
+    numNodes_ = cardinality_ == 0 ? 1 : tbl_.getNumNodes();
     LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
   }
 
