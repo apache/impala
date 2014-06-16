@@ -232,6 +232,10 @@ class QueryExecutor(object):
     Results are returned as a list of QueryExecResult objects. get_results() should be
     called after run(), otherwise the result list will be empty.
     """
+    for result in self.__results:
+      if self.exit_on_error and not result.success:
+        error_msg = "Error executing query, Error: %s." % result.query_error
+        raise RuntimeError, error_msg + ' Aborting.'
     return self.__results
 
 def establish_beeswax_connection(query, query_options):
