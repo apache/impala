@@ -185,9 +185,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
-  Thread wait_thread(
-      "impala-server", "wait-thread", &ImpalaServer::Wait, this, exec_state);
-  RAISE_IF_ERROR(exec_state->query_status(), SQLSTATE_GENERAL_ERROR);
+  exec_state->WaitAsync();
 }
 
 void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
@@ -219,7 +217,8 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
   // block until results are ready
-  Status status = exec_state->Wait();
+  exec_state->Wait();
+  const Status& status = exec_state->query_status();
   if (!status.ok()) {
     UnregisterQuery(exec_state->query_id(), &status);
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
@@ -549,6 +548,11 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
     const bool start_over, const int32_t fetch_size, beeswax::Results* query_results) {
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
   if (exec_state == NULL) return Status("Invalid query handle");
+
+  // Make sure QueryExecState::Wait() has completed before fetching rows. Wait() ensures
+  // that rows are ready to be fetched (e.g., Wait() opens QueryExecState::output_exprs_,
+  // which are evaluated in QueryExecState::FetchRows() below).
+  exec_state->BlockOnWait();
 
   lock_guard<mutex> frl(*exec_state->fetch_rows_lock());
   lock_guard<mutex> l(*exec_state->lock());

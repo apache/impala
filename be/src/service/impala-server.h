@@ -433,10 +433,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void CatalogObjectsPathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
-  // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
-  // Must not be called with exec_state->lock() already taken.
-  void Wait(boost::shared_ptr<QueryExecState> exec_state);
-
   // Initialize "default_configs_" to show the default values for ImpalaQueryOptions and
   // "support_start_over/false" to indicate that Impala does not support start over
   // in the fetch call.

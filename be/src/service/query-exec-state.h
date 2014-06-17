@@ -58,8 +58,7 @@ class ImpalaServer::QueryExecState {
                  ImpalaServer* server,
                  boost::shared_ptr<ImpalaServer::SessionState> session);
 
-  ~QueryExecState() {
-  }
+  ~QueryExecState();
 
   // Initiates execution of a exec_request.
   // Non-blocking.
@@ -71,15 +70,24 @@ class ImpalaServer::QueryExecState {
   // code paths.
   Status Exec(const TMetadataOpRequest& exec_request);
 
-  // Call this to ensure that rows are ready when calling FetchRows().
-  // Must be preceded by call to Exec(). Waits for all child queries to complete.
-  Status Wait();
+  // Call this to ensure that rows are ready when calling FetchRows(). Updates the
+  // query_status_, and advances query_state_ to FINISHED or EXCEPTION. Must be preceded
+  // by call to Exec(). Waits for all child queries to complete. Takes lock_.
+  void Wait();
+
+  // Calls Wait() asynchronously in a thread and returns immediately.
+  void WaitAsync();
+
+  // BlockOnWait() may be called after WaitAsync() has been called in order to wait for
+  // the asynchronous thread to complete. It is safe to call this multiple times (only the
+  // first call will block). Do not call while holding lock_.
+  void BlockOnWait();
 
   // Return at most max_rows from the current batch. If the entire current batch has
   // been returned, fetch another batch first.
   // Caller needs to hold fetch_rows_lock_ and lock_.
   // Caller should verify that EOS has not be reached before calling.
-  // Always calls coord()->Wait() prior to getting a batch.
+  // Must be preceeded by call to Wait() (or WaitAsync()/BlockOnWait()).
   // Also updates query_state_/status_ in case of error.
   Status FetchRows(const int32_t max_rows, QueryResultSet* fetched_rows);
 
@@ -198,6 +206,9 @@ class ImpalaServer::QueryExecState {
   // increased, and decreased once that work is completed.
   uint32_t ref_count_;
 
+  // Thread for asynchronously running Wait().
+  boost::scoped_ptr<Thread> wait_thread_;
+
   boost::mutex lock_;  // protects all following fields
   ExecEnv* exec_env_;
 
@@ -310,6 +321,9 @@ class ImpalaServer::QueryExecState {
 
   // Executes a LOAD DATA
   Status ExecLoadDataRequest();
+
+  // Core logic of Wait(). Does not update query_state_/status_.
+  Status WaitInternal();
 
   // Core logic of FetchRows(). Does not update query_state_/status_.
   // Caller needs to hold fetch_rows_lock_ and lock_.

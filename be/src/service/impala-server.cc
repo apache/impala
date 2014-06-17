@@ -712,28 +712,8 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id, const Status* caus
       }
     }
   }
-
-
   ArchiveQuery(*exec_state);
   return true;
-}
-
-void ImpalaServer::Wait(shared_ptr<QueryExecState> exec_state) {
-  // block until results are ready
-  Status status = exec_state->Wait();
-  {
-    lock_guard<mutex> l(*(exec_state->lock()));
-    if (exec_state->returns_result_set()) {
-      exec_state->query_events()->MarkEvent("Rows available");
-    } else {
-      exec_state->query_events()->MarkEvent("Request finished");
-    }
-
-    exec_state->UpdateQueryStatus(status);
-  }
-  if (status.ok()) {
-    exec_state->UpdateQueryState(QueryState::FINISHED);
-  }
 }
 
 Status ImpalaServer::UpdateCatalogMetrics() {

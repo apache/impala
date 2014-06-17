@@ -89,7 +89,9 @@ Status ChildQuery::ExecAndFetch() {
     lock_guard<mutex> l(lock_);
     is_running_ = false;
   }
-  status = close_resp.status;
+  // Don't overwrite error from fetch. A failed fetch unregisters the query and we want to
+  // preserve the original error status (e.g., CANCELLED).
+  if (status.ok()) status = close_resp.status;
   return status;
 }
 

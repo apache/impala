@@ -247,6 +247,11 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
   const TUniqueId session_id = exec_state->session_id();
   RETURN_IF_ERROR(session_handle.WithSession(session_id));
 
+  // Make sure QueryExecState::Wait() has completed before fetching rows. Wait() ensures
+  // that rows are ready to be fetched (e.g., Wait() opens QueryExecState::output_exprs_,
+  // which are evaluated in QueryExecState::FetchRows() below).
+  exec_state->BlockOnWait();
+
   lock_guard<mutex> frl(*exec_state->fetch_rows_lock());
   lock_guard<mutex> l(*exec_state->lock());
 
@@ -485,10 +490,8 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
   TUniqueIdToTHandleIdentifier(exec_state->query_id(), exec_state->query_id(),
                                &return_val.operationHandle.operationId);
 
-  // start thread to wait for results to become available, which will allow
-  // us to advance query state to FINISHED or EXCEPTION
-  Thread wait_thread(
-      "impala-server", "wait-thread", &ImpalaServer::Wait, this, exec_state);
+  // Start thread to wait for results to become available.
+  exec_state->WaitAsync();
 
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);

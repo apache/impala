@@ -95,6 +95,10 @@ ImpalaServer::QueryExecState::QueryExecState(
   summary_profile_.AddInfoString("Sql Statement", query_ctx_.request.stmt);
 }
 
+ImpalaServer::QueryExecState::~QueryExecState() {
+  DCHECK(wait_thread_.get() == NULL) << "BlockOnWait() needs to be called!";
+}
+
 Status ImpalaServer::QueryExecState::SetResultCache(QueryResultSet* cache,
     int64_t max_size) {
   lock_guard<mutex> l(lock_);
@@ -401,8 +405,11 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
 }
 
 void ImpalaServer::QueryExecState::Done() {
-  unique_lock<mutex> l(lock_);
   MarkActive();
+  // Make sure we join on wait_thread_ before we finish (and especially before this object
+  // is destroyed).
+  BlockOnWait();
+  unique_lock<mutex> l(lock_);
   end_time_ = TimestampValue::local_time_micros();
   summary_profile_.AddInfoString("End Time", end_time().DebugString());
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
@@ -434,7 +441,36 @@ Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request
   return Status::OK;
 }
 
-Status ImpalaServer::QueryExecState::Wait() {
+void ImpalaServer::QueryExecState::WaitAsync() {
+  wait_thread_.reset(new Thread(
+      "query-exec-state", "wait-thread", &ImpalaServer::QueryExecState::Wait, this));
+}
+
+void ImpalaServer::QueryExecState::BlockOnWait() {
+  if (wait_thread_.get() != NULL) {
+    wait_thread_->Join();
+    wait_thread_.reset();
+  }
+}
+
+void ImpalaServer::QueryExecState::Wait() {
+  // block until results are ready
+  Status status = WaitInternal();
+  {
+    lock_guard<mutex> l(lock_);
+    if (returns_result_set()) {
+      query_events()->MarkEvent("Rows available");
+    } else {
+      query_events()->MarkEvent("Request finished");
+    }
+    UpdateQueryStatus(status);
+  }
+  if (status.ok()) {
+    UpdateQueryState(QueryState::FINISHED);
+  }
+}
+
+Status ImpalaServer::QueryExecState::WaitInternal() {
   // Explain requests have already populated the result set. Nothing to do here.
   if (exec_request_.stmt_type == TStmtType::EXPLAIN) {
     MarkInactive();
@@ -473,7 +509,7 @@ Status ImpalaServer::QueryExecState::FetchRows(const int32_t max_rows,
   // Pause the wait timer, since the client has instructed us to do work on its behalf.
   MarkActive();
 
-  // FetchInternal has already taken our lock_
+  // ImpalaServer::FetchInternal has already taken our lock_
   UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows));
 
   MarkInactive();
@@ -560,14 +596,6 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     eos_ = true;
     return Status::OK;
   }
-
-  lock_.unlock();
-  Status status = coord_->Wait();
-  lock_.lock();
-  if (!status.ok()) return status;
-
-  // Check if query_state_ changed during Wait() call
-  if (query_state_ == QueryState::EXCEPTION) return query_status_;
 
   query_state_ = QueryState::FINISHED;  // results will be ready after this call
   // Fetch the next batch if we've returned the current batch entirely
