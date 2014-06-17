@@ -35,8 +35,11 @@ struct TRowBatch {
   // TODO: figure out how we can avoid copying the data during TRowBatch construction
   4: string tuple_data
 
-  // Indicates whether tuple_data is snappy-compressed
-  5: bool is_compressed
+  // Indicates the type of compression used
+  5: required CatalogObjects.THdfsCompression compression_type
+
+  // Indicates the uncompressed size
+  6:i32 uncompressed_size
 }
 
 // this is a union over all possible return types

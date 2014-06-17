@@ -66,17 +66,17 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
   DCHECK(mem_tracker_ != NULL);
   tuple_ptrs_size_ = num_rows_ * input_batch.row_tuples.size() * sizeof(Tuple*);
   mem_tracker_->Consume(tuple_ptrs_size_);
-  if (input_batch.is_compressed) {
+  if (input_batch.compression_type != THdfsCompression::NONE) {
     // Decompress tuple data into data pool
     uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();
     size_t compressed_size = input_batch.tuple_data.size();
 
     scoped_ptr<Codec> decompressor;
-    Status status =
-        Codec::CreateDecompressor(NULL, false, THdfsCompression::SNAPPY, &decompressor);
+    Status status = Codec::CreateDecompressor(NULL, false, input_batch.compression_type,
+        &decompressor);
     DCHECK(status.ok()) << status.GetErrorMsg();
 
-    int uncompressed_size = decompressor->MaxOutputLen(compressed_size, compressed_data);
+    int uncompressed_size = input_batch.uncompressed_size;
     DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
     uint8_t* data = tuple_data_pool_->Allocate(uncompressed_size);
     status = decompressor->ProcessBlock(true, compressed_size, compressed_data,
@@ -146,7 +146,7 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
   // why does Thrift not generate a Clear() function?
   output_batch->row_tuples.clear();
   output_batch->tuple_offsets.clear();
-  output_batch->is_compressed = false;
+  output_batch->compression_type = THdfsCompression::NONE;
 
   output_batch->num_rows = num_rows_;
   row_desc_.ToThrift(&output_batch->row_tuples);
@@ -154,6 +154,7 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
 
   int size = TotalByteSize();
   output_batch->tuple_data.resize(size);
+  output_batch->uncompressed_size = size;
 
   // Copy tuple data, including strings, into output_batch (converting string
   // pointers into offsets in the process)
@@ -195,7 +196,7 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
     if (LIKELY(compressed_size < size)) {
       compression_scratch_.resize(compressed_size);
       output_batch->tuple_data.swap(compression_scratch_);
-      output_batch->is_compressed = true;
+      output_batch->compression_type = THdfsCompression::SNAPPY;
     }
     VLOG_ROW << "uncompressed size: " << size << ", compressed size: " << compressed_size;
   }
