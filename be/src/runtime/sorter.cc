@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "runtime/sorter.h"
+#include <gutil/strings/substitute.h>
+
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -21,6 +23,7 @@
 
 using namespace boost;
 using namespace std;
+using namespace strings;
 
 namespace impala {
 
@@ -185,21 +188,92 @@ class Sorter::Run {
 // cancellation during an in-memory sort.
 class Sorter::TupleSorter {
  public:
-  typedef function<bool (Tuple*, Tuple*)> LessThanComparator;
-
-  TupleSorter(const LessThanComparator& less_than_comp, int64_t block_size,
+  TupleSorter(const TupleRowComparator& less_than_comp, int64_t block_size,
       int tuple_size, RuntimeState* state);
 
   ~TupleSorter();
 
-  // Performs a quicksort for tuples in the range [0, num_tuples)
-  // followed by an insertion sort to finish smaller blocks.
+  // Performs a quicksort for tuples in 'run' followed by an insertion sort to
+  // finish smaller blocks.
   // Returns early if stste_->is_cancelled() is true. No status
   // is returned - the caller must check for cancellation.
-  void Sort(Run* run, int64_t num_tuples);
+  void Sort(Run* run);
 
  private:
   static const int INSERTION_THRESHOLD = 16;
+
+  // Helper class used to iterate over tuples in a run during quick sort and insertion
+  // sort.
+  class TupleIterator {
+   public:
+    TupleIterator(TupleSorter* parent, int64_t index)
+      : parent_(parent),
+        index_(index) {
+      DCHECK_GE(index, 0);
+      DCHECK_LE(index, parent_->run_->num_tuples_);
+      // If the run is empty, only index_ is initialized.
+      if (parent_->run_->num_tuples_ == 0) return;
+      // If the iterator is initialized to past the end, set up buffer_start_ and
+      // block_index_ as if it pointing to the last tuple. Add tuple_size_ bytes to
+      // current_tuple_, so everything is correct when Prev() is invoked.
+      int past_end_bytes = 0;
+      if (UNLIKELY(index >= parent_->run_->num_tuples_)) {
+        past_end_bytes = parent->tuple_size_;
+        index_ = parent_->run_->num_tuples_;
+        index = index_ - 1;
+      }
+      block_index_ = index / parent->block_capacity_;
+      buffer_start_ = parent->run_->fixed_len_blocks_[block_index_]->buffer();
+      int block_offset = (index % parent->block_capacity_) * parent->tuple_size_;
+      current_tuple_ = buffer_start_ + block_offset + past_end_bytes;
+    }
+
+    // Sets current_tuple_ to point to the next tuple in the run. Increments
+    // block_index and resets buffer if the next tuple is in the next block.
+    void Next() {
+      current_tuple_ += parent_->tuple_size_;
+      ++index_;
+      if (UNLIKELY(current_tuple_ > buffer_start_ + parent_->last_tuple_block_offset_ &&
+          index_ < parent_->run_->num_tuples_)) {
+       // Don't increment block index, etc. past the end.
+       ++block_index_;
+       DCHECK_LT(block_index_, parent_->run_->fixed_len_blocks_.size());
+       buffer_start_ = parent_->run_->fixed_len_blocks_[block_index_]->buffer();
+       current_tuple_ = buffer_start_;
+      }
+    }
+
+    // Sets current_tuple to point to the previous tuple in the run. Decrements
+    // block_index and resets buffer if the new tuple is in the previous block.
+    void Prev() {
+      current_tuple_ -= parent_->tuple_size_;
+      --index_;
+      if (UNLIKELY(current_tuple_ < buffer_start_ && index_ >= 0)) {
+       --block_index_;
+       DCHECK_GE(block_index_, 0);
+       buffer_start_ = parent_->run_->fixed_len_blocks_[block_index_]->buffer();
+       current_tuple_ = buffer_start_ + parent_->last_tuple_block_offset_;
+      }
+    }
+
+   private:
+    friend class TupleSorter;
+
+    // Pointer to the tuple sorter.
+    TupleSorter* parent_;
+
+    // Index of the current tuple in the run.
+    int64_t index_;
+
+    // Pointer to the current tuple.
+    uint8_t* current_tuple_;
+
+    // Start of the buffer containing current tuple.
+    uint8_t* buffer_start_;
+
+    // Index into run_.fixed_len_blocks_ of the block containing the current tuple.
+    int block_index_;
+  };
 
   // Size of the tuples in memory.
   const int tuple_size_;
@@ -207,8 +281,11 @@ class Sorter::TupleSorter {
   // Number of tuples per block in a run.
   const int block_capacity_;
 
-  // Comparator that returns true if lhs < rhs.
-  const LessThanComparator less_than_comp_;
+  // Offset in bytes of the last tuple in a block, calculated from block and tuple sizes.
+  const int last_tuple_block_offset_;
+
+  // Tuple comparator that returns true if lhs < rhs.
+  const TupleRowComparator less_than_comp_;
 
   // Runtime state instance to check for cancellation. Not owned.
   RuntimeState* const state_;
@@ -218,30 +295,27 @@ class Sorter::TupleSorter {
 
   // Temporarily allocated space to copy and swap tuples (Both are used in Partition()).
   // temp_tuple_ points to temp_tuple_buffer_. Owned by this TupleSorter instance.
-  Tuple* temp_tuple_;
+  TupleRow* temp_tuple_row_;
   uint8_t* temp_tuple_buffer_;
   uint8_t* swap_buffer_;
 
   // Perform an insertion sort for rows in the range [first, last) in a run.
-  void InsertionSort(int64_t first, int64_t last);
+  void InsertionSort(const TupleIterator& first, const TupleIterator& last);
 
   // Partitions the sequence of tuples in the range [first, last) in a run into two
   // groups around the pivot tuple - i.e. tuples in first group are <= the pivot, and
   // tuples in the second group are >= pivot. Tuples are swapped in place to create the
   // groups and the index to the first element in the second group is returned.
   // Checks state_->is_cancelled() and returns early with an invalid result if true.
-  int64_t Partition(int64_t first, int64_t last, Tuple* pivot);
+  TupleIterator Partition(TupleIterator first, TupleIterator last, Tuple* pivot);
 
   // Performs a quicksort of rows in the range [first, last).
   // followed by insertion sort for smaller groups of elements.
   // Checks state_->is_cancelled() and returns early if true.
-  void SortHelper(int64_t first, int64_t last);
+  void SortHelper(TupleIterator first, TupleIterator last);
 
-  // Swaps left and right tuples using the swap buffer.
-  void Swap(Tuple* left, Tuple* right);
-
-  // Get the tuple at the specified index from run_.
-  Tuple* GetTuple(int64_t index);
+  // Swaps tuples pointed to by left and right using the swap buffer.
+  void Swap(uint8_t* left, uint8_t* right);
 }; // class TupleSorter
 
 // Sorter::Run methods
@@ -310,6 +384,11 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
       if (materialize_slots_) {
         new_tuple->MaterializeExprs<has_var_len_data>(input_row, *sort_tuple_desc_,
             sorter_->sort_tuple_slot_exprs_, NULL, &var_values, &total_var_len);
+        if (total_var_len > sorter_->block_mgr_->block_size()) {
+          return Status(TStatusCode::INTERNAL_ERROR, Substitute(
+              "Variable length data in a single tuple larger than block size $0 > $1",
+              total_var_len, sorter_->block_mgr_->block_size()));
+        }
       } else {
         memcpy(new_tuple, input_row->GetTuple(0), sort_tuple_size_);
         if (has_var_len_data) {
@@ -622,14 +701,15 @@ void Sorter::Run::CopyVarLenDataConvertOffset(char* dest, int64_t offset,
 }
 
 // Sorter::TupleSorter methods.
-Sorter::TupleSorter::TupleSorter(const LessThanComparator& comp, int64_t block_size,
+Sorter::TupleSorter::TupleSorter(const TupleRowComparator& comp, int64_t block_size,
     int tuple_size, RuntimeState* state)
   : tuple_size_(tuple_size),
     block_capacity_(block_size / tuple_size),
+    last_tuple_block_offset_(tuple_size * ((block_size / tuple_size) - 1)),
     less_than_comp_(comp),
     state_(state) {
   temp_tuple_buffer_ = new uint8_t[tuple_size];
-  temp_tuple_ = reinterpret_cast<Tuple*>(temp_tuple_buffer_);
+  temp_tuple_row_ = reinterpret_cast<TupleRow*>(&temp_tuple_buffer_);
   swap_buffer_ = new uint8_t[tuple_size];
 }
 
@@ -638,9 +718,9 @@ Sorter::TupleSorter::~TupleSorter() {
   delete[] swap_buffer_;
 }
 
-void Sorter::TupleSorter::Sort(Run* run, int64_t num_tuples) {
+void Sorter::TupleSorter::Sort(Run* run) {
   run_ = run;
-  SortHelper(0, num_tuples);
+  SortHelper(TupleIterator(this, 0), TupleIterator(this, run_->num_tuples_));
   run->is_sorted_ = true;
 }
 
@@ -650,63 +730,73 @@ void Sorter::TupleSorter::Sort(Run* run, int64_t num_tuples) {
 // the sorted sequence by comparing it to each element of the sorted sequence
 // (reverse order) to find its correct place in the sorted sequence, copying tuples
 // along the way.
-void Sorter::TupleSorter::InsertionSort(int64_t first, int64_t last) {
-  for (int64_t i = first + 1; i < last; ++i) {
-    Tuple* copy_to = GetTuple(i);
-    // Copied to temp_tuple_ since the tuple at position 'i' may be overwritten by the
-    // one at position 'i-1'
-    memcpy(temp_tuple_, copy_to, tuple_size_);
-    Tuple* compare_to = GetTuple(i-1);
-    int64_t copy_index = i;
-    while (less_than_comp_(temp_tuple_, compare_to)) {
-      memcpy(copy_to, compare_to, tuple_size_);
-      --copy_index;
-      copy_to = compare_to;
-      if (copy_index <= first) break;
-      compare_to = GetTuple(copy_index - 1);
+void Sorter::TupleSorter::InsertionSort(const TupleIterator& first,
+    const TupleIterator& last) {
+  TupleIterator insert_iter = first;
+  insert_iter.Next();
+  for (; insert_iter.index_ < last.index_; insert_iter.Next()) {
+    // insert_iter points to the tuple after the currently sorted sequence that must
+    // be inserted into the sorted sequence. Copy to temp_tuple_row_ since it may be
+    // overwritten by the one at position 'insert_iter - 1'
+    memcpy(temp_tuple_buffer_, insert_iter.current_tuple_, tuple_size_);
+
+    // 'iter' points to the tuple that temp_tuple_row_ will be compared to.
+    // 'copy_to' is the where iter should be copied to if it is >= temp_tuple_row_.
+    // copy_to always to the next row after 'iter'
+    TupleIterator iter = insert_iter;
+    iter.Prev();
+    uint8_t* copy_to = insert_iter.current_tuple_;
+    while (less_than_comp_(temp_tuple_row_,
+        reinterpret_cast<TupleRow*>(&iter.current_tuple_))) {
+      memcpy(copy_to, iter.current_tuple_, tuple_size_);
+      copy_to = iter.current_tuple_;
+      // Break if 'iter' has reached the first row, meaning that temp_tuple_row_
+      // will be inserted in position 'first'
+      if (iter.index_ <= first.index_) break;
+      iter.Prev();
     }
 
-    memcpy(copy_to, temp_tuple_, tuple_size_);
+    memcpy(copy_to, temp_tuple_buffer_, tuple_size_);
   }
 }
 
-int64_t Sorter::TupleSorter::Partition(int64_t first, int64_t last, Tuple* pivot) {
+Sorter::TupleSorter::TupleIterator Sorter::TupleSorter::Partition(TupleIterator first,
+    TupleIterator last, Tuple* pivot) {
   // Copy pivot into temp_tuple since it points to a tuple within [first, last).
-  memcpy(temp_tuple_, pivot, tuple_size_);
-  while (!state_->is_cancelled()) {
+  memcpy(temp_tuple_buffer_, pivot, tuple_size_);
+
+  last.Prev();
+  while (true) {
     // Search for the first and last out-of-place elements, and swap them.
-    Tuple* first_tuple = GetTuple(first);
-    while (less_than_comp_(first_tuple, temp_tuple_)) {
-      ++first;
-      first_tuple = GetTuple(first);
+    while (less_than_comp_(reinterpret_cast<TupleRow*>(&first.current_tuple_),
+        temp_tuple_row_)) {
+      first.Next();
+    }
+    while (less_than_comp_(temp_tuple_row_,
+        reinterpret_cast<TupleRow*>(&last.current_tuple_))) {
+      last.Prev();
     }
 
-    --last;
-    Tuple* last_tuple = GetTuple(last);
-    while (less_than_comp_(temp_tuple_, last_tuple)) {
-      --last;
-      last_tuple = GetTuple(last);
-    }
-
-    if (first >= last) break;
-
+    if (first.index_ >= last.index_) break;
     // Swap first and last tuples.
-    Swap(first_tuple, last_tuple);
+    Swap(first.current_tuple_, last.current_tuple_);
 
-    ++first;
+    first.Next();
+    last.Prev();
   }
 
   return first;
 }
 
-void Sorter::TupleSorter::SortHelper(int64_t first, int64_t last) {
+void Sorter::TupleSorter::SortHelper(TupleIterator first, TupleIterator last) {
   if (UNLIKELY(state_->is_cancelled())) return;
   // Use insertion sort for smaller sequences.
-  while (last - first > INSERTION_THRESHOLD) {
-    Tuple* pivot = GetTuple(first + (last - first)/2);
+  while (last.index_ - first.index_ > INSERTION_THRESHOLD) {
+    TupleIterator iter(this, first.index_ + (last.index_ - first.index_)/2);
     // Parititon() splits the tuples in [first, last) into two groups (<= pivot
     // and >= pivot) in-place. 'cut' is the index of the first tuple in the second group.
-    int64_t cut = Partition(first, last, pivot);
+    TupleIterator cut = Partition(first, last,
+        reinterpret_cast<Tuple*>(iter.current_tuple_));
     SortHelper(cut, last);
     last = cut;
     if (UNLIKELY(state_->is_cancelled())) return;
@@ -715,19 +805,10 @@ void Sorter::TupleSorter::SortHelper(int64_t first, int64_t last) {
   InsertionSort(first, last);
 }
 
-inline void Sorter::TupleSorter::Swap(Tuple* left, Tuple* right) {
+inline void Sorter::TupleSorter::Swap(uint8_t* left, uint8_t* right) {
   memcpy(swap_buffer_, left, tuple_size_);
   memcpy(left, right, tuple_size_);
   memcpy(right, swap_buffer_, tuple_size_);
-}
-
-inline Tuple* Sorter::TupleSorter::GetTuple(int64_t index) {
-  // TODO: This is called repeatedly from the in-memory sorter. Ensure that this
-  // is not a bottleneck.
-  int block_index = index / block_capacity_;
-  int block_offset = (index % block_capacity_) * tuple_size_;
-  uint8_t* tuple_ptr = run_->fixed_len_blocks_[block_index]->buffer() + block_offset;
-  return reinterpret_cast<Tuple*>(tuple_ptr);
 }
 
 // Sorter methods
@@ -857,7 +938,7 @@ Status Sorter::SortRun() {
   }
   {
     SCOPED_TIMER(in_mem_sort_timer_);
-    in_mem_tuple_sorter_->Sort(unsorted_run_, unsorted_run_->num_tuples_);
+    in_mem_tuple_sorter_->Sort(unsorted_run_);
     RETURN_IF_CANCELLED(state_);
   }
   sorted_runs_.push_back(unsorted_run_);

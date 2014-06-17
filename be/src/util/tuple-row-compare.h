@@ -34,19 +34,24 @@ class TupleRowComparator {
       const std::vector<Expr*>& key_exprs_rhs,
       const std::vector<bool>& is_asc,
       const std::vector<bool>& nulls_first)
-      : key_exprs_lhs_(key_exprs_lhs), key_exprs_rhs_(key_exprs_rhs),
-        is_asc_(is_asc), nulls_first_(nulls_first) {
+      : key_exprs_lhs_(key_exprs_lhs), key_exprs_rhs_(key_exprs_rhs) {
     DCHECK_EQ(key_exprs_lhs.size(), key_exprs_rhs.size());
     DCHECK_EQ(key_exprs_lhs.size(), is_asc.size());
     DCHECK_EQ(key_exprs_lhs.size(), nulls_first.size());
+    is_asc_.reserve(key_exprs_lhs.size());
+    nulls_first_.reserve(key_exprs_lhs.size());
+    for (int i = 0; i < key_exprs_lhs.size(); ++i) {
+      is_asc_.push_back(is_asc[i] ? 1 : 0);
+      nulls_first_.push_back(nulls_first[i] ? 1 : 0);
+    }
   }
 
   // Returns true if x is strictly less than y.
   bool operator() (TupleRow* lhs, TupleRow* rhs) const {
     std::vector<Expr*>::const_iterator lhs_expr_iter = key_exprs_lhs_.begin();
     std::vector<Expr*>::const_iterator rhs_expr_iter = key_exprs_rhs_.begin();
-    std::vector<bool>::const_iterator is_asc_iter = is_asc_.begin();
-    std::vector<bool>::const_iterator nulls_first_iter = nulls_first_.begin();
+    std::vector<uint8_t>::const_iterator is_asc_iter = is_asc_.begin();
+    std::vector<uint8_t>::const_iterator nulls_first_iter = nulls_first_.begin();
 
     for (;lhs_expr_iter != key_exprs_lhs_.end();
          ++lhs_expr_iter, ++rhs_expr_iter, ++is_asc_iter, ++nulls_first_iter) {
@@ -54,8 +59,8 @@ class TupleRowComparator {
       Expr* rhs_expr = *rhs_expr_iter;
       void* lhs_value = lhs_expr->GetValue(lhs);
       void* rhs_value = rhs_expr->GetValue(rhs);
-      bool less_than = *is_asc_iter;
-      bool nulls_first = *nulls_first_iter;
+      bool less_than = static_cast<bool>(*is_asc_iter);
+      bool nulls_first = static_cast<bool>(*nulls_first_iter);
 
       // The sort order of NULLs is independent of asc/desc.
       if (lhs_value == NULL && rhs_value == NULL) continue;
@@ -80,8 +85,8 @@ class TupleRowComparator {
  private:
   std::vector<Expr*> key_exprs_lhs_;
   std::vector<Expr*> key_exprs_rhs_;
-  std::vector<bool> is_asc_;
-  std::vector<bool> nulls_first_;
+  std::vector<uint8_t> is_asc_;
+  std::vector<uint8_t> nulls_first_;
 };
 
 // Compares the equality of two Tuples, going slot by slot.
