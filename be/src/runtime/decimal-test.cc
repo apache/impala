@@ -45,7 +45,8 @@ void VerifyParse(const string& s, const ColumnType& t,
   DecimalValue<T> val = StringParser::StringToDecimal<T>(
       s.c_str(), s.size(), t, &parse_result);
   EXPECT_EQ(parse_result, expected_result);
-  if (expected_result == StringParser::PARSE_SUCCESS) {
+  if (expected_result == StringParser::PARSE_SUCCESS ||
+      expected_result == StringParser::PARSE_UNDERFLOW) {
     VerifyEquals(expected_val, val);
   }
 }
@@ -165,7 +166,7 @@ TEST(StringToDecimal, Basic) {
   StringToAllDecimals("-.45", t2, -45, StringParser::PARSE_SUCCESS);
   StringToAllDecimals(" 123.4 ", t4, 12340000, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-123.45", t4, -12345000, StringParser::PARSE_SUCCESS);
-  StringToAllDecimals("-123.456", t2, -123456, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("-123.456", t2, -12345, StringParser::PARSE_UNDERFLOW);
 }
 
 TEST(StringToDecimal, LargeDecimals) {
@@ -175,7 +176,7 @@ TEST(StringToDecimal, LargeDecimals) {
 
   StringToAllDecimals("1", t1, 1, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-1", t1, -1, StringParser::PARSE_SUCCESS);
-  StringToAllDecimals(".1", t1, -1, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals(".1", t1, 0, StringParser::PARSE_UNDERFLOW);
   StringToAllDecimals("10", t1, 10, StringParser::PARSE_OVERFLOW);
   StringToAllDecimals("-10", t1, -10, StringParser::PARSE_OVERFLOW);
 
@@ -184,17 +185,17 @@ TEST(StringToDecimal, LargeDecimals) {
   VerifyParse("-.1234567890", t2,
       Decimal8Value(-1234567890L), StringParser::PARSE_SUCCESS);
   VerifyParse(".12345678900", t2,
-      Decimal8Value(12345678900L), StringParser::PARSE_UNDERFLOW);
+      Decimal8Value(1234567890L), StringParser::PARSE_UNDERFLOW);
   VerifyParse("-.12345678900", t2,
-      Decimal8Value(-12345678900L), StringParser::PARSE_UNDERFLOW);
+      Decimal8Value(-1234567890L), StringParser::PARSE_UNDERFLOW);
   VerifyParse(".1234567890", t2,
       Decimal16Value(1234567890L), StringParser::PARSE_SUCCESS);
   VerifyParse("-.1234567890", t2,
       Decimal16Value(-1234567890L), StringParser::PARSE_SUCCESS);
   VerifyParse(".12345678900", t2,
-      Decimal16Value(12345678900L), StringParser::PARSE_UNDERFLOW);
+      Decimal16Value(1234567890L), StringParser::PARSE_UNDERFLOW);
   VerifyParse("-.12345678900", t2,
-      Decimal16Value(-12345678900L), StringParser::PARSE_UNDERFLOW);
+      Decimal16Value(-1234567890L), StringParser::PARSE_UNDERFLOW);
 
   // Up to 8 digits with 5 before the decimal and 3 after.
   VerifyParse("12345.678", t3,
@@ -204,7 +205,7 @@ TEST(StringToDecimal, LargeDecimals) {
   VerifyParse("123456.78", t3,
       Decimal8Value(12345678L), StringParser::PARSE_OVERFLOW);
   VerifyParse("1234.5678", t3,
-      Decimal8Value(12345678L), StringParser::PARSE_UNDERFLOW);
+      Decimal8Value(1234567L), StringParser::PARSE_UNDERFLOW);
   VerifyParse("12345.678", t3,
       Decimal16Value(12345678L), StringParser::PARSE_SUCCESS);
   VerifyParse("-12345.678", t3,
@@ -212,7 +213,7 @@ TEST(StringToDecimal, LargeDecimals) {
   VerifyParse("123456.78", t3,
       Decimal16Value(12345678L), StringParser::PARSE_OVERFLOW);
   VerifyParse("1234.5678", t3,
-      Decimal16Value(12345678L), StringParser::PARSE_UNDERFLOW);
+      Decimal16Value(1234567L), StringParser::PARSE_UNDERFLOW);
 
   // Test max unscaled value for each of the decimal types.
   VerifyParse("999999999", ColumnType::CreateDecimalType(9, 0),

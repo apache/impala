@@ -72,6 +72,12 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, double val) {
   }
 }
 
+// Converting from one decimal type to another requires two steps.
+// - Converting between the decimal types (e.g. decimal8 -> decimal16)
+// - Adjusting the scale.
+// When going from a larger type to a smaller type, we need to adjust the scales first
+// (since it can reduce the magnitude of the value) to minimize cases where we overflow.
+
 inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type,
     const Decimal4Value& val) {
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
@@ -107,8 +113,8 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
   bool overflow = false;
   switch (e->type().GetByteSize()) {
     case 4: {
-      Decimal4Value val4 = Decimal8ToDecimal4(val, &overflow);
-      e->result_.decimal4_val = val4.ScaleTo(val_type, e->type(), &overflow);
+      Decimal8Value val8 = val.ScaleTo(val_type, e->type(), &overflow);
+      e->result_.decimal4_val = Decimal8ToDecimal4(val8, &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal4_val;
     }
@@ -133,21 +139,20 @@ inline void* DecimalOperators::SetDecimalVal(Expr* e, const ColumnType& val_type
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(val_type.type, TYPE_DECIMAL);
   bool overflow = false;
+  Decimal16Value val_scaled = val.ScaleTo(val_type, e->type(), &overflow);
   switch (e->type().GetByteSize()) {
     case 4: {
-      Decimal4Value val4 = Decimal16ToDecimal4(val, &overflow);
-      e->result_.decimal4_val = val4.ScaleTo(val_type, e->type(), &overflow);
+      e->result_.decimal4_val = Decimal16ToDecimal4(val_scaled, &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal4_val;
     }
     case 8: {
-      Decimal8Value val8 = Decimal16ToDecimal8(val, &overflow);
-      e->result_.decimal8_val = val8.ScaleTo(val_type, e->type(), &overflow);
+      e->result_.decimal8_val = Decimal16ToDecimal8(val_scaled, &overflow);
       if (overflow) return NULL;
       return &e->result_.decimal8_val;
     }
     case 16:
-      e->result_.decimal16_val = val.ScaleTo(val_type, e->type(), &overflow);
+      e->result_.decimal16_val = val_scaled;
       if (overflow) return NULL;
       return &e->result_.decimal16_val;
     default:
@@ -434,8 +439,13 @@ void* DecimalOperators::Cast_StringValue_decimal(Expr* e, TupleRow* row) {
       ptr = &e->result_.decimal16_val;
       break;
   }
-  if (result != StringParser::PARSE_SUCCESS) return NULL;
-  return ptr;
+  // Like all the cast functions, we return the truncated value on underflow and NULL
+  // on overflow.
+  // TODO: log warning on underflow.
+  if (result == StringParser::PARSE_SUCCESS || result == StringParser::PARSE_UNDERFLOW) {
+    return ptr;
+  }
+  return NULL;
 }
 
 void* DecimalOperators::Cast_decimal_StringValue(Expr* e, TupleRow* row) {

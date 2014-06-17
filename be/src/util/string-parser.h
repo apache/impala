@@ -96,7 +96,10 @@ class StringParser {
     return StringToBoolInternal(s + i, len - i, result);
   }
 
-  // Parses a decimal from s, storing the result in *v.
+  // Parses a decimal from s, returning the result.
+  // The parse status is returned in *result.
+  // On overflow or invalid values, the return value is undefined.
+  // On underflow, the truncated value is returned.
   template <typename T>
   static inline DecimalValue<T> StringToDecimal(const char* s, int len,
       const ColumnType& type, StringParser::ParseResult* result) {
@@ -125,13 +128,18 @@ class StringParser {
     int digits_before = 0;
     int digits_after = 0;
     bool dot_found = false;
+    bool underflow = false;
 
     for (int i = 0; i < len; ++i) {
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
         T digit = s[i] - '0';
         if (dot_found) {
-          ++digits_after;
-          decimal = decimal * 10 + digit;
+          if (digits_after < type.scale) {
+            ++digits_after;
+            decimal = decimal * 10 + digit;
+          } else {
+            underflow = true;
+          }
         } else {
           ++digits_before;
           decimal = decimal * 10 + digit;
@@ -149,23 +157,22 @@ class StringParser {
 
     // TODO: consider making the Int parsing keep track of digits as well.
     // It makes the overflow case much easier to think about.
-    if (UNLIKELY(digits_after > type.scale)) {
-      *result = StringParser::PARSE_UNDERFLOW;
-      return DecimalValue<T>();
-    }
     if (UNLIKELY(digits_before > type.precision - type.scale)) {
-      *result = StringParser::PARSE_OVERFLOW;
-      return DecimalValue<T>();
-    }
-    if (UNLIKELY(digits_before + digits_after > type.precision)) {
       *result = StringParser::PARSE_OVERFLOW;
       return DecimalValue<T>();
     }
 
     // Pad the decimal out with 0's. e.g. scale of 3 for the string
     // "1.1" should pad it out by 100 (as if the string was "1.100"
-    decimal *= DecimalUtil::GetScaleMultiplier<T>(type.scale - digits_after);
-    *result = StringParser::PARSE_SUCCESS;
+    if (digits_after < type.scale) {
+      decimal *= DecimalUtil::GetScaleMultiplier<T>(type.scale - digits_after);
+    }
+
+    if (underflow) {
+      *result = StringParser::PARSE_UNDERFLOW;
+    } else {
+      *result = StringParser::PARSE_SUCCESS;
+    }
     return DecimalValue<T>(negative ? -decimal : decimal);
   }
 

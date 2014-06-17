@@ -3790,6 +3790,15 @@ TEST_F(ExprTest, DecimalOverflowCasts) {
   TestDecimalValue("cast(123.4567890 as decimal(10,7))",
       Decimal8Value(1234567890L), ColumnType::CreateDecimalType(10, 7));
 
+  TestDecimalValue("cast(cast(\"123.01234567890123456789\" as decimal(23,20))\
+      as decimal(12,9))", Decimal8Value(123012345678L),
+      ColumnType::CreateDecimalType(12, 9));
+  TestDecimalValue("cast(cast(\"123.01234567890123456789\" as decimal(23,20))\
+      as decimal(4,1))", Decimal4Value(1230), ColumnType::CreateDecimalType(4, 1));
+
+  TestDecimalValue("cast(cast(\"123.0123456789\" as decimal(13,10))\
+      as decimal(5,2))", Decimal4Value(12301), ColumnType::CreateDecimalType(5, 2));
+
   // Overflow
   TestIsNull("cast(123.456 as decimal(2,0))", ColumnType::CreateDecimalType(2, 0));
   TestIsNull("cast(123.456 as decimal(2,1))", ColumnType::CreateDecimalType(2, 2));
