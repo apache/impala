@@ -84,6 +84,9 @@ struct TQueryOptions {
 
   // test hook to disable topn on the outermost select block.
   24: optional bool disable_outermost_topn = 0
+
+  // Override for initial memory reservation size if RM is enabled.
+  25: optional i64 rm_initial_mem = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

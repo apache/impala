@@ -135,8 +135,8 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
     return Status(GetHdfsErrorMsg("Failed to connect to HDFS."));
   }
 
-  mem_tracker_.reset(
-      new MemTracker(profile(), -1, profile()->name(), state->instance_mem_tracker()));
+  mem_tracker_.reset(new MemTracker(profile(), -1, -1, profile()->name(),
+      state->instance_mem_tracker()));
 
   rows_inserted_counter_ =
       ADD_COUNTER(profile(), "RowsInserted", TCounterType::UNIT);

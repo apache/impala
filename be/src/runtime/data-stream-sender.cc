@@ -391,8 +391,8 @@ Status DataStreamSender::Prepare(RuntimeState* state) {
 
   RETURN_IF_ERROR(Expr::Prepare(partition_exprs_, state, row_desc_));
 
-  mem_tracker_.reset(
-      new MemTracker(profile(), -1, "DataStreamSender", state->instance_mem_tracker()));
+  mem_tracker_.reset(new MemTracker(profile(), -1, -1, "DataStreamSender",
+      state->instance_mem_tracker()));
   bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
   uncompressed_bytes_counter_ =

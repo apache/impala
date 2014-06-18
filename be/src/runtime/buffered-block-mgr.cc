@@ -201,7 +201,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
     is_cancelled_(false),
     state_(state) {
   // Create a new mem_tracker and allocate buffers.
-  mem_tracker_.reset(new MemTracker(mem_limit, "Block Manager", parent));
+  mem_tracker_.reset(new MemTracker(mem_limit, -1, "Block Manager", parent));
   buffer_pool_.reset(new MemPool(mem_tracker_.get(), block_size));
   for (int i = 0; i < initial_num_buffers; ++i) {
     uint8_t* buffer = buffer_pool_->TryAllocate(block_size_);

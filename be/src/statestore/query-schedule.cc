@@ -91,15 +91,41 @@ int64_t QuerySchedule::GetClusterMemoryEstimate() const {
 
 int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
   // Precedence of different estimate sources is:
-  // query_options > defaults (if rm_always_use_defaults == true) > computed estimates
-  bool ignored;
-  int64_t per_host_mem = ParseUtil::ParseMemSpec(FLAGS_rm_default_memory,
-      &ignored);
+  // user-supplied RM query option >
+  //   server-side defaults (if rm_always_use_defaults == true) >
+  //     query option limit >
+  //       estimate >
+  //         server-side defaults (if rm_always_use_defaults == false)
+  int64_t query_option_memory_limit = numeric_limits<int64_t>::max();
+  bool has_query_option = false;
   if (query_options_.__isset.mem_limit && query_options_.mem_limit > 0) {
-    per_host_mem = max(1024L * 1024, query_options_.mem_limit);
-  } else if (!FLAGS_rm_always_use_defaults && request_.__isset.per_host_mem_req &&
-      request_.per_host_mem_req > 0) {
-    per_host_mem = request_.per_host_mem_req;
+    query_option_memory_limit = query_options_.mem_limit;
+    has_query_option = true;
+  }
+
+  int64_t estimate_limit = numeric_limits<int64_t>::max();
+  bool has_estimate = false;
+  if (request_.__isset.per_host_mem_req && request_.per_host_mem_req > 0) {
+    estimate_limit = request_.per_host_mem_req;
+    has_estimate = true;
+  }
+
+  int64_t per_host_mem = 0L;
+  if (query_options_.__isset.rm_initial_mem && query_options_.rm_initial_mem > 0) {
+    per_host_mem = query_options_.rm_initial_mem;
+  } else if (FLAGS_rm_always_use_defaults) {
+    bool ignored;
+    per_host_mem = ParseUtil::ParseMemSpec(FLAGS_rm_default_memory,
+        &ignored);
+  } else if (has_query_option) {
+    per_host_mem = query_option_memory_limit;
+  } else if (has_estimate) {
+    per_host_mem = estimate_limit;
+  } else {
+    // If no estimate or query option, use the server-side limits anyhow.
+    bool ignored;
+    per_host_mem = ParseUtil::ParseMemSpec(FLAGS_rm_default_memory,
+        &ignored);
   }
   // Cap the memory estimate at the amount of physical memory available. The user's
   // provided value or the estimate from planning can each be unreasonable.
@@ -109,13 +135,15 @@ int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
 
 int16_t QuerySchedule::GetPerHostVCores() const {
   // Precedence of different estimate sources is:
-  // query_options > defaults (if rm_always_use_defaults == true) > computed estimates
+  // server-side defaults (if rm_always_use_defaults == true) >
+  //   computed estimates
+  //     server-side defaults (if rm_always_use_defaults == false)
   int16_t v_cpu_cores = FLAGS_rm_default_cpu_vcores;
-  if (query_options_.__isset.v_cpu_cores && query_options_.v_cpu_cores > 0) {
+  if (!FLAGS_rm_always_use_defaults && query_options_.__isset.v_cpu_cores &&
+      query_options_.v_cpu_cores > 0) {
     v_cpu_cores = query_options_.v_cpu_cores;
-  } else if (request_.__isset.per_host_vcores && !FLAGS_rm_always_use_defaults) {
-    v_cpu_cores = request_.per_host_vcores;
   }
+
   return v_cpu_cores;
 }
 

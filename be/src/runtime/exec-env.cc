@@ -263,7 +263,7 @@ ExecEnv::~ExecEnv() {
 }
 
 Status ExecEnv::InitForFeTests() {
-  mem_tracker_.reset(new MemTracker(-1, "Process"));
+  mem_tracker_.reset(new MemTracker(-1, -1, "Process"));
   is_fe_tests_ = true;
   return Status::OK;
 }
@@ -309,7 +309,7 @@ Status ExecEnv::StartServices() {
 #ifndef ADDRESS_SANITIZER
   // Limit of -1 means no memory limit.
   mem_tracker_.reset(new MemTracker(TcmallocMetric::PHYSICAL_BYTES_RESERVED,
-                                    bytes_limit > 0 ? bytes_limit : -1, "Process"));
+      bytes_limit > 0 ? bytes_limit : -1, -1, "Process"));
 
   // Since tcmalloc does not free unused memory, we may exceed the process mem limit even
   // if Impala is not actually using that much memory. Add a callback to free any unused

@@ -52,7 +52,7 @@ TEST(MemTestTest, ConsumptionMetric) {
   Metrics::PrimitiveMetric<uint64_t> metric("test", 0);
   EXPECT_EQ(metric.value(), 0);
 
-  MemTracker t(&metric, 100, "");
+  MemTracker t(&metric, 100, -1, "");
   EXPECT_TRUE(t.has_limit());
   EXPECT_EQ(t.consumption(), 0);
 
@@ -91,8 +91,8 @@ TEST(MemTestTest, ConsumptionMetric) {
 
 TEST(MemTestTest, TrackerHierarchy) {
   MemTracker p(100);
-  MemTracker c1(80, "", &p);
-  MemTracker c2(50, "", &p);
+  MemTracker c1(80, -1, "", &p);
+  MemTracker c2(50, -1, "", &p);
 
   // everything below limits
   c1.Consume(60);
@@ -195,4 +195,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

@@ -18,6 +18,7 @@
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/foreach.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
@@ -48,7 +49,7 @@ DECLARE_bool(enable_rm);
 
 using namespace std;
 using namespace boost;
-
+using namespace strings;
 using namespace apache::thrift;
 
 namespace impala {
@@ -126,21 +127,35 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   // reservation or a query option.
   int64_t bytes_limit = -1;
-  if (request.__isset.reserved_resource && request.reserved_resource.memory_mb > 0) {
-    bytes_limit =
-        static_cast<int64_t>(request.reserved_resource.memory_mb) * 1024L * 1024L;
-    VLOG_QUERY << "Using query memory limit from resource reservation: "
-        << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
-  } else if (runtime_state_->query_options().__isset.mem_limit &&
+  if (runtime_state_->query_options().__isset.mem_limit &&
       runtime_state_->query_options().mem_limit > 0) {
     bytes_limit = runtime_state_->query_options().mem_limit;
     VLOG_QUERY << "Using query memory limit from query options: "
                << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
   }
 
+  int64_t rm_reservation_size_bytes = -1;
+  if (request.__isset.reserved_resource && request.reserved_resource.memory_mb > 0) {
+    rm_reservation_size_bytes =
+        static_cast<int64_t>(request.reserved_resource.memory_mb) * 1024L * 1024L;
+    // Queries that use more than the hard limit will be killed, so it's not useful to
+    // have a reservation larger than the hard limit. Clamp reservation bytes limit to the
+    // hard limit (if it exists).
+    if (rm_reservation_size_bytes > bytes_limit && bytes_limit != -1) {
+      runtime_state_->LogError(Substitute("Reserved resource size ($0) is larger than "
+          "query mem limit ($1), and will be restricted to $1. Configure the reservation "
+          "size by setting RM_INITIAL_MEM.",
+          PrettyPrinter::PrintBytes(rm_reservation_size_bytes),
+          PrettyPrinter::PrintBytes(bytes_limit)));
+      rm_reservation_size_bytes = bytes_limit;
+    }
+    VLOG_QUERY << "Using RM reservation memory limit from resource reservation: "
+               << PrettyPrinter::Print(rm_reservation_size_bytes, TCounterType::BYTES);
+  }
+
   DCHECK(!params.request_pool.empty());
   RETURN_IF_ERROR(runtime_state_->InitMemTrackers(query_id_, &params.request_pool,
-      bytes_limit));
+          bytes_limit, rm_reservation_size_bytes));
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();

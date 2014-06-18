@@ -139,7 +139,10 @@ enum TImpalaQueryOptions {
   DISABLE_CACHED_READS,
 
   // Temporary testing flag
-  DISABLE_OUTERMOST_TOPN
+  DISABLE_OUTERMOST_TOPN,
+
+  // Size of initial memory reservation when RM is enabled
+  RM_INITIAL_MEM
 }
 
 // The summary of an insert.

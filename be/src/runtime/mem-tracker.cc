@@ -41,8 +41,10 @@ AtomicInt<int64_t> MemTracker::released_memory_since_gc_;
 // Name for request pool MemTrackers. '$0' is replaced with the pool name.
 const string REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT = "RequestPool=$0";
 
-MemTracker::MemTracker(int64_t byte_limit, const string& label, MemTracker* parent)
+MemTracker::MemTracker(int64_t byte_limit, int64_t rm_reserved_limit, const string& label,
+    MemTracker* parent)
   : limit_(byte_limit),
+    rm_reserved_limit_(rm_reserved_limit),
     label_(label),
     parent_(parent),
     consumption_(&local_counter_),
@@ -60,9 +62,10 @@ MemTracker::MemTracker(int64_t byte_limit, const string& label, MemTracker* pare
 }
 
 MemTracker::MemTracker(
-    RuntimeProfile* profile, int64_t byte_limit,
+    RuntimeProfile* profile, int64_t byte_limit, int64_t rm_reserved_limit,
     const std::string& label, MemTracker* parent)
   : limit_(byte_limit),
+    rm_reserved_limit_(rm_reserved_limit),
     label_(label),
     parent_(parent),
     consumption_(profile->AddHighWaterMarkCounter(COUNTER_NAME, TCounterType::BYTES)),
@@ -80,8 +83,9 @@ MemTracker::MemTracker(
 }
 
 MemTracker::MemTracker(Metrics::PrimitiveMetric<uint64_t>* consumption_metric,
-                       int64_t byte_limit, const string& label)
+    int64_t byte_limit, int64_t rm_reserved_limit, const string& label)
   : limit_(byte_limit),
+    rm_reserved_limit_(rm_reserved_limit),
     label_(label),
     parent_(NULL),
     consumption_(&local_counter_),
@@ -98,6 +102,7 @@ MemTracker::MemTracker(Metrics::PrimitiveMetric<uint64_t>* consumption_metric,
 }
 
 void MemTracker::Init() {
+  DCHECK(rm_reserved_limit_ == -1 || limit_ == -1 || rm_reserved_limit_ <= limit_);
   // populate all_trackers_ and limit_trackers_
   MemTracker* tracker = this;
   while (tracker != NULL) {
@@ -133,7 +138,7 @@ MemTracker* MemTracker::GetRequestPoolMemTracker(const string& pool_name,
   } else {
     if (parent == NULL) return NULL;
     // First time this pool_name registered, make a new object.
-    MemTracker* tracker = new MemTracker(-1,
+    MemTracker* tracker = new MemTracker(-1, -1,
           Substitute(REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT, pool_name),
           parent);
     tracker->auto_unregister_ = true;
@@ -144,7 +149,7 @@ MemTracker* MemTracker::GetRequestPoolMemTracker(const string& pool_name,
 }
 
 shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
-    const TUniqueId& id, int64_t byte_limit, MemTracker* parent,
+    const TUniqueId& id, int64_t byte_limit, int64_t rm_reserved_limit, MemTracker* parent,
     QueryResourceMgr* res_mgr) {
   if (byte_limit != -1) {
     if (byte_limit > MemInfo::physical_mem()) {
@@ -170,7 +175,7 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
   } else {
     // First time this id registered, make a new object.  Give a shared ptr to
     // the caller and put a weak ptr in the map.
-    shared_ptr<MemTracker> tracker(new MemTracker(byte_limit,
+    shared_ptr<MemTracker> tracker(new MemTracker(byte_limit, rm_reserved_limit,
         Substitute("Query($0) Limit", lexical_cast<string>(id)), parent));
     tracker->auto_unregister_ = true;
     tracker->query_id_ = id;
@@ -281,13 +286,16 @@ void MemTracker::GcTcmalloc() {
 #endif
 }
 
-bool MemTracker::ExpandLimit(int64_t bytes) {
-  if (query_resource_mgr_ == NULL) return false;
+bool MemTracker::ExpandRmReservation(int64_t bytes) {
+  if (query_resource_mgr_ == NULL || rm_reserved_limit_ == -1) return false;
   // TODO: Make this asynchronous after IO mgr changes to use TryConsume() are done.
   lock_guard<mutex> l(resource_acquisition_lock_);
+  int64_t requested = consumption_->current_value() + bytes;
+  // Can't exceed the hard limit under any circumstance
+  if (requested >= limit_ && limit_ != -1) return false;
   // Test to see if we can satisfy the limit anyhow; maybe a different request was already
   // in flight.
-  if (consumption_->current_value() + bytes < limit_) return true;
+  if (requested < rm_reserved_limit_) return true;
 
   TResourceBrokerExpansionRequest exp;
   query_resource_mgr_->CreateExpansionRequest(max(1L, bytes / (1024 * 1024)), 0L, &exp);
@@ -305,9 +313,10 @@ bool MemTracker::ExpandLimit(int64_t bytes) {
   const llama::TAllocatedResource& resource =
       response.allocated_resources.begin()->second;
   DCHECK(resource.v_cpu_cores == 0L) << "Unexpected VCPUs returned by Llama";
+
   // Finally, check whether the allocation that we got took us over the limits for any of
   // our ancestors.
-  int64_t bytes_allocated = resource.memory_mb * 1024 * 1024;
+  int64_t bytes_allocated = resource.memory_mb * 1024L * 1024L;
   BOOST_FOREACH(const MemTracker* tracker, all_trackers_) {
     if (tracker == this) continue;
     if (tracker->consumption_->current_value() + bytes_allocated > tracker->limit_) {
@@ -316,7 +325,9 @@ bool MemTracker::ExpandLimit(int64_t bytes) {
     }
   }
 
-  limit_ += bytes_allocated;
+  rm_reserved_limit_ += bytes_allocated;
+  // Resource broker might give us more than we ask for
+  if (limit_ != -1) rm_reserved_limit_ = min(rm_reserved_limit_, limit_);
   return true;
 }
 

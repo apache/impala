@@ -62,18 +62,19 @@ class MemTracker {
  public:
   // byte_limit < 0 means no limit
   // 'label' is the label used in the usage string (LogUsage())
-  MemTracker(int64_t byte_limit = -1, const std::string& label = std::string(),
-             MemTracker* parent = NULL);
+  MemTracker(int64_t byte_limit = -1, int64_t rm_reserved_limit = -1,
+      const std::string& label = std::string(), MemTracker* parent = NULL);
 
   // C'tor for tracker for which consumption counter is created as part of a profile.
   // The counter is created with name COUNTER_NAME.
-  MemTracker(RuntimeProfile* profile, int64_t byte_limit,
-             const std::string& label = std::string(), MemTracker* parent = NULL);
+  MemTracker(RuntimeProfile* profile, int64_t byte_limit, int64_t rm_reserved_limit = -1,
+      const std::string& label = std::string(), MemTracker* parent = NULL);
 
   // C'tor for tracker that uses consumption_metric as the consumption value.
   // Consume()/Release() can still be called. This is used for the process tracker.
   MemTracker(Metrics::PrimitiveMetric<uint64_t>* consumption_metric,
-             int64_t byte_limit = -1, const std::string& label = std::string());
+      int64_t byte_limit = -1, int64_t rm_reserved_limit = -1,
+      const std::string& label = std::string());
 
   ~MemTracker();
 
@@ -89,7 +90,8 @@ class MemTracker {
   // byte_limit and parent must be the same for all GetMemTracker() calls with the
   // same id.
   static boost::shared_ptr<MemTracker> GetQueryMemTracker(const TUniqueId& id,
-      int64_t byte_limit, MemTracker* parent, QueryResourceMgr* res_mgr);
+      int64_t byte_limit, int64_t rm_reserved_limit, MemTracker* parent,
+      QueryResourceMgr* res_mgr);
 
   // Returns a MemTracker object for request pool 'pool_name'. Calling this with the same
   // 'pool_name' will return the same MemTracker object. This is used to track the local
@@ -100,6 +102,14 @@ class MemTracker {
   // created trackers will always have a limit of -1.
   static MemTracker* GetRequestPoolMemTracker(const std::string& pool_name,
       MemTracker* parent);
+
+  // Returns the minimum of limit and rm_reserved_limit
+  int64_t effective_limit() const {
+    // TODO: maybe no limit should be MAX_LONG?
+    DCHECK(rm_reserved_limit_ <= limit_ || limit_ == -1);
+    if (rm_reserved_limit_ == -1) return limit_;
+    return rm_reserved_limit_;
+  }
 
   // Increases consumption of this tracker and its ancestors by 'bytes'.
   void Consume(int64_t bytes) {
@@ -124,11 +134,6 @@ class MemTracker {
     }
   }
 
-  // Try to expand the limit (by asking the resource broker for more memory) by at least
-  // 'bytes'. Returns false if not possible, true if the request succeeded. May allocate
-  // more memory than was requested.
-  bool ExpandLimit(int64_t bytes);
-
   // Increases consumption of this tracker and its ancestors by 'bytes' only if
   // they can all consume 'bytes'. If this brings any of them over, none of them
   // are updated.
@@ -141,16 +146,19 @@ class MemTracker {
     // Walk the tracker tree top-down, to avoid expanding a limit on a child whose parent
     // won't accommodate the change.
     for (i = all_trackers_.size() - 1; i >= 0; --i) {
-      if (all_trackers_[i]->limit_ < 0) {
-        all_trackers_[i]->consumption_->Update(bytes);
+      MemTracker* tracker = all_trackers_[i];
+      int64_t limit = tracker->effective_limit();
+      if (limit < 0) {
+        tracker->consumption_->Update(bytes);
       } else {
-        if (!all_trackers_[i]->consumption_->TryUpdate(bytes, all_trackers_[i]->limit_)) {
+        if (!tracker->consumption_->TryUpdate(bytes, limit)) {
           // One of the trackers failed, attempt to GC memory or expand our limit. If that
           // succeeds, TryUpdate() again. Bail if either fails.
-          if (!all_trackers_[i]->GcMemory(all_trackers_[i]->limit_ - bytes) ||
-              all_trackers_[i]->ExpandLimit(bytes)) {
-            if (!all_trackers_[i]->consumption_->TryUpdate(
-                bytes, all_trackers_[i]->limit_)) break;
+          //
+          // TODO: This may not be right if more than one tracker can actually change its
+          // rm reservation limit.
+          if (!tracker->GcMemory(limit - bytes) || tracker->ExpandRmReservation(bytes)) {
+            if (!tracker->consumption_->TryUpdate(bytes, tracker->limit_)) break;
           } else {
             break;
           }
@@ -315,6 +323,11 @@ class MemTracker {
   static std::string LogUsage(const std::string& prefix,
       const std::list<MemTracker*>& trackers);
 
+  // Try to expand the limit (by asking the resource broker for more memory) by at least
+  // 'bytes'. Returns false if not possible, true if the request succeeded. May allocate
+  // more memory than was requested.
+  bool ExpandRmReservation(int64_t bytes);
+
   // Size, in bytes, that is considered a large value for Release() (or Consume() with
   // a negative value). If tcmalloc is used, this can trigger it to GC.
   // A higher value will make us call into tcmalloc less often (and therefore more
@@ -351,7 +364,15 @@ class MemTracker {
   // Only valid for MemTrackers returned from GetRequestPoolMemTracker()
   std::string pool_name_;
 
-  int64_t limit_;  // in bytes; < 0: no limit
+  // Hard limit on memory consumption, in bytes. May not be exceeded. If limit_ == -1,
+  // there is no consumption limit.
+  int64_t limit_;
+
+  // If > -1, when RM is enabled this is the limit after which this memtracker needs to
+  // acquire more memory from Llama.
+  // This limit is always less than or equal to the hard limit.
+  int64_t rm_reserved_limit_;
+
   std::string label_;
   MemTracker* parent_;
 
@@ -393,7 +414,8 @@ class MemTracker {
   // If true, log the stack as well.
   bool log_stack_;
 
-  // Lock is taken during ExpandLimit() to prevent concurrent acquisition of new resources.
+  // Lock is taken during ExpandRmReservation() to prevent concurrent acquisition of new
+  // resources.
   boost::mutex resource_acquisition_lock_;
 
   // If non-NULL, contains all the information required to expand resource reservations if

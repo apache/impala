@@ -218,8 +218,8 @@ class MemPoolTest {
 
 TEST(MemPoolTest, Limits) {
   MemTracker limit3(320);
-  MemTracker limit1(160, "", &limit3);
-  MemTracker limit2(240, "", &limit3);
+  MemTracker limit1(160, -1, "", &limit3);
+  MemTracker limit2(240, -1, "", &limit3);
 
   MemPool* p1 = new MemPool(&limit1, 80);
   EXPECT_FALSE(limit1.AnyLimitExceeded());
@@ -289,4 +289,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

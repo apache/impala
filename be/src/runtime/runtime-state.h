@@ -85,7 +85,7 @@ class RuntimeState {
   // tracker (in the fifth level). If 'request_pool' is null, no request pool mem
   // tracker is set up, i.e. query pools will have the process mem pool as the parent.
   Status InitMemTrackers(const TUniqueId& query_id, const std::string* request_pool,
-      int64_t query_bytes_limit);
+      int64_t query_bytes_limit, int64_t query_rm_reservation_limit_bytes = -1);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }

@@ -123,7 +123,7 @@ Status ExecNode::Prepare(RuntimeState* state) {
   rows_returned_counter_ =
       ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
   mem_tracker_.reset(new MemTracker(
-      runtime_profile_.get(), -1, runtime_profile_->name(),
+      runtime_profile_.get(), -1, -1, runtime_profile_->name(),
       state->instance_mem_tracker()));
 
   rows_returned_rate_ = runtime_profile()->AddDerivedCounter(

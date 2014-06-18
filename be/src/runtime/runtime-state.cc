@@ -127,22 +127,22 @@ Status RuntimeState::Init(ExecEnv* exec_env) {
   return Status::OK;
 }
 
-Status RuntimeState::InitMemTrackers(const TUniqueId& query_id,
-    const string* pool_name, int64_t query_bytes_limit) {
+Status RuntimeState::InitMemTrackers(const TUniqueId& query_id, const string* pool_name,
+    int64_t query_bytes_limit, int64_t query_rm_reservation_limit_bytes) {
   MemTracker* query_parent_tracker = exec_env_->process_mem_tracker();
   if (pool_name != NULL) {
     query_parent_tracker = MemTracker::GetRequestPoolMemTracker(*pool_name,
         query_parent_tracker);
   }
   query_mem_tracker_ =
-      MemTracker::GetQueryMemTracker(query_id, query_bytes_limit, query_parent_tracker,
-          query_resource_mgr());
-  instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1,
+      MemTracker::GetQueryMemTracker(query_id, query_bytes_limit,
+          query_rm_reservation_limit_bytes, query_parent_tracker, query_resource_mgr());
+  instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1, -1,
       runtime_profile()->name(), query_mem_tracker_.get()));
 
   // TODO: this is a stopgap until we implement ExprContext
   udf_mem_tracker_.reset(
-      new MemTracker(-1, "UDFs", instance_mem_tracker_.get()));
+      new MemTracker(-1, -1, "UDFs", instance_mem_tracker_.get()));
   udf_pool_.reset(new MemPool(udf_mem_tracker_.get()));
   return Status::OK;
 }

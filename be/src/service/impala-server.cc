@@ -977,6 +977,18 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         query_options->__set_disable_outermost_topn(
             iequals(value, "true") || iequals(value, "1"));
         break;
+      case TImpalaQueryOptions::RM_INITIAL_MEM: {
+        bool is_percent;
+        int64_t reservation_size = ParseUtil::ParseMemSpec(value, &is_percent);
+        if (reservation_size < 0) {
+          return Status("Failed to parse mem limit from '" + value + "'.");
+        }
+        if (is_percent) {
+          return Status("Invalid RM memory limit with percent '" + value + "'.");
+        }
+        query_options->__set_rm_initial_mem(reservation_size);
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1255,6 +1267,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::DISABLE_OUTERMOST_TOPN:
         val << query_option.disable_outermost_topn;
+        break;
+      case TImpalaQueryOptions::RM_INITIAL_MEM:
+        val << query_option.rm_initial_mem;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
