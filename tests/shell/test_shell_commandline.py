@@ -149,7 +149,7 @@ class TestImpalaShell(object):
     args = ('-q "set abort_on_error=false;'
         ' select count(*) from functional_seq_snap.bad_seq_snap" --quiet')
     result = run_impala_shell_cmd(args)
-    assert 'ERRORS:' in result.stderr
+    assert 'WARNINGS:' in result.stderr
     assert 'Bad synchronization marker' in result.stderr
     assert 'Expected: ' in result.stderr
     assert 'Actual: ' in result.stderr
@@ -258,7 +258,7 @@ class TestImpalaShell(object):
     # Query with fetch
     args = '-q "select * from functional.alltypeserror"'
     result = run_impala_shell_cmd(args)
-    assert result.stderr.count('ERRORS') == 1
+    assert result.stderr.count('WARNINGS') == 1
 
     # Insert query (doesn't fetch)
     INSERT_TBL = "alltypes_get_log"
@@ -269,7 +269,7 @@ class TestImpalaShell(object):
     args = '-q "insert overwrite %s.%s partition(year, month)' \
            'select * from functional.alltypeserror"' % (TEST_DB, INSERT_TBL)
     result = run_impala_shell_cmd(args)
-    assert result.stderr.count('ERRORS') == 1
+    assert result.stderr.count('WARNINGS') == 1
     run_impala_shell_cmd(DROP_ARGS)
 
 class ImpalaShellResult(object):

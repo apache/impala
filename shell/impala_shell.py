@@ -759,7 +759,7 @@ class ImpalaShell(cmd.Cmd):
         break
       elif query_state == self.query_state["EXCEPTION"]:
         if self.connected:
-          self.__print_error_log()
+          self.__print_warning_log()
           # Close the query handle even if it's an insert.
           return self.__close_query()
         else:
@@ -769,15 +769,15 @@ class ImpalaShell(cmd.Cmd):
       time.sleep(self.__get_sleep_interval(loop_start))
 
     if is_insert:
-      self.__print_error_log()
+      self.__print_warning_log()
       return self.__close_insert(query, start_time)
     return self.__fetch(query, start_time)
 
   def __fetch(self, query, start_time):
-    """Wrapper around __fetch_internal that ensures that __print_error_log() and
+    """Wrapper around __fetch_internal that ensures that __print_warning_log() and
     __close_query() are called."""
     result = self.__fetch_internal(query, start_time)
-    self.__print_error_log()
+    self.__print_warning_log()
     close_result = self.__close_query()
     return result and close_result
 
@@ -901,14 +901,14 @@ class ImpalaShell(cmd.Cmd):
       return db_table_name
 
 
-  def __print_error_log(self):
+  def __print_warning_log(self):
     rpc_result = self.__do_rpc(
         lambda: self.imp_service.get_log(self.last_query_handle.log_context))
     log, status = rpc_result.get_results()
     if status != RpcStatus.OK:
       print_to_stderr("Failed to get error log: %s" % status)
     if log and log.strip():
-      print_to_stderr("ERRORS: %s" % log)
+      print_to_stderr("WARNINGS: %s" % log)
 
   def do_alter(self, args):
     return self.__execute_query(self.__create_beeswax_query("alter %s" % args))
