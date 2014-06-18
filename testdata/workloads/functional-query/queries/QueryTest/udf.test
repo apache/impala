@@ -343,7 +343,7 @@ decimal
 ====
 ---- QUERY
 # More complicated arguments
-select native_function_test.var_sum(
+select var_sum(
     cast(1 as decimal(4,2)), cast(2 as decimal(4,2)),
     cast(3 as decimal(3,2)) + cast("1.1" as decimal(3,2)));
 ---- TYPES
