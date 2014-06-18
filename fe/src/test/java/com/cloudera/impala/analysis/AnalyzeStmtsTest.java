@@ -869,6 +869,21 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select string_col a, int_col A from " +
         "functional.alltypessmall order by a limit 1",
         "Column a in order clause is ambiguous");
+
+    // Test if an ignored order by produces the expected warning.
+    String warning = "Ignoring ORDER BY clause without LIMIT or OFFSET ";
+    String selectWarning = warning + "in nested query, view or union operand";
+    AnalyzesOk("select * from (select * from functional.alltypes order by int_col) A",
+        selectWarning + ": ORDER BY int_col ASC");
+    AnalyzesOk("select * from functional.alltypes order by int_col desc union all " +
+        "select * from functional.alltypes", selectWarning + ": ORDER BY int_col DESC");
+    String dmlWarning = warning + "in INSERT/CTAS";
+    AnalyzesOk("insert into functional.alltypes partition (year, month) " +
+        "select * from functional.alltypes order by int_col",
+        dmlWarning + ": ORDER BY int_col ASC");
+    AnalyzesOk("create table functional.alltypescopy as " +
+        "select * from functional.alltypes order by int_col",
+        dmlWarning + ": ORDER BY int_col ASC");
   }
 
   @Test

@@ -152,6 +152,22 @@ public abstract class QueryStmt extends StatementBase {
     if (!hasLimit() && !hasOffset() &&
         (!analyzer.isRootAnalyzer() || analyzer.isInsertStmt())) {
       evaluateOrderBy_ = false;
+      // Return a warning of the form:
+      // Ignoring order by ... <reason>: <order by clause>
+      StringBuilder strBuilder = new StringBuilder();
+      strBuilder.append("Ignoring ORDER BY clause without LIMIT or OFFSET ");
+      if (!analyzer.isRootAnalyzer()) {
+        strBuilder.append("in nested query, view or union operand");
+      } else {
+        Preconditions.checkState(analyzer.isInsertStmt());
+        strBuilder.append("in INSERT/CTAS");
+      }
+      strBuilder.append(": ORDER BY ");
+      strBuilder.append(orderByElements_.get(0).toSql());
+      for (int i = 1; i < orderByElements_.size(); ++i) {
+        strBuilder.append(", ").append(orderByElements_.get(i).toSql());
+      }
+      analyzer.addWarning(strBuilder.toString());
     } else {
       evaluateOrderBy_ = true;
     }

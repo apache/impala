@@ -162,19 +162,46 @@ public class AnalyzerTest {
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    */
   public ParseNode AnalyzesOk(String stmt) {
-    return AnalyzesOk(stmt, createAnalyzer(Catalog.DEFAULT_DB));
+    return AnalyzesOk(stmt, createAnalyzer(Catalog.DEFAULT_DB), null);
+  }
+
+  /**
+   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
+   * If 'expectedWarning' is not null, asserts that a warning is produced.
+   */
+  public ParseNode AnalyzesOk(String stmt, String expectedWarning) {
+    return AnalyzesOk(stmt, createAnalyzer(Catalog.DEFAULT_DB), expectedWarning);
   }
 
   /**
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    */
   public ParseNode AnalyzesOk(String stmt, Analyzer analyzer) {
+    return AnalyzesOk(stmt, analyzer, null);
+  }
+
+  /**
+   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
+   * If 'expectedWarning' is not null, asserts that a warning is produced.
+   */
+  public ParseNode AnalyzesOk(String stmt, Analyzer analyzer, String expectedWarning) {
     this.analyzer_ = analyzer;
     LOG.info("analyzing " + stmt);
     ParseNode node = ParsesOk(stmt);
     assertNotNull(node);
     try {
       node.analyze(analyzer);
+      if (expectedWarning != null) {
+        List<String> actualWarnings = analyzer.getWarnings();
+        boolean matchedWarning = false;
+        for (String actualWarn: actualWarnings) {
+          if (actualWarn.startsWith(expectedWarning)) {
+            matchedWarning = true;
+            break;
+          }
+        }
+        if (!matchedWarning) fail("Did not produce expected warning " + expectedWarning);
+      }
     } catch (ImpalaException e) {
       e.printStackTrace();
       fail("Error:\n" + e.toString());
