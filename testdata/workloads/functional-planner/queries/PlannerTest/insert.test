@@ -282,14 +282,14 @@ select 100, false, 1, 1, 1, 10,
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=1
 |
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=1
 |
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ====
 # dynamic partition insert from a constant select
 insert into table functional.alltypessmall
@@ -300,14 +300,14 @@ select 100, false, 1, 1, 1, 10,
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=1
 |
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=1
 |
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ====
 # static partition insert from values statement
 insert into table functional.alltypessmall
@@ -319,14 +319,14 @@ partition (year=2010, month=4) values
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=1
 |
-00:MERGE
-   constant-selects=3
+00:UNION
+   constant-operands=3
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=1
 |
-00:MERGE
-   constant-selects=3
+00:UNION
+   constant-operands=3
 ====
 # dynamic partition insert from values statement
 insert into table functional.alltypessmall
@@ -338,14 +338,14 @@ partition (year, month) values
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=9
 |
-00:MERGE
-   constant-selects=3
+00:UNION
+   constant-operands=3
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2010,4)]
 |  partitions=9
 |
-00:MERGE
-   constant-selects=3
+00:UNION
+   constant-operands=3
 ====
 # test static partition insert from a query with grouped aggregation
 # we expect the insert fragment to be partitioned by the grouping exprs of the query stmt

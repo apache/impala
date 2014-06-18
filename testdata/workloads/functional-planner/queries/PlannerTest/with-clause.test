@@ -26,41 +26,41 @@ with t1 as (select int_col x, bigint_col y from functional.alltypes),
 t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
 select x, y from t2
 ---- PLAN
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ====
 # Multiple views in with-clause. All views are used in a union.
 with t1 as (select int_col x, bigint_col y from functional.alltypes),
 t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
 select * from t1 union all select * from t2 union all select * from t3
 ---- PLAN
-00:MERGE
+00:UNION
 |
-|--03:MERGE
-|     constant-selects=2
+|--03:UNION
+|     constant-operands=2
 |
-|--02:MERGE
-|     constant-selects=1
+|--02:UNION
+|     constant-operands=1
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 06:EXCHANGE [UNPARTITIONED]
 |
-00:MERGE
+00:UNION
 |
 |--05:EXCHANGE [RANDOM]
 |  |
-|  03:MERGE
-|     constant-selects=2
+|  03:UNION
+|     constant-operands=2
 |
 |--04:EXCHANGE [RANDOM]
 |  |
-|  02:MERGE
-|     constant-selects=1
+|  02:UNION
+|     constant-operands=1
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -360,24 +360,24 @@ with t1 as (values('a', 'b'))
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
 |
-00:MERGE
+00:UNION
 |
-|--02:MERGE
-|     constant-selects=1
+|--02:UNION
+|     constant-operands=1
 |
-01:MERGE
-   constant-selects=1
+01:UNION
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
 |
-00:MERGE
+00:UNION
 |
-|--02:MERGE
-|     constant-selects=1
+|--02:UNION
+|     constant-operands=1
 |
-01:MERGE
-   constant-selects=1
+01:UNION
+   constant-operands=1
 ====
 # Multiple with clauses. One for the UnionStmt and one for each union operand.
 with t1 as (values('a', 'b'))
@@ -387,24 +387,24 @@ with t1 as (values('a', 'b'))
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
 |
-00:MERGE
+00:UNION
 |
-|--02:MERGE
-|     constant-selects=1
+|--02:UNION
+|     constant-operands=1
 |
-01:MERGE
-   constant-selects=1
+01:UNION
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
 03:TOP-N [LIMIT=1]
 |  order by: 'c' ASC
 |
-00:MERGE
+00:UNION
 |
-|--02:MERGE
-|     constant-selects=1
+|--02:UNION
+|     constant-operands=1
 |
-01:MERGE
-   constant-selects=1
+01:UNION
+   constant-operands=1
 ====
 # Test with clause in an insert statement.
 with t1 as (select * from functional.alltypestiny)
@@ -433,7 +433,7 @@ select * from t1 union all select * from t2
 WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=16
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
@@ -446,7 +446,7 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
 |
 03:EXCHANGE [HASH(year,month)]
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B

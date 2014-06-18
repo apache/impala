@@ -274,7 +274,7 @@ order by int_col desc limit 10 offset 5
 03:TOP-N [LIMIT=10 OFFSET=5]
 |  order by: int_col DESC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -290,7 +290,7 @@ order by int_col desc limit 10 offset 5
 03:TOP-N [LIMIT=15]
 |  order by: int_col DESC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -311,7 +311,7 @@ order by int_col desc limit 10 offset 5
 03:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -335,7 +335,7 @@ order by int_col desc limit 10 offset 5
 03:AGGREGATE
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -374,7 +374,7 @@ order by int_col limit 10
 03:TOP-N [LIMIT=10]
 |  order by: int_col ASC
 |
-00:MERGE
+00:UNION
 |  limit: 10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
@@ -389,7 +389,7 @@ order by int_col limit 10
 04:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
-00:MERGE
+00:UNION
 |  limit: 10
 |
 |--02:SCAN HDFS [functional.alltypessmall]

@@ -187,7 +187,7 @@ order by int_col desc offset 5
 03:SORT
 |  order by: int_col DESC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -202,7 +202,7 @@ order by int_col desc offset 5
 03:SORT
 |  order by: int_col DESC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -223,7 +223,7 @@ order by int_col desc offset 5
 03:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -246,7 +246,7 @@ order by int_col desc offset 5
 03:AGGREGATE
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -477,7 +477,7 @@ order by 1
 05:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-00:MERGE
+00:UNION
 |
 |--04:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 size=115B
@@ -505,7 +505,7 @@ order by 1
 05:AGGREGATE
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
-00:MERGE
+00:UNION
 |
 |--04:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 size=115B
@@ -531,12 +531,12 @@ order by 1,2
 07:SORT
 |  order by: id ASC, bool_col ASC
 |
-04:MERGE
+04:UNION
 |
 |--03:AGGREGATE [FINALIZE]
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  |
-|  00:MERGE
+|  00:UNION
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
 |  |     partitions=1/4 size=115B
@@ -556,7 +556,7 @@ order by 1,2
 07:SORT
 |  order by: id ASC, bool_col ASC
 |
-04:MERGE
+04:UNION
 |
 |--09:AGGREGATE [MERGE FINALIZE]
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
@@ -566,7 +566,7 @@ order by 1,2
 |  03:AGGREGATE
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  |
-|  00:MERGE
+|  00:UNION
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
 |  |     partitions=1/4 size=115B
@@ -604,17 +604,17 @@ order by 12, 13, 1
 16:SORT
 |  order by: year ASC, month ASC, id ASC
 |
-09:MERGE
+09:UNION
 |
 |--08:AGGREGATE [FINALIZE]
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  |
-|  00:MERGE
+|  00:UNION
 |  |
 |  |--07:TOP-N [LIMIT=3]
 |  |  |  order by: id ASC
 |  |  |
-|  |  04:MERGE
+|  |  04:UNION
 |  |  |
 |  |  |--06:SCAN HDFS [functional.alltypestiny]
 |  |  |     partitions=1/4 size=115B
@@ -634,7 +634,7 @@ order by 12, 13, 1
 |--15:TOP-N [LIMIT=3]
 |  |  order by: id ASC
 |  |
-|  12:MERGE
+|  12:UNION
 |  |
 |  |--14:SCAN HDFS [functional.alltypestiny]
 |  |     partitions=0/4 size=0B
@@ -654,7 +654,7 @@ order by 12, 13, 1
 16:SORT
 |  order by: year ASC, month ASC, id ASC
 |
-09:MERGE
+09:UNION
 |
 |--21:AGGREGATE [MERGE FINALIZE]
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
@@ -664,7 +664,7 @@ order by 12, 13, 1
 |  08:AGGREGATE
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  |
-|  00:MERGE
+|  00:UNION
 |  |
 |  |--19:EXCHANGE [RANDOM]
 |  |  |
@@ -675,7 +675,7 @@ order by 12, 13, 1
 |  |  07:TOP-N [LIMIT=3]
 |  |  |  order by: id ASC
 |  |  |
-|  |  04:MERGE
+|  |  04:UNION
 |  |  |
 |  |  |--06:SCAN HDFS [functional.alltypestiny]
 |  |  |     partitions=1/4 size=115B
@@ -701,7 +701,7 @@ order by 12, 13, 1
 |  15:TOP-N [LIMIT=3]
 |  |  order by: id ASC
 |  |
-|  12:MERGE
+|  12:UNION
 |  |
 |  |--14:SCAN HDFS [functional.alltypestiny]
 |  |     partitions=0/4 size=0B
@@ -754,7 +754,7 @@ order by int_col
 03:TOP-N [LIMIT=10]
 |  order by: bigint_col ASC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -772,7 +772,7 @@ order by int_col
 03:TOP-N [LIMIT=10]
 |  order by: bigint_col ASC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -849,7 +849,7 @@ select * from functional.alltypes
    union all
 select * from functional.alltypessmall order by bigint_col
 ---- PLAN
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -859,7 +859,7 @@ select * from functional.alltypessmall order by bigint_col
 ---- DISTRIBUTEDPLAN
 03:EXCHANGE [UNPARTITIONED]
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -875,7 +875,7 @@ select * from functional.alltypes
 03:SORT
 |  order by: bigint_col ASC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -889,7 +889,7 @@ select * from functional.alltypes
 03:SORT
 |  order by: bigint_col ASC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 size=6.32KB
@@ -909,7 +909,7 @@ order by int_col offset 5
 06:AGGREGATE [FINALIZE]
 |  group by: int_col
 |
-00:MERGE
+00:UNION
 |
 |--05:TOP-N [LIMIT=10 OFFSET=5]
 |  |  order by: int_col ASC
@@ -941,7 +941,7 @@ order by int_col offset 5
 06:AGGREGATE
 |  group by: int_col
 |
-00:MERGE
+00:UNION
 |
 |--11:EXCHANGE [RANDOM]
 |  |
@@ -1009,7 +1009,7 @@ order by x
 06:TOP-N [LIMIT=100]
 |  order by: bigint_col ASC
 |
-00:MERGE
+00:UNION
 |
 |--05:TOP-N [LIMIT=100]
 |  |  order by: int_col ASC
@@ -1046,7 +1046,7 @@ order by x
 06:TOP-N [LIMIT=100]
 |  order by: bigint_col ASC
 |
-00:MERGE
+00:UNION
 |
 |--15:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: int_col ASC
@@ -1087,7 +1087,7 @@ order by bigint_col limit 10) A
 03:TOP-N [LIMIT=10]
 |  order by: bigint_col ASC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypesagg]
 |     partitions=10/10 size=743.67KB
@@ -1102,7 +1102,7 @@ order by bigint_col limit 10) A
 03:TOP-N [LIMIT=10]
 |  order by: bigint_col ASC
 |
-00:MERGE
+00:UNION
 |
 |--02:SCAN HDFS [functional.alltypesagg]
 |     partitions=10/10 size=743.67KB

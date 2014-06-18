@@ -153,7 +153,7 @@ public class PlanFragment {
     if (node instanceof ScanNode || node instanceof ExchangeNode) {
       // nothing to propagate for leaves
       return;
-    } else if (node instanceof AggregationNode || node instanceof MergeNode) {
+    } else if (node instanceof AggregationNode || node instanceof UnionNode) {
       for (PlanNode child: node.getChildren()) {
         // row composition changes at an aggregation node
         setRowTupleIds(child, null);

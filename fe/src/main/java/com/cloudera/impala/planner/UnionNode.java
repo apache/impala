@@ -26,20 +26,18 @@ import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
-import com.cloudera.impala.thrift.TMergeNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TUnionNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
  * Node that merges the results of its child plans by materializing
- * the corresponding result exprs.
- * If no result exprs are specified for a child, it simply passes on the child's
- * results.
+ * the corresponding result exprs into a new tuple.
  */
-public class MergeNode extends PlanNode {
-  private final static Logger LOG = LoggerFactory.getLogger(MergeNode.class);
+public class UnionNode extends PlanNode {
+  private final static Logger LOG = LoggerFactory.getLogger(UnionNode.class);
 
   // Expr lists corresponding to the input query stmts.
   // The ith resultExprList belongs to the ith child.
@@ -56,8 +54,8 @@ public class MergeNode extends PlanNode {
 
   protected final TupleId tupleId_;
 
-  protected MergeNode(PlanNodeId id, TupleId tupleId) {
-    super(id, Lists.newArrayList(tupleId), "MERGE");
+  protected UnionNode(PlanNodeId id, TupleId tupleId) {
+    super(id, Lists.newArrayList(tupleId), "UNION");
     rowTupleIds_.add(tupleId);
     tupleId_ = tupleId;
   }
@@ -88,18 +86,18 @@ public class MergeNode extends PlanNode {
         cardinality_ += child.cardinality_;
       }
     }
-    // The number of nodes of a merge node is -1 (invalid) if all the referenced tables
+    // The number of nodes of a union node is -1 (invalid) if all the referenced tables
     // are inline views (e.g. select 1 FROM (VALUES(1 x, 1 y)) a FULL OUTER JOIN
     // (VALUES(1 x, 1 y)) b ON (a.x = b.y)). We need to set the correct value.
     if (numNodes_ == -1) numNodes_ = 1;
 
-    LOG.debug("stats Merge: cardinality=" + Long.toString(cardinality_));
+    LOG.debug("stats Union: cardinality=" + Long.toString(cardinality_));
   }
 
   /**
    * Must be called after addChild()/addConstExprList(). Computes the materialized
-   * result/const expr lists based on the materialized slots of this MergeNode's
-   * produced tuple. The MergeNode doesn't need an smap: like a ScanNode, it
+   * result/const expr lists based on the materialized slots of this UnionNode's
+   * produced tuple. The UnionNode doesn't need an smap: like a ScanNode, it
    * materializes an original tuple.
    */
   @Override
@@ -107,7 +105,7 @@ public class MergeNode extends PlanNode {
     assignConjuncts(analyzer);
     // All non-constant conjuncts should have been assigned to children.
     // This requirement is important to guarantee that conjuncts do not trigger
-    // materialization of slots in this MergeNode's tuple.
+    // materialization of slots in this UnionNode's tuple.
     // TODO: It's possible to get constant conjuncts if a union operand
     // consists of a select stmt on a constant inline view. We should
     // drop the operand in such cases.
@@ -153,8 +151,8 @@ public class MergeNode extends PlanNode {
     for (List<Expr> constTexprList: materializedConstExprLists_) {
       constTexprLists.add(Expr.treesToThrift(constTexprList));
     }
-    msg.merge_node = new TMergeNode(tupleId_.asInt(), texprLists, constTexprLists);
-    msg.node_type = TPlanNodeType.MERGE_NODE;
+    msg.union_node = new TUnionNode(tupleId_.asInt(), texprLists, constTexprLists);
+    msg.node_type = TPlanNodeType.UNION_NODE;
   }
 
   @Override
@@ -162,13 +160,13 @@ public class MergeNode extends PlanNode {
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(String.format("%s%s:%s\n", prefix, id_.toString(), displayName_));
-    // A MergeNode may have predicates if a union is used inside an inline view,
+    // A UnionNode may have predicates if a union is used inside an inline view,
     // and the enclosing select stmt has predicates referring to the inline view.
     if (!conjuncts_.isEmpty()) {
       output.append(detailPrefix + "predicates: " + getExplainString(conjuncts_) + "\n");
     }
     if (!constExprLists_.isEmpty()) {
-      output.append(detailPrefix + "constant-selects=" + constExprLists_.size() + "\n");
+      output.append(detailPrefix + "constant-operands=" + constExprLists_.size() + "\n");
     }
     return output.toString();
   }

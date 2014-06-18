@@ -263,8 +263,8 @@ public class Planner {
           perNodeMemLimit, fragments, analyzer);
     } else if (root instanceof SelectNode) {
       result = createSelectNodeFragment((SelectNode) root, childFragments, analyzer);
-    } else if (root instanceof MergeNode) {
-      result = createMergeNodeFragment((MergeNode) root, childFragments, fragments,
+    } else if (root instanceof UnionNode) {
+      result = createUnionNodeFragment((UnionNode) root, childFragments, fragments,
           analyzer);
     } else if (root instanceof AggregationNode) {
       result = createAggregationFragment(
@@ -593,27 +593,27 @@ public class Planner {
   }
 
   /**
-   * Returns a new fragment with a MergeNode as its root. The data partition of the
+   * Returns a new fragment with a UnionNode as its root. The data partition of the
    * returned fragment and how the data of the child fragments is consumed depends on the
    * data partitions of the child fragments:
    * - All child fragments are unpartitioned or partitioned: The returned fragment has an
-   *   UNPARTITIONED or RANDOM data partition, respectively. The MergeNode absorbs the
+   *   UNPARTITIONED or RANDOM data partition, respectively. The UnionNode absorbs the
    *   plan trees of all child fragments.
    * - Mixed partitioned/unpartitioned child fragments: The returned fragment is
    *   RANDOM partitioned. The plan trees of all partitioned child fragments are absorbed
-   *   into the MergeNode. All unpartitioned child fragments are connected to the
-   *   MergeNode via a RANDOM exchange, and remain unchanged otherwise.
+   *   into the UnionNode. All unpartitioned child fragments are connected to the
+   *   UnionNode via a RANDOM exchange, and remain unchanged otherwise.
    */
-  private PlanFragment createMergeNodeFragment(MergeNode mergeNode,
+  private PlanFragment createUnionNodeFragment(UnionNode unionNode,
       ArrayList<PlanFragment> childFragments, ArrayList<PlanFragment> fragments,
       Analyzer analyzer) throws InternalException, AuthorizationException {
-    Preconditions.checkState(mergeNode.getChildren().size() == childFragments.size());
+    Preconditions.checkState(unionNode.getChildren().size() == childFragments.size());
 
-    // A MergeNode could have no children or constant selects if all of its operands
+    // A UnionNode could have no children or constant selects if all of its operands
     // were dropped because of constant predicates that evaluated to false.
-    if (mergeNode.getChildren().isEmpty()) {
+    if (unionNode.getChildren().isEmpty()) {
       return new PlanFragment(
-          fragmentIdGenerator_.getNextId(), mergeNode, DataPartition.UNPARTITIONED);
+          fragmentIdGenerator_.getNextId(), unionNode, DataPartition.UNPARTITIONED);
     }
 
     Preconditions.checkState(!childFragments.isEmpty());
@@ -623,39 +623,39 @@ public class Planner {
     }
 
     // If all child fragments are unpartitioned, return a single unpartitioned fragment
-    // with a MergeNode that merges all child fragments.
+    // with a UnionNode that merges all child fragments.
     if (numUnpartitionedChildFragments == childFragments.size()) {
-      // Absorb the plan trees of all childFragments into mergeNode.
+      // Absorb the plan trees of all childFragments into unionNode.
       for (int i = 0; i < childFragments.size(); ++i) {
-        mergeNode.setChild(i, childFragments.get(i).getPlanRoot());
+        unionNode.setChild(i, childFragments.get(i).getPlanRoot());
       }
-      PlanFragment mergeFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
-          mergeNode, DataPartition.UNPARTITIONED);
-      mergeNode.init(analyzer);
-      // All child fragments have been absorbed into mergeFragment.
+      PlanFragment unionFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
+          unionNode, DataPartition.UNPARTITIONED);
+      unionNode.init(analyzer);
+      // All child fragments have been absorbed into unionFragment.
       fragments.removeAll(childFragments);
-      return mergeFragment;
+      return unionFragment;
     }
 
     // There is at least one partitioned child fragment.
     for (int i = 0; i < childFragments.size(); ++i) {
       PlanFragment childFragment = childFragments.get(i);
       if (childFragment.isPartitioned()) {
-        // Absorb the plan trees of all partitioned child fragments into mergeNode.
-        mergeNode.setChild(i, childFragment.getPlanRoot());
+        // Absorb the plan trees of all partitioned child fragments into unionNode.
+        unionNode.setChild(i, childFragment.getPlanRoot());
         fragments.remove(childFragment);
       } else {
-        // Connect the unpartitioned child fragments to mergeNode via a random exchange.
-        connectChildFragment(analyzer, mergeNode, i, childFragment);
+        // Connect the unpartitioned child fragments to unionNode via a random exchange.
+        connectChildFragment(analyzer, unionNode, i, childFragment);
         childFragment.setOutputPartition(DataPartition.RANDOM);
       }
     }
 
-    // Fragment contains the MergeNode that consumes the data of all child fragments.
-    PlanFragment mergeFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
-        mergeNode, DataPartition.RANDOM);
-    mergeNode.init(analyzer);
-    return mergeFragment;
+    // Fragment contains the UnionNode that consumes the data of all child fragments.
+    PlanFragment unionFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
+        unionNode, DataPartition.RANDOM);
+    unionNode.init(analyzer);
+    return unionFragment;
   }
 
   /**
@@ -1155,7 +1155,7 @@ public class Planner {
    */
   private PlanNode createSelectPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws ImpalaException {
-    // no from clause -> materialize the select's exprs with a MergeNode
+    // no from clause -> materialize the select's exprs with a UnionNode
     if (selectStmt.getTableRefs().isEmpty()) {
       return createConstantSelectPlan(selectStmt, analyzer);
     }
@@ -1239,7 +1239,7 @@ public class Planner {
   }
 
   /**
-  * Returns a MergeNode that materializes the exprs of the constant selectStmt.
+  * Returns a UnionNode that materializes the exprs of the constant selectStmt.
   * Replaces the resultExprs of the selectStmt with SlotRefs into the materialized tuple.
   */
   private PlanNode createConstantSelectPlan(SelectStmt selectStmt, Analyzer analyzer)
@@ -1250,9 +1250,9 @@ public class Planner {
     // Create tuple descriptor for materialized tuple.
     TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor();
     tupleDesc.setIsMaterialized(true);
-    MergeNode mergeNode = new MergeNode(nodeIdGenerator_.getNextId(), tupleDesc.getId());
+    UnionNode unionNode = new UnionNode(nodeIdGenerator_.getNextId(), tupleDesc.getId());
     // Analysis guarantees that selects without a FROM clause only have constant exprs.
-    mergeNode.addConstExprList(Lists.newArrayList(resultExprs));
+    unionNode.addConstExprList(Lists.newArrayList(resultExprs));
 
     // Replace the select stmt's resultExprs with SlotRefs into tupleDesc.
     for (int i = 0; i < resultExprs.size(); ++i) {
@@ -1265,9 +1265,9 @@ public class Planner {
       resultExprs.set(i, slotRef);
     }
     tupleDesc.computeMemLayout();
-    // MergeNode.init() needs tupleDesc to have been initialized
-    mergeNode.init(analyzer);
-    return mergeNode;
+    // UnionNode.init() needs tupleDesc to have been initialized
+    unionNode.init(analyzer);
+    return unionNode;
   }
 
   /**
@@ -1369,7 +1369,7 @@ public class Planner {
     // materialized
     analyzer.materializeSlots(Expr.cloneList(unassigned, inlineViewRef.getBaseTblSmap()));
 
-    // Turn a constant select into a MergeNode that materializes the exprs.
+    // Turn a constant select into a UnionNode that materializes the exprs.
     // TODO: unify this with createConstantSelectPlan(), this is basically the
     // same thing
     QueryStmt viewStmt = inlineViewRef.getViewStmt();
@@ -1380,12 +1380,12 @@ public class Planner {
         Preconditions.checkState(inlineViewRef.getMaterializedTupleIds().size() == 1);
         // we need to materialize all slots of our inline view tuple
         analyzer.getTupleDesc(inlineViewRef.getId()).materializeSlots();
-        MergeNode mergeNode = new MergeNode(nodeIdGenerator_.getNextId(),
+        UnionNode unionNode = new UnionNode(nodeIdGenerator_.getNextId(),
             inlineViewRef.getMaterializedTupleIds().get(0));
-        mergeNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
-        mergeNode.addConstExprList(selectStmt.getBaseTblResultExprs());
-        mergeNode.init(analyzer);
-        return mergeNode;
+        unionNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
+        unionNode.addConstExprList(selectStmt.getBaseTblResultExprs());
+        unionNode.init(analyzer);
+        return unionNode;
       }
     }
 
@@ -1622,36 +1622,36 @@ public class Planner {
 
   /**
    * Create a plan tree corresponding to 'unionOperands' for the given unionStmt.
-   * The individual operands' plan trees are attached to a single MergeNode.
+   * The individual operands' plan trees are attached to a single UnionNode.
    */
-  private MergeNode createUnionMergePlan(
+  private UnionNode createUnionPlan(
       Analyzer analyzer, UnionStmt unionStmt, List<UnionOperand> unionOperands)
       throws ImpalaException {
-    MergeNode mergeNode =
-        new MergeNode(nodeIdGenerator_.getNextId(), unionStmt.getTupleId());
+    UnionNode unionNode =
+        new UnionNode(nodeIdGenerator_.getNextId(), unionStmt.getTupleId());
     for (UnionOperand op: unionOperands) {
       QueryStmt queryStmt = op.getQueryStmt();
       if (op.isDropped()) continue;
       if (queryStmt instanceof SelectStmt) {
         SelectStmt selectStmt = (SelectStmt) queryStmt;
         if (selectStmt.getTableRefs().isEmpty()) {
-          mergeNode.addConstExprList(selectStmt.getBaseTblResultExprs());
+          unionNode.addConstExprList(selectStmt.getBaseTblResultExprs());
           continue;
         }
       }
       PlanNode opPlan = createQueryPlan(queryStmt, analyzer, false);
-      mergeNode.addChild(opPlan, op.getQueryStmt().getBaseTblResultExprs());
+      unionNode.addChild(opPlan, op.getQueryStmt().getBaseTblResultExprs());
     }
-    mergeNode.init(analyzer);
-    return mergeNode;
+    unionNode.init(analyzer);
+    return unionNode;
   }
 
   /**
    * Returns plan tree for unionStmt:
-   * - distinctOperands' plan trees are collected in a single MergeNode
+   * - distinctOperands' plan trees are collected in a single UnionNode
    *   and duplicates removed via distinct aggregation
    * - the output of that plus the allOperands' plan trees are collected in
-   *   another MergeNode which materializes the result of unionStmt
+   *   another UnionNode which materializes the result of unionStmt
    */
   private PlanNode createUnionPlan(UnionStmt unionStmt, Analyzer analyzer )
       throws ImpalaException {
@@ -1690,7 +1690,7 @@ public class Planner {
     PlanNode result = null;
     // create DISTINCT tree
     if (unionStmt.hasDistinctOps()) {
-      result = createUnionMergePlan(
+      result = createUnionPlan(
           analyzer, unionStmt, unionStmt.getDistinctOperands());
       result = new AggregationNode(
           nodeIdGenerator_.getNextId(), result, unionStmt.getDistinctAggInfo());
@@ -1698,8 +1698,8 @@ public class Planner {
     }
     // create ALL tree
     if (unionStmt.hasAllOps()) {
-      MergeNode allMerge =
-          createUnionMergePlan(analyzer, unionStmt, unionStmt.getAllOperands());
+      UnionNode allMerge =
+          createUnionPlan(analyzer, unionStmt, unionStmt.getAllOperands());
       // for unionStmt, baseTblResultExprs = resultExprs
       if (result != null) allMerge.addChild(result,
           unionStmt.getDistinctAggInfo().getGroupingExprs());
@@ -1971,7 +1971,7 @@ public class Planner {
       rhsSet = null;
     }
 
-    // Assume that non-join, non-blocking nodes with multiple children (e.g., MergeNode)
+    // Assume that non-join, non-blocking nodes with multiple children (e.g., UnionNode)
     // consume their inputs in an arbitrary order (i.e., all child subtrees execute
     // concurrently).
     for (PlanNode child: node.getChildren()) {

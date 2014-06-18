@@ -763,7 +763,7 @@ where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
 |  hash predicates: a.id = id
 |  other predicates: id IS NULL, int_col = 17
 |
-|--01:MERGE
+|--01:UNION
 |  |
 |  |--05:AGGREGATE [FINALIZE]
 |  |  |  group by: id, int_col
@@ -819,7 +819,7 @@ where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
 |     partitions=24/24 size=478.45KB compact
 |     predicates: isnull(a.id, 0) = 0
 |
-00:MERGE
+00:UNION
 |
 |--04:AGGREGATE [FINALIZE]
 |  |  group by: id, int_col

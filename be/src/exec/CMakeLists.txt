@@ -55,7 +55,7 @@ add_library(Exec STATIC
   hbase-scan-node.cc
   hbase-table-scanner.cc
   blocking-join-node.cc
-  merge-node.cc
+  union-node.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc

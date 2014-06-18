@@ -233,7 +233,7 @@ class TestImpalaShell(object):
     # Test queries without an exchange
     args = "-q 'select 1; summary;'"
     result_set = run_impala_shell_cmd(args)
-    assert "00:MERGE" in result_set.stdout
+    assert "00:UNION" in result_set.stdout
 
   @pytest.mark.execute_serially
   def test_queries_closed(self):

@@ -881,11 +881,11 @@ group by x.smallint_col
 # Values statement in subqueries with predicate
 select * from (select y from (values((1 as y),(11))) a where y < 10) b
 ---- PLAN
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ====
 # Mixed constant and non-constant select; the predicate is evaluated directly
 # by the non-const select
@@ -896,8 +896,8 @@ select * from
      (select tinyint_col from functional.alltypes)) a
    where y < 10) b
 ---- PLAN
-00:MERGE
-|  constant-selects=1
+00:UNION
+|  constant-operands=1
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -905,8 +905,8 @@ select * from
 ---- DISTRIBUTEDPLAN
 02:EXCHANGE [UNPARTITIONED]
 |
-00:MERGE
-|  constant-selects=1
+00:UNION
+|  constant-operands=1
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -917,34 +917,34 @@ select * from
 select * from (select 1 as y union all select 2 union all select * from (select 11) a) b
 where y < 10
 ---- PLAN
-00:MERGE
-|  constant-selects=2
+00:UNION
+|  constant-operands=2
 |
-01:MERGE
+01:UNION
    predicates: 11 < 10
-   constant-selects=1
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
-00:MERGE
-|  constant-selects=2
+00:UNION
+|  constant-operands=2
 |
-01:MERGE
+01:UNION
    predicates: 11 < 10
-   constant-selects=1
+   constant-operands=1
 ====
 # Union of values statements in subquery
 # TODO: We could combine the merge nodes below.
 select * from (values(1 as y) union all values(2) union all select * from (values(11)) a) b
 where y < 10
 ---- PLAN
-00:MERGE
-|  constant-selects=2
+00:UNION
+|  constant-operands=2
 |
-01:MERGE
+01:UNION
 ---- DISTRIBUTEDPLAN
-00:MERGE
-|  constant-selects=2
+00:UNION
+|  constant-operands=2
 |
-01:MERGE
+01:UNION
 ====
 # Inner join on inline views made up of unions of constant selects
 select * from
@@ -957,36 +957,36 @@ inner join
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: b = b
 |
-|--02:MERGE
-|     constant-selects=2
+|--02:UNION
+|     constant-operands=2
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a = a
 |
-|--01:MERGE
-|     constant-selects=2
+|--01:UNION
+|     constant-operands=2
 |
-00:MERGE
-   constant-selects=2
+00:UNION
+   constant-operands=2
 ---- DISTRIBUTEDPLAN
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: b = b
 |
 |--06:EXCHANGE [UNPARTITIONED]
 |  |
-|  02:MERGE
-|     constant-selects=2
+|  02:UNION
+|     constant-operands=2
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a = a
 |
 |--05:EXCHANGE [UNPARTITIONED]
 |  |
-|  01:MERGE
-|     constant-selects=2
+|  01:UNION
+|     constant-operands=2
 |
-00:MERGE
-   constant-selects=2
+00:UNION
+   constant-operands=2
 ====
 # Semi and inner join on a table and on inline views made up of constant selects
 select * from functional.alltypessmall x
@@ -998,14 +998,14 @@ inner join
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: b = b
 |
-|--02:MERGE
-|     constant-selects=2
+|--02:UNION
+|     constant-operands=2
 |
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: x.id = a
 |
-|--01:MERGE
-|     constant-selects=2
+|--01:UNION
+|     constant-operands=2
 |
 00:SCAN HDFS [functional.alltypessmall x]
    partitions=4/4 size=6.32KB
@@ -1017,16 +1017,16 @@ inner join
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
-|  02:MERGE
-|     constant-selects=2
+|  02:UNION
+|     constant-operands=2
 |
 03:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: x.id = a
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
-|  01:MERGE
-|     constant-selects=2
+|  01:UNION
+|     constant-operands=2
 |
 00:SCAN HDFS [functional.alltypessmall x]
    partitions=4/4 size=6.32KB

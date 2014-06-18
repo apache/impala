@@ -1,44 +1,44 @@
 values(1+1, 2, 5.0, 'a')
 ---- PLAN
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ====
 values(1+1, 2, 5.0, 'a') order by 1 limit 10
 ---- PLAN
 01:TOP-N [LIMIT=10]
 |  order by: 1 + 1 ASC
 |
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
 01:TOP-N [LIMIT=10]
 |  order by: 1 + 1 ASC
 |
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ====
 values((1+1, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c'))
 ---- PLAN
-00:MERGE
-   constant-selects=3
+00:UNION
+   constant-operands=3
 ---- DISTRIBUTEDPLAN
-00:MERGE
-   constant-selects=3
+00:UNION
+   constant-operands=3
 ====
 values((1+1, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c')) order by 1 limit 10
 ---- PLAN
 01:TOP-N [LIMIT=10]
 |  order by: 1 + 1 ASC
 |
-00:MERGE
-   constant-selects=3
+00:UNION
+   constant-operands=3
 ---- DISTRIBUTEDPLAN
 01:TOP-N [LIMIT=10]
 |  order by: 1 + 1 ASC
 |
-00:MERGE
-   constant-selects=3
+00:UNION
+   constant-operands=3
 ====

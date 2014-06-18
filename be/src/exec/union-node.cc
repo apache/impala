@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "exec/merge-node.h"
+#include "exec/union-node.h"
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -23,10 +23,10 @@ using namespace std;
 
 namespace impala {
 
-MergeNode::MergeNode(ObjectPool* pool, const TPlanNode& tnode,
+UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
                      const DescriptorTbl& descs)
     : ExecNode(pool, tnode, descs),
-      tuple_id_(tnode.merge_node.tuple_id),
+      tuple_id_(tnode.union_node.tuple_id),
       const_result_expr_idx_(0),
       child_idx_(INVALID_CHILD_IDX),
       child_row_batch_(NULL),
@@ -34,18 +34,18 @@ MergeNode::MergeNode(ObjectPool* pool, const TPlanNode& tnode,
       child_row_idx_(0) {
 }
 
-Status MergeNode::Init(const TPlanNode& tnode) {
+Status UnionNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(ExecNode::Init(tnode));
-  DCHECK(tnode.__isset.merge_node);
+  DCHECK(tnode.__isset.union_node);
   // Create const_expr_lists_ from thrift exprs.
-  const vector<vector<TExpr> >& const_texpr_lists = tnode.merge_node.const_expr_lists;
+  const vector<vector<TExpr> >& const_texpr_lists = tnode.union_node.const_expr_lists;
   for (int i = 0; i < const_texpr_lists.size(); ++i) {
     vector<Expr*> exprs;
     RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, const_texpr_lists[i], &exprs));
     const_result_expr_lists_.push_back(exprs);
   }
   // Create result_expr_lists_ from thrift exprs.
-  const vector<vector<TExpr> >& result_texpr_lists = tnode.merge_node.result_expr_lists;
+  const vector<vector<TExpr> >& result_texpr_lists = tnode.union_node.result_expr_lists;
   for (int i = 0; i < result_texpr_lists.size(); ++i) {
     vector<Expr*> exprs;
     RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, result_texpr_lists[i], &exprs));
@@ -54,7 +54,7 @@ Status MergeNode::Init(const TPlanNode& tnode) {
   return Status::OK;
 }
 
-Status MergeNode::Prepare(RuntimeState* state) {
+Status UnionNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
@@ -79,7 +79,7 @@ Status MergeNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
-Status MergeNode::Open(RuntimeState* state) {
+Status UnionNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   // Open const expr lists.
   for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
@@ -92,7 +92,7 @@ Status MergeNode::Open(RuntimeState* state) {
   return Status::OK;
 }
 
-Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
@@ -163,7 +163,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK;
 }
 
-void MergeNode::Close(RuntimeState* state) {
+void UnionNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   child_row_batch_.reset();
   for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
@@ -175,7 +175,7 @@ void MergeNode::Close(RuntimeState* state) {
   ExecNode::Close(state);
 }
 
-bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
+bool UnionNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
     bool const_exprs, Tuple** tuple, RowBatch* row_batch) {
   // Make sure there are rows left in the batch.
   if (!const_exprs && child_row_idx_ >= child_row_batch_->num_rows()) {

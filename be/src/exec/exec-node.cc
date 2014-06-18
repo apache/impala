@@ -29,7 +29,7 @@
 #include "exec/hbase-scan-node.h"
 #include "exec/data-source-scan-node.h"
 #include "exec/exchange-node.h"
-#include "exec/merge-node.h"
+#include "exec/union-node.h"
 #include "exec/cross-join-node.h"
 #include "exec/topn-node.h"
 #include "exec/select-node.h"
@@ -266,8 +266,8 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
         *node = pool->Add(new SortNode(pool, tnode, descs));
       }
       break;
-    case TPlanNodeType::MERGE_NODE:
-      *node = pool->Add(new MergeNode(pool, tnode, descs));
+    case TPlanNodeType::UNION_NODE:
+      *node = pool->Add(new UnionNode(pool, tnode, descs));
       break;
     default:
       map<int, const char*>::const_iterator i =

@@ -34,7 +34,7 @@ enum TPlanNodeType {
   AGGREGATION_NODE,
   SORT_NODE,
   EXCHANGE_NODE,
-  MERGE_NODE,
+  UNION_NODE,
   SELECT_NODE,
   CROSS_JOIN_NODE,
   DATA_SOURCE_NODE
@@ -204,11 +204,11 @@ struct TSortNode {
   3: optional i64 offset
 }
 
-struct TMergeNode {
-  // A MergeNode could be the left input of a join and needs to know which tuple to write.
+struct TUnionNode {
+  // A UnionNode materializes all const/result exprs into this tuple.
   1: required Types.TTupleId tuple_id
   // List or expr lists materialized by this node.
-  // There is one list of exprs per query stmt feeding into this merge node.
+  // There is one list of exprs per query stmt feeding into this union node.
   2: required list<list<Exprs.TExpr>> result_expr_lists
   // Separate list of expr lists coming from a constant select stmts.
   3: required list<list<Exprs.TExpr>> const_expr_lists
@@ -248,7 +248,7 @@ struct TPlanNode {
   11: optional THashJoinNode hash_join_node
   12: optional TAggregationNode agg_node
   13: optional TSortNode sort_node
-  14: optional TMergeNode merge_node
+  14: optional TUnionNode union_node
   15: optional TExchangeNode exchange_node
 
   // Label that should be used to print this node to the user.

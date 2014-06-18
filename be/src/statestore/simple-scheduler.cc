@@ -679,13 +679,13 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
       continue;
     }
 
-    // MergeNodes are special because they can consume multiple partitioned inputs,
+    // UnionNodes are special because they can consume multiple partitioned inputs,
     // as well as execute multiple scans in the same fragment.
-    // Fragments containing a MergeNode are executed on the union of hosts of all
+    // Fragments containing a UnionNode are executed on the union of hosts of all
     // scans in the fragment as well as the hosts of all its input fragments (s.t.
-    // a MergeNode with partitioned joins or grouping aggregates as children runs on
+    // a UnionNode with partitioned joins or grouping aggregates as children runs on
     // at least as many hosts as the input to those children).
-    if (ContainsNode(fragment.plan, TPlanNodeType::MERGE_NODE)) {
+    if (ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE)) {
       vector<TPlanNodeId> scan_nodes;
       FindNodes(fragment.plan, scan_node_types, &scan_nodes);
       vector<TPlanNodeId> exch_nodes;
@@ -707,7 +707,7 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
             (*fragment_exec_params)[input_fragment_idx].hosts;
         hosts.insert(input_fragment_hosts.begin(), input_fragment_hosts.end());
       }
-      DCHECK(!hosts.empty()) << "no hosts for fragment " << i << " with a MergeNode";
+      DCHECK(!hosts.empty()) << "no hosts for fragment " << i << " with a UnionNode";
 
       // Set unique hosts in the fragment's params.
       params.hosts.assign(hosts.begin(), hosts.end());

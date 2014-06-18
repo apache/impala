@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_EXEC_MERGE_NODE_H_
-#define IMPALA_EXEC_MERGE_NODE_H_
+#ifndef IMPALA_EXEC_UNION_NODE_H_
+#define IMPALA_EXEC_UNION_NODE_H_
 
 #include <boost/scoped_ptr.hpp>
 
@@ -28,12 +28,12 @@ class Tuple;
 class TupleRow;
 
 // Node that merges the results of its children by materializing their
-// evaluated expressions into row batches. The MergeNode pulls row batches sequentially
-// from its children sequentially, i.e., it exhausts one child completely before moving
+// evaluated expressions into row batches. The UnionNode pulls row batches from its
+// children sequentially, i.e., it exhausts one child completely before moving
 // on to the next one.
-class MergeNode : public ExecNode {
+class UnionNode : public ExecNode {
  public:
-  MergeNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  UnionNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   virtual Status Init(const TPlanNode& tnode);
   virtual Status Prepare(RuntimeState* state);
@@ -47,7 +47,7 @@ class MergeNode : public ExecNode {
   // Tuple id resolved in Prepare() to set tuple_desc_;
   int tuple_id_;
 
-  // Descriptor for tuples this merge node constructs.
+  // Descriptor for tuples this union node constructs.
   const TupleDescriptor* tuple_desc_;
 
   // those tuple_desc_->slots() which are materialized, in the same order

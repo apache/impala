@@ -1,8 +1,8 @@
 select 1 + 1
 ---- PLAN
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ---- DISTRIBUTEDPLAN
-00:MERGE
-   constant-selects=1
+00:UNION
+   constant-operands=1
 ====
