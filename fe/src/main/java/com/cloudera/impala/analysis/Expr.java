@@ -174,6 +174,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     analyze(analyzer);
   }
 
+  static public void reanalyze(List<Expr> exprs, Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
+    if (exprs == null) return;
+    for (Expr e: exprs) {
+      e.reanalyze(analyzer);
+    }
+  }
+
   protected void computeNumDistinctValues() {
     if (isConstant()) {
       numDistinctValues_ = 1;

@@ -453,15 +453,20 @@ public class SelectStmt extends QueryStmt {
             finalAggInfo.getSMap());
     LOG.debug("combined smap: " + combinedSMap.debugString());
 
-    // change select list, having and ordering exprs to point to agg output
+    // change select list, having and ordering exprs to point to agg output. We need
+    // to reanalyze the exprs at this point.
+    // TODO: substitute really needs to bundle the reanalysis.
     Expr.substituteList(resultExprs_, combinedSMap);
+    Expr.reanalyze(resultExprs_, analyzer);
     LOG.debug("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
     if (havingPred_ != null) {
       havingPred_ = havingPred_.substitute(combinedSMap);
+      havingPred_.reanalyze(analyzer);
       analyzer.registerConjuncts(havingPred_, null, false);
       LOG.debug("post-agg havingPred: " + havingPred_.debugString());
     }
     Expr.substituteList(orderingExprs, combinedSMap);
+    Expr.reanalyze(orderingExprs, analyzer);
     LOG.debug("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
 
     // check that all post-agg exprs point to agg output

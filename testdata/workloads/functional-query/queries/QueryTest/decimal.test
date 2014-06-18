@@ -134,6 +134,18 @@ order by t1.c1 desc limit 3
 DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ====
 ---- QUERY
+select cast(avg(c1) as decimal(10,4)) as c from decimal_tiny
+group by c3 having c > 5.5 order by 1
+---- RESULTS
+5.5550
+5.6661
+5.7772
+5.8883
+5.9994
+---- TYPES
+decimal
+====
+---- QUERY
 select * from decimal_tiny
 ---- RESULTS
 0.0000,100.00000,0.0

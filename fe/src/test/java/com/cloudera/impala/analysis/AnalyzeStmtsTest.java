@@ -621,6 +621,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select avg(d5) from functional.decimal_tbl");
     AnalysisError("select group_concat(d5) from functional.decimal_tbl",
         "No matching function with signature: group_concat(DECIMAL(10,5))");
+
+    // Test select stmt avg smap.
+    AnalyzesOk("select cast(avg(c1) as decimal(10,4)) as c from " +
+        "functional.decimal_tiny group by c3 having c = 5.1106 order by 1");
   }
 
   @Test
