@@ -41,12 +41,13 @@ class TestAggregation(ImpalaTestSuite):
 
   @classmethod
   def is_valid_vector(cls, vector):
-    # Reduce execution time when exploration strategy is 'core'
-    if cls.exploration_strategy() == 'core':
-      if vector.get_value('exec_option')['batch_size'] != 0: return False
-
     data_type, agg_func = vector.get_value('data_type'), vector.get_value('agg_func')
     file_format = vector.get_value('table_format').file_format
+    if file_format not in ['parquet']: return False
+
+    if cls.exploration_strategy() == 'core':
+      # Reduce execution time when exploration strategy is 'core'
+      if vector.get_value('exec_option')['batch_size'] != 0: return False
 
     # Avro doesn't have timestamp type
     if file_format == 'avro' and data_type == 'timestamp':

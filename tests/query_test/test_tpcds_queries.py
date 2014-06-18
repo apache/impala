@@ -17,11 +17,17 @@ class TestTpcdsQuery(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTpcdsQuery, cls).add_test_dimensions()
-    # Cut down on the execution time for these tests
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format not in ['rc', 'hbase', 'avro'] and\
         v.get_value('table_format').compression_codec in ['none', 'snap'] and\
         v.get_value('table_format').compression_type != 'record')
+
+    if cls.exploration_strategy() != 'exhaustive':
+      # Cut down on the execution time for these tests in core by running only
+      # against parquet.
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('table_format').file_format in ['parquet'])
+
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('exec_option')['batch_size'] == 0)
 

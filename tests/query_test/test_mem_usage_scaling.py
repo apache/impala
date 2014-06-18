@@ -40,6 +40,9 @@ class TestQueryMemLimitScaling(ImpalaTestSuite):
     # add mem_limit as a test dimension.
     new_dimension = TestDimension('mem_limit', *TestQueryMemLimitScaling.MEM_LIMITS)
     cls.TestMatrix.add_dimension(new_dimension)
+    if cls.exploration_strategy() != 'exhaustive':
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('table_format').file_format in ['parquet'])
 
   # Test running with different mem limits to exercise the dynamic memory
   # scaling functionality.

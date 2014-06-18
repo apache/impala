@@ -23,7 +23,11 @@ class TestJoinQueries(ImpalaTestSuite):
     # TODO: Look into splitting up join tests to accomodate hbase.
     # Joins with hbase tables produce drastically different results.
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format != 'hbase')
+        v.get_value('table_format').file_format in ['parquet'])
+
+    if cls.exploration_strategy() != 'exhaustive':
+      # Cut down on execution time when not running in exhaustive mode.
+      cls.TestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
 
   def test_joins(self, vector):
     new_vector = copy(vector)

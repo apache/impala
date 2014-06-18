@@ -36,11 +36,16 @@ class TestDdlStatements(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestDdlStatements, cls).add_test_dimensions()
+    sync_ddl_opts = [0, 1]
+    if cls.exploration_strategy() != 'exhaustive':
+      # Only run with sync_ddl on exhaustive since it increases test runtime.
+      sync_ddl_opts = [0]
+
     cls.TestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=ALL_NODES_ONLY,
         disable_codegen_options=[False],
         batch_sizes=[0],
-        sync_ddl=[0, 1]))
+        sync_ddl=sync_ddl_opts))
 
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
