@@ -57,6 +57,10 @@
   <value>false</value>
 </property>
 <property>
+  <name>hive.stats.autogather</name>
+  <value>false</value>
+</property>
+<property>
   <name>hive.stats.dbclass</name>
   <value>jdbc:mysql</value>
 </property>
