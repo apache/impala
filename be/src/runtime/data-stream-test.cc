@@ -143,6 +143,8 @@ class DataStreamTest : public testing::Test {
   }
 
   virtual void TearDown() {
+    lhs_slot_->Close(NULL);
+    rhs_slot_->Close(NULL);
     exec_env_.impalad_client_cache()->TestShutdown();
     StopBackend();
   }
@@ -268,10 +270,14 @@ class DataStreamTest : public testing::Test {
 
   // Create a tuple comparator to sort in ascending order on the single bigint column.
   void CreateTupleComparator() {
-    SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
-    SlotRef* rhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
-    less_than_ = obj_pool_.Add(new TupleRowComparator(vector<Expr*>(1, lhs_slot),
-        vector<Expr*>(1, rhs_slot), vector<bool>(1, true), vector<bool>(1, false)));
+    lhs_slot_ = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
+    rhs_slot_ = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
+    Expr::Prepare(lhs_slot_, NULL, *row_desc_);
+    Expr::Prepare(rhs_slot_, NULL, *row_desc_);
+    lhs_slot_->Open(NULL);
+    rhs_slot_->Open(NULL);
+    less_than_ = obj_pool_.Add(new TupleRowComparator(vector<Expr*>(1, lhs_slot_),
+        vector<Expr*>(1, rhs_slot_), vector<bool>(1, true), vector<bool>(1, false)));
   }
 
   // Create batch_, but don't fill it with data yet. Assumes we created row_desc_.
@@ -494,6 +500,10 @@ class DataStreamTest : public testing::Test {
     JoinReceivers();
     CheckReceivers(stream_type, num_senders);
   }
+
+ private:
+  SlotRef* lhs_slot_;  
+  SlotRef* rhs_slot_;  
 };
 
 TEST_F(DataStreamTest, UnknownSenderSmallResult) {

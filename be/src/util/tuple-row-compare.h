@@ -46,7 +46,9 @@ class TupleRowComparator {
     }
   }
 
-  // Returns true if x is strictly less than y.
+  // Returns true if lhs is strictly less than rhs.
+  // All exprs (key_exprs_lhs_ and key_exprs_rhs_) must have been prepared and opened
+  // before calling this.
   bool operator() (TupleRow* lhs, TupleRow* rhs) const {
     std::vector<Expr*>::const_iterator lhs_expr_iter = key_exprs_lhs_.begin();
     std::vector<Expr*>::const_iterator rhs_expr_iter = key_exprs_rhs_.begin();

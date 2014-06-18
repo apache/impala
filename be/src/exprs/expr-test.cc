@@ -705,8 +705,12 @@ void TestSingleLiteralConstruction(const ColumnType& type, const void* value,
 
   Expr* expr = Expr::CreateLiteral(&pool, type, const_cast<void*>(value));
   EXPECT_TRUE(expr != NULL);
-  Expr::Prepare(expr, &state, desc, disable_codegen_);
+  Status status = Expr::Prepare(expr, &state, desc, disable_codegen_);
+  EXPECT_TRUE(status.ok());
+  status = expr->Open(&state);
+  EXPECT_TRUE(status.ok());
   EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
+  expr->Close(&state);
 }
 
 TEST_F(ExprTest, NullLiteral) {
@@ -715,7 +719,10 @@ TEST_F(ExprTest, NullLiteral) {
     RuntimeState state(TPlanFragmentInstanceCtx(), "", NULL);
     Status status = Expr::Prepare(&expr, &state, RowDescriptor(), disable_codegen_);
     EXPECT_TRUE(status.ok());
+    status = expr.Open(&state);
+    EXPECT_TRUE(status.ok());
     EXPECT_TRUE(expr.GetValue(NULL) == NULL);
+    expr.Close(&state);
   }
 }
 

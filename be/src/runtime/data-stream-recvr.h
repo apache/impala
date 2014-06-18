@@ -71,9 +71,9 @@ class DataStreamRecvr {
   // Deregister from DataStreamMgr instance, which shares ownership of this instance.
   void Close();
 
-  // Create a SortedRunMerger instance to merge rows from multiple sender according
-  // to the specified row comparator. Fetches the first batches from the individual
-  // sender queues.
+  // Create a SortedRunMerger instance to merge rows from multiple sender according to the
+  // specified row comparator. Fetches the first batches from the individual sender
+  // queues. The exprs used in less_than must have already been prepared and opened.
   Status CreateMerger(const TupleRowComparator& less_than);
 
   // Fill output_batch with the next batch of rows obtained by merging the per-sender

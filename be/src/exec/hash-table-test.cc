@@ -54,10 +54,19 @@ class HashTableTest : public testing::Test {
     build_expr_.push_back(pool_.Add(new SlotRef(TYPE_INT, 0)));
     status = Expr::Prepare(build_expr_, NULL, desc);
     EXPECT_TRUE(status.ok());
+    status = Expr::Open(build_expr_, NULL);
+    EXPECT_TRUE(status.ok());
 
     probe_expr_.push_back(pool_.Add(new SlotRef(TYPE_INT, 0)));
     status = Expr::Prepare(probe_expr_, NULL, desc);
     EXPECT_TRUE(status.ok());
+    status = Expr::Open(probe_expr_, NULL);
+    EXPECT_TRUE(status.ok());
+  }
+
+  virtual void TearDown() {
+    Expr::Close(build_expr_, NULL);
+    Expr::Close(probe_expr_, NULL);
   }
 
   TupleRow* CreateTupleRow(int32_t val) {
