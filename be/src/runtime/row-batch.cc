@@ -183,7 +183,7 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
     // smaller
     scoped_ptr<Codec> compressor;
     Status status =
-        Codec::CreateCompressor(NULL, false, THdfsCompression::SNAPPY, &compressor);
+        Codec::CreateCompressor(NULL, false, THdfsCompression::LZ4, &compressor);
     DCHECK(status.ok()) << status.GetErrorMsg();
 
     int compressed_size = compressor->MaxOutputLen(size);
@@ -196,7 +196,7 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
     if (LIKELY(compressed_size < size)) {
       compression_scratch_.resize(compressed_size);
       output_batch->tuple_data.swap(compression_scratch_);
-      output_batch->compression_type = THdfsCompression::SNAPPY;
+      output_batch->compression_type = THdfsCompression::LZ4;
     }
     VLOG_ROW << "uncompressed size: " << size << ", compressed size: " << compressed_size;
   }
