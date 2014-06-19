@@ -21,7 +21,7 @@ class TestTpchQuery(ImpalaTestSuite):
     # execute over
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format == 'parquet')
+          v.get_value('table_format').file_format in ['parquet', 'text'])
 
   def test_tpch_q1(self, vector):
     self.run_test_case('tpch-q1', vector)
