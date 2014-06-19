@@ -72,7 +72,9 @@ inline int256_t ConvertToInt256(const int128_t& x) {
 // Converts an int256_t to an int128_t.  int256_t does support convert_to<int128_t>() but
 // that produces an approximate int128_t which makes it unusable.
 // Instead, we'll construct it using convert_to<int64_t> which is exact.
-inline int128_t ConvertToInt128(int256_t x) {
+// *overflow is set to true if the value cannot be converted. The return value is
+// undefined in this case.
+inline int128_t ConvertToInt128(int256_t x, int128_t max_value, bool* overflow) {
   bool negative = false;
   if (x < 0) {
     x = -x;
@@ -87,7 +89,10 @@ inline int128_t ConvertToInt128(int256_t x) {
   while (x != 0) {
     uint64_t v = (x % base).convert_to<uint64_t>();
     x /= base;
-    result += v * scale;
+    *overflow |= (v > max_value / scale);
+    int128_t n = v * scale;
+    *overflow |= (result > max_value - n);
+    result += n;
     scale *= base;
   }
   return negative ? -result : result;

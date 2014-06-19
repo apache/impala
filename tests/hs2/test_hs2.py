@@ -175,26 +175,10 @@ class TestHS2(HS2TestSuite):
     assert "Sql Statement: GET_SCHEMAS" in profile_page
     assert "Query Type: DDL" in profile_page
 
-  @needs_session
-  def test_get_log(self):
-    # Test query that generates analysis warnings
+  def get_log(self, query_stmt):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "compute stats functional.decimal_tbl"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
-
-    get_log_req = TCLIService.TGetLogReq()
-    get_log_req.operationHandle = execute_statement_resp.operationHandle
-    get_log_resp = self.hs2_client.GetLog(get_log_req)
-    TestHS2.check_response(get_log_resp)
-
-    assert "Decimal column stats not yet supported" in get_log_resp.log
-
-    # Test query that generates BE warnings
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "select * from functional.alltypeserror"
+    execute_statement_req.statement = query_stmt
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     TestHS2.check_response(execute_statement_resp)
 
@@ -209,5 +193,18 @@ class TestHS2(HS2TestSuite):
     get_log_req.operationHandle = execute_statement_resp.operationHandle
     get_log_resp = self.hs2_client.GetLog(get_log_req)
     TestHS2.check_response(get_log_resp)
+    return get_log_resp.log
 
-    assert "Error converting column" in get_log_resp.log
+  @needs_session
+  def test_get_log(self):
+    # Test query that generates analysis warnings
+    log = self.get_log("compute stats functional.decimal_tbl")
+    assert "Decimal column stats not yet supported" in log
+
+    # Test query that generates BE warnings
+    log = self.get_log("select * from functional.alltypeserror")
+    assert "Error converting column" in log
+
+    # Test overflow warning
+    log = self.get_log("select cast(1000 as decimal(2, 1))")
+    assert "Expression overflowed, returning NULL" in log

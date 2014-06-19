@@ -161,7 +161,7 @@ Status RuntimeState::CreateCodegen() {
 
 bool RuntimeState::ErrorLogIsEmpty() {
   lock_guard<mutex> l(error_log_lock_);
-  return (error_log_.size() > 0);
+  return (error_log_.size() == 0);
 }
 
 string RuntimeState::ErrorLog() {

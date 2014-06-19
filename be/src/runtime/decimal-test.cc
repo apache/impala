@@ -417,12 +417,12 @@ TEST(DecimalTest, Overflow) {
   Decimal16Value d3(DecimalUtil::MAX_UNSCALED_DECIMAL / 10);
   overflow = false;
   result = d3.Add<int128_t>(t1, zero, t2, 1, &overflow);
-  EXPECT_TRUE(!overflow);
+  EXPECT_FALSE(overflow);
   EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 9);
 
   overflow = false;
   result = d3.Add<int128_t>(t1, one, t2, 1, &overflow);
-  EXPECT_TRUE(!overflow);
+  EXPECT_FALSE(overflow);
   EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL - 8);
 }
 
@@ -538,14 +538,16 @@ TEST(DecimalArithmetic, Divide) {
           ColumnType t1 = ColumnType::CreateDecimalType(numerator_p, numerator_s);
           ColumnType t2 = ColumnType::CreateDecimalType(denominator_p, denominator_s);
           ColumnType t3 = GetResultType(t1, t2, DIVIDE);
-          bool is_nan;
-          Decimal8Value r = x.Divide<int64_t>(t1, y, t2, t3.scale, &is_nan);
+          bool is_nan = false;
+          bool is_overflow = false;
+          Decimal8Value r = x.Divide<int64_t>(t1, y, t2, t3.scale, &is_nan, &is_overflow);
           double approx_x = x.ToDouble(t1);
           double approx_y = y.ToDouble(t2);
           double approx_r = r.ToDouble(t3);
           double expected_r = approx_x / approx_y;
 
-          EXPECT_TRUE(!is_nan);
+          EXPECT_FALSE(is_nan);
+          EXPECT_FALSE(is_overflow);
           if (fabs(approx_r - expected_r) > MAX_ERROR) {
             LOG(ERROR) << approx_r << " " << expected_r;
             LOG(ERROR) << x.ToString(t1) << "/" << y.ToString(t2)
@@ -557,10 +559,23 @@ TEST(DecimalArithmetic, Divide) {
     }
   }
   // Divide by 0
-  bool is_nan;
+  bool is_nan = false;
+  bool is_overflow = false;
   Decimal8Value r = x.Divide<int64_t>(ColumnType::CreateDecimalType(10, 0),
-      Decimal4Value(0), ColumnType::CreateDecimalType(2,0), 4, &is_nan);
+      Decimal4Value(0), ColumnType::CreateDecimalType(2,0), 4, &is_nan, &is_overflow);
   EXPECT_TRUE(is_nan) << "Expected NaN, got: " << r;
+  EXPECT_FALSE(is_overflow);
+
+  // In this case, we are dividing large precision decimals meaning the resulting
+  // decimal underflows. The resulting type is (38,38).
+  ColumnType t4 = ColumnType::CreateDecimalType(38, 4);
+  Decimal16Value x2(53994500);
+  Decimal16Value y2(5399450);
+  is_nan = false;
+  is_overflow = false;
+  x2.Divide<int128_t>(t4, y2, t4, 38, &is_nan, &is_overflow);
+  EXPECT_TRUE(is_overflow);
+  EXPECT_FALSE(is_nan);
 }
 
 TEST(DecimalArithmetic, DivideLargeScales) {
@@ -572,13 +587,18 @@ TEST(DecimalArithmetic, DivideLargeScales) {
   Decimal16Value x =
       StringParser::StringToDecimal<int128_t>(data, strlen(data), t1, &result);
   Decimal16Value y(10000);
-  bool is_nan;
-  Decimal16Value r = x.Divide<int128_t>(t1, y, t2, t3.scale, &is_nan);
+  bool is_nan = false;
+  bool is_overflow = false;
+  Decimal16Value r = x.Divide<int128_t>(t1, y, t2, t3.scale, &is_nan, &is_overflow);
   VerifyToString(r, t3, "31939128.06356147605500000000000000000");
+  EXPECT_FALSE(is_nan);
+  EXPECT_FALSE(is_overflow);
 
   y = -y;
-  r = x.Divide<int128_t>(t1, y, t2, t3.scale, &is_nan);
+  r = x.Divide<int128_t>(t1, y, t2, t3.scale, &is_nan, &is_overflow);
   VerifyToString(r, t3, "-31939128.06356147605500000000000000000");
+  EXPECT_FALSE(is_nan);
+  EXPECT_FALSE(is_overflow);
 }
 
 template<typename T>

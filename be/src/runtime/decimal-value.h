@@ -202,14 +202,14 @@ class DecimalValue {
   // is_nan is set to true if 'other' is 0. The value returned is undefined.
   template<typename RESULT_T>
   DecimalValue<RESULT_T> Divide(const ColumnType& this_type, const DecimalValue& other,
-      const ColumnType& other_type, int result_scale, bool* is_nan) const {
+      const ColumnType& other_type, int result_scale, bool* is_nan, bool* overflow)
+      const {
     DCHECK_GE(result_scale, this_type.scale);
     if (other.value() == 0) {
       // Divide by 0.
       *is_nan = true;
       return DecimalValue<RESULT_T>();
     }
-    *is_nan = false;
     // We need to scale x up by the result precision and then do an integer divide.
     // This truncates the result to the output precision.
     // TODO: confirm with standard that truncate is okay.
@@ -220,8 +220,8 @@ class DecimalValue {
       int256_t x = DecimalUtil::MultiplyByScale<int256_t>(
           ConvertToInt256(value()), scale_by);
       int256_t y = ConvertToInt256(other.value());
-      int256_t r = x / y;
-      return DecimalValue<RESULT_T>(ConvertToInt128(r));
+      int128_t r = ConvertToInt128(x / y, DecimalUtil::MAX_UNSCALED_DECIMAL, overflow);
+      return DecimalValue<RESULT_T>(r);
     } else {
       int128_t x = DecimalUtil::MultiplyByScale<RESULT_T>(value(), scale_by);
       int128_t y = other.value();
@@ -233,7 +233,8 @@ class DecimalValue {
   // is_nan is set to true if 'other' is 0. The value returned is undefined.
   template<typename RESULT_T>
   DecimalValue<RESULT_T> Mod(const ColumnType& this_type, const DecimalValue& other,
-      const ColumnType& other_type, int result_scale, bool* is_nan) const {
+      const ColumnType& other_type, int result_scale, bool* is_nan, bool* overflow)
+      const {
     DCHECK_EQ(result_scale, std::max(this_type.scale, other_type.scale));
     if (other.value() == 0) {
       // Mod by 0.

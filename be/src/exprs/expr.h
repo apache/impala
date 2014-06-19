@@ -383,6 +383,9 @@ class Expr {
   // Returns codegen function for the expr tree rooted at this expr.
   llvm::Function* codegen_fn() { return codegen_fn_; }
 
+  // Logs that this expr overflowed.
+  void LogOverflow();
+
   // Returns the scratch buffer size needed to call codegen_fn
   int scratch_buffer_size() { return scratch_buffer_size_; }
 
@@ -458,6 +461,9 @@ class Expr {
   // Return OK if successful, otherwise return error status.
   Status PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc);
 
+  // RuntimeState, set in Prepare(), that can be used to log errors.
+  RuntimeState* state_;
+
   // Cache entry for the library implementing this function.
   LibCache::LibCacheEntry* cache_entry_;
 
@@ -495,6 +501,9 @@ class Expr {
 
   // Set to true after Open() has been called.
   bool opened_;
+
+  // Set to true if a warning message for this expr overflowing has been logged.
+  bool overflow_logged_;
 
   // Returns an llvm::Function* with signature:
   // <subclass of AnyVal> ComputeFn(int8_t* context, TupleRow* row)

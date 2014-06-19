@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 
 #include <boost/math/constants/constants.hpp>
+#include "common/logging.h"
 #include "runtime/multi-precision.h"
 
 using namespace boost::multiprecision;
@@ -57,7 +58,16 @@ TEST(MultiPrecisionIntTest, Conversion) {
   y = -numeric_limits<int64_t>::max();
   y *= 1000;
   EXPECT_TRUE(ConvertToInt256(x) == y);
-  EXPECT_TRUE(ConvertToInt128(ConvertToInt256(x)) == x);
+
+  // Note: numer_limits<> doesn't work for int128_t.
+  static int128_t MAX_VALUE;
+  memset(&MAX_VALUE, 255, sizeof(MAX_VALUE));
+  uint8_t* buf = reinterpret_cast<uint8_t*>(&MAX_VALUE);
+  buf[15] = 127;
+
+  bool overflow = false;
+  EXPECT_TRUE(ConvertToInt128(ConvertToInt256(x), MAX_VALUE, &overflow) == x);
+  EXPECT_FALSE(overflow);
 }
 
 // Simple example of adding and subtracting numbers that use more than
