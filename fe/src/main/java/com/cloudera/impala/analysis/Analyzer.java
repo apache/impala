@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -166,8 +167,11 @@ public class Analyzer {
     public List<TAccessEvent> accessEvents = Lists.newArrayList();
 
     // Tracks all warnings (e.g. non-fatal errors) that were generated during analysis.
-    // These are passed to the backend and eventually propagated to the shell.
-    public final List<String> warnings = Lists.newArrayList();
+    // These are passed to the backend and eventually propagated to the shell. Maps from
+    // warning message to the number of times that warning was logged (in order to avoid
+    // duplicating the same warning over and over).
+    public final LinkedHashMap<String, Integer> warnings =
+        new LinkedHashMap<String, Integer>();
 
     // map from equivalence class id to the list of its member slots
     private final Map<EquivalenceClassId, ArrayList<SlotId>> equivClassMembers =
@@ -231,7 +235,24 @@ public class Analyzer {
   }
 
   public Set<TableName> getMissingTbls() { return missingTbls_; }
-  public List<String> getWarnings() { return globalState_.warnings; }
+
+  /**
+   * Returns a list of each warning logged, indicating if it was logged more than once.
+   */
+  public List<String> getWarnings() {
+    List<String> result = new ArrayList<String>();
+    for (Map.Entry<String, Integer> e : globalState_.warnings.entrySet()) {
+      String error = e.getKey();
+      int count = e.getValue();
+      Preconditions.checkState(count > 0);
+      if (count == 1) {
+        result.add(error);
+      } else {
+        result.add(error + " (" + count + " warnings like this)");
+      }
+    }
+    return result;
+  }
 
   /**
    * Substitute analyzer's internal expressions (conjuncts) with the given substitution
@@ -1528,7 +1549,11 @@ public class Analyzer {
    * Add a warning that will be displayed to the user.
    */
   public void addWarning(String msg) {
-    globalState_.warnings.add(msg);
+    Integer count = globalState_.warnings.get(msg);
+    if (count == null) {
+      count = 0;
+    }
+    globalState_.warnings.put(msg, count + 1);
   }
 
   /**
