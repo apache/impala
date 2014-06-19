@@ -26,6 +26,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.log4j.Logger;
 
+import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -295,6 +296,7 @@ public abstract class Table implements CatalogObject {
   public Db getDb() { return db_; }
   public String getName() { return name_; }
   public String getFullName() { return (db_ != null ? db_.getName() + "." : "") + name_; }
+  public TableName getTableName() { return new TableName(db_.getName(), name_); }
   public String getOwner() { return owner_; }
   public ArrayList<Column> getColumns() { return colsByPos_; }
 

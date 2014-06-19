@@ -20,6 +20,7 @@ from tests.common.test_dimensions import create_uncompressed_text_dimension
 # TODO: Merge this test file with test_col_stats.py
 class TestComputeStats(ImpalaTestSuite):
   TEST_DB_NAME = "compute_stats_db"
+  TEST_ALIASING_DB_NAME = "parquet"
 
   @classmethod
   def get_workload(self):
@@ -37,9 +38,13 @@ class TestComputeStats(ImpalaTestSuite):
     # cleanup and create a fresh test database
     self.cleanup_db(self.TEST_DB_NAME)
     self.execute_query("create database %s" % (self.TEST_DB_NAME))
+    # cleanup and create a fresh test database whose name is a keyword
+    self.cleanup_db(self.TEST_ALIASING_DB_NAME)
+    self.execute_query("create database `%s`" % (self.TEST_ALIASING_DB_NAME))
 
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)
+    self.cleanup_db(self.TEST_ALIASING_DB_NAME)
 
   def test_compute_stats(self, vector):
     self.run_test_case('QueryTest/compute-stats', vector)

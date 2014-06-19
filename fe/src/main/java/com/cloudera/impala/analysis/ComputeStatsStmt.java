@@ -79,9 +79,10 @@ public class ComputeStatsStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     table_ = analyzer.getTable(tableName_, Privilege.ALTER);
+    String sqlTableName = table_.getTableName().toSql();
     if (table_ instanceof View) {
       throw new AnalysisException(String.format(
-          "COMPUTE STATS not allowed on a view: %s", table_.getFullName()));
+          "COMPUTE STATS not allowed on a view: %s", sqlTableName));
     }
 
     // Query for getting the per-partition row count and the total row count.
@@ -102,7 +103,7 @@ public class ComputeStatsStmt extends StatementBase {
       }
     }
     tableStatsQueryBuilder.append(Joiner.on(", ").join(tableStatsSelectList));
-    tableStatsQueryBuilder.append(" FROM " + table_.getFullName());
+    tableStatsQueryBuilder.append(" FROM " + sqlTableName);
     if (!groupByCols.isEmpty()) {
       tableStatsQueryBuilder.append(" GROUP BY ");
       tableStatsQueryBuilder.append(Joiner.on(", ").join(groupByCols));
@@ -164,7 +165,7 @@ public class ComputeStatsStmt extends StatementBase {
     }
 
     columnStatsQueryBuilder.append(Joiner.on(", ").join(columnStatsSelectList));
-    columnStatsQueryBuilder.append(" FROM " + table_.getFullName());
+    columnStatsQueryBuilder.append(" FROM " + sqlTableName);
     columnStatsQueryStr_ = columnStatsQueryBuilder.toString();
     LOG.debug(columnStatsQueryStr_);
   }

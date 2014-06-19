@@ -504,3 +504,25 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
+# For IMPALA-1055, using a database called `parquet` to test cases where the name of
+# the database is a keyword.
+---- QUERY
+CREATE TABLE `parquet`.billion_parquet(id INT);
+====
+---- QUERY
+COMPUTE STATS `parquet`.billion_parquet
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+CREATE TABLE `parquet`.`parquet`(id INT)
+====
+---- QUERY
+COMPUTE STATS `parquet`.`parquet`
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
