@@ -57,11 +57,7 @@ Status SortNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(state->CheckQueryState());
   RETURN_IF_ERROR(child(0)->Open(state));
 
-  int64_t block_mgr_limit;
-  RETURN_IF_ERROR(GetBlockMgrLimit(state, &block_mgr_limit));
-  int block_size = state->io_mgr()->max_read_buffer_size();
-  block_mgr_.reset(BufferedBlockMgr::Create(state, mem_tracker(), runtime_profile(),
-      block_mgr_limit, block_size));
+  RETURN_IF_ERROR(CreateBlockMgr(state));
   TupleRowComparator less_than(sort_exec_exprs_.lhs_ordering_exprs(),
       sort_exec_exprs_.rhs_ordering_exprs(), is_asc_order_, nulls_first_);
   sorter_.reset(new Sorter(less_than, sort_exec_exprs_.sort_tuple_slot_exprs(),
@@ -153,39 +149,42 @@ Status SortNode::SortInput(RuntimeState* state) {
   return Status::OK;
 }
 
-Status SortNode::GetBlockMgrLimit(RuntimeState* state, int64_t* block_mgr_limit) {
+Status SortNode::CreateBlockMgr(RuntimeState* state) {
   int64_t mem_remaining = mem_tracker()->SpareCapacity();
+  int min_blocks_required = BufferedBlockMgr::GetNumReservedBlocks() +
+      Sorter::MinBuffersRequired(&row_descriptor_);
+  int block_size = state->io_mgr()->max_read_buffer_size();
+  int64_t block_mgr_limit;
   if (mem_remaining > FLAGS_max_sort_memory &&
       !state->query_mem_tracker()->has_limit()) {
-    *block_mgr_limit = FLAGS_max_sort_memory;
-    return Status::OK;
+    block_mgr_limit = FLAGS_max_sort_memory;
   } else if (mem_remaining < 0) {
     return state->SetMemLimitExceeded(mem_tracker());
-  }
-
-  int block_size = state->io_mgr()->max_read_buffer_size();
-  // Estimate the memory overhead for a merge based on the available memory and block
-  // size, and subtract it from the block manager's budget.
-  uint64_t max_merge_mem = Sorter::EstimateMergeMem(mem_remaining / block_size,
-      &row_descriptor_, state->batch_size());
-  uint64_t min_mem_required = max_merge_mem + (block_size *
-      (BufferedBlockMgr::GetNumReservedBlocks() +
-          Sorter::MinBuffersRequired(&row_descriptor_)));
-  if (mem_remaining < min_mem_required) {
-    stringstream ss;
-    ss << "Sort Memory " << mem_remaining << " bytes is less than minimum "
-       << "required memory " << min_mem_required << " bytes."
-       << " block size = " << block_size << " bytes.";
-    state->LogError(ss.str());
-    return state->SetMemLimitExceeded(mem_tracker(), min_mem_required);
   } else {
-    mem_remaining = min<int64_t>(SORT_MEM_FRACTION * mem_remaining,
-        mem_remaining - SORT_MEM_UNUSED);
-    mem_remaining = max<int64_t>(mem_remaining, min_mem_required);
-  }
+    // Estimate the memory overhead for a merge based on the available memory and block
+    // size, and subtract it from the block manager's budget.
+    uint64_t max_merge_mem = Sorter::EstimateMergeMem(mem_remaining / block_size,
+        &row_descriptor_, state->batch_size());
+    uint64_t min_mem_required = max_merge_mem + (block_size * min_blocks_required);
+    if (mem_remaining < min_mem_required) {
+      stringstream ss;
+      ss << "Sort Memory " << mem_remaining << " bytes is less than minimum "
+         << "required memory " << min_mem_required << " bytes."
+         << " block size = " << block_size << " bytes.";
+      state->LogError(ss.str());
+      return state->SetMemLimitExceeded(mem_tracker(), min_mem_required);
+    } else {
+      mem_remaining = min<int64_t>(SORT_MEM_FRACTION * mem_remaining,
+          mem_remaining - SORT_MEM_UNUSED);
+      mem_remaining = max<int64_t>(mem_remaining, min_mem_required);
+    }
 
-  mem_remaining -= max_merge_mem;
-  *block_mgr_limit = mem_remaining;
+    mem_remaining -= max_merge_mem;
+    block_mgr_limit = mem_remaining;
+  }
+  block_mgr_.reset(BufferedBlockMgr::Create(state, mem_tracker(), runtime_profile(),
+      block_mgr_limit, block_size, min_blocks_required));
+
   return Status::OK;
 }
 

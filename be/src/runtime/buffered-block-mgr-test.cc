@@ -78,12 +78,13 @@ class BufferedBlockMgrTest : public ::testing::Test {
     EXPECT_TRUE(*reinterpret_cast<int32_t*>(block->buffer()) == data);
   }
 
-  BufferedBlockMgr* CreateMgr(int num_buffers) {
+  BufferedBlockMgr* CreateMgr(int num_buffers, int initial_alloc) {
     BufferedBlockMgr* block_mgr = BufferedBlockMgr::Create(runtime_state_.get(),
         block_mgr_parent_tracker_.get(), runtime_state_->runtime_profile(),
-        num_buffers * block_size_, block_size_);
-    int available_buffers = block_mgr->max_available_buffers();
-    EXPECT_TRUE(available_buffers == (num_buffers - TmpFileMgr::num_tmp_devices()));
+        num_buffers * block_size_, block_size_, initial_alloc);
+    int available_buffers = block_mgr->available_allocated_buffers();
+    EXPECT_TRUE(available_buffers == (initial_alloc - TmpFileMgr::num_tmp_devices()));
+    EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == initial_alloc * block_size_);
     return block_mgr;
   }
 
@@ -110,7 +111,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
 // Test that pinning more blocks than the max available buffers is blocking.
 TEST_F(BufferedBlockMgrTest, PinWait) {
   int num_blocks = 5;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(num_blocks));
+  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(num_blocks, num_blocks));
 
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), num_blocks, &blocks);
@@ -133,18 +134,37 @@ TEST_F(BufferedBlockMgrTest, PinWait) {
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
+TEST_F(BufferedBlockMgrTest, Expansion) {
+  int num_blocks = 5;
+  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(num_blocks, num_blocks - 1));
+
+  vector<BufferedBlockMgr::Block*> blocks;
+  AllocateBlocks(block_mgr.get(), num_blocks - 1, &blocks);
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption()
+      == (num_blocks - 1) * block_size_);
+  BufferedBlockMgr::Block* new_block;
+  bool expanded;
+  block_mgr->TryExpand(&new_block, &expanded);
+  EXPECT_TRUE(expanded);
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == num_blocks * block_size_);
+  block_mgr->TryExpand(&new_block, &expanded);
+  EXPECT_TRUE(!expanded);
+  block_mgr->Close();
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+}
+
 // Test the eviction policy of the block mgr. No writes issued until more than
 // the max available buffers are allocated. Writes must be issued in LIFO order.
 TEST_F(BufferedBlockMgrTest, Eviction) {
   int max_num_buffers = 5;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers, max_num_buffers));
 
   // Check counters.
   RuntimeProfile* profile = runtime_state_->runtime_profile();
   RuntimeProfile::Counter* buffered_pin = profile->GetCounter("BufferedPins");
   RuntimeProfile::Counter* writes_issued = profile->GetCounter("WritesIssued");
 
-  int available_buffers = block_mgr->max_available_buffers();
+  int available_buffers = block_mgr->available_allocated_buffers();
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), available_buffers, &blocks);
 
@@ -187,14 +207,14 @@ TEST_F(BufferedBlockMgrTest, Eviction) {
 // Test deletion and reuse of blocks.
 TEST_F(BufferedBlockMgrTest, Deletion) {
   int max_num_buffers = 5;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers, max_num_buffers));
 
   // Check counters.
   RuntimeProfile* profile = runtime_state_->runtime_profile();
   RuntimeProfile::Counter* recycled_cnt = profile->GetCounter("RecycledBlocks");
   RuntimeProfile::Counter* created_cnt = profile->GetCounter("NumCreatedBlocks");
 
-  int available_buffers = block_mgr->max_available_buffers();
+  int available_buffers = block_mgr->available_allocated_buffers();
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), available_buffers, &blocks);
   EXPECT_TRUE(created_cnt->value() == available_buffers);
@@ -214,9 +234,9 @@ TEST_F(BufferedBlockMgrTest, Deletion) {
 // Test that all APIs return cancelled after close.
 TEST_F(BufferedBlockMgrTest, Close) {
   int max_num_buffers = 5;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers, max_num_buffers));
 
-  int available_buffers = block_mgr->max_available_buffers();
+  int available_buffers = block_mgr->available_allocated_buffers();
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), available_buffers, &blocks);
 
@@ -239,8 +259,8 @@ TEST_F(BufferedBlockMgrTest, Close) {
 TEST_F(BufferedBlockMgrTest, WriteError) {
   int max_num_buffers = 2;
   const int write_wait_millis = 500;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
-  int available_buffers = block_mgr->max_available_buffers();
+  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers, max_num_buffers));
+  int available_buffers = block_mgr->available_allocated_buffers();
   RuntimeProfile* profile = runtime_state_->runtime_profile();
   RuntimeProfile::Counter* writes_outstanding = profile->GetCounter("WritesOutstanding");
   vector<BufferedBlockMgr::Block*> blocks;
@@ -292,7 +312,7 @@ TEST_F(BufferedBlockMgrTest, Random) {
 
   typedef enum { Pin, New, Unpin, Delete, Close } ApiFunction;
   ApiFunction api_function;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(num_buffers));
+  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(num_buffers, num_buffers));
   pinned_blocks.reserve(num_buffers);
   BufferedBlockMgr::Block* new_block;
   Status status;

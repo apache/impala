@@ -101,9 +101,10 @@ string BufferedBlockMgr::Block::DebugString() const {
 
 // BufferedBlockMgr methods.
 BufferedBlockMgr* BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
-      RuntimeProfile* profile, int64_t mem_limit, int64_t block_size) {
+      RuntimeProfile* profile, int64_t mem_limit, int64_t block_size,
+      int initial_num_buffers) {
   BufferedBlockMgr* block_mgr = new BufferedBlockMgr(state, parent, mem_limit,
-      block_size);
+      block_size, initial_num_buffers);
 
   // Initialize the tmp files and the initial file to use.
   int num_tmp_devices = TmpFileMgr::num_tmp_devices();
@@ -124,23 +125,36 @@ Status BufferedBlockMgr::GetFreeBlock(Block** block) {
     if (is_cancelled_) return Status::CANCELLED;
   }
 
-  Block* new_block;
-  if (unused_blocks_.empty()) {
-    new_block = obj_pool_.Add(new Block(this));
-    new_block->Init();
-    created_block_counter_->Update(1);
-  } else {
-    new_block = unused_blocks_.Dequeue();
-    recycled_blocks_counter_->Update(1);
-  }
-
-  DCHECK_NOTNULL(new_block);
-  DCHECK(new_block->Validate()) << endl << new_block->DebugString();
+  Block* new_block = GetUnusedBlock();
   bool in_mem;
   RETURN_IF_ERROR(FindBufferForBlock(new_block, &in_mem));
   DCHECK(!in_mem);
 
   *block = new_block;
+  return Status::OK;
+}
+
+Status BufferedBlockMgr::TryExpand(Block** block, bool* expanded) {
+  lock_guard<mutex> lock(lock_);
+  if (is_cancelled_) return Status::CANCELLED;
+
+  *expanded = false;
+  uint8_t* buffer = buffer_pool_->TryAllocate(block_size_);
+  if (buffer == NULL) return Status::OK;
+  // The number of unallocated buffers has decreased. Call WriteUnpinnedBlocks()
+  // to check if the number of free buffers is below the threshold and write any
+  // unpinned blocks if necessary.
+  RETURN_IF_ERROR(WriteUnpinnedBlocks());
+
+  BufferDescriptor* buffer_desc = obj_pool_.Add(new BufferDescriptor(buffer));
+  all_buffers_.push_back(buffer_desc);
+  Block* new_block = GetUnusedBlock();
+  buffer_desc->block = new_block;
+  new_block->buffer_desc_ = buffer_desc;
+  new_block->is_pinned_ = true;
+  *block = new_block;
+  *expanded = true;
+  mem_limit_counter_->Update(block_size_);
   return Status::OK;
 }
 
@@ -182,7 +196,7 @@ void BufferedBlockMgr::Close() {
 }
 
 BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
-    int64_t mem_limit, int64_t block_size)
+    int64_t mem_limit, int64_t block_size, int initial_num_buffers)
   : block_size_(block_size),
     block_write_threshold_(TmpFileMgr::num_tmp_devices()),
     num_outstanding_writes_(0),
@@ -192,12 +206,9 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(new MemTracker(mem_limit, "Block Manager", parent));
   buffer_pool_.reset(new MemPool(mem_tracker_.get(), block_size));
-  // Use SpareCapacity() to determine the actual memory limit in case the parent has
-  // a limit lower than mem_limit.
-  int64_t memory_available = mem_tracker_->SpareCapacity();
-  int64_t total_buffers = memory_available / block_size_;
-  for (int i = 0; i < total_buffers; ++i) {
-    uint8_t* buffer = buffer_pool_->Allocate(block_size_);
+  for (int i = 0; i < initial_num_buffers; ++i) {
+    uint8_t* buffer = buffer_pool_->TryAllocate(block_size_);
+    if (buffer == NULL) break;
     BufferDescriptor* buffer_desc = obj_pool_.Add(new BufferDescriptor(buffer));
     free_buffers_.Enqueue(buffer_desc);
     all_buffers_.push_back(buffer_desc);
@@ -258,7 +269,8 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
 Status BufferedBlockMgr::WriteUnpinnedBlocks() {
   // Assumes block manager lock is already taken.
   while (!unpinned_blocks_.empty() &&
-      num_outstanding_writes_ < (block_write_threshold_ - free_buffers_.size())) {
+      (num_outstanding_writes_ + free_buffers_.size() +
+          (mem_tracker_->SpareCapacity() / block_size_)) < block_write_threshold_) {
     // Pop a block from the back of the list (LIFO)
     Block* block_to_write = unpinned_blocks_.back();
     unpinned_blocks_.pop_back();
@@ -391,6 +403,9 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     // Wait if there are no free buffers available.
     while (free_buffers_.empty()) {
       SCOPED_TIMER(buffer_wait_timer_);
+      // The mem tracker capacity may have reduced since the last time
+      // WriteUnpinnedBlocks() was called. Call it again before waiting.
+      RETURN_IF_ERROR(WriteUnpinnedBlocks());
       buffer_available_cv_.wait(l);
       if (is_cancelled_) return Status::CANCELLED;
     }
@@ -413,6 +428,22 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
   RETURN_IF_ERROR(WriteUnpinnedBlocks());
   DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
+}
+
+BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock() {
+  Block* new_block;
+  if (unused_blocks_.empty()) {
+    new_block = obj_pool_.Add(new Block(this));
+    new_block->Init();
+    created_block_counter_->Update(1);
+  } else {
+    new_block = unused_blocks_.Dequeue();
+    recycled_blocks_counter_->Update(1);
+  }
+
+  DCHECK_NOTNULL(new_block);
+  DCHECK(new_block->Validate()) << endl << new_block->DebugString();
+  return new_block;
 }
 
 bool BufferedBlockMgr::Validate() const {
@@ -497,7 +528,7 @@ string BufferedBlockMgr::DebugString() const {
 }
 
 void BufferedBlockMgr::InitCounters(RuntimeProfile* profile) {
-  mem_limit_counter_ = ADD_COUNTER(profile, "MemoryLimit", TCounterType::UNIT);
+  mem_limit_counter_ = ADD_COUNTER(profile, "MemoryUsed", TCounterType::UNIT);
   mem_limit_counter_->Set(static_cast<int64_t>(all_buffers_.size()) * block_size_);
   block_size_counter_ = ADD_COUNTER(profile, "BlockSize", TCounterType::UNIT);
   block_size_counter_->Set(block_size_);

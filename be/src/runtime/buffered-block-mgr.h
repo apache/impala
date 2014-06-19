@@ -42,8 +42,10 @@ class RuntimeState;
 //    to a different block.
 //
 // The Client API is as follows:
-// GetFreeBlock() allocates a new pinned block. It waits if there are
+// GetFreeBlock() returns a new pinned block. It waits if there are
 //   no free buffers available.
+// TryExpand() attempts a allocate a new buffer and assign it to a pinned block. If the
+// memory limit is reached, TryExpand() returns immediately. It is non-blocking.
 // A Block supports the following operations
 // Pin(): Pins a block to a buffer in memory, and reads its contents from disk if
 //   necessary. If there are no free buffers, waits for a buffer to become available.
@@ -186,10 +188,12 @@ class BufferedBlockMgr {
     bool is_deleted_;
   }; // class Block
 
-  // Create a block manager with the specified mem_limit. All buffers are allocated
-  // up-front in Create(). The returned block manager is owned by the caller.
+  // Create a block manager with the specified mem_limit. 'initial_num_buffers' is the
+  // number of buffers to allocate initially, subject to the mem_limit.
+  // The returned block manager is owned by the caller.
   static BufferedBlockMgr* Create(RuntimeState* state, MemTracker* parent,
-      RuntimeProfile* profile, int64_t mem_limit, int64_t buffer_size);
+      RuntimeProfile* profile, int64_t mem_limit, int64_t buffer_size,
+      int initial_num_buffers);
 
   // Return the number of blocks a block manager will reserve for its I/O buffers.
   static int GetNumReservedBlocks() {
@@ -199,12 +203,20 @@ class BufferedBlockMgr {
   // Return a free pinned block. Waits for a free buffer if none are available.
   Status GetFreeBlock(Block** block);
 
+  // Try to expand the block manager capacity by allocating a new buffer subject to
+  // available memory. If allocation was successful, a new pinned block is returned in
+  // 'block' and expanded is set to true. Otherwise, expanded is set to false.
+  // This is a non-blocking call, and checks for cancellation.
+  // TODO: This should be subsumed into GetFreeBlock() once the block manager has the
+  // ability to relinquish memory.
+  Status TryExpand(Block** block, bool* expanded);
+
   // Release all resources associated with this block manager. Is idempotent.
   void Close();
 
-  // The maximum number of buffers that can be simultaneously pinned by clients
+  // The number of allocated buffers that can be simultaneously pinned by clients
   // without incurring writes on Unpin().
-  int max_available_buffers() const {
+  int available_allocated_buffers() const {
     return all_buffers_.size() - block_write_threshold_;
   }
 
@@ -225,7 +237,7 @@ class BufferedBlockMgr {
   }; // struct BufferDescriptor
 
   BufferedBlockMgr(RuntimeState* state, MemTracker* parent, int64_t mem_limit,
-      int64_t block_size);
+      int64_t block_size, int initial_num_buffers);
 
   // Initialize the counters to track the block manager behavior.
   void InitCounters(RuntimeProfile* profile);
@@ -259,6 +271,10 @@ class BufferedBlockMgr {
   // Return a deleted block to the list of free blocks. Assumes the block's buffer has
   // already been returned to the free buffers list. Non-blocking.
   void ReturnUnusedBlock(Block* block);
+
+  // Checks unused_blocks_ for an unused block object, else allocates a new one.
+  // Non-blocking and takes no locks.
+  Block* GetUnusedBlock();
 
   // Used to debug the state of the block manager. Lock must already be taken.
   bool Validate() const;

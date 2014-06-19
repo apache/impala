@@ -61,10 +61,10 @@ class SortNode : public ExecNode {
   // Fetch input rows and feed them to the sorter until the input is exhausted.
   Status SortInput(RuntimeState* state);
 
-  // Get the memory limit to be imposed on the block manager object.
+  // Create a block manager object and set it in block_mgr_.
   // Returns and sets the query status to Status::MEM_LIMIT_EXCEEDED if there is not
   // enough memory for the sort.
-  Status GetBlockMgrLimit(RuntimeState* state, int64_t* block_mgr_limit);
+  Status CreateBlockMgr(RuntimeState* state);
 
   // Number of rows to skip.
   int64_t offset_;
