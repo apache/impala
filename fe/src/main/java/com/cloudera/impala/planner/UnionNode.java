@@ -14,6 +14,9 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -24,6 +27,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -92,6 +96,55 @@ public class UnionNode extends PlanNode {
     if (numNodes_ == -1) numNodes_ = 1;
 
     LOG.debug("stats Union: cardinality=" + Long.toString(cardinality_));
+  }
+
+  /**
+   * Re-order the union's operands descending by their estimated per-host memory,
+   * such that parent nodes can gauge the peak memory consumption of this MergeNode after
+   * opening it during execution (a MergeNode opens its first operand in Open()).
+   * Scan nodes are always ordered last because they can dynamically scale down their
+   * memory usage, whereas many other nodes cannot (e.g., joins, aggregations).
+   * One goal is to decrease the likelihood of a SortNode parent claiming too much
+   * memory in its Open(), possibly causing the mem limit to be hit when subsequent
+   * union operands are executed.
+   * Can only be called on a fragmented plan because this function calls computeCosts()
+   * on this node's children.
+   * TODO: Come up with a good way of handing memory out to individual operators so that
+   * they don't trip each other up. Then remove this function.
+   */
+  public void reorderOperands(Analyzer analyzer) {
+    Preconditions.checkNotNull(fragment_,
+        "Operands can only be reordered on the fragmented plan.");
+
+    // List of estimated per-host memory consumption (first) by child index (second).
+    List<Pair<Long, Integer>> memByChildIdx = Lists.newArrayList();
+    for (int i = 0; i < children_.size(); ++i) {
+      PlanNode child = children_.get(i);
+      child.computeCosts(analyzer.getQueryCtx().request.getQuery_options());
+      memByChildIdx.add(new Pair<Long, Integer>(child.getPerHostMemCost(), i));
+    }
+
+    Collections.sort(memByChildIdx,
+        new Comparator<Pair<Long, Integer>>() {
+      public int compare(Pair<Long, Integer> a, Pair<Long, Integer> b) {
+        PlanNode aNode = children_.get(a.second);
+        PlanNode bNode = children_.get(b.second);
+        // Order scan nodes last because they can dynamically scale down their mem.
+        if (bNode instanceof ScanNode && !(aNode instanceof ScanNode)) return -1;
+        if (aNode instanceof ScanNode && !(bNode instanceof ScanNode)) return 1;
+        long diff = b.first - a.first;
+        return (diff < 0 ? -1 : (diff > 0 ? 1 : 0));
+      }
+    });
+
+    List<List<Expr>> newResultExprLists = Lists.newArrayList();
+    ArrayList<PlanNode> newChildren = Lists.newArrayList();
+    for (Pair<Long, Integer> p: memByChildIdx) {
+      newResultExprLists.add(resultExprLists_.get(p.second));
+      newChildren.add(children_.get(p.second));
+    }
+    resultExprLists_ = newResultExprLists;
+    children_ = newChildren;
   }
 
   /**

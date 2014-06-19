@@ -98,7 +98,7 @@ public class HdfsScanNode extends ScanNode {
   // Partitions that are filtered in for scanning by the key ranges
   private final ArrayList<HdfsPartition> partitions_ = Lists.newArrayList();
 
-  // List of scan-range locations. Populated in getScanRangeLocations().
+  // List of scan-range locations. Populated in init().
   private List<TScanRangeLocations> scanRanges_;
 
   // Total number of bytes from partitions_
@@ -122,7 +122,7 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Populate conjuncts_ and partitions_.
+   * Populate conjuncts_, partitions_, and scanRanges_.
    */
   @Override
   public void init(Analyzer analyzer)
@@ -146,8 +146,77 @@ public class HdfsScanNode extends ScanNode {
     // do this at the end so it can take all conjuncts into account
     computeStats(analyzer);
 
+    // compute scan range locations
+    computeScanRangeLocations(analyzer.getQueryCtx().getRequest().getQuery_options()
+        .getMax_scan_range_length());
+
     // TODO: do we need this?
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
+  }
+
+  /**
+   * Computes scan ranges (hdfs splits) plus their storage locations, including volume
+   * ids, based on the given maximum number of bytes each scan range should scan.
+   */
+  private void computeScanRangeLocations(long maxScanRangeLength) {
+    scanRanges_ = Lists.newArrayList();
+    for (HdfsPartition partition: partitions_) {
+      Preconditions.checkState(partition.getId() >= 0);
+      for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
+        for (THdfsFileBlock thriftBlock: fileDesc.getFileBlocks()) {
+          HdfsPartition.FileBlock block = FileBlock.fromThrift(thriftBlock);
+          List<Integer> replicaHostIdxs = block.getReplicaHostIdxs();
+          if (replicaHostIdxs.size() == 0) {
+            // we didn't get locations for this block; for now, just ignore the block
+            // TODO: do something meaningful with that
+            continue;
+          }
+
+          // Look up the network addresses of all hosts (datanodes) that contain
+          // replicas of this block.
+          List<TNetworkAddress> blockNetworkAddresses =
+              new ArrayList<TNetworkAddress>(replicaHostIdxs.size());
+          for (Integer replicaHostId: replicaHostIdxs) {
+            TNetworkAddress blockNetworkAddress =
+                partition.getTable().getNetworkAddressByIdx(replicaHostId);
+            Preconditions.checkNotNull(blockNetworkAddress);
+            blockNetworkAddresses.add(blockNetworkAddress);
+          }
+
+          // record host/ports and volume ids
+          Preconditions.checkState(blockNetworkAddresses.size() > 0);
+          List<TScanRangeLocation> locations = Lists.newArrayList();
+          for (int i = 0; i < blockNetworkAddresses.size(); ++i) {
+            TScanRangeLocation location = new TScanRangeLocation();
+            location.setServer(blockNetworkAddresses.get(i));
+            location.setVolume_id(block.getDiskId(i));
+            location.setIs_cached(block.isCached(i));
+            locations.add(location);
+          }
+
+          // create scan ranges, taking into account maxScanRangeLength
+          long currentOffset = block.getOffset();
+          long remainingLength = block.getLength();
+          while (remainingLength > 0) {
+            long currentLength = remainingLength;
+            if (maxScanRangeLength > 0 && remainingLength > maxScanRangeLength) {
+              currentLength = maxScanRangeLength;
+            }
+            TScanRange scanRange = new TScanRange();
+            scanRange.setHdfs_file_split(new THdfsFileSplit(
+                new Path(partition.getLocation(), fileDesc.getFileName()).toString(),
+                currentOffset, currentLength, partition.getId(),
+                fileDesc.getFileLength()));
+            TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
+            scanRangeLocations.scan_range = scanRange;
+            scanRangeLocations.locations = locations;
+            scanRanges_.add(scanRangeLocations);
+            remainingLength -= currentLength;
+            currentOffset += currentLength;
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -415,7 +484,6 @@ public class HdfsScanNode extends ScanNode {
       }
     }
     List<HdfsPartitionFilter> partitionFilters = Lists.newArrayList();
-    List<Expr> filterConjuncts = Lists.newArrayList();
     // Conjuncts that can be evaluated from the partition key values.
     List<Expr> simpleFilterConjuncts = Lists.newArrayList();
 
@@ -584,70 +652,9 @@ public class HdfsScanNode extends ScanNode {
     msg.node_type = TPlanNodeType.HDFS_SCAN_NODE;
   }
 
-  /**
-   * Return scan ranges (hdfs splits) plus their storage locations, including volume
-   * ids.
-   */
   @Override
-  public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
-    scanRanges_ = Lists.newArrayList();
-    for (HdfsPartition partition: partitions_) {
-      Preconditions.checkState(partition.getId() >= 0);
-      for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
-        for (THdfsFileBlock thriftBlock: fileDesc.getFileBlocks()) {
-          HdfsPartition.FileBlock block = FileBlock.fromThrift(thriftBlock);
-          List<Integer> replicaHostIdxs = block.getReplicaHostIdxs();
-          if (replicaHostIdxs.size() == 0) {
-            // we didn't get locations for this block; for now, just ignore the block
-            // TODO: do something meaningful with that
-            continue;
-          }
-
-          // Look up the network addresses of all hosts (datanodes) that contain
-          // replicas of this block.
-          List<TNetworkAddress> blockNetworkAddresses =
-              new ArrayList<TNetworkAddress>(replicaHostIdxs.size());
-          for (Integer replicaHostId: replicaHostIdxs) {
-            TNetworkAddress blockNetworkAddress =
-                partition.getTable().getNetworkAddressByIdx(replicaHostId);
-            Preconditions.checkNotNull(blockNetworkAddress);
-            blockNetworkAddresses.add(blockNetworkAddress);
-          }
-
-          // record host/ports and volume ids
-          Preconditions.checkState(blockNetworkAddresses.size() > 0);
-          List<TScanRangeLocation> locations = Lists.newArrayList();
-          for (int i = 0; i < blockNetworkAddresses.size(); ++i) {
-            TScanRangeLocation location = new TScanRangeLocation();
-            location.setServer(blockNetworkAddresses.get(i));
-            location.setVolume_id(block.getDiskId(i));
-            location.setIs_cached(block.isCached(i));
-            locations.add(location);
-          }
-
-          // create scan ranges, taking into account maxScanRangeLength
-          long currentOffset = block.getOffset();
-          long remainingLength = block.getLength();
-          while (remainingLength > 0) {
-            long currentLength = remainingLength;
-            if (maxScanRangeLength > 0 && remainingLength > maxScanRangeLength) {
-              currentLength = maxScanRangeLength;
-            }
-            TScanRange scanRange = new TScanRange();
-            scanRange.setHdfs_file_split(new THdfsFileSplit(
-                new Path(partition.getLocation(), fileDesc.getFileName()).toString(),
-                currentOffset, currentLength, partition.getId(),
-                fileDesc.getFileLength()));
-            TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
-            scanRangeLocations.scan_range = scanRange;
-            scanRangeLocations.locations = locations;
-            scanRanges_.add(scanRangeLocations);
-            remainingLength -= currentLength;
-            currentOffset += currentLength;
-          }
-        }
-      }
-    }
+  public List<TScanRangeLocations> getScanRangeLocations() {
+    Preconditions.checkNotNull(scanRanges_, "Need to call init() first.");
     return scanRanges_;
   }
 

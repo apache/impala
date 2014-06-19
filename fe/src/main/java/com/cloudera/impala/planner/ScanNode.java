@@ -39,12 +39,9 @@ abstract public class ScanNode extends PlanNode {
   public TupleDescriptor getTupleDesc() { return desc_; }
 
   /**
-   * Returns all scan ranges plus their locations. Needs to be preceded by a call to
-   * finalize().
-   * @param maxScanRangeLength The maximum number of bytes each scan range should scan;
-   *     only applicable to HDFS; less than or equal to zero means no maximum.
+   * Returns all scan ranges plus their locations.
    */
-  abstract public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength);
+  abstract public List<TScanRangeLocations> getScanRangeLocations();
 
   @Override
   protected String debugString() {

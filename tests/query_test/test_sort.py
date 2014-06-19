@@ -78,7 +78,6 @@ class TestQueryFullSort(ImpalaTestSuite):
     assert(result[0] == sorted(result[0]))
 
   def test_sort_union(self, vector):
-
     query = """select o_orderdate, o_custkey, o_comment from (select * from orders union
     select * from orders union all select * from orders) as i
     order by o_orderdate limit 100000"""

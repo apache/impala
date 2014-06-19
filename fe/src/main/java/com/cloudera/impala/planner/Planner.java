@@ -654,6 +654,7 @@ public class Planner {
     // Fragment contains the UnionNode that consumes the data of all child fragments.
     PlanFragment unionFragment = new PlanFragment(fragmentIdGenerator_.getNextId(),
         unionNode, DataPartition.RANDOM);
+    unionNode.reorderOperands(analyzer);
     unionNode.init(analyzer);
     return unionFragment;
   }

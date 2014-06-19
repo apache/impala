@@ -306,7 +306,7 @@ public class DataSourceScanNode extends ScanNode {
   }
 
   @Override
-  public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
+  public List<TScanRangeLocations> getScanRangeLocations() {
     // Always returns a single scan range for the localhost
     // TODO: Does the port matter?
     return Lists.newArrayList(

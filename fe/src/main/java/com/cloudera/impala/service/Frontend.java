@@ -677,8 +677,7 @@ public class Frontend {
     for (ScanNode scanNode: scanNodes) {
       queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
-          scanNode.getScanRangeLocations(
-              queryCtx.request.query_options.getMax_scan_range_length()));
+          scanNode.getScanRangeLocations());
       if (scanNode.isTableMissingStats()) {
         tablesMissingStats.add(scanNode.getTupleDesc().getTableName().toThrift());
       }

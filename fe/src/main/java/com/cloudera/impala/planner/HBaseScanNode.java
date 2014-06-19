@@ -101,6 +101,9 @@ public class HBaseScanNode extends ScanNode {
   // HBase config; Common across all object instance.
   private static Configuration hbaseConf_ = HBaseConfiguration.create();
 
+  // List of scan-range locations. Populated in init().
+  private List<TScanRangeLocations> scanRanges_;
+
   public HBaseScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc, "SCAN HBASE");
     desc_ = desc;
@@ -123,6 +126,8 @@ public class HBaseScanNode extends ScanNode {
     analyzer.materializeSlots(conjuncts_);
     computeMemLayout(analyzer);
     computeStats(analyzer);
+
+    computeScanRangeLocations();
   }
 
   /**
@@ -279,12 +284,11 @@ public class HBaseScanNode extends ScanNode {
    * relevant region, and the created TScanRange will contain all the relevant regions
    * of that region server.
    */
-  @Override
-  public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
-    List<TScanRangeLocations> result = Lists.newArrayList();
+  private void computeScanRangeLocations() {
+    scanRanges_ = Lists.newArrayList();
 
     // For empty scan node, return an empty list.
-    if (isEmpty_) return result;
+    if (isEmpty_) return;
 
     // Retrieve relevant HBase regions and their region servers
     HBaseTable tbl = (HBaseTable) desc_.getTable();
@@ -336,7 +340,7 @@ public class HBaseScanNode extends ScanNode {
           TScanRangeLocations scanRangeLocation = new TScanRangeLocations();
           scanRangeLocation.addToLocations(
               new TScanRangeLocation(addressToTNetworkAddress(locEntry.getKey())));
-          result.add(scanRangeLocation);
+          scanRanges_.add(scanRangeLocation);
 
           TScanRange scanRange = new TScanRange();
           scanRange.setHbase_key_range(keyRange);
@@ -345,7 +349,12 @@ public class HBaseScanNode extends ScanNode {
         prevEndKey = curRegEndKey;
       }
     }
-    return result;
+  }
+
+  @Override
+  public List<TScanRangeLocations> getScanRangeLocations() {
+    Preconditions.checkNotNull(scanRanges_, "Need to call init() first.");
+    return scanRanges_;
   }
 
   /**

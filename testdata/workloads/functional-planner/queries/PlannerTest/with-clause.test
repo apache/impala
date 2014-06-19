@@ -52,18 +52,18 @@ select * from t1 union all select * from t2 union all select * from t3
 |
 00:UNION
 |
+|--01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|
 |--05:EXCHANGE [RANDOM]
 |  |
 |  03:UNION
 |     constant-operands=2
 |
-|--04:EXCHANGE [RANDOM]
-|  |
-|  02:UNION
-|     constant-operands=1
+04:EXCHANGE [RANDOM]
 |
-01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+02:UNION
+   constant-operands=1
 ====
 # Multiple views in with-clause. All views are used in a join.
 with t1 as (select int_col x, bigint_col y from functional.alltypes),
