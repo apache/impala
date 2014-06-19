@@ -28,7 +28,7 @@ UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
     : ExecNode(pool, tnode, descs),
       tuple_id_(tnode.union_node.tuple_id),
       const_result_expr_idx_(0),
-      child_idx_(INVALID_CHILD_IDX),
+      child_idx_(0),
       child_row_batch_(NULL),
       child_eos_(false),
       child_row_idx_(0) {
@@ -89,6 +89,23 @@ Status UnionNode::Open(RuntimeState* state) {
   for (int i = 0; i < result_expr_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Open(result_expr_lists_[i], state));
   }
+
+  // Open and fetch from the first child if there is one. Ensures that rows are
+  // available for clients to fetch after this Open() has succeeded.
+  if (!children_.empty()) RETURN_IF_ERROR(OpenCurrentChild(state));
+
+  return Status::OK;
+}
+
+Status UnionNode::OpenCurrentChild(RuntimeState* state) {
+  DCHECK_LT(child_idx_, children_.size());
+  child_row_batch_.reset(new RowBatch(
+      child(child_idx_)->row_desc(), state->batch_size(), mem_tracker()));
+  // Open child and fetch the first row batch.
+  RETURN_IF_ERROR(child(child_idx_)->Open(state));
+  RETURN_IF_ERROR(child(child_idx_)->GetNext(state, child_row_batch_.get(),
+      &child_eos_));
+  child_row_idx_ = 0;
   return Status::OK;
 }
 
@@ -101,32 +118,10 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   int tuple_buffer_size = row_batch->capacity() * tuple_desc_->byte_size();
   Tuple* tuple = Tuple::Create(tuple_buffer_size, row_batch->tuple_data_pool());
 
-  // Evaluate and materialize the const expr lists exactly once.
-  while (const_result_expr_idx_ < const_result_expr_lists_.size()) {
-    // Only evaluate the const expr lists by the first fragment instance.
-    if (state->fragment_ctx().fragment_instance_idx == 0) {
-      // Materialize expr results into row_batch.
-      EvalAndMaterializeExprs(const_result_expr_lists_[const_result_expr_idx_], true,
-          &tuple, row_batch);
-    }
-    ++const_result_expr_idx_;
-    *eos = ReachedLimit();
-    if (*eos || row_batch->AtCapacity()) return Status::OK;
-  }
-  if (child_idx_ == INVALID_CHILD_IDX) child_idx_ = 0;
-
   // Fetch from children, evaluate corresponding exprs and materialize.
   while (child_idx_ < children_.size()) {
     // Row batch was either never set or we're moving on to a different child.
-    if (child_row_batch_.get() == NULL) {
-      child_row_batch_.reset(new RowBatch(
-          child(child_idx_)->row_desc(), state->batch_size(), mem_tracker()));
-      // Open child and fetch the first row batch.
-      RETURN_IF_ERROR(child(child_idx_)->Open(state));
-      RETURN_IF_ERROR(child(child_idx_)->GetNext(state, child_row_batch_.get(),
-          &child_eos_));
-      child_row_idx_ = 0;
-    }
+    if (child_row_batch_.get() == NULL) RETURN_IF_ERROR(OpenCurrentChild(state));
 
     // Start (or continue) consuming row batches from current child.
     while (true) {
@@ -134,9 +129,6 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
       if (EvalAndMaterializeExprs(result_expr_lists_[child_idx_], false, &tuple,
           row_batch)) {
         *eos = ReachedLimit();
-        if (*eos) {
-          child_idx_ = INVALID_CHILD_IDX;
-        }
         return Status::OK;
       }
 
@@ -158,7 +150,19 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     child_row_batch_.reset();
   }
 
-  child_idx_ = INVALID_CHILD_IDX;
+  // Evaluate and materialize the const expr lists exactly once.
+  while (const_result_expr_idx_ < const_result_expr_lists_.size()) {
+    // Only evaluate the const expr lists by the first fragment instance.
+    if (state->fragment_ctx().fragment_instance_idx == 0) {
+      // Materialize expr results into row_batch.
+      EvalAndMaterializeExprs(const_result_expr_lists_[const_result_expr_idx_], true,
+          &tuple, row_batch);
+    }
+    ++const_result_expr_idx_;
+    *eos = ReachedLimit();
+    if (*eos || row_batch->AtCapacity()) return Status::OK;
+  }
+
   *eos = true;
   return Status::OK;
 }

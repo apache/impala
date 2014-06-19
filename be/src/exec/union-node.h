@@ -42,8 +42,6 @@ class UnionNode : public ExecNode {
   virtual void Close(RuntimeState* state);
 
  private:
-  const static int INVALID_CHILD_IDX = -1;
-
   // Tuple id resolved in Prepare() to set tuple_desc_;
   int tuple_id_;
 
@@ -74,6 +72,10 @@ class UnionNode : public ExecNode {
 
   // Index of current row in child_row_batch_.
   int child_row_idx_;
+
+  // Opens the child at child_idx_, fetches the first batch into child_row_batch_,
+  // and sets child_row_idx_ to 0. May set child_eos_.
+  Status OpenCurrentChild(RuntimeState* state);
 
   // Evaluates exprs on all rows in child_row_batch_ starting from child_row_idx_,
   // and materializes their results into *tuple.
