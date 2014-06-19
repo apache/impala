@@ -1264,7 +1264,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(decimal_10_0 + " * " + decimal_38_34,
         ColumnType.createDecimalType(38, 34));
     testDecimalExpr(decimal_10_0 + " / " + decimal_38_34,
-        ColumnType.createDecimalType(38, 38));
+        ColumnType.createDecimalType(38, 34));
     testDecimalExpr(decimal_10_0 + " % " + decimal_38_34,
         ColumnType.createDecimalType(38, 34));
 
@@ -1275,7 +1275,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(decimal_38_34 + " * " + decimal_5_5,
         ColumnType.createDecimalType(38, 38));
     testDecimalExpr(decimal_38_34 + " / " + decimal_5_5,
-        ColumnType.createDecimalType(38, 38));
+        ColumnType.createDecimalType(38, 34));
     testDecimalExpr(decimal_38_34 + " % " + decimal_5_5,
         ColumnType.createDecimalType(34, 34));
 
@@ -1312,7 +1312,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(decimal_5_5 + " % cast(1 as bigint)",
         ColumnType.createDecimalType(5, 5));
     testDecimalExpr(decimal_5_5 + " / cast(1 as float)",
-        ColumnType.createDecimalType(38, 38));
+        ColumnType.createDecimalType(38, 9));
     testDecimalExpr(decimal_5_5 + " + cast(1 as double)",
         ColumnType.createDecimalType(38, 17));
 

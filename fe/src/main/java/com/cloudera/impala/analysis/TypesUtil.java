@@ -154,9 +154,19 @@ public class TypesUtil {
       case MULTIPLY:
         return ColumnType.createDecimalTypeInternal(p1 + p2 + 1, s1 + s2);
       case DIVIDE:
-        return ColumnType.createDecimalTypeInternal(
-            p1 - s1 + s2 + Math.max(DECIMAL_DIVISION_SCALE_INCREMENT, s1 + p2 + 1),
-            Math.max(DECIMAL_DIVISION_SCALE_INCREMENT, s1 + p2 + 1));
+        int resultScale = Math.max(DECIMAL_DIVISION_SCALE_INCREMENT, s1 + p2 + 1);
+        int resultPrecision = p1 - s1 + s2 + resultScale;
+        if (resultPrecision > ColumnType.MAX_PRECISION) {
+          // In this case, the desired resulting precision exceeds the maximum and
+          // we need to truncate some way. We can either remove digits before or
+          // after the decimal and there is no right answer. This is an implementation
+          // detail and different databases will handle this differently.
+          // For simplicity, we will set the resulting scale to be the max of the input
+          // scales and use the maximum precision.
+          resultScale = Math.max(s1, s2);
+          resultPrecision = ColumnType.MAX_PRECISION;
+        }
+        return ColumnType.createDecimalTypeInternal(resultPrecision, resultScale);
       case MOD:
         return ColumnType.createDecimalTypeInternal(
             Math.min(p1 - s1, p2 - s2) + sMax, sMax);
