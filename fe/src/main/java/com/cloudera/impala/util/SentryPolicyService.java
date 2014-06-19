@@ -180,7 +180,7 @@ public class SentryPolicyService {
         AuthorizeableDb db = (AuthorizeableDb) authorizeable;
         try {
           client.get().grantDatabasePrivilege(user_.getName(), roleName,
-              serverName_, db.getName());
+              serverName_, db.getName(), privilege.toString());
         } catch (SentryUserException e) {
           throw new InternalException("Error granting privilege: ", e);
         } catch (RuntimeException e) {
