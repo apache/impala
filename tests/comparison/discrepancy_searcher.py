@@ -475,6 +475,13 @@ if __name__ == '__main__':
   parser.add_option('--exclude-types', default='Double,Float,TinyInt',
       help='A comma separated list of data types to exclude while generating queries.')
 
+  group = OptionGroup(parser, "Impala Options")
+  group.add_option('--impalad-host', default='localhost',
+      help="The name of the host running the Impala daemon")
+  group.add_option("--impalad-hs2-port", default=21050, type=int,
+      help="The hs2 port of the host running the Impala daemon")
+  parser.add_option_group(group)
+
   group = OptionGroup(parser, 'MySQL Options')
   group.add_option('--mysql-host', default='localhost',
       help='The name of the host running the MySQL database.')
@@ -506,7 +513,10 @@ if __name__ == '__main__':
 
   basicConfig(level=options.log_level)
 
-  impala_connection = DbConnector(IMPALA).create_connection(options.db_name)
+  impala_connection = DbConnector(IMPALA,
+      host_name=getattr(options, 'impalad_host'),
+      port=getattr(options, 'impalad_hs2_port'))\
+      .create_connection(options.db_name)
   db_connector_param_key = options.reference_db_type.lower()
   reference_connection = DbConnector(options.reference_db_type,
       user_name=getattr(options, db_connector_param_key + '_user'),

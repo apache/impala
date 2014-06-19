@@ -30,6 +30,7 @@ except:
   raise
 from itertools import izip
 from logging import getLogger
+from socket import getfqdn
 from tests.comparison.model import Column, Table, TYPES, String
 
 LOG = getLogger(__name__)
@@ -57,7 +58,7 @@ class DbConnector(object):
       raise Exception('Unsupported database: %s' % db_type)
     self.user_name = user_name
     self.password = password
-    self.host_name = host_name or 'localhost'
+    self.host_name = host_name or getfqdn()
     self.port = port
 
   def create_connection(self, db_name=None):

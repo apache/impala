@@ -639,33 +639,33 @@ class AggFunc(Func):
 # structure. Non-standard funcs, such as string concatenation, would need to have
 # their representation information elsewhere (like classes above).
 
-Parentheses = type('Parentheses', (UnaryFunc, UpcastingFunc), {'FORMAT': '({})'})
+Parentheses = type('Parentheses', (UnaryFunc, UpcastingFunc), {'FORMAT': '({0})'})
 
-IsNull = type('IsNull', (UnaryFunc, BooleanFunc), {'FORMAT': '{} IS NULL'})
-IsNotNull = type('IsNotNull', (UnaryFunc, BooleanFunc), {'FORMAT': '{} IS NOT NULL'})
-And = type('And', (BinaryFunc, BooleanFunc), {'FORMAT': '{} AND {}'})
-Or = type('Or', (BinaryFunc, BooleanFunc), {'FORMAT': '{} OR {}'})
-Equals = type('Equals', (BinaryFunc, BooleanFunc), {'FORMAT': '{} = {}'})
-NotEquals = type('NotEquals', (BinaryFunc, BooleanFunc), {'FORMAT': '{} != {}'})
-GreaterThan = type('GreaterThan', (BinaryFunc, BooleanFunc), {'FORMAT': '{} > {}'})
-LessThan = type('LessThan', (BinaryFunc, BooleanFunc), {'FORMAT': '{} < {}'})
+IsNull = type('IsNull', (UnaryFunc, BooleanFunc), {'FORMAT': '{0} IS NULL'})
+IsNotNull = type('IsNotNull', (UnaryFunc, BooleanFunc), {'FORMAT': '{0} IS NOT NULL'})
+And = type('And', (BinaryFunc, BooleanFunc), {'FORMAT': '{0} AND {1}'})
+Or = type('Or', (BinaryFunc, BooleanFunc), {'FORMAT': '{0} OR {1}'})
+Equals = type('Equals', (BinaryFunc, BooleanFunc), {'FORMAT': '{0} = {1}'})
+NotEquals = type('NotEquals', (BinaryFunc, BooleanFunc), {'FORMAT': '{0} != {1}'})
+GreaterThan = type('GreaterThan', (BinaryFunc, BooleanFunc), {'FORMAT': '{0} > {1}'})
+LessThan = type('LessThan', (BinaryFunc, BooleanFunc), {'FORMAT': '{0} < {1}'})
 GreaterThanOrEquals = type(
-    'GreaterThanOrEquals', (BinaryFunc, BooleanFunc), {'FORMAT': '{} >= {}'})
+    'GreaterThanOrEquals', (BinaryFunc, BooleanFunc), {'FORMAT': '{0} >= {1}'})
 LessThanOrEquals = type(
-    'LessThanOrEquals', (BinaryFunc, BooleanFunc), {'FORMAT': '{} <= {}'})
+    'LessThanOrEquals', (BinaryFunc, BooleanFunc), {'FORMAT': '{0} <= {1}'})
 
-Plus = type('Plus', (BinaryFunc, UpcastingFunc), {'FORMAT': '{} + {}'})
-Minus = type('Minus', (BinaryFunc, UpcastingFunc), {'FORMAT': '{} - {}'})
-Multiply = type('Multiply', (BinaryFunc, UpcastingFunc), {'FORMAT': '{} * {}'})
-Divide = type('Divide', (BinaryFunc, DoubleFunc), {'FORMAT': '{} / {}'})
+Plus = type('Plus', (BinaryFunc, UpcastingFunc), {'FORMAT': '{0} + {1}'})
+Minus = type('Minus', (BinaryFunc, UpcastingFunc), {'FORMAT': '{0} - {1}'})
+Multiply = type('Multiply', (BinaryFunc, UpcastingFunc), {'FORMAT': '{0} * {1}'})
+Divide = type('Divide', (BinaryFunc, DoubleFunc), {'FORMAT': '{0} / {1}'})
 
-Floor = type('Floor', (UnaryFunc, IntFunc), {'FORMAT': 'FLOOR({})'})
+Floor = type('Floor', (UnaryFunc, IntFunc), {'FORMAT': 'FLOOR({0})'})
 
-Concat = type('Concat', (BinaryFunc, StringFunc), {'FORMAT': 'CONCAT({}, {})'})
-Length = type('Length', (UnaryFunc, IntFunc), {'FORMAT': 'LENGTH({})'})
+Concat = type('Concat', (BinaryFunc, StringFunc), {'FORMAT': 'CONCAT({0}, {1})'})
+Length = type('Length', (UnaryFunc, IntFunc), {'FORMAT': 'LENGTH({0})'})
 
 ExtractYear = type(
-    'ExtractYear', (UnaryFunc, IntFunc), {'FORMAT': "EXTRACT('YEAR' FROM {})"})
+    'ExtractYear', (UnaryFunc, IntFunc), {'FORMAT': "EXTRACT('YEAR' FROM {0})"})
 
 # Formatting of agg funcs is a little trickier since they may have a distinct
 Avg = type('Avg', (UnaryFunc, DoubleFunc, AggFunc), {})
@@ -685,7 +685,7 @@ AGG_FUNCS = [Avg, Count, Max, Min, Sum]
 
 class If(Func):
 
-  FORMAT = 'CASE WHEN {} THEN {} ELSE {} END'
+  FORMAT = 'CASE WHEN {0} THEN {1} ELSE {2} END'
 
   def __init__(self, boolean_expr, consquent_expr, alternative_expr):
     Func.__init__(
@@ -721,11 +721,11 @@ class Greatest(BinaryFunc, UpcastingFunc, If):
 
 class Cast(Func):
 
-  FORMAT = 'CAST({} AS {})'
+  FORMAT = 'CAST({0} AS {1})'
 
   def __init__(self, val_expr, resulting_type):
     if resulting_type not in TYPES:
-      raise Exception('Unexpected type: {}'.format(resulting_type))
+      raise Exception('Unexpected type: {0}'.format(resulting_type))
     Func.__init__(self, val_expr, resulting_type)
 
   @property

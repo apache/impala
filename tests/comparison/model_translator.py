@@ -153,9 +153,9 @@ class SqlWriter(object):
   def _write_data_type(self, data_type):
     '''Write a literal value.'''
     if data_type.returns_string:
-      return "'{}'".format(data_type.val)
+      return "'{0}'".format(data_type.val)
     if data_type.returns_timestamp:
-      return "CAST('{}' AS TIMESTAMP)".format(data_type.val)
+      return "CAST('{0}' AS TIMESTAMP)".format(data_type.val)
     return str(data_type.val)
 
   def _write_func(self, func):
@@ -166,18 +166,18 @@ class SqlWriter(object):
     # make sense like casting a DATE as a BOOLEAN....
     if cast.val_expr.returns_boolean:
       if issubclass(cast.resulting_type, Timestamp):
-        return "CAST(CASE WHEN {} THEN '2000-01-01' ELSE '1999-01-01' END AS TIMESTAMP)"\
+        return "CAST(CASE WHEN {0} THEN '2000-01-01' ELSE '1999-01-01' END AS TIMESTAMP)"\
             .format(self._write(cast.val_expr))
     elif cast.val_expr.returns_number:
       if issubclass(cast.resulting_type, Timestamp):
         return ("CAST(CONCAT('2000-01-', "
-            "LPAD(CAST(ABS(FLOOR({})) % 31 + 1 AS STRING), 2, '0')) "
+            "LPAD(CAST(ABS(FLOOR({0})) % 31 + 1 AS STRING), 2, '0')) "
             "AS TIMESTAMP)").format(self._write(cast.val_expr))
     elif cast.val_expr.returns_string:
       if issubclass(cast.resulting_type, Boolean):
-        return "(LENGTH({}) > 2)".format(self._write(cast.val_expr))
+        return "(LENGTH({0}) > 2)".format(self._write(cast.val_expr))
       if issubclass(cast.resulting_type, Timestamp):
-        return ("CAST(CONCAT('2000-01-', LPAD(CAST(LENGTH({}) % 31 + 1 AS STRING), "
+        return ("CAST(CONCAT('2000-01-', LPAD(CAST(LENGTH({0}) % 31 + 1 AS STRING), "
             "2, '0')) AS TIMESTAMP)").format(self._write(cast.val_expr))
     elif cast.val_expr.returns_timestamp:
       if issubclass(cast.resulting_type, Boolean):
@@ -231,7 +231,7 @@ class PostgresqlSqlWriter(SqlWriter):
 
   def _write_divide(self, divide):
     # For ints, Postgresql does int division but Impala does float division.
-    return 'CAST({} AS REAL) / {}' \
+    return 'CAST({0} AS REAL) / {1}' \
         .format(*[self._write(arg) for arg in divide.args])
 
   def _write_data_type_metaclass(self, data_type_class):
@@ -245,24 +245,24 @@ class PostgresqlSqlWriter(SqlWriter):
     # make sense like casting a DATE as a BOOLEAN....
     if cast.val_expr.returns_boolean:
       if issubclass(cast.resulting_type, Float):
-        return "CASE {} WHEN TRUE THEN 1.0 WHEN FALSE THEN 0.0 END".format(
+        return "CASE {0} WHEN TRUE THEN 1.0 WHEN FALSE THEN 0.0 END".format(
             self._write(cast.val_expr))
       if issubclass(cast.resulting_type, Timestamp):
-        return "CASE WHEN {} THEN '2000-01-01' ELSE '1999-01-01' END".format(
+        return "CASE WHEN {0} THEN '2000-01-01' ELSE '1999-01-01' END".format(
             self._write(cast.val_expr))
       if issubclass(cast.resulting_type, String):
-        return "CASE {} WHEN TRUE THEN '1' WHEN FALSE THEN '0' END".format(
+        return "CASE {0} WHEN TRUE THEN '1' WHEN FALSE THEN '0' END".format(
             self._write(cast.val_expr))
     elif cast.val_expr.returns_number:
       if issubclass(cast.resulting_type, Boolean):
         return 'CASE WHEN ({0}) != 0 THEN TRUE WHEN ({0}) = 0 THEN FALSE END'.format(
             self._write(cast.val_expr))
       if issubclass(cast.resulting_type, Timestamp):
-        return "CASE WHEN ({}) > 0 THEN '2000-01-01' ELSE '1999-01-01' END".format(
+        return "CASE WHEN ({0}) > 0 THEN '2000-01-01' ELSE '1999-01-01' END".format(
             self._write(cast.val_expr))
     elif cast.val_expr.returns_string:
       if issubclass(cast.resulting_type, Boolean):
-        return "(LENGTH({}) > 2)".format(self._write(cast.val_expr))
+        return "(LENGTH({0}) > 2)".format(self._write(cast.val_expr))
     elif cast.val_expr.returns_timestamp:
       if issubclass(cast.resulting_type, Boolean):
         return '(EXTRACT(DAY FROM {0}) > EXTRACT(MONTH FROM {0}))'.format(
@@ -317,7 +317,7 @@ class MySQLSqlWriter(SqlWriter):
   def _write_data_type(self, data_type):
     '''Write a literal value.'''
     if data_type.returns_timestamp:
-      return "CAST('{}' AS DATETIME)".format(data_type.val)
+      return "CAST('{0}' AS DATETIME)".format(data_type.val)
     if data_type.returns_boolean:
       # MySQL will error if a data_type "FALSE" is used as a GROUP BY field
       return '(0 = 0)' if data_type.val else '(1 = 0)'
@@ -328,20 +328,20 @@ class MySQLSqlWriter(SqlWriter):
     # make sense like casting a DATE as a BOOLEAN....
     if cast.val_expr.returns_boolean:
       if issubclass(cast.resulting_type, Timestamp):
-        return "CAST(CASE WHEN {} THEN '2000-01-01' ELSE '1999-01-01' END AS DATETIME)"\
+        return "CAST(CASE WHEN {0} THEN '2000-01-01' ELSE '1999-01-01' END AS DATETIME)"\
             .format(self._write(cast.val_expr))
     elif cast.val_expr.returns_number:
       if issubclass(cast.resulting_type, Boolean):
         return ("CASE WHEN ({0}) != 0 THEN TRUE WHEN ({0}) = 0 THEN FALSE END").format(
             self._write(cast.val_expr))
       if issubclass(cast.resulting_type, Timestamp):
-        return "CAST(CONCAT('2000-01-', ABS(FLOOR({})) % 31 + 1) AS DATETIME)"\
+        return "CAST(CONCAT('2000-01-', ABS(FLOOR({0})) % 31 + 1) AS DATETIME)"\
             .format(self._write(cast.val_expr))
     elif cast.val_expr.returns_string:
       if issubclass(cast.resulting_type, Boolean):
-        return "(LENGTH({}) > 2)".format(self._write(cast.val_expr))
+        return "(LENGTH({0}) > 2)".format(self._write(cast.val_expr))
       if issubclass(cast.resulting_type, Timestamp):
-        return ("CAST(CONCAT('2000-01-', LENGTH({}) % 31 + 1) AS DATETIME)").format(
+        return ("CAST(CONCAT('2000-01-', LENGTH({0}) % 31 + 1) AS DATETIME)").format(
            self._write(cast.val_expr))
     elif cast.val_expr.returns_timestamp:
       if issubclass(cast.resulting_type, Number):
