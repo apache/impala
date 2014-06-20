@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.Authorizeable;
 import com.cloudera.impala.authorization.AuthorizeableDb;
+import com.cloudera.impala.authorization.AuthorizeableServer;
 import com.cloudera.impala.authorization.AuthorizeableTable;
 import com.cloudera.impala.authorization.AuthorizeableUri;
 import com.cloudera.impala.authorization.Privilege;
@@ -176,16 +177,20 @@ public class SentryPolicyService {
 
     SentryServiceClient client = new SentryServiceClient();
     try {
-      if (authorizeable instanceof AuthorizeableDb) {
+      if (authorizeable instanceof AuthorizeableServer) {
+        try {
+          client.get().grantServerPrivilege(user_.getName(), roleName,
+              authorizeable.getName());
+        } catch (SentryUserException e) {
+          throw new InternalException("Error granting privilege: ", e);
+        }
+      } else if (authorizeable instanceof AuthorizeableDb) {
         AuthorizeableDb db = (AuthorizeableDb) authorizeable;
         try {
           client.get().grantDatabasePrivilege(user_.getName(), roleName,
               serverName_, db.getName(), privilege.toString());
         } catch (SentryUserException e) {
           throw new InternalException("Error granting privilege: ", e);
-        } catch (RuntimeException e) {
-          if (e.getMessage().contains("duplicate key value")) return;
-          throw e;
         }
       } else if (authorizeable instanceof AuthorizeableUri) {
         AuthorizeableUri uri = (AuthorizeableUri) authorizeable;
@@ -194,9 +199,6 @@ public class SentryPolicyService {
               roleName, serverName_, uri.getName());
         } catch (SentryUserException e) {
           throw new InternalException("Error granting privilege: ", e);
-        } catch (RuntimeException e) {
-          if (e.getMessage().contains("duplicate key value")) return;
-          throw e;
         }
       } else if (authorizeable instanceof AuthorizeableTable) {
         AuthorizeableTable tbl = (AuthorizeableTable) authorizeable;
@@ -207,10 +209,6 @@ public class SentryPolicyService {
               dbName, tblName, privilege.toString());
         } catch (SentryUserException e) {
           throw new InternalException("Error granting privilege: ", e);
-        } catch (RuntimeException e) {
-          // TODO: Fix this once Sentry has better error codes.
-          if (e.getMessage().contains("duplicate key value")) return;
-          throw e;
         }
       } else {
         Preconditions.checkState(false, "Unexpected Authorizeable type: %s",

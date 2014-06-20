@@ -212,13 +212,14 @@ public class CatalogServiceCatalog extends Catalog {
             grantGroups.add(group.getGroupName());
           }
           Role existingRole = authPolicy_.getRole(sentryRole.getRoleName());
-          Role role = new Role(sentryRole.getRoleName(), grantGroups);
+          Role role;
 
           // These roles are the same, use the current role.
           if (existingRole != null &&
               existingRole.getGrantGroups().equals(grantGroups)) {
             role = existingRole;
           } else {
+            role = new Role(sentryRole.getRoleName(), grantGroups);
             // Increment the catalog version and add the role atomically.
             catalogLock_.writeLock().lock();
             try {
@@ -266,8 +267,8 @@ public class CatalogServiceCatalog extends Catalog {
           try {
             for (String privilegeName: privilegesToRemove) {
               role.removePrivilege(privilegeName);
+              incrementAndGetCatalogVersion();
             }
-            incrementAndGetCatalogVersion();
           } finally {
             catalogLock_.writeLock().unlock();
           }
@@ -283,8 +284,8 @@ public class CatalogServiceCatalog extends Catalog {
       try {
         for (String roleName: rolesToRemove) {
           authPolicy_.removeRole(roleName);
+          incrementAndGetCatalogVersion();
         }
-        incrementAndGetCatalogVersion();
       } finally {
         catalogLock_.writeLock().unlock();
       }

@@ -19,6 +19,7 @@ import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
@@ -35,9 +36,11 @@ import com.google.common.base.Preconditions;
 public class ImpaladTestCatalog extends ImpaladCatalog {
   // Used to load missing table metadata when running the FE tests.
   private final CatalogServiceCatalog srcCatalog_;
+  private final AuthorizationConfig authzConfig_;
 
   public ImpaladTestCatalog(AuthorizationConfig authzConfig) {
     super(authzConfig);
+    authzConfig_ = authzConfig;
     CatalogServiceCatalog catalogServerCatalog =
         CatalogServiceTestCatalog.createWithAuth(authzConfig.getSentryConfig());
     // Bootstrap the catalog by adding all dbs, tables, and functions.
@@ -54,6 +57,14 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
   @Override
   public HdfsCachePool getHdfsCachePool(String poolName) {
     return srcCatalog_.getHdfsCachePool(poolName);
+  }
+
+  /**
+   * Reloads all metadata from the source catalog.
+   */
+  public void reset() throws CatalogException {
+    srcCatalog_.reset();
+    authzChecker_ = new AuthorizationChecker(authzConfig_, authPolicy_);
   }
 
   /**

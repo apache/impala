@@ -135,6 +135,10 @@ public class AuthorizationChecker {
         }
       }
       return false;
+    } else if (request.getPrivilege() == Privilege.CREATE && authorizeables.size() > 1) {
+      // CREATE on an object requires CREATE on the parent,
+      // so don't check access on the object we're creating.
+      authorizeables.remove(authorizeables.size() - 1);
     }
     return provider_.hasAccess(new Subject(user.getShortName()), authorizeables, actions,
         ActiveRoleSet.ALL);

@@ -14,6 +14,9 @@
 
 package com.cloudera.impala.catalog;
 
+import static org.apache.sentry.provider.common.ProviderConstants.AUTHORIZABLE_JOINER;
+import static org.apache.sentry.provider.common.ProviderConstants.KV_JOINER;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,7 +25,7 @@ import org.apache.log4j.Logger;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.provider.cache.PrivilegeCache;
 
-import com.cloudera.impala.thrift.TPrivilegeScope;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -62,12 +65,15 @@ public class AuthorizationPolicy implements PrivilegeCache {
    */
   public synchronized void addRole(Role role) {
     Role existingRole = roleCache_.get(role.getName());
-    // There is already a newer version of this role in the catalog.
-    if (!roleCache_.add(role)) return;
+    // There is already a newer version of this role in the catalog, ignore
+    // just return.
+    if (existingRole != null &&
+        existingRole.getCatalogVersion() >= role.getCatalogVersion()) return;
 
     // If there was an existing role that was replaced we first need to remove it.
     // TODO: only remove things that have changed?
     if (existingRole != null) removeRole(role.getName());
+    roleCache_.add(role);
 
     // Add new grants
     for (String groupName: role.getGrantGroups()) {
@@ -153,7 +159,8 @@ public class AuthorizationPolicy implements PrivilegeCache {
     if (roleNames != null) {
       for (String roleName: roleNames) {
         // TODO: verify they actually exist.
-        grantedRoles.add(roleCache_.get(roleName));
+        Role role = roleCache_.get(roleName);
+        if (role != null) grantedRoles.add(roleCache_.get(roleName));
       }
     }
     return grantedRoles;
@@ -193,40 +200,65 @@ public class AuthorizationPolicy implements PrivilegeCache {
       List<Role> grantedRoles = getGrantedRoles(groupName);
       for (Role role: grantedRoles) {
         for (RolePrivilege privilege: role.getPrivileges()) {
-          // TODO: Temporary workaround for a sentry bug cause privileges
-          // to not be returned in the proper format.
-          StringBuilder sb = new StringBuilder();
-          String[] priv = privilege.getName().split("\\+");
-          if (priv.length > 0) {
-            sb.append("server=" + priv[0]);
+          String authorizeable = toSentryAuthorizeableStr(privilege);
+          if (authorizeable == null) {
+            LOG.error("Ignoring invalid privilege: " + privilege.getName());
+            continue;
           }
-          if (priv.length > 1) {
-            if (privilege.getScope() == TPrivilegeScope.URI) {
-              sb.append("->uri=" + priv[1]);
-            } else {
-              sb.append("->db=" + priv[1]);
-            }
-          }
-          if (priv.length > 2) {
-            if (priv.length == 3 && privilege.getScope() == TPrivilegeScope.DATABASE) {
-              if (!priv[2].equals("*")) sb.append("->action=" + priv[2]);
-            } else {
-              sb.append("->table=" + priv[2]);
-            }
-          }
-          if (priv.length > 3) {
-            if (priv.length == 4) {
-              sb.append("->action=" + priv[3]);
-            } else {
-              LOG.error("Ignoring invalid privilege: " + privilege.getName());
-              continue;
-            }
-          }
-          privileges.add(sb.toString());
+          privileges.add(authorizeable);
         }
       }
     }
     return privileges;
+  }
+
+  /**
+   * Converts a RolePrivilege to the string format that can be sent to Sentry.
+   * Returns null if the privilege is not in the correct format.
+   */
+  private String toSentryAuthorizeableStr(RolePrivilege privilege) {
+    List<String> authorizable = Lists.newArrayListWithExpectedSize(4);
+    try {
+      String[] priv = privilege.getName().split("\\+");
+      switch (privilege.getScope()) {
+        case SERVER: {
+          Preconditions.checkState(priv.length >= 1);
+          authorizable.add(KV_JOINER.join("server", priv[0]));
+          break;
+        }
+        case URI: {
+          Preconditions.checkState(priv.length >= 2);
+          authorizable.add(KV_JOINER.join("server", priv[0]));
+          authorizable.add(KV_JOINER.join("uri", priv[1]));
+          break;
+        }
+        case DATABASE: {
+          Preconditions.checkState(priv.length >= 2);
+          authorizable.add(KV_JOINER.join("server", priv[0]));
+          authorizable.add(KV_JOINER.join("db", priv[1]));
+          break;
+        }
+        case TABLE: {
+          Preconditions.checkState(priv.length >= 3);
+          authorizable.add(KV_JOINER.join("server", priv[0]));
+          authorizable.add(KV_JOINER.join("db", priv[1]));
+          authorizable.add(KV_JOINER.join("table", priv[2]));
+          break;
+        }
+      }
+
+      if (authorizable.size() < priv.length) {
+        // There is an action associated with this privilege. The action is the final
+        String action = priv[priv.length - 1];
+        // The * action is implied. Sentry does not accept it as an action.
+        if (!action.equals("*")) authorizable.add(KV_JOINER.join("action", action));
+      }
+      return AUTHORIZABLE_JOINER.join(authorizable);
+    } catch (Exception e) {
+      // Should never make it here unless the privilege is malformed.
+      LOG.error("ERROR: ", e);
+      return null;
+    }
   }
 
   @Override

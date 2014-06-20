@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -37,13 +38,16 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.AuthorizeableDb;
+import com.cloudera.impala.authorization.AuthorizeableServer;
 import com.cloudera.impala.authorization.AuthorizeableTable;
 import com.cloudera.impala.authorization.AuthorizeableUri;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.ImpaladCatalog;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -118,6 +122,9 @@ public class AuthorizationTest {
     // the test cases.
     String roleName = "admin";
     sentryService.createRole(roleName, true);
+    sentryService.grantRolePrivilege(roleName, new AuthorizeableServer("server1"),
+        Privilege.ALL);
+    sentryService.revokeRoleFromGroup("admin", USER.getName());
 
     // insert functional alltypes
     roleName = "insert_functional_alltypes";
@@ -422,10 +429,13 @@ public class AuthorizationTest {
     AuthzOk("use tpcds");
     AuthzOk("use tpch");
 
+    // Should always be able to use default, even if privilege was not explicitly
+    // granted.
+    AuthzOk("use default");
+
     AuthzError("use functional_seq",
         "User '%s' does not have privileges to access: functional_seq.*");
-    AuthzError("use default",
-        "User '%s' does not have privileges to access: default.*");
+
     // Database does not exist, user does not have access.
     AuthzError("use nodb",
         "User '%s' does not have privileges to access: nodb.*");
@@ -443,7 +453,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestResetMetadata() throws AnalysisException, AuthorizationException {
+  public void TestResetMetadata() throws ImpalaException {
     // Positive cases (user has privileges on these tables/views).
     AuthzOk("invalidate metadata functional.alltypesagg");
     AuthzOk("refresh functional.alltypesagg");
@@ -465,17 +475,22 @@ public class AuthorizationTest {
     AuthzError("refresh functional.alltypes_view",
         "User '%s' does not have privileges to access: functional.alltypes_view");
 
-    // The admin user should have privileges invalidate the server metadata.
-    /*
-    if (true) return;
-    AnalysisContext adminAc = new AnalysisContext(
-        new ImpaladTestCatalog(authzConfig_),
-        TestUtils.createQueryContext(Catalog.DEFAULT_DB, ADMIN_USER.getName()));
-    AuthzOk(adminAc, "invalidate metadata");
-
     AuthzError("invalidate metadata",
         "User '%s' does not have privileges to access: server");
-    */
+
+    // TODO: Add test support for dynamically changing privileges for
+    // file-based policy.
+    if (authzConfig_.isFileBasedPolicy()) return;
+    SentryPolicyService sentryService = createSentryService();
+
+    try {
+      sentryService.grantRoleToGroup("admin", USER.getName());
+      ((ImpaladTestCatalog) catalog_).reset();
+      AuthzOk("invalidate metadata");
+    } finally {
+      sentryService.revokeRoleFromGroup("admin", USER.getName());
+      ((ImpaladTestCatalog) catalog_).reset();
+    }
   }
 
   @Test
@@ -601,30 +616,42 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestCreateDatabase() throws AnalysisException, AuthorizationException {
-    // User has permissions to create database.
-    AuthzOk("create database newdb");
-
-    // Create database with location specified explicitly (user has permission).
-    AuthzOk("create database newdb location " +
-        "'hdfs://localhost:20500/test-warehouse/new_table'");
-
-    // Create database with location specified explicitly (user does not have permission).
-    AuthzError("create database newdb location '/test-warehouse/no_access'",
-        "User '%s' does not have privileges to access: " +
-        "hdfs://localhost:20500/test-warehouse/no_access");
-
+  public void TestCreateDatabase() throws ImpalaException {
     // Database already exists (no permissions).
     AuthzError("create database functional",
         "User '%s' does not have privileges to execute 'CREATE' on: functional");
 
-    // No existent db (no permissions).
+    // Non existent db (no permissions).
     AuthzError("create database nodb",
         "User '%s' does not have privileges to execute 'CREATE' on: nodb");
 
-    // No existent db (no permissions).
+    // Non existent db (no permissions).
     AuthzError("create database if not exists _impala_builtins",
         "Cannot modify system database.");
+
+    // TODO: Add test support for dynamically changing privileges for
+    // file-based policy.
+    if (authzConfig_.isFileBasedPolicy()) return;
+
+    SentryPolicyService sentryService =
+        new SentryPolicyService(authzConfig_.getSentryConfig(), "server1");
+    try {
+      sentryService.grantRoleToGroup("admin", USER.getName());
+      ((ImpaladTestCatalog) catalog_).reset();
+
+      // User has permissions to create database.
+      AuthzOk("create database newdb");
+
+      // Create database with location specified explicitly (user has permission).
+      // Since create database requires server-level privileges there should never
+      // be a case where the user has privileges to create a database does not have
+      // privileges on the URI.
+      AuthzOk("create database newdb location " +
+          "'hdfs://localhost:20500/test-warehouse/new_table'");
+    } finally {
+      sentryService.revokeRoleFromGroup("admin", USER.getName());
+      ((ImpaladTestCatalog) catalog_).reset();
+    }
   }
 
   @Test
@@ -1149,8 +1176,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void TestFunction() throws AnalysisException, AuthorizationException {
-
+  public void TestFunction() throws ImpalaException {
     // First try with the less privileged user.
     User currentUser = USER;
     AnalysisContext context = new AnalysisContext(catalog_,
@@ -1177,53 +1203,58 @@ public class AuthorizationTest {
     AuthzError(context, "drop function notdb.f()",
         "User '%s' does not have privileges to CREATE/DROP functions.", currentUser);
 
+    // TODO: Add test support for dynamically changing privileges for
+    // file-based policy.
+    if (authzConfig_.isFileBasedPolicy()) return;
+
     // Admin should be able to do everything
-    // TODO: Add back in support for these tests. We need to be able to support running
-    // with "fake" users/groups.
-    /*
-    AnalysisContext adminContext = new AnalysisContext(catalog_,
-        TestUtils.createQueryContext(Catalog.DEFAULT_DB, ADMIN_USER.getName()));
-    AuthzOk(adminContext, "show functions");
-    AuthzOk(adminContext, "show functions in tpch");
+    SentryPolicyService sentryService =
+        new SentryPolicyService(authzConfig_.getSentryConfig(), "server1");
+    try {
+      sentryService.grantRoleToGroup("admin", USER.getName());
+      ((ImpaladTestCatalog) catalog_).reset();
 
-    AuthzOk(adminContext, "create function f() returns int location " +
-        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
-    AuthzOk(adminContext, "create function tpch.f() returns int location " +
-        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
-    AuthzOk(adminContext, "drop function if exists f()");
+      AuthzOk("show functions");
+      AuthzOk("show functions in tpch");
 
-    // Can't add function to system db
-    AuthzError(adminContext, "create function _impala_builtins.f() returns int location " +
-        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
-        "Cannot modify system database.", ADMIN_USER);
-    AuthzError(adminContext, "drop function if exists pi()",
-        "Cannot modify system database.", ADMIN_USER);
+      AuthzOk("create function f() returns int location " +
+          "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
+      AuthzOk("create function tpch.f() returns int location " +
+          "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
+      AuthzOk("drop function if exists f()");
 
-    // Add default.f(), tpch.f()
-    catalog_.addFunction(new ScalarFunction(new FunctionName("default", "f"),
-        new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
-    catalog_.addFunction(new ScalarFunction(new FunctionName("tpch", "f"),
-        new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+      // Can't add function to system db
+      AuthzError("create function _impala_builtins.f() returns int location " +
+          "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+          "Cannot modify system database.");
+      AuthzError("drop function if exists pi()",
+          "Cannot modify system database.");
 
-    AuthzError(context, "select default.f()",
-        "User '%s' does not have privileges to access: default",
-        currentUser);
-    // Couldn't create tpch.f() but can run it.
-    AuthzOk(context, "select tpch.f()");
-    AuthzOk(adminContext, "drop function tpch.f()");
-    */
+      // Add default.f(), tpch.f()
+      catalog_.addFunction(new ScalarFunction(new FunctionName("default", "f"),
+          new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+      catalog_.addFunction(new ScalarFunction(new FunctionName("tpch", "f"),
+          new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
 
-    // TODO: if we add a function, we need to clean up.
-    // This try/finally is to clean up from add function commented out above
-    //try {
-    //} finally {
+      AuthzOk("drop function tpch.f()");
+    } finally {
+      sentryService.revokeRoleFromGroup("admin", USER.getName());
+      ((ImpaladTestCatalog) catalog_).reset();
+
+      AuthzError(context, "create function tpch.f() returns int location " +
+          "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+          "User '%s' does not have privileges to CREATE/DROP functions.", currentUser);
+
+      // Couldn't create tpch.f() but can run it.
+      AuthzOk("select tpch.f()");
+
       //Other tests don't expect tpch to contain functions
       //Specifically, if these functions are not cleaned up, TestDropDatabase() will fail
-      //catalog_.removeFunction(new ScalarFunction(new FunctionName("default", "f"),
-          //new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
-      //catalog_.removeFunction(new ScalarFunction(new FunctionName("tpch", "f"),
-          //new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
-    //}
+      catalog_.removeFunction(new ScalarFunction(new FunctionName("default", "f"),
+          new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+      catalog_.removeFunction(new ScalarFunction(new FunctionName("tpch", "f"),
+          new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+    }
   }
 
   @Test
@@ -1375,5 +1406,9 @@ public class AuthorizationTest {
   private static TSessionState createSessionState(String defaultDb, User user) {
     return new TSessionState(null, null,
         defaultDb, user.getName(), new TNetworkAddress("", 0));
+  }
+
+  private SentryPolicyService createSentryService() {
+    return new SentryPolicyService(authzConfig_.getSentryConfig(), "server1");
   }
 }
