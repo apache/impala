@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# encoding=utf-8
 # Copyright 2012 Cloudera Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +18,7 @@ import os
 import logging
 import pytest
 import shlex
+import sys
 from time import sleep
 from subprocess import Popen, PIPE, call
 from tests.common.impala_cluster import ImpalaCluster
@@ -26,7 +28,6 @@ DEFAULT_QUERY = 'select 1'
 TEST_DB = "tmp_shell"
 TEST_TBL = "tbl1"
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
-
 
 class TestImpalaShell(object):
   """A set of sanity tests for the Impala shell commandiline parameters.
@@ -271,6 +272,17 @@ class TestImpalaShell(object):
     result = run_impala_shell_cmd(args)
     assert result.stderr.count('WARNINGS') == 1
     run_impala_shell_cmd(DROP_ARGS)
+
+  @pytest.mark.execute_serially
+  def test_international_characters(self):
+    """Sanity test to ensure that the shell can read international characters."""
+    RUSSIAN_CHARS = (u"А, Б, В, Г, Д, Е, Ё, Ж, З, И, Й, К, Л, М, Н, О, П, Р,"
+                     u"С, Т, У, Ф, Х, Ц,Ч, Ш, Щ, Ъ, Ы, Ь, Э, Ю, Я")
+    args = """-B -q "select '%s'" """ % RUSSIAN_CHARS
+    result = run_impala_shell_cmd(args.encode('utf-8'))
+    assert 'UnicodeDecodeError' not in result.stderr
+    #print result.stdout.encode('utf-8')
+    assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
 
 class ImpalaShellResult(object):
   def __init__(self):

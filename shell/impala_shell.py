@@ -59,6 +59,16 @@ try:
 except Exception:
   pass
 
+class ImpalaPrettyTable(prettytable.PrettyTable):
+  """Patched version of PrettyTable that TODO"""
+  def _unicode(self, value):
+    if not isinstance(value, basestring):
+      value = str(value)
+    if not isinstance(value, unicode):
+      # If a value cannot be encoded, replace it with a placeholder.
+      value = unicode(value, self.encoding, "replace")
+    return value
+
 class RpcStatus:
   """Convenience enum to describe Rpc return statuses"""
   OK = 0
@@ -146,6 +156,10 @@ class ImpalaShell(cmd.Cmd):
     self.output_delimiter = options.output_delimiter
     self.write_delimited = options.write_delimited
     self.print_header = options.print_header
+    if options.strict_unicode:
+      self.utf8_encode_policy = 'strict'
+    else:
+      self.utf8_encode_policy = 'ignore'
     self.__populate_command_list()
     try:
       self.readline = __import__('readline')
@@ -367,7 +381,7 @@ class ImpalaShell(cmd.Cmd):
       # If cmdqueue is populated, then commands are executed from the cmdqueue, and user
       # input is ignored. Send an empty string as the user input just to be safe.
       return str()
-    return args
+    return args.encode('utf-8', self.utf8_encode_policy)
 
   def postcmd(self, status, args):
     """Hack to make non interactive mode work"""
@@ -725,9 +739,10 @@ class ImpalaShell(cmd.Cmd):
     Should be called after the query has finished and before data is fetched. All data
     is left aligned.
     """
-    table = prettytable.PrettyTable()
+    table = ImpalaPrettyTable()
     for column in column_names:
-      table.add_column(column, [])
+      # Column names may be encoded as utf-8
+      table.add_column(column.decode('utf-8', 'ignore'), [])
     table.align = "l"
     return table
 
@@ -1163,10 +1178,10 @@ Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 def print_to_stderr(message):
   print >>sys.stderr, message
 
-def parse_query_text(query_text):
-  """Parse query file text and filter comments """
-  queries = sqlparse.split(query_text)
-  return map(strip_comments_from_query, queries)
+def parse_query_text(query_text, utf8_encode_policy='strict'):
+  """Parse query file text, by stripping comments and encoding into utf-8"""
+  return [ strip_comments_from_query(q).encode('utf-8', utf8_encode_policy)
+           for q in sqlparse.split(query_text) ]
 
 def strip_comments_from_query(query):
   """Strip comments from an individual query """
@@ -1180,6 +1195,7 @@ def execute_queries_non_interactive_mode(options):
   if options.query_file:
     try:
       query_file_handle = open(options.query_file, 'r')
+
       queries = parse_query_text(query_file_handle.read())
       query_file_handle.close()
     except Exception, e:
@@ -1256,6 +1272,10 @@ if __name__ == "__main__":
                     "certs) or the certificate of a trusted third-party CA. If not set, "
                     "but SSL is enabled, the shell will NOT verify Impala's server "
                     "certificate"))
+  parser.add_option("--strict_unicode", dest="strict_unicode", default=True,
+                    action="store_true", help=("If true, non UTF-8 compatible input "
+                    "characters are rejected by the shell. If false, such characters are"
+                    " silently ignored."))
   options, args = parser.parse_args()
 
   # Arguments that could not be parsed are stored in args. Print an error and exit.
