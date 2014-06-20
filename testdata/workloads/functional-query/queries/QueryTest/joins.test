@@ -433,3 +433,86 @@ ON (a.x = b.y) GROUP BY a.x
 ---- TYPES
 TINYINT
 ====
+---- QUERY
+# Test joins with union inputs. One input is a union.
+select a.id, b.id, a.string_col, b.string_col
+from
+  (select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 1
+   union all
+   select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 2
+   union all
+   select 0, '1234') a
+inner join
+functional.alltypestiny b
+on a.id = b.id
+where b.id < 5
+---- RESULTS
+0,0,'0','0'
+0,0,'1234','0'
+1,1,'1','1'
+2,2,'2','0'
+3,3,'3','1'
+4,4,'4','0'
+---- TYPES
+INT, INT, STRING, STRING
+====
+---- QUERY
+# Test joins with union inputs. One input is a union.
+select a.id, b.id, a.string_col, b.string_col
+from
+functional.alltypestiny b
+left outer join
+  (select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 1
+   union all
+   select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 2
+   union all
+   select 0, '1234') a
+on a.id = b.id
+where b.id < 5
+---- RESULTS
+0,0,'0','0'
+0,0,'1234','0'
+1,1,'1','1'
+2,2,'2','0'
+3,3,'3','1'
+4,4,'4','0'
+---- TYPES
+INT, INT, STRING, STRING
+====
+---- QUERY
+# Test joins with union inputs. Both inputs are a union.
+select a.id, b.id, a.string_col, b.string_col
+from
+  (select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 1
+   union all
+   select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 2
+   union all
+   select 0, '1234') a
+full outer join
+  (select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 1
+   union all
+   select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 2
+   union all
+   select 0, '5678') b
+on a.id = b.id
+where b.id < 5
+---- RESULTS
+0,0,'0','0'
+0,0,'0','5678'
+0,0,'1234','0'
+0,0,'1234','5678'
+1,1,'1','1'
+2,2,'2','2'
+3,3,'3','3'
+4,4,'4','4'
+---- TYPES
+INT, INT, STRING, STRING
+====

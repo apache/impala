@@ -902,3 +902,130 @@ on (a.int_col = b.bigint_col)
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 size=6.32KB
 ====
+# Test joins with union inputs. One side of the join is a union.
+select a.id, b.id, a.string_col, b.string_col
+from
+  (select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 1
+   union all
+   select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 2
+   union all
+   select 0, '1234') a
+inner join
+functional.alltypestiny b
+on a.id = b.id
+where b.id < 5
+---- DISTRIBUTEDPLAN
+06:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: id = b.id
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 size=460B
+|     predicates: b.id < 5
+|
+00:UNION
+|  constant-operands=1
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=1/4 size=1.58KB
+|     predicates: functional.alltypessmall.id < 5
+|
+01:SCAN HDFS [functional.alltypessmall]
+   partitions=1/4 size=1.57KB
+   predicates: functional.alltypessmall.id < 5
+====
+# Test joins with union inputs. One input is a union.
+select a.id, b.id, a.string_col, b.string_col
+from
+functional.alltypestiny b
+left outer join
+  (select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 1
+   union all
+   select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 2
+   union all
+   select 0, '1234') a
+on a.id = b.id
+where b.id < 5
+---- DISTRIBUTEDPLAN
+07:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: b.id = id
+|
+|--06:EXCHANGE [HASH(id)]
+|  |
+|  01:UNION
+|  |  constant-operands=1
+|  |
+|  |--03:SCAN HDFS [functional.alltypessmall]
+|  |     partitions=1/4 size=1.58KB
+|  |     predicates: functional.alltypessmall.id < 5
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=1/4 size=1.57KB
+|     predicates: functional.alltypessmall.id < 5
+|
+05:EXCHANGE [HASH(b.id)]
+|
+00:SCAN HDFS [functional.alltypestiny b]
+   partitions=4/4 size=460B
+   predicates: b.id < 5
+====
+# Test joins with union inputs. Both inputs are a union.
+select a.id, b.id, a.string_col, b.string_col
+from
+  (select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 1
+   union all
+   select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 2
+   union all
+   select 0, '1234') a
+full outer join
+  (select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 1
+   union all
+   select id, string_col from functional.alltypessmall
+   where year = 2009 and month = 2
+   union all
+   select 0, '5678') b
+on a.id = b.id
+where b.id < 5
+---- DISTRIBUTEDPLAN
+09:EXCHANGE [UNPARTITIONED]
+|
+06:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: id = id
+|  other predicates: id < 5
+|
+|--08:EXCHANGE [HASH(id)]
+|  |
+|  03:UNION
+|  |  constant-operands=1
+|  |
+|  |--05:SCAN HDFS [functional.alltypessmall]
+|  |     partitions=1/4 size=1.58KB
+|  |     predicates: functional.alltypessmall.id < 5
+|  |
+|  04:SCAN HDFS [functional.alltypessmall]
+|     partitions=1/4 size=1.57KB
+|     predicates: functional.alltypessmall.id < 5
+|
+07:EXCHANGE [HASH(id)]
+|
+00:UNION
+|  constant-operands=1
+|
+|--02:SCAN HDFS [functional.alltypessmall]
+|     partitions=1/4 size=1.58KB
+|
+01:SCAN HDFS [functional.alltypessmall]
+   partitions=1/4 size=1.57KB
+====
