@@ -35,21 +35,18 @@ BufferedBlockMgr::Block::Block(BufferedBlockMgr* block_mgr)
 }
 
 Status BufferedBlockMgr::Block::Pin() {
-  block_mgr_->pin_counter_->Update(1);
   RETURN_IF_ERROR(block_mgr_->PinBlock(this));
   DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
 }
 
 Status BufferedBlockMgr::Block::Unpin() {
-  block_mgr_->unpin_counter_->Update(1);
   RETURN_IF_ERROR(block_mgr_->UnpinBlock(this));
   DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
 }
 
 Status BufferedBlockMgr::Block::Delete() {
-  block_mgr_->delete_counter_->Update(1);
   RETURN_IF_ERROR(block_mgr_->DeleteBlock(this));
   DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
@@ -154,7 +151,7 @@ Status BufferedBlockMgr::TryExpand(Block** block, bool* expanded) {
   new_block->is_pinned_ = true;
   *block = new_block;
   *expanded = true;
-  mem_limit_counter_->Update(block_size_);
+  mem_used_counter_->Update(block_size_);
   return Status::OK;
 }
 
@@ -517,10 +514,7 @@ bool BufferedBlockMgr::Validate() const {
 
 string BufferedBlockMgr::DebugString() const {
   stringstream ss;
-  ss << " Num blocks unpinned " << unpin_counter_->value()
-     << " Num blocks pinned " << pin_counter_->value()
-     << " Num blocks deleted " << delete_counter_->value()
-     << " Num writes outstanding " << outstanding_writes_counter_->value()
+  ss << " Num writes outstanding " << outstanding_writes_counter_->value()
      << " Num free buffers " << free_buffers_.size()
      << " Block write threshold " << block_write_threshold_;
 
@@ -528,21 +522,17 @@ string BufferedBlockMgr::DebugString() const {
 }
 
 void BufferedBlockMgr::InitCounters(RuntimeProfile* profile) {
-  mem_limit_counter_ = ADD_COUNTER(profile, "MemoryUsed", TCounterType::UNIT);
-  mem_limit_counter_->Set(static_cast<int64_t>(all_buffers_.size()) * block_size_);
-  block_size_counter_ = ADD_COUNTER(profile, "BlockSize", TCounterType::UNIT);
+  mem_limit_counter_ = ADD_COUNTER(profile, "MemoryLimit", TCounterType::BYTES);
+  mem_limit_counter_->Set(mem_tracker_->limit());
+  mem_used_counter_ = ADD_COUNTER(profile, "MemoryUsed", TCounterType::BYTES);
+  mem_used_counter_->Set(static_cast<int64_t>(all_buffers_.size()) * block_size_);
+  block_size_counter_ = ADD_COUNTER(profile, "BlockSize", TCounterType::BYTES);
   block_size_counter_->Set(block_size_);
-  created_block_counter_ = ADD_COUNTER(profile, "NumCreatedBlocks", TCounterType::UNIT);
-  recycled_blocks_counter_ =
-      ADD_COUNTER(profile, "RecycledBlocks", TCounterType::UNIT);
-  writes_issued_counter_ = ADD_COUNTER(profile, "WritesIssued", TCounterType::UNIT);
+  created_block_counter_ = ADD_COUNTER(profile, "BlocksCreated", TCounterType::UNIT);
+  recycled_blocks_counter_ = ADD_COUNTER(profile, "BlocksRecycled", TCounterType::UNIT);
+  writes_issued_counter_ = ADD_COUNTER(profile, "BlockWritesIssued", TCounterType::UNIT);
   outstanding_writes_counter_ =
-      ADD_COUNTER(profile, "WritesOutstanding", TCounterType::UNIT);
-
-  pin_counter_ = ADD_COUNTER(profile, "NumPinned", TCounterType::UNIT);
-  unpin_counter_ = ADD_COUNTER(profile, "NumUnpinned", TCounterType::UNIT);
-  delete_counter_ = ADD_COUNTER(profile, "NumDeleted", TCounterType::UNIT);
-
+      ADD_COUNTER(profile, "BlockWritesOutstanding", TCounterType::UNIT);
   buffered_pin_counter_ = ADD_COUNTER(profile, "BufferedPins", TCounterType::UNIT);
   disk_read_timer_ = ADD_TIMER(profile, "TotalReadBlockTime");
   buffer_wait_timer_ = ADD_TIMER(profile, "TotalBufferWaitTime");

@@ -183,10 +183,10 @@ class Sorter {
 
   // Runtime profile and counters for this sorter instance.
   RuntimeProfile* profile_;
-  RuntimeProfile::Counter* num_runs_counter_;
+  RuntimeProfile::Counter* initial_runs_counter_;
   RuntimeProfile::Counter* num_merges_counter_;
   RuntimeProfile::Counter* in_mem_sort_timer_;
-  RuntimeProfile::Counter* sort_bytes_counter_;
+  RuntimeProfile::Counter* sorted_data_size_;
 };
 
 } // namespace impala

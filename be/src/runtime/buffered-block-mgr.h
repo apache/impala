@@ -349,19 +349,11 @@ class BufferedBlockMgr {
   // Counters and timers to track behavior.
   // These have a fixed value for the lifetime of the manager and show memory usage.
   RuntimeProfile::Counter* mem_limit_counter_;
+  RuntimeProfile::Counter* mem_used_counter_;
   RuntimeProfile::Counter* block_size_counter_;
 
   // Total number of blocks created.
   RuntimeProfile::Counter* created_block_counter_;
-
-  // Total number of blocks pinned (via Pin()/GetFreeBlock())
-  RuntimeProfile::Counter* pin_counter_;
-
-  // Total number of blocks unpinned (via Unpin())
-  RuntimeProfile::Counter* unpin_counter_;
-
-  // Total number of blocks deleted (via Delete())
-  RuntimeProfile::Counter* delete_counter_;
 
   // Number of deleted blocks reused.
   RuntimeProfile::Counter* recycled_blocks_counter_;

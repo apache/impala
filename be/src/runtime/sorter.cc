@@ -345,7 +345,7 @@ Status Sorter::Run::Init() {
       RETURN_IF_ERROR(sorter_->block_mgr_->GetFreeBlock(&var_len_copy_block_));
     }
   }
-  sorter_->num_runs_counter_->Update(1);
+  if (!is_sorted_) sorter_->initial_runs_counter_->Update(1);
   return Status::OK;
 }
 
@@ -674,7 +674,7 @@ Status Sorter::Run::TryAddBlock(vector<BufferedBlockMgr::Block*>* block_sequence
     if (is_sorted_) {
       RETURN_IF_ERROR(last_block->Unpin());
     } else {
-      sorter_->sort_bytes_counter_->Update(last_block->valid_data_len());
+      sorter_->sorted_data_size_->Update(last_block->valid_data_len());
     }
 
     RETURN_IF_ERROR(sorter_->block_mgr_->GetFreeBlock(&new_block));
@@ -688,7 +688,7 @@ Status Sorter::Run::TryAddBlock(vector<BufferedBlockMgr::Block*>* block_sequence
     // by one block.
     RETURN_IF_ERROR(sorter_->block_mgr_->TryExpand(&new_block, added));
     if (*added) {
-      sorter_->sort_bytes_counter_->Update(last_block->valid_data_len());
+      sorter_->sorted_data_size_->Update(last_block->valid_data_len());
       block_sequence->push_back(new_block);
     }
   }
@@ -844,10 +844,10 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
   in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than, block_mgr->block_size(),
       sort_tuple_desc->byte_size(), state));
 
-  num_runs_counter_ = ADD_COUNTER(profile_, "NumRuns", TCounterType::UNIT);
-  num_merges_counter_ = ADD_COUNTER(profile_, "NumMerges", TCounterType::UNIT);
+  initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TCounterType::UNIT);
+  num_merges_counter_ = ADD_COUNTER(profile_, "TotalMergesPerformed", TCounterType::UNIT);
   in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
-  sort_bytes_counter_ = ADD_COUNTER(profile_, "NumSortBytes", TCounterType::UNIT);
+  sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TCounterType::BYTES);
 
   unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
   unsorted_run_->Init();
@@ -941,7 +941,7 @@ Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
 Status Sorter::SortRun() {
   BufferedBlockMgr::Block* last_block = unsorted_run_->fixed_len_blocks_.back();
   if (last_block->valid_data_len() > 0) {
-    sort_bytes_counter_->Update(last_block->valid_data_len());
+    sorted_data_size_->Update(last_block->valid_data_len());
   } else {
     RETURN_IF_ERROR(last_block->Delete());
     unsorted_run_->fixed_len_blocks_.pop_back();
@@ -950,7 +950,7 @@ Status Sorter::SortRun() {
     DCHECK_NOTNULL(unsorted_run_->var_len_copy_block_);
     last_block = unsorted_run_->var_len_blocks_.back();
     if (last_block->valid_data_len() > 0) {
-      sort_bytes_counter_->Update(last_block->valid_data_len());
+      sorted_data_size_->Update(last_block->valid_data_len());
     } else {
       RETURN_IF_ERROR(last_block->Delete());
       unsorted_run_->var_len_blocks_.pop_back();

@@ -162,7 +162,7 @@ TEST_F(BufferedBlockMgrTest, Eviction) {
   // Check counters.
   RuntimeProfile* profile = runtime_state_->runtime_profile();
   RuntimeProfile::Counter* buffered_pin = profile->GetCounter("BufferedPins");
-  RuntimeProfile::Counter* writes_issued = profile->GetCounter("WritesIssued");
+  RuntimeProfile::Counter* writes_issued = profile->GetCounter("BlockWritesIssued");
 
   int available_buffers = block_mgr->available_allocated_buffers();
   vector<BufferedBlockMgr::Block*> blocks;
@@ -211,8 +211,8 @@ TEST_F(BufferedBlockMgrTest, Deletion) {
 
   // Check counters.
   RuntimeProfile* profile = runtime_state_->runtime_profile();
-  RuntimeProfile::Counter* recycled_cnt = profile->GetCounter("RecycledBlocks");
-  RuntimeProfile::Counter* created_cnt = profile->GetCounter("NumCreatedBlocks");
+  RuntimeProfile::Counter* recycled_cnt = profile->GetCounter("BlocksRecycled");
+  RuntimeProfile::Counter* created_cnt = profile->GetCounter("BlocksCreated");
 
   int available_buffers = block_mgr->available_allocated_buffers();
   vector<BufferedBlockMgr::Block*> blocks;
@@ -262,7 +262,7 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers, max_num_buffers));
   int available_buffers = block_mgr->available_allocated_buffers();
   RuntimeProfile* profile = runtime_state_->runtime_profile();
-  RuntimeProfile::Counter* writes_outstanding = profile->GetCounter("WritesOutstanding");
+  RuntimeProfile::Counter* writes_outstanding = profile->GetCounter("BlockWritesOutstanding");
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), available_buffers + 1, &blocks);
   // Unpin a block, forcing a write.
