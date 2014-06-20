@@ -24,6 +24,9 @@ namespace impala {
 class TExprNode;
 
 class CaseExpr: public Expr {
+ public:
+  virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
+
  protected:
   friend class Expr;
   friend class ComputeFunctions;

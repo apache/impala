@@ -878,6 +878,187 @@ where cast('2010-01-01 00:00:00' as timestamp) not in (timestamp_col)
 bigint
 ====
 ---- QUERY
+# CASE expr - Basic functionality
+select count(*) from alltypesagg where case date_string_col when "01/06/10" then (true)
+else (false) end
+---- RESULTS
+1100
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case date_string_col when "01/06/10" then (false)
+else (true) end
+---- RESULTS
+9900
+---- TYPES
+bigint
+====
+---- QUERY
+# CASE expr - then expr will return NULL
+select count(*) from alltypesagg where case date_string_col when "01/06/10" then (NULL)
+else (false) end is null
+---- RESULTS
+1100
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case date_string_col when NULL then (NULL) else
+(false) end is null
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case tinyint_col when 5 then true when 6 then
+true else NULL end
+---- RESULTS
+2000
+---- TYPES
+bigint
+====
+---- QUERY
+# CASE expr - test multiple when exprs, ensure NULL when expr does not return
+# corresponding then expr
+select count(*) from alltypesagg where case tinyint_col when NULL then true else false end
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+# CASE expr - test return else works with NULL
+select count(*) from alltypesagg where case tinyint_col when 1 then true else NULL end
+is null
+---- RESULTS
+10000
+---- TYPES
+bigint
+====
+---- QUERY
+# CASE expr - test that case statement without else expr returns NULL on no match
+select count(*) from alltypesagg where case tinyint_col when 1 then true end
+is null
+---- RESULTS
+10000
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case when (tinyint_col = 1) then true when
+(tinyint_col = 2) then true else false end
+---- RESULTS
+2000
+---- TYPES
+bigint
+====
+---- QUERY
+# CASE expr - Test basic functionality with strings
+select count(*) from alltypesagg where case date_string_col when "01/06/10" then true
+when "01/02/10" then false when "01/08/10" then true end
+---- RESULTS
+2200
+---- TYPES
+bigint
+====
+---- QUERY
+select sum(case date_string_col when "01/06/10" then 2 else 0 end) from alltypesagg
+---- RESULTS
+2200
+---- TYPES
+bigint
+====
+---- QUERY
+select sum(case date_string_col when "01/06/10" then 2 when "01/02/10" then 1 else 0 end)
+from alltypesagg
+---- RESULTS
+3300
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where(case bool_col when true then "true" when false
+then "false" end = "true")
+---- RESULTS
+6000
+---- TYPES
+bigint
+====
+---- QUERY
+# CASE expr - test when other expr types
+select count(*) from alltypesagg where case id when 8999 then cast(1 as int) else
+cast(0 as int) end = 1
+---- RESULTS
+1
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case bool_col when false then true else false end
+---- RESULTS
+5000
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case smallint_col  when 90 then cast(1 as smallint)
+else cast(0 as smallint) end = 1
+---- RESULTS
+200
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case int_col  when 90 then cast(1 as int)
+else cast(0 as int) end = 1;
+---- RESULTS
+20
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case bigint_col when 90 then cast(1 as bigint)
+else cast(0 as bigint) end = 1;
+---- RESULTS
+10
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case float_col when 1089 then cast(1.0 as float)
+else cast(0.0 as float) end = 1.0
+---- RESULTS
+20
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case double_col when 9999 then cast(1.0 as double)
+else cast(0.0 as double) end = 1.0
+---- RESULTS
+20
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case date_string_col  when "01/08/10" then "true"
+else "false" end = "true"
+---- RESULTS
+1100
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where case timestamp_col when
+"2010-01-08 18:02:05.100000000"  then true else false end
+---- RESULTS
+1
+---- TYPES
+bigint
+====
+---- QUERY
 # BETWEEN predicate
 select count(*) from alltypesagg where tinyint_col between 1 and 2
 ---- RESULTS
