@@ -21,7 +21,8 @@ import pytest
 METRIC_LIST = ["impala-server.backends.client-cache.clients-in-use",
                "impala-server.hash-table.total-bytes",
                "impala-server.io-mgr.num-open-files",
-               "impala-server.mem-pool.total-bytes",
+               # Disable checking of mem-pool.total-bytes DUE TO IMPALA-1057
+               #"impala-server.mem-pool.total-bytes",
                "impala-server.num-files-open-for-insert",
                # Disable checking of num-missing-volume-id due to IMPALA-467
                # "impala-server.scan-ranges.num-missing-volume-id",
