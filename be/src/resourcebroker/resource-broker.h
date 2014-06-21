@@ -63,7 +63,16 @@ class ResourceBroker {
   Status Expand(const TResourceBrokerExpansionRequest& request,
       TResourceBrokerExpansionResponse* response);
 
-  // Releases resources acquired from Llama.
+  // Removes the record of all resource requests associated with this reservationID
+  // (except the reservation request itself, if include_reservation is false) so that the
+  // per-node accounting is correct when plan fragments finish. Does not communicate this
+  // to Llama (i.e. only updates the local node's accounting), so the coordinator should
+  // always call Release() to make sure that Llama knows the resources have gone.
+  void ClearRequests(const TUniqueId& reservation_id, bool include_reservation);
+
+  // Releases resources acquired from Llama for this reservation and all associated
+  // expansion requests across _all_ nodes. Should therefore only be called once per
+  // query.
   Status Release(const TResourceBrokerReleaseRequest& request,
       TResourceBrokerReleaseResponse* response);
 

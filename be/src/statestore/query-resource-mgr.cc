@@ -232,6 +232,11 @@ void QueryResourceMgr::Shutdown() {
     callbacks_.clear();
   }
   threads_changed_cv_.notify_all();
+
+  // Delete all non-reservation requests associated with this reservation ID. If this the
+  // coordinator, the SimpleScheduler will actually release the resources by releasing the
+  // original reservation ID.
+  ExecEnv::GetInstance()->resource_broker()->ClearRequests(reservation_id_, false);
 }
 
 QueryResourceMgr::~QueryResourceMgr() {

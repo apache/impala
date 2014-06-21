@@ -472,7 +472,7 @@ bool ResourceBroker::WaitForNotification(int64_t timeout, ResourceMap* resources
   if (request_granted && !*timed_out) {
     pending_request->GetResources(resources);
     int64_t total_memory_mb = 0L;
-    int32_t total_vcpus = 0L;
+    int32_t total_vcpus = 0;
     BOOST_FOREACH(const ResourceMap::value_type& resource, *resources) {
       total_memory_mb += resource.second.memory_mb;
       total_vcpus += resource.second.v_cpu_cores;
@@ -623,53 +623,55 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
   return Status::OK;
 }
 
+void ResourceBroker::ClearRequests(const TUniqueId& reservation_id,
+    bool include_reservation) {
+  int64_t total_memory_bytes = 0L;
+  int32_t total_vcpus = 0L;
+  llama::TUniqueId llama_id = CastTUniqueId<TUniqueId, llama::TUniqueId>(reservation_id);
+  {
+    lock_guard<mutex> l(allocated_requests_lock_);
+    AllocatedRequestMap::iterator it = allocated_requests_.find(llama_id);
+    if (it == allocated_requests_.end()) return;
+    vector<AllocatedRequest>::iterator request_it = it->second.begin();
+    while (request_it != it->second.end()) {
+      DCHECK(request_it->reservation_id() == llama_id);
+      if (!request_it->is_expansion() && !include_reservation) {
+        // Leave the original reservation
+        ++request_it;
+        continue;
+      }
+      total_memory_bytes += (request_it->memory_mb() * 1024L * 1024L);
+      total_vcpus += request_it->vcpus();
+      request_it = it->second.erase(request_it);
+    }
+  }
+
+  VLOG_QUERY << "Releasing "
+             << PrettyPrinter::Print(total_memory_bytes, TCounterType::BYTES)
+             << " and " << total_vcpus << " cores for " << llama_id;
+  allocated_memory_metric_->Increment(-total_memory_bytes);
+  allocated_vcpus_metric_->Increment(-total_vcpus);
+}
+
 Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
     TResourceBrokerReleaseResponse* response) {
   VLOG_QUERY << "Releasing all resources for reservation: " << request.reservation_id;
 
-  int64_t total_memory_bytes = 0L;
-  int32_t total_vcpus = 0L;
-  bool have_reservation = false;
-  llama::TUniqueId reservation_id;
-  reservation_id << request.reservation_id;
-  // Count the total resources to be released
-  {
-    lock_guard<mutex> l(allocated_requests_lock_);
-    AllocatedRequestMap::iterator it =
-        allocated_requests_.find(reservation_id);
-    // There may be no allocated resources when releasing a request that timed out.
-    if (it != allocated_requests_.end()) {
-      BOOST_FOREACH(const AllocatedRequest& request, it->second) {
-        DCHECK(request.reservation_id() == reservation_id);
-        total_memory_bytes += (request.memory_mb() * 1024L * 1024L);
-        total_vcpus += request.vcpus();
-        if (!request.is_expansion()) have_reservation = true;
-      }
-    }
-  }
+  ClearRequests(request.reservation_id, true);
 
-  // Only actually issue the Release() call if we are the original issuer of the
-  // Reserve() call, otherwise just update the accounting.
-  if (have_reservation) {
-    llama::TLlamaAMReleaseRequest llama_request;
-    llama::TLlamaAMReleaseResponse llama_response;
-    CreateLlamaReleaseRequest(request, llama_request);
+  llama::TLlamaAMReleaseRequest llama_request;
+  llama::TLlamaAMReleaseResponse llama_response;
+  CreateLlamaReleaseRequest(request, llama_request);
 
-    RETURN_IF_ERROR(LlamaRpc(
-            &llama_request, &llama_response,reservation_rpc_time_metric_));
-    RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
-    requests_released_metric_->Increment(1);
-  }
+  RETURN_IF_ERROR(LlamaRpc(
+          &llama_request, &llama_response,reservation_rpc_time_metric_));
+  RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
+  requests_released_metric_->Increment(1);
 
   {
     lock_guard<mutex> l(allocated_requests_lock_);
-    allocated_requests_.erase(reservation_id);
-
-    VLOG_QUERY << "Releasing "
-               << PrettyPrinter::Print(total_memory_bytes, TCounterType::BYTES)
-               << " and " << total_vcpus << " cores for " << reservation_id;
-    allocated_memory_metric_->Increment(-total_memory_bytes);
-    allocated_vcpus_metric_->Increment(-total_vcpus);
+    llama::TUniqueId reservation_id =
+        CastTUniqueId<TUniqueId, llama::TUniqueId>(request.reservation_id);;
     allocated_requests_.erase(reservation_id);
   }
 
