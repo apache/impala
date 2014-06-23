@@ -1,0 +1,1 @@
+This product includes software developed by the Impala project (http://impala.io/)
