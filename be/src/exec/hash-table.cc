@@ -29,29 +29,36 @@ using namespace std;
 const char* HashTable::LLVM_CLASS_NAME = "class.impala::HashTable";
 
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
+static const int PAGE_SIZE = 8 * 1024 * 1024;
 
 HashTable::HashTable(RuntimeState* state, const vector<Expr*>& build_exprs,
     const vector<Expr*>& probe_exprs, int num_build_tuples, bool stores_nulls,
-    bool finds_nulls, int32_t initial_seed, MemTracker* mem_tracker, int64_t num_buckets)
+    bool finds_nulls, int32_t initial_seed, MemTracker* mem_tracker, bool stores_tuples,
+    int64_t num_buckets)
   : state_(state),
     build_exprs_(build_exprs),
     probe_exprs_(probe_exprs),
     num_build_tuples_(num_build_tuples),
     stores_nulls_(stores_nulls),
     finds_nulls_(finds_nulls),
+    stores_tuples_(stores_tuples),
     initial_seed_(initial_seed),
-    node_byte_size_(sizeof(Node) + sizeof(Tuple*) * num_build_tuples_),
     num_filled_buckets_(0),
-    nodes_(NULL),
     num_nodes_(0),
+    mem_pool_(new MemPool(mem_tracker)),
+    num_data_pages_(0),
+    next_node_(NULL),
+    node_remaining_current_page_(0),
     mem_tracker_(mem_tracker),
     mem_limit_exceeded_(false) {
   DCHECK(mem_tracker != NULL);
   DCHECK_EQ(build_exprs_.size(), probe_exprs_.size());
+
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   buckets_.resize(num_buckets);
   num_buckets_ = num_buckets;
   num_buckets_till_resize_ = MAX_BUCKET_OCCUPANCY_FRACTION * num_buckets_;
+  mem_tracker_->Consume(buckets_.capacity() * sizeof(Bucket));
 
   // Compute the layout and buffer size to store the evaluated expr results
   results_buffer_size_ = Expr::ComputeResultsLayout(build_exprs_,
@@ -60,29 +67,19 @@ HashTable::HashTable(RuntimeState* state, const vector<Expr*>& build_exprs,
   memset(expr_values_buffer_, 0, sizeof(uint8_t) * results_buffer_size_);
   expr_value_null_bits_ = new uint8_t[build_exprs_.size()];
 
-  nodes_capacity_ = 1024;
-  nodes_ = reinterpret_cast<uint8_t*>(malloc(nodes_capacity_ * node_byte_size_));
-  if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(nodes_capacity_ * node_byte_size_);
-  }
-
-  // update mem_limits_
-  int64_t allocated_bytes =
-      num_buckets * sizeof(Bucket) + nodes_capacity_ * node_byte_size_;
-  mem_tracker_->Consume(allocated_bytes);
+  GrowNodeArray();
 }
 
 void HashTable::Close() {
   // TODO: use tr1::array?
   delete[] expr_values_buffer_;
   delete[] expr_value_null_bits_;
-  free(nodes_);
+  mem_pool_->FreeAll();
   if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-nodes_capacity_ * node_byte_size_);
+    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-num_data_pages_ * PAGE_SIZE);
   }
-  int64_t bytes_freed = nodes_capacity_ * node_byte_size_ +
-      buckets_.size() * sizeof(Bucket);
-  mem_tracker_->Release(bytes_freed);
+  mem_tracker_->Release(buckets_.capacity() * sizeof(Bucket));
+  buckets_.clear();
 }
 
 bool HashTable::EvalRow(TupleRow* row, const vector<Expr*>& exprs) {
@@ -655,11 +652,10 @@ void HashTable::ResizeBuckets(int64_t num_buckets) {
     Bucket* bucket = &buckets_[i];
     Bucket* sister_bucket = &buckets_[i + old_num_buckets];
     Node* last_node = NULL;
-    int node_idx = bucket->node_idx_;
+    Node* node = bucket->node_;
 
-    while (node_idx != -1) {
-      Node* node = GetNode(node_idx);
-      int64_t next_idx = node->next_idx_;
+    while (node != NULL) {
+      Node* next = node->next_;
       uint32_t hash = node->hash_;
 
       bool node_must_move;
@@ -674,12 +670,12 @@ void HashTable::ResizeBuckets(int64_t num_buckets) {
       }
 
       if (node_must_move) {
-        MoveNode(bucket, move_to, node_idx, node, last_node);
+        MoveNode(bucket, move_to, node, last_node);
       } else {
         last_node = node;
       }
 
-      node_idx = next_idx;
+      node = next;
     }
   }
 
@@ -688,21 +684,13 @@ void HashTable::ResizeBuckets(int64_t num_buckets) {
 }
 
 void HashTable::GrowNodeArray() {
-  int64_t old_size = nodes_capacity_ * node_byte_size_;
-  int64_t new_capacity = nodes_capacity_ + nodes_capacity_ / 2;
-  int64_t new_size = new_capacity * node_byte_size_;
-
-  // This can be a rather large allocation so check the limit before (to prevent
-  // us from going over the limits too much).
-  if (!mem_tracker_->TryConsume(new_size - old_size)) {
-    MemLimitExceeded(new_size - old_size);
-    return;
-  }
-  nodes_capacity_ = new_capacity;
-  nodes_ = reinterpret_cast<uint8_t*>(realloc(nodes_, new_size));
+  node_remaining_current_page_ = PAGE_SIZE / sizeof(Node);
+  next_node_ = reinterpret_cast<Node*>(mem_pool_->Allocate(PAGE_SIZE));
+  ++num_data_pages_;
   if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(new_size - old_size);
+    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(PAGE_SIZE);
   }
+  if (mem_tracker_->LimitExceeded()) MemLimitExceeded(PAGE_SIZE);
 }
 
 void HashTable::MemLimitExceeded(int64_t allocation_size) {
@@ -715,21 +703,18 @@ string HashTable::DebugString(bool skip_empty, const RowDescriptor* desc) {
   stringstream ss;
   ss << endl;
   for (int i = 0; i < buckets_.size(); ++i) {
-    int64_t node_idx = buckets_[i].node_idx_;
+    Node* node = buckets_[i].node_;
     bool first = true;
-    if (skip_empty && node_idx == -1) continue;
+    if (skip_empty && node == NULL) continue;
     ss << i << ": ";
-    while (node_idx != -1) {
-      Node* node = GetNode(node_idx);
-      if (!first) {
-        ss << ",";
-      }
+    while (node != NULL) {
+      if (!first) ss << ",";
       if (desc == NULL) {
-        ss << node_idx << "(" << (void*)node->data() << ")";
+        ss << node << "(" << node->data_ << ")";
       } else {
-        ss << (void*)node->data() << " " << PrintRow(node->data(), *desc);
+        ss << node->data_ << " " << PrintRow(GetRow(node), *desc);
       }
-      node_idx = node->next_idx_;
+      node = node->next_;
       first = false;
     }
     ss << endl;

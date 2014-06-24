@@ -271,16 +271,16 @@ TEST_F(HashTableTest, ScanTest) {
 
 // This test continues adding to the hash table to trigger the resize code paths
 TEST_F(HashTableTest, GrowTableTest) {
-  int build_row_val = 0;
   int num_to_add = 4;
   int expected_size = 0;
-  MemTracker tracker(1024 * 1024);
+  MemTracker tracker(100 * 1024 * 1024);
   HashTable hash_table(
-      NULL, build_expr_, probe_expr_, 1, false, false, 0, &tracker, num_to_add);
+      NULL, build_expr_, probe_expr_, 1, false, false, 0, &tracker, false, num_to_add);
   EXPECT_FALSE(hash_table.mem_limit_exceeded());
   EXPECT_TRUE(!tracker.LimitExceeded());
 
   // This inserts about 5M entries
+  int build_row_val = 0;
   for (int i = 0; i < 20; ++i) {
     for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
       hash_table.Insert(CreateTupleRow(build_row_val));
@@ -289,7 +289,7 @@ TEST_F(HashTableTest, GrowTableTest) {
     num_to_add *= 2;
   }
   EXPECT_TRUE(hash_table.mem_limit_exceeded());
-  EXPECT_FALSE(tracker.LimitExceeded());
+  EXPECT_TRUE(tracker.LimitExceeded());
 
   // Validate that we can find the entries before we went over the limit
   for (int i = 0; i < expected_size * 5; i += 100000) {

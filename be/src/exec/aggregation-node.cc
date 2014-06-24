@@ -120,13 +120,13 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 
   // TODO: how many buckets?
   hash_tbl_.reset(new HashTable(state, build_exprs_, probe_exprs_, 1, true, true,
-      id(), mem_tracker()));
+      id(), mem_tracker(), true));
 
   if (probe_exprs_.empty()) {
     // create single output tuple now; we need to output something
     // even if our input is empty
     singleton_output_tuple_ = ConstructAggTuple();
-    hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&singleton_output_tuple_));
+    hash_tbl_->Insert(singleton_output_tuple_);
     output_iterator_ = hash_tbl_->Begin();
   }
 
@@ -220,7 +220,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   while (!output_iterator_.AtEnd() && !row_batch->AtCapacity()) {
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
-    Tuple* agg_tuple = output_iterator_.GetRow()->GetTuple(0);
+    Tuple* agg_tuple = output_iterator_.GetTuple();
     FinalizeAggTuple(agg_tuple);
     output_iterator_.Next<false>();
     row->SetTuple(0, agg_tuple);
@@ -242,7 +242,7 @@ void AggregationNode::Close(RuntimeState* state) {
   // Iterate through the remaining rows in the hash table and call Serialize/Finalize on
   // them in order to free any memory allocated by UDAs
   while (!output_iterator_.AtEnd()) {
-    Tuple* agg_tuple = output_iterator_.GetRow()->GetTuple(0);
+    Tuple* agg_tuple = output_iterator_.GetTuple();
     FinalizeAggTuple(agg_tuple);
     output_iterator_.Next<false>();
   }

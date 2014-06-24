@@ -330,13 +330,11 @@ Status PlanFragmentExecutor::OpenInternal() {
   while (!done_) {
     RowBatch* batch;
     RETURN_IF_ERROR(GetNextInternal(&batch));
-    if (batch == NULL)
-      break;
+    if (batch == NULL) break;
     if (VLOG_ROW_IS_ON) {
       VLOG_ROW << "OpenInternal: #rows=" << batch->num_rows();
       for (int i = 0; i < batch->num_rows(); ++i) {
-        TupleRow* row = batch->GetRow(i);
-        VLOG_ROW << PrintRow(row, row_desc());
+        VLOG_ROW << PrintRow(batch->GetRow(i), row_desc());
       }
     }
 
@@ -446,8 +444,7 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
         << " instance_id=" << PrintId(runtime_state_->fragment_instance_id());
     FragmentComplete();
     // GetNext() uses *batch = NULL to signal the end.
-    if (*batch != NULL && (*batch)->num_rows() == 0)
-      *batch = NULL;
+    if (*batch != NULL && (*batch)->num_rows() == 0) *batch = NULL;
   }
 
   return status;

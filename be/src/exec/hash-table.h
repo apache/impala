@@ -20,6 +20,7 @@
 #include <boost/cstdint.hpp>
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
+#include "runtime/mem-pool.h"
 #include "util/bitmap.h"
 #include "util/hash-util.h"
 #include "util/runtime-profile.h"
@@ -75,6 +76,9 @@ class TupleRow;
 // Inserts().  We can want to optimize joins more heavily for Inserts() (in particular
 // growing).
 class HashTable {
+ private:
+  struct Node;
+
  public:
   class Iterator;
 
@@ -89,10 +93,12 @@ class HashTable {
   //  - mem_tracker: if non-empty, all memory allocations for nodes and for buckets are
   //    tracked; the tracker must be valid until the d'tor is called
   //  - initial_seed: Initial seed value to use when computing hashes for rows
+  //  - stores_tuples: If true, the hash table stores tuples, otherwise it stores tuple
+  //    rows.
   HashTable(RuntimeState* state, const std::vector<Expr*>& build_exprs,
       const std::vector<Expr*>& probe_exprs, int num_build_tuples,
       bool stores_nulls, bool finds_nulls, int32_t initial_seed,
-      MemTracker* mem_tracker, int64_t num_buckets = 1024);
+      MemTracker* mem_tracker, bool stores_tuples = false, int64_t num_buckets = 1024);
 
   // Call to cleanup any resources. Must be called once.
   void Close();
@@ -102,6 +108,8 @@ class HashTable {
   // If the hash table has or needs to go over the mem limit, the Insert will
   // be ignored. The caller is assumed to periodically (e.g. per row batch) check
   // the limits to identify this case.
+  // The 'row' is not copied by the hash table and the caller must guarantee it
+  // stays in memory.
   void IR_ALWAYS_INLINE Insert(TupleRow* row) {
     if (UNLIKELY(mem_limit_exceeded_)) return;
     if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
@@ -109,7 +117,21 @@ class HashTable {
       ResizeBuckets(num_buckets_ * 2);
       if (UNLIKELY(mem_limit_exceeded_)) return;
     }
+    bool has_null = EvalBuildRow(row);
+    if (!stores_nulls_ && has_null) return;
     InsertImpl(row);
+  }
+
+  void IR_ALWAYS_INLINE Insert(Tuple* tuple) {
+    if (UNLIKELY(mem_limit_exceeded_)) return;
+    if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
+      // TODO: next prime instead of double?
+      ResizeBuckets(num_buckets_ * 2);
+      if (UNLIKELY(mem_limit_exceeded_)) return;
+    }
+    bool has_null = EvalBuildRow(reinterpret_cast<TupleRow*>(&tuple));
+    if (!stores_nulls_ && has_null) return;
+    InsertImpl(tuple);
   }
 
   // Returns the start iterator for all rows that match 'probe_row'.  'probe_row' is
@@ -136,7 +158,8 @@ class HashTable {
 
   // Returns the number of bytes allocated to the hash table
   int64_t byte_size() const {
-    return node_byte_size_ * nodes_capacity_ + sizeof(Bucket) * buckets_.size();
+    int64_t nodes_mem = (num_nodes_ + node_remaining_current_page_) * sizeof(Node);
+    return nodes_mem + sizeof(Bucket) * buckets_.capacity();
   }
 
   bool mem_limit_exceeded() const { return mem_limit_exceeded_; }
@@ -168,9 +191,7 @@ class HashTable {
   Iterator Begin();
 
   // Returns end marker
-  Iterator End() {
-    return Iterator();
-  }
+  Iterator End() { return Iterator(); }
 
   // Codegen for evaluating a tuple row.  Codegen'd function matches the signature
   // for EvalBuildRow and EvalTupleRow.
@@ -195,7 +216,7 @@ class HashTable {
   // stl-like iterator interface.
   class Iterator {
    public:
-    Iterator() : table_(NULL), bucket_idx_(-1), node_idx_(-1) {
+    Iterator() : table_(NULL), bucket_idx_(-1), node_(NULL) {
     }
 
     // Iterates to the next element.  In the case where the iterator was
@@ -208,29 +229,31 @@ class HashTable {
     // calling GetRow().
     TupleRow* GetRow() {
       DCHECK(!AtEnd());
-      return table_->GetNode(node_idx_)->data();
+      DCHECK(!table_->stores_tuples_);
+      return reinterpret_cast<TupleRow*>(node_->data_);
+    }
+
+    Tuple* GetTuple() {
+      DCHECK(!AtEnd());
+      DCHECK(table_->stores_tuples_);
+      return reinterpret_cast<Tuple*>(node_->data_);
     }
 
     // Returns true if this iterator is at the end, i.e. GetRow() cannot be called.
-    bool AtEnd() {
-      return node_idx_ == -1;
-    }
+    bool AtEnd() { return node_ == NULL; }
+    bool operator!=(const Iterator& rhs) { return !(*this == rhs); }
 
     bool operator==(const Iterator& rhs) {
-      return bucket_idx_ == rhs.bucket_idx_ && node_idx_ == rhs.node_idx_;
-    }
-
-    bool operator!=(const Iterator& rhs) {
-      return bucket_idx_ != rhs.bucket_idx_ || node_idx_ != rhs.node_idx_;
+      return bucket_idx_ == rhs.bucket_idx_ && node_ == rhs.node_;
     }
 
    private:
     friend class HashTable;
 
-    Iterator(HashTable* table, int bucket_idx, int64_t node, uint32_t hash) :
+    Iterator(HashTable* table, int bucket_idx, Node* node, uint32_t hash) :
       table_(table),
       bucket_idx_(bucket_idx),
-      node_idx_(node),
+      node_(node),
       scan_hash_(hash) {
     }
 
@@ -238,7 +261,7 @@ class HashTable {
     // Current bucket idx
     int64_t bucket_idx_;
     // Current node idx (within current bucket)
-    int64_t node_idx_;
+    Node* node_;
     // cached hash value for the row passed to Find()()
     uint32_t scan_hash_;
   };
@@ -247,53 +270,34 @@ class HashTable {
   friend class Iterator;
   friend class HashTableTest;
 
-  // Header portion of a Node.  The node data (TupleRow) is right after the
-  // node memory to maximize cache hits.
   struct Node {
-    int64_t next_idx_;  // chain to next node for collisions
-    uint32_t hash_;     // Cache of the hash for data_
-
-    TupleRow* data() {
-      uint8_t* mem = reinterpret_cast<uint8_t*>(this);
-      DCHECK_EQ(reinterpret_cast<uint64_t>(mem) % 8, 0);
-      return reinterpret_cast<TupleRow*>(mem + sizeof(Node));
-    }
+    Node* next_;      // chain to next node for collisions
+    uint32_t hash_;   // Cache of the hash for data_
+    void* data_;      // Either the Tuple* or TupleRow*
   };
 
   struct Bucket {
-    // Index into nodes_ to the start of the values at this bucket. -1 if this
-    // bucket is empty.
-    int64_t node_idx_;
-
-    Bucket() {
-      node_idx_ = -1;
-    }
+    Node* node_;
+    Bucket() : node_(NULL) { }
   };
 
   // Returns the next non-empty bucket and updates idx to be the index of that bucket.
   // If there are no more buckets, returns NULL and sets idx to -1
   Bucket* NextBucket(int64_t* bucket_idx);
 
-  // Returns node at idx.  Tracking structures do not use pointers since they will
-  // change as the HashTable grows.
-  Node* GetNode(int64_t idx) {
-    DCHECK_NE(idx, -1);
-    return reinterpret_cast<Node*>(nodes_ + node_byte_size_ * idx);
-  }
-
   // Resize the hash table to 'num_buckets'
   void ResizeBuckets(int64_t num_buckets);
 
   // Insert row into the hash table
-  void IR_ALWAYS_INLINE InsertImpl(TupleRow* row);
+  void IR_ALWAYS_INLINE InsertImpl(void* data);
 
   // Chains the node at 'node_idx' to 'bucket'.  Nodes in a bucket are chained
   // as a linked list; this places the new node at the beginning of the list.
-  void AddToBucket(Bucket* bucket, int64_t node_idx, Node* node);
+  void AddToBucket(Bucket* bucket, Node* node);
 
   // Moves a node from one bucket to another. 'previous_node' refers to the
   // node (if any) that's chained before this node in from_bucket's linked list.
-  void MoveNode(Bucket* from_bucket, Bucket* to_bucket, int64_t node_idx, Node* node,
+  void MoveNode(Bucket* from_bucket, Bucket* to_bucket, Node* node,
                 Node* previous_node);
 
   // Evaluate the exprs over row and cache the results in 'expr_values_buffer_'.
@@ -329,6 +333,14 @@ class HashTable {
     }
   }
 
+  TupleRow* GetRow(Node* node) const {
+    if (stores_tuples_) {
+      return reinterpret_cast<TupleRow*>(&node->data_);
+    } else {
+      return reinterpret_cast<TupleRow*>(node->data_);
+    }
+  }
+
   // Compute the hash of the values in expr_values_buffer_ for rows with variable length
   // fields (e.g. strings)
   uint32_t HashVariableLenRow();
@@ -357,28 +369,35 @@ class HashTable {
 
   // Number of Tuple* in the build tuple row
   const int num_build_tuples_;
+
+  // Constants on how the hash table should behave. Joins and aggs have slightly
+  // different behavior.
+  // TODO: these constants are an ideal candidate to be removed with codegen.
   const bool stores_nulls_;
   const bool finds_nulls_;
+  const bool stores_tuples_;
 
   const int32_t initial_seed_;
 
-  // Size of hash table nodes.  This includes a fixed size header and the Tuple*'s that
-  // follow.
-  const int node_byte_size_;
-
   // Number of non-empty buckets.  Used to determine when to grow and rehash
   int64_t num_filled_buckets_;
-  // Memory to store node data.  This is not allocated from a pool to take advantage
-  // of realloc.
-  // TODO: integrate with mem pools
-  uint8_t* nodes_;
+
   // number of nodes stored (i.e. size of hash table)
   int64_t num_nodes_;
-  // max number of nodes that can be stored in 'nodes_' before realloc
-  int64_t nodes_capacity_;
+
+  // MemPool used to allocate data pages.
+  boost::scoped_ptr<MemPool> mem_pool_;
+
+  // Number of data pages for nodes.
+  int num_data_pages_;
+
+  // Next node to insert.
+  Node* next_node_;
+
+  // Number of nodes left in the current page.
+  int node_remaining_current_page_;
 
   MemTracker* mem_tracker_;
-
   // Set to true if the hash table exceeds the memory limit. If this is set,
   // subsequent calls to Insert() will be ignored.
   bool mem_limit_exceeded_;

@@ -62,8 +62,6 @@ class TupleDescriptor;
 //
 // A row batch is considered at capacity if all the rows are full or it has accumulated
 // auxiliary memory up to a soft cap. (See AT_CAPACITY_MEM_USAGE comment).
-//
-// TODO: stick tuple_ptrs_ into a pool?
 class RowBatch {
  public:
   // Create RowBatch for a maximum of 'capacity' rows of tuples specified
@@ -164,10 +162,6 @@ class RowBatch {
 
   void ClearRow(TupleRow* row) {
     memset(row, 0, num_tuples_per_row_ * sizeof(Tuple*));
-  }
-
-  void ClearBatch() {
-    memset(tuple_ptrs_, 0, capacity_ * num_tuples_per_row_ * sizeof(Tuple*));
   }
 
   // Acquires state from the 'src' row batch into this row batch. This includes all IO

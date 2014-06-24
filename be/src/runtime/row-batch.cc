@@ -40,10 +40,9 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
     auxiliary_mem_usage_(0),
     tuple_data_pool_(new MemPool(mem_tracker_)) {
   DCHECK(mem_tracker_ != NULL);
-  tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
-  tuple_ptrs_ = new Tuple*[capacity_ * num_tuples_per_row_];
-  mem_tracker_->Consume(tuple_ptrs_size_);
   DCHECK_GT(capacity, 0);
+  tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
+  tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
 }
 
 // TODO: we want our input_batch's tuple_data to come from our (not yet implemented)
@@ -60,12 +59,11 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     capacity_(num_rows_),
     num_tuples_per_row_(input_batch.row_tuples.size()),
     row_desc_(row_desc),
-    tuple_ptrs_(new Tuple*[num_rows_ * input_batch.row_tuples.size()]),
     auxiliary_mem_usage_(0),
     tuple_data_pool_(new MemPool(mem_tracker)) {
   DCHECK(mem_tracker_ != NULL);
   tuple_ptrs_size_ = num_rows_ * input_batch.row_tuples.size() * sizeof(Tuple*);
-  mem_tracker_->Consume(tuple_ptrs_size_);
+  tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
   if (input_batch.compression_type != THdfsCompression::NONE) {
     // Decompress tuple data into data pool
     uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();
@@ -96,8 +94,8 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     if (*offset == -1) {
       tuple_ptrs_[tuple_idx++] = NULL;
     } else {
-      tuple_ptrs_[tuple_idx++] =
-          reinterpret_cast<Tuple*>(tuple_data_pool_->GetDataPtr(*offset));
+      tuple_ptrs_[tuple_idx++] = reinterpret_cast<Tuple*>(
+          tuple_data_pool_->GetDataPtr(*offset + tuple_ptrs_size_));
     }
   }
 
@@ -126,8 +124,8 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
       for (; slot != (*desc)->string_slots().end(); ++slot) {
         DCHECK_EQ((*slot)->type(), TYPE_STRING);
         StringValue* string_val = t->GetStringSlot((*slot)->tuple_offset());
-        string_val->ptr = reinterpret_cast<char*>(
-            tuple_data_pool_->GetDataPtr(reinterpret_cast<intptr_t>(string_val->ptr)));
+        int offset = reinterpret_cast<intptr_t>(string_val->ptr) + tuple_ptrs_size_;
+        string_val->ptr = reinterpret_cast<char*>(tuple_data_pool_->GetDataPtr(offset));
       }
     }
   }
@@ -135,8 +133,6 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
 
 RowBatch::~RowBatch() {
   tuple_data_pool_->FreeAll();
-  mem_tracker_->Release(tuple_ptrs_size_);
-  delete [] tuple_ptrs_;
   for (int i = 0; i < io_buffers_.size(); ++i) {
     io_buffers_[i]->Return();
   }
@@ -224,6 +220,7 @@ void RowBatch::Reset() {
   }
   io_buffers_.clear();
   auxiliary_mem_usage_ = 0;
+  tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
 }
 
 void RowBatch::TransferResourceOwnership(RowBatch* dest) {
@@ -237,8 +234,7 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
   }
   io_buffers_.clear();
   auxiliary_mem_usage_ = 0;
-  // make sure we can't access our tuples after we gave up the pools holding the
-  // tuple data
+  tuple_ptrs_ = NULL;
   Reset();
 }
 

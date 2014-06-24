@@ -38,9 +38,9 @@ void AggregationNode::ProcessRowBatchWithGrouping(RowBatch* batch) {
     HashTable::Iterator it = hash_tbl_->Find(row);
     if (it.AtEnd()) {
       agg_tuple = ConstructAggTuple();
-      hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&agg_tuple));
+      hash_tbl_->Insert(agg_tuple);
     } else {
-      agg_tuple = it.GetRow()->GetTuple(0);
+      agg_tuple = it.GetTuple();
     }
     UpdateAggTuple(agg_tuple, row);
   }

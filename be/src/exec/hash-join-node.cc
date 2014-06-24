@@ -92,7 +92,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
       join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
   hash_tbl_.reset(new HashTable(state, build_exprs_, probe_exprs_,
       child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
-      false, state->fragment_hash_seed(), mem_tracker()));
+      false, state->fragment_hash_seed(), mem_tracker(), false));
 
   if (state->codegen_enabled()) {
     // Codegen for hashing rows
