@@ -28,6 +28,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tmp-file-mgr.h"
+#include "service/fe-support.h"
 #include "util/disk-info.h"
 #include "util/cpu-info.h"
 #include "util/promise.h"
@@ -620,6 +621,7 @@ TEST_F(BufferedBlockMgrTest, Random) {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true);
+  impala::InitFeSupport();
   impala::TmpFileMgr::Init();
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();

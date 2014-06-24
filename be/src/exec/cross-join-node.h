@@ -50,7 +50,7 @@ class CrossJoinNode : public BlockingJoinNode {
   virtual void Close(RuntimeState* state);
 
  protected:
-  virtual void InitGetNext(TupleRow* first_left_row);
+  virtual Status InitGetNext(TupleRow* first_left_row);
   virtual Status ConstructBuildSide(RuntimeState* state);
 
  private:

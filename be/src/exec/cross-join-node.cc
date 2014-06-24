@@ -70,8 +70,9 @@ Status CrossJoinNode::ConstructBuildSide(RuntimeState* state) {
   return Status::OK;
 }
 
-void CrossJoinNode::InitGetNext(TupleRow* first_left_row) {
+Status CrossJoinNode::InitGetNext(TupleRow* first_left_row) {
   current_build_row_ = build_batches_.Iterator();
+  return Status::OK;
 }
 
 Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
@@ -141,7 +142,7 @@ int CrossJoinNode::ProcessLeftChildBatch(RowBatch* output_batch, RowBatch* batch
 
   while (true) {
     while (!current_build_row_.AtEnd()) {
-      CreateOutputRow(output_row, current_left_child_row_, current_build_row_.GetRow());
+      CreateOutputRow(output_row, current_left_row_, current_build_row_.GetRow());
       current_build_row_.Next();
 
       if (!EvalConjuncts(conjuncts, conjuncts_.size(), output_row)) continue;
@@ -156,7 +157,7 @@ int CrossJoinNode::ProcessLeftChildBatch(RowBatch* output_batch, RowBatch* batch
     DCHECK(current_build_row_.AtEnd());
     // Advance to the next row in the left child batch
     if (UNLIKELY(left_batch_pos_ == batch->num_rows())) goto end;
-    current_left_child_row_ = batch->GetRow(left_batch_pos_++);
+    current_left_row_ = batch->GetRow(left_batch_pos_++);
     current_build_row_ = build_batches_.Iterator();
   }
 

@@ -151,7 +151,11 @@ Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
   }
   (*block_mgr)->next_block_index_ = rand() % num_tmp_devices;
   (*block_mgr)->InitCounters(profile);
-  (*block_mgr)->num_unreserved_buffers_ = mem_limit / block_size;
+  if (mem_limit > 0) {
+    (*block_mgr)->num_unreserved_buffers_ = mem_limit / block_size;
+  } else {
+    (*block_mgr)->num_unreserved_buffers_ = numeric_limits<int>::max();
+  }
   return Status::OK;
 }
 
@@ -238,6 +242,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
     io_mgr_(state->io_mgr()),
     is_cancelled_(false),
     state_(state) {
+  DCHECK(parent != NULL);
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(new MemTracker(mem_limit, -1, "Block Manager", parent));
   buffer_pool_.reset(new MemPool(mem_tracker_.get(), block_size));
@@ -292,7 +297,6 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
     io_mgr_buffer->Return();
   } while (!io_mgr_buffer->eosr());
   DCHECK_EQ(offset, block->write_range_->len());
-
   return Status::OK;
 }
 

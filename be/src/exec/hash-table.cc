@@ -74,6 +74,8 @@ void HashTable::Close() {
   // TODO: use tr1::array?
   delete[] expr_values_buffer_;
   delete[] expr_value_null_bits_;
+  expr_values_buffer_ = NULL;
+  expr_value_null_bits_ = NULL;
   mem_pool_->FreeAll();
   if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
     ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-num_data_pages_ * PAGE_SIZE);

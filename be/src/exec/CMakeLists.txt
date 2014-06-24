@@ -25,6 +25,7 @@ add_library(Exec STATIC
   aggregation-node.cc
   aggregation-node-ir.cc
   base-sequence-scanner.cc
+  blocking-join-node.cc
   catalog-op-executor.cc
   cross-join-node.cc
   data-sink.cc
@@ -54,8 +55,7 @@ add_library(Exec STATIC
   hdfs-parquet-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
-  blocking-join-node.cc
-  union-node.cc
+  partitioned-hash-join-node.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc
@@ -64,6 +64,7 @@ add_library(Exec STATIC
   sort-node.cc
   text-converter.cc
   topn-node.cc
+  union-node.cc
 )
 
 ADD_BE_TEST(zigzag-test)

@@ -151,15 +151,15 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     left_batch_pos_ = 0;
     if (left_batch_->num_rows() == 0) {
       if (left_side_eos_) {
-        InitGetNext(NULL /* eos */);
+        RETURN_IF_ERROR(InitGetNext(NULL /* eos */));
         eos_ = true;
         break;
       }
       left_batch_->Reset();
       continue;
     } else {
-      current_left_child_row_ = left_batch_->GetRow(left_batch_pos_++);
-      InitGetNext(current_left_child_row_);
+      current_left_row_ = left_batch_->GetRow(left_batch_pos_++);
+      RETURN_IF_ERROR(InitGetNext(current_left_row_));
       break;
     }
   }

@@ -59,7 +59,7 @@ class HashJoinNode : public BlockingJoinNode {
 
  protected:
   virtual void AddToDebugString(int indentation_level, std::stringstream* out) const;
-  virtual void InitGetNext(TupleRow* first_probe_row);
+  virtual Status InitGetNext(TupleRow* first_probe_row);
   virtual Status ConstructBuildSide(RuntimeState* state);
 
  private:

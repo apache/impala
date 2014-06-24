@@ -21,6 +21,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 
 add_library(Runtime STATIC
   buffered-block-mgr.cc
+  buffered-tuple-stream.cc
   client-cache.cc
   coordinator.cc
   data-stream-mgr.cc
@@ -75,3 +76,4 @@ ADD_BE_TEST(thread-resource-mgr-test)
 ADD_BE_TEST(mem-tracker-test)
 ADD_BE_TEST(multi-precision-test)
 ADD_BE_TEST(decimal-test)
+ADD_BE_TEST(buffered-tuple-stream-test)

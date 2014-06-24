@@ -24,16 +24,17 @@
 #include "common/status.h"
 #include "exprs/expr.h"
 #include "exec/aggregation-node.h"
+#include "exec/cross-join-node.h"
+#include "exec/data-source-scan-node.h"
+#include "exec/exchange-node.h"
 #include "exec/hash-join-node.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hbase-scan-node.h"
-#include "exec/data-source-scan-node.h"
-#include "exec/exchange-node.h"
-#include "exec/union-node.h"
-#include "exec/cross-join-node.h"
-#include "exec/topn-node.h"
 #include "exec/select-node.h"
+#include "exec/partitioned-hash-join-node.h"
 #include "exec/sort-node.h"
+#include "exec/topn-node.h"
+#include "exec/union-node.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/mem-pool.h"
@@ -45,6 +46,9 @@
 using namespace llvm;
 using namespace std;
 using namespace boost;
+
+// TODO: remove when we remove hash-join-node.
+DEFINE_bool(enable_partitioned_hash_join, false, "Enable partitioned hash join");
 
 namespace impala {
 
@@ -154,7 +158,8 @@ void ExecNode::Close(RuntimeState* state) {
     children_[i]->Close(state);
   }
   if (mem_tracker() != NULL) {
-    DCHECK_EQ(mem_tracker()->consumption(), 0) << "Leaked memory.";
+    DCHECK_EQ(mem_tracker()->consumption(), 0)
+        << "Leaked memory." << endl << mem_tracker()->LogUsage();
   }
   Expr::Close(conjuncts_, state);
 }
@@ -248,7 +253,12 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       *node = pool->Add(new AggregationNode(pool, tnode, descs));
       break;
     case TPlanNodeType::HASH_JOIN_NODE:
-      *node = pool->Add(new HashJoinNode(pool, tnode, descs));
+      if (FLAGS_enable_partitioned_hash_join &&
+          tnode.hash_join_node.join_op == TJoinOp::INNER_JOIN) {
+        *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));
+      } else {
+        *node = pool->Add(new HashJoinNode(pool, tnode, descs));
+      }
       break;
     case TPlanNodeType::CROSS_JOIN_NODE:
       *node = pool->Add(new CrossJoinNode(pool, tnode, descs));

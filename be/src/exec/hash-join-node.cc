@@ -186,13 +186,14 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   return Status::OK;
 }
 
-void HashJoinNode::InitGetNext(TupleRow* first_probe_row) {
+Status HashJoinNode::InitGetNext(TupleRow* first_probe_row) {
   if (first_probe_row == NULL) {
     hash_tbl_iterator_ = hash_tbl_->Begin();
   } else {
     matched_probe_ = false;
     hash_tbl_iterator_ = hash_tbl_->Find(first_probe_row);
   }
+  return Status::OK;
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
@@ -234,7 +235,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       TupleRow* out_row = out_batch->GetRow(row_idx);
 
       TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
-      CreateOutputRow(out_row, current_left_child_row_, matched_build_row);
+      CreateOutputRow(out_row, current_left_row_, matched_build_row);
       if (!EvalConjuncts(other_conjuncts, num_other_conjuncts, out_row)) {
         hash_tbl_iterator_.Next<true>();
         continue;
@@ -266,7 +267,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     if (match_all_probe_ && !matched_probe_) {
       int row_idx = out_batch->AddRow();
       TupleRow* out_row = out_batch->GetRow(row_idx);
-      CreateOutputRow(out_row, current_left_child_row_, NULL);
+      CreateOutputRow(out_row, current_left_row_, NULL);
       if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
@@ -318,10 +319,10 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     if (eos_) break;
 
     // join remaining rows in probe batch_
-    current_left_child_row_ = left_batch_->GetRow(left_batch_pos_++);
-    VLOG_ROW << "probe row: " << GetLeftChildRowString(current_left_child_row_);
+    current_left_row_ = left_batch_->GetRow(left_batch_pos_++);
+    VLOG_ROW << "probe row: " << GetLeftChildRowString(current_left_row_);
     matched_probe_ = false;
-    hash_tbl_iterator_ = hash_tbl_->Find(current_left_child_row_);
+    hash_tbl_iterator_ = hash_tbl_->Find(current_left_row_);
   }
 
   *eos = true;

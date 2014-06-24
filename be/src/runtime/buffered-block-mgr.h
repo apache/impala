@@ -79,6 +79,7 @@ class BufferedBlockMgr {
   // The remaining memory that is not reserved by any clients is free for all and
   // available to all clients.
   // This is an opaque handle.
+  // TODO: move the APIs to client we don't need to pass the BufferedBlockMgr around.
   struct Client;
 
   // A fixed-size block of data that may be be persisted to disk. The state of the block
@@ -150,6 +151,8 @@ class BufferedBlockMgr {
 
     // Return the number of bytes allocated in this block.
     int64_t valid_data_len() const { return valid_data_len_; }
+
+    bool is_pinned() const { return is_pinned_; }
 
    private:
     friend class BufferedBlockMgr;

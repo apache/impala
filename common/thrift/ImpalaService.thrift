@@ -148,6 +148,8 @@ enum TImpalaQueryOptions {
   // --idle_query_timeout if that flag > 0.
   QUERY_TIMEOUT_S
 
+  // Test hook for spill to disk joins
+  MAX_JOIN_MEMORY,
 }
 
 // The summary of an insert.

@@ -75,6 +75,7 @@ class TupleRow;
 // all the rows and then calls scan to find them.  Aggregation interleaves Find() and
 // Inserts().  We can want to optimize joins more heavily for Inserts() (in particular
 // growing).
+// TODO: batched interface for inserts and finds.
 class HashTable {
  private:
   struct Node;
@@ -134,6 +135,12 @@ class HashTable {
     InsertImpl(tuple);
   }
 
+  // Evaluate and hash the build/probe row, returning in *hash. Returns false if this
+  // row should be rejected (doesn't need to be processed further) because it
+  // contains NULL.
+  bool EvalAndHashBuild(TupleRow* row, uint32_t* hash);
+  bool EvalAndHashProbe(TupleRow* row, uint32_t* hash);
+
   // Returns the start iterator for all rows that match 'probe_row'.  'probe_row' is
   // evaluated with probe_exprs_.  The iterator can be iterated until HashTable::End()
   // to find all the matching rows.
@@ -154,6 +161,14 @@ class HashTable {
   // Returns the load factor (the number of non-empty buckets)
   float load_factor() {
     return num_filled_buckets_ / static_cast<float>(buckets_.size());
+  }
+
+  // Returns an estimate of the number of bytes needed to build the hash table
+  // structure for 'num_rows'.
+  static int64_t EstimateSize(int64_t num_rows) {
+    // Assume 50% fill factor.
+    int64_t num_buckets = num_rows * 2;
+    return num_buckets * sizeof(Bucket) + num_rows * sizeof(Node);
   }
 
   // Returns the number of bytes allocated to the hash table

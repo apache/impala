@@ -71,7 +71,7 @@ class BlockingJoinNode : public ExecNode {
   boost::scoped_ptr<RowBatch> left_batch_;
   int left_batch_pos_;  // current scan pos in left_batch_
   bool left_side_eos_;  // if true, left child has no more rows to process
-  TupleRow* current_left_child_row_;
+  TupleRow* current_left_row_;
 
   // Size of the TupleRow (just the Tuple ptrs) from the build and left side.
   // Cached because it is used in the hot path.
@@ -90,7 +90,7 @@ class BlockingJoinNode : public ExecNode {
   // Init the build-side state for a new left child row (e.g. hash table iterator or list
   // iterator) given the first row. Used in Open() to prepare for GetNext().
   // A NULL ptr for first_left_child_row indicates the left child eos.
-  virtual void InitGetNext(TupleRow* first_left_child_row) = 0;
+  virtual Status InitGetNext(TupleRow* first_left_child_row) = 0;
 
   // We parallelize building the build-side with Open'ing the
   // left child. If, for example, the left child is another
