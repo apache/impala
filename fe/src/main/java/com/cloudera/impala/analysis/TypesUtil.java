@@ -133,8 +133,12 @@ public class TypesUtil {
 
   /**
    * Returns the resulting typical type from (t1 op t2)
-   * These rules are identical to the hive/sql server rules.
+   * These rules are mostly taken from the hive/sql server rules with some changes.
    * http://blogs.msdn.com/b/sqlprogrammability/archive/2006/03/29/564110.aspx
+   *
+   * Changes:
+   *  - Multiply does not need +1 for the result precision.
+   *  - Divide scale truncation is different.
    */
   public static ColumnType getDecimalArithmeticResultType(ColumnType t1, ColumnType t2,
       ArithmeticExpr.Operator op) throws AnalysisException {
@@ -152,7 +156,7 @@ public class TypesUtil {
         return ColumnType.createDecimalTypeInternal(
             sMax + Math.max(p1 - s1, p2 - s2) + 1, sMax);
       case MULTIPLY:
-        return ColumnType.createDecimalTypeInternal(p1 + p2 + 1, s1 + s2);
+        return ColumnType.createDecimalTypeInternal(p1 + p2, s1 + s2);
       case DIVIDE:
         int resultScale = Math.max(DECIMAL_DIVISION_SCALE_INCREMENT, s1 + p2 + 1);
         int resultPrecision = p1 - s1 + s2 + resultScale;

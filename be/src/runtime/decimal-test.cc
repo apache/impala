@@ -81,7 +81,6 @@ TEST(IntToDecimal, Basic) {
 
   // Smaller decimal types can't overflow here since the FE should never generate
   // that.
-  //NONG
 }
 
 TEST(DoubleToDecimal, Basic) {
@@ -472,7 +471,7 @@ ColumnType GetResultType(const ColumnType& t1, const ColumnType& t2, Op op) {
           max(t1.scale, t2.scale));
     case MULTIPLY:
       return ColumnType::CreateDecimalType(
-          t1.precision + t2.precision + 1, t1.scale + t2.scale);
+          t1.precision + t2.precision, t1.scale + t2.scale);
     case DIVIDE:
       return ColumnType::CreateDecimalType(
           min(38,
