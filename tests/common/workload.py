@@ -27,7 +27,18 @@ class Workload(object):
 
   A workload is the internal representation for the set of queries on a dataset. It
   consists of the dataset name, and a mapping of query names to query strings.
+
+  Args:
+    name (str): workload name. (Eg. tpch)
+    query_name_filters (list of str): List of regular expressions used for matching query
+      names
+
+  Attributes:
+    name (str): workload name (Eg. tpch)
+    __query_map (dict): contains a query name -> string mapping; mapping of query name to
+      section (ex. "TPCH-Q10" -> "select * from...")
   """
+
   WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 
   def __init__(self, name, query_name_filters=None):
@@ -82,7 +93,15 @@ class Workload(object):
 
     Transform all the queries in the workload's query map to query objects based on the
     input test vector and scale factor.
+
+    Args:
+      test_vector (?): query vector
+      scale_factor (str): eg. "300gb"
+
+    Returns:
+      (list of Query): these will be consumed by ?
     """
+
     queries = list()
     for query_name, query_str in self.__query_map.iteritems():
       queries.append(Query(name=query_name,

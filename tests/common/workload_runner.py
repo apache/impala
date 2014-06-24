@@ -37,6 +37,19 @@ class WorkloadRunner(object):
    Internally, for each workload, this module looks up and parses that workload's
    query files and reads the workload's test vector to determine what combination(s)
    of file format / compression to run with.
+
+  Args:
+    workload (Workload)
+    scale_factor (str): eg. "300gb"
+    config (WorkloadConfig)
+
+  Attributes:
+    workload (Workload)
+    scale_factor (str): eg. "300gb"
+    config (WorkloadConfig)
+    exit_on_error (boolean)
+    results (list of QueryResult)
+    __test_vectors (list of ?)
   """
   def __init__(self, workload, scale_factor, config):
     self.workload = workload
@@ -106,7 +119,7 @@ class WorkloadRunner(object):
           self.exit_on_error)
       query_executors.append(query_executor)
     # Initialize the scheduler.
-    scheduler= Scheduler(query_executors=query_executors,
+    scheduler = Scheduler(query_executors=query_executors,
         shuffle=self.config.shuffle_queries,
         iterations=self.config.workload_iterations,
         query_iterations=self.config.query_iterations,

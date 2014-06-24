@@ -17,10 +17,16 @@ import shlex
 import traceback
 import getpass
 import re
+import prettytable
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
 from datetime import datetime
+try:
+  # If Exec Summary is not implemented in Impala, this cannot be imported
+  from ExecStats.ttypes import TExecStats
+except ImportError:
+  pass
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
 from tests.util.thrift_util import create_transport
@@ -57,6 +63,7 @@ class ImpalaBeeswaxResult(object):
     self.summary = kwargs.get('summary', str())
     self.schema = kwargs.get('schema', None)
     self.runtime_profile = kwargs.get('runtime_profile', str())
+    self.exec_summary = kwargs.get('exec_summary', None)
 
   def get_data(self):
     return self.__format_data()
@@ -154,7 +161,7 @@ class ImpalaBeeswaxClient(object):
     start = time.time()
     start_time = datetime.now()
     handle = self.__execute_query(query_string.strip())
-    result = self.fetch_results(query_string,  handle)
+    result = self.fetch_results(query_string, handle)
     result.time_taken = time.time() - start
     result.start_time = start_time
     # Don't include the time it takes to get the runtime profile in the execution time
@@ -164,7 +171,124 @@ class ImpalaBeeswaxClient(object):
     # the handle twice.
     if self.__get_query_type(query_string) != 'insert':
       self.close_query(handle)
+    result.exec_summary = self.get_exec_summary(handle)
     return result
+
+  def get_exec_summary(self, handle):
+    """Calls GetExecSummary() for the last query handle"""
+    try:
+      summary = self.__do_rpc(lambda: self.imp_service.GetExecSummary(handle))
+    except ImpalaBeeswaxException:
+      summary = None
+
+    if summary is None or summary.nodes is None:
+      return None
+      # If exec summary is not implemented in Impala, this function returns, so we do not
+      # get the function __build_summary_table which requires TExecStats to be imported.
+
+    output = []
+    self.__build_summary_table(summary, 0, False, 0, output)
+    return output
+
+  def __build_summary_table(self, summary, idx, is_fragment_root, indent_level, output):
+    """NOTE: This was taken impala_shell.py. This method will be a placed in a library
+    that is shared between impala_shell and this file.
+
+    Direct translation of Coordinator::PrintExecSummary() to recursively build a list
+    of rows of summary statistics, one per exec node
+
+    summary: the TExecSummary object that contains all the summary data
+
+    idx: the index of the node to print
+
+    is_fragment_root: true if the node to print is the root of a fragment (and therefore
+    feeds into an exchange)
+
+    indent_level: the number of spaces to print before writing the node's label, to give
+    the appearance of a tree. The 0th child of a node has the same indent_level as its
+    parent. All other children have an indent_level of one greater than their parent.
+
+    output: the list of rows into which to append the rows produced for this node and its
+    children.
+
+    Returns the index of the next exec node in summary.exec_nodes that should be
+    processed, used internally to this method only.
+    """
+    attrs = ["latency_ns", "cpu_time_ns", "cardinality", "memory_used"]
+
+    # Initialise aggregate and maximum stats
+    agg_stats, max_stats = TExecStats(), TExecStats()
+    for attr in attrs:
+      setattr(agg_stats, attr, 0)
+      setattr(max_stats, attr, 0)
+
+    node = summary.nodes[idx]
+    for stats in node.exec_stats:
+      for attr in attrs:
+        val = getattr(stats, attr)
+        if val is not None:
+          setattr(agg_stats, attr, getattr(agg_stats, attr) + val)
+          setattr(max_stats, attr, max(getattr(max_stats, attr), val))
+
+    if len(node.exec_stats) > 0:
+      avg_time = agg_stats.latency_ns / len(node.exec_stats)
+    else:
+      avg_time = 0
+
+    # If the node is a broadcast-receiving exchange node, the cardinality of rows produced
+    # is the max over all instances (which should all have received the same number of
+    # rows). Otherwise, the cardinality is the sum over all instances which process
+    # disjoint partitions.
+    if node.is_broadcast and is_fragment_root:
+      cardinality = max_stats.cardinality
+    else:
+      cardinality = agg_stats.cardinality
+
+    est_stats = node.estimated_stats
+
+    label_prefix = ""
+    if indent_level > 0:
+      label_prefix = "|"
+      if is_fragment_root:
+        label_prefix += "  " * indent_level
+      else:
+        label_prefix += "--" * indent_level
+
+    row = {}
+    row["prefix"] = label_prefix
+    row["operator"] = node.label
+    row["num_hosts"] = len(node.exec_stats)
+    row["avg_time"] = avg_time
+    row["max_time"] = max_stats.latency_ns
+    row["num_rows"] = cardinality
+    row["est_num_rows"] = est_stats.cardinality
+    row["peak_mem"] = max_stats.memory_used
+    row["est_peak_mem"] = est_stats.memory_used
+    row["detail"] = node.label_detail
+    output.append(row)
+
+    try:
+      sender_idx = summary.exch_to_sender_map[idx]
+      # This is an exchange node, so the sender is a fragment root, and should be printed
+      # next.
+      self.__build_summary_table(summary, sender_idx, True, indent_level, output)
+    except (KeyError, TypeError):
+      # Fall through if idx not in map, or if exch_to_sender_map itself is not set
+      pass
+
+    idx += 1
+    if node.num_children > 0:
+      first_child_output = []
+      idx = \
+        self.__build_summary_table(summary, idx, False, indent_level, first_child_output)
+      for child_idx in xrange(1, node.num_children):
+        # All other children are indented (we only have 0, 1 or 2 children for every exec
+        # node at the moment)
+        idx = self.__build_summary_table(summary, idx, False, indent_level + 1, output)
+      output += first_child_output
+    return idx
+
+
 
   def get_runtime_profile(self, handle):
     return self.__do_rpc(lambda: self.imp_service.GetRuntimeProfile(handle))

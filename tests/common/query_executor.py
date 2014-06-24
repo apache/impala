@@ -50,13 +50,22 @@ hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
 
 ## TODO: Split executors into their own modules.
 class QueryExecConfig(object):
-  """Base Class for Execution Configs"""
+  """Base Class for Execution Configs
+
+  Attributes:
+    plugin_runner (PluginRunner?)
+  """
   def __init__(self, plugin_runner=None):
     self.plugin_runner = plugin_runner
 
 
 class ImpalaQueryExecConfig(QueryExecConfig):
-  """Base class for Impala query execution config"""
+  """Base class for Impala query execution config
+
+  Attributes:
+    impalad (str): address of impalad <host>:<port>
+  """
+
   def __init__(self, plugin_runner=None, impalad='localhost:21000'):
     super(ImpalaQueryExecConfig, self).__init__(plugin_runner=plugin_runner)
     self._impalad = impalad
@@ -71,8 +80,14 @@ class ImpalaQueryExecConfig(QueryExecConfig):
 
 
 class JdbcQueryExecConfig(ImpalaQueryExecConfig):
-  """Impala query execution config for jdbc"""
+  """Impala query execution config for jdbc
+
+  Attributes:
+    tranport (?): ?
+  """
+
   JDBC_CLIENT_PATH = os.path.join(os.environ['IMPALA_HOME'], 'bin/run-jdbc-client.sh')
+
   def __init__(self, plugin_runner=None, impalad='localhost:21050', transport=None):
     super(JdbcQueryExecConfig, self).__init__(plugin_runner=plugin_runner,
         impalad=impalad)
@@ -87,9 +102,20 @@ class JdbcQueryExecConfig(ImpalaQueryExecConfig):
     return JdbcQueryExecConfig.JDBC_CLIENT_PATH + ' -i "%s" -t %s' % (self._impalad,
                                                                       self.transport)
 
-
 class BeeswaxQueryExecConfig(ImpalaQueryExecConfig):
-  """Impala query execution config for beeswax"""
+  """Impala query execution config for beeswax
+
+  Args:
+    use_kerberos (boolean)
+    exec_options (str): String formatted as "opt1:val1;opt2:val2"
+    impalad (str): address of impalad <host>:<port>
+    plugin_runner (?): ?
+
+  Attributes:
+    use_kerberos (boolean)
+    exec_options (dict str -> str): execution options
+  """
+
   def __init__(self, use_kerberos=False, exec_options=None, impalad='localhost:21000',
       plugin_runner=None):
     super(BeeswaxQueryExecConfig, self).__init__(plugin_runner=plugin_runner,
@@ -99,7 +125,12 @@ class BeeswaxQueryExecConfig(ImpalaQueryExecConfig):
     self.__build_options(exec_options)
 
   def __build_options(self, exec_options):
-    """Read the exec_options into a dictionary"""
+    """Read the exec_options into self.exec_options
+
+    Args:
+      exec_options (str): String formatted as "opt1:val1;opt2:val2"
+    """
+
     if exec_options:
       # exec_options are seperated by ; on the command line
       options = exec_options.split(';')
@@ -121,13 +152,27 @@ class HiveQueryExecConfig(QueryExecConfig):
 
 
 class QueryExecutor(object):
-  def __init__(self, name, query, func, config, exit_on_error):
-    """
-    Executes a query.
+  """Executes a query.
 
-    The query_exec_func needs to be a function that accepts a QueryExecOption parameter
-    and returns a QueryResult.
-    """
+  Args:
+    name (str): eg. "hive"
+    query (str): string containing SQL query to be executed
+    func (function): Function that accepts a QueryExecOption parameter and returns a
+      QueryResult. Eg. execute_using_impala_beeswax
+    config (QueryExecOption)
+    exit_on_error (boolean): Exit right after an error encountered.
+
+  Attributes:
+    exec_func (function): Function that accepts a QueryExecOption parameter and returns a
+      QueryResult.
+    exec_config (QueryExecOption)
+    query (str): string containing SQL query to be executed
+    exit_on_error (boolean): Exit right after an error encountered.
+    executor_name (str): eg. "hive"
+    result (QueryResult): Contains the result after execute method is called.
+  """
+
+  def __init__(self, name, query, func, config, exit_on_error):
     self.exec_func = func
     self.exec_config = config
     self.query = query
@@ -163,7 +208,15 @@ class QueryExecutor(object):
     return self.__result
 
 def establish_beeswax_connection(query, query_config):
-  """Establish a connection to the user specified impalad"""
+  """Establish a connection to the user specified impalad.
+
+  Args:
+    query_config (QueryExecConfig)
+
+  Returns:
+    (boolean, ImpalaBeeswaxClient): True if successful
+  """
+
   # TODO: Make this generic, for hive etc.
   use_kerberos = query_config.use_kerberos
   client = ImpalaBeeswaxClient(query_config.impalad, use_kerberos=use_kerberos)
@@ -177,8 +230,16 @@ def establish_beeswax_connection(query, query_config):
 def execute_using_impala_beeswax(query, query_config):
   """Executes a query using beeswax.
 
-  A new client is created per query, then destroyed. Returns QueryResult()
+  A new client is created per query, then destroyed.
+
+  Args:
+    query (str): string containing the query to be executed.
+    query_config (QueryExecConfig)
+
+  Returns:
+    QueryResult
   """
+
   # Create a client object to talk to impalad
   exec_result = QueryResult(query, query_config=query_config)
   plugin_runner = query_config.plugin_runner
@@ -203,23 +264,52 @@ def execute_using_impala_beeswax(query, query_config):
     return construct_exec_result(result, exec_result)
 
 def build_context(query, query_config):
+  """Build context based on query config for plugin_runner.
+
+  Why not pass QueryExecConfig to plugins directly?
+
+  Args:
+    query (str)
+    query_config (QueryExecConfig)
+
+  Returns:
+    dict str -> str
+  """
+
   context = vars(query_config)
   context['query'] = query
   return context
 
 def construct_exec_result(result, exec_result):
+  """ Transform an ImpalaBeeswaxResult object to a QueryResult object.
+
+  Args:
+    result (ImpalaBeeswasResult): Tranfers data from here.
+    exec_result (QueryResult): Transfers data to here.
+
+  Returns:
+    QueryResult
   """
-  Transform an ImpalaBeeswaxResult object to a QueryResult object.
-  """
+
   # Return immedietely if the query failed.
   if not result.success: return exec_result
   exec_result.success = True
-  for attr in ['data', 'runtime_profile', 'start_time', 'time_taken', 'summary']:
+  attrs = ['data', 'runtime_profile', 'start_time',
+      'time_taken', 'summary', 'exec_summary']
+  for attr in attrs:
     setattr(exec_result, attr, getattr(result, attr))
   return exec_result
 
 def execute_shell_cmd(cmd):
-  """Executes a command in the shell, pipes the output to local variables"""
+  """Executes a command in the shell, pipes the output to local variables
+
+  Args:
+    cmd (str): Command to be executed.
+
+  Returns:
+    (str, str, str): return code, stdout, stderr
+  """
+
   LOG.debug('Executing: %s' % (cmd,))
   # Popen needs a list as its first parameter.
   # The first element is the command, with the rest being arguments.

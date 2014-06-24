@@ -34,12 +34,21 @@ LOG.setLevel(level=logging.DEBUG)
 class Scheduler(object):
   """Schedules the submission of workloads across one of more clients.
 
-  A workload execution expects the following arguments:
-  query_executors: A list of initialized query executor objects.
-  shuffle: Change the order of execution of queries in a workload. By default, the queries
-           are executed sorted by query name.
-  num_clients: The degree of parallelism.
-  impalads: A list of impalads to connect to. Ignored when the executor is hive.
+  Args:
+    query_executors (list of QueryExecutor): the objects should be initialized.
+    shuffle (boolean): If True, change the order of execution of queries in a workload.
+      By default, the queries are executed sorted by query name.
+    num_clients (int): Number of concurrent clients.
+    impalads (list of str): A list of impalads to connect to. Ignored when the executor
+      is hive.
+
+  Attributes:
+    query_executors (list of QueryExecutor): initialized query executors
+    shuffle (boolean): shuffle query executors
+    iterations (int): number of iterations ALL query executors will run
+    query_iterations (int): number of times each query executor will execute
+    impalads (list of str?): list of impalads for execution. It is rotated after each execution.
+    num_clients (int): Number of concurrent clients
   """
   def __init__(self, **kwargs):
     self.query_executors = kwargs.get('query_executors')
@@ -77,7 +86,12 @@ class Scheduler(object):
     return self.impalads[-1]
 
   def __run_queries(self, thread_num):
-    """Runs the list of query executors"""
+    """This method is run by every thread concurrently.
+
+    Args:
+      thread_num (int): Thread number. Used for setting the client name in the result.
+    """
+
     # each thread gets its own copy of query_executors
     query_executors = deepcopy(sorted(self.query_executors, key=lambda x: x.query.name))
     for j in xrange(self.iterations):

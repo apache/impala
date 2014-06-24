@@ -20,9 +20,9 @@ class PerfResultDataStore(object):
           (username, password, host, database_name)
     self.connection = MySQLdb.connect(host, username, password, database_name)
 
-  def get_file_format_id(self, file_format, compression):
+  def get_file_format_id(self, file_format, compression_codec, compression_type):
     """ Gets the file_format_id for the fiven file_format/compression codec"""
-    return self.__get_file_format_id(file_format, compression)
+    return self.__get_file_format_id(file_format, compression_codec, compression_type)
 
   def get_query_id(self, query_name, query):
     """ Gets the query_id for the given query name and query text """
@@ -70,12 +70,8 @@ class PerfResultDataStore(object):
 
   # Internal methods
   @cursor_wrapper
-  def __get_file_format_id(self, file_format, compression, cursor):
+  def __get_file_format_id(self, file_format, compression_codec, compression_type, cursor):
     """ Gets the file_format_id for the fiven file_format/compression codec"""
-    if compression == 'none':
-      compression_codec, compression_type = ['none', 'none']
-    else:
-      compression_codec, compression_type = compression.split('/')
     result = cursor.execute("select file_type_id from FileType where format=%s and "\
                             "compression_codec=%s and compression_type=%s",
                             (file_format, compression_codec, compression_type))

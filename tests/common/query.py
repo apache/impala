@@ -18,7 +18,18 @@ from tests.util.test_file_parser import QueryTestSectionReader
 # TODO: This interface needs to be more robust; At the moment, it has two users with
 # completely different uses (the benchmark suite and the impala test suite)
 class Query(object):
-  """Represents a query and all the information neede to execute it"""
+  """Represents a query and all the information neede to execute it
+
+  Attributes:
+    query_str (str): The SQL query string.
+    name (str): query name?
+    scale_factor (str): for example 300gb, used to determine the database.
+    test_vector (?): Specifies some parameters
+    results (list of ?): ?
+    workload_name (str): for example tpch, tpcds, visa (used to determine directory)
+    db (str): ? represents the database
+    table_format_str (str): ?
+  """
   def __init__(self, **kwargs):
     self.query_str = kwargs.get('query_str')
     self.name = kwargs.get('name')
@@ -41,6 +52,7 @@ class Query(object):
             self.db == other.db)
 
   def __build_query(self):
+    """Populates db, query_str, table_format_str"""
     self.db = QueryTestSectionReader.get_db_name(self.test_vector, self.scale_factor)
     self.query_str = QueryTestSectionReader.build_query(self.query_str.strip())
     self.table_format_str = '%s/%s/%s' % (self.test_vector.file_format,
@@ -56,16 +68,27 @@ class Query(object):
 class QueryResult(object):
   """Contains the results of a query execution.
 
-  A query execution results contains the following fields:
-  query - The query object
-  time_taken - Time taken to execute the query
-  start_time - The time at which the client submits the query.
-  data - Query results
-  client_name - The thread id
-  runtime_profile - Saved runtime profile of the query's execution.
-  query_error - Empty string if the query succeeded. Error returned by the client if
-                it failed.
+  Parameters:
+    Required:
+      query (Query): The query object associated with this result.
+      start_time (datetime): Timestamp at the start of execution.
+      query_config (BeeswaxQueryExecConfig)
+      client_name (int): The thread id
+
+    Optional:
+      time_taken (float): Time taken to execute the query.
+      summary (str): query exection summary (ex. returned 10 rows)
+      data (list of str): Query results returned by Impala.
+      runtime_profile (str): Saved runtime profile of the query's execution.
+      exec_summary (TExecSummary)
+      success (bool): True if the execution was successful.
+
+  Attributes - these are modified by another class:
+    query_error (str): Empty string if the query succeeded. Error returned by the client
+        if it failed.
+    executor_name (str)
   """
+
   def __init__(self, query, **kwargs):
     self.query = query
     self.time_taken = kwargs.get('time_taken', 0.0)
@@ -75,6 +98,7 @@ class QueryResult(object):
     self.query_config = kwargs.get('query_config')
     self.client_name = kwargs.get('client_name')
     self.runtime_profile = kwargs.get('runtime_profile', str())
+    self.exec_summary = kwargs.get('exec_summary', str())
     self.success = kwargs.get('success', False)
     self.query_error = str()
     self.executor_name = str()
