@@ -537,7 +537,14 @@ def generate_statements(output_name, test_vectors, sections,
       # moment, it assumes we're only using ALTER for partitioning the table.
       if alter and file_format != "hbase":
         use_table = 'USE {db_name};\n'.format(db_name=db)
-        output.create.append(use_table + alter.format(table_name=table_name))
+        if output == hive_output and codec == 'lzo':
+          if not options.force_reload:
+            # If this is not a force reload use msck repair to add the partitions
+            # into the table. This is to work around a problem where the null
+            # partition cannot be explicitly created in Hive.
+            output.create.append(use_table + 'msck repair table %s;' % (table_name,))
+        else:
+          output.create.append(use_table + alter.format(table_name=table_name))
 
       # If the directory already exists in HDFS, assume that data files already exist
       # and skip loading the data. Otherwise, the data is generated using either an
