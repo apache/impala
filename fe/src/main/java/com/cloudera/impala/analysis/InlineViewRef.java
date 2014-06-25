@@ -64,8 +64,8 @@ public class InlineViewRef extends TableRef {
    * @param alias inline view alias
    * @param inlineViewStmt the select statement of the inline view
    */
-  public InlineViewRef(String alias, QueryStmt queryStmt) {
-    super(alias);
+  public InlineViewRef(TableName name, String alias, QueryStmt queryStmt) {
+    super(name, alias);
     Preconditions.checkNotNull(queryStmt);
     this.queryStmt_ = queryStmt;
   }
@@ -101,7 +101,7 @@ public class InlineViewRef extends TableRef {
     inlineViewAnalyzer_.setHasLimitOffsetClause(
         queryStmt_.hasLimit() || queryStmt_.hasOffset());
     queryStmt_.getMaterializedTupleIds(materializedTupleIds_);
-    desc_ = analyzer.registerInlineViewRef(this);
+    desc_ = analyzer.registerTableRef(this);
     isAnalyzed_ = true;  // true now that we have assigned desc
 
     // For constant selects we materialize its exprs into a tuple.
@@ -143,10 +143,10 @@ public class InlineViewRef extends TableRef {
    * Create a non-materialized tuple descriptor in descTbl for this inline view.
    * This method is called from the analyzer when registering this inline view.
    */
-  public TupleDescriptor createTupleDescriptor(DescriptorTable descTbl)
+  @Override
+  public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
       throws AnalysisException {
-    // Create a fake catalog table for the inline view
-    InlineView inlineView = new InlineView(alias_);
+    InlineView inlineView = createDummyTable();
     for (int i = 0; i < queryStmt_.getColLabels().size(); ++i) {
       // inline view select statement has been analyzed. Col label should be filled.
       Expr selectItemExpr = queryStmt_.getResultExprs().get(i);
@@ -164,11 +164,18 @@ public class InlineViewRef extends TableRef {
     }
 
     // Create the non-materialized tuple and set the fake table in it.
-    TupleDescriptor result = descTbl.createTupleDescriptor();
+    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor();
     result.setIsMaterialized(false);
     result.setTable(inlineView);
     return result;
   }
+
+  /**
+   * Creates a fake catalog table for the inline view.
+   * TODO: Clean up resolution and replacement of view/table refs and remove this
+   * function.
+   */
+  protected InlineView createDummyTable() { return new InlineView(alias_); }
 
   /**
    * Makes each rhs expr in baseTblSmap_ nullable, if necessary by wrapping as follows:
@@ -265,8 +272,6 @@ public class InlineViewRef extends TableRef {
   public QueryStmt getViewStmt() { return queryStmt_; }
   @Override
   public String getAlias() { return alias_; }
-  @Override
-  public TableName getAliasAsName() { return new TableName(null, alias_); }
   @Override
   public TableRef clone() { return new InlineViewRef(this); }
 

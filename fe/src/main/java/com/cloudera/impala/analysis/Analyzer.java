@@ -204,10 +204,17 @@ public class Analyzer {
   // map from lowercase table alias to a view definition of a WITH clause.
   private final Map<String, ViewRef> withClauseViews_ = Maps.newHashMap();
 
-  // map from lowercase table alias to descriptor.
+  // Map from lowercase table alias to descriptor. Tables without an explicit alias
+  // are assigned two implicit aliases: the unqualified and fully-qualified table name.
+  // Such tables have two entries pointing to the same descriptor. If an alias is
+  // ambiguous, then this map retains the first entry with that alias to simplify error
+  // checking (duplicate vs. ambiguous alias).
   private final Map<String, TupleDescriptor> aliasMap_ = Maps.newHashMap();
 
-  // map from lowercase qualified column name ("alias.col") to descriptor
+  // Set of lowercase ambiguous implicit table aliases.
+  private final Set<String> ambiguousAliases_ = Sets.newHashSet();
+
+  // map from lowercase explicit or fully-qualified implicit alias to descriptor
   private final Map<String, SlotDescriptor> slotRefMap_ = Maps.newHashMap();
 
   // Tracks the all tables/views found during analysis that were missing metadata.
@@ -313,27 +320,49 @@ public class Analyzer {
   }
 
   /**
-   * Checks that 'name' references an existing base table and that alias
-   * isn't already registered. Creates and returns an empty TupleDescriptor
-   * and registers it against alias. If alias is empty, register
-   * "name.tbl" and "name.db.tbl" as aliases.
-   * Requires that all views have been substituted.
+   * Creates an returns an empty TupleDescriptor for the given table ref and registers
+   * it against all its legal aliases. For tables refs with an explicit alias, only the
+   * explicit alias is legal. For tables refs with no explicit alias, the fully-qualified
+   * and unqualified table names are legal aliases. Column references against unqualified
+   * implicit aliases can be ambiguous, therefore, we register such ambiguous aliases
+   * here. Requires that all views have been substituted.
+   * Throws if an existing explicit alias or implicit fully-qualified alias
+   * has already been registered for another table ref.
    */
-  public TupleDescriptor registerBaseTableRef(BaseTableRef ref)
+  public TupleDescriptor registerTableRef(TableRef ref)
       throws AnalysisException, AuthorizationException {
-    String lookupAlias = ref.getAlias().toLowerCase();
-    if (aliasMap_.containsKey(lookupAlias)) {
-      throw new AnalysisException("Duplicate table alias: '" + lookupAlias + "'");
+    // Alias is the explicit alias or the fully-qualified table name.
+    String alias = ref.getAlias().toLowerCase();
+    if (aliasMap_.containsKey(alias)) {
+      throw new AnalysisException("Duplicate table alias: '" + alias + "'");
     }
 
-    Table tbl = getTable(ref.getName(), ref.getPrivilegeRequirement(), true);
-    // Views should have been substituted already.
-    Preconditions.checkState(!(tbl instanceof View),
-        String.format("View %s has not been properly substituted.", tbl.getFullName()));
-    TupleDescriptor result = globalState_.descTbl.createTupleDescriptor();
-    result.setTable(tbl);
-    result.setAlias(lookupAlias);
-    aliasMap_.put(lookupAlias, result);
+    // If ref has no explicit alias, then the unqualified and the fully-qualified table
+    // names are legal implicit aliases. Column references against unqualified implicit
+    // aliases can be ambiguous, therefore, we register such ambiguous aliases here.
+    String unqualifiedAlias = null;
+    if (!ref.hasExplicitAlias()) {
+      unqualifiedAlias = ref.getName().getTbl().toLowerCase();
+      TupleDescriptor tupleDesc = aliasMap_.get(unqualifiedAlias);
+      if (tupleDesc != null) {
+        if (tupleDesc.hasExplicitAlias()) {
+          throw new AnalysisException(
+              "Duplicate table alias: '" + unqualifiedAlias + "'");
+        } else {
+          ambiguousAliases_.add(unqualifiedAlias);
+        }
+      }
+    }
+
+    TupleDescriptor result = ref.createTupleDescriptor(this);
+    result.setAlias(ref.getAlias(), ref.hasExplicitAlias());
+    // Register explicit or fully-qualified implicit alias.
+    aliasMap_.put(alias, result);
+    if (!ref.hasExplicitAlias()) {
+      // Register unqualified implicit alias.
+      Preconditions.checkNotNull(unqualifiedAlias);
+      aliasMap_.put(unqualifiedAlias, result);
+    }
     return result;
   }
 
@@ -348,33 +377,18 @@ public class Analyzer {
   }
 
   /**
-   * Register an inline view. The enclosing select block of the inline view should have
-   * been analyzed.
-   * Checks that the alias isn't already registered. Checks the inline view doesn't have
-   * duplicate column names.
-   * Creates and returns an empty, non-materialized TupleDescriptor for the inline view
-   * and registers it against alias.
-   * An InlineView object is created and is used as the underlying table of the tuple
-   * descriptor.
+   * Return descriptor of registered table/alias or null if no matching descriptor was
+   * found. Attempts to resolve name in the context of any of the registered tuples.
+   * Throws an analysis exception if name is unqualified and could match multiple
+   * registered descriptors (i.e., is ambiguous).
    */
-  public TupleDescriptor registerInlineViewRef(InlineViewRef ref)
-      throws AnalysisException {
-    String lookupAlias = ref.getAlias().toLowerCase();
-    if (aliasMap_.containsKey(lookupAlias)) {
-      throw new AnalysisException("Duplicate table alias: '" + lookupAlias + "'");
+  public TupleDescriptor getDescriptor(TableName name) throws AnalysisException {
+    String lookupAlias = name.toString().toLowerCase();
+    if (!name.isFullyQualified() && ambiguousAliases_.contains(lookupAlias)) {
+      throw new AnalysisException(
+          "unqualified table alias '" + name.toString() + "' is ambiguous");
     }
-    // Delegate creation of the tuple descriptor to the concrete inline view ref.
-    TupleDescriptor tupleDesc = ref.createTupleDescriptor(globalState_.descTbl);
-    tupleDesc.setAlias(lookupAlias);
-    aliasMap_.put(lookupAlias, tupleDesc);
-    return tupleDesc;
-  }
-
-  /**
-   * Return descriptor of registered table/alias.
-   */
-  public TupleDescriptor getDescriptor(TableName name) {
-    return aliasMap_.get(name.toString().toLowerCase());
+    return aliasMap_.get(lookupAlias);
   }
 
   public TupleDescriptor getTupleDesc(TupleId id) {
@@ -403,43 +417,49 @@ public class Analyzer {
    */
   public SlotDescriptor registerColumnRef(TableName tblName, String colName)
       throws AnalysisException {
-    String alias;
+    TupleDescriptor tupleDesc = null;
+    Column col = null;
     if (tblName == null) {
-      alias = resolveColumnRef(colName, null);
-      if (alias == null) {
+      // Resolve colName in the context of all registered tables.
+      tupleDesc = resolveColumnRef(colName);
+      if (tupleDesc == null) {
         throw new AnalysisException("couldn't resolve column reference: '" +
             colName + "'");
       }
+      col = tupleDesc.getTable().getColumn(colName);
+      Preconditions.checkNotNull(col);
     } else {
-      alias = tblName.toString().toLowerCase();
+      // Resolve colName in the context of tblName.
+      String lookupAlias = tblName.toString().toLowerCase();
+      if (!tblName.isFullyQualified() && ambiguousAliases_.contains(lookupAlias)) {
+        throw new AnalysisException(
+            String.format("unqualified table alias '%s' in column " +
+                "reference '%s' is ambiguous",
+                tblName.toString(), tblName.toString() + "." + colName));
+      }
+      tupleDesc = aliasMap_.get(lookupAlias);
+      if (tupleDesc == null) {
+        throw new AnalysisException(
+            String.format("unknown table alias '%s' in column reference '%s'",
+                tblName.toString(), tblName.toString() + "." + colName));
+      }
+      col = tupleDesc.getTable().getColumn(colName);
+      if (col == null) {
+        throw new AnalysisException(
+            String.format("couldn't resolve column reference: '%s'",
+                tblName.toString() + "." + colName));
+      }
     }
 
-    TupleDescriptor tupleDesc = aliasMap_.get(alias);
-    // Try to resolve column references ("table.col") that do not refer to an explicit
-    // alias, and that do not use a fully-qualified table name.
-    String tmpAlias = alias;
-    if (tupleDesc == null && tblName != null) {
-      tmpAlias = resolveColumnRef(colName, tblName.getTbl());
-      tupleDesc = aliasMap_.get(tmpAlias);
-    }
-    if (tupleDesc == null) {
-      throw new AnalysisException("unknown table alias: '" + alias + "'");
-    }
-    alias = tmpAlias;
-
-    Column col = tupleDesc.getTable().getColumn(colName);
-    if (col == null) {
-      throw new AnalysisException("unknown column '" + colName +
-          "' (table alias '" + alias + "')");
-    }
-
-    String key = alias + "." + col.getName();
+    // SlotRefs are registered against the tuple's explicit or fully-qualified
+    // implicit alias.
+    String key = tupleDesc.getAlias() + "." + col.getName();
     SlotDescriptor result = slotRefMap_.get(key);
     if (result != null) return result;
     result = addSlotDescriptor(tupleDesc);
     result.setColumn(col);
     result.setLabel(col.getName());
-    slotRefMap_.put(alias + "." + col.getName(), result);
+    slotRefMap_.put(key, result);
     return result;
   }
 
@@ -453,25 +473,24 @@ public class Analyzer {
   }
 
   /**
-   * Resolves column name in context of any of the registered table aliases.
-   * Returns null if not found or multiple bindings to different tables exist,
-   * otherwise returns the table alias.
-   * If a specific table name was given (tableName != null) then only
-   * columns from registered tables with a matching name are considered.
+   * Resolves column name in context of any of the registered tuple descriptors.
+   * Returns the matching tuple descriptor or null if none could be found.
+   * Throws if multiple bindings to different tables exist.
    */
-  private String resolveColumnRef(String colName, String tableName)
-      throws AnalysisException {
-    String result = null;
+  private TupleDescriptor resolveColumnRef(String colName) throws AnalysisException {
+    TupleDescriptor result = null;
     for (Map.Entry<String, TupleDescriptor> entry: aliasMap_.entrySet()) {
-      Table table = entry.getValue().getTable();
-      Column col = table.getColumn(colName);
-      if (col != null &&
-          (tableName == null || tableName.equalsIgnoreCase(table.getName()))) {
-        if (result != null) {
+      TupleDescriptor tupleDesc = entry.getValue();
+      Column col = tupleDesc.getTable().getColumn(colName);
+      if (col != null) {
+        // The same tuple descriptor may have been registered for multiple
+        // implicit aliases, so only throw an error if the tuple descriptors
+        // are different.
+        if (result != null && result != tupleDesc) {
           throw new AnalysisException(
-              "Unqualified column reference '" + colName + "' is ambiguous");
+              "unqualified column reference '" + colName + "' is ambiguous");
         }
-        result = entry.getKey();
+        result = tupleDesc;
       }
     }
     return result;

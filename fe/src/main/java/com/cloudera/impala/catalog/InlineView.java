@@ -21,20 +21,30 @@ import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.base.Preconditions;
 
 /**
- * A fake catalog representation of an inline view. It's like a table. It has name
- * and columns, but it won't have ids and it shouldn't be converted to Thrift.
- * An inline view is constructed by providing an alias (required) and then adding columns
- * one-by-one.
+ * A fake catalog representation of an inline view that is similar to a table.
+ * Inline views originating directly from the query or from WITH-clause views can only
+ * be referenced by their explicit alias, so their table name is the alias. Inline views
+ * instantiated from a catalog view have a real table name. Giving such fake tables
+ * a real table name is important to resolve their implicit aliases properly.
+ * Fake tables for inline views do not have an id, msTbl or an owner and cannot be
+ * converted to Thrift.
  */
 public class InlineView extends Table {
 
   /**
-   * An inline view only has an alias and columns, but it won't have id, db and owner.
-   * @param alias alias of the inline view; must not be null;
+   * C'tor for inline views that only have an explicit alias and not a real table name.
    */
   public InlineView(String alias) {
     super(null, null, null, alias, null);
     Preconditions.checkArgument(alias != null);
+  }
+
+  /**
+   * C'tor for inline views with a real table name instantiated from a catalog view.
+   */
+  public InlineView(Table tbl) {
+    super(null, null, tbl.getDb(), tbl.getName(), null);
+    Preconditions.checkArgument(tbl != null);
   }
 
   /**

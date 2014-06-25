@@ -17,6 +17,8 @@ package com.cloudera.impala.analysis;
 import java.util.List;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
@@ -31,18 +33,13 @@ import com.google.common.base.Preconditions;
  * of abstract TableRefs in a SelectStmt and replace them with Views or BaseTableRefs.
  */
 public class BaseTableRef extends TableRef {
-  private TableName name_;
-
   // Indicates whether this table should be considered for view replacement
   // from WITH-clause views. Used to distinguish non-fully-qualified references
   // to catalog entries (base table or view) from WITH-clause views.
   private boolean allowWithViewReplacement_ = true;
 
   public BaseTableRef(TableName name, String alias) {
-    super(alias);
-    Preconditions.checkArgument(!name.toString().isEmpty());
-    Preconditions.checkArgument(alias == null || !alias.isEmpty());
-    this.name_ = name;
+    super(name, alias);
   }
 
   /**
@@ -50,22 +47,7 @@ public class BaseTableRef extends TableRef {
    */
   public BaseTableRef(BaseTableRef other) {
     super(other);
-    this.name_ = other.name_;
     this.allowWithViewReplacement_ = other.allowWithViewReplacement_;
-  }
-
-  /**
-   * Returns the name of the table referred to. Before analysis, the table name
-   * may not be fully qualified. If the table name is unqualified, the current
-   * default database from the analyzer will be used as the db name.
-   */
-  public TableName getName() { return name_; }
-
-  /**
-   * Replaces name_ with the fully-qualified table name.
-   */
-  public void setFullyQualifiedTableName(Analyzer analyzer) {
-    name_ = analyzer.getFullyQualifiedTableName(name_);
   }
 
   /**
@@ -76,7 +58,7 @@ public class BaseTableRef extends TableRef {
       AuthorizationException {
     Preconditions.checkNotNull(getPrivilegeRequirement());
     setFullyQualifiedTableName(analyzer);
-    desc_ = analyzer.registerBaseTableRef(this);
+    desc_ = analyzer.registerTableRef(this);
     isAnalyzed_ = true;  // true that we have assigned desc
     try {
       analyzeJoin(analyzer);
@@ -86,32 +68,23 @@ public class BaseTableRef extends TableRef {
   }
 
   @Override
+  public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException {
+    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor();
+    Table tbl = analyzer.getTable(name_, getPrivilegeRequirement(), true);
+    // Views should have been substituted already.
+    Preconditions.checkState(!(tbl instanceof View),
+        String.format("View %s has not been properly substituted.", tbl.getFullName()));
+    result.setTable(tbl);
+    return result;
+  }
+
+  @Override
   public List<TupleId> getMaterializedTupleIds() {
     // This function should only be called after analyze().
     Preconditions.checkState(isAnalyzed_);
     Preconditions.checkState(desc_ != null);
     return desc_.getId().asList();
-  }
-
-  /**
-   * Return alias by which this table is referenced in select block.
-   */
-  @Override
-  public String getAlias() {
-    if (alias_ == null) {
-      return name_.toString().toLowerCase();
-    } else {
-      return alias_;
-    }
-  }
-
-  @Override
-  public TableName getAliasAsName() {
-    if (alias_ != null) {
-      return new TableName(null, alias_);
-    } else {
-      return name_;
-    }
   }
 
   @Override

@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
@@ -54,7 +55,7 @@ public class ViewRef extends InlineViewRef {
    * C'tor used for creating a view definition in a WITH clause.
    */
   public ViewRef(String alias, QueryStmt queryStmt) {
-    super(alias, queryStmt);
+    super(null, alias, queryStmt);
     Preconditions.checkNotNull(alias);
     table_ = null;
     origTblRef_ = null;
@@ -64,7 +65,7 @@ public class ViewRef extends InlineViewRef {
    * C'tor used for creating a view definition from a view registered in the catalog.
    */
   public ViewRef(String alias, QueryStmt queryStmt, View table) {
-    super(alias, queryStmt);
+    super(table.getTableName(), alias, queryStmt);
     Preconditions.checkNotNull(alias);
     this.table_ = table;
     origTblRef_ = null;
@@ -75,8 +76,7 @@ public class ViewRef extends InlineViewRef {
    * Only accessible via instantiate().
    */
   private ViewRef(BaseTableRef origTblRef, QueryStmt queryStmt, View table) {
-    // Use tblRef's explicit alias if it has one, otherwise the table name.
-    super(origTblRef.getAlias(), queryStmt);
+    super(origTblRef.name_, origTblRef.alias_, queryStmt);
     this.table_ = table;
     this.origTblRef_ = origTblRef;
     // Set context-dependent attributes from the original table.
@@ -147,6 +147,19 @@ public class ViewRef extends InlineViewRef {
   }
 
   @Override
+  protected InlineView createDummyTable() {
+    if (table_ != null) {
+      // Catalog view.
+      return new InlineView(table_);
+    } else {
+      // WITH-clause view.
+      Preconditions.checkNotNull(name_);
+      Preconditions.checkNotNull(!name_.isFullyQualified());
+      return new InlineView(name_.getTbl());
+    }
+  }
+
+  @Override
   protected String tableRefToSql() {
     if (origTblRef_ != null) return origTblRef_.tableRefToSql();
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
@@ -163,9 +176,6 @@ public class ViewRef extends InlineViewRef {
     if (origTblRef_ == null) return alias_;
     return origTblRef_.getAlias().toLowerCase();
   }
-
-  @Override
-  public TableName getAliasAsName() { return new TableName(null, alias_); }
 
   /**
    * Returns true if this refers to a view registered in the catalog.

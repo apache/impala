@@ -18,6 +18,7 @@ import static org.junit.Assert.fail;
 
 import org.junit.Test;
 
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.testutil.TestUtils;
 import com.google.common.base.Preconditions;
 
@@ -100,6 +101,61 @@ public class ToSqlTest extends AnalyzerTest {
         "FROM functional.alltypes");
   }
 
+  @Test
+  public void TestTableAliases() throws AnalysisException {
+    String[] tables = new String[] { "alltypes", "alltypes_view" };
+    String[] columns = new String[] { "int_col", "*" };
+
+    for (String tbl: tables) {
+      for (String col: columns) {
+        // Test implicit table aliases with unqualified table/view name.
+        // Unqualified table/view name is fully qualified in toSql().
+        // Regression tests for IMPALA-962.
+        testToSql(String.format("select %s from %s", col, tbl), "functional",
+            String.format("SELECT %s FROM functional.%s", col, tbl));
+        testToSql(String.format("select %s.%s from %s", tbl, col, tbl), "functional",
+            String.format("SELECT %s.%s FROM functional.%s", tbl, col, tbl));
+        testToSql(String.format("select functional.%s.%s from %s", tbl, col, tbl),
+            "functional",
+            String.format("SELECT functional.%s.%s FROM functional.%s", tbl, col, tbl));
+
+        // Test implicit table aliases with fully-qualified table/view name.
+        testToSql(String.format("select %s from functional.%s", col, tbl),
+            String.format("SELECT %s FROM functional.%s", col, tbl));
+        testToSql(String.format("select %s.%s from functional.%s", tbl, col, tbl),
+            String.format("SELECT %s.%s FROM functional.%s", tbl, col, tbl));
+        testToSql(String.format("select functional.%s.%s from functional.%s",
+            tbl, col, tbl),
+            String.format("SELECT functional.%s.%s FROM functional.%s", tbl, col, tbl));
+
+        // Explicit table alias.
+        testToSql(String.format("select %s from functional.%s a", col, tbl),
+            String.format("SELECT %s FROM functional.%s a", col, tbl));
+        testToSql(String.format("select a.%s from functional.%s a", col, tbl),
+            String.format("SELECT a.%s FROM functional.%s a", col, tbl));
+      }
+    }
+
+    for (String t1: tables) {
+      for (String t2: tables) {
+        if (t1 == t2) continue;
+        for (String col: columns) {
+          // Multiple implicit fully-qualified aliases work.
+          testToSql(String.format(
+              "select functional.%s.%s, functional.%s.%s " +
+                  "from functional.%s, functional.%s", t1, col, t2, col, t1, t2),
+              String.format("SELECT functional.%s.%s, functional.%s.%s " +
+                  "FROM functional.%s, functional.%s", t1, col, t2, col, t1, t2));
+        }
+      }
+    }
+
+    // Unqualified '*' is not ambiguous.
+    testToSql("select * from functional.alltypes " +
+        "cross join functional_parquet.alltypes",
+        "SELECT * FROM functional.alltypes CROSS JOIN functional_parquet.alltypes");
+  }
+
   /**
    * Tests quoting of identifiers for view compatibility with Hive,
    * and for proper quoting of Impala keywords in view-definition stmts.
@@ -158,33 +214,6 @@ public class ToSqlTest extends AnalyzerTest {
     testToSql("select id from functional.alltypes " +
         "where 5 not in (smallint_col, int_col)",
         "SELECT id FROM functional.alltypes WHERE 5 NOT IN (smallint_col, int_col)");
-  }
-
-  @Test
-  public void tableRefTest() {
-    String db = "functional";
-    String[] tableRefs = new String[] {"alltypes", "alltypes_view"};
-    // Run tests on tables and catalog views.
-    for (String tbl: tableRefs) {
-      // Fully-qualified table/view ref without an alias.
-      testToSql(String.format("select * from %s.%s", db, tbl),
-          String.format("SELECT * FROM %s.%s", db, tbl));
-      // Fully-qualified table/view ref with alias.
-      testToSql(String.format("select * from %s.%s a", db, tbl),
-          String.format("SELECT * FROM %s.%s a", db, tbl));
-      // Fully-qualified table/view ref with an alias that needs quoting.
-      testToSql(String.format("select * from %s.%s `table`", db, tbl),
-          String.format("SELECT * FROM %s.%s `table`", db, tbl));
-      // Unqualified table/view name is fully qualified in toSql().
-      // Regression tests for IMPALA-962.
-      testToSql(String.format("select * from %s", tbl), db,
-          String.format("SELECT * FROM %s.%s", db, tbl));
-      testToSql(String.format("select * from (select * from %s) t", tbl), db,
-          String.format("SELECT * FROM (SELECT * FROM %s.%s) t", db, tbl));
-      testToSql(String.format("with t as (select * from %s) select * from t", tbl),
-          "functional",
-          String.format("WITH t AS (SELECT * FROM %s.%s) SELECT * FROM t", db, tbl));
-    }
   }
 
   // Test the toSql() output of joins in a standalone select block.

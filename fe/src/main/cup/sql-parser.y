@@ -1568,7 +1568,7 @@ table_ref ::=
 
 inline_view_ref ::=
   LPAREN query_stmt:query RPAREN alias_clause:alias
-  {: RESULT = new InlineViewRef(alias, query); :}
+  {: RESULT = new InlineViewRef(null, alias, query); :}
   ;
 
 base_table_ref ::=

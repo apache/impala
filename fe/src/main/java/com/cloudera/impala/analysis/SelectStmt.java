@@ -307,7 +307,7 @@ public class SelectStmt extends QueryStmt {
       throws AnalysisException, AuthorizationException {
     TupleDescriptor tupleDesc = analyzer.getDescriptor(tblName);
     if (tupleDesc == null) {
-      throw new AnalysisException("unknown table: " + tblName.toString());
+      throw new AnalysisException("unknown table alias '" + tblName.toString() + "'");
     }
     expandStar(analyzer, tblName, tupleDesc);
   }

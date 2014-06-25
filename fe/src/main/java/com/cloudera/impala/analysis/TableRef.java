@@ -34,7 +34,7 @@ import com.google.common.collect.Sets;
  * representation of table also contains the JOIN specification.
  */
 public abstract class TableRef implements ParseNode {
-  // Table alias
+  protected TableName name_;
   protected final String alias_;
 
   protected JoinOperator joinOp_;
@@ -59,17 +59,29 @@ public abstract class TableRef implements ParseNode {
   // analysis output
   protected TupleDescriptor desc_;
 
-  public TableRef(String alias) {
+  public TableRef(TableName name, String alias) {
     super();
+    Preconditions.checkArgument(name == null || !name.toString().isEmpty());
+    Preconditions.checkArgument(alias == null || !alias.isEmpty());
+    this.name_ = name;
     this.alias_ = alias;
     isAnalyzed_ = false;
   }
+
+  /**
+   * Creates and returns a empty TupleDescriptor registered with the analyzer. The
+   * returned tuple descriptor must have its source table set via descTbl.setTable()).
+   * This method is called from the analyzer when registering this table reference.
+   */
+  public abstract TupleDescriptor createTupleDescriptor(Analyzer analyzer)
+      throws AnalysisException, AuthorizationException;
 
   /**
    * C'tor for cloning.
    */
   protected TableRef(TableRef other) {
     super();
+    this.name_ = other.name_;
     this.alias_ = other.alias_;
     this.joinOp_ = other.joinOp_;
     this.joinHints_ =
@@ -323,20 +335,49 @@ public abstract class TableRef implements ParseNode {
   }
 
   /**
-   * Return alias by which table is referenced in select block.
-   * @return
+   * Returns the name of the table referred to. Before analysis, the table name
+   * may not be fully qualified. If the table name is unqualified, the current
+   * default database from the analyzer will be used as the db name.
    */
-  abstract public String getAlias();
+  public TableName getName() { return name_; }
 
-  abstract public TableName getAliasAsName();
+  /**
+   * Replaces name_ with the fully-qualified table name.
+   */
+  public void setFullyQualifiedTableName(Analyzer analyzer) {
+    name_ = analyzer.getFullyQualifiedTableName(name_);
+  }
+
+  /**
+   * Returns true if this table ref has an explicit table alias.
+   */
+  public boolean hasExplicitAlias() { return alias_ != null; }
+
+  /**
+   * Return the explicit alias of this table ref if one was given, otherwise the
+   * fully-qualified table name.
+   */
+  public String getAlias() {
+    if (alias_ == null) {
+      return name_.toString().toLowerCase();
+    } else {
+      return alias_;
+    }
+  }
+
+  public TableName getAliasAsName() {
+    if (alias_ != null) {
+      return new TableName(null, alias_);
+    } else {
+      return name_;
+    }
+  }
 
   @Override
   public abstract TableRef clone();
 
-  /*
+  /**
    * Gets the privilege requirement. This is always SELECT for TableRefs.
    */
-  public Privilege getPrivilegeRequirement() {
-    return Privilege.SELECT;
-  }
+  public Privilege getPrivilegeRequirement() { return Privilege.SELECT; }
 }
