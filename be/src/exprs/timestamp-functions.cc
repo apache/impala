@@ -21,10 +21,15 @@
 #include "exprs/timestamp-functions.h"
 #include "exprs/expr.h"
 #include "exprs/function-call.h"
+#include "exprs/anyval-util.h"
+
 #include "runtime/tuple-row.h"
 #include "runtime/timestamp-value.h"
 #include "util/path-builder.h"
 #include "runtime/string-value.inline.h"
+#include "udf/udf.h"
+#include "udf/udf-internal.h"
+#include "runtime/runtime-state.h"
 
 #define TIMEZONE_DATABASE "be/files/date_time_zonespec.csv"
 
@@ -33,315 +38,343 @@ using namespace boost::posix_time;
 using namespace boost::local_time;
 using namespace boost::gregorian;
 using namespace std;
+using namespace impala_udf;
 
 namespace impala {
 
 local_time::tz_database TimezoneDatabase::tz_database_;
 vector<string> TimezoneDatabase::tz_region_list_;
 
-const StringValue TimestampFunctions::MONDAY = StringValue("Monday");
-const StringValue TimestampFunctions::TUESDAY = StringValue("Tuesday");
-const StringValue TimestampFunctions::WEDNESDAY = StringValue("Wednesday");
-const StringValue TimestampFunctions::THURSDAY = StringValue("Thursday");
-const StringValue TimestampFunctions::FRIDAY = StringValue("Friday");
-const StringValue TimestampFunctions::SATURDAY = StringValue("Saturday");
-const StringValue TimestampFunctions::SUNDAY = StringValue("Sunday");
+// Constant strings used for DayName function.
+const char* TimestampFunctions::SUNDAY = "Sunday";
+const char* TimestampFunctions::MONDAY = "Monday";
+const char* TimestampFunctions::TUESDAY = "Tuesday";
+const char* TimestampFunctions::WEDNESDAY = "Wednesday";
+const char* TimestampFunctions::THURSDAY = "Thursday";
+const char* TimestampFunctions::FRIDAY = "Friday";
+const char* TimestampFunctions::SATURDAY = "Saturday";
 
 // Moscow Timezone No Daylight Savings Time (GMT+4), for use after March 2011
 const time_zone_ptr TIMEZONE_MSK_2011_NODST(time_zone_ptr(
     new posix_time_zone(string("MSK+04MSK+00,M3.5.0,M10.5.0"))));
 
-template <class TIME>
-void* TimestampFunctions::FromUnix(Expr* e, TupleRow* row) {
-  DCHECK_LE(e->GetNumChildren(), 2);
-  DCHECK_NE(e->GetNumChildren(), 0);
-
-  Expr* op = e->children()[0];
-  TIME* intp = reinterpret_cast<TIME*>(op->GetValue(row));
-  if (intp == NULL) return NULL;
-  TimestampValue t(boost::posix_time::from_time_t(*intp));
-
-  // If there is a second argument then it's a format statement.
-  // Otherwise the string is in the default format.
-  if (e->GetNumChildren() == 2) {
-    Expr* fmt_op = e->children()[1];
-    FunctionCall* func_expr = static_cast<FunctionCall*>(e);
-    DateTimeFormatContext* const dt_ctx = func_expr->GetDateTimeFormatCtx();
-    if (dt_ctx == NULL) return NULL;
-    // If our format string is constant then we benefit from it only being parsed once in
-    // Expr::Prepare. If it's not constant, then we can reuse a context by resetting it.
-    // This is much cheaper vs alloc/dealloc'ing a context for each evaluation.
-    if (!fmt_op->IsConstant()) {
-      StringValue* fmt = reinterpret_cast<StringValue*>(fmt_op->GetValue(row));
-      dt_ctx->Reset(fmt->ptr, fmt->len);
-      if (!TimestampParser::ParseFormatTokens(dt_ctx)) {
-        ReportBadFormat(fmt);
-        return NULL;
-      }
+void TimestampFunctions::UnixAndFromUnixPrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::THREAD_LOCAL) return;
+  DateTimeFormatContext* dt_ctx = NULL;
+  if (context->IsArgConstant(1)) {
+    StringVal fmt_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
+    const StringValue& fmt_ref = StringValue::FromStringVal(fmt_val);
+    if (fmt_val.is_null || fmt_ref.len <= 0) {
+      TimestampFunctions::ReportBadFormat(context, fmt_val, true);
+      return;
     }
-    int buff_len = dt_ctx->fmt_out_len + 1;
-    e->result_.string_data.resize(buff_len);
-    e->result_.SyncStringVal();
-    e->result_.string_val.len = t.Format(*dt_ctx, buff_len, e->result_.string_val.ptr);
-    if (e->result_.string_val.len <= 0) return NULL;
+    dt_ctx = new DateTimeFormatContext(fmt_ref.ptr, fmt_ref.len);
+    bool parse_result = TimestampParser::ParseFormatTokens(dt_ctx);
+    if (!parse_result) {
+      delete dt_ctx;
+      TimestampFunctions::ReportBadFormat(context, fmt_val, true);
+      return;
+    }
   } else {
-    e->result_.SetStringVal(lexical_cast<string>(t));
+    // If our format string is constant, then we benefit from it only being parsed once in
+    // the code above. If it's not constant, then we can reuse a context by resetting it.
+    // This is much cheaper vs alloc/dealloc'ing a context for each evaluation.
+    dt_ctx = new DateTimeFormatContext();
   }
-  return &e->result_.string_val;
+  context->SetFunctionState(scope, dt_ctx);
 }
 
-void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
-  DCHECK_LE(e->GetNumChildren(), 2);
+void TimestampFunctions::UnixAndFromUnixClose(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope == FunctionContext::THREAD_LOCAL) {
+    DateTimeFormatContext* dt_ctx =
+        reinterpret_cast<DateTimeFormatContext*>(context->GetFunctionState(scope));
+    delete dt_ctx;
+  }
+}
+
+template <class TIME>
+StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& intp) {
+  if (intp.is_null) return StringVal::null();
+  TimestampValue t(boost::posix_time::from_time_t(intp.val));
+  return AnyValUtil::FromString(context, lexical_cast<string>(t));
+}
+
+template <class TIME>
+StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& intp,
+    const StringVal& fmt) {
+  if (fmt.is_null || fmt.len <= 0) {
+    TimestampFunctions::ReportBadFormat(context, fmt, false);
+    return StringVal::null();
+  }
+  if (intp.is_null) return StringVal::null();
+
+  TimestampValue t(boost::posix_time::from_time_t(intp.val));
+  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
+  if (!context->IsArgConstant(1)) {
+    dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
+    if (!TimestampParser::ParseFormatTokens(dt_ctx)){
+      TimestampFunctions::ReportBadFormat(context, fmt, false);
+      return StringVal::null();
+    }
+  }
+
+  int buff_len = dt_ctx->fmt_out_len + 1;
+  StringVal result(context, buff_len);
+  result.len = t.Format(*dt_ctx, buff_len, reinterpret_cast<char*>(result.ptr));
+  if (result.len <= 0) return StringVal::null();
+  return result;
+}
+
+IntVal TimestampFunctions::Unix(FunctionContext* context, const StringVal& string_val,
+    const StringVal& fmt) {
+  if (fmt.is_null || fmt.len <= 0) {
+    TimestampFunctions::ReportBadFormat(context, fmt, false);
+    return IntVal::null();
+  }
+  if(string_val.is_null || string_val.len <= 0) return IntVal::null();
+
+  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
+
+  if (!context->IsArgConstant(1)) {
+     dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
+     if (!TimestampParser::ParseFormatTokens(dt_ctx)){
+       ReportBadFormat(context, fmt, false);
+       return IntVal::null();
+     }
+  }
+
   TimestampValue default_tv;
   TimestampValue* tv = &default_tv;
-  if (e->GetNumChildren() == 0) {
-    // Expr::Prepare put the current timestamp here.
-    tv = &e->result_.timestamp_val;
-  } else if (e->GetNumChildren() == 1) {
-    Expr* op = e->children()[0];
-    tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-    if (tv == NULL) return NULL;
-  } else {
-    Expr* op = e->children()[0];
-    StringValue* value = reinterpret_cast<StringValue*>(op->GetValue(row));
-    if ((value == NULL) || (value->len <= 0)) return NULL;
-    Expr* fmt_op = e->children()[1];
-    FunctionCall* func_expr = static_cast<FunctionCall*>(e);
-    DateTimeFormatContext* const dt_ctx = func_expr->GetDateTimeFormatCtx();
-    if (dt_ctx == NULL) return NULL;
-    // If our format string is constant then we benefit from it only being parsed once in
-    // Expr::Prepare. If it's not constant, then we can reuse a context by resetting it.
-    // This is much cheaper vs alloc/dealloc'ing a context for each evaluation.
-    if (!fmt_op->IsConstant()) {
-      StringValue* fmt = reinterpret_cast<StringValue*>(fmt_op->GetValue(row));
-      if ((fmt == NULL) || (fmt->len <= 0)) return NULL;
-      dt_ctx->Reset(fmt->ptr, fmt->len);
-      if (!TimestampParser::ParseFormatTokens(dt_ctx)) {
-        ReportBadFormat(fmt);
-        return NULL;
-      }
-    }
-    default_tv = TimestampValue(value->ptr, value->len, *dt_ctx);
-  }
-  if (tv->date().is_special()) return NULL;
+  default_tv = TimestampValue(
+      reinterpret_cast<const char*>(string_val.ptr), string_val.len, *dt_ctx);
+  if (tv->date().is_special()) return IntVal::null();
   ptime temp;
   tv->ToPtime(&temp);
-  e->result_.int_val = static_cast<int32_t>(to_time_t(temp));
-  return &e->result_.int_val;
+  return IntVal(to_time_t(temp));
 }
 
-void* TimestampFunctions::UnixFromString(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  StringValue* sv = reinterpret_cast<StringValue*>(op->GetValue(row));
-  if (sv == NULL) return NULL;
-  TimestampValue tv(sv->ptr, sv->len);
-  if (tv.date().is_special()) return NULL;
+IntVal TimestampFunctions::Unix(FunctionContext* context, const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value_ref = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value_ref.get_date().is_special()) return IntVal::null();
+  ptime temp;
+  ts_value_ref.ToPtime(&temp);
+  return IntVal(to_time_t(temp));
+}
+
+IntVal TimestampFunctions::Unix(FunctionContext* context) {
+  TimestampValue default_tv;
+  TimestampValue* tv = &default_tv;
+  default_tv = TimestampValue(context->impl()->state()->now());
+  if (tv->date().is_special()) return IntVal::null();
+  ptime temp;
+  tv->ToPtime(&temp);
+  return IntVal(to_time_t(temp));
+}
+
+IntVal TimestampFunctions::UnixFromString(FunctionContext* context, const StringVal& sv) {
+  if (sv.is_null) return IntVal::null();
+  TimestampValue tv(reinterpret_cast<const char *>(sv.ptr), sv.len);
+  if (tv.date().is_special()) return IntVal::null();
   ptime temp;
   tv.ToPtime(&temp);
-  e->result_.int_val = static_cast<int32_t>(to_time_t(temp));
-  return &e->result_.int_val;
+  return IntVal(to_time_t(temp));
 }
 
-void TimestampFunctions::ReportBadFormat(StringValue* format) {
-  // This was filling up log space -- temporary solution is to disable logging
-  // TODO (victor.bittorf) set the error in the runtime state and then bubble up
-  //LOG(WARNING) << "Bad date/time conversion format: " << format->DebugString();
-}
-
-void* TimestampFunctions::DayName(Expr* e, TupleRow* row) {
-  void* dow = DayOfWeek(e, row);
-  if (dow == NULL) return NULL;
-  switch (e->result_.int_val) {
-    case 1: e->result_.string_val = SUNDAY; break;
-    case 2: e->result_.string_val = MONDAY; break;
-    case 3: e->result_.string_val = TUESDAY; break;
-    case 4: e->result_.string_val = WEDNESDAY; break;
-    case 5: e->result_.string_val = THURSDAY; break;
-    case 6: e->result_.string_val = FRIDAY; break;
-    case 7: e->result_.string_val = SATURDAY; break;
-    default: DCHECK(false);
+void TimestampFunctions::ReportBadFormat(FunctionContext* context,
+    const StringVal& format, bool is_error) {
+  stringstream ss;
+  const StringValue& fmt = StringValue::FromStringVal(format);
+  if (format.is_null || format.len <= 0) {
+    ss << "Bad date/time coversion format: format string is NULL or has 0 length";
+  } else {
+    ss << "Bad date/time coversion format: " << fmt.DebugString();
   }
-  return &e->result_.string_val;
+  if (is_error) {
+    context->SetError(ss.str().c_str());
+  } else {
+    context->AddWarning(ss.str().c_str());
+  }
 }
 
-void* TimestampFunctions::Year(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
-
-  // If the value has been set to not_a_date_time then it will be marked special
-  // therefore there is no valid date component and this function returns NULL.
-  if (tv->date().is_special()) return NULL;
-  e->result_.int_val = tv->date().year();
-  return &e->result_.int_val;
+StringVal TimestampFunctions::DayName(FunctionContext* context, const TimestampVal& ts) {
+  if (ts.is_null) return StringVal::null();
+  IntVal dow = DayOfWeek(context, ts);
+  switch(dow.val) {
+    case 1: return StringVal(SUNDAY);
+    case 2: return StringVal(MONDAY);
+    case 3: return StringVal(TUESDAY);
+    case 4: return StringVal(WEDNESDAY);
+    case 5: return StringVal(THURSDAY);
+    case 6: return StringVal(FRIDAY);
+    case 7: return StringVal(SATURDAY);
+    default: return StringVal::null();
+   }
 }
 
-void* TimestampFunctions::Month(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
-
-  if (tv->date().is_special()) return NULL;
-  e->result_.int_val = tv->date().month();
-  return &e->result_.int_val;
+IntVal TimestampFunctions::Year(FunctionContext* context, const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.get_date().is_special()) return IntVal::null();
+  return IntVal(ts_value.get_date().year());
 }
 
-void* TimestampFunctions::DayOfWeek(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
 
-  if (tv->date().is_special()) return NULL;
-  // Sql has the result in [1,7] where 1 = Sunday.  Boost has 0 = Sunday.
-  e->result_.int_val = tv->date().day_of_week() + 1;
-  DCHECK_GE(e->result_.int_val, 1);
-  DCHECK_LE(e->result_.int_val, 7);
-  return &e->result_.int_val;
+IntVal TimestampFunctions::Month(FunctionContext* context, const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.get_date().is_special()) return IntVal::null();
+  return IntVal(ts_value.get_date().month());
 }
 
-void* TimestampFunctions::DayOfMonth(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
 
-  if (tv->date().is_special()) return NULL;
-  e->result_.int_val = tv->date().day();
-  return &e->result_.int_val;
+IntVal TimestampFunctions::DayOfWeek(FunctionContext* context,
+    const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue ts_value_ref = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value_ref.get_date().is_special()) return IntVal::null();
+  // Sql has the result in [1,7] where 1 = Sunday. Boost has 0 = Sunday.
+  return IntVal(ts_value_ref.get_date().day_of_week() + 1);
 }
 
-void* TimestampFunctions::DayOfYear(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
-
-  if (tv->date().is_special()) return NULL;
-  e->result_.int_val = tv->date().day_of_year();
-  return &e->result_.int_val;
+IntVal TimestampFunctions::DayOfMonth(FunctionContext* context,
+    const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.get_date().is_special()) return IntVal::null();
+  return IntVal(ts_value.get_date().day());
 }
 
-void* TimestampFunctions::WeekOfYear(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
-
-  if (tv->date().is_special()) return NULL;
-  e->result_.int_val = tv->date().week_number();
-  return &e->result_.int_val;
+IntVal TimestampFunctions::DayOfYear(FunctionContext* context,
+    const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.get_date().is_special()) return IntVal::null();
+  return IntVal(ts_value.get_date().day_of_year());
 }
 
-void* TimestampFunctions::Hour(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
-
-  if (tv->time_of_day().is_special()) return NULL;
-
-  e->result_.int_val = tv->time_of_day().hours();
-  return &e->result_.int_val;
+IntVal TimestampFunctions::WeekOfYear(FunctionContext* context,
+    const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.get_date().is_special()) return IntVal::null();
+  return IntVal(ts_value.get_date().week_number());
 }
 
-void* TimestampFunctions::Minute(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
-
-  if (tv->time_of_day().is_special()) return NULL;
-
-  e->result_.int_val = tv->time_of_day().minutes();
-  return &e->result_.int_val;
+IntVal TimestampFunctions::Hour(FunctionContext* context, const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.get_time().is_special()) return IntVal::null();
+  return IntVal(ts_value.get_time().hours());
 }
 
-void* TimestampFunctions::Second(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
-
-  if (tv->time_of_day().is_special()) return NULL;
-
-  e->result_.int_val = tv->time_of_day().seconds();
-  return &e->result_.int_val;
+IntVal TimestampFunctions::Minute(FunctionContext* context, const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.get_time().is_special()) return IntVal::null();
+  return IntVal(ts_value.get_time().minutes());
 }
 
-void* TimestampFunctions::Now(Expr* e, TupleRow* row) {
-  // Make sure FunctionCall::Prepare() properly set the timestamp value.
-  DCHECK(!e->result_.timestamp_val.date().is_special());
-  return &e->result_.timestamp_val;
+IntVal TimestampFunctions::Second(FunctionContext* context, const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.get_time().is_special()) return IntVal::null();
+  return IntVal(ts_value.get_time().seconds());
 }
 
-void* TimestampFunctions::ToDate(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
+TimestampVal TimestampFunctions::Now(FunctionContext* context) {
+  TimestampValue default_tv;
+  TimestampValue* tv = &default_tv;
+  default_tv = TimestampValue(context->impl()->state()->now());
+  if (tv->date().is_special()) return TimestampVal::null();
+  TimestampVal return_val;
+  default_tv.ToTimestampVal(&return_val);
+  return return_val;
+}
 
-  string result = to_iso_extended_string(tv->date());
-  e->result_.SetStringVal(result);
-  return &e->result_.string_val;
+StringVal TimestampFunctions::ToDate(FunctionContext* context,
+    const TimestampVal& ts_val) {
+  if (ts_val.is_null) return StringVal::null();
+  const TimestampValue ts_value = TimestampValue::FromTimestampVal(ts_val);
+  string result = to_iso_extended_string(ts_value.get_date());
+  return AnyValUtil::FromString(context, result);
 }
 
 template <bool ISADD, class VALTYPE, class UNIT>
-void* TimestampFunctions::DateAddSub(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 2);
-  Expr* op1 = e->children()[0];
-  Expr* op2 = e->children()[1];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op1->GetValue(row));
-  VALTYPE* count = reinterpret_cast<VALTYPE*>(op2->GetValue(row));
-  if (tv == NULL || count == NULL) return NULL;
+TimestampVal TimestampFunctions::DateAddSub(FunctionContext* contenxt,
+    const TimestampVal& ts_val, const VALTYPE& count) {
+  if (ts_val.is_null || count.is_null) return TimestampVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
 
-  if (tv->date().is_special()) return NULL;
-
-  UNIT unit(*count);
-  TimestampValue
-      value((ISADD ? tv->date() + unit : tv->date() - unit), tv->time_of_day());
-  e->result_.timestamp_val = value;
-
-  return &e->result_.timestamp_val;
+  if (ts_value.get_date().is_special()) return TimestampVal::null();
+  UNIT unit(count.val);
+  TimestampValue value((ISADD ? ts_value.get_date() + unit : ts_value.get_date() - unit),
+      ts_value.get_time());
+  TimestampVal return_val;
+  value.ToTimestampVal(&return_val);
+  return return_val;
 }
 
 template <bool ISADD, class VALTYPE, class UNIT>
-void* TimestampFunctions::TimeAddSub(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 2);
-  Expr* op1 = e->children()[0];
-  Expr* op2 = e->children()[1];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op1->GetValue(row));
-  VALTYPE* count = reinterpret_cast<VALTYPE*>(op2->GetValue(row));
-  if (tv == NULL || count == NULL) return NULL;
-
-  if (tv->date().is_special()) return NULL;
-
-  UNIT unit(*count);
-  ptime p(tv->date(), tv->time_of_day());
+TimestampVal TimestampFunctions::TimeAddSub(FunctionContext * context,
+    const TimestampVal& ts_val, const VALTYPE& count) {
+  if (ts_val.is_null || count.is_null) return TimestampVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.get_date().is_special()) return TimestampVal::null();
+  UNIT unit(count.val);
+  ptime p(ts_value.get_date(), ts_value.get_time());
   TimestampValue value(ISADD ? p + unit : p - unit);
-  e->result_.timestamp_val = value;
-
-  return &e->result_.timestamp_val;
+  TimestampVal return_val;
+  value.ToTimestampVal(&return_val);
+  return return_val;
 }
 
-void* TimestampFunctions::DateDiff(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 2);
-  Expr* op1 = e->children()[0];
-  Expr* op2 = e->children()[1];
-  TimestampValue* tv1 = reinterpret_cast<TimestampValue*>(op1->GetValue(row));
-  TimestampValue* tv2 = reinterpret_cast<TimestampValue*>(op2->GetValue(row));
-  if (tv1 == NULL || tv2 == NULL) return NULL;
-
-  if (tv1->date().is_special()) return NULL;
-  if (tv2->date().is_special()) return NULL;
-
-  e->result_.int_val = (tv1->date() - tv2->date()).days();
-  return &e->result_.int_val;
+IntVal TimestampFunctions::DateDiff(FunctionContext* context,
+    const TimestampVal& ts_val1,
+    const TimestampVal& ts_val2) {
+  if (ts_val1.is_null || ts_val2.is_null) return IntVal::null();
+  const TimestampValue& ts_value1 = TimestampValue::FromTimestampVal(ts_val1);
+  const TimestampValue& ts_value2 = TimestampValue::FromTimestampVal(ts_val2);
+  if (ts_value1.get_date().is_special() || ts_value2.get_date().is_special()) {
+    return IntVal::null();
+  }
+  return IntVal((ts_value1.get_date() - ts_value2.get_date()).days());
 }
 
+TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
+    const TimestampVal& ts_val, const StringVal& tz_string_val) {
+  if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.NotADateTime()) return TimestampVal::null();
+
+  const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
+  time_zone_ptr timezone =
+      TimezoneDatabase::FindTimezone(tz_string_value.DebugString(), ts_value);
+  if (timezone == NULL) {
+    // This should return null. Hive just ignores it.
+    stringstream ss;
+    ss << "Unknown timezone '" << tz_string_value << "'" << endl;
+    context->AddWarning(ss.str().c_str());
+    return ts_val;
+  }
+
+  ptime temp;
+  ts_value.ToPtime(&temp);
+  local_date_time lt(temp, timezone);
+  TimestampValue return_value = lt.local_time();
+  TimestampVal return_val;
+  return_value.ToTimestampVal(&return_val);
+  return return_val;
+}
+
+// This function uses inline asm functions, which we believe to be from the boost library.
+// Inline asm is not currently supported by JIT. The UDFs for FromUTC are included in this
+// file and have been tested, but the function symbols were not changed in
+// impala_functions.py because it will cause a failure when running codegen.
 void* TimestampFunctions::FromUtc(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 2);
   Expr* op1 = e->children()[0];
@@ -353,8 +386,8 @@ void* TimestampFunctions::FromUtc(Expr* e, TupleRow* row) {
   if (tv->NotADateTime()) return NULL;
 
   time_zone_ptr timezone = TimezoneDatabase::FindTimezone(tz->DebugString(), *tv);
-  // This should raise some sort of error or at least null. Hive just ignores it.
   if (timezone == NULL) {
+    // This should return null. Hive just ignores it.
     LOG(ERROR) << "Unknown timezone '" << *tz << "'" << endl;
     e->result_.timestamp_val = *tv;
     return &e->result_.timestamp_val;
@@ -366,6 +399,10 @@ void* TimestampFunctions::FromUtc(Expr* e, TupleRow* row) {
   return &e->result_.timestamp_val;
 }
 
+// This function uses inline asm functions, which we believe to be from the boost library.
+// Inline asm is not currently supported by JIT. The UDFs for ToUTC are included in this
+// file and have been tested, but the function symbols were not changed in
+// impala_functions.py because it will cause a failure when running codegen.
 void* TimestampFunctions::ToUtc(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 2);
   Expr* op1 = e->children()[0];
@@ -384,9 +421,34 @@ void* TimestampFunctions::ToUtc(Expr* e, TupleRow* row) {
     return &e->result_.timestamp_val;
   }
   local_date_time lt(tv->date(), tv->time_of_day(),
-                     timezone, local_date_time::NOT_DATE_TIME_ON_ERROR);
+      timezone, local_date_time::NOT_DATE_TIME_ON_ERROR);
   e->result_.timestamp_val = TimestampValue(lt.utc_time());
   return &e->result_.timestamp_val;
+}
+
+TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
+    const TimestampVal& ts_val, const StringVal& tz_string_val) {
+  if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (ts_value.NotADateTime()) return TimestampVal::null();
+
+  const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
+  time_zone_ptr timezone =
+      TimezoneDatabase::FindTimezone(tz_string_value.DebugString(), ts_value);
+  // This should raise some sort of error or at least null. Hive Just ignores it.
+  if (timezone == NULL) {
+    stringstream ss;
+    ss << "Unknown timezone '" << tz_string_value << "'" << endl;
+    context->AddWarning(ss.str().c_str());
+    return ts_val;
+  }
+
+  local_date_time lt(ts_value.get_date(), ts_value.get_time(),
+      timezone, local_date_time::NOT_DATE_TIME_ON_ERROR);
+  TimestampValue return_value(lt.utc_time());
+  TimestampVal return_val;
+  return_value.ToTimestampVal(&return_val);
+  return return_val;
 }
 
 TimezoneDatabase::TimezoneDatabase() {
@@ -465,92 +527,136 @@ time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz, const TimestampVa
 // are only indirectly called via a function pointer provided by the opcode registry
 // which does not trigger implicit template instantiation.
 // Must be kept in sync with common/function-registry/impala_functions.py.
+template StringVal
+TimestampFunctions::FromUnix<IntVal>(FunctionContext* context, const IntVal& intp, const
+  StringVal& fmt);
+template StringVal
+TimestampFunctions::FromUnix<BigIntVal>(FunctionContext* context, const BigIntVal& intp,
+    const StringVal& fmt);
+template StringVal
+TimestampFunctions::FromUnix<IntVal>(FunctionContext* context , const IntVal& intp);
+template StringVal
+TimestampFunctions::FromUnix<BigIntVal>(FunctionContext* context, const BigIntVal& intp);
 
-template void*
-TimestampFunctions::FromUnix<int32_t>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::FromUnix<int64_t>(Expr* e, TupleRow* row);
+template TimestampVal
+TimestampFunctions::DateAddSub<true, IntVal, years>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<true, BigIntVal, years>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<false, IntVal, years>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<false, BigIntVal, years>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<true, IntVal, months>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<true, BigIntVal, months>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<false, IntVal, months>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<false, BigIntVal, months>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<true, IntVal, weeks>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<true, BigIntVal, weeks>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<false, IntVal, weeks>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<false, BigIntVal, weeks>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<true, IntVal, days>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<true, BigIntVal, days>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<false, IntVal, days>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::DateAddSub<false, BigIntVal, days>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
 
-template void*
-TimestampFunctions::DateAddSub<true, int32_t, years>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<true, int64_t, years>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<false, int32_t, years>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<false, int64_t, years>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<true, int32_t, months>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<true, int64_t, months>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<false, int32_t, months>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<false, int64_t, months>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<true, int32_t, weeks>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<true, int64_t, weeks>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<false, int32_t, weeks>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<false, int64_t, weeks>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<true, int32_t, days>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<true, int64_t, days>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<false, int32_t, days>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::DateAddSub<false, int64_t, days>(Expr* e, TupleRow* row);
-
-template void*
-TimestampFunctions::TimeAddSub<true, int32_t, hours>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int64_t, hours>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int32_t, hours>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int64_t, hours>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int32_t, minutes>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int64_t, minutes>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int32_t, minutes>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int64_t, minutes>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int32_t, seconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int64_t, seconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int32_t, seconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int64_t, seconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int32_t, milliseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int64_t, milliseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int32_t, milliseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int64_t, milliseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int32_t, microseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int64_t, microseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int32_t, microseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int64_t, microseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int32_t, nanoseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<true, int64_t, nanoseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int32_t, nanoseconds>(Expr* e, TupleRow* row);
-template void*
-TimestampFunctions::TimeAddSub<false, int64_t, nanoseconds>(Expr* e, TupleRow* row);
-
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, IntVal, hours>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, BigIntVal, hours>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, IntVal, hours>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, BigIntVal, hours>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, IntVal, minutes>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, BigIntVal, minutes>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, IntVal, minutes>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, BigIntVal, minutes>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, IntVal, seconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, BigIntVal, seconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, IntVal, seconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, BigIntVal, seconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, IntVal, milliseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, BigIntVal, milliseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, IntVal, milliseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, BigIntVal, milliseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, IntVal, microseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, BigIntVal, microseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, IntVal, microseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, BigIntVal, microseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, IntVal, nanoseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<true, BigIntVal, nanoseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, IntVal, nanoseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::TimeAddSub<false, BigIntVal, nanoseconds>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
 }

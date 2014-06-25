@@ -134,8 +134,8 @@ class TimestampParser {
   // Return true if the parse was successful.
   static inline bool ParseFormatTokens(DateTimeFormatContext* dt_ctx) {
     DCHECK(dt_ctx != NULL);
-    DCHECK(dt_ctx->fmt_len > 0);
     DCHECK(dt_ctx->fmt != NULL);
+    DCHECK(dt_ctx->fmt_len > 0);
     DCHECK(dt_ctx->toks.size() == 0);
     const char* str_begin = dt_ctx->fmt;
     const char* str_end = str_begin + dt_ctx->fmt_len;

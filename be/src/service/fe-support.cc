@@ -56,7 +56,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeFeTestInit(
   DCHECK(ExecEnv::GetInstance() == NULL) << "This should only be called once from the FE";
   char* name = const_cast<char*>("FeSupport");
   InitCommonRuntime(1, &name, false, true);
-  LlvmCodeGen::InitializeLlvm();
+  LlvmCodeGen::InitializeLlvm(true);
   ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
   exec_env->InitForFeTests();
 }

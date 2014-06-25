@@ -170,7 +170,7 @@ public class TimestampArithmeticExpr extends Expr {
 
   @Override
   protected void toThrift(TExprNode msg) {
-    msg.node_type = TExprNodeType.COMPUTE_FUNCTION_CALL;
+    msg.node_type = TExprNodeType.FUNCTION_CALL;
   }
 
   public String getTimeUnitIdent() { return timeUnitIdent_; }

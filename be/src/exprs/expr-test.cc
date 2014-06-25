@@ -169,10 +169,14 @@ class ExprTest : public testing::Test {
   }
 
   void GetValue(const string& expr, const ColumnType& expr_type,
-      void** interpreted_value) {
+      void** interpreted_value, bool expect_error = false) {
     string stmt = "select " + expr;
     vector<FieldSchema> result_types;
     Status status = executor_->Exec(stmt, &result_types);
+    if (expect_error) {
+      ASSERT_FALSE(status.ok()) << "Expected error\nstmt: " << stmt;
+      return;
+    }
     ASSERT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetErrorMsg();
     string result_row;
     ASSERT_TRUE(executor_->FetchResult(&result_row).ok()) << expr;
@@ -316,6 +320,11 @@ class ExprTest : public testing::Test {
     void* result;
     GetValue(expr, expr_type, &result);
     EXPECT_TRUE(result == NULL) << expr;
+  }
+
+  void TestError(const string& expr) {
+    void* dummy_result;
+    GetValue(expr, INVALID_TYPE, &dummy_result, /* expect_error */ true);
   }
 
   void TestNonOkStatus(const string& expr) {
@@ -2636,8 +2645,6 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("unix_timestamp('00:00:00')", TYPE_INT);
   TestIsNull("unix_timestamp(NULL, 'yyyy-MM-dd')", TYPE_INT);
   TestIsNull("unix_timestamp('00:00:00', 'yyyy-MM-dd HH:mm:ss')", TYPE_INT);
-  TestIsNull("unix_timestamp('1970-01-01 10:10:10', NULL)", TYPE_INT);
-  TestIsNull("unix_timestamp(NULL, NULL)", TYPE_INT);
   TestStringValue("cast(cast(0 as timestamp) as string)", "1970-01-01 00:00:00");
   TestStringValue("from_unixtime(0)", "1970-01-01 00:00:00");
   TestStringValue("from_unixtime(cast(0 as bigint))", "1970-01-01 00:00:00");
@@ -2647,10 +2654,7 @@ TEST_F(ExprTest, TimestampFunctions) {
       "1970-01-01 00:00:00");
   TestStringValue("from_unixtime(0, 'yyyy-MM-dd')", "1970-01-01");
   TestStringValue("from_unixtime(cast(0 as bigint), 'yyyy-MM-dd')", "1970-01-01");
-  TestIsNull("from_unixtime(0, NULL)", TYPE_STRING);
-  TestIsNull("from_unixtime(cast(0 as bigint), NULL)", TYPE_STRING);
   TestIsNull("from_unixtime(NULL, 'yyyy-MM-dd')", TYPE_STRING);
-  TestIsNull("from_unixtime(NULL, NULL)", TYPE_STRING);
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
       'yyyy-MM-dd')", "1999-01-01");
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
@@ -2793,26 +2797,34 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("from_unixtime(0, 'yyyy|MM|dd HH|mm|ss')", "1970|01|01 00|00|00");
   TestStringValue("from_unixtime(0, 'dd,MMM,yyyy,HH,mm,ss')", "01,Jan,1970,00,00,00");
 
-  // Test invalid formats returning NULL
-  TestIsNull("unix_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd hh:mm:ss')", TYPE_INT);
+  // Test invalid formats returns error
+  TestError("unix_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd hh:mm:ss')");
+  TestError("unix_timestamp('1970-01-01 10:10:10', NULL)");
+  TestError("unix_timestamp(NULL, NULL)");
+  TestError("from_unixtime(0, NULL)");
+  TestError("from_unixtime(cast(0 as bigint), NULL)");
+  TestError("from_unixtime(NULL, NULL)");
+  TestError("unix_timestamp('1970-01-01 00:00:00', ' ')");
+  TestError("unix_timestamp('1970-01-01 00:00:00', ' -===-')");
+  TestError("unix_timestamp('1970-01-01', '\"foo\"')");
+  TestError("from_unixtime(0, 'YY-MM-dd HH:mm:dd')");
+  TestError("from_unixtime(0, 'yyyy-MM-dd hh::dd')");
+  TestError("from_unixtime(cast(0 as bigint), 'YY-MM-dd HH:mm:dd')");
+  TestError("from_unixtime(cast(0 as bigint), 'yyyy-MM-dd hh::dd')");
+  TestError("from_unixtime(0, '')");
+  TestError("from_unixtime(0, NULL)");
+  TestError("from_unixtime(0, ' ')");
+  TestError("from_unixtime(0, ' -=++=- ')");
+
+  // Valid format string, but invalid Timestamp, should return null;
   TestIsNull("unix_timestamp('1970-01-01', 'yyyy-MM-dd HH:mm:ss')", TYPE_INT);
   TestIsNull("unix_timestamp('1970', 'yyyy-MM-dd')", TYPE_INT);
   TestIsNull("unix_timestamp('', 'yyyy-MM-dd')", TYPE_INT);
   TestIsNull("unix_timestamp('|1|1 00|00|00', 'yyyy|M|d HH|MM|ss')", TYPE_INT);
-  TestIsNull("unix_timestamp('1970-01-01 00:00:00', ' ')", TYPE_INT);
-  TestIsNull("unix_timestamp('1970-01-01 00:00:00', ' -===-')", TYPE_INT);
+
   TestIsNull("unix_timestamp('1970-01', 'yyyy-MM-dd')", TYPE_INT);
   TestIsNull("unix_timestamp('1970-20-01', 'yyyy-MM-dd')", TYPE_INT);
-  TestIsNull("unix_timestamp('1970-01-01', '\"foo\"')", TYPE_INT);
 
-  TestIsNull("from_unixtime(0, 'YY-MM-dd HH:mm:dd')", TYPE_STRING);
-  TestIsNull("from_unixtime(0, 'yyyy-MM-dd hh::dd')", TYPE_STRING);
-  TestIsNull("from_unixtime(cast(0 as bigint), 'YY-MM-dd HH:mm:dd')", TYPE_STRING);
-  TestIsNull("from_unixtime(cast(0 as bigint), 'yyyy-MM-dd hh::dd')", TYPE_STRING);
-  TestIsNull("from_unixtime(0, '')", TYPE_STRING);
-  TestIsNull("from_unixtime(0, NULL)", TYPE_STRING);
-  TestIsNull("from_unixtime(0, ' ')", TYPE_STRING);
-  TestIsNull("from_unixtime(0, ' -=++=- ')", TYPE_STRING);
 
   TestStringValue(
         "cast(trunc(cast('2014-04-01 01:01:01' as timestamp), 'SYYYY') as string)",

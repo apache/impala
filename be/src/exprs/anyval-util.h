@@ -157,6 +157,16 @@ class AnyValUtil {
     }
   }
 
+  static StringVal FromString(FunctionContext* ctx, const std::string& s) {
+    return FromBuffer(ctx, s.c_str(), s.size());
+  }
+
+  static StringVal FromBuffer(FunctionContext* ctx, const char* ptr, int len) {
+    StringVal result(ctx, len);
+    memcpy(result.ptr, ptr, len);
+    return result;
+  }
+
   static void ColumnTypeToTypeDesc(
       const ColumnType& type, FunctionContext::TypeDesc* out);
 };

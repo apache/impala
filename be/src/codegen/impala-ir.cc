@@ -28,6 +28,7 @@
 #include "runtime/string-value-ir.cc"
 #include "udf/udf.cc"
 #include "util/hash-util-ir.cc"
+#include "exprs/timestamp-functions.cc"
 #else
 #error "This file should only be used for cross compiling to IR."
 #endif

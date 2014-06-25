@@ -67,6 +67,8 @@ class FunctionContextImpl {
 
   static const char* LLVM_FUNCTIONCONTEXT_NAME;
 
+  RuntimeState* state() { return state_; }
+
  private:
   friend class impala_udf::FunctionContext;
 

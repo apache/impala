@@ -25,6 +25,8 @@
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 
+using namespace impala_udf;
+
 namespace impala {
 
 class Expr;
@@ -34,66 +36,90 @@ class TupleRow;
 // TODO: Reconsider whether this class needs to exist.
 class TimestampFunctions {
  public:
-  // Return the unix time_t, seconds from 1970
+  // Parse and initialize format string if it is a constant. Raise error if invalid.
+  static void UnixAndFromUnixPrepare(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+  static void UnixAndFromUnixClose(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+
   // With 0 arguments, returns the current time.
   // With 1 argument, converts it to a unix time_t
   // With 2 arguments, the second argument is the format of the timestamp string.
   static void* Unix(Expr* e, TupleRow* row);
-  static void* UnixFromString(Expr* e, TupleRow* row);
+
+  // Unix UDF functions.
+  static IntVal Unix(FunctionContext* context, const StringVal& string_val,
+      const StringVal& fmt);
+  static IntVal Unix(FunctionContext* context, const TimestampVal& tv_val);
+  static IntVal Unix(FunctionContext* context);
+
+  static IntVal UnixFromString(FunctionContext* context, const StringVal& sv);
 
   // Return a timestamp string from a unix time_t
   // Optional second argument is the format of the string.
   // TIME is the integer type of the unix time argument.
   template <class TIME>
-  static void* FromUnix(Expr* e, TupleRow* row);
+  static StringVal FromUnix(FunctionContext* context, const TIME& unix_time);
+  template <class TIME>
+  static StringVal FromUnix(FunctionContext* context, const TIME& unix_time,
+      const StringVal& fmt);
 
   // Convert a timestamp to or from a particular timezone based time.
+  // Still need non-UDF version because of inline asm JIT issue
   static void* FromUtc(Expr* e, TupleRow* row);
+  static TimestampVal FromUtc(FunctionContext* context,
+    const TimestampVal& ts_val, const StringVal& tz_string_val);
   static void* ToUtc(Expr* e, TupleRow* row);
+  static TimestampVal ToUtc(FunctionContext* context,
+      const TimestampVal& ts_val, const StringVal& tz_string_val);
 
   // Returns the day's name as a string (e.g. 'Saturday').
-  static void* DayName(Expr* e, TupleRow* row);
+  static StringVal DayName(FunctionContext* context, const TimestampVal& dow);
 
   // Functions to extract parts of the timestamp, return integers.
-  static void* Year(Expr* e, TupleRow* row);
-  static void* Month(Expr* e, TupleRow* row);
-  static void* DayOfWeek(Expr* e, TupleRow* row);
-  static void* DayOfMonth(Expr* e, TupleRow* row);
-  static void* DayOfYear(Expr* e, TupleRow* row);
-  static void* WeekOfYear(Expr* e, TupleRow* row);
-  static void* Hour(Expr* e, TupleRow* row);
-  static void* Minute(Expr* e, TupleRow* row);
-  static void* Second(Expr* e, TupleRow* row);
+  static IntVal Year(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Month(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal DayOfWeek(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal DayOfMonth(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal DayOfYear(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal WeekOfYear(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Hour(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Minute(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Second(FunctionContext* context, const TimestampVal& ts_val);
 
   // Date/time functions.
-  static void* Now(Expr* e, TupleRow* row);
-  static void* ToDate(Expr* e, TupleRow* row);
-  static void* DateDiff(Expr* e, TupleRow* row);
+  static TimestampVal Now(FunctionContext* context);
+  static StringVal ToDate(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal DateDiff(FunctionContext* context, const TimestampVal& ts_val1,
+      const TimestampVal& ts_val2);
 
   // Add/sub functions on the date portion.
   template <bool ISADD, class VALTYPE, class UNIT>
-  static void* DateAddSub(Expr* e, TupleRow* row);
+  static TimestampVal DateAddSub(FunctionContext* context, const TimestampVal& ts_value,
+      const VALTYPE& count);
 
   // Add/sub functions on the time portion.
   template <bool ISADD, class VALTYPE, class UNIT>
-  static void* TimeAddSub(Expr* e, TupleRow* row);
+  static TimestampVal TimeAddSub(FunctionContext* context, const TimestampVal& ts_value,
+      const VALTYPE& count);
 
   // Helper function to check date/time format strings.
   // TODO: eventually return format converted from Java to Boost.
   static StringValue* CheckFormat(StringValue* format);
 
   // Issue a warning for a bad format string.
-  static void ReportBadFormat(StringValue* format);
+  static void ReportBadFormat(FunctionContext* context,
+      const StringVal& format, bool is_error);
 
  private:
   // Static result values for DayName() function.
-  static const StringValue MONDAY;
-  static const StringValue TUESDAY;
-  static const StringValue WEDNESDAY;
-  static const StringValue THURSDAY;
-  static const StringValue FRIDAY;
-  static const StringValue SATURDAY;
-  static const StringValue SUNDAY;
+  static const char* MONDAY;
+  static const char* TUESDAY;
+  static const char* WEDNESDAY;
+  static const char* THURSDAY;
+  static const char* FRIDAY;
+  static const char* SATURDAY;
+  static const char* SUNDAY;
 };
 
 // Functions to load and access the timestamp database.
