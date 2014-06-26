@@ -29,7 +29,12 @@
 // Instead, we'll implement a dummy version that is not used.
 // When they build their library to a .so, they'd use the version of FunctionContext
 // in the main binary, which does include FreePool.
+
+#define VLOG_ROW while(false) std::cout
+#define VLOG_ROW_IS_ON (false)
+
 namespace impala {
+
 class MemTracker {
  public:
   void Consume(int64_t bytes) { }
@@ -76,7 +81,9 @@ class RuntimeState {
 
   const std::string connected_user() const { return ""; }
 };
+
 }
+
 #else
 #include "runtime/free-pool.h"
 #include "runtime/mem-tracker.h"
@@ -100,6 +107,8 @@ FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool
   ctx->impl_->pool_ = new FreePool(pool);
   ctx->impl_->arg_types_ = arg_types;
   ctx->impl_->debug_ = debug;
+  VLOG_ROW << "Created FunctionContext: " << ctx
+           << " with pool " << ctx->impl_->pool_;
   return ctx;
 }
 
@@ -192,18 +201,28 @@ uint8_t* FunctionContext::Allocate(int byte_size) {
   uint8_t* buffer = impl_->pool_->Allocate(byte_size);
   impl_->allocations_[buffer] = byte_size;
   if (impl_->debug_) memset(buffer, 0xff, byte_size);
+  VLOG_ROW << "Allocate: FunctionContext=" << this
+           << " size=" << byte_size
+           << " result=" << reinterpret_cast<void*>(buffer);
   return buffer;
 }
 
 uint8_t* FunctionContext::Reallocate(uint8_t* ptr, int byte_size) {
+  VLOG_ROW << "Reallocate: FunctionContext=" << this
+           << " size=" << byte_size
+           << " ptr=" << reinterpret_cast<void*>(ptr);
   impl_->allocations_.erase(ptr);
   ptr = impl_->pool_->Reallocate(ptr, byte_size);
   impl_->allocations_[ptr] = byte_size;
+  VLOG_ROW << "FunctionContext=" << this
+           << " reallocated: " << reinterpret_cast<void*>(ptr);
   return ptr;
 }
 
 void FunctionContext::Free(uint8_t* buffer) {
   if (buffer == NULL) return;
+  VLOG_ROW << "Free: FunctionContext=" << this << " "
+           << reinterpret_cast<void*>(buffer);
   if (impl_->debug_) {
     map<uint8_t*, int>::iterator it = impl_->allocations_.find(buffer);
     if (it != impl_->allocations_.end()) {
@@ -301,10 +320,22 @@ uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {
   if (byte_size == 0) return NULL;
   uint8_t* buffer = pool_->Allocate(byte_size);
   local_allocations_.push_back(buffer);
+  VLOG_ROW << "Allocate Local: FunctionContext=" << this->context_
+           << " size=" << byte_size
+           << " result=" << reinterpret_cast<void*>(buffer);
   return buffer;
 }
 
 void FunctionContextImpl::FreeLocalAllocations() {
+  if (VLOG_ROW_IS_ON) {
+    stringstream ss;
+    ss << "Free local allocations: FunctionCteonxt=" << context_
+       << " pool=" << pool_ << endl;
+    for (int i = 0; i < local_allocations_.size(); ++i) {
+      ss << "  " << reinterpret_cast<void*>(local_allocations_[i]) << endl;
+    }
+    VLOG_ROW << ss.str();
+  }
   for (int i = 0; i < local_allocations_.size(); ++i) {
     pool_->Free(local_allocations_[i]);
   }

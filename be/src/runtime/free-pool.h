@@ -77,7 +77,7 @@ class FreePool {
     FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
     FreeListNode* list = node->list;
 #ifndef NDEBUG
-    CheckValidAllocation(list);
+    CheckValidAllocation(list, ptr);
 #endif
     // Add node to front of list.
     node->next = list->next;
@@ -92,7 +92,7 @@ class FreePool {
     FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
     FreeListNode* list = node->list;
 #ifndef NDEBUG
-    CheckValidAllocation(list);
+    CheckValidAllocation(list, ptr);
 #endif
     int bucket_idx = (list - &lists_[0]);
     // This is the actual size of ptr.
@@ -122,13 +122,35 @@ class FreePool {
     };
   };
 
-  void CheckValidAllocation(FreeListNode* computed_list_ptr) {
+  void CheckValidAllocation(FreeListNode* computed_list_ptr, uint8_t* allocation) const {
     // On debug, check that list is valid.
     bool found = false;
     for (int i = 0; i < NUM_LISTS && !found; ++i) {
       if (computed_list_ptr == &lists_[i]) found = true;
     }
-    DCHECK(found);
+    DCHECK(found) << "Could not find list for ptr: "
+                  << reinterpret_cast<void*>(allocation)
+                  << ". Allocation could have already been freed." << std::endl
+                  << DebugString();
+  }
+
+  std::string DebugString() const {
+    std::stringstream ss;
+    ss << "FreePool: " << this << std::endl;
+    for (int i = 0; i < NUM_LISTS; ++i) {
+      FreeListNode* n = lists_[i].next;
+      if (n == NULL) continue;
+      ss << i << ": ";
+      while (n != NULL) {
+        uint8_t* ptr = reinterpret_cast<uint8_t*>(n);
+        ptr += sizeof(FreeListNode);
+        ss << reinterpret_cast<void*>(ptr);
+        n = n->next;
+        if (n != NULL) ss << "->";
+      }
+      ss << std::endl;
+    }
+    return ss.str();
   }
 
   // MemPool to allocate from. Unowned.
