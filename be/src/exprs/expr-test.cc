@@ -3466,19 +3466,26 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(2,0));
 
   // Case
-  TestDecimalValue("case when true then cast('10' as decimal(2,0)) end",
+  TestDecimalValue("CASE when true then cast('10' as decimal(2,0)) end",
       Decimal4Value(10), ColumnType::CreateDecimalType(2, 0));
-  TestDecimalValue("case when true then cast('1.1' as decimal(18,1)) end",
+  TestDecimalValue("CASE when true then cast('1.1' as decimal(18,1)) end",
       Decimal8Value(11), ColumnType::CreateDecimalType(18,1));
-  TestDecimalValue("case when true then cast('-1.23' as decimal(32,2)) end",
+  TestDecimalValue("CASE when true then cast('-1.23' as decimal(32,2)) end",
       Decimal8Value(-123), ColumnType::CreateDecimalType(32,2));
-  TestDecimalValue("case when false then NULL else cast('10' as decimal(2,0)) end",
+  TestDecimalValue("CASE when false then NULL else cast('10' as decimal(2,0)) end",
       Decimal4Value(10), ColumnType::CreateDecimalType(2, 0));
-  TestDecimalValue("case when false then NULL else cast('1.1' as decimal(18,1)) end",
+  TestDecimalValue("CASE when false then NULL else cast('1.1' as decimal(18,1)) end",
       Decimal8Value(11), ColumnType::CreateDecimalType(18,1));
-  TestDecimalValue("case when false then NULL else cast('-1.23' as decimal(32,2)) end",
+  TestDecimalValue("CASE when false then NULL else cast('-1.23' as decimal(32,2)) end",
       Decimal8Value(-123), ColumnType::CreateDecimalType(32,2));
 
+  TestValue("CASE 1.1 when 1.1 then 1 when 2.22 then 2 else 3 end", TYPE_TINYINT, 1);
+  TestValue("CASE 2.22 when 1.1 then 1 when 2.22 then 2 else 3 end", TYPE_TINYINT, 2);
+  TestValue("CASE 2.21 when 1.1 then 1 when 2.22 then 2 else 3 end", TYPE_TINYINT, 3);
+  TestValue("CASE NULL when 1.1 then 1 when 2.22 then 2 else 3 end", TYPE_TINYINT, 3);
+
+  TestDecimalValue("CASE 2.21 when 1.1 then 1.1 when 2.21 then 2.2 else 3.3 end",
+      Decimal4Value(22), ColumnType::CreateDecimalType(2, 1));
 
   // Positive()
   TestDecimalValue("positive(cast('10' as decimal(2,0)))",
@@ -3487,7 +3494,8 @@ TEST_F(ExprTest, DecimalFunctions) {
       Decimal8Value(11), ColumnType::CreateDecimalType(18,1));
   TestDecimalValue("positive(cast('-1.23' as decimal(32,2)))",
       Decimal8Value(-123), ColumnType::CreateDecimalType(32,2));
-  TestIsNull("positive(cast(NULL as decimal(32,2)))", ColumnType::CreateDecimalType(32,2));
+  TestIsNull("positive(cast(NULL as decimal(32,2)))",
+      ColumnType::CreateDecimalType(32,2));
 
   // Negative()
   TestDecimalValue("negative(cast('10' as decimal(2,0)))",
@@ -3496,7 +3504,8 @@ TEST_F(ExprTest, DecimalFunctions) {
       Decimal8Value(-11), ColumnType::CreateDecimalType(18,1));
   TestDecimalValue("negative(cast('-1.23' as decimal(32,2)))",
       Decimal8Value(123), ColumnType::CreateDecimalType(32,2));
-  TestIsNull("negative(cast(NULL as decimal(32,2)))", ColumnType::CreateDecimalType(32,2));
+  TestIsNull("negative(cast(NULL as decimal(32,2)))",
+      ColumnType::CreateDecimalType(32,2));
 
   // Least()
   TestDecimalValue("least(cast('10' as decimal(2,0)), cast('-10' as decimal(2,0)))",

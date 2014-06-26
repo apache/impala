@@ -28,6 +28,7 @@ class CaseExpr: public Expr {
   friend class Expr;
   friend class ComputeFunctions;
   friend class ConditionalFunctions;
+  friend class DecimalOperators;
 
   CaseExpr(const TExprNode& node);
 
