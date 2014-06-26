@@ -633,15 +633,15 @@ class ExprTest : public testing::Test {
   // Test all binary ops with both operands being NULL.
   // We expect such exprs to return TYPE_INT.
   void TestNullOperandsArithmeticOps() {
-    TestIsNull("NULL + NULL", TYPE_INT);
-    TestIsNull("NULL - NULL", TYPE_INT);
-    TestIsNull("NULL * NULL", TYPE_INT);
-    TestIsNull("NULL / NULL", TYPE_INT);
+    TestIsNull("NULL + NULL", TYPE_DOUBLE);
+    TestIsNull("NULL - NULL", TYPE_DOUBLE);
+    TestIsNull("NULL * NULL", TYPE_DOUBLE);
+    TestIsNull("NULL / NULL", TYPE_DOUBLE);
     TestIsNull("NULL & NULL", TYPE_INT);
     TestIsNull("NULL | NULL", TYPE_INT);
     TestIsNull("NULL ^ NULL", TYPE_INT);
     TestIsNull("NULL DIV NULL", TYPE_INT);
-    TestIsNull("NULL % NULL", TYPE_INT);
+    TestIsNull("NULL % NULL", TYPE_DOUBLE);
     TestIsNull("~NULL", TYPE_INT);
   }
 
@@ -2280,7 +2280,7 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("NULL % cast(3.2 as double)", TYPE_DOUBLE);
   TestIsNull("cast(10.3 as double) % NULL", TYPE_DOUBLE);
   TestIsNull("fmod(NULL, NULL)", TYPE_FLOAT);
-  TestIsNull("NULL % NULL", TYPE_INT);
+  TestIsNull("NULL % NULL", TYPE_DOUBLE);
   TestIsNull("positive(NULL)", TYPE_TINYINT);
   TestIsNull("negative(NULL)", TYPE_TINYINT);
   TestIsNull("quotient(NULL, 1.0)", TYPE_BIGINT);

@@ -505,7 +505,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         boolean inputsNull = false;
         if (type1.isNull() && type2.isNull()) {
           inputsNull = true;
-          promotedType = compatibleType = ColumnType.INT;
+          promotedType = ColumnType.DOUBLE;
+          compatibleType = ColumnType.INT;
         }
 
         // +, -, *, %
@@ -522,15 +523,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MULTIPLY, null,
             promotedType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MOD, null,
-            compatibleType);
+            inputsNull? ColumnType.DOUBLE : compatibleType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MOD, null,
-            compatibleType);
+            inputsNull? ColumnType.DOUBLE : compatibleType);
 
         // /
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.DIVIDE, null,
-            inputsNull ? promotedType : ColumnType.DOUBLE);
+            ColumnType.DOUBLE);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.DIVIDE, null,
-            inputsNull ? promotedType : ColumnType.DOUBLE);
+            ColumnType.DOUBLE);
 
         // div, &, |, ^ only for fixed-point types
         if ((!type1.isFixedPointType() && !type1.isNull())

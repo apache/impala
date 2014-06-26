@@ -69,14 +69,11 @@ public class ArithmeticExpr extends Expr {
   public static void initBuiltins(Db db) {
     for (ColumnType t: ColumnType.getNumericTypes()) {
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.MULTIPLY.getName(), Lists.newArrayList(t, t),
-          t.getMaxResolutionType()));
+          Operator.MULTIPLY.getName(), Lists.newArrayList(t, t), t));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.ADD.getName(), Lists.newArrayList(t, t),
-          t.getNextResolutionType()));
+          Operator.ADD.getName(), Lists.newArrayList(t, t), t));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.SUBTRACT.getName(), Lists.newArrayList(t, t),
-          t.getNextResolutionType()));
+          Operator.SUBTRACT.getName(), Lists.newArrayList(t, t), t));
     }
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.DIVIDE.getName(),
@@ -185,6 +182,9 @@ public class ArithmeticExpr extends Expr {
       case MULTIPLY:
       case MOD:
         type_ = TypesUtil.getArithmeticResultType(t0, t1, op_);
+        // If both of the children are null, we'll default to the DOUBLE version of the
+        // operator. This prevents the BE from seeing NULL_TYPE.
+        if (type_.isNull()) type_ = ColumnType.DOUBLE;
         break;
 
       case INT_DIVIDE:
@@ -197,8 +197,10 @@ public class ArithmeticExpr extends Expr {
               op_.toString() + "': " + this.toSql());
         }
         type_ = ColumnType.getAssignmentCompatibleType(t0, t1);
-        // the result is always an integer or null
-        Preconditions.checkState(type_.isIntegerType() || type_.isNull());
+        // If both of the children are null, we'll default to the INT version of the
+        // operator. This prevents the BE from seeing NULL_TYPE.
+        if (type_.isNull()) type_ = ColumnType.INT;
+        Preconditions.checkState(type_.isIntegerType());
         break;
 
       default:
@@ -208,6 +210,11 @@ public class ArithmeticExpr extends Expr {
         break;
     }
 
+    castChild(0, type_);
+    castChild(1, type_);
+    t0 = getChild(0).getType();
+    t1 = getChild(1).getType();
+
     // Use MATH_MOD function operator for floating-point modulo.
     // TODO remove this when we have operators implemented using the UDF interface
     // and we can resolve this just using function overloading.
@@ -216,22 +223,12 @@ public class ArithmeticExpr extends Expr {
       fnName = "fmod";
     }
 
-    // In this case, both the children are null types, so we'll just default to
-    // the INT version of the operator. This prevents the BE from seeing NULL_TYPE.
-    if (type_.isNull()) {
-      Preconditions.checkState(getChild(0).type_.isNull());
-      Preconditions.checkState(getChild(1).type_.isNull());
-      type_ = ColumnType.INT;
-    }
-
-    castChild(0, type_);
-    castChild(1, type_);
-
     fn_ = getBuiltinFunction(analyzer, fnName, collectChildReturnTypes(),
-        CompareMode.IS_SUPERTYPE_OF);
+        CompareMode.IS_IDENTICAL);
     if (fn_ == null) {
       Preconditions.checkState(false, String.format("No match " +
           "for '%s' with operand types %s and %s", toSql(), t0, t1));
     }
+    Preconditions.checkState(type_.matchesType(fn_.getReturnType()));
   }
 }
