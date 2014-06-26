@@ -586,6 +586,8 @@ Status ImpalaServer::ExecuteInternal(
       (*exec_state)->set_result_metadata(result.result_set_metadata);
     }
   }
+  VLOG_QUERY << "Execution request: " << ThriftDebugString(result);
+
   if (IsAuditEventLoggingEnabled()) {
     LogAuditRecord(*(exec_state->get()), result);
   }
