@@ -237,7 +237,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size(),
         runtime_state_->instance_mem_tracker()));
-  VLOG(3) << "plan_root=\n" << plan_->DebugString();
+  VLOG(2) << "plan_root=\n" << plan_->DebugString();
   prepared_ = true;
   return Status::OK;
 }
