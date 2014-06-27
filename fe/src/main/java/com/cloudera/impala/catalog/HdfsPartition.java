@@ -323,6 +323,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     return fileDescriptors_;
   }
 
+  public boolean hasFileDescriptors() { return !fileDescriptors_.isEmpty(); }
+
   private HdfsPartition(HdfsTable table,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyValues,

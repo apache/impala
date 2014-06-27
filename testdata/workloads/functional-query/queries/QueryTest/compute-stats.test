@@ -125,6 +125,108 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
+# Add partitions with NULL values and check for stats.
+---- QUERY
+alter table compute_stats_db.alltypes add partition (year=NULL, month=NULL)
+---- RESULTS
+====
+---- QUERY
+show column stats compute_stats_db.alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bool_col','BOOLEAN',-1,-1,1,1
+'tinyint_col','TINYINT',-1,-1,1,1
+'smallint_col','SMALLINT',-1,-1,2,2
+'int_col','INT',-1,-1,4,4
+'bigint_col','BIGINT',-1,-1,8,8
+'float_col','FLOAT',-1,-1,4,4
+'double_col','DOUBLE',-1,-1,8,8
+'date_string_col','STRING',-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16
+'year','INT',3,1,4,4
+'month','INT',13,1,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+alter table compute_stats_db.alltypes add partition (year=2011, month=NULL)
+---- RESULTS
+====
+---- QUERY
+show column stats compute_stats_db.alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bool_col','BOOLEAN',-1,-1,1,1
+'tinyint_col','TINYINT',-1,-1,1,1
+'smallint_col','SMALLINT',-1,-1,2,2
+'int_col','INT',-1,-1,4,4
+'bigint_col','BIGINT',-1,-1,8,8
+'float_col','FLOAT',-1,-1,4,4
+'double_col','DOUBLE',-1,-1,8,8
+'date_string_col','STRING',-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16
+'year','INT',4,1,4,4
+'month','INT',13,2,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+# Drop the partitions with NULL values and check for stats.
+---- QUERY
+alter table compute_stats_db.alltypes drop partition (year=NULL, month=NULL)
+---- RESULTS
+====
+---- QUERY
+show column stats compute_stats_db.alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bool_col','BOOLEAN',-1,-1,1,1
+'tinyint_col','TINYINT',-1,-1,1,1
+'smallint_col','SMALLINT',-1,-1,2,2
+'int_col','INT',-1,-1,4,4
+'bigint_col','BIGINT',-1,-1,8,8
+'float_col','FLOAT',-1,-1,4,4
+'double_col','DOUBLE',-1,-1,8,8
+'date_string_col','STRING',-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16
+'year','INT',3,0,4,4
+'month','INT',13,1,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+alter table compute_stats_db.alltypes drop partition (year=2011, month=NULL)
+---- RESULTS
+====
+---- QUERY
+show column stats compute_stats_db.alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bool_col','BOOLEAN',-1,-1,1,1
+'tinyint_col','TINYINT',-1,-1,1,1
+'smallint_col','SMALLINT',-1,-1,2,2
+'int_col','INT',-1,-1,4,4
+'bigint_col','BIGINT',-1,-1,8,8
+'float_col','FLOAT',-1,-1,4,4
+'double_col','DOUBLE',-1,-1,8,8
+'date_string_col','STRING',-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
 ---- QUERY
 # drop stats from this table a second time, should not throw an error.
 drop stats compute_stats_db.alltypes

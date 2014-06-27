@@ -38,6 +38,7 @@ import org.apache.sentry.provider.db.service.thrift.TSentryRole;
 import org.apache.thrift.TException;
 
 import com.cloudera.impala.authorization.SentryConfig;
+import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
@@ -47,6 +48,7 @@ import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TGetAllCatalogObjectsResponse;
+import com.cloudera.impala.thrift.TPartitionKeyValue;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUniqueId;
@@ -777,7 +779,6 @@ public class CatalogServiceCatalog extends Catalog {
     } finally {
       catalogLock_.readLock().unlock();
     }
-
     Preconditions.checkNotNull(loadReq);
 
     try {
@@ -785,6 +786,58 @@ public class CatalogServiceCatalog extends Catalog {
     } finally {
       loadReq.close();
     }
+  }
+
+  /**
+   * Drops the partition from its HdfsTable.
+   * If the HdfsTable does not exist, an exception is thrown.
+   * If the partition having the given partition spec does not exist, null is returned.
+   * Otherwise, the table with an updated catalog version is returned.
+   */
+  public Table dropPartition(TableName tableName, List<TPartitionKeyValue> partitionSpec)
+      throws CatalogException {
+    Preconditions.checkNotNull(partitionSpec);
+    Table tbl = getOrLoadTable(tableName.getDb(), tableName.getTbl());
+    if (tbl == null) {
+      throw new TableNotFoundException("Table not found: " + tbl.getFullName());
+    }
+    if (!(tbl instanceof HdfsTable)) {
+      throw new CatalogException("Table " + tbl.getFullName() + " is not an Hdfs table");
+    }
+    HdfsTable hdfsTable = (HdfsTable) tbl;
+    // Locking the catalog here because this accesses hdfsTable's partition list and
+    // updates its catalog version.
+    // TODO: Fix this locking pattern.
+    catalogLock_.writeLock().lock();
+    try {
+      HdfsPartition hdfsPartition = hdfsTable.dropPartition(partitionSpec);
+      if (hdfsPartition == null) return null;
+      return replaceTableIfUnchanged(hdfsTable, hdfsTable.getCatalogVersion());
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Adds the partition to its HdfsTable. Returns the table with an updated catalog
+   * version.
+   */
+  public Table addPartition(HdfsPartition partition) throws CatalogException {
+    Preconditions.checkNotNull(partition);
+    HdfsTable hdfsTable = partition.getTable();
+    Db db = getDb(hdfsTable.getDb().getName());
+    // Locking the catalog here because this accesses the hdfsTable's partition list and
+    // updates its catalog version.
+    // TODO: Fix this locking pattern.
+    catalogLock_.writeLock().lock();
+    try {
+      hdfsTable.addPartition(partition);
+      hdfsTable.setCatalogVersion(incrementAndGetCatalogVersion());
+      db.addTable(hdfsTable);
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+    return hdfsTable;
   }
 
   /**

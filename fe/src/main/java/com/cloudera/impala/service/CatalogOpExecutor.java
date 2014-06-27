@@ -39,6 +39,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
@@ -226,7 +227,7 @@ public class CatalogOpExecutor {
 
   /**
    * Execute the ALTER TABLE command according to the TAlterTableParams and refresh the
-   * table metadata (except RENAME).
+   * table metadata, except for RENAME, ADD PARTITION and DROP PARTITION.
    */
   private void alterTable(TAlterTableParams params, TDdlExecResponse response)
       throws ImpalaException {
@@ -240,10 +241,18 @@ public class CatalogOpExecutor {
         break;
       case ADD_PARTITION:
         TAlterTableAddPartitionParams addPartParams = params.getAdd_partition_params();
-        alterTableAddPartition(TableName.fromThrift(params.getTable_name()),
-            addPartParams.getPartition_spec(), addPartParams.getLocation(),
-            addPartParams.isIf_not_exists(), addPartParams.getCache_op());
-        break;
+        // Create and add HdfsPartition object to the corresponding HdfsTable and load
+        // its block metadata. Get the new table object with an updated catalog version.
+        // If the partition already exists in Hive and "IfNotExists" is true, then null
+        // is returned.
+        Table refreshedTable = alterTableAddPartition(TableName.fromThrift(
+            params.getTable_name()), addPartParams.getPartition_spec(),
+            addPartParams.isIf_not_exists(), addPartParams.getLocation(),
+            addPartParams.getCache_op());
+        response.result.setUpdated_catalog_object(TableToTCatalogObject(refreshedTable));
+        response.result.setVersion(
+            response.result.getUpdated_catalog_object().getCatalog_version());
+        return;
       case DROP_COLUMN:
         TAlterTableDropColParams dropColParams = params.getDrop_col_params();
         alterTableDropCol(TableName.fromThrift(params.getTable_name()),
@@ -256,9 +265,16 @@ public class CatalogOpExecutor {
         break;
       case DROP_PARTITION:
         TAlterTableDropPartitionParams dropPartParams = params.getDrop_partition_params();
-        alterTableDropPartition(TableName.fromThrift(params.getTable_name()),
-            dropPartParams.getPartition_spec(), dropPartParams.isIf_exists());
-        break;
+        // Drop the partition from the corresponding HdfsTable. Get the table object
+        // with an updated catalog version. If the partition does not exist and
+        // "IfExists" is true, null is returned.
+        refreshedTable = alterTableDropPartition(TableName.fromThrift(
+            params.getTable_name()), dropPartParams.getPartition_spec(),
+            dropPartParams.isIf_exists());
+        response.result.setUpdated_catalog_object(TableToTCatalogObject(refreshedTable));
+        response.result.setVersion(
+            response.result.getUpdated_catalog_object().getCatalog_version());
+        return;
       case RENAME_TABLE:
       case RENAME_VIEW:
         TAlterTableOrViewRenameParams renameParams = params.getRename_params();
@@ -313,6 +329,22 @@ public class CatalogOpExecutor {
     response.result.setUpdated_catalog_object(TableToTCatalogObject(refreshedTable));
     response.result.setVersion(
         response.result.getUpdated_catalog_object().getCatalog_version());
+  }
+
+  /**
+   * Creates a new HdfsPartition object and adds it to the corresponding HdfsTable.
+   * Does not create the object in the Hive metastore.
+   */
+  private Table addHdfsPartition(TableName tableName, Partition partition)
+      throws CatalogException {
+    Preconditions.checkNotNull(partition);
+    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
+    if (!(tbl instanceof HdfsTable)) {
+      throw new CatalogException("Table " + tbl.getFullName() + " is not an HDFS table");
+    }
+    HdfsTable hdfsTable = (HdfsTable) tbl;
+    HdfsPartition hdfsPartition = hdfsTable.createPartition(partition.getSd(), partition);
+    return catalog_.addPartition(hdfsPartition);
   }
 
   /**
@@ -448,7 +480,7 @@ public class CatalogOpExecutor {
 
     // Update the partitions' ROW_COUNT parameter.
     int numTargetedPartitions = 0;
-    for(org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
+    for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
       TTableStats partitionStats = params.partition_stats.get(msPartition.getValues());
       if (partitionStats == null) continue;
       LOG.trace(String.format("Updating stats for partition %s: numRows=%s",
@@ -1169,13 +1201,16 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Adds a new partition to the given table.
-   * If cacheOp != null, the partition's location will be cached according
+   * Adds a new partition to the given table in Hive. Also creates and adds
+   * a new HdfsPartition to the corresponding HdfsTable.
+   * If cacheOp is not null, the partition's location will be cached according
    * to the cacheOp. If cacheOp is null, the new partition will inherit the
    * the caching properties of the parent table.
+   * Returns null if the partition already exists in Hive and "IfNotExists"
+   * is true. Otherwise, returns the table object with an updated catalog version.
    */
-  private void alterTableAddPartition(TableName tableName,
-      List<TPartitionKeyValue> partitionSpec, String location, boolean ifNotExists,
+  private Table alterTableAddPartition(TableName tableName,
+      List<TPartitionKeyValue> partitionSpec, boolean ifNotExists, String location,
       THdfsCachingOp cacheOp) throws ImpalaException {
     org.apache.hadoop.hive.metastore.api.Partition partition =
         new org.apache.hadoop.hive.metastore.api.Partition();
@@ -1183,9 +1218,8 @@ public class CatalogOpExecutor {
         tableName.getTbl(), partitionSpec)) {
       LOG.debug(String.format("Skipping partition creation because (%s) already exists" +
           " and ifNotExists is true.", Joiner.on(", ").join(partitionSpec)));
-      return;
+      return null;
     }
-
     synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       partition.setDbName(tableName.getDb());
@@ -1246,22 +1280,30 @@ public class CatalogOpExecutor {
         msClient.release();
       }
     }
+    // Create and add the HdfsPartition. Return the table object with an updated catalog
+    // version.
+    return addHdfsPartition(tableName, partition);
   }
 
   /**
-   * Drops an existing partition from the given table. If the partition is cached,
+   * Drops an existing partition from the given table in Hive. If the partition is cached,
    * the associated cache directive will also be removed.
+   * Also drops the partition from its Hdfs table.
+   * Returns the table object with an updated catalog version. If the partition does not
+   * exist and "IfExists" is true, null is returned.
    */
-  private void alterTableDropPartition(TableName tableName,
-      List<TPartitionKeyValue> partitionSpec, boolean ifExists) throws ImpalaException {
-
+  private Table alterTableDropPartition(TableName tableName,
+      List<TPartitionKeyValue> partitionSpec, boolean ifExists)
+      throws ImpalaException {
     if (ifExists && !catalog_.containsHdfsPartition(tableName.getDb(), tableName.getTbl(),
         partitionSpec)) {
       LOG.debug(String.format("Skipping partition drop because (%s) does not exist " +
           "and ifExists is true.", Joiner.on(", ").join(partitionSpec)));
-      return;
+      return null;
     }
 
+    HdfsPartition part = catalog_.getHdfsPartition(tableName.getDb(),
+        tableName.getTbl(), partitionSpec);
     synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       List<String> values = Lists.newArrayList();
@@ -1278,8 +1320,6 @@ public class CatalogOpExecutor {
         msClient.getHiveClient().dropPartition(tableName.getDb(),
             tableName.getTbl(), values);
         updateLastDdlTime(msTbl, msClient);
-        HdfsPartition part = catalog_.getHdfsPartition(tableName.getDb(),
-            tableName.getTbl(), partitionSpec);
         if (part.isMarkedCached()) {
           HdfsCachingUtil.uncachePartition(part.getMetaStorePartition());
         }
@@ -1296,8 +1336,8 @@ public class CatalogOpExecutor {
       } finally {
         msClient.release();
       }
-
     }
+    return catalog_.dropPartition(tableName, partitionSpec);
   }
 
   /**
@@ -1648,7 +1688,7 @@ public class CatalogOpExecutor {
   /**
    * Applies an ALTER TABLE command to the metastore table. The caller should take the
    * metastoreDdlLock before calling this method.
-   * Note: The metastore interface is not very safe because it only accepts a
+   * Note: The metastore interface is not very safe because it only accepts
    * an entire metastore.api.Table object rather than a delta of what to change. This
    * means an external modification to the table could be overwritten by an ALTER TABLE
    * command if the metadata is not completely in-sync. This affects both Hive and

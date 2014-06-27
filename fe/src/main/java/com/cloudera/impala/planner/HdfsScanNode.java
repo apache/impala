@@ -527,10 +527,12 @@ public class HdfsScanNode extends ScanNode {
     // Evaluate the 'complex' partition filters in the BE.
     evalPartitionFiltersInBe(partitionFilters, matchingPartitionIds, analyzer);
 
-    // Populate the list of valid partitions to process
+    // Populate the list of valid, non-empty partitions to process
     HashMap<Long, HdfsPartition> partitionMap = tbl_.getPartitionMap();
     for (Long id: matchingPartitionIds) {
-      partitions_.add(partitionMap.get(id));
+      HdfsPartition partition = partitionMap.get(id);
+      Preconditions.checkNotNull(partition);
+      if (partition.hasFileDescriptors()) partitions_.add(partition);
     }
   }
 
