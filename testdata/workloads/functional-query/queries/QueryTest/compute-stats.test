@@ -504,9 +504,9 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
+---- QUERY
 # For IMPALA-1055, using a database called `parquet` to test cases where the name of
 # the database is a keyword.
----- QUERY
 CREATE TABLE `parquet`.billion_parquet(id INT);
 ====
 ---- QUERY
