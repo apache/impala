@@ -2358,6 +2358,26 @@ TEST_F(ExprTest, UnaryOperators) {
 
 // TODO: I think a lot of these casts are not necessary and we should fix this
 TEST_F(ExprTest, TimestampFunctions) {
+  // Regression test for CDH-19918
+  TestStringValue("cast(from_utc_timestamp(cast(1301180400 as timestamp),"
+      "'Europe/Moscow') as string)", "2011-03-27 03:00:00");
+  TestStringValue("cast(from_utc_timestamp(cast(1301180399 as timestamp),"
+      "'Europe/Moscow') as string)", "2011-03-27 01:59:59");
+  TestStringValue("cast(from_utc_timestamp(cast(1288404000 as timestamp),"
+      "'Europe/Moscow') as string)", "2010-10-30 06:00:00");
+  TestStringValue("cast(from_utc_timestamp(cast(1288584000 as timestamp),"
+      "'Europe/Moscow') as string)", "2010-11-01 07:00:00");
+  TestStringValue("cast(from_utc_timestamp(cast(1301104740 as timestamp),"
+      "'Europe/Moscow') as string)", "2011-03-26 04:59:00");
+  TestStringValue("cast(from_utc_timestamp(cast(1301277600 as timestamp),"
+      "'Europe/Moscow') as string)", "2011-03-28 06:00:00");
+  TestStringValue("cast(from_utc_timestamp(cast(1324947600 as timestamp),"
+      "'Europe/Moscow') as string)", "2011-12-27 05:00:00");
+  TestStringValue("cast(from_utc_timestamp(cast(1325725200 as timestamp),"
+      "'Europe/Moscow') as string)", "2012-01-05 05:00:00");
+  TestStringValue("cast(from_utc_timestamp(cast(1333594800 as timestamp),"
+      "'Europe/Moscow') as string)", "2012-04-05 07:00:00");
+
   TestStringValue("cast(cast('2012-01-01 09:10:11.123456789' as timestamp) as string)",
       "2012-01-01 09:10:11.123456789");
   // Add/sub years.

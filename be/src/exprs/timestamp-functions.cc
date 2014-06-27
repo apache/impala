@@ -16,6 +16,7 @@
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/time_zone_base.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "exprs/timestamp-functions.h"
 #include "exprs/expr.h"
@@ -45,6 +46,10 @@ const StringValue TimestampFunctions::THURSDAY = StringValue("Thursday");
 const StringValue TimestampFunctions::FRIDAY = StringValue("Friday");
 const StringValue TimestampFunctions::SATURDAY = StringValue("Saturday");
 const StringValue TimestampFunctions::SUNDAY = StringValue("Sunday");
+
+// Moscow Timezone No Daylight Savings Time (GMT+4), for use after March 2011
+const time_zone_ptr TIMEZONE_MSK_2011_NODST(time_zone_ptr(
+    new posix_time_zone(string("MSK+04MSK+00,M3.5.0,M10.5.0"))));
 
 template <class TIME>
 void* TimestampFunctions::FromUnix(Expr* e, TupleRow* row) {
@@ -347,7 +352,7 @@ void* TimestampFunctions::FromUtc(Expr* e, TupleRow* row) {
 
   if (tv->NotADateTime()) return NULL;
 
-  time_zone_ptr timezone = TimezoneDatabase::FindTimezone(tz->DebugString());
+  time_zone_ptr timezone = TimezoneDatabase::FindTimezone(tz->DebugString(), *tv);
   // This should raise some sort of error or at least null. Hive just ignores it.
   if (timezone == NULL) {
     LOG(ERROR) << "Unknown timezone '" << *tz << "'" << endl;
@@ -371,7 +376,7 @@ void* TimestampFunctions::ToUtc(Expr* e, TupleRow* row) {
 
   if (tv->NotADateTime()) return NULL;
 
-  time_zone_ptr timezone = TimezoneDatabase::FindTimezone(tz->DebugString());
+  time_zone_ptr timezone = TimezoneDatabase::FindTimezone(tz->DebugString(), *tv);
   // This should raise some sort of error or at least null. Hive just ignores it.
   if (timezone == NULL) {
     LOG(ERROR) << "Unknown timezone '" << *tz << "'" << endl;
@@ -418,10 +423,28 @@ TimezoneDatabase::TimezoneDatabase() {
 
 TimezoneDatabase::~TimezoneDatabase() { }
 
-time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz) {
+time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz, const TimestampValue& tv) {
+  // The backing database does not capture some subtleties, there are special cases
+  if ((tv.get_date().year() > 2011
+       || (tv.get_date().year() == 2011 && tv.get_date().month() >= 4))
+      && (iequals("Europe/Moscow", tz) || iequals("Moscow", tz) || iequals("MSK", tz))) {
+    // We transition in April 2011 from using the tz_database_ to a custom rule
+    // Russia stopped using daylight savings in 2011, the tz_database_ is
+    // set up assuming Russia uses daylight saving every year.
+    // Sun, Mar 27, 2:00AM Moscow clocks moved forward +1 hour (a total of GMT +4)
+    // Specifically,
+    // UTC Time 26 Mar 2011 22:59:59 +0000 ===> Sun Mar 27 01:59:59 MSK 2011
+    // UTC Time 26 Mar 2011 23:00:00 +0000 ===> Sun Mar 27 03:00:00 MSK 2011
+    // This means in 2011, The database rule will apply DST starting March 26 2011.
+    // This will be a correct +4 offset, and the database rule can apply until
+    // Oct 31 when tz_database_ will incorrectly attempt to turn clocks backwards 1 hour.
+    return TIMEZONE_MSK_2011_NODST;
+  }
+
   // See if they specified a zone id
-  if (tz.find_first_of('/') != string::npos)
-    return  tz_database_.time_zone_from_region(tz);
+  if (tz.find_first_of('/') != string::npos) {
+    return tz_database_.time_zone_from_region(tz);
+  }
   for (vector<string>::const_iterator iter = tz_region_list_.begin();
        iter != tz_region_list_.end(); ++iter) {
     time_zone_ptr tzp = tz_database_.time_zone_from_region(*iter);
@@ -436,7 +459,6 @@ time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz) {
       return tzp;
   }
   return time_zone_ptr();
-
 }
 
 // Explicit template instantiation is required for proper linking. These functions

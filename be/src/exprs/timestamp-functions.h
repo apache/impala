@@ -21,7 +21,9 @@
 #include <boost/date_time/time_zone_base.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/thread/thread.hpp>
+
 #include "runtime/string-value.h"
+#include "runtime/timestamp-value.h"
 
 namespace impala {
 
@@ -29,6 +31,7 @@ class Expr;
 class OpcodeRegistry;
 class TupleRow;
 
+// TODO: Reconsider whether this class needs to exist.
 class TimestampFunctions {
  public:
   // Return the unix time_t, seconds from 1970
@@ -99,7 +102,11 @@ class TimezoneDatabase {
    TimezoneDatabase();
    ~TimezoneDatabase();
 
-  static boost::local_time::time_zone_ptr FindTimezone(const std::string& tz);
+  // Converts the name of a timezone to a boost timezone object.
+  // Some countries change their timezones, the tiemstamp is required to correctly
+  // determine the timezone information.
+  static boost::local_time::time_zone_ptr FindTimezone(const std::string& tz,
+      const TimestampValue& tv);
 
  private:
   static const char* TIMEZONE_DATABASE_STR;
@@ -107,6 +114,6 @@ class TimezoneDatabase {
   static std::vector<std::string> tz_region_list_;
 };
 
-}
+} // namespace impala
 
 #endif
