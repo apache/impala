@@ -21,7 +21,9 @@
 #include <string>
 #include <string.h>
 #include <vector>
-#include "runtime/decimal-value.h"
+
+// Be very careful when adding Impala includes in this file. We don't want to pull
+// in unnecessary dependencies for the development libs.
 #include "udf/udf.h"
 
 namespace impala {
