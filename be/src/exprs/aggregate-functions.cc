@@ -450,13 +450,14 @@ StringVal AggregateFunctions::PcFinalize(FunctionContext* c, const StringVal& sr
   DCHECK(!src.is_null);
   double estimate = DistinceEstimateFinalize(src);
   int64_t result = estimate;
+  c->Free(src.ptr);
+
   // TODO: this should return bigint. this is a hack
   stringstream ss;
   ss << result;
   string str = ss.str();
   StringVal dst(c, str.length());
   memcpy(dst.ptr, str.c_str(), str.length());
-  c->Free(src.ptr);
   return dst;
 }
 
@@ -465,14 +466,14 @@ StringVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& 
   // When using stochastic averaging, the result has to be multiplied by NUM_PC_BITMAPS.
   double estimate = DistinceEstimateFinalize(src) * NUM_PC_BITMAPS;
   int64_t result = estimate;
+  c->Free(src.ptr);
+
   // TODO: this should return bigint. this is a hack
   stringstream ss;
   ss << result;
   string str = ss.str();
-  StringVal dst = src;
+  StringVal dst(c, str.length());
   memcpy(dst.ptr, str.c_str(), str.length());
-  dst.len = str.length();
-  c->Free(src.ptr);
   return dst;
 }
 
@@ -803,6 +804,7 @@ StringVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
     // linear counting.
     estimate = num_streams * log(static_cast<float>(num_streams) / num_zero_registers);
   }
+  ctx->Free(src.ptr);
 
   // Output the estimate as ascii string
   stringstream out;
@@ -810,7 +812,6 @@ StringVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
   string out_str = out.str();
   StringVal result_str(ctx, out_str.size());
   memcpy(result_str.ptr, out_str.c_str(), result_str.len);
-  ctx->Free(src.ptr);
   return result_str;
 }
 

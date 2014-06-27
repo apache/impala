@@ -51,3 +51,5 @@ DEFINE_string(heap_profile_dir, "", "Output directory to store heap profiles. If
 DEFINE_bool(abort_on_config_error, true, "Abort Impala startup if there are improper "
     "configs or running on unsupported hardware.");
 
+DEFINE_bool(disable_mem_pools, false, "Set to true to disable memory pooling. "
+    "This can be used to help diagnose memory corruption issues.");

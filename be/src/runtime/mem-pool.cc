@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <sstream>
 
+DECLARE_bool(disable_mem_pools);
+
 using namespace std;
 using namespace impala;
 
@@ -44,7 +46,7 @@ MemPool::MemPool(MemTracker* mem_tracker, int chunk_size)
 
 MemPool::ChunkInfo::ChunkInfo(int size)
   : owns_data(true),
-    data(new uint8_t[size]),
+    data(reinterpret_cast<uint8_t*>(malloc(size))),
     size(size),
     cumulative_allocated_bytes(0),
     allocated_bytes(0) {
@@ -58,7 +60,7 @@ MemPool::~MemPool() {
   for (size_t i = 0; i < chunks_.size(); ++i) {
     if (!chunks_[i].owns_data) continue;
     total_bytes_released += chunks_[i].size;
-    delete [] chunks_[i].data;
+    free(chunks_[i].data);
   }
 
   DCHECK(chunks_.empty()) << "Must call FreeAll() or AcquireData() for this pool";
@@ -72,7 +74,7 @@ void MemPool::FreeAll() {
   for (size_t i = 0; i < chunks_.size(); ++i) {
     if (!chunks_[i].owns_data) continue;
     total_bytes_released += chunks_[i].size;
-    delete [] chunks_[i].data;
+    free(chunks_[i].data);
   }
   chunks_.clear();
   current_chunk_idx_ = -1;
@@ -118,6 +120,8 @@ bool MemPool::FindChunk(int min_size, bool check_limits) {
       }
     }
     chunk_size = ::max(min_size, chunk_size);
+
+    if (FLAGS_disable_mem_pools) chunk_size = min_size;
 
     if (check_limits) {
       if (!mem_tracker_->TryConsume(chunk_size)) {
@@ -258,6 +262,9 @@ int64_t MemPool::GetTotalChunkSizes() const {
 }
 
 bool MemPool::CheckIntegrity(bool current_chunk_empty) {
+  // Without pooling, there are way too many chunks and this takes too long.
+  if (FLAGS_disable_mem_pools) return true;
+
   // check that current_chunk_idx_ points to the last chunk with allocated data
   DCHECK_LT(current_chunk_idx_, static_cast<int>(chunks_.size()));
   int64_t total_allocated = 0;

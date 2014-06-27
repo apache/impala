@@ -23,6 +23,8 @@
 #include "runtime/mem-pool.h"
 #include "util/bit-util.h"
 
+DECLARE_bool(disable_mem_pools);
+
 namespace impala {
 
 // Implementation of a free pool to recycle allocations. The pool is broken
@@ -48,6 +50,8 @@ class FreePool {
 
   // Allocates a buffer of size.
   uint8_t* Allocate(int size) {
+    if (FLAGS_disable_mem_pools) return reinterpret_cast<uint8_t*>(malloc(size));
+
     // This is the typical malloc behavior. NULL is reserved for failures.
     if (size == 0) return reinterpret_cast<uint8_t*>(0x1);
 
@@ -73,6 +77,10 @@ class FreePool {
   }
 
   void Free(uint8_t* ptr) {
+    if (FLAGS_disable_mem_pools) {
+      free(ptr);
+      return;
+    }
     if (ptr == NULL || reinterpret_cast<int64_t>(ptr) == 0x1) return;
     FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
     FreeListNode* list = node->list;
@@ -88,6 +96,9 @@ class FreePool {
   // backing 'ptr' is big enough, 'ptr' is returned. Otherwise a new one is
   // made and the contents of ptr are copied into it.
   uint8_t* Reallocate(uint8_t* ptr, int size) {
+    if (FLAGS_disable_mem_pools) {
+      return reinterpret_cast<uint8_t*>(realloc(reinterpret_cast<void*>(ptr), size));
+    }
     if (ptr == NULL || reinterpret_cast<int64_t>(ptr) == 0x1) return Allocate(size);
     FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
     FreeListNode* list = node->list;
