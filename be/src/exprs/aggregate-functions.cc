@@ -563,33 +563,37 @@ void AggregateFunctions::KnuthVarMerge(FunctionContext* ctx, const StringVal& sr
 
 StringVal AggregateFunctions::KnuthVarFinalize(FunctionContext* ctx,
                                                const StringVal& state_sv) {
-  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  if (state->count == 0) return StringVal::null();
-  double variance = ComputeKnuthVariance(*state, false);
+  KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  ctx->Free(state_sv.ptr);
+  if (state.count == 0) return StringVal::null();
+  double variance = ComputeKnuthVariance(state, false);
   return ToStringVal(ctx, variance);
 }
 
 StringVal AggregateFunctions::KnuthVarPopFinalize(FunctionContext* ctx,
                                                   const StringVal& state_sv) {
-  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  if (state->count == 0) return StringVal::null();
-  double variance = ComputeKnuthVariance(*state, true);
+  KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  ctx->Free(state_sv.ptr);
+  if (state.count == 0) return StringVal::null();
+  double variance = ComputeKnuthVariance(state, true);
   return ToStringVal(ctx, variance);
 }
 
 StringVal AggregateFunctions::KnuthStddevFinalize(FunctionContext* ctx,
                                                   const StringVal& state_sv) {
-  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  if (state->count == 0) return StringVal::null();
-  double variance = ComputeKnuthVariance(*state, false);
+  KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  ctx->Free(state_sv.ptr);
+  if (state.count == 0) return StringVal::null();
+  double variance = ComputeKnuthVariance(state, false);
   return ToStringVal(ctx, sqrt(variance));
 }
 
 StringVal AggregateFunctions::KnuthStddevPopFinalize(FunctionContext* ctx,
                                                      const StringVal& state_sv) {
-  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  if (state->count == 0) return StringVal::null();
-  double variance = ComputeKnuthVariance(*state, true);
+  KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  ctx->Free(state_sv.ptr);
+  if (state.count == 0) return StringVal::null();
+  double variance = ComputeKnuthVariance(state, true);
   return ToStringVal(ctx, sqrt(variance));
 }
 
