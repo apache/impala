@@ -272,6 +272,18 @@ class ImpalaShell(cmd.Cmd):
     args = self.__check_for_command_completion(' '.join(tokens).strip())
     return args.rstrip(ImpalaShell.CMD_DELIM)
 
+  def _shlex_split(self, line):
+    """Reimplement shlex.split() so that escaped single quotes
+    are actually escaped. shlex.split() only escapes double quotes
+    by default. This method will throw a ValueError if an open
+    quotation (either single or double) is found.
+    """
+    my_split = shlex.shlex(line, posix=True)
+    my_split.escapedquotes = '"\''
+    my_split.whitespace_split = True
+    my_split.commenters = ''
+    return list(my_split)
+
   def __cmd_ends_with_delim(self, line):
     """Check if the input command ends with a command delimiter.
 
@@ -284,13 +296,36 @@ class ImpalaShell(cmd.Cmd):
         # Look for an open quotation in the entire command, and not just the
         # current line.
         if self.partial_cmd: line = '%s %s' % (self.partial_cmd, line)
-        shlex.split(line)
+        self._shlex_split(line)
         return True
       # If the command ends with a delimiter, check if it has an open quotation.
-      # shlex.split() throws a ValueError iff an open quoation is found.
+      # shlex in self._split() throws a ValueError iff an open quotation is found.
       # A quotation can either be a single quote or a double quote.
       except ValueError:
         pass
+
+    # This checks to see if there are any backslashed quotes
+    # outside of quotes, since backslashed quotes
+    # outside of single or double quotes should not be escaped.
+    # Ex. 'abc\'xyz' -> closed because \' is escaped
+    #     \'abcxyz   -> open because \' is not escaped
+    #     \'abcxyz'  -> closed
+    # Iterate through the line and switch the state if a single or double quote is found
+    # and ignore escaped single and double quotes if the line is considered open (meaning
+    # a previous single or double quote has not been closed yet)
+      state_closed = True;
+      opener = None;
+      for i, char in enumerate(line):
+        if state_closed and (char in ['\'', '\"']):
+          state_closed = False
+          opener = char
+        elif not state_closed and opener == char:
+          if line[i - 1] != '\\':
+            state_closed = True
+            opener = None;
+
+      return state_closed
+
     return False
 
   def __check_for_command_completion(self, cmd):

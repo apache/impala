@@ -15,13 +15,13 @@
 # limitations under the License.
 
 import os
-import logging
 import pytest
 import shlex
-import sys
-from time import sleep
+
+from impala_shell_results import get_shell_cmd_result
 from subprocess import Popen, PIPE, call
 from tests.common.impala_cluster import ImpalaCluster
+from time import sleep
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 DEFAULT_QUERY = 'select 1'
@@ -30,7 +30,7 @@ TEST_TBL = "tbl1"
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
 class TestImpalaShell(object):
-  """A set of sanity tests for the Impala shell commandiline parameters.
+  """A set of sanity tests for the Impala shell commandline parameters.
 
   The tests need to maintain Python 2.4 compatibility as a sub-goal of having
   shell tests is to ensure that it's not broken in systems running Python 2.4.
@@ -38,7 +38,6 @@ class TestImpalaShell(object):
 
   TODO:
      * Test individual modules.
-     * Test the shell in interactive mode.
      * Add a test for a kerberized impala.
   """
 
@@ -331,7 +330,6 @@ class ImpalaShellResult(object):
     self.stdout = str()
     self.stderr = str()
 
-
 def run_impala_shell_cmd(shell_args, expect_success=True):
   """Runs the Impala shell on the commandline.
 
@@ -345,10 +343,4 @@ def run_impala_shell_cmd(shell_args, expect_success=True):
     assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (cmd, result.stderr)
   else:
     assert result.rc != 0, "Cmd %s was expected to fail" % cmd
-  return result
-
-def get_shell_cmd_result(process):
-  result = ImpalaShellResult()
-  result.stdout, result.stderr = process.communicate()
-  result.rc = process.returncode
   return result
