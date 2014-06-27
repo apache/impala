@@ -93,7 +93,7 @@ class RpcResult(object):
       # Block until the results are available.
       # queue.get() without a timeout is not interruptable with KeyboardInterrupt.
       # Set the timeout to a day (a reasonable limit for a single rpc call)
-      self.result, self.status = self.result_queue.get(True, 60*24*24)
+      self.result, self.status = self.result_queue.get(True, 60 * 24 * 24)
     return self.result, self.status
 
 
@@ -209,7 +209,7 @@ class ImpalaShell(cmd.Cmd):
           print '\n'.join(["\t%s: [%s]" % (k, default_options[k])])
 
   def __options_to_string_list(self):
-    return ["%s=%s" % (k,v) for (k,v) in self.set_query_options.iteritems()]
+    return ["%s=%s" % (k, v) for (k, v) in self.set_query_options.iteritems()]
 
   def __build_default_query_options_dict(self):
     # The default query options are retrieved from a rpc call, and are dependent
@@ -328,7 +328,7 @@ class ImpalaShell(cmd.Cmd):
         self.readline.remove_history_item(current_history_len - 1)
       # An empty string results in a no-op. Look at emptyline()
       return str()
-    elif self.partial_cmd: # input ends with a delimiter and partial_cmd is not empty
+    elif self.partial_cmd:  # input ends with a delimiter and partial_cmd is not empty
       if cmd != ImpalaShell.CMD_DELIM:
         completed_cmd = "%s\n%s" % (self.partial_cmd, cmd)
       else:
@@ -341,11 +341,11 @@ class ImpalaShell(cmd.Cmd):
         # Update the history item to replace newlines with spaces. This is needed so
         # readline can properly restore the history (otherwise it interprets each newline
         # as a separate history item).
-        self.readline.replace_history_item(current_history_len - 1,\
+        self.readline.replace_history_item(current_history_len - 1,
           completed_cmd.replace('\n', ' '))
       # Revert the prompt to its earlier state
       self.prompt = self.cached_prompt
-    else: # Input has a delimiter and partial_cmd is empty
+    else:  # Input has a delimiter and partial_cmd is empty
       completed_cmd = sqlparse.format(cmd, strip_comments=True)
     # The comments have been parsed out, there is no need to retain the newlines.
     # They can cause parse errors in sqlparse when unescaped quotes and delimiters
@@ -626,7 +626,7 @@ class ImpalaShell(cmd.Cmd):
         self.cmdqueue.append('invalidate metadata' + ImpalaShell.CMD_DELIM)
         print_to_stderr("Invalidating Metadata")
       if self.current_db:
-        self.cmdqueue.append('use %s' % self.current_db + ImpalaShell.CMD_DELIM)
+        self.cmdqueue.append(('use `%s`' % self.current_db) + ImpalaShell.CMD_DELIM)
       self.__build_default_query_options_dict()
     # In the case that we lost connection while a command was being entered,
     # we may have a dangling command, clear partial_cmd
@@ -903,7 +903,7 @@ class ImpalaShell(cmd.Cmd):
       return None
 
     # If a multi-line argument, the name might be split across lines
-    arg = arg.replace('\n','')
+    arg = arg.replace('\n', '')
     # Get the database and table name, using the current database if the table name
     # wasn't fully qualified.
     db_name, tbl_name = self.current_db, arg
@@ -1176,7 +1176,7 @@ Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 (Shell build version: %s)""" % VERSION_STRING
 
 def print_to_stderr(message):
-  print >>sys.stderr, message
+  print >> sys.stderr, message
 
 def parse_query_text(query_text, utf8_encode_policy='strict'):
   """Parse query file text, by stripping comments and encoding into utf-8"""

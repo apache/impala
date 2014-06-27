@@ -55,7 +55,7 @@ class TestImpalaShell(object):
   def __create_shell_data(cls):
     # Create a temporary table and populate it with test data.
     stmts = ['create database if not exists %s' % TEST_DB,
-             'create table if not exists %s.%s (i integer, s string)' % (TEST_DB,\
+             'create table if not exists %s.%s (i integer, s string)' % (TEST_DB,
                                                                          TEST_TBL),
              "insert into %s.%s values (1, 'a'),(1, 'b'),(3, 'b')" % (TEST_DB, TEST_TBL)
             ]
@@ -79,6 +79,11 @@ class TestImpalaShell(object):
     run_impala_shell_cmd(args)
     args = '-q "describe %s"' % TEST_TBL
     run_impala_shell_cmd(args, expect_success=False)
+    # test keyword parquet is interpreted as an identifier
+    # when passed as an argument to -d
+    args = '-d parquet'
+    result = run_impala_shell_cmd(args)
+    assert "Query: use `parquet`" in result.stderr, result.stderr
 
   @pytest.mark.execute_serially
   def test_refresh_on_connect(self):
