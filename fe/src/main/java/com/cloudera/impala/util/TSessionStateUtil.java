@@ -22,13 +22,13 @@ import com.cloudera.impala.thrift.TSessionState;
 public class TSessionStateUtil {
   /**
    * Returns the actual user to perform authorisation against for the provided
-   * session. That is, returns the impersonated user for a session if set, otherwise
+   * session. That is, returns the delegated user for a session if set, otherwise
    * returns the connected user.
    */
   public static String getEffectiveUser(TSessionState session) {
-    if (session.getImpersonated_user() != null &&
-        !session.getImpersonated_user().isEmpty()) {
-      return session.getImpersonated_user();
+    if (session.getDelegated_user() != null &&
+        !session.getDelegated_user().isEmpty()) {
+      return session.getDelegated_user();
     }
     return session.getConnected_user();
   }

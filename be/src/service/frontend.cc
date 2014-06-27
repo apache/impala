@@ -43,10 +43,10 @@ DEFINE_string(authorization_policy_provider_class,
     "org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider",
     "(Deprecated) Advanced: The authorization policy provider class name.");
 DEFINE_string(authorized_proxy_user_config, "",
-    "Specifies the set of authorized proxy users (users who can impersonate other "
-    "users during authorization) and whom they are allowed to impersonate. "
+    "Specifies the set of authorized proxy users (users who can delegate to other "
+    "users during authorization) and whom they are allowed to delegate. "
     "Input is a semicolon-separated list of key=value pairs of authorized proxy "
-    "users to the user(s) they can impersonate. These users are specified as a comma "
+    "users to the user(s) they can delegate to. These users are specified as a comma "
     "separated list of short usernames, or '*' to indicate all users. For example: "
     "hue=user1,user2;admin=*");
 

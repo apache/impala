@@ -474,7 +474,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Must be called with query_exec_state_map_lock_ held
   void ArchiveQuery(const QueryExecState& query);
 
-  // Checks whether the given user is allowed to impersonate as the specified do_as_user.
+  // Checks whether the given user is allowed to delegate as the specified do_as_user.
   // Returns OK if the authorization suceeds, otherwise returns an status with details
   // on why the failure occurred.
   Status AuthorizeProxyUser(const std::string& user, const std::string& do_as_user);
@@ -491,8 +491,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     TUniqueId id;
 
     // Queries are run and authorized on behalf of the effective_user.
-    // If there is no impersonated user, this will be the connected user. Otherwise, it
-    // will be set to the impersonated user.
+    // If there is no delegated user, this will be the connected user. Otherwise, it
+    // will be set to the delegated user.
     std::string effective_user;
 
     // default db for this query
@@ -727,7 +727,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // Connected user for this session, i.e. the user which originated this session.
     std::string connected_user;
 
-    // The user to impersonate. Empty for no impersonation.
+    // The user to delegate to. Empty for no delegation.
     std::string do_as_user;
 
     // Client network address
@@ -901,7 +901,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   int64_t min_subscriber_catalog_topic_version_;
 
   // Map of short usernames of authorized proxy users to the set of user(s) they are
-  // allowed to impersonate. Populated by parsing the --authorized_proxy_users_config
+  // allowed to delegate to. Populated by parsing the --authorized_proxy_users_config
   // flag.
   typedef boost::unordered_map<std::string, boost::unordered_set<std::string> >
       ProxyUserMap;

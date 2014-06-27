@@ -294,7 +294,7 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
             << "<tr><th>Session Type</th>"
             << "<th>Open Queries</th>"
             << "<th>User</th>"
-            << "<th>Impersonated User</th>"
+            << "<th>Delegated User</th>"
             << "<th>Session ID</th>"
             << "<th>Network Address</th>"
             << "<th>Default Database</th>"

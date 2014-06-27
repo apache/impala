@@ -104,13 +104,13 @@ class RuntimeState {
   const TQueryCtx& query_ctx() const { return fragment_instance_ctx_.query_ctx; }
   const TPlanFragmentInstanceCtx& fragment_ctx() const { return fragment_instance_ctx_; }
   const std::string& effective_user() const {
-    if (query_ctx().session.__isset.impersonated_user &&
-        !query_ctx().session.impersonated_user.empty()) {
+    if (query_ctx().session.__isset.delegated_user &&
+        !query_ctx().session.delegated_user.empty()) {
       return do_as_user();
     }
     return connected_user();
   }
-  const std::string& do_as_user() const { return query_ctx().session.impersonated_user; }
+  const std::string& do_as_user() const { return query_ctx().session.delegated_user; }
   const std::string& connected_user() const {
     return query_ctx().session.connected_user;
   }

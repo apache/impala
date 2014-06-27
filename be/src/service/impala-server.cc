@@ -236,7 +236,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   if (!FLAGS_authorized_proxy_user_config.empty()) {
     // Parse the proxy user configuration using the format:
-    // <proxy user>=<comma separated list of users they are allowed to impersonate>
+    // <proxy user>=<comma separated list of users they are allowed to delegate>
     // See FLAGS_authorized_proxy_user_config for more details.
     vector<string> proxy_user_config;
     split(proxy_user_config, FLAGS_authorized_proxy_user_config, is_any_of(";"),
@@ -337,7 +337,7 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
     // If there is no do_as_user() is empty, the "impersonator" field should be Null.
     writer.Null();
   } else {
-    // Otherwise, the impersonator is the current connected user.
+    // Otherwise, the delegator is the current connected user.
     writer.String(exec_state.connected_user().c_str());
   }
   writer.String("statement_type");
@@ -1273,9 +1273,9 @@ void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,
   state->session_type = session_type;
   state->database = database;
   state->connected_user = connected_user;
-  // The do_as_user will only be set if impersonation is enabled and the
-  // proxy user is authorized to impersonate as this user.
-  if (!do_as_user.empty()) state->__set_impersonated_user(do_as_user);
+  // The do_as_user will only be set if delegation is enabled and the
+  // proxy user is authorized to delegate as this user.
+  if (!do_as_user.empty()) state->__set_delegated_user(do_as_user);
   state->network_address = network_address;
 }
 
@@ -1298,16 +1298,16 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
 
 Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_user) {
   if (user.empty()) {
-    return Status("Unable to impersonate using empty proxy username.");
+    return Status("Unable to delegate using empty proxy username.");
   } else if (user.empty()) {
-    return Status("Unable to impersonate using empty doAs username.");
+    return Status("Unable to delegate using empty doAs username.");
   }
 
   stringstream error_msg;
-  error_msg << "User '" << user << "' is not authorized to impersonate '"
+  error_msg << "User '" << user << "' is not authorized to delegate to '"
             << do_as_user << "'.";
   if (authorized_proxy_user_config_.size() == 0) {
-    error_msg << " User impersonation is disabled.";
+    error_msg << " User delegation is disabled.";
     return Status(error_msg.str());
   }
 
@@ -1320,7 +1320,7 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
       end_idx == string::npos || end_idx == 0 ? user : user.substr(0, end_idx));
 
   // Check if the proxy user exists. If he/she does, then check if they are allowed
-  // to impersonate the do_as_user.
+  // to delegate to the do_as_user.
   ProxyUserMap::const_iterator proxy_user =
       authorized_proxy_user_config_.find(short_user);
   if (proxy_user != authorized_proxy_user_config_.end()) {

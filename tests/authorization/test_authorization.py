@@ -64,7 +64,7 @@ class TestAuthorization(CustomClusterTestSuite):
     # Connected user is 'hue'
     open_session_req.username = 'hue'
     open_session_req.configuration = dict()
-    # Impersonated user is the current user
+    # Delegated user is the current user
     open_session_req.configuration['impala.doas.user'] = getuser()
     resp = self.hs2_client.OpenSession(open_session_req)
     TestHS2.check_response(resp)
@@ -94,12 +94,12 @@ class TestAuthorization(CustomClusterTestSuite):
         execute_statement_resp.operationHandle.operationId)
     profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
     self.__verify_profile_user_fields(profile_page, effective_user=getuser(),
-        impersonated_user=getuser(), connected_user='hue')
+        delegated_user=getuser(), connected_user='hue')
 
-    # Try to impersonate as a user we are not authorized to impersonate.
+    # Try to user we are not authorized to delegate to.
     open_session_req.configuration['impala.doas.user'] = 'some_user'
     resp = self.hs2_client.OpenSession(open_session_req)
-    assert 'User \'hue\' is not authorized to impersonate \'some_user\'' in str(resp)
+    assert 'User \'hue\' is not authorized to delegate to \'some_user\'' in str(resp)
 
     # Create a new session which does not have a do_as_user.
     open_session_req.username = 'hue'
@@ -115,23 +115,23 @@ class TestAuthorization(CustomClusterTestSuite):
     TestHS2.check_response(execute_statement_resp)
 
     # Verify the correct user information is in the runtime profile. Since there is
-    # no do_as_user the Impersonated User field should be empty.
+    # no do_as_user the Delegated User field should be empty.
     query_id = operation_id_to_query_id(
         execute_statement_resp.operationHandle.operationId)
     profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
     self.__verify_profile_user_fields(profile_page, effective_user='hue',
-        impersonated_user='', connected_user='hue')
+        delegated_user='', connected_user='hue')
 
     self.socket.close()
     self.socket = None
 
   def __verify_profile_user_fields(self, profile_str, effective_user, connected_user,
-      impersonated_user):
+      delegated_user):
     """Verifies the given runtime profile string contains the specified values for
-    User, Connected User, and Impersonated User"""
+    User, Connected User, and Delegated User"""
     assert '\n    User: %s\n' % effective_user in profile_str
     assert '\n    Connected User: %s\n' % connected_user in profile_str
-    assert '\n    Impersonated User: %s\n' % impersonated_user in profile_str
+    assert '\n    Delegated User: %s\n' % delegated_user in profile_str
 
   def __wait_for_audit_record(self, user, impersonator, timeout_secs=30):
     """Waits until an audit log record is found that contains the given user and
