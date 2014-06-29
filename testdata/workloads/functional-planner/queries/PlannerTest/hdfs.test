@@ -392,6 +392,47 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=__HIVE_DEFAULT_PARTITION__/000000_0 0:72759
 ====
+# Predicates on a partition key with no values (see CDH-20089)
+select * from functional.emptytable where f2 = 10
+---- PLAN
+00:SCAN HDFS [functional.emptytable]
+   partitions=0/0 size=0B
+====
+select * from functional.emptytable where f2 != 10
+---- PLAN
+00:SCAN HDFS [functional.emptytable]
+   partitions=0/0 size=0B
+====
+select * from functional.emptytable where f2 > 10
+---- PLAN
+00:SCAN HDFS [functional.emptytable]
+   partitions=0/0 size=0B
+====
+select * from functional.emptytable where f2 < 10
+---- PLAN
+00:SCAN HDFS [functional.emptytable]
+   partitions=0/0 size=0B
+====
+select * from functional.emptytable where f2 in (10)
+---- PLAN
+00:SCAN HDFS [functional.emptytable]
+   partitions=0/0 size=0B
+====
+select * from functional.emptytable where f2 not in (10)
+---- PLAN
+00:SCAN HDFS [functional.emptytable]
+   partitions=0/0 size=0B
+====
+select * from functional.emptytable where f2 is null
+---- PLAN
+00:SCAN HDFS [functional.emptytable]
+   partitions=0/0 size=0B
+====
+select * from functional.emptytable where f2 is not null
+---- PLAN
+00:SCAN HDFS [functional.emptytable]
+   partitions=0/0 size=0B
+====
 # multi-file non-partitioned table
 select * from functional.alltypesaggmultifilesNoPart
 ---- PLAN
