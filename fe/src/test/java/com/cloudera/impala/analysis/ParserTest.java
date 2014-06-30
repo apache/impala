@@ -1213,10 +1213,10 @@ public class ParserTest {
     ParsesOk("SHOW DATABASES LIKE 'pattern'");
     ParsesOk("SHOW SCHEMAS LIKE 'p*ttern'");
     // Data sources
-    ParsesOk("SHOW DATASOURCES");
-    ParsesOk("SHOW DATASOURCES 'pattern'");
-    ParsesOk("SHOW DATASOURCES LIKE 'pattern'");
-    ParsesOk("SHOW DATASOURCES LIKE 'p*ttern'");
+    ParsesOk("SHOW DATA SOURCES");
+    ParsesOk("SHOW DATA SOURCES 'pattern'");
+    ParsesOk("SHOW DATA SOURCES LIKE 'pattern'");
+    ParsesOk("SHOW DATA SOURCES LIKE 'p*ttern'");
     // Functions
     ParsesOk("SHOW FUNCTIONS");
     ParsesOk("SHOW FUNCTIONS LIKE 'pattern'");
@@ -1249,10 +1249,10 @@ public class ParserTest {
     ParserError("SHOW");
     // Malformed pattern (no quotes)
     ParserError("SHOW TABLES tablename");
-    // Invalid SHOW DATASOURCE statements
+    // Invalid SHOW DATA SOURCE statements
     ParserError("SHOW DATA");
     ParserError("SHOW SOURCE");
-    ParserError("SHOW DATASOURCE LIKE NotStrLiteral");
+    ParserError("SHOW DATA SOURCE LIKE NotStrLiteral");
     ParserError("SHOW UNKNOWN FUNCTIONS");
     // Missing table/column qualifier.
     ParserError("SHOW STATS tbl");
@@ -1787,20 +1787,22 @@ public class ParserTest {
     ParserError("CREATE EXTERNAL TABLE Foo");
     ParserError("CREATE");
 
-    // Valid syntax for tables PRODUCED BY DATASOURCE
-    ParsesOk("CREATE TABLE Foo (i int, s string) PRODUCED BY DATASOURCE Bar");
-    ParsesOk("CREATE TABLE Foo (i int, s string) PRODUCED BY DATASOURCE Bar(\"\")");
-    ParsesOk("CREATE TABLE Foo (i int) PRODUCED BY DATASOURCE " +
+    // Valid syntax for tables PRODUCED BY DATA SOURCE
+    ParsesOk("CREATE TABLE Foo (i int, s string) PRODUCED BY DATA SOURCE Bar");
+    ParsesOk("CREATE TABLE Foo (i int, s string) PRODUCED BY DATA SOURCE Bar(\"\")");
+    ParsesOk("CREATE TABLE Foo (i int) PRODUCED BY DATA SOURCE " +
         "Bar(\"Foo \\!@#$%^&*()\")");
-    ParsesOk("CREATE TABLE IF NOT EXISTS Foo (i int) PRODUCED BY DATASOURCE Bar(\"\")");
+    ParsesOk("CREATE TABLE IF NOT EXISTS Foo (i int) PRODUCED BY DATA SOURCE Bar(\"\")");
 
-    // Invalid syntax for tables PRODUCED BY DATASOURCE
-    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATASOURCE Foo.Bar");
-    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATASOURCE Foo()");
-    ParserError("CREATE EXTERNAL TABLE Foo (i int) PRODUCED BY DATASOURCE Foo(\"\")");
-    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATASOURCE Foo(\"\") " +
+    // Invalid syntax for tables PRODUCED BY DATA SOURCE
+    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATA Foo");
+    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATA SRC Foo");
+    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATA SOURCE Foo.Bar");
+    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATA SOURCE Foo()");
+    ParserError("CREATE EXTERNAL TABLE Foo (i int) PRODUCED BY DATA SOURCE Foo(\"\")");
+    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATA SOURCE Foo(\"\") " +
         "LOCATION 'x'");
-    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATASOURCE Foo(\"\") " +
+    ParserError("CREATE TABLE Foo (i int) PRODUCED BY DATA SOURCE Foo(\"\") " +
         "ROW FORMAT DELIMITED");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY (j string) PRODUCED BY DATA " +
         "SOURCE Foo(\"\")");
@@ -1808,46 +1810,51 @@ public class ParserTest {
 
   @Test
   public void TestCreateDataSource() {
-    ParsesOk("CREATE DATASOURCE foo LOCATION '/foo.jar' CLASS 'com.bar.Foo' " +
+    ParsesOk("CREATE DATA SOURCE foo LOCATION '/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
-    ParsesOk("CREATE DATASOURCE foo LOCATION \"/foo.jar\" CLASS \"com.bar.Foo\" " +
+    ParsesOk("CREATE DATA SOURCE foo LOCATION \"/foo.jar\" CLASS \"com.bar.Foo\" " +
         "API_VERSION \"V1\"");
-    ParsesOk("CREATE DATASOURCE foo LOCATION '/x/foo@hi_^!#.jar' CLASS 'com.bar.Foo' " +
+    ParsesOk("CREATE DATA SOURCE foo LOCATION '/x/foo@hi_^!#.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
 
-    ParserError("CREATE DATASOURCE foo.bar LOCATION '/x/foo.jar' CLASS 'com.bar.Foo' " +
+    ParserError("CREATE DATA foo LOCATION '/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
-    ParserError("CREATE DATASOURCE foo LOCATION /x/foo.jar CLASS 'com.bar.Foo' " +
+    ParserError("CREATE DATA SRC foo.bar LOCATION '/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
-    ParserError("CREATE DATASOURCE foo LOCATION '/x/foo.jar' CLASS com.bar.Foo " +
+    ParserError("CREATE DATA SOURCE foo.bar LOCATION '/x/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
-    ParserError("CREATE DATASOURCE foo LOCATION '/x/foo.jar' CLASS 'com.bar.Foo' " +
+    ParserError("CREATE DATA SOURCE foo LOCATION /x/foo.jar CLASS 'com.bar.Foo' " +
+        "API_VERSION 'V1'");
+    ParserError("CREATE DATA SOURCE foo LOCATION '/x/foo.jar' CLASS com.bar.Foo " +
+        "API_VERSION 'V1'");
+    ParserError("CREATE DATA SOURCE foo LOCATION '/x/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION V1");
-    ParserError("CREATE DATASOURCE LOCATION '/x/foo.jar' CLASS 'com.bar.Foo' " +
+    ParserError("CREATE DATA SOURCE LOCATION '/x/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
-    ParserError("CREATE DATASOURCE foo CLASS 'com.bar.Foo' " +
+    ParserError("CREATE DATA SOURCE foo CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
-    ParserError("CREATE DATASOURCE foo LOCATION CLASS 'com.bar.Foo' " +
+    ParserError("CREATE DATA SOURCE foo LOCATION CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
-    ParserError("CREATE DATASOURCE foo LOCATION '/foo.jar' API_VERSION 'V1'");
-    ParserError("CREATE DATASOURCE foo LOCATION '/foo.jar' CLASS API_VERSION 'V1'");
-    ParserError("CREATE DATASOURCE foo LOCATION '/foo.jar' CLASS 'com.bar.Foo'");
-    ParserError("CREATE DATASOURCE foo LOCATION '/foo.jar' CLASS 'Foo' API_VERSION");
-    ParserError("CREATE DATASOURCE foo CLASS 'com.bar.Foo' LOCATION '/x/foo.jar' " +
+    ParserError("CREATE DATA SOURCE foo LOCATION '/foo.jar' API_VERSION 'V1'");
+    ParserError("CREATE DATA SOURCE foo LOCATION '/foo.jar' CLASS API_VERSION 'V1'");
+    ParserError("CREATE DATA SOURCE foo LOCATION '/foo.jar' CLASS 'com.bar.Foo'");
+    ParserError("CREATE DATA SOURCE foo LOCATION '/foo.jar' CLASS 'Foo' API_VERSION");
+    ParserError("CREATE DATA SOURCE foo CLASS 'com.bar.Foo' LOCATION '/x/foo.jar' " +
         "API_VERSION 'V1'");
-    ParserError("CREATE DATASOURCE foo CLASS 'com.bar.Foo' API_VERSION 'V1' " +
+    ParserError("CREATE DATA SOURCE foo CLASS 'com.bar.Foo' API_VERSION 'V1' " +
         "LOCATION '/x/foo.jar' ");
-    ParserError("CREATE DATASOURCE foo API_VERSION 'V1' LOCATION '/x/foo.jar' " +
+    ParserError("CREATE DATA SOURCE foo API_VERSION 'V1' LOCATION '/x/foo.jar' " +
         "CLASS 'com.bar.Foo'");
   }
 
   @Test
   public void TestDropDataSource() {
-    ParsesOk("DROP DATASOURCE foo");
+    ParsesOk("DROP DATA SOURCE foo");
 
     ParserError("DROP DATA foo");
-    ParserError("DROP DATASOURCE foo.bar");
-    ParserError("DROP DATASOURCE");
+    ParserError("DROP DATA SRC foo");
+    ParserError("DROP DATA SOURCE foo.bar");
+    ParserError("DROP DATA SOURCE");
   }
 
   @Test
@@ -2183,6 +2190,19 @@ public class ParserTest {
         "Expected: CASE, CAST, FALSE, " +
         "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
 
+    // Parsing identifiers that have different names printed as EXPECTED
+    ParserError("DROP DATA SRC foo",
+        "Syntax error in line 1:\n" +
+        "DROP DATA SRC foo\n" +
+        "          ^\n" +
+        "Encountered: IDENTIFIER\n" +
+        "Expected: SOURCE\n");
+    ParserError("SHOW DATA SRCS",
+        "Syntax error in line 1:\n" +
+        "SHOW DATA SRCS\n" +
+        "          ^\n" +
+        "Encountered: IDENTIFIER\n" +
+        "Expected: SOURCES\n");
   }
 
   @Test

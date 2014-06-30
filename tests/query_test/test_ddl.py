@@ -154,13 +154,13 @@ class TestDdlStatements(ImpalaTestSuite):
   def test_create_drop_data_src(self, vector):
     # This will create, run, and drop the same data source repeatedly, exercising
     # the lib cache mechanism.
-    create_ds_stmt = """CREATE DATASOURCE test_data_src
+    create_ds_stmt = """CREATE DATA SOURCE test_data_src
         LOCATION '/test-warehouse/data-sources/test-data-source.jar'
         CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource'
         API_VERSION 'V1'"""
     create_tbl_stmt = """CREATE TABLE data_src_tbl (x int)
-        PRODUCED BY DATASOURCE test_data_src"""
-    drop_ds_stmt = "drop datasource %s test_data_src"
+        PRODUCED BY DATA SOURCE test_data_src"""
+    drop_ds_stmt = "drop data source %s test_data_src"
     drop_tbl_stmt = "drop table %s data_src_tbl"
     select_stmt = "select * from data_src_tbl limit 1"
 

@@ -31,11 +31,16 @@ import java_cup.runtime.Symbol;
 import com.google.common.collect.Lists;
 
 parser code {:
-  private Symbol errorToken;
+  private Symbol errorToken_;
+
+  // Set if the errorToken_ to be printed in the error message has a different name, e.g.
+  // when parsing identifiers instead of defined keywords. This is necessary to avoid
+  // conflicting keywords.
+  private String expectedTokenName_;
 
   // list of expected tokens ids from current parsing state
   // for generating syntax error message
-  private final List<Integer> expectedTokenIds = new ArrayList<Integer>();
+  private final List<Integer> expectedTokenIds_ = new ArrayList<Integer>();
 
   // to avoid reporting trivial tokens as expected tokens in error messages
   private boolean reportExpectedToken(Integer tokenId) {
@@ -66,10 +71,10 @@ parser code {:
 
   // override to save error token
   public void syntax_error(java_cup.runtime.Symbol token) {
-    errorToken = token;
+    errorToken_ = token;
 
     // derive expected tokens from current parsing state
-    expectedTokenIds.clear();
+    expectedTokenIds_.clear();
     int state = ((Symbol)stack.peek()).parse_state;
     // get row of actions table corresponding to current parsing state
     // the row consists of pairs of <tokenId, actionId>
@@ -82,7 +87,7 @@ parser code {:
     for (int i = 0; i < row.length-2; ++i) {
       // get tokenId and skip actionId
       tokenId = row[i++];
-      expectedTokenIds.add(Integer.valueOf(tokenId));
+      expectedTokenIds_.add(Integer.valueOf(tokenId));
     }
   }
 
@@ -102,6 +107,16 @@ parser code {:
    *   id of symbol from SqlParserSymbols on which to fail parsing
    */
   public void parseError(String symbolName, int symbolId) throws Exception {
+    parseError(symbolName, symbolId, null);
+  }
+
+  /**
+   * Same as parseError() above but allows the error token to have a different
+   * name printed as the expected token.
+   */
+  public void parseError(String symbolName, int symbolId, String expectedTokenName)
+      throws Exception {
+    expectedTokenName_ = expectedTokenName;
     Symbol errorToken = getSymbolFactory().newSymbol(symbolName, symbolId,
         ((Symbol) stack.peek()), ((Symbol) stack.peek()), null);
     // Call syntax error to gather information about expected tokens, etc.
@@ -115,42 +130,42 @@ parser code {:
   // with a '^' under the offending token. Assumes
   // that parse() has been called and threw an exception
   public String getErrorMsg(String stmt) {
-    if (errorToken == null || stmt == null) return null;
+    if (errorToken_ == null || stmt == null) return null;
     String[] lines = stmt.split("\n");
     StringBuffer result = new StringBuffer();
-    result.append(getErrorTypeMessage(errorToken.sym) + " in line ");
-    result.append(errorToken.left);
+    result.append(getErrorTypeMessage(errorToken_.sym) + " in line ");
+    result.append(errorToken_.left);
     result.append(":\n");
 
-    // errorToken.left is the line number of error.
-    // errorToken.right is the column number of the error.
-    String errorLine = lines[errorToken.left - 1];
-    // If the error is that additional tokens are expected past the end, errorToken.right
-    // will be past the end of the string.
-    int lastCharIndex = Math.min(errorLine.length(), errorToken.right);
+    // errorToken_.left is the line number of error.
+    // errorToken_.right is the column number of the error.
+    String errorLine = lines[errorToken_.left - 1];
+    // If the error is that additional tokens are expected past the end,
+    // errorToken_.right will be past the end of the string.
+    int lastCharIndex = Math.min(errorLine.length(), errorToken_.right);
     int maxPrintLength = 60;
     int errorLoc = 0;
     if (errorLine.length() <= maxPrintLength) {
       // The line is short. Print the entire line.
       result.append(errorLine);
       result.append('\n');
-      errorLoc = errorToken.right;
+      errorLoc = errorToken_.right;
     } else {
       // The line is too long. Print maxPrintLength/2 characters before the error and
       // after the error.
       int contextLength = maxPrintLength / 2 - 3;
       String leftSubStr;
-      if (errorToken.right > maxPrintLength / 2) {
-        leftSubStr = "..." + errorLine.substring(errorToken.right - contextLength,
+      if (errorToken_.right > maxPrintLength / 2) {
+        leftSubStr = "..." + errorLine.substring(errorToken_.right - contextLength,
             lastCharIndex);
       } else {
-        leftSubStr = errorLine.substring(0, errorToken.right);
+        leftSubStr = errorLine.substring(0, errorToken_.right);
       }
       errorLoc = leftSubStr.length();
       result.append(leftSubStr);
-      if (errorLine.length() - errorToken.right > maxPrintLength / 2) {
-        result.append(errorLine.substring(errorToken.right,
-           errorToken.right + contextLength) + "...");
+      if (errorLine.length() - errorToken_.right > maxPrintLength / 2) {
+        result.append(errorLine.substring(errorToken_.right,
+           errorToken_.right + contextLength) + "...");
       } else {
         result.append(errorLine.substring(lastCharIndex));
       }
@@ -164,35 +179,39 @@ parser code {:
     result.append("^\n");
 
     // only report encountered and expected tokens for syntax errors
-    if (errorToken.sym == SqlParserSymbols.UNMATCHED_STRING_LITERAL ||
-        errorToken.sym == SqlParserSymbols.NUMERIC_OVERFLOW) {
+    if (errorToken_.sym == SqlParserSymbols.UNMATCHED_STRING_LITERAL ||
+        errorToken_.sym == SqlParserSymbols.NUMERIC_OVERFLOW) {
       return result.toString();
     }
 
     // append last encountered token
     result.append("Encountered: ");
     String lastToken =
-      SqlScanner.tokenIdMap.get(Integer.valueOf(errorToken.sym));
+      SqlScanner.tokenIdMap.get(Integer.valueOf(errorToken_.sym));
     if (lastToken != null) {
       result.append(lastToken);
     } else {
-      result.append("Unknown last token with id: " + errorToken.sym);
+      result.append("Unknown last token with id: " + errorToken_.sym);
     }
 
     // append expected tokens
     result.append('\n');
     result.append("Expected: ");
-    String expectedToken = null;
-    Integer tokenId = null;
-    for (int i = 0; i < expectedTokenIds.size(); ++i) {
-      tokenId = expectedTokenIds.get(i);
-      if (reportExpectedToken(tokenId)) {
-       expectedToken = SqlScanner.tokenIdMap.get(tokenId);
-         result.append(expectedToken + ", ");
+    if (expectedTokenName_ == null) {
+      String expectedToken = null;
+      Integer tokenId = null;
+      for (int i = 0; i < expectedTokenIds_.size(); ++i) {
+        tokenId = expectedTokenIds_.get(i);
+        if (reportExpectedToken(tokenId)) {
+          expectedToken = SqlScanner.tokenIdMap.get(tokenId);
+          result.append(expectedToken + ", ");
+        }
       }
+      // remove trailing ", "
+      result.delete(result.length()-2, result.length());
+    } else {
+      result.append(expectedTokenName_);
     }
-    // remove trailing ", "
-    result.delete(result.length()-2, result.length());
     result.append('\n');
 
     return result.toString();
@@ -204,23 +223,22 @@ terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_API_VERSION, KW_AS, KW_ASC, KW_AVRO,
   KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CACHED, KW_CASE, KW_CAST,
   KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT,
-  KW_COMPUTE, KW_CREATE, KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATASOURCE,
-  KW_DATASOURCES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE,
-  KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS,
-  KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST,
-  KW_FLOAT, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS,
-  KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,
-  KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT,
-  KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_MERGE_FN, KW_METADATA, KW_NOT,
-  KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE,
-  KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PREPARE_FN,
-  KW_PRODUCED, KW_RCFILE, KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS,
-  KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE,
-  KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED,
-  KW_STRAIGHT_JOIN, KW_STRING, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES,
-  KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO,
-  KW_TRUE,KW_UNCACHED, KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING, KW_VALUES, KW_VIEW,
-  KW_WHEN, KW_WHERE, KW_WITH;
+  KW_COMPUTE, KW_CREATE, KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE,
+  KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV,
+  KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL,
+  KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT, KW_FORMAT,
+  KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_HAVING, KW_IF,
+  KW_IN, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
+  KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES,
+  KW_LOAD, KW_LOCATION, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET,
+  KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE,
+  KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PREPARE_FN, KW_PRODUCED, KW_RCFILE,
+  KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW,
+  KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
+  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING,
+  KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN,
+  KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE,KW_UNCACHED, KW_UNION, KW_UPDATE_FN,
+  KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
   DIVIDE, MOD, ADD, SUBTRACT;
@@ -361,6 +379,11 @@ nonterminal String optional_kw_column;
 // Used to simplify commands where KW_TABLE is optional
 nonterminal String opt_kw_table;
 nonterminal Boolean overwrite_val;
+
+// Used to parse 'SOURCE' and 'SOURCES' as identifiers rather than keywords. Throws a
+// parse exception if the identifier is not SOURCE/SOURCES.
+nonterminal Boolean source_ident;
+nonterminal Boolean sources_ident;
 
 // For Create/Drop/Show function ddl
 nonterminal FunctionArgs function_def_args;
@@ -672,7 +695,7 @@ create_tbl_stmt ::=
   :}
   | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
     table_name:table LPAREN column_def_list:col_defs RPAREN
-    KW_PRODUCED KW_BY KW_DATASOURCE IDENT:data_src_name
+    KW_PRODUCED KW_BY KW_DATA source_ident:is_source_id IDENT:data_src_name
     opt_init_string_val:init_string comment_val:comment
   {:
     // Need external_val in the grammar to avoid shift/reduce conflict with other
@@ -871,13 +894,34 @@ create_view_stmt ::=
   ;
 
 create_data_src_stmt ::=
-  KW_CREATE KW_DATASOURCE if_not_exists_val:if_not_exists IDENT:data_src_name
+  KW_CREATE KW_DATA source_ident:is_source_id
+  if_not_exists_val:if_not_exists IDENT:data_src_name
   KW_LOCATION STRING_LITERAL:location
   KW_CLASS STRING_LITERAL:class_name
   KW_API_VERSION STRING_LITERAL:api_version
   {:
     RESULT = new CreateDataSrcStmt(data_src_name, new HdfsUri(location), class_name,
         api_version, if_not_exists);
+  :}
+  ;
+
+source_ident ::=
+  IDENT:ident
+  {:
+    if (!ident.toUpperCase().equals("SOURCE")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "SOURCE");
+    }
+    RESULT = true;
+  :}
+  ;
+
+sources_ident ::=
+  IDENT:ident
+  {:
+    if (!ident.toUpperCase().equals("SOURCES")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "SOURCES");
+    }
+    RESULT = true;
   :}
   ;
 
@@ -939,7 +983,7 @@ drop_function_stmt ::=
   ;
 
 drop_data_src_stmt ::=
-  KW_DROP KW_DATASOURCE if_exists_val:if_exists IDENT:data_src_name
+  KW_DROP KW_DATA source_ident:is_source_id if_exists_val:if_exists IDENT:data_src_name
   {: RESULT = new DropDataSrcStmt(data_src_name, if_exists); :}
   ;
 
@@ -1328,9 +1372,9 @@ show_functions_stmt ::=
   ;
 
 show_data_srcs_stmt ::=
-  KW_SHOW KW_DATASOURCES
+  KW_SHOW KW_DATA sources_ident:is_sources_id
   {: RESULT = new ShowDataSrcsStmt(); :}
-  | KW_SHOW KW_DATASOURCES show_pattern:showPattern
+  | KW_SHOW KW_DATA sources_ident:is_sources_id show_pattern:showPattern
   {: RESULT = new ShowDataSrcsStmt(showPattern); :}
   ;
 

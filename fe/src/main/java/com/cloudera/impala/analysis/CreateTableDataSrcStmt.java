@@ -37,7 +37,7 @@ import com.google.common.collect.Maps;
 
 /**
  * Represents a CREATE TABLE statement for external data sources. Such tables
- * reference an external data source (created with a CREATE DATASOURCE statement)
+ * reference an external data source (created with a CREATE DATA SOURCE statement)
  * and the properties of that source are stored in the table properties because
  * the metastore does not store the data sources themselves.
  */

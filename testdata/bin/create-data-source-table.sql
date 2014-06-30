@@ -16,8 +16,8 @@
 
 USE functional;
 
-DROP DATASOURCE IF EXISTS AllTypesDataSource;
-CREATE DATASOURCE AllTypesDataSource
+DROP DATA SOURCE IF EXISTS AllTypesDataSource;
+CREATE DATA SOURCE AllTypesDataSource
 LOCATION '/test-warehouse/data-sources/test-data-source.jar'
 CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource'
 API_VERSION 'V1';
@@ -39,4 +39,4 @@ CREATE TABLE alltypes_datasource (
   dec_col3 DECIMAL(20,10),
   dec_col4 DECIMAL(38,37),
   dec_col5 DECIMAL(10,5))
-PRODUCED BY DATASOURCE AllTypesDataSource("TestInitString");
+PRODUCED BY DATA SOURCE AllTypesDataSource("TestInitString");
