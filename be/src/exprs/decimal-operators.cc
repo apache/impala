@@ -350,8 +350,14 @@ void* DecimalOperators::RoundDecimalNegativeScale(Expr* e, TupleRow* row,
       Decimal16Value* r = reinterpret_cast<Decimal16Value*>(result);
       int128_t base = DecimalUtil::GetScaleMultiplier<int128_t>(rounding_scale);
       int128_t d = RoundDelta(*r, 0, -rounding_scale, op);
-      r->value() -= (r->value() % base);
-      r->value() += d * base;
+      int128_t delta = d * base - (r->value() % base);
+      // Need to check for overflow. This can't happen in the other cases since the
+      // FE should have picked a high enough precision.
+      if (DecimalUtil::MAX_UNSCALED_DECIMAL - abs(delta) < abs(r->value())) {
+        e->LogOverflow();
+        return NULL;
+      }
+      r->value() += delta;
       break;
     }
     default:
@@ -410,6 +416,9 @@ void* DecimalOperators::RoundDecimal(Expr* e, TupleRow* row,
       reinterpret_cast<Decimal8Value*>(result)->value() += delta;
       break;
     case 16:
+      // This can't overflow. Rounding to a non-negative scale means at least one
+      // digit is dropped if rounding occurred and the round can add at most one digit
+      // before the decimal.
       reinterpret_cast<Decimal16Value*>(result)->value() += delta;
       break;
   }

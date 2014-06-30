@@ -365,6 +365,17 @@ public class ColumnType {
       if (t1.isNull()) return t2;
       if (t2.isNull()) return t1;
 
+      // In the case of decimal and float/double, return the floating point type.
+      // Floating point types can contain values larger than the maximum decimal
+      // so it is a safer compatible type.
+      // TODO: revisit, the function comment is clear that this should return the type
+      // which results in no loss of precision. This would mean there is no compatible
+      // type between decimals and floating point types. However, we can't return
+      // INVALID since this path is also used when checking if an explicit cast is
+      // legal.
+      if (t1.isFloatingPointType()) return t1;
+      if (t2.isFloatingPointType()) return t2;
+
       // Allow casts between decimal and numeric types by converting
       // numeric types to the containing decimal type.
       ColumnType t1Decimal = t1.getMinResolutionDecimal();

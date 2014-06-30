@@ -69,7 +69,6 @@ void* DecimalFunctions::Ceil(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(e->type().scale, 0);
-  DCHECK_LE(e->type().precision, e->children()[0]->type().precision);
   return DecimalOperators::RoundDecimal(e, row, DecimalOperators::CEIL);
 }
 
@@ -78,7 +77,6 @@ void* DecimalFunctions::Floor(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(e->type().scale, 0);
-  DCHECK_LE(e->type().precision, e->children()[0]->type().precision);
   return DecimalOperators::RoundDecimal(e, row, DecimalOperators::FLOOR);
 }
 
@@ -87,7 +85,6 @@ void* DecimalFunctions::Round(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
   DCHECK_EQ(e->type().type, TYPE_DECIMAL);
   DCHECK_EQ(e->type().scale, 0);
-  DCHECK_LE(e->type().precision, e->children()[0]->type().precision);
   return DecimalOperators::RoundDecimal(e, row, DecimalOperators::ROUND);
 }
 

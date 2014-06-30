@@ -1414,14 +1414,36 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select round(cast(1.123 as decimal(10,3)), NULL)",
         "round() cannot be called with a NULL second argument.");
 
-    testDecimalExpr("round(1.23)", ColumnType.createDecimalType(1, 0));
-    testDecimalExpr("round(1.23, 1)", ColumnType.createDecimalType(2, 1));
-    testDecimalExpr("round(1.23, 0)", ColumnType.createDecimalType(1, 0));
+    // This has 39 digits and can only be represented as a DOUBLE.
+    AnalysisError("select precision(999999999999999999999999999999999999999.)",
+        "No matching function with signature: precision(DOUBLE).");
+
+    AnalysisError("select precision(cast(1 as float))",
+        "No matching function with signature: precision(FLOAT)");
+
+    AnalysisError("select precision(NULL)",
+        "Cannot resolve DECIMAL precision and scale from NULL type.");
+    AnalysisError("select scale(NULL)",
+        "Cannot resolve DECIMAL precision and scale from NULL type.");
+
+    testDecimalExpr("round(1.23)", ColumnType.createDecimalType(2, 0));
+    testDecimalExpr("round(1.23, 1)", ColumnType.createDecimalType(3, 1));
+    testDecimalExpr("round(1.23, 0)", ColumnType.createDecimalType(2, 0));
     testDecimalExpr("round(1.23, 3)", ColumnType.createDecimalType(4, 3));
-    testDecimalExpr("round(1.23, -1)", ColumnType.createDecimalType(1, 0));
-    testDecimalExpr("round(1.23, -2)", ColumnType.createDecimalType(1, 0));
+    testDecimalExpr("round(1.23, -1)", ColumnType.createDecimalType(2, 0));
+    testDecimalExpr("round(1.23, -2)", ColumnType.createDecimalType(2, 0));
     testDecimalExpr("round(cast(1.23 as decimal(3,2)), -2)",
-        ColumnType.createDecimalType(1, 0));
+        ColumnType.createDecimalType(2, 0));
+
+    testDecimalExpr("ceil(123.45)", ColumnType.createDecimalType(4, 0));
+    testDecimalExpr("floor(12.345)", ColumnType.createDecimalType(3, 0));
+
+    testDecimalExpr("truncate(1.23)", ColumnType.createDecimalType(1, 0));
+    testDecimalExpr("truncate(1.23, 1)", ColumnType.createDecimalType(2, 1));
+    testDecimalExpr("truncate(1.23, 0)", ColumnType.createDecimalType(1, 0));
+    testDecimalExpr("truncate(1.23, 3)", ColumnType.createDecimalType(4, 3));
+    testDecimalExpr("truncate(1.23, -1)", ColumnType.createDecimalType(1, 0));
+    testDecimalExpr("truncate(1.23, -2)", ColumnType.createDecimalType(1, 0));
   }
 
   /**

@@ -3316,10 +3316,6 @@ TEST_F(ExprTest, DecimalFunctions) {
   TestValue("precision(1)", TYPE_INT, 3);
   TestValue("precision(cast(1 as smallint))", TYPE_INT, 5);
   TestValue("precision(cast(123 as bigint))", TYPE_INT, 19);
-  TestValue("precision(cast(123 as float))", TYPE_INT, 38);
-  TestValue("scale(cast(123 as float))", TYPE_INT, 9);
-  TestValue("precision(cast(123.45 as double))", TYPE_INT, 38);
-  TestValue("scale(cast(123.45 as double))", TYPE_INT, 17);
   TestValue("precision(123.45)", TYPE_INT, 5);
   TestValue("scale(123.45)", TYPE_INT, 2);
   TestValue("precision(1 + 1)", TYPE_INT, 5);
@@ -3329,20 +3325,20 @@ TEST_F(ExprTest, DecimalFunctions) {
   TestValue("scale(cast(NULL as decimal(10, 2)))", TYPE_INT, 2);
 
   // Test result scale/precision from round()/truncate()
-  TestValue("scale(round(cast(\"123.456\" as decimal(6, 3)), 3))", TYPE_INT, 3);
+  TestValue("scale(round(123.456, 3))", TYPE_INT, 3);
   TestValue("precision(round(cast(\"123.456\" as decimal(6, 3)), 3))", TYPE_INT, 6);
 
-  TestValue("scale(truncate(cast(\"123.456\" as decimal(6, 3)), 1))", TYPE_INT, 1);
-  TestValue("precision(truncate(cast(\"123.456\" as decimal(6, 3)), 1))", TYPE_INT, 4);
+  TestValue("scale(truncate(123.456, 1))", TYPE_INT, 1);
+  TestValue("precision(truncate(123.456, 1))", TYPE_INT, 4);
 
   TestValue("scale(round(cast(\"123.456\" as decimal(6, 3)), -2))", TYPE_INT, 0);
-  TestValue("precision(round(cast(\"123.456\" as decimal(6, 3)), -2))", TYPE_INT, 3);
+  TestValue("precision(round(123.456, -2))", TYPE_INT, 4);
 
-  TestValue("scale(truncate(cast(\"123.456\" as decimal(6, 3)), 10))", TYPE_INT, 10);
+  TestValue("scale(truncate(123.456, 10))", TYPE_INT, 10);
   TestValue("precision(truncate(cast(\"123.456\" as decimal(6, 3)), 10))", TYPE_INT, 13);
 
-  TestValue("scale(round(cast(\"123.456\" as decimal(6, 3)), -10))", TYPE_INT, 0);
-  TestValue("precision(round(cast(\"123.456\" as decimal(6, 3)), -10))", TYPE_INT, 3);
+  TestValue("scale(round(123.456, -10))", TYPE_INT, 0);
+  TestValue("precision(round(cast(\"123.456\" as decimal(6, 3)), -10))", TYPE_INT, 4);
 
   // Abs()
   TestDecimalValue("abs(cast('0' as decimal(2,0)))", Decimal4Value(0),
@@ -3573,6 +3569,8 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(33, 0));
   TestDecimalValue("ceil(cast('3' as decimal(33,5)))", Decimal16Value(3),
       ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("ceil(cast('9.14159' as decimal(6,5)))", Decimal4Value(10),
+      ColumnType::CreateDecimalType(2, 0));
   TestIsNull("ceil(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
 
   // Floor()
@@ -3594,6 +3592,8 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(33, 0));
   TestDecimalValue("floor(cast('3' as decimal(33,5)))", Decimal16Value(3),
       ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("floor(cast('-9.14159' as decimal(6,5)))", Decimal4Value(-10),
+      ColumnType::CreateDecimalType(2, 0));
   TestIsNull("floor(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
 
   // Round()
@@ -3615,6 +3615,10 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(33, 0));
   TestDecimalValue("round(cast('3' as decimal(33,5)))", Decimal16Value(3),
       ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("round(cast('9.54159' as decimal(6,5)))", Decimal4Value(10),
+      ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("round(cast('-9.54159' as decimal(6,5)))", Decimal4Value(-10),
+      ColumnType::CreateDecimalType(2, 0));
   TestIsNull("round(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
 
   // Truncate()
@@ -3636,6 +3640,8 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(33, 0));
   TestDecimalValue("truncate(cast('3' as decimal(33,5)))", Decimal16Value(3),
       ColumnType::CreateDecimalType(33, 0));
+  TestDecimalValue("truncate(cast('9.54159' as decimal(6,5)))", Decimal4Value(9),
+      ColumnType::CreateDecimalType(1, 0));
   TestIsNull("truncate(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
 
   // RoundTo()
@@ -3665,6 +3671,8 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(6, 0));
   TestDecimalValue("round(cast('175.0' as decimal(6,1)), -4)", Decimal4Value(0),
       ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("round(cast('999.951' as decimal(6,3)), 1)", Decimal4Value(10000),
+      ColumnType::CreateDecimalType(5, 1));
 
   TestDecimalValue("round(cast('-3.1615' as decimal(16,4)), 0)", Decimal8Value(-3),
       ColumnType::CreateDecimalType(12, 0));
@@ -3680,6 +3688,8 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(16, 4));
   TestDecimalValue("round(cast('3.1615' as decimal(16,4)), 5)", Decimal8Value(316150),
       ColumnType::CreateDecimalType(17, 5));
+  TestDecimalValue("round(cast('-999.951' as decimal(16,3)), 1)", Decimal8Value(-10000),
+      ColumnType::CreateDecimalType(17, 1));
 
   TestDecimalValue("round(cast('-175.0' as decimal(15,1)), 0)", Decimal8Value(-175),
       ColumnType::CreateDecimalType(15, 0));
@@ -3716,6 +3726,8 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(35, 0));
   TestDecimalValue("round(cast('-175.0' as decimal(35,1)), -4)", Decimal16Value(0),
       ColumnType::CreateDecimalType(35, 0));
+  TestDecimalValue("round(cast('99999.9951' as decimal(35,4)), 2)",
+      Decimal16Value(10000000), ColumnType::CreateDecimalType(36, 2));
 
   // TruncateTo()
   TestIsNull("truncate(cast(NULL as decimal(2,0)), 1)",
@@ -3789,6 +3801,15 @@ TEST_F(ExprTest, DecimalFunctions) {
       Decimal16Value(0), ColumnType::CreateDecimalType(35, 0));
   TestDecimalValue("truncate(cast('-175.0' as decimal(35,1)), -4)",
       Decimal16Value(0), ColumnType::CreateDecimalType(35, 0));
+
+  // Overflow on Round()/etc. This can only happen when the input is has enough
+  // leading 9's.
+  // Rounding this value requries a precision of 39 so it overflows.
+  TestIsNull("round(99999999999999999999999999999999999999., -1)",
+      ColumnType::CreateDecimalType(38, 0));
+  TestIsNull("round(-99999999999999999999999999999999000000., -7)",
+      ColumnType::CreateDecimalType(38, 0));
+
 }
 
 // Sanity check some overflow casting. We have a random test framework that covers

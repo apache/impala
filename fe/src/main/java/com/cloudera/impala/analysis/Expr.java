@@ -237,7 +237,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Returns the max resolution type of all the wild card decimal types.
    * Returns null if there are no wild card types.
    */
-  ColumnType getResolvedWildCardType() {
+  ColumnType getResolvedWildCardType() throws AnalysisException {
     ColumnType result = null;
     ColumnType[] fnArgs = fn_.getArgs();
     for (int i = 0; i < children_.size(); ++i) {
@@ -255,6 +255,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       }
     }
     if (result != null) {
+      if (result.isNull()) {
+        throw new AnalysisException(
+            "Cannot resolve DECIMAL precision and scale from NULL type.");
+      }
       Preconditions.checkState(result.isDecimal() && !result.isWildcardDecimal());
     }
     return result;

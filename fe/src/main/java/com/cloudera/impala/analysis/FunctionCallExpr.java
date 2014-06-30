@@ -222,16 +222,20 @@ public class FunctionCallExpr extends Expr {
     ColumnType returnType = childType;
 
     if (fnName_.getFunction().equalsIgnoreCase("sum")) {
-      returnType = childType.getMaxResolutionType();
-    } else if (fnName_.getFunction().equalsIgnoreCase("ceil") ||
+      return childType.getMaxResolutionType();
+    }
+
+    int digitsBefore = childType.decimalPrecision() - childType.decimalScale();
+    int digitsAfter = childType.decimalScale();
+    if (fnName_.getFunction().equalsIgnoreCase("ceil") ||
                fnName_.getFunction().equalsIgnoreCase("ceiling") ||
                fnName_.getFunction().equals("floor")) {
-      // These functions just return with scale 0.
-      returnType = ColumnType.createDecimalType(
-          childType.decimalPrecision() - childType.decimalScale(), 0);
+      // These functions just return with scale 0 but can trigger rounding. We need
+      // to increase the precision by 1 to handle that.
+      ++digitsBefore;
+      digitsAfter = 0;
     } else if (fnName_.getFunction().equalsIgnoreCase("truncate") ||
                fnName_.getFunction().equalsIgnoreCase("round")) {
-      int resultScale = 0;
       if (children_.size() > 1) {
         // The second argument to these functions is the desired scale, otherwise
         // the default is 0.
@@ -252,32 +256,30 @@ public class FunctionCallExpr extends Expr {
         }
         NumericLiteral scaleLiteral = (NumericLiteral) LiteralExpr.create(
             children_.get(1), analyzer.getQueryCtx());
-        resultScale = (int)scaleLiteral.getLongValue();
-        if (Math.abs(resultScale) > ColumnType.MAX_SCALE) {
+        digitsAfter = (int)scaleLiteral.getLongValue();
+        if (Math.abs(digitsAfter) > ColumnType.MAX_SCALE) {
           throw new AnalysisException("Cannot round/truncate to scales greater than " +
               ColumnType.MAX_SCALE + ".");
         }
         children_.set(1, scaleLiteral.uncheckedCastTo(ColumnType.INT));
-      }
-
-      if (resultScale < 0) {
         // Round/Truncate to a negative scale means to round to the digit before
         // the decimal e.g. round(1234.56, -2) would be 1200.
         // The resulting scale is always 0.
-        // TODO: there is an optimization here to replace this call with the literal 0
-        // if the scale is greater than the original precision.
-        // e.g. round(decimal(4,*), -5) will always be 0.
-        int resultPrecision = childType.decimalPrecision() - childType.decimalScale();
-        returnType = ColumnType.createDecimalTypeInternal(resultPrecision, 0);
+        digitsAfter = Math.max(digitsAfter, 0);
       } else {
-        // deltaScale can be negative meaning the new digits should be 0's.
-        int deltaScale = childType.decimalScale() - resultScale;
-        returnType = ColumnType.createDecimalTypeInternal(
-            childType.decimalPrecision() - deltaScale, resultScale);
+        // Round()/Truncate() with no second argument.
+        digitsAfter = 0;
+      }
+
+      if (fnName_.getFunction().equalsIgnoreCase("round") &&
+          digitsAfter < childType.decimalScale()) {
+        // If we are rounding to fewer decimal places, it's possible we need another
+        // digit before the decimal.
+        ++digitsBefore;
       }
     }
     Preconditions.checkState(returnType.isDecimal() && !returnType.isWildcardDecimal());
-    return returnType;
+    return ColumnType.createDecimalTypeInternal(digitsBefore + digitsAfter, digitsAfter);
   }
 
   @Override
