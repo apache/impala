@@ -116,8 +116,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
               Boolean.toString(exprNode.bool_literal.value), colType);
           break;
         case NULL_LITERAL:
-          result = (LiteralExpr) new NullLiteral().castTo(colType);
-          break;
+          return NullLiteral.create(colType);
         default:
           throw new UnsupportedOperationException("Unsupported partition key type: " +
               exprNode.node_type);

@@ -175,6 +175,10 @@ public class CaseExpr extends Expr {
           lastCompatibleThenExpr, elseExpr);
     }
 
+    // Make sure BE doesn't see TYPE_NULL by picking an arbitrary type
+    if (whenType.isNull()) whenType = ColumnType.BOOLEAN;
+    if (returnType.isNull()) returnType = ColumnType.BOOLEAN;
+
     // Add casts to case expr to compatible type.
     if (hasCaseExpr_) {
       // Cast case expr.

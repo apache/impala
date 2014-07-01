@@ -86,7 +86,11 @@ void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
   for (int i = 0; i < desc.slots().size(); ++i) {
     SlotDescriptor* slot_desc = desc.slots()[i];
     if (!slot_desc->is_materialized()) continue;
-    DCHECK_EQ(slot_desc->type(), materialize_exprs[mat_expr_index]->type());
+    // The FE ensures we don't get any TYPE_NULL expressions by picking an arbitrary type
+    // when necessary, but does not do this for slot descs.
+    // TODO: revisit this logic in the FE
+    DCHECK(slot_desc->type().type == TYPE_NULL ||
+           slot_desc->type() == materialize_exprs[mat_expr_index]->type());
     void* src = materialize_exprs[mat_expr_index]->GetValue(row);
     if (src != NULL) {
       void* dst = GetSlot(slot_desc->tuple_offset());

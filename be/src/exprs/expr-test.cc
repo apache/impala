@@ -1043,14 +1043,22 @@ TEST_F(ExprTest, CompoundPredicates) {
   TestValue("TRUE || (FALSE && TRUE)", TYPE_BOOLEAN, true);
   TestValue("TRUE && TRUE || FALSE", TYPE_BOOLEAN, true);
   TestIsNull("TRUE AND NULL", TYPE_BOOLEAN);
+  TestIsNull("NULL AND TRUE", TYPE_BOOLEAN);
   TestValue("FALSE AND NULL", TYPE_BOOLEAN, false);
+  TestValue("NULL AND FALSE", TYPE_BOOLEAN, false);
+  TestIsNull("NULL AND NULL", TYPE_BOOLEAN);
   TestValue("TRUE OR NULL", TYPE_BOOLEAN, true);
+  TestValue("NULL OR TRUE", TYPE_BOOLEAN, true);
   TestIsNull("FALSE OR NULL", TYPE_BOOLEAN);
+  TestIsNull("NULL OR FALSE", TYPE_BOOLEAN);
+  TestIsNull("NULL OR NULL", TYPE_BOOLEAN);
   TestIsNull("NOT NULL", TYPE_BOOLEAN);
   TestIsNull("TRUE && NULL", TYPE_BOOLEAN);
   TestValue("FALSE && NULL", TYPE_BOOLEAN, false);
+  TestIsNull("NULL && NULL", TYPE_BOOLEAN);
   TestValue("TRUE || NULL", TYPE_BOOLEAN, true);
   TestIsNull("FALSE || NULL", TYPE_BOOLEAN);
+  TestIsNull("NULL || NULL", TYPE_BOOLEAN);
   TestIsNull("!NULL", TYPE_BOOLEAN);
 }
 
@@ -1170,6 +1178,7 @@ TEST_F(ExprTest, BetweenPredicate) {
   TestIsNull("NULL between 0 and 10", TYPE_BOOLEAN);
   TestIsNull("1 between NULL and 10", TYPE_BOOLEAN);
   TestIsNull("1 between 0 and NULL", TYPE_BOOLEAN);
+  TestIsNull("1 between NULL and NULL", TYPE_BOOLEAN);
   TestIsNull("NULL between NULL and NULL", TYPE_BOOLEAN);
 }
 
@@ -1230,6 +1239,17 @@ TEST_F(ExprTest, InPredicate) {
   // Test operator precedence.
   TestValue("5+1 in (3, 6, 10)", TYPE_BOOLEAN, true);
   TestValue("5+1 not in (3, 6, 10)", TYPE_BOOLEAN, false);
+
+  // Test NULLs
+  TestIsNull("NULL in (1, 2, 3)", TYPE_BOOLEAN);
+  TestIsNull("NULL in (NULL, 1)", TYPE_BOOLEAN);
+  TestIsNull("3 in (NULL)", TYPE_BOOLEAN);
+  TestIsNull("3 in (1, 2, NULL)", TYPE_BOOLEAN);
+  TestValue("3 in (NULL, 3)", TYPE_BOOLEAN, true);
+  TestIsNull("'hello' in (NULL)", TYPE_BOOLEAN);
+  TestValue("'hello' in ('hello', NULL)", TYPE_BOOLEAN, true);
+  TestIsNull("NULL in (NULL)", TYPE_BOOLEAN);
+  TestIsNull("NULL in (NULL, NULL)", TYPE_BOOLEAN);
 }
 
 TEST_F(ExprTest, StringFunctions) {
@@ -3104,12 +3124,13 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestValue("case NULL when 1 then 1 else 2 end", TYPE_TINYINT, 2);
   TestValue("case 10 when NULL then 1 else 2 end", TYPE_TINYINT, 2);
   TestValue("case 10 when NULL then 1 when 10 then 2 else 3 end", TYPE_TINYINT, 2);
+  TestValue("case 'abc' when NULL then 1 when NULL then 2 else 3 end", TYPE_TINYINT, 3);
   // Not statically known that it will return NULL.
   TestIsNull("case NULL when NULL then true end", TYPE_BOOLEAN);
   TestIsNull("case NULL when NULL then true else NULL end", TYPE_BOOLEAN);
   // Statically known that it will return NULL.
-  TestIsNull("case NULL when NULL then NULL end", TYPE_NULL);
-  TestIsNull("case NULL when NULL then NULL else NULL end", TYPE_NULL);
+  TestIsNull("case NULL when NULL then NULL end", TYPE_BOOLEAN);
+  TestIsNull("case NULL when NULL then NULL else NULL end", TYPE_BOOLEAN);
 
   // Test all types in case/when exprs, without casts.
   unordered_map<int, string>::iterator def_iter;

@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
@@ -54,6 +55,13 @@ public class InPredicate extends Predicate {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
     analyzer.castAllToCompatibleType(children_);
+
+    if (children_.get(0).getType().isNull()) {
+      // Make sure the BE never sees TYPE_NULL by picking an arbitrary type
+      for (int i = 0; i < children_.size(); ++i) {
+        uncheckedCastChild(ColumnType.BOOLEAN, i);
+      }
+    }
 
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     Reference<Integer> idxRef = new Reference<Integer>();

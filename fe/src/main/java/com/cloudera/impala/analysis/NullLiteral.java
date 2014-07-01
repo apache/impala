@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.ColumnType;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Objects;
@@ -32,6 +31,21 @@ public class NullLiteral extends LiteralExpr {
    */
   protected NullLiteral(NullLiteral other) {
     super(other);
+  }
+
+  /**
+   * Returns an analyzed NullLiteral of the specified type.
+   */
+  public static NullLiteral create(ColumnType type) {
+    NullLiteral l = new NullLiteral();
+    try {
+      l.analyze(null);
+    } catch (Exception e) {
+      Preconditions.checkState(false, "NullLiteral failed to analyze!", e);
+      return null;
+    }
+    l.uncheckedCastTo(type);
+    return l;
   }
 
   @Override
@@ -58,7 +72,7 @@ public class NullLiteral extends LiteralExpr {
   }
 
   @Override
-  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(ColumnType targetType) {
     Preconditions.checkState(targetType.isValid());
     type_ = targetType;
     return this;

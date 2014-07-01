@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -195,4 +196,14 @@ public class SlotRef extends Expr {
 
   @Override
   public Expr clone() { return new SlotRef(this); }
+
+  @Override
+  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
+    if (type_.isNull()) {
+      // Hack to prevent null SlotRefs in the BE
+      return NullLiteral.create(targetType);
+    } else {
+      return super.uncheckedCastTo(targetType);
+    }
+  }
 }

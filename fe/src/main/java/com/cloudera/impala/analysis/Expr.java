@@ -359,6 +359,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   // Convert this expr, including all children, to its Thrift representation.
   public TExpr treeToThrift() {
+    if (type_.isNull()) {
+      // Hack to ensure BE never sees TYPE_NULL. If an expr makes it this far without
+      // being cast to a non-NULL type, the type doesn't matter and we can cast it
+      // arbitrarily.
+      Preconditions.checkState(this instanceof NullLiteral || this instanceof SlotRef);
+      return NullLiteral.create(ColumnType.BOOLEAN).treeToThrift();
+    }
     TExpr result = new TExpr();
     treeToThriftHelper(result);
     return result;
@@ -369,6 +376,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Preconditions.checkState(isAnalyzed_,
         "Must be analyzed before serializing to thrift. %s", this);
     Preconditions.checkState(!type_.isWildcardDecimal());
+    // The BE should never see TYPE_NULL
+    Preconditions.checkState(!type_.isNull(), "Expr has type null!");
     TExprNode msg = new TExprNode();
     msg.type = type_.toThrift();
     msg.num_children = children_.size();
@@ -822,6 +831,23 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public void castChild(ColumnType targetType, int childIndex) throws AnalysisException {
     Expr child = getChild(childIndex);
     Expr newChild = child.castTo(targetType);
+    setChild(childIndex, newChild);
+  }
+
+
+  /**
+   * Convert child to to targetType, possibly by inserting an implicit cast, or by
+   * returning an altogether new expression, or by returning 'this' with a modified
+   * return type'.
+   * @param targetType
+   *          type to be cast to
+   * @param childIndex
+   *          index of child to be cast
+   */
+  protected void uncheckedCastChild(ColumnType targetType, int childIndex)
+      throws AnalysisException {
+    Expr child = getChild(childIndex);
+    Expr newChild = child.uncheckedCastTo(targetType);
     setChild(childIndex, newChild);
   }
 

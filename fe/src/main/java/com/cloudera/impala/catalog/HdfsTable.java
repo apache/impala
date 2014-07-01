@@ -635,12 +635,12 @@ public class HdfsTable extends Table {
         int i = 0;
         for (String partitionKey: msPartition.getValues()) {
           uniquePartitionKeys[i].add(partitionKey);
+          ColumnType type = colsByPos_.get(keyValues.size()).getType();
           // Deal with Hive's special NULL partition key.
           if (partitionKey.equals(nullPartitionKeyValue_)) {
-            keyValues.add(new NullLiteral());
+            keyValues.add(NullLiteral.create(type));
             ++numNullKeys[i];
           } else {
-            ColumnType type = colsByPos_.get(keyValues.size()).getType();
             try {
               LiteralExpr expr = LiteralExpr.create(partitionKey, type);
               keyValues.add(expr);

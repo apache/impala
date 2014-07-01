@@ -147,6 +147,11 @@ public class CastExpr extends Expr {
       ((NumericLiteral)children_.get(0)).explicitlyCastToFloat(targetType_);
     }
 
+    if (children_.get(0).getType().isNull()) {
+      // Make sure BE never sees TYPE_NULL
+      uncheckedCastChild(targetType_, 0);
+    }
+
     // Our cast fn currently takes two arguments. The first is the value to cast and the
     // second is a dummy of the type to cast to. We need this to be able to resolve the
     // proper function.

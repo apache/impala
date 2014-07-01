@@ -320,6 +320,12 @@ public class FunctionCallExpr extends Expr {
       Function searchDesc = new Function(fnName_, argTypes, ColumnType.INVALID, false);
       fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUPERTYPE_OF);
       type_ = fn_.getReturnType();
+      // Make sure BE doesn't see any TYPE_NULL exprs
+      for (int i = 0; i < children_.size(); ++i) {
+        if (getChild(i).getType().isNull()) {
+          uncheckedCastChild(ColumnType.BOOLEAN, i);
+        }
+      }
       return;
     }
 
