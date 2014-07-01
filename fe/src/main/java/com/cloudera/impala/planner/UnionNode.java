@@ -87,7 +87,7 @@ public class UnionNode extends PlanNode {
       // ignore missing child cardinality info in the hope it won't matter enough
       // to change the planning outcome
       if (child.cardinality_ > 0) {
-        cardinality_ += child.cardinality_;
+        cardinality_ = addCardinalities(cardinality_, child.cardinality_);
       }
     }
     // The number of nodes of a union node is -1 (invalid) if all the referenced tables

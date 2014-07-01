@@ -33,6 +33,7 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.google.common.base.Preconditions;
+import com.google.common.math.LongMath;
 
 /**
  * A PlanFragment is part of a tree of such fragments that together make
@@ -245,10 +246,9 @@ public class PlanFragment {
         break;
       }
       if (dataPartition_.getPartitionExprs().contains(expr)) {
-        result *= Math.max((double) numDistinct / (double) numNodes, 1L);
-      } else {
-        result *= numDistinct;
+        numDistinct = (long)Math.max((double) numDistinct / (double) numNodes, 1L);
       }
+      result = PlanNode.multiplyCardinalities(result, numDistinct);
     }
     return result;
   }

@@ -68,7 +68,8 @@ public class CrossJoinNode extends PlanNode {
     if (getChild(0).cardinality_ == -1 || getChild(1).cardinality_ == -1) {
       cardinality_ = -1;
     } else {
-      cardinality_ = getChild(0).cardinality_ * getChild(1).cardinality_;
+      cardinality_ = multiplyCardinalities(getChild(0).cardinality_,
+          getChild(1).cardinality_);
       if (computeSelectivity() != -1) {
         cardinality_ = Math.round(((double) cardinality_) * computeSelectivity());
       }

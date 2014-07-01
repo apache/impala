@@ -39,6 +39,7 @@ import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.math.LongMath;
 
 /**
  * Each PlanNode represents a single relational operator
@@ -542,6 +543,32 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected boolean hasValidStats() {
     return (numNodes_ == -1 || numNodes_ >= 0) &&
            (cardinality_ == -1 || cardinality_ >= 0);
+  }
+
+  /**
+   * Computes and returns the sum of two cardinalities. If an overflow occurs,
+   * the maximum Long value is returned (Long.MAX_VALUE).
+   */
+  public static long addCardinalities(long a, long b) {
+    try {
+      return LongMath.checkedAdd(a, b);
+    } catch (ArithmeticException e) {
+      LOG.warn("overflow when adding cardinalities: " + a + ", " + b);
+      return Long.MAX_VALUE;
+    }
+  }
+
+  /**
+   * Computes and returns the product of two cardinalities. If an overflow
+   * occurs, the maximum Long value is returned (Long.MAX_VALUE).
+   */
+  public static long multiplyCardinalities(long a, long b) {
+    try {
+      return LongMath.checkedMultiply(a, b);
+    } catch (ArithmeticException e) {
+      LOG.warn("overflow when multiplying cardinalities: " + a + ", " + b);
+      return Long.MAX_VALUE;
+    }
   }
 
   /**

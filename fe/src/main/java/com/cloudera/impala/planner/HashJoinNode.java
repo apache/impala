@@ -209,9 +209,9 @@ public class HashJoinNode extends PlanNode {
       // FK/PK join (which doesn't alter the cardinality of the left-hand side)
       cardinality_ = getChild(0).cardinality_;
     } else if (getChild(0).cardinality_ != -1 && getChild(1).cardinality_ != -1) {
-      cardinality_ = Math.round(
-          (double) getChild(0).cardinality_
-            * (double) getChild(1).cardinality_ / (double) maxNumDistinct);
+      cardinality_ = multiplyCardinalities(getChild(0).cardinality_,
+          getChild(1).cardinality_);
+      cardinality_ = Math.round((double)cardinality_ / (double) maxNumDistinct);
     }
 
     // Impose lower/upper bounds on the cardinality based on the join type.
@@ -236,8 +236,9 @@ public class HashJoinNode extends PlanNode {
       }
       case FULL_OUTER_JOIN: {
         if (getChild(0).cardinality_ != -1 && getChild(1).cardinality_ != -1) {
-          cardinality_ =
-              Math.max(getChild(0).cardinality_ + getChild(1).cardinality_, cardinality_);
+          long cardinalitySum = addCardinalities(getChild(0).cardinality_,
+              getChild(1).cardinality_);
+          cardinality_ = Math.max(cardinalitySum, cardinality_);
         }
         break;
       }

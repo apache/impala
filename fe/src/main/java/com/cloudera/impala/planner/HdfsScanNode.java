@@ -615,7 +615,7 @@ public class HdfsScanNode extends ScanNode {
         // ignore partitions with missing stats in the hope they don't matter
         // enough to change the planning outcome
         if (p.getNumRows() > 0) {
-          cardinality_ += p.getNumRows();
+          cardinality_ = addCardinalities(cardinality_, p.getNumRows());
           hasValidPartitionCardinality = true;
         }
         totalBytes_ += p.getSize();
