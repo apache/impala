@@ -549,10 +549,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Removes implicit casts and analysis state while cloning/substituting exprs within
    * this tree, such that the returned result has minimal implicit casts and types.
    * Throws if analyzing the post-substitution expr tree failed.
+   * If smap is null, this function is equivalent to clone().
    */
   public Expr trySubstitute(ExprSubstitutionMap smap, Analyzer analyzer)
       throws AuthorizationException, AnalysisException {
     Expr result = clone();
+    // Return clone to avoid removing casts.
+    if (smap == null) return result;
     result = result.substituteImpl(smap, analyzer);
     result.analyze(analyzer);
     return result;
@@ -563,6 +566,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Removes implicit casts and analysis state while cloning/substituting exprs within
    * this tree, such that the returned result has minimal implicit casts and types.
    * Expects the analysis of the post-substitution expr to succeed.
+   * If smap is null, this function is equivalent to clone().
    */
   public Expr substitute(ExprSubstitutionMap smap, Analyzer analyzer) {
     try {

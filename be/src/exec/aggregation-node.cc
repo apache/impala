@@ -98,6 +98,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   // Construct build exprs from agg_tuple_desc_
   for (int i = 0; i < probe_exprs_.size(); ++i) {
     SlotDescriptor* desc = agg_tuple_desc_->slots()[i];
+    DCHECK(desc->type().type == TYPE_NULL || desc->type() == probe_exprs_[i]->type());
     Expr* expr = new SlotRef(desc);
     state->obj_pool()->Add(expr);
     build_exprs_.push_back(expr);

@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.ColumnStats;
+import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.DataPartition;
@@ -212,7 +213,7 @@ public class AggregateInfo {
     isDistinctAgg_ = true;
 
     // add DISTINCT parameters to grouping exprs
-    groupingExprs_.addAll(distinctAggExprs.get(0).getChildren());
+    groupingExprs_.addAll(expr0Children);
 
     // remove DISTINCT aggregate functions from aggExprs
     aggregateExprs_.removeAll(distinctAggExprs);
@@ -615,16 +616,43 @@ public class AggregateInfo {
   }
 
   /**
-   * Sanity check that the number of materialized slots of the agg tuple corresponds to
-   * the number of materialized aggregate functions plus the number of grouping exprs.
+   * Validates the internal state of this agg info: Checks that the number of
+   * materialized slots of the agg tuple corresponds to the number of materialized
+   * aggregate functions plus the number of grouping exprs. Also checks that the return
+   * types of the aggregate and grouping exprs correspond to the slots in the agg tuple.
    */
   public void checkConsistency() {
+    ArrayList<SlotDescriptor> slots = aggTupleDesc_.getSlots();
+
+    // Check materialized slots.
     int numMaterializedSlots = 0;
-    for (SlotDescriptor slotDesc: aggTupleDesc_.getSlots()) {
+    for (SlotDescriptor slotDesc: slots) {
       if (slotDesc.isMaterialized()) ++numMaterializedSlots;
     }
     Preconditions.checkState(numMaterializedSlots ==
         materializedAggregateSlots_.size() + groupingExprs_.size());
+
+    // Check that grouping expr return types match the slot descriptors.
+    int slotIdx = 0;
+    for (int i = 0; i < groupingExprs_.size(); ++i) {
+      Expr groupingExpr = groupingExprs_.get(i);
+      ColumnType slotType = slots.get(slotIdx).getType();
+      Preconditions.checkState(groupingExpr.getType().equals(slotType),
+          String.format("Grouping expr %s returns type %s but its agg tuple " +
+              "slot has type %s", groupingExpr.toSql(),
+              groupingExpr.getType().toString(), slotType.toString()));
+      ++slotIdx;
+    }
+    // Check that aggregate expr return types match the slot descriptors.
+    for (int i = 0; i < aggregateExprs_.size(); ++i) {
+      Expr aggExpr = aggregateExprs_.get(i);
+      ColumnType slotType = slots.get(slotIdx).getType();
+      Preconditions.checkState(aggExpr.getType().equals(slotType),
+          String.format("Agg expr %s returns type %s but its agg tuple " +
+              "slot has type %s", aggExpr.toSql(), aggExpr.getType().toString(),
+              slotType.toString()));
+      ++slotIdx;
+    }
   }
 
   /**
