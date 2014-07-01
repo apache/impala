@@ -137,7 +137,7 @@ void AggregateFunctions::Min(FunctionContext* ctx, const StringVal& src, StringV
   if (src.is_null) return;
   if (dst->is_null ||
       StringValue::FromStringVal(src) < StringValue::FromStringVal(*dst)) {
-    ctx->Free(dst->ptr);
+    if (!dst->is_null) ctx->Free(dst->ptr);
     uint8_t* copy = ctx->Allocate(src.len);
     memcpy(copy, src.ptr, src.len);
     *dst = StringVal(copy, src.len);
@@ -149,7 +149,7 @@ void AggregateFunctions::Max(FunctionContext* ctx, const StringVal& src, StringV
   if (src.is_null) return;
   if (dst->is_null ||
       StringValue::FromStringVal(src) > StringValue::FromStringVal(*dst)) {
-    ctx->Free(dst->ptr);
+    if (!dst->is_null) ctx->Free(dst->ptr);
     uint8_t* copy = ctx->Allocate(src.len);
     memcpy(copy, src.ptr, src.len);
     *dst = StringVal(copy, src.len);
@@ -404,6 +404,7 @@ double DistinceEstimateFinalize(const StringVal& src) {
 }
 
 StringVal AggregateFunctions::PcFinalize(FunctionContext* c, const StringVal& src) {
+  DCHECK(!src.is_null);
   double estimate = DistinceEstimateFinalize(src);
   int64_t result = estimate;
   // TODO: this should return bigint. this is a hack
@@ -417,6 +418,7 @@ StringVal AggregateFunctions::PcFinalize(FunctionContext* c, const StringVal& sr
 }
 
 StringVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& src) {
+  DCHECK(!src.is_null);
   // When using stochastic averaging, the result has to be multiplied by NUM_PC_BITMAPS.
   double estimate = DistinceEstimateFinalize(src) * NUM_PC_BITMAPS;
   int64_t result = estimate;
@@ -563,6 +565,7 @@ void AggregateFunctions::KnuthVarMerge(FunctionContext* ctx, const StringVal& sr
 
 StringVal AggregateFunctions::KnuthVarFinalize(FunctionContext* ctx,
                                                const StringVal& state_sv) {
+  DCHECK(!state_sv.is_null);
   KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
   ctx->Free(state_sv.ptr);
   if (state.count == 0) return StringVal::null();
@@ -572,6 +575,7 @@ StringVal AggregateFunctions::KnuthVarFinalize(FunctionContext* ctx,
 
 StringVal AggregateFunctions::KnuthVarPopFinalize(FunctionContext* ctx,
                                                   const StringVal& state_sv) {
+  DCHECK(!state_sv.is_null);
   KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
   ctx->Free(state_sv.ptr);
   if (state.count == 0) return StringVal::null();
@@ -581,6 +585,7 @@ StringVal AggregateFunctions::KnuthVarPopFinalize(FunctionContext* ctx,
 
 StringVal AggregateFunctions::KnuthStddevFinalize(FunctionContext* ctx,
                                                   const StringVal& state_sv) {
+  DCHECK(!state_sv.is_null);
   KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
   ctx->Free(state_sv.ptr);
   if (state.count == 0) return StringVal::null();
@@ -590,6 +595,7 @@ StringVal AggregateFunctions::KnuthStddevFinalize(FunctionContext* ctx,
 
 StringVal AggregateFunctions::KnuthStddevPopFinalize(FunctionContext* ctx,
                                                      const StringVal& state_sv) {
+  DCHECK(!state_sv.is_null);
   KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
   ctx->Free(state_sv.ptr);
   if (state.count == 0) return StringVal::null();
