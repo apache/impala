@@ -1239,6 +1239,7 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("substring('Hello', -5)", "Hello");
   TestStringValue("substring('Hello', cast(-6 as bigint))", "");
   TestStringValue("substring('Hello', 100)", "");
+  TestStringValue("substring('Hello', -100)", "");
   TestIsNull("substring(NULL, 100)", TYPE_STRING);
   TestIsNull("substring('Hello', NULL)", TYPE_STRING);
   TestIsNull("substring(NULL, NULL)", TYPE_STRING);

@@ -50,7 +50,7 @@ void* StringFunctions::Substring(Expr* e, TupleRow* row) {
   if (fixed_pos < 0) fixed_pos = str->len + fixed_pos + 1;
   T max_len = str->len - fixed_pos + 1;
   T fixed_len = (len == NULL ? max_len : ::min(*len, max_len));
-  if (fixed_pos != 0 && fixed_pos <= str->len && fixed_len > 0) {
+  if (fixed_pos > 0 && fixed_pos <= str->len && fixed_len > 0) {
     e->result_.string_val = str->Substring(fixed_pos - 1, fixed_len);
   } else {
     e->result_.string_val = StringValue();
