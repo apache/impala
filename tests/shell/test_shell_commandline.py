@@ -197,6 +197,8 @@ class TestImpalaShell(object):
     args = '-q "set"'
     result_set = run_impala_shell_cmd(args)
     assert 'MEM_LIMIT: [0]' in result_set.stdout
+    # test to check that explain_level is 1
+    assert 'EXPLAIN_LEVEL: [1]' in result_set.stdout
     # test values displayed after setting value
     args = '-q "set mem_limit=1g;set"'
     result_set = run_impala_shell_cmd(args)

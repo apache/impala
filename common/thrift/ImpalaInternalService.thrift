@@ -63,7 +63,7 @@ struct TQueryOptions {
   15: optional i32 hbase_caching = 0
   16: optional bool hbase_cache_blocks = 0
   17: optional i64 parquet_file_size = 0
-  18: optional Types.TExplainLevel explain_level
+  18: optional Types.TExplainLevel explain_level = 1
   19: optional bool sync_ddl = 0
 
   // Request pool this request should be submitted to. If not set
