@@ -133,8 +133,12 @@ public class ComputeStatsStmt extends StatementBase {
         // Count the number of NULL values.
         columnStatsSelectList.add("COUNT(IF(" + colRefSql + " IS NULL, 1, NULL))");
       } else {
-        // Using -1 to indicate "unknown"
-        columnStatsSelectList.add("-1");
+        // Using -1 to indicate "unknown". We need cast to BIGINT because backend expects
+        // an i64Val as the number of NULLs returned by the COMPUTE STATS column stats
+        // child query. See CatalogOpExecutor::SetColumnStats(). If we do not cast, then
+        // the -1 will be treated as TINYINT resulting a 0 to be placed in the #NULLs
+        // column (see IMPALA-1068).
+        columnStatsSelectList.add("CAST(-1 as BIGINT)");
       }
 
       // For STRING columns also compute the max and avg string length.
