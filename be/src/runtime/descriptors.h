@@ -175,10 +175,11 @@ class HdfsPartitionDescriptor {
   THdfsCompression::type compression() const { return compression_; }
   int64_t id() const { return id_; }
 
-  // Calls Prepare() on all partition key exprs. Calls after the first are no-ops.
-  // Note that because these exprs are always literals, they do not need to be opened or
-  // closed.
+  // Calls Prepare()/Open()/Close() on all partition key exprs. Idempotent (this is
+  // because both HdfsScanNode and HdfsTableSink may both use the same partition desc).
   Status PrepareExprs(RuntimeState* state);
+  Status OpenExprs(RuntimeState* state);
+  void CloseExprs(RuntimeState* state);
 
   std::string DebugString() const;
 
@@ -194,6 +195,8 @@ class HdfsPartitionDescriptor {
 
   // True if PrepareExprs has been called, to prevent repeating expensive codegen
   bool exprs_prepared_;
+  bool exprs_opened_;
+  bool exprs_closed_;
 
   // List of literal (and therefore constant) expressions for each
   // partition key. The Expr objects are owned by the local object

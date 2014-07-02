@@ -406,17 +406,16 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   }
 
   // Convert the TScanRangeParams into per-file DiskIO::ScanRange objects and populate
-  // file_descs_ and per_type_files_.
+  // partition_ids_, file_descs_, and per_type_files_.
   DCHECK(scan_range_params_ != NULL)
       << "Must call SetScanRanges() before calling Prepare()";
 
-  unordered_set<int64_t> partition_id_set;
   int num_ranges_missing_volume_id = 0;
   for (int i = 0; i < scan_range_params_->size(); ++i) {
     DCHECK((*scan_range_params_)[i].scan_range.__isset.hdfs_file_split);
     const THdfsFileSplit& split = (*scan_range_params_)[i].scan_range.hdfs_file_split;
     const string& path = split.path;
-    partition_id_set.insert(split.partition_id);
+    partition_ids_.insert(split.partition_id);
 
     HdfsFileDesc* file_desc = NULL;
     FileDescMap::iterator file_desc_it = file_descs_.find(path);
@@ -483,7 +482,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   scanner_thread_bytes_required_ += SCANNER_THREAD_MEM_USAGE;
 
   // Prepare all the partitions scanned by the scan node
-  BOOST_FOREACH(const int64_t& partition_id, partition_id_set) {
+  BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
     DCHECK(partition_desc != NULL);
     RETURN_IF_ERROR(partition_desc->PrepareExprs(state));
@@ -541,6 +540,14 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     return Status::OK;
   }
 
+  // Open all the partitions scanned by the scan node
+  BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
+    HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
+    DCHECK(partition_desc != NULL);
+    RETURN_IF_ERROR(partition_desc->OpenExprs(state));
+  }
+
+  // Open all conjuncts
   for (list<vector<Expr*>*>::iterator it = all_conjuncts_copies_.begin();
      it != all_conjuncts_copies_.end(); ++it) {
     RETURN_IF_ERROR(Expr::Open(**it, state));
@@ -644,9 +651,17 @@ void HdfsScanNode::Close(RuntimeState* state) {
 
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
+  // Close all conjuncts
   for (list<vector<Expr*>*>::iterator it = all_conjuncts_copies_.begin();
      it != all_conjuncts_copies_.end(); ++it) {
     Expr::Close(**it, state);
+  }
+
+  // Close all the partitions scanned by the scan node
+  BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
+    HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
+    DCHECK(partition_desc != NULL);
+    partition_desc->CloseExprs(state);
   }
 
   ScanNode::Close(state);

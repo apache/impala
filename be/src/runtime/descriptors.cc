@@ -100,6 +100,8 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_pa
     compression_(thrift_partition.compression),
     id_(thrift_partition.id),
     exprs_prepared_(false),
+    exprs_opened_(false),
+    exprs_closed_(false),
     file_format_(thrift_partition.fileFormat),
     object_pool_(pool) {
 
@@ -121,6 +123,18 @@ Status HdfsPartitionDescriptor::PrepareExprs(RuntimeState* state) {
     RETURN_IF_ERROR(Expr::Prepare(partition_key_values_, state, RowDescriptor()));
   }
   return Status::OK;
+}
+
+Status HdfsPartitionDescriptor::OpenExprs(RuntimeState* state) {
+  if (exprs_opened_) return Status::OK;
+  exprs_opened_ = true;
+  return Expr::Open(partition_key_values_, state);
+}
+
+void HdfsPartitionDescriptor::CloseExprs(RuntimeState* state) {
+  if (exprs_closed_) return;
+  exprs_closed_ = true;
+  Expr::Close(partition_key_values_, state);
 }
 
 string HdfsPartitionDescriptor::DebugString() const {

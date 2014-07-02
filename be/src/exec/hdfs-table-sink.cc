@@ -151,6 +151,13 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
 Status HdfsTableSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(output_exprs_, state));
   RETURN_IF_ERROR(Expr::Open(partition_key_exprs_, state));
+  // Open literal partition key exprs
+  BOOST_FOREACH(
+      const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
+      table_desc_->partition_descriptors()) {
+    HdfsPartitionDescriptor* partition = id_to_desc.second;
+    RETURN_IF_ERROR(partition->OpenExprs(state));
+  }
 
   // Get file format for default partition in table descriptor, and build a map from
   // partition key values to partition descriptor for multiple output format support. The
@@ -528,6 +535,14 @@ void HdfsTableSink::Close(RuntimeState* state) {
     ClosePartitionFile(state, cur_partition->second.first);
   }
   partition_keys_to_output_partitions_.clear();
+
+  // Close literal partition key exprs
+  BOOST_FOREACH(
+      const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
+      table_desc_->partition_descriptors()) {
+    HdfsPartitionDescriptor* partition = id_to_desc.second;
+    partition->CloseExprs(state);
+  }
   Expr::Close(output_exprs_, state);
   Expr::Close(partition_key_exprs_, state);
   closed_ = true;

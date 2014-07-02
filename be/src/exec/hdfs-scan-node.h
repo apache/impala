@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -286,6 +287,9 @@ class HdfsScanNode : public ScanNode {
   // If true, the warning that some disk ids are unknown was logged.  Only log
   // this once per scan node since it can be noisy.
   bool unknown_disk_id_warned_;
+
+  // Partitions scanned by this scan node.
+  boost::unordered_set<int64_t> partition_ids_;
 
   // File path => file descriptor (which includes the file's splits)
   typedef std::map<std::string, HdfsFileDesc*> FileDescMap;
