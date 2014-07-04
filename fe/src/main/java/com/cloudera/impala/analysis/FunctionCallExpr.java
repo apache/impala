@@ -384,7 +384,7 @@ public class FunctionCallExpr extends Expr {
       }
     }
 
-    castForFunctionCall();
+    castForFunctionCall(false);
     type_ = fn_.getReturnType();
     if (type_.isDecimal() && type_.isWildcardDecimal()) {
       type_ = resolveDecimalReturnType(analyzer);

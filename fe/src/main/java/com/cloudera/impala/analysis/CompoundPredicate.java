@@ -127,7 +127,7 @@ public class CompoundPredicate extends Predicate {
         CompareMode.IS_SUPERTYPE_OF);
     Preconditions.checkState(fn_ != null);
     Preconditions.checkState(fn_.getReturnType().isBoolean());
-    castForFunctionCall();
+    castForFunctionCall(false);
 
     if (getChild(0).selectivity_ == -1
         || children_.size() == 2 && getChild(1).selectivity_ == -1) {

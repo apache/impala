@@ -172,7 +172,7 @@ public class ArithmeticExpr extends Expr {
       fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
           CompareMode.IS_SUPERTYPE_OF);
       Preconditions.checkNotNull(fn_);
-      castForFunctionCall();
+      castForFunctionCall(false);
       type_ = fn_.getReturnType();
       return;
     }
@@ -218,8 +218,9 @@ public class ArithmeticExpr extends Expr {
         break;
     }
 
-    castChild(0, type_);
-    castChild(1, type_);
+    // Don't cast from decimal to decimal. The BE function can just handle this.
+    if (!(type_.isDecimal() && t0.isDecimal())) castChild(0, type_);
+    if (!(type_.isDecimal() && t1.isDecimal())) castChild(1, type_);
     t0 = getChild(0).getType();
     t1 = getChild(1).getType();
 

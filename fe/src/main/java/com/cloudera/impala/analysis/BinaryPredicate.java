@@ -122,7 +122,8 @@ public class BinaryPredicate extends Predicate {
     // This check is important because we often clone and/or evaluate predicates,
     // and it's easy to get the casting logic wrong, e.g., cloned predicates
     // with expr substitutions need to be re-analyzed with reanalyze().
-    Preconditions.checkState(getChild(0).getType().matchesType(getChild(1).getType()),
+    Preconditions.checkState(getChild(0).getType().getPrimitiveType() ==
+                             getChild(1).getType().getPrimitiveType(),
         "child 0 type: " + getChild(0).getType() +
         " child 1 type: " + getChild(1).getType());
     msg.node_type = TExprNodeType.BINARY_PRED;
@@ -150,7 +151,7 @@ public class BinaryPredicate extends Predicate {
           " and " + getChild(1).getType()  + " are not comparable: " + toSql());
     }
     Preconditions.checkState(fn_.getReturnType().isBoolean());
-    castForFunctionCall();
+    castForFunctionCall(true);
 
     // determine selectivity
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();

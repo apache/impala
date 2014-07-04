@@ -160,7 +160,7 @@ public class TimestampArithmeticExpr extends Expr {
 
     fn_ = getBuiltinFunction(analyzer, funcOpName.toLowerCase(),
          collectChildReturnTypes(), CompareMode.IS_SUPERTYPE_OF);
-    castForFunctionCall();
+    castForFunctionCall(false);
 
     Preconditions.checkNotNull(fn_);
     Preconditions.checkState(

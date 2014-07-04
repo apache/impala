@@ -208,14 +208,18 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * child(0) is cast to the function's first argument, child(1) to the second etc.
    * This does not do any validation and the casts are assumed to be safe.
    *
-   * If the function signature contains wildcard decimals, each wildcard child
-   * argument will be cast to the highest resolution that can contain all of
-   * the child wildcard arguments.
-   * e.g. cast(decimal(*), decimal(*))
-   *      called with cast(decimal(10,2), decimal(5,3))
+   * If ignoreWildcardDecimals is true, the function will not cast arguments that
+   * are wildcard decimals. This is used for builtins where the cast is done within
+   * the BE function.
+   * Otherwise, if the function signature contains wildcard decimals, each wildcard child
+   * argument will be cast to the highest resolution that can contain all of the child
+   * wildcard arguments.
+   * e.g. fn(decimal(*), decimal(*))
+   *      called with fn(decimal(10,2), decimal(5,3))
    * both children will be cast to (11, 3).
    */
-  protected void castForFunctionCall() throws AnalysisException {
+  protected void castForFunctionCall(boolean ignoreWildcardDecimals)
+      throws AnalysisException {
     Preconditions.checkState(fn_ != null);
     ColumnType[] fnArgs = fn_.getArgs();
     ColumnType resolvedWildcardType = getResolvedWildCardType();
@@ -223,6 +227,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       // For varargs, we must compare with the last type in fnArgs.argTypes.
       int ix = Math.min(fnArgs.length - 1, i);
       if (fnArgs[ix].isWildcardDecimal()) {
+        if (children_.get(i).type_.isDecimal() && ignoreWildcardDecimals) continue;
         Preconditions.checkState(resolvedWildcardType != null);
         if (!children_.get(i).type_.equals(resolvedWildcardType)) {
           castChild(resolvedWildcardType, i);

@@ -115,6 +115,7 @@ class ExprTest : public testing::Test {
   string default_bool_str_;
   string default_string_str_;
   string default_timestamp_str_;
+  string default_decimal_str_;
   // Corresponding default values.
   bool default_bool_val_;
   string default_string_val_;
@@ -139,6 +140,7 @@ class ExprTest : public testing::Test {
     default_bool_str_ = "false";
     default_string_str_ = "'abc'";
     default_timestamp_str_ = "cast('2011-01-01 09:01:01' as timestamp)";
+    default_decimal_str_ = "1.23";
     default_bool_val_ = false;
     default_string_val_ = "abc";
     default_timestamp_val_ = TimestampValue(1293872461);
@@ -163,6 +165,7 @@ class ExprTest : public testing::Test {
     default_type_strs_[TYPE_BOOLEAN] = default_bool_str_;
     default_type_strs_[TYPE_STRING] = default_string_str_;
     default_type_strs_[TYPE_TIMESTAMP] = default_timestamp_str_;
+    default_type_strs_[TYPE_DECIMAL] = default_decimal_str_;
   }
 
   void GetValue(const string& expr, const ColumnType& expr_type,
@@ -312,7 +315,7 @@ class ExprTest : public testing::Test {
   void TestIsNull(const string& expr, const ColumnType& expr_type) {
     void* result;
     GetValue(expr, expr_type, &result);
-    EXPECT_TRUE(result == NULL);
+    EXPECT_TRUE(result == NULL) << expr;
   }
 
   void TestNonOkStatus(const string& expr) {
@@ -326,8 +329,8 @@ class ExprTest : public testing::Test {
     int64_t t_min = numeric_limits<T>::min();
     int64_t t_max = numeric_limits<T>::max();
     TestComparison(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
-    TestEqual(lexical_cast<string>(t_min), true);
-    TestEqual(lexical_cast<string>(t_max), true);
+    TestBinaryPredicates(lexical_cast<string>(t_min), true);
+    TestBinaryPredicates(lexical_cast<string>(t_max), true);
     if (test_boundaries) {
       // this requires a cast of the second operand to a higher-resolution type
       TestComparison(lexical_cast<string>(t_min - 1),
@@ -344,8 +347,8 @@ class ExprTest : public testing::Test {
     T t_max = numeric_limits<T>::max();
     TestComparison(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
     TestComparison(lexical_cast<string>(-1.0 * t_max), lexical_cast<string>(t_max), true);
-    TestEqual(lexical_cast<string>(t_min), true);
-    TestEqual(lexical_cast<string>(t_max), true);
+    TestBinaryPredicates(lexical_cast<string>(t_min), true);
+    TestBinaryPredicates(lexical_cast<string>(t_max), true);
     if (test_boundaries) {
       // this requires a cast of the second operand to a higher-resolution type
       TestComparison(lexical_cast<string>(numeric_limits<T>::min() - 1),
@@ -396,6 +399,25 @@ class ExprTest : public testing::Test {
     TestValue<bool>("'abcd' >= ''", TYPE_BOOLEAN, true);
     TestValue<bool>("'' > ''", TYPE_BOOLEAN, false);
     TestValue<bool>("'' = ''", TYPE_BOOLEAN, true);
+  }
+
+  void TestDecimalComparisons() {
+    TestValue("1.23 = 1.23", TYPE_BOOLEAN, true);
+    TestValue("1.23 = 1.230", TYPE_BOOLEAN, true);
+    TestValue("1.23 = 1.234", TYPE_BOOLEAN, false);
+    TestValue("1.23 != 1.234", TYPE_BOOLEAN, true);
+    TestValue("1.23 < 1.234", TYPE_BOOLEAN, true);
+    TestValue("1.23 > 1.234", TYPE_BOOLEAN, false);
+    TestValue("1.23 = 1.230000000000000000000", TYPE_BOOLEAN, true);
+    TestValue("1.2300 != 1.230000000000000000001", TYPE_BOOLEAN, true);
+    TestValue("cast(1 as decimal(38,0)) = cast(1 as decimal(38,37))", TYPE_BOOLEAN, true);
+    TestValue("cast(1 as decimal(38,0)) = cast(0.1 as decimal(38,38))",
+              TYPE_BOOLEAN, false);
+    TestValue("cast(1 as decimal(38,0)) > cast(0.1 as decimal(38,38))",
+              TYPE_BOOLEAN, true);
+    TestBinaryPredicates("cast(1 as decimal(8,0))", false);
+    TestBinaryPredicates("cast(1 as decimal(10,0))", false);
+    TestBinaryPredicates("cast(1 as decimal(38,0))", false);
   }
 
   // Test comparison operators with a left or right NULL operand against op.
@@ -481,7 +503,7 @@ class ExprTest : public testing::Test {
 
   // Generate all possible tests for combinations of <value> <op> <value>
   // Also test conversions from strings.
-  void TestEqual(const string& value, bool compare_strings) {
+  void TestBinaryPredicates(const string& value, bool compare_strings) {
     // disabled for now, because our implicit casts from strings are broken
     // and might return analysis errors when they shouldn't
     // TODO: fix and re-enable tests
@@ -936,12 +958,37 @@ TEST_F(ExprTest, ArithmeticExprs) {
   TestNullOperandsArithmeticOps();
 }
 
+TEST_F(ExprTest, DecimalArithmeticExprs) {
+  TestDecimalValue("1.23 + cast(1 as decimal(4,3))",
+                   Decimal4Value(2230), ColumnType::CreateDecimalType(5,3));
+  TestDecimalValue("1.23 - cast(0.23 as decimal(10,3))",
+                   Decimal4Value(1000), ColumnType::CreateDecimalType(11,3));
+  TestDecimalValue("1.23 * cast(1 as decimal(20,3))",
+                   Decimal4Value(123000), ColumnType::CreateDecimalType(23,5));
+  TestDecimalValue("cast(1.23 as decimal(8,2)) / cast(1 as decimal(4,3))",
+                   Decimal4Value(12300000), ColumnType::CreateDecimalType(16,7));
+  TestDecimalValue("cast(1.23 as decimal(8,2)) % cast(1 as decimal(10,3))",
+                   Decimal4Value(230), ColumnType::CreateDecimalType(9,3));
+  TestDecimalValue("cast(1.23 as decimal(8,2)) + cast(1 as decimal(20,3))",
+                   Decimal4Value(2230), ColumnType::CreateDecimalType(21, 3));
+  TestDecimalValue("cast(1.23 as decimal(30,2)) - cast(1 as decimal(4,3))",
+                   Decimal4Value(230), ColumnType::CreateDecimalType(34,3));
+  TestDecimalValue("cast(1.23 as decimal(30,2)) * cast(1 as decimal(10,3))",
+                   Decimal4Value(123000), ColumnType::CreateDecimalType(38,5));
+  TestDecimalValue("cast(1.23 as decimal(30,2)) / cast(1 as decimal(20,3))",
+                   Decimal4Value(1230), ColumnType::CreateDecimalType(38, 3));
+  TestDecimalValue("cast(1 as decimal(38,0)) + cast(.2 as decimal(38,1))",
+                   Decimal4Value(12), ColumnType::CreateDecimalType(38, 1));
+  TestDecimalValue("cast(1 as decimal(38,0)) / cast(.2 as decimal(38,1))",
+                   Decimal4Value(50), ColumnType::CreateDecimalType(38, 1));
+}
+
 // There are two tests of ranges, the second of which requires a cast
 // of the second operand to a higher-resolution type.
 TEST_F(ExprTest, BinaryPredicates) {
   TestComparison("false", "true", false);
-  TestEqual("false", false);
-  TestEqual("true", false);
+  TestBinaryPredicates("false", false);
+  TestBinaryPredicates("true", false);
   TestFixedPointComparisons<int8_t>(true);
   TestFixedPointComparisons<int16_t>(true);
   TestFixedPointComparisons<int32_t>(true);
@@ -949,6 +996,7 @@ TEST_F(ExprTest, BinaryPredicates) {
   TestFloatingPointComparisons<float>(true);
   TestFloatingPointComparisons<double>(false);
   TestStringComparisons();
+  TestDecimalComparisons();
   TestNullComparisons();
 }
 
@@ -1554,7 +1602,8 @@ TEST_F(ExprTest, StringParseUrlFunction) {
 
   // AUTHORITY part.
   TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
-      "index.html?name=networking#DOWNLOADING', 'AUTHORITY')", "user:pass@example.com:80");
+      "index.html?name=networking#DOWNLOADING', 'AUTHORITY')",
+      "user:pass@example.com:80");
   TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
       "index.html?name=networking#DOWNLOADING', 'AUTHORITY')", "user:pass@example.com");
   // Without user and pass.
@@ -1743,7 +1792,7 @@ TEST_F(ExprTest, StringParseUrlFunction) {
       "index.html?name=networking#DOWNLOADING', 'USERINFO')", TYPE_STRING);
 
   // Invalid part parameters.
-  // All characters in the part parameter must be uppercase (conistent with Hive).
+  // All characters in the part parameter must be uppercase (consistent with Hive).
   TestIsNull("parse_url('http://example.com', 'authority')", TYPE_STRING);
   TestIsNull("parse_url('http://example.com', 'Authority')", TYPE_STRING);
   TestIsNull("parse_url('http://example.com', 'AUTHORITYXYZ')", TYPE_STRING);
@@ -1792,7 +1841,8 @@ TEST_F(ExprTest, StringParseUrlFunction) {
       "index.html?test=true&name=networking&op=true', 'QUERY', 'name')", "networking");
   // Key string appears in various parts of the url.
   TestStringValue("parse_url('http://name.name:80/name/books/tutorial/"
-      "name.html?name_fake=true&name=networking&op=true#name', 'QUERY', 'name')", "networking");
+      "name.html?name_fake=true&name=networking&op=true#name', 'QUERY', 'name')",
+      "networking");
   // We can still match this even though no '?' was given.
   TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
       "index.htmltest=true&name=networking&op=true', 'QUERY', 'name')", "networking");
@@ -3562,9 +3612,11 @@ TEST_F(ExprTest, DecimalFunctions) {
   // Greatest()
   TestDecimalValue("greatest(cast('10' as decimal(2,0)), cast('-10' as decimal(2,0)))",
       Decimal4Value(10), ColumnType::CreateDecimalType(2, 0));
-  TestDecimalValue("greatest(cast('1.1' as decimal(18,1)), cast('-1.1' as decimal(18,1)))",
+  TestDecimalValue(
+      "greatest(cast('1.1' as decimal(18,1)), cast('-1.1' as decimal(18,1)))",
       Decimal8Value(11), ColumnType::CreateDecimalType(18,1));
-  TestDecimalValue("greatest(cast('-1.23' as decimal(32,2)), cast('1.23' as decimal(32,2)))",
+  TestDecimalValue(
+      "greatest(cast('-1.23' as decimal(32,2)), cast('1.23' as decimal(32,2)))",
       Decimal8Value(123), ColumnType::CreateDecimalType(32,2));
   TestIsNull("greatest(cast(NULL as decimal(32,2)), cast('1.23' as decimal(32,2)))",
       ColumnType::CreateDecimalType(32,2));
@@ -3851,7 +3903,6 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(38, 0));
   TestIsNull("round(-99999999999999999999999999999999000000., -7)",
       ColumnType::CreateDecimalType(38, 0));
-
 }
 
 // Sanity check some overflow casting. We have a random test framework that covers
