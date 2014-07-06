@@ -14,11 +14,13 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Subquery;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.common.AnalysisException;
@@ -26,6 +28,10 @@ import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TInPredicate;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Lists;
 
 public class InPredicate extends Predicate {
   private final static Logger LOG = LoggerFactory.getLogger(InPredicate.class);
@@ -38,7 +44,16 @@ public class InPredicate extends Predicate {
   public InPredicate(Expr compareExpr, List<Expr> inList, boolean isNotIn) {
     children_.add(compareExpr);
     children_.addAll(inList);
-    this.isNotIn_ = isNotIn;
+    isNotIn_ = isNotIn;
+  }
+
+  // C'tor for initializing an [NOT] IN predicate with a subquery child.
+  public InPredicate(Expr compareExpr, Expr subquery, boolean isNotIn) {
+    Preconditions.checkNotNull(compareExpr);
+    Preconditions.checkNotNull(subquery);
+    children_.add(compareExpr);
+    children_.add(subquery);
+    isNotIn_ = isNotIn;
   }
 
   /**
@@ -54,15 +69,38 @@ public class InPredicate extends Predicate {
       AuthorizationException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
-    analyzer.castAllToCompatibleType(children_);
 
-    if (children_.get(0).getType().isNull()) {
-      // Make sure the BE never sees TYPE_NULL by picking an arbitrary type
-      for (int i = 0; i < children_.size(); ++i) {
-        uncheckedCastChild(ColumnType.BOOLEAN, i);
+    if (contains(Predicates.instanceOf(Subquery.class))) {
+      // An [NOT] IN predicate with a subquery must contain two children, the second of
+      // which is a Subquery.
+      Preconditions.checkState(children_.size() == 2);
+      Preconditions.checkState(getChild(1) instanceof Subquery);
+      Subquery subquery = (Subquery)getChild(1);
+      // TODO: Change this when we have complex types.
+      ArrayList<Expr> subqueryExprs = subquery.getStatement().getResultExprs();
+      if (subqueryExprs.size() > 1) {
+        throw new AnalysisException("Subquery must return a single column: " +
+            subquery.toSql());
+      }
+
+      // Ensure that the column in the lhs of the IN predicate and the result of
+      // the subquery are type compatible. No need to perform any
+      // casting at this point. Any casting needed will be performed when the
+      // subquery is unnested.
+      Expr compareExpr = children_.get(0);
+      Expr subqueryExpr = subqueryExprs.get(0);
+      analyzer.getCompatibleType(compareExpr.getType(), compareExpr, subqueryExpr);
+    } else {
+      analyzer.castAllToCompatibleType(children_);
+      if (children_.get(0).getType().isNull()) {
+        // Make sure the BE never sees TYPE_NULL by picking an arbitrary type
+        for (int i = 0; i < children_.size(); ++i) {
+          uncheckedCastChild(ColumnType.BOOLEAN, i);
+        }
       }
     }
 
+    // TODO: Fix selectivity_ for nested predicate
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     Reference<Integer> idxRef = new Reference<Integer>();
     if (isSingleColumnPredicate(slotRefRef, idxRef)
@@ -78,6 +116,8 @@ public class InPredicate extends Predicate {
 
   @Override
   protected void toThrift(TExprNode msg) {
+    // Can't serialize a predicate with a subquery
+    Preconditions.checkState(!contains(Predicates.instanceOf(Subquery.class)));
     msg.in_predicate = new TInPredicate(isNotIn_);
     msg.node_type = TExprNodeType.IN_PRED;
   }
@@ -86,12 +126,14 @@ public class InPredicate extends Predicate {
   public String toSqlImpl() {
     StringBuilder strBuilder = new StringBuilder();
     String notStr = (isNotIn_) ? "NOT " : "";
-    strBuilder.append(getChild(0).toSql() + " " + notStr + "IN (");
+    strBuilder.append(getChild(0).toSql() + " " + notStr + "IN ");
+    boolean hasSubquery = contains(Predicates.instanceOf(Subquery.class));
+    if (!hasSubquery) strBuilder.append("(");
     for (int i = 1; i < children_.size(); ++i) {
       strBuilder.append(getChild(i).toSql());
       strBuilder.append((i+1 != children_.size()) ? ", " : "");
     }
-    strBuilder.append(")");
+    if (!hasSubquery) strBuilder.append(")");
     return strBuilder.toString();
   }
 

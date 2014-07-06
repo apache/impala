@@ -127,6 +127,10 @@ public abstract class QueryStmt extends StatementBase {
 
     // extract exprs
     for (OrderByElement orderByElement: orderByElements_) {
+      if (orderByElement.getExpr().contains(Predicates.instanceOf(Subquery.class))) {
+        throw new AnalysisException(
+            "Subqueries are not supported in the ORDER BY clause.");
+      }
       // create copies, we don't want to modify the original parse node, in case
       // we need to print it
       orderingExprs.add(orderByElement.getExpr().clone());
@@ -151,7 +155,7 @@ public abstract class QueryStmt extends StatementBase {
     // are ignored.
     if (!hasLimit() && !hasOffset() && !analyzer.isRootAnalyzer()) {
       evaluateOrderBy_ = false;
-      // Return a warning that the oder by was ignored.
+      // Return a warning that the order by was ignored.
       StringBuilder strBuilder = new StringBuilder();
       strBuilder.append("Ignoring ORDER BY clause without LIMIT or OFFSET: ");
       strBuilder.append("ORDER BY ");
@@ -161,7 +165,7 @@ public abstract class QueryStmt extends StatementBase {
       }
       strBuilder.append("\n.An ORDER BY without a LIMIT or OFFSET appearing in ");
       strBuilder.append("an (inline) view, union operand or an INSERT/CTAS statement ");
-      strBuilder.append("has no effect on query results.");
+      strBuilder.append("has no effect on the query result.");
       analyzer.addWarning(strBuilder.toString());
     } else {
       evaluateOrderBy_ = true;

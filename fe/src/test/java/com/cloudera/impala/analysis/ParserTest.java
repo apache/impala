@@ -2083,7 +2083,7 @@ public class ParserTest {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: ALL, CASE, CAST, DISTINCT, " +
+        "Expected: ALL, CASE, CAST, DISTINCT, EXISTS, " +
         "FALSE, IF, INTERVAL, NOT, NULL, " +
         "STRAIGHT_JOIN, TRUE, IDENTIFIER\n");
 
@@ -2110,7 +2110,7 @@ public class ParserTest {
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
-        "Expected: CASE, CAST, FALSE, " +
+        "Expected: CASE, CAST, EXISTS, FALSE, " +
         "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
@@ -2119,7 +2119,7 @@ public class ParserTest {
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
-        "Expected: CASE, CAST, FALSE, " +
+        "Expected: CASE, CAST, EXISTS, FALSE, " +
         "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
@@ -2140,9 +2140,9 @@ public class ParserTest {
         "select (i + 5)(1 - i) from t\n" +
         "              ^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, " +
-        "OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
+        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, " +
+        "FULL, GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, " +
+        "OFFSET, OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
         "IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i) from t",
@@ -2150,18 +2150,20 @@ public class ParserTest {
         "(1 - i) from t\n" +
         "^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, " +
-        "OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
+        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, " +
+        "FULL, GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, " +
+        "OFFSET, OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
+        "IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i)\nfrom t",
         "Syntax error in line 2:\n" +
         "(1 - i)\n" +
         "^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, OFFSET, " +
-        "OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, IDENTIFIER\n");
+        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, " +
+        "FULL, GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, " +
+        "OFFSET, OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
+        "IDENTIFIER\n");
 
     // Long line: error in the middle
     ParserError("select c, b, c,c,c,c,c,c,c,c,c,a a a,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",
@@ -2187,7 +2189,7 @@ public class ParserTest {
         "...c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t\n" +
         "                             ^\n" +
         "Encountered: COMMA\n" +
-        "Expected: CASE, CAST, FALSE, " +
+        "Expected: CASE, CAST, EXISTS, FALSE, " +
         "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
 
     // Parsing identifiers that have different names printed as EXPECTED
@@ -2234,4 +2236,107 @@ public class ParserTest {
     ParserError("CREATE TABLE foo(d decimal(-1))");
   }
 
+  @Test
+  public void TestSubqueries() {
+    // Binary nested predicates
+    String subquery = "(SELECT count(*) FROM bar)";
+    String[] operators = {"=", "!=", "<>", ">", ">=", "<", "<="};
+    for (String op: operators) {
+      ParsesOk(String.format("SELECT * FROM foo WHERE a %s %s", op, subquery));
+      ParsesOk(String.format("SELECT * FROM foo WHERE %s %s a", subquery, op));
+    }
+    // Binary predicate with an arithmetic expr
+    ParsesOk("SELECT * FROM foo WHERE a+1 > (SELECT count(a) FROM bar)");
+    ParsesOk("SELECT * FROM foo WHERE (SELECT count(a) FROM bar) < a+1");
+
+    // [NOT] IN nested predicates
+    ParsesOk("SELECT * FROM foo WHERE a IN (SELECT a FROM bar)");
+    ParsesOk("SELECT * FROM foo WHERE a NOT IN (SELECT a FROM bar)");
+
+    // [NOT] EXISTS predicates
+    ParsesOk("SELECT * FROM foo WHERE EXISTS (SELECT a FROM bar WHERE b > 0)");
+    ParsesOk("SELECT * FROM foo WHERE NOT EXISTS (SELECT a FROM bar WHERE b > 0)");
+    ParsesOk("SELECT * FROM foo WHERE NOT (EXISTS (SELECT a FROM bar))");
+
+    // Compound nested predicates
+    ParsesOk("SELECT * FROM foo WHERE a = (SELECT count(a) FROM bar) AND " +
+             "b != (SELECT count(b) FROM baz) and c IN (SELECT c FROM qux)");
+    ParsesOk("SELECT * FROM foo WHERE EXISTS (SELECT a FROM bar WHERE b < 0) AND " +
+             "NOT EXISTS (SELECT a FROM baz WHERE b > 0)");
+    ParsesOk("SELECT * FROM foo WHERE EXISTS (SELECT a from bar) AND " +
+             "NOT EXISTS (SELECT a FROM baz) AND b IN (SELECT b FROM bar) AND " +
+             "c NOT IN (SELECT c FROM qux) AND d = (SELECT max(d) FROM quux)");
+
+    // Nested parentheses
+    ParsesOk("SELECT * FROM foo WHERE EXISTS ((SELECT * FROM bar))");
+    ParsesOk("SELECT * FROM foo WHERE EXISTS (((SELECT * FROM bar)))");
+    ParsesOk("SELECT * FROM foo WHERE a IN ((SELECT a FROM bar))");
+    ParsesOk("SELECT * FROM foo WHERE a = ((SELECT max(a) FROM bar))");
+
+    // More than one nesting level
+    ParsesOk("SELECT * FROM foo WHERE a IN (SELECT a FROM bar WHERE b IN " +
+             "(SELECT b FROM baz))");
+    ParsesOk("SELECT * FROM foo WHERE EXISTS (SELECT a FROM bar WHERE b NOT IN " +
+             "(SELECT b FROM baz WHERE c < 10 AND d = (SELECT max(d) FROM qux)))");
+
+    // Binary predicate between subqueries
+    for (String op: operators) {
+      ParsesOk(String.format("SELECT * FROM foo WHERE %s %s %s", subquery, op,
+          subquery));
+    }
+
+    // Malformed nested subqueries
+    // Missing or misplaced parenthesis around a subquery
+    ParserError("SELECT * FROM foo WHERE a IN SELECT a FROM bar");
+    ParserError("SELECT * FROM foo WHERE a = SELECT count(*) FROM bar");
+    ParserError("SELECT * FROM foo WHERE EXISTS SELECT * FROM bar");
+    ParserError("SELECT * FROM foo WHERE a IN (SELECT a FROM bar");
+    ParserError("SELECT * FROM foo WHERE a IN SELECT a FROM bar)");
+    ParserError("SELECT * FROM foo WHERE a IN (SELECT) a FROM bar");
+
+    // Invalid syntax for [NOT] EXISTS
+    ParserError("SELECT * FROM foo WHERE a EXISTS (SELECT * FROM bar)");
+    ParserError("SELECT * FROM foo WHERE a NOT EXISTS (SELECT * FROM bar)");
+
+    // Set operations between subqueries
+    ParserError("SELECT * FROM foo WHERE EXISTS ((SELECT a FROM bar) UNION " +
+                "(SELECT a FROM baz))");
+
+    // Nested predicate in the HAVING clause
+    ParsesOk("SELECT a, count(*) FROM foo GROUP BY a HAVING count(*) > " +
+             "(SELECT count(*) FROM bar)");
+    ParsesOk("SELECT a, count(*) FROM foo GROUP BY a HAVING 10 > " +
+             "(SELECT count(*) FROM bar)");
+
+    // Subquery in the SELECT clause
+    ParsesOk("SELECT a, b, (SELECT c FROM foo) FROM foo");
+    ParsesOk("SELECT (SELECT a FROM foo), b, c FROM bar");
+    ParsesOk("SELECT (SELECT (SELECT a FROM foo) FROM bar) FROM baz");
+    ParsesOk("SELECT (SELECT a FROM foo)");
+
+    // Malformed subquery in the SELECT clause
+    ParserError("SELECT SELECT a FROM foo FROM bar");
+    ParserError("SELECT (SELECT a FROM foo FROM bar");
+    ParserError("SELECT SELECT a FROM foo) FROM bar");
+    ParserError("SELECT (SELECT) a FROM foo");
+
+    // Subquery in the GROUP BY clause
+    ParsesOk("SELECT a, count(*) FROM foo GROUP BY (SELECT a FROM bar)");
+    ParsesOk("SELECT a, count(*) FROM foo GROUP BY a, (SELECT b FROM bar)");
+
+    // Malformed subquery in the GROUP BY clause
+    ParserError("SELECT a, count(*) FROM foo GROUP BY SELECT a FROM bar");
+    ParserError("SELECT a, count(*) FROM foo GROUP BY (SELECT) a FROM bar");
+    ParserError("SELECT a, count(*) FROM foo GROUP BY (SELECT a FROM bar");
+
+    // Subquery in the ORDER BY clause
+    ParsesOk("SELECT a, b FROM foo ORDER BY (SELECT a FROM bar)");
+    ParsesOk("SELECT a, b FROM foo ORDER BY (SELECT a FROM bar) DESC");
+    ParsesOk("SELECT a, b FROM foo ORDER BY a ASC, (SELECT a FROM bar) DESC");
+
+    // Malformed subquery in the ORDER BY clause
+    ParserError("SELECT a, count(*) FROM foo ORDER BY SELECT a FROM bar");
+    ParserError("SELECT a, count(*) FROM foo ORDER BY (SELECT) a FROM bar DESC");
+    ParserError("SELECT a, count(*) FROM foo ORDER BY (SELECT a FROM bar ASC");
+  }
 }

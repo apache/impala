@@ -14,9 +14,12 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Subquery;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
@@ -30,6 +33,7 @@ import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
 /**
@@ -119,6 +123,8 @@ public class BinaryPredicate extends Predicate {
   @Override
   protected void toThrift(TExprNode msg) {
     Preconditions.checkState(children_.size() == 2);
+    // Cannot serialize a nested predicate.
+    Preconditions.checkState(!contains(Predicates.instanceOf(Subquery.class)));
     // This check is important because we often clone and/or evaluate predicates,
     // and it's easy to get the casting logic wrong, e.g., cloned predicates
     // with expr substitutions need to be re-analyzed with reanalyze().
@@ -143,6 +149,20 @@ public class BinaryPredicate extends Predicate {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
 
+    if (contains(Predicates.instanceOf(Subquery.class))) {
+      // Check if every subquery in this predicate returns a scalar.
+      //
+      // TODO: Refactor this when we have collection-valued types.
+      for (Expr expr: children_) {
+        if (!(expr instanceof Subquery)) continue;
+        Subquery subquery = (Subquery)expr;
+        if (!((SelectStmt)subquery.getStatement()).returnsScalarValue()) {
+          throw new AnalysisException("Subquery must return a scalar value: " +
+              subquery.toSql());
+        }
+      }
+    }
+
     convertNumericLiteralsFromDecimal(analyzer);
     fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
         CompareMode.IS_SUPERTYPE_OF);
@@ -151,9 +171,12 @@ public class BinaryPredicate extends Predicate {
           " and " + getChild(1).getType()  + " are not comparable: " + toSql());
     }
     Preconditions.checkState(fn_.getReturnType().isBoolean());
-    castForFunctionCall(true);
+    // Don't perform any casting for predicates with subqueries here. Any casting
+    // required will be performed when the subquery is unnested.
+    if (!contains(Predicates.instanceOf(Subquery.class))) castForFunctionCall(true);
 
     // determine selectivity
+    // TODO: Compute selectivity for nested predicates
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     if (op_ == Operator.EQ
         && isSingleColumnPredicate(slotRefRef, null)

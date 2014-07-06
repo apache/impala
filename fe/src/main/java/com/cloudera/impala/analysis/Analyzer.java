@@ -39,6 +39,7 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
+import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.View;
@@ -106,6 +107,12 @@ public class Analyzer {
   // maximum expr-tree depth. Needs to be manually maintained by the user
   // of this Analyzer with incrementCallDepth() and decrementCallDepth().
   private int callDepth_ = 0;
+
+  // Flag indicating if this analyzer instance belongs to a subquery.
+  private boolean isSubquery_ = false;
+
+  public void setIsSubquery() { isSubquery_ = true; }
+  public boolean isSubquery() { return isSubquery_; }
 
   // state shared between all objects of an Analyzer tree
   private static class GlobalState {
@@ -299,6 +306,7 @@ public class Analyzer {
         }
       }
     }
+
     // Delegate creation of the tuple descriptor to the concrete table ref.
     TupleDescriptor result = ref.createTupleDescriptor(this);
     result.setAlias(ref.getAlias(), ref.hasExplicitAlias());
@@ -333,7 +341,7 @@ public class Analyzer {
         analyzer = (analyzer.ancestors_.isEmpty() ? null : analyzer.ancestors_.get(0));
       } while (analyzer != null);
     }
-    // Try to find a matching table or view from the catalog.
+
     Table table = getTable(tableRef.getName(), tableRef.getPrivilegeRequirement());
     if (table instanceof View) {
       return new InlineViewRef((View) table, tableRef);
@@ -388,7 +396,7 @@ public class Analyzer {
   public boolean isRootAnalyzer() { return ancestors_.isEmpty(); }
 
   /**
-   * Checks that 'col' references an existing column for a registered table alias;
+   * Checks that 'colName' references an existing column for a registered table alias;
    * if alias is empty, tries to resolve the column name in the context of any of the
    * registered tables. Creates and returns an empty SlotDescriptor if the
    * column hasn't previously been registered, otherwise returns the existing
@@ -398,37 +406,20 @@ public class Analyzer {
       throws AnalysisException {
     TupleDescriptor tupleDesc = null;
     Column col = null;
+    boolean resolveInAncestors = isSubquery_ ? true : false;
     if (tblName == null) {
       // Resolve colName in the context of all registered tables.
-      tupleDesc = resolveColumnRef(colName);
-      if (tupleDesc == null) {
-        throw new AnalysisException("couldn't resolve column reference: '" +
-            colName + "'");
-      }
-      col = tupleDesc.getTable().getColumn(colName);
-      Preconditions.checkNotNull(col);
+      tupleDesc = resolveColumnRef(colName, resolveInAncestors);
     } else {
-      // Resolve colName in the context of tblName.
-      String lookupAlias = tblName.toString().toLowerCase();
-      if (!tblName.isFullyQualified() && ambiguousAliases_.contains(lookupAlias)) {
-        throw new AnalysisException(
-            String.format("unqualified table alias '%s' in column " +
-                "reference '%s' is ambiguous",
-                tblName.toString(), tblName.toString() + "." + colName));
-      }
-      tupleDesc = aliasMap_.get(lookupAlias);
-      if (tupleDesc == null) {
-        throw new AnalysisException(
-            String.format("unknown table alias '%s' in column reference '%s'",
-                tblName.toString(), tblName.toString() + "." + colName));
-      }
-      col = tupleDesc.getTable().getColumn(colName);
-      if (col == null) {
-        throw new AnalysisException(
-            String.format("couldn't resolve column reference: '%s'",
-                tblName.toString() + "." + colName));
-      }
+      // Resolve colName in the context of a specific table.
+      tupleDesc = resolveColumnRef(tblName, colName, resolveInAncestors);
     }
+    if (tupleDesc == null) {
+      throw new AnalysisException("couldn't resolve column reference: '" +
+          colName + "'");
+    }
+    col = tupleDesc.getTable().getColumn(colName);
+    Preconditions.checkNotNull(col);
 
     // SlotRefs are registered against the tuple's explicit or fully-qualified
     // implicit alias.
@@ -452,12 +443,60 @@ public class Analyzer {
   }
 
   /**
+   * Resolve column name with table alias in the context of the registered tuple
+   * descriptor of table 'tblName'. If 'resolveInAncestors' is true, the resolution
+   * process will continue along the chain of ancestors until we either resolve the
+   * column name, throw an AnalysisException, or reach the root of the analyzers
+   * hierarchy. Otherwise, the resolution process will only consider the current
+   * analysis context.
+   */
+  private TupleDescriptor resolveColumnRef(TableName tblName,
+      String colName, boolean resolveInAncestors) throws AnalysisException {
+    Preconditions.checkNotNull(tblName);
+    String lookupAlias = tblName.toString().toLowerCase();
+    if (ambiguousAliases_.contains(lookupAlias)) {
+      Preconditions.checkState(!tblName.isFullyQualified());
+      throw new AnalysisException(
+          String.format("unqualified table alias '%s' in column " +
+            "reference '%s' is ambiguous", tblName.toString(),
+            tblName.toString() + "." + colName));
+    }
+
+    TupleDescriptor tupleDesc = aliasMap_.get(lookupAlias);
+    if (tupleDesc != null) {
+      Column col = tupleDesc.getTable().getColumn(colName);
+      if (col == null) {
+        throw new AnalysisException(
+            String.format("couldn't resolve column reference: '%s'",
+              tblName.toString() + "." + colName));
+      }
+    }
+
+    if (tupleDesc != null) return tupleDesc;
+    if (resolveInAncestors && !ancestors_.isEmpty()) {
+      // Resolve the column ref in an outer query block.
+      return ancestors_.get(0).resolveColumnRef(tblName, colName, resolveInAncestors);
+    }
+    // The column ref couldn't be resolved in the speficied table context.
+    throw new AnalysisException(
+        String.format("unknown table alias '%s' in column reference '%s'",
+          tblName.toString(), tblName.toString() + "." + colName));
+  }
+
+  /**
    * Resolves column name in context of any of the registered tuple descriptors.
    * Returns the matching tuple descriptor or null if none could be found.
-   * Throws if multiple bindings to different tables exist.
+   * Throws if multiple bindings to different tables exist. If 'resolveInAncestors'
+   * is true, the resolution process will continue along the chain of ancestors
+   * until we either resolve the column name, throw an AnalysisException, or reach
+   * the root of the analyzers hierarchy. Otherwise, the resolution process will only
+   * consider the current analysis context.
    */
-  private TupleDescriptor resolveColumnRef(String colName) throws AnalysisException {
+  private TupleDescriptor resolveColumnRef(String colName,
+      boolean resolveInAncestors) throws AnalysisException {
     TupleDescriptor result = null;
+    // We don't have a specific table context, so iterate through all of the
+    // entries in this analyzer's alias map.
     for (Map.Entry<String, TupleDescriptor> entry: aliasMap_.entrySet()) {
       TupleDescriptor tupleDesc = entry.getValue();
       Column col = tupleDesc.getTable().getColumn(colName);
@@ -472,7 +511,13 @@ public class Analyzer {
         result = tupleDesc;
       }
     }
-    return result;
+
+    if (result != null) return result;
+    if (resolveInAncestors && !ancestors_.isEmpty()) {
+      // Resolve the column ref in an outer query block.
+      return ancestors_.get(0).resolveColumnRef(colName, resolveInAncestors);
+    }
+    return null;
   }
 
   /**
@@ -486,7 +531,7 @@ public class Analyzer {
 
   /**
    * Register all conjuncts that make up the predicate and assign each conjunct an id.
-   * If ref != null, ref is expected to be the right-hand side of an outer join,
+   * If rhsRef != null, rhsRef is expected to be the right-hand side of an outer join,
    * and the conjuncts of p can only be evaluated by the node implementing that join
    * (p is the On clause).
    */

@@ -151,6 +151,10 @@ public class SelectStmt extends QueryStmt {
         // Analyze the resultExpr before generating a label to ensure enforcement
         // of expr child and depth limits (toColumn() label may call toSql()).
         item.getExpr().analyze(analyzer);
+        if (item.getExpr().contains(Predicates.instanceOf(Subquery.class))) {
+          throw new AnalysisException(
+              "Subqueries are not supported in the select list.");
+        }
         resultExprs_.add(item.getExpr());
         String label = item.toColumnLabel(i, analyzer.useHiveColLabels());
         SlotRef aliasRef = new SlotRef(null, label);
@@ -340,6 +344,16 @@ public class SelectStmt extends QueryStmt {
       }
     }
 
+    // disallow subqueries in the GROUP BY clause
+    if (groupingExprs_ != null) {
+      for (Expr expr: groupingExprs_) {
+        if (expr.contains(Predicates.instanceOf(Subquery.class))) {
+          throw new AnalysisException(
+              "Subqueries are not supported in the GROUP BY clause.");
+        }
+      }
+    }
+
     // analyze grouping exprs
     ArrayList<Expr> groupingExprsCopy = Lists.newArrayList();
     if (groupingExprs_ != null) {
@@ -366,6 +380,9 @@ public class SelectStmt extends QueryStmt {
 
     // analyze having clause
     if (havingClause_ != null) {
+      if (havingClause_.contains(Predicates.instanceOf(Subquery.class))) {
+        throw new AnalysisException("Subqueries are not supported in the HAVING clause.");
+      }
       // substitute aliases in place (ordinals not allowed in having clause)
       havingPred_ = havingClause_.substitute(aliasSmap_, analyzer);
       havingPred_.checkReturnsBool("HAVING clause", true);
@@ -430,6 +447,10 @@ public class SelectStmt extends QueryStmt {
     resultExprs_ = Expr.substituteList(resultExprs_, combinedSMap, analyzer);
     LOG.debug("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
     if (havingPred_ != null) {
+      // Make sure the predicate in the HAVING clause does not contain a
+      // subquery.
+      Preconditions.checkState(!havingPred_.contains(
+          Predicates.instanceOf(Subquery.class)));
       havingPred_ = havingPred_.substitute(combinedSMap, analyzer);
       analyzer.registerConjuncts(havingPred_, null, false);
       LOG.debug("post-agg havingPred: " + havingPred_.debugString());
@@ -717,5 +738,29 @@ public class SelectStmt extends QueryStmt {
         (limitElement_ != null) ? limitElement_.clone() : null);
     selectClone.setWithClause(cloneWithClause());
     return selectClone;
+  }
+
+  /*
+   * Check if the stmt returns a scalar value. This can happen in
+   * the following cases:
+   * 1. select stmt with a 'limit 1' clause
+   * 2. select stmt with an aggregate function and no group by.
+   * 3. select stmt with no from clause.
+   *
+   * This function does not consider the case where a table with a single row is
+   * accessed through that stmt.
+   *
+   * TODO: Change this when we have complex types.
+   */
+  public boolean returnsScalarValue() {
+    if (resultExprs_.size() > 1) return false;
+    // limit 1 clause
+    if (limitElement_ != null && limitElement_.getLimit() == 1) return true;
+    // No from clause (base tables or inline views)
+    if (tableRefs_.isEmpty()) return true;
+    // Aggregation with no group by
+    if (aggInfo_ != null && groupingExprs_ == null) return true;
+    // In all other cases, return false.
+    return false;
   }
 }

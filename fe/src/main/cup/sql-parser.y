@@ -293,7 +293,7 @@ nonterminal TableName table_name;
 nonterminal FunctionName function_name;
 nonterminal Expr where_clause;
 nonterminal Predicate predicate, between_predicate, comparison_predicate,
-  compound_predicate, in_predicate, like_predicate;
+  compound_predicate, in_predicate, like_predicate, exists_predicate;
 nonterminal ArrayList<Expr> group_by_clause;
 nonterminal Expr having_clause;
 nonterminal ArrayList<OrderByElement> order_by_elements, order_by_clause;
@@ -314,6 +314,7 @@ nonterminal WithClause opt_with_clause;
 nonterminal ArrayList<View> with_view_def_list;
 nonterminal View with_view_def;
 nonterminal TableRef table_ref;
+nonterminal Subquery subquery;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal ArrayList<String> opt_plan_hints;
@@ -400,7 +401,7 @@ nonterminal CreateFunctionStmtBase.OptArg create_function_arg_key;
 precedence left KW_OR;
 precedence left KW_AND;
 precedence left KW_NOT, NOT;
-precedence left KW_BETWEEN, KW_IN, KW_IS;
+precedence left KW_BETWEEN, KW_IN, KW_IS, KW_EXISTS;
 precedence left KW_LIKE, KW_RLIKE, KW_REGEXP;
 precedence left EQUAL, LESSTHAN, GREATERTHAN;
 precedence left ADD, SUBTRACT;
@@ -1780,6 +1781,11 @@ expr ::=
   {: RESULT = p; :}
   ;
 
+exists_predicate ::=
+  KW_EXISTS subquery:s
+  {: RESULT = new ExistsPredicate(s, false); :}
+  ;
+
 non_pred_expr ::=
   sign_chain_expr:e
   {: RESULT = e; :}
@@ -1807,6 +1813,8 @@ non_pred_expr ::=
     e.setPrintSqlInParens(true);
     RESULT = e;
   :}
+  | subquery:s
+  {: RESULT = s; :}
   ;
 
 arithmetic_expr ::=
@@ -1929,6 +1937,8 @@ predicate ::=
   {: RESULT = p; :}
   | in_predicate:p
   {: RESULT = p; :}
+  | exists_predicate:p
+  {: RESULT = p; :}
   | like_predicate:p
   {: RESULT = p; :}
   | LPAREN predicate:p RPAREN
@@ -1939,19 +1949,19 @@ predicate ::=
   ;
 
 comparison_predicate ::=
-  expr:e1 EQUAL:op expr:e2
+  expr:e1 EQUAL expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.EQ, e1, e2); :}
-  | expr:e1 NOT EQUAL:op expr:e2
+  | expr:e1 NOT EQUAL expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, e1, e2); :}
-  | expr:e1 LESSTHAN GREATERTHAN:op expr:e2
+  | expr:e1 LESSTHAN GREATERTHAN expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, e1, e2); :}
-  | expr:e1 LESSTHAN EQUAL:op expr:e2
+  | expr:e1 LESSTHAN EQUAL expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.LE, e1, e2); :}
-  | expr:e1 GREATERTHAN EQUAL:op expr:e2
+  | expr:e1 GREATERTHAN EQUAL expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.GE, e1, e2); :}
-  | expr:e1 LESSTHAN:op expr:e2
+  | expr:e1 LESSTHAN expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.LT, e1, e2); :}
-  | expr:e1 GREATERTHAN:op expr:e2
+  | expr:e1 GREATERTHAN expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.GT, e1, e2); :}
   ;
 
@@ -1991,6 +2001,17 @@ in_predicate ::=
   {: RESULT = new InPredicate(e, l, false); :}
   | expr:e KW_NOT KW_IN LPAREN expr_list:l RPAREN
   {: RESULT = new InPredicate(e, l, true); :}
+  | expr:e KW_IN subquery:s
+  {: RESULT = new InPredicate(e, s, false); :}
+  | expr:e KW_NOT KW_IN subquery:s
+  {: RESULT = new InPredicate(e, s, true); :}
+  ;
+
+subquery ::=
+  LPAREN subquery:s RPAREN
+  {: RESULT = s; :}
+  | LPAREN query_stmt:s RPAREN
+  {: RESULT = new Subquery(s); :}
   ;
 
 compound_predicate ::=

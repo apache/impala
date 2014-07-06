@@ -203,7 +203,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestSubquery() throws AnalysisException {
+  public void TestInlineView() throws AnalysisException {
     AnalyzesOk("select y x from (select id y from functional_hbase.alltypessmall) a");
     AnalyzesOk("select id from (select id from functional_hbase.alltypessmall) a");
     AnalyzesOk("select * from (select id+2 from functional_hbase.alltypessmall) a");
@@ -377,6 +377,244 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
            "SUM(t1.d2) IS NULL " +
           "FROM functional.decimal_tbl AS t1) AS t3 " +
         "ON t3.double_col_3 = t1.d3");
+
+    // Inline view with a subquery
+    AnalyzesOk("select y x from " +
+        "(select id y from functional.alltypestiny where id in " +
+        "(select id from functional.alltypessmall)) a");
+  }
+
+  @Test
+  public void TestSubquery() throws AnalysisException {
+    // [NOT] IN predicate with a subquery
+    AnalyzesOk("select * from functional.alltypestiny where id in " +
+        "(select id from functional.alltypessmall)");
+    AnalyzesOk("select * from functional.alltypestiny where id not in " +
+        "(select id from functional.alltypessmall)");
+    AnalyzesOk("select * from functional.alltypestiny where id in " +
+        "(select id from functional.alltypessmall t where t.int_col < 10)");
+    AnalyzesOk("select * from functional.alltypestiny t where id in " +
+        "(select id from functional.alltypessmall s where t.int_col = s.int_col)");
+    AnalyzesOk("select * from functional.alltypestiny t where id not in " +
+        "(select id from functional.alltypessmall s where t.int_col = s.int_col)");
+    AnalyzesOk("select * from functional.alltypestiny t where id in " +
+        "(select id from functional.alltypessmall s " +
+        "where t.int_col = s.int_col and t.id > 10)");
+    AnalyzesOk("select * from functional.alltypes, " +
+        "(select * from functional.alltypesagg where int_col in " +
+        "(select int_col from functional.alltypes)) v");
+
+    // Subquery returns multiple columns
+    AnalysisError("select * from functional.alltypestiny t where id in " +
+        "(select id, int_col from functional.alltypessmall)",
+        "Subquery must return a single column: (SELECT id, int_col " +
+        "FROM functional.alltypessmall)");
+    // Subquery returns an incompatible column type
+    AnalysisError("select * from functional.alltypestiny t where id in " +
+        "(select timestamp_col from functional.alltypessmall)",
+        "Incompatible return types 'INT' and 'TIMESTAMP' of exprs 'id' and " +
+        "'timestamp_col'.");
+    AnalysisError("select id from functional.alltypestiny where int_col = " +
+        "(select max(timestamp_col) from functional.alltypessmall)",
+        "operands of type INT and TIMESTAMP are not comparable: " +
+        "int_col = (SELECT max(timestamp_col) FROM functional.alltypessmall)");
+
+    // [NOT] EXISTS predicate
+    AnalyzesOk("select * from functional.alltypestiny where exists " +
+        "(select * from functional.alltypessmall where id < 10)");
+    AnalyzesOk("select id from functional.alltypestiny where not exists " +
+        "(select * from functional.alltypessmall where id = 1000)");
+    AnalyzesOk("select count(*) from functional.alltypestiny t where exists " +
+        "(select * from functional.alltypessmall s where s.int_col = t.int_col)");
+    AnalyzesOk("select int_col from functional.alltypestiny t where not exists " +
+        "(select * from functional.alltypessmall s where s.int_col = t.int_col)");
+    AnalyzesOk("select count(distinct id) from functional.alltypestiny t where exists " +
+        "(select t.int_col, count(*) from functional.alltypessmall s where " +
+        "t.id = s.id group by t.int_col having count(t.id) > 10 " +
+        "order by t.int_col)");
+    AnalyzesOk("select * from functional.alltypes a, " +
+        "(select * from functional.alltypesagg) t where a.id = t.id and exists " +
+        "(select * from functional.alltypestiny s where s.int_col = t.int_col)");
+
+    // Binary predicate with a subquery
+    AnalyzesOk("select id from functional.alltypestiny where int_col = " +
+        "(select max(int_col) from functional.alltypessmall)");
+    AnalyzesOk("select * from functional.alltypestiny where int_col != " +
+        "(select min(int_col) from functional.alltypessmall)");
+    AnalyzesOk("select int_col from functional.alltypestiny where int_col < " +
+        "(select sum(int_col) from functional.alltypessmall)");
+    AnalyzesOk("select count(*) from functional.alltypestiny where int_col <= " +
+        "(select avg(int_col) from functional.alltypessmall)");
+    AnalyzesOk("select id from functional.alltypestiny where int_col > " +
+        "(select count(int_col) from functional.alltypessmall)");
+    AnalyzesOk("select id from functional.alltypestiny where int_col >= " +
+        "(select count(distinct int_col) from functional.alltypessmall)");
+    AnalyzesOk("select id from functional.alltypestiny t where int_col = " +
+        "(select max(int_col) from functional.alltypessmall s where t.id = s.id)");
+    AnalyzesOk("select * from functional.alltypestiny t where " +
+        "(select count(*) from functional.alltypessmall) = " +
+        "(select count(*) from functional.alltypesagg)");
+    AnalyzesOk("select * from functional.alltypestiny t where " +
+        "(select count(*) from functional.alltypessmall s where s.id = t.id) = " +
+        "(select count(*) from functional.alltypesagg a where a.id = t.id)");
+    AnalyzesOk("select * from functional.alltypestiny t where " +
+        "(select max(id) from functional.alltypessmall) + " +
+        "(select min(id) from functional.alltypessmall) - " +
+        "(select count(id) from functional.alltypessmall) < 1000");
+
+
+    // Subquery references an explicit alias from the outer block
+    AnalysisError("select * from functional.alltypestiny t where " +
+        "exists (select * from t)", "Table does not exist: default.t");
+    // Outer join with a table from the outer block using an explicit alias
+    AnalysisError("select id from functional.alltypestiny t where int_col = " +
+        "(select count(*) from functional.alltypessmall s left outer join t " +
+        "on (t.id = s.id))", "Table does not exist: default.t");
+    AnalysisError("select id from functional.alltypestiny t where int_col = " +
+        "(select count(*) from functional.alltypessmall s right outer join t " +
+        "on (t.id = s.id))", "Table does not exist: default.t");
+    AnalysisError("select id from functional.alltypestiny t where int_col = " +
+        "(select count(*) from functional.alltypessmall s full outer join t " +
+        "on (t.id = s.id))", "Table does not exist: default.t");
+
+    // Subquery returns a scalar due to a LIMIT clause
+    AnalyzesOk("select id from functional.alltypestiny t where int_col = " +
+        "(select int_col from functional.alltypessmall limit 1)");
+    // Subquery returns a scalar (no FORM clause)
+    AnalyzesOk("select id from functional.alltypestiny where id = " +
+        "(select 1)");
+
+    // Subquery returns multiple rows
+    AnalysisError("select id from functional.alltypestiny t where int_col = " +
+        "(select int_col from functional.alltypessmall limit 2)",
+        "Subquery must return a scalar value: (SELECT int_col FROM " +
+        "functional.alltypessmall LIMIT 2)");
+    AnalysisError("select id from functional.alltypestiny where int_col = " +
+        "(select id from functional.alltypessmall)",
+        "Subquery must return a scalar value: (SELECT id FROM " +
+        "functional.alltypessmall)");
+
+    // Subquery returns multiple columns
+    AnalysisError("select id from functional.alltypestiny where int_col = " +
+        "(select id, int_col from functional.alltypessmall)",
+        "Subquery must return a scalar value: (SELECT id, int_col FROM " +
+        "functional.alltypessmall)");
+    AnalysisError("select * from functional.alltypestiny where id in " +
+        "(select * from (values(1,2)) as t)",
+        "Subquery must return a single column: (SELECT * FROM (VALUES(1, 2)) t)");
+
+    // Subquery returns multiple columns due to a group by clause
+    AnalysisError("select id from functional.alltypestiny where int_col = " +
+        "(select int_col, count(*) from functional.alltypessmall group by int_col)",
+        "Subquery must return a scalar value: (SELECT int_col, count(*) FROM " +
+        "functional.alltypessmall GROUP BY int_col)");
+
+    // Multiple predicates with subqueries
+    AnalyzesOk("select * from functional.alltypestiny t where " +
+        "id in (select id from functional.alltypessmall) and " +
+        "int_col = (select max(int_col) from functional.alltypesagg) and " +
+        "exists (select * from functional.alltypes where id < 10)");
+
+    // Multiple nesting levels
+    AnalyzesOk("select * from functional.alltypestiny t where id in " +
+        "(select id from functional.alltypessmall where int_col in " +
+        "(select int_col from functional.alltypesagg))");
+    AnalyzesOk("select * from functional.alltypestiny t where id in " +
+        "(select id from functional.alltypessmall s where s.int_col = t.int_col " +
+        "and bigint_col = (select count(int_col) from functional.alltypesagg a " +
+        "where a.id = t.id))");
+    AnalyzesOk("select * from functional.alltypestiny t where id in " +
+        "(select id from (select * from functional.alltypes where " +
+        "exists (select * from functional.alltypesagg a where a.id = t.id)) s where " +
+        "s.int_col > 100 and s.string_col = t.string_col)");
+
+    // Reference a non-existing table in the subquery
+    AnalysisError("select * from functional.alltypestiny t where id in " +
+        "(select id from functional.alltypessmall s left outer join p on " +
+        "(s.int_col = p.int_col))", "Table does not exist: default.p");
+    // Reference a non-existing column from a table in the outer scope
+    AnalysisError("select * from functional.alltypestiny t where id in " +
+        "(select id from functional.alltypessmall s where s.int_col = t.bad_col)",
+        "couldn't resolve column reference: 't.bad_col'");
+
+    // Predicate with a child subquery in the HAVING clause
+    AnalysisError("select id, count(*) from functional.alltypestiny t group by " +
+        "id having count(*) > (select count(*) from functional.alltypesagg)",
+        "Subqueries are not supported in the HAVING clause.");
+    AnalysisError("select id, count(*) from functional.alltypestiny t group by " +
+        "id having (select count(*) from functional.alltypesagg) > 10",
+        "Subqueries are not supported in the HAVING clause.");
+
+    // Subquery in the select list
+    AnalysisError("select id, (select int_col from functional.alltypestiny) " +
+        "from functional.alltypestiny",
+        "Subqueries are not supported in the select list.");
+
+    // Subquery in the GROUP BY clause
+    AnalysisError("select id, count(*) from functional.alltypestiny " +
+        "group by (select int_col from functional.alltypestiny)",
+        "Subqueries are not supported in the GROUP BY clause.");
+
+    // Subquery in the ORDER BY clause
+    AnalysisError("select id from functional.alltypestiny " +
+        "order by (select int_col from functional.alltypestiny)",
+        "Subqueries are not supported in the ORDER BY clause.");
+
+    // Referencing the same table in the inner and the outer query block
+    // No explicit alias
+    AnalyzesOk("select id from functional.alltypestiny where int_col in " +
+        "(select int_col from functional.alltypestiny)");
+    // Different alias between inner and outer block referencing the same table
+    AnalyzesOk("select id from functional.alltypestiny t where int_col in " +
+        "(select int_col from functional.alltypestiny p)");
+    // Alias only in the outer block
+    AnalyzesOk("select id from functional.alltypestiny t where int_col in " +
+        "(select int_col from functional.alltypestiny)");
+    // Same alias in both inner and outer block
+    AnalyzesOk("select id from functional.alltypestiny t where int_col in " +
+        "(select int_col from functional.alltypestiny t)");
+
+    // Subquery with an inline view
+    AnalyzesOk("select id from functional.alltypestiny t where exists " +
+        "(select * from (select id from functional.alltypesagg) a where a.id < 10)");
+    // Correlated subquery with an inline view
+    AnalyzesOk("select id from functional.alltypestiny t where exists " +
+        "(select * from (select id from functional.alltypesagg) a where a.id = t.id)");
+
+    // Inner block references an inline view in the outer block
+    AnalysisError("select id from (select * from functional.alltypestiny) t " +
+        "where t.int_col = (select count(*) from t)",
+        "Table does not exist: default.t");
+    AnalysisError("select id from (select * from functional.alltypestiny) t " +
+        "where t.int_col = (select count(*) from t) and " +
+        "t.string_col in (select string_col from t)",
+        "Table does not exist: default.t");
+    AnalysisError("select id from (select * from functional.alltypestiny) t " +
+        "where exists (select * from t, functional.alltypesagg p where " +
+        "t.id = p.id)", "Table does not exist: default.t");
+
+    // Subquery referencing a view
+    AnalyzesOk("select * from functional.alltypes where exists " +
+        "(select * from functional.alltypes_view)");
+    // Same view referenced in both the inner and outer block
+    AnalyzesOk("select * from functional.alltypes_view where exists " +
+        "(select * from functional.alltypes_view)");
+
+    // Union in the subquery
+    AnalysisError("select * from functional.alltypes where exists " +
+        "(select id from functional.alltypestiny union " +
+        "select id from functional.alltypesagg)",
+        "A subquery must contain a single select block: " +
+        "(SELECT id FROM functional.alltypestiny UNION " +
+        "SELECT id FROM functional.alltypesagg)");
+    AnalysisError("select * from functional.alltypes where exists (values(1))",
+        "A subquery must contain a single select block: (VALUES(1))");
+
+    // Subquery in LIMIT
+    AnalysisError("select * from functional.alltypes limit " +
+        "(select count(*) from functional.alltypesagg)",
+        "LIMIT expression must be a constant expression: " +
+        "(SELECT count(*) FROM functional.alltypesagg)");
   }
 
   @Test
@@ -1359,7 +1597,19 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("with t1 as (select int_col x, bigint_col y from t2), " +
         "t2 as (select int_col x, bigint_col y from t1) select x, y from t1",
         "Table does not exist: default.t2");
-  }
+
+    // WITH clause with subqueries
+    AnalyzesOk("with t as (select * from functional.alltypesagg where id in " +
+        "(select id from functional.alltypes)) select int_col from t");
+    AnalyzesOk("with t as (select * from functional.alltypes) select * from " +
+        "functional.alltypesagg where exists (select id from t)");
+    AnalyzesOk("with t as (select * from functional.alltypes) select * from " +
+        "functional.alltypesagg where 10 > (select count(*) from t) and " +
+        "100 < (select max(int_col) from t)");
+    AnalyzesOk("with t as (select * from functional.alltypes where exists " +
+        "(select * from functional.alltypesagg where id = 1) and not exists " +
+        "(select * from functional.alltypesagg where id = 1)) select * from t");
+}
 
   @Test
   public void TestViews() throws AnalysisException {

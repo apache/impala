@@ -437,6 +437,66 @@ public class ToSqlTest extends AnalyzerTest {
         "WHERE t1.id = t2.id AND t1.string_col = 'abc' AND t2.float_col < 10");
   }
 
+  /**
+   * Tests that toSql() properly handles subqueries in the where clause.
+   */
+  @Test
+  public void subqueryTest() {
+    // Nested predicates
+    testToSql("select * from functional.alltypes where id in " +
+        "(select id from functional.alltypestiny)",
+        "SELECT * FROM functional.alltypes WHERE id IN " +
+        "(SELECT id FROM functional.alltypestiny)");
+    testToSql("select * from functional.alltypes where id not in " +
+        "(select id from functional.alltypestiny)",
+        "SELECT * FROM functional.alltypes WHERE id NOT IN " +
+        "(SELECT id FROM functional.alltypestiny)");
+    testToSql("select * from functional.alltypes where bigint_col = " +
+        "(select count(*) from functional.alltypestiny)",
+        "SELECT * FROM functional.alltypes WHERE bigint_col = " +
+        "(SELECT count(*) FROM functional.alltypestiny)");
+    testToSql("select * from functional.alltypes where exists " +
+        "(select * from functional.alltypestiny)",
+        "SELECT * FROM functional.alltypes WHERE EXISTS " +
+        "(SELECT * FROM functional.alltypestiny)");
+    testToSql("select * from functional.alltypes where not exists " +
+        "(select * from functional.alltypestiny)",
+        "SELECT * FROM functional.alltypes WHERE NOT EXISTS " +
+        "(SELECT * FROM functional.alltypestiny)");
+    // Multiple nested predicates in the WHERE clause
+    testToSql("select * from functional.alltypes where not (id < 10 and " +
+        "(int_col in (select int_col from functional.alltypestiny)) and " +
+        "(string_col = (select max(string_col) from functional.alltypestiny)))",
+        "SELECT * FROM functional.alltypes WHERE NOT (id < 10 AND " +
+        "(int_col IN (SELECT int_col FROM functional.alltypestiny)) AND " +
+        "(string_col = (SELECT max(string_col) FROM functional.alltypestiny)))");
+    // Multiple nesting levels
+    testToSql("select * from functional.alltypes where id in " +
+        "(select id from functional.alltypestiny where int_col = " +
+        "(select avg(int_col) from functional.alltypesagg))",
+        "SELECT * FROM functional.alltypes WHERE id IN " +
+        "(SELECT id FROM functional.alltypestiny WHERE int_col = " +
+        "(SELECT avg(int_col) FROM functional.alltypesagg))");
+    // Inline view with a subquery
+    testToSql("select * from (select id from functional.alltypes where " +
+        "int_col in (select int_col from functional.alltypestiny)) t where " +
+        "t.id < 10",
+        "SELECT * FROM (SELECT id FROM functional.alltypes WHERE " +
+        "int_col IN (SELECT int_col FROM functional.alltypestiny)) t WHERE " +
+        "t.id < 10");
+    // Subquery in a WITH clause
+    testToSql("with t as (select * from functional.alltypes where id in " +
+        "(select id from functional.alltypestiny)) select * from t",
+        "WITH t AS (SELECT * FROM functional.alltypes WHERE id IN " +
+        "(SELECT id FROM functional.alltypestiny)) SELECT * FROM t");
+    testToSql("with t as (select * from functional.alltypes s where id in " +
+        "(select id from functional.alltypestiny t where s.id = t.id)) " +
+        "select * from t t1, t t2 where t1.id = t2.id",
+        "WITH t AS (SELECT * FROM functional.alltypes s WHERE id IN " +
+        "(SELECT id FROM functional.alltypestiny t WHERE s.id = t.id)) " +
+        "SELECT * FROM t t1, t t2 WHERE t1.id = t2.id");
+  }
+
   @Test
   public void withClauseTest() {
     // WITH clause in select stmt.
