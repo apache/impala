@@ -319,7 +319,7 @@ Status ExecEnv::StartServices() {
 #else
   // tcmalloc metrics aren't defined in ASAN builds, just use the default behavior to
   // track process memory usage (sum of all children trackers).
-  mem_tracker_.reset(new MemTracker(bytes_limit > 0 ? bytes_limit : -1, "Process"));
+  mem_tracker_.reset(new MemTracker(bytes_limit > 0 ? bytes_limit : -1, -1, "Process"));
 #endif
 
   mem_tracker_->RegisterMetrics(metrics_.get(), "mem-tracker.process");
