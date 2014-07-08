@@ -52,6 +52,7 @@ add_library(Exec
   hdfs-text-scanner.cc
   hdfs-lzo-text-scanner.cc
   hdfs-text-table-writer.cc
+  hdfs-sequence-table-writer.cc
   hdfs-parquet-scanner.cc
   hdfs-parquet-table-writer.cc
   hbase-scan-node.cc

@@ -97,6 +97,8 @@ class Codec {
 
   // Return the name of a compression algorithm.
   static std::string GetCodecName(THdfsCompression::type);
+  // Returns the java class name for the given compression type
+  static Status GetHadoopCodecClassName(THdfsCompression::type, std::string* out_name);
 
   virtual ~Codec() {}
 

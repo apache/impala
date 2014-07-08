@@ -49,6 +49,6 @@ class TestInsertParquetQueries(ImpalaTestSuite):
   def test_insert_parquet(self, vector):
     vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = \
         vector.get_value('file_size')
-    vector.get_value('exec_option')['PARQUET_COMPRESSION_CODEC'] = \
+    vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
         vector.get_value('compression_codec')
     self.run_test_case('insert_parquet', vector, multiple_impalad=True)

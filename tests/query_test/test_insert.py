@@ -54,7 +54,7 @@ class TestInsertQueries(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_insert(self, vector):
     if (vector.get_value('table_format').file_format == 'parquet'):
-      vector.get_value('exec_option')['PARQUET_COMPRESSION_CODEC'] = \
+      vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)

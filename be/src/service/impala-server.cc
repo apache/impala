@@ -923,17 +923,23 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::DEBUG_ACTION:
         query_options->__set_debug_action(value.c_str());
         break;
-      case TImpalaQueryOptions::PARQUET_COMPRESSION_CODEC: {
+      case TImpalaQueryOptions::COMPRESSION_CODEC: {
         if (value.empty()) break;
         if (iequals(value, "none")) {
-          query_options->__set_parquet_compression_codec(THdfsCompression::NONE);
+          query_options->__set_compression_codec(THdfsCompression::NONE);
         } else if (iequals(value, "gzip")) {
-          query_options->__set_parquet_compression_codec(THdfsCompression::GZIP);
+          query_options->__set_compression_codec(THdfsCompression::GZIP);
+        } else if (iequals(value, "bzip2")) {
+          query_options->__set_compression_codec(THdfsCompression::BZIP2);
+        } else if (iequals(value, "default")) {
+          query_options->__set_compression_codec(THdfsCompression::DEFAULT);
         } else if (iequals(value, "snappy")) {
-          query_options->__set_parquet_compression_codec(THdfsCompression::SNAPPY);
+          query_options->__set_compression_codec(THdfsCompression::SNAPPY);
+        } else if (iequals(value, "snappy_blocked")) {
+          query_options->__set_compression_codec(THdfsCompression::SNAPPY_BLOCKED);
         } else {
           stringstream ss;
-          ss << "Invalid parquet compression codec: " << value;
+          ss << "Invalid compression codec: " << value;
           return Status(ss.str());
         }
         break;
@@ -1251,8 +1257,8 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
       case TImpalaQueryOptions::ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
         val << query_option.abort_on_default_limit_exceeded;
         break;
-      case TImpalaQueryOptions::PARQUET_COMPRESSION_CODEC:
-        val << query_option.parquet_compression_codec;
+      case TImpalaQueryOptions::COMPRESSION_CODEC:
+        val << query_option.compression_codec;
         break;
       case TImpalaQueryOptions::HBASE_CACHING:
         val << query_option.hbase_caching;

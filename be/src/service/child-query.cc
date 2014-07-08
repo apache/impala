@@ -137,7 +137,7 @@ void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
   SET_QUERY_OPTION(mem_limit, MEM_LIMIT);
   SET_QUERY_OPTION(num_nodes, NUM_NODES);
   SET_QUERY_OPTION(num_scanner_threads, NUM_SCANNER_THREADS);
-  SET_QUERY_OPTION(parquet_compression_codec, PARQUET_COMPRESSION_CODEC);
+  SET_QUERY_OPTION(compression_codec, COMPRESSION_CODEC);
   SET_QUERY_OPTION(parquet_file_size, PARQUET_FILE_SIZE);
   SET_QUERY_OPTION(request_pool, REQUEST_POOL);
   SET_QUERY_OPTION(reservation_request_timeout, RESERVATION_REQUEST_TIMEOUT);

@@ -621,9 +621,17 @@ Status HdfsParquetTableWriter::Init() {
   THdfsCompression::type codec = THdfsCompression::SNAPPY;
 
   const TQueryOptions& query_options = state_->query_options();
-  if (query_options.__isset.parquet_compression_codec) {
-    codec = query_options.parquet_compression_codec;
+  if (query_options.__isset.compression_codec) {
+    codec = query_options.compression_codec;
   }
+  if (!(codec == THdfsCompression::NONE ||
+        codec == THdfsCompression::GZIP ||
+        codec == THdfsCompression::SNAPPY)) {
+    stringstream ss;
+    ss << "Invalid parquet compression codec." << Codec::GetCodecName(codec);
+    return Status(ss.str());
+  }
+
   VLOG_FILE << "Using compression codec: " << codec;
 
   // Initialize each column structure.

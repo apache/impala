@@ -146,6 +146,10 @@ struct ColumnType {
     return thrift_type;
   }
 
+  inline bool IsStringType() const {
+    return type == TYPE_STRING;
+  }
+
   // Returns the byte size of this type.  Returns 0 for variable length types.
   inline int GetByteSize() const {
     switch (type) {

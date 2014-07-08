@@ -61,7 +61,6 @@ class TestCompressedFormats(ImpalaTestSuite):
     else:
       assert False, "Unknown file_format: %s" % file_format
 
-
   # TODO: switch to using hive metastore API rather than hive shell.
   def __copy_and_query_compressed_file(self, table_name, db_suffix, compression_codec,
                                      file_name, extension, expected_error=None):
@@ -101,3 +100,16 @@ class TestCompressedFormats(ImpalaTestSuite):
         raise
     finally:
       call(["hive", "-e", drop_cmd]);
+
+
+class TestTableWriters(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTableWriters, cls).add_test_dimensions()
+
+  def test_seq_writer(self, vector):
+    self.run_test_case('QueryTest/seq-writer', vector)

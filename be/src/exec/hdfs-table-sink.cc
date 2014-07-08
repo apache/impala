@@ -14,6 +14,7 @@
 
 #include "exec/hdfs-table-sink.h"
 #include "exec/hdfs-text-table-writer.h"
+#include "exec/hdfs-sequence-table-writer.h"
 #include "exec/hdfs-parquet-table-writer.h"
 #include "exec/exec-node.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
@@ -361,13 +362,20 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
               output_expr_ctxs_));
       break;
     }
+    case THdfsFileFormat::SEQUENCE_FILE: {
+      output_partition->writer.reset(
+          new HdfsSequenceTableWriter(
+              this, state, output_partition, &partition_descriptor, table_desc_,
+              output_expr_ctxs_));
+      break;
+    }
     default:
       stringstream error_msg;
       map<int, const char*>::const_iterator i =
           _THdfsFileFormat_VALUES_TO_NAMES.find(partition_descriptor.file_format());
       if (i != _THdfsFileFormat_VALUES_TO_NAMES.end()) {
         error_msg << "Cannot write to table with format " << i->second << ". "
-                  << "Impala only supports writing to TEXT and PARQUET tables.";
+                  << "Impala only supports writing to TEXT, PARQUET, and SEQ tables.";
       } else {
         error_msg << "Cannot write to table. Impala only supports writing to TEXT"
                   << " and PARQUET tables. (Unknown file format: "

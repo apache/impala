@@ -93,10 +93,10 @@ enum TImpalaQueryOptions {
   // If true, raise an error when the DEFAULT_ORDER_BY_LIMIT has been reached.
   ABORT_ON_DEFAULT_LIMIT_EXCEEDED,
 
-  // Compression codec for parquet when inserting into parquet tables.
-  // Valid values are "snappy", "gzip" and "none"
+  // Compression codec when inserting into tables.
+  // Valid values are "snappy", "gzip", "bzip2" and "none"
   // Leave blank to use default.
-  PARQUET_COMPRESSION_CODEC,
+  COMPRESSION_CODEC,
 
   // HBase scan query option. If set and > 0, HBASE_CACHING is the value for
   // "hbase.client.Scan.setCaching()" when querying HBase table. Otherwise, use backend

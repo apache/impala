@@ -59,6 +59,20 @@ string Codec::GetCodecName(THdfsCompression::type type) {
   return "INVALID";
 }
 
+Status Codec::GetHadoopCodecClassName(THdfsCompression::type type, string* out_name) {
+  map<const string, const THdfsCompression::type>::const_iterator im;
+  for (im = CODEC_MAP.begin(); im != CODEC_MAP.end(); ++im) {
+    if (im->second == type) {
+      out_name->assign(im->first);
+      return Status::OK;
+    }
+  }
+  stringstream ss;
+  string name(_THdfsCompression_VALUES_TO_NAMES.find(type)->second);
+  ss << "Unsupported codec for given file type: " << name;
+  return Status(ss.str());
+}
+
 Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const string& codec,
                                scoped_ptr<Codec>* compressor) {
   map<const string, const THdfsCompression::type>::const_iterator

@@ -56,11 +56,19 @@ class ReadWriteUtil {
   static int GetVLong(uint8_t* buf, int64_t* vlong);
   static int GetVInt(uint8_t* buf, int32_t* vint);
 
+  // Writes a variable-length Long or int value to a byte buffer.
+  // Returns the number of bytes written
+  static int64_t PutVLong(int64_t val, uint8_t* buf);
+  static int64_t PutVInt(int32_t val, uint8_t* buf);
+
+  // returns size of the encoded long value, not including the 1 byte for length
+  static int VLongRequiredBytes(int64_t val);
+
   // Read a variable-length Long value from a byte buffer starting at the specified
   // byte offset.
   static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
 
-  // Put an Integer into a buffer in big endian order .  The buffer must be big
+  // Put an Integer into a buffer in big endian order.  The buffer must be big
   // enough.
   static void PutInt(uint8_t* buf, uint16_t integer);
   static void PutInt(uint8_t* buf, uint32_t integer);
@@ -162,6 +170,47 @@ inline int ReadWriteUtil::GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong)
   }
 
   return len;
+}
+
+inline int ReadWriteUtil::VLongRequiredBytes(int64_t val) {
+  // returns size of the encoded long value, not including the 1 byte for length
+  if (val & 0xFF00000000000000llu) return 8;
+  if (val & 0x00FF000000000000llu) return 7;
+  if (val & 0x0000FF0000000000llu) return 6;
+  if (val & 0x000000FF00000000llu) return 5;
+  if (val & 0x00000000FF000000llu) return 4;
+  if (val & 0x0000000000FF0000llu) return 3;
+  if (val & 0x000000000000FF00llu) return 2;
+  // Values between -112 and 127 are stored using 1 byte,
+  // values between -127 and -112 are stored using 2 bytes
+  // See ReadWriteUtil::DecodeVIntSize for this case
+  if (val < -112) return 2;
+  return 1;
+}
+
+inline int64_t ReadWriteUtil::PutVLong(int64_t val, uint8_t* buf) {
+  int64_t num_bytes = VLongRequiredBytes(val);
+
+  if (num_bytes == 1) {
+    // store the value itself instead of the length
+    buf[0] = static_cast<int8_t>(val);
+    return 1;
+  }
+
+  // This is how we encode the length for a length less than or equal to 8
+  buf[0] = -119 + num_bytes;
+
+  // write to buffer in reversed endianness
+  for (int i = 0; i < num_bytes; ++i) {
+    buf[i+1] = (val >> (8 * (num_bytes - i - 1))) & 0xFF;
+  }
+
+  // +1 for the length byte
+  return num_bytes + 1;
+}
+
+inline int64_t ReadWriteUtil::PutVInt(int32_t val, uint8_t* buf) {
+  return PutVLong(val, buf);
 }
 
 inline int32_t ReadWriteUtil::ReadZInt(uint8_t** buf) {
