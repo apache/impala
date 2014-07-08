@@ -24,7 +24,6 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.SlotRef;
-import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
@@ -33,7 +32,6 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.google.common.base.Preconditions;
-import com.google.common.math.LongMath;
 
 /**
  * A PlanFragment is part of a tree of such fragments that together make
@@ -115,10 +113,7 @@ public class PlanFragment {
    */
   public void finalize(Analyzer analyzer)
       throws InternalException, NotImplementedException {
-    if (planRoot_ != null) {
-      setRowTupleIds(planRoot_, null);
-      computeCanAddSlotFilters(planRoot_);
-    }
+    if (planRoot_ != null) computeCanAddSlotFilters(planRoot_);
 
     if (destNode_ != null) {
       Preconditions.checkState(sink_ == null);
@@ -135,45 +130,6 @@ public class PlanFragment {
    */
   public int getNumNodes() {
     return dataPartition_ == DataPartition.UNPARTITIONED ? 1 : planRoot_.getNumNodes();
-  }
-
-  /**
-   * Sets node.rowTupleIds, which is either the parent's rowTupleIds or the
-   * list of materialized ids. Propagates row tuple ids to the children according
-   * to the requirements of the particular node.
-   */
-  private void setRowTupleIds(PlanNode node, ArrayList<TupleId> parentRowTupleIds) {
-    if (parentRowTupleIds != null) {
-      // we don't output less than we materialize
-      Preconditions.checkState(parentRowTupleIds.containsAll(node.tupleIds_));
-      node.rowTupleIds_ = parentRowTupleIds;
-    } else {
-      node.rowTupleIds_ = node.tupleIds_;
-    }
-
-    if (node instanceof ScanNode || node instanceof ExchangeNode) {
-      // nothing to propagate for leaves
-      return;
-    } else if (node instanceof AggregationNode || node instanceof UnionNode) {
-      for (PlanNode child: node.getChildren()) {
-        // row composition changes at an aggregation node
-        setRowTupleIds(child, null);
-      }
-    } else if (node instanceof SortNode) {
-      Preconditions.checkState(node.getChildren().size() == 1);
-      // top-n only materializes rows as wide as the input
-      node.rowTupleIds_ = node.tupleIds_;
-      setRowTupleIds(node.getChild(0), null);
-    } else if (node instanceof SelectNode) {
-      // propagate parent's row composition to child
-      Preconditions.checkState(node.getChildren().size() == 1);
-      setRowTupleIds(node.getChild(0), node.rowTupleIds_);
-    } else if (node instanceof HashJoinNode || node instanceof CrossJoinNode) {
-      // propagate parent's row composition only to left child
-      Preconditions.checkState(node.getChildren().size() == 2);
-      setRowTupleIds(node.getChild(0), node.rowTupleIds_);
-      setRowTupleIds(node.getChild(1), null);
-    }
   }
 
   /**

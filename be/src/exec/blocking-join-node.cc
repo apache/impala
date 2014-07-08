@@ -70,7 +70,8 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
     build_tuple_idx_.push_back(row_descriptor_.GetTupleIdx(build_tuple_desc->id()));
   }
 
-  left_batch_.reset(new RowBatch(row_descriptor_, state->batch_size(), mem_tracker()));
+  left_batch_.reset(
+      new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
   return Status::OK;
 }
 

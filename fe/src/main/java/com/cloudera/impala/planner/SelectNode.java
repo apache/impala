@@ -33,7 +33,6 @@ public class SelectNode extends PlanNode {
     super(id, child.getTupleIds(), "SELECT");
     addChild(child);
     this.tblRefIds_ = child.tblRefIds_;
-    this.rowTupleIds_ = child.rowTupleIds_;
     this.nullableTupleIds_ = child.nullableTupleIds_;
   }
 

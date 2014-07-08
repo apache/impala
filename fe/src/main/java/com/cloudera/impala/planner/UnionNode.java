@@ -60,7 +60,6 @@ public class UnionNode extends PlanNode {
 
   protected UnionNode(PlanNodeId id, TupleId tupleId) {
     super(id, Lists.newArrayList(tupleId), "UNION");
-    rowTupleIds_.add(tupleId);
     tupleId_ = tupleId;
   }
 
@@ -75,7 +74,7 @@ public class UnionNode extends PlanNode {
     if (baseTblResultExprs != null) {
       // if we're materializing output, we can only do that into a single
       // output tuple
-      Preconditions.checkState(tupleIds_.size() == 1);
+      Preconditions.checkState(tupleIds_.size() == 1, tupleIds_.size());
     }
   }
 

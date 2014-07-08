@@ -78,13 +78,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // useful for during plan generation
   protected ArrayList<TupleId> tblRefIds_;
 
-  // Composition of rows produced by this node. Possibly a superset of tupleIds_
-  // (the same RowBatch passes through multiple nodes; for instances, join nodes
-  // form a left-deep chain and pass RowBatches on to their left children).
-  // rowTupleIds_[0] is the first tuple in the row, rowTupleIds_[1] the second, etc.
-  // Set in PlanFragment.finalize()
-  protected ArrayList<TupleId> rowTupleIds_ = Lists.newArrayList();
-
   // A set of nullable TupleId produced by this node. It is a subset of tupleIds_.
   // A tuple is nullable within a particular plan tree if it's the "nullable" side of
   // an outer join, which has nothing to do with the schema.
@@ -164,7 +157,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     limit_ = node.limit_;
     tupleIds_ = Lists.newArrayList(node.tupleIds_);
     tblRefIds_ = Lists.newArrayList(node.tblRefIds_);
-    rowTupleIds_ = Lists.newArrayList(node.rowTupleIds_);
     nullableTupleIds_ = Sets.newHashSet(node.nullableTupleIds_);
     conjuncts_ = Expr.cloneList(node.conjuncts_);
     cardinality_ = -1;
@@ -220,11 +212,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   public ArrayList<TupleId> getTblRefIds() { return tblRefIds_; }
   public void setTblRefIds(ArrayList<TupleId> ids) { tblRefIds_ = ids; }
-
-  public ArrayList<TupleId> getRowTupleIds() {
-    Preconditions.checkState(rowTupleIds_ != null);
-    return rowTupleIds_;
-  }
 
   public Set<TupleId> getNullableTupleIds() {
     Preconditions.checkState(nullableTupleIds_ != null);
@@ -382,7 +369,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     msg.setLabel_detail(getDisplayLabelDetail());
     msg.setEstimated_stats(estimatedStats);
 
-    for (TupleId tid: rowTupleIds_) {
+    for (TupleId tid: tupleIds_) {
       msg.addToRow_tuples(tid.asInt());
       msg.addToNullable_tuples(nullableTupleIds_.contains(tid));
     }
