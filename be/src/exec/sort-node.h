@@ -50,7 +50,7 @@ class SortNode : public ExecNode {
   // query. That is, the memory allocated to all sort nodes cannot exceed
   // available * SORT_MEM_FRACTION, unless that is lower than the minimum required for
   // the sort.
-  const static float SORT_MEM_FRACTION = 0.80f;
+  const static float SORT_MEM_FRACTION;
 
   // Minimum number of bytes of memory that must be available after a sort node has
   // acquired memory for itself. That is, the memory allocated cannot exceed

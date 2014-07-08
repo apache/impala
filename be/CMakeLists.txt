@@ -32,11 +32,13 @@ PROJECT(ASSEMBLER)
 #    integers
 #   -fno-strict-aliasing: disable optimizations that assume strict aliasing. This
 #       is unsafe to do if the code uses casts (which we obviously do).
-#  - Wunknown-pragmas: suppress warnings for unknown (compiler specific) pragmas
+#  - Wno-unknown-pragmas: suppress warnings for unknown (compiler specific) pragmas
+#  - Wno-deprecated: gutil contains deprecated headers
 #  - pthread: enable multithreaded malloc
 #  - DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
 SET(CXX_COMMON_FLAGS "-msse4.2 -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 
@@ -46,7 +48,7 @@ SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 #   -ggdb: Enable gdb debugging
 # For CMAKE_BUILD_TYPE=Release
 #   -O3: Enable all compiler optimizations
-#   -g: Enable symbols for profiler tools (TODO: remove for shipping)
+#   -g: Enable symbols for profiler tools
 #   -DNDEBUG: Turn off dchecks/asserts/debug only code.
 # For profile guided optimization (PGO) builds, in addition to the flags for release
 # builds:

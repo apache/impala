@@ -727,7 +727,7 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
   string file_name = "/tmp/disk_io_mgr_test.txt";
   CreateTempFile(file_name.c_str(), file_size);
 
-  int64_t iters;
+  int64_t iters = 0;
   vector<DiskIoMgr::RequestContext*> contexts(num_contexts);
   Status status;
   for (int iteration = 0; iteration < ITERATIONS; ++iteration) {

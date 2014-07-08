@@ -106,10 +106,6 @@ class HBaseScanNode : public ScanNode {
   // Size of tuple buffer determined by size of tuples and capacity of row batches.
   int tuple_buffer_size_;
 
-  // Buffer into which fixed-length portion of tuple data is written in current
-  // GetNext() call.
-  void* tuple_buffer_;
-
   // Current tuple.
   Tuple* tuple_;
 

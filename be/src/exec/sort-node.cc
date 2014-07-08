@@ -25,6 +25,8 @@ DEFINE_int64(max_sort_memory, 1532 * 1024 * 1024,
 
 namespace impala {
 
+const float SortNode::SORT_MEM_FRACTION = 0.80f;
+
 SortNode::SortNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
     offset_(tnode.sort_node.__isset.offset ? tnode.sort_node.offset : 0),
