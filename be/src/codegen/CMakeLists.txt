@@ -59,6 +59,7 @@ set(IR_DEPENDENT_FILES
   ../exprs/decimal-functions.cc
   ../exprs/decimal-operators.cc
   ../exprs/expr-ir.cc
+  ../exprs/math-functions.cc
   ../exprs/operators.cc
   ../exprs/udf-builtins.cc
   ../exprs/like-predicate.cc

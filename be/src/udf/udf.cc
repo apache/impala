@@ -366,6 +366,10 @@ const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const 
   return &impl_->arg_types_[arg_idx];
 }
 
+int FunctionContext::GetNumArgs() const {
+  return impl_->arg_types_.size();
+}
+
 const FunctionContext::TypeDesc& FunctionContext::GetReturnType() const {
   return impl_->return_type_;
 }

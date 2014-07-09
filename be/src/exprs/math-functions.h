@@ -19,6 +19,9 @@
 #include <stdint.h>
 // For StringParser::ParseResult
 #include "util/string-parser.h"
+#include "udf/udf.h"
+
+using namespace impala_udf;
 
 namespace impala {
 
@@ -28,58 +31,70 @@ class TupleRow;
 
 class MathFunctions {
  public:
-  static void* Pi(Expr* e, TupleRow* row);
-  static void* E(Expr* e, TupleRow* row);
-  static void* Abs(Expr* e, TupleRow* row);
-  static void* Sign(Expr* e, TupleRow* row);
-  static void* Sin(Expr* e, TupleRow* row);
-  static void* Asin(Expr* e, TupleRow* row);
-  static void* Cos(Expr* e, TupleRow* row);
-  static void* Acos(Expr* e, TupleRow* row);
-  static void* Tan(Expr* e, TupleRow* row);
-  static void* Atan(Expr* e, TupleRow* row);
-  static void* Radians(Expr* e, TupleRow* row);
-  static void* Degrees(Expr* e, TupleRow* row);
-  static void* Ceil(Expr* e, TupleRow* row);
-  static void* Floor(Expr* e, TupleRow* row);
-  static void* Round(Expr* e, TupleRow* row);
-  static void* RoundUpTo(Expr* e, TupleRow* row);
-  static void* Exp(Expr* e, TupleRow* row);
-  static void* Ln(Expr* e, TupleRow* row);
-  static void* Log10(Expr* e, TupleRow* row);
-  static void* Log2(Expr* e, TupleRow* row);
-  static void* Log(Expr* e, TupleRow* row);
-  static void* Pow(Expr* e, TupleRow* row);
-  static void* Sqrt(Expr* e, TupleRow* row);
-  static void* Rand(Expr* e, TupleRow* row);
-  static void* RandSeed(Expr* e, TupleRow* row);
-  static void* Bin(Expr* e, TupleRow* row);
-  static void* HexInt(Expr* e, TupleRow* row);
-  static void* HexString(Expr* e, TupleRow* row);
-  static void* Unhex(Expr* e, TupleRow* row);
-  static void* ConvInt(Expr* e, TupleRow* row);
-  static void* ConvString(Expr* e, TupleRow* row);
-  static void* PmodBigInt(Expr* e, TupleRow* row);
-  static void* PmodDouble(Expr* e, TupleRow* row);
-  static void* FmodFloat(Expr* e, TupleRow* row);
-  static void* FmodDouble(Expr* e, TupleRow* row);
-  static void* QuotientDouble(Expr* e, TupleRow* row);
-  static void* QuotientBigInt(Expr* e, TupleRow* row);
-  static void* Positive(Expr* e, TupleRow* row);
-  template <typename T> static void* Negative(Expr* e, TupleRow* row);
-  static void* NegativeDecimal(Expr* e, TupleRow* row);
-  template <typename T, bool ISLEAST> static void* LeastGreatest(Expr* e, TupleRow* row);
-  template <bool ISLEAST> static void* LeastGreatestString(Expr* e, TupleRow* row);
-  template <bool ISLEAST> static void* LeastGreatestDecimal(Expr* e, TupleRow* row);
+  static DoubleVal Pi(FunctionContext*);
+  static DoubleVal E(FunctionContext*);
+  static DoubleVal Abs(FunctionContext*, const DoubleVal&);
+  static DoubleVal Sin(FunctionContext*, const DoubleVal&);
+  static DoubleVal Asin(FunctionContext*, const DoubleVal&);
+  static DoubleVal Cos(FunctionContext*, const DoubleVal&);
+  static DoubleVal Acos(FunctionContext*, const DoubleVal&);
+  static DoubleVal Tan(FunctionContext*, const DoubleVal&);
+  static DoubleVal Atan(FunctionContext*, const DoubleVal&);
+  static DoubleVal Sqrt(FunctionContext*, const DoubleVal&);
+  static DoubleVal Exp(FunctionContext*, const DoubleVal&);
+  static BigIntVal Ceil(FunctionContext*, const DoubleVal&);
+  static BigIntVal Floor(FunctionContext*, const DoubleVal&);
+  static DoubleVal Ln(FunctionContext*, const DoubleVal&);
+  static DoubleVal Log10(FunctionContext*, const DoubleVal&);
+  static FloatVal Sign(FunctionContext*, const DoubleVal&);
+  static DoubleVal Radians(FunctionContext*, const DoubleVal&);
+  static DoubleVal Degrees(FunctionContext*, const DoubleVal&);
+  static BigIntVal Round(FunctionContext*, const DoubleVal&);
+  static DoubleVal RoundUpTo(FunctionContext*, const DoubleVal&, const IntVal&);
+  static DoubleVal Log2(FunctionContext*, const DoubleVal&);
+  static DoubleVal Log(FunctionContext*, const DoubleVal& base, const DoubleVal& val);
+  static DoubleVal Pow(FunctionContext*, const DoubleVal& base, const DoubleVal& val);
+  
+  // Used for both Rand() and RandSeed()
+  static void RandPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
+  static DoubleVal Rand(FunctionContext*);
+  static DoubleVal RandSeed(FunctionContext*, const BigIntVal& seed);
+
+  static StringVal Bin(FunctionContext*, const BigIntVal&);
+  static StringVal HexInt(FunctionContext*, const BigIntVal&);
+  static StringVal HexString(FunctionContext*, const StringVal&);
+  static StringVal Unhex(FunctionContext*, const StringVal&);
+  static StringVal ConvInt(FunctionContext*, const BigIntVal& n,
+      const TinyIntVal& src_base, const TinyIntVal& dst_base);
+  static StringVal ConvString(FunctionContext*, const StringVal& s,
+      const TinyIntVal& src_base, const TinyIntVal& dst_base);
+  static BigIntVal PmodBigInt(FunctionContext*, const BigIntVal&, const BigIntVal&);
+  static DoubleVal PmodDouble(FunctionContext*, const DoubleVal&, const DoubleVal&);
+  static FloatVal FmodFloat(FunctionContext*, const FloatVal&, const FloatVal&);
+  static DoubleVal FmodDouble(FunctionContext*, const DoubleVal&, const DoubleVal&);
+
+  template <typename T> static T Positive(FunctionContext*, const T&);
+  template <typename T> static T Negative(FunctionContext*, const T&);
+
+  static BigIntVal QuotientDouble(FunctionContext*, const DoubleVal&, const DoubleVal&);
+  static BigIntVal QuotientBigInt(FunctionContext*, const BigIntVal&, const BigIntVal&);
+
+  template <typename VAL_TYPE, bool ISLEAST>
+  static VAL_TYPE LeastGreatest(FunctionContext*, int num_args, const VAL_TYPE* args);
+  template <bool ISLEAST> static StringVal LeastGreatest(
+      FunctionContext*, int num_args, const StringVal* args);
+  template <bool ISLEAST> static TimestampVal LeastGreatest(
+      FunctionContext*, int num_args, const TimestampVal* args);
+  template <bool ISLEAST> static DecimalVal LeastGreatest(
+      FunctionContext*, int num_args, const DecimalVal* args);
 
  private:
   static const int32_t MIN_BASE = 2;
   static const int32_t MAX_BASE = 36;
   static const char* ALPHANUMERIC_CHARS;
 
-  // Converts src_num in decimal to dest_base,
-  // and fills expr_val.string_val with the result.
-  static void DecimalToBase(int64_t src_num, int8_t dest_base, ExprValue* expr_val);
+  // Converts src_num in decimal to dest_base.
+  static StringVal DecimalToBase(FunctionContext*, int64_t src_num, int8_t dest_base);
 
   // Converts src_num representing a number in src_base but encoded in decimal
   // into its actual decimal number.

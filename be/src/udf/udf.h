@@ -162,6 +162,10 @@ class FunctionContext {
   // return type of the UDA (e.g., the type returned by the finalize function).
   const TypeDesc& GetReturnType() const;
 
+  // Returns the number of arguments to this function (not including the FunctionContext*
+  // argument).
+  int GetNumArgs() const;
+
   // Returns the type information for the arg_idx-th argument (0-indexed, not including
   // the FunctionContext* argument). Returns NULL if arg_idx is invalid.
   const TypeDesc* GetArgType(int arg_idx) const;

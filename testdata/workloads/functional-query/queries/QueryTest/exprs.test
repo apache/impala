@@ -1691,3 +1691,11 @@ select 1.1 * 1.1 + c3 from functional.decimal_tiny limit 2;
 ---- TYPES
 decimal
 ====
+---- QUERY
+# Test weird log values (these are annoying to check in expr-test)
+select log(1,2), log(1,1), log(0,2), log(2,0), log(0,0);
+---- RESULTS
+Infinity,NaN,-0,-Infinity,Nan
+---- TYPES
+double,double,double,double,double
+====

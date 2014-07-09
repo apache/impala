@@ -27,6 +27,7 @@
 #include "exprs/decimal-functions.cc"
 #include "exprs/decimal-operators.cc"
 #include "exprs/expr-ir.cc"
+#include "exprs/math-functions.cc"
 #include "exprs/operators.cc"
 #include "exprs/udf-builtins.cc"
 #include "runtime/string-value-ir.cc"

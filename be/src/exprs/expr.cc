@@ -1020,7 +1020,7 @@ void Expr::InitBuiltinsDummy() {
   ConditionalFunctions::IsNull(NULL, NULL);
   DecimalFunctions::Precision(NULL, DecimalVal::null());
   DecimalOperators::CastToDecimalVal(NULL, DecimalVal::null());
-  MathFunctions::Pi(NULL, NULL);
+  MathFunctions::Pi(NULL);
   Operators::Add_IntVal_IntVal(NULL, IntVal::null(), IntVal::null());
   StringFunctions::Length(NULL, NULL);
   TimestampFunctions::Year(NULL, TimestampVal::null());
