@@ -60,15 +60,28 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   left_child_row_counter_ = ADD_COUNTER(runtime_profile(), "LeftChildRows",
       TCounterType::UNIT);
 
-  result_tuple_row_size_ = row_descriptor_.tuple_descriptors().size() * sizeof(Tuple*);
-
-  // pre-compute the tuple index of build tuples in the output row
-  build_tuple_size_ = child(1)->row_desc().tuple_descriptors().size();
-  build_tuple_idx_.reserve(build_tuple_size_);
-  for (int i = 0; i < build_tuple_size_; ++i) {
-    TupleDescriptor* build_tuple_desc = child(1)->row_desc().tuple_descriptors()[i];
-    build_tuple_idx_.push_back(row_descriptor_.GetTupleIdx(build_tuple_desc->id()));
+  // Validate the row desc layout is what we expect. The join node returns a row
+  // that is a concatenation of the left side and build side row desc's. For example if
+  // the probe row had 1 tuple and the build row had 2, the resulting row desc
+  // of the join node would have 3 tuples with:
+  //   result[0] = left[0]
+  //   result[1] = build[0]
+  //   result[2] = build[1]
+  // The current join node implementation relies on this property to enable some
+  // optimizations.
+  int num_left_tuples = child(0)->row_desc().tuple_descriptors().size();
+  int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
+  for (int i = 0; i < num_left_tuples; ++i) {
+    TupleDescriptor* desc = child(0)->row_desc().tuple_descriptors()[i];
+    DCHECK_EQ(i, row_desc().GetTupleIdx(desc->id()));
   }
+  for (int i = 0; i < num_build_tuples; ++i) {
+    TupleDescriptor* desc = child(1)->row_desc().tuple_descriptors()[i];
+    DCHECK_EQ(num_left_tuples + i, row_desc().GetTupleIdx(desc->id()));
+  }
+
+  left_tuple_row_size_ = num_left_tuples * sizeof(Tuple*);
+  build_tuple_row_size_ = num_build_tuples * sizeof(Tuple*);
 
   left_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
@@ -166,14 +179,11 @@ void BlockingJoinNode::DebugString(int indentation_level, stringstream* out) con
 string BlockingJoinNode::GetLeftChildRowString(TupleRow* row) {
   stringstream out;
   out << "[";
-  int* build_tuple_idx_ptr_ = &build_tuple_idx_[0];
+  int num_probe_tuple_rows = child(0)->row_desc().tuple_descriptors().size();
   for (int i = 0; i < row_desc().tuple_descriptors().size(); ++i) {
     if (i != 0) out << " ";
-
-    int* is_build_tuple =
-        ::find(build_tuple_idx_ptr_, build_tuple_idx_ptr_ + build_tuple_size_, i);
-
-    if (is_build_tuple != build_tuple_idx_ptr_ + build_tuple_size_) {
+    if (i >= num_probe_tuple_rows) {
+      // Build row is not yet populated, print NULL
       out << PrintTuple(NULL, *row_desc().tuple_descriptors()[i]);
     } else {
       out << PrintTuple(row->GetTuple(i), *row_desc().tuple_descriptors()[i]);
@@ -185,19 +195,15 @@ string BlockingJoinNode::GetLeftChildRowString(TupleRow* row) {
 
 // This function is replaced by codegen
 void BlockingJoinNode::CreateOutputRow(TupleRow* out, TupleRow* left, TupleRow* build) {
+  uint8_t* out_ptr = reinterpret_cast<uint8_t*>(out);
   if (left == NULL) {
-    memset(out, 0, result_tuple_row_size_);
+    memset(out_ptr, 0, left_tuple_row_size_);
   } else {
-    memcpy(out, left, result_tuple_row_size_);
+    memcpy(out_ptr, left, left_tuple_row_size_);
   }
-
-  if (build != NULL) {
-    for (int i = 0; i < build_tuple_size_; ++i) {
-      out->SetTuple(build_tuple_idx_[i], build->GetTuple(i));
-    }
+  if (build == NULL) {
+    memset(out_ptr + left_tuple_row_size_, 0, build_tuple_row_size_);
   } else {
-    for (int i = 0; i < build_tuple_size_; ++i) {
-      out->SetTuple(build_tuple_idx_[i], NULL);
-    }
+    memcpy(out_ptr + left_tuple_row_size_, build, build_tuple_row_size_);
   }
 }

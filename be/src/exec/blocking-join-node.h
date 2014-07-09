@@ -73,13 +73,10 @@ class BlockingJoinNode : public ExecNode {
   bool left_side_eos_;  // if true, left child has no more rows to process
   TupleRow* current_left_child_row_;
 
-  // build_tuple_idx_[i] is the tuple index of child(1)'s tuple[i] in the output row
-  std::vector<int> build_tuple_idx_;
-  int build_tuple_size_;
-
-  // byte size of result tuple row (sum of the tuple ptrs, not the tuple data).
-  // This should be the same size as the left child tuple row.
-  int result_tuple_row_size_;
+  // Size of the TupleRow (just the Tuple ptrs) from the build and left side.
+  // Cached because it is used in the hot path.
+  int left_tuple_row_size_;
+  int build_tuple_row_size_;
 
   // If true, this node can add filters to the left child node after processing
   // the entire build side.

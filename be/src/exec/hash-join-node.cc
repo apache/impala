@@ -90,8 +90,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   // TODO: default buckets
   bool stores_nulls =
       join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
-  hash_tbl_.reset(new HashTable(state, build_exprs_, probe_exprs_, build_tuple_size_,
-      stores_nulls, false, state->fragment_hash_seed(), mem_tracker()));
+  hash_tbl_.reset(new HashTable(state, build_exprs_, probe_exprs_,
+      child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
+      false, state->fragment_hash_seed(), mem_tracker()));
 
   if (state->codegen_enabled()) {
     // Codegen for hashing rows
@@ -429,7 +430,8 @@ void HashJoinNode::AddToDebugString(int indentation_level, stringstream* out) co
 //
 // build_null:                                       ; preds = %entry
 //   %dst_tuple_ptr = getelementptr i8** %out, i32 1
-//   store i8* null, i8** %dst_tuple_ptr
+//   call void @llvm.memcpy.p0i8.p0i8.i32(
+//      i8* %dst_tuple_ptr, i8* %1, i32 16, i32 16, i1 false)
 //   ret void
 // }
 Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
@@ -460,8 +462,13 @@ Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
   Value* probe_row_arg = builder.CreateBitCast(args[2], tuple_row_working_type, "probe");
   Value* build_row_arg = builder.CreateBitCast(args[3], tuple_row_working_type, "build");
 
+  int num_probe_tuples = child(0)->row_desc().tuple_descriptors().size();
+  int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
+
   // Copy probe row
-  codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, result_tuple_row_size_);
+  codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, left_tuple_row_size_);
+  Value* build_row_idx[] = { codegen->GetIntConstant(TYPE_INT, num_probe_tuples) };
+  Value* build_row_dst = builder.CreateGEP(out_row_arg, build_row_idx, "build_dst_ptr");
 
   // Copy build row.
   BasicBlock* build_not_null_block = BasicBlock::Create(context, "build_not_null", fn);
@@ -474,9 +481,12 @@ Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
     builder.CreateCondBr(is_build_null, build_null_block, build_not_null_block);
 
     // Set tuple build ptrs to NULL
+    // TODO: this should be replaced with memset() but I can't get the llvm intrinsic
+    // to work.
     builder.SetInsertPoint(build_null_block);
-    for (int i = 0; i < build_tuple_size_; ++i) {
-      Value* array_idx[] = { codegen->GetIntConstant(TYPE_INT, build_tuple_idx_[i]) };
+    for (int i = 0; i < num_build_tuples; ++i) {
+      Value* array_idx[] =
+          { codegen->GetIntConstant(TYPE_INT, i + num_probe_tuples) };
       Value* dst = builder.CreateGEP(out_row_arg, array_idx, "dst_tuple_ptr");
       builder.CreateStore(codegen->null_ptr_value(), dst);
     }
@@ -488,13 +498,7 @@ Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
 
   // Copy build tuple ptrs
   builder.SetInsertPoint(build_not_null_block);
-  for (int i = 0; i < build_tuple_size_; ++i) {
-    Value* dst_idx[] = { codegen->GetIntConstant(TYPE_INT, build_tuple_idx_[i]) };
-    Value* src_idx[] = { codegen->GetIntConstant(TYPE_INT, i) };
-    Value* dst = builder.CreateGEP(out_row_arg, dst_idx, "dst_tuple_ptr");
-    Value* src = builder.CreateGEP(build_row_arg, src_idx, "src_tuple_ptr");
-    builder.CreateStore(builder.CreateLoad(src), dst);
-  }
+  codegen->CodegenMemcpy(&builder, build_row_dst, build_row_arg, build_tuple_row_size_);
   builder.CreateRetVoid();
 
   return codegen->FinalizeFunction(fn);
