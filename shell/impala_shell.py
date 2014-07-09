@@ -626,6 +626,7 @@ class ImpalaShell(cmd.Cmd):
         self.cmdqueue.append('invalidate metadata' + ImpalaShell.CMD_DELIM)
         print_to_stderr("Invalidating Metadata")
       if self.current_db:
+        self.current_db = self.current_db.strip('`')
         self.cmdqueue.append(('use `%s`' % self.current_db) + ImpalaShell.CMD_DELIM)
       self.__build_default_query_options_dict()
     # In the case that we lost connection while a command was being entered,

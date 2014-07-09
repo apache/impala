@@ -84,6 +84,10 @@ class TestImpalaShell(object):
     args = '-d parquet'
     result = run_impala_shell_cmd(args)
     assert "Query: use `parquet`" in result.stderr, result.stderr
+    # test if backticking is idempotent
+    args = "-d '```parquet```'"
+    result = run_impala_shell_cmd(args)
+    assert "Query: use `parquet`" in result.stderr, result.stderr
 
   @pytest.mark.execute_serially
   def test_refresh_on_connect(self):
