@@ -40,11 +40,11 @@ const StringSearch UrlParser::colon_search(&colon);
 const StringSearch UrlParser::question_search(&question);
 const StringSearch UrlParser::hash_search(&hash);
 
-bool UrlParser::ParseUrl(const StringValue* url, UrlPart part, StringValue* result) {
+bool UrlParser::ParseUrl(const StringValue& url, UrlPart part, StringValue* result) {
   result->ptr = NULL;
   result->len = 0;
   // Remove leading and trailing spaces.
-  StringValue trimmed_url = url->Trim();
+  StringValue trimmed_url = url.Trim();
 
   // All parts require checking for the protocol.
   int32_t protocol_pos = protocol_search.Search(&trimmed_url);
@@ -157,17 +157,17 @@ bool UrlParser::ParseUrl(const StringValue* url, UrlPart part, StringValue* resu
   return true;
 }
 
-bool UrlParser::ParseUrlKey(const StringValue* url, UrlPart part,
-      const StringValue* key, StringValue* result) {
+bool UrlParser::ParseUrlKey(const StringValue& url, UrlPart part,
+      const StringValue& key, StringValue* result) {
   // Part must be query to ask for a specific query key.
   if (part != QUERY) {
     return false;
   }
   // Remove leading and trailing spaces.
-  StringValue trimmed_url = url->Trim();
+  StringValue trimmed_url = url.Trim();
 
   // Search for the key in the url, ignoring malformed URLs for now.
-  StringSearch key_search(key);
+  StringSearch key_search(&key);
   while(trimmed_url.len > 0) {
     // Search for the key in the current substring.
     int32_t key_pos = key_search.Search(&trimmed_url);
@@ -182,7 +182,7 @@ bool UrlParser::ParseUrlKey(const StringValue* url, UrlPart part,
       match = false;
     }
     // Advance substring beyond matching key.
-    trimmed_url = trimmed_url.Substring(key_pos + key->len);
+    trimmed_url = trimmed_url.Substring(key_pos + key.len);
     if (!match) {
       continue;
     }
@@ -211,41 +211,41 @@ bool UrlParser::ParseUrlKey(const StringValue* url, UrlPart part,
   return false;
 }
 
-UrlParser::UrlPart UrlParser::GetUrlPart(const StringValue* part) {
+UrlParser::UrlPart UrlParser::GetUrlPart(const StringValue& part) {
   // Quick filter on requested URL part, based on first character.
   // Hive requires the requested URL part to be all upper case.
-  switch(part->ptr[0]) {
+  switch(part.ptr[0]) {
     case 'A': {
-      if (!part->Eq(url_authority)) return INVALID;
+      if (!part.Eq(url_authority)) return INVALID;
       return AUTHORITY;
     }
     case 'F': {
-      if (!part->Eq(url_file)) return INVALID;
+      if (!part.Eq(url_file)) return INVALID;
       return FILE;
     }
     case 'H': {
-      if (!part->Eq(url_host)) return INVALID;
+      if (!part.Eq(url_host)) return INVALID;
       return HOST;
     }
     case 'P': {
-      if (part->Eq(url_path)) {
+      if (part.Eq(url_path)) {
         return PATH;
-      } else if (part->Eq(url_protocol)) {
+      } else if (part.Eq(url_protocol)) {
         return PROTOCOL;
       } else {
         return INVALID;
       }
     }
     case 'Q': {
-      if (!part->Eq(url_query)) return INVALID;
+      if (!part.Eq(url_query)) return INVALID;
       return QUERY;
     }
     case 'R': {
-      if (!part->Eq(url_ref)) return INVALID;
+      if (!part.Eq(url_ref)) return INVALID;
       return REF;
     }
     case 'U': {
-      if (!part->Eq(url_userinfo)) return INVALID;
+      if (!part.Eq(url_userinfo)) return INVALID;
       return USERINFO;
     }
     default: return INVALID;

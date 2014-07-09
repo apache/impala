@@ -157,6 +157,10 @@ class AnyValUtil {
     }
   }
 
+  static std::string ToString(const StringVal& v) {
+    return std::string(reinterpret_cast<char*>(v.ptr), v.len);
+  }
+
   static StringVal FromString(FunctionContext* ctx, const std::string& s) {
     return FromBuffer(ctx, s.c_str(), s.size());
   }

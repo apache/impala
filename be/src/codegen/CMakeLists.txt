@@ -61,6 +61,7 @@ set(IR_DEPENDENT_FILES
   ../exprs/expr-ir.cc
   ../exprs/math-functions.cc
   ../exprs/operators.cc
+  ../exprs/string-functions.cc
   ../exprs/udf-builtins.cc
   ../exprs/like-predicate.cc
   ../runtime/string-value-ir.cc

@@ -29,6 +29,7 @@
 #include "exprs/expr-ir.cc"
 #include "exprs/math-functions.cc"
 #include "exprs/operators.cc"
+#include "exprs/string-functions.cc"
 #include "exprs/udf-builtins.cc"
 #include "runtime/string-value-ir.cc"
 #include "udf/udf.cc"

@@ -1438,6 +1438,7 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("repeat('', cast(6 as bigint))", "");
   TestStringValue("repeat('ab', 0)", "");
   TestStringValue("repeat('ab', -1)", "");
+  TestStringValue("repeat('ab', -100)", "");
   TestStringValue("repeat('ab', 1)", "ab");
   TestStringValue("repeat('ab', cast(6 as bigint))", "abababababab");
   TestIsNull("repeat(NULL, 6)", TYPE_STRING);
@@ -1581,8 +1582,8 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   // Test finding of leftmost maximal match.
   TestStringValue("regexp_extract('I001=-200,I003=-210,I007=0', 'I001=-?[0-9]+', 0)",
       "I001=-200");
-  // Invalid regex patter, unmatched parenthesis.
-  TestIsNull("regexp_extract('abxcy1234a', '(/.', 0)", TYPE_STRING);
+  // Invalid regex pattern, unmatched parenthesis.
+  TestError("regexp_extract('abxcy1234a', '(/.', 0)");
   // NULL arguments.
   TestIsNull("regexp_extract(NULL, 'a.x', 2)", TYPE_STRING);
   TestIsNull("regexp_extract('abxcy1234a', NULL, 2)", TYPE_STRING);
@@ -1602,8 +1603,8 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestStringValue("regexp_replace('', 'err', '')", "");
   TestStringValue("regexp_replace('', '', 'abc')", "abc");
   TestStringValue("regexp_replace('axcaycazc', '', 'r')", "rarxrcraryrcrarzrcr");
-  // Invalid regex patter, unmatched parenthesis.
-  TestIsNull("regexp_replace('abxcy1234a', '(/.', 'x')", TYPE_STRING);
+  // Invalid regex pattern, unmatched parenthesis.
+  TestError("regexp_replace('abxcy1234a', '(/.', 'x')");
   // NULL arguments.
   TestIsNull("regexp_replace(NULL, 'a.*', 'abcde')", TYPE_STRING);
   TestIsNull("regexp_replace('axcaycazc', NULL, 'abcde')", TYPE_STRING);
@@ -1810,30 +1811,30 @@ TEST_F(ExprTest, StringParseUrlFunction) {
 
   // Invalid part parameters.
   // All characters in the part parameter must be uppercase (consistent with Hive).
-  TestIsNull("parse_url('http://example.com', 'authority')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'Authority')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'AUTHORITYXYZ')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'file')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'File')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'FILEXYZ')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'host')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'Host')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'HOSTXYZ')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'path')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'Path')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'PATHXYZ')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'protocol')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'Protocol')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'PROTOCOLXYZ')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'query')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'Query')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'QUERYXYZ')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'ref')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'Ref')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'REFXYZ')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'userinfo')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'Userinfo')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com', 'USERINFOXYZ')", TYPE_STRING);
+  TestError("parse_url('http://example.com', 'authority')");
+  TestError("parse_url('http://example.com', 'Authority')");
+  TestError("parse_url('http://example.com', 'AUTHORITYXYZ')");
+  TestError("parse_url('http://example.com', 'file')");
+  TestError("parse_url('http://example.com', 'File')");
+  TestError("parse_url('http://example.com', 'FILEXYZ')");
+  TestError("parse_url('http://example.com', 'host')");
+  TestError("parse_url('http://example.com', 'Host')");
+  TestError("parse_url('http://example.com', 'HOSTXYZ')");
+  TestError("parse_url('http://example.com', 'path')");
+  TestError("parse_url('http://example.com', 'Path')");
+  TestError("parse_url('http://example.com', 'PATHXYZ')");
+  TestError("parse_url('http://example.com', 'protocol')");
+  TestError("parse_url('http://example.com', 'Protocol')");
+  TestError("parse_url('http://example.com', 'PROTOCOLXYZ')");
+  TestError("parse_url('http://example.com', 'query')");
+  TestError("parse_url('http://example.com', 'Query')");
+  TestError("parse_url('http://example.com', 'QUERYXYZ')");
+  TestError("parse_url('http://example.com', 'ref')");
+  TestError("parse_url('http://example.com', 'Ref')");
+  TestError("parse_url('http://example.com', 'REFXYZ')");
+  TestError("parse_url('http://example.com', 'userinfo')");
+  TestError("parse_url('http://example.com', 'Userinfo')");
+  TestError("parse_url('http://example.com', 'USERINFOXYZ')");
 
   // NULL arguments.
   TestIsNull("parse_url(NULL, 'AUTHORITY')", TYPE_STRING);
@@ -1888,8 +1889,8 @@ TEST_F(ExprTest, StringParseUrlFunction) {
       "index.html?test=true&name=networking&op=true', 'PROTOCOL', 'name')", TYPE_STRING);
   TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
       "index.html?test=true&name=networking&op=true', 'REF', 'name')", TYPE_STRING);
-  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
-      "index.html?test=true&name=networking&op=true', 'XYZ', 'name')", TYPE_STRING);
+  TestError("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=networking&op=true', 'XYZ', 'name')");
 }
 
 TEST_F(ExprTest, UtilityFunctions) {

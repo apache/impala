@@ -1022,7 +1022,7 @@ void Expr::InitBuiltinsDummy() {
   DecimalOperators::CastToDecimalVal(NULL, DecimalVal::null());
   MathFunctions::Pi(NULL);
   Operators::Add_IntVal_IntVal(NULL, IntVal::null(), IntVal::null());
-  StringFunctions::Length(NULL, NULL);
+  StringFunctions::Length(NULL, StringVal::null());
   TimestampFunctions::Year(NULL, TimestampVal::null());
   UdfBuiltins::Pi(NULL);
   UtilityFunctions::Pid(NULL, NULL);
