@@ -318,18 +318,15 @@ public class HBaseTable extends Table {
       // so the final position depends on the other mapped HBase columns.
       // Sort columns and update positions.
       Collections.sort(tmpCols);
-      colsByPos_.clear();
-      colsByName_.clear();
+      clearColumns();
 
       keyCol.setPosition(0);
-      colsByPos_.add(keyCol);
-      colsByName_.put(keyCol.getName(), keyCol);
+      addColumn(keyCol);
       // Update the positions of the remaining columns
       for (int i = 0; i < tmpCols.size(); ++i) {
         HBaseColumn col = tmpCols.get(i);
         col.setPosition(i + 1);
-        colsByPos_.add(col);
-        colsByName_.put(col.getName(), col);
+        addColumn(col);
       }
 
       // Set table stats.
@@ -510,12 +507,12 @@ public class HBaseTable extends Table {
    * Hive returns the columns in order of their declaration for HBase tables.
    */
   @Override
-  public ArrayList<Column> getColumnsInHiveOrder() { return colsByPos_; }
+  public ArrayList<Column> getColumnsInHiveOrder() { return getColumns(); }
 
   @Override
   public TTableDescriptor toThriftDescriptor() {
     TTableDescriptor tableDescriptor =
-        new TTableDescriptor(id_.asInt(), TTableType.HBASE_TABLE, colsByPos_.size(),
+        new TTableDescriptor(id_.asInt(), TTableType.HBASE_TABLE, getColumns().size(),
             numClusteringCols_, hbaseTableName_, db_.getName());
     tableDescriptor.setHbaseTable(getTHBaseTable());
     tableDescriptor.setColNames(getColumnNames());
@@ -546,7 +543,7 @@ public class HBaseTable extends Table {
   private THBaseTable getTHBaseTable() {
     THBaseTable tHbaseTable = new THBaseTable();
     tHbaseTable.setTableName(hbaseTableName_);
-    for (Column c : colsByPos_) {
+    for (Column c : getColumns()) {
       HBaseColumn hbaseCol = (HBaseColumn) c;
       tHbaseTable.addToFamilies(hbaseCol.getColumnFamily());
       if (hbaseCol.getColumnQualifier() != null) {

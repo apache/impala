@@ -48,15 +48,6 @@ public class InlineView extends Table {
   }
 
   /**
-   * An inline view has to be constructed by adding columns one by one.
-   * @param col Column of the inline view
-   */
-  public void addColumn(Column col) {
-    colsByPos_.add(col);
-    colsByName_.put(col.getName(), col);
-  }
-
-  /**
    * This should never be called.
    */
   @Override

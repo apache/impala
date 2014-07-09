@@ -51,7 +51,8 @@ class ChildQuery {
     : query_(query),
       parent_exec_state_(parent_exec_state),
       parent_server_(parent_server),
-      is_running_(false) {
+      is_running_(false),
+      is_cancelled_(false) {
     DCHECK(!query_.empty());
     DCHECK(parent_exec_state_ != NULL);
     DCHECK(parent_server_ != NULL);
@@ -63,7 +64,8 @@ class ChildQuery {
     : query_(other.query_),
       parent_exec_state_(other.parent_exec_state_),
       parent_server_(other.parent_server_),
-      is_running_(other.is_running_) {}
+      is_running_(other.is_running_),
+      is_cancelled_(other.is_cancelled_) {}
 
   // Allow child queries to be added to std collections.
   // (boost::mutex's operator= and copy c'tor are private)
@@ -72,15 +74,15 @@ class ChildQuery {
     parent_exec_state_ = other.parent_exec_state_;
     parent_server_ = other.parent_server_;
     is_running_ = other.is_running_;
+    is_cancelled_ = other.is_cancelled_;
     return *this;
   }
 
   // Executes this child query through HiveServer2 and fetches all its results.
   Status ExecAndFetch();
 
-  // Cancels and closes the given child query if it is running. No-op if the query is
-  // not running. Child queries can be cancelled by the parent query through
-  // QueryExecState::Cancel() or inside this child query's own ExecAndFetch().
+  // Cancels and closes the given child query if it is running. Sets is_cancelled_.
+  // Child queries can be cancelled by the parent query through QueryExecState::Cancel().
   // Child queries should never cancel their parent to avoid deadlock (but the parent
   // query may decide to cancel itself based on a non-OK status from a child query).
   // Note that child queries have a different QueryExecState than their parent query,
@@ -101,9 +103,9 @@ class ChildQuery {
   void SetQueryOptions(const TQueryOptions& parent_options,
       apache::hive::service::cli::thrift::TExecuteStatementReq* exec_stmt_req);
 
-  // Checks whether the parent query has failed or been cancelled. If so, cancels this
-  // child query (but not the parent query). Returns the status of the parent query.
-  Status CheckParentStatus();
+  // Returns Status::Cancelled if this child query has been cancelled, otherwise OK.
+  // Acquires lock_.
+  Status IsCancelled();
 
   // SQL string to be executed.
   std::string query_;
@@ -122,12 +124,15 @@ class ChildQuery {
   // HS2 query handle. Set in ExecChildQuery().
   apache::hive::service::cli::thrift::TOperationHandle hs2_handle_;
 
-  // Protects is_running_ to ensure idempotent cancellations.
+  // Protects is_running_ and is_cancelled_ to ensure idempotent cancellations.
   boost::mutex lock_;
 
   // Indicates whether this query is running. False if the query has not started yet
   // or if the query has finished either successfully or because of an error.
   bool is_running_;
+
+  // Indicates whether this child query has been cancelled. Set in Cancel().
+  bool is_cancelled_;
 };
 
 }

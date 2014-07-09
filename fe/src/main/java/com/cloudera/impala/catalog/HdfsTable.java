@@ -517,8 +517,7 @@ public class HdfsTable extends Table {
       }
 
       Column col = new Column(s.getName(), type, s.getComment(), pos);
-      colsByPos_.add(col);
-      colsByName_.put(s.getName(), col);
+      addColumn(col);
       ++pos;
 
       // Load and set column stats in col.
@@ -635,7 +634,7 @@ public class HdfsTable extends Table {
         int i = 0;
         for (String partitionKey: msPartition.getValues()) {
           uniquePartitionKeys[i].add(partitionKey);
-          ColumnType type = colsByPos_.get(keyValues.size()).getType();
+          ColumnType type = getColumns().get(keyValues.size()).getType();
           // Deal with Hive's special NULL partition key.
           if (partitionKey.equals(nullPartitionKeyValue_)) {
             keyValues.add(NullLiteral.create(type));
@@ -683,7 +682,7 @@ public class HdfsTable extends Table {
 
       // update col stats for partition key cols
       for (int i = 0; i < numClusteringCols_; ++i) {
-        ColumnStats stats = colsByPos_.get(i).getStats();
+        ColumnStats stats = getColumns().get(i).getStats();
         stats.setNumNulls(numNullKeys[i]);
         stats.setNumDistinctValues(uniquePartitionKeys[i].size());
         LOG.debug("#col=" + Integer.toString(i) + " stats=" + stats.toString());
@@ -1109,7 +1108,7 @@ public class HdfsTable extends Table {
   @Override
   public TTableDescriptor toThriftDescriptor() {
     TTableDescriptor tableDesc = new TTableDescriptor(id_.asInt(), TTableType.HDFS_TABLE,
-        colsByPos_.size(), numClusteringCols_, name_, db_.getName());
+        getColumns().size(), numClusteringCols_, name_, db_.getName());
     tableDesc.setHdfsTable(getHdfsTable());
     tableDesc.setColNames(getColumnNames());
     return tableDesc;
@@ -1191,7 +1190,7 @@ public class HdfsTable extends Table {
     result.setSchema(resultSchema);
     for (int i = 0; i < numClusteringCols_; ++i) {
       // Add the partition-key values as strings for simplicity.
-      Column partCol = colsByPos_.get(i);
+      Column partCol = getColumns().get(i);
       TColumn colDesc = new TColumn(partCol.getName(), partCol.getType().toThrift());
       resultSchema.addToColumns(colDesc);
     }

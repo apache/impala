@@ -65,10 +65,9 @@ import com.cloudera.impala.catalog.IncompleteTable;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.InlineView;
-import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.common.InternalException;
@@ -414,7 +413,8 @@ public class CatalogOpExecutor {
         }
 
         synchronized (metastoreDdlLock_) {
-          if (colStats != null) {
+          if (numUpdatedColumns > 0) {
+            Preconditions.checkNotNull(colStats);
             // Update column stats.
             try {
               msClient.getHiveClient().updateTableColumnStatistics(colStats);
