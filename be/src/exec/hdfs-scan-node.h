@@ -33,6 +33,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/string-buffer.h"
 #include "util/progress-updater.h"
+#include "util/spinlock.h"
 #include "util/thread.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -48,19 +49,21 @@ class TPlanNode;
 class TScanRange;
 
 // Maintains per file information for files assigned to this scan node.  This includes
-// all the splits for the file as well as a lock which can be used when updating
-// the file's metadata.
+// all the splits for the file. Note that it is not thread-safe.
 struct HdfsFileDesc {
-  boost::mutex lock;
   std::string filename;
 
-  // length of the file. This is not related to which parts of the file have been
+  // Length of the file. This is not related to which parts of the file have been
   // assigned to this node.
   int64_t file_length;
 
+  THdfsCompression::type file_compression;
+
   // Splits (i.e. raw byte ranges) for this file, assigned to this scan node.
   std::vector<DiskIoMgr::ScanRange*> splits;
-  HdfsFileDesc(const std::string& filename) : filename(filename) {}
+  HdfsFileDesc(const std::string& filename)
+    : filename(filename), file_length(0), file_compression(THdfsCompression::NONE) {
+  }
 };
 
 // Struct for additional metadata for scan ranges. This contains the partition id
@@ -440,7 +443,7 @@ class HdfsScanNode : public ScanNode {
   // Mapping of file formats (file type, compression type) to the number of
   // splits of that type and the lock protecting it.
   // This lock cannot be taken together with any other locks except lock_.
-  boost::mutex file_type_counts_lock_;
+  SpinLock file_type_counts_lock_;
   typedef std::map<
       std::pair<THdfsFileFormat::type, THdfsCompression::type>, int> FileTypeCountsMap;
   FileTypeCountsMap file_type_counts_;
@@ -463,9 +466,10 @@ class HdfsScanNode : public ScanNode {
   // thread tokens if they are available.
   void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
 
-  // Create a new scanner for this partition type.
-  // If the scanner cannot be created return NULL.
-  HdfsScanner* CreateScanner(HdfsPartitionDescriptor*);
+  // Create and prepare new scanner for this partition type.
+  // If the scanner cannot be created, return NULL.
+  HdfsScanner* CreateAndPrepareScanner(HdfsPartitionDescriptor* partition_desc,
+      ScannerContext* context, Status* status);
 
   // Main function for scanner thread. This thread pulls the next range to be
   // processed from the IoMgr and then processes the entire range end to end.

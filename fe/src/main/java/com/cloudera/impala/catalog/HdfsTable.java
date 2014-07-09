@@ -1125,6 +1125,9 @@ public class HdfsTable extends Table {
   private THdfsTable getHdfsTable() {
     Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
     for (HdfsPartition partition: partitions_) {
+      // TODO: Should we be sending the list of all partitions including *all* file
+      //       descriptors (includeFileDescriptorMetadata=true in partition.toThrift())?
+      //       IMPALA-978 tracks this issue.
       idToPartition.put(partition.getId(), partition.toThrift(true));
     }
 

@@ -151,7 +151,6 @@
 
 namespace impala {
 
-class Codec;
 class DelimitedTextParser;
 
 class HdfsSequenceScanner : public BaseSequenceScanner {
@@ -167,11 +166,11 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   // Implementation of HdfsScanner interface.
   virtual Status Prepare(ScannerContext* context);
 
-  // Codegen writing tuples and evaluating predicates
+  // Codegen writing tuples and evaluating predicates.
   static llvm::Function* Codegen(HdfsScanNode*, const std::vector<Expr*>& conjuncts);
 
  protected:
-  // Implementation of sequence container super class methods
+  // Implementation of sequence container super class methods.
   virtual FileHeader* AllocateFileHeader();
   virtual Status ReadFileHeader();
   virtual Status InitNewRange();

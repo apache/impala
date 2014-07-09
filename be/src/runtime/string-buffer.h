@@ -31,9 +31,9 @@ class StringBuffer {
  public:
   // C'tor for StringBuffer.  Memory backing the string will be allocated from
   // the pool as necessary.  Can optionally be initialized from a StringValue.
-  StringBuffer(MemPool* pool, StringValue* str = NULL) :
-    pool_(pool),
-    buffer_size_(0) {
+  StringBuffer(MemPool* pool, StringValue* str = NULL)
+      : pool_(pool), buffer_size_(0) {
+    DCHECK(pool_ != NULL);
     if (str != NULL) {
       string_value_ = *str;
       buffer_size_ = str->len;

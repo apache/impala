@@ -30,6 +30,7 @@ import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.THdfsCompression;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileDesc;
 import com.cloudera.impala.thrift.THdfsPartition;
@@ -57,6 +58,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
     public String getFileName() { return fileDescriptor_.getFile_name(); }
     public long getFileLength() { return fileDescriptor_.getLength(); }
+    public THdfsCompression getFileCompression() {
+      return fileDescriptor_.getCompression();
+    }
     public long getModificationTime() {
       return fileDescriptor_.getLast_modification_time();
     }
@@ -342,9 +346,10 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     // invalid and moving on, so that table loading won't fail and user can query other
     // partitions.
     for (FileDescriptor fileDescriptor: fileDescriptors_) {
-      String result = checkFileCompressionTypeSupported(fileDescriptor.getFileName());
-      if (!result.isEmpty()) {
-        throw new RuntimeException(result);
+      StringBuilder errorMsg = new StringBuilder();
+      if (!getInputFormatDescriptor().getFileFormat().isFileCompressionTypeSupported(
+          fileDescriptor.getFileName(), errorMsg)) {
+        throw new RuntimeException(errorMsg.toString());
       }
     }
   }
@@ -367,38 +372,6 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         storageDescriptor, emptyFileDescriptorList,
         ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID, null,
         TAccessLevel.READ_WRITE);
-  }
-
-  /*
-   * Checks whether a file is supported in Impala based on the file extension.
-   * Returns an empty string if the file format is supported, otherwise a string with
-   * details on the incompatibility is returned.
-   * Impala only supports .lzo on text files for partitions that have been declared in
-   * the metastore as TEXT_LZO. For now, raise an error on any other type.
-   */
-  public String checkFileCompressionTypeSupported(String fileName) {
-    // Check to see if the file has a compression suffix.
-    // Impala only supports .lzo on text files that have been declared in the metastore
-    // as TEXT_LZO. For now, raise an error on any other type.
-    HdfsCompression compressionType = HdfsCompression.fromFileName(fileName);
-    if (compressionType == HdfsCompression.LZO_INDEX) {
-      // Index files are read by the LZO scanner directly.
-      return "";
-    }
-
-    HdfsStorageDescriptor sd = getInputFormatDescriptor();
-    if (compressionType == HdfsCompression.LZO) {
-      if (sd.getFileFormat() != HdfsFileFormat.LZO_TEXT) {
-        return "Compressed file not supported without compression input format: " +
-            fileName;
-      }
-    } else if (sd.getFileFormat() == HdfsFileFormat.LZO_TEXT) {
-      return "Expected file with .lzo suffix: " + fileName;
-    } else if (sd.getFileFormat() == HdfsFileFormat.TEXT
-               && compressionType != HdfsCompression.NONE) {
-      return "Compressed text files are not supported: " + fileName;
-    }
-    return "";
   }
 
   /**
@@ -429,8 +402,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         thriftPartition.mapKeyDelim,
         thriftPartition.escapeChar,
         (byte) '"', // TODO: We should probably add quoteChar to THdfsPartition.
-        thriftPartition.blockSize,
-        thriftPartition.compression);
+        thriftPartition.blockSize);
 
     List<LiteralExpr> literalExpr = Lists.newArrayList();
     if (id != ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
@@ -501,7 +473,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         fileFormatDescriptor_.getMapKeyDelim(),
         fileFormatDescriptor_.getEscapeChar(),
         fileFormatDescriptor_.getFileFormat().toThrift(), thriftExprs,
-        fileFormatDescriptor_.getBlockSize(), fileFormatDescriptor_.getCompression());
+        fileFormatDescriptor_.getBlockSize());
     thriftHdfsPart.setLocation(location_);
     thriftHdfsPart.setStats(new TTableStats(numRows_));
     thriftHdfsPart.setAccess_level(accessLevel_);

@@ -61,7 +61,6 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state)
   : HdfsScanner(node, state),
     header_(NULL),
-    data_buffer_pool_(new MemPool(node->mem_tracker())),
     block_start_(0),
     total_block_size_(0),
     num_syncs_(0) {
@@ -73,7 +72,6 @@ BaseSequenceScanner::~BaseSequenceScanner() {
 Status BaseSequenceScanner::Prepare(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(context));
   stream_->set_read_past_size_cb(bind(&BaseSequenceScanner::ReadPastSize, this, _1));
-  decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   bytes_skipped_counter_ = ADD_COUNTER(
       scan_node_->runtime_profile(), "BytesSkipped", TCounterType::BYTES);
   return Status::OK;
@@ -83,7 +81,12 @@ void BaseSequenceScanner::Close() {
   VLOG_FILE << "Bytes read past scan range: " << -stream_->bytes_left();
   VLOG_FILE << "Average block size: "
             << (num_syncs_ > 1 ? total_block_size_ / (num_syncs_ - 1) : 0);
-  if (decompressor_.get() != NULL) decompressor_->Close();
+  // Need to close the decompressor before releasing the resources at AddFinalRowBatch(),
+  // because in some cases there is memory allocated in decompressor_'s temp_memory_pool_.
+  if (decompressor_.get() != NULL) {
+    decompressor_->Close();
+    decompressor_.reset(NULL);
+  }
   AttachPool(data_buffer_pool_.get(), false);
   AddFinalRowBatch();
   if (!only_parsing_header_) {

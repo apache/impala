@@ -42,10 +42,9 @@ ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
   AddStream(scan_range);
 }
 
-void ScannerContext::AttachCompletedResources(RowBatch* batch, bool done) {
-  DCHECK(batch != NULL);
+void ScannerContext::ReleaseCompletedResources(RowBatch* batch, bool done) {
   for (int i = 0; i < streams_.size(); ++i) {
-    streams_[i]->AttachCompletedResources(batch, done);
+    streams_[i]->ReleaseCompletedResources(batch, done);
   }
   if (done) streams_.clear();
 }
@@ -72,8 +71,8 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   return stream;
 }
 
-void ScannerContext::Stream::AttachCompletedResources(RowBatch* batch, bool done) {
-  DCHECK(batch != NULL);
+void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool done) {
+  DCHECK((batch != NULL) || (batch == NULL && !contains_tuple_data_));
   if (done) {
     // Mark any pending resources as completed
     if (io_buffer_ != NULL) {

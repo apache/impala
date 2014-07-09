@@ -346,10 +346,7 @@ def build_hbase_create_stmt(db_name, table_name, column_families):
   return create_stmt
 
 def build_db_suffix(file_format, codec, compression_type):
-  if file_format == 'text' and codec != 'none' and codec != 'lzo':
-    print 'Unsupported combination of file_format (text) and compression codec.'
-    sys.exit(1)
-  elif file_format == 'text' and codec == 'none':
+  if file_format == 'text' and codec == 'none':
     return ''
   elif codec == 'none':
     return '_%s' % (file_format)

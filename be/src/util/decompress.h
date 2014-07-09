@@ -65,6 +65,10 @@ class BzipDecompressor : public Codec {
 
 class SnappyDecompressor : public Codec {
  public:
+  // Snappy-compressed data block includes trailing 4-byte checksum. Decompressor
+  // doesn't expect this.
+  static const uint TRAILING_CHECKSUM_LEN = 4;
+
   virtual ~SnappyDecompressor() { }
   virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,

@@ -74,9 +74,7 @@ Status HdfsSequenceScanner::InitNewRange() {
 
   SeqFileHeader* seq_header = reinterpret_cast<SeqFileHeader*>(header_);
   if (seq_header->is_compressed) {
-    RETURN_IF_ERROR(Codec::CreateDecompressor(
-        data_buffer_pool_.get(), scan_node_->tuple_desc()->string_slots().empty(),
-        header_->codec, &decompressor_));
+    RETURN_IF_ERROR(UpdateDecompressor(header_->codec));
   }
 
   // Initialize codegen fn

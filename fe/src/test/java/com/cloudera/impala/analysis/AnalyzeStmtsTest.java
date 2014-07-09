@@ -1762,12 +1762,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "HDFS file system");
 
       // File type / table type mismatch.
-      AnalysisError(String.format("load data inpath '%s' %s into table " +
+      AnalyzesOk(String.format("load data inpath '%s' %s into table " +
           "tpch.lineitem",
-          "/test-warehouse/alltypes_text_lzo/year=2009/month=4", overwrite),
-          "Compressed file not supported without compression input format: " +
-          "hdfs://localhost:20500/test-warehouse/alltypes_text_lzo/" +
-          "year=2009/month=4/000021_0.lzo");
+          "/test-warehouse/alltypes_text_lzo/year=2009/month=4", overwrite));
       // When table type matches, analysis passes for partitioned and unpartitioned
       // tables.
       AnalyzesOk(String.format("load data inpath '%s' %s into table " +

@@ -25,8 +25,8 @@ class DelimitedTextParser;
 class ScannerContext;
 struct HdfsFileDesc;
 
-// HdfsScanner implementation that understands text-formatted
-// records. Uses SSE instructions, if available, for performance.
+// HdfsScanner implementation that understands text-formatted records.
+// Uses SSE instructions, if available, for performance.
 class HdfsTextScanner : public HdfsScanner {
  public:
   HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state);
@@ -37,15 +37,23 @@ class HdfsTextScanner : public HdfsScanner {
   virtual Status ProcessSplit();
   virtual void Close();
 
-  // Issue io manager byte ranges for 'files'
-  static Status IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
+  // Issue io manager byte ranges for 'files'.
+  static Status IssueInitialRanges(HdfsScanNode* scan_node,
+                                   const std::vector<HdfsFileDesc*>& files);
 
-  // Codegen writing tuples and evaluating predicates
+  // Codegen writing tuples and evaluating predicates.
   static llvm::Function* Codegen(HdfsScanNode*, const std::vector<Expr*>& conjuncts);
+
+  // Suffix for lzo index files.
+  const static std::string LZO_INDEX_SUFFIX;
 
   static const char* LLVM_CLASS_NAME;
 
  protected:
+  // Reset the scanner.  This clears any partial state that needs to
+  // be cleared when starting or when restarting after an error.
+  Status ResetScanner();
+
   // Current position in byte buffer.
   char* byte_buffer_ptr_;
 
@@ -55,19 +63,12 @@ class HdfsTextScanner : public HdfsScanner {
   // Actual bytes received from last file read.
   int byte_buffer_read_size_;
 
-  // Memory pool for allocations into the boundary row / column
-  boost::scoped_ptr<MemPool> boundary_mem_pool_;
-
-  // Reset the scanner.  This clears any partial state that needs to
-  // be cleared when starting or when restarting after an error.
-  void ResetScanner();
-
  private:
   const static int NEXT_BLOCK_READ_SIZE = 1024; //bytes
 
   // Initializes this scanner for this context.  The context maps to a single
   // scan range.
-  void InitNewRange();
+  virtual Status InitNewRange();
 
   // Finds the start of the first tuple in this scan range and initializes
   // byte_buffer_ptr to be the next character (the start of the first tuple).  If
@@ -86,11 +87,12 @@ class HdfsTextScanner : public HdfsScanner {
   // Reads past the end of the scan range for the next tuple end.
   Status FinishScanRange();
 
-  // Fills the next byte buffer from the context.  This will block if there are
-  // no bytes ready.  Updates byte_buffer_ptr, byte_buffer_end_ and
-  // byte_buffer_read_size_.
+  // Fills the next byte buffer from the context.  This will block if there are no bytes
+  // ready.  Updates byte_buffer_ptr_, byte_buffer_end_ and byte_buffer_read_size_.
   // If num_bytes is 0, the scanner will read whatever is the io mgr buffer size,
   // otherwise it will just read num_bytes.
+  // If the file is compressed, then it will attempt to read the file, decompress it and
+  // set the byte_buffer_ptr_ to pointing to the decompressed buffer.
   virtual Status FillByteBuffer(bool* eosr, int num_bytes = 0);
 
   // Prepends field data that was from the previous file buffer (This field straddled two

@@ -97,7 +97,6 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_pa
     escape_char_(thrift_partition.escapeChar),
     block_size_(thrift_partition.blockSize),
     location_(thrift_partition.location),
-    compression_(thrift_partition.compression),
     id_(thrift_partition.id),
     exprs_prepared_(false),
     exprs_opened_(false),

@@ -71,12 +71,11 @@ class VectorGenerator:
       filter_func = lambda vector: True
     return [list(vec) for vec in product(*self.input_vectors) if filter_func(vec)]
 
-# Add vector value constraints to this function. This
+# Add vector value constraints to this function.
 def is_valid_combination(vector):
   if len(vector) == 4:
     return not (
-        (vector[FILE_FORMAT_IDX] == 'text' and\
-         vector[COMPRESSION_IDX] not in ['none', 'lzo']) or
+        (vector[FILE_FORMAT_IDX] == 'text' and vector[COMPRESSION_IDX] in ['def']) or
         (vector[FILE_FORMAT_IDX] != 'text' and vector[COMPRESSION_IDX] == 'lzo') or
         (vector[COMPRESSION_IDX] == 'none' and vector[COMPRESSION_TYPE_IDX] != 'none') or
         (vector[COMPRESSION_IDX] != 'none' and vector[COMPRESSION_TYPE_IDX] == 'none') or

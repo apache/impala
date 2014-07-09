@@ -72,7 +72,7 @@ const parquet::CompressionCodec::type IMPALA_TO_PARQUET_CODEC[] = {
 // The plain encoding does not maintain any state so all these functions
 // are static helpers.
 // TODO: we are using templates to provide a generic interface (over the
-// types) to avoid performance penalities. This makes the code more complex
+// types) to avoid performance penalties. This makes the code more complex
 // and should be removed when we have codegen support to inline virtual
 // calls.
 class ParquetPlainEncoder {

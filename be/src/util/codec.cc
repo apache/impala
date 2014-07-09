@@ -38,7 +38,7 @@ const char* const Codec::BZIP2_COMPRESSION =
 const char* const Codec::SNAPPY_COMPRESSION =
     "org.apache.hadoop.io.compress.SnappyCodec";
 
-const char* const UNKNOWN_CODEC_ERROR =
+const char* const Codec::UNKNOWN_CODEC_ERROR =
     "This compression codec is currently unsupported: ";
 
 const Codec::CodecMap Codec::CODEC_MAP = map_list_of
@@ -176,6 +176,8 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
     case THdfsCompression::LZ4:
       *decompressor = new Lz4Decompressor(mem_pool, reuse);
       break;
+    case THdfsCompression::LZO:
+      VLOG(2) << "The LZO codec is created as a linked library." ;
     default: {
       stringstream ss;
       ss << "Unsupported codec: " << format;

@@ -367,7 +367,6 @@ class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColu
 
 Status HdfsParquetScanner::Prepare(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(context));
-  decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   num_cols_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TCounterType::UNIT);
 
@@ -715,7 +714,7 @@ Status HdfsParquetScanner::ProcessSplit() {
     // Attach any resources and clear the streams before starting a new row group. These
     // streams could either be just the footer stream or streams for the previous row
     // group.
-    context_->AttachCompletedResources(batch_, /* done */ true);
+    context_->ReleaseCompletedResources(batch_, /* done */ true);
     // Commit the rows to flush the row batch from the previous row group
     CommitRows(0);
 

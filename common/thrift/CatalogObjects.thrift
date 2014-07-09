@@ -47,7 +47,6 @@ enum TTableType {
 
 enum THdfsFileFormat {
   TEXT,
-  LZO_TEXT,
   RC_FILE,
   SEQUENCE_FILE,
   AVRO,
@@ -193,23 +192,22 @@ struct THdfsPartition {
   6: required THdfsFileFormat fileFormat
   7: list<Exprs.TExpr> partitionKeyExprs
   8: required i32 blockSize
-  9: required THdfsCompression compression
-  10: optional list<THdfsFileDesc> file_desc
-  11: optional string location
+  9: optional list<THdfsFileDesc> file_desc
+  10: optional string location
 
   // The access level Impala has on this partition (READ_WRITE, READ_ONLY, etc).
-  12: optional TAccessLevel access_level
+  11: optional TAccessLevel access_level
 
   // Statistics on this partition, e.g., number of rows in this partition.
-  13: optional TTableStats stats
+  12: optional TTableStats stats
 
   // True if this partition has been marked as cached (does not necessarily mean the
   // underlying data is cached).
-  14: optional bool is_marked_cached
+  13: optional bool is_marked_cached
 
   // Unique (in this table) id of this partition. If -1, the partition does not currently
   // exist.
-  15: optional i64 id
+  14: optional i64 id
 }
 
 struct THdfsTable {

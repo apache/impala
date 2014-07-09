@@ -26,7 +26,7 @@ public class HiveStorageDescriptorFactory {
    * Creates and returns a Hive StoreDescriptor for the given FileFormat and RowFormat.
    * Currently supports creating StorageDescriptors for Parquet, Text, Sequence, and
    * RC file.
-   * TODO: Add support for Avro and HBase
+   * TODO: Add support for HBase
    */
   public static StorageDescriptor createSd(THdfsFileFormat fileFormat, RowFormat rowFormat) {
     Preconditions.checkNotNull(fileFormat);
@@ -63,7 +63,6 @@ public class HiveStorageDescriptorFactory {
     sd.setOutputFormat("parquet.hive.DeprecatedParquetOutputFormat");
     // TODO: Should we use "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"?
     sd.getSerdeInfo().setSerializationLib("parquet.hive.serde.ParquetHiveSerDe");
-    sd.setCompressed(false);
     return sd;
   }
 
@@ -74,7 +73,6 @@ public class HiveStorageDescriptorFactory {
         org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat.class.getName());
     sd.getSerdeInfo().setSerializationLib(
         org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.class.getName());
-    sd.setCompressed(false);
     return sd;
   }
 
@@ -85,7 +83,6 @@ public class HiveStorageDescriptorFactory {
         org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat.class.getName());
     sd.getSerdeInfo().setSerializationLib(
         org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.class.getName());
-    sd.setCompressed(false);
     return sd;
   }
 
@@ -95,7 +92,6 @@ public class HiveStorageDescriptorFactory {
     sd.setOutputFormat(org.apache.hadoop.hive.ql.io.RCFileOutputFormat.class.getName());
     sd.getSerdeInfo().setSerializationLib(
         org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe.class.getName());
-    sd.setCompressed(false);
     return sd;
   }
 
@@ -108,9 +104,8 @@ public class HiveStorageDescriptorFactory {
     sd.getSerdeInfo().setSerializationLib(
         org.apache.hadoop.hive.serde2.avro.AvroSerDe.class.getName());
     // Writing compressed Avro tables is done using a session level configuration
-    // setting, it is not specified as part of the table metadata. This compression
-    // property has a different purpose.
-    sd.setCompressed(false);
+    // setting, it is not specified as part of the table metadata. The compression
+    // property of the StorageDescriptor has a different purpose.
     return sd;
   }
 
@@ -121,6 +116,9 @@ public class HiveStorageDescriptorFactory {
     StorageDescriptor sd = new StorageDescriptor();
     sd.setSerdeInfo(new org.apache.hadoop.hive.metastore.api.SerDeInfo());
     sd.getSerdeInfo().setParameters(new HashMap<String, String>());
+    // The compressed flag is not used to determine whether the table is compressed or
+    // not. Instead, we use the input format or the filename.
+    sd.setCompressed(false);
     return sd;
   }
 }

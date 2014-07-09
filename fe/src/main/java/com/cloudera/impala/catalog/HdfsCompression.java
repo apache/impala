@@ -2,14 +2,17 @@
 package com.cloudera.impala.catalog;
 
 import com.cloudera.impala.thrift.THdfsCompression;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
 /**
  * Support for recognizing compression suffixes on data files.
  * Compression of a file is recognized in mapreduce by looking for suffixes of
  * supported codecs.
- * For now Impala only supports LZO which requires a specific HIVE input class.
+ * For now Impala supports LZO, GZIP, SNAPPY, and BZIP2. LZO can use the specific HIVE
+ * input class.
  */
+// TODO: Add LZ4?
 public enum HdfsCompression {
   NONE,
   DEFLATE,
@@ -57,4 +60,13 @@ public enum HdfsCompression {
     }
   }
 
+  /* Returns a compression type based on (Hive's) intput format. Special case for LZO. */
+  public static HdfsCompression fromHdfsInputFormatClass(String inputFormatClass) {
+    // TODO: Remove when we have the native LZO writer.
+    Preconditions.checkNotNull(inputFormatClass);
+    if (inputFormatClass.equals(HdfsFileFormat.LZO_TEXT_INPUT_FORMAT)) {
+      return LZO;
+    }
+    return NONE;
+  }
 }

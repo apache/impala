@@ -24,6 +24,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
@@ -169,10 +170,11 @@ public class LoadDataStmt extends StatementBase {
       // Verify the files being loaded are supported.
       for (FileStatus fStatus: fs.listStatus(source)) {
         if (fs.isDirectory(fStatus.getPath())) continue;
-        String result = partition.checkFileCompressionTypeSupported(
-            fStatus.getPath().toString());
-        if (!result.isEmpty()) {
-          throw new AnalysisException(result);
+        StringBuilder errorMsg = new StringBuilder();
+        HdfsFileFormat fileFormat = partition.getInputFormatDescriptor().getFileFormat();
+        if (!fileFormat.isFileCompressionTypeSupported(fStatus.getPath().toString(),
+          errorMsg)) {
+          throw new AnalysisException(errorMsg.toString());
         }
       }
     } catch (FileNotFoundException e) {

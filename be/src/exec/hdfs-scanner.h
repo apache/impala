@@ -42,6 +42,7 @@ class Tuple;
 class TupleDescriptor;
 class TPlanNode;
 class TScanRange;
+class Codec;
 
 // Intermediate structure used for two pass parsing approach. In the first pass,
 // the FieldLocation structs are filled out and contain where all the fields start and
@@ -69,6 +70,9 @@ struct FieldLocation {
 // The HdfsScanner works in tandem with the ScannerContext to interleave IO
 // and parsing.
 //
+// If a split is compressed, then a decompressor will be created, either during Prepare()
+// or at the beginning of ProcessSplit(), and used for decompressing and reading the split.
+//
 // For codegen, the implementation is split into two parts.
 // 1. During the Prepare() phase of the ScanNode, the scanner subclass's static
 //    Codegen() function will be called to perform codegen for that scanner type
@@ -78,10 +82,10 @@ struct FieldLocation {
 //    function to use.
 // This way, we only codegen once per scanner type, rather than once per scanner object.
 //
-// This class also encapsulates row batch management.  Subclasses should call CommitRows
+// This class also encapsulates row batch management.  Subclasses should call CommitRows()
 // after writing to the current row batch, which handles creating row batches, attaching
-// resources (IO buffers and mempools) to the current row batch, and passing row batches
-// up to the scan node . Subclasses can also use GetMemory to help with per-row memory
+// resources (IO buffers and mem pools) to the current row batch, and passing row batches
+// up to the scan node. Subclasses can also use GetMemory() to help with per-row memory
 // management.
 class HdfsScanner {
  public:
@@ -122,12 +126,13 @@ class HdfsScanner {
   // should be issued to the io mgr.  This is one range for the metadata and one
   // range for each column, for each split.
   // This function is how scanners can pick their strategy.
-  // void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>& files);
+  // void IssueInitialRanges(HdfsScanNode* scan_node,
+  //                         const std::vector<HdfsFileDesc*>& files);
 
   // Codegen all functions for this scanner.  The codegen'd function is specific to
   // the scanner subclass but not specific to each scanner object.  We don't want to
   // codegen the functions for each scanner object.
-  // llvm::Function* Codegen(HdfsScanNode*);
+  // llvm::Function* Codegen(HdfsScanNode* scan_node);
 
   static const char* LLVM_CLASS_NAME;
 
@@ -168,9 +173,9 @@ class HdfsScanner {
   Tuple* tuple_;
 
   // The current row batch being populated. Creating new row batches, attaching context
-  // resources, and handing off to the scan node is handled by this class in CommitRows,
-  // but AttachPool must be called by scanner subclasses to attach any memory allocated by
-  // that subclass. All row batches created by this class are transferred to the scan
+  // resources, and handing off to the scan node is handled by this class in CommitRows(),
+  // but AttachPool() must be called by scanner subclasses to attach any memory allocated
+  // by that subclass. All row batches created by this class are transferred to the scan
   // node (i.e., all batches are ultimately owned by the scan node).
   RowBatch* batch_;
 
@@ -192,6 +197,19 @@ class HdfsScanner {
   // cheap to create and destroy.
   Status parse_status_;
 
+  // Decompressor class to use, if any.
+  boost::scoped_ptr<Codec> decompressor_;
+
+  // The most recently used decompression type.
+  THdfsCompression::type decompression_type_;
+
+  // Pool to allocate per data block memory.  This should be used with the
+  // decompressor and any other per data block allocations.
+  boost::scoped_ptr<MemPool> data_buffer_pool_;
+
+  // Time spent decompressing bytes.
+  RuntimeProfile::Counter* decompress_timer_;
+
   // Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
   // that function.
   typedef int (*WriteTuplesFn)(HdfsScanner*, MemPool*, TupleRow*, int, FieldLocation*,
@@ -209,6 +227,9 @@ class HdfsScanner {
   // Set batch_ to a new row batch and update tuple_mem_ accordingly.
   void StartNewRowBatch();
 
+  // Reset internal state for a new scan range.
+  virtual Status InitNewRange() = 0;
+
   // Gets memory for outputting tuples into batch_.
   //  *pool is the mem pool that should be used for memory allocated for those tuples.
   //  *tuple_mem should be the location to output tuples, and
@@ -219,8 +240,8 @@ class HdfsScanner {
   // call GetMemory again after calling this function.
   int GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem);
 
-  // Commit num_rows to the current row batch.  If this completes the row batch, the
-  // row batch is enqueued with the scan node and StartNewRowBatch is called.
+  // Commit num_rows to the current row batch.  If this completes, the row batch is
+  // enqueued with the scan node and StartNewRowBatch() is called.
   // Returns Status::OK if the query is not cancelled and hasn't exceeded any mem limits.
   // Scanner can call this with 0 rows to flush any pending resources (attached pools
   // and io buffers) to minimize memory consumption.
@@ -228,8 +249,8 @@ class HdfsScanner {
 
   // Attach all remaining resources from context_ to batch_ and send batch_ to the scan
   // node. This must be called after all rows have been committed and no further resources
-  // are needed from context_ (in practice this will in each scanner subclass's Close()
-  // implementation).
+  // are needed from context_ (in practice this will happen in each scanner subclass's
+  // Close() implementation).
   void AddFinalRowBatch();
 
   // Release all memory in 'pool' to batch_. If commit_batch is true, the row batch
@@ -265,6 +286,12 @@ class HdfsScanner {
   int WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row_mem, int row_size,
       FieldLocation* fields, int num_tuples,
       int max_added_tuples, int slots_per_tuple, int row_start_indx);
+
+  // Update the decompressor_ object given a compression type or codec name. Depending on
+  // the old compression type and the new one, it may close the old decompressor and/or
+  // create a new one of different type.
+  Status UpdateDecompressor(const THdfsCompression::type& compression);
+  Status UpdateDecompressor(const std::string& codec);
 
   // Utility function to report parse errors for each field.
   // If errors[i] is nonzero, fields[i] had a parse error.

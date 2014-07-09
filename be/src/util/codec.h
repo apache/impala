@@ -38,11 +38,12 @@ class RuntimeState;
 // can implement this without binary dependency issues.
 class Codec {
  public:
-  // These are the codec string representation used in Hadoop.
+  // These are the codec string representations used in Hadoop.
   static const char* const DEFAULT_COMPRESSION;
   static const char* const GZIP_COMPRESSION;
   static const char* const BZIP2_COMPRESSION;
   static const char* const SNAPPY_COMPRESSION;
+  static const char* const UNKNOWN_CODEC_ERROR;
 
   // Map from codec string to compression format
   typedef std::map<const std::string, const THdfsCompression::type> CodecMap;

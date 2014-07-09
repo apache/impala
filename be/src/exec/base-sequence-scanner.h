@@ -24,7 +24,6 @@
 
 namespace impala {
 
-class Codec;
 struct HdfsFileDesc;
 class ScannerContext;
 
@@ -36,7 +35,8 @@ class ScannerContext;
 class BaseSequenceScanner : public HdfsScanner {
  public:
   // Issue the initial ranges for all sequence container files.
-  static Status IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
+  static Status IssueInitialRanges(HdfsScanNode* scan_node,
+                                   const std::vector<HdfsFileDesc*>& files);
 
   virtual Status Prepare(ScannerContext* context);
   virtual void Close();
@@ -84,9 +84,6 @@ class BaseSequenceScanner : public HdfsScanner {
   // The allocated object will be placed in the scan node's pool.
   virtual FileHeader* AllocateFileHeader() = 0;
 
-  // Reset internal state for a new scan range.
-  virtual Status InitNewRange() = 0;
-
   // Read the file header.  The underlying ScannerContext is at the start of
   // the file header.  This function must read the file header (which advances
   // context_ past it) and initialize header_.
@@ -131,16 +128,6 @@ class BaseSequenceScanner : public HdfsScanner {
 
   // If true, this scanner object is only for processing the header.
   bool only_parsing_header_;
-
-  // Decompressor class to use, if any.
-  boost::scoped_ptr<Codec> decompressor_;
-
-  // Pool to allocate per data block memory.  This should be used with the
-  // decompressor and any other per data block allocations.
-  boost::scoped_ptr<MemPool> data_buffer_pool_;
-
-  // Time spent decompressing bytes
-  RuntimeProfile::Counter* decompress_timer_;
 
  private:
   // Set to true when this scanner has processed all the bytes it is responsible

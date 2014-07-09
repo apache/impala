@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.ql.parse.HiveLexer;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
+import com.cloudera.impala.catalog.HdfsCompression;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
@@ -93,10 +94,11 @@ public class ToSqlUtils {
     for (ColumnDesc col: stmt.getPartitionColumnDescs()) {
       partitionColsSql.add(col.toString());
     }
+    // TODO: Pass the correct compression, if applicable.
     return getCreateTableSql(stmt.getDb(), stmt.getTbl(), stmt.getComment(), colsSql,
         partitionColsSql, stmt.getTblProperties(), stmt.getSerdeProperties(),
         stmt.isExternal(), stmt.getIfNotExists(), stmt.getRowFormat(),
-        HdfsFileFormat.fromThrift(stmt.getFileFormat()), null,
+        HdfsFileFormat.fromThrift(stmt.getFileFormat()), HdfsCompression.NONE, null,
         stmt.getLocation().toString());
   }
 
@@ -126,11 +128,13 @@ public class ToSqlUtils {
     RowFormat rowFormat = RowFormat.fromStorageDescriptor(msTable.getSd());
     HdfsFileFormat format = HdfsFileFormat.fromHdfsInputFormatClass(
         msTable.getSd().getInputFormat());
+    HdfsCompression compression = HdfsCompression.fromHdfsInputFormatClass(
+        msTable.getSd().getInputFormat());
     String location = isHbaseTable ? null : msTable.getSd().getLocation();
-    Map<String, String> serdeProperties = msTable.getSd().getSerdeInfo().getParameters();
+    Map<String, String> serdeParameters = msTable.getSd().getSerdeInfo().getParameters();
     return getCreateTableSql(table.getDb().getName(), table.getName(), comment, colsSql,
-        partitionColsSql, properties, serdeProperties, isExternal, false, rowFormat,
-        format, table.getStorageHandlerClassName(), location);
+        partitionColsSql, properties, serdeParameters, isExternal, false, rowFormat,
+        format, compression, table.getStorageHandlerClassName(), location);
   }
 
   /**
@@ -140,9 +144,10 @@ public class ToSqlUtils {
    */
   public static String getCreateTableSql(String dbName, String tableName,
       String tableComment, List<String> columnsSql, List<String> partitionColumnsSql,
-      Map<String, String> tblProperties, Map<String, String> serdeProperties,
+      Map<String, String> tblProperties, Map<String, String> serdeParameters,
       boolean isExternal, boolean ifNotExists, RowFormat rowFormat,
-      HdfsFileFormat fileFormat, String storageHandlerClass, String location) {
+      HdfsFileFormat fileFormat, HdfsCompression compression, String storageHandlerClass,
+      String location) {
     Preconditions.checkNotNull(tableName);
     StringBuilder sb = new StringBuilder("CREATE ");
     if (isExternal) sb.append("EXTERNAL ");
@@ -180,26 +185,29 @@ public class ToSqlUtils {
     }
 
     if (storageHandlerClass == null) {
+      // TODO: Remove this special case when we have the LZO_TEXT writer
       // We must handle LZO_TEXT specially because Impala does not yet support creating
       // tables with this row format. In this case, we cannot output "WITH
       // SERDEPROPERTIES" because Hive does not support it with "STORED AS". For any
       // other HdfsFileFormat we want to output the serdeproperties because it is
       // supported by Impala.
-      if (fileFormat != HdfsFileFormat.LZO_TEXT &&
-          serdeProperties != null && !serdeProperties.isEmpty()) {
+      if (compression != HdfsCompression.LZO &&
+          compression != HdfsCompression.LZO_INDEX &&
+          serdeParameters != null && !serdeParameters.isEmpty()) {
         sb.append(
-            "WITH SERDEPROPERTIES " + propertyMapToSql(serdeProperties) + "\n");
+            "WITH SERDEPROPERTIES " + propertyMapToSql(serdeParameters) + "\n");
       }
+
       if (fileFormat != null) {
-        sb.append("STORED AS " + fileFormat.toSql() + "\n");
+        sb.append("STORED AS " + fileFormat.toSql(compression) + "\n");
       }
     } else {
       // If the storageHandlerClass is set, then we will generate the proper Hive DDL
       // because we do not yet support creating HBase tables via Impala.
       sb.append("STORED BY '" + storageHandlerClass + "'\n");
-      if (serdeProperties != null && !serdeProperties.isEmpty()) {
+      if (serdeParameters != null && !serdeParameters.isEmpty()) {
         sb.append(
-            "WITH SERDEPROPERTIES " + propertyMapToSql(serdeProperties) + "\n");
+            "WITH SERDEPROPERTIES " + propertyMapToSql(serdeParameters) + "\n");
       }
     }
     if (location != null) {

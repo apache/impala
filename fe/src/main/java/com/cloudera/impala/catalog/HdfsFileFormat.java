@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableMap;
 public enum HdfsFileFormat {
   RC_FILE,
   TEXT,
-  LZO_TEXT,
   SEQUENCE_FILE,
   AVRO,
   PARQUET;
@@ -40,11 +39,11 @@ public enum HdfsFileFormat {
       "org.apache.hadoop.mapred.TextInputFormat";
 
   // Input format class for LZO compressed Text tables read by Hive.
-  private static final String LZO_TEXT_INPUT_FORMAT =
+  public static final String LZO_TEXT_INPUT_FORMAT =
       "com.hadoop.mapred.DeprecatedLzoTextInputFormat";
 
   // Output format class for LZO compressed Text tables read by Hive.
-  private static final String LZO_TEXT_OUTPUT_FORMAT =
+  public static final String LZO_TEXT_OUTPUT_FORMAT =
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat";
 
   // Input format class for Sequence file tables read by Hive.
@@ -70,7 +69,7 @@ public enum HdfsFileFormat {
       ImmutableMap.<String, HdfsFileFormat>builder()
           .put(RCFILE_INPUT_FORMAT, RC_FILE)
           .put(TEXT_INPUT_FORMAT, TEXT)
-          .put(LZO_TEXT_INPUT_FORMAT, LZO_TEXT)
+          .put(LZO_TEXT_INPUT_FORMAT, TEXT)
           .put(SEQUENCE_INPUT_FORMAT, SEQUENCE_FILE)
           .put(AVRO_INPUT_FORMAT, AVRO)
           .put(PARQUET_INPUT_FORMATS[0], PARQUET)
@@ -110,7 +109,6 @@ public enum HdfsFileFormat {
     switch (thriftFormat) {
       case RC_FILE: return HdfsFileFormat.RC_FILE;
       case TEXT: return HdfsFileFormat.TEXT;
-      case LZO_TEXT: return HdfsFileFormat.LZO_TEXT;
       case SEQUENCE_FILE: return HdfsFileFormat.SEQUENCE_FILE;
       case AVRO: return HdfsFileFormat.AVRO;
       case PARQUET: return HdfsFileFormat.PARQUET;
@@ -124,7 +122,6 @@ public enum HdfsFileFormat {
     switch (this) {
       case RC_FILE: return THdfsFileFormat.RC_FILE;
       case TEXT: return THdfsFileFormat.TEXT;
-      case LZO_TEXT: return THdfsFileFormat.LZO_TEXT;
       case SEQUENCE_FILE: return THdfsFileFormat.SEQUENCE_FILE;
       case AVRO: return THdfsFileFormat.AVRO;
       case PARQUET: return THdfsFileFormat.PARQUET;
@@ -134,21 +131,65 @@ public enum HdfsFileFormat {
     }
   }
 
-  public String toSql() {
+  public String toSql(HdfsCompression compressionType) {
     switch (this) {
       case RC_FILE: return "RCFILE";
-      case TEXT: return "TEXTFILE";
+      case TEXT:
+        if (compressionType == HdfsCompression.LZO ||
+            compressionType == HdfsCompression.LZO_INDEX) {
+          // TODO: Update this when we can write LZO text.
+          // It is not currently possible to create a table with LZO compressed text files
+          // in Impala, but this is valid in Hive.
+          return String.format("INPUTFORMAT '%s' OUTPUTFORMAT '%s'",
+              LZO_TEXT_INPUT_FORMAT,
+              LZO_TEXT_OUTPUT_FORMAT);
+        }
+        return "TEXTFILE";
       case SEQUENCE_FILE: return "SEQUENCEFILE";
       case AVRO: return "AVRO";
       case PARQUET: return "PARQUET";
-      case LZO_TEXT:
-        // It is not currently possible to create a table with LZO compressed text files
-        // in Impala, but this is valid in Hive.
-        return String.format("INPUTFORMAT '%s' OUTPUTFORMAT '%s'",
-            LZO_TEXT_INPUT_FORMAT, LZO_TEXT_OUTPUT_FORMAT);
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
+    }
+  }
+
+  /*
+   * Checks whether a file is supported in Impala based on the file extension.
+   * Returns true if the file format is supported. If the file format is not
+   * supported, then it returns false and 'errorMsg' contains details on the
+   * incompatibility.
+   *
+   * Impala supports LZO, GZIP, SNAPPY and BZIP2 on text files for partitions that have
+   * been declared in the metastore as TEXT. LZO files can have their own input format.
+   * For now, raise an error on any other type.
+   */
+  public boolean isFileCompressionTypeSupported(String fileName,
+      StringBuilder errorMsg) {
+    // Check to see if the file has a compression suffix.
+    // TODO: Add LZ4
+    HdfsCompression compressionType = HdfsCompression.fromFileName(fileName);
+    switch (compressionType) {
+      case LZO:
+      case LZO_INDEX:
+        // Index files are read by the LZO scanner directly.
+      case GZIP:
+      case SNAPPY:
+      case BZIP2:
+      case NONE:
+        return true;
+      case DEFLATE:
+        // TODO: Ensure that text/deflate works correctly
+        if (this == TEXT) {
+          errorMsg.append("Expected compressed text file with {.lzo,.gzip,.snappy,.bz2} "
+              + "suffix: " + fileName);
+          return false;
+        } else {
+          return true;
+        }
+      default:
+        errorMsg.append("Unknown compression suffix: " + fileName);
+        return false;
     }
   }
 

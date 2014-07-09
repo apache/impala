@@ -172,7 +172,6 @@ class HdfsPartitionDescriptor {
   const std::vector<Expr*>& partition_key_values() const { return partition_key_values_; }
   int block_size() const { return block_size_; }
   const std::string& location() const { return location_; }
-  THdfsCompression::type compression() const { return compression_; }
   int64_t id() const { return id_; }
 
   // Calls Prepare()/Open()/Close() on all partition key exprs. Idempotent (this is
@@ -190,7 +189,6 @@ class HdfsPartitionDescriptor {
   char escape_char_;
   int block_size_;
   std::string location_;
-  THdfsCompression::type compression_;
   int64_t id_;
 
   // True if PrepareExprs has been called, to prevent repeating expensive codegen

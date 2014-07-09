@@ -51,7 +51,8 @@ class HdfsParquetScanner : public HdfsScanner {
 
   // Issue just the footer range for each file.  We'll then parse the footer and pick
   // out the columns we want.
-  static Status IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
+  static Status IssueInitialRanges(HdfsScanNode* scan_node,
+                                   const std::vector<HdfsFileDesc*>& files);
 
   struct FileVersion {
     // Application that wrote the file. e.g. "IMPALA"
@@ -123,9 +124,6 @@ class HdfsParquetScanner : public HdfsScanner {
   // Timer for materializing rows.  This ignores time getting the next buffer.
   ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
 
-  // Time spent decompressing bytes
-  RuntimeProfile::Counter* decompress_timer_;
-
   // Number of cols that need to be read.
   RuntimeProfile::Counter* num_cols_counter_;
 
@@ -161,6 +159,9 @@ class HdfsParquetScanner : public HdfsScanner {
   // Validates the column metadata at 'col_idx' to make sure this column is supported
   // (e.g. encoding, type, etc) and matches the type for slot_desc.
   Status ValidateColumn(const SlotDescriptor* slot_desc, int col_idx);
+
+  // Part of the HdfsScanner interface, not used in Parquet.
+  Status InitNewRange() { return Status::OK; };
 };
 
 } // namespace impala

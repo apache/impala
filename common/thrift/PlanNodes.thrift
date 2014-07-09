@@ -79,6 +79,9 @@ struct THdfsFileSplit {
 
   // total size of the hdfs file
   5: required i64 file_length
+
+  // compression type of the hdfs file
+  6: required CatalogObjects.THdfsCompression file_compression
 }
 
 // key range for single THBaseScanNode

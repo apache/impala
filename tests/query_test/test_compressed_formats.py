@@ -17,9 +17,9 @@ compression_formats = [
 
 class TestCompressedFormats(ImpalaTestSuite):
   """
-  Tests that we support compressed RC and sequence files (see IMPALA-14: Files
-  with .gz extension reported as 'not supported') and that unsupported formats
-  fail gracefully.
+  Tests that we support compressed RC, sequence and text files and that unsupported
+  formats fail gracefully (see IMPALA-14: Files with .gz extension reported as 'not
+  supported').
   """
   @classmethod
   def get_workload(self):
@@ -43,19 +43,21 @@ class TestCompressedFormats(ImpalaTestSuite):
     file_format = vector.get_value('file_format')
     extension, suffix = vector.get_value('compression_format')
     if file_format in ['rc', 'seq']:
-      # Test that compressed RC/sequence files are supported
+      # Test that compressed RC/sequence files are supported.
       db_suffix = '_%s_%s' % (file_format, suffix)
       self.__copy_and_query_compressed_file(
        'tinytable', db_suffix, suffix, '000000_0', extension)
-
     elif file_format is 'text':
-      # Test that that compressed text files (or at least text files with a
-      # compressed extension) fail.
-      db_suffix = ""
-      self.__copy_and_query_compressed_file(
-        'tinytable', db_suffix, suffix, 'data.csv', extension,
-        'Compressed text files are not supported')
-
+      # TODO: How about LZO?
+      if suffix in ['gzip', 'snap', 'bzip']:
+        # Test that {gzip,snappy,bzip}-compressed text files are supported.
+        db_suffix = '_%s_%s' % (file_format, suffix)
+        self.__copy_and_query_compressed_file(
+          'tinytable', db_suffix, suffix, '000000_0', extension)
+      else:
+        # Deflate-compressed (['def']) text files (or at least text files with a
+        # compressed extension) have not been tested yet.
+        pytest.skip("Skipping the text/def tests")
     else:
       assert False, "Unknown file_format: %s" % file_format
 

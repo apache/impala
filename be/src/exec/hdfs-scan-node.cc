@@ -118,11 +118,6 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
         per_type_files_[THdfsFileFormat::AVRO]));
     RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
           per_type_files_[THdfsFileFormat::PARQUET]));
-    if (!per_type_files_[THdfsFileFormat::LZO_TEXT].empty()) {
-      // This will dlopen the lzo binary and can fail if it is not present
-      RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,
-          this, per_type_files_[THdfsFileFormat::LZO_TEXT]));
-    }
     if (progress_.done()) SetDone();
   }
 
@@ -268,16 +263,23 @@ void HdfsScanNode::ReleaseConjuncts(vector<Expr*>* conjuncts) {
   DCHECK_LE(interpreted_conjuncts_copies_.size(), num_interpreted_conjuncts_copies_);
 }
 
-HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
+HdfsScanner* HdfsScanNode::CreateAndPrepareScanner(HdfsPartitionDescriptor* partition,
+    ScannerContext* context, Status* status) {
+  DCHECK(context != NULL);
   HdfsScanner* scanner = NULL;
+  THdfsCompression::type compression =
+      context->GetStream()->file_desc()->file_compression;
 
-  // Create a new scanner for this file format
+  // Create a new scanner for this file format and compression.
   switch (partition->file_format()) {
     case THdfsFileFormat::TEXT:
-      scanner = new HdfsTextScanner(this, runtime_state_);
-      break;
-    case THdfsFileFormat::LZO_TEXT:
-      scanner = HdfsLzoTextScanner::GetHdfsLzoTextScanner(this, runtime_state_);
+      // Lzo-compressed text files are scanned by a scanner that it is implemented as a
+      // dynamic library, so that Impala does not include GPL code.
+      if (compression == THdfsCompression::LZO) {
+        scanner = HdfsLzoTextScanner::GetHdfsLzoTextScanner(this, runtime_state_);
+      } else {
+        scanner = new HdfsTextScanner(this, runtime_state_);
+      }
       break;
     case THdfsFileFormat::SEQUENCE_FILE:
       scanner = new HdfsSequenceScanner(this, runtime_state_);
@@ -297,6 +299,7 @@ HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
   }
   DCHECK(scanner != NULL);
   runtime_state_->obj_pool()->Add(scanner);
+  *status = scanner->Prepare(context);
   return scanner;
 }
 
@@ -425,6 +428,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       file_desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(path));
       file_descs_[path] = file_desc;
       file_desc->file_length = split.file_length;
+      file_desc->file_compression = split.file_compression;
 
       HdfsPartitionDescriptor* partition_desc =
           hdfs_table_->GetPartition(split.partition_id);
@@ -502,7 +506,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
 
   RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::TEXT));
-  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::LZO_TEXT));
   RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::RC_FILE));
   RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::SEQUENCE_FILE));
   RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::AVRO));
@@ -829,30 +832,35 @@ void HdfsScanNode::ScannerThread() {
 
       ScannerContext* context = runtime_state_->obj_pool()->Add(
           new ScannerContext(runtime_state_, this, partition, scan_range));
-      HdfsScanner* scanner = CreateScanner(partition);
-      status = scanner->Prepare(context);
+      Status scanner_status;
+      HdfsScanner* scanner = CreateAndPrepareScanner(partition, context, &scanner_status);
+      if (!scanner_status.ok() || scanner == NULL) {
+        stringstream ss;
+        ss << "Error preparing text scanner for scan range " << scan_range->file() <<
+            "(" << scan_range->offset() << ":" << scan_range->len() << ").";
+        ss << endl << runtime_state_->ErrorLog();
+        VLOG_QUERY << ss.str();
+      }
 
-      if (status.ok()) {
-        status = scanner->ProcessSplit();
-        if (!status.ok()) {
-          // This thread hit an error, record it and bail
-          // TODO: better way to report errors?  Maybe via the thrift interface?
-          if (VLOG_QUERY_IS_ON && !runtime_state_->error_log().empty()) {
-            stringstream ss;
-            ss << "Scan node (id=" << id() << ") ran into a parse error for scan range "
-              << scan_range->file() << "(" << scan_range->offset() << ":"
-              << scan_range->len() << ").";
-            if (partition->file_format() != THdfsFileFormat::PARQUET) {
-              // Parquet doesn't read the range end to end so the current offset
-              // isn't useful.
-              // TODO: make sure the parquet reader is outputting as much diagnostic
-              // information as possible.
-              ScannerContext::Stream* stream = context->GetStream();
-              ss << "  Processed " << stream->total_bytes_returned() << " bytes.";
-            }
-            ss << endl << runtime_state_->ErrorLog();
-            VLOG_QUERY << ss.str();
+      status = scanner->ProcessSplit();
+      if (!status.ok()) {
+        // This thread hit an error, record it and bail
+        // TODO: better way to report errors?  Maybe via the thrift interface?
+        if (VLOG_QUERY_IS_ON && !runtime_state_->error_log().empty()) {
+          stringstream ss;
+          ss << "Scan node (id=" << id() << ") ran into a parse error for scan range "
+             << scan_range->file() << "(" << scan_range->offset() << ":"
+             << scan_range->len() << ").";
+          if (partition->file_format() != THdfsFileFormat::PARQUET) {
+            // Parquet doesn't read the range end to end so the current offset
+            // isn't useful.
+            // TODO: make sure the parquet reader is outputting as much diagnostic
+            // information as possible.
+            ScannerContext::Stream* stream = context->GetStream();
+            ss << "  Processed " << stream->total_bytes_returned() << " bytes.";
           }
+          ss << endl << runtime_state_->ErrorLog();
+          VLOG_QUERY << ss.str();
         }
       }
       scanner->Close();
@@ -915,7 +923,7 @@ void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
   progress_.Update(1);
 
   {
-    unique_lock<mutex> l(file_type_counts_lock_);
+    ScopedSpinLock l(&file_type_counts_lock_);
     for (int i = 0; i < compression_types.size(); ++i) {
       ++file_type_counts_[make_pair(file_type, compression_types[i])];
     }
@@ -989,12 +997,13 @@ void HdfsScanNode::StopAndFinalizeCounters() {
 
   // output completed file types and counts to info string
   if (!file_type_counts_.empty()) {
-    unique_lock<mutex> l2(file_type_counts_lock_);
     stringstream ss;
-    for (FileTypeCountsMap::const_iterator it = file_type_counts_.begin();
-        it != file_type_counts_.end(); ++it) {
-      ss << it->first.first << "/" << it->first.second
-        << ":" << it->second << " ";
+    {
+      ScopedSpinLock l2(&file_type_counts_lock_);
+      for (FileTypeCountsMap::const_iterator it = file_type_counts_.begin();
+          it != file_type_counts_.end(); ++it) {
+        ss << it->first.first << "/" << it->first.second << ":" << it->second << " ";
+      }
     }
     runtime_profile_->AddInfoString("File Formats", ss.str());
   }
@@ -1058,14 +1067,12 @@ Status HdfsScanNode::CreateConjunctsCopies(THdfsFileFormat::type format) {
     num_splits += desc->splits.size();
   }
 
-  int num_codegen_copies;
+  // If codegen function is thread safe, we can just use a single copy of the conjuncts
+  int num_codegen_copies = 1;
   if (!codegend_conjuncts_thread_safe_) {
     // If the codegen'd conjuncts are not thread safe, we need to make copies of the exprs
     // and codegen those as well.
     num_codegen_copies = min(num_threads, num_splits);
-  } else {
-    // Codegen function is thread safe, we can just use a single copy of the conjuncts
-    num_codegen_copies = 1;
   }
 
   for (int i = 0; i < num_codegen_copies; ++i) {
@@ -1074,7 +1081,6 @@ Status HdfsScanNode::CreateConjunctsCopies(THdfsFileFormat::type format) {
     Function* fn;
     switch (format) {
       case THdfsFileFormat::TEXT:
-      case THdfsFileFormat::LZO_TEXT:
         fn = HdfsTextScanner::Codegen(this, *conjuncts);
         break;
       case THdfsFileFormat::SEQUENCE_FILE:

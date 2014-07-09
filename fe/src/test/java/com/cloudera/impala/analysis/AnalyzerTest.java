@@ -289,6 +289,16 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestCompressedText() throws AnalysisException, AuthorizationException {
+    AnalyzesOk("SELECT count(*) FROM functional_text_lzo.tinyinttable");
+    // TODO: Disabling the text/{gzip,bzip,snap} analysis test until the corresponding
+    //       databases are loaded.
+    // AnalyzesOk("SELECT count(*) FROM functional_text_gzip.tinyinttable");
+    // AnalyzesOk("SELECT count(*) FROM functional_text_snap.tinyinttable");
+    // AnalyzesOk("SELECT count(*) FROM functional_text_bzip.tinyinttable");
+  }
+
+  @Test
   public void TestMemLayout() throws AnalysisException, AuthorizationException {
     testSelectStar();
     testNonNullable();

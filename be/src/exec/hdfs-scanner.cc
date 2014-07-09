@@ -34,6 +34,7 @@
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
+#include "util/codec.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
 #include "util/sse-util.h"
@@ -59,6 +60,8 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
       batch_(NULL),
       num_errors_in_file_(0),
       num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
+      decompression_type_(THdfsCompression::NONE),
+      data_buffer_pool_(new MemPool(scan_node->mem_tracker())),
       write_tuples_fn_(NULL) {
 }
 
@@ -76,10 +79,12 @@ Status HdfsScanner::Prepare(ScannerContext* context) {
   conjuncts_ = scan_node_->GetConjuncts();
   num_conjuncts_ = conjuncts_->size();
   StartNewRowBatch();
+  decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
   return Status::OK;
 }
 
 void HdfsScanner::Close() {
+  if (decompressor_.get() != NULL) decompressor_->Close();
   if (conjuncts_ != NULL) {
     scan_node_->ReleaseConjuncts(conjuncts_);
     conjuncts_ = NULL;
@@ -132,7 +137,7 @@ Status HdfsScanner::CommitRows(int num_rows) {
   // We need to pass the row batch to the scan node if there is too much memory attached,
   // which can happen if the query is very selective.
   if (batch_->AtCapacity() || context_->num_completed_io_buffers() > 0) {
-    context_->AttachCompletedResources(batch_, /* done */ false);
+    context_->ReleaseCompletedResources(batch_, /* done */ false);
     scan_node_->AddMaterializedRowBatch(batch_);
     StartNewRowBatch();
   }
@@ -144,7 +149,7 @@ Status HdfsScanner::CommitRows(int num_rows) {
 
 void HdfsScanner::AddFinalRowBatch() {
   DCHECK(batch_ != NULL);
-  context_->AttachCompletedResources(batch_, /* done */ true);
+  context_->ReleaseCompletedResources(batch_, /* done */ true);
   scan_node_->AddMaterializedRowBatch(batch_);
   batch_ = NULL;
 }
@@ -504,6 +509,39 @@ Function* HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNode* node,
   DCHECK(write_tuples_fn != NULL);
 
   return codegen->FinalizeFunction(write_tuples_fn);
+}
+
+Status HdfsScanner::UpdateDecompressor(const THdfsCompression::type& compression) {
+  // Check whether the file in the stream has different compression from the last one.
+  if (compression != decompression_type_) {
+    if (decompression_type_ != THdfsCompression::NONE) {
+      // Close the previous decompressor before creating a new one.
+      DCHECK(decompressor_.get() != NULL);
+      decompressor_->Close();
+      decompressor_.reset(NULL);
+    }
+    // The LZO-compression scanner is implemented in a dynamically linked library and it
+    // is not created at Codec::CreateDecompressor().
+    if (compression != THdfsCompression::NONE && compression != THdfsCompression::LZO) {
+      RETURN_IF_ERROR(Codec::CreateDecompressor(data_buffer_pool_.get(),
+        scan_node_->tuple_desc()->string_slots().empty(), compression, &decompressor_));
+    }
+    decompression_type_ = compression;
+  }
+  return Status::OK;
+}
+
+Status HdfsScanner::UpdateDecompressor(const string& codec) {
+  map<const string, const THdfsCompression::type>::const_iterator
+    type = Codec::CODEC_MAP.find(codec);
+
+  if (type == Codec::CODEC_MAP.end()) {
+    stringstream ss;
+    ss << Codec::UNKNOWN_CODEC_ERROR << codec;
+    return Status(ss.str());
+  }
+  RETURN_IF_ERROR(UpdateDecompressor(type->second));
+  return Status::OK;
 }
 
 bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,

@@ -30,6 +30,7 @@ import parquet.schema.PrimitiveType;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.HdfsCompression;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.ScalarType;
@@ -193,11 +194,13 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
   public String toSql() {
     ArrayList<String> colsSql = Lists.newArrayList();
     ArrayList<String> partitionColsSql = Lists.newArrayList();
+    HdfsCompression compression = HdfsCompression.fromFileName(
+        schemaLocation_.toString());
     String s = ToSqlUtils.getCreateTableSql(getDb(),
         getTbl() + " __LIKE_FILEFORMAT__ ",  getComment(), colsSql, partitionColsSql,
         getTblProperties(), getSerdeProperties(), isExternal(), getIfNotExists(),
-        getRowFormat(), HdfsFileFormat.fromThrift(getFileFormat()), null,
-        getLocation().toString());
+        getRowFormat(), HdfsFileFormat.fromThrift(getFileFormat()),
+        compression, null, getLocation().toString());
     s = s.replace("__LIKE_FILEFORMAT__", "LIKE " + schemaFileFormat_ + " " +
         schemaLocation_.toString());
     return s;

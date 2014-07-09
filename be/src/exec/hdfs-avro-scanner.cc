@@ -26,6 +26,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
 #include "util/codec.h"
+#include "util/decompress.h"
 #include "util/runtime-profile.h"
 
 // Note: the Avro C++ library uses exceptions for error handling. Any Avro
@@ -505,9 +506,7 @@ Status HdfsAvroScanner::InitNewRange() {
   avro_header_ = reinterpret_cast<AvroFileHeader*>(header_);
   template_tuple_ = avro_header_->template_tuple;
   if (header_->is_compressed) {
-    RETURN_IF_ERROR(Codec::CreateDecompressor(
-        data_buffer_pool_.get(), scan_node_->tuple_desc()->string_slots().empty(),
-        header_->compression_type, &decompressor_));
+    RETURN_IF_ERROR(UpdateDecompressor(header_->compression_type));
   }
 
   if (avro_header_->use_codegend_decode_avro_data) {
@@ -545,7 +544,7 @@ Status HdfsAvroScanner::ProcessRange() {
       if (header_->compression_type == THdfsCompression::SNAPPY) {
         // Snappy-compressed data block includes trailing 4-byte checksum,
         // decompressor_ doesn't expect this
-        compressed_size -= 4;
+        compressed_size -= SnappyDecompressor::TRAILING_CHECKSUM_LEN;
       }
       int size;
       SCOPED_TIMER(decompress_timer_);
