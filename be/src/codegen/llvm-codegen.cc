@@ -40,6 +40,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "common/logging.h"
+#include "codegen/codegen-anyval.h"
 #include "codegen/subexpr-elimination.h"
 #include "impala-ir/impala-ir-names.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -642,8 +643,38 @@ void LlvmCodeGen::OptimizeModule() {
   module_pass_manager->run(*module_);
 }
 
-void LlvmCodeGen::AddFunctionToJit(Function* fn, void** result) {
-  fns_to_jit_compile_.push_back(make_pair(fn, result));
+void LlvmCodeGen::AddFunctionToJit(Function* fn, void** fn_ptr) {
+  Type* decimal_val_type = GetType(CodegenAnyVal::LLVM_DECIMALVAL_NAME);
+  if (fn->getReturnType() == decimal_val_type) {
+    // Per the x86 calling convention ABI, DecimalVals should be returned via an extra
+    // first DecimalVal* argument. We generate non-compliant functions that return the
+    // DecimalVal directly, which we can call from generated code, but not from compiled
+    // native code.  To avoid accidentally calling a non-compliant function from native
+    // code, call 'function' from an ABI-compliant wrapper.
+    stringstream name;
+    name << fn->getName().str() << "ABIWrapper";
+    LlvmCodeGen::FnPrototype prototype(this, name.str(), void_type_);
+    // Add return argument
+    prototype.AddArgument(NamedVariable("result", decimal_val_type->getPointerTo()));
+    // Add regular arguments
+    for (Function::arg_iterator arg = fn->arg_begin(); arg != fn->arg_end(); ++arg) {
+      prototype.AddArgument(NamedVariable(arg->getName(), arg->getType()));
+    }
+    LlvmBuilder builder(context());
+    Value* args[fn->arg_size() + 1];
+    Function* fn_wrapper = prototype.GeneratePrototype(&builder, &args[0]);
+    fn_wrapper->addFnAttr(llvm::Attribute::AlwaysInline);
+    // Mark first argument as sret (not sure if this is necessary but it can't hurt)
+    fn_wrapper->addAttribute(1, Attribute::StructRet);
+    // Call 'fn' and store the result in the result argument
+    Value* result =
+        builder.CreateCall(fn, ArrayRef<Value*>(&args[1], fn->arg_size()), "result");
+    builder.CreateStore(result, args[0]);
+    builder.CreateRetVoid();
+    fn = FinalizeFunction(fn_wrapper);
+    DCHECK(fn != NULL);
+  }
+  fns_to_jit_compile_.push_back(make_pair(fn, fn_ptr));
 }
 
 void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {

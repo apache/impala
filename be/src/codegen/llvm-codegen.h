@@ -302,7 +302,11 @@ class LlvmCodeGen {
   //
   // In addition, any functions not registered with AddFunctionToJit() are marked as
   // internal in FinalizeModule() and may be removed as part of optimization.
-  void AddFunctionToJit(llvm::Function* fn, void** result_fn_ptr);
+  //
+  // This will also wrap functions returning DecimalVals in an ABI-compliant wrapper (see
+  // the comment in the .cc file for details). This is so we don't accidentally try to
+  // call non-compliant code from native code.
+  void AddFunctionToJit(llvm::Function* fn, void** fn_ptr);
 
   // Verfies the function if the verfier is enabled.  Returns false if function
   // is invalid.
