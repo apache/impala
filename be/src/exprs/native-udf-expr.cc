@@ -362,6 +362,11 @@ void NativeUdfExpr::Close(RuntimeState* state) {
 //        i64* inttoptr (i64 89111072 to i64*))
 //   ret { i8, double } %result
 Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
+  if (ir_compute_fn_ != NULL) {
+    *fn = ir_compute_fn_;
+    return Status::OK;
+  }
+
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
   llvm::Function* udf;
@@ -451,6 +456,7 @@ Status NativeUdfExpr::GetIrComputeFn(RuntimeState* state, llvm::Function** fn) {
   (*fn)->addFnAttr(llvm::Attribute::AlwaysInline);
   *fn = codegen->FinalizeFunction(*fn);
   DCHECK(*fn != NULL);
+  ir_compute_fn_ = *fn;
   return Status::OK;
 }
 

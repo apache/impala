@@ -84,6 +84,7 @@ Expr::Expr(const ColumnType& type, bool is_slotref)
       is_slotref_(is_slotref),
       type_(type),
       output_scale_(-1),
+      ir_compute_fn_(NULL),
       codegen_fn_(NULL),
       adapter_fn_used_(false),
       scratch_buffer_size_(0),
@@ -100,6 +101,7 @@ Expr::Expr(const TExprNode& node, bool is_slotref)
       is_slotref_(is_slotref),
       type_(ColumnType(node.type)),
       output_scale_(-1),
+      ir_compute_fn_(NULL),
       codegen_fn_(NULL),
       adapter_fn_used_(false),
       scratch_buffer_size_(0),
@@ -934,8 +936,14 @@ Function* Expr::Codegen(LlvmCodeGen* codegen) {
 }
 
 Status Expr::GetIrComputeFn(RuntimeState* state, Function** fn) {
+  if (ir_compute_fn_ != NULL) {
+    *fn = ir_compute_fn_;
+    return Status::OK;
+  }
   DCHECK(state->codegen() != NULL);
-  return GetWrapperIrComputeFunction(state->codegen(), fn);
+  Status status = GetWrapperIrComputeFunction(state->codegen(), fn);
+  if (status.ok()) ir_compute_fn_ = *fn;
+  return status;
 }
 
 // Codegens a function that calls GetValue(this, row) and wraps the returned void* value

@@ -482,6 +482,9 @@ class Expr {
   ExprValue result_;
   int output_scale_;
 
+  // Cached codegened IR function. Exprs should set this in GetIrComputeFn().
+  llvm::Function* ir_compute_fn_;
+
   // Codegened IR function.  Will be NULL if this expr was not codegen'd.
   llvm::Function* codegen_fn_;
 
