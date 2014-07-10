@@ -229,21 +229,25 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     //    a semi-join;
     // 2) there are more matching build rows
     while (!hash_tbl_iterator_.AtEnd()) {
-      TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
-      hash_tbl_iterator_.Next<true>();
-
       int row_idx = out_batch->AddRow();
       TupleRow* out_row = out_batch->GetRow(row_idx);
+
+      TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
       CreateOutputRow(out_row, current_left_child_row_, matched_build_row);
-      if (!EvalConjuncts(other_conjuncts, num_other_conjuncts, out_row)) continue;
+      if (!EvalConjuncts(other_conjuncts, num_other_conjuncts, out_row)) {
+        hash_tbl_iterator_.Next<true>();
+        continue;
+      }
       // we have a match for the purpose of the (outer?) join as soon as we
       // satisfy the JOIN clause conjuncts
       matched_probe_ = true;
       if (match_all_build_) {
         // remember that we matched this build row
-        joined_build_rows_.insert(matched_build_row);
+        hash_tbl_iterator_.set_matched(true);
         VLOG_ROW << "joined build row: " << matched_build_row;
       }
+
+      hash_tbl_iterator_.Next<true>();
       if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
@@ -325,10 +329,10 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     TupleRow* build_row = NULL;
     while (!out_batch->AtCapacity() && !hash_tbl_iterator_.AtEnd()) {
       build_row = hash_tbl_iterator_.GetRow();
+      bool matched = hash_tbl_iterator_.matched();
       hash_tbl_iterator_.Next<false>();
-      if (joined_build_rows_.find(build_row) != joined_build_rows_.end()) {
-        continue;
-      }
+      if (matched) continue;
+
       int row_idx = out_batch->AddRow();
       TupleRow* out_row = out_batch->GetRow(row_idx);
       CreateOutputRow(out_row, NULL, build_row);

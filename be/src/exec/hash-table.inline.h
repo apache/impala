@@ -63,6 +63,7 @@ inline void HashTable::InsertImpl(void* data) {
   }
   next_node_->hash_ = hash;
   next_node_->data_ = data;
+  next_node_->matched_ = false;
   AddToBucket(&buckets_[bucket_idx], next_node_);
   DCHECK_GT(node_remaining_current_page_, 0);
   --node_remaining_current_page_;

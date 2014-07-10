@@ -17,7 +17,6 @@
 #define IMPALA_EXEC_HASH_JOIN_NODE_H
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/unordered_set.hpp>
 #include <boost/thread.hpp>
 #include <string>
 
@@ -66,10 +65,6 @@ class HashJoinNode : public BlockingJoinNode {
  private:
   boost::scoped_ptr<HashTable> hash_tbl_;
   HashTable::Iterator hash_tbl_iterator_;
-
-  // for right outer joins, keep track of what's been joined
-  typedef boost::unordered_set<TupleRow*> BuildTupleRowSet;
-  BuildTupleRowSet joined_build_rows_;
 
   // our equi-join predicates "<lhs> = <rhs>" are separated into
   // build_exprs_ (over child(1)) and probe_exprs_ (over child(0))

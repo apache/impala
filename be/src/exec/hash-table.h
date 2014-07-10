@@ -239,8 +239,18 @@ class HashTable {
       return reinterpret_cast<Tuple*>(node_->data_);
     }
 
+    void set_matched(bool v) {
+      DCHECK(!AtEnd());
+      node_->matched_ = v;
+    }
+
+    bool matched() const {
+      DCHECK(!AtEnd());
+      return node_->matched_;
+    }
+
     // Returns true if this iterator is at the end, i.e. GetRow() cannot be called.
-    bool AtEnd() { return node_ == NULL; }
+    bool AtEnd() const { return node_ == NULL; }
     bool operator!=(const Iterator& rhs) { return !(*this == rhs); }
 
     bool operator==(const Iterator& rhs) {
@@ -270,9 +280,18 @@ class HashTable {
   friend class Iterator;
   friend class HashTableTest;
 
+  // TODO: bit pack this struct. The default alignment makes this struct have a lot
+  // of wasted bytes.
   struct Node {
-    Node* next_;      // chain to next node for collisions
+    // Only used for full/right outer hash join to indicate if this row has been
+    // matched.
+    // From an abstraction point of view, this is an awkward place to store this
+    // information but it is very efficient here. This space is otherwise unused
+    // (and we can bitpack this more in the future).
+    bool matched_;
+
     uint32_t hash_;   // Cache of the hash for data_
+    Node* next_;      // chain to next node for collisions
     void* data_;      // Either the Tuple* or TupleRow*
   };
 
