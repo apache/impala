@@ -879,184 +879,227 @@ bigint
 ====
 ---- QUERY
 # CASE expr - Basic functionality
-select count(*) from alltypesagg where case date_string_col when "01/06/10" then (true)
-else (false) end
+select date_string_col, count(*) from alltypesagg where case date_string_col when "01/06/10" then (true)
+else (false) end group by 1
 ---- RESULTS
-1100
+'01/06/10',1100
 ---- TYPES
-bigint
+STRING, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case date_string_col when "01/06/10" then (false)
-else (true) end
+select date_string_col, count(*) from alltypesagg where case date_string_col when "01/06/10" then (false)
+else (true) end group by 1
 ---- RESULTS
-9900
+'01/08/10',1100
+'01/09/10',1100
+'01/02/10',1100
+'01/01/10',1100
+'01/03/10',1100
+'01/04/10',1100
+'01/10/10',1100
+'01/07/10',1100
+'01/05/10',1100
 ---- TYPES
-bigint
+STRING, BIGINT
 ====
 ---- QUERY
 # CASE expr - then expr will return NULL
-select count(*) from alltypesagg where case date_string_col when "01/06/10" then (NULL)
-else (false) end is null
+select date_string_col, count(*) from alltypesagg where case date_string_col when "01/06/10" then (NULL)
+else (false) end is null group by 1
 ---- RESULTS
-1100
+'01/06/10',1100
 ---- TYPES
-bigint
+STRING, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case date_string_col when NULL then (NULL) else
-(false) end is null
+select date_string_col, count(*) from alltypesagg where case date_string_col when NULL then (NULL) else
+(false) end is null group by 1
 ---- RESULTS
-0
 ---- TYPES
-bigint
+STRING, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case tinyint_col when 5 then true when 6 then
-true else NULL end
+select tinyint_col, count(*) from alltypesagg where case tinyint_col when 5 then true when 6 then
+true else NULL end group by 1
 ---- RESULTS
-2000
+6,1000
+5,1000
 ---- TYPES
-bigint
+TINYINT, BIGINT
 ====
 ---- QUERY
 # CASE expr - test multiple when exprs, ensure NULL when expr does not return
 # corresponding then expr
-select count(*) from alltypesagg where case tinyint_col when NULL then true else false end
+select tinyint_col, count(*) from alltypesagg where case tinyint_col when NULL then true else false end group by 1
 ---- RESULTS
-0
 ---- TYPES
-bigint
+TINYINT, BIGINT
 ====
 ---- QUERY
 # CASE expr - test return else works with NULL
-select count(*) from alltypesagg where case tinyint_col when 1 then true else NULL end
-is null
+select tinyint_col, count(*) from alltypesagg where case tinyint_col when 1 then true else NULL end
+is null group by 1
 ---- RESULTS
-10000
+3,1000
+NULL,2000
+2,1000
+4,1000
+8,1000
+6,1000
+5,1000
+7,1000
+9,1000
 ---- TYPES
-bigint
+TINYINT, BIGINT
 ====
 ---- QUERY
 # CASE expr - test that case statement without else expr returns NULL on no match
-select count(*) from alltypesagg where case tinyint_col when 1 then true end
-is null
+select tinyint_col, count(*) from alltypesagg where case tinyint_col when 1 then true end
+is null group by 1
 ---- RESULTS
-10000
+3,1000
+NULL,2000
+2,1000
+4,1000
+8,1000
+6,1000
+5,1000
+7,1000
+9,1000
 ---- TYPES
-bigint
+TINYINT, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case when (tinyint_col = 1) then true when
-(tinyint_col = 2) then true else false end
+select tinyint_col, count(*) from alltypesagg where case when (tinyint_col = 1) then true when
+(tinyint_col = 2) then true else false end group by 1
 ---- RESULTS
-2000
+2,1000
+1,1000
 ---- TYPES
-bigint
+TINYINT, BIGINT
 ====
 ---- QUERY
 # CASE expr - Test basic functionality with strings
-select count(*) from alltypesagg where case date_string_col when "01/06/10" then true
-when "01/02/10" then false when "01/08/10" then true end
+select date_string_col, count(*) from alltypesagg where case date_string_col when "01/06/10" then true
+when "01/02/10" then false when "01/08/10" then true end group by 1
 ---- RESULTS
-2200
+'01/08/10',1100
+'01/06/10',1100
 ---- TYPES
-bigint
+STRING, BIGINT
 ====
 ---- QUERY
-select sum(case date_string_col when "01/06/10" then 2 else 0 end) from alltypesagg
+select date_string_col, sum(case date_string_col when "01/06/10" then 2 else 0 end) from alltypesagg group by 1
 ---- RESULTS
-2200
+'01/08/10',0
+'01/09/10',0
+'01/02/10',0
+'01/06/10',2200
+'01/01/10',0
+'01/03/10',0
+'01/04/10',0
+'01/10/10',0
+'01/07/10',0
+'01/05/10',0
 ---- TYPES
-bigint
+STRING, BIGINT
 ====
 ---- QUERY
-select sum(case date_string_col when "01/06/10" then 2 when "01/02/10" then 1 else 0 end)
-from alltypesagg
+select date_string_col, sum(case date_string_col when "01/06/10" then 2 when "01/02/10" then 1 else 0 end)
+from alltypesagg group by 1
 ---- RESULTS
-3300
+'01/08/10',0
+'01/09/10',0
+'01/02/10',1100
+'01/06/10',2200
+'01/01/10',0
+'01/03/10',0
+'01/04/10',0
+'01/10/10',0
+'01/07/10',0
+'01/05/10',0
 ---- TYPES
-bigint
+STRING, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where(case bool_col when true then "true" when false
-then "false" end = "true")
+select bool_col, count(*) from alltypesagg where(case bool_col when true then "true" when false
+then "false" end = "true") group by 1
 ---- RESULTS
-6000
+true,6000
 ---- TYPES
-bigint
+BOOLEAN, BIGINT
 ====
 ---- QUERY
 # CASE expr - test when other expr types
-select count(*) from alltypesagg where case id when 8999 then cast(1 as int) else
-cast(0 as int) end = 1
+select id, count(*) from alltypesagg where case id when 8999 then cast(1 as int) else
+cast(0 as int) end = 1 group by 1
 ---- RESULTS
-1
+8999,1
 ---- TYPES
-bigint
+INT, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case bool_col when false then true else false end
+select bool_col, count(*) from alltypesagg where case bool_col when false then true else false end group by 1
 ---- RESULTS
-5000
+false,5000
 ---- TYPES
-bigint
+BOOLEAN, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case smallint_col  when 90 then cast(1 as smallint)
-else cast(0 as smallint) end = 1
+select smallint_col, count(*) from alltypesagg where case smallint_col  when 90 then cast(1 as smallint)
+else cast(0 as smallint) end = 1 group by 1
 ---- RESULTS
-200
+90,200
 ---- TYPES
-bigint
+SMALLINT, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case int_col  when 90 then cast(1 as int)
-else cast(0 as int) end = 1;
+select int_col, count(*) from alltypesagg where case int_col  when 90 then cast(1 as int)
+else cast(0 as int) end = 1 group by 1
 ---- RESULTS
-20
+90,20
 ---- TYPES
-bigint
+INT, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case bigint_col when 90 then cast(1 as bigint)
-else cast(0 as bigint) end = 1;
+select bigint_col, count(*) from alltypesagg where case bigint_col when 90 then cast(1 as bigint)
+else cast(0 as bigint) end = 1 group by 1
 ---- RESULTS
-10
+90,10
 ---- TYPES
-bigint
+BIGINT, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case float_col when 1089 then cast(1.0 as float)
-else cast(0.0 as float) end = 1.0
+select float_col, count(*) from alltypesagg where case float_col when 1089 then cast(1.0 as float)
+else cast(0.0 as float) end = 1.0 group by 1
 ---- RESULTS
-20
+1089,20
 ---- TYPES
-bigint
+FLOAT, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case double_col when 9999 then cast(1.0 as double)
-else cast(0.0 as double) end = 1.0
+select double_col, count(*) from alltypesagg where case double_col when 9999 then cast(1.0 as double)
+else cast(0.0 as double) end = 1.0 group by 1
 ---- RESULTS
-20
+9999,20
 ---- TYPES
-bigint
+DOUBLE, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case date_string_col  when "01/08/10" then "true"
-else "false" end = "true"
+select date_string_col, count(*) from alltypesagg where case date_string_col  when "01/08/10" then "true"
+else "false" end = "true" group by 1
 ---- RESULTS
-1100
+'01/08/10',1100
 ---- TYPES
-bigint
+STRING, BIGINT
 ====
 ---- QUERY
-select count(*) from alltypesagg where case timestamp_col when
-"2010-01-08 18:02:05.100000000"  then true else false end
+select timestamp_col, count(*) from alltypesagg where case timestamp_col when
+"2010-01-08 18:02:05.100000000"  then true else false end group by 1
 ---- RESULTS
-1
+2010-01-08 18:02:05.100000000,1
 ---- TYPES
-bigint
+TIMESTAMP, BIGINT
 ====
 ---- QUERY
 # BETWEEN predicate
