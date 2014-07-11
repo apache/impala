@@ -308,7 +308,9 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
 // HiveServer2 API
 void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     const TOpenSessionReq& request) {
-  VLOG_QUERY << "OpenSession(): request=" << ThriftDebugString(request);
+  // DO NOT log this Thrift struct in its entirety, in case a bad client sets the
+  // password.
+  VLOG_QUERY << "OpenSession(): username=" << request.username;
 
   // Generate session ID and the secret
   TUniqueId session_id;
