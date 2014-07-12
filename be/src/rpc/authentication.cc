@@ -68,6 +68,9 @@ DEFINE_bool(ldap_tls, false, "If true, use the secure TLS protocol to connect to
     " server");
 DEFINE_string(ldap_ca_certificate, "", "The full path to the certificate file used to"
     " authenticate the LDAP server's certificate for SSL / TLS connections.");
+DEFINE_bool(ldap_passwords_in_clear_ok, false, "If set, will allow LDAP passwords "
+    "to be sent in the clear (without TLS/SSL) over the network.  This option should not "
+    "be used in production environments" );
 DEFINE_bool(ldap_allow_anonymous_binds, false, "(Advanced) If true, LDAP authentication "
     "with a blank password (an 'anonymous bind') is allowed by Impala.");
 DEFINE_bool(ldap_manual_config, false, "(Advanced) If true, use a custom SASL config file"
@@ -90,8 +93,12 @@ static vector<sasl_callback_t> SASL_CALLBACKS;
 static const string HOSTNAME_PATTERN = "_HOST";
 
 // Constants for the two Sasl mechanisms we support
-static const std::string KERBEROS_MECHANISM = "GSSAPI";
-static const std::string PLAIN_MECHANISM = "PLAIN";
+static const string KERBEROS_MECHANISM = "GSSAPI";
+static const string PLAIN_MECHANISM = "PLAIN";
+
+// Required prefixes for ldap URIs:
+static const string LDAP_URI_PREFIX = "ldap://";
+static const string LDAPS_URI_PREFIX = "ldaps://";
 
 // Passed to the SaslGetOption() callback by SASL to indicate that the callback is for
 // LDAP, not any other mechanism.
@@ -533,8 +540,7 @@ Status LdapAuthProvider::Start() {
           ldap_err2string(set_rc)));
     }
   } else {
-    LOG(INFO) << "No certificate file specified for LDAP, will not check certificate for"
-              <<" authentication";
+    // A warning was already logged...
     int val = LDAP_OPT_X_TLS_ALLOW;
     int set_rc = ldap_set_option(NULL, LDAP_OPT_X_TLS_REQUIRE_CERT,
         reinterpret_cast<void*>(&val));
@@ -597,6 +603,37 @@ Status AuthManager::Init() {
       if (!FLAGS_ldap_bind_pattern.empty()) {
         return Status(Substitute(err_msg, "ldap_baseDN", "ldap_bind_pattern"));
       }
+    }
+
+    if (FLAGS_ldap_uri.empty()) {
+      return Status("--ldap_uri must be supplied when --ldap_enable_auth is set");
+    }
+
+    if ((FLAGS_ldap_uri.find(LDAP_URI_PREFIX) != 0) &&
+        (FLAGS_ldap_uri.find(LDAPS_URI_PREFIX) != 0)) {
+      return Status(Substitute("--ldap_uri must start with either $0 or $1",
+              LDAP_URI_PREFIX, LDAPS_URI_PREFIX ));
+    }
+
+    LOG(INFO) << "Using LDAP authentication with server " << FLAGS_ldap_uri;
+
+    if (!FLAGS_ldap_tls && (FLAGS_ldap_uri.find(LDAPS_URI_PREFIX) != 0)) {
+      if (FLAGS_ldap_passwords_in_clear_ok) {
+        LOG(WARNING) << "LDAP authentication is being used, but without TLS. "
+                     << "ALL PASSWORDS WILL GO OVER THE NETWORK IN THE CLEAR.";
+      } else {
+        return Status("LDAP authentication specified, but without TLS. "
+                      "Passwords would go over the network in the clear. "
+                      "Enable TLS with --ldap_tls or use an ldaps:// URI. "
+                      "To override this is non-production environments, "
+                      "specify --ldap_passwords_in_clear_ok");
+      }
+    } else if (FLAGS_ldap_ca_certificate.empty()) {
+      LOG(WARNING) << "LDAP authentication is being used with TLS, but without "
+                   << "an --ldap_ca_certificate file, the identity of the LDAP "
+                   << "server cannot be verified.  Network communication (and "
+                   << "hence passwords) could be intercepted by a "
+                   << "man-in-the-middle attack";
     }
 
     client_auth_provider_.reset(new LdapAuthProvider());
