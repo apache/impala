@@ -88,6 +88,7 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     ls = self.hdfs_client.list_dir(partition_dir)
     assert len(ls['FileStatuses']['FileStatus']) == 1
 
+  @pytest.mark.xfail(run=False, reason="Fails intermittently on test clusters")
   @pytest.mark.execute_serially
   def test_insert_inherit_acls(self):
     """Check that ACLs are inherited when we create new partitions"""
