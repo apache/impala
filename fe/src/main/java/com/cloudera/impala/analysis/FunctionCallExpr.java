@@ -20,10 +20,11 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExprNode;
@@ -168,7 +169,7 @@ public class FunctionCallExpr extends Expr {
   // a bit more user friendly than a generic function not found.
   // TODO: should we bother to do this? We could also improve the general
   // error messages. For example, listing the alternatives.
-  private String getFunctionNotFoundError(ColumnType[] argTypes) {
+  private String getFunctionNotFoundError(Type[] argTypes) {
     if (fnName_.isBuiltin_) {
       // Some custom error message for builtins
       if (params_.isStar()) {
@@ -203,7 +204,7 @@ public class FunctionCallExpr extends Expr {
    * TODO: this prevents UDFs from using wildcard decimals and is in general not scalable.
    * We should add a prepare_fn() to UDFs for doing this.
    */
-  private ColumnType resolveDecimalReturnType(Analyzer analyzer)
+  private Type resolveDecimalReturnType(Analyzer analyzer)
       throws AnalysisException, AuthorizationException {
     Preconditions.checkState(type_.isWildcardDecimal());
     Preconditions.checkState(fn_.getBinaryType() == TFunctionBinaryType.BUILTIN);
@@ -211,15 +212,15 @@ public class FunctionCallExpr extends Expr {
 
     // Find first decimal input (some functions, such as if(), begin with non-decimal
     // arguments).
-    ColumnType childType = null;
+    ScalarType childType = null;
     for (Expr child : children_) {
       if (child.type_.isDecimal()) {
-        childType = child.type_;
+        childType = (ScalarType) child.type_;
         break;
       }
     }
     Preconditions.checkState(childType != null && !childType.isWildcardDecimal());
-    ColumnType returnType = childType;
+    Type returnType = childType;
 
     if (fnName_.getFunction().equalsIgnoreCase("sum")) {
       return childType.getMaxResolutionType();
@@ -257,11 +258,11 @@ public class FunctionCallExpr extends Expr {
         NumericLiteral scaleLiteral = (NumericLiteral) LiteralExpr.create(
             children_.get(1), analyzer.getQueryCtx());
         digitsAfter = (int)scaleLiteral.getLongValue();
-        if (Math.abs(digitsAfter) > ColumnType.MAX_SCALE) {
+        if (Math.abs(digitsAfter) > ScalarType.MAX_SCALE) {
           throw new AnalysisException("Cannot round/truncate to scales greater than " +
-              ColumnType.MAX_SCALE + ".");
+              ScalarType.MAX_SCALE + ".");
         }
-        children_.set(1, scaleLiteral.uncheckedCastTo(ColumnType.INT));
+        children_.set(1, scaleLiteral.uncheckedCastTo(ScalarType.INT));
         // Round/Truncate to a negative scale means to round to the digit before
         // the decimal e.g. round(1234.56, -2) would be 1200.
         // The resulting scale is always 0.
@@ -279,7 +280,7 @@ public class FunctionCallExpr extends Expr {
       }
     }
     Preconditions.checkState(returnType.isDecimal() && !returnType.isWildcardDecimal());
-    return ColumnType.createDecimalTypeInternal(digitsBefore + digitsAfter, digitsAfter);
+    return ScalarType.createDecimalTypeInternal(digitsBefore + digitsAfter, digitsAfter);
   }
 
   @Override
@@ -295,7 +296,7 @@ public class FunctionCallExpr extends Expr {
       // check here.
       // TODO: rethink how we generate the merge aggregation.
       AggregateFunction aggFn = (AggregateFunction)fn_;
-      ColumnType intermediateType = aggFn.getIntermediateType();
+      Type intermediateType = aggFn.getIntermediateType();
       if (intermediateType == null) intermediateType = type_;
       // TODO: this needs to change when the intermediate type != the return type
       Preconditions.checkArgument(intermediateType.equals(fn_.getReturnType()));
@@ -303,7 +304,7 @@ public class FunctionCallExpr extends Expr {
       return;
     }
 
-    ColumnType[] argTypes = collectChildReturnTypes();
+    Type[] argTypes = collectChildReturnTypes();
 
     // User needs DB access.
     Db db = analyzer.getDb(fnName_.getDb(), Privilege.VIEW_METADATA);
@@ -316,14 +317,14 @@ public class FunctionCallExpr extends Expr {
       // There is no version of COUNT() that takes more than 1 argument but after
       // the rewrite, we only need count(*).
       // TODO: fix how we rewrite count distinct.
-      argTypes = new ColumnType[0];
-      Function searchDesc = new Function(fnName_, argTypes, ColumnType.INVALID, false);
+      argTypes = new Type[0];
+      Function searchDesc = new Function(fnName_, argTypes, Type.INVALID, false);
       fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUPERTYPE_OF);
       type_ = fn_.getReturnType();
       // Make sure BE doesn't see any TYPE_NULL exprs
       for (int i = 0; i < children_.size(); ++i) {
         if (getChild(i).getType().isNull()) {
-          uncheckedCastChild(ColumnType.BOOLEAN, i);
+          uncheckedCastChild(ScalarType.BOOLEAN, i);
         }
       }
       return;
@@ -340,7 +341,7 @@ public class FunctionCallExpr extends Expr {
           "AVG requires a numeric or timestamp parameter: " + toSql());
     }
 
-    Function searchDesc = new Function(fnName_, argTypes, ColumnType.INVALID, false);
+    Function searchDesc = new Function(fnName_, argTypes, Type.INVALID, false);
     fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUPERTYPE_OF);
 
     if (fn_ == null || !fn_.userVisible()) {

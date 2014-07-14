@@ -15,16 +15,18 @@
 package com.cloudera.impala.analysis;
 
 import java.util.HashMap;
+import java.util.List;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
+import com.google.common.collect.Lists;
 
 /**
  * Base class for CREATE [] FUNCTION.
@@ -125,10 +127,20 @@ public class CreateFunctionStmtBase extends StatementBase {
     }
 
     // Validate function arguments
-    for (ColumnType t: fn_.getArgs()) {
+    for (Type t: fn_.getArgs()) {
       t.analyze();
     }
     fn_.getReturnType().analyze();
+
+    // Forbid unsupported and complex types.
+    List<Type> refdTypes = Lists.newArrayList(fn_.getReturnType());
+    refdTypes.addAll(Lists.newArrayList(fn_.getArgs()));
+    for (Type t: refdTypes) {
+      if (!t.isSupported() || t.isComplexType()) {
+        throw new AnalysisException(
+            String.format("Type '%s' is not supported in UDFs/UDAs.", t.toSql()));
+      }
+    }
 
     if (analyzer.getCatalog().getDb(
         fn_.dbName(), analyzer.getUser(), Privilege.CREATE) == null) {

@@ -41,7 +41,7 @@ java_registry_preamble = '\
 \n\
 package com.cloudera.impala.builtins;\n\
 \n\
-import com.cloudera.impala.catalog.ColumnType;\n\
+import com.cloudera.impala.catalog.Type;\n\
 import com.cloudera.impala.catalog.Db;\n\
 \n\
 public class ScalarBuiltins { \n\
@@ -93,9 +93,9 @@ def generate_fe_entry(entry, name):
   else:
     java_output += ", false"
 
-  java_output += ", ColumnType." + entry["ret_type"]
+  java_output += ", Type." + entry["ret_type"]
   for arg in entry["args"]:
-    java_output += ", ColumnType." + arg
+    java_output += ", Type." + arg
   return java_output
 
 # Generates the FE builtins init file that registers all the builtins.

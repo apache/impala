@@ -47,10 +47,10 @@ import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -1288,7 +1288,7 @@ public class Planner {
       if (comp.getOp() == BinaryPredicate.Operator.NE) continue;
       Expr slotBinding = comp.getSlotBinding(d.getId());
       if (slotBinding == null || !slotBinding.isConstant() ||
-          !slotBinding.getType().equals(ColumnType.STRING)) {
+          !slotBinding.getType().equals(Type.STRING)) {
         continue;
       }
 

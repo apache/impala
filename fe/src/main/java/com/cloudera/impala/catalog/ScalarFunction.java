@@ -41,12 +41,12 @@ public class ScalarFunction extends Function {
   // TODO: remove when ComputeFn interface is removed.
   private boolean udfInterface_;
 
-  public ScalarFunction(FunctionName fnName, FunctionArgs args, ColumnType retType) {
+  public ScalarFunction(FunctionName fnName, FunctionArgs args, Type retType) {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
   }
 
-  public ScalarFunction(FunctionName fnName, List<ColumnType> argTypes,
-      ColumnType retType, HdfsUri location, String symbolName, String initFnSymbol,
+  public ScalarFunction(FunctionName fnName, List<Type> argTypes,
+      Type retType, HdfsUri location, String symbolName, String initFnSymbol,
       String closeFnSymbol) {
     super(fnName, argTypes, retType, false);
     setLocation(location);
@@ -59,8 +59,8 @@ public class ScalarFunction extends Function {
    * Creates a builtin scalar function. This is a helper that wraps a few steps
    * into one call. This defaults to not using a Prepare/Close function.
    */
-  public static ScalarFunction createBuiltin(String name, ArrayList<ColumnType> argTypes,
-      boolean hasVarArgs, ColumnType retType, String symbol, boolean udfInterface) {
+  public static ScalarFunction createBuiltin(String name, ArrayList<Type> argTypes,
+      boolean hasVarArgs, Type retType, String symbol, boolean udfInterface) {
     return createBuiltin(name, argTypes, hasVarArgs, retType,
                          symbol, null, null, udfInterface);
   }
@@ -69,8 +69,8 @@ public class ScalarFunction extends Function {
    * Creates a builtin scalar function. This is a helper that wraps a few steps
    * into one call.
    */
-  public static ScalarFunction createBuiltin(String name, ArrayList<ColumnType> argTypes,
-      boolean hasVarArgs, ColumnType retType, String symbol,
+  public static ScalarFunction createBuiltin(String name, ArrayList<Type> argTypes,
+      boolean hasVarArgs, Type retType, String symbol,
       String prepareFnSymbol, String closeFnSymbol, boolean udfInterface) {
     Preconditions.checkNotNull(symbol);
     FunctionArgs fnArgs = new FunctionArgs(argTypes, hasVarArgs);
@@ -92,7 +92,7 @@ public class ScalarFunction extends Function {
    * implementations. (gen_functions.py). Is there a better way to coordinate this.
    */
   public static ScalarFunction createBuiltinOperator(String name,
-      ArrayList<ColumnType> argTypes, ColumnType retType) {
+      ArrayList<Type> argTypes, Type retType) {
     // Operators have a well defined symbol based on the function name and type.
     // Convert Add(TINYINT, TINYINT) --> Add_char_char
     String beFn = Character.toUpperCase(name.charAt(0)) + name.substring(1);
@@ -131,7 +131,8 @@ public class ScalarFunction extends Function {
           usesDecimal = true;
           break;
         default:
-          Preconditions.checkState(false);
+          Preconditions.checkState(false,
+              "Argument type not supported: " + argTypes.get(i).toSql());
       }
     }
     String beClass = usesDecimal ? "DecimalOperators" : "ComputeFunctions";
@@ -142,7 +143,7 @@ public class ScalarFunction extends Function {
    * Create a builtin function with the symbol beClass::beFn
    */
   public static ScalarFunction createBuiltinOperator(String name,
-      String beClass, String beFn, ArrayList<ColumnType> argTypes, ColumnType retType) {
+      String beClass, String beFn, ArrayList<Type> argTypes, Type retType) {
     FunctionArgs fnArgs = new FunctionArgs(argTypes, false);
     ScalarFunction fn =
         new ScalarFunction(new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, retType);
@@ -168,13 +169,13 @@ public class ScalarFunction extends Function {
    * Create a function that is used to search the catalog for a matching builtin. Only
    * the fields necessary for matching function prototypes are specified.
    */
-  public static ScalarFunction createBuiltinSearchDesc(String name, ColumnType[] argTypes,
+  public static ScalarFunction createBuiltinSearchDesc(String name, Type[] argTypes,
       boolean hasVarArgs) {
     FunctionArgs fnArgs = new FunctionArgs(
-        argTypes == null ? new ArrayList<ColumnType>() : Lists.newArrayList(argTypes),
+        argTypes == null ? new ArrayList<Type>() : Lists.newArrayList(argTypes),
         hasVarArgs);
     ScalarFunction fn = new ScalarFunction(
-        new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, ColumnType.INVALID);
+        new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, Type.INVALID);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     return fn;
   }

@@ -54,7 +54,7 @@ public class ColumnStats {
   private long numDistinctValues_;
   private long numNulls_;
 
-  public ColumnStats(ColumnType colType) {
+  public ColumnStats(Type colType) {
     initColStats(colType);
   }
 
@@ -63,7 +63,7 @@ public class ColumnStats {
    * (those which don't need additional storage besides the slot they occupy),
    * sets avgSerializedSize and maxSize to their slot size.
    */
-  private void initColStats(ColumnType colType) {
+  private void initColStats(Type colType) {
     avgSize_ = -1;
     avgSerializedSize_ = -1;
     maxSize_ = -1;
@@ -141,8 +141,8 @@ public class ColumnStats {
    * Returns false if the ColumnStatisticsData data was incompatible with the given
    * column type, otherwise returns true.
    */
-  public boolean update(ColumnType colType, ColumnStatisticsData statsData) {
-    Preconditions.checkState(SUPPORTED_COL_TYPES.contains(colType.getPrimitiveType()));
+  public boolean update(Type colType, ColumnStatisticsData statsData) {
+    Preconditions.checkState(isSupportedColType(colType));
     initColStats(colType);
     boolean isCompatible = false;
     switch (colType.getPrimitiveType()) {
@@ -215,11 +215,13 @@ public class ColumnStats {
   /**
    * Returns true if the given PrimitiveType supports column stats updates.
    */
-  public static boolean isSupportedColType(ColumnType colType) {
-    return SUPPORTED_COL_TYPES.contains(colType.getPrimitiveType());
+  public static boolean isSupportedColType(Type colType) {
+    if (!colType.isScalarType()) return false;
+    ScalarType scalarType = (ScalarType) colType;
+    return SUPPORTED_COL_TYPES.contains(scalarType.getPrimitiveType());
   }
 
-  public void update(ColumnType colType, TColumnStats stats) {
+  public void update(Type colType, TColumnStats stats) {
     initColStats(colType);
     avgSize_ = Double.valueOf(stats.getAvg_size()).floatValue();
     if (colType.getPrimitiveType() == PrimitiveType.STRING ||

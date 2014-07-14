@@ -24,10 +24,11 @@ import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.CatalogException;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
 
@@ -943,9 +944,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         DATA_SOURCE_NAME);
     AnalysisError("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
         "not_a_data_src(\"\")", "Data source does not exist");
-    for (ColumnType columnType: ColumnType.getSupportedTypes()) {
-      PrimitiveType type = columnType.getPrimitiveType();
-      if (DataSourceTable.isSupportedPrimitiveType(type) || columnType.isNull()) continue;
+    for (Type t: Type.getSupportedTypes()) {
+      PrimitiveType type = t.getPrimitiveType();
+      if (DataSourceTable.isSupportedPrimitiveType(type) || t.isNull()) continue;
       String typeSpec = type.name();
       if (type == PrimitiveType.CHAR || type == PrimitiveType.DECIMAL) {
         typeSpec += "(10)";
@@ -1302,9 +1303,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("drop function if exists foo(double, int...)");
 
     // Add functions default.TestFn(), default.TestFn(double), default.TestFn(String...),
-    addTestFunction("TestFn", new ArrayList<ColumnType>(), false);
-    addTestFunction("TestFn", Lists.newArrayList(ColumnType.DOUBLE), false);
-    addTestFunction("TestFn", Lists.newArrayList(ColumnType.STRING), true);
+    addTestFunction("TestFn", new ArrayList<ScalarType>(), false);
+    addTestFunction("TestFn", Lists.newArrayList(Type.DOUBLE), false);
+    addTestFunction("TestFn", Lists.newArrayList(Type.STRING), true);
 
     AnalysisError("create function TestFn() RETURNS INT " + udfSuffix,
         "Function already exists: testfn()");
@@ -1318,8 +1319,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Function already exists: testfn(DOUBLE)");
 
     // Add default.TestFn(int, int)
-    addTestFunction("TestFn",
-        Lists.newArrayList(ColumnType.INT, ColumnType.INT), false);
+    addTestFunction("TestFn", Lists.newArrayList(Type.INT, Type.INT), false);
     AnalyzesOk("drop function TestFn(int, int)");
     AnalysisError("drop function TestFn(int, int, int)",
         "Function does not exist: testfn(INT, INT, INT)");

@@ -225,7 +225,7 @@ public class Db implements CatalogObject {
    * This defaults to not using a Prepare/Close function.
    */
   public void addScalarBuiltin(boolean udfInterface, String fnName, String symbol,
-      boolean varArgs, ColumnType retType, ColumnType ... args) {
+      boolean varArgs, Type retType, Type ... args) {
     addScalarBuiltin(udfInterface, fnName, symbol, null, null, varArgs, retType, args);
   }
 
@@ -233,8 +233,8 @@ public class Db implements CatalogObject {
    * Add a builtin with the specified name and signatures to this db.
    */
   public void addScalarBuiltin(boolean udfInterface, String fnName, String symbol,
-      String prepareFnSymbol, String closeFnSymbol, boolean varArgs, ColumnType retType,
-      ColumnType ... args) {
+      String prepareFnSymbol, String closeFnSymbol, boolean varArgs, Type retType,
+      Type ... args) {
     Preconditions.checkState(isSystemDb());
     addBuiltin(ScalarFunction.createBuiltin(
         fnName, Lists.newArrayList(args), varArgs, retType,

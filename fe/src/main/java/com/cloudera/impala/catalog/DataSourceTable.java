@@ -98,7 +98,7 @@ public class DataSourceTable extends Table {
   /**
    * Returns true if the column type is supported.
    */
-  public static boolean isSupportedColumnType(ColumnType colType) {
+  public static boolean isSupportedColumnType(Type colType) {
     Preconditions.checkNotNull(colType);
     return isSupportedPrimitiveType(colType.getPrimitiveType());
   }
@@ -207,7 +207,7 @@ public class DataSourceTable extends Table {
   public TResultSet getTableStats() {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
-    resultSchema.addToColumns(new TColumn("#Rows", ColumnType.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
     result.setSchema(resultSchema);
     TResultRowBuilder rowBuilder = new TResultRowBuilder();
     rowBuilder.add(numRows_);

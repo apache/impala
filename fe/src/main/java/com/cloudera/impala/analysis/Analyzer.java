@@ -32,7 +32,6 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
@@ -42,6 +41,7 @@ import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Id;
@@ -1373,15 +1373,14 @@ public class Analyzer {
    * but note that lastCompatibleExpr may not yet have lastCompatibleType,
    * because it was not cast yet.
    */
-  public ColumnType getCompatibleType(ColumnType lastCompatibleType,
-      Expr lastCompatibleExpr, Expr expr)
-      throws AnalysisException {
-    ColumnType newCompatibleType;
+  public Type getCompatibleType(Type lastCompatibleType, Expr lastCompatibleExpr,
+      Expr expr) throws AnalysisException {
+    Type newCompatibleType;
     if (lastCompatibleType == null) {
       newCompatibleType = expr.getType();
     } else {
       newCompatibleType =
-        ColumnType.getAssignmentCompatibleType(lastCompatibleType, expr.getType());
+          Type.getAssignmentCompatibleType(lastCompatibleType, expr.getType());
     }
     if (!newCompatibleType.isValid()) {
       throw new AnalysisException("Incompatible return types '" + lastCompatibleType +
@@ -1397,11 +1396,11 @@ public class Analyzer {
    * Throw an AnalysisException if the types are incompatible,
    * returns compatible type otherwise.
    */
-  public ColumnType castAllToCompatibleType(List<Expr> exprs)
+  public Type castAllToCompatibleType(List<Expr> exprs)
       throws AnalysisException, AuthorizationException {
     // Determine compatible type of exprs.
     Expr lastCompatibleExpr = exprs.get(0);
-    ColumnType compatibleType = null;
+    Type compatibleType = null;
     for (int i = 0; i < exprs.size(); ++i) {
       exprs.get(i).analyze(this);
       compatibleType = getCompatibleType(compatibleType, lastCompatibleExpr,

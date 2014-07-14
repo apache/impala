@@ -26,7 +26,7 @@ public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
   private final boolean binaryEncoded_;
 
   public HBaseColumn(String name, String columnFamily, String columnQualifier,
-      boolean binaryEncoded, ColumnType type, String comment, int position) {
+      boolean binaryEncoded, Type type, String comment, int position) {
     super(name, type, comment, position);
     columnFamily_ = columnFamily;
     columnQualifier_ = columnQualifier;

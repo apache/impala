@@ -227,7 +227,7 @@ public class HBaseTable extends Table {
 
   private boolean supportsBinaryEncoding(FieldSchema fs) {
     try {
-      ColumnType colType = parseColumnType(fs);
+      Type colType = parseColumnType(fs);
       // Only boolean, integer and floating point types can use binary storage.
       return colType.isBoolean() || colType.isIntegerType()
           || colType.isFloatingPointType();
@@ -292,7 +292,7 @@ public class HBaseTable extends Table {
       HBaseColumn keyCol = null;
       for (int i = 0; i < fieldSchemas.size(); ++i) {
         FieldSchema s = fieldSchemas.get(i);
-        ColumnType t = ColumnType.INVALID;
+        Type t = Type.INVALID;
         try {
           t = parseColumnType(s);
         } catch (TableLoadingException e) {
@@ -612,11 +612,11 @@ public class HBaseTable extends Table {
     TResultSetMetadata resultSchema = new TResultSetMetadata();
     result.setSchema(resultSchema);
     resultSchema.addToColumns(
-        new TColumn("Region Location", ColumnType.STRING.toThrift()));
+        new TColumn("Region Location", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Start RowKey",
-        ColumnType.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Est. #Rows", ColumnType.BIGINT.toThrift()));
-    resultSchema.addToColumns(new TColumn("Size", ColumnType.STRING.toThrift()));
+        Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Est. #Rows", Type.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
 
     // TODO: Consider fancier stats maintenance techniques for speeding up this process.
     // Currently, we list all regions and perform a mini-scan of each of them to

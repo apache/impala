@@ -45,7 +45,6 @@ import com.cloudera.impala.thrift.TDataSourceScanNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
-import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TScanRangeLocation;
@@ -105,34 +104,35 @@ public class DataSourceScanNode extends ScanNode {
    * predicate, or null if the type cannot be represented.
    */
   public static TColumnValue literalToColumnValue(LiteralExpr expr) {
-    TPrimitiveType colType = expr.getType().toThrift().getType();
-    switch (colType) {
-    case BOOLEAN:
-      return new TColumnValue().setBool_val(((BoolLiteral) expr).getValue());
-    case TINYINT:
-      return new TColumnValue().setByte_val(
-          (byte) ((NumericLiteral) expr).getLongValue());
-    case SMALLINT:
-      return new TColumnValue().setShort_val(
+    switch (expr.getType().getPrimitiveType()) {
+      case BOOLEAN:
+        return new TColumnValue().setBool_val(((BoolLiteral) expr).getValue());
+      case TINYINT:
+        return new TColumnValue().setByte_val(
+            (byte) ((NumericLiteral) expr).getLongValue());
+      case SMALLINT:
+        return new TColumnValue().setShort_val(
           (short) ((NumericLiteral) expr).getLongValue());
-    case INT:
-      return new TColumnValue().setInt_val((int) ((NumericLiteral) expr).getLongValue());
-    case BIGINT:
-      return new TColumnValue().setLong_val(((NumericLiteral) expr).getLongValue());
-    case FLOAT:
-    case DOUBLE:
-      return new TColumnValue().setDouble_val(((NumericLiteral) expr).getDoubleValue());
-    case STRING:
-      return new TColumnValue().setString_val(((StringLiteral) expr).getValue());
-    case DECIMAL:
-    case DATE:
-    case DATETIME:
-    case TIMESTAMP:
-      // TODO: we support DECIMAL and TIMESTAMP but no way to specify it in SQL.
-      return null;
-    default:
-      Preconditions.checkState(false);
-      return null;
+      case INT:
+        return new TColumnValue().setInt_val(
+            (int) ((NumericLiteral) expr).getLongValue());
+      case BIGINT:
+        return new TColumnValue().setLong_val(((NumericLiteral) expr).getLongValue());
+      case FLOAT:
+      case DOUBLE:
+        return new TColumnValue().setDouble_val(
+            ((NumericLiteral) expr).getDoubleValue());
+      case STRING:
+        return new TColumnValue().setString_val(((StringLiteral) expr).getValue());
+      case DECIMAL:
+      case DATE:
+      case DATETIME:
+      case TIMESTAMP:
+        // TODO: we support DECIMAL and TIMESTAMP but no way to specify it in SQL.
+        return null;
+      default:
+        Preconditions.checkState(false);
+        return null;
     }
   }
 

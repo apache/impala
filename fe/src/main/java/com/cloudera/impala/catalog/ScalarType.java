@@ -1,0 +1,407 @@
+package com.cloudera.impala.catalog;
+
+import com.cloudera.impala.analysis.TypesUtil;
+import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TColumnType;
+import com.cloudera.impala.thrift.TScalarType;
+import com.cloudera.impala.thrift.TTypeNode;
+import com.cloudera.impala.thrift.TTypeNodeType;
+import com.google.common.base.Preconditions;
+
+/**
+ * Describes a scalar type. For most types this class just wraps a PrimitiveType enum,
+ * but for types like CHAR and DECIMAL, this class contain additional information.
+ *
+ * Scalar types have a few ways they can be compared to other scalar types. They can be:
+ *   1. completely identical,
+ *   2. implicitly castable (convertible without loss of precision)
+ *   3. subtype. For example, in the case of decimal, a type can be decimal(*, *)
+ *   indicating that any decimal type is a subtype of the decimal type.
+ */
+public class ScalarType extends Type {
+  private final PrimitiveType type_;
+
+  // Only used for type CHAR.
+  private int len_;
+
+  // Only used if type is DECIMAL. -1 (for both) is used to represent a
+  // decimal with any precision and scale.
+  // It is invalid to have one by -1 and not the other.
+  // TODO: we could use that to store DECIMAL(8,*), indicating a decimal
+  // with 8 digits of precision and any valid ([0-8]) scale.
+  private int precision_;
+  private int scale_;
+
+  // SQL allows the engine to pick the default precision. We pick the largest
+  // precision that is supported by the smallest decimal type in the BE (4 bytes).
+  public static final int DEFAULT_PRECISION = 9;
+  public static final int DEFAULT_SCALE = 0; // SQL standard
+
+  // Hive, mysql, sql server standard.
+  public static final int MAX_PRECISION = 38;
+  public static final int MAX_SCALE = MAX_PRECISION;
+
+  protected ScalarType(PrimitiveType type) {
+    type_ = type;
+  }
+
+  public static ScalarType createType(PrimitiveType type) {
+    switch (type) {
+      case INVALID_TYPE: return INVALID;
+      case NULL_TYPE: return NULL;
+      case BOOLEAN: return BOOLEAN;
+      case SMALLINT: return SMALLINT;
+      case TINYINT: return TINYINT;
+      case INT: return INT;
+      case BIGINT: return BIGINT;
+      case FLOAT: return FLOAT;
+      case DOUBLE: return DOUBLE;
+      case STRING: return STRING;
+      case BINARY: return BINARY;
+      case TIMESTAMP: return TIMESTAMP;
+      case DATE: return DATE;
+      case DATETIME: return DATETIME;
+      case DECIMAL: return (ScalarType) createDecimalType();
+      default:
+        Preconditions.checkState(false);
+        return NULL;
+    }
+  }
+
+  public static Type createCharType(int len) {
+    ScalarType type = new ScalarType(PrimitiveType.CHAR);
+    type.len_ = len;
+    return type;
+  }
+
+  public static ScalarType createDecimalType() { return DEFAULT_DECIMAL; }
+
+  public static ScalarType createDecimalType(int precision) {
+    return createDecimalType(precision, DEFAULT_SCALE);
+  }
+
+  public static ScalarType createDecimalType(int precision, int scale) {
+    Preconditions.checkState(precision >= 0); // Enforced by parser
+    Preconditions.checkState(scale >= 0); // Enforced by parser.
+    ScalarType type = new ScalarType(PrimitiveType.DECIMAL);
+    type.precision_ = precision;
+    type.scale_ = scale;
+    return type;
+  }
+
+  // Identical to createDecimalType except that higher precisions are truncated
+  // to the max storable precision. The BE will report overflow in these cases
+  // (think of this as adding ints to BIGINT but BIGINT can still overflow).
+  public static ScalarType createDecimalTypeInternal(int precision, int scale) {
+    ScalarType type = new ScalarType(PrimitiveType.DECIMAL);
+    type.precision_ = Math.min(precision, MAX_PRECISION);
+    type.scale_ = Math.min(type.precision_, scale);
+    type.isAnalyzed_ = true;
+    return type;
+  }
+
+  @Override
+  public void analyze() throws AnalysisException {
+    if (isAnalyzed_) return;
+    Preconditions.checkState(type_ != PrimitiveType.INVALID_TYPE);
+    switch (type_) {
+      case CHAR: {
+        if (len_ <= 0) {
+          throw new AnalysisException("Char size must be > 0. Size was set to: " +
+              len_ + ".");
+        }
+        break;
+      }
+      case DECIMAL: {
+        if (precision_ > MAX_PRECISION) {
+          throw new AnalysisException(
+              "Decimal precision must be <= " + MAX_PRECISION + ".");
+        }
+        if (precision_ == 0) {
+          throw new AnalysisException("Decimal precision must be greater than 0.");
+        }
+        if (scale_ > precision_) {
+          throw new AnalysisException("Decimal scale (" + scale_ + ") must be <= " +
+              "precision (" + precision_ + ").");
+        }
+      }
+      default: break;
+    }
+    isAnalyzed_ = true;
+  }
+
+  @Override
+  public String toString() {
+    if (type_ == PrimitiveType.CHAR) {
+      return "CHAR(" + len_ + ")";
+    } else  if (type_ == PrimitiveType.DECIMAL) {
+      return "DECIMAL(" + precision_ + "," + scale_ + ")";
+    }
+    return type_.toString();
+  }
+
+  @Override
+  public String toSql() {
+    switch(type_) {
+      case BINARY: return type_.toString();
+      case CHAR: return type_.toString() + "(" + len_ + ")";
+      case DECIMAL:
+        return String.format("%s(%s,%s)", type_.toString(), precision_, scale_);
+      default: return type_.toString();
+    }
+  }
+
+  @Override
+  public void toThrift(TColumnType container) {
+    TTypeNode node = new TTypeNode();
+    container.types.add(node);
+    switch(type_) {
+      case CHAR: {
+        node.setType(TTypeNodeType.SCALAR);
+        TScalarType scalarType = new TScalarType();
+        scalarType.setType(type_.toThrift());
+        scalarType.setLen(len_);
+        node.setScalar_type(scalarType);
+        break;
+      }
+      case DECIMAL: {
+        node.setType(TTypeNodeType.SCALAR);
+        TScalarType scalarType = new TScalarType();
+        scalarType.setType(type_.toThrift());
+        scalarType.setScale(scale_);
+        scalarType.setPrecision(precision_);
+        node.setScalar_type(scalarType);
+        break;
+      }
+      default: {
+        node.setType(TTypeNodeType.SCALAR);
+        TScalarType scalarType = new TScalarType();
+        scalarType.setType(type_.toThrift());
+        node.setScalar_type(scalarType);
+        break;
+      }
+    }
+  }
+
+  public static Type[] toColumnType(PrimitiveType[] types) {
+    Type result[] = new Type[types.length];
+    for (int i = 0; i < types.length; ++i) {
+      result[i] = createType(types[i]);
+    }
+    return result;
+  }
+
+  public int decimalPrecision() {
+    Preconditions.checkState(type_ == PrimitiveType.DECIMAL);
+    return precision_;
+  }
+
+  public int decimalScale() {
+    Preconditions.checkState(type_ == PrimitiveType.DECIMAL);
+    return scale_;
+  }
+
+  @Override
+  public PrimitiveType getPrimitiveType() { return type_; }
+  public int ordinal() { return type_.ordinal(); }
+
+  @Override
+  public boolean isWildcardDecimal() {
+    return type_ == PrimitiveType.DECIMAL && precision_ == -1 && scale_ == -1;
+  }
+
+  /**
+   *  Returns true if this type is a fully specified (not wild card) decimal.
+   */
+  @Override
+  public boolean isFullySpecifiedDecimal() {
+    if (!isDecimal()) return false;
+    if (isWildcardDecimal()) return false;
+    if (precision_ <= 0 || precision_ > MAX_PRECISION) return false;
+    if (scale_ < 0 || scale_ > precision_) return false;
+    return true;
+  }
+
+  @Override
+  public boolean isFixedLengthType() {
+    return type_ == PrimitiveType.BOOLEAN || type_ == PrimitiveType.TINYINT
+        || type_ == PrimitiveType.SMALLINT || type_ == PrimitiveType.INT
+        || type_ == PrimitiveType.BIGINT || type_ == PrimitiveType.FLOAT
+        || type_ == PrimitiveType.DOUBLE || type_ == PrimitiveType.DATE
+        || type_ == PrimitiveType.DATETIME || type_ == PrimitiveType.TIMESTAMP
+        || type_ == PrimitiveType.CHAR || type_ == PrimitiveType.DECIMAL;
+  }
+
+  @Override
+  public boolean isSupported() {
+    switch (type_) {
+      case DATE:
+      case DATETIME:
+      case BINARY:
+        return false;
+      default:
+        return true;
+      }
+  }
+
+  @Override
+  public boolean supportsTablePartitioning() {
+    if (!isSupported() || isComplexType() || type_ == PrimitiveType.TIMESTAMP
+        || type_ == PrimitiveType.CHAR) {
+      return false;
+    }
+    return true;
+  }
+
+  @Override
+  public int getSlotSize() {
+    switch (type_) {
+      case CHAR: return len_;
+      case DECIMAL: return TypesUtil.getDecimalSlotSize(this);
+      default:
+        return type_.getSlotSize();
+    }
+  }
+
+  /**
+   * Returns true if this object is of type t.
+   * Handles wildcard types. That is, if t is the wildcard type variant
+   * of 'this', returns true.
+   */
+  @Override
+  public boolean matchesType(Type t) {
+    if (equals(t)) return true;
+    if (!t.isScalarType()) return false;
+    ScalarType scalarType = (ScalarType) t;
+    if (isDecimal() && scalarType.isWildcardDecimal()) {
+      Preconditions.checkState(!isWildcardDecimal());
+      return true;
+    }
+    return false;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof ScalarType)) return false;
+    ScalarType other = (ScalarType)o;
+    if (type_ != other.type_) return false;
+    if (type_ == PrimitiveType.CHAR) return len_ == other.len_;
+    if (type_ == PrimitiveType.DECIMAL) {
+      return precision_ == other.precision_ && scale_ == other.scale_;
+    }
+    return true;
+  }
+
+  public Type getMaxResolutionType() {
+    if (isIntegerType()) {
+      return ScalarType.BIGINT;
+    // Timestamps get summed as DOUBLE for AVG.
+    } else if (isFloatingPointType() || type_ == PrimitiveType.TIMESTAMP) {
+      return ScalarType.DOUBLE;
+    } else if (isNull()) {
+      return ScalarType.NULL;
+    } else if (isDecimal()) {
+      return createDecimalTypeInternal(MAX_PRECISION, scale_);
+    } else {
+      return ScalarType.INVALID;
+    }
+  }
+
+  public ScalarType getNextResolutionType() {
+    Preconditions.checkState(isNumericType() || isNull());
+    if (type_ == PrimitiveType.DOUBLE || type_ == PrimitiveType.BIGINT || isNull()) {
+      return this;
+    } else if (type_ == PrimitiveType.DECIMAL) {
+      return createDecimalTypeInternal(MAX_PRECISION, scale_);
+    }
+    return createType(PrimitiveType.values()[type_.ordinal() + 1]);
+  }
+
+  /**
+   * Returns the smallest decimal type that can safely store this type. Returns
+   * INVALID if this type cannot be stored as a decimal.
+   */
+  public ScalarType getMinResolutionDecimal() {
+    switch (type_) {
+      case NULL_TYPE: return Type.NULL;
+      case DECIMAL: return this;
+      case TINYINT: return createDecimalType(3);
+      case SMALLINT: return createDecimalType(5);
+      case INT: return createDecimalType(10);
+      case BIGINT: return createDecimalType(19);
+      case FLOAT: return createDecimalTypeInternal(MAX_PRECISION, 9);
+      case DOUBLE: return createDecimalTypeInternal(MAX_PRECISION, 17);
+      default: return ScalarType.INVALID;
+    }
+  }
+
+  /**
+   * Returns true if this decimal type is a supertype of the other decimal type.
+   * e.g. (10,3) is a super type of (3,3) but (5,4) is not a supertype of (3,0).
+   * To be a super type of another decimal, the number of digits before and after
+   * the decimal point must be greater or equal.
+   */
+  public boolean isSupertypeOf(ScalarType o) {
+    Preconditions.checkState(isDecimal());
+    Preconditions.checkState(o.isDecimal());
+    if (isWildcardDecimal()) return true;
+    return scale_ >= o.scale_ && precision_ - scale_ >= o.precision_ - o.scale_;
+  }
+
+  /**
+   * Return type t such that values from both t1 and t2 can be assigned to t
+   * without loss of precision. Returns INVALID_TYPE if there is no such type
+   * or if any of t1 and t2 is INVALID_TYPE.
+   */
+  public static ScalarType getAssignmentCompatibleType(ScalarType t1,
+      ScalarType t2) {
+    if (!t1.isValid() || !t2.isValid()) return INVALID;
+    if (t1.equals(t2)) return t1;
+
+    if (t1.isDecimal() || t2.isDecimal()) {
+      if (t1.isNull()) return t2;
+      if (t2.isNull()) return t1;
+
+      // In the case of decimal and float/double, return the floating point type.
+      // Floating point types can contain values larger than the maximum decimal
+      // so it is a safer compatible type.
+      // TODO: revisit, the function comment is clear that this should return the type
+      // which results in no loss of precision. This would mean there is no compatible
+      // type between decimals and floating point types. However, we can't return
+      // INVALID since this path is also used when checking if an explicit cast is
+      // legal.
+      if (t1.isFloatingPointType()) return t1;
+      if (t2.isFloatingPointType()) return t2;
+
+      // Allow casts between decimal and numeric types by converting
+      // numeric types to the containing decimal type.
+      ScalarType t1Decimal = t1.getMinResolutionDecimal();
+      ScalarType t2Decimal = t2.getMinResolutionDecimal();
+      if (t1Decimal.isInvalid() || t2Decimal.isInvalid()) return Type.INVALID;
+      Preconditions.checkState(t1Decimal.isDecimal());
+      Preconditions.checkState(t2Decimal.isDecimal());
+
+      if (t1Decimal.isSupertypeOf(t2Decimal)) return t1;
+      if (t2Decimal.isSupertypeOf(t1Decimal)) return t2;
+      return TypesUtil.getDecimalAssignmentCompatibleType(t1Decimal, t2Decimal);
+    }
+
+    PrimitiveType smallerType =
+        (t1.type_.ordinal() < t2.type_.ordinal() ? t1.type_ : t2.type_);
+    PrimitiveType largerType =
+        (t1.type_.ordinal() > t2.type_.ordinal() ? t1.type_ : t2.type_);
+    PrimitiveType result =
+        compatibilityMatrix[smallerType.ordinal()][largerType.ordinal()];
+    Preconditions.checkNotNull(result);
+    return createType(result);
+  }
+
+  /**
+   * Returns if it is compatible to implicitly cast from t1 to t2 (casting from
+   * t1 to t2 results in no loss of precision).
+   */
+  public static boolean isImplicitlyCastable(ScalarType t1, ScalarType t2) {
+    return getAssignmentCompatibleType(t1, t2).matchesType(t2) ||
+        getAssignmentCompatibleType(t2, t1).matchesType(t2);
+  }
+}

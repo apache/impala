@@ -16,11 +16,11 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprNode;
@@ -31,7 +31,7 @@ import com.google.common.collect.Lists;
 
 public class CastExpr extends Expr {
 
-  private final ColumnType targetType_;
+  private final Type targetType_;
 
   // true if this is a "pre-analyzed" implicit cast
   private final boolean isImplicit_;
@@ -41,7 +41,7 @@ public class CastExpr extends Expr {
 
   private static final String CAST_FN_NAME = "cast";
 
-  public CastExpr(ColumnType targetType, Expr e, boolean isImplicit) {
+  public CastExpr(Type targetType, Expr e, boolean isImplicit) {
     super();
     Preconditions.checkArgument(targetType.isValid());
     this.targetType_ = targetType;
@@ -82,9 +82,9 @@ public class CastExpr extends Expr {
   }
 
   public static void initBuiltins(Db db) {
-    for (ColumnType t1: ColumnType.getSupportedTypes()) {
+    for (Type t1: Type.getSupportedTypes()) {
       if (t1.isNull()) continue;
-      for (ColumnType t2: ColumnType.getSupportedTypes()) {
+      for (Type t2: Type.getSupportedTypes()) {
         if (t2.isNull()) continue;
         // For some reason we don't allow string->bool.
         // TODO: revisit
@@ -138,6 +138,10 @@ public class CastExpr extends Expr {
 
   private void analyze() throws AnalysisException {
     targetType_.analyze();
+    if (targetType_.isComplexType()) {
+      throw new AnalysisException(
+          "Unsupported cast to complex type: " + targetType_.toSql());
+    }
 
     if (children_.get(0) instanceof NumericLiteral &&
         targetType_.isFloatingPointType()) {
@@ -157,7 +161,7 @@ public class CastExpr extends Expr {
     // proper function.
     //  e.g. to differentiate between cast(bool, int) and cast(bool, smallint).
     // TODO: this is not very intuitive. We could also call the functions castToInt(*)
-    ColumnType[] args = new ColumnType[2];
+    Type[] args = new Type[2];
     args[0] = children_.get(0).type_;
     args[1] = targetType_;
     if (args[0].equals(args[1])) {
@@ -167,7 +171,7 @@ public class CastExpr extends Expr {
     }
 
     FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, CAST_FN_NAME);
-    Function searchDesc = new Function(fnName, args, ColumnType.INVALID, false);
+    Function searchDesc = new Function(fnName, args, Type.INVALID, false);
     if (isImplicit_ || args[0].isNull()) {
       fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_SUPERTYPE_OF);
       Preconditions.checkState(fn_ != null);

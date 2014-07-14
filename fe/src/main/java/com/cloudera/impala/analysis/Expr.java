@@ -25,10 +25,11 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExpr;
@@ -76,7 +77,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // false if Expr originated with a query stmt directly
   private boolean isAuxExpr_ = false;
 
-  protected ColumnType type_;  // result of analysis
+  protected Type type_;  // result of analysis
   protected boolean isAnalyzed_;  // true after analyze() has been called
   protected boolean isWhereClauseConjunct_;  // set by Analyzer
 
@@ -99,7 +100,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   protected Expr() {
     super();
-    type_ = ColumnType.INVALID;
+    type_ = Type.INVALID;
     selectivity_ = -1.0;
     numDistinctValues_ = -1;
   }
@@ -122,7 +123,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public ExprId getId() { return id_; }
   protected void setId(ExprId id) { this.id_ = id; }
-  public ColumnType getType() { return type_; }
+  public Type getType() { return type_; }
   public double getSelectivity() { return selectivity_; }
   public long getNumDistinctValues() { return numDistinctValues_; }
   public void setPrintSqlInParens(boolean b) { printSqlInParens_ = b; }
@@ -184,8 +185,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * Collects the returns types of the child nodes in an array.
    */
-  protected ColumnType[] collectChildReturnTypes() {
-    ColumnType[] childTypes = new ColumnType[children_.size()];
+  protected Type[] collectChildReturnTypes() {
+    Type[] childTypes = new Type[children_.size()];
     for (int i = 0; i < children_.size(); ++i) {
       childTypes[i] = children_.get(i).type_;
     }
@@ -197,9 +198,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Returns null if the function is not found.
    */
   protected Function getBuiltinFunction(Analyzer analyzer, String name,
-      ColumnType[] argTypes, CompareMode mode) throws AnalysisException {
+      Type[] argTypes, CompareMode mode) throws AnalysisException {
     FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, name);
-    Function searchDesc = new Function(fnName, argTypes, ColumnType.INVALID, false);
+    Function searchDesc = new Function(fnName, argTypes, Type.INVALID, false);
     return analyzer.getCatalog().getFunction(searchDesc, mode);
   }
 
@@ -221,8 +222,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   protected void castForFunctionCall(boolean ignoreWildcardDecimals)
       throws AnalysisException {
     Preconditions.checkState(fn_ != null);
-    ColumnType[] fnArgs = fn_.getArgs();
-    ColumnType resolvedWildcardType = getResolvedWildCardType();
+    Type[] fnArgs = fn_.getArgs();
+    Type resolvedWildcardType = getResolvedWildCardType();
     for (int i = 0; i < children_.size(); ++i) {
       // For varargs, we must compare with the last type in fnArgs.argTypes.
       int ix = Math.min(fnArgs.length - 1, i);
@@ -242,21 +243,24 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Returns the max resolution type of all the wild card decimal types.
    * Returns null if there are no wild card types.
    */
-  ColumnType getResolvedWildCardType() throws AnalysisException {
-    ColumnType result = null;
-    ColumnType[] fnArgs = fn_.getArgs();
+  Type getResolvedWildCardType() throws AnalysisException {
+    Type result = null;
+    Type[] fnArgs = fn_.getArgs();
     for (int i = 0; i < children_.size(); ++i) {
       // For varargs, we must compare with the last type in fnArgs.argTypes.
       int ix = Math.min(fnArgs.length - 1, i);
       if (!fnArgs[ix].isWildcardDecimal()) continue;
 
-      ColumnType childType = children_.get(i).type_;
+      Type childType = children_.get(i).type_;
       Preconditions.checkState(!childType.isWildcardDecimal(),
           "Child expr should have been resolved.");
+      Preconditions.checkState(childType.isScalarType(),
+          "Function should not have resolved with a non-scalar child type.");
+      ScalarType decimalType = (ScalarType) childType;
       if (result == null) {
-        result = childType.getMinResolutionDecimal();
+        result = decimalType.getMinResolutionDecimal();
       } else {
-        result = ColumnType.getAssignmentCompatibleType(result, childType);
+        result = Type.getAssignmentCompatibleType(result, childType);
       }
     }
     if (result != null) {
@@ -283,9 +287,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * cast to targetType.
    */
   private Expr convertNumericLiteralsToFloat(Analyzer analyzer, Expr child,
-      ColumnType targetType) throws AnalysisException, AuthorizationException {
+      Type targetType) throws AnalysisException, AuthorizationException {
     if (!targetType.isFloatingPointType() && !targetType.isIntegerType()) return child;
-    if (targetType.isIntegerType()) targetType = ColumnType.DOUBLE;
+    if (targetType.isIntegerType()) targetType = Type.DOUBLE;
     List<NumericLiteral> literals = Lists.newArrayList();
     child.collectAll(Predicates.instanceOf(NumericLiteral.class), literals);
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
@@ -321,8 +325,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Preconditions.checkState(this instanceof ArithmeticExpr ||
         this instanceof BinaryPredicate);
     Preconditions.checkState(children_.size() == 2);
-    ColumnType t0 = getChild(0).getType();
-    ColumnType t1 = getChild(1).getType();
+    Type t0 = getChild(0).getType();
+    Type t1 = getChild(1).getType();
     boolean c0IsConstantDecimal = getChild(0).isConstant() && t0.isDecimal();
     boolean c1IsConstantDecimal = getChild(1).isConstant() && t1.isDecimal();
     if (c0IsConstantDecimal && c1IsConstantDecimal) return;
@@ -369,7 +373,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       // being cast to a non-NULL type, the type doesn't matter and we can cast it
       // arbitrarily.
       Preconditions.checkState(this instanceof NullLiteral || this instanceof SlotRef);
-      return NullLiteral.create(ColumnType.BOOLEAN).treeToThrift();
+      return NullLiteral.create(ScalarType.BOOLEAN).treeToThrift();
     }
     TExpr result = new TExpr();
     treeToThriftHelper(result);
@@ -818,8 +822,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *           when an invalid cast is asked for, for example,
    *           failure to convert a string literal to a date literal
    */
-  public final Expr castTo(ColumnType targetType) throws AnalysisException {
-    ColumnType type = ColumnType.getAssignmentCompatibleType(this.type_, targetType);
+  public final Expr castTo(Type targetType) throws AnalysisException {
+    Type type = Type.getAssignmentCompatibleType(this.type_, targetType);
     Preconditions.checkState(type.isValid(), "cast %s to %s", this.type_, targetType);
     // If the targetType is NULL_TYPE then ignore the cast because NULL_TYPE
     // is compatible with all types and no cast is necessary.
@@ -845,7 +849,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *           when an invalid cast is asked for, for example,
    *           failure to convert a string literal to a date literal
    */
-  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
     return new CastExpr(targetType, this, true);
   }
 
@@ -858,7 +862,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * @param childIndex
    *          index of child to be cast
    */
-  public void castChild(ColumnType targetType, int childIndex) throws AnalysisException {
+  public void castChild(Type targetType, int childIndex) throws AnalysisException {
     Expr child = getChild(childIndex);
     Expr newChild = child.castTo(targetType);
     setChild(childIndex, newChild);
@@ -874,7 +878,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * @param childIndex
    *          index of child to be cast
    */
-  protected void uncheckedCastChild(ColumnType targetType, int childIndex)
+  protected void uncheckedCastChild(Type targetType, int childIndex)
       throws AnalysisException {
     Expr child = getChild(childIndex);
     Expr newChild = child.uncheckedCastTo(targetType);

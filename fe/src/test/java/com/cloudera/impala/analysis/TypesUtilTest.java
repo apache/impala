@@ -18,14 +18,15 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 
 // TODO: move other types related tests into this class to break up the large
 // AnalyzerTest files.
 public class TypesUtilTest extends AnalyzerTest {
 
-  private void verifyDecimalType(ColumnType t1, ColumnType t2) {
+  private void verifyDecimalType(Type t1, Type t2) {
     assertTrue(t1.getPrimitiveType() == PrimitiveType.DECIMAL);
     assertTrue(t2.getPrimitiveType() == PrimitiveType.DECIMAL);
     assertTrue(t1.equals(t2));
@@ -36,40 +37,40 @@ public class TypesUtilTest extends AnalyzerTest {
   public void TestDecimalAssignementType() {
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.DEFAULT_DECIMAL, ColumnType.DEFAULT_DECIMAL),
-        ColumnType.DEFAULT_DECIMAL);
+            Type.DEFAULT_DECIMAL, Type.DEFAULT_DECIMAL),
+        Type.DEFAULT_DECIMAL);
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.createDecimalType(10, 2), ColumnType.createDecimalType(12, 2)),
-        ColumnType.createDecimalType(12, 2));
+            ScalarType.createDecimalType(10, 2), ScalarType.createDecimalType(12, 2)),
+        ScalarType.createDecimalType(12, 2));
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.createDecimalType(10, 5), ColumnType.createDecimalType(12, 3)),
-        ColumnType.createDecimalType(14, 5));
+            ScalarType.createDecimalType(10, 5), ScalarType.createDecimalType(12, 3)),
+        ScalarType.createDecimalType(14, 5));
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.createDecimalType(12, 2), ColumnType.createDecimalType(10, 2)),
-        ColumnType.createDecimalType(12, 2));
+            ScalarType.createDecimalType(12, 2), ScalarType.createDecimalType(10, 2)),
+        ScalarType.createDecimalType(12, 2));
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.createDecimalType(12, 3), ColumnType.createDecimalType(10, 5)),
-        ColumnType.createDecimalType(14, 5));
+            ScalarType.createDecimalType(12, 3), ScalarType.createDecimalType(10, 5)),
+        ScalarType.createDecimalType(14, 5));
     verifyDecimalType(
-        TypesUtil.getDecimalAssignmentCompatibleType(ColumnType.createDecimalType(10, 0),
-            ColumnType.createDecimalType(16, 5)),
-        ColumnType.createDecimalType(16, 5));
+        TypesUtil.getDecimalAssignmentCompatibleType(ScalarType.createDecimalType(10, 0),
+            ScalarType.createDecimalType(16, 5)),
+        ScalarType.createDecimalType(16, 5));
 
     // Decimal(10, 0) && Decimal(10, 0) --> Decimal(10, 0)
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.createDecimalType(), ColumnType.createDecimalType()),
-        ColumnType.createDecimalType());
+            ScalarType.createDecimalType(), ScalarType.createDecimalType()),
+        ScalarType.createDecimalType());
 
     // decimal(10, 2) && decimal(12, 2) -> decimal(12, 2)
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.createDecimalType(10, 2), ColumnType.createDecimalType(12, 2)),
-        ColumnType.createDecimalType(12, 2));
+            ScalarType.createDecimalType(10, 2), ScalarType.createDecimalType(12, 2)),
+        ScalarType.createDecimalType(12, 2));
 
 
     // decimal (38, 38) && decimal(3, 0) -> decimal(38 , 38)
@@ -77,17 +78,17 @@ public class TypesUtilTest extends AnalyzerTest {
     // need 41 digits). Return the best we can do.
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.createDecimalType(38, 38), ColumnType.createDecimalType(3)),
-        ColumnType.createDecimalType(38, 38));
+            ScalarType.createDecimalType(38, 38), ScalarType.createDecimalType(3)),
+        ScalarType.createDecimalType(38, 38));
 
     // Decimal(5,0) with Decimal(*,*) should be Decimal(5,0)
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.createDecimalType(5, 0), ColumnType.DECIMAL),
-        ColumnType.createDecimalType(5, 0));
+            ScalarType.createDecimalType(5, 0), Type.DECIMAL),
+        ScalarType.createDecimalType(5, 0));
     verifyDecimalType(
         TypesUtil.getDecimalAssignmentCompatibleType(
-            ColumnType.DECIMAL, ColumnType.createDecimalType(5, 0)),
-        ColumnType.createDecimalType(5, 0));
+            Type.DECIMAL, ScalarType.createDecimalType(5, 0)),
+        ScalarType.createDecimalType(5, 0));
   }
 }

@@ -17,10 +17,11 @@ package com.cloudera.impala.analysis;
 import java.util.List;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCaseExpr;
 import com.cloudera.impala.thrift.TExprNode;
@@ -68,7 +69,7 @@ public class CaseExpr extends Expr {
   }
 
   public static void initBuiltins(Db db) {
-    for (ColumnType t: ColumnType.getSupportedTypes()) {
+    for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue;
       // TODO: case is special and the signature cannot be represented.
       // It is alternating varargs
@@ -118,9 +119,9 @@ public class CaseExpr extends Expr {
     super.analyze(analyzer);
 
     // Keep track of maximum compatible type of case expr and all when exprs.
-    ColumnType whenType = null;
+    Type whenType = null;
     // Keep track of maximum compatible type of else expr and all then exprs.
-    ColumnType returnType = null;
+    Type returnType = null;
     // Remember last of these exprs for error reporting.
     Expr lastCompatibleThenExpr = null;
     Expr lastCompatibleWhenExpr = null;
@@ -138,7 +139,7 @@ public class CaseExpr extends Expr {
       whenType = caseExpr.getType();
       lastCompatibleWhenExpr = children_.get(0);
     } else {
-      whenType = ColumnType.BOOLEAN;
+      whenType = Type.BOOLEAN;
       loopStart = 0;
     }
 
@@ -154,13 +155,13 @@ public class CaseExpr extends Expr {
       } else {
         // If no case expr was given, then the when exprs should always return
         // boolean or be castable to boolean.
-        if (!ColumnType.isImplicitlyCastable(whenExpr.getType(),
-            ColumnType.BOOLEAN)) {
+        if (!Type.isImplicitlyCastable(whenExpr.getType(),
+            Type.BOOLEAN)) {
           throw new AnalysisException("When expr '" + whenExpr.toSql() + "'" +
               " is not of type boolean and not castable to type boolean.");
         }
         // Add a cast if necessary.
-        if (!whenExpr.getType().isBoolean()) castChild(ColumnType.BOOLEAN, i);
+        if (!whenExpr.getType().isBoolean()) castChild(Type.BOOLEAN, i);
       }
       // Determine maximum compatible type of the then exprs seen so far.
       // We will add casts to them at the very end.
@@ -176,8 +177,8 @@ public class CaseExpr extends Expr {
     }
 
     // Make sure BE doesn't see TYPE_NULL by picking an arbitrary type
-    if (whenType.isNull()) whenType = ColumnType.BOOLEAN;
-    if (returnType.isNull()) returnType = ColumnType.BOOLEAN;
+    if (whenType.isNull()) whenType = ScalarType.BOOLEAN;
+    if (returnType.isNull()) returnType = ScalarType.BOOLEAN;
 
     // Add casts to case expr to compatible type.
     if (hasCaseExpr_) {
@@ -206,7 +207,7 @@ public class CaseExpr extends Expr {
     }
 
     // Do the function lookup just based on the whenType.
-    ColumnType[] args = new ColumnType[1];
+    Type[] args = new Type[1];
     args[0] = whenType;
     fn_ = getBuiltinFunction(analyzer, "case", args, CompareMode.IS_SUPERTYPE_OF);
     if (fn_ == null) {

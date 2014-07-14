@@ -55,6 +55,7 @@ apache::hive::service::cli::thrift::TTypeId::type TypeToHiveServer2Type(Primitiv
 
 // Wrapper struct to describe a type. Includes the enum and, optionally,
 // size information.
+// TODO: Rename to ScalarType and mirror FE type hierarchy after the expr refactoring.
 struct ColumnType {
   PrimitiveType type;
   /// Only set if type == TYPE_CHAR
@@ -95,15 +96,19 @@ struct ColumnType {
 
   ColumnType(const TColumnType& t) {
     len = precision = scale = -1;
-    type = ThriftToType(t.type);
-    if (t.__isset.len) {
-      DCHECK_EQ(type, TYPE_CHAR);
-      len = t.len;
-    } else if (t.__isset.precision) {
-      DCHECK_EQ(type, TYPE_DECIMAL);
-      DCHECK(t.__isset.scale);
-      precision = t.precision;
-      scale = t.scale;
+    DCHECK_EQ(1, t.types.size());
+    const TTypeNode& node = t.types[0];
+    DCHECK(node.__isset.scalar_type);
+    const TScalarType scalar_type = node.scalar_type;
+    type = ThriftToType(scalar_type.type);
+    if (type == TYPE_CHAR) {
+      DCHECK(scalar_type.__isset.len);
+      len = scalar_type.len;
+    } else if (type == TYPE_DECIMAL) {
+      DCHECK(scalar_type.__isset.precision);
+      DCHECK(scalar_type.__isset.scale);
+      precision = scalar_type.precision;
+      scale = scalar_type.scale;
     } else {
       DCHECK_NE(type, TYPE_DECIMAL);
       DCHECK_NE(type, TYPE_CHAR);
@@ -122,16 +127,22 @@ struct ColumnType {
   }
 
   TColumnType ToThrift() const {
+    // TODO: Decimal and complex types.
     TColumnType thrift_type;
-    thrift_type.type = impala::ToThrift(type);
+    thrift_type.types.push_back(TTypeNode());
+    TTypeNode& node = thrift_type.types.back();
+    node.type = TTypeNodeType::SCALAR;
+    node.__set_scalar_type(TScalarType());
+    TScalarType& scalar_type = node.scalar_type;
+    scalar_type.__set_type(impala::ToThrift(type));
     if (type == TYPE_CHAR) {
       DCHECK_NE(len, -1);
-      thrift_type.__set_len(len);
+      scalar_type.__set_len(len);
     } else if (type == TYPE_DECIMAL) {
       DCHECK_NE(precision, -1);
       DCHECK_NE(scale, -1);
-      thrift_type.__set_precision(precision);
-      thrift_type.__set_scale(scale);
+      scalar_type.__set_precision(precision);
+      scalar_type.__set_scale(scale);
     }
     return thrift_type;
   }

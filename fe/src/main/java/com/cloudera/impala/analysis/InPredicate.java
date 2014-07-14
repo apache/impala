@@ -20,18 +20,15 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Subquery;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TInPredicate;
-
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
-import com.google.common.collect.Lists;
 
 public class InPredicate extends Predicate {
   private final static Logger LOG = LoggerFactory.getLogger(InPredicate.class);
@@ -95,7 +92,7 @@ public class InPredicate extends Predicate {
       if (children_.get(0).getType().isNull()) {
         // Make sure the BE never sees TYPE_NULL by picking an arbitrary type
         for (int i = 0; i < children_.size(); ++i) {
-          uncheckedCastChild(ColumnType.BOOLEAN, i);
+          uncheckedCastChild(Type.BOOLEAN, i);
         }
       }
     }

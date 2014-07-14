@@ -18,7 +18,7 @@ import java.util.HashMap;
 
 import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TSymbolType;
@@ -30,7 +30,7 @@ import com.google.common.base.Preconditions;
 public class CreateUdaStmt extends CreateFunctionStmtBase {
   // Same as super.fn_. Typed here for convenience.
   private final AggregateFunction uda_;
-  private ColumnType intermediateType_;
+  private Type intermediateType_;
 
   /**
    * Builds a CREATE AGGREGATE FUNCTION statement
@@ -44,7 +44,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
    *        validated in analyze()
    */
   public CreateUdaStmt(FunctionName fnSymbol, FunctionArgs args,
-      ColumnType retType, ColumnType intermediateType,
+      Type retType, Type intermediateType,
       HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
     super(new AggregateFunction(fnSymbol, args, retType), location, ifNotExists, optArgs);

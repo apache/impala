@@ -20,7 +20,6 @@ import java.util.Map;
 import com.cloudera.impala.analysis.ArithmeticExpr.Operator;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Function.CompareMode;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -140,8 +139,7 @@ public class TimestampArithmeticExpr extends Expr {
     }
 
     // The first child must return a timestamp or null.
-    if (getChild(0).getType().getPrimitiveType() != PrimitiveType.TIMESTAMP &&
-        !getChild(0).getType().isNull()) {
+    if (!getChild(0).getType().isTimestamp() && !getChild(0).getType().isNull()) {
       throw new AnalysisException("Operand '" + getChild(0).toSql() +
           "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
           getChild(0).getType() + "'. Expected type 'TIMESTAMP'.");
@@ -163,8 +161,7 @@ public class TimestampArithmeticExpr extends Expr {
     castForFunctionCall(false);
 
     Preconditions.checkNotNull(fn_);
-    Preconditions.checkState(
-        fn_.getReturnType().getPrimitiveType() == PrimitiveType.TIMESTAMP);
+    Preconditions.checkState(fn_.getReturnType().isTimestamp());
     type_ = fn_.getReturnType();
   }
 

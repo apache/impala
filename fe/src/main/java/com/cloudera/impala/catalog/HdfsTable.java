@@ -507,7 +507,7 @@ public class HdfsTable extends Table {
       throws TableLoadingException {
     int pos = 0;
     for (FieldSchema s: fieldSchemas) {
-      ColumnType type = parseColumnType(s);
+      Type type = parseColumnType(s);
       // Check if we support partitioning on columns of such a type.
       if (pos < numClusteringCols_ && !type.supportsTablePartitioning()) {
         throw new TableLoadingException(
@@ -634,7 +634,7 @@ public class HdfsTable extends Table {
         int i = 0;
         for (String partitionKey: msPartition.getValues()) {
           uniquePartitionKeys[i].add(partitionKey);
-          ColumnType type = getColumns().get(keyValues.size()).getType();
+          Type type = getColumns().get(keyValues.size()).getType();
           // Deal with Hive's special NULL partition key.
           if (partitionKey.equals(nullPartitionKeyValue_)) {
             keyValues.add(NullLiteral.create(type));
@@ -1194,11 +1194,11 @@ public class HdfsTable extends Table {
       TColumn colDesc = new TColumn(partCol.getName(), partCol.getType().toThrift());
       resultSchema.addToColumns(colDesc);
     }
-    resultSchema.addToColumns(new TColumn("#Rows", ColumnType.BIGINT.toThrift()));
-    resultSchema.addToColumns(new TColumn("#Files", ColumnType.BIGINT.toThrift()));
-    resultSchema.addToColumns(new TColumn("Size", ColumnType.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Bytes Cached", ColumnType.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Format", ColumnType.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("#Files", Type.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Bytes Cached", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Format", Type.STRING.toThrift()));
 
     // Pretty print partitions and their stats.
     ArrayList<HdfsPartition> orderedPartitions = Lists.newArrayList(partitions_);

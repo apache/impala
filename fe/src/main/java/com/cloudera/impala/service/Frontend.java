@@ -53,7 +53,6 @@ import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
@@ -63,6 +62,7 @@ import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
@@ -169,44 +169,44 @@ public class Frontend {
       ddl.op_type = TCatalogOpType.SHOW_TABLES;
       ddl.setShow_tables_params(analysis.getShowTablesStmt().toThrift());
       metadata.setColumns(Arrays.asList(
-          new TColumn("name", ColumnType.STRING.toThrift())));
+          new TColumn("name", Type.STRING.toThrift())));
     } else if (analysis.isShowDbsStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_DBS;
       ddl.setShow_dbs_params(analysis.getShowDbsStmt().toThrift());
       metadata.setColumns(Arrays.asList(
-          new TColumn("name", ColumnType.STRING.toThrift())));
+          new TColumn("name", Type.STRING.toThrift())));
     } else if (analysis.isShowDataSrcsStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_DATA_SRCS;
       ddl.setShow_data_srcs_params(analysis.getShowDataSrcsStmt().toThrift());
       metadata.setColumns(Arrays.asList(
-          new TColumn("name", ColumnType.STRING.toThrift()),
-          new TColumn("location", ColumnType.STRING.toThrift()),
-          new TColumn("class name", ColumnType.STRING.toThrift()),
-          new TColumn("api version", ColumnType.STRING.toThrift())));
+          new TColumn("name", Type.STRING.toThrift()),
+          new TColumn("location", Type.STRING.toThrift()),
+          new TColumn("class name", Type.STRING.toThrift()),
+          new TColumn("api version", Type.STRING.toThrift())));
     } else if (analysis.isShowStatsStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_STATS;
       ddl.setShow_stats_params(analysis.getShowStatsStmt().toThrift());
       metadata.setColumns(Arrays.asList(
-          new TColumn("name", ColumnType.STRING.toThrift())));
+          new TColumn("name", Type.STRING.toThrift())));
     } else if (analysis.isShowFunctionsStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_FUNCTIONS;
       ShowFunctionsStmt stmt = (ShowFunctionsStmt)analysis.getStmt();
       ddl.setShow_fns_params(stmt.toThrift());
       metadata.setColumns(Arrays.asList(
-          new TColumn("return type", ColumnType.STRING.toThrift()),
-          new TColumn("signature", ColumnType.STRING.toThrift())));
+          new TColumn("return type", Type.STRING.toThrift()),
+          new TColumn("signature", Type.STRING.toThrift())));
     } else if (analysis.isShowCreateTableStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_CREATE_TABLE;
       ddl.setShow_create_table_params(analysis.getShowCreateTableStmt().toThrift());
       metadata.setColumns(Arrays.asList(
-          new TColumn("result", ColumnType.STRING.toThrift())));
+          new TColumn("result", Type.STRING.toThrift())));
     } else if (analysis.isDescribeStmt()) {
       ddl.op_type = TCatalogOpType.DESCRIBE;
       ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());
       metadata.setColumns(Arrays.asList(
-          new TColumn("name", ColumnType.STRING.toThrift()),
-          new TColumn("type", ColumnType.STRING.toThrift()),
-          new TColumn("comment", ColumnType.STRING.toThrift())));
+          new TColumn("name", Type.STRING.toThrift()),
+          new TColumn("type", Type.STRING.toThrift()),
+          new TColumn("comment", Type.STRING.toThrift())));
     } else if (analysis.isAlterTableStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -236,7 +236,7 @@ public class Frontend {
           analysis.getCreateTableAsSelectStmt().getCreateStmt().toThrift());
       ddl.setDdl_params(req);
       metadata.setColumns(Arrays.asList(
-          new TColumn("summary", ColumnType.STRING.toThrift())));
+          new TColumn("summary", Type.STRING.toThrift())));
     } else if (analysis.isCreateTableLikeStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -442,18 +442,18 @@ public class Frontend {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
     result.setSchema(resultSchema);
-    resultSchema.addToColumns(new TColumn("Column", ColumnType.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Type", ColumnType.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Column", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Type", Type.STRING.toThrift()));
     resultSchema.addToColumns(
-        new TColumn("#Distinct Values", ColumnType.BIGINT.toThrift()));
-    resultSchema.addToColumns(new TColumn("#Nulls", ColumnType.BIGINT.toThrift()));
-    resultSchema.addToColumns(new TColumn("Max Size", ColumnType.DOUBLE.toThrift()));
-    resultSchema.addToColumns(new TColumn("Avg Size", ColumnType.DOUBLE.toThrift()));
+        new TColumn("#Distinct Values", Type.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("#Nulls", Type.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("Max Size", Type.DOUBLE.toThrift()));
+    resultSchema.addToColumns(new TColumn("Avg Size", Type.DOUBLE.toThrift()));
 
     for (Column c: table.getColumnsInHiveOrder()) {
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
       // Add name, type, NDVs, numNulls, max size and avg size.
-      rowBuilder.add(c.getName()).add(c.getType().toString())
+      rowBuilder.add(c.getName()).add(c.getType().toSql())
           .add(c.getStats().getNumDistinctValues()).add(c.getStats().getNumNulls())
           .add(c.getStats().getMaxSize()).add(c.getStats().getAvgSize());
       result.addToRows(rowBuilder.get());
@@ -644,7 +644,7 @@ public class Frontend {
     } else if (analysisResult.isLoadDataStmt()) {
       result.stmt_type = TStmtType.LOAD;
       result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
-          new TColumn("summary", ColumnType.STRING.toThrift()))));
+          new TColumn("summary", Type.STRING.toThrift()))));
       result.setLoad_data_request(analysisResult.getLoadDataStmt().toThrift());
       return result;
     }
@@ -779,7 +779,7 @@ public class Frontend {
    */
   private void createExplainRequest(String explainString, TExecRequest result) {
     // update the metadata - one string column
-    TColumn colDesc = new TColumn("Explain String", ColumnType.STRING.toThrift());
+    TColumn colDesc = new TColumn("Explain String", Type.STRING.toThrift());
     TResultSetMetadata metadata = new TResultSetMetadata(Lists.newArrayList(colDesc));
     result.setResult_set_metadata(metadata);
 

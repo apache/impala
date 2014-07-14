@@ -16,14 +16,14 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.thrift.TSlotDescriptor;
 import com.google.common.base.Objects;
 
 public class SlotDescriptor {
   private final SlotId id_;
   private final TupleDescriptor parent_;
-  private ColumnType type_;
+  private Type type_;
   private Column column_;  // underlying column, if there is one
   private String label_;  // for SlotRef.toSql() in absence of column name
 
@@ -59,8 +59,8 @@ public class SlotDescriptor {
   }
   public SlotId getId() { return id_; }
   public TupleDescriptor getParent() { return parent_; }
-  public ColumnType getType() { return type_; }
-  public void setType(ColumnType type) { this.type_ = type; }
+  public Type getType() { return type_; }
+  public void setType(Type type) { this.type_ = type; }
   public Column getColumn() { return column_; }
   public void setColumn(Column column) {
     this.column_ = column;

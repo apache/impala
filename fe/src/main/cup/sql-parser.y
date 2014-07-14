@@ -14,9 +14,11 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
+import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.View;
+import com.cloudera.impala.analysis.ColumnDesc;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
@@ -319,7 +321,7 @@ nonterminal Subquery subquery;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal ArrayList<String> opt_plan_hints;
-nonterminal ColumnType column_type;
+nonterminal Type type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
 nonterminal StatementBase explain_stmt;
@@ -391,7 +393,7 @@ nonterminal FunctionArgs function_def_args;
 nonterminal FunctionArgs function_def_arg_list;
 nonterminal Boolean opt_is_aggregate_fn;
 nonterminal Boolean opt_is_varargs;
-nonterminal ColumnType opt_aggregate_fn_intermediate_type;
+nonterminal Type opt_aggregate_fn_intermediate_type;
 nonterminal CreateUdfStmt create_udf_stmt;
 nonterminal CreateUdaStmt create_uda_stmt;
 nonterminal ShowFunctionsStmt show_functions_stmt;
@@ -712,7 +714,7 @@ create_tbl_stmt ::=
 create_udf_stmt ::=
   KW_CREATE KW_FUNCTION if_not_exists_val:if_not_exists
   function_name:fn_name function_def_args:fn_args
-  KW_RETURNS column_type:return_type
+  KW_RETURNS type:return_type
   KW_LOCATION STRING_LITERAL:binary_path
   create_function_args_map:arg_map
   {:
@@ -724,7 +726,7 @@ create_udf_stmt ::=
 create_uda_stmt ::=
   KW_CREATE KW_AGGREGATE KW_FUNCTION if_not_exists_val:if_not_exists
   function_name:fn_name function_def_args:fn_args
-  KW_RETURNS column_type:return_type
+  KW_RETURNS type:return_type
   opt_aggregate_fn_intermediate_type:intermediate_type
   KW_LOCATION STRING_LITERAL:binary_path
   create_function_args_map:arg_map
@@ -884,7 +886,7 @@ column_def_list ::=
   ;
 
 column_def ::=
-  IDENT:col_name column_type:targetType comment_val:comment
+  IDENT:col_name type:targetType comment_val:comment
   {: RESULT = new ColumnDesc(col_name, targetType, comment); :}
   ;
 
@@ -1087,13 +1089,13 @@ function_def_args ::=
   ;
 
 function_def_arg_list ::=
-  column_type:type
+  type:type
   {:
     FunctionArgs args = new FunctionArgs();
     args.argTypes.add(type);
     RESULT = args;
   :}
-  | function_def_arg_list:args COMMA column_type:type
+  | function_def_arg_list:args COMMA type:type
   {:
     args.argTypes.add(type);
     RESULT = args;
@@ -1115,7 +1117,7 @@ opt_is_varargs ::=
   ;
 
 opt_aggregate_fn_intermediate_type ::=
-  KW_INTERMEDIATE column_type:type
+  KW_INTERMEDIATE type:type
   {: RESULT = type; :}
   |
   {: RESULT = null; :}
@@ -1726,7 +1728,7 @@ opt_offset_clause ::=
   ;
 
 cast_expr ::=
-  KW_CAST LPAREN expr:e KW_AS column_type:targetType RPAREN
+  KW_CAST LPAREN expr:e KW_AS type:targetType RPAREN
   {: RESULT = new CastExpr(targetType, e, false); :}
   ;
 
@@ -2044,37 +2046,37 @@ column_ref ::=
   {: RESULT = new SlotRef(new TableName(db, tbl), col); :}
   ;
 
-column_type ::=
+type ::=
   KW_TINYINT
-  {: RESULT = ColumnType.TINYINT; :}
+  {: RESULT = Type.TINYINT; :}
   | KW_SMALLINT
-  {: RESULT = ColumnType.SMALLINT; :}
+  {: RESULT = Type.SMALLINT; :}
   | KW_INT
-  {: RESULT = ColumnType.INT; :}
+  {: RESULT = Type.INT; :}
   | KW_BIGINT
-  {: RESULT = ColumnType.BIGINT; :}
+  {: RESULT = Type.BIGINT; :}
   | KW_BOOLEAN
-  {: RESULT = ColumnType.BOOLEAN; :}
+  {: RESULT = Type.BOOLEAN; :}
   | KW_FLOAT
-  {: RESULT = ColumnType.FLOAT; :}
+  {: RESULT = Type.FLOAT; :}
   | KW_DOUBLE
-  {: RESULT = ColumnType.DOUBLE; :}
+  {: RESULT = Type.DOUBLE; :}
   | KW_DATE
-  {: RESULT = ColumnType.DATE; :}
+  {: RESULT = Type.DATE; :}
   | KW_DATETIME
-  {: RESULT = ColumnType.DATETIME; :}
+  {: RESULT = Type.DATETIME; :}
   | KW_TIMESTAMP
-  {: RESULT = ColumnType.TIMESTAMP; :}
+  {: RESULT = Type.TIMESTAMP; :}
   | KW_STRING
-  {: RESULT = ColumnType.STRING; :}
+  {: RESULT = Type.STRING; :}
   | KW_BINARY
-  {: RESULT = ColumnType.BINARY; :}
+  {: RESULT = Type.BINARY; :}
   | KW_CHAR LPAREN INTEGER_LITERAL:len RPAREN
-  {: RESULT = ColumnType.createCharType(len.intValue()); :}
+  {: RESULT = ScalarType.createCharType(len.intValue()); :}
   | KW_DECIMAL LPAREN INTEGER_LITERAL:precision RPAREN
-  {: RESULT = ColumnType.createDecimalType(precision.intValue()); :}
+  {: RESULT = ScalarType.createDecimalType(precision.intValue()); :}
   | KW_DECIMAL LPAREN INTEGER_LITERAL:precision COMMA INTEGER_LITERAL:scale RPAREN
-  {: RESULT = ColumnType.createDecimalType(precision.intValue(), scale.intValue()); :}
+  {: RESULT = ScalarType.createDecimalType(precision.intValue(), scale.intValue()); :}
   | KW_DECIMAL
-  {: RESULT = ColumnType.createDecimalType(); :}
+  {: RESULT = ScalarType.createDecimalType(); :}
   ;

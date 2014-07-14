@@ -15,10 +15,11 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -75,7 +76,7 @@ public class ArithmeticExpr extends Expr {
   }
 
   public static void initBuiltins(Db db) {
-    for (ColumnType t: ColumnType.getNumericTypes()) {
+    for (Type t: Type.getNumericTypes()) {
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.MULTIPLY.getName(), Lists.newArrayList(t, t), t));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
@@ -85,14 +86,14 @@ public class ArithmeticExpr extends Expr {
     }
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.DIVIDE.getName(),
-        Lists.newArrayList(ColumnType.DOUBLE, ColumnType.DOUBLE),
-        ColumnType.DOUBLE));
+        Lists.<Type>newArrayList(Type.DOUBLE, Type.DOUBLE),
+        Type.DOUBLE));
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.DIVIDE.getName(),
-        Lists.newArrayList(ColumnType.DECIMAL, ColumnType.DECIMAL),
-        ColumnType.DECIMAL));
+        Lists.<Type>newArrayList(Type.DECIMAL, Type.DECIMAL),
+        Type.DECIMAL));
 
-    for (ColumnType t: ColumnType.getIntegerTypes()) {
+    for (Type t: Type.getIntegerTypes()) {
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.INT_DIVIDE.getName(), Lists.newArrayList(t, t), t));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
@@ -107,8 +108,8 @@ public class ArithmeticExpr extends Expr {
           Operator.BITNOT.getName(), Lists.newArrayList(t), t));
     }
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
-        Operator.MOD.getName(), Lists.newArrayList(
-            ColumnType.DECIMAL, ColumnType.DECIMAL), ColumnType.DECIMAL));
+        Operator.MOD.getName(), Lists.<Type>newArrayList(
+            Type.DECIMAL, Type.DECIMAL), Type.DECIMAL));
   }
 
   @Override
@@ -140,10 +141,13 @@ public class ArithmeticExpr extends Expr {
    * the cast is handled as part of the operator and in general, the return type
    * does not match the input types.
    */
-  void castChild(int childIdx, ColumnType targetType) throws AnalysisException {
-    ColumnType t = getChild(childIdx).getType();
+  void castChild(int childIdx, Type targetType) throws AnalysisException {
+    Type t = getChild(childIdx).getType();
     if (t.matchesType(targetType)) return;
-    if (targetType.isDecimal() && !t.isNull()) targetType = t.getMinResolutionDecimal();
+    if (targetType.isDecimal() && !t.isNull()) {
+      Preconditions.checkState(t.isScalarType());
+      targetType = ((ScalarType) t).getMinResolutionDecimal();
+    }
     castChild(targetType, childIdx);
   }
 
@@ -160,7 +164,7 @@ public class ArithmeticExpr extends Expr {
       }
     }
 
-    ColumnType t0 = getChild(0).getType();
+    Type t0 = getChild(0).getType();
     // bitnot is the only unary op, deal with it here
     if (op_ == Operator.BITNOT) {
       // Special case ~NULL to resolve to TYPE_INT.
@@ -168,7 +172,7 @@ public class ArithmeticExpr extends Expr {
         throw new AnalysisException("Bitwise operations only allowed on integer " +
             "types: " + toSql());
       }
-      if (t0.isNull()) castChild(0, ColumnType.INT);
+      if (t0.isNull()) castChild(0, Type.INT);
       fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
           CompareMode.IS_SUPERTYPE_OF);
       Preconditions.checkNotNull(fn_);
@@ -180,7 +184,7 @@ public class ArithmeticExpr extends Expr {
     Preconditions.checkState(children_.size() == 2); // only bitnot is unary
     convertNumericLiteralsFromDecimal(analyzer);
     t0 = getChild(0).getType();
-    ColumnType t1 = getChild(1).getType();
+    Type t1 = getChild(1).getType();
 
     String fnName = op_.getName();
     switch (op_) {
@@ -192,7 +196,7 @@ public class ArithmeticExpr extends Expr {
         type_ = TypesUtil.getArithmeticResultType(t0, t1, op_);
         // If both of the children are null, we'll default to the DOUBLE version of the
         // operator. This prevents the BE from seeing NULL_TYPE.
-        if (type_.isNull()) type_ = ColumnType.DOUBLE;
+        if (type_.isNull()) type_ = Type.DOUBLE;
         break;
 
       case INT_DIVIDE:
@@ -204,10 +208,10 @@ public class ArithmeticExpr extends Expr {
           throw new AnalysisException("Invalid non-integer argument to operation '" +
               op_.toString() + "': " + this.toSql());
         }
-        type_ = ColumnType.getAssignmentCompatibleType(t0, t1);
+        type_ = Type.getAssignmentCompatibleType(t0, t1);
         // If both of the children are null, we'll default to the INT version of the
         // operator. This prevents the BE from seeing NULL_TYPE.
-        if (type_.isNull()) type_ = ColumnType.INT;
+        if (type_.isNull()) type_ = Type.INT;
         Preconditions.checkState(type_.isIntegerType());
         break;
 

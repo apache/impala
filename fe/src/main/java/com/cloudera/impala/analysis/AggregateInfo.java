@@ -21,7 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.DataPartition;
@@ -636,7 +636,7 @@ public class AggregateInfo {
     int slotIdx = 0;
     for (int i = 0; i < groupingExprs_.size(); ++i) {
       Expr groupingExpr = groupingExprs_.get(i);
-      ColumnType slotType = slots.get(slotIdx).getType();
+      Type slotType = slots.get(slotIdx).getType();
       Preconditions.checkState(groupingExpr.getType().equals(slotType),
           String.format("Grouping expr %s returns type %s but its agg tuple " +
               "slot has type %s", groupingExpr.toSql(),
@@ -646,7 +646,7 @@ public class AggregateInfo {
     // Check that aggregate expr return types match the slot descriptors.
     for (int i = 0; i < aggregateExprs_.size(); ++i) {
       Expr aggExpr = aggregateExprs_.get(i);
-      ColumnType slotType = slots.get(slotIdx).getType();
+      Type slotType = slots.get(slotIdx).getType();
       Preconditions.checkState(aggExpr.getType().equals(slotType),
           String.format("Agg expr %s returns type %s but its agg tuple " +
               "slot has type %s", aggExpr.toSql(), aggExpr.getType().toString(),

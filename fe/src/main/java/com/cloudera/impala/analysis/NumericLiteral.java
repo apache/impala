@@ -18,7 +18,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TDecimalLiteral;
@@ -53,7 +54,7 @@ public class NumericLiteral extends LiteralExpr {
     init(value);
   }
 
-  public NumericLiteral(String value, ColumnType t)
+  public NumericLiteral(String value, Type t)
       throws AnalysisException, AuthorizationException {
     BigDecimal val = null;
     try {
@@ -66,7 +67,8 @@ public class NumericLiteral extends LiteralExpr {
     if (type_.isDecimal() && t.isDecimal()) {
       // Verify that the input decimal value is consistent with the specified
       // column type.
-      if (!t.isSupertypeOf(type_)) {
+      ScalarType scalarType = (ScalarType) t;
+      if (!scalarType.isSupertypeOf((ScalarType) type_)) {
         StringBuilder errMsg = new StringBuilder();
         errMsg.append("invalid ").append(t);
         errMsg.append(" value: " + value);
@@ -80,13 +82,13 @@ public class NumericLiteral extends LiteralExpr {
    * The versions of the ctor that take types assume the type is correct
    * and the NumericLiteral is created as analyzed with that type.
    */
-  public NumericLiteral(BigInteger value, ColumnType type) {
+  public NumericLiteral(BigInteger value, Type type) {
     isAnalyzed_ = true;
     value_ = new BigDecimal(value);
     type_ = type;
   }
 
-  public NumericLiteral(BigDecimal value, ColumnType type) {
+  public NumericLiteral(BigDecimal value, Type type) {
     isAnalyzed_ = true;
     value_ = value;
     type_ = type;
@@ -174,25 +176,27 @@ public class NumericLiteral extends LiteralExpr {
         float fvalue;
         fvalue = value_.floatValue();
         if (fvalue == value_.doubleValue()) {
-          type_ = ColumnType.FLOAT;
+          type_ = Type.FLOAT;
         } else {
-          type_ = ColumnType.DOUBLE;
+          type_ = Type.DOUBLE;
         }
       } else {
         // Check for integer types.
-        if (type_.decimalScale() == 0) {
+        Preconditions.checkState(type_.isScalarType());
+        ScalarType scalarType = (ScalarType) type_;
+        if (scalarType.decimalScale() == 0) {
           if (value_.compareTo(BigDecimal.valueOf(Byte.MAX_VALUE)) <= 0 &&
               value_.compareTo(BigDecimal.valueOf(Byte.MIN_VALUE)) >= 0) {
-            type_ = ColumnType.TINYINT;
+            type_ = Type.TINYINT;
           } else if (value_.compareTo(BigDecimal.valueOf(Short.MAX_VALUE)) <= 0 &&
               value_.compareTo(BigDecimal.valueOf(Short.MIN_VALUE)) >= 0) {
-            type_ = ColumnType.SMALLINT;
+            type_ = Type.SMALLINT;
           } else if (value_.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) <= 0 &&
               value_.compareTo(BigDecimal.valueOf(Integer.MIN_VALUE)) >= 0) {
-            type_ = ColumnType.INT;
+            type_ = Type.INT;
           } else if (value_.compareTo(BigDecimal.valueOf(Long.MAX_VALUE)) <= 0 &&
               value_.compareTo(BigDecimal.valueOf(Long.MIN_VALUE)) >= 0) {
-            type_ = ColumnType.BIGINT;
+            type_ = Type.BIGINT;
           }
         }
       }
@@ -205,14 +209,14 @@ public class NumericLiteral extends LiteralExpr {
    * Explicitly cast this literal to 'targetType'. The targetType must be a
    * float point type.
    */
-  protected void explicitlyCastToFloat(ColumnType targetType) {
+  protected void explicitlyCastToFloat(Type targetType) {
     Preconditions.checkState(targetType.isFloatingPointType());
     type_ = targetType;
     explicitlyCast_ = true;
   }
 
   @Override
-  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType());
     type_ = targetType;
     return this;
@@ -245,7 +249,8 @@ public class NumericLiteral extends LiteralExpr {
     // If valueScale is less than 0, it indicates the power of 10 to multiply the
     // unscaled value. This path also handles this case by padding with zeros.
     // e.g. unscaled value = 123, value scale = -2 means 12300.
-    return result.multiply(BigInteger.TEN.pow(type_.decimalScale() - valueScale));
+    ScalarType decimalType = (ScalarType) type_;
+    return result.multiply(BigInteger.TEN.pow(decimalType.decimalScale() - valueScale));
   }
 
   @Override

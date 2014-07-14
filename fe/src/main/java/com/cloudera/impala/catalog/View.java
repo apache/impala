@@ -93,7 +93,7 @@ public class View extends Table {
               String.format("Failed to load metadata for table '%s' due to unsupported " +
               "column type '%s' in column '%s'", getName(), s.getType(), s.getName()));
         }
-        ColumnType type = parseColumnType(s);
+        Type type = parseColumnType(s);
         Column col = new Column(s.getName(), type, s.getComment(), i);
         addColumn(col);
       }

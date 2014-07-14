@@ -14,7 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TBoolLiteral;
 import com.cloudera.impala.thrift.TExprNode;
@@ -26,11 +26,11 @@ public class BoolLiteral extends LiteralExpr {
 
   public BoolLiteral(boolean value) {
     this.value_ = value;
-    type_ = ColumnType.BOOLEAN;
+    type_ = Type.BOOLEAN;
   }
 
   public BoolLiteral(String value) throws AnalysisException {
-    type_ = ColumnType.BOOLEAN;
+    type_ = Type.BOOLEAN;
     if (value.toLowerCase().equals("true")) {
       this.value_ = true;
     } else if (value.toLowerCase().equals("false")) {
@@ -82,7 +82,7 @@ public class BoolLiteral extends LiteralExpr {
   }
 
   @Override
-  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
     if (targetType.equals(this.type_)) {
       return this;
     } else {

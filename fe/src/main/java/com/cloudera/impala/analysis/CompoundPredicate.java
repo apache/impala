@@ -20,10 +20,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -58,13 +58,15 @@ public class CompoundPredicate extends Predicate {
   public static void initBuiltins(Db db) {
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.AND.name(), "CompoundPredicate", "AndComputeFn",
-        Lists.newArrayList(ColumnType.BOOLEAN, ColumnType.BOOLEAN), ColumnType.BOOLEAN));
+        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN),
+        Type.BOOLEAN));
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.OR.name(), "CompoundPredicate", "OrComputeFn",
-        Lists.newArrayList(ColumnType.BOOLEAN, ColumnType.BOOLEAN), ColumnType.BOOLEAN));
+        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN),
+        Type.BOOLEAN));
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.NOT.name(), "CompoundPredicate", "NotComputeFn",
-        Lists.newArrayList(ColumnType.BOOLEAN), ColumnType.BOOLEAN));
+        Lists.<Type>newArrayList(Type.BOOLEAN), Type.BOOLEAN));
   }
 
   public CompoundPredicate(Operator op, Expr e1, Expr e2) {

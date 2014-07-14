@@ -51,139 +51,139 @@ public class BuiltinsDb extends Db {
     ScalarBuiltins.initBuiltins(this);
   }
 
-  private static final Map<ColumnType, String> HLL_UPDATE_SYMBOL =
-      ImmutableMap.<ColumnType, String>builder()
-        .put(ColumnType.BOOLEAN,
+  private static final Map<Type, String> HLL_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
             "9HllUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.TINYINT,
+        .put(Type.TINYINT,
             "9HllUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.SMALLINT,
+        .put(Type.SMALLINT,
             "9HllUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.INT,
+        .put(Type.INT,
             "9HllUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.BIGINT,
+        .put(Type.BIGINT,
             "9HllUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.FLOAT,
+        .put(Type.FLOAT,
             "9HllUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.DOUBLE,
+        .put(Type.DOUBLE,
             "9HllUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.STRING,
+        .put(Type.STRING,
             "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
-        .put(ColumnType.TIMESTAMP,
+        .put(Type.TIMESTAMP,
             "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.DECIMAL,
+        .put(Type.DECIMAL,
             "9HllUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
-  private static final Map<ColumnType, String> PC_UPDATE_SYMBOL =
-      ImmutableMap.<ColumnType, String>builder()
-        .put(ColumnType.BOOLEAN,
+  private static final Map<Type, String> PC_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
             "8PcUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.TINYINT,
+        .put(Type.TINYINT,
             "8PcUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.SMALLINT,
+        .put(Type.SMALLINT,
             "8PcUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.INT,
+        .put(Type.INT,
             "8PcUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.BIGINT,
+        .put(Type.BIGINT,
             "8PcUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.FLOAT,
+        .put(Type.FLOAT,
             "8PcUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.DOUBLE,
+        .put(Type.DOUBLE,
             "8PcUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.STRING,
+        .put(Type.STRING,
             "8PcUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
-        .put(ColumnType.TIMESTAMP,
+        .put(Type.TIMESTAMP,
             "8PcUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-         .put(ColumnType.DECIMAL,
+         .put(Type.DECIMAL,
             "8PcUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
-    private static final Map<ColumnType, String> PCSA_UPDATE_SYMBOL =
-      ImmutableMap.<ColumnType, String>builder()
-          .put(ColumnType.BOOLEAN,
+    private static final Map<Type, String> PCSA_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+          .put(Type.BOOLEAN,
               "10PcsaUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-          .put(ColumnType.TINYINT,
+          .put(Type.TINYINT,
               "10PcsaUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-          .put(ColumnType.SMALLINT,
+          .put(Type.SMALLINT,
               "10PcsaUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-          .put(ColumnType.INT,
+          .put(Type.INT,
               "10PcsaUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-          .put(ColumnType.BIGINT,
+          .put(Type.BIGINT,
               "10PcsaUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-          .put(ColumnType.FLOAT,
+          .put(Type.FLOAT,
               "10PcsaUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-          .put(ColumnType.DOUBLE,
+          .put(Type.DOUBLE,
               "10PcsaUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-          .put(ColumnType.STRING,
+          .put(Type.STRING,
               "10PcsaUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
-          .put(ColumnType.TIMESTAMP,
+          .put(Type.TIMESTAMP,
               "10PcsaUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-          .put(ColumnType.DECIMAL,
+          .put(Type.DECIMAL,
               "10PcsaUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
           .build();
 
-  private static final Map<ColumnType, String> MIN_UPDATE_SYMBOL =
-      ImmutableMap.<ColumnType, String>builder()
-        .put(ColumnType.BOOLEAN,
+  private static final Map<Type, String> MIN_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
             "3MinIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.TINYINT,
+        .put(Type.TINYINT,
             "3MinIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.SMALLINT,
+        .put(Type.SMALLINT,
             "3MinIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.INT,
+        .put(Type.INT,
             "3MinIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.BIGINT,
+        .put(Type.BIGINT,
             "3MinIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.FLOAT,
+        .put(Type.FLOAT,
             "3MinIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.DOUBLE,
+        .put(Type.DOUBLE,
             "3MinIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.STRING,
+        .put(Type.STRING,
             "3MinIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.TIMESTAMP,
+        .put(Type.TIMESTAMP,
             "3MinIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.DECIMAL,
+        .put(Type.DECIMAL,
             "3MinIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
-  private static final Map<ColumnType, String> MAX_UPDATE_SYMBOL =
-      ImmutableMap.<ColumnType, String>builder()
-        .put(ColumnType.BOOLEAN,
+  private static final Map<Type, String> MAX_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
             "3MaxIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.TINYINT,
+        .put(Type.TINYINT,
             "3MaxIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.SMALLINT,
+        .put(Type.SMALLINT,
             "3MaxIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.INT,
+        .put(Type.INT,
             "3MaxIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.BIGINT,
+        .put(Type.BIGINT,
             "3MaxIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.FLOAT,
+        .put(Type.FLOAT,
             "3MaxIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.DOUBLE,
+        .put(Type.DOUBLE,
             "3MaxIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.STRING,
+        .put(Type.STRING,
             "3MaxIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.TIMESTAMP,
+        .put(Type.TIMESTAMP,
             "3MaxIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
-        .put(ColumnType.DECIMAL,
+        .put(Type.DECIMAL,
             "3MaxIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
-  private static final Map<ColumnType, String> STDDEV_UPDATE_SYMBOL =
-      ImmutableMap.<ColumnType, String>builder()
-        .put(ColumnType.TINYINT,
+  private static final Map<Type, String> STDDEV_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.TINYINT,
             "14KnuthVarUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.SMALLINT,
+        .put(Type.SMALLINT,
             "14KnuthVarUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.INT,
+        .put(Type.INT,
             "14KnuthVarUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.BIGINT,
+        .put(Type.BIGINT,
             "14KnuthVarUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.FLOAT,
+        .put(Type.FLOAT,
             "14KnuthVarUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
-        .put(ColumnType.DOUBLE,
+        .put(Type.DOUBLE,
             "14KnuthVarUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
@@ -205,18 +205,17 @@ public class BuiltinsDb extends Db {
     // TODO: the merge function should be Sum but the way we rewrite distincts
     // makes that not work.
     db.addBuiltin(AggregateFunction.createBuiltin(db, "count",
-        new ArrayList<ColumnType>(),
-        ColumnType.BIGINT, ColumnType.BIGINT,
+        new ArrayList<Type>(), Type.BIGINT, Type.BIGINT,
         prefix + "8InitZeroIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextEPT_",
         prefix + "15CountStarUpdateEPN10impala_udf15FunctionContextEPNS1_9BigIntValE",
         prefix + "15CountStarUpdateEPN10impala_udf15FunctionContextEPNS1_9BigIntValE",
         null, null, false));
 
-    for (ColumnType t : ColumnType.getSupportedTypes()) {
+    for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       // Count
       db.addBuiltin(AggregateFunction.createBuiltin(db, "count",
-          Lists.newArrayList(t), ColumnType.BIGINT, ColumnType.BIGINT,
+          Lists.newArrayList(t), Type.BIGINT, Type.BIGINT,
           prefix + "8InitZeroIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextEPT_",
           prefix + "11CountUpdateEPN10impala_udf15FunctionContextERKNS1_6AnyValEPNS1_9BigIntValE",
           prefix + "11CountUpdateEPN10impala_udf15FunctionContextERKNS1_6AnyValEPNS1_9BigIntValE",
@@ -239,7 +238,7 @@ public class BuiltinsDb extends Db {
       // NDV
       // TODO: this needs to switch to CHAR(64) as the intermediate type
       db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv",
-          Lists.newArrayList(t), ColumnType.STRING, ColumnType.STRING,
+          Lists.newArrayList(t), Type.STRING, Type.STRING,
           prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + HLL_UPDATE_SYMBOL.get(t),
           prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -250,7 +249,7 @@ public class BuiltinsDb extends Db {
       // distinctpc
       // TODO: this needs to switch to CHAR(64) as the intermediate type
       db.addBuiltin(AggregateFunction.createBuiltin(db, "distinctpc",
-          Lists.newArrayList(t), ColumnType.STRING, ColumnType.STRING,
+          Lists.newArrayList(t), Type.STRING, Type.STRING,
           prefix + "6PcInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + PC_UPDATE_SYMBOL.get(t),
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -261,7 +260,7 @@ public class BuiltinsDb extends Db {
       // distinctpcsa
       // TODO: this needs to switch to CHAR(64) as the intermediate type
       db.addBuiltin(AggregateFunction.createBuiltin(db, "distinctpcsa",
-          Lists.newArrayList(t), ColumnType.STRING, ColumnType.STRING,
+          Lists.newArrayList(t), Type.STRING, Type.STRING,
           prefix + "6PcInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + PCSA_UPDATE_SYMBOL.get(t),
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -271,7 +270,7 @@ public class BuiltinsDb extends Db {
 
       if (STDDEV_UPDATE_SYMBOL.containsKey(t)) {
         db.addBuiltin(AggregateFunction.createBuiltin(db, "stddev",
-            Lists.newArrayList(t), ColumnType.STRING, ColumnType.STRING,
+            Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -279,7 +278,7 @@ public class BuiltinsDb extends Db {
             prefix + "19KnuthStddevFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             true));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "stddev_samp",
-            Lists.newArrayList(t), ColumnType.STRING, ColumnType.STRING,
+            Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -287,7 +286,7 @@ public class BuiltinsDb extends Db {
             prefix + "19KnuthStddevFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             true));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "stddev_pop",
-            Lists.newArrayList(t), ColumnType.STRING, ColumnType.STRING,
+            Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -295,7 +294,7 @@ public class BuiltinsDb extends Db {
             prefix + "22KnuthStddevPopFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             true));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance",
-            Lists.newArrayList(t), ColumnType.STRING, ColumnType.STRING,
+            Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -303,7 +302,7 @@ public class BuiltinsDb extends Db {
             prefix + "16KnuthVarFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             true));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance_samp",
-            Lists.newArrayList(t), ColumnType.STRING, ColumnType.STRING,
+            Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -311,7 +310,7 @@ public class BuiltinsDb extends Db {
             prefix + "16KnuthVarFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             true));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance_pop",
-            Lists.newArrayList(t), ColumnType.STRING, ColumnType.STRING,
+            Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -323,50 +322,43 @@ public class BuiltinsDb extends Db {
 
     // Sum
     db.addBuiltin(AggregateFunction.createBuiltin(db, "sum",
-        Lists.newArrayList(ColumnType.BIGINT), ColumnType.BIGINT, ColumnType.BIGINT,
-        initNull,
+        Lists.<Type>newArrayList(Type.BIGINT), Type.BIGINT, Type.BIGINT, initNull,
         prefix + "3SumIN10impala_udf9BigIntValES3_EEvPNS2_15FunctionContextERKT_PT0_",
         prefix + "3SumIN10impala_udf9BigIntValES3_EEvPNS2_15FunctionContextERKT_PT0_",
         null, null, false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "sum",
-        Lists.newArrayList(ColumnType.DOUBLE), ColumnType.DOUBLE, ColumnType.DOUBLE,
-        initNull,
+        Lists.<Type>newArrayList(Type.DOUBLE), Type.DOUBLE, Type.DOUBLE, initNull,
         prefix + "3SumIN10impala_udf9DoubleValES3_EEvPNS2_15FunctionContextERKT_PT0_",
         prefix + "3SumIN10impala_udf9DoubleValES3_EEvPNS2_15FunctionContextERKT_PT0_",
         null, null, false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "sum",
-        Lists.newArrayList(ColumnType.DECIMAL), ColumnType.DECIMAL, ColumnType.DECIMAL,
-        initNull,
+        Lists.<Type>newArrayList(Type.DECIMAL), Type.DECIMAL, Type.DECIMAL, initNull,
         prefix + "9SumUpdateEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPS4_",
         prefix + "8SumMergeEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPS4_",
         null, null, false));
 
-    for (ColumnType t: ColumnType.getNumericTypes()) {
+    for (Type t: Type.getNumericTypes()) {
       // Avg
       // TODO: because of avg rewrite, BE doesn't implement it yet.
       db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
-          Lists.newArrayList(t), ColumnType.DOUBLE, ColumnType.DOUBLE,
+          Lists.newArrayList(t), Type.DOUBLE, Type.DOUBLE,
           "", "", "", null, "", false));
     }
     // Avg(Timestamp)
     // TODO: why does this make sense? Avg(timestamp) returns a double.
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
-        Lists.newArrayList(ColumnType.TIMESTAMP),
-        ColumnType.DOUBLE, ColumnType.DOUBLE,
+        Lists.<Type>newArrayList(Type.TIMESTAMP), Type.DOUBLE, Type.DOUBLE,
         "", "", "", null, "", false));
 
     // Group_concat(string)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "group_concat",
-        Lists.newArrayList(ColumnType.STRING),
-        ColumnType.STRING, ColumnType.STRING,
-        initNullString,
+        Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING, initNullString,
         prefix + "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
         prefix + "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
         stringValSerializeOrFinalize, stringValSerializeOrFinalize, false));
     // Group_concat(string, string)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "group_concat",
-        Lists.newArrayList(ColumnType.STRING, ColumnType.STRING),
-        ColumnType.STRING, ColumnType.STRING,
+        Lists.<Type>newArrayList(Type.STRING, Type.STRING), Type.STRING, Type.STRING,
         initNullString,
         prefix +
             "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValES6_PS4_",

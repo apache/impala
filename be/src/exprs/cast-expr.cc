@@ -70,8 +70,12 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
   Function* child_function = children()[0]->Codegen(codegen);
   if (child_function == NULL) return NULL;
 
-  const ColumnType& ct1 = ThriftToType(fn_.arg_types[0].type);
-  const ColumnType& ct2 = ThriftToType(fn_.arg_types[1].type);
+  DCHECK_EQ(TTypeNodeType::SCALAR, fn_.arg_types[0].types[0].type);
+  DCHECK_EQ(true, fn_.arg_types[0].types[0].__isset.scalar_type);
+  DCHECK_EQ(TTypeNodeType::SCALAR, fn_.arg_types[1].types[0].type);
+  DCHECK_EQ(true, fn_.arg_types[1].types[0].__isset.scalar_type);
+  const ColumnType& ct1 = ThriftToType(fn_.arg_types[0].types[0].scalar_type.type);
+  const ColumnType& ct2 = ThriftToType(fn_.arg_types[1].types[0].scalar_type.type);
 
   PrimitiveType t1 = ct1.type;
   PrimitiveType t2 = ct2.type;

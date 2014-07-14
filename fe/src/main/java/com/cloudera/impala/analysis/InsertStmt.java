@@ -26,7 +26,7 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
@@ -330,7 +330,7 @@ public class InsertStmt extends StatementBase {
         // Instead of working around the Hive bugs, INSERT is disabled for BOOLEAN
         // partitions in Impala. Once the Hive JIRA is resolved, we can remove this
         // analysis check.
-        if (col.getType() == ColumnType.BOOLEAN) {
+        if (col.getType() == Type.BOOLEAN) {
           throw new AnalysisException(String.format("INSERT into table with BOOLEAN " +
               "partition column (%s) is not supported: %s", col.getName(),
               targetTableName_));
@@ -527,13 +527,13 @@ public class InsertStmt extends StatementBase {
       throws AnalysisException {
     // Check for compatible type, and add casts to the selectListExprs if necessary.
     // We don't allow casting to a lower precision type.
-    ColumnType colType = column.getType();
-    ColumnType exprType = expr.getType();
+    Type colType = column.getType();
+    Type exprType = expr.getType();
     // Trivially compatible.
     if (colType.equals(exprType)) return expr;
 
-    ColumnType compatibleType =
-        ColumnType.getAssignmentCompatibleType(colType, exprType);
+    Type compatibleType =
+        Type.getAssignmentCompatibleType(colType, exprType);
     // Incompatible types.
     if (!compatibleType.isValid()) {
       throw new AnalysisException(

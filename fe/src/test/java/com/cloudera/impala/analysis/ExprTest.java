@@ -18,44 +18,45 @@ import static org.junit.Assert.fail;
 
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 
 
 public class ExprTest {
   // Test creation of LiteralExprs from Strings, e.g., for partitioning keys.
   @Test
   public void TestLiteralExpr() {
-    testLiteralExprPositive("false", ColumnType.BOOLEAN);
-    testLiteralExprPositive("1", ColumnType.TINYINT);
-    testLiteralExprPositive("1", ColumnType.SMALLINT);
-    testLiteralExprPositive("1", ColumnType.INT);
-    testLiteralExprPositive("1", ColumnType.BIGINT);
-    testLiteralExprPositive("1.0", ColumnType.FLOAT);
-    testLiteralExprPositive("1.0", ColumnType.DOUBLE);
-    testLiteralExprPositive("ABC", ColumnType.STRING);
-    testLiteralExprPositive("1.1", ColumnType.createDecimalType(2, 1));
+    testLiteralExprPositive("false", Type.BOOLEAN);
+    testLiteralExprPositive("1", Type.TINYINT);
+    testLiteralExprPositive("1", Type.SMALLINT);
+    testLiteralExprPositive("1", Type.INT);
+    testLiteralExprPositive("1", Type.BIGINT);
+    testLiteralExprPositive("1.0", Type.FLOAT);
+    testLiteralExprPositive("1.0", Type.DOUBLE);
+    testLiteralExprPositive("ABC", Type.STRING);
+    testLiteralExprPositive("1.1", ScalarType.createDecimalType(2, 1));
 
     // INVALID_TYPE should always fail
-    testLiteralExprNegative("ABC", ColumnType.INVALID);
+    testLiteralExprNegative("ABC", Type.INVALID);
 
     // Invalid casts
-    testLiteralExprNegative("ABC", ColumnType.BOOLEAN);
-    testLiteralExprNegative("ABC", ColumnType.TINYINT);
-    testLiteralExprNegative("ABC", ColumnType.SMALLINT);
-    testLiteralExprNegative("ABC", ColumnType.INT);
-    testLiteralExprNegative("ABC", ColumnType.BIGINT);
-    testLiteralExprNegative("ABC", ColumnType.FLOAT);
-    testLiteralExprNegative("ABC", ColumnType.DOUBLE);
-    testLiteralExprNegative("ABC", ColumnType.TIMESTAMP);
-    testLiteralExprNegative("ABC", ColumnType.createDecimalType());
+    testLiteralExprNegative("ABC", Type.BOOLEAN);
+    testLiteralExprNegative("ABC", Type.TINYINT);
+    testLiteralExprNegative("ABC", Type.SMALLINT);
+    testLiteralExprNegative("ABC", Type.INT);
+    testLiteralExprNegative("ABC", Type.BIGINT);
+    testLiteralExprNegative("ABC", Type.FLOAT);
+    testLiteralExprNegative("ABC", Type.DOUBLE);
+    testLiteralExprNegative("ABC", Type.TIMESTAMP);
+    testLiteralExprNegative("ABC", ScalarType.createDecimalType());
 
     // Date types not implemented
-    testLiteralExprNegative("2010-01-01", ColumnType.DATE);
-    testLiteralExprNegative("2010-01-01", ColumnType.DATETIME);
-    testLiteralExprNegative("2010-01-01", ColumnType.TIMESTAMP);
+    testLiteralExprNegative("2010-01-01", Type.DATE);
+    testLiteralExprNegative("2010-01-01", Type.DATETIME);
+    testLiteralExprNegative("2010-01-01", Type.TIMESTAMP);
   }
 
-  private void testLiteralExprPositive(String value, ColumnType type) {
+  private void testLiteralExprPositive(String value, Type type) {
     LiteralExpr expr = null;
     try {
       expr = LiteralExpr.create(value, type);
@@ -68,7 +69,7 @@ public class ExprTest {
     }
   }
 
-  private void testLiteralExprNegative(String value, ColumnType type) {
+  private void testLiteralExprNegative(String value, Type type) {
     boolean failure = false;
     LiteralExpr expr = null;
     try {

@@ -27,13 +27,13 @@ import parquet.hadoop.ParquetFileReader;
 import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.schema.OriginalType;
 import parquet.schema.PrimitiveType;
-import parquet.schema.Type;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.RowFormat;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.THdfsFileFormat;
@@ -102,29 +102,29 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
    * Converts a "primitive" parquet type to an Impala column type.
    * A primitive type is a non-nested type which does not have annotations.
    */
-  private static ColumnType convertPrimitiveParquetType(Type parquetType)
+  private static Type convertPrimitiveParquetType(parquet.schema.Type parquetType)
       throws AnalysisException {
     Preconditions.checkState(parquetType.isPrimitive());
     PrimitiveType prim = parquetType.asPrimitiveType();
     switch (prim.getPrimitiveTypeName()) {
     case BINARY:
-      return ColumnType.STRING;
+      return Type.STRING;
     case BOOLEAN:
-      return ColumnType.BOOLEAN;
+      return Type.BOOLEAN;
     case DOUBLE:
-      return ColumnType.DOUBLE;
+      return Type.DOUBLE;
     case FIXED_LEN_BYTE_ARRAY:
       throw new AnalysisException(
           "Unsupported parquet type FIXED_LEN_BYTE_ARRAY for field " +
               parquetType.getName());
     case FLOAT:
-      return ColumnType.FLOAT;
+      return Type.FLOAT;
     case INT32:
-      return ColumnType.INT;
+      return Type.INT;
     case INT64:
-      return ColumnType.BIGINT;
+      return Type.BIGINT;
     case INT96:
-      return ColumnType.TIMESTAMP;
+      return Type.TIMESTAMP;
     default:
       Preconditions.checkState(false, "Unexpected parquet primitive type: " +
              prim.getPrimitiveTypeName());
@@ -138,7 +138,7 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
    * a "OriginalType". The parquet documentation refers to these as logical types,
    * so we use that terminology here.
    */
-  private static ColumnType convertLogicalParquetType(Type parquetType)
+  private static Type convertLogicalParquetType(parquet.schema.Type parquetType)
       throws AnalysisException {
     PrimitiveType prim = parquetType.asPrimitiveType();
     OriginalType orig = parquetType.getOriginalType();
@@ -147,11 +147,11 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
       // UTF8 is the type annotation Parquet uses for strings
       // We check to make sure it applies to BINARY to avoid errors if there is a bad
       // annotation.
-      return ColumnType.STRING;
+      return Type.STRING;
     }
     if (orig == OriginalType.DECIMAL) {
-      return ColumnType.createDecimalType(prim.getDecimalMetadata().getPrecision(),
-                                          prim.getDecimalMetadata().getScale());
+      return ScalarType.createDecimalType(prim.getDecimalMetadata().getPrecision(),
+                                           prim.getDecimalMetadata().getScale());
     }
 
     throw new AnalysisException(
@@ -168,23 +168,23 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
   private static List<ColumnDesc> extractParquetSchema(HdfsUri location)
       throws AnalysisException {
     parquet.schema.MessageType parquetSchema = loadParquetSchema(location.getPath());
-    List<Type> fields = parquetSchema.getFields();
+    List<parquet.schema.Type> fields = parquetSchema.getFields();
     List<ColumnDesc> schema = new ArrayList<ColumnDesc>();
 
-    for (Type field : fields) {
-      ColumnType colType = null;
+    for (parquet.schema.Type field: fields) {
+      Type type = null;
 
       if (field.getOriginalType() != null) {
-        colType = convertLogicalParquetType(field);
+        type = convertLogicalParquetType(field);
       } else if (field.isPrimitive()) {
-        colType = convertPrimitiveParquetType(field);
+        type = convertPrimitiveParquetType(field);
       } else {
         throw new AnalysisException("Unsupported parquet type for field " +
             field.getName());
       }
 
       String colName = field.getName();
-      schema.add(new ColumnDesc(colName, colType, "inferred from: " + field.toString()));
+      schema.add(new ColumnDesc(colName, type, "inferred from: " + field.toString()));
     }
     return schema;
   }

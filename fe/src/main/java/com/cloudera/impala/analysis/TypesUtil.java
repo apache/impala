@@ -16,7 +16,8 @@ package com.cloudera.impala.analysis;
 
 import java.math.BigDecimal;
 
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
@@ -35,8 +36,8 @@ public class TypesUtil {
    * For precision [20-28], we could support a 12 byte decimal but currently a 12
    * byte decimal in the BE is not implemented.
    */
-  public static int getDecimalSlotSize(ColumnType type) {
-    Preconditions.checkState(type.isFullySpecifiedDecimal());
+  public static int getDecimalSlotSize(ScalarType type) {
+    Preconditions.checkState(type.isDecimal() && !type.isWildcardDecimal());
     if (type.decimalPrecision() <= 9) return 4;
     if (type.decimalPrecision() <= 18) return 8;
     return 16;
@@ -48,16 +49,16 @@ public class TypesUtil {
    * In the case where the decimal can be bigger than BIGINT, we return
    * BIGINT (and the execution will report it as overflows).
    */
-  public static ColumnType getContainingIntType(ColumnType decType) {
+  public static ScalarType getContainingIntType(ScalarType decType) {
     Preconditions.checkState(decType.isFullySpecifiedDecimal());
     Preconditions.checkState(decType.decimalScale() == 0);
     // TINYINT_MAX = 128
-    if (decType.decimalPrecision() <= 2) return ColumnType.TINYINT;
+    if (decType.decimalPrecision() <= 2) return Type.TINYINT;
     // SMALLINT_MAX = 32768
-    if (decType.decimalPrecision() <= 4) return ColumnType.SMALLINT;
+    if (decType.decimalPrecision() <= 4) return Type.SMALLINT;
     // INT_MAX = 2147483648
-    if (decType.decimalPrecision() <= 9) return ColumnType.INT;
-    return ColumnType.BIGINT;
+    if (decType.decimalPrecision() <= 9) return Type.INT;
+    return Type.BIGINT;
   }
 
   /**
@@ -66,8 +67,8 @@ public class TypesUtil {
    * decimal (10, 5) && decimal(12, 3) -> decimal(14, 5)
    * Either t1 or t2 can be a wildcard decimal (but not both).
    */
-  public static ColumnType getDecimalAssignmentCompatibleType(
-      ColumnType t1, ColumnType t2) {
+  public static ScalarType getDecimalAssignmentCompatibleType(
+      ScalarType t1, ScalarType t2) {
     Preconditions.checkState(t1.isDecimal());
     Preconditions.checkState(t2.isDecimal());
     Preconditions.checkState(!(t1.isWildcardDecimal() && t2.isWildcardDecimal()));
@@ -83,32 +84,33 @@ public class TypesUtil {
     int p2 = t2.decimalPrecision();
     int digitsBefore = Math.max(p1 - s1, p2 - s2);
     int digitsAfter = Math.max(s1, s2);
-    return ColumnType.createDecimalTypeInternal(digitsBefore + digitsAfter, digitsAfter);
+    return ScalarType.createDecimalTypeInternal(
+        digitsBefore + digitsAfter, digitsAfter);
   }
 
   /**
    * Returns the necessary result type for t1 op t2. Throws an analysis exception
    * if the operation does not make sense for the types.
    */
-  public static ColumnType getArithmeticResultType(ColumnType t1, ColumnType t2,
+  public static Type getArithmeticResultType(Type t1, Type t2,
       ArithmeticExpr.Operator op) throws AnalysisException {
     Preconditions.checkState(t1.isNumericType() || t1.isNull());
     Preconditions.checkState(t2.isNumericType() || t2.isNull());
 
-    if (t1.isNull() && t2.isNull()) return ColumnType.NULL;
+    if (t1.isNull() && t2.isNull()) return Type.NULL;
 
     if (t1.isDecimal() || t2.isDecimal()) {
       if (t1.isNull()) return t2;
       if (t2.isNull()) return t1;
 
-      t1 = t1.getMinResolutionDecimal();
-      t2 = t2.getMinResolutionDecimal();
+      t1 = ((ScalarType) t1).getMinResolutionDecimal();
+      t2 = ((ScalarType) t2).getMinResolutionDecimal();
       Preconditions.checkState(t1.isDecimal());
       Preconditions.checkState(t2.isDecimal());
       return getDecimalArithmeticResultType(t1, t2, op);
     }
 
-    ColumnType type = null;
+    Type type = null;
     switch (op) {
       case MULTIPLY:
       case ADD:
@@ -116,13 +118,16 @@ public class TypesUtil {
         // If one of the types is null, use the compatible type without promotion.
         // Otherwise, promote the compatible type to the next higher resolution type,
         // to ensure that that a <op> b won't overflow/underflow.
-        type = ColumnType.getAssignmentCompatibleType(t1, t2).getNextResolutionType();
+        Type compatibleType =
+            ScalarType.getAssignmentCompatibleType(t1, t2);
+        Preconditions.checkState(compatibleType.isScalarType());
+        type = ((ScalarType) compatibleType).getNextResolutionType();
         break;
       case MOD:
-        type = ColumnType.getAssignmentCompatibleType(t1, t2);
+        type = ScalarType.getAssignmentCompatibleType(t1, t2);
         break;
       case DIVIDE:
-        type = ColumnType.DOUBLE;
+        type = Type.DOUBLE;
         break;
       default:
         throw new AnalysisException("Invalid op: " + op);
@@ -140,27 +145,29 @@ public class TypesUtil {
    *  - Multiply does not need +1 for the result precision.
    *  - Divide scale truncation is different.
    */
-  public static ColumnType getDecimalArithmeticResultType(ColumnType t1, ColumnType t2,
+  public static ScalarType getDecimalArithmeticResultType(Type t1, Type t2,
       ArithmeticExpr.Operator op) throws AnalysisException {
     Preconditions.checkState(t1.isFullySpecifiedDecimal());
     Preconditions.checkState(t2.isFullySpecifiedDecimal());
-    int s1 = t1.decimalScale();
-    int s2 = t2.decimalScale();
-    int p1 = t1.decimalPrecision();
-    int p2 = t2.decimalPrecision();
+    ScalarType st1 = (ScalarType) t1;
+    ScalarType st2 = (ScalarType) t2;
+    int s1 = st1.decimalScale();
+    int s2 = st2.decimalScale();
+    int p1 = st1.decimalPrecision();
+    int p2 = st2.decimalPrecision();
     int sMax = Math.max(s1, s2);
 
     switch (op) {
       case ADD:
       case SUBTRACT:
-        return ColumnType.createDecimalTypeInternal(
+        return ScalarType.createDecimalTypeInternal(
             sMax + Math.max(p1 - s1, p2 - s2) + 1, sMax);
       case MULTIPLY:
-        return ColumnType.createDecimalTypeInternal(p1 + p2, s1 + s2);
+        return ScalarType.createDecimalTypeInternal(p1 + p2, s1 + s2);
       case DIVIDE:
         int resultScale = Math.max(DECIMAL_DIVISION_SCALE_INCREMENT, s1 + p2 + 1);
         int resultPrecision = p1 - s1 + s2 + resultScale;
-        if (resultPrecision > ColumnType.MAX_PRECISION) {
+        if (resultPrecision > ScalarType.MAX_PRECISION) {
           // In this case, the desired resulting precision exceeds the maximum and
           // we need to truncate some way. We can either remove digits before or
           // after the decimal and there is no right answer. This is an implementation
@@ -168,11 +175,11 @@ public class TypesUtil {
           // For simplicity, we will set the resulting scale to be the max of the input
           // scales and use the maximum precision.
           resultScale = Math.max(s1, s2);
-          resultPrecision = ColumnType.MAX_PRECISION;
+          resultPrecision = ScalarType.MAX_PRECISION;
         }
-        return ColumnType.createDecimalTypeInternal(resultPrecision, resultScale);
+        return ScalarType.createDecimalTypeInternal(resultPrecision, resultScale);
       case MOD:
-        return ColumnType.createDecimalTypeInternal(
+        return ScalarType.createDecimalTypeInternal(
             Math.min(p1 - s1, p2 - s2) + sMax, sMax);
       default:
         throw new AnalysisException(
@@ -186,7 +193,7 @@ public class TypesUtil {
    * (much more like significant figures and exponent).
    * Returns null if the value cannot be represented.
    */
-  public static ColumnType computeDecimalType(BigDecimal v) {
+  public static Type computeDecimalType(BigDecimal v) {
     // PlainString returns the string with no exponent. We walk it to compute
     // the digits before and after.
     // TODO: better way?
@@ -212,9 +219,9 @@ public class TypesUtil {
         ++digitsBefore;
       }
     }
-    if (digitsAfter > ColumnType.MAX_SCALE) return null;
-    if (digitsBefore + digitsAfter > ColumnType.MAX_PRECISION) return null;
+    if (digitsAfter > ScalarType.MAX_SCALE) return null;
+    if (digitsBefore + digitsAfter > ScalarType.MAX_PRECISION) return null;
     if (digitsBefore == 0 && digitsAfter == 0) digitsBefore = 1;
-    return ColumnType.createDecimalType(digitsBefore + digitsAfter, digitsAfter);
+    return ScalarType.createDecimalType(digitsBefore + digitsAfter, digitsAfter);
   }
 }

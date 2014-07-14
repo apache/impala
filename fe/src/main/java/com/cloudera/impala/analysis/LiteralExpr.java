@@ -18,7 +18,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -48,7 +49,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   /**
    * Returns an analyzed literal of 'type'.
    */
-  public static LiteralExpr create(String value, ColumnType type)
+  public static LiteralExpr create(String value, Type type)
       throws AnalysisException, AuthorizationException {
     Preconditions.checkArgument(type.isValid());
     LiteralExpr e = null;
@@ -78,7 +79,8 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         throw new AnalysisException(
             "DATE/DATETIME/TIMESTAMP literals not supported: " + value);
       default:
-        Preconditions.checkState(false);
+        Preconditions.checkState(false,
+            String.format("Literals of type '%s' not supported.", type.toSql()));
     }
     e.analyze(null);
     // Need to cast since we cannot infer the type from the value. e.g. value
@@ -89,7 +91,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   /**
    * Returns an analyzed literal from the thrift object.
    */
-  public static LiteralExpr fromThrift(TExprNode exprNode, ColumnType colType) {
+  public static LiteralExpr fromThrift(TExprNode exprNode, Type colType) {
     try {
       LiteralExpr result = null;
       switch (exprNode.node_type) {
@@ -100,8 +102,9 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         case DECIMAL_LITERAL:
           byte[] bytes = exprNode.decimal_literal.getValue();
           BigDecimal val = new BigDecimal(new BigInteger(bytes));
+          ScalarType decimalType = (ScalarType) colType;
           // We store the decimal as the unscaled bytes. Need to adjust for the scale.
-          val = val.movePointLeft(colType.decimalScale());
+          val = val.movePointLeft(decimalType.decimalScale());
           result = new NumericLiteral(val, colType);
           break;
         case INT_LITERAL:
@@ -145,6 +148,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   /**
    * Evaluates the given constant expr and returns its result as a LiteralExpr.
    * Assumes expr has been analyzed. Returns constExpr if is it already a LiteralExpr.
+   * TODO: Support non-scalar types.
    */
   public static LiteralExpr create(Expr constExpr, TQueryCtx queryCtx)
       throws AnalysisException, AuthorizationException {
@@ -210,7 +214,9 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         throw new AnalysisException(
             "DATE/DATETIME/TIMESTAMP literals not supported: " + constExpr.toSql());
       default:
-        Preconditions.checkState(false);
+        Preconditions.checkState(false,
+            String.format("Literals of type '%s' not supported.",
+                constExpr.getType().toSql()));
     }
     // None of the fields in the thrift struct were set indicating a NULL.
     if (result == null) result = new NullLiteral();

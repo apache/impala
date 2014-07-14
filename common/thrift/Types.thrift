@@ -39,18 +39,52 @@ enum TPrimitiveType {
   BINARY,
   DECIMAL,
   // CHAR(n). Currently only supported in UDAs
-  CHAR,
+  CHAR
 }
 
-struct TColumnType {
+enum TTypeNodeType {
+  SCALAR,
+  ARRAY,
+  MAP,
+  STRUCT
+}
+
+struct TScalarType {
   1: required TPrimitiveType type
 
-  // Only set if type == CHAR
+  // Only set for CHAR
   2: optional i32 len
 
-  // Only set if type == DECIMAL
+  // Only set for DECIMAL
   3: optional i32 precision
   4: optional i32 scale
+}
+
+// Represents a field in a STRUCT type.
+// TODO: Model column stats for struct fields.
+struct TStructField {
+  1: required string name
+  2: optional string comment
+}
+
+struct TTypeNode {
+  1: required TTypeNodeType type
+
+  // only set for scalar types
+  2: optional TScalarType scalar_type
+
+  // only used for structs; has struct_fields.size() corresponding child types
+  3: optional list<TStructField> struct_fields
+}
+
+// A flattened representation of a tree of column types obtained by depth-first
+// traversal. Complex types such as map, array and struct have child types corresponding
+// to the map key/value, array item type, and struct fields, respectively.
+// For scalar types the list contains only a single node.
+// Note: We cannot rename this to TType because it conflicts with Thrift's internal TType
+// and the generated Python thrift files will not work.
+struct TColumnType {
+  1: list<TTypeNode> types
 }
 
 enum TStmtType {

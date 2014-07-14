@@ -61,7 +61,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.util.UnsafeUtil;
@@ -163,35 +163,35 @@ public class UdfExecutorTest {
   }
 
   // Returns the primitive type for w
-  ColumnType getType(Object w) {
+  Type getType(Object w) {
     if (w instanceof ImpalaBooleanWritable) {
-      return ColumnType.BOOLEAN;
+      return Type.BOOLEAN;
     } else if (w instanceof ImpalaTinyIntWritable) {
-      return ColumnType.TINYINT;
+      return Type.TINYINT;
     } else if (w instanceof ImpalaSmallIntWritable) {
-      return ColumnType.SMALLINT;
+      return Type.SMALLINT;
     } else if (w instanceof ImpalaIntWritable) {
-      return ColumnType.INT;
+      return Type.INT;
     } else if (w instanceof ImpalaBigIntWritable) {
-      return ColumnType.BIGINT;
+      return Type.BIGINT;
     } else if (w instanceof ImpalaFloatWritable) {
-      return ColumnType.FLOAT;
+      return Type.FLOAT;
     } else if (w instanceof ImpalaDoubleWritable) {
-      return ColumnType.DOUBLE;
+      return Type.DOUBLE;
     } else if (w instanceof ImpalaBytesWritable || w instanceof ImpalaTextWritable
         || w instanceof String) {
-      return ColumnType.STRING;
+      return Type.STRING;
     }
     Preconditions.checkArgument(false);
-    return ColumnType.INVALID;
+    return Type.INVALID;
   }
 
   // Runs the hive udf contained in c. Validates that c.evaluate(args) == retValue.
   // Arguments and return value cannot be NULL.
-  void TestUdfImpl(String jar, Class<?> c, Object expectedValue, ColumnType expectedType,
-      boolean validate, Object... args)
+  void TestUdfImpl(String jar, Class<?> c, Object expectedValue,
+      Type expectedType, boolean validate, Object... args)
       throws MalformedURLException, ImpalaRuntimeException {
-    ColumnType[] argTypes = new ColumnType[args.length];
+    Type[] argTypes = new Type[args.length];
     for (int i = 0; i < args.length; ++i) {
       Preconditions.checkNotNull(args[i]);
       argTypes[i] = getType(args[i]);

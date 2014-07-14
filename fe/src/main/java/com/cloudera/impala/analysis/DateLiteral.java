@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDateLiteral;
 import com.cloudera.impala.thrift.TExprNode;
@@ -49,7 +49,7 @@ class DateLiteral extends LiteralExpr {
    * @param type
    *          desired type of date literal
    */
-  public DateLiteral(String s, ColumnType type) throws AnalysisException {
+  public DateLiteral(String s, Type type) throws AnalysisException {
     Preconditions.checkArgument(type.isDateType());
     Date date = null;
     ParsePosition pos = new ParsePosition(0);
@@ -115,7 +115,7 @@ class DateLiteral extends LiteralExpr {
   public Timestamp getValue() { return value_; }
 
   @Override
-  protected Expr uncheckedCastTo(ColumnType targetType) throws AnalysisException {
+  protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
     // programmer error, we should never reach this state
     Preconditions.checkState(false);
     return this;

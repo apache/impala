@@ -37,7 +37,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.StringLiteral;
 import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.HBaseColumn;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -149,7 +149,7 @@ public class HBaseScanNode extends ScanNode {
       if (rowRange.getLowerBound() != null) {
         Preconditions.checkState(rowRange.getLowerBound().isConstant());
         Preconditions.checkState(
-            rowRange.getLowerBound().getType().equals(ColumnType.STRING));
+            rowRange.getLowerBound().getType().equals(Type.STRING));
         TColumnValue val = FeSupport.EvalConstExpr(rowRange.getLowerBound(),
             analyzer.getQueryCtx());
         if (!val.isSetString_val()) {
@@ -164,7 +164,7 @@ public class HBaseScanNode extends ScanNode {
       if (rowRange.getUpperBound() != null) {
         Preconditions.checkState(rowRange.getUpperBound().isConstant());
         Preconditions.checkState(
-            rowRange.getUpperBound().getType().equals(ColumnType.STRING));
+            rowRange.getUpperBound().getType().equals(Type.STRING));
         TColumnValue val = FeSupport.EvalConstExpr(rowRange.getUpperBound(),
             analyzer.getQueryCtx());
         if (!val.isSetString_val()) {

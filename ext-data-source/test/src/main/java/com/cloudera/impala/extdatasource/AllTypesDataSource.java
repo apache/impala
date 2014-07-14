@@ -37,8 +37,10 @@ import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
 import com.cloudera.impala.thrift.TColumnData;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TPrimitiveType;
+import com.cloudera.impala.thrift.TScalarType;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStatusCode;
+import com.cloudera.impala.thrift.TTypeNodeType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -177,7 +179,11 @@ public class AllTypesDataSource implements ExternalDataSource {
       // If validating predicates, only one STRING column should be selected.
       Preconditions.checkArgument(schema_.getColsSize() == 1);
       TColumnDesc firstCol = schema_.getCols().get(0);
-      Preconditions.checkArgument(firstCol.getType().getType() == TPrimitiveType.STRING);
+      TColumnType firstType = firstCol.getType();
+      Preconditions.checkState(firstType.getTypesSize() == 1);
+      Preconditions.checkState(firstType.types.get(0).getType() == TTypeNodeType.SCALAR);
+      Preconditions.checkArgument(
+          firstType.types.get(0).scalar_type.getType() == TPrimitiveType.STRING);
     }
     scanHandle_ = UUID.randomUUID().toString();
     return new TOpenResult(STATUS_OK).setScan_handle(scanHandle_);
@@ -233,7 +239,14 @@ public class AllTypesDataSource implements ExternalDataSource {
       TColumnDesc colDesc = schema_.getCols().get(i);
       TColumnData colData = cols.get(i);
       TColumnType type = colDesc.getType();
-      switch (type.getType()) {
+      if (type.types.get(0).getType() != TTypeNodeType.SCALAR) {
+        // Unsupported non-scalar type.
+        throw new UnsupportedOperationException("Unsupported column type: " +
+            type.types.get(0).getType());
+      }
+      Preconditions.checkState(type.getTypesSize() == 1);
+      TScalarType scalarType = type.types.get(0).scalar_type;
+      switch (scalarType.type) {
         case TINYINT:
           colData.addToIs_null(false);
           colData.addToByte_vals((byte) (currRow_ % 10));
@@ -277,7 +290,7 @@ public class AllTypesDataSource implements ExternalDataSource {
           break;
         case DECIMAL:
           colData.addToIs_null(false);
-          BigInteger maxUnscaled = BigInteger.TEN.pow(type.getPrecision());
+          BigInteger maxUnscaled = BigInteger.TEN.pow(scalarType.getPrecision());
           BigInteger val = maxUnscaled.subtract(BigInteger.valueOf(currRow_ + 1));
           val = val.mod(maxUnscaled);
           if (currRow_ % 2 == 0) val = val.negate();
@@ -292,7 +305,7 @@ public class AllTypesDataSource implements ExternalDataSource {
         default:
           // Unsupported.
           throw new UnsupportedOperationException("Unsupported column type: " +
-              colDesc.getType().getType());
+              scalarType.getType());
       }
     }
   }

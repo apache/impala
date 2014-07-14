@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -26,10 +27,11 @@ import junit.framework.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -38,49 +40,49 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   @Test
   public void TestNumericLiteralMinMaxValues() {
-    testNumericLiteral(Byte.toString(Byte.MIN_VALUE), ColumnType.TINYINT);
-    testNumericLiteral(Byte.toString(Byte.MAX_VALUE), ColumnType.TINYINT);
-    testNumericLiteral("- " + Byte.toString(Byte.MIN_VALUE), ColumnType.SMALLINT);
-    testNumericLiteral("- " + Byte.toString(Byte.MAX_VALUE), ColumnType.TINYINT);
+    testNumericLiteral(Byte.toString(Byte.MIN_VALUE), Type.TINYINT);
+    testNumericLiteral(Byte.toString(Byte.MAX_VALUE), Type.TINYINT);
+    testNumericLiteral("- " + Byte.toString(Byte.MIN_VALUE), Type.SMALLINT);
+    testNumericLiteral("- " + Byte.toString(Byte.MAX_VALUE), Type.TINYINT);
 
-    testNumericLiteral(Short.toString(Short.MIN_VALUE), ColumnType.SMALLINT);
-    testNumericLiteral(Short.toString(Short.MAX_VALUE), ColumnType.SMALLINT);
-    testNumericLiteral("- " + Short.toString(Short.MIN_VALUE), ColumnType.INT);
-    testNumericLiteral("- " + Short.toString(Short.MAX_VALUE), ColumnType.SMALLINT);
+    testNumericLiteral(Short.toString(Short.MIN_VALUE), Type.SMALLINT);
+    testNumericLiteral(Short.toString(Short.MAX_VALUE), Type.SMALLINT);
+    testNumericLiteral("- " + Short.toString(Short.MIN_VALUE), Type.INT);
+    testNumericLiteral("- " + Short.toString(Short.MAX_VALUE), Type.SMALLINT);
 
-    testNumericLiteral(Integer.toString(Integer.MIN_VALUE), ColumnType.INT);
-    testNumericLiteral(Integer.toString(Integer.MAX_VALUE), ColumnType.INT);
-    testNumericLiteral("- " + Integer.toString(Integer.MIN_VALUE), ColumnType.BIGINT);
-    testNumericLiteral("- " + Integer.toString(Integer.MAX_VALUE), ColumnType.INT);
+    testNumericLiteral(Integer.toString(Integer.MIN_VALUE), Type.INT);
+    testNumericLiteral(Integer.toString(Integer.MAX_VALUE), Type.INT);
+    testNumericLiteral("- " + Integer.toString(Integer.MIN_VALUE), Type.BIGINT);
+    testNumericLiteral("- " + Integer.toString(Integer.MAX_VALUE), Type.INT);
 
-    testNumericLiteral(Long.toString(Long.MIN_VALUE), ColumnType.BIGINT);
-    testNumericLiteral(Long.toString(Long.MAX_VALUE), ColumnType.BIGINT);
-    testNumericLiteral(Long.toString(Long.MIN_VALUE), ColumnType.BIGINT);
-    testNumericLiteral("- " + Long.toString(Long.MAX_VALUE), ColumnType.BIGINT);
+    testNumericLiteral(Long.toString(Long.MIN_VALUE), Type.BIGINT);
+    testNumericLiteral(Long.toString(Long.MAX_VALUE), Type.BIGINT);
+    testNumericLiteral(Long.toString(Long.MIN_VALUE), Type.BIGINT);
+    testNumericLiteral("- " + Long.toString(Long.MAX_VALUE), Type.BIGINT);
 
     // Result type is a decimal because Long can't hold the value.
     testNumericLiteral(Long.toString(Long.MIN_VALUE) + "1",
-        ColumnType.createDecimalType(20, 0));
+        ScalarType.createDecimalType(20, 0));
     testNumericLiteral(Long.toString(Long.MIN_VALUE) + "1",
-        ColumnType.createDecimalType(20, 0));
+        ScalarType.createDecimalType(20, 0));
     // Test min int64-1.
     BigInteger minMinusOne = BigInteger.valueOf(Long.MIN_VALUE);
     minMinusOne = minMinusOne.subtract(BigInteger.ONE);
-    testNumericLiteral(minMinusOne.toString(), ColumnType.createDecimalType(19, 0));
+    testNumericLiteral(minMinusOne.toString(), ScalarType.createDecimalType(19, 0));
     // Test max int64+1.
     BigInteger maxPlusOne = BigInteger.valueOf(Long.MAX_VALUE);
     maxPlusOne = maxPlusOne.add(BigInteger.ONE);
-    testNumericLiteral(maxPlusOne.toString(), ColumnType.createDecimalType(19, 0));
+    testNumericLiteral(maxPlusOne.toString(), ScalarType.createDecimalType(19, 0));
 
     // Test floating-point types.
-    testNumericLiteral(Float.toString(Float.MIN_VALUE), ColumnType.DOUBLE);
-    testNumericLiteral(Float.toString(Float.MAX_VALUE), ColumnType.DOUBLE);
-    testNumericLiteral("-" + Float.toString(Float.MIN_VALUE), ColumnType.DOUBLE);
-    testNumericLiteral("-" + Float.toString(Float.MAX_VALUE), ColumnType.DOUBLE);
-    testNumericLiteral(Double.toString(Double.MIN_VALUE), ColumnType.DOUBLE);
-    testNumericLiteral(Double.toString(Double.MAX_VALUE), ColumnType.DOUBLE);
-    testNumericLiteral("-" + Double.toString(Double.MIN_VALUE), ColumnType.DOUBLE);
-    testNumericLiteral("-" + Double.toString(Double.MAX_VALUE), ColumnType.DOUBLE);
+    testNumericLiteral(Float.toString(Float.MIN_VALUE), Type.DOUBLE);
+    testNumericLiteral(Float.toString(Float.MAX_VALUE), Type.DOUBLE);
+    testNumericLiteral("-" + Float.toString(Float.MIN_VALUE), Type.DOUBLE);
+    testNumericLiteral("-" + Float.toString(Float.MAX_VALUE), Type.DOUBLE);
+    testNumericLiteral(Double.toString(Double.MIN_VALUE), Type.DOUBLE);
+    testNumericLiteral(Double.toString(Double.MAX_VALUE), Type.DOUBLE);
+    testNumericLiteral("-" + Double.toString(Double.MIN_VALUE), Type.DOUBLE);
+    testNumericLiteral("-" + Double.toString(Double.MAX_VALUE), Type.DOUBLE);
 
     AnalysisError(String.format("select %s1", Double.toString(Double.MAX_VALUE)),
       "Numeric literal '1.7976931348623157E+3081' exceeds maximum range of doubles.");
@@ -88,17 +90,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       "Numeric literal '4.9E-3241' underflows minimum resolution of doubles.");
 
     testNumericLiteral("0.99999999999999999999999999999999999999",
-        ColumnType.createDecimalType(38,38));
+        ScalarType.createDecimalType(38,38));
     testNumericLiteral("99999999999999999999999999999999999999.",
-        ColumnType.createDecimalType(38,0));
+        ScalarType.createDecimalType(38,0));
     testNumericLiteral("-0.99999999999999999999999999999999999999",
-        ColumnType.createDecimalType(38,38));
+        ScalarType.createDecimalType(38,38));
     testNumericLiteral("-99999999999999999999999999999999999999.",
-        ColumnType.createDecimalType(38,0));
+        ScalarType.createDecimalType(38,0));
     testNumericLiteral("999999999999999999999.99999999999999999",
-        ColumnType.createDecimalType(38,17));
+        ScalarType.createDecimalType(38,17));
     testNumericLiteral("-999999999999999999.99999999999999999999",
-        ColumnType.createDecimalType(38,20));
+        ScalarType.createDecimalType(38,20));
 
   }
 
@@ -106,9 +108,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    * Asserts that "select literal" analyzes ok and that the expectedType
    * matches the actual type.
    */
-  private void testNumericLiteral(String literal, ColumnType expectedType) {
+  private void testNumericLiteral(String literal, Type expectedType) {
     SelectStmt selectStmt = (SelectStmt) AnalyzesOk("select " + literal);
-    ColumnType actualType = selectStmt.resultExprs_.get(0).getType();
+    Type actualType = selectStmt.resultExprs_.get(0).getType();
     Assert.assertTrue("Expected Type: " + expectedType + " Actual type: " + actualType,
         expectedType.equals(actualType));
   }
@@ -192,7 +194,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select cast(cast(1 as timestamp) as decimal)",
         "Invalid type cast of CAST(1 AS TIMESTAMP) from TIMESTAMP to DECIMAL(9,0)");
 
-    for (ColumnType type: ColumnType.getSupportedTypes()) {
+    for (Type type: Type.getSupportedTypes()) {
       if (type.isNull() || type.isDecimal() || type.isBoolean() || type.isDateType()) {
         continue;
       }
@@ -201,9 +203,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     }
 
     // Casts to all other decimals are supported.
-    for (int precision = 1; precision <= ColumnType.MAX_PRECISION; ++precision) {
+    for (int precision = 1; precision <= ScalarType.MAX_PRECISION; ++precision) {
       for (int scale = 0; scale < precision; ++scale) {
-        ColumnType t = ColumnType.createDecimalType(precision, scale);
+        Type t = ScalarType.createDecimalType(precision, scale);
         AnalyzesOk("select cast(1.1 as " + t + ")");
         AnalyzesOk("select cast(cast(1 as " + t + ") as decimal)");
       }
@@ -288,19 +290,19 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    */
   @Test
   public void TestNullCasts() throws AnalysisException {
-    for (ColumnType type: ColumnType.getSupportedTypes()) {
+    for (Type type: Type.getSupportedTypes()) {
       // TODO: Implement CHAR
       if (type.getPrimitiveType() == PrimitiveType.CHAR) continue;
        // Cannot cast to NULL_TYPE
       if (type.isNull()) continue;
-      if (type.isDecimal()) type = ColumnType.DEFAULT_DECIMAL;
+      if (type.isDecimal()) type = Type.DEFAULT_DECIMAL;
       checkExprType("select cast(null as " + type + ")", type);
     }
   }
 
   // Analyzes query and asserts that the first result expr returns the given type.
   // Requires query to parse to a SelectStmt.
-  private void checkExprType(String query, ColumnType type) {
+  private void checkExprType(String query, Type type) {
     SelectStmt select = (SelectStmt) AnalyzesOk(query);
     assertEquals(select.getResultExprs().get(0).getType(), type);
   }
@@ -486,24 +488,21 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    */
   @Test
   public void TestArithmeticTypeCasts() throws AnalysisException {
-    // test all numeric types and the null type
-    List<ColumnType> numericTypes =
-        new ArrayList<ColumnType>(ColumnType.getFixedSizeNumericTypes());
-    numericTypes.add(ColumnType.NULL);
-    for (ColumnType type1 : numericTypes) {
-      // Decimal has custom type promotion rules which are tested elsewhere.
-      if (type1.isDecimal()) continue;
-      for (ColumnType type2 : numericTypes) {
-        if (type2.isDecimal()) continue;
-
-        ColumnType compatibleType =
-            ColumnType.getAssignmentCompatibleType(type1, type2);
-        ColumnType promotedType = compatibleType.getNextResolutionType();
+    // Test all non-decimal numeric types and the null type.
+    // Decimal has custom type promotion rules which are tested elsewhere.
+    Type[] numericTypes = new Type[] { Type.TINYINT, Type.SMALLINT, Type.INT,
+        Type.BIGINT, Type.FLOAT, Type.DOUBLE , Type.NULL };
+    for (Type type1 : numericTypes) {
+      for (Type type2 : numericTypes) {
+        Type t = Type.getAssignmentCompatibleType(type1, type2);
+        assertTrue(t.isScalarType());
+        ScalarType compatibleType = (ScalarType) t;
+        Type promotedType = compatibleType.getNextResolutionType();
         boolean inputsNull = false;
         if (type1.isNull() && type2.isNull()) {
           inputsNull = true;
-          promotedType = ColumnType.DOUBLE;
-          compatibleType = ColumnType.INT;
+          promotedType = Type.DOUBLE;
+          compatibleType = Type.INT;
         }
 
         // +, -, *, %
@@ -520,15 +519,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MULTIPLY, null,
             promotedType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MOD, null,
-            inputsNull? ColumnType.DOUBLE : compatibleType);
+            inputsNull ? Type.DOUBLE : compatibleType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MOD, null,
-            inputsNull? ColumnType.DOUBLE : compatibleType);
+            inputsNull ? Type.DOUBLE : compatibleType);
 
         // /
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.DIVIDE, null,
-            ColumnType.DOUBLE);
+            Type.DOUBLE);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.DIVIDE, null,
-            ColumnType.DOUBLE);
+            Type.DOUBLE);
 
         // div, &, |, ^ only for fixed-point types
         if ((!type1.isFixedPointType() && !type1.isNull())
@@ -554,12 +553,12 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       }
     }
 
-    List<ColumnType> fixedPointTypes = new ArrayList<ColumnType>(
-        ColumnType.getIntegerTypes());
-    fixedPointTypes.add(ColumnType.NULL);
-    for (ColumnType type: fixedPointTypes) {
+    List<Type> fixedPointTypes = new ArrayList<Type>(
+        Type.getIntegerTypes());
+    fixedPointTypes.add(Type.NULL);
+    for (Type type: fixedPointTypes) {
       typeCastTest(null, type, false, ArithmeticExpr.Operator.BITNOT, null,
-          type.isNull() ? ColumnType.INT : type);
+          type.isNull() ? Type.INT : type);
     }
   }
 
@@ -568,17 +567,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    */
   @Test
   public void TestComparisonTypeCasts() throws AnalysisException {
-    // test all numeric types and the null type
-    List<ColumnType> types =
-        new ArrayList<ColumnType>(ColumnType.getFixedSizeNumericTypes());
-    types.add(ColumnType.NULL);
+    // Test all non-decimal numeric types and the null type.
+    // Decimal has custom type promotion rules which are tested elsewhere.
+    Type[] types = new Type[] { Type.TINYINT, Type.SMALLINT, Type.INT,
+        Type.BIGINT, Type.FLOAT, Type.DOUBLE , Type.NULL };
 
     // test on all comparison ops
     for (BinaryPredicate.Operator cmpOp : BinaryPredicate.Operator.values()) {
-      for (ColumnType type1 : types) {
-        for (ColumnType type2 : types) {
-          ColumnType compatibleType =
-              ColumnType.getAssignmentCompatibleType(type1, type2);
+      for (Type type1 : types) {
+        for (Type type2 : types) {
+          Type compatibleType =
+              Type.getAssignmentCompatibleType(type1, type2);
           typeCastTest(type1, type2, false, null, cmpOp, compatibleType);
           typeCastTest(type1, type2, true, null, cmpOp, compatibleType);
         }
@@ -592,9 +591,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    * ops or bool for comparisons) and that both operands are of type 'opType'.
    * @throws AnalysisException
    */
-  private void typeCastTest(ColumnType type1, ColumnType type2,
+  private void typeCastTest(Type type1, Type type2,
       boolean op1IsLiteral, ArithmeticExpr.Operator arithmeticOp,
-      BinaryPredicate.Operator cmpOp, ColumnType opType) throws AnalysisException {
+      BinaryPredicate.Operator cmpOp, Type opType) throws AnalysisException {
     Preconditions.checkState((arithmeticOp == null) != (cmpOp == null));
     boolean arithmeticMode = arithmeticOp != null;
     String op1 = "";
@@ -632,8 +631,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     }
     checkCasts(expr);
     // The children's types must be NULL or equal to the requested opType.
-    ColumnType child1Type = expr.getChild(0).getType();
-    ColumnType child2Type = type1 == null ? null : expr.getChild(1).getType();
+    Type child1Type = expr.getChild(0).getType();
+    Type child2Type = type1 == null ? null : expr.getChild(1).getType();
     Assert.assertTrue("opType= " + opType + " child1Type=" + child1Type,
         opType.equals(child1Type) || opType.isNull() || child1Type.isNull());
     if (type1 != null) {
@@ -642,7 +641,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     }
   }
 
-  private void checkReturnType(String stmt, ColumnType resultType) {
+  private void checkReturnType(String stmt, Type resultType) {
     SelectStmt select = (SelectStmt) AnalyzesOk(stmt);
     ArrayList<Expr> selectListExprs = select.getResultExprs();
     assertNotNull(selectListExprs);
@@ -655,62 +654,62 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   @Test
   public void TestNumericLiteralTypeResolution() throws AnalysisException {
-    checkReturnType("select 1", ColumnType.TINYINT);
-    checkReturnType("select 1.1", ColumnType.createDecimalType(2,1));
-    checkReturnType("select 01.1", ColumnType.createDecimalType(2,1));
-    checkReturnType("select 1 + 1.1", ColumnType.DOUBLE);
-    checkReturnType("select 0.23 + 1.1", ColumnType.createDecimalType(4,2));
+    checkReturnType("select 1", Type.TINYINT);
+    checkReturnType("select 1.1", ScalarType.createDecimalType(2,1));
+    checkReturnType("select 01.1", ScalarType.createDecimalType(2,1));
+    checkReturnType("select 1 + 1.1", Type.DOUBLE);
+    checkReturnType("select 0.23 + 1.1", ScalarType.createDecimalType(4,2));
 
     checkReturnType("select float_col + float_col from functional.alltypestiny",
-        ColumnType.DOUBLE);
+        Type.DOUBLE);
     checkReturnType("select int_col + int_col from functional.alltypestiny",
-        ColumnType.BIGINT);
+        Type.BIGINT);
 
     // floating point + numeric literal = floating point
     checkReturnType("select float_col + 1.1 from functional.alltypestiny",
-        ColumnType.DOUBLE);
+        Type.DOUBLE);
     // decimal + numeric literal = decimal
     checkReturnType("select d1 + 1.1 from functional.decimal_tbl",
-        ColumnType.createDecimalType(11,1));
+        ScalarType.createDecimalType(11,1));
     // int + numeric literal = floating point
     checkReturnType("select int_col + 1.1 from functional.alltypestiny",
-        ColumnType.DOUBLE);
+        Type.DOUBLE);
 
     // Explicitly casting the literal to a decimal will override the behavior
     checkReturnType("select int_col + cast(1.1 as decimal(2,1)) from "
-        + " functional.alltypestiny", ColumnType.createDecimalType(12,1));
+        + " functional.alltypestiny", ScalarType.createDecimalType(12,1));
     checkReturnType("select float_col + cast(1.1 as decimal(2,1)) from "
-        + " functional.alltypestiny", ColumnType.createDecimalType(38,9));
+        + " functional.alltypestiny", ScalarType.createDecimalType(38,9));
     checkReturnType("select float_col + cast(1.1*1.2+1.3 as decimal(2,1)) from "
-        + " functional.alltypestiny", ColumnType.createDecimalType(38,9));
+        + " functional.alltypestiny", ScalarType.createDecimalType(38,9));
 
     // The location and complexity of the expr should not matter.
     checkReturnType("select 1.0 + float_col + 1.1 from functional.alltypestiny",
-        ColumnType.DOUBLE);
+        Type.DOUBLE);
     checkReturnType("select 1.0 + 2.0 + float_col from functional.alltypestiny",
-        ColumnType.DOUBLE);
+        Type.DOUBLE);
     checkReturnType("select 1.0 + 2.0 + pi() * float_col from functional.alltypestiny",
-        ColumnType.DOUBLE);
+        Type.DOUBLE);
     checkReturnType("select 1.0 + d1 + 1.1 from functional.decimal_tbl",
-        ColumnType.createDecimalType(12,1));
+        ScalarType.createDecimalType(12,1));
     checkReturnType("select 1.0 + 2.0 + d1 from functional.decimal_tbl",
-        ColumnType.createDecimalType(11,1));
+        ScalarType.createDecimalType(11,1));
     checkReturnType("select 1.0 + 2.0 + pi()*d1 from functional.decimal_tbl",
-        ColumnType.createDecimalType(38,17));
+        ScalarType.createDecimalType(38,17));
 
     // Test with multiple cols
     checkReturnType("select double_col + 1.23 + float_col + 1.0 " +
-        " from functional.alltypestiny", ColumnType.DOUBLE);
+        " from functional.alltypestiny", Type.DOUBLE);
     checkReturnType("select double_col + 1.23 + float_col + 1.0 + int_col " +
-        " + bigint_col from functional.alltypestiny", ColumnType.DOUBLE);
+        " + bigint_col from functional.alltypestiny", Type.DOUBLE);
     checkReturnType("select d1 + 1.23 + d2 + 1.0 " +
-        " from functional.decimal_tbl", ColumnType.createDecimalType(14,2));
+        " from functional.decimal_tbl", ScalarType.createDecimalType(14,2));
 
     // Test with slot of both decimal and non-decimal
     checkReturnType("select t1.int_col + t2.c1 from functional.alltypestiny t1 " +
-        " cross join functional.decimal_tiny t2", ColumnType.createDecimalType(15,4));
+        " cross join functional.decimal_tiny t2", ScalarType.createDecimalType(15,4));
     checkReturnType("select 1.1 + t1.int_col + t2.c1 from functional.alltypestiny t1 " +
-        " cross join functional.decimal_tiny t2", ColumnType.createDecimalType(38,17));
+        " cross join functional.decimal_tiny t2", ScalarType.createDecimalType(38,17));
   }
 
   /**
@@ -1092,24 +1091,24 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Add a udf default.udf(), default.udf(int), default.udf(string...),
     // default.udf(int, string...) and functional.udf(double)
     catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
-        new ArrayList<ColumnType>(), ColumnType.INT, dummyUri, null, null, null));
+        new ArrayList<Type>(), Type.INT, dummyUri, null, null, null));
     catalog_.addFunction(new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.newArrayList(ColumnType.INT),
-        ColumnType.INT, dummyUri, null, null, null));
+        Lists.<Type>newArrayList(Type.INT),
+        Type.INT, dummyUri, null, null, null));
     ScalarFunction varArgsUdf1 = new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.newArrayList(ColumnType.STRING),
-        ColumnType.INT, dummyUri, null, null, null);
+        Lists.<Type>newArrayList(Type.STRING),
+        Type.INT, dummyUri, null, null, null);
     varArgsUdf1.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf1);
     ScalarFunction varArgsUdf2 = new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.newArrayList(
-            ColumnType.INT, ColumnType.STRING),
-        ColumnType.INT, dummyUri, null, null, null);
+        Lists.<Type>newArrayList(
+            Type.INT, Type.STRING),
+        Type.INT, dummyUri, null, null, null);
     varArgsUdf2.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf2);
     ScalarFunction udf = new ScalarFunction(new FunctionName("functional", "udf"),
-        Lists.newArrayList(ColumnType.DOUBLE),
-        ColumnType.INT, dummyUri, null, null, null);
+        Lists.<Type>newArrayList(Type.DOUBLE),
+        Type.INT, dummyUri, null, null, null);
     catalog_.addFunction(udf);
 
     AnalyzesOk("select udf()");
@@ -1186,8 +1185,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // UDF.
     ScalarFunction udf = new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.newArrayList(ColumnType.INT),
-        ColumnType.INT, new HdfsUri(""), null, null, null);
+        Lists.<Type>newArrayList(Type.INT),
+        Type.INT, new HdfsUri(""), null, null, null);
     catalog_.addFunction(udf);
     try {
       testFuncExprDepthLimit("udf(", "1", ")");
@@ -1203,10 +1202,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   }
 
   // Verifies the resulting expr decimal type is exptectedType
-  private void testDecimalExpr(String expr, ColumnType expectedType) {
+  private void testDecimalExpr(String expr, Type expectedType) {
     SelectStmt selectStmt = (SelectStmt) AnalyzesOk("select " + expr);
     Expr root = selectStmt.resultExprs_.get(0);
-    ColumnType actualType = root.getType();
+    Type actualType = root.getType();
     Assert.assertTrue(
         "Expr: " + expr + " Expected: " + expectedType + " Actual: " + actualType,
         expectedType.equals(actualType));
@@ -1218,103 +1217,103 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     String decimal_5_5 = "cast(1 as decimal(5, 5))";
     String decimal_38_34 = "cast(1 as decimal(38, 34))";
 
-    testDecimalExpr(decimal_10_0, ColumnType.createDecimalType(10, 0));
-    testDecimalExpr(decimal_5_5, ColumnType.createDecimalType(5, 5));
-    testDecimalExpr(decimal_38_34, ColumnType.createDecimalType(38, 34));
+    testDecimalExpr(decimal_10_0, ScalarType.createDecimalType(10, 0));
+    testDecimalExpr(decimal_5_5, ScalarType.createDecimalType(5, 5));
+    testDecimalExpr(decimal_38_34, ScalarType.createDecimalType(38, 34));
 
     // Test arithmetic operations.
     testDecimalExpr(decimal_10_0 + " + " + decimal_10_0,
-        ColumnType.createDecimalType(11, 0));
+        ScalarType.createDecimalType(11, 0));
     testDecimalExpr(decimal_10_0 + " - " + decimal_10_0,
-        ColumnType.createDecimalType(11, 0));
+        ScalarType.createDecimalType(11, 0));
     testDecimalExpr(decimal_10_0 + " * " + decimal_10_0,
-        ColumnType.createDecimalType(20, 0));
+        ScalarType.createDecimalType(20, 0));
     testDecimalExpr(decimal_10_0 + " / " + decimal_10_0,
-        ColumnType.createDecimalType(21, 11));
+        ScalarType.createDecimalType(21, 11));
     testDecimalExpr(decimal_10_0 + " % " + decimal_10_0,
-        ColumnType.createDecimalType(10, 0));
+        ScalarType.createDecimalType(10, 0));
 
     testDecimalExpr(decimal_10_0 + " + " + decimal_5_5,
-        ColumnType.createDecimalType(16, 5));
+        ScalarType.createDecimalType(16, 5));
     testDecimalExpr(decimal_10_0 + " - " + decimal_5_5,
-        ColumnType.createDecimalType(16, 5));
+        ScalarType.createDecimalType(16, 5));
     testDecimalExpr(decimal_10_0 + " * " + decimal_5_5,
-        ColumnType.createDecimalType(15, 5));
+        ScalarType.createDecimalType(15, 5));
     testDecimalExpr(decimal_10_0 + " / " + decimal_5_5,
-        ColumnType.createDecimalType(21, 6));
+        ScalarType.createDecimalType(21, 6));
     testDecimalExpr(decimal_10_0 + " % " + decimal_5_5,
-            ColumnType.createDecimalType(5, 5));
+            ScalarType.createDecimalType(5, 5));
 
     testDecimalExpr(decimal_5_5 + " + " + decimal_10_0,
-        ColumnType.createDecimalType(16, 5));
+        ScalarType.createDecimalType(16, 5));
     testDecimalExpr(decimal_5_5 + " - " + decimal_10_0,
-        ColumnType.createDecimalType(16, 5));
+        ScalarType.createDecimalType(16, 5));
     testDecimalExpr(decimal_5_5 + " * " + decimal_10_0,
-        ColumnType.createDecimalType(15, 5));
+        ScalarType.createDecimalType(15, 5));
     testDecimalExpr(decimal_5_5 + " / " + decimal_10_0,
-        ColumnType.createDecimalType(16, 16));
+        ScalarType.createDecimalType(16, 16));
     testDecimalExpr(decimal_5_5 + " % " + decimal_10_0,
-        ColumnType.createDecimalType(5, 5));
+        ScalarType.createDecimalType(5, 5));
 
     // Test some overflow cases.
     testDecimalExpr(decimal_10_0 + " + " + decimal_38_34,
-        ColumnType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34));
     testDecimalExpr(decimal_10_0 + " - " + decimal_38_34,
-        ColumnType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34));
     testDecimalExpr(decimal_10_0 + " * " + decimal_38_34,
-        ColumnType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34));
     testDecimalExpr(decimal_10_0 + " / " + decimal_38_34,
-        ColumnType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34));
     testDecimalExpr(decimal_10_0 + " % " + decimal_38_34,
-        ColumnType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34));
 
     testDecimalExpr(decimal_38_34 + " + " + decimal_5_5,
-        ColumnType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34));
     testDecimalExpr(decimal_38_34 + " - " + decimal_5_5,
-        ColumnType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34));
     testDecimalExpr(decimal_38_34 + " * " + decimal_5_5,
-        ColumnType.createDecimalType(38, 38));
+        ScalarType.createDecimalType(38, 38));
     testDecimalExpr(decimal_38_34 + " / " + decimal_5_5,
-        ColumnType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34));
     testDecimalExpr(decimal_38_34 + " % " + decimal_5_5,
-        ColumnType.createDecimalType(34, 34));
+        ScalarType.createDecimalType(34, 34));
 
     testDecimalExpr(decimal_10_0 + " + " + decimal_10_0 + " + " + decimal_10_0,
-        ColumnType.createDecimalType(12, 0));
+        ScalarType.createDecimalType(12, 0));
     testDecimalExpr(decimal_10_0 + " - " + decimal_10_0 + " * " + decimal_10_0,
-        ColumnType.createDecimalType(21, 0));
+        ScalarType.createDecimalType(21, 0));
     testDecimalExpr(decimal_10_0 + " / " + decimal_10_0 + " / " + decimal_10_0,
-        ColumnType.createDecimalType(32, 22));
+        ScalarType.createDecimalType(32, 22));
     testDecimalExpr(decimal_10_0 + " % " + decimal_10_0 + " + " + decimal_10_0,
-        ColumnType.createDecimalType(11, 0));
+        ScalarType.createDecimalType(11, 0));
 
     // Operators between decimal and numeric types should be supported. The int
     // should be cast to the appropriate decimal (e.g. tinyint -> decimal(3,0)).
     testDecimalExpr(decimal_10_0 + " + cast(1 as tinyint)",
-        ColumnType.createDecimalType(11, 0));
+        ScalarType.createDecimalType(11, 0));
     testDecimalExpr(decimal_10_0 + " + cast(1 as smallint)",
-        ColumnType.createDecimalType(11, 0));
+        ScalarType.createDecimalType(11, 0));
     testDecimalExpr(decimal_10_0 + " + cast(1 as int)",
-        ColumnType.createDecimalType(11, 0));
+        ScalarType.createDecimalType(11, 0));
     testDecimalExpr(decimal_10_0 + " + cast(1 as bigint)",
-        ColumnType.createDecimalType(20, 0));
+        ScalarType.createDecimalType(20, 0));
     testDecimalExpr(decimal_10_0 + " + cast(1 as float)",
-        ColumnType.createDecimalType(38, 9));
+        ScalarType.createDecimalType(38, 9));
     testDecimalExpr(decimal_10_0 + " + cast(1 as double)",
-        ColumnType.createDecimalType(38, 17));
+        ScalarType.createDecimalType(38, 17));
 
     testDecimalExpr(decimal_5_5 + " + cast(1 as tinyint)",
-        ColumnType.createDecimalType(9, 5));
+        ScalarType.createDecimalType(9, 5));
     testDecimalExpr(decimal_5_5 + " - cast(1 as smallint)",
-        ColumnType.createDecimalType(11, 5));
+        ScalarType.createDecimalType(11, 5));
     testDecimalExpr(decimal_5_5 + " * cast(1 as int)",
-        ColumnType.createDecimalType(15, 5));
+        ScalarType.createDecimalType(15, 5));
     testDecimalExpr(decimal_5_5 + " % cast(1 as bigint)",
-        ColumnType.createDecimalType(5, 5));
+        ScalarType.createDecimalType(5, 5));
     testDecimalExpr(decimal_5_5 + " / cast(1 as float)",
-        ColumnType.createDecimalType(38, 9));
+        ScalarType.createDecimalType(38, 9));
     testDecimalExpr(decimal_5_5 + " + cast(1 as double)",
-        ColumnType.createDecimalType(38, 17));
+        ScalarType.createDecimalType(38, 17));
 
     AnalyzesOk("select " + decimal_5_5 + " = cast(1 as tinyint)");
     AnalyzesOk("select " + decimal_5_5 + " != cast(1 as smallint)");
@@ -1426,24 +1425,24 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select scale(NULL)",
         "Cannot resolve DECIMAL precision and scale from NULL type.");
 
-    testDecimalExpr("round(1.23)", ColumnType.createDecimalType(2, 0));
-    testDecimalExpr("round(1.23, 1)", ColumnType.createDecimalType(3, 1));
-    testDecimalExpr("round(1.23, 0)", ColumnType.createDecimalType(2, 0));
-    testDecimalExpr("round(1.23, 3)", ColumnType.createDecimalType(4, 3));
-    testDecimalExpr("round(1.23, -1)", ColumnType.createDecimalType(2, 0));
-    testDecimalExpr("round(1.23, -2)", ColumnType.createDecimalType(2, 0));
+    testDecimalExpr("round(1.23)", ScalarType.createDecimalType(2, 0));
+    testDecimalExpr("round(1.23, 1)", ScalarType.createDecimalType(3, 1));
+    testDecimalExpr("round(1.23, 0)", ScalarType.createDecimalType(2, 0));
+    testDecimalExpr("round(1.23, 3)", ScalarType.createDecimalType(4, 3));
+    testDecimalExpr("round(1.23, -1)", ScalarType.createDecimalType(2, 0));
+    testDecimalExpr("round(1.23, -2)", ScalarType.createDecimalType(2, 0));
     testDecimalExpr("round(cast(1.23 as decimal(3,2)), -2)",
-        ColumnType.createDecimalType(2, 0));
+        ScalarType.createDecimalType(2, 0));
 
-    testDecimalExpr("ceil(123.45)", ColumnType.createDecimalType(4, 0));
-    testDecimalExpr("floor(12.345)", ColumnType.createDecimalType(3, 0));
+    testDecimalExpr("ceil(123.45)", ScalarType.createDecimalType(4, 0));
+    testDecimalExpr("floor(12.345)", ScalarType.createDecimalType(3, 0));
 
-    testDecimalExpr("truncate(1.23)", ColumnType.createDecimalType(1, 0));
-    testDecimalExpr("truncate(1.23, 1)", ColumnType.createDecimalType(2, 1));
-    testDecimalExpr("truncate(1.23, 0)", ColumnType.createDecimalType(1, 0));
-    testDecimalExpr("truncate(1.23, 3)", ColumnType.createDecimalType(4, 3));
-    testDecimalExpr("truncate(1.23, -1)", ColumnType.createDecimalType(1, 0));
-    testDecimalExpr("truncate(1.23, -2)", ColumnType.createDecimalType(1, 0));
+    testDecimalExpr("truncate(1.23)", ScalarType.createDecimalType(1, 0));
+    testDecimalExpr("truncate(1.23, 1)", ScalarType.createDecimalType(2, 1));
+    testDecimalExpr("truncate(1.23, 0)", ScalarType.createDecimalType(1, 0));
+    testDecimalExpr("truncate(1.23, 3)", ScalarType.createDecimalType(4, 3));
+    testDecimalExpr("truncate(1.23, -1)", ScalarType.createDecimalType(1, 0));
+    testDecimalExpr("truncate(1.23, -2)", ScalarType.createDecimalType(1, 0));
   }
 
   /**

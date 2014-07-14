@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Subquery;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -80,20 +80,20 @@ public class BinaryPredicate extends Predicate {
   }
 
   public static void initBuiltins(Db db) {
-    for (ColumnType t: ColumnType.getSupportedTypes()) {
+    for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.EQ.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+          Operator.EQ.getName(), Lists.newArrayList(t, t), Type.BOOLEAN));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.NE.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+          Operator.NE.getName(), Lists.newArrayList(t, t), Type.BOOLEAN));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.LE.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+          Operator.LE.getName(), Lists.newArrayList(t, t), Type.BOOLEAN));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.GE.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+          Operator.GE.getName(), Lists.newArrayList(t, t), Type.BOOLEAN));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.LT.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+          Operator.LT.getName(), Lists.newArrayList(t, t), Type.BOOLEAN));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.GT.getName(), Lists.newArrayList(t, t), ColumnType.BOOLEAN));
+          Operator.GT.getName(), Lists.newArrayList(t, t), Type.BOOLEAN));
     }
   }
 

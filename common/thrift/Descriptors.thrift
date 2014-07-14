@@ -23,6 +23,7 @@ struct TSlotDescriptor {
   1: required Types.TSlotId id
   2: required Types.TTupleId parent
   3: required Types.TColumnType slotType
+  // TODO: Make this a list of positions to support SlotRefs into struct fields.
   4: required i32 columnPos   // in originating table
   5: required i32 byteOffset  // into tuple
   6: required i32 nullIndicatorByte

@@ -96,7 +96,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
           columnDefs_.size() == viewDefStmt_.getBaseTblResultExprs().size());
       for (int i = 0; i < columnDefs_.size(); ++i) {
         // Set type in the column definition from the view-definition statement.
-        columnDefs_.get(i).setColType(viewDefStmt_.getBaseTblResultExprs().get(i).getType());
+        columnDefs_.get(i).setType(viewDefStmt_.getBaseTblResultExprs().get(i).getType());
       }
     } else {
       // Create list of column definitions from the view-definition statement.

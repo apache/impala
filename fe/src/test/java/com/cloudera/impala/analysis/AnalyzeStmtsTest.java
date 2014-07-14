@@ -21,8 +21,8 @@ import java.lang.reflect.Field;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.AggregateFunction;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -814,7 +814,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "truncate() must be called with a constant second argument.");
   }
 
-  void addTestUda(String name, ColumnType retType, ColumnType... argTypes) {
+  void addTestUda(String name, Type retType, Type... argTypes) {
     FunctionName fnName = new FunctionName("default", name);
     catalog_.addFunction(new AggregateFunction(fnName,
         new FunctionArgs(Lists.newArrayList(argTypes), false), retType));
@@ -830,11 +830,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // TODO: if we could persist these in the catalog, we'd just use those
     // TODO: add cases where the intermediate type is not the return type when
     // the planner supports that.
-    addTestUda("AggFn", ColumnType.BIGINT, ColumnType.INT);
-    addTestUda("AggFn", ColumnType.BIGINT, ColumnType.BIGINT);
-    addTestUda("AggFn", ColumnType.BIGINT, ColumnType.DOUBLE);
-    addTestUda("AggFn", ColumnType.STRING,
-        ColumnType.STRING, ColumnType.STRING);
+    addTestUda("AggFn", Type.BIGINT, Type.INT);
+    addTestUda("AggFn", Type.BIGINT, Type.BIGINT);
+    addTestUda("AggFn", Type.BIGINT, Type.DOUBLE);
+    addTestUda("AggFn", Type.STRING, Type.STRING, Type.STRING);
 
     AnalyzesOk("select aggfn(int_col) from functional.alltypesagg");
     AnalysisError("select default.AggFn(1)",
@@ -910,7 +909,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select group_concat(string_col, '-') from functional.alltypes");
     AnalyzesOk("select group_concat(string_col, string_col) from functional.alltypes");
     // test all types as arguments
-    for (ColumnType type: typeToLiteralValue_.keySet()) {
+    for (Type type: typeToLiteralValue_.keySet()) {
       String literal = typeToLiteralValue_.get(type);
       String query1 = String.format(
           "select group_concat(%s) from functional.alltypes", literal);
@@ -928,7 +927,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     }
 
     // Test distinct estimate
-    for (ColumnType type: typeToLiteralValue_.keySet()) {
+    for (Type type: typeToLiteralValue_.keySet()) {
       AnalyzesOk(String.format(
           "select ndv(%s) from functional.alltypes",
           typeToLiteralValue_.get(type)));

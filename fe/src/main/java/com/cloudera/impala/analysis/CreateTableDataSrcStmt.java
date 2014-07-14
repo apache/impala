@@ -75,9 +75,9 @@ public class CreateTableDataSrcStmt extends CreateTableStmt {
     }
 
     for (ColumnDesc col: getColumnDescs()) {
-      if (!DataSourceTable.isSupportedColumnType(col.getColType())) {
+      if (!DataSourceTable.isSupportedColumnType(col.getType())) {
         throw new AnalysisException("Tables produced by an external data source do " +
-            "not support the column type: " + col.getColType());
+            "not support the column type: " + col.getType());
       }
     }
     // Add table properties from the DataSource catalog object now that we have access

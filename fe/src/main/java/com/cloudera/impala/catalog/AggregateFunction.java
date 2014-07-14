@@ -27,7 +27,7 @@ import com.cloudera.impala.thrift.TFunctionBinaryType;
  * Internal representation of an aggregate function.
  */
 public class AggregateFunction extends Function {
-  private ColumnType intermediateType_;
+  private Type intermediateType_;
 
   // The symbol inside the binary at location_ that contains this particular.
   // They can be null if it is not required.
@@ -45,12 +45,12 @@ public class AggregateFunction extends Function {
   // extend the create aggregate function stmt to allow additional metdata like this.
   private boolean ignoresDistinct_;
 
-  public AggregateFunction(FunctionName fnName, FunctionArgs args, ColumnType retType) {
+  public AggregateFunction(FunctionName fnName, FunctionArgs args, Type retType) {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
   }
 
-  public AggregateFunction(FunctionName fnName, List<ColumnType> argTypes,
-      ColumnType retType, ColumnType intermediateType,
+  public AggregateFunction(FunctionName fnName, List<Type> argTypes,
+      Type retType, Type intermediateType,
       HdfsUri location, String updateFnSymbol, String initFnSymbol,
       String serializeFnSymbol, String mergeFnSymbol, String finalizeFnSymbol) {
     super(fnName, argTypes, retType, false);
@@ -65,7 +65,7 @@ public class AggregateFunction extends Function {
   }
 
   public static AggregateFunction createBuiltin(Db db, String name,
-      List<ColumnType> argTypes, ColumnType retType, ColumnType intermediateType,
+      List<Type> argTypes, Type retType, Type intermediateType,
       String initFnSymbol, String updateFnSymbol, String mergeFnSymbol,
       String serializeFnSymbol, String finalizeFnSymbol,
       boolean ignoresDistinct) {
@@ -82,7 +82,7 @@ public class AggregateFunction extends Function {
   public String getSerializeFnSymbol() { return serializeFnSymbol_; }
   public String getMergeFnSymbol() { return mergeFnSymbol_; }
   public String getFinalizeFnSymbol() { return finalizeFnSymbol_; }
-  public ColumnType getIntermediateType() { return intermediateType_; }
+  public Type getIntermediateType() { return intermediateType_; }
   public boolean ignoresDistinct() { return ignoresDistinct_; }
 
   public void setUpdateFnSymbol(String fn) { updateFnSymbol_ = fn; }
@@ -90,7 +90,7 @@ public class AggregateFunction extends Function {
   public void setSerializeFnSymbol(String fn) { serializeFnSymbol_ = fn; }
   public void setMergeFnSymbol(String fn) { mergeFnSymbol_ = fn; }
   public void setFinalizeFnSymbol(String fn) { finalizeFnSymbol_ = fn; }
-  public void setIntermediateType(ColumnType t) { intermediateType_ = t; }
+  public void setIntermediateType(Type t) { intermediateType_ = t; }
 
   @Override
   public TFunction toThrift() {

@@ -18,10 +18,10 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
@@ -50,13 +50,16 @@ public class LikePredicate extends Predicate {
   public static void initBuiltins(Db db) {
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.LIKE.name(), "LikePredicate", "LikeFn",
-        Lists.newArrayList(ColumnType.STRING, ColumnType.STRING), ColumnType.BOOLEAN));
+        Lists.<Type>newArrayList(Type.STRING, Type.STRING),
+        Type.BOOLEAN));
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.RLIKE.name(), "LikePredicate", "RegexFn",
-        Lists.newArrayList(ColumnType.STRING, ColumnType.STRING), ColumnType.BOOLEAN));
+        Lists.<Type>newArrayList(Type.STRING, Type.STRING),
+        Type.BOOLEAN));
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.REGEXP.name(), "LikePredicate", "RegexFn",
-        Lists.newArrayList(ColumnType.STRING, ColumnType.STRING), ColumnType.BOOLEAN));
+        Lists.<Type>newArrayList(Type.STRING, Type.STRING),
+        Type.BOOLEAN));
   }
 
   private final Operator op_;

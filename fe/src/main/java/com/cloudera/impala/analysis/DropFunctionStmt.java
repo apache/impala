@@ -16,7 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDropFunctionParams;
@@ -36,7 +36,7 @@ public class DropFunctionStmt extends StatementBase {
    */
   public DropFunctionStmt(FunctionName fnName, FunctionArgs fnArgs, boolean ifExists) {
     desc_ = new Function(
-        fnName, fnArgs.argTypes, ColumnType.INVALID, fnArgs.hasVarArgs);
+        fnName, fnArgs.argTypes, Type.INVALID, fnArgs.hasVarArgs);
     ifExists_ = ifExists;
   }
 
@@ -55,7 +55,7 @@ public class DropFunctionStmt extends StatementBase {
   public TDropFunctionParams toThrift() {
     TDropFunctionParams params = new TDropFunctionParams();
     params.setFn_name(desc_.getFunctionName().toThrift());
-    params.setArg_types(ColumnType.toThrift(desc_.getArgs()));
+    params.setArg_types(Type.toThrift(desc_.getArgs()));
     params.setIf_exists(getIfExists());
     params.setSignature(desc_.signatureString());
     return params;

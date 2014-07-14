@@ -17,8 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.HashMap;
 
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.ColumnType;
-import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
@@ -42,7 +41,7 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
    *        validated in analyze()
    */
   public CreateUdfStmt(FunctionName fnName, FunctionArgs args,
-      ColumnType retType, HdfsUri location, boolean ifNotExists,
+      Type retType, HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
     super(new ScalarFunction(fnName, args, retType), location, ifNotExists, optArgs);
     udf_ = (ScalarFunction)fn_;
@@ -54,7 +53,11 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     super.analyze(analyzer);
 
     if (udf_.getBinaryType() == TFunctionBinaryType.HIVE) {
-      if (udf_.getReturnType().getPrimitiveType() == PrimitiveType.TIMESTAMP) {
+      if (!udf_.getReturnType().isScalarType()) {
+        throw new AnalysisException("Non-scalar return types not supported: "
+            + udf_.getReturnType().toSql());
+      }
+      if (udf_.getReturnType().isTimestamp()) {
         throw new AnalysisException(
             "Hive UDFs that use TIMESTAMP are not yet supported.");
       }
@@ -63,7 +66,11 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
             "Hive UDFs that use DECIMAL are not yet supported.");
       }
       for (int i = 0; i < udf_.getNumArgs(); ++i) {
-        if (udf_.getArgs()[i].getPrimitiveType() == PrimitiveType.TIMESTAMP) {
+        if (!udf_.getArgs()[i].isScalarType()) {
+          throw new AnalysisException("Non-scalar argument types not supported: "
+              + udf_.getArgs()[i].toSql());
+        }
+        if (udf_.getArgs()[i].isTimestamp()) {
           throw new AnalysisException(
               "Hive UDFs that use TIMESTAMP are not yet supported.");
         }

@@ -16,7 +16,7 @@ package com.cloudera.impala.analysis;
 
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumn;
 
@@ -32,16 +32,16 @@ public class ColumnDesc {
   private final String colName_;
   private final String comment_;
   // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW stmts.
-  private ColumnType colType_;
+  private Type type_;
 
-  public ColumnDesc(String colName, ColumnType colType, String comment) {
-    this.colName_ = colName;
-    this.colType_ = colType;
-    this.comment_ = comment;
+  public ColumnDesc(String colName, Type type, String comment) {
+    colName_ = colName;
+    type_ = type;
+    comment_ = comment;
   }
 
-  public void setColType(ColumnType colType) { this.colType_ = colType; }
-  public ColumnType getColType() { return colType_; }
+  public void setType(Type type) { type_ = type; }
+  public Type getType() { return type_; }
   public String getColName() { return colName_; }
   public String getComment() { return comment_; }
 
@@ -50,20 +50,20 @@ public class ColumnDesc {
     if (!MetaStoreUtils.validateName(colName_)) {
       throw new AnalysisException("Invalid column name: " + colName_);
     }
-    colType_.analyze();
+    type_.analyze();
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder(colName_);
-    if (colType_ != null) sb.append(" " + colType_.toString());
+    if (type_ != null) sb.append(" " + type_.toString());
     if (comment_ != null) sb.append(String.format(" COMMENT '%s'", comment_));
     return sb.toString();
   }
 
   public TColumn toThrift() {
     TColumn col = new TColumn(
-        new TColumn(getColName(), getColType().toThrift()));
+        new TColumn(getColName(), type_.toThrift()));
     col.setComment(getComment());
     return col;
   }

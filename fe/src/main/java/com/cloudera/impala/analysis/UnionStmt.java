@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
@@ -183,7 +183,7 @@ public class UnionStmt extends QueryStmt {
     for (int i = 0; i < firstQueryExprs.size(); ++i) {
       // Type compatible with the i-th exprs of all selects.
       // Initialize with type of i-th expr in first select.
-      ColumnType compatibleType = firstQueryExprs.get(i).getType();
+      Type compatibleType = firstQueryExprs.get(i).getType();
       // Remember last compatible expr for error reporting.
       Expr lastCompatibleExpr = firstQueryExprs.get(i);
       for (int j = 1; j < operands_.size(); ++j) {

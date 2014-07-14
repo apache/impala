@@ -24,8 +24,8 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -505,7 +505,7 @@ public class SelectStmt extends QueryStmt {
       if (aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP) {
         Expr aggExprClone = aggExpr.getChild(0).clone();
         aggExprClone.analyze(analyzer);
-        inCastExpr = new CastExpr(ColumnType.DOUBLE, aggExprClone, false);
+        inCastExpr = new CastExpr(Type.DOUBLE, aggExprClone, false);
       }
 
       List<Expr> sumInputExprs =
@@ -526,7 +526,7 @@ public class SelectStmt extends QueryStmt {
           new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);
 
       if (aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP) {
-        CastExpr outCastExpr = new CastExpr(ColumnType.TIMESTAMP, divExpr, false);
+        CastExpr outCastExpr = new CastExpr(Type.TIMESTAMP, divExpr, false);
         outCastExpr.analyze(analyzer);
         result.put(aggExpr, outCastExpr);
       } else {

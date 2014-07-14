@@ -845,7 +845,11 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
 void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col_val,
     const TColumnType& type,
     apache::hive::service::cli::thrift::TColumnValue* hs2_col_val) {
-  switch (type.type) {
+  // TODO: Handle complex types.
+  DCHECK_EQ(1, type.types.size());
+  DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
+  DCHECK_EQ(true, type.types[0].__isset.scalar_type);
+  switch (type.types[0].scalar_type.type) {
     case TPrimitiveType::BOOLEAN:
       hs2_col_val->__isset.boolVal = true;
       hs2_col_val->boolVal.value = col_val.bool_val;
@@ -887,17 +891,21 @@ void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col
       }
       break;
     default:
-      DCHECK(false) << "bad type: " << ColumnType(type);
+      DCHECK(false) << "bad type: "
+                     << TypeToString(ThriftToType(type.types[0].scalar_type.type));
       break;
   }
 }
 
 void ImpalaServer::ExprValueToHiveServer2TColumnValue(const void* value,
-    const TColumnType& t,
+    const TColumnType& type,
     apache::hive::service::cli::thrift::TColumnValue* hs2_col_val) {
-  ColumnType type(t);
   bool not_null = (value != NULL);
-  switch (t.type) {
+  // TODO: Handle complex types.
+  DCHECK_EQ(1, type.types.size());
+  DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
+  DCHECK_EQ(1, type.types[0].__isset.scalar_type);
+  switch (type.types[0].scalar_type.type) {
     case TPrimitiveType::NULL_TYPE:
       // Set NULLs in the bool_val.
       hs2_col_val->__isset.boolVal = true;
@@ -957,12 +965,13 @@ void ImpalaServer::ExprValueToHiveServer2TColumnValue(const void* value,
         RawValue::PrintValue(value, TYPE_TIMESTAMP, -1, &(hs2_col_val->stringVal.value));
       }
       break;
-    case TPrimitiveType::DECIMAL:
+    case TPrimitiveType::DECIMAL: {
       // HiveServer2 requires decimal to be presented as string.
       hs2_col_val->__isset.stringVal = true;
       hs2_col_val->stringVal.__isset.value = not_null;
+      ColumnType decimalType(type);
       if (not_null) {
-        switch (type.GetByteSize()) {
+        switch (decimalType.GetByteSize()) {
           case 4:
             hs2_col_val->stringVal.value =
               reinterpret_cast<const Decimal4Value*>(value)->ToString(type);
@@ -980,8 +989,10 @@ void ImpalaServer::ExprValueToHiveServer2TColumnValue(const void* value,
         }
       }
       break;
+    }
     default:
-      DCHECK(false) << "bad type: " << type;
+      DCHECK(false) << "bad type: "
+                     << TypeToString(ThriftToType(type.types[0].scalar_type.type));
       break;
   }
 }

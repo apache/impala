@@ -70,9 +70,9 @@ public class Function implements CatalogObject {
   // User specified function name e.g. "Add"
   private FunctionName name_;
 
-  private final ColumnType retType_;
+  private final Type retType_;
   // Array of parameter types.  empty array if this function does not have parameters.
-  private ColumnType[] argTypes_;
+  private Type[] argTypes_;
 
   // If true, this function has variable arguments.
   // TODO: we don't currently support varargs with no fixed types. i.e. fn(...)
@@ -89,12 +89,12 @@ public class Function implements CatalogObject {
   private TFunctionBinaryType binaryType_;
   private long catalogVersion_ =  Catalog.INITIAL_CATALOG_VERSION;
 
-  public Function(FunctionName name, ColumnType[] argTypes,
-      ColumnType retType, boolean varArgs) {
+  public Function(FunctionName name, Type[] argTypes,
+      Type retType, boolean varArgs) {
     this.name_ = name;
     this.hasVarArgs_ = varArgs;
     if (argTypes == null) {
-      argTypes_ = new ColumnType[0];
+      argTypes_ = new Type[0];
     } else {
       this.argTypes_ = argTypes;
     }
@@ -102,29 +102,29 @@ public class Function implements CatalogObject {
     this.userVisible_ = true;
   }
 
-  public Function(FunctionName name, List<ColumnType> args,
-      ColumnType retType, boolean varArgs) {
-    this(name, (ColumnType[])null, retType, varArgs);
+  public Function(FunctionName name, List<Type> args,
+      Type retType, boolean varArgs) {
+    this(name, (Type[])null, retType, varArgs);
     if (args.size() > 0) {
-      argTypes_ = args.toArray(new ColumnType[args.size()]);
+      argTypes_ = args.toArray(new Type[args.size()]);
     } else {
-      argTypes_ = new ColumnType[0];
+      argTypes_ = new Type[0];
     }
   }
 
   public FunctionName getFunctionName() { return name_; }
   public String functionName() { return name_.getFunction(); }
   public String dbName() { return name_.getDb(); }
-  public ColumnType getReturnType() { return retType_; }
-  public ColumnType[] getArgs() { return argTypes_; }
+  public Type getReturnType() { return retType_; }
+  public Type[] getArgs() { return argTypes_; }
   // Returns the number of arguments to this function.
   public int getNumArgs() { return argTypes_.length; }
   public HdfsUri getLocation() { return location_; }
   public TFunctionBinaryType getBinaryType() { return binaryType_; }
   public boolean hasVarArgs() { return hasVarArgs_; }
   public boolean userVisible() { return userVisible_; }
-  public ColumnType getVarArgsType() {
-    if (!hasVarArgs_) return ColumnType.INVALID;
+  public Type getVarArgsType() {
+    if (!hasVarArgs_) return Type.INVALID;
     Preconditions.checkState(argTypes_.length > 0);
     return argTypes_[argTypes_.length - 1];
   }
@@ -177,7 +177,7 @@ public class Function implements CatalogObject {
     }
     if (this.hasVarArgs_ && other.argTypes_.length < this.argTypes_.length) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
-      if (!ColumnType.isImplicitlyCastable(other.argTypes_[i], this.argTypes_[i])) {
+      if (!Type.isImplicitlyCastable(other.argTypes_[i], this.argTypes_[i])) {
         return false;
       }
     }
@@ -185,7 +185,7 @@ public class Function implements CatalogObject {
     if (this.hasVarArgs_) {
       for (int i = this.argTypes_.length; i < other.argTypes_.length; ++i) {
         if (other.argTypes_[i].matchesType(this.getVarArgsType())) continue;
-        if (!ColumnType.isImplicitlyCastable(other.argTypes_[i],
+        if (!Type.isImplicitlyCastable(other.argTypes_[i],
             this.getVarArgsType())) {
           return false;
         }
@@ -268,7 +268,7 @@ public class Function implements CatalogObject {
     fn.setName(name_.toThrift());
     fn.setBinary_type(binaryType_);
     if (location_ != null) fn.setHdfs_location(location_.toString());
-    fn.setArg_types(ColumnType.toThrift(argTypes_));
+    fn.setArg_types(Type.toThrift(argTypes_));
     fn.setRet_type(getReturnType().toThrift());
     fn.setHas_var_args(hasVarArgs_);
     // TODO: Comment field is missing?
@@ -277,23 +277,23 @@ public class Function implements CatalogObject {
   }
 
   public static Function fromThrift(TFunction fn) {
-    List<ColumnType> argTypes = Lists.newArrayList();
+    List<Type> argTypes = Lists.newArrayList();
     for (TColumnType t: fn.getArg_types()) {
-      argTypes.add(ColumnType.fromThrift(t));
+      argTypes.add(Type.fromThrift(t));
     }
 
     Function function = null;
     if (fn.isSetScalar_fn()) {
       TScalarFunction scalarFn = fn.getScalar_fn();
       function = new ScalarFunction(FunctionName.fromThrift(fn.getName()), argTypes,
-          ColumnType.fromThrift(fn.getRet_type()), new HdfsUri(fn.getHdfs_location()),
+          Type.fromThrift(fn.getRet_type()), new HdfsUri(fn.getHdfs_location()),
           scalarFn.getSymbol(), scalarFn.getPrepare_fn_symbol(),
           scalarFn.getClose_fn_symbol());
     } else if (fn.isSetAggregate_fn()) {
       TAggregateFunction aggFn = fn.getAggregate_fn();
       function = new AggregateFunction(FunctionName.fromThrift(fn.getName()), argTypes,
-          ColumnType.fromThrift(fn.getRet_type()),
-          ColumnType.fromThrift(aggFn.getIntermediate_type()),
+          Type.fromThrift(fn.getRet_type()),
+          Type.fromThrift(aggFn.getIntermediate_type()),
           new HdfsUri(fn.getHdfs_location()), aggFn.getUpdate_fn_symbol(),
           aggFn.getInit_fn_symbol(), aggFn.getSerialize_fn_symbol(),
           aggFn.getMerge_fn_symbol(), aggFn.getFinalize_fn_symbol());
@@ -301,7 +301,7 @@ public class Function implements CatalogObject {
       // In the case where we are trying to look up the object, we only have the
       // signature.
       function = new Function(FunctionName.fromThrift(fn.getName()),
-          argTypes, ColumnType.fromThrift(fn.getRet_type()), fn.isHas_var_args());
+          argTypes, Type.fromThrift(fn.getRet_type()), fn.isHas_var_args());
     }
     function.setBinaryType(fn.getBinary_type());
     function.setHasVarArgs(fn.isHas_var_args());
@@ -315,8 +315,8 @@ public class Function implements CatalogObject {
   // in the binary and try to resolve unmangled names.
   // If this function is expecting a return argument, retArgType is that type. It should
   // be null if this function isn't expecting a return argument.
-  public String lookupSymbol(String symbol, TSymbolType symbolType, ColumnType retArgType,
-      boolean hasVarArgs, ColumnType... argTypes) throws AnalysisException {
+  public String lookupSymbol(String symbol, TSymbolType symbolType, Type retArgType,
+      boolean hasVarArgs, Type... argTypes) throws AnalysisException {
     if (symbol.length() == 0) {
       if (binaryType_ == TFunctionBinaryType.BUILTIN) {
         // We allow empty builtin symbols in order to stage work in the FE before its
@@ -334,7 +334,7 @@ public class Function implements CatalogObject {
     lookup.symbol = symbol;
     lookup.symbol_type = symbolType;
     lookup.fn_binary_type = binaryType_;
-    lookup.arg_types = ColumnType.toThrift(argTypes);
+    lookup.arg_types = Type.toThrift(argTypes);
     lookup.has_var_args = hasVarArgs;
     if (retArgType != null) lookup.setRet_arg_type(retArgType.toThrift());
 

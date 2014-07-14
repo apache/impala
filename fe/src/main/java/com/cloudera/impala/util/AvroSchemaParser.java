@@ -31,7 +31,8 @@ import org.apache.avro.SchemaParseException;
 import org.codehaus.jackson.JsonNode;
 
 import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.ColumnType;
+import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Type;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -42,15 +43,15 @@ import com.google.common.collect.Lists;
  */
 public class AvroSchemaParser {
   // Map of Avro to Impala primitive types.
-  private static final Map<Schema.Type, ColumnType> avroToImpalaPrimitiveTypeMap_;
+  private static final Map<Schema.Type, Type> avroToImpalaPrimitiveTypeMap_;
   static {
-    Map<Schema.Type, ColumnType> typeMap = new Hashtable<Schema.Type, ColumnType>();
-    typeMap.put(STRING, ColumnType.STRING);
-    typeMap.put(INT, ColumnType.INT);
-    typeMap.put(BOOLEAN, ColumnType.BOOLEAN);
-    typeMap.put(LONG, ColumnType.BIGINT);
-    typeMap.put(FLOAT, ColumnType.FLOAT);
-    typeMap.put(DOUBLE, ColumnType.DOUBLE);
+    Map<Schema.Type, Type> typeMap = new Hashtable<Schema.Type, Type>();
+    typeMap.put(STRING, Type.STRING);
+    typeMap.put(INT, Type.INT);
+    typeMap.put(BOOLEAN, Type.BOOLEAN);
+    typeMap.put(LONG, Type.BIGINT);
+    typeMap.put(FLOAT, Type.FLOAT);
+    typeMap.put(DOUBLE, Type.DOUBLE);
     avroToImpalaPrimitiveTypeMap_ = Collections.unmodifiableMap(typeMap);
   }
 
@@ -80,7 +81,7 @@ public class AvroSchemaParser {
    * Parses the given Avro schema and returns the matching Impala type
    * for this field. Handles primitive and complex types.
    */
-  private static ColumnType getTypeInfo(Schema schema, String colName) {
+  private static Type getTypeInfo(Schema schema, String colName) {
     // Avro requires NULLable types to be defined as unions of some type T
     // and NULL.  This is annoying and we're going to hide it from the user.
     if (isNullableType(schema)) {
@@ -95,9 +96,8 @@ public class AvroSchemaParser {
     switch(type) {
       case BYTES:
         // Decimal is stored in Avro as a BYTE.
-        ColumnType decimalType = getDecimalType(schema);
+        Type decimalType = getDecimalType(schema);
         if (decimalType != null) return decimalType;
-
       case RECORD:
       case MAP:
       case ARRAY:
@@ -140,7 +140,7 @@ public class AvroSchemaParser {
    * Throws a SchemaParseException if the logicType=decimal, but scale/precision
    * is not specified or in the incorrect format.
    */
-  private static ColumnType getDecimalType(Schema schema) {
+  private static Type getDecimalType(Schema schema) {
     Preconditions.checkState(schema.getType() == Schema.Type.BYTES);
     String logicalType = schema.getProp("logicalType");
     if (logicalType != null && logicalType.equalsIgnoreCase("decimal")) {
@@ -155,7 +155,7 @@ public class AvroSchemaParser {
         throw new SchemaParseException(
             "No 'precision' property specified for 'decimal' logicalType");
       }
-      return ColumnType.createDecimalType(precision, scale);
+      return ScalarType.createDecimalType(precision, scale);
     }
     return null;
   }

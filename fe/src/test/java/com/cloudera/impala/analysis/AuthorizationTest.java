@@ -45,9 +45,9 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
@@ -1243,9 +1243,9 @@ public class AuthorizationTest {
 
       // Add default.f(), tpch.f()
       catalog_.addFunction(new ScalarFunction(new FunctionName("default", "f"),
-          new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+          new ArrayList<Type>(), Type.INT, null, null, null, null));
       catalog_.addFunction(new ScalarFunction(new FunctionName("tpch", "f"),
-          new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+          new ArrayList<Type>(), Type.INT, null, null, null, null));
 
       AuthzOk("drop function tpch.f()");
     } finally {
@@ -1262,9 +1262,9 @@ public class AuthorizationTest {
       //Other tests don't expect tpch to contain functions
       //Specifically, if these functions are not cleaned up, TestDropDatabase() will fail
       catalog_.removeFunction(new ScalarFunction(new FunctionName("default", "f"),
-          new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+          new ArrayList<Type>(), Type.INT, null, null, null, null));
       catalog_.removeFunction(new ScalarFunction(new FunctionName("tpch", "f"),
-          new ArrayList<ColumnType>(), ColumnType.INT, null, null, null, null));
+          new ArrayList<Type>(), Type.INT, null, null, null, null));
     }
   }
 

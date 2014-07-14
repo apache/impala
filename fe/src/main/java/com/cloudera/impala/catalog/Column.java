@@ -31,17 +31,17 @@ public class Column {
   private final static Logger LOG = LoggerFactory.getLogger(Column.class);
 
   protected final String name_;
-  protected final ColumnType type_;
+  protected final Type type_;
   protected final String comment_;
   protected int position_;  // in table
 
   protected final ColumnStats stats_;
 
-  public Column(String name, ColumnType type, int position) {
+  public Column(String name, Type type, int position) {
     this(name, type, null, position);
   }
 
-  public Column(String name, ColumnType type, String comment, int position) {
+  public Column(String name, Type type, String comment, int position) {
     name_ = name;
     type_ = type;
     comment_ = comment;
@@ -51,7 +51,7 @@ public class Column {
 
   public String getComment() { return comment_; }
   public String getName() { return name_; }
-  public ColumnType getType() { return type_; }
+  public Type getType() { return type_; }
   public int getPosition() { return position_; }
   public void setPosition(int position) { this.position_ = position; }
   public ColumnStats getStats() { return stats_; }
@@ -88,11 +88,11 @@ public class Column {
       Preconditions.checkState(columnDesc.isSetIs_binary());
       col = new HBaseColumn(columnDesc.getColumnName(), columnDesc.getColumn_family(),
           columnDesc.getColumn_qualifier(), columnDesc.isIs_binary(),
-          ColumnType.fromThrift(columnDesc.getColumnType()), comment, position);
+          Type.fromThrift(columnDesc.getColumnType()), comment, position);
     } else {
       // Hdfs table column.
       col = new Column(columnDesc.getColumnName(),
-          ColumnType.fromThrift(columnDesc.getColumnType()), comment, position);
+          Type.fromThrift(columnDesc.getColumnType()), comment, position);
     }
     if (columnDesc.isSetCol_stats()) col.updateStats(columnDesc.getCol_stats());
     return col;

@@ -81,6 +81,11 @@ public class TupleDescriptor {
     hasExplicitAlias_ = isExplicit;
   }
 
+  public TableName getAliasAsName() {
+    if (hasExplicitAlias_) return new TableName(null, alias_);
+    return getTableName();
+  }
+
   public String debugString() {
     String tblStr = (table_ == null ? "null" : table_.getFullName());
     List<String> slotStrings = Lists.newArrayList();

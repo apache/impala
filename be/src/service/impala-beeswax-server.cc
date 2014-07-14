@@ -99,6 +99,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
 
   // Convert expr values (col_values) to ASCII using "\t" as column delimiter and store
   // it in this result set.
+  // TODO: Handle complex types.
   virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales) {
     int num_col = col_values.size();
     DCHECK_EQ(num_col, metadata_.columns.size());
@@ -107,8 +108,10 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
     for (int i = 0; i < num_col; ++i) {
       // ODBC-187 - ODBC can only take "\t" as the delimiter
       out_stream << (i > 0 ? "\t" : "");
-      const ColumnType type(metadata_.columns[i].columnType);
-      RawValue::PrintValue(col_values[i], type, scales[i], &out_stream);
+      DCHECK_EQ(1, metadata_.columns[i].columnType.types.size());
+      RawValue::PrintValue(col_values[i],
+          ColumnType(metadata_.columns[i].columnType),
+          scales[i], &out_stream);
     }
     result_set_->push_back(out_stream.str());
     return Status::OK;
@@ -276,6 +279,7 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
   }
 }
 
+// TODO: Handle complex types.
 void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
     const QueryHandle& handle) {
   ScopedSessionState session_handle(this);
@@ -301,7 +305,11 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
     results_metadata.schema.__isset.fieldSchemas = true;
     results_metadata.schema.fieldSchemas.resize(result_set_md->columns.size());
     for (int i = 0; i < results_metadata.schema.fieldSchemas.size(); ++i) {
-      TPrimitiveType::type col_type = result_set_md->columns[i].columnType.type;
+      const TColumnType& type = result_set_md->columns[i].columnType;
+      DCHECK_EQ(1, type.types.size());
+      DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
+      DCHECK(type.types[0].__isset.scalar_type);
+      TPrimitiveType::type col_type = type.types[0].scalar_type.type;
       results_metadata.schema.fieldSchemas[i].__set_type(
           TypeToOdbcString(ThriftToType(col_type)));
 
@@ -574,7 +582,12 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
     // TODO: As of today, the ODBC driver does not support boolean and timestamp data
     // type but it should. This is tracked by ODBC-189. We should verify that our
     // boolean and timestamp type are correctly recognized when ODBC-189 is closed.
-    TPrimitiveType::type col_type = result_metadata->columns[i].columnType.type;
+    // TODO: Handle complex types.
+    const TColumnType& type = result_metadata->columns[i].columnType;
+    DCHECK_EQ(1, type.types.size());
+    DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
+    DCHECK(type.types[0].__isset.scalar_type);
+    TPrimitiveType::type col_type = type.types[0].scalar_type.type;
     query_results->columns[i] = TypeToOdbcString(ThriftToType(col_type));
   }
   query_results->__isset.columns = true;

@@ -53,7 +53,6 @@ import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnNotFoundException;
-import com.cloudera.impala.catalog.ColumnType;
 import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
@@ -67,6 +66,7 @@ import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
@@ -421,7 +421,7 @@ public class CatalogOpExecutor {
     // Set the results to be reported to the client.
     TResultSet resultSet = new TResultSet();
     resultSet.setSchema(new TResultSetMetadata(Lists.newArrayList(
-        new TColumn("summary", ColumnType.STRING.toThrift()))));
+        new TColumn("summary", Type.STRING.toThrift()))));
     TColumnValue resultColVal = new TColumnValue();
     resultColVal.setString_val("Updated " + numTargetedPartitions + " partition(s) and " +
         numUpdatedColumns + " column(s).");
@@ -509,7 +509,7 @@ public class CatalogOpExecutor {
   }
 
   private static ColumnStatisticsData createHiveColStatsData(TColumnStats colStats,
-      ColumnType colType) {
+      Type colType) {
     ColumnStatisticsData colStatsData = new ColumnStatisticsData();
     long ndvs = colStats.getNum_distinct_values();
     long numNulls = colStats.getNum_nulls();
@@ -893,12 +893,12 @@ public class CatalogOpExecutor {
 
   private void dropFunction(TDropFunctionParams params, TDdlExecResponse resp)
       throws ImpalaException {
-    ArrayList<ColumnType> argTypes = Lists.newArrayList();
+    ArrayList<Type> argTypes = Lists.newArrayList();
     for (TColumnType t: params.arg_types) {
-      argTypes.add(ColumnType.fromThrift(t));
+      argTypes.add(Type.fromThrift(t));
     }
-    Function desc = new Function(new FunctionName(params.fn_name),
-        argTypes, ColumnType.INVALID, false);
+    Function desc = new Function(FunctionName.fromThrift(params.fn_name),
+        argTypes, Type.INVALID, false);
     LOG.debug(String.format("Dropping Function %s", desc.signatureString()));
     Function fn = catalog_.removeFunction(desc);
     if (fn == null) {
@@ -1152,7 +1152,7 @@ public class CatalogOpExecutor {
         FieldSchema fs = iterator.next();
         if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
           fs.setName(newCol.getColumnName());
-          ColumnType type = ColumnType.fromThrift(newCol.getColumnType());
+          Type type = Type.fromThrift(newCol.getColumnType());
           fs.setType(type.toString().toLowerCase());
           // Don't overwrite the existing comment unless a new comment is given
           if (newCol.getComment() != null) {
@@ -1740,9 +1740,10 @@ public class CatalogOpExecutor {
     List<FieldSchema> fsList = Lists.newArrayList();
     // Add in all the columns
     for (TColumn col: columns) {
-      ColumnType type = ColumnType.fromThrift(col.getColumnType());
-      FieldSchema fs = new FieldSchema(col.getColumnName(),
-          type.toString().toLowerCase(), col.getComment());
+      Type type = Type.fromThrift(col.getColumnType());
+      // The type string must be lowercase for Hive to read the column metadata properly.
+      String typeSql = type.toSql().toLowerCase();
+      FieldSchema fs = new FieldSchema(col.getColumnName(), typeSql, col.getComment());
       fsList.add(fs);
     }
     return fsList;
