@@ -56,6 +56,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("alter", new Integer(SqlParserSymbols.KW_ALTER));
     keywordMap.put("and", new Integer(SqlParserSymbols.KW_AND));
     keywordMap.put("api_version", new Integer(SqlParserSymbols.KW_API_VERSION));
+    keywordMap.put("array", new Integer(SqlParserSymbols.KW_ARRAY));
     keywordMap.put("as", new Integer(SqlParserSymbols.KW_AS));
     keywordMap.put("asc", new Integer(SqlParserSymbols.KW_ASC));
     keywordMap.put("avro", new Integer(SqlParserSymbols.KW_AVRO));
@@ -131,6 +132,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("lines", new Integer(SqlParserSymbols.KW_LINES));
     keywordMap.put("load", new Integer(SqlParserSymbols.KW_LOAD));
     keywordMap.put("location", new Integer(SqlParserSymbols.KW_LOCATION));
+    keywordMap.put("map", new Integer(SqlParserSymbols.KW_MAP));
     keywordMap.put("merge_fn", new Integer(SqlParserSymbols.KW_MERGE_FN));
     keywordMap.put("metadata", new Integer(SqlParserSymbols.KW_METADATA));
     keywordMap.put("not", new Integer(SqlParserSymbols.KW_NOT));
@@ -174,6 +176,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("stored", new Integer(SqlParserSymbols.KW_STORED));
     keywordMap.put("straight_join", new Integer(SqlParserSymbols.KW_STRAIGHT_JOIN));
     keywordMap.put("string", new Integer(SqlParserSymbols.KW_STRING));
+    keywordMap.put("struct", new Integer(SqlParserSymbols.KW_STRUCT));
     keywordMap.put("symbol", new Integer(SqlParserSymbols.KW_SYMBOL));
     keywordMap.put("table", new Integer(SqlParserSymbols.KW_TABLE));
     keywordMap.put("tables", new Integer(SqlParserSymbols.KW_TABLES));
@@ -209,6 +212,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
 
     // add non-keyword tokens
     tokenIdMap.put(new Integer(SqlParserSymbols.IDENT), "IDENTIFIER");
+    tokenIdMap.put(new Integer(SqlParserSymbols.COLON), ":");
     tokenIdMap.put(new Integer(SqlParserSymbols.COMMA), "COMMA");
     tokenIdMap.put(new Integer(SqlParserSymbols.BITNOT), "~");
     tokenIdMap.put(new Integer(SqlParserSymbols.LPAREN), "(");
@@ -284,6 +288,7 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 "..." { return newToken(SqlParserSymbols.DOTDOTDOT, null); }
 
 // single-character tokens
+":" { return newToken(SqlParserSymbols.COLON, null); }
 "," { return newToken(SqlParserSymbols.COMMA, null); }
 "." { return newToken(SqlParserSymbols.DOT, null); }
 "*" { return newToken(SqlParserSymbols.STAR, null); }

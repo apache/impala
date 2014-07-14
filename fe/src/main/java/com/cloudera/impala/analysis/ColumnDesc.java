@@ -48,7 +48,7 @@ public class ColumnDesc {
   public void analyze() throws AnalysisException {
     // Check whether the column name meets the Metastore's requirements.
     if (!MetaStoreUtils.validateName(colName_)) {
-      throw new AnalysisException("Invalid column name: " + colName_);
+      throw new AnalysisException("Invalid column/field name: " + colName_);
     }
     type_.analyze();
   }

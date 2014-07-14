@@ -16,6 +16,10 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.ArrayType;
+import com.cloudera.impala.catalog.MapType;
+import com.cloudera.impala.catalog.StructType;
+import com.cloudera.impala.catalog.StructField;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.analysis.ColumnDesc;
@@ -222,27 +226,28 @@ parser code {:
 
 // List of keywords. Please keep them sorted alphabetically.
 terminal
-  KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_API_VERSION, KW_AS, KW_ASC, KW_AVRO,
-  KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CACHED, KW_CASE, KW_CAST,
-  KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT,
-  KW_COMPUTE, KW_CREATE, KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE,
-  KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV,
-  KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL,
-  KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT, KW_FORMAT,
-  KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_HAVING, KW_IF,
-  KW_IN, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
-  KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES,
-  KW_LOAD, KW_LOCATION, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET,
-  KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE,
-  KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PREPARE_FN, KW_PRODUCED, KW_RCFILE,
-  KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW,
-  KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
-  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING,
-  KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN,
-  KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE,KW_UNCACHED, KW_UNION, KW_UPDATE_FN,
-  KW_USE, KW_USING, KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_ARRAY, KW_AND, KW_API_VERSION, KW_AS,
+  KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CACHED,
+  KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS,
+  KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_DATA, KW_DATABASE, KW_DATABASES,
+  KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT,
+  KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
+  KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT,
+  KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GROUP,
+  KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,
+  KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT,
+  KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA,
+  KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVERWRITE,
+  KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PREPARE_FN,
+  KW_PRODUCED, KW_RCFILE, KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS,
+  KW_RIGHT, KW_RLIKE, KW_ROW, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_STRUCT,
+  KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT,
+  KW_STORED, KW_STRAIGHT_JOIN, KW_STRING, KW_SYMBOL, KW_TABLE, KW_TABLES,
+  KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT,
+  KW_STATS, KW_TO, KW_TRUE,KW_UNCACHED, KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING,
+  KW_VALUES, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
-terminal COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
+terminal COLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
   DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
@@ -351,9 +356,11 @@ nonterminal CreateViewStmt create_view_stmt;
 nonterminal CreateDataSrcStmt create_data_src_stmt;
 nonterminal DropDataSrcStmt drop_data_src_stmt;
 nonterminal ShowDataSrcsStmt show_data_srcs_stmt;
+nonterminal StructField struct_field_def;
 nonterminal ColumnDesc column_def, view_column_def;
 nonterminal ArrayList<ColumnDesc> column_def_list, view_column_def_list;
 nonterminal ArrayList<ColumnDesc> partition_column_defs, view_column_defs;
+nonterminal ArrayList<StructField> struct_field_def_list;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal HdfsCachingOp cache_op_val;
 nonterminal String comment_val;
@@ -2079,4 +2086,30 @@ type ::=
   {: RESULT = ScalarType.createDecimalType(precision.intValue(), scale.intValue()); :}
   | KW_DECIMAL
   {: RESULT = ScalarType.createDecimalType(); :}
+  | KW_ARRAY LESSTHAN type:value_type GREATERTHAN
+  {: RESULT = new ArrayType(value_type); :}
+  | KW_MAP LESSTHAN type:key_type COMMA type:value_type GREATERTHAN
+  {: RESULT = new MapType(key_type, value_type); :}
+  | KW_STRUCT LESSTHAN struct_field_def_list:fields GREATERTHAN
+  {: RESULT = new StructType(fields); :}
   ;
+
+struct_field_def ::=
+  IDENT:name COLON type:t comment_val:comment
+  {: RESULT = new StructField(name, t, comment); :}
+  ;
+
+struct_field_def_list ::=
+  struct_field_def:field_def
+  {:
+    ArrayList<StructField> list = new ArrayList<StructField>();
+    list.add(field_def);
+    RESULT = list;
+  :}
+  | struct_field_def_list:list COMMA struct_field_def:field_def
+  {:
+    list.add(field_def);
+    RESULT = list;
+  :}
+  ;
+

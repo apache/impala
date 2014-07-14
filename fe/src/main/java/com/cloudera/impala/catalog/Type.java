@@ -255,7 +255,7 @@ public abstract class Type {
    * TODO: Support non-scalar types.
    */
   public static Type getAssignmentCompatibleType(Type t1, Type t2) {
-    if (t1.isScalarType() && t1.isScalarType()) {
+    if (t1.isScalarType() && t2.isScalarType()) {
       return ScalarType.getAssignmentCompatibleType(
           (ScalarType) t1, (ScalarType) t2);
     }
@@ -282,7 +282,7 @@ public abstract class Type {
   }
 
   /**
-   * Constructs a ColumnType rooted at the TTypeNode at nodeIdx in TType.
+   * Constructs a ColumnType rooted at the TTypeNode at nodeIdx in TColumnType.
    * Returned pair: The resulting ColumnType and the next nodeIdx that is not a child
    * type of the result.
    */

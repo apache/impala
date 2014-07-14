@@ -30,6 +30,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class AnalyzeDDLTest extends AnalyzerTest {
@@ -155,8 +156,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   public void TestAlterTableAddReplaceColumns() throws AnalysisException {
     AnalyzesOk("alter table functional.alltypes add columns (new_col int)");
     AnalyzesOk("alter table functional.alltypes add columns (c1 string comment 'hi')");
+    AnalyzesOk("alter table functional.alltypes add columns (c struct<f1:int>)");
     AnalyzesOk(
         "alter table functional.alltypes replace columns (c1 int comment 'c', c2 int)");
+    AnalyzesOk("alter table functional.alltypes replace columns (c array<string>)");
 
     // Column name must be unique for add
     AnalysisError("alter table functional.alltypes add columns (int_col int)",
@@ -166,9 +169,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Column name conflicts with existing partition column: year");
     // Invalid column name.
     AnalysisError("alter table functional.alltypes add columns (`???` int)",
-        "Invalid column name: ???");
+        "Invalid column/field name: ???");
     AnalysisError("alter table functional.alltypes replace columns (`???` int)",
-        "Invalid column name: ???");
+        "Invalid column/field name: ???");
 
     // Replace should not throw an error if the column already exists
     AnalyzesOk("alter table functional.alltypes replace columns (int_col int)");
@@ -243,6 +246,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("alter table functional.alltypes change column int_col int_col2 int");
     // Rename and change the datatype
     AnalyzesOk("alter table functional.alltypes change column int_col c2 string");
+    AnalyzesOk(
+        "alter table functional.alltypes change column int_col c2 map<int, string>");
     // Change only the datatype
     AnalyzesOk("alter table functional.alltypes change column int_col int_col tinyint");
     // Add a comment to a column.
@@ -260,7 +265,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Invalid column name.
     AnalysisError("alter table functional.alltypes change column int_col `???` int",
-        "Invalid column name: ???");
+        "Invalid column/field name: ???");
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes change c1 c2 int",
@@ -522,7 +527,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Duplicate column name: id");
     // Invalid column name.
     AnalysisError("alter view functional.alltypes_view as select 'abc' as `???`",
-        "Invalid column name: ???");
+        "Invalid column/field name: ???");
   }
 
   @Test
@@ -564,6 +569,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk(stmt.getColStatsQuery());
 
     parseNode = AnalyzesOk("compute stats functional_hbase.alltypes");
+    assertTrue(parseNode instanceof ComputeStatsStmt);
+    stmt = (ComputeStatsStmt) parseNode;
+    AnalyzesOk(stmt.getTblStatsQuery());
+    AnalyzesOk(stmt.getColStatsQuery());
+
+    // Test that complex-typed columns are ignored.
+    parseNode = AnalyzesOk("compute stats functional.allcomplextypes");
     assertTrue(parseNode instanceof ComputeStatsStmt);
     stmt = (ComputeStatsStmt) parseNode;
     AnalyzesOk(stmt.getTblStatsQuery());
@@ -839,12 +851,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (d decimal)");
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (d decimal(3,1))");
     AnalyzesOk("create table new_table(d1 decimal, d2 decimal(10), d3 decimal(5, 2))");
-    AnalysisError("create table new_table(d1 decimal(1,10))",
-        "Decimal scale (10) must be <= precision (1).");
-    AnalysisError("create table new_table(d1 decimal(0,0))",
-        "Decimal precision must be greater than 0.");
-    AnalysisError("create table new_table(d1 decimal(49,0))",
-        "Decimal precision must be <= 38.");
     AnalysisError("create table new_table (i int) PARTITIONED BY (d decimal(40,1))",
         "Decimal precision must be <= 38.");
 
@@ -913,9 +919,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Invalid table/view name: ^&*");
     // Invalid column names.
     AnalysisError("create table new_table (`???` int) PARTITIONED BY (i int)",
-        "Invalid column name: ???");
+        "Invalid column/field name: ???");
     AnalysisError("create table new_table (i int) PARTITIONED BY (`^&*` int)",
-        "Invalid column name: ^&*");
+        "Invalid column/field name: ^&*");
     // Invalid source database/table name reports non-existence instead of invalidity.
     AnalysisError("create table functional.foo like `???`.alltypes",
         "Database does not exist: ???");
@@ -1046,6 +1052,36 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "{\"name\": \"union1\", \"type\": [\"float\", \"boolean\"]}]}')",
         "Error parsing Avro schema for table 'default.foo_avro': " +
         "Unsupported type 'union' of column 'union1'");
+
+    // TODO: Add COLLECTION ITEMS TERMINATED BY and MAP KEYS TERMINATED BY clauses.
+    // Test struct complex type.
+    AnalyzesOk("create table functional.new_table (" +
+        "a struct<f1: int, f2: string, f3: timestamp, f4: boolean>, " +
+        "b struct<f1: struct<f11: int>, f2: struct<f21: struct<f22: string>>>, " +
+        "c struct<f1: map<int, string>, f2: array<bigint>>," +
+        "d struct<f1: struct<f11: map<int, string>, f12: array<bigint>>>)");
+    // Test array complex type.
+    AnalyzesOk("create table functional.new_table (" +
+        "a array<int>, b array<timestamp>, c array<string>, d array<boolean>, " +
+        "e array<array<int>>, f array<array<array<string>>>, " +
+        "g array<struct<f1: int, f2: string>>, " +
+        "h array<map<string,int>>)");
+    // Test map complex type.
+    AnalyzesOk("create table functional.new_table (" +
+        "a map<string, int>, b map<timestamp, boolean>, c map<bigint, float>, " +
+        "d array<array<int>>, e array<array<array<string>>>, " +
+        "f array<struct<f1: int, f2: string>>," +
+        "g array<map<string,int>>)");
+    // Cannot partition by a complex column.
+    AnalysisError("create table functional.new_table (i int) " +
+        "partitioned by (x array<int>)",
+        "Type 'ARRAY<INT>' is not supported as partition-column type in column: x");
+    AnalysisError("create table functional.new_table (i int) " +
+        "partitioned by (x map<int,int>)",
+        "Type 'MAP<INT,INT>' is not supported as partition-column type in column: x");
+    AnalysisError("create table functional.new_table (i int) " +
+        "partitioned by (x struct<f1:int>)",
+        "Type 'STRUCT<f1:INT>' is not supported as partition-column type in column: x");
   }
 
   @Test
@@ -1058,6 +1094,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "from functional.alltypes");
     AnalyzesOk("create view functional.foo (a, b) as select int_col x, double_col y " +
         "from functional.alltypes");
+    // View can have complex-typed columns.
+    AnalyzesOk("create view functional.foo (a, b, c) as " +
+        "select int_array_col, int_map_col, int_struct_col " +
+        "from functional.allcomplextypes");
 
     // Creating a view on a view is ok (alltypes_view is a view on alltypes).
     AnalyzesOk("create view foo as select * from functional.alltypes_view");
@@ -1102,9 +1142,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create view `^%&` as select 1, 2, 3",
         "Invalid table/view name: ^%&");
     AnalysisError("create view foo as select 1 as `???`",
-        "Invalid column name: ???");
+        "Invalid column/field name: ???");
     AnalysisError("create view foo(`%^&`) as select 1",
-        "Invalid column name: %^&");
+        "Invalid column/field name: %^&");
 
     // Table/view already exists.
     AnalysisError("create view functional.alltypes as " +
@@ -1293,6 +1333,14 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create function baddb.f() RETURNS int" + udfSuffix,
         "Database does not exist: baddb");
 
+    // Try creating functions with unsupported return/arg types.
+    AnalysisError("create function f() RETURNS array<int>" + udfSuffix,
+        "Type 'ARRAY<INT>' is not supported in UDFs/UDAs.");
+    AnalysisError("create function f(map<string,int>) RETURNS int" + udfSuffix,
+        "Type 'MAP<STRING,INT>' is not supported in UDFs/UDAs.");
+    AnalysisError("create function f() RETURNS struct<f:int>" + udfSuffix,
+        "Type 'STRUCT<f:INT>' is not supported in UDFs/UDAs.");
+
     // Try dropping functions.
     AnalyzesOk("drop function if exists foo()");
     AnalysisError("drop function foo()", "Function does not exist: foo()");
@@ -1443,6 +1491,17 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
         "'/foo.jar' UPDATE_FN='b'", "Java UDAs are not supported.");
 
+    // Try creating functions with unsupported return/arg types.
+    AnalysisError("create aggregate function foo(string, double) RETURNS array<int> " +
+        loc + "UPDATE_FN='AggUpdate'",
+        "Type 'ARRAY<INT>' is not supported in UDFs/UDAs.");
+    AnalysisError("create aggregate function foo(map<string,int>) RETURNS int " +
+        loc + "UPDATE_FN='AggUpdate'",
+        "Type 'MAP<STRING,INT>' is not supported in UDFs/UDAs.");
+    AnalysisError("create aggregate function foo(int) RETURNS struct<f:int> " +
+        loc + "UPDATE_FN='AggUpdate'",
+        "Type 'STRUCT<f:INT>' is not supported in UDFs/UDAs.");
+
     // Test missing .ll file. TODO: reenable when we can run IR UDAs
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
             "'/foo.ll' UPDATE_FN='Fn'", "IR UDAs are not yet supported.");
@@ -1504,6 +1563,87 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "UPDATE_FN='Agg2Update' INIT_FN='AggInit' MERGE_FN='AggMerge' "+
             "FINALIZE_FN='not there'",
         "Could not find function not there(STRING) in: " + hdfsLoc);
+  }
+
+  /**
+   * Wraps the given typeDefs in a CREATE TABLE stmt and runs AnalyzesOk().
+   * Also tests that the type is analyzes correctly in ARRAY, MAP, and STRUCT types.
+   */
+  private void TypeDefsAnalyzeOk(String... typeDefs) {
+    for (String typeDefStr: typeDefs) {
+      ParseNode stmt = AnalyzesOk(String.format("CREATE TABLE t (i %s)", typeDefStr));
+      AnalyzesOk(String.format("CREATE TABLE t (i ARRAY<%s>)", typeDefStr));
+      AnalyzesOk(String.format("CREATE TABLE t (i STRUCT<f:%s>)", typeDefStr));
+
+      Preconditions.checkState(stmt instanceof CreateTableStmt);
+      CreateTableStmt createTableStmt = (CreateTableStmt) stmt;
+      Type t = createTableStmt.getColumnDescs().get(0).getType();
+      // If the given type is complex, don't use it as a map key.
+      if (t.isComplexType()) {
+        AnalyzesOk(String.format(
+            "CREATE TABLE t (i MAP<int, %s>)", typeDefStr, typeDefStr));
+      } else {
+        AnalyzesOk(String.format(
+            "CREATE TABLE t (i MAP<%s, %s>)", typeDefStr, typeDefStr));
+      }
+    }
+  }
+
+  /**
+   * Wraps the given typeDefs in a CREATE TABLE stmt and asserts that the type def
+   * failed to analyze with the given error message.
+   */
+  private void TypeDefAnalysisError(String typeDef, String expectedError) {
+    AnalysisError(String.format("CREATE TABLE t (i %s)", typeDef), expectedError);
+  }
+
+  @Test
+  public void TestTypes() {
+    // Test primitive types.
+    TypeDefsAnalyzeOk("BOOLEAN");
+    TypeDefsAnalyzeOk("TINYINT");
+    TypeDefsAnalyzeOk("SMALLINT");
+    TypeDefsAnalyzeOk("INT", "INTEGER");
+    TypeDefsAnalyzeOk("BIGINT");
+    TypeDefsAnalyzeOk("FLOAT");
+    TypeDefsAnalyzeOk("DOUBLE", "REAL");
+    TypeDefsAnalyzeOk("STRING");
+    TypeDefsAnalyzeOk("CHAR(1)", "CHAR(20)");
+    TypeDefsAnalyzeOk("BINARY");
+    TypeDefsAnalyzeOk("DECIMAL");
+    TypeDefsAnalyzeOk("TIMESTAMP");
+
+    // Test decimal.
+    TypeDefsAnalyzeOk("DECIMAL");
+    TypeDefsAnalyzeOk("DECIMAL(1)");
+    TypeDefsAnalyzeOk("DECIMAL(12, 7)");
+    TypeDefsAnalyzeOk("DECIMAL(38)");
+    TypeDefsAnalyzeOk("DECIMAL(38, 1)");
+    TypeDefsAnalyzeOk("DECIMAL(38, 38)");
+
+    TypeDefAnalysisError("DECIMAL(1, 10)",
+        "Decimal scale (10) must be <= precision (1).");
+    TypeDefAnalysisError("DECIMAL(0, 0)",
+        "Decimal precision must be greater than 0.");
+    TypeDefAnalysisError("DECIMAL(39, 0)",
+        "Decimal precision must be <= 38.");
+
+    // Test complex types.
+    TypeDefsAnalyzeOk("ARRAY<BIGINT>");
+    TypeDefsAnalyzeOk("MAP<TINYINT, DOUBLE>");
+    TypeDefsAnalyzeOk("STRUCT<f:TINYINT>");
+    TypeDefsAnalyzeOk("STRUCT<a:TINYINT, b:BIGINT, c:DOUBLE>");
+    TypeDefsAnalyzeOk("STRUCT<a:TINYINT COMMENT 'x', b:BIGINT, c:DOUBLE COMMENT 'y'>");
+
+    // Map keys can't be complex types.
+    TypeDefAnalysisError("map<array<int>, int>",
+        "Map type cannot have a complex-typed key: MAP<ARRAY<INT>,INT>");
+    // Duplicate struct-field name.
+    TypeDefAnalysisError("STRUCT<f1: int, f2: string, f1: float>",
+        "Duplicate field name 'f1' in struct 'STRUCT<f1:INT,f2:STRING,f1:FLOAT>'");
+    // Invalid struct-field name.
+    TypeDefAnalysisError("STRUCT<`???`: int>",
+        "Invalid struct field name: ???");
   }
 
   @Test

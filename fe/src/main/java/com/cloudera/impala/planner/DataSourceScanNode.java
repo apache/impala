@@ -112,7 +112,7 @@ public class DataSourceScanNode extends ScanNode {
             (byte) ((NumericLiteral) expr).getLongValue());
       case SMALLINT:
         return new TColumnValue().setShort_val(
-          (short) ((NumericLiteral) expr).getLongValue());
+            (short) ((NumericLiteral) expr).getLongValue());
       case INT:
         return new TColumnValue().setInt_val(
             (int) ((NumericLiteral) expr).getLongValue());

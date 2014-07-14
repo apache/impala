@@ -14,17 +14,14 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Subquery;
 import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
@@ -154,8 +151,8 @@ public class BinaryPredicate extends Predicate {
         CompareMode.IS_SUPERTYPE_OF);
     if (fn_ == null) {
       // Construct an appropriate error message and throw an AnalysisException.
-      String errMsg = "operands of type " + getChild(0).getType() + " and " +
-            getChild(1).getType()  + " are not comparable: " + toSql();
+      String errMsg = "operands of type " + getChild(0).getType().toSql() + " and " +
+            getChild(1).getType().toSql()  + " are not comparable: " + toSql();
 
       // Check if any of the children is a Subquery that does not return a
       // scalar.

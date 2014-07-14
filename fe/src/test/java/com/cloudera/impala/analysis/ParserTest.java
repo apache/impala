@@ -2026,12 +2026,80 @@ public class ParserTest {
     ParserError("LOAD DATA LOCAL INPATH '/a/b' INTO TABLE Foo");
   }
 
+  /**
+   * Wraps the given typeDefs in a CREATE TABLE and CAST and runs ParsesOk().
+   * Also tests that the type is parsed correctly in ARRAY, MAP, and STRUCT types.
+   */
+  private void TypeDefsParseOk(String... typeDefs) {
+    for (String typeDefStr: typeDefs) {
+      ParsesOk(String.format("CREATE TABLE t (i %s)", typeDefStr));
+      ParsesOk(String.format("SELECT CAST (i AS %s)", typeDefStr));
+      // Test typeDefStr in complex types.
+      ParsesOk(String.format("CREATE TABLE t (i MAP<%s, %s>)", typeDefStr, typeDefStr));
+      ParsesOk(String.format("CREATE TABLE t (i ARRAY<%s>)", typeDefStr));
+      ParsesOk(String.format("CREATE TABLE t (i STRUCT<f:%s>)", typeDefStr));
+    }
+  }
+
+  /**
+   * Asserts that the given typeDefs fail to parse.
+   */
+  private void TypeDefsError(String... typeDefs) {
+    for (String typeDefStr: typeDefs) {
+      ParserError(String.format("CREATE TABLE t (i %s)", typeDefStr));
+      ParserError(String.format("SELECT CAST (i AS %s)", typeDefStr));
+    }
+  }
+
   @Test
-  public void TestTypeSynonyms() {
-    ParsesOk("CREATE TABLE bar (i INTEGER)");
-    ParsesOk("CREATE TABLE bar (r REAL)");
-    ParsesOk("SELECT CAST(a as INTEGER) from tbl");
-    ParsesOk("SELECT CAST(a as REAL) from tbl");
+  public void TestTypes() {
+    // Test primitive types.
+    TypeDefsParseOk("BOOLEAN");
+    TypeDefsParseOk("TINYINT");
+    TypeDefsParseOk("SMALLINT");
+    TypeDefsParseOk("INT", "INTEGER");
+    TypeDefsParseOk("BIGINT");
+    TypeDefsParseOk("FLOAT");
+    TypeDefsParseOk("DOUBLE", "REAL");
+    TypeDefsParseOk("STRING");
+    TypeDefsParseOk("CHAR(1)", "CHAR(20)");
+    TypeDefsParseOk("BINARY");
+    TypeDefsParseOk("DECIMAL");
+    TypeDefsParseOk("TIMESTAMP");
+
+    // Test decimal.
+    TypeDefsParseOk("DECIMAL");
+    TypeDefsParseOk("DECIMAL(1)");
+    TypeDefsParseOk("DECIMAL(1, 2)");
+    TypeDefsParseOk("DECIMAL(2, 1)");
+    TypeDefsParseOk("DECIMAL(6, 6)");
+    TypeDefsParseOk("DECIMAL(100, 0)");
+    TypeDefsParseOk("DECIMAL(0, 0)");
+
+    TypeDefsError("DECIMAL()");
+    TypeDefsError("DECIMAL(a)");
+    TypeDefsError("DECIMAL(1, a)");
+    TypeDefsError("DECIMAL(1, 2, 3)");
+    TypeDefsError("DECIMAL(-1)");
+
+    // Test complex types.
+    TypeDefsParseOk("ARRAY<BIGINT>");
+    TypeDefsParseOk("MAP<TINYINT, DOUBLE>");
+    TypeDefsParseOk("STRUCT<f:TINYINT>");
+    TypeDefsParseOk("STRUCT<a:TINYINT, b:BIGINT, c:DOUBLE>");
+    TypeDefsParseOk("STRUCT<a:TINYINT COMMENT 'x', b:BIGINT, c:DOUBLE COMMENT 'y'>");
+
+    TypeDefsError("CHAR()");
+    TypeDefsError("CHAR(1, 1)");
+    TypeDefsError("ARRAY<>");
+    TypeDefsError("ARRAY BIGINT");
+    TypeDefsError("MAP<>");
+    TypeDefsError("MAP<TINYINT>");
+    TypeDefsError("MAP<TINYINT, BIGINT, DOUBLE>");
+    TypeDefsError("STRUCT<>");
+    TypeDefsError("STRUCT<TINYINT>");
+    TypeDefsError("STRUCT<a TINYINT>");
+    TypeDefsError("STRUCT<'a':TINYINT>");
   }
 
   @Test
@@ -2226,24 +2294,6 @@ public class ParserTest {
     ParserError("explain explain select a from tbl");
     // cannot EXPLAIN DDL stmt
     ParserError("explain CREATE TABLE Foo (i int)");
-  }
-
-  @Test
-  public void TestDecimal() {
-    ParsesOk("CREATE TABLE foo(d decimal)");
-    ParsesOk("CREATE TABLE foo(d decimal, d2 decimal(1))");
-    ParsesOk("CREATE TABLE foo(d decimal(1, 2))");
-    ParsesOk("CREATE TABLE foo(d decimal(0, 0))");
-
-    ParsesOk("SELECT CAST(1 as DECIMAL)");
-    ParsesOk("SELECT CAST(1 as DECIMAL(0))");
-    ParsesOk("SELECT CAST(1 as DECIMAL(100, 0))");
-
-    ParserError("CREATE TABLE foo(d decimal())");
-    ParserError("CREATE TABLE foo(d decimal(a))");
-    ParserError("CREATE TABLE foo(d decimal(1, a))");
-    ParserError("CREATE TABLE foo(d decimal(1, 2, 3))");
-    ParserError("CREATE TABLE foo(d decimal(-1))");
   }
 
   @Test

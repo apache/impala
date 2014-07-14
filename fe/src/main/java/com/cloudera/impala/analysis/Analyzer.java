@@ -1383,9 +1383,10 @@ public class Analyzer {
           Type.getAssignmentCompatibleType(lastCompatibleType, expr.getType());
     }
     if (!newCompatibleType.isValid()) {
-      throw new AnalysisException("Incompatible return types '" + lastCompatibleType +
-          "' and '" + expr.getType() + "' of exprs '" +
-          lastCompatibleExpr.toSql() + "' and '" + expr.toSql() + "'.");
+      throw new AnalysisException(String.format(
+          "Incompatible return types '%s' and '%s' of exprs '%s' and '%s'.",
+          lastCompatibleType.toSql(), expr.getType().toSql(),
+          lastCompatibleExpr.toSql(), expr.toSql()));
     }
     return newCompatibleType;
   }

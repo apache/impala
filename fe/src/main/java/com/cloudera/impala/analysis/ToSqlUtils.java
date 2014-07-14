@@ -213,7 +213,7 @@ public class ToSqlUtils {
 
   private static String columnToSql(Column col) {
     StringBuilder sb = new StringBuilder(col.getName());
-    if (col.getType() != null) sb.append(" " + col.getType().toString());
+    if (col.getType() != null) sb.append(" " + col.getType().toSql());
     if (!Strings.isNullOrEmpty(col.getComment())) {
       sb.append(String.format(" COMMENT '%s'", col.getComment()));
     }

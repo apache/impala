@@ -101,7 +101,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         ScalarType.createDecimalType(38,17));
     testNumericLiteral("-999999999999999999.99999999999999999999",
         ScalarType.createDecimalType(38,20));
-
   }
 
   /**
@@ -177,6 +176,24 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // invalid casts
     AnalysisError("select * from functional.alltypes where bool_col = '15'",
         "operands of type BOOLEAN and STRING are not comparable: bool_col = '15'");
+    // Complex types are not comparable.
+    AnalysisError("select 1 from functional.allcomplextypes where int_array_col = 1",
+        "operands of type ARRAY<INT> and TINYINT are not comparable: int_array_col = 1");
+    AnalysisError("select 1 from functional.allcomplextypes where int_map_col = 1",
+        "operands of type MAP<STRING,INT> and TINYINT are not comparable: " +
+        "int_map_col = 1");
+    AnalysisError("select 1 from functional.allcomplextypes where int_struct_col = 1",
+        "operands of type STRUCT<f1:INT,f2:INT> and TINYINT are not comparable: " +
+        "int_struct_col = 1");
+    // Complex types are not comparable even if identical.
+    // TODO: Reconsider this behavior. Such a comparison should ideally work,
+    // but may require complex-typed SlotRefs and BE functions able to accept
+    // complex-typed parameters.
+    AnalysisError("select 1 from functional.allcomplextypes " +
+        "where int_map_col = int_map_col",
+        "operands of type MAP<STRING,INT> and MAP<STRING,INT> are not comparable: " +
+        "int_map_col = int_map_col");
+    // TODO: Enable once date and datetime are implemented.
     // AnalysisError("select * from functional.alltypes where date_col = 15",
     // "operands are not comparable: date_col = 15");
     // AnalysisError("select * from functional.alltypes where datetime_col = 1.0",
@@ -206,8 +223,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     for (int precision = 1; precision <= ScalarType.MAX_PRECISION; ++precision) {
       for (int scale = 0; scale < precision; ++scale) {
         Type t = ScalarType.createDecimalType(precision, scale);
-        AnalyzesOk("select cast(1.1 as " + t + ")");
-        AnalyzesOk("select cast(cast(1 as " + t + ") as decimal)");
+        AnalyzesOk("select cast(1.1 as " + t.toSql() + ")");
+        AnalyzesOk("select cast(cast(1 as " + t.toSql() + ") as decimal)");
       }
     }
 
@@ -300,6 +317,19 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     }
   }
 
+  /**
+   * Tests that casts to complex types fail with an appropriate error message.
+   */
+  @Test
+  public void TestComplexTypeCasts() throws AnalysisException {
+    AnalysisError("select cast(1 as array<int>)",
+        "Unsupported cast to complex type: ARRAY<INT>");
+    AnalysisError("select cast(1 as map<int, int>)",
+        "Unsupported cast to complex type: MAP<INT,INT>");
+    AnalysisError("select cast(1 as struct<a:int,b:char(20)>)",
+        "Unsupported cast to complex type: STRUCT<a:INT,b:CHAR(20)>");
+  }
+
   // Analyzes query and asserts that the first result expr returns the given type.
   // Requires query to parse to a SelectStmt.
   private void checkExprType(String query, Type type) {
@@ -381,6 +411,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select * from functional.alltypes where bool_col or double_col",
         "Operand 'double_col' part of predicate 'bool_col OR double_col' should " +
             "return type 'BOOLEAN' but returns type 'DOUBLE'.");
+    AnalysisError("select int_array_col or true from functional.allcomplextypes",
+        "Operand 'int_array_col' part of predicate 'int_array_col OR TRUE' should " +
+            "return type 'BOOLEAN' but returns type 'ARRAY<INT>'");
+    AnalysisError("select false and int_struct_col from functional.allcomplextypes",
+        "Operand 'int_struct_col' part of predicate 'FALSE AND int_struct_col' should " +
+            "return type 'BOOLEAN' but returns type 'STRUCT<f1:INT,f2:INT>'.");
+    AnalysisError("select not int_map_col from functional.allcomplextypes",
+        "Operand 'int_map_col' part of predicate 'NOT int_map_col' should return " +
+            "type 'BOOLEAN' but returns type 'MAP<STRING,INT>'.");
   }
 
   @Test
@@ -388,6 +427,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where int_col is null");
     AnalyzesOk("select * from functional.alltypes where string_col is not null");
     AnalyzesOk("select * from functional.alltypes where null is not null");
+    AnalyzesOk("select 1 from functional.allcomplextypes where int_map_col is null");
   }
 
   @Test
@@ -441,6 +481,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "where timestamp_col between int_col and double_col",
         "Incompatible return types 'TIMESTAMP' and 'INT' " +
         "of exprs 'timestamp_col' and 'int_col'.");
+    AnalysisError("select 1 from functional.allcomplextypes " +
+        "where int_struct_col between 10 and 20",
+        "Incompatible return types 'STRUCT<f1:INT,f2:INT>' and 'TINYINT' " +
+        "of exprs 'int_struct_col' and '10'.");
   }
 
   @Test
@@ -481,6 +525,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "timestamp_col in (NULL, int_col)",
         "Incompatible return types 'TIMESTAMP' and 'INT' " +
         "of exprs 'timestamp_col' and 'int_col'.");
+    AnalysisError("select 1 from functional.allcomplextypes where " +
+        "int_array_col in (id, NULL)",
+        "Incompatible return types 'ARRAY<INT>' and 'INT' " +
+        "of exprs 'int_array_col' and 'id'.");
   }
 
   /**
@@ -492,8 +540,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Decimal has custom type promotion rules which are tested elsewhere.
     Type[] numericTypes = new Type[] { Type.TINYINT, Type.SMALLINT, Type.INT,
         Type.BIGINT, Type.FLOAT, Type.DOUBLE , Type.NULL };
-    for (Type type1 : numericTypes) {
-      for (Type type2 : numericTypes) {
+    for (Type type1: numericTypes) {
+      for (Type type2: numericTypes) {
         Type t = Type.getAssignmentCompatibleType(type1, type2);
         assertTrue(t.isScalarType());
         ScalarType compatibleType = (ScalarType) t;
@@ -553,8 +601,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       }
     }
 
-    List<Type> fixedPointTypes = new ArrayList<Type>(
-        Type.getIntegerTypes());
+    List<Type> fixedPointTypes = new ArrayList<Type>(Type.getIntegerTypes());
     fixedPointTypes.add(Type.NULL);
     for (Type type: fixedPointTypes) {
       typeCastTest(null, type, false, ArithmeticExpr.Operator.BITNOT, null,
@@ -573,9 +620,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         Type.BIGINT, Type.FLOAT, Type.DOUBLE , Type.NULL };
 
     // test on all comparison ops
-    for (BinaryPredicate.Operator cmpOp : BinaryPredicate.Operator.values()) {
-      for (Type type1 : types) {
-        for (Type type2 : types) {
+    for (BinaryPredicate.Operator cmpOp: BinaryPredicate.Operator.values()) {
+      for (Type type1: types) {
+        for (Type type2: types) {
           Type compatibleType =
               Type.getAssignmentCompatibleType(type1, type2);
           typeCastTest(type1, type2, false, null, cmpOp, compatibleType);
@@ -589,7 +636,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    * Generate an expr of the form "<type1> <arithmeticOp | cmpOp> <type2>"
    * and make sure that the expr has the correct type (opType for arithmetic
    * ops or bool for comparisons) and that both operands are of type 'opType'.
-   * @throws AnalysisException
    */
   private void typeCastTest(Type type1, Type type2,
       boolean op1IsLiteral, ArithmeticExpr.Operator arithmeticOp,
@@ -621,12 +667,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       assertEquals(selectListExprs.size(), 1);
       // check the first expr in select list
       expr = selectListExprs.get(0);
-      assert(opType.equals(expr.getType()));
+      Assert.assertEquals("opType= " + opType + " exprType=" + expr.getType(),
+          opType, expr.getType());
     } else {
       // check the where clause
       expr = select.getWhereClause();
       if (!expr.getType().isNull()) {
-        assertEquals(PrimitiveType.BOOLEAN, expr.getType().getPrimitiveType());
+        assertEquals(Type.BOOLEAN, expr.getType());
       }
     }
     checkCasts(expr);
@@ -784,9 +831,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         new String[] {"tinyint_col", "smallint_col", "int_col", "bigint_col", "NULL"};
 
     // Tests all time units.
-    for (TimeUnit timeUnit : TimeUnit.values()) {
+    for (TimeUnit timeUnit: TimeUnit.values()) {
       // Tests on all valid time value types (fixed points).
-      for (String col : valueTypeCols) {
+      for (String col: valueTypeCols) {
         // Non-function call like version.
         AnalyzesOk("select timestamp_col + interval " + col + " " + timeUnit.toString() +
             " from functional.alltypes");
@@ -818,6 +865,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Operand 'string_col' of timestamp arithmetic expression " +
         "'string_col + INTERVAL 10 years' returns type 'STRING'. " +
         "Expected type 'TIMESTAMP'.");
+    AnalysisError(
+        "select int_struct_col + interval 10 years from functional.allcomplextypes",
+        "Operand 'int_struct_col' of timestamp arithmetic expression " +
+        "'int_struct_col + INTERVAL 10 years' returns type 'STRUCT<f1:INT,f2:INT>'. " +
+        "Expected type 'TIMESTAMP'.");
     // Reversed interval and timestamp using addition.
     AnalysisError("select interval 10 years + float_col from functional.alltypes",
         "Operand 'float_col' of timestamp arithmetic expression " +
@@ -827,6 +879,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Operand 'string_col' of timestamp arithmetic expression " +
         "'INTERVAL 10 years + string_col' returns type 'STRING'. " +
         "Expected type 'TIMESTAMP'");
+    AnalysisError(
+        "select interval 10 years + int_array_col from functional.allcomplextypes",
+        "Operand 'int_array_col' of timestamp arithmetic expression " +
+        "'INTERVAL 10 years + int_array_col' returns type 'ARRAY<INT>'. " +
+        "Expected type 'TIMESTAMP'.");
     // First operand does not return a timestamp. Function-call like version.
     AnalysisError("select date_add(float_col, interval 10 years) " +
         "from functional.alltypes",
@@ -838,6 +895,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Operand 'string_col' of timestamp arithmetic expression " +
         "'DATE_ADD(string_col, INTERVAL 10 years)' returns type 'STRING'. " +
         "Expected type 'TIMESTAMP'.");
+    AnalysisError("select date_add(int_map_col, interval 10 years) " +
+        "from functional.allcomplextypes",
+        "Operand 'int_map_col' of timestamp arithmetic expression " +
+        "'DATE_ADD(int_map_col, INTERVAL 10 years)' returns type 'MAP<STRING,INT>'. " +
+        "Expected type 'TIMESTAMP'.");
 
     // Second operand is not compatible with a fixed-point type.
     // Non-function-call like version.
@@ -845,6 +907,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Operand '5.2' of timestamp arithmetic expression " +
         "'timestamp_col + INTERVAL 5.2 years' returns type 'DECIMAL(2,1)'. " +
         "Expected an integer type.");
+    AnalysisError("select cast(0 as timestamp) + interval int_array_col years " +
+        "from functional.allcomplextypes",
+        "Operand 'int_array_col' of timestamp arithmetic expression " +
+        "'CAST(0 AS TIMESTAMP) + INTERVAL int_array_col years' " +
+        "returns type 'ARRAY<INT>'. Expected an integer type.");
 
     // No implicit cast from STRING to integer types.
     AnalysisError("select timestamp_col + interval '10' years from functional.alltypes",
@@ -900,7 +967,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestFunctions() throws AnalysisException {
+  public void TestFunctionCallExpr() throws AnalysisException {
     AnalyzesOk("select pi()");
     AnalyzesOk("select sin(pi())");
     AnalyzesOk("select sin(cos(pi()))");
@@ -921,6 +988,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select round(cast('1.1' as decimal), cast(1 as int))");
     // 1 is a tinyint, so the function is not a perfect match
     AnalyzesOk("select round(cast('1.1' as decimal), 1)");
+
+    // No matching signature for complex type.
+    AnalysisError("select lower(int_struct_col) from functional.allcomplextypes",
+        "No matching function with signature: lower(STRUCT<f1:INT,f2:INT>).");
   }
 
   @Test
@@ -995,11 +1066,19 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select case when 20 then 20 when 1 > 2 then timestamp_col " +
         "when 4 < 5 then 2 else 15 end from functional.alltypes",
         "When expr '20' is not of type boolean and not castable to type boolean.");
+    AnalysisError("select case when int_array_col then 20 when 1 > 2 then id end " +
+        "from functional.allcomplextypes",
+        "When expr 'int_array_col' is not of type boolean and not castable to " +
+        "type boolean.");
     // Then exprs return incompatible types.
     AnalysisError("select case when 20 > 10 then 20 when 1 > 2 then timestamp_col " +
         "when 4 < 5 then 2 else 15 end from functional.alltypes",
         "Incompatible return types 'TINYINT' and 'TIMESTAMP' " +
          "of exprs '20' and 'timestamp_col'.");
+    AnalysisError("select case when 20 > 10 then 20 when 1 > 2 then int_map_col " +
+        "else 15 end from functional.allcomplextypes",
+        "Incompatible return types 'TINYINT' and 'MAP<STRING,INT>' of exprs " +
+        "'20' and 'int_map_col'.");
 
     // With case expr.
     AnalyzesOk("select case int_col when 20 then 30 else 15 end " +
@@ -1053,6 +1132,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select if(bool_col, NULL, true) from functional.alltypes");
     AnalyzesOk("select if(bool_col, false, NULL) from functional.alltypes");
     AnalyzesOk("select if(NULL, NULL, NULL) from functional.alltypes");
+    // No matching signature.
+    AnalysisError("select if(true, int_struct_col, int_struct_col) " +
+        "from functional.allcomplextypes",
+        "No matching function with signature: " +
+        "if(BOOLEAN, STRUCT<f1:INT,f2:INT>, STRUCT<f1:INT,f2:INT>).");
 
     // if() only accepts three arguments
     AnalysisError("select if(true, false, true, true)",
@@ -1078,6 +1162,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Incompatible types.
     AnalysisError("select isnull('a', true)",
         "No matching function with signature: isnull(STRING, BOOLEAN).");
+    // No matching signature.
+    AnalysisError("select isnull(1, int_array_col) from functional.allcomplextypes",
+        "No matching function with signature: isnull(TINYINT, ARRAY<INT>).");
   }
 
   @Test
@@ -1101,8 +1188,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     varArgsUdf1.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf1);
     ScalarFunction varArgsUdf2 = new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.<Type>newArrayList(
-            Type.INT, Type.STRING),
+        Lists.<Type>newArrayList(Type.INT, Type.STRING),
         Type.INT, dummyUri, null, null, null);
     varArgsUdf2.setHasVarArgs(true);
     catalog_.addFunction(varArgsUdf2);
@@ -1185,8 +1271,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // UDF.
     ScalarFunction udf = new ScalarFunction(new FunctionName("default", "udf"),
-        Lists.<Type>newArrayList(Type.INT),
-        Type.INT, new HdfsUri(""), null, null, null);
+        Lists.<Type>newArrayList(Type.INT), Type.INT, new HdfsUri(""), null, null, null);
     catalog_.addFunction(udf);
     try {
       testFuncExprDepthLimit("udf(", "1", ")");
@@ -1242,7 +1327,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(decimal_10_0 + " / " + decimal_5_5,
         ScalarType.createDecimalType(21, 6));
     testDecimalExpr(decimal_10_0 + " % " + decimal_5_5,
-            ScalarType.createDecimalType(5, 5));
+        ScalarType.createDecimalType(5, 5));
 
     testDecimalExpr(decimal_5_5 + " + " + decimal_10_0,
         ScalarType.createDecimalType(16, 5));

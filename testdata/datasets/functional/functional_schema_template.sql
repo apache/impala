@@ -529,6 +529,45 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100110.
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+allcomplextypes
+---- PARTITION_COLUMNS
+year int
+month int
+---- COLUMNS
+id int
+int_array_col array<int>
+array_array_col array<array<int>>
+map_array_col array<map<string,int>>
+struct_array_col array<struct<f1: bigint, f2: string>>
+int_map_col map<string, int>
+array_map_col map<string, array<int>>
+map_map_col map<string, map<string, int>>
+struct_map_col map<string, struct<f1: bigint, f2: string>>
+int_struct_col struct<f1: int, f2: int>
+complex_struct_col struct<f1: int, f2: array<int>, f3: map<string, int>>
+nested_struct_col struct<f1: int, f2: struct<f11: bigint, f12: struct<f21: bigint>>>
+complex_nested_struct_col struct<f1: int, f2: array<struct<f11: bigint, f12: map<string, struct<f21: bigint>>>>>
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- DEPENDENT_LOAD
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+functional
+---- COLUMNS
+-- For testing ambiguous path resolution
+id int
+functional struct<functional: struct<functional: int>>
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- DEPENDENT_LOAD
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 testtbl
 ---- COLUMNS
 id bigint
@@ -1217,33 +1256,6 @@ functional
 bad_parquet
 ---- COLUMNS
 field STRING
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-map_table
----- CREATE_HIVE
--- For structured-type testing
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (map_col map<int, string>);
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-map_table_hbase
----- COLUMNS
-key string
-map_col map<string, string>
----- LOAD
--- TODO: Combine this table and the 'map_table' above when the data loading framework
--- has better support for specifying the executor (Hive vs Impala) for a table section.
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-array_table
----- CREATE_HIVE
--- For structured-type testing
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (array_col array<int>);
 ====
 ---- DATASET
 functional

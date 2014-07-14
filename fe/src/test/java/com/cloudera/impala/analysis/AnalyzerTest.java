@@ -56,14 +56,15 @@ public class AnalyzerTest {
   protected Analyzer analyzer_;
 
   // maps from type to string that will result in literal of that type
-  protected static Map<Type, String> typeToLiteralValue_ =
-      new HashMap<Type, String>();
+  protected static Map<ScalarType, String> typeToLiteralValue_ =
+      new HashMap<ScalarType, String>();
   static {
     typeToLiteralValue_.put(Type.BOOLEAN, "true");
     typeToLiteralValue_.put(Type.TINYINT, "1");
     typeToLiteralValue_.put(Type.SMALLINT, (Byte.MAX_VALUE + 1) + "");
     typeToLiteralValue_.put(Type.INT, (Short.MAX_VALUE + 1) + "");
-    typeToLiteralValue_.put(Type.BIGINT, ((long) Integer.MAX_VALUE + 1) + "");
+    typeToLiteralValue_.put(Type.BIGINT,
+        ((long) Integer.MAX_VALUE + 1) + "");
     typeToLiteralValue_.put(Type.FLOAT, "cast(1.0 as float)");
     typeToLiteralValue_.put(Type.DOUBLE,
         "cast(" + (Float.MAX_VALUE + 1) + " as double)");
@@ -91,6 +92,11 @@ public class AnalyzerTest {
   protected Function addTestFunction(String name,
       ArrayList<ScalarType> args, boolean varArgs) {
     return addTestFunction("default", name, args, varArgs);
+  }
+
+  protected Function addTestFunction(String name,
+      ScalarType arg, boolean varArgs) {
+    return addTestFunction("default", name, Lists.newArrayList(arg), varArgs);
   }
 
   protected Function addTestFunction(String db, String fnName,
@@ -156,7 +162,7 @@ public class AnalyzerTest {
     try {
       node = (ParseNode) parser.parse().value;
     } catch (Exception e) {
-      System.err.println(e.toString());
+      e.printStackTrace();
       fail("\nParser error:\n" + parser.getErrorMsg(stmt));
     }
     assertNotNull(node);
@@ -415,15 +421,6 @@ public class AnalyzerTest {
    */
   @Test
   public void TestUnsupportedTypes() throws AuthorizationException {
-    // The table metadata should not have been loaded.
-    AnalysisError("select * from functional.map_table",
-        "Failed to load metadata for table: functional.map_table");
-    /*
-     * TODO: Renable these tests. The table contains decimal which we used to treat
-     * as a primitive type (and therefore could read tables that contains this type
-     * as long as we were skipping those columns. In hive 12's decimal, this is no
-     * longer the case.
-     */
     // Select supported types from a table with mixed supported/unsupported types.
     AnalyzesOk("select int_col, str_col, bigint_col from functional.unsupported_types");
 
@@ -442,9 +439,7 @@ public class AnalyzerTest {
         "Failed to load metadata for table: functional.unsupported_partition_types");
 
     // Try with hbase
-    AnalyzesOk("describe functional_hbase.map_table_hbase");
-    AnalysisError("select * from functional_hbase.map_table_hbase",
-        "Unsupported type in 'functional_hbase.map_table_hbase.map_col'.");
+    AnalyzesOk("describe functional_hbase.allcomplextypes");
   }
 
   @Test
@@ -576,8 +571,7 @@ public class AnalyzerTest {
   }
 
   private Function createFunction(boolean hasVarArgs, Type... args) {
-    return new Function(
-        new FunctionName("test"), args, Type.INVALID, hasVarArgs);
+    return new Function(new FunctionName("test"), args, Type.INVALID, hasVarArgs);
   }
 
   @Test
@@ -615,20 +609,18 @@ public class AnalyzerTest {
     fns[9] = createFunction(false, Type.SMALLINT, Type.TINYINT);
 
     // test(int, double, double, double)
-    fns[10] = createFunction(false, Type.INT, Type.DOUBLE,
-        Type.DOUBLE, Type.DOUBLE);
+    fns[10] = createFunction(false, Type.INT, Type.DOUBLE, Type.DOUBLE, Type.DOUBLE);
 
     // test(int, string, int...)
-    fns[11] = createFunction(
-        true, Type.INT, Type.STRING, Type.INT);
+    fns[11] = createFunction(true, Type.INT, Type.STRING, Type.INT);
 
     // test(tinying, string, tinyint, int, tinyint)
-    fns[12] = createFunction(false, Type.TINYINT, Type.STRING,
-        Type.TINYINT, Type.INT, Type.TINYINT);
+    fns[12] = createFunction(false, Type.TINYINT, Type.STRING, Type.TINYINT, Type.INT,
+        Type.TINYINT);
 
     // test(tinying, string, bigint, int, tinyint)
-    fns[13] = createFunction(false, Type.TINYINT, Type.STRING,
-        Type.BIGINT, Type.INT, Type.TINYINT);
+    fns[13] = createFunction(false, Type.TINYINT, Type.STRING, Type.BIGINT, Type.INT,
+        Type.TINYINT);
 
     Assert.assertFalse(fns[1].compare(fns[0], Function.CompareMode.IS_SUPERTYPE_OF));
     Assert.assertTrue(fns[1].compare(fns[2], Function.CompareMode.IS_SUPERTYPE_OF));

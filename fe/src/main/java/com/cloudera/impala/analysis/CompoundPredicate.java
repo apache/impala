@@ -117,11 +117,11 @@ public class CompoundPredicate extends Predicate {
     super.analyze(analyzer);
 
     // Check that children are predicates.
-    for (Expr e : children_) {
+    for (Expr e: children_) {
       if (!e.getType().isBoolean() && !e.getType().isNull()) {
         throw new AnalysisException(String.format("Operand '%s' part of predicate " +
             "'%s' should return type 'BOOLEAN' but returns type '%s'.",
-            e.toSql(), toSql(), e.getType()));
+            e.toSql(), toSql(), e.getType().toSql()));
       }
     }
 

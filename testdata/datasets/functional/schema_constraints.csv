@@ -36,9 +36,12 @@ table_name:bad_text_lzo, constraint:restrict_to, table_format:text/lzo/block
 table_name:bad_seq_snap, constraint:restrict_to, table_format:seq/snap/block
 table_name:bad_parquet, constraint:restrict_to, table_format:parquet/none/none
 
-table_name:map_table, constraint:restrict_to, table_format:text/none/none
-table_name:map_table_hbase, constraint:restrict_to, table_format:hbase/none/none
-table_name:array_table, constraint:restrict_to, table_format:text/none/none
+# TODO: Support Avro. Data loading currently fails for Avro because complex types
+# cannot be converted to the corresponding Avro types yet.
+table_name:allcomplextypes, constraint:restrict_to, table_format:text/none/none
+table_name:allcomplextypes, constraint:restrict_to, table_format:parquet/none/none
+table_name:allcomplextypes, constraint:restrict_to, table_format:hbase/none/none
+table_name:functional, constraint:restrict_to, table_format:text/none/none
 
 table_name:alltypeserror, constraint:exclude, table_format:parquet/none/none
 table_name:alltypeserrornonulls, constraint:exclude, table_format:parquet/none/none
@@ -57,6 +60,7 @@ table_name:unsupported_partition_types, constraint:restrict_to, table_format:tex
 table_name:nullformat_custom, constraint:exclude, table_format:parquet/none/none
 
 table_name:alltypes_view, constraint:restrict_to, table_format:text/none/none
+table_name:allcomplextypes_view, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_view, constraint:restrict_to, table_format:seq/snap/block
 table_name:alltypes_hive_view, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_view_sub, constraint:restrict_to, table_format:text/none/none

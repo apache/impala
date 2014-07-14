@@ -262,3 +262,31 @@ WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:bool_col,d:tinyint_col,d:s
 TBLPROPERTIES ('hbase.table.name'='functional_hbase.alltypes',
                'storage_handler'='org.apache.hadoop.hive.hbase.HBaseStorageHandler')
 ====
+---- QUERY
+SHOW CREATE TABLE functional.allcomplextypes
+---- RESULTS
+CREATE EXTERNAL TABLE functional.allcomplextypes (
+  id INT,
+  int_array_col ARRAY<INT>,
+  array_array_col ARRAY<ARRAY<INT>>,
+  map_array_col ARRAY<MAP<STRING,INT>>,
+  struct_array_col ARRAY<STRUCT<f1:BIGINT,f2:STRING>>,
+  int_map_col MAP<STRING,INT>,
+  array_map_col MAP<STRING,ARRAY<INT>>,
+  map_map_col MAP<STRING,MAP<STRING,INT>>,
+  struct_map_col MAP<STRING,STRUCT<f1:BIGINT,f2:STRING>>,
+  int_struct_col STRUCT<f1:INT,f2:INT>,
+  complex_struct_col STRUCT<f1:INT,f2:ARRAY<INT>,f3:MAP<STRING,INT>>,
+  nested_struct_col STRUCT<f1:INT,f2:STRUCT<f11:BIGINT,f12:STRUCT<f21:BIGINT>>>,
+  complex_nested_struct_col STRUCT<f1:INT,f2:ARRAY<STRUCT<f11:BIGINT,f12:MAP<STRING,STRUCT<f21:BIGINT>>>>>
+)
+PARTITIONED BY (
+  year INT,
+  month INT
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ESCAPED BY '\\'
+WITH SERDEPROPERTIES ('field.delim'=',', 'serialization.format'=',', 'escape.delim'='\\')
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('transient_lastDdlTime'='1405990341')
+====

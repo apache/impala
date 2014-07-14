@@ -188,9 +188,13 @@ public class FunctionCallExpr extends Expr {
       }
     }
 
+    String[] argTypesSql = new String[argTypes.length];
+    for (int i = 0; i < argTypes.length; ++i) {
+      argTypesSql[i] = argTypes[i].toSql();
+    }
     return String.format(
         "No matching function with signature: %s(%s).",
-        fnName_, params_.isStar() ? "*" : Joiner.on(", ").join(argTypes));
+        fnName_, params_.isStar() ? "*" : Joiner.on(", ").join(argTypesSql));
   }
 
   /**

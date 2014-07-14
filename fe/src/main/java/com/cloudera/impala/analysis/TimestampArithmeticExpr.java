@@ -142,7 +142,7 @@ public class TimestampArithmeticExpr extends Expr {
     if (!getChild(0).getType().isTimestamp() && !getChild(0).getType().isNull()) {
       throw new AnalysisException("Operand '" + getChild(0).toSql() +
           "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
-          getChild(0).getType() + "'. Expected type 'TIMESTAMP'.");
+          getChild(0).getType().toSql() + "'. Expected type 'TIMESTAMP'.");
     }
 
     // The second child must be an integer type.
@@ -150,7 +150,7 @@ public class TimestampArithmeticExpr extends Expr {
         !getChild(1).getType().isNull()) {
       throw new AnalysisException("Operand '" + getChild(1).toSql() +
           "' of timestamp arithmetic expression '" + toSql() + "' returns type '" +
-          getChild(1).getType() + "'. Expected an integer type.");
+          getChild(1).getType().toSql() + "'. Expected an integer type.");
     }
 
     String funcOpName = String.format("%sS_%s", timeUnit_.toString(),

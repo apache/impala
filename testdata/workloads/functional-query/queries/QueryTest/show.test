@@ -16,6 +16,7 @@ STRING
 show tables "all*ypes"
 ---- RESULTS
 'alltypes'
+'allcomplextypes'
 ---- TYPES
 STRING
 ====
@@ -65,7 +66,6 @@ show tables '*'
 'alltypesnopart_insert'
 'alltypessmall'
 'alltypestiny'
-'array_table'
 'dimtbl'
 'emptytable'
 'escapechartesttable'
@@ -74,7 +74,6 @@ show tables '*'
 'insert_overwrite_partitioned'
 'jointbl'
 'liketbl'
-'map_table'
 'nullescapedtable'
 'nullinsert'
 'nullinsert_alt'
@@ -120,7 +119,6 @@ show tables in functional
 'alltypesnopart_insert'
 'alltypessmall'
 'alltypestiny'
-'array_table'
 'dimtbl'
 'emptytable'
 'escapechartesttable'
@@ -129,7 +127,6 @@ show tables in functional
 'insert_overwrite_partitioned'
 'jointbl'
 'liketbl'
-'map_table'
 'nullescapedtable'
 'nullinsert'
 'nullinsert_alt'
