@@ -70,10 +70,6 @@ class SortNode : public ExecNode {
   int64_t offset_;
   int64_t num_rows_skipped_;
 
-  // BufferedBlockMgr object used to allocate and manage blocks of input data in memory
-  // with a fixed memory budget.
-  boost::scoped_ptr<BufferedBlockMgr> block_mgr_;
-
   // Object used for external sorting.
   boost::scoped_ptr<Sorter> sorter_;
 

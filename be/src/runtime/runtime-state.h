@@ -42,6 +42,7 @@
 namespace impala {
 
 class Bitmap;
+class BufferedBlockMgr;
 class DescriptorTbl;
 class ObjectPool;
 class Status;
@@ -189,6 +190,18 @@ class RuntimeState {
   // state is created. If codegen is disabled for the query, this is created
   // on first use.
   Status CreateCodegen();
+
+  // Creates the buffered block mgr with mem_limit.
+  // TODO: this should be made private and created during the Prepare() phase once
+  // the join and agg nodes use this. The limit would then be some (large) fraction of
+  // the query limit. Right now, we need the sort to create it with the fraction of
+  // the limit the sort node should use.
+  Status CreateBlockMgr(int64_t mem_limit);
+
+  BufferedBlockMgr* block_mgr() {
+    DCHECK(block_mgr_.get() != NULL);
+    return block_mgr_.get();
+  }
 
   Status query_status() {
     boost::lock_guard<boost::mutex> l(query_status_lock_);
@@ -356,6 +369,10 @@ class RuntimeState {
 
   // Reader contexts that need to be closed when the fragment is closed.
   std::vector<DiskIoMgr::RequestContext*> reader_contexts_;
+
+  // BufferedBlockMgr object used to allocate and manage blocks of input data in memory
+  // with a fixed memory budget.
+  boost::scoped_ptr<BufferedBlockMgr> block_mgr_;
 
   // This is the node id of the root node for this plan fragment. This is used as the
   // hash seed and has two useful properties:

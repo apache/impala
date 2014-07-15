@@ -25,17 +25,31 @@ using namespace boost;
 
 namespace impala {
 
+struct BufferedBlockMgr::Client {
+  Client(int num_reserved_buffers)
+    : num_reserved_buffers_(num_reserved_buffers),
+      num_pinned_buffers_(0) {
+  }
+
+  // Number of buffers reserved by this client.
+  int num_reserved_buffers_;
+
+  // Number of buffers pinned by this client.
+  int num_pinned_buffers_;
+};
+
 // BufferedBlockMgr::Block methods.
 BufferedBlockMgr::Block::Block(BufferedBlockMgr* block_mgr)
   : buffer_desc_(NULL),
     block_mgr_(block_mgr),
+    client_(NULL),
     write_range_(NULL),
     valid_data_len_(0),
     unpinned_blocks_it_(block_mgr->unpinned_blocks_.end()) {
 }
 
-Status BufferedBlockMgr::Block::Pin() {
-  RETURN_IF_ERROR(block_mgr_->PinBlock(this));
+Status BufferedBlockMgr::Block::Pin(bool* pinned) {
+  RETURN_IF_ERROR(block_mgr_->PinBlock(this, pinned));
   DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
 }
@@ -58,27 +72,28 @@ void BufferedBlockMgr::Block::Init() {
   in_write_ = false;
   is_deleted_ = false;
   valid_data_len_ = 0;
+  client_ = NULL;
 }
 
 bool BufferedBlockMgr::Block::Validate() const {
   if (is_deleted_ && (is_pinned_ || (!in_write_ && buffer_desc_ != NULL))) {
-    LOG (WARNING) << "Deleted block in use - " << DebugString();
+    LOG(ERROR) << "Deleted block in use - " << DebugString();
     return false;
   }
 
   if (buffer_desc_ == NULL && (is_pinned_ || in_write_)) {
-    LOG (WARNING) << "Block without buffer in use - " << DebugString();
+    LOG(ERROR) << "Block without buffer in use - " << DebugString();
     return false;
   }
 
   if (buffer_desc_ == NULL &&
       (unpinned_blocks_it_ != block_mgr_->unpinned_blocks_.end())) {
-    LOG (WARNING) << "Unpersisted block without buffer - " << DebugString();
+    LOG(ERROR) << "Unpersisted block without buffer - " << DebugString();
     return false;
   }
 
   if (buffer_desc_ != NULL && (buffer_desc_->block != this)) {
-    LOG (WARNING) << "Block buffer inconsistency - " << DebugString();
+    LOG(ERROR) << "Block buffer inconsistency - " << DebugString();
     return false;
   }
 
@@ -97,61 +112,60 @@ string BufferedBlockMgr::Block::DebugString() const {
 }
 
 // BufferedBlockMgr methods.
-BufferedBlockMgr* BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
-      RuntimeProfile* profile, int64_t mem_limit, int64_t block_size,
-      int initial_num_buffers) {
-  BufferedBlockMgr* block_mgr = new BufferedBlockMgr(state, parent, mem_limit,
-      block_size, initial_num_buffers);
+Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
+    RuntimeProfile* profile, int64_t mem_limit, int64_t block_size,
+    BufferedBlockMgr** block_mgr) {
+  *block_mgr = new BufferedBlockMgr(state, parent, mem_limit, block_size);
 
   // Initialize the tmp files and the initial file to use.
   int num_tmp_devices = TmpFileMgr::num_tmp_devices();
-  block_mgr->tmp_files_.reserve(num_tmp_devices);
+  (*block_mgr)->tmp_files_.reserve(num_tmp_devices);
   for (int i = 0; i < num_tmp_devices; ++i) {
     TmpFileMgr::File* tmp_file;
-    TmpFileMgr::GetFile(i, state->query_id(), state->fragment_instance_id(), &tmp_file);
-    block_mgr->tmp_files_.push_back(tmp_file);
+    RETURN_IF_ERROR(TmpFileMgr::GetFile(
+        i, state->query_id(), state->fragment_instance_id(), &tmp_file));
+    (*block_mgr)->tmp_files_.push_back(tmp_file);
   }
-  block_mgr->next_block_index_ = rand() % num_tmp_devices;
-  block_mgr->InitCounters(profile);
-  return block_mgr;
+  (*block_mgr)->next_block_index_ = rand() % num_tmp_devices;
+  (*block_mgr)->InitCounters(profile);
+  (*block_mgr)->num_unreserved_buffers_ = mem_limit / block_size;
+  return Status::OK;
 }
 
-Status BufferedBlockMgr::GetFreeBlock(Block** block) {
+Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers, Client** client) {
+  DCHECK_GE(num_reserved_buffers, 0);
+  *client = state_->obj_pool()->Add(new Client(num_reserved_buffers));
+  num_unreserved_buffers_ -= num_reserved_buffers;
+  return Status::OK;
+}
+
+void BufferedBlockMgr::LowerBufferReservation(Client* client, int num_buffers) {
+  lock_guard<mutex> lock(lock_);
+  DCHECK_GE(client->num_reserved_buffers_, num_buffers);
+  int delta = client->num_reserved_buffers_ - num_buffers;
+  client->num_reserved_buffers_ = num_buffers;
+  num_unreserved_buffers_ += delta;
+}
+
+Status BufferedBlockMgr::GetNewBlock(Client* client, Block** block) {
+  *block = NULL;
   {
     lock_guard<mutex> lock(lock_);
     if (is_cancelled_) return Status::CANCELLED;
   }
 
-  Block* new_block = GetUnusedBlock();
+  Block* new_block = GetUnusedBlock(client);
+  DCHECK(new_block->client_ == client);
   bool in_mem;
   RETURN_IF_ERROR(FindBufferForBlock(new_block, &in_mem));
-  DCHECK(!in_mem);
-
-  *block = new_block;
-  return Status::OK;
-}
-
-Status BufferedBlockMgr::TryExpand(Block** block, bool* expanded) {
-  lock_guard<mutex> lock(lock_);
-  if (is_cancelled_) return Status::CANCELLED;
-
-  *expanded = false;
-  uint8_t* buffer = buffer_pool_->TryAllocate(block_size_);
-  if (buffer == NULL) return Status::OK;
-  // The number of unallocated buffers has decreased. Call WriteUnpinnedBlocks()
-  // to check if the number of free buffers is below the threshold and write any
-  // unpinned blocks if necessary.
-  RETURN_IF_ERROR(WriteUnpinnedBlocks());
-
-  BufferDescriptor* buffer_desc = obj_pool_.Add(new BufferDescriptor(buffer));
-  all_buffers_.push_back(buffer_desc);
-  Block* new_block = GetUnusedBlock();
-  buffer_desc->block = new_block;
-  new_block->buffer_desc_ = buffer_desc;
-  new_block->is_pinned_ = true;
-  *block = new_block;
-  *expanded = true;
-  mem_used_counter_->Update(block_size_);
+  DCHECK(!in_mem) << "A new block cannot start in mem.";
+  if (new_block->is_pinned_) {
+    *block = new_block;
+  } else {
+    new_block->is_deleted_ = true;
+    ReturnUnusedBlock(new_block);
+    *block = NULL;
+  }
   return Status::OK;
 }
 
@@ -193,7 +207,7 @@ void BufferedBlockMgr::Close() {
 }
 
 BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
-    int64_t mem_limit, int64_t block_size, int initial_num_buffers)
+    int64_t mem_limit, int64_t block_size)
   : block_size_(block_size),
     block_write_threshold_(TmpFileMgr::num_tmp_devices()),
     num_outstanding_writes_(0),
@@ -203,51 +217,66 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(new MemTracker(mem_limit, -1, "Block Manager", parent));
   buffer_pool_.reset(new MemPool(mem_tracker_.get(), block_size));
-  for (int i = 0; i < initial_num_buffers; ++i) {
-    uint8_t* buffer = buffer_pool_->TryAllocate(block_size_);
-    if (buffer == NULL) break;
-    BufferDescriptor* buffer_desc = obj_pool_.Add(new BufferDescriptor(buffer));
-    free_buffers_.Enqueue(buffer_desc);
-    all_buffers_.push_back(buffer_desc);
-  }
-
   state->io_mgr()->RegisterContext(NULL, &io_request_context_);
 }
 
-Status BufferedBlockMgr::PinBlock(Block* block) {
-  bool in_mem;
-  RETURN_IF_ERROR(FindBufferForBlock(block, &in_mem));
+int64_t BufferedBlockMgr::bytes_allocated() const {
+  return buffer_pool_->total_allocated_bytes();
+}
 
-  if (!in_mem) {
-    // Read the block from disk if it was not in memory.
-    DCHECK_NOTNULL(block->write_range_);
-    SCOPED_TIMER(disk_read_timer_);
-    // Create a ScanRange to perform the read.
-    DiskIoMgr::ScanRange* scan_range = obj_pool_.Add(new DiskIoMgr::ScanRange());
-    scan_range->Reset(block->write_range_->file(), block->write_range_->len(),
-        block->write_range_->offset(), block->write_range_->disk_id(), false, block);
-    vector<DiskIoMgr::ScanRange*> ranges(1, scan_range);
-    RETURN_IF_ERROR(io_mgr_->AddScanRanges(io_request_context_, ranges, true));
-
-    // Read from the io mgr buffer into the block's assigned buffer.
-    int64_t offset = 0;
-    DiskIoMgr::BufferDescriptor* io_mgr_buffer;
-    do {
-      RETURN_IF_ERROR(scan_range->GetNext(&io_mgr_buffer));
-      memcpy(block->buffer() + offset, io_mgr_buffer->buffer(), io_mgr_buffer->len());
-      offset += io_mgr_buffer->len();
-      io_mgr_buffer->Return();
-    } while (!io_mgr_buffer->eosr());
-    DCHECK_EQ(offset, block->write_range_->len());
+Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
+  DCHECK(!block->is_deleted_);
+  *pinned = false;
+  {
+    lock_guard<mutex> lock(lock_);
+    if (is_cancelled_) return Status::CANCELLED;
   }
+
+  if (block->is_pinned_) {
+    *pinned = true;
+    return Status::OK;
+  }
+
+  bool in_mem = false;
+  RETURN_IF_ERROR(FindBufferForBlock(block, &in_mem));
+  *pinned = block->is_pinned_;
+
+  if (!block->is_pinned_ || in_mem) {
+    // Either there was no memory for this block or the buffer was never evicted
+    // and already contains the data. Either way, nothing left to do.
+    return Status::OK;
+  }
+
+  // Read the block from disk if it was not in memory.
+  DCHECK_NOTNULL(block->write_range_);
+  SCOPED_TIMER(disk_read_timer_);
+  // Create a ScanRange to perform the read.
+  DiskIoMgr::ScanRange* scan_range =
+      state_->obj_pool()->Add(new DiskIoMgr::ScanRange());
+  scan_range->Reset(block->write_range_->file(), block->write_range_->len(),
+      block->write_range_->offset(), block->write_range_->disk_id(), false, block);
+  vector<DiskIoMgr::ScanRange*> ranges(1, scan_range);
+  RETURN_IF_ERROR(io_mgr_->AddScanRanges(io_request_context_, ranges, true));
+
+  // Read from the io mgr buffer into the block's assigned buffer.
+  int64_t offset = 0;
+  DiskIoMgr::BufferDescriptor* io_mgr_buffer;
+  do {
+    RETURN_IF_ERROR(scan_range->GetNext(&io_mgr_buffer));
+    memcpy(block->buffer() + offset, io_mgr_buffer->buffer(), io_mgr_buffer->len());
+    offset += io_mgr_buffer->len();
+    io_mgr_buffer->Return();
+  } while (!io_mgr_buffer->eosr());
+  DCHECK_EQ(offset, block->write_range_->len());
 
   return Status::OK;
 }
 
 Status BufferedBlockMgr::UnpinBlock(Block* block) {
+  DCHECK(!block->is_deleted_);
   lock_guard<mutex> unpinned_lock(lock_);
   if (is_cancelled_) return Status::CANCELLED;
-  DCHECK(block->is_pinned_) << "Unpin for unpinned block.";
+  if (!block->is_pinned_) return Status::OK;
   DCHECK(!block->is_deleted_) << "Unpin for deleted block.";
   DCHECK(Validate()) << endl << DebugString();
   // Add 'block' to the list of unpinned blocks and set is_pinned_ to false.
@@ -255,9 +284,14 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   block->is_pinned_ = false;
   DCHECK(block->unpinned_blocks_it_ == unpinned_blocks_.end())
       << " Unpin for block in unpinned list";
+  DCHECK_GT(block->client_->num_pinned_buffers_, 0);
   if (!block->in_write_) {
     block->unpinned_blocks_it_ = unpinned_blocks_.insert(unpinned_blocks_.end(), block);
   }
+  if (block->client_->num_pinned_buffers_ > block->client_->num_reserved_buffers_) {
+    --num_unreserved_pinned_buffers_;
+  }
+  --block->client_->num_pinned_buffers_;
   RETURN_IF_ERROR(WriteUnpinnedBlocks());
   DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
@@ -265,13 +299,15 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
 
 Status BufferedBlockMgr::WriteUnpinnedBlocks() {
   // Assumes block manager lock is already taken.
-  while (!unpinned_blocks_.empty() &&
-      (num_outstanding_writes_ + free_buffers_.size() +
-          (mem_tracker_->SpareCapacity() / block_size_)) < block_write_threshold_) {
+  while (num_outstanding_writes_ + free_buffers_.size() < block_write_threshold_) {
+    if (unpinned_blocks_.empty()) break;
     // Pop a block from the back of the list (LIFO)
     Block* block_to_write = unpinned_blocks_.back();
     unpinned_blocks_.pop_back();
     block_to_write->unpinned_blocks_it_ = unpinned_blocks_.end();
+
+    DCHECK(!block_to_write->is_pinned_) << block_to_write->DebugString();
+    DCHECK(!block_to_write->in_write_) << block_to_write->DebugString();
 
     if (block_to_write->write_range_ == NULL) {
       // First time the block is being persisted. Find the next physical file in
@@ -289,7 +325,7 @@ Status BufferedBlockMgr::WriteUnpinnedBlocks() {
       disk_id %= io_mgr_->num_disks();
       DiskIoMgr::WriteRange::WriteDoneCallback callback =
           bind(mem_fn(&BufferedBlockMgr::WriteComplete), this, block_to_write, _1);
-      block_to_write->write_range_ = obj_pool_.Add(new DiskIoMgr::WriteRange(
+      block_to_write->write_range_ = state_->obj_pool()->Add(new DiskIoMgr::WriteRange(
           tmp_file.path(), file_offset, disk_id, callback));
     }
 
@@ -313,9 +349,10 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   outstanding_writes_counter_->Update(-1);
   lock_guard<mutex> lock(lock_);
   DCHECK(Validate()) << endl << DebugString();
-  --num_outstanding_writes_;
+  DCHECK_GT(num_outstanding_writes_, 0);
   DCHECK(block->in_write_) << "WriteComplete() for block not in write."
                            << endl << block->DebugString();
+  --num_outstanding_writes_;
   block->in_write_ = false;
   if (is_cancelled_) return;
   // Check for an error. Set cancelled and wake up waiting threads if an error occurred.
@@ -335,46 +372,80 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
     return;
   }
   free_buffers_.Enqueue(block->buffer_desc_);
-  if (block->is_deleted_) ReturnUnusedBlock(block);
+  if (block->is_deleted_) {
+    block->buffer_desc_->block = NULL;
+    block->buffer_desc_ = NULL;
+    ReturnUnusedBlock(block);
+  }
   DCHECK(Validate()) << endl << DebugString();
   buffer_available_cv_.notify_one();
 }
 
 Status BufferedBlockMgr::DeleteBlock(Block* block) {
+  DCHECK(!block->is_deleted_);
   lock_guard<mutex> lock(lock_);
   if (is_cancelled_) return Status::CANCELLED;
-  // For now, only pinned blocks can be deleted.
-  DCHECK(block->is_pinned_);
 
   block->is_deleted_ = true;
-  block->is_pinned_ = false;
+  if (block->is_pinned_) {
+    block->is_pinned_ = false;
+    if (block->client_->num_pinned_buffers_ > block->client_->num_reserved_buffers_) {
+      --num_unreserved_pinned_buffers_;
+    }
+    --block->client_->num_pinned_buffers_;
+  } else if (block->unpinned_blocks_it_ != unpinned_blocks_.end()) {
+    // Remove block from unpinned list.
+    unpinned_blocks_.erase(block->unpinned_blocks_it_);
+    block->unpinned_blocks_it_ = unpinned_blocks_.end();
+  } else {
+    // Otherwise, this block's buffer must have already been put on the free list.
+    DCHECK(block->buffer_desc_ == NULL);
+  }
 
-  // If a write is still pending, return. Cleanup will be done in WriteComplete().
-  if (block->in_write_) return Status::OK;
+  if (block->in_write_) {
+    // If a write is still pending, return. Cleanup will be done in WriteComplete().
+    return Status::OK;
+  }
 
-  free_buffers_.Enqueue(block->buffer_desc_);
+  if (block->buffer_desc_ != NULL) {
+    DCHECK(!free_buffers_.Contains(block->buffer_desc_));
+    free_buffers_.Enqueue(block->buffer_desc_);
+    block->buffer_desc_->block = NULL;
+    block->buffer_desc_ = NULL;
+    buffer_available_cv_.notify_one();
+  }
   ReturnUnusedBlock(block);
   DCHECK(Validate()) << endl << DebugString();
-  buffer_available_cv_.notify_one();
   return Status::OK;
 }
 
 void BufferedBlockMgr::ReturnUnusedBlock(Block* block) {
   // Assumes the lock is already taken.
-  DCHECK(block->is_deleted_);
-  block->buffer_desc_->block = NULL;
-  block->buffer_desc_ = NULL;
+  DCHECK(block->is_deleted_) << block->DebugString();
+  DCHECK(!block->is_pinned_) << block->DebugString();;
+  DCHECK(block->buffer_desc_ == NULL);
   unused_blocks_.Enqueue(block);
   block->Init();
 }
 
 Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
-  unique_lock<mutex> l(lock_);
-  if (is_cancelled_) return Status::CANCELLED;
-  DCHECK(!block->is_pinned_ && !block->is_deleted_) << "GetBufferForBlock() "
-                                                    << endl << block->DebugString();
-  DCHECK(Validate()) << endl << DebugString();
+  Client* client = block->client_;
+  DCHECK(client != NULL);
+  DCHECK(!block->is_pinned_);
+
   *in_mem = false;
+  unique_lock<mutex> l(lock_);
+
+  DCHECK(!block->is_pinned_ && !block->is_deleted_)
+      << "FindBufferForBlock() " << endl << block->DebugString();
+  DCHECK(Validate()) << endl << DebugString();
+
+  bool is_optional_request = client->num_pinned_buffers_ >= client->num_reserved_buffers_;
+  if (is_optional_request && num_unreserved_pinned_buffers_ >= num_unreserved_buffers_) {
+    // The client already has its quota and there are no optional blocks left.
+    return Status::OK;
+  }
+
   if (block->buffer_desc_ != NULL) {
     // The block is in memory. It may be in 3 states
     // 1) In the unpinned list. The buffer will not be in the free list.
@@ -386,36 +457,62 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
       unpinned_blocks_.erase(block->unpinned_blocks_it_);
       block->unpinned_blocks_it_ = unpinned_blocks_.end();
       DCHECK(!free_buffers_.Contains(block->buffer_desc_));
-    } else if (!block->in_write_) {
-      free_buffers_.Remove(block->buffer_desc_);
-    } else {
+    } else if (block->in_write_) {
       DCHECK(block->in_write_ && !free_buffers_.Contains(block->buffer_desc_));
+    } else {
+      free_buffers_.Remove(block->buffer_desc_);
     }
-
     buffered_pin_counter_->Update(1);
     *in_mem = true;
   } else {
-    // At this point, we know the block is not associated with any buffer.
-    // Get a free buffer from the front of the queue and assign it to the block.
-    // Wait if there are no free buffers available.
-    while (free_buffers_.empty()) {
-      SCOPED_TIMER(buffer_wait_timer_);
-      // The mem tracker capacity may have reduced since the last time
-      // WriteUnpinnedBlocks() was called. Call it again before waiting.
-      RETURN_IF_ERROR(WriteUnpinnedBlocks());
-      buffer_available_cv_.wait(l);
-      if (is_cancelled_) return Status::CANCELLED;
+    // We need to find a new buffer for this block. We prefer getting this buffer in
+    // this order:
+    //  1. Allocate a new block if the number of free blocks is less than the write
+    //     threshold, until we run out of memory.
+    //  2. Pick a buffer from the free list.
+    //  3. Wait and evict an unpinned buffer.
+    BufferDescriptor* buffer_desc = NULL;
+    if (free_buffers_.size() < block_write_threshold_) {
+      uint8_t* new_buffer = buffer_pool_->TryAllocate(block_size_);
+      if (new_buffer != NULL) {
+        mem_used_counter_->Update(block_size_);
+        buffer_desc = state_->obj_pool()->Add(new BufferDescriptor(new_buffer));
+        all_buffers_.push_back(buffer_desc);
+      }
     }
-    BufferDescriptor* buffer = free_buffers_.Dequeue();
-    // Check if the buffer was assigned to a different block
-    if (buffer->block != NULL) {
-      DCHECK(buffer->block->Validate()) << endl << buffer->block->DebugString();
-      buffer->block->buffer_desc_ = NULL;
+    if (buffer_desc == NULL) {
+      if (free_buffers_.empty() && unpinned_blocks_.empty() &&
+          num_outstanding_writes_ == 0) {
+        // There are no free buffers or blocks we can evict. We need to fail this request.
+        // If this is an optional request, return OK. If it is required, return OOM.
+        if (is_optional_request) return Status::OK;
+        return Status::MEM_LIMIT_EXCEEDED;
+      }
+
+      // At this point, this block needs to use a buffer that was unpinned from another
+      // block. Get a free buffer from the front of the queue and assign it to the block.
+      while (free_buffers_.empty()) {
+        SCOPED_TIMER(buffer_wait_timer_);
+        // Try to evict unpinned blocks before waiting.
+        RETURN_IF_ERROR(WriteUnpinnedBlocks());
+        buffer_available_cv_.wait(l);
+        if (is_cancelled_) return Status::CANCELLED;
+      }
+      buffer_desc = free_buffers_.Dequeue();
     }
 
-    buffer->block = block;
-    block->buffer_desc_ = buffer;
+    DCHECK(buffer_desc != NULL);
+    if (buffer_desc->block != NULL) {
+      // This buffer was assigned to a block but now we are reusing it. Reset the
+      // previous block->buffer link.
+      DCHECK(buffer_desc->block->Validate()) << endl << buffer_desc->block->DebugString();
+      buffer_desc->block->buffer_desc_ = NULL;
+    }
+    buffer_desc->block = block;
+    block->buffer_desc_ = buffer_desc;
   }
+  ++client->num_pinned_buffers_;
+  if (is_optional_request) ++num_unreserved_pinned_buffers_;
 
   DCHECK_NOTNULL(block->buffer_desc_);
   block->is_pinned_ = true;
@@ -427,16 +524,18 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
   return Status::OK;
 }
 
-BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock() {
+BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock(Client* client) {
+  DCHECK(client != NULL);
   Block* new_block;
   if (unused_blocks_.empty()) {
-    new_block = obj_pool_.Add(new Block(this));
+    new_block = state_->obj_pool()->Add(new Block(this));
     new_block->Init();
     created_block_counter_->Update(1);
   } else {
     new_block = unused_blocks_.Dequeue();
     recycled_blocks_counter_->Update(1);
   }
+  new_block->client_ = client;
 
   DCHECK_NOTNULL(new_block);
   DCHECK(new_block->Validate()) << endl << new_block->DebugString();
@@ -445,24 +544,31 @@ BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock() {
 
 bool BufferedBlockMgr::Validate() const {
   int num_free_buffers = 0;
+
+  if (num_unreserved_pinned_buffers_ < 0) {
+    LOG(ERROR) << "num_unreserved_pinned_buffers_ < 0: "
+                 << num_unreserved_pinned_buffers_;
+    return false;
+  }
+
   BOOST_FOREACH(BufferDescriptor* buffer, all_buffers_) {
     bool is_free = free_buffers_.Contains(buffer);
     num_free_buffers += is_free;
     if (buffer->block == NULL && !is_free) {
-      LOG(WARNING) << "Buffer with no block not in free list." << endl << DebugString();
+      LOG(ERROR) << "Buffer with no block not in free list." << endl << DebugString();
       return false;
     }
 
     if (buffer->block != NULL) {
       if (!buffer->block->Validate()) {
-        LOG (WARNING) << "buffer->block inconsistent."
+        LOG(ERROR) << "buffer->block inconsistent."
                       << endl << buffer->block->DebugString();
         return false;
       }
 
       if (is_free && (buffer->block->is_pinned_ || buffer->block->in_write_ ||
           buffer->block->unpinned_blocks_it_ != unpinned_blocks_.end())) {
-        LOG (WARNING) << "Block with buffer in free list and"
+        LOG(ERROR) << "Block with buffer in free list and"
                       << " is_pinned_ = " << buffer->block->is_pinned_
                       << " in_write_ = " << buffer->block->in_write_
                       << " Unpinned_blocks_.Contains = "
@@ -474,7 +580,7 @@ bool BufferedBlockMgr::Validate() const {
   }
 
   if (free_buffers_.size() != num_free_buffers) {
-    LOG (WARNING) << "free_buffer_list_ inconsistency."
+    LOG(ERROR) << "free_buffer_list_ inconsistency."
                   << " num_free_buffers = " << num_free_buffers
                   << " free_buffer_list_.size() = " << free_buffers_.size()
                   << endl << DebugString();
@@ -483,17 +589,17 @@ bool BufferedBlockMgr::Validate() const {
 
   BOOST_FOREACH(Block* block, unpinned_blocks_) {
     if (block->unpinned_blocks_it_ == unpinned_blocks_.end()) {
-      LOG (WARNING) << "Block in unpinned list with no pointer to list "
+      LOG(ERROR) << "Block in unpinned list with no pointer to list "
                     << endl << block->DebugString();
     }
     if (!block->Validate()) {
-      LOG (WARNING) << "Block inconsistent in unpinned list."
+      LOG(ERROR) << "Block inconsistent in unpinned list."
                     << endl << block->DebugString();
       return false;
     }
 
     if (block->in_write_ || free_buffers_.Contains(block->buffer_desc_)) {
-      LOG (WARNING) << "Block in unpinned list with"
+      LOG(ERROR) << "Block in unpinned list with"
                     << " in_write_ = " << block->in_write_
                     << " free_buffers_.Contains = "
                     << free_buffers_.Contains(block->buffer_desc_)
@@ -506,7 +612,7 @@ bool BufferedBlockMgr::Validate() const {
   // threshold. We don't write blocks after cancellation.
   if (!is_cancelled_ && !unpinned_blocks_.empty() &&
       (free_buffers_.size() + num_outstanding_writes_ < block_write_threshold_)) {
-    LOG (WARNING) << "Missed writing unpinned blocks";
+    LOG(ERROR) << "Missed writing unpinned blocks";
     return false;
   }
   return true;
@@ -514,28 +620,35 @@ bool BufferedBlockMgr::Validate() const {
 
 string BufferedBlockMgr::DebugString() const {
   stringstream ss;
-  ss << " Num writes outstanding " << outstanding_writes_counter_->value()
-     << " Num free buffers " << free_buffers_.size()
+  ss << "Buffered block mgr" << endl
+     << " Num writes outstanding " << outstanding_writes_counter_->value() << endl
+     << " Num free buffers " << free_buffers_.size() << endl
+     << " Num unpinned blocks " << unpinned_blocks_.size() << endl
+     << " Remaining memory " << mem_tracker_->SpareCapacity() << endl
      << " Block write threshold " << block_write_threshold_;
-
   return ss.str();
 }
 
 void BufferedBlockMgr::InitCounters(RuntimeProfile* profile) {
-  mem_limit_counter_ = ADD_COUNTER(profile, "MemoryLimit", TCounterType::BYTES);
+  profile_.reset(new RuntimeProfile(state_->obj_pool(), "BlockMgr"));
+  profile->AddChild(profile_.get());
+
+  mem_limit_counter_ = ADD_COUNTER(profile_.get(), "MemoryLimit", TCounterType::BYTES);
   mem_limit_counter_->Set(mem_tracker_->limit());
-  mem_used_counter_ = ADD_COUNTER(profile, "MemoryUsed", TCounterType::BYTES);
-  mem_used_counter_->Set(static_cast<int64_t>(all_buffers_.size()) * block_size_);
-  block_size_counter_ = ADD_COUNTER(profile, "BlockSize", TCounterType::BYTES);
+  mem_used_counter_ = ADD_COUNTER(profile_.get(), "MemoryUsed", TCounterType::BYTES);
+  block_size_counter_ = ADD_COUNTER(profile_.get(), "BlockSize", TCounterType::BYTES);
   block_size_counter_->Set(block_size_);
-  created_block_counter_ = ADD_COUNTER(profile, "BlocksCreated", TCounterType::UNIT);
-  recycled_blocks_counter_ = ADD_COUNTER(profile, "BlocksRecycled", TCounterType::UNIT);
-  writes_issued_counter_ = ADD_COUNTER(profile, "BlockWritesIssued", TCounterType::UNIT);
+  created_block_counter_ = ADD_COUNTER(
+      profile_.get(), "BlocksCreated", TCounterType::UNIT);
+  recycled_blocks_counter_ = ADD_COUNTER(
+      profile_.get(), "BlocksRecycled", TCounterType::UNIT);
+  writes_issued_counter_ = ADD_COUNTER(
+      profile_.get(), "BlockWritesIssued", TCounterType::UNIT);
   outstanding_writes_counter_ =
-      ADD_COUNTER(profile, "BlockWritesOutstanding", TCounterType::UNIT);
-  buffered_pin_counter_ = ADD_COUNTER(profile, "BufferedPins", TCounterType::UNIT);
-  disk_read_timer_ = ADD_TIMER(profile, "TotalReadBlockTime");
-  buffer_wait_timer_ = ADD_TIMER(profile, "TotalBufferWaitTime");
+      ADD_COUNTER(profile_.get(), "BlockWritesOutstanding", TCounterType::UNIT);
+  buffered_pin_counter_ = ADD_COUNTER(profile_.get(), "BufferedPins", TCounterType::UNIT);
+  disk_read_timer_ = ADD_TIMER(profile_.get(), "TotalReadBlockTime");
+  buffer_wait_timer_ = ADD_TIMER(profile_.get(), "TotalBufferWaitTime");
 }
 
 } // namespace impala

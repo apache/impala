@@ -15,11 +15,11 @@
 #ifndef IMPALA_RUNTIME_SORTER_H_
 #define IMPALA_RUNTIME_SORTER_H_
 
+#include "runtime/buffered-block-mgr.h"
 #include "util/tuple-row-compare.h"
 
 namespace impala {
 
-class BufferedBlockMgr;
 class SortedRunMerger;
 class RuntimeProfile;
 class RowBatch;
@@ -86,9 +86,9 @@ class Sorter {
   // merge_batch_size_ is the size of the batches created to provide rows to the merger
   // and retrieve rows from an intermediate merger.
   Sorter(const TupleRowComparator& compare_less_than,
-      const std::vector<Expr*>& sort_tuple_slot_exprs, BufferedBlockMgr* block_mgr,
-      RowDescriptor* output_row_desc, MemTracker* mem_tracker, RuntimeProfile* profile,
-      RuntimeState* state);
+      const std::vector<Expr*>& sort_tuple_slot_exprs,
+      RowDescriptor* output_row_desc, MemTracker* mem_tracker,
+      RuntimeProfile* profile, RuntimeState* state);
 
   ~Sorter();
 
@@ -148,6 +148,9 @@ class Sorter {
 
   // Block manager object used to allocate, pin and release runs. Not owned by Sorter.
   BufferedBlockMgr* block_mgr_;
+
+  // Handle to block mgr to make allocations from.
+  BufferedBlockMgr::Client* block_mgr_client_;
 
   // True if the tuples to be sorted have var-length slots.
   bool has_var_len_slots_;

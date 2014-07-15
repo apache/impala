@@ -20,6 +20,7 @@
 
 namespace impala {
 
+class MemPool;
 class RuntimeState;
 
 // BufferedBlockMgr is used to allocate and manage blocks of data using a fixed memory
@@ -34,6 +35,10 @@ class RuntimeState;
 // re-read in FIFO order). TmpFileMgr is used to obtain file handles to write to within
 // the tmp directories configured for Impala.
 //
+// It is expected to have one BufferedBlockMgr per PlanFragmentInstance (ideally per
+// query). All allocations that can grow proportional to input size and might need
+// to spill to disk should allocate from the same BufferedBlockMgr.
+//
 // A client must pin a block in memory to read/write its contents and unpin it
 // when it is no longer in active use. BufferedBlockMgr guarantees that
 // a) The memory buffer assigned to a block is not removed or released while it is pinned
@@ -42,10 +47,7 @@ class RuntimeState;
 //    to a different block.
 //
 // The Client API is as follows:
-// GetFreeBlock() returns a new pinned block. It waits if there are
-//   no free buffers available.
-// TryExpand() attempts a allocate a new buffer and assign it to a pinned block. If the
-// memory limit is reached, TryExpand() returns immediately. It is non-blocking.
+// GetNewBlock() returns a new pinned block.
 // A Block supports the following operations
 // Pin(): Pins a block to a buffer in memory, and reads its contents from disk if
 //   necessary. If there are no free buffers, waits for a buffer to become available.
@@ -65,11 +67,20 @@ class RuntimeState;
 // TODO: When a block is read from disk, data is copied from the IOMgr buffer to the
 // block manager's buffer. This should be avoided in the common case where these buffers
 // are of the same size.
+// TODO: see if the one big lock is a bottleneck.
 class BufferedBlockMgr {
  private:
   struct BufferDescriptor;
 
  public:
+  // A client of the BufferedBlockMgr. There is a single BufferedBlockMgr per plan
+  // fragment and all operators that need blocks from it should be a separate client.
+  // Each client has the option to reserve a number of blocks that it can claim later.
+  // The remaining memory that is not reserved by any clients is free for all and
+  // available to all clients.
+  // This is an opaque handle.
+  struct Client;
+
   // A fixed-size block of data that may be be persisted to disk. The state of the block
   // is maintained by the block manager and is described by 3 bools
   // is_pinned_ = True if the block is pinned. The block has a non-null buffer_desc_,
@@ -102,15 +113,16 @@ class BufferedBlockMgr {
   class Block : public InternalQueue<Block>::Node {
    public:
     // Pins a block in memory - assigns a free buffer to a block and reads it from
-    // disk if necessary. Waits until a free buffer is available.
-    Status Pin();
+    // disk if necessary. If there are no free blocks and no unpinned blocks,
+    // *pinned is set to false and the block is not pinned.
+    Status Pin(bool* pinned);
 
     // Unpin a block - add it to the list of unpinned blocks maintained by the block
     // manager. Is non-blocking.
     Status Unpin();
 
     // Delete a block. Its buffer is released and on-disk location can be over-written.
-    // For now, only a pinned block can be deleted. Is non-blocking.
+    // Non-blocking.
     Status Delete();
 
     // Allocates the specified number of bytes from this block.
@@ -160,6 +172,9 @@ class BufferedBlockMgr {
     // Parent block manager object. Responsible for maintaining the state of the block.
     BufferedBlockMgr* block_mgr_;
 
+    // The client that owns this block.
+    Client* client_;
+
     // WriteRange object representing the on-disk location used to persist a block.
     // Is created the first time a block is persisted, and retained until the block
     // object is destroyed. The file location and offset in write_range_ are valid
@@ -177,6 +192,8 @@ class BufferedBlockMgr {
 
     // Block state variables. The block's buffer can be freed only if is_pinned_ and
     // in_write_ are both false.
+    // TODO: this might be better expressed as an enum.
+
     // is_pinned_ is true while the block is pinned by a client.
     bool is_pinned_;
 
@@ -188,39 +205,55 @@ class BufferedBlockMgr {
     bool is_deleted_;
   }; // class Block
 
-  // Create a block manager with the specified mem_limit. 'initial_num_buffers' is the
-  // number of buffers to allocate initially, subject to the mem_limit.
+  // Create a block manager with the specified mem_limit.
   // The returned block manager is owned by the caller.
-  static BufferedBlockMgr* Create(RuntimeState* state, MemTracker* parent,
+  static Status Create(RuntimeState* state, MemTracker* parent,
       RuntimeProfile* profile, int64_t mem_limit, int64_t buffer_size,
-      int initial_num_buffers);
+      BufferedBlockMgr** block_mgr);
+
+  // Registers a client with num_reserved_buffers. The returned client is owned
+  // by the BufferedBlockMgr and has the same lifetime as it.
+  // We allow oversubscribing the reserved buffers. It is likely that the
+  // num_reserved_buffers will be very pessimistic for small
+  // queries and we don't want to fail all of them with mem limit exceeded.
+  // The min reserved buffers is often independent of data size and we still want
+  // to run small queries with very small limits.
+  Status RegisterClient(int num_reserved_buffers, Client** client);
+
+  // Lowers the buffer reservation of the client to num_buffers. This doesn't change
+  // buffers that have already been given to this client.
+  // num_buffers must be less than the current reservation.
+  // TODO: we could relax this and let the reservation go up but there isn't a use
+  // case now.
+  void LowerBufferReservation(Client* client, int num_buffers);
 
   // Return the number of blocks a block manager will reserve for its I/O buffers.
   static int GetNumReservedBlocks() {
     return TmpFileMgr::num_tmp_devices();
   }
 
-  // Return a free pinned block. Waits for a free buffer if none are available.
-  Status GetFreeBlock(Block** block);
-
-  // Try to expand the block manager capacity by allocating a new buffer subject to
-  // available memory. If allocation was successful, a new pinned block is returned in
-  // 'block' and expanded is set to true. Otherwise, expanded is set to false.
-  // This is a non-blocking call, and checks for cancellation.
-  // TODO: This should be subsumed into GetFreeBlock() once the block manager has the
-  // ability to relinquish memory.
-  Status TryExpand(Block** block, bool* expanded);
+  // Return a new pinned block. If there is no memory for this block, *block will be
+  // set to NULL.
+  // This function will try to allocate new memory for the block up to the limit.
+  // Otherwise it will (conceptually) write out a unpinned block and use that memory.
+  Status GetNewBlock(Client* client, Block** block);
 
   // Release all resources associated with this block manager. Is idempotent.
   void Close();
 
-  // The number of allocated buffers that can be simultaneously pinned by clients
-  // without incurring writes on Unpin().
+  int num_free_buffers() const {
+    return free_buffers_.size();
+  }
+
+  // The number of allocated buffers that can be simultaneously pinned by clients.
   int available_allocated_buffers() const {
-    return all_buffers_.size() - block_write_threshold_;
+    return all_buffers_.size();
   }
 
   int64_t block_size() const { return block_size_; }
+  int64_t bytes_allocated() const;
+
+  RuntimeProfile* profile() { return profile_.get(); }
 
  private:
   // Descriptor for a single memory buffer in the pool.
@@ -237,22 +270,25 @@ class BufferedBlockMgr {
   }; // struct BufferDescriptor
 
   BufferedBlockMgr(RuntimeState* state, MemTracker* parent, int64_t mem_limit,
-      int64_t block_size, int initial_num_buffers);
+      int64_t block_size);
 
   // Initialize the counters to track the block manager behavior.
   void InitCounters(RuntimeProfile* profile);
 
   // PinBlock(), UnpinBlock(), DeleteBlock() perform the actual work of Block::Pin(),
   // Unpin() and Delete().
-  Status PinBlock(Block* block);
+  Status PinBlock(Block* block, bool* pinned);
   Status UnpinBlock(Block* block);
   Status DeleteBlock(Block* block);
 
-  // Finds a buffer for a block and pins it. If the block already has a buffer, removes
-  // the buffer from the free list and removes the block from the unpinned list.
-  // Otherwise, assigns a buffer from the free buffer list to the block. Waits if no
-  // free buffer is available.
-  // Sets block->is_pinned_ to true.
+  // Finds a buffer for a block and pins it. If the block's buffer has not been evicted,
+  // removes the block from the unpinned list and sets *in_mem = true.
+  // Otherwise, this function gets a new buffer by:
+  //   1. Allocating a new buffer if possible.
+  //   2. Using a buffer from the free list (which is populated by moving blocks from
+  //      the unpinned list by writing them out).
+  // If we can't get a buffer (no more memory, nothing in the unpinned and free lists,
+  // this function returns with the block unpinned.
   Status FindBufferForBlock(Block* block, bool* in_mem);
 
   // Writes unpinned blocks via DiskIoMgr until one of the following is true:
@@ -274,7 +310,7 @@ class BufferedBlockMgr {
 
   // Checks unused_blocks_ for an unused block object, else allocates a new one.
   // Non-blocking and takes no locks.
-  Block* GetUnusedBlock();
+  Block* GetUnusedBlock(Client* client);
 
   // Used to debug the state of the block manager. Lock must already be taken.
   bool Validate() const;
@@ -286,6 +322,13 @@ class BufferedBlockMgr {
   // Unpinned blocks are written when the number of free buffers is below this threshold.
   // Equal to the number of disks.
   const int block_write_threshold_;
+
+  // The number of unreserved buffers. This can be less than 0 if we've oversubscribed
+  // the number of reserved buffers.
+  AtomicInt<int> num_unreserved_buffers_;
+
+  // The number of unreserved buffers that are currently pinned. Must be >= 0.
+  AtomicInt<int> num_unreserved_pinned_buffers_;
 
   // Track buffers allocated by the block manager.
   boost::scoped_ptr<MemTracker> mem_tracker_;
@@ -306,12 +349,12 @@ class BufferedBlockMgr {
   std::list<Block*> unpinned_blocks_;
 
   // List of blocks that have been deleted and are no longer in use.
-  // Can be reused in GetFreeBlock(). Blocks in this list must be in the Init'ed state,
+  // Can be reused in GetNewBlock(). Blocks in this list must be in the Init'ed state,
   // i.e. buffer_desc_ = NULL, is_pinned_ = false, in_write_ = false,
   // is_deleted_ = false, valid_data_len = 0.
   InternalQueue<Block> unused_blocks_;
 
-  // List of buffers that can be assigned to a block in Pin() or GetFreeBlock().
+  // List of buffers that can be assigned to a block in Pin() or GetNewBlock().
   // These buffers either have no block associated with them or are associated with an
   // an unpinned block that has been persisted. That is, either block = NULL or
   // (!block->is_pinned_  && !block->in_write_  && !unpinned_blocks_.Contains(block)).
@@ -332,9 +375,6 @@ class BufferedBlockMgr {
   DiskIoMgr* io_mgr_;
   DiskIoMgr::RequestContext* io_request_context_;
 
-  // Pool of Block, BufferDescriptor and DiskIoMgr::WriteRange objects.
-  ObjectPool obj_pool_;
-
   // Memory pool from which buffers are allocated.
   boost::scoped_ptr<MemPool> buffer_pool_;
 
@@ -347,6 +387,8 @@ class BufferedBlockMgr {
   RuntimeState* state_;
 
   // Counters and timers to track behavior.
+  boost::scoped_ptr<RuntimeProfile> profile_;
+
   // These have a fixed value for the lifetime of the manager and show memory usage.
   RuntimeProfile::Counter* mem_limit_counter_;
   RuntimeProfile::Counter* mem_used_counter_;

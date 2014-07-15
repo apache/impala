@@ -63,8 +63,7 @@ Status SortNode::Open(RuntimeState* state) {
   TupleRowComparator less_than(sort_exec_exprs_.lhs_ordering_exprs(),
       sort_exec_exprs_.rhs_ordering_exprs(), is_asc_order_, nulls_first_);
   sorter_.reset(new Sorter(less_than, sort_exec_exprs_.sort_tuple_slot_exprs(),
-      block_mgr_.get(), &row_descriptor_, mem_tracker(), runtime_profile(),
-      state));
+      &row_descriptor_, mem_tracker(), runtime_profile(), state));
 
   // The child has been opened and the sorter created. Sort the input.
   // The final merge is done on-demand as rows are requested in GetNext().
@@ -118,8 +117,6 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 void SortNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   sort_exec_exprs_.Close(state);
-  if (block_mgr_.get() != NULL) block_mgr_->Close();
-  block_mgr_.reset();
   sorter_.reset();
   ExecNode::Close(state);
 }
@@ -184,10 +181,7 @@ Status SortNode::CreateBlockMgr(RuntimeState* state) {
     mem_remaining -= max_merge_mem;
     block_mgr_limit = mem_remaining;
   }
-  block_mgr_.reset(BufferedBlockMgr::Create(state, mem_tracker(), runtime_profile(),
-      block_mgr_limit, block_size, min_blocks_required));
-
-  return Status::OK;
+  return state->CreateBlockMgr(block_mgr_limit);
 }
 
 }

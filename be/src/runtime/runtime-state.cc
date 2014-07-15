@@ -22,6 +22,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
+#include "runtime/buffered-block-mgr.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
@@ -80,6 +81,7 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
 }
 
 RuntimeState::~RuntimeState() {
+  if (block_mgr_.get() != NULL) block_mgr_->Close();
   if (udf_pool_.get() != NULL) udf_pool_->FreeAll();
   // query_mem_tracker_ must be valid as long as instance_mem_tracker_ is so
   // delete instance_mem_tracker_ first.
@@ -157,6 +159,15 @@ Status RuntimeState::CreateCodegen() {
   RETURN_IF_ERROR(LlvmCodeGen::LoadImpalaIR(obj_pool_.get(), &codegen_));
   codegen_->EnableOptimizations(true);
   profile_.AddChild(codegen_->runtime_profile());
+  return Status::OK;
+}
+
+Status RuntimeState::CreateBlockMgr(int64_t mem_limit) {
+  if (block_mgr_.get() != NULL) return Status::OK;
+  BufferedBlockMgr* block_mgr;
+  RETURN_IF_ERROR(BufferedBlockMgr::Create(this, query_mem_tracker(),
+      runtime_profile(), mem_limit, io_mgr()->max_read_buffer_size(), &block_mgr));
+  block_mgr_.reset(block_mgr);
   return Status::OK;
 }
 
