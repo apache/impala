@@ -133,7 +133,6 @@ public class InsertStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException,
       AuthorizationException {
     if (isExplain_) analyzer.setIsExplain();
-    analyzer.setIsInsertStmt(true);
     try {
       if (withClause_ != null) withClause_.analyze(analyzer);
     } catch (AnalysisException e) {
@@ -145,7 +144,10 @@ public class InsertStmt extends StatementBase {
     List<Expr> selectListExprs = null;
     if (!needsGeneratedQueryStatement_) {
       try {
-        queryStmt_.analyze(analyzer);
+        // Use a child analyzer for the query stmt to properly scope WITH-clause
+        // views and to ignore irrelevant ORDER BYs.
+        Analyzer queryStmtAnalyzer = new Analyzer(analyzer, analyzer.getUser());
+        queryStmt_.analyze(queryStmtAnalyzer);
         selectListExprs = Expr.cloneList(queryStmt_.getBaseTblResultExprs());
       } catch (AnalysisException e) {
         if (analyzer.getMissingTbls().isEmpty()) throw e;

@@ -149,24 +149,19 @@ public abstract class QueryStmt extends StatementBase {
     sortInfo_ = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
     // order by w/o limit and offset in inline views, union operands and insert statements
     // are ignored.
-    if (!hasLimit() && !hasOffset() &&
-        (!analyzer.isRootAnalyzer() || analyzer.isInsertStmt())) {
+    if (!hasLimit() && !hasOffset() && !analyzer.isRootAnalyzer()) {
       evaluateOrderBy_ = false;
-      // Return a warning of the form:
-      // Ignoring order by ... <reason>: <order by clause>
+      // Return a warning that the oder by was ignored.
       StringBuilder strBuilder = new StringBuilder();
-      strBuilder.append("Ignoring ORDER BY clause without LIMIT or OFFSET ");
-      if (!analyzer.isRootAnalyzer()) {
-        strBuilder.append("in nested query, view or union operand");
-      } else {
-        Preconditions.checkState(analyzer.isInsertStmt());
-        strBuilder.append("in INSERT/CTAS");
-      }
-      strBuilder.append(": ORDER BY ");
+      strBuilder.append("Ignoring ORDER BY clause without LIMIT or OFFSET: ");
+      strBuilder.append("ORDER BY ");
       strBuilder.append(orderByElements_.get(0).toSql());
       for (int i = 1; i < orderByElements_.size(); ++i) {
         strBuilder.append(", ").append(orderByElements_.get(i).toSql());
       }
+      strBuilder.append("\n.An ORDER BY without a LIMIT or OFFSET appearing in ");
+      strBuilder.append("an (inline) view, union operand or an INSERT/CTAS statement ");
+      strBuilder.append("has no effect on query results.");
       analyzer.addWarning(strBuilder.toString());
     } else {
       evaluateOrderBy_ = true;

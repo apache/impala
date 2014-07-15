@@ -954,19 +954,21 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Column a in order clause is ambiguous");
 
     // Test if an ignored order by produces the expected warning.
-    String warning = "Ignoring ORDER BY clause without LIMIT or OFFSET ";
-    String selectWarning = warning + "in nested query, view or union operand";
     AnalyzesOk("select * from (select * from functional.alltypes order by int_col) A",
-        selectWarning + ": ORDER BY int_col ASC");
+        "Ignoring ORDER BY clause without LIMIT or OFFSET: " +
+        "ORDER BY int_col ASC");
     AnalyzesOk("select * from functional.alltypes order by int_col desc union all " +
-        "select * from functional.alltypes", selectWarning + ": ORDER BY int_col DESC");
-    String dmlWarning = warning + "in INSERT/CTAS";
+        "select * from functional.alltypes",
+        "Ignoring ORDER BY clause without LIMIT or OFFSET: " +
+        "ORDER BY int_col DESC");
     AnalyzesOk("insert into functional.alltypes partition (year, month) " +
         "select * from functional.alltypes order by int_col",
-        dmlWarning + ": ORDER BY int_col ASC");
+        "Ignoring ORDER BY clause without LIMIT or OFFSET: " +
+        "ORDER BY int_col ASC");
     AnalyzesOk("create table functional.alltypescopy as " +
         "select * from functional.alltypes order by int_col",
-        dmlWarning + ": ORDER BY int_col ASC");
+        "Ignoring ORDER BY clause without LIMIT or OFFSET: " +
+        "ORDER BY int_col ASC");
   }
 
   @Test
@@ -1213,6 +1215,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // WITH clause in insert statement.
     AnalyzesOk("with t1 as (select * from functional.alltypestiny)" +
         "insert into functional.alltypes partition(year, month) select * from t1");
+    // WITH-clause views belong to different scopes.
+    AnalyzesOk("with t1 as (select id from functional.alltypestiny) " +
+        "insert into functional.alltypes partition(year, month) " +
+        "with t1 as (select * from functional.alltypessmall) select * from t1");
     // WITH-clause view used in inline view.
     AnalyzesOk("with t1 as (select 'a') select * from (select * from t1) as t2");
     AnalyzesOk("with t1 as (select 'a') " +
@@ -1299,10 +1305,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Conflicting table aliases in WITH clause.
     AnalysisError("with t1 as (select 1), t1 as (select 2) select * from t1",
         "Duplicate table alias: 't1'");
-    AnalysisError("with t1 as (select * from functional.alltypestiny) " +
-        "insert into functional.alltypes partition(year, month) " +
-        "with t1 as (select * from functional.alltypessmall) select * from t1",
-        "Duplicate table alias: 't1");
     // Check that aliases from WITH-clause views conflict with other table aliases.
     AnalysisError("with t1 as (select 1 x), t2 as (select 2 y)" +
         "select * from functional.alltypes as t1 inner join t1",

@@ -43,6 +43,7 @@ import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TQueryCtx;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 public class AnalyzerTest {
@@ -194,13 +195,17 @@ public class AnalyzerTest {
       if (expectedWarning != null) {
         List<String> actualWarnings = analyzer.getWarnings();
         boolean matchedWarning = false;
-        for (String actualWarn: actualWarnings) {
-          if (actualWarn.startsWith(expectedWarning)) {
+        for (String actualWarning: actualWarnings) {
+          if (actualWarning.startsWith(expectedWarning)) {
             matchedWarning = true;
             break;
           }
         }
-        if (!matchedWarning) fail("Did not produce expected warning " + expectedWarning);
+        if (!matchedWarning) {
+          fail(String.format("Did not produce expected warning.\n" +
+              "Expected warning:\n%s.\nActual warnings:\n%s",
+              expectedWarning, Joiner.on("\n").join(actualWarnings)));
+        }
       }
     } catch (ImpalaException e) {
       e.printStackTrace();
