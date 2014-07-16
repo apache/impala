@@ -83,12 +83,9 @@ class TablePrinter;
 //
 // The implementation ensures that setting an overall error status and initiating
 // cancellation of local and all remote fragments is atomic.
-//
-// TODO:
-// - add profile counters for coordinator (how much time do we spend in startup?)
 class Coordinator {
  public:
-  Coordinator(ExecEnv* exec_env);
+  Coordinator(ExecEnv* exec_env, RuntimeProfile::EventSequence* events);
   ~Coordinator();
 
   // Initiate asynchronous execution of a query with the given schedule. Returns as soon
@@ -299,6 +296,9 @@ class Coordinator {
 
   // Aggregate counters for the entire query.
   boost::scoped_ptr<RuntimeProfile> query_profile_;
+
+  // Event timeline for this query. Unowned.
+  RuntimeProfile::EventSequence* query_events_;
 
   // Per fragment profile information
   struct PerFragmentProfileData {

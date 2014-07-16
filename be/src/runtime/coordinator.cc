@@ -224,14 +224,15 @@ int64_t Coordinator::BackendExecState::UpdateNumScanRangesCompleted() {
   return delta;
 }
 
-Coordinator::Coordinator(ExecEnv* exec_env)
+Coordinator::Coordinator(ExecEnv* exec_env, RuntimeProfile::EventSequence* events)
   : exec_env_(exec_env),
     has_called_wait_(false),
     returned_all_results_(false),
     executor_(NULL), // Set in Prepare()
     query_mem_tracker_(), // Set in Exec()
     num_remaining_backends_(0),
-    obj_pool_(new ObjectPool()) {
+    obj_pool_(new ObjectPool()),
+    query_events_(events) {
 }
 
 Coordinator::~Coordinator() {
@@ -371,6 +372,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
   VLOG_QUERY << "starting " << schedule.num_backends()
              << " backends for query " << query_id_;
 
+  query_events_->MarkEvent("Ready to start remote fragments");
   int backend_num = 0;
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
        fragment_idx < request.fragments.size(); ++fragment_idx) {
@@ -412,6 +414,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
       return fragments_exec_status;
     }
   }
+  query_events_->MarkEvent("Remote fragments started");
 
   // If we have a coordinator fragment and remote fragments (the common case),
   // release the thread token on the coordinator fragment.  This fragment

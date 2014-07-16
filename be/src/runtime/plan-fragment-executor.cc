@@ -93,6 +93,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   runtime_state_.reset(
       new RuntimeState(request.fragment_instance_ctx, cgroup, exec_env_));
 
+  // total_time_counter() is in the runtime_state_ so start it up now.
+  SCOPED_TIMER(profile()->total_time_counter());
+
   // Register after setting runtime_state_ to ensure proper cleanup.
   if (FLAGS_enable_rm && !cgroup.empty() && request.__isset.reserved_resource) {
     bool is_first;
@@ -269,8 +272,7 @@ void PlanFragmentExecutor::OptimizeLlvmModule() {
 
 void PlanFragmentExecutor::PrintVolumeIds(
     const PerNodeScanRanges& per_node_scan_ranges) {
-  if (per_node_scan_ranges.empty())
-    return;
+  if (per_node_scan_ranges.empty()) return;
 
   HdfsScanNode::PerVolumnStats per_volume_stats;
   BOOST_FOREACH(const PerNodeScanRanges::value_type& entry, per_node_scan_ranges) {
@@ -394,8 +396,7 @@ void PlanFragmentExecutor::ReportProfile() {
       VLOG_FILE << ss.str();
     }
 
-    if (!report_thread_active_)
-      break;
+    if (!report_thread_active_) break;
 
     if (completed_report_sent_.Read() == 0) {
       // No complete fragment report has been sent.
@@ -408,8 +409,7 @@ void PlanFragmentExecutor::ReportProfile() {
 }
 
 void PlanFragmentExecutor::SendReport(bool done) {
-  if (report_status_cb_.empty())
-    return;
+  if (report_status_cb_.empty()) return;
 
   Status status;
   {
@@ -424,8 +424,7 @@ void PlanFragmentExecutor::SendReport(bool done) {
 }
 
 void PlanFragmentExecutor::StopReportThread() {
-  if (!report_thread_active_)
-    return;
+  if (!report_thread_active_) return;
   {
     lock_guard<mutex> l(report_thread_lock_);
     report_thread_active_ = false;
@@ -494,8 +493,7 @@ void PlanFragmentExecutor::FragmentComplete() {
 }
 
 void PlanFragmentExecutor::UpdateStatus(const Status& status) {
-  if (status.ok())
-    return;
+  if (status.ok()) return;
 
   bool send_report = completed_report_sent_.Swap(0,1);
 

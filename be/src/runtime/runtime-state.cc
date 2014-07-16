@@ -96,6 +96,7 @@ RuntimeState::~RuntimeState() {
 }
 
 Status RuntimeState::Init(ExecEnv* exec_env) {
+  SCOPED_TIMER(profile_.total_time_counter());
   exec_env_ = exec_env;
   TQueryOptions& query_options =
       fragment_instance_ctx_.query_ctx.request.query_options;

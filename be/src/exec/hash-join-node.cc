@@ -72,6 +72,7 @@ Status HashJoinNode::Init(const TPlanNode& tnode) {
 }
 
 Status HashJoinNode::Prepare(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
 
   build_buckets_counter_ =
