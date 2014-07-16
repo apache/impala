@@ -1030,7 +1030,7 @@ void Expr::InitBuiltinsDummy() {
   DecimalOperators::Cast_decimal_decimal(NULL, NULL);
   MathFunctions::Pi(NULL, NULL);
   StringFunctions::Length(NULL, NULL);
-  TimestampFunctions::Year(NULL, NULL);
+  TimestampFunctions::Year(NULL, TimestampVal::null());
   UdfBuiltins::Pi(NULL);
   UtilityFunctions::Pid(NULL, NULL);
 }
