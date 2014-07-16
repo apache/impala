@@ -65,6 +65,7 @@ class TestRowsAvailability(ImpalaTestSuite):
         "previous timeline event.\nExpected the event to be marked no earlier than "\
         "%sms after the previous event.\nQuery: %s"\
         % (rows_avail_ms, self.ROWS_AVAIL_LOWER_BOUND_MS, query)
+    self.close_query(handle)
 
   def __get_rows_available_event(self, query_handle):
     profile = self.client.get_runtime_profile(query_handle)

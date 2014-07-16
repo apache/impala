@@ -123,6 +123,7 @@ class Coordinator {
   // Cancel execution of query. This includes the execution of the local plan fragment,
   // if any, as well as all plan fragments on remote nodes. Sets query_status_ to
   // the given cause if non-NULL. Otherwise, sets query_status_ to Status::CANCELLED.
+  // Idempotent.
   void Cancel(const Status* cause = NULL);
 
   // Updates status and query execution metadata of a particular

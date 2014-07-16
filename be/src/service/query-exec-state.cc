@@ -670,14 +670,14 @@ void ImpalaServer::QueryExecState::Cancel(const Status* cause) {
     child_query.Cancel();
   }
 
-  // If the query is completed, no need to cancel.
-  if (eos_) return;
-  // we don't want multiple concurrent cancel calls to end up executing
-  // Coordinator::Cancel() multiple times
-  if (query_state_ == QueryState::EXCEPTION) return;
-  if (cause != NULL) UpdateQueryStatus(*cause);
-  query_events_->MarkEvent("Cancelled");
-  query_state_ = QueryState::EXCEPTION;
+  // If the query is completed or cancelled, no need to cancel.
+  if (eos_ || query_state_ == QueryState::EXCEPTION) return;
+
+  if (cause != NULL) {
+    UpdateQueryStatus(*cause);
+    query_events_->MarkEvent("Cancelled");
+    query_state_ = QueryState::EXCEPTION;
+  }
   if (coord_.get() != NULL) coord_->Cancel(cause);
 }
 

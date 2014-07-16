@@ -296,6 +296,10 @@ class ImpalaTestSuite(BaseTestSuite):
     return self.client.execute_async(query)
 
   @execute_wrapper
+  def close_query(self, query):
+    return self.client.close_query(query)
+
+  @execute_wrapper
   def execute_scalar(self, query, query_options=None):
     result = self.__execute_query(self.client, query, query_options)
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
