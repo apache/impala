@@ -245,6 +245,7 @@ terminal COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
+terminal String EMPTY_IDENT;
 terminal String NUMERIC_OVERFLOW;
 terminal BigDecimal INTEGER_LITERAL;
 terminal BigDecimal DECIMAL_LITERAL;

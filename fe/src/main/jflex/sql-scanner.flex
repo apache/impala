@@ -237,6 +237,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     tokenIdMap.put(new Integer(SqlParserSymbols.error), "ERROR");
     tokenIdMap.put(new Integer(SqlParserSymbols.BITXOR), "^");
     tokenIdMap.put(new Integer(SqlParserSymbols.NUMERIC_OVERFLOW), "NUMERIC OVERFLOW");
+    tokenIdMap.put(new Integer(SqlParserSymbols.EMPTY_IDENT), "EMPTY IDENTIFIER");
   }
 
   public static boolean isKeyword(Integer tokenId) {
@@ -332,8 +333,7 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
   // Remove the quotes and trim whitespace.
   String trimmedIdent = yytext().substring(1, yytext().length() - 1).trim();
   if (trimmedIdent.isEmpty()) {
-    throw new java.io.IOException(
-        "Identifier consisting of only whitespace not allowed.");
+    return newToken(SqlParserSymbols.EMPTY_IDENT, yytext());
   }
   return newToken(SqlParserSymbols.IDENT, trimmedIdent);
 }

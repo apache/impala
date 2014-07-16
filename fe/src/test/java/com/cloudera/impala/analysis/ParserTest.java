@@ -2209,6 +2209,12 @@ public class ParserTest {
         "          ^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: SOURCES\n");
+    ParserError("USE ` `",
+        "Syntax error in line 1:\n" +
+        "USE ` `\n" +
+        "    ^\n" +
+        "Encountered: EMPTY IDENTIFIER\n" +
+        "Expected: IDENTIFIER\n");
   }
 
   @Test
