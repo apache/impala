@@ -1,0 +1,3 @@
+[impala]
+query=select 1
+refresh_after_connect=true

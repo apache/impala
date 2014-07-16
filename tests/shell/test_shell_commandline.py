@@ -295,6 +295,27 @@ class TestImpalaShell(object):
     #print result.stdout.encode('utf-8')
     assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
 
+  @pytest.mark.execute_serially
+  def test_config_file(self):
+      """Test the optional configuration file"""
+      # Positive tests
+      args = '--config_file=%s/good_impalarc' % QUERY_FILE_PATH
+      result = run_impala_shell_cmd(args)
+      assert 'Query: select 1' in  result.stderr
+      assert 'Invalidating Metadata' in result.stderr
+      # override option in config file through command line
+      args = '--config_file=%s/good_impalarc --query="select 2"' % QUERY_FILE_PATH
+      result = run_impala_shell_cmd(args)
+      assert 'Query: select 2' in result.stderr
+
+      # Negative Tests
+      # specified config file does not exist
+      args = '--config_file=%s/does_not_exist' % QUERY_FILE_PATH
+      run_impala_shell_cmd(args, expect_success=False)
+      # bad formatting of config file
+      args = '--config_file=%s/bad_impalarc' % QUERY_FILE_PATH
+      run_impala_shell_cmd(args, expect_success=False)
+
 class ImpalaShellResult(object):
   def __init__(self):
     self.rc = 0

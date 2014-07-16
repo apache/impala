@@ -17,33 +17,35 @@
 # Impala's shell
 import cmd
 import getpass
-import prettytable
 import os
+import prettytable
+import re
 import sasl
 import shlex
 import signal
 import socket
 import sqlparse
 import sys
-import threading
 import time
-import re
-from optparse import OptionParser
+import threading
+
+from impala_shell_config_defaults import impala_shell_defaults
+from option_parser import get_option_parser, get_config_from_file
 from Queue import Queue, Empty
 from shell_output import OutputStream, DelimitedOutputFormatter, PrettyOutputFormatter
 from subprocess import call
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
-from ImpalaService import ImpalaService
-from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
 from ExecStats.ttypes import TExecStats
-from ImpalaService.ImpalaService import TPingImpalaServiceResp
+from ImpalaService import ImpalaService
+from ImpalaService.ImpalaService import (TImpalaQueryOptions, TResetTableReq,
+                                         TPingImpalaServiceResp)
 from Status.ttypes import TStatus, TStatusCode
+from thrift.protocol import TBinaryProtocol
 from thrift_sasl import TSaslClientTransport
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
-from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
@@ -315,6 +317,7 @@ class ImpalaShell(cmd.Cmd):
       if not self.partial_cmd and cmd:
         self.cached_prompt = self.prompt
         self.prompt = '> '.rjust(len(self.cached_prompt))
+
       # partial_cmd is already populated, add the current input after a newline.
       if self.partial_cmd and cmd:
         self.partial_cmd = "%s\n%s" % (self.partial_cmd, cmd)
@@ -540,7 +543,7 @@ class ImpalaShell(cmd.Cmd):
       print ("Connect to an impalad to view and set query options.")
       return True
     if len(args) == 0:
-      print "Query options (defaults shown in []):"
+      print "Query options (config_defaults shown in []):"
       self.__print_options(self.default_query_options, self.set_query_options);
       return True
 
@@ -553,7 +556,7 @@ class ImpalaShell(cmd.Cmd):
     option_upper = tokens[0].upper()
     if option_upper not in self.default_query_options.keys():
       print "Unknown query option: %s" % (tokens[0])
-      print "Available query options, with their values are (defaults shown in []):"
+      print "Available query options, with their values are (config_defaults shown in []):"
       self.__print_options(self.default_query_options, self.set_query_options)
       return False
     self.set_query_options[option_upper] = tokens[1]
@@ -586,9 +589,9 @@ class ImpalaShell(cmd.Cmd):
 
   def do_connect(self, args):
     """Connect to an Impalad instance:
-    Usage: connect, defaults to the fqdn of the localhost and port 21000
+    Usage: connect, config_defaults to the fqdn of the localhost and port 21000
            connect <hostname:port>
-           connect <hostname>, defaults to port 21000
+           connect <hostname>, config_defaults to port 21000
 
     """
     # Assume the user wants to connect to the local impalad if no connection string is
@@ -1221,62 +1224,36 @@ def execute_queries_non_interactive_mode(options):
         sys.exit(1)
 
 if __name__ == "__main__":
-  parser = OptionParser()
-  parser.add_option("-i", "--impalad", dest="impalad", default=socket.getfqdn(),
-                    help="<host:port> of impalad to connect to")
-  parser.add_option("-q", "--query", dest="query", default=None,
-                    help="Execute a query without the shell")
-  parser.add_option("-f", "--query_file", dest="query_file", default=None,
-                    help="Execute the queries in the query file, delimited by ;")
-  parser.add_option("-k", "--kerberos", dest="use_kerberos", default=False,
-                    action="store_true", help="Connect to a kerberized impalad")
-  parser.add_option("-o", "--output_file", dest="output_file", default=None,
-                    help=("If set, query results will written to the "
-                          "given file. Results from multiple semicolon-terminated "
-                          "queries will be appended to the same file"))
-  parser.add_option("-B", "--delimited", dest="write_delimited", action="store_true",
-                    help="Output rows in delimited mode")
-  parser.add_option("--print_header", dest="print_header", action="store_true",
-                    help="Print column names in delimited mode, true by default"
-                         " when pretty-printed.")
-  parser.add_option("--output_delimiter", dest="output_delimiter", default='\t',
-                    help="Field delimiter to use for output in delimited mode")
-  parser.add_option("-s", "--kerberos_service_name",
-                    dest="kerberos_service_name", default='impala',
-                    help="Service name of a kerberized impalad, default is 'impala'")
-  parser.add_option("-V", "--verbose", dest="verbose", default=True, action="store_true",
-                    help="Verbose output, enabled by default")
-  parser.add_option("-p", "--show_profiles", dest="show_profiles", default=False,
-                    action="store_true",
-                    help="Always display query profiles after execution")
-  parser.add_option("--quiet", dest="verbose", default=True, action="store_false",
-                    help="Disable verbose output")
-  parser.add_option("-v", "--version", dest="version", default=False, action="store_true",
-                    help="Print version information")
-  parser.add_option("-c", "--ignore_query_failure", dest="ignore_query_failure",
-                    default=False, action="store_true", help="Continue on query failure")
-  parser.add_option("-r", "--refresh_after_connect", dest="refresh_after_connect",
-                    default=False, action="store_true",
-                    help="Refresh Impala catalog after connecting")
-  parser.add_option("-d", "--database", dest="default_db", default=None,
-                    help="Issue a use database command on startup.")
-  parser.add_option("-l", "--ldap", dest="use_ldap", default=False, action="store_true",
-                    help="Use LDAP to authenticate with Impala. Impala must be configured"
-                    " to allow LDAP authentication.")
-  parser.add_option("-u", "--user", dest="user", default=getpass.getuser(),
-                    help="User to authenticate with.")
-  parser.add_option("--ssl", dest="ssl", default=False, action="store_true",
-                    help="Connect to Impala via SSL-secured connection")
-  parser.add_option("--ca_cert", dest="ca_cert", default=None, help=("Full path to "
-                    "certificate file used to authenticate Impala's SSL certificate."
-                    " May either be a copy of Impala's certificate (for self-signed "
-                    "certs) or the certificate of a trusted third-party CA. If not set, "
-                    "but SSL is enabled, the shell will NOT verify Impala's server "
-                    "certificate"))
-  parser.add_option("--strict_unicode", dest="strict_unicode", default=True,
-                    action="store_true", help=("If true, non UTF-8 compatible input "
-                    "characters are rejected by the shell. If false, such characters are"
-                    " silently ignored."))
+
+  # pass defaults into option parser
+  parser = get_option_parser(impala_shell_defaults)
+  options, args = parser.parse_args()
+
+  # use path to file specified by user in config_file option
+  user_config = os.path.expanduser(options.config_file);
+  # by default, use the .impalarc in the home directory
+  config_to_load = impala_shell_defaults.get("config_file")
+
+  # verify user_config, if found
+  if os.path.isfile(user_config) and user_config != config_to_load:
+    if options.verbose:
+      print_to_stderr("Loading in options from config file: %s \n" % user_config)
+    # Command line overrides loading ~/.impalarc
+    config_to_load = user_config
+  elif user_config != config_to_load:
+    print_to_stderr('%s not found.\n' % user_config)
+    sys.exit(1)
+
+  # default options loaded in from impala_shell_config_defaults.py
+  # options defaults overwritten by those in config file
+  try:
+    impala_shell_defaults.update(get_config_from_file(config_to_load))
+  except Exception, e:
+    msg = "Unable to read configuration file correctly. Check formatting: %s\n" % e
+    print_to_stderr(msg)
+    sys.exit(1)
+
+  parser = get_option_parser(impala_shell_defaults)
   options, args = parser.parse_args()
 
   # Arguments that could not be parsed are stored in args. Print an error and exit.
