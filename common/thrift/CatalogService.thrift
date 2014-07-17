@@ -91,6 +91,9 @@ struct TDdlExecRequest {
 
   // Parameters for DROP DATA SOURCE
   15: optional JniCatalog.TDropDataSourceParams drop_data_source_params
+
+  // Parameters for DROP STATS
+  16: optional JniCatalog.TDropStatsParams drop_stats_params
 }
 
 // Response from executing a TDdlExecRequest

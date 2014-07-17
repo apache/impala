@@ -933,6 +933,17 @@ public class AuthorizationTest {
   }
 
   @Test
+  public void TestDropStats() throws AnalysisException, AuthorizationException {
+    AuthzOk("drop stats functional_seq_snap.alltypes");
+
+    AuthzError("drop stats functional.alltypes",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
+    AuthzError("drop stats functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'ALTER' on: " +
+        "functional.alltypesagg");
+  }
+
+  @Test
   public void TestDescribe() throws AuthorizationException, AnalysisException {
     AuthzOk("describe functional.alltypesagg");
     AuthzOk("describe functional.alltypes");

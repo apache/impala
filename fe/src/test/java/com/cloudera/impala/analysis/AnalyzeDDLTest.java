@@ -604,6 +604,18 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestDropStats() throws AnalysisException {
+    AnalyzesOk("drop stats functional.alltypes");
+
+    // Table does not exist
+    AnalysisError("drop stats tbl_does_not_exist",
+        "Table does not exist: default.tbl_does_not_exist");
+    // Database does not exist
+    AnalysisError("drop stats no_db.no_tbl",
+        "Database does not exist: no_db");
+  }
+
+  @Test
   public void TestDrop() throws AnalysisException {
     AnalyzesOk("drop database functional");
     AnalyzesOk("drop table functional.alltypes");

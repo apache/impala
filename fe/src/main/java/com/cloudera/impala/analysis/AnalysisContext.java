@@ -58,6 +58,7 @@ public class AnalysisContext {
     }
     public boolean isDropFunctionStmt() { return stmt_ instanceof DropFunctionStmt; }
     public boolean isDropDataSrcStmt() { return stmt_ instanceof DropDataSrcStmt; }
+    public boolean isDropStatsStmt() { return stmt_ instanceof DropStatsStmt; }
     public boolean isCreateTableLikeStmt() {
       return stmt_ instanceof CreateTableLikeStmt;
     }
@@ -92,7 +93,8 @@ public class AnalysisContext {
           isDropTableOrViewStmt() || isResetMetadataStmt() || isAlterTableStmt() ||
           isAlterViewStmt() || isComputeStatsStmt() || isCreateUdfStmt() ||
           isCreateUdaStmt() || isShowFunctionsStmt() || isDropFunctionStmt() ||
-          isCreateTableAsSelectStmt() || isCreateDataSrcStmt() || isDropDataSrcStmt();
+          isCreateTableAsSelectStmt() || isCreateDataSrcStmt() || isDropDataSrcStmt() ||
+          isDropStatsStmt();
     }
 
     public boolean isDmlStmt() {

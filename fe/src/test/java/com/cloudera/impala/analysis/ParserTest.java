@@ -2049,20 +2049,24 @@ public class ParserTest {
   }
 
   @Test
-  public void TestComputeStats() {
-    ParsesOk("compute stats bar");
-    ParsesOk("compute stats `bar`");
-    ParsesOk("compute stats foo.bar");
-    ParsesOk("compute stats `foo`.`bar`");
+  public void TestComputeDropStats() {
+    String[] prefixes = {"compute", "drop"};
 
-    // Missing table name.
-    ParserError("compute stats");
-    // Missing 'stats' keyword.
-    ParserError("compute foo");
-    // Cannot use string literal as table name.
-    ParserError("compute stats 'foo'");
-    // Cannot analyze multiple tables in one stmt.
-    ParserError("compute stats foo bar");
+    for (String prefix: prefixes) {
+      ParsesOk(prefix + " stats bar");
+      ParsesOk(prefix + " stats `bar`");
+      ParsesOk(prefix + " stats foo.bar");
+      ParsesOk(prefix + " stats `foo`.`bar`");
+
+      // Missing table name.
+      ParserError(prefix + " stats");
+      // Missing 'stats' keyword.
+      ParserError(prefix + " foo");
+      // Cannot use string literal as table name.
+      ParserError(prefix + " stats 'foo'");
+      // Cannot analyze multiple tables in one stmt.
+      ParserError(prefix + " stats foo bar");
+    }
   }
 
   @Test

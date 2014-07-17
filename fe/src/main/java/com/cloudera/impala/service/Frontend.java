@@ -39,6 +39,7 @@ import com.cloudera.impala.analysis.CreateUdaStmt;
 import com.cloudera.impala.analysis.CreateUdfStmt;
 import com.cloudera.impala.analysis.DropDataSrcStmt;
 import com.cloudera.impala.analysis.DropFunctionStmt;
+import com.cloudera.impala.analysis.DropStatsStmt;
 import com.cloudera.impala.analysis.DropTableOrViewStmt;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
@@ -317,6 +318,14 @@ public class Frontend {
       req.setDdl_type(TDdlType.DROP_DATA_SOURCE);
       DropDataSrcStmt stmt = (DropDataSrcStmt)analysis.getStmt();
       req.setDrop_data_source_params(stmt.toThrift());
+      ddl.setDdl_params(req);
+      metadata.setColumns(Collections.<TColumn>emptyList());
+    } else if (analysis.isDropStatsStmt()) {
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.DROP_STATS);
+      DropStatsStmt stmt = (DropStatsStmt) analysis.getStmt();
+      req.setDrop_stats_params(stmt.toThrift());
       ddl.setDdl_params(req);
       metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isResetMetadataStmt()) {

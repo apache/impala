@@ -104,6 +104,7 @@ import com.cloudera.impala.thrift.TDdlExecResponse;
 import com.cloudera.impala.thrift.TDropDataSourceParams;
 import com.cloudera.impala.thrift.TDropDbParams;
 import com.cloudera.impala.thrift.TDropFunctionParams;
+import com.cloudera.impala.thrift.TDropStatsParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
 import com.cloudera.impala.thrift.THdfsCachingOp;
 import com.cloudera.impala.thrift.THdfsFileFormat;
@@ -197,6 +198,9 @@ public class CatalogOpExecutor {
         break;
       case COMPUTE_STATS:
         Preconditions.checkState(false, "Compute stats should trigger an ALTER TABLE.");
+        break;
+      case DROP_STATS:
+        dropStats(ddlRequest.getDrop_stats_params(), response);
         break;
       case DROP_DATABASE:
         dropDatabase(ddlRequest.getDrop_db_params(), response);
@@ -392,25 +396,8 @@ public class CatalogOpExecutor {
           numUpdatedColumns = colStats.getStatsObjSize();
         }
 
-        // Update partitions in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'. This
-        // reduces the time spent in a single update and helps avoid metastore client
-        // timeouts.
-        for (int i = 0; i < modifiedParts.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
-          int numPartitionsToUpdate =
-              Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, modifiedParts.size());
-          List<org.apache.hadoop.hive.metastore.api.Partition> partsToUpdate =
-              modifiedParts.subList(i, numPartitionsToUpdate);
-          synchronized (metastoreDdlLock_) {
-            // Alter partitions in bulk.
-            try {
-              msClient.getHiveClient().alter_partitions(tableName.getDb(),
-                  tableName.getTbl(), partsToUpdate);
-            } catch (TException e) {
-              throw new ImpalaRuntimeException(
-                  String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), e);
-            }
-          }
-        }
+        // Update all partitions.
+        bulkAlterPartitions(table.getDb().getName(), table.getName(), modifiedParts);
 
         synchronized (metastoreDdlLock_) {
           if (numUpdatedColumns > 0) {
@@ -689,6 +676,112 @@ public class CatalogOpExecutor {
     removedObject.setCatalog_version(dataSource.getCatalogVersion());
     resp.result.setRemoved_catalog_object(removedObject);
     resp.result.setVersion(dataSource.getCatalogVersion());
+  }
+
+  /**
+   * Drops all table and column stats from the target table in the HMS and
+   * updates the Impala catalog. Throws an ImpalaException if any errors are
+   * encountered as part of this operation.
+   */
+  private void dropStats(TDropStatsParams params, TDdlExecResponse resp)
+      throws ImpalaException {
+    Table table = getExistingTable(params.getTable_name().getDb_name(),
+        params.getTable_name().getTable_name());
+    Preconditions.checkNotNull(table);
+
+    // TODO: Report the number of updated partitions/columns to the user?
+    dropColumnStats(table);
+    dropTableStats(table);
+
+    Table refreshedTable = catalog_.reloadTable(params.getTable_name());
+    resp.result.setUpdated_catalog_object(TableToTCatalogObject(refreshedTable));
+    resp.result.setVersion(
+        resp.result.getUpdated_catalog_object().getCatalog_version());
+  }
+
+  /**
+   * Drops all column stats from the table in the HMS. Returns the number of columns
+   * that were updated as part of this operation.
+   */
+  private int dropColumnStats(Table table) throws ImpalaRuntimeException {
+    MetaStoreClient msClient = null;
+    int numColsUpdated = 0;
+    try {
+      msClient = catalog_.getMetaStoreClient();
+
+      for (Column col: table.getColumns()) {
+        // Skip columns that don't have stats.
+        if (!col.getStats().hasStats()) continue;
+
+        try {
+          synchronized (metastoreDdlLock_) {
+            msClient.getHiveClient().deleteTableColumnStatistics(
+                table.getDb().getName(), table.getName(), col.getName());
+            ++numColsUpdated;
+          }
+        } catch (NoSuchObjectException e) {
+          // We don't care if the column stats do not exist, just ignore the exception.
+          // We would only expect to make it here if the Impala and HMS metadata
+          // diverged.
+        } catch (TException e) {
+          throw new ImpalaRuntimeException(
+              String.format(HMS_RPC_ERROR_FORMAT_STR,
+                  "delete_table_column_statistics"), e);
+        }
+      }
+    } finally {
+      if (msClient != null) msClient.release();
+    }
+    return numColsUpdated;
+  }
+
+  /**
+   * Drops all table and partition stats from this table in the HMS.
+   * Partitions are updated in batches of MAX_PARTITION_UPDATES_PER_RPC. Returns
+   * the number of partitions updated as part of this operation, or 1 if the table
+   * is unpartitioned.
+   */
+  private int dropTableStats(Table table) throws ImpalaRuntimeException {
+    // Delete the ROW_COUNT from the table (if it was set).
+    org.apache.hadoop.hive.metastore.api.Table msTbl = table.getMetaStoreTable();
+    int numTargetedPartitions = 0;
+    if (msTbl.getParameters().remove(StatsSetupConst.ROW_COUNT) != null) {
+      applyAlterTable(msTbl);
+      ++numTargetedPartitions;
+    }
+
+    if (!(table instanceof HdfsTable) || table.getNumClusteringCols() == 0) {
+      // If this is not an HdfsTable or if the table is not partitioned, there
+      // is no more work to be done so just return.
+      return numTargetedPartitions;
+    }
+
+    // Now clear the stats for all partitions in the table.
+    HdfsTable hdfsTable = (HdfsTable) table;
+    Preconditions.checkNotNull(hdfsTable);
+
+    // List of partitions that were modified as part of this operation.
+    List<org.apache.hadoop.hive.metastore.api.Partition> modifiedParts =
+        Lists.newArrayList();
+    for (HdfsPartition part: hdfsTable.getPartitions()) {
+      // The default partition is an Impala-internal abstraction and is not
+      // represented in the Hive Metastore.
+      if (part.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
+        continue;
+      }
+      org.apache.hadoop.hive.metastore.api.Partition msPart =
+          part.getMetaStorePartition();
+      Preconditions.checkNotNull(msPart);
+
+      // Remove the ROW_COUNT parameter if it has been set.
+      if (msPart.getParameters().remove(StatsSetupConst.ROW_COUNT) != null) {
+        // This partition needs to be updated, add it to the list of modified partitions.
+        modifiedParts.add(msPart);
+      }
+    }
+
+    bulkAlterPartitions(table.getDb().getName(), table.getName(), modifiedParts);
+    return modifiedParts.size();
   }
 
   /**
@@ -1596,6 +1689,40 @@ public class CatalogOpExecutor {
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partition"), e);
     } finally {
       msClient.release();
+    }
+  }
+
+  /**
+   * Alters partitions in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'. This
+   * reduces the time spent in a single update and helps avoid metastore client
+   * timeouts.
+   */
+  private void bulkAlterPartitions(String dbName, String tableName,
+      List<org.apache.hadoop.hive.metastore.api.Partition> modifiedParts)
+      throws ImpalaRuntimeException {
+    MetaStoreClient msClient = null;
+    try {
+      msClient = catalog_.getMetaStoreClient();
+
+      // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
+      for (int i = 0; i < modifiedParts.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
+        int numPartitionsToUpdate =
+            Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, modifiedParts.size());
+        List<org.apache.hadoop.hive.metastore.api.Partition> partsToUpdate =
+            modifiedParts.subList(i, numPartitionsToUpdate);
+
+        synchronized (metastoreDdlLock_) {
+          try {
+            // Alter partitions in bulk.
+            msClient.getHiveClient().alter_partitions(dbName, tableName, partsToUpdate);
+          } catch (TException e) {
+            throw new ImpalaRuntimeException(
+                String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), e);
+          }
+        }
+      }
+    } finally {
+      if (msClient != null) msClient.release();
     }
   }
 

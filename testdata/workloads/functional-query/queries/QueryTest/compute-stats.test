@@ -67,6 +67,69 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
 ---- QUERY
+# drop stats from this table
+drop stats compute_stats_db.alltypes
+====
+---- QUERY
+show table stats compute_stats_db.alltypes
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
+---- RESULTS
+2009,1,-1,1,'24.56KB','NOT CACHED','TEXT'
+2009,2,-1,1,'22.27KB','NOT CACHED','TEXT'
+2009,3,-1,1,'24.67KB','NOT CACHED','TEXT'
+2009,4,-1,1,'24.06KB','NOT CACHED','TEXT'
+2009,5,-1,1,'24.97KB','NOT CACHED','TEXT'
+2009,6,-1,1,'24.16KB','NOT CACHED','TEXT'
+2009,7,-1,1,'24.97KB','NOT CACHED','TEXT'
+2009,8,-1,1,'24.97KB','NOT CACHED','TEXT'
+2009,9,-1,1,'24.16KB','NOT CACHED','TEXT'
+2009,10,-1,1,'24.97KB','NOT CACHED','TEXT'
+2009,11,-1,1,'24.16KB','NOT CACHED','TEXT'
+2009,12,-1,1,'24.97KB','NOT CACHED','TEXT'
+2010,1,-1,1,'24.97KB','NOT CACHED','TEXT'
+2010,2,-1,1,'22.54KB','NOT CACHED','TEXT'
+2010,3,-1,1,'24.97KB','NOT CACHED','TEXT'
+2010,4,-1,1,'24.16KB','NOT CACHED','TEXT'
+2010,5,-1,1,'24.97KB','NOT CACHED','TEXT'
+2010,6,-1,1,'24.16KB','NOT CACHED','TEXT'
+2010,7,-1,1,'24.97KB','NOT CACHED','TEXT'
+2010,8,-1,1,'24.97KB','NOT CACHED','TEXT'
+2010,9,-1,1,'24.16KB','NOT CACHED','TEXT'
+2010,10,-1,1,'24.97KB','NOT CACHED','TEXT'
+2010,11,-1,1,'24.16KB','NOT CACHED','TEXT'
+2010,12,-1,1,'24.97KB','NOT CACHED','TEXT'
+Total,,-1,24,'586.84KB','0B',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+# Note - the NDV for partition columns is read from the table metadata.
+show column stats compute_stats_db.alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',-1,-1,4,4
+'bool_col','BOOLEAN',-1,-1,1,1
+'tinyint_col','TINYINT',-1,-1,1,1
+'smallint_col','SMALLINT',-1,-1,2,2
+'int_col','INT',-1,-1,4,4
+'bigint_col','BIGINT',-1,-1,8,8
+'float_col','FLOAT',-1,-1,4,4
+'double_col','DOUBLE',-1,-1,8,8
+'date_string_col','STRING',-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# drop stats from this table a second time, should not throw an error.
+drop stats compute_stats_db.alltypes
+====
+---- QUERY
 # test computing stats on an partitioned text table with all types
 create table compute_stats_db.alltypesnopart like functional.alltypesnopart;
 insert into compute_stats_db.alltypesnopart

@@ -337,6 +337,7 @@ nonterminal AlterTableStmt alter_tbl_stmt;
 nonterminal StatementBase alter_view_stmt;
 nonterminal ComputeStatsStmt compute_stats_stmt;
 nonterminal DropDbStmt drop_db_stmt;
+nonterminal DropStatsStmt drop_stats_stmt;
 nonterminal DropTableOrViewStmt drop_tbl_or_view_stmt;
 nonterminal CreateDbStmt create_db_stmt;
 nonterminal CreateTableAsSelectStmt create_tbl_as_select_stmt;
@@ -455,6 +456,8 @@ stmt ::=
   {: RESULT = alter_view; :}
   | compute_stats_stmt:compute_stats
   {: RESULT = compute_stats; :}
+  | drop_stats_stmt:drop_stats
+  {: RESULT = drop_stats; :}
   | create_tbl_as_select_stmt:create_tbl_as_select
   {: RESULT = create_tbl_as_select; :}
   | create_tbl_like_stmt:create_tbl_like
@@ -960,6 +963,11 @@ alter_view_stmt ::=
 compute_stats_stmt ::=
   KW_COMPUTE KW_STATS table_name:table
   {: RESULT = new ComputeStatsStmt(table); :}
+  ;
+
+drop_stats_stmt ::=
+  KW_DROP KW_STATS table_name:table
+  {: RESULT = new DropStatsStmt(table); :}
   ;
 
 drop_db_stmt ::=

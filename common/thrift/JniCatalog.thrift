@@ -37,7 +37,8 @@ enum TDdlType {
   DROP_VIEW,
   DROP_FUNCTION,
   CREATE_DATA_SOURCE,
-  DROP_DATA_SOURCE
+  DROP_DATA_SOURCE,
+  DROP_STATS,
 }
 
 // Types of ALTER TABLE commands supported.
@@ -89,6 +90,12 @@ struct TDropDataSourceParams {
 
   // If true, no error is raised if the target data source does not exist
   2: optional bool if_exists
+}
+
+// Parameters of DROP STATS commands
+struct TDropStatsParams {
+  // Fully qualified name of the target table
+  1: required CatalogObjects.TTableName table_name
 }
 
 // Parameters of CREATE FUNCTION commands
