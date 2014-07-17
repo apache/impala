@@ -95,15 +95,13 @@ class TestProcessFailures(CustomClusterTestSuite):
     impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE - 1, timeout=60)
 
     # Wait until the in-flight query has been cancelled.
-    impalad.service.wait_for_query_state(client, handle,\
-                                         client.QUERY_STATES['EXCEPTION'])
-
     # The in-flight query should have been cancelled, reporting a failed worker as the
     # cause. The query may have been cancelled because the state store detected a failed
     # node, or because a stream sender failed to establish a thrift connection. It is
     # non-deterministic which of those paths will initiate cancellation, but in either
     # case the query status should include the failed (or unreachable) worker.
-    assert client.get_state(handle) == client.QUERY_STATES['EXCEPTION']
+    impalad.service.wait_for_query_state(client, handle,\
+                                         client.QUERY_STATES['EXCEPTION'])
 
     # Wait for the query status on the query profile web page to contain the
     # expected failed hostport.

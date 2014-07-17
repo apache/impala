@@ -49,7 +49,8 @@ class TestRowsAvailability(ImpalaTestSuite):
     # Execute async to get a handle. Wait until the query has completed.
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
     self.impalad_test_service.wait_for_query_state(self.client, handle,
-        self.client.QUERY_STATES['FINISHED'])
+        self.client.QUERY_STATES['FINISHED'], timeout=20)
+
     # Parse the query profile for the 'Rows available' timeline event.
     rows_avail_line = self.__get_rows_available_event(handle)
     # Match the parenthesized delta duration between the 'Rows available' event
