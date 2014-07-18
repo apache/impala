@@ -37,6 +37,7 @@
 #include "codegen/llvm-codegen.h"
 #include "util/debug-util.h"
 #include "util/string-parser.h"
+#include "util/test-info.h"
 #include "rpc/thrift-server.h"
 #include "rpc/thrift-client.h"
 #include "testutil/in-process-servers.h"
@@ -49,6 +50,7 @@ DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
 DECLARE_string(impalad);
 DECLARE_bool(abort_on_config_error);
+DECLARE_bool(disable_optimization_passes);
 
 using namespace impala;
 using namespace llvm;
@@ -4025,9 +4027,20 @@ TEST_F(ExprTest, MADlib) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, true);
+  InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
   InitFeSupport();
   impala::LlvmCodeGen::InitializeLlvm();
+
+  // Disable llvm optimization passes if the env var is no set to true. Running without
+  // the optimizations makes the tests run much faster.
+  char* optimizations = getenv("EXPR_TEST_ENABLE_OPTIMIZATIONS");
+  if (optimizations != NULL && strcmp(optimizations, "true") == 0) {
+    cout << "Running with optimization passes." << endl;
+    FLAGS_disable_optimization_passes = false;
+  } else {
+    cout << "Running without optimization passes." << endl;
+    FLAGS_disable_optimization_passes = true;
+  }
 
   // Create an in-process Impala server and in-process backends for test environment
   // without any startup validation check

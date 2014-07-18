@@ -12,21 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IMPALA_UTIL_FE_TEST_INFO_H
-#define IMPALA_UTIL_FE_TEST_INFO_H
+#ifndef IMPALA_UTIL_TEST_INFO_H
+#define IMPALA_UTIL_TEST_INFO_H
 
 namespace impala {
 
-// Provides global access to whether this binary is running as part of the FE tests
+// Provides global access to whether this binary is running as part of the tests
 // (i.e., without a full BE).
-class FeTestInfo {
+class TestInfo {
  public:
+  enum Mode {
+    NON_TEST, // Not a test, one of the main daemons
+    BE_TEST,
+    FE_TEST,
+  };
+
   // Called in InitCommonRuntime().
-  static void Init(bool is_fe_tests) { is_fe_tests_ = is_fe_tests; }
-  static bool is_fe_tests() { return is_fe_tests_; }
+  static void Init(Mode mode) { mode_ = mode; }
+
+  static bool is_fe_test() { return mode_ == FE_TEST; }
+  static bool is_test() { return mode_ == BE_TEST || mode_ == FE_TEST; }
 
  private:
-  static bool is_fe_tests_;
+  static Mode mode_;
 };
 
 }

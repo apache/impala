@@ -52,11 +52,13 @@ using namespace boost;
 using namespace llvm;
 using namespace std;
 
+DEFINE_bool(disable_optimization_passes, false,
+    "if true, disables llvm optimization passes (used for testing)");
 DEFINE_bool(dump_ir, false, "if true, output IR after optimization passes");
 DEFINE_string(unopt_module, "",
-              "if set, saves the unoptimized generated IR to the specified file.");
+    "if set, saves the unoptimized generated IR to the specified file.");
 DEFINE_string(opt_module, "",
-              "if set, saves the optimized generated IR to the specified file.");
+    "if set, saves the optimized generated IR to the specified file.");
 DECLARE_string(local_library_dir);
 
 namespace impala {
@@ -571,7 +573,7 @@ Status LlvmCodeGen::FinalizeModule() {
   SCOPED_TIMER(profile_.total_time_counter());
   SCOPED_TIMER(compile_timer_);
 
-  if (optimizations_enabled_) OptimizeModule();
+  if (optimizations_enabled_ && !FLAGS_disable_optimization_passes) OptimizeModule();
 
   // JIT compile all codegen'd functions
   for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {

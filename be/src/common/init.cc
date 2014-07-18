@@ -23,11 +23,11 @@
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
-#include "util/fe-test-info.h"
 #include "util/logging-support.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"
 #include "util/os-info.h"
+#include "util/test-info.h"
 #include "runtime/decimal-value.h"
 #include "runtime/exec-env.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -64,8 +64,9 @@ static void MaintenanceThread() {
 
     google::FlushLogFiles(google::GLOG_INFO);
 
-    // Front end tests don't use tcmalloc
-    if (impala::FeTestInfo::is_fe_tests()) continue;
+    // Tests don't need to run the maintenance thread. It causes issues when
+    // on teardown.
+    if (impala::TestInfo::is_test()) continue;
 
 #ifndef ADDRESS_SANITIZER
     // Required to ensure memory gets released back to the OS, even if tcmalloc doesn't do
@@ -102,14 +103,15 @@ static void MaintenanceThread() {
   }
 }
 
-void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm, bool is_fe_tests) {
+void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
+    TestInfo::Mode test_mode) {
   CpuInfo::Init();
   DiskInfo::Init();
   MemInfo::Init();
   OsInfo::Init();
   DecimalUtil::InitMaxUnscaledDecimal();
 
-  FeTestInfo::Init(is_fe_tests);
+  TestInfo::Init(test_mode);
 
   if (!CpuInfo::IsSupported(CpuInfo::SSE3)) {
     LOG(ERROR) << "CPU does not support the SSE3 instruction set, which is required."

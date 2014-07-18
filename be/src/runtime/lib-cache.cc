@@ -22,10 +22,10 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-state.h"
 #include "util/dynamic-util.h"
-#include "util/fe-test-info.h"
 #include "util/hash-util.h"
 #include "util/hdfs-util.h"
 #include "util/path-builder.h"
+#include "util/test-info.h"
 
 using namespace boost;
 using namespace std;
@@ -98,7 +98,7 @@ Status LibCache::Init() {
 }
 
 Status LibCache::InitInternal() {
-  if (FeTestInfo::is_fe_tests()) {
+  if (TestInfo::is_fe_test()) {
     // In the FE tests, NULL gives the handle to the java process.
     // Explicitly load the fe-support shared object.
     string fe_support_path;
@@ -121,7 +121,7 @@ LibCache::LibCacheEntry::~LibCacheEntry() {
   unlink(local_path.c_str());
 }
 
-Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& symbol, 
+Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& symbol,
                                   void** fn_ptr, LibCacheEntry** ent) {
   if (hdfs_lib_file.empty()) {
     // Just loading a function ptr in the current process. No need to take any locks.

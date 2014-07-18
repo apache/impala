@@ -19,7 +19,7 @@
 #include "common/logging.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
-#include "util/fe-test-info.h"
+#include "util/test-info.h"
 
 using namespace std;
 using namespace boost;

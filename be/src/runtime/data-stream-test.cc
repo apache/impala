@@ -35,6 +35,7 @@
 #include "util/thread.h"
 #include "util/time.h"
 #include "util/mem-info.h"
+#include "util/test-info.h"
 #include "util/tuple-row-compare.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -504,8 +505,8 @@ class DataStreamTest : public testing::Test {
   }
 
  private:
-  SlotRef* lhs_slot_;  
-  SlotRef* rhs_slot_;  
+  SlotRef* lhs_slot_;
+  SlotRef* rhs_slot_;
 };
 
 TEST_F(DataStreamTest, UnknownSenderSmallResult) {
@@ -572,7 +573,7 @@ TEST_F(DataStreamTest, BasicTest) {
 }
 
 int main(int argc, char **argv) {
-  InitCommonRuntime(argc, argv, true);
+  InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
   impala::LlvmCodeGen::InitializeLlvm();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

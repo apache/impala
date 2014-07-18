@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util/fe-test-info.h"
+#include "util/test-info.h"
 
 using namespace impala;
 
-bool FeTestInfo::is_fe_tests_ = false;
+TestInfo::Mode TestInfo::mode_ = TestInfo::NON_TEST;

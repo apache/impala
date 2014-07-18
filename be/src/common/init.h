@@ -15,13 +15,17 @@
 #ifndef IMPALA_COMMON_INIT_H
 #define IMPALA_COMMON_INIT_H
 
+#include "util/test-info.h"
+
 namespace impala {
 
 // Initialises logging, flags, and, if init_jvm is true, an embedded JVM.
-// is_fe_tests is set to true when called from the FE during tests when there is no BE.
+// Tests can initialize indicating if they are a FE or BE test if they require
+// different behavior (most BE tests don't.).
 // Callers that want to override default gflags variables should do so before calling
 // this method. No logging should be performed until after this method returns.
-void InitCommonRuntime(int argc, char** argv, bool init_jvm, bool is_fe_tests = false);
+void InitCommonRuntime(int argc, char** argv, bool init_jvm,
+    TestInfo::Mode m = TestInfo::NON_TEST);
 
 }
 
