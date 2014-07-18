@@ -435,6 +435,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes a, " +
         "(select * from functional.alltypesagg) t where a.id = t.id and exists " +
         "(select * from functional.alltypestiny s where s.int_col = t.int_col)");
+    AnalyzesOk("select * from functional.alltypes where exists " +
+        "(select 1, 1, 2, 2)");
+    AnalyzesOk("select * from functional.alltypes where exists " +
+        "(select * from functional.alltypestiny cross join functional.alltypessmall)");
 
     // Binary predicate with a subquery
     AnalyzesOk("select id from functional.alltypestiny where int_col = " +
@@ -462,6 +466,29 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "(select min(id) from functional.alltypessmall) - " +
         "(select count(id) from functional.alltypessmall) < 1000");
 
+    // Binary predicate with non-comparable operands
+    AnalysisError("select * from functional.alltypes t where " +
+        "(id in (select id from functional.alltypestiny)) = 'string_val'",
+        "operands of type BOOLEAN and STRING are not comparable: " +
+        "(id IN (SELECT id FROM functional.alltypestiny)) = 'string_val'");
+    AnalysisError("select * from functional.alltypestiny where " +
+        "(select max(id) from functional.alltypes) = " +
+        "(select id from functional.alltypestiny)",
+        "Subquery must return a single row: " +
+        "(SELECT id FROM functional.alltypestiny)");
+
+    // Invalid arithmetic expr between two subqueries
+    AnalysisError("select * from functional.alltypes where " +
+        "(select max(id) from functional.alltypesagg) + " +
+        "(select id from functional.alltypestiny) = 10",
+        "Subquery must return a single row: " +
+        "(SELECT id FROM functional.alltypestiny)");
+    AnalysisError("select * from functional.alltypes where " +
+        "(select max(string_col) from functional.alltypesagg) + " +
+        "(select count(*) from functional.alltypestiny) = 1",
+        "Arithmetic operation requires numeric operands: " +
+        "(SELECT max(string_col) FROM functional.alltypesagg) + " +
+        "(SELECT count(*) FROM functional.alltypestiny)");
 
     // Subquery references an explicit alias from the outer block
     AnalysisError("select * from functional.alltypestiny t where " +
@@ -487,18 +514,18 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Subquery returns multiple rows
     AnalysisError("select id from functional.alltypestiny t where int_col = " +
         "(select int_col from functional.alltypessmall limit 2)",
-        "Subquery must return a scalar value: (SELECT int_col FROM " +
-        "functional.alltypessmall LIMIT 2)");
+        "Subquery must return a single row: " +
+        "(SELECT int_col FROM functional.alltypessmall LIMIT 2)");
     AnalysisError("select id from functional.alltypestiny where int_col = " +
         "(select id from functional.alltypessmall)",
-        "Subquery must return a scalar value: (SELECT id FROM " +
-        "functional.alltypessmall)");
+        "Subquery must return a single row: " +
+        "(SELECT id FROM functional.alltypessmall)");
 
     // Subquery returns multiple columns
     AnalysisError("select id from functional.alltypestiny where int_col = " +
         "(select id, int_col from functional.alltypessmall)",
-        "Subquery must return a scalar value: (SELECT id, int_col FROM " +
-        "functional.alltypessmall)");
+        "Subquery must return a single row: " +
+        "(SELECT id, int_col FROM functional.alltypessmall)");
     AnalysisError("select * from functional.alltypestiny where id in " +
         "(select * from (values(1,2)) as t)",
         "Subquery must return a single column: (SELECT * FROM (VALUES(1, 2)) t)");
@@ -506,8 +533,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Subquery returns multiple columns due to a group by clause
     AnalysisError("select id from functional.alltypestiny where int_col = " +
         "(select int_col, count(*) from functional.alltypessmall group by int_col)",
-        "Subquery must return a scalar value: (SELECT int_col, count(*) FROM " +
-        "functional.alltypessmall GROUP BY int_col)");
+        "Subquery must return a single row: " +
+        "(SELECT int_col, count(*) FROM functional.alltypessmall " +
+        "GROUP BY int_col)");
 
     // Multiple predicates with subqueries
     AnalyzesOk("select * from functional.alltypestiny t where " +

@@ -149,26 +149,24 @@ public class BinaryPredicate extends Predicate {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
 
-    if (contains(Predicates.instanceOf(Subquery.class))) {
-      // Check if every subquery in this predicate returns a scalar.
-      //
-      // TODO: Refactor this when we have collection-valued types.
-      for (Expr expr: children_) {
-        if (!(expr instanceof Subquery)) continue;
-        Subquery subquery = (Subquery)expr;
-        if (!((SelectStmt)subquery.getStatement()).returnsScalarValue()) {
-          throw new AnalysisException("Subquery must return a scalar value: " +
-              subquery.toSql());
-        }
-      }
-    }
-
     convertNumericLiteralsFromDecimal(analyzer);
     fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
         CompareMode.IS_SUPERTYPE_OF);
     if (fn_ == null) {
-      throw new AnalysisException("operands of type " + getChild(0).getType() +
-          " and " + getChild(1).getType()  + " are not comparable: " + toSql());
+      // Construct an appropriate error message and throw an AnalysisException.
+      String errMsg = "operands of type " + getChild(0).getType() + " and " +
+            getChild(1).getType()  + " are not comparable: " + toSql();
+
+      // Check if any of the children is a Subquery that does not return a
+      // scalar.
+      for (Expr expr: children_) {
+        if (expr instanceof Subquery && !expr.getType().isScalarType()) {
+          errMsg = "Subquery must return a single row: " + expr.toSql();
+          break;
+        }
+      }
+
+      throw new AnalysisException(errMsg);
     }
     Preconditions.checkState(fn_.getReturnType().isBoolean());
     // Don't perform any casting for predicates with subqueries here. Any casting

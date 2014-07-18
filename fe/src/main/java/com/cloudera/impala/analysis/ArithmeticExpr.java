@@ -159,8 +159,11 @@ public class ArithmeticExpr extends Expr {
     for (Expr child: children_) {
       Expr operand = (Expr) child;
       if (!operand.type_.isNumericType() && !operand.type_.isNull()) {
-        throw new AnalysisException("Arithmetic operation requires " +
-            "numeric operands: " + toSql());
+        String errMsg = "Arithmetic operation requires numeric operands: " + toSql();
+        if (operand instanceof Subquery && !operand.type_.isScalarType()) {
+          errMsg = "Subquery must return a single row: " + operand.toSql();
+        }
+        throw new AnalysisException(errMsg);
       }
     }
 

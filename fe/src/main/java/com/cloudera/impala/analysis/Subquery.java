@@ -16,15 +16,23 @@ package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
+
+import com.cloudera.impala.catalog.ArrayType;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.StructField;
+import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Class representing a subquery. A Subquery consists of a QueryStmt and has
@@ -73,13 +81,67 @@ public class Subquery extends Expr {
     analyzer_ = new Analyzer(analyzer, analyzer.getUser());
     analyzer_.setIsSubquery();
     stmt_.analyze(analyzer_);
+
+    // Set the subquery type based on the types of the exprs in the
+    // result list of the associated SelectStmt.
     ArrayList<Expr> stmtResultExprs = stmt_.getResultExprs();
-    // If the subquery returns a single column, set the type of this expr to be
-    // the type of the return expr in the subquery's select clause.
-    // TODO: When complex types arrive this can also be a struct, so this check
-    // may no longer be valid.
-    if (stmtResultExprs.size() == 1) type_ = stmtResultExprs.get(0).getType();
+    if (stmtResultExprs.size() == 1) {
+      type_ = stmtResultExprs.get(0).getType();
+      Preconditions.checkState(!type_.isComplexType());
+    } else {
+      type_ = createStructTypeFromExprList();
+    }
+
+    // If the subquery returns many rows, set its type to ArrayType.
+    if (!((SelectStmt)stmt_).returnsSingleRow()) type_ = new ArrayType(type_);
+
+    Preconditions.checkNotNull(type_);
+    type_.analyze();
     isAnalyzed_ = true;
+  }
+
+  /**
+   * Check if the subquery's SelectStmt returns a single column of scalar type.
+   */
+  public boolean returnsScalarColumn() {
+    ArrayList<Expr> stmtResultExprs = stmt_.getResultExprs();
+    if (stmtResultExprs.size() == 1 && stmtResultExprs.get(0).getType().isScalarType()) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Create a StrucType from the result expr list of a subquery's SelectStmt.
+   */
+  private StructType createStructTypeFromExprList() {
+    ArrayList<Expr> stmtResultExprs = stmt_.getResultExprs();
+    ArrayList<StructField> structFields = Lists.newArrayList();
+    // Check if we have unique labels
+    ArrayList<String> labels = stmt_.getColLabels();
+    boolean hasUniqueLabels = true;
+    if (Sets.newHashSet(labels).size() != labels.size()) hasUniqueLabels = false;
+
+    // Construct a StructField from each expr in the select list
+    for (int i = 0; i < stmtResultExprs.size(); ++i) {
+      Expr expr = stmtResultExprs.get(i);
+      String fieldName = null;
+      // Check if the label meets the Metastore's requirements.
+      if (MetaStoreUtils.validateName(labels.get(i))) {
+        fieldName = labels.get(i);
+        // Make sure the field names are unique.
+        if (!hasUniqueLabels) {
+          fieldName = "_" + Integer.toString(i) + "_" + fieldName;
+        }
+      } else {
+        // Use the expr ordinal to construct a StructField.
+        fieldName = "_" + Integer.toString(i);
+      }
+      Preconditions.checkNotNull(fieldName);
+      structFields.add(new StructField(fieldName, expr.getType(), null));
+    }
+    Preconditions.checkState(structFields.size() != 0);
+    return new StructType(structFields);
   }
 
   @Override

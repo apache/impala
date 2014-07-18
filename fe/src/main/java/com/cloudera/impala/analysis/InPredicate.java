@@ -73,9 +73,7 @@ public class InPredicate extends Predicate {
       Preconditions.checkState(children_.size() == 2);
       Preconditions.checkState(getChild(1) instanceof Subquery);
       Subquery subquery = (Subquery)getChild(1);
-      // TODO: Change this when we have complex types.
-      ArrayList<Expr> subqueryExprs = subquery.getStatement().getResultExprs();
-      if (subqueryExprs.size() > 1) {
+      if (!subquery.returnsScalarColumn()) {
         throw new AnalysisException("Subquery must return a single column: " +
             subquery.toSql());
       }
@@ -84,6 +82,7 @@ public class InPredicate extends Predicate {
       // the subquery are type compatible. No need to perform any
       // casting at this point. Any casting needed will be performed when the
       // subquery is unnested.
+      ArrayList<Expr> subqueryExprs = subquery.getStatement().getResultExprs();
       Expr compareExpr = children_.get(0);
       Expr subqueryExpr = subqueryExprs.get(0);
       analyzer.getCompatibleType(compareExpr.getType(), compareExpr, subqueryExpr);

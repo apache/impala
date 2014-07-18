@@ -740,20 +740,17 @@ public class SelectStmt extends QueryStmt {
     return selectClone;
   }
 
-  /*
-   * Check if the stmt returns a scalar value. This can happen in
-   * the following cases:
+  /**
+   * Check if the stmt returns a single row. This can happen
+   * in the following cases:
    * 1. select stmt with a 'limit 1' clause
    * 2. select stmt with an aggregate function and no group by.
    * 3. select stmt with no from clause.
    *
-   * This function does not consider the case where a table with a single row is
-   * accessed through that stmt.
-   *
-   * TODO: Change this when we have complex types.
+   * This function may produce false negatives because the cardinality of the
+   * result set also depends on the data a stmt is processing.
    */
-  public boolean returnsScalarValue() {
-    if (resultExprs_.size() > 1) return false;
+  public boolean returnsSingleRow() {
     // limit 1 clause
     if (limitElement_ != null && limitElement_.getLimit() == 1) return true;
     // No from clause (base tables or inline views)
