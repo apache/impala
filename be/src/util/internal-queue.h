@@ -31,6 +31,7 @@ namespace impala {
 //  NULL <-- N1 <--> N2 <--> N3 --> NULL
 //          (head)          (tail)
 // TODO: this is an ideal candidate to be made lock free.
+
 // T must be a subclass of InternalQueue::Node
 template<typename T>
 class InternalQueue {
@@ -39,6 +40,16 @@ class InternalQueue {
    public:
     Node() : parent_queue(NULL), next(NULL), prev(NULL) {}
     virtual ~Node() {}
+
+    // Returns the Next/Prev node or NULL if this is the end/front.
+    T* Next() const {
+      ScopedSpinLock lock(&parent_queue->lock_);
+      return reinterpret_cast<T*>(next);
+    }
+    T* Prev() const {
+      ScopedSpinLock lock(&parent_queue->lock_);
+      return reinterpret_cast<T*>(prev);
+    }
 
    private:
     friend class InternalQueue;
@@ -50,6 +61,22 @@ class InternalQueue {
   };
 
   InternalQueue() : head_(NULL), tail_(NULL), size_(0) {}
+
+  // Returns the element at the head of the list without dequeuing or NULL
+  // if the queue is empty. This is O(1).
+  T* head() const {
+    ScopedSpinLock lock(&lock_);
+    if (empty()) return NULL;
+    return reinterpret_cast<T*>(head_);
+  }
+
+  // Returns the element at the end of the list without dequeuing or NULL
+  // if the queue is empty. This is O(1).
+  T* tail() {
+    ScopedSpinLock lock(&lock_);
+    if (empty()) return NULL;
+    return reinterpret_cast<T*>(tail_);
+  }
 
   // Enqueue node onto the queue's tail. This is O(1).
   void Enqueue(T* n) {
@@ -68,14 +95,6 @@ class InternalQueue {
     }
   }
 
-  // Returns the element at the head of the list without dequeuing or NULL
-  // if the queue is empty. This is O(1).
-  T* head() {
-    ScopedSpinLock lock(&lock_);
-    if (empty()) return NULL;
-    return reinterpret_cast<T*>(head_);
-  }
-
   // Dequeues an element from the queue's head. Returns NULL if the queue
   // is empty. This is O(1).
   T* Dequeue() {
@@ -90,6 +109,28 @@ class InternalQueue {
         tail_ = NULL;
       } else {
         head_->prev = NULL;
+      }
+    }
+    DCHECK(result != NULL);
+    result->next = result->prev = NULL;
+    result->parent_queue = NULL;
+    return reinterpret_cast<T*>(result);
+  }
+
+  // Dequeues an element from the queue's tail. Returns NULL if the queue
+  // is empty. This is O(1).
+  T* PopBack() {
+    Node* result = NULL;
+    {
+      ScopedSpinLock lock(&lock_);
+      if (empty()) return NULL;
+      --size_;
+      result = tail_;
+      tail_ = tail_->prev;
+      if (tail_ == NULL) {
+        head_ = NULL;
+      } else {
+        tail_->next = NULL;
       }
     }
     DCHECK(result != NULL);
@@ -203,7 +244,8 @@ class InternalQueue {
   }
 
  private:
-  SpinLock lock_;
+  friend class Node;
+  mutable SpinLock lock_;
   Node* head_, *tail_;
   int size_;
 };

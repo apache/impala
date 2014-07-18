@@ -44,8 +44,7 @@ BufferedBlockMgr::Block::Block(BufferedBlockMgr* block_mgr)
     block_mgr_(block_mgr),
     client_(NULL),
     write_range_(NULL),
-    valid_data_len_(0),
-    unpinned_blocks_it_(block_mgr->unpinned_blocks_.end()) {
+    valid_data_len_(0) {
 }
 
 Status BufferedBlockMgr::Block::Pin(bool* pinned) {
@@ -86,8 +85,7 @@ bool BufferedBlockMgr::Block::Validate() const {
     return false;
   }
 
-  if (buffer_desc_ == NULL &&
-      (unpinned_blocks_it_ != block_mgr_->unpinned_blocks_.end())) {
+  if (buffer_desc_ == NULL && block_mgr_->unpinned_blocks_.Contains(this)) {
     LOG(ERROR) << "Unpersisted block without buffer - " << DebugString();
     return false;
   }
@@ -282,12 +280,9 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   // Add 'block' to the list of unpinned blocks and set is_pinned_ to false.
   // Cache its position in the list for later removal.
   block->is_pinned_ = false;
-  DCHECK(block->unpinned_blocks_it_ == unpinned_blocks_.end())
-      << " Unpin for block in unpinned list";
+  DCHECK(!unpinned_blocks_.Contains(block)) << " Unpin for block in unpinned list";
   DCHECK_GT(block->client_->num_pinned_buffers_, 0);
-  if (!block->in_write_) {
-    block->unpinned_blocks_it_ = unpinned_blocks_.insert(unpinned_blocks_.end(), block);
-  }
+  if (!block->in_write_) unpinned_blocks_.Enqueue(block);
   if (block->client_->num_pinned_buffers_ > block->client_->num_reserved_buffers_) {
     --num_unreserved_pinned_buffers_;
   }
@@ -302,10 +297,7 @@ Status BufferedBlockMgr::WriteUnpinnedBlocks() {
   while (num_outstanding_writes_ + free_buffers_.size() < block_write_threshold_) {
     if (unpinned_blocks_.empty()) break;
     // Pop a block from the back of the list (LIFO)
-    Block* block_to_write = unpinned_blocks_.back();
-    unpinned_blocks_.pop_back();
-    block_to_write->unpinned_blocks_it_ = unpinned_blocks_.end();
-
+    Block* block_to_write = unpinned_blocks_.PopBack();
     DCHECK(!block_to_write->is_pinned_) << block_to_write->DebugString();
     DCHECK(!block_to_write->in_write_) << block_to_write->DebugString();
 
@@ -393,10 +385,9 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
       --num_unreserved_pinned_buffers_;
     }
     --block->client_->num_pinned_buffers_;
-  } else if (block->unpinned_blocks_it_ != unpinned_blocks_.end()) {
+  } else if (unpinned_blocks_.Contains(block)) {
     // Remove block from unpinned list.
-    unpinned_blocks_.erase(block->unpinned_blocks_it_);
-    block->unpinned_blocks_it_ = unpinned_blocks_.end();
+    unpinned_blocks_.Remove(block);
   } else {
     // Otherwise, this block's buffer must have already been put on the free list.
     DCHECK(block->buffer_desc_ == NULL);
@@ -451,11 +442,11 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     // 1) In the unpinned list. The buffer will not be in the free list.
     // 2) Or, in_write_ = true. The buffer will not be in the free list.
     // 3) Or, the buffer is free, but hasn't yet been reassigned to a different block.
-    DCHECK((block->unpinned_blocks_it_ != unpinned_blocks_.end()) ||
-        free_buffers_.Contains(block->buffer_desc_) || block->in_write_);
-    if (block->unpinned_blocks_it_ != unpinned_blocks_.end()) {
-      unpinned_blocks_.erase(block->unpinned_blocks_it_);
-      block->unpinned_blocks_it_ = unpinned_blocks_.end();
+    DCHECK(unpinned_blocks_.Contains(block) ||
+           block->in_write_ ||
+           free_buffers_.Contains(block->buffer_desc_));
+    if (unpinned_blocks_.Contains(block)) {
+      unpinned_blocks_.Remove(block);
       DCHECK(!free_buffers_.Contains(block->buffer_desc_));
     } else if (block->in_write_) {
       DCHECK(block->in_write_ && !free_buffers_.Contains(block->buffer_desc_));
@@ -567,12 +558,12 @@ bool BufferedBlockMgr::Validate() const {
       }
 
       if (is_free && (buffer->block->is_pinned_ || buffer->block->in_write_ ||
-          buffer->block->unpinned_blocks_it_ != unpinned_blocks_.end())) {
+          unpinned_blocks_.Contains(buffer->block))) {
         LOG(ERROR) << "Block with buffer in free list and"
                       << " is_pinned_ = " << buffer->block->is_pinned_
                       << " in_write_ = " << buffer->block->in_write_
                       << " Unpinned_blocks_.Contains = "
-                      << (buffer->block->unpinned_blocks_it_ != unpinned_blocks_.end())
+                      << unpinned_blocks_.Contains(buffer->block)
                       << endl << buffer->block->DebugString();
         return false;
       }
@@ -587,11 +578,8 @@ bool BufferedBlockMgr::Validate() const {
     return false;
   }
 
-  BOOST_FOREACH(Block* block, unpinned_blocks_) {
-    if (block->unpinned_blocks_it_ == unpinned_blocks_.end()) {
-      LOG(ERROR) << "Block in unpinned list with no pointer to list "
-                    << endl << block->DebugString();
-    }
+  Block* block = unpinned_blocks_.head();
+  while (block != NULL) {
     if (!block->Validate()) {
       LOG(ERROR) << "Block inconsistent in unpinned list."
                     << endl << block->DebugString();
@@ -606,6 +594,7 @@ bool BufferedBlockMgr::Validate() const {
                     << endl << block->DebugString();
       return false;
     }
+    block = block->Next();
   }
 
   // Check if we're writing blocks when the number of free buffers falls below

@@ -65,21 +65,52 @@ TEST(InternalQueue, TestBasic) {
   ASSERT_TRUE(i != NULL);
   ASSERT_EQ(i->value, 1);
   ASSERT_TRUE(list.Validate());
-  
+
   i = list.Dequeue();
   ASSERT_TRUE(i != NULL);
   ASSERT_EQ(i->value, 2);
   ASSERT_TRUE(list.Validate());
-  
+
   i = list.Dequeue();
   ASSERT_TRUE(i != NULL);
   ASSERT_EQ(i->value, 3);
   ASSERT_TRUE(list.Validate());
-  
+
   i = list.Dequeue();
   ASSERT_TRUE(i != NULL);
   ASSERT_EQ(i->value, 4);
   ASSERT_TRUE(list.Validate());
+
+  list.Enqueue(&one);
+  list.Enqueue(&two);
+  list.Enqueue(&three);
+  list.Enqueue(&four);
+
+  IntNode* node = list.head();
+  int val = 1;
+  while (node != NULL) {
+    ASSERT_EQ(node->value, val);
+    node = node->Next();
+    ++val;
+  }
+
+  node = list.tail();
+  val = 4;
+  while (node != NULL) {
+    ASSERT_EQ(node->value, val);
+    node = node->Prev();
+    --val;
+  }
+
+  for (int i = 0; i < 4; ++i) {
+    node = list.PopBack();
+    ASSERT_TRUE(node != NULL);
+    ASSERT_EQ(node->value, 4 - i);
+    ASSERT_TRUE(list.Validate());
+  }
+  ASSERT_TRUE(list.PopBack() == NULL);
+  ASSERT_EQ(list.size(), 0);
+  ASSERT_TRUE(list.empty());
 }
 
 // Add all the nodes and then remove every other one.
@@ -118,7 +149,7 @@ TEST(InternalQueue, TestRemove) {
 const int VALIDATE_INTERVAL = 10000;
 
 // CHECK() is not thread safe so return the result in *failed.
-void ProducerThread(InternalQueue<IntNode>* queue, int num_inserts, 
+void ProducerThread(InternalQueue<IntNode>* queue, int num_inserts,
     vector<IntNode>& nodes, AtomicInt<int32_t>* counter, bool* failed) {
   for (int i = 0; i < num_inserts && !*failed; ++i) {
     // Get the next index to queue.
@@ -160,11 +191,11 @@ TEST(InternalQueue, TestClear) {
   queue.Enqueue(&nodes[0]);
   queue.Enqueue(&nodes[1]);
   queue.Enqueue(&nodes[2]);
-  
+
   queue.Clear();
   ASSERT_TRUE(queue.Validate());
   ASSERT_TRUE(queue.empty());
-  
+
   queue.Enqueue(&nodes[0]);
   queue.Enqueue(&nodes[1]);
   queue.Enqueue(&nodes[2]);
@@ -209,7 +240,7 @@ TEST(InternalQueue, TestMultiProducerMultiConsumer) {
     ASSERT_EQ(nodes.size() % num_producers, 0);
     const int num_per_consumer = nodes.size() / NUM_CONSUMERS;
     const int num_per_producer = nodes.size() / num_producers;
-    
+
     vector<vector<int> > results;
     results.resize(NUM_CONSUMERS);
 
@@ -227,7 +258,7 @@ TEST(InternalQueue, TestMultiProducerMultiConsumer) {
       // enqueued.
       expected_delta = -1;
     }
-    
+
     InternalQueue<IntNode> queue;
     thread_group consumers;
     thread_group producers;
@@ -238,7 +269,7 @@ TEST(InternalQueue, TestMultiProducerMultiConsumer) {
     }
 
     for (int i = 0; i < NUM_CONSUMERS; ++i) {
-      consumers.add_thread(new thread(ConsumerThread, 
+      consumers.add_thread(new thread(ConsumerThread,
           &queue, num_per_consumer, expected_delta, &results[i], &failed));
     }
 
@@ -264,7 +295,7 @@ TEST(InternalQueue, TestMultiProducerMultiConsumer) {
 
 int main(int argc, char **argv) {
 #ifdef ADDRESS_SANITIZER
-  // These tests are disabled for address sanitier builds. 
+  // These tests are disabled for address sanitizer builds.
   // TODO: investigate why the multithreaded ones fail in boost:thread_local_data.
   cerr << "Internal Queue Test Skipped" << endl;
   return 0;

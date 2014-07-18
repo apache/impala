@@ -186,10 +186,6 @@ class BufferedBlockMgr {
     // Length of valid (i.e. allocated) data within the block.
     int64_t valid_data_len_;
 
-    // Points to the block's location in the list of unpinned blocks in the block manager
-    // object - for O(1) removal from the list.
-    std::list<Block*>::iterator unpinned_blocks_it_;
-
     // Block state variables. The block's buffer can be freed only if is_pinned_ and
     // in_write_ are both false.
     // TODO: this might be better expressed as an enum.
@@ -346,7 +342,7 @@ class BufferedBlockMgr {
   // Blocks are added to and removed from the back of the list. (i.e. in LIFO order).
   // Blocks in this list must have is_pinned_ = false, in_write_ = false,
   // is_deleted_ = false.
-  std::list<Block*> unpinned_blocks_;
+  InternalQueue<Block> unpinned_blocks_;
 
   // List of blocks that have been deleted and are no longer in use.
   // Can be reused in GetNewBlock(). Blocks in this list must be in the Init'ed state,
