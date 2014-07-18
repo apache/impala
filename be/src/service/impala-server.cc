@@ -1872,7 +1872,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
         new RpcEventHandler("beeswax", exec_env->metrics()));
     beeswax_processor->setEventHandler(event_handler);
     *beeswax_server = new ThriftServer(BEESWAX_SERVER_NAME, beeswax_processor,
-        beeswax_port, AuthManager::GetInstance()->GetClientFacingAuthProvider(),
+        beeswax_port, AuthManager::GetInstance()->GetExternalAuthProvider(),
         exec_env->metrics(), FLAGS_fe_service_threads, ThriftServer::ThreadPool);
 
     (*beeswax_server)->SetConnectionHandler(handler.get());
@@ -1894,7 +1894,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
     hs2_fe_processor->setEventHandler(event_handler);
 
     *hs2_server = new ThriftServer(HS2_SERVER_NAME, hs2_fe_processor, hs2_port,
-        AuthManager::GetInstance()->GetClientFacingAuthProvider(), exec_env->metrics(),
+        AuthManager::GetInstance()->GetExternalAuthProvider(), exec_env->metrics(),
         FLAGS_fe_service_threads, ThriftServer::ThreadPool);
 
     (*hs2_server)->SetConnectionHandler(handler.get());

@@ -159,7 +159,7 @@ class TSaslClient : public sasl::TSasl {
 
 class SaslServerImplException : public SaslException {
   public:
-    SaslServerImplException(const char* errMsg) 
+    SaslServerImplException(const char* errMsg)
         : SaslException(errMsg) {
     }
 };
@@ -168,7 +168,7 @@ class SaslServerImplException : public SaslException {
 class TSaslServer : public sasl::TSasl {
  public:
   TSaslServer(const std::string& service, const std::string& serverFQDN,
-              const std::string& userRelm, unsigned flags, sasl_callback_t* callbacks);
+              const std::string& userRealm, unsigned flags, sasl_callback_t* callbacks);
 
   /*
    * This initializes the sasl server library and should be called onece per application

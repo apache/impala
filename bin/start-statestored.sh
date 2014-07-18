@@ -44,7 +44,7 @@ done
 # If Kerberized, source appropriate vars and set startup options
 if ${CLUSTER_DIR}/admin is_kerberized; then
   . ${MINIKDC_ENV}
-  STATESTORED_ARGS="${STATESTORED_ARGS} -principal=${MINIKDC_PRINC_IMPA}"
+  STATESTORED_ARGS="${STATESTORED_ARGS} -principal=${MINIKDC_PRINC_IMPALA_BE}"
   STATESTORED_ARGS="${STATESTORED_ARGS} -keytab_file=${KRB5_KTNAME}"
 fi
 

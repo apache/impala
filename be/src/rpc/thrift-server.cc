@@ -283,7 +283,7 @@ ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& pro
       connection_handler_(NULL),
       auth_provider_(auth_provider) {
   if (auth_provider_ == NULL) {
-    auth_provider_ = AuthManager::GetInstance()->GetServerFacingAuthProvider();
+    auth_provider_ = AuthManager::GetInstance()->GetInternalAuthProvider();
   }
   if (metrics != NULL) {
     metrics_enabled_ = true;

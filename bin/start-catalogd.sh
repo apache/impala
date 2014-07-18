@@ -68,7 +68,7 @@ fi
 # If Kerberized, source appropriate vars and set startup options
 if ${CLUSTER_DIR}/admin is_kerberized; then
   . ${MINIKDC_ENV}
-  CATALOGD_ARGS="${CATALOGD_ARGS} -principal=${MINIKDC_PRINC_IMPA}"
+  CATALOGD_ARGS="${CATALOGD_ARGS} -principal=${MINIKDC_PRINC_IMPALA_BE}"
   CATALOGD_ARGS="${CATALOGD_ARGS} -keytab_file=${KRB5_KTNAME}"
   export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} ${JAVA_KERBEROS_MAGIC}"
 fi

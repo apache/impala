@@ -45,7 +45,8 @@ export MINIKDC_PRINC_HTTP=HTTP/localhost@${MINIKDC_REALM}
 export MINIKDC_PRINC_HIVE=hive/localhost@${MINIKDC_REALM}
 export MINIKDC_PRINC_HBSE=hbase/localhost@${MINIKDC_REALM}
 export MINIKDC_PRINC_ZOOK=zookeeper/localhost@${MINIKDC_REALM}
-export MINIKDC_PRINC_IMPA=impala/localhost@${MINIKDC_REALM}
+export MINIKDC_PRINC_IMPALA=impala/localhost@${MINIKDC_REALM}
+export MINIKDC_PRINC_IMPALA_BE=impala-be/localhost@${MINIKDC_REALM}
 export MINIKDC_PRINC_USER=${USER}/localhost@${MINIKDC_REALM}
 export MINIKDC_PRINC_LLAM=llama/localhost@${MINIKDC_REALM}
 

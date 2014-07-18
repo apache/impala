@@ -30,8 +30,6 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
-// Make sure ldap_simple_bind_s() is available.
-#define LDAP_DEPRECATED 1
 #include <ldap.h>
 
 #include "rpc/auth-provider.h"
@@ -73,8 +71,7 @@ DEFINE_bool(ldap_passwords_in_clear_ok, false, "If set, will allow LDAP password
     "be used in production environments" );
 DEFINE_bool(ldap_allow_anonymous_binds, false, "(Advanced) If true, LDAP authentication "
     "with a blank password (an 'anonymous bind') is allowed by Impala.");
-DEFINE_bool(ldap_manual_config, false, "(Advanced) If true, use a custom SASL config file"
-    " to configure access to an LDAP server.");
+DEFINE_bool(ldap_manual_config, false, "Obsolete; Ignored");
 DEFINE_string(ldap_domain, "", "If set, Impala will try to bind to LDAP with a name of "
     "the form <userid>@<ldap_domain>");
 DEFINE_string(ldap_baseDN, "", "If set, Impala will try to bind to LDAP with a name of "
@@ -86,8 +83,21 @@ DEFINE_string(ldap_bind_pattern, "", "If set, Impala will try to bind to LDAP wi
 
 namespace impala {
 
-// Array of default callbacks for the Sasl library. Initialised in InitAuth().
-static vector<sasl_callback_t> SASL_CALLBACKS;
+// Sasl callbacks.  Why are these here?  Well, Sasl isn't that bright, and
+// instead of copying the callbacks, it just saves a pointer to them.  If
+// they're on the stack, this means that they *go away* when the function
+// exits... so make these global and static here, and fill them in below.
+// Vectors are used for the three latter items because that's what the thrift
+// interface expects.
+//
+// The way the callbacks work is that the Sasl code will look for a registered
+// callback in the connection-specific callback list (one of the latter three),
+// and if not found, then look for a registered callback in the
+// "GENERAL_CALLBACKS" list.
+static sasl_callback_t GENERAL_CALLBACKS[5];        // Applies to all connections
+static vector<sasl_callback_t> KERB_INT_CALLBACKS;  // Internal kerberos connections
+static vector<sasl_callback_t> KERB_EXT_CALLBACKS;  // External kerberos connections
+static vector<sasl_callback_t> LDAP_EXT_CALLBACKS;  // External LDAP connections
 
 // Pattern for hostname substitution.
 static const string HOSTNAME_PATTERN = "_HOST";
@@ -100,58 +110,67 @@ static const string PLAIN_MECHANISM = "PLAIN";
 static const string LDAP_URI_PREFIX = "ldap://";
 static const string LDAPS_URI_PREFIX = "ldaps://";
 
-// Passed to the SaslGetOption() callback by SASL to indicate that the callback is for
-// LDAP, not any other mechanism.
-static const void* LDAP_AUTH_CONTEXT = reinterpret_cast<void*>(1);
-
-// Our dummy plugin needs a standard name.
-static const string IMPALA_AUXPROP_PLUGIN = "impala-auxprop";
-
 AuthManager* AuthManager::auth_manager_ = new AuthManager();
 
-// Output Sasl messages.
-// context: not used.
-// level: logging level.
-// message: message to output;
-static int SaslLogCallback(void* context, int level,  const char* message) {
+// This Sasl callback is called when the underlying cyrus-sasl layer has
+// something that it would like to say.  We catch it and turn it into the
+// appropriate LOG() call.
+//
+// context: Passed a (char *) that comes from the initialization, used
+//          to describe the kerb|ldap internal|external context
+// level: The SASL_LOG_ level
+// message: The message to log
+// Return: Always SASL_OK, unless message is NULL, then it's SASL_BADPARAM.
+static int SaslLogCallback(void* context, int level, const char* message) {
   if (message == NULL) return SASL_BADPARAM;
+  const char* authctx = (context == NULL) ? "Unknown" :
+      reinterpret_cast<const char*>(context);
 
   switch (level) {
-  case SASL_LOG_NONE:
+  case SASL_LOG_NONE:  // "Don't log anything"
+  case SASL_LOG_PASS:  // "Traces... including passwords" - don't log!
     break;
   case SASL_LOG_ERR:
   case SASL_LOG_FAIL:
-    LOG(ERROR) << "SASL message: " << message;
+    LOG(ERROR) << "SASL message (" << authctx << "): " << message;
     break;
   case SASL_LOG_WARN:
-    LOG(WARNING) << "SASL message: " << message;
+    LOG(WARNING) << "SASL message (" << authctx << "): " << message;
     break;
   case SASL_LOG_NOTE:
-    LOG(INFO) << "SASL message: " << message;
+    LOG(INFO) << "SASL message (" << authctx << "): " << message;
     break;
   case SASL_LOG_DEBUG:
-    VLOG(1) << "SASL message: " << message;
+    VLOG(1) << "SASL message (" << authctx << "): " << message;
     break;
   case SASL_LOG_TRACE:
-  case SASL_LOG_PASS:
-    VLOG(3) << "SASL message: " << message;
+    VLOG(3) << "SASL message (" << authctx << "): " << message;
     break;
   }
 
   return SASL_OK;
 }
 
-// Called by the SASL library during LDAP authentication. This is where we 'cheat' and use
-// this callback to confirm the user's credentials without implementing a fully-fledged
-// auxprop plugin.
+// This callback is only called when we're providing LDAP authentication. This "check
+// pass" callback is our hook to ask the real LDAP server if we're allowed to log in or
+// not. We can be thought of as a proxy for LDAP logins - the user gives their password
+// to us, and we pass it to the real LDAP server.
 //
-// Note that this method uses ldap_simple_bind_s(), which does *not* provide any security
+// Note that this method uses ldap_sasl_bind_s(), which does *not* provide any security
 // to the connection between Impala and the LDAP server. You must either set --ldap_tls,
 // or have a URI which has "ldaps://" as the scheme in order to get a secure connection.
 // Use --ldap_ca_certificate to specify the location of the certificate used to confirm
 // the authenticity of the LDAP server certificate.
+//
+// conn: The Sasl connection struct, which we ignore
+// context: Ignored; always NULL
+// user: The username to authenticate
+// pass: The password to use
+// passlen: The length of pass
+// propctx: Ignored - properties requested
+// Return: SASL_OK on success, SASL_FAIL otherwise
 int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
-    const char *pass, unsigned passlen, struct propctx *propctx) {
+    const char* pass, unsigned passlen, struct propctx* propctx) {
   if (passlen == 0 && !FLAGS_ldap_allow_anonymous_binds) {
     // Disable anonymous binds.
     return SASL_FAIL;
@@ -174,14 +193,13 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
     if (tls_rc != LDAP_SUCCESS) {
       LOG(WARNING) << "Could not start TLS secure connection to LDAP server ("
                    << FLAGS_ldap_uri << "). Error: " << ldap_err2string(tls_rc);
-      ldap_unbind(ld);
+      ldap_unbind_ext(ld, NULL, NULL);
       return SASL_FAIL;
     }
     LOG(INFO) << "Started TLS connection with LDAP server: " << FLAGS_ldap_uri;
   }
 
-  string pass_str(pass, passlen);
-
+  // Map the user string into an acceptable LDAP "DN" (distinguished name)
   string user_str = user;
   if (!FLAGS_ldap_domain.empty()) {
     user_str = Substitute("$0@$1", user_str, FLAGS_ldap_domain);
@@ -192,11 +210,17 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
     replace_all(user_str, "#UID", user);
   }
 
+  // Map the password into a credentials structure
+  struct berval cred;
+  cred.bv_val = const_cast<char*>(pass);
+  cred.bv_len = passlen;
+
   VLOG_QUERY << "Trying simple LDAP bind for: " << user_str;
 
-  rc = ldap_simple_bind_s(ld, user_str.c_str(), pass_str.c_str());
+  rc = ldap_sasl_bind_s(ld, user_str.c_str(), LDAP_SASL_SIMPLE, &cred,
+      NULL, NULL, NULL);
   // Free ld
-  ldap_unbind(ld);
+  ldap_unbind_ext(ld, NULL, NULL);
   if (rc != LDAP_SUCCESS) {
     LOG(WARNING) << "LDAP bind failed: " << ldap_err2string(rc);
     return SASL_FAIL;
@@ -207,27 +231,23 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
   return SASL_OK;
 }
 
-// Get Sasl option.
-// context: not used
-// plugin_name: name of plugin for which an option is being requested.
-// option: option requested
-// result: value for option
-// len: length of the result
-// Return SASL_FAIL if the option is not handled, this does not fail the handshake.
+// Sasl wants a way to ask us about some options, this function provides
+// answers.  Currently we only support telling Sasl about the log_level; other
+// items are printed out for curiosity's sake, but otherwise ignored.
+//
+// context: Ignored, always NULL
+// plugin_name: If applicable, the name of the plugin making the
+//              request.  NULL if it's a general option.
+// option: The name of the configurable parameter
+// result: A char * array to hold our answer
+// len: Bytes at result
+// Return: SASL_OK for things we deal with; SASL_FAIL otherwise.  The
+//         cyrus-sasl code rarely checks the return value; it's more
+//         interested in whether we fill in *result or not.
 static int SaslGetOption(void* context, const char* plugin_name, const char* option,
     const char** result, unsigned* len) {
-  // Tell SASL to use our dummy plugin if we are using LDAP. If --ldap_manual_config is
-  // set, users are expecting to override these settings so we don't respond to the SASL
-  // request.
-  if (strcmp("auxprop_plugin", option) == 0 && context == LDAP_AUTH_CONTEXT
-      && !FLAGS_ldap_manual_config) {
-    *result = IMPALA_AUXPROP_PLUGIN.c_str();
-    if (len != NULL) *len = strlen(*result);
-    return SASL_OK;
-  }
 
   if (plugin_name == NULL) {
-    // Return the logging level that we want the sasl library to use.
     if (strcmp("log_level", option) == 0) {
       int level = SASL_LOG_WARN;
       if (VLOG_CONNECTION_IS_ON) {
@@ -242,38 +262,55 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
       return SASL_OK;
     }
 
-    // Options can default so don't complain.
-    VLOG(3) << "SaslGetOption: Unknown option: " << option;
+    VLOG_RPC << "Sasl general option " << option << " requested";
     return SASL_FAIL;
   }
 
-  if (strcmp(KERBEROS_MECHANISM.c_str(), plugin_name) == 0) {
-    // Return the path to our keytab file.
-    // TODO: why is this never called?
-    // TODO: Always returns FLAGS_keytab_file, even though technically we might have
-    // different keytabs for different principals. Ok for now, because in practice we
-    // never have different keytabs.
-    if (strcmp("keytab", option) == 0) {
-        *result = FLAGS_keytab_file.c_str();
-        if (len != NULL) *len = strlen(*result);
-        return SASL_OK;
-    }
-    VLOG(3) << "SaslGetOption: Unknown option: " << option << " for plugin_name: "
-            << plugin_name;
-    return SASL_FAIL;
-  }
-
-  VLOG(3) << "SaslGetOption: Unknown plugin: " << plugin_name << " : " << option;
+  VLOG_RPC << "Sasl option " << plugin_name << " : "
+           << option << " requested";
   return SASL_FAIL;
-
 }
 
-// Sasl Authorize callback.
-// Can be used to restrict access.  Currently used for diagnostics.
-// requsted_user, rlen: The user requesting access and string length.
-// auth_identity, alen: The identity (principal) and length.
-// default_realm, urlen: Realm of the user and length.
-// propctx: properties requested.
+// This Sasl callback will tell us what files Sasl is trying to access.  It's
+// here just for curiousity's sake at the moment. It might be useful for
+// telling us precisely which plugins have been found.
+//
+// context: Ignored, always NULL
+// file: The file being accessed
+// type: What type of thing is it: plugin, config file, etc
+// Return: SASL_OK
+static int SaslVerifyFile(void* context, const char* file,
+    sasl_verify_type_t type ) {
+  switch(type) {
+    case SASL_VRFY_PLUGIN:
+      VLOG(2) << "Sasl found plugin " << file;
+      break;
+    case SASL_VRFY_CONF:
+      VLOG(2) << "Sasl trying to access config file " << file;
+      break;
+    case SASL_VRFY_PASSWD:
+      VLOG(2) << "Sasl accessing password file " << file;
+      break;
+    default:
+      VLOG(2) << "Sasl found other file " << file;
+      break;
+  }
+  return SASL_OK;
+}
+
+// This callback could be used to authorize, or restrict access to certain
+// users.  Currently it's just used for diagnostics to see who is logging in.
+//
+// conn: Sasl connection - Ignored
+// context: Ignored, always NULL
+// requested_user: The identity/username to authorize
+// rlen: Length of above
+// auth_identity: "The identity associated with the secret"
+// alen: Length of above
+// def_realm: Default user realm
+// urlen: Length of above
+// propctx: Auxiliary properties - Ignored
+// Return: SASL_OK
 static int SaslAuthorize(sasl_conn_t* conn, void* context, const char* requested_user,
     unsigned rlen, const char* auth_identity, unsigned alen, const char* def_realm,
     unsigned urlen, struct propctx* propctx) {
@@ -281,23 +318,37 @@ static int SaslAuthorize(sasl_conn_t* conn, void* context, const char* requested
   string user(requested_user, rlen);
   string auth(auth_identity, alen);
   string realm(def_realm, urlen);
+
   VLOG_CONNECTION << "SASL authorize. User: " << user << " for: " << auth << " from "
                   << realm;
   return SASL_OK;
 }
 
-// Sasl Get Path callback.
-// Returns the list of possible places for the plugins might be.
+// Sasl callback - where to look for plugins.  We return the list of possible
+// places the plugins might be; this comes from the sasl_path flag.
+//
 // Places we know they might be:
 // UBUNTU:          /usr/lib/sasl2
 // CENTOS:          /usr/lib64/sasl2
 // custom install:  /usr/local/lib/sasl2
+// UBUNTU:          /usr/lib/x86_64-linux-gnu/sasl2
+//
+// context: Ignored, always NULL
+// path: We return the plugin paths here.
+// Return: SASL_OK
 static int SaslGetPath(void* context, const char** path) {
   *path = FLAGS_sasl_path.c_str();
   return SASL_OK;
 }
 
-void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
+// When operating as a Kerberos client (internal connections only), we need to
+// 'kinit' as the principal.  A thread is created and calls this function for
+// that purpose, and to periodically renew the ticket as well.
+//
+// first_kinit: Used to communicate success/failure of the initial kinit call to
+//              the parent thread
+// Return: Only if the first call to 'kinit' fails
+void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   // Minumum lifetime to request for each ticket renewal.
   static const int MIN_TICKET_LIFETIME_IN_MINS = 1440;
 
@@ -364,51 +415,101 @@ void KerberosAuthProvider::RunKinit(Promise<Status>* first_kinit) {
 }
 
 Status InitAuth(const string& appname) {
-  // Application-wide set of callbacks.
-  SASL_CALLBACKS.resize(5);
-  SASL_CALLBACKS[0].id = SASL_CB_LOG;
-  SASL_CALLBACKS[0].proc = (int (*)())&SaslLogCallback;
-  SASL_CALLBACKS[0].context = NULL;
-  SASL_CALLBACKS[1].id = SASL_CB_GETOPT;
-  SASL_CALLBACKS[1].proc = (int (*)())&SaslGetOption;
-  SASL_CALLBACKS[1].context = NULL;
-  SASL_CALLBACKS[2].id = SASL_CB_PROXY_POLICY;
-  SASL_CALLBACKS[2].proc = (int (*)())&SaslAuthorize;
-  SASL_CALLBACKS[2].context = NULL;
-  SASL_CALLBACKS[3].id = SASL_CB_GETPATH;
-  SASL_CALLBACKS[3].proc = (int (*)())&SaslGetPath;
-  SASL_CALLBACKS[3].context = NULL;
-  SASL_CALLBACKS[SASL_CALLBACKS.size() - 1].id = SASL_CB_LIST_END;
+  // We only set up Sasl things if we are indeed going to be using Sasl.
+  // Checking of these flags for sanity is done later, but this check is good
+  // enough at this early stage:
+  if (FLAGS_enable_ldap_auth || !FLAGS_principal.empty()) {
+    // Good idea to have logging everywhere
+    GENERAL_CALLBACKS[0].id = SASL_CB_LOG;
+    GENERAL_CALLBACKS[0].proc = (int (*)())&SaslLogCallback;
+    GENERAL_CALLBACKS[0].context = ((void *)"General");
 
-  try {
-    // We assume all impala processes are both server and client.
-    sasl::TSaslServer::SaslInit(&SASL_CALLBACKS[0], appname);
-    sasl::TSaslClient::SaslInit(&SASL_CALLBACKS[0]);
-  } catch (sasl::SaslServerImplException& e) {
-    stringstream err_msg;
-    err_msg << "Could not initialize Sasl library: " << e.what();
-    return Status(err_msg.str());
+    // Need this here so we can find available mechanisms
+    GENERAL_CALLBACKS[1].id = SASL_CB_GETPATH;
+    GENERAL_CALLBACKS[1].proc = (int (*)())&SaslGetPath;
+    GENERAL_CALLBACKS[1].context = NULL;
+
+    // Allows us to view and set some options
+    GENERAL_CALLBACKS[2].id = SASL_CB_GETOPT;
+    GENERAL_CALLBACKS[2].proc = (int (*)())&SaslGetOption;
+    GENERAL_CALLBACKS[2].context = NULL;
+
+    // For curiosity, let's see what files are being touched.
+    GENERAL_CALLBACKS[3].id = SASL_CB_VERIFYFILE;
+    GENERAL_CALLBACKS[3].proc = (int (*)())&SaslVerifyFile;
+    GENERAL_CALLBACKS[3].context = NULL;
+
+    GENERAL_CALLBACKS[4].id = SASL_CB_LIST_END;
+
+    if (!FLAGS_principal.empty()) {
+      // Callbacks for when we're a Kerberos Sasl internal connection.  Just do logging.
+      KERB_INT_CALLBACKS.resize(2);
+
+      KERB_INT_CALLBACKS[0].id = SASL_CB_LOG;
+      KERB_INT_CALLBACKS[0].proc = (int (*)())&SaslLogCallback;
+      KERB_INT_CALLBACKS[0].context = ((void *)"Kerberos (internal)");
+
+      KERB_INT_CALLBACKS[1].id = SASL_CB_LIST_END;
+
+      // Our externally facing Sasl callbacks for Kerberos communication
+      KERB_EXT_CALLBACKS.resize(3);
+
+      KERB_EXT_CALLBACKS[0].id = SASL_CB_LOG;
+      KERB_EXT_CALLBACKS[0].proc = (int (*)())&SaslLogCallback;
+      KERB_EXT_CALLBACKS[0].context = ((void *)"Kerberos (external)");
+
+      KERB_EXT_CALLBACKS[1].id = SASL_CB_PROXY_POLICY;
+      KERB_EXT_CALLBACKS[1].proc = (int (*)())&SaslAuthorize;
+      KERB_EXT_CALLBACKS[1].context = NULL;
+
+      KERB_EXT_CALLBACKS[2].id = SASL_CB_LIST_END;
+    }
+
+    if (FLAGS_enable_ldap_auth) {
+      // Our external server-side SASL callbacks for LDAP communication
+      LDAP_EXT_CALLBACKS.resize(4);
+
+      LDAP_EXT_CALLBACKS[0].id = SASL_CB_LOG;
+      LDAP_EXT_CALLBACKS[0].proc = (int (*)())&SaslLogCallback;
+      LDAP_EXT_CALLBACKS[0].context = ((void *)"LDAP");
+
+      LDAP_EXT_CALLBACKS[1].id = SASL_CB_PROXY_POLICY;
+      LDAP_EXT_CALLBACKS[1].proc = (int (*)())&SaslAuthorize;
+      LDAP_EXT_CALLBACKS[1].context = NULL;
+
+      // This last callback is where we take the password and turn around and
+      // call into openldap.
+      LDAP_EXT_CALLBACKS[2].id = SASL_CB_SERVER_USERDB_CHECKPASS;
+      LDAP_EXT_CALLBACKS[2].proc = (int (*)())&SaslLdapCheckPass;
+      LDAP_EXT_CALLBACKS[2].context = NULL;
+
+      LDAP_EXT_CALLBACKS[3].id = SASL_CB_LIST_END;
+    }
+
+    try {
+      // We assume all impala processes are both server and client.
+      sasl::TSaslServer::SaslInit(GENERAL_CALLBACKS, appname);
+      sasl::TSaslClient::SaslInit(GENERAL_CALLBACKS);
+    } catch (sasl::SaslServerImplException& e) {
+      stringstream err_msg;
+      err_msg << "Could not initialize Sasl library: " << e.what();
+      return Status(err_msg.str());
+    }
   }
 
   RETURN_IF_ERROR(AuthManager::GetInstance()->Init());
   return Status::OK;
 }
 
-KerberosAuthProvider::KerberosAuthProvider(const string& principal,
-    const string& keytab_path, bool needs_kinit)
-    : principal_(principal), keytab_path_(keytab_path), needs_kinit_(needs_kinit) {
+Status SaslAuthProvider::InitKerberos(const string& principal,
+    const string& keytab_path) {
+  principal_ = principal;
+  keytab_path_ = keytab_path;
+  // The logic here is that needs_kinit_ is false unless we are the internal
+  // auth provider and we support kerberos.
+  needs_kinit_ = is_internal_;
 
-}
-
-Status KerberosAuthProvider::Start() {
-  // The "keytab" callback is never called.  Set the file name in the environment.
-  if (setenv("KRB5_KTNAME", keytab_path_.c_str(), 1)) {
-    stringstream ss;
-    ss << "Kerberos could not set KRB5_KTNAME: " << GetStrErrMsg();
-    return Status(ss.str());
-  }
-
-  // Replace the string _HOST with our hostname.
+  // Replace the string _HOST in principal with our hostname.
   size_t off = principal_.find(HOSTNAME_PATTERN);
   if (off != string::npos) {
     string hostname;
@@ -420,161 +521,139 @@ Status KerberosAuthProvider::Start() {
   split(names, principal_, is_any_of("/@"));
 
   if (names.size() != 3) {
-    stringstream ss;
-    ss << "Kerberos principal should of the form: <service>/<hostname>@<realm> - got: "
-       << principal_;
-    return Status(ss.str());
+    return Status(Substitute("Kerberos principal should be of the form: "
+        "<service>/<hostname>@<realm> - got: $0", principal_));
   }
 
   service_name_ = names[0];
   hostname_ = names[1];
-  // Realm (names[2]) is unused.
+  realm_ = names[2];
 
+  // Set the keytab name in the environment so that Sasl Kerberos and kinit can
+  // find and use it.
+  if (setenv("KRB5_KTNAME", keytab_path_.c_str(), 1)) {
+    return Status(Substitute("Kerberos could not set KRB5_KTNAME: $0",
+        GetStrErrMsg()));
+  }
+
+  LOG(INFO) << "Set " << (is_internal_ ? "internal" : "external")
+            << " kerberos principal = " << service_name_ << "/"
+            << hostname_ << "@" << realm_;
+
+  return Status::OK;
+}
+
+Status SaslAuthProvider::Start() {
+  // True for kerberos internal use
   if (needs_kinit_) {
+    DCHECK(is_internal_);
+    DCHECK(!principal_.empty());
     Promise<Status> first_kinit;
     stringstream thread_name;
     thread_name << "kinit-" << principal_;
     kinit_thread_.reset(new Thread("authentication", thread_name.str(),
-        &KerberosAuthProvider::RunKinit, this, &first_kinit));
+        &SaslAuthProvider::RunKinit, this, &first_kinit));
     LOG(INFO) << "Waiting for Kerberos ticket for principal: " << principal_;
     RETURN_IF_ERROR(first_kinit.Get());
     LOG(INFO) << "Kerberos ticket granted to " << principal_;
   }
 
-  return Status::OK;
-}
+  if (has_ldap_) {
+    DCHECK(!is_internal_);
+    if (!FLAGS_ldap_ca_certificate.empty()) {
+      int set_rc = ldap_set_option(NULL, LDAP_OPT_X_TLS_CACERTFILE,
+          FLAGS_ldap_ca_certificate.c_str());
+      if (set_rc != LDAP_SUCCESS) {
+        return Status(Substitute("Could not set location of LDAP server cert: $0",
+            ldap_err2string(set_rc)));
+      }
+    } else {
+      // A warning was already logged...
+      int val = LDAP_OPT_X_TLS_ALLOW;
+      int set_rc = ldap_set_option(NULL, LDAP_OPT_X_TLS_REQUIRE_CERT,
+          reinterpret_cast<void*>(&val));
+      if (set_rc != LDAP_SUCCESS) {
+        return Status(Substitute(
+            "Could not disable certificate requirement for LDAP server: $0",
+            ldap_err2string(set_rc)));
+      }
+    }
 
-Status KerberosAuthProvider::GetServerTransportFactory(
-    shared_ptr<TTransportFactory>* factory) {
-  // The string should be service/hostname@realm
-
-  try {
-    // TSaslServerTransport::Factory doesn't actually do anything with the properties
-    // argument, so we pass in an empty map
-    map<string, string> sasl_props;
-    factory->reset(new TSaslServerTransport::Factory(
-        KERBEROS_MECHANISM, service_name_, hostname_, 0, sasl_props, SASL_CALLBACKS));
-  } catch (const TException& e) {
-    LOG(ERROR) << "Failed to create a Kerberos transport factory: " << e.what();
-    return Status(e.what());
+    if (hostname_.empty()) {
+      RETURN_IF_ERROR(GetHostname(&hostname_));
+    }
   }
 
   return Status::OK;
 }
 
-Status KerberosAuthProvider::WrapClientTransport(const string& hostname,
+Status SaslAuthProvider::GetServerTransportFactory(
+    shared_ptr<TTransportFactory>* factory) {
+  DCHECK(!principal_.empty() || has_ldap_);
+
+  // This is the heart of the link between this file and thrift.  Here we
+  // associate a Sasl mechanism with our callbacks.
+  try {
+    map<string, string> sasl_props; // Empty; unused by Thrift
+    TSaslServerTransport::Factory* sst_factory = NULL;
+    factory->reset(sst_factory = new TSaslServerTransport::Factory());
+
+    if(!principal_.empty()) {
+      // Tell it about Kerberos:
+      sst_factory->addServerDefinition(KERBEROS_MECHANISM, service_name_,
+          hostname_, realm_, 0, sasl_props,
+          is_internal_ ? KERB_INT_CALLBACKS : KERB_EXT_CALLBACKS);
+    }
+
+    if (has_ldap_) {
+      // Tell it about LDAP:
+      sst_factory->addServerDefinition(PLAIN_MECHANISM, "LDAP", hostname_,
+          "", 0, sasl_props, LDAP_EXT_CALLBACKS);
+    }
+
+  } catch (const TException& e) {
+    LOG(ERROR) << "Failed to create Sasl Server transport factory: "
+               << e.what();
+    return Status(e.what());
+  }
+
+  VLOG_RPC << "Made " << (is_internal_ ? "internal" : "external")
+           << " server transport factory with "
+           << (!principal_.empty() ? "Kerberos " : " ")
+           << (has_ldap_ ? "LDAP " : " ") << "authentication";
+
+  return Status::OK;
+}
+
+Status SaslAuthProvider::WrapClientTransport(const string& hostname,
     shared_ptr<TTransport> raw_transport, const string& service_name,
     shared_ptr<TTransport>* wrapped_transport) {
-  shared_ptr<sasl::TSasl> sasl_client;
-  map<string, string> props;
-  // We do not set this.
-  string auth_id;
 
+  shared_ptr<sasl::TSasl> sasl_client;
+  const map<string, string> props; // Empty; unused by thrift
+  const string auth_id; // Empty; unused by thrift
+
+  DCHECK(!has_ldap_);
+  DCHECK(is_internal_);
+
+  // Since the daemons are never LDAP clients, we go straight to Kerberos
   try {
-    string service = service_name.empty() ? service_name_ : service_name;
-    sasl_client.reset(new sasl::TSaslClient(KERBEROS_MECHANISM, auth_id, service,
-        hostname, props, &SASL_CALLBACKS[0]));
+    const string& service = service_name.empty() ? service_name_ : service_name;
+    sasl_client.reset(new sasl::TSaslClient(KERBEROS_MECHANISM, auth_id,
+        service, hostname, props, &KERB_INT_CALLBACKS[0]));
   } catch (sasl::SaslClientImplException& e) {
     LOG(ERROR) << "Failed to create a GSSAPI/SASL client: " << e.what();
     return Status(e.what());
   }
 
   wrapped_transport->reset(new TSaslClientTransport(sasl_client, raw_transport));
-  return Status::OK;
-}
+  VLOG_RPC << "Created wrapped client transport";
 
-
-// This is the one required method to implement a SASL 'auxprop' plugin. It's just a
-// no-op; the work is done in SaslLdapCheckPass();
-void ImpalaAuxpropLookup(void* glob_context, sasl_server_params_t* sparams,
-    unsigned int flags, const char* user, unsigned ulen) {
-  // NO-OP
-}
-
-// Singleton structure used to register auxprop plugin with SASL
-static sasl_auxprop_plug_t impala_auxprop_plugin = {
-  0, // feature flag
-  0, // 'spare'
-  NULL, // global plugin state
-  NULL, // Free global state callback
-  &ImpalaAuxpropLookup, // Auxprop lookup method
-  const_cast<char*>(IMPALA_AUXPROP_PLUGIN.c_str()), // Name of plugin
-  NULL // Store property callback
-};
-
-// Called by SASL during registration of the auxprop plugin.
-int ImpalaAuxpropInit(const sasl_utils_t* utils, int max_version, int* out_version,
-    sasl_auxprop_plug_t** plug, const char* plugname) {
-  LOG(INFO) << "Initialising Impala SASL plugin: " << plugname;
-  *plug = &impala_auxprop_plugin;
-  *out_version = max_version;
-  return SASL_OK;
-}
-
-Status LdapAuthProvider::Start() {
-  sasl_callbacks_.resize(6);
-  sasl_callbacks_[0].id = SASL_CB_LOG;
-  sasl_callbacks_[0].proc = (int (*)())&SaslLogCallback;
-  sasl_callbacks_[0].context = NULL;
-  sasl_callbacks_[1].id = SASL_CB_GETOPT;
-  sasl_callbacks_[1].proc = (int (*)())&SaslGetOption;
-  sasl_callbacks_[1].context = (void*)1;
-  sasl_callbacks_[2].id = SASL_CB_PROXY_POLICY;
-  sasl_callbacks_[2].proc = (int (*)())&SaslAuthorize;
-  sasl_callbacks_[2].context = NULL;
-  sasl_callbacks_[3].id = SASL_CB_GETPATH;
-  sasl_callbacks_[3].proc = (int (*)())&SaslGetPath;
-  sasl_callbacks_[3].context = NULL;
-  // This is where LDAP / PLAIN differs from other SASL mechanisms: we use the checkpass
-  // callback to do authentication.
-  sasl_callbacks_[4].id = SASL_CB_SERVER_USERDB_CHECKPASS;
-  sasl_callbacks_[4].proc = (int (*)())&SaslLdapCheckPass;
-  sasl_callbacks_[4].context = NULL;
-  sasl_callbacks_[sasl_callbacks_.size() - 1].id = SASL_CB_LIST_END;
-
-  if (!FLAGS_ldap_ca_certificate.empty()) {
-    int set_rc = ldap_set_option(NULL, LDAP_OPT_X_TLS_CACERTFILE,
-        FLAGS_ldap_ca_certificate.c_str());
-    if (set_rc != LDAP_SUCCESS) {
-      return Status(Substitute("Could not set location of LDAP server cert: $0",
-          ldap_err2string(set_rc)));
-    }
-  } else {
-    // A warning was already logged...
-    int val = LDAP_OPT_X_TLS_ALLOW;
-    int set_rc = ldap_set_option(NULL, LDAP_OPT_X_TLS_REQUIRE_CERT,
-        reinterpret_cast<void*>(&val));
-    if (set_rc != LDAP_SUCCESS) {
-      return Status(Substitute(
-          "Could not disable certificate requirement for LDAP server: $0",
-          ldap_err2string(set_rc)));
-    }
-  }
-
-  return Status::OK;
-}
-
-Status LdapAuthProvider::GetServerTransportFactory(
-    shared_ptr<TTransportFactory>* factory) {
-  // TSaslServerTransport::Factory doesn't actually do anything with the properties
-  // argument, so we pass in an empty map
-  map<string, string> sasl_props;
-  // If overriding the hard-coded LDAP configuration, use the default callbacks,
-  // otherwise use those specific to LDAP.
-  factory->reset(
-      new TSaslServerTransport::Factory(PLAIN_MECHANISM, "", "", 0, sasl_props,
-          FLAGS_ldap_manual_config ? SASL_CALLBACKS : sasl_callbacks_));
-  return Status::OK;
-}
-
-Status LdapAuthProvider::WrapClientTransport(const string& hostname,
-  shared_ptr<TTransport> raw_transport, const string& dummy_service,
-  shared_ptr<TTransport>* wrapped_transport) {
-  *wrapped_transport = raw_transport;
   return Status::OK;
 }
 
 Status NoAuthProvider::GetServerTransportFactory(shared_ptr<TTransportFactory>* factory) {
+  // No Sasl - yawn.  Here, have a regular old transport.
   factory->reset(new TBufferedTransportFactory());
   return Status::OK;
 }
@@ -582,26 +661,30 @@ Status NoAuthProvider::GetServerTransportFactory(shared_ptr<TTransportFactory>* 
 Status NoAuthProvider::WrapClientTransport(const string& hostname,
     shared_ptr<TTransport> raw_transport, const string& dummy_service,
     shared_ptr<TTransport>* wrapped_transport) {
+  // No Sasl - yawn.  Don't do any transport wrapping for clients.
   *wrapped_transport = raw_transport;
   return Status::OK;
 }
 
 Status AuthManager::Init() {
-  // Client-side uses LDAP if enabled, else Kerberos if FLAGS_principal is set, otherwise
-  // a NoAuthProvider.
+  bool use_ldap = false;
+  const string excl_msg = "--$0 and --$1 are mutually exclusive "
+      "and should not be set together";
+
+  // Get all of the flag validation out of the way
   if (FLAGS_enable_ldap_auth) {
-    const string err_msg = "--$0 and --$1 are mutually exclusive and should not be set"
-        " together";
+    use_ldap = true;
+
     if (!FLAGS_ldap_domain.empty()) {
       if (!FLAGS_ldap_baseDN.empty()) {
-        return Status(Substitute(err_msg, "ldap_domain", "ldap_baseDN"));
+        return Status(Substitute(excl_msg, "ldap_domain", "ldap_baseDN"));
       }
       if (!FLAGS_ldap_bind_pattern.empty()) {
-        return Status(Substitute(err_msg, "ldap_domain", "ldap_bind_pattern"));
+        return Status(Substitute(excl_msg, "ldap_domain", "ldap_bind_pattern"));
       }
     } else if (!FLAGS_ldap_baseDN.empty()) {
       if (!FLAGS_ldap_bind_pattern.empty()) {
-        return Status(Substitute(err_msg, "ldap_baseDN", "ldap_bind_pattern"));
+        return Status(Substitute(excl_msg, "ldap_baseDN", "ldap_bind_pattern"));
       }
     }
 
@@ -635,46 +718,91 @@ Status AuthManager::Init() {
                    << "hence passwords) could be intercepted by a "
                    << "man-in-the-middle attack";
     }
-
-    client_auth_provider_.reset(new LdapAuthProvider());
-    // We only want to register the plugin once for the whole application, so don't
-    // register inside the LdapAuthProvider() instructor.
-    int rc = sasl_auxprop_add_plugin(IMPALA_AUXPROP_PLUGIN.c_str(), &ImpalaAuxpropInit);
-    if (rc != SASL_OK) return Status(sasl_errstring(rc, NULL, NULL));
-  } else if (!FLAGS_principal.empty()) {
-    client_auth_provider_.reset(
-        new KerberosAuthProvider(FLAGS_principal, FLAGS_keytab_file, false));
-  } else {
-    client_auth_provider_.reset(new NoAuthProvider());
   }
 
-  // Server-side uses Kerberos if either FLAGS_principal or the specific
-  // FLAGS_be_principal is set, otherwise a NoAuthProvider.
-  if (!FLAGS_principal.empty() || !FLAGS_be_principal.empty()) {
-    if (FLAGS_be_principal.empty()) FLAGS_be_principal = FLAGS_principal;
-
-    // Should init as this principal as well, in order to allow connections to other
-    // backend services.
-    server_auth_provider_.reset(
-        new KerberosAuthProvider(FLAGS_be_principal, FLAGS_keytab_file, true));
-  } else {
-    server_auth_provider_.reset(new NoAuthProvider());
+  if (FLAGS_principal.empty() && !FLAGS_be_principal.empty()) {
+    return Status("A back end principal (--be_principal) was supplied without "
+        "also supplying a regular principal (--principal). Either --principal "
+        "must be supplied alone, in which case it applies to all communication, "
+        "or --principal and --be_principal must be supplied together, in which "
+        "case --principal is used in external communication and --be_principal "
+        "is used in internal (back-end) communication.");
   }
 
-  RETURN_IF_ERROR(server_auth_provider_->Start());
-  RETURN_IF_ERROR(client_auth_provider_->Start());
+  // When acting as a server on external connections:
+  string kerberos_external_principal;
+  // When acting as a client, or as a server on internal connections:
+  string kerberos_internal_principal;
+
+  if (!FLAGS_principal.empty()) {
+    kerberos_external_principal = FLAGS_principal;
+    if (FLAGS_be_principal.empty()) {
+      kerberos_internal_principal = FLAGS_principal;
+    } else {
+      kerberos_internal_principal = FLAGS_be_principal;
+    }
+  }
+
+  // This is written from the perspective of the daemons - thus "internal"
+  // means "I am used for communication with other daemons, both as a client
+  // and as a server".  "External" means that "I am used when being a server
+  // for clients that are external - that is, they aren't daemons - like the
+  // impala shell, odbc, jdbc, etc.
+  //
+  // Flags     | Internal | External
+  // --------- | -------- | --------
+  // None      | NoAuth   | NoAuth
+  // LDAP only | NoAuth   | Sasl(ldap)
+  // Kerb only | Sasl(be) | Sasl(fe)
+  // Both      | Sasl(be) | Sasl(fe+ldap)
+
+  // Set up the internal auth provider as per above.  Since there's no LDAP on
+  // the client side, this is just a check for the "back end" kerberos
+  // principal.
+  if (!kerberos_internal_principal.empty()) {
+    SaslAuthProvider* sap = NULL;
+    internal_auth_provider_.reset(sap = new SaslAuthProvider(true));
+    RETURN_IF_ERROR(sap->InitKerberos(kerberos_internal_principal,
+        FLAGS_keytab_file));
+    LOG(INFO) << "Internal communication is authenticated with Kerberos";
+  } else {
+    internal_auth_provider_.reset(new NoAuthProvider());
+    LOG(INFO) << "Internal communication is not authenticated";
+  }
+  RETURN_IF_ERROR(internal_auth_provider_->Start());
+
+  // Set up the external auth provider as per above.  Either a "front end"
+  // principal or ldap tells us to use a SaslAuthProvider, and we fill in
+  // details from there.
+  if (use_ldap || !kerberos_external_principal.empty()) {
+    SaslAuthProvider* sap = NULL;
+    external_auth_provider_.reset(sap = new SaslAuthProvider(false));
+    if (!kerberos_external_principal.empty()) {
+      RETURN_IF_ERROR(sap->InitKerberos(kerberos_external_principal,
+          FLAGS_keytab_file));
+      LOG(INFO) << "External communication is authenticated with Kerberos";
+    }
+    if (use_ldap) {
+      sap->InitLdap();
+      LOG(INFO) << "External communication is authenticated with LDAP";
+    }
+  } else {
+    external_auth_provider_.reset(new NoAuthProvider());
+    LOG(INFO) << "External communication is not authenticated";
+  }
+  RETURN_IF_ERROR(external_auth_provider_->Start());
 
   return Status::OK;
 }
 
-AuthProvider* AuthManager::GetClientFacingAuthProvider() {
-  DCHECK(client_auth_provider_.get() != NULL);
-  return client_auth_provider_.get();
+AuthProvider* AuthManager::GetExternalAuthProvider() {
+  DCHECK(external_auth_provider_.get() != NULL);
+  return external_auth_provider_.get();
 }
 
-AuthProvider* AuthManager::GetServerFacingAuthProvider() {
-  DCHECK(server_auth_provider_.get() != NULL);
-  return server_auth_provider_.get();
+AuthProvider* AuthManager::GetInternalAuthProvider() {
+  DCHECK(internal_auth_provider_.get() != NULL);
+  return internal_auth_provider_.get();
 }
 
 }

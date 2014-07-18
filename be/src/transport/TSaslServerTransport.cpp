@@ -41,12 +41,15 @@ TSaslServerTransport::TSaslServerTransport(shared_ptr<TTransport> transport)
 
 TSaslServerTransport::TSaslServerTransport(const string& mechanism,
                                            const string& protocol,
-                                           const string& serverName, unsigned flags,
+                                           const string& serverName,
+                                           const string& realm,
+                                           unsigned flags,
                                            const map<string, string>& props,
                                            const vector<struct sasl_callback>& callbacks,
                                            shared_ptr<TTransport> transport)
      : TSaslTransport(transport) {
-  addServerDefinition(mechanism, protocol, serverName, flags, props, callbacks);
+  addServerDefinition(mechanism, protocol, serverName, realm, flags,
+      props, callbacks);
 }
 
 TSaslServerTransport:: TSaslServerTransport(
@@ -92,11 +95,11 @@ void TSaslServerTransport::handleSaslStartMessage() {
                     reinterpret_cast<const uint8_t*>(ss.str().c_str()), ss.str().size());
     throw TTransportException(TTransportException::BAD_ARGS, ss.str());
   }
-  // TODO: when should realm be used?
-  string realm;
+
   TSaslServerDefinition* serverDefinition = defn->second;
   sasl_.reset(new TSaslServer(serverDefinition->protocol_,
-                              serverDefinition->serverName_, realm,
+                              serverDefinition->serverName_,
+                              serverDefinition->realm_,
                               serverDefinition->flags_,
                               &serverDefinition->callbacks_[0]));
   // First argument is interpreted as C-string

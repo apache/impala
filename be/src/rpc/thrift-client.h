@@ -130,7 +130,7 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
   transport_.reset(new apache::thrift::transport::TBufferedTransport(socket_));
 
   if (auth_provider_ == NULL) {
-    auth_provider_ = AuthManager::GetInstance()->GetServerFacingAuthProvider();
+    auth_provider_ = AuthManager::GetInstance()->GetInternalAuthProvider();
   }
 
   auth_provider_->WrapClientTransport(address_.hostname, transport_, service_name,

@@ -50,95 +50,104 @@ class AuthProvider {
       const std::string& service_name,
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport) = 0;
 
-  // Returns true if this provider uses SASL at the transport layer.
+  // Returns true if this provider uses Sasl at the transport layer.
   virtual bool is_sasl() = 0;
 };
 
-// Implements Kerberos-based authentication.
-class KerberosAuthProvider : public AuthProvider {
+// If either (or both) Kerberos and LDAP auth are desired, we use Sasl for the
+// communication.  This "wraps" the underlying communication, in thrift-speak.
+// This is used for both client and server contexts; there is one for internal
+// and one for external communication.
+class SaslAuthProvider : public AuthProvider {
  public:
-  // FOR NOW: keytab_path must be the same for all auth provider invocations.
-  // If needs_kinit is true, this auth provider will also attempt to obtain credentials
-  // for the supplied principal.
-  KerberosAuthProvider(const std::string& principal, const std::string& keytab_path,
-      bool should_kinit);
+  SaslAuthProvider(bool is_internal) : has_ldap_(false), is_internal_(is_internal),
+      needs_kinit_(false) {}
 
-  // Runs Kinit in a separate thread.
+  // Performs initialization of external state.  If we're using kerberos and
+  // need to kinit, start that thread.  If we're using ldap, set up appropriate
+  // certificate usage.
   virtual Status Start();
 
+  // Wrap the client transport with a new TSaslClientTransport.  This is only for
+  // internal connections.  Since, as a daemon, we only do Kerberos and not LDAP,
+  // we can go straight to Kerberos.
   virtual Status WrapClientTransport(const std::string& hostname,
       boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
       const std::string& service_name,
       boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
 
+  // This sets up a mapping between auth types (PLAIN and GSSAPI) and callbacks.
+  // When a connection comes in, thrift will see one of the above on the wire, do
+  // a table lookup, and associate the appropriate callbacks with the connection.
+  // Then presto! You've got authentication for the connection.
   virtual Status GetServerTransportFactory(
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
 
   virtual bool is_sasl() { return true; }
 
+  // Initializes kerberos items and checks for sanity.  Failures can occur on a
+  // malformed principal or when setting some environment variables.  Called
+  // prior to Start().
+  Status InitKerberos(const std::string& principal, const std::string& keytab_path);
+
+  // Initializes ldap - just record that we're going to use it.  Called prior to
+  // Start().
+  void InitLdap() { has_ldap_ = true; }
+
   // Used for testing
-  const std::string& principal() const { return principal_; };
-  const std::string& hostname() const { return hostname_; };
-  const std::string& service_name() const { return service_name_; };
+  const std::string& principal() const { return principal_; }
+  const std::string& service_name() const { return service_name_; }
+  const std::string& hostname() const { return hostname_; }
+  const std::string& realm() const { return realm_; }
+  bool has_ldap() { return has_ldap_; }
 
  private:
-  // Runs Kinit periodically if required for this principal, i.e. if it's going to be used
-  // to connect as a service client.
-  boost::scoped_ptr<Thread> kinit_thread_;
+  // Do we (the server side only) support ldap for this connnection?
+  bool has_ldap_;
 
-  // The Kerberos principal to kinit as. Set from FLAGS_principal usually.
-  std::string principal_;
-
-  // The full path to the system keytab
-  std::string keytab_path_;
-
-  // The service name, deduced from the principal. Used by servers to indicate what
-  // service a principal must have a ticket for in order to be granted access to this
-  // service.
-  std::string service_name_;
-
-  // Principal's hostname, derived from principal string.
+  // Hostname of this machine - if kerberos, derived from principal.  If there
+  // is no kerberos, but LDAP is used, then acquired via GetHostname().
   std::string hostname_;
 
-  // True if tickets for this principal should be obtained.
+  // True if internal, false if external.
+  bool is_internal_;
+
+  // All the rest of these private items are Kerberos-specific.
+
+  // The Kerberos principal. If is_internal_ is true and --be_principal was
+  // supplied, this is --be_principal.  In all other cases this is --principal.
+  std::string principal_;
+
+  // The full path to the keytab where the above principal can be found.
+  std::string keytab_path_;
+
+  // The service name, deduced from the principal. Used by servers to indicate
+  // what service a principal must have a ticket for in order to be granted
+  // access to this service.
+  std::string service_name_;
+
+  // Principal's realm, again derived from principal.
+  std::string realm_;
+
+  // True if tickets for this principal should be obtained.  This is true if
+  // we're an auth provider for an "internal" connection, because we may
+  // function as a client.
   bool needs_kinit_;
 
-  // Periodically (roughly once every FLAGS_kerberor_reinit_interval minutes) calls kinit
+  // Runs "RunKinit" below if needs_kinit_ is true.
+  boost::scoped_ptr<Thread> kinit_thread_;
+
+  // Periodically (roughly once every FLAGS_kerberos_reinit_interval minutes) calls kinit
   // to get a ticket granting ticket from the kerberos server for principal_, which is
-  // kept in the kerberos cache associated with this process. Once the first attempt to
-  // obtain a ticket has completed, first_kinit is Set() with the status of the
-  // operation. Additionally, if the first attempt fails, this method will return.
+  // kept in the kerberos cache associated with this process. This ensures that we have
+  // valid kerberos credentials when operating as a client. Once the first attempt to
+  // obtain a ticket has completed, first_kinit is Set() with the status of the operation.
+  // Additionally, if the first attempt fails, this method will return.
   void RunKinit(Promise<Status>* first_kinit);
 };
 
-// Provider for Ldap-based authentication. In fact, this only sets up PLAIN/SASL as the
-// client<->server mechanism. External configuration is required via the usual
-// <appname>.conf file in the system SASL configuration directory to set up LDAP
-// authentication/
-//
-// This provider should only be used with servers that use SSL, since passwords are sent
-// in plain text over the wire.
-class LdapAuthProvider : public AuthProvider {
- public:
-  LdapAuthProvider() { }
-  virtual Status Start();
-  virtual Status GetServerTransportFactory(
-      boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
-  virtual Status WrapClientTransport(const std::string& hostname,
-      boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
-      const std::string& service_name,
-      boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
-
-  virtual bool is_sasl() { return true; }
-
- private:
-  // These callbacks override the default callbacks so that we can ensure our custom
-  // checkpass callback is invoked.
-  std::vector<sasl_callback_t> sasl_callbacks_;
-};
-
 // This provider implements no authentication, so any connection is immediately
-// successful.
+// successful.  There's no Sasl in the picture.
 class NoAuthProvider : public AuthProvider {
  public:
   NoAuthProvider() { }
@@ -156,8 +165,9 @@ class NoAuthProvider : public AuthProvider {
   virtual bool is_sasl() { return false; }
 };
 
-// Initialises the authentication subsystem, including SASL and the global AuthManager
-// instance.
+// The first entry point to the authentication subsystem.  Performs initialization
+// of Sasl, the global AuthManager, and the two authentication providers.  Appname
+// should generally be argv[0].
 Status InitAuth(const std::string& appname);
 
 }

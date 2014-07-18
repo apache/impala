@@ -36,26 +36,28 @@ class AuthManager {
  public:
   static AuthManager* GetInstance() { return AuthManager::auth_manager_; };
 
-  // Checks the auth flags and creates appropriate auth providers for client and backend
-  // use. If the authentication scheme needs any initialisation (e.g. run Kinit for
-  // Kerberos), this method does that by calling Start() on both auth providers.
+  // Set up internal and external AuthProvider classes.  This does a bunch of flag
+  // checking and calls each AuthProvider->Start().
   Status Init();
 
-  // Returns the provider to use if you are an Impala client-facing service such as
-  // Beeswax or HS2.
-  AuthProvider* GetClientFacingAuthProvider();
+  // Returns the authentication provider to use for "external" communication
+  // such as the impala shell, jdbc, odbc, etc. This only applies to the server
+  // side of a connection; the client side of said connection is never an
+  // internal process.
+  AuthProvider* GetExternalAuthProvider();
 
-  // Returns the provider to use if you are an internal server<->server service such as an
-  // Impala backend.
-  AuthProvider* GetServerFacingAuthProvider();
+  // Returns the authentication provider to use for internal daemon <-> daemon
+  // connections.  This goes for both the client and server sides.  An example
+  // connection this applies to would be backend <-> statestore.
+  AuthProvider* GetInternalAuthProvider();
 
  private:
   static AuthManager* auth_manager_;
 
   // These are provided for convenience, so that demon<->demon and client<->demon services
   // don't have to check the auth flags to figure out which auth provider to use.
-  boost::scoped_ptr<AuthProvider> client_auth_provider_;
-  boost::scoped_ptr<AuthProvider> server_auth_provider_;
+  boost::scoped_ptr<AuthProvider> internal_auth_provider_;
+  boost::scoped_ptr<AuthProvider> external_auth_provider_;
 };
 
 
