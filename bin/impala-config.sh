@@ -85,6 +85,7 @@ export IMPALA_AVRO_VERSION=1.7.4
 export IMPALA_PARQUET_VERSION=1.2.5-cdh5.2.0-SNAPSHOT
 export IMPALA_THRIFT_VERSION=0.9.0
 export IMPALA_LLVM_VERSION=3.3
+export IMPALA_MINIKDC_VERSION=1.0.0
 
 export IMPALA_FE_DIR=$IMPALA_HOME/fe
 export IMPALA_BE_DIR=$IMPALA_HOME/be
@@ -101,6 +102,7 @@ export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data
 export PATH=$HADOOP_HOME/bin:$PATH
 
 export LLAMA_HOME=$IMPALA_HOME/thirdparty/llama-${IMPALA_LLAMA_VERSION}/
+export MINIKDC_HOME=$IMPALA_HOME/thirdparty/llama-minikdc-${IMPALA_MINIKDC_VERSION}
 
 export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_VERSION}/
 export PATH=$HIVE_HOME/bin:$PATH
@@ -127,6 +129,8 @@ export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
 export THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}/
 export THRIFT_HOME=${THRIFT_SRC_DIR}build/
+
+export CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
 
 export IMPALA_BUILD_THREADS=`nproc`
 
@@ -179,6 +183,9 @@ export CLASSPATH
 # Helper alias to script that verifies and merges Gerrit changes
 alias gerrit-verify-merge="${IMPALA_AUX_TEST_HOME}/jenkins/gerrit-verify-merge.sh"
 
+# A marker in the environment to prove that we really did source this file
+export IMPALA_CONFIG_SOURCED=1
+
 echo "IMPALA_HOME            = $IMPALA_HOME"
 echo "HADOOP_HOME            = $HADOOP_HOME"
 echo "HADOOP_CONF_DIR        = $HADOOP_CONF_DIR"
@@ -187,6 +194,7 @@ echo "HIVE_HOME              = $HIVE_HOME"
 echo "HIVE_CONF_DIR          = $HIVE_CONF_DIR"
 echo "HBASE_HOME             = $HBASE_HOME"
 echo "HBASE_CONF_DIR         = $HBASE_CONF_DIR"
+echo "MINIKDC_HOME           = $MINIKDC_HOME"
 echo "PPROF_PATH             = $PPROF_PATH"
 echo "THRIFT_HOME            = $THRIFT_HOME"
 echo "HADOOP_LZO             = $HADOOP_LZO"
@@ -197,3 +205,25 @@ echo "PYTHONPATH             = $PYTHONPATH"
 echo "JAVA_HOME              = $JAVA_HOME"
 echo "LD_LIBRARY_PATH        = $LD_LIBRARY_PATH"
 echo "LD_PRELOAD             = $LD_PRELOAD"
+
+# Kerberos things.  If the cluster exists and is kerberized, source
+# the required environment.  This is required for any hadoop tool to
+# work.  Note that if impala-config.sh is sourced before the
+# kerberized cluster is created, it will have to be sourced again
+# *after* the cluster is created in order to pick up these settings.
+export MINIKDC_ENV=${IMPALA_HOME}/testdata/bin/minikdc_env.sh
+if ${CLUSTER_DIR}/admin is_kerberized; then
+  . ${MINIKDC_ENV}
+  echo " *** This cluster is kerberized ***"
+  echo "KRB5_KTNAME            = $KRB5_KTNAME"
+  echo "KRB5_CONFIG            = $KRB5_CONFIG"
+  echo "KRB5_TRACE             = $KRB5_TRACE"
+  echo "HADOOP_OPTS            = $HADOOP_OPTS"
+  echo " *** This cluster is kerberized ***"
+else
+  # If the cluster *isn't* kerberized, ensure that the environment isn't
+  # polluted with kerberos items that might screw us up.  We go through
+  # everything set in the minikdc environment and explicitly unset it.
+  unset `grep export ${MINIKDC_ENV} | sed "s/.*export \([^=]*\)=.*/\1/" \
+      | sort | uniq`
+fi

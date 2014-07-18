@@ -93,4 +93,37 @@
         $HADOOP_PREFIX/share/hadoop/yarn/*,$HADOOP_PREFIX/share/hadoop/yarn/lib/*
      </value>
   </property>
+
+  <!-- BEGIN Kerberos settings -->
+
+  <!-- KERBEROS TODO: Add these to yarn.application.classpath.
+       ${IMPALA_FE_DIR}/target/*,${HADOOP_LZO}/build/*,
+       ${IMPALA_FE_DIR}/target/dependency/* -->
+
+  <!-- ResourceManager security configs -->
+  <property>
+    <name>yarn.resourcemanager.keytab</name>
+    <value>${KRB5_KTNAME}</value>
+  </property>
+
+  <property>
+    <name>yarn.resourcemanager.principal</name>
+    <value>${MINIKDC_PRINC_USER}</value>
+    <!-- Sort of horrible: instead of the yarn principle, we'll use ${USER}
+         so that we don't have a problem with file system permissions. -->
+  </property>
+
+  <!-- NodeManager security configs -->
+  <property>
+    <name>yarn.nodemanager.keytab</name>
+    <value>${KRB5_KTNAME}</value>
+  </property>
+
+  <property>
+    <name>yarn.nodemanager.principal</name>
+    <value>${MINIKDC_PRINC_USER}</value>
+    <!-- Also sort of horrible as per above -->
+  </property>
+  <!-- END Kerberos settings -->
+
 </configuration>

@@ -78,6 +78,11 @@ hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/malformed_decimal_tiny.parqu
 hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/decimal.parquet \
   /test-warehouse/schemas/
 
+# For kerberized clusters, use kerberos
+if ${CLUSTER_DIR}/admin is_kerberized; then
+  LOAD_DATA_ARGS="${LOAD_DATA_ARGS} --use_kerberos --principal=${MINIKDC_PRINC_HIVE}"
+fi
+
 # Load the data set
 pushd ${IMPALA_HOME}/bin
 ./start-impala-cluster.py -s 3 --wait_for_cluster --log_dir=${IMPALAD_LOG_DIR}
@@ -96,7 +101,8 @@ python -u ./load-data.py --workloads tpch --exploration_strategy core ${LOAD_DAT
 # Load all the auxiliary workloads (if any exist)
 if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
   python -u ./load-data.py --workloads all --workload_dir=${IMPALA_AUX_WORKLOAD_DIR}\
-      --dataset_dir=${IMPALA_AUX_DATASET_DIR} --exploration_strategy core
+      --dataset_dir=${IMPALA_AUX_DATASET_DIR} --exploration_strategy core \
+      ${LOAD_DATA_ARGS}
 else
   echo "Skipping load of auxilary workloads because directories do not exist"
 fi

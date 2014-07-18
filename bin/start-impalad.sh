@@ -78,7 +78,14 @@ fi
 if [ -n "$JVM_ARGS" ]; then
   export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} ${JVM_ARGS}"
 fi
-set -u
+
+# If Kerberized, source appropriate vars and set startup options
+if ${CLUSTER_DIR}/admin is_kerberized; then
+  . ${MINIKDC_ENV}
+  IMPALAD_ARGS="${IMPALAD_ARGS} -principal=${MINIKDC_PRINC_IMPA}"
+  IMPALAD_ARGS="${IMPALAD_ARGS} -keytab_file=${KRB5_KTNAME}"
+  export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} ${JAVA_KERBEROS_MAGIC}"
+fi
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
 exec ${GDB_PREFIX} ${IMPALA_CMD} ${IMPALAD_ARGS}

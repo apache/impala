@@ -59,4 +59,28 @@
       User name use by Llama when interacting with Yarn.
     </description>
   </property>
+
+<!-- BEGIN Kerberos settings -->
+  <property>
+    <name>llama.am.server.thrift.security</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>llama.am.server.thrift.kerberos.keytab.file</name>
+    <value>${KRB5_KTNAME}</value>
+  </property>
+
+  <property>
+    <name>llama.am.server.thrift.kerberos.server.principal.name</name>
+    <value>${MINIKDC_PRINC_LLAM}</value>
+  </property>
+
+  <property>
+    <name>llama.am.server.thrift.kerberos.notification.principal.name</name>
+    <!-- <value>${MINIKDC_PRINC_IMPA}</value> -->
+    <value>impala</value>
+  </property>
+<!-- END Kerberos settings -->
+
 </configuration>

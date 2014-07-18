@@ -18,7 +18,10 @@
 # This script exits with 0 and 1 as the returncodes
 #  - 0 implies that the schema diff is emppty, or that a reference githash was not found.
 #  - 1 implies that the schemas have changed.
+
+. ${IMPALA_HOME}/bin/impala-config.sh
 set -ex
+
 # If /test-warehouse/githash.txt does not exist, exit with a 0
 hdfs dfs -test -e  /test-warehouse/githash.txt || { exit 0; }
 GIT_HASH=$(echo $(hdfs dfs -cat /test-warehouse/githash.txt))

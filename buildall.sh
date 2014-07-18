@@ -19,6 +19,13 @@
 ROOT=`dirname "$0"`
 ROOT=`cd "$ROOT"; pwd`
 
+# Grab this *before* we source impala-config.sh to see if the caller has
+# kerberized environment variables already or not.
+NEEDS_RE_SOURCE_NOTE=1
+if [ ! -z "${MINIKDC_REALM}" ]; then
+  NEEDS_RE_SOURCE_NOTE=0
+fi
+
 export IMPALA_HOME=$ROOT
 . "$ROOT"/bin/impala-config.sh
 
@@ -29,6 +36,7 @@ FORMAT_CLUSTER=0
 FORMAT_METASTORE=0
 TARGET_BUILD_TYPE=Debug
 EXPLORATION_STRATEGY=core
+IMPALA_KERBERIZE=0
 SNAPSHOT_FILE=
 MAKE_IMPALA_ARGS=""
 
@@ -98,6 +106,13 @@ do
       SNAPSHOT_FILE="UNDEFINED"
       TESTDATA_ACTION=1
       ;;
+    -k|-kerberize|-kerberos|-kerb)
+      # Export to the environment for all child process tools
+      export IMPALA_KERBERIZE=1
+      set +u
+      . ${MINIKDC_ENV}
+      set -u
+      ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
@@ -118,6 +133,7 @@ do
            "specified. If -snapshot_file is not specified, data will be regenerated."
       echo "[-snapshot_file <file name>] : Load test data from a snapshot file"
       echo "[-so|-build_shared_libs] : Dynamically link executables (default is static)"
+      echo "[-kerberize] : Enable kerberos on the cluster"
       echo "-----------------------------------------------------------------------------
 Examples of common tasks:
 
@@ -153,6 +169,22 @@ elif [ "$SNAPSHOT_FILE" != "" ] &&  [ ! -e $SNAPSHOT_FILE ]; then
   exit 1
 fi
 
+# If we aren't kerberized then we certainly don't need to talk about
+# re-sourcing impala-config.
+if [ ${IMPALA_KERBERIZE} -eq 0 ]; then
+  NEEDS_RE_SOURCE_NOTE=0
+fi
+
+# Test for HADOOP_LZO and IMAPALA_LZO
+if [ ! -d "${HADOOP_LZO}" ]; then
+    echo "HADOOP_LZO is either not set or not a directory: ${HADOOP_LZO}"
+    exit 1
+fi
+if [ ! -d "${IMPALA_LZO}" ]; then
+    echo "IMPALA_LZO is either not set or not a directory: ${IMPALA_LZO}"
+    exit 1
+fi
+
 # Sanity check that thirdparty is built.
 if [ ! -e $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION}/libgflags.la ]
 then
@@ -183,6 +215,11 @@ fi
 # option to clean everything first
 if [ $CLEAN_ACTION -eq 1 ]
 then
+  # Stop the minikdc if needed.
+  if ${CLUSTER_DIR}/admin is_kerberized; then
+    ${IMPALA_HOME}/testdata/bin/minikdc.sh stop
+  fi
+
   # clean the external data source project
   cd ${IMPALA_HOME}/ext-data-source
   rm -rf api/generated-sources/*
@@ -254,6 +291,45 @@ elif [ $TESTDATA_ACTION -eq 1 ] || [ $TESTS_ACTION -eq 1 ]; then
   $IMPALA_HOME/testdata/bin/run-all.sh
 fi
 
+#
+# KERBEROS TODO
+# There is still work to be done for kerberos.
+# - The hive metastore needs to be kerberized
+# - If the user principal is "impala/localhost", MR jobs complain that user
+#   "impala" is not user ${USER}.  But if the principal is ${USER}/localhost,
+#   the impala daemons change it to impala/localhost in
+#   KerberosAuthProvider::RunKinit() - and there may be other difficulties
+#   down the road with getting all the permissions correct.
+# - Futher Beeline -> HiveServer2 -> HBase|MapReduce combo issues
+# - Getting farther down the testing path, it's likely more issues will turn up
+# - Further extensive testing
+#
+if [ ${IMPALA_KERBERIZE} -eq 1 ]; then
+  if [ ${TESTDATA_ACTION} -eq 1 -o ${TESTS_ACTION} -eq 1 ]; then
+    echo "At this time we only support cluster creation and impala daemon"
+    echo "bringup in kerberized mode.  Data won't be loaded, and tests"
+    echo "won't be run.  The impala daemons will be started."
+    TESTDATA_ACTION=0
+    TESTS_ACTION=0
+    ${IMPALA_HOME}/bin/start-impala-cluster.py
+  fi
+fi
+# END KERBEROS TODO
+
+#
+# Don't try to run tests without data!
+#
+TESTWH_ITEMS=`hadoop fs -ls /test-warehouse 2> /dev/null | \
+    grep test-warehouse |wc -l`
+if [ ${TESTS_ACTION} -eq 1 -a \
+     ${TESTDATA_ACTION} -eq 0 -a \
+     ${TESTWH_ITEMS} -lt 5 ]; then
+  set +x
+  echo "You just asked buildall to run tests, but did not supply any data."
+  echo "Running tests without data doesn't work. Exiting now."
+  exit 1
+fi
+
 if [ $TESTDATA_ACTION -eq 1 ]
 then
   # create and load test data
@@ -275,3 +351,15 @@ fi
 
 # Generate list of files for Cscope to index
 $IMPALA_HOME/bin/gen-cscope.sh
+
+if [ ${NEEDS_RE_SOURCE_NOTE} -eq 1 ]; then
+  echo
+  echo "You have just successfully created a kerberized cluster."
+  echo "Congratulations!  Communication with this cluster requires"
+  echo "the setting of certain environment variables.  These"
+  echo "environment variables weren't available before the cluster"
+  echo "was created.  To pick them up, please source impala-config.sh:"
+  echo
+  echo "   . ${IMPALA_HOME}/bin/impala-config.sh"
+  echo
+fi

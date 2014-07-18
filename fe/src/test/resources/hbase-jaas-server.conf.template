@@ -1,0 +1,16 @@
+Client {
+   com.sun.security.auth.module.Krb5LoginModule required
+   useKeyTab=true
+   useTicketCache=false
+   keyTab="${MINIKDC_KEYTAB}"
+   principal="${MINIKDC_PRINC_HBSE}";
+};
+
+Server {
+   com.sun.security.auth.module.Krb5LoginModule required
+   useKeyTab=true
+   useTicketCache=false
+   storeKey=true
+   keyTab="${MINIKDC_KEYTAB}"
+   principal="${MINIKDC_PRINC_ZOOK}";
+};

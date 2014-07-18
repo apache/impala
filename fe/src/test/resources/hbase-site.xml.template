@@ -50,4 +50,68 @@
     <name>hbase.rpc.timeout</name>
     <value>30000</value>
   </property>
+
+  <property>
+    <name>hbase.zookeeper.property.dataDir</name>
+    <value>${IMPALA_TEST_CLUSTER_LOG_DIR}/zoo</value>
+  </property>
+
+  <!-- BEGIN Kerberos settings -->
+  <property>
+    <name>hbase.security.authentication</name>
+    <value>kerberos</value>
+  </property>
+
+  <property>
+    <name>hbase.regionserver.kerberos.principal</name>
+    <value>${MINIKDC_PRINC_HBSE}</value>
+  </property>
+
+  <property>
+    <name>hbase.regionserver.keytab.file</name>
+    <value>${KRB5_KTNAME}</value>
+  </property>
+
+  <property>
+    <name>hbase.master.kerberos.principal</name>
+    <value>${MINIKDC_PRINC_HBSE}</value>
+  </property>
+
+  <property>
+    <name>hbase.master.keytab.file</name>
+    <value>${KRB5_KTNAME}</value>
+  </property>
+
+  <property>
+    <name>hbase.coprocessor.region.classes</name>
+    <value>org.apache.hadoop.hbase.security.token.TokenProvider</value>
+  </property>
+
+  <property>
+    <name>hbase.zookeeper.quorum</name>
+    <value>localhost</value> <!-- The comma-separated
+    list of hostnames of the ZooKeeper Quorum hosts -->
+  </property>
+
+  <property>
+    <name>hbase.cluster.distributed</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>hbase.zookeeper.property.authProvider.1</name>
+    <value>org.apache.zookeeper.server.auth.SASLAuthenticationProvider</value>
+  </property>
+
+  <property>
+    <name>hbase.zookeeper.property.kerberos.removeHostFromPrincipal</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>hbase.zookeeper.property.kerberos.removeRealmFromPrincipal</name>
+    <value>true</value>
+  </property>
+  <!-- END Kerberos settings -->
+
 </configuration>

@@ -134,8 +134,73 @@
       With NONE, Hive uses the plain SASL transport. -->
 <property>
   <name>hive.server2.authentication</name>
-  <value>NONE</value>
+  <value>${HIVE_S2_AUTH}</value> <!-- NONE | KERBEROS -->
 </property>
+
+<!-- BEGIN Kerberos settings -->
+<property>
+  <name>hive.server2.authentication.kerberos.principal</name>
+  <value>${MINIKDC_PRINC_HIVE}</value>
+</property>
+
+<property>
+  <name>hive.server2.authentication.kerberos.keytab</name>
+  <value>${KRB5_KTNAME}</value>
+</property>
+
+<property>
+  <name>hive.server2.enable.impersonation</name>
+  <description>Enable user impersonation for HiveServer2</description>
+  <value>true</value>
+</property>
+
+<!-- Having problems getting the metastore up with Kerberos.  Defer for now.
+<property>
+  <name>hive.metastore.sasl.enabled</name>
+  <value>true</value>
+  <description>If true, the metastore thrift interface will be secured
+    with SASL. Clients must authenticate with Kerberos.</description>
+</property>
+
+<property>
+  <name>hive.metastore.kerberos.keytab.file</name>
+  <value>${KRB5_KTNAME}</value>
+</property>
+
+<property>
+  <name>hive.metastore.kerberos.principal</name>
+  <value>${MINIKDC_PRINC_HIVE}</value>
+</property>
+-->
+
+<!-- Start CDH-17946 -->
+<property>
+  <name>hbase.security.authentication</name>
+  <value>kerberos</value>
+</property>
+
+<property>
+  <name>hbase.master.kerberos.principal</name>
+  <value>${MINIKDC_PRINC_HBSE}</value>
+</property>
+
+<property>
+  <name>hbase.regionserver.kerberos.principal</name>
+  <value>${MINIKDC_PRINC_HBSE}</value>
+</property>
+
+<property>
+  <name>hbase.zookeeper.quorum</name>
+  <value>localhost</value>
+</property>
+<!-- END CDH-17946 -->
+
+<property>
+  <name>hbase.coprocessor.region.classes</name>
+  <value>org.apache.hadoop.hbase.security.token.TokenProvider</value>
+</property>
+
+<!-- END Kerberos settings -->
 
 <property>
   <!--  TODO: Remove this once Hive has changed their default back to ColumnarSerDe -->

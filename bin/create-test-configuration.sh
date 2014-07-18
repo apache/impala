@@ -27,12 +27,23 @@ do
     -create_metastore)
       CREATE_METASTORE=1
       ;;
+    -k|-kerberize|-kerberos|-kerb)
+      # This could also come in through the environment...
+      export IMPALA_KERBERIZE=1
+      ;;
     -help|*)
       echo "[-create_metastore] : If true, creates a new metastore."
+      echo "[-kerberize] : Enable kerberos on the cluster"
       exit 1
       ;;
   esac
 done
+
+# If this isn't sourced, bad things will always happen
+if [ "${IMPALA_CONFIG_SOURCED}" != "1" ]; then
+  echo "You must source bin/impala-config.sh"
+  exit 1
+fi
 
 # If a specific metastore db is defined, use that. Otherwise create unique metastore
 # DB name based on the current directory.
@@ -40,10 +51,23 @@ if [ -z "${METASTORE_DB}" ]; then
   METASTORE_DB=`basename ${IMPALA_HOME} | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
 fi
 
-set -u
-
-CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
 ${CLUSTER_DIR}/admin create_cluster
+
+if [ ! -z "${IMPALA_KERBERIZE}" ]; then
+  # Sanity check...
+  if ! ${CLUSTER_DIR}/admin is_kerberized; then
+    echo "Kerberized cluster not created, even though told to."
+    exit 1
+  fi
+
+  # Set some more environment variables.
+  . ${MINIKDC_ENV}
+
+  # For hive-site.xml further down...
+  export HIVE_S2_AUTH=KERBEROS
+else
+  export HIVE_S2_AUTH=NONE
+fi
 
 # Convert Metastore DB name to be lowercase
 export METASTORE_DB=`echo $METASTORE_DB | tr '[A-Z]' '[a-z]'`
@@ -56,10 +80,9 @@ echo "Metastore DB: hive_${METASTORE_DB}"
 
 pushd ${CONFIG_DIR}
 # Cleanup any existing files
-rm -f {core,hdfs,hbase,hive}-site.xml
+rm -f {core,hdfs,hbase,hive,yarn,mapred}-site.xml
 rm -f authz-provider.ini
 
-# TODO: Throw an error if the template references an undefined environment variable
 if [ $CREATE_METASTORE -eq 1 ]; then
   echo "Creating postgresql database for Hive metastore"
   set +o errexit
@@ -76,10 +99,33 @@ echo "Creating Sentry Policy Server DB"
 createdb -U hiveuser sentry_policy
 set -e
 
+# Perform search-replace on $1, output to $2.
+# Search $1 ($GCIN) for strings that look like "${FOO}".  If FOO is defined in
+# the environment then replace "${FOO}" with the environment value.  Also
+# remove or leave special kerberos settings as desired.  Sanity check at end.
 function generate_config {
-  # Search for strings like ${FOO}, if FOO is defined in the environment then replace
-  # "${FOO}" with the environment value.
-  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' $1 > $2
+  GCIN="$1"
+  GCOUT="$2"
+
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+      "${GCIN}" > "${GCOUT}.tmp"
+
+  if [ "${IMPALA_KERBERIZE}" = "" ]; then
+    sed '/<!-- BEGIN Kerberos/,/END Kerberos settings -->/d' \
+        "${GCOUT}.tmp" > "${GCOUT}"
+  else
+    cp "${GCOUT}.tmp" "${GCOUT}"
+  fi
+  rm -f "${GCOUT}.tmp"
+
+  # Check for anything that might have been missed.
+  # Assumes that environment variables will be ALL CAPS...
+  if grep '\${[A-Z_]*}' "${GCOUT}"; then
+    echo "Found undefined variables in ${GCOUT}, aborting"
+    exit 1
+  fi
+
+  echo "Generated `pwd`/${GCOUT}"
 }
 
 echo "Linking core-site.xml from local cluster"
@@ -89,20 +135,30 @@ ln -s ${CLUSTER_HADOOP_CONF_DIR}/core-site.xml
 echo "Linking hdfs-site.xml from local cluster"
 ln -s ${CLUSTER_HADOOP_CONF_DIR}/hdfs-site.xml
 
-echo "Generating hive-site.xml using postgresql for metastore"
+if ${CLUSTER_DIR}/admin is_kerberized; then
+  # KERBEROS TODO: Without this, the yarn daemons can see these
+  # files, but mapreduce jobs *cannot* see these files.  This seems
+  # strange, but making these symlinks also results in data loading
+  # failures in the non-kerberized case.  Without these, mapreduce
+  # jobs die in a kerberized cluster because they can't find their
+  # kerberos principals.  Obviously this has to be sorted out before
+  # a kerberized cluster can load data.
+  echo "Linking yarn and mapred from local cluster"
+  ln -s ${CLUSTER_HADOOP_CONF_DIR}/yarn-site.xml
+  ln -s ${CLUSTER_HADOOP_CONF_DIR}/mapred-site.xml
+fi
+
 generate_config postgresql-hive-site.xml.template hive-site.xml
-
-echo "Generating hive-log4j.properties"
 generate_config hive-log4j.properties.template hive-log4j.properties
-
-echo "Generating hbase-site.xml"
 generate_config hbase-site.xml.template hbase-site.xml
-
-echo "Generating authorization policy file"
 generate_config authz-policy.ini.template authz-policy.ini
-
-echo "Generating sentry policy server config file"
 generate_config sentry-site.xml.template sentry-site.xml
+
+if [ ! -z "${IMPALA_KERBERIZE}" ]; then
+  generate_config hbase-jaas-server.conf.template hbase-jaas-server.conf
+  generate_config hbase-jaas-client.conf.template hbase-jaas-client.conf
+fi
+
 popd
 
 echo "Completed config generation"

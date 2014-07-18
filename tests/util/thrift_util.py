@@ -18,6 +18,7 @@
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 import getpass
+import sasl
 
 def create_transport(host, port, service, transport_type="buffered", user=None,
                      password=None, use_ssl=False, ssl_cert=None):
@@ -51,11 +52,6 @@ def create_transport(host, port, service, transport_type="buffered", user=None,
   # Initializes a sasl client
   from shell.thrift_sasl import TSaslClientTransport
   def sasl_factory():
-    try:
-      import saslwrapper as sasl
-    except ImportError:
-      print 'saslwrapper not found, trying to import sasl'
-      import sasl
     sasl_client = sasl.Client()
     sasl_client.setAttr("host", host)
     sasl_client.setAttr("service", service)

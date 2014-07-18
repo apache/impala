@@ -33,6 +33,7 @@ echo "Killing running services..."
 $IMPALA_HOME/testdata/bin/kill-all.sh &>${IMPALA_TEST_CLUSTER_LOG_DIR}/kill-all.log
 
 set -e
+set -o pipefail
 
 # Starts up a mini-cluster which includes:
 # - HDFS with 3 DNs
@@ -40,15 +41,17 @@ set -e
 # - Multiple Yarn NodeManagers, exactly one per HDFS DN
 echo "Starting all cluster services..."
 echo " --> Starting mini-DFS cluster"
-$IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER-}
+$IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER-} 2>&1 | \
+    tee ${IMPALA_TEST_CLUSTER_LOG_DIR}/run-mini-dfs.log
 
 echo " --> Starting HBase"
-$IMPALA_HOME/testdata/bin/run-hbase.sh &>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-hbase.log
+$IMPALA_HOME/testdata/bin/run-hbase.sh 2>&1 | \
+    tee ${IMPALA_TEST_CLUSTER_LOG_DIR}/run-hbase.log
 
 echo " --> Starting Hive Server and Metastore Service"
-$IMPALA_HOME/testdata/bin/run-hive-server.sh\
-    &>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-hive-server.log
+$IMPALA_HOME/testdata/bin/run-hive-server.sh 2>&1 | \
+    tee ${IMPALA_TEST_CLUSTER_LOG_DIR}/run-hive-server.log
 
 echo " --> Starting the Sentry Policy Server"
-$IMPALA_HOME/testdata/bin/run-sentry-service.sh\
-    &>${IMPALA_TEST_CLUSTER_LOG_DIR}/run-sentry-service.log
+$IMPALA_HOME/testdata/bin/run-sentry-service.sh > \
+    ${IMPALA_TEST_CLUSTER_LOG_DIR}/run-sentry-service.log 2>&1

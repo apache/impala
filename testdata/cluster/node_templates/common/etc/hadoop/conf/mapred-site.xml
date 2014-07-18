@@ -27,4 +27,23 @@
     <name>mapreduce.shuffle.port</name>
     <value>0</value>
   </property>
+
+  <!-- BEGIN Kerberos settings -->
+  <!-- MapReduce Job History Server security configs -->
+  <property>
+    <name>mapreduce.jobhistory.address</name>
+    <value>localhost:10020</value>
+  </property>
+
+  <property>
+    <name>mapreduce.jobhistory.keytab</name>
+    <value>${KRB5_KTNAME}</value>
+  </property>
+
+  <property>
+    <name>mapreduce.jobhistory.principal</name>
+    <value>${MINIKDC_PRINC_MAPR}</value>
+  </property>
+  <!-- END Kerberos settings -->
+
 </configuration>

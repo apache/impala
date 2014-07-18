@@ -19,9 +19,16 @@
 # Exit on reference to uninitialized variables and non-zero exit codes
 set -u
 set -e
+
 . $IMPALA_HOME/bin/set-pythonpath.sh
 EXPLORATION_STRATEGY=core
 NUM_ITERATIONS=1
+KERB_ARGS=""
+
+. ${IMPALA_HOME}/bin/impala-config.sh
+if ${CLUSTER_DIR}/admin is_kerberized; then
+  KERB_ARGS="--use_kerberos"
+fi
 
 # parse command line options
 while getopts "e:n:" OPTION
@@ -70,13 +77,14 @@ do
 
   # Run some queries using run-workload to verify run-workload has not been broken.
   ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
-      --table_format=text/none --exec_options="disable_codegen:False"
+      --table_format=text/none --exec_options="disable_codegen:False" ${KERB_ARGS}
 
   # Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
   # functional-query workload because the larger datasets (ex. tpch) are not generated
   # in all table formats.
+  # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
   ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
-      --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY
+      --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY #${KERB_ARGS}
 
   # Run JUnit frontend tests
   # Requires a running impalad cluster because some tests (such as DataErrorTest and

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+. ${IMPALA_HOME}/bin/impala-config.sh
+
 # TODO: remove this once we understand why Hive looks in HDFS for many of its jars
 ${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${HIVE_HOME}/lib/ 
 ${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${HIVE_HOME}/lib/ 

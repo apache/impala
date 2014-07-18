@@ -116,6 +116,13 @@ class TestImpalaShell(object):
   @pytest.mark.execute_serially
   def test_kerberos_option(self):
     args = "-k"
+
+    # If you have a valid kerberos ticket in your cache, this test fails - so
+    # here we set a bogus KRB5CCNAME in the environment so that klist (and other
+    # kerberos commands) won't find the normal ticket cache.
+    # KERBEROS TODO: add kerberized cluster test case
+    os.environ["KRB5CCNAME"] = "/tmp/this/file/hopefully/does/not/exist"
+
     # The command will fail because we're trying to connect to a kerberized impalad.
     results = run_impala_shell_cmd(args, expect_success=False)
     # Check that impala is using the right service name.

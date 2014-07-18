@@ -37,7 +37,16 @@ parser.add_option("--transport", dest="transport", default="buffered",
 options, args = parser.parse_args()
 
 hs2_host, hs2_port = options.hs2_hostport.split(':')
-hs2_transport = create_transport(hs2_host, hs2_port, "hiveserver2", options.transport)
+
+if options.transport == "plain_sasl":
+  # Here we supply a bogus username of "foo" and a bogus password of "bar".
+  # We just have to supply *something*, else HS2 will block waiting for user
+  # input.  Any bogus username and password are accepted.
+  hs2_transport = create_transport(hs2_host, hs2_port, "hive", options.transport,
+                                   "foo", "bar")
+else:
+  hs2_transport = create_transport(hs2_host, hs2_port, "hive", options.transport)
+
 protocol = TBinaryProtocol.TBinaryProtocol(hs2_transport)
 hs2_client = TCLIService.Client(protocol)
 
@@ -56,7 +65,13 @@ while time.time() - now < TIMEOUT_SECONDS:
       hs2_client.CloseSession(close_session_req)
       print "HiveServer2 service is up at %s." % options.hs2_hostport
       exit(0)
-  except Exception, e:
+  except Exception as e:
+    if "SASL" in e.message:  # Bail out on SASL failures
+      print "SASL failure when attempting connection:"
+      raise
+    if "GSS" in e.message:   # Other GSSAPI failures
+      print "GSS failure when attempting connection:"
+      raise
     print "Waiting for HiveServer2 at %s..." % options.hs2_hostport
   finally:
     hs2_transport.close()

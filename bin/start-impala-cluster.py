@@ -61,8 +61,8 @@ IMPALA_HOME = os.environ['IMPALA_HOME']
 KNOWN_BUILD_TYPES = ['debug', 'release']
 IMPALAD_PATH = os.path.join(IMPALA_HOME,
     'bin/start-impalad.sh -build_type=%s' % options.build_type)
-STATE_STORE_PATH = os.path.join(IMPALA_HOME, 'be/build',
-    options.build_type, 'statestore/statestored')
+STATE_STORE_PATH = os.path.join(IMPALA_HOME,
+    'bin/start-statestored.sh -build_type=%s' % options.build_type)
 CATALOGD_PATH = os.path.join(IMPALA_HOME,
     'bin/start-catalogd.sh -build_type=%s' % options.build_type)
 MINI_IMPALA_CLUSTER_PATH = IMPALAD_PATH + " -in-process"
@@ -148,6 +148,10 @@ def start_impalad_instances(cluster_size):
       service_name = "impalad"
     else:
       service_name = "impalad_node%s" % i
+      # Sleep between instance startup: simultaneous starts hurt the minikdc
+      # Yes, this is a hack, but it's easier than modifying the minikdc...
+      sleep(2)
+
     args = "%s %s %s %s" %\
           (build_impalad_logging_args(i, service_name), build_jvm_args(i),
            build_impalad_port_args(i), options.impalad_args.replace("#ID", str(i)))

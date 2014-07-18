@@ -21,7 +21,6 @@
 # Subsequent loads should assign a correct replication factor.
 
 set -e
-set -u
 
 cat > /tmp/create_hive_table.q << EOF
 DROP TABLE if exists hive_replication_bug_warmup_table;
@@ -35,8 +34,15 @@ cat > /tmp/drop_hive_tables.q << EOF
 DROP TABLE if exists hive_replication_bug_warmup_table;
 EOF
 
-beeline -n $USER -u "jdbc:hive2://localhost:11050/default;" -f /tmp/create_hive_table.q
-beeline -n $USER -u "jdbc:hive2://localhost:11050/default;" -f /tmp/drop_hive_tables.q
+JDBC_URL="jdbc:hive2://localhost:11050/default;"
+if ${CLUSTER_DIR}/admin is_kerberized; then
+    # Making a kerberized cluster... set some more environment variables.
+    . ${MINIKDC_ENV}
+    JDBC_URL="${JDBC_URL}principal=${MINIKDC_PRINC_HIVE}"
+fi
+
+beeline -n $USER -u "${JDBC_URL}" -f /tmp/create_hive_table.q
+beeline -n $USER -u "${JDBC_URL}" -f /tmp/drop_hive_tables.q
 
 # Clean up temp files.
 rm /tmp/create_hive_table.q

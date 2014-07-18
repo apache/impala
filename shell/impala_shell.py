@@ -489,6 +489,8 @@ class ImpalaShell(cmd.Cmd):
           print_to_stderr(("Kerberos ticket found in the credentials cache, retrying "
                            "the connection with a secure transport."))
           self.imp_client.use_kerberos = True
+          self.imp_client.use_ldap = False
+          self.imp_client.ldap_password = None
           self._connect()
       except OSError, e:
         pass

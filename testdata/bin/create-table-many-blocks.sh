@@ -20,6 +20,7 @@
 # way a table with 100K blocks can be created by using 100 partitions x 1000
 # blocks/files.
 
+. ${IMPALA_HOME}/bin/impala-config.sh
 set -e
 set -u
 

@@ -24,14 +24,16 @@
 # kept as close as possible to a real cluster. For example, the first node will live in
 # the dir "cdh-<version>/node-1" and its logs would be at "cdh-<version>/node-1/var/log".
 
-set -eu
+set -e
 
-while getopts v OPT; do
+while getopts vk OPT; do
   case $OPT in
-    v) set -x; shift;;
-    ?) echo "Usage: $0 [-v (verbose)] ACTION (see source...)"; exit 1;;
+    v) set -x;;
+    k) export IMPALA_KERBERIZE=1;;
+    ?) echo "Usage: $0 [-v (verbose) -k (kerberize)] ACTION (see source...)"; exit 1;;
   esac
 done
+shift $(($OPTIND-1))
 
 DIR=$(dirname $0)
 NODES_DIR="$DIR/cdh$CDH_MAJOR_VERSION"
@@ -71,6 +73,89 @@ if [[ "$CDH_MAJOR_VERSION" -ge 5 ]]; then
 fi
 
 EASY_ACCESS_LOG_DIR="$IMPALA_HOME/cluster_logs"
+MINIKDC_INIT=${IMPALA_HOME}/testdata/bin/minikdc.sh
+
+#
+# Various initialization routines for a Kerberized cluster setup.  We
+# do this if either
+#    1) IMPALA_KERBERIZE is set
+#    2) The config files exist and use kerberos
+# If either are true, then we set IMPALA_KERBERIZE ourselves, ensure the
+# minikdc is started, source the appropriate env vars from it, and get
+# ourselves a fresh TGT (Ticket-Granting-Ticket).
+#
+function kerberize_setup {
+  if is_kerberized; then
+    export IMPALA_KERBERIZE=1
+  fi
+
+  # No kerberos?  We're done.
+  if [ -z "${IMPALA_KERBERIZE}" ]; then
+    return
+  fi
+
+  # We must have the 'kinit' binary installed so that the minikdc can
+  # grant the user a ticket-granting-ticket.
+  if ! type -f kinit > /dev/null 2>&1; then
+    echo "Unable to locate 'kinit' on this machine, it must be installed"
+    echo "in order for you to actually communicate with the kerberized"
+    echo "components of the cluster."
+    echo "Try this (on ubuntu):"
+    echo " --> $ sudo apt-get install krb5-user"
+    echo
+    exit 1
+  fi
+
+  # While we're checking things, make sure the SASL GSSAPI libraries
+  # are installed.  These aren't required until we go to start up
+  # the impala daemons, but we might as well fail early...
+  IMPALA_SASL_PATH="/usr/lib/sasl2 /usr/lib64/sasl2 /usr/local/lib/sasl2"
+  IMPALA_SASL_PATH="${IMPALA_SASL_PATH} /usr/lib/x86_64-linux-gnu/sasl2"
+  SASL_GSSAPI_FOUND=0
+  for i in ${IMPALA_SASL_PATH}; do
+    if ls $i/libgssapi* > /dev/null 2>&1; then
+      SASL_GSSAPI_FOUND=1
+      break
+    fi
+  done
+  if [ ${SASL_GSSAPI_FOUND} -eq 0 ]; then
+    echo "Unable to locate the SASL GSSAPI libraries in the following path:"
+    echo "${IMPALA_SASL_PATH}"
+    echo "This is required for Kerberos communication using SASL, which"
+    echo "the Impala daemons depend on.  To install (on Ubuntu), try:"
+    echo " --> $ sudo apt-get install libsasl2-modules-gssapi-mit"
+    echo
+    exit 1
+  fi
+
+  # Starting it has no effect if it's already started...
+  ${MINIKDC_INIT} start
+
+  # Source the appropriate minikdc environment variables
+  . ${MINIKDC_ENV}
+
+  # Give ourselves a fresh TGT.  Debate here whether that should be
+  # ${USER} or 'impala'.  Each has issues; see comments in buildall.sh.
+  # Stick with ${USER} for now.
+  kinit -k -t "${KRB5_KTNAME}" "${MINIKDC_PRINC_USER}"
+  if [ $? -ne 0 ]; then
+    echo "kinit failure; aborting"
+    exit 1
+  fi
+}
+
+# Return success if the cluster is kerberized
+function is_kerberized {
+  HCONFSC="`get_hadoop_client_conf_dir`/core-site.xml"
+  if [ -f "${HCONFSC}" ]; then
+    if grep -qi "Kerberos settings" "${HCONFSC}"; then
+      # If the config exists and has kerberos things in it, treat as kerberized
+      return 0
+    fi
+  fi
+
+  return 1
+}
 
 function cluster_exists {
   # Just use the first node as an indicator...
@@ -85,6 +170,18 @@ function create_cluster {
   # Used to populate config templates later
   GROUP=$(id -gn)
   export GROUP
+
+  # Blow away existing config files (so we don't pick up kerberos settings)
+  rm -f `get_hadoop_client_conf_dir`/*
+
+  if [ ! -z "${IMPALA_KERBERIZE}" ]; then
+    kerberize_setup
+    echo "Creating Kerberized cluster."
+  else
+    # Stop the minikdc in case it was running
+    . ${MINIKDC_ENV}
+    ${MINIKDC_INIT} stop
+  fi
 
   # Llama needs a mapping of DataNodes to NodeManagers and for that we'll need to know
   # the hostname hadoop has chosen. It should be the first entry in /etc/hosts for
@@ -147,11 +244,27 @@ function create_cluster {
       # Search for strings like ${FOO}, if FOO is defined in the environment then replace
       # "${FOO}" with the environment value.
       perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-          "$TEMPLATE_PATH" > "$ACTUAL_PATH"
+          "$TEMPLATE_PATH" > "$ACTUAL_PATH.1"
+
+      # Chop out everything between the BEGIN/END Kerberos comments if
+      # not kerberized
+      if [ -z "${IMPALA_KERBERIZE}" ]; then
+        sed '/<!-- BEGIN Kerberos/,/END Kerberos settings -->/d' \
+            "$ACTUAL_PATH.1" > "$ACTUAL_PATH"
+      else
+        cp "$ACTUAL_PATH.1" "$ACTUAL_PATH"
+      fi
+
+      # Assumes that environment variables will be ALL CAPS...
+      if grep '\${[A-Z_]*}' "$ACTUAL_PATH"; then
+        echo "Found undefined variables in $ACTUAL_PATH, aborting"
+        exit 1
+      fi
+
       if [[ -x "$TEMPLATE_PATH" ]]; then
         chmod u+x "$ACTUAL_PATH"
       fi
-      rm "$TEMPLATE_PATH"
+      rm "$TEMPLATE_PATH" "$ACTUAL_PATH.1"
     done
   done
 }
@@ -162,15 +275,56 @@ function start_cluster {
     return 1
   fi
 
+  if [ ! -z "${IMPALA_KERBERIZE}" ] && ! is_kerberized; then
+    echo "Kerberized start requested, but the config files aren't set up"
+    echo "for kerberos.  Destroy the cluster and rebuild it:"
+    echo "  --> $ ./testdata/cluster/admin delete_cluster"
+    echo "  --> $ IMPALA_KERBERIZE=1 ./testdata/cluster/admin create_cluster"
+    exit 1
+  fi
+
+  kerberize_setup
+  if is_kerberized; then
+    echo "Starting Kerberized cluster."
+  fi
+
   for SERVICE in ${SUPPORTED_SERVICES[@]}; do
     WEBUI_PORT_VAR="${SERVICE^^}_WEBUI_PORT"
     echo "Starting ${SERVICE^^} (Web UI - http://localhost:${!WEBUI_PORT_VAR})"
     exec_init_script "$SERVICE*" start
+    if [ "${SERVICE}" = "hdfs" ]; then
+        chmod_hdfs_root
+    fi
   done
 
   # Check if the cluster is still alive...
   sleep 10
   check_cluster_status
+  return $?
+}
+
+function chmod_hdfs_root {
+    # When created, the cluster only contains the root directory with
+    # 0755 permissions and owned by hdfs.  In a kerberized
+    # environment, this means that no one but hdfs can create
+    # anything!  Chmod / to 01777 so that other users can create
+    # things.  Insecure, but easy.  While we're here, make other sane
+    # and permissive initial directories
+    if is_kerberized; then
+        PREVIOUS_PRINCIPAL=`klist | grep ^Default | awk '{print $3}'`
+        # Become hdfs:
+        kinit -k -t ${KRB5_KTNAME} ${MINIKDC_PRINC_HDFS}
+        # Do the chmod, etc
+        hadoop fs -chmod 1777 /
+        if ! hadoop fs -ls /tmp > /dev/null 2>&1; then
+            for i in /tmp /home /user; do
+                hadoop fs -mkdir $i
+                hadoop fs -chmod 1777 $i
+            done
+        fi
+        # Become ourselves again.
+        kinit -k -t ${KRB5_KTNAME} ${PREVIOUS_PRINCIPAL}
+    fi
 }
 
 function exec_init_script {

@@ -52,6 +52,7 @@ def pytest_addoption(parser):
                    "If running on a cluster, specify the scale factor"\
                    "Ex. --scale_factor=500gb")
 
+# KERBEROS TODO: I highly doubt that the default is correct.  Try "hive".
   parser.addoption("--hive_service_name", dest="hive_service_name",
                    default="Hive Metastore Server", help="The principal service name "\
                    "for the hive metastore client when using kerberos.")

@@ -35,7 +35,7 @@ parser.add_option("--transport", dest="transport", default="buffered",
 options, args = parser.parse_args()
 
 metastore_host, metastore_port = options.metastore_hostport.split(':')
-hive_transport = create_transport(metastore_host, metastore_port, "metastore",
+hive_transport = create_transport(metastore_host, metastore_port, "hive",
                                   options.transport)
 protocol = TBinaryProtocol.TBinaryProtocol(hive_transport)
 hive_client = ThriftHiveMetastore.Client(protocol)
@@ -50,7 +50,13 @@ while time.time() - now < TIMEOUT_SECONDS:
     if resp is not None:
       print "Metastore service is up at %s." % options.metastore_hostport
       exit(0)
-  except Exception, e:
+  except Exception as e:
+    if "SASL" in e.message:  # Bail out on SASL failures
+      print "SASL failure when attempting connection:"
+      raise
+    if "GSS" in e.message:   # Other GSSAPI failures
+      print "GSS failure when attempting connection:"
+      raise
     print "Waiting for the Metastore at %s..." % options.metastore_hostport
   finally:
     hive_transport.close()

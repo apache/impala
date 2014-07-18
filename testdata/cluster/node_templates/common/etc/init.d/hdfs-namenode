@@ -12,7 +12,17 @@ function start {
   do_start hdfs namenode
 
   # Wait for the name node to exit safe mode
-  hdfs dfsadmin -safemode wait
+  TRIES=30
+  while ! hdfs dfsadmin -safemode wait 2>&1 | grep -q "OFF$"; do
+    printf "."
+    if [ ${TRIES} -le 0 ]; then
+      echo "Failed to start namenode"
+      return 1
+    fi
+    TRIES=`expr ${TRIES} - 1`
+  done
+  echo "Namenode started"
+  return 0
 }
 
 $1

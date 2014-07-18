@@ -100,4 +100,55 @@
     <name>dfs.namenode.acls.enabled</name>
     <value>true</value>
   </property>
+
+  <!-- BEGIN Kerberos settings -->
+  <!-- We use the MiniKdc; it generates a keytab and krb5.conf; we point
+       everyone at that one keytab and go to town... -->
+  <property>
+    <name>dfs.block.access.token.enable</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.keytab.file</name>
+    <value>${KRB5_KTNAME}</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.kerberos.principal</name>
+    <value>${MINIKDC_PRINC_HDFS}</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.kerberos.internal.spnego.principal</name>
+    <value>${MINIKDC_PRINC_HTTP}</value>
+  </property>
+
+  <property>
+    <name>ignore.secure.ports.for.testing</name>
+    <value>true</value>
+    <!-- This one lets us run the datanode without root! -->
+  </property>
+
+  <property>
+    <name>dfs.datanode.keytab.file</name>
+    <value>${KRB5_KTNAME}</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.kerberos.principal</name>
+    <value>${MINIKDC_PRINC_HDFS}</value>
+  </property>
+
+  <property>
+    <name>dfs.web.authentication.kerberos.principal</name>
+    <value>${MINIKDC_PRINC_HTTP}</value>
+  </property>
+
+  <property>
+    <name>dfs.web.authentication.kerberos.keytab</name>
+    <value>${KRB5_KTNAME}</value>
+  </property>
+  <!-- END Kerberos settings -->
+
 </configuration>

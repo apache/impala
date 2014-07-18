@@ -20,6 +20,7 @@
 # NOTE: Running this script will remove your existing test-warehouse directory. Be sure
 # to backup any data you need before running this script.
 
+. ${IMPALA_HOME}/bin/impala-config.sh
 TEST_WAREHOUSE_HDFS_DIR=/test-warehouse
 
 if [[ ! $1 ]]; then
