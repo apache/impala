@@ -647,6 +647,13 @@ public class Frontend {
           new TColumn("summary", Type.STRING.toThrift()))));
       result.setLoad_data_request(analysisResult.getLoadDataStmt().toThrift());
       return result;
+    } else if (analysisResult.isSetStmt()) {
+      result.stmt_type = TStmtType.SET;
+      result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
+          new TColumn("option", Type.STRING.toThrift()),
+          new TColumn("value", Type.STRING.toThrift()))));
+      result.setSet_query_option_request(analysisResult.getSetStmt().toThrift());
+      return result;
     }
 
     // create TQueryExecRequest

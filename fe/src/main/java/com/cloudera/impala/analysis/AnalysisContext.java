@@ -73,6 +73,7 @@ public class AnalysisContext {
     public boolean isCreateDataSrcStmt() { return stmt_ instanceof CreateDataSrcStmt; }
     public boolean isLoadDataStmt() { return stmt_ instanceof LoadDataStmt; }
     public boolean isUseStmt() { return stmt_ instanceof UseStmt; }
+    public boolean isSetStmt() { return stmt_ instanceof SetStmt; }
     public boolean isShowTablesStmt() { return stmt_ instanceof ShowTablesStmt; }
     public boolean isShowDbsStmt() { return stmt_ instanceof ShowDbsStmt; }
     public boolean isShowDataSrcsStmt() { return stmt_ instanceof ShowDataSrcsStmt; }
@@ -188,6 +189,11 @@ public class AnalysisContext {
     public UseStmt getUseStmt() {
       Preconditions.checkState(isUseStmt());
       return (UseStmt) stmt_;
+    }
+
+    public SetStmt getSetStmt() {
+      Preconditions.checkState(isSetStmt());
+      return (SetStmt) stmt_;
     }
 
     public ShowTablesStmt getShowTablesStmt() {

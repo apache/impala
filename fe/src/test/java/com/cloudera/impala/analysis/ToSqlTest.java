@@ -742,4 +742,13 @@ public class ToSqlTest extends AnalyzerTest {
   public void testDecimal() {
     testToSql("select cast(1 as decimal)", "SELECT CAST(1 AS DECIMAL(9,0))");
   }
+
+  /**
+   * Tests set query option statements are output correctly.
+   */
+  @Test
+  public void testSet() {
+    testToSql("set a = 1", "SET a='1'");
+    testToSql("set `a b` = \"x y\"", "SET `a b`='x y'");
+  }
 }

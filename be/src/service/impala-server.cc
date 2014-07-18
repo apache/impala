@@ -1678,6 +1678,7 @@ void ImpalaServer::ConnectionStart(
     session_state->database = "default";
     session_state->session_type = TSessionType::BEESWAX;
     session_state->network_address = connection_context.network_address;
+    session_state->default_query_options = default_query_options_;
     // If the username was set by a lower-level transport, use it.
     if (!connection_context.username.empty()) {
       session_state->connected_user = connection_context.username;

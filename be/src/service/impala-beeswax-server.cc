@@ -504,7 +504,6 @@ void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& req
 
 Status ImpalaServer::QueryToTQueryContext(const Query& query,
     TQueryCtx* query_ctx) {
-  query_ctx->request.query_options = default_query_options_;
   query_ctx->request.stmt = query.query;
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
@@ -519,6 +518,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
     lock_guard<mutex> l(session->lock);
     if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
     query_ctx->session.connected_user = session->connected_user;
+    query_ctx->request.query_options = session->default_query_options;
   }
 
   // Override default query options with Query.Configuration

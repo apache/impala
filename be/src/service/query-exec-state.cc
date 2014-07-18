@@ -158,6 +158,31 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
           exec_request_.query_options.sync_ddl));
       return Status::OK;
     }
+    case TStmtType::SET: {
+      DCHECK(exec_request_.__isset.set_query_option_request);
+      lock_guard<mutex> l(session_->lock);
+      if (exec_request_.set_query_option_request.__isset.key) {
+        // "SET key=value" updates the session query options.
+        DCHECK(exec_request_.set_query_option_request.__isset.value);
+        RETURN_IF_ERROR(parent_server_->SetQueryOptions(
+            exec_request_.set_query_option_request.key,
+            exec_request_.set_query_option_request.value,
+            &session_->default_query_options));
+      } else {
+        // "SET" returns a table of all query options.
+        map<string, string> config;
+        parent_server_->TQueryOptionsToMap(
+            session_->default_query_options, &config);
+        vector<string> keys, values;
+        map<string, string>::const_iterator itr = config.begin();
+        for (; itr != config.end(); ++itr) {
+          keys.push_back(itr->first);
+          values.push_back(itr->second);
+        }
+        SetResultSet(keys, values);
+      }
+      return Status::OK;
+    }
     default:
       stringstream errmsg;
       errmsg << "Unknown  exec request stmt type: " << exec_request_.stmt_type;

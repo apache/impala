@@ -2147,7 +2147,7 @@ public class ParserTest {
         "^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: ALTER, COMPUTE, CREATE, DESCRIBE, DROP, EXPLAIN, INSERT, " +
-        "INVALIDATE, LOAD, REFRESH, SELECT, SHOW, USE, VALUES, WITH\n");
+        "INVALIDATE, LOAD, REFRESH, SELECT, SET, SHOW, USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",
@@ -2283,6 +2283,14 @@ public class ParserTest {
         "    ^\n" +
         "Encountered: EMPTY IDENTIFIER\n" +
         "Expected: IDENTIFIER\n");
+
+    // Expecting = token
+    ParserError("SET foo",
+         "Syntax error in line 1:\n" +
+         "SET foo\n" +
+         "       ^\n" +
+         "Encountered: EOF\n" +
+         "Expected: =\n");
   }
 
   @Test
@@ -2398,5 +2406,27 @@ public class ParserTest {
     ParserError("SELECT a, count(*) FROM foo ORDER BY SELECT a FROM bar");
     ParserError("SELECT a, count(*) FROM foo ORDER BY (SELECT) a FROM bar DESC");
     ParserError("SELECT a, count(*) FROM foo ORDER BY (SELECT a FROM bar ASC");
+  }
+
+  @Test
+  public void TestSet() {
+    ParsesOk("SET foo='bar'");
+    ParsesOk("SET foo=\"bar\"");
+    ParsesOk("SET foo=bar");
+    ParsesOk("SET foo = bar");
+    ParsesOk("SET foo=1");
+    ParsesOk("SET foo=true");
+    ParsesOk("SET foo=false");
+    ParsesOk("SET foo=1.2");
+    ParsesOk("SET foo=null");
+    ParsesOk("SET foo=10g");
+    ParsesOk("SET `foo`=0");
+    ParsesOk("SET foo=''");
+    ParsesOk("SET");
+
+    ParserError("SET foo");
+    ParserError("SET foo=");
+    ParserError("SET foo=1+2");
+    ParserError("SET foo = '10");
   }
 }

@@ -2316,4 +2316,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           cl.getSimpleName(), expectedNumMembers, actualNumMembers));
     }
   }
+
+  @Test
+  public void TestSetQueryOption() {
+    AnalyzesOk("set foo=true");
+  }
 }

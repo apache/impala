@@ -92,7 +92,8 @@ enum TStmtType {
   DDL, // Data definition, e.g. CREATE TABLE (includes read-only functions e.g. SHOW)
   DML, // Data modification e.g. INSERT
   EXPLAIN,
-  LOAD // Statement type for LOAD commands
+  LOAD, // Statement type for LOAD commands
+  SET
 }
 
 // Level of verboseness for "explain" output.

@@ -365,6 +365,13 @@ struct TCatalogOpRequest {
   10: optional CatalogObjects.TTableName show_create_table_params
 }
 
+// Parameters for the SET query option command
+struct TSetQueryOptionRequest {
+  // Set for "SET key=value", unset for "SET" statement.
+  1: optional string key
+  2: optional string value
+}
+
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)
 enum TMetadataOpcode {
   GET_TYPE_INFO,
@@ -442,6 +449,9 @@ struct TExecRequest {
 
   // List of warnings that were generated during analysis. May be empty.
   9: required list<string> analysis_warnings
+
+  // Set iff stmt_type is SET
+  10: optional TSetQueryOptionRequest set_query_option_request
 }
 
 // Parameters to FeSupport.cacheJar().

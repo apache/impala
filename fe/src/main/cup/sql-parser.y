@@ -49,19 +49,20 @@ parser code {:
   private final List<Integer> expectedTokenIds_ = new ArrayList<Integer>();
 
   // to avoid reporting trivial tokens as expected tokens in error messages
-  private boolean reportExpectedToken(Integer tokenId) {
+  private boolean reportExpectedToken(Integer tokenId, int numExpectedTokens) {
     if (SqlScanner.isKeyword(tokenId) ||
         tokenId.intValue() == SqlParserSymbols.COMMA ||
         tokenId.intValue() == SqlParserSymbols.IDENT) {
       return true;
     } else {
-      return false;
+      // if this is the only valid token, always report it
+      return numExpectedTokens == 1;
     }
   }
 
   private String getErrorTypeMessage(int lastTokenId) {
     String msg = null;
-    switch(lastTokenId) {
+    switch (lastTokenId) {
       case SqlParserSymbols.UNMATCHED_STRING_LITERAL:
         msg = "Unmatched string literal";
         break;
@@ -208,7 +209,7 @@ parser code {:
       Integer tokenId = null;
       for (int i = 0; i < expectedTokenIds_.size(); ++i) {
         tokenId = expectedTokenIds_.get(i);
-        if (reportExpectedToken(tokenId)) {
+        if (reportExpectedToken(tokenId, expectedTokenIds_.size())) {
           expectedToken = SqlScanner.tokenIdMap.get(tokenId);
           result.append(expectedToken + ", ");
         }
@@ -275,6 +276,7 @@ nonterminal List<UnionOperand> union_operand_list;
 nonterminal List<UnionOperand> values_operand_list;
 // USE stmt
 nonterminal UseStmt use_stmt;
+nonterminal SetStmt set_stmt;
 nonterminal ShowTablesStmt show_tables_stmt;
 nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal ShowPartitionsStmt show_partitions_stmt;
@@ -500,6 +502,8 @@ stmt ::=
   {: RESULT = load; :}
   | reset_metadata_stmt: reset_metadata
   {: RESULT = reset_metadata; :}
+  | set_stmt:set
+  {: RESULT = set; :}
   ;
 
 load_stmt ::=
@@ -1455,6 +1459,15 @@ select_clause ::=
     l.setIsStraightJoin(s);
     RESULT = l;
   :}
+  ;
+
+set_stmt ::=
+  KW_SET IDENT:key EQUAL literal:l
+  {: RESULT = new SetStmt(key, l.getStringValue()); :}
+  | KW_SET IDENT:key EQUAL IDENT:ident
+  {: RESULT = new SetStmt(key, ident); :}
+  | KW_SET
+  {: RESULT = new SetStmt(null, null); :}
   ;
 
 opt_straight_join ::=
