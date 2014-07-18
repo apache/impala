@@ -113,7 +113,7 @@ TEST_F(BufferedBlockMgrTest, GetNewBlock) {
   int max_num_blocks = 5;
   scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_blocks));
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 
@@ -140,7 +140,7 @@ TEST_F(BufferedBlockMgrTest, Pin) {
   int max_num_blocks = 5;
   scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_blocks));
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -190,7 +190,7 @@ TEST_F(BufferedBlockMgrTest, Eviction) {
   int max_num_buffers = 5;
   scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -243,7 +243,7 @@ TEST_F(BufferedBlockMgrTest, Deletion) {
   int max_num_buffers = 5;
   scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -272,7 +272,7 @@ TEST_F(BufferedBlockMgrTest, Close) {
   int max_num_buffers = 5;
   scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -303,7 +303,7 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   const int write_wait_millis = 500;
   scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -356,10 +356,10 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   BufferedBlockMgr::Client* client2;
   Status status;
 
-  status = block_mgr->RegisterClient(client1_buffers, &client1);
+  status = block_mgr->RegisterClient(client1_buffers, NULL, &client1);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, &client2);
+  status = block_mgr->RegisterClient(client2_buffers, NULL, &client2);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
 
@@ -412,10 +412,10 @@ TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
   Status status;
   BufferedBlockMgr::Block* block;
 
-  status = block_mgr->RegisterClient(client1_buffers, &client1);
+  status = block_mgr->RegisterClient(client1_buffers, NULL, &client1);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, &client2);
+  status = block_mgr->RegisterClient(client2_buffers, NULL, &client2);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
 
@@ -459,10 +459,10 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   Status status;
   BufferedBlockMgr::Block* block;
 
-  status = block_mgr->RegisterClient(client1_buffers, &client1);
+  status = block_mgr->RegisterClient(client1_buffers, NULL, &client1);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, &client2);
+  status = block_mgr->RegisterClient(client2_buffers, NULL, &client2);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
 
@@ -508,7 +508,7 @@ TEST_F(BufferedBlockMgrTest, Random) {
   ApiFunction api_function;
   scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(num_buffers));
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 

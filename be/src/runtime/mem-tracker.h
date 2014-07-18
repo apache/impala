@@ -134,6 +134,21 @@ class MemTracker {
     }
   }
 
+  // Increases/Decreases the consumption of just this tracker. This is useful if
+  // we only want to update accounting on one tracker. This happens when we want
+  // to update tracking on a particular mem tracker but the consumption against
+  // the limit recorded in one of its ancestors already happened.
+  void ConsumeLocal(int64_t bytes) {
+    DCHECK(consumption_metric_ == NULL) << "Should not be called on root.";
+    DCHECK(limit_ == -1) << "This probably doesn't make sense for trackers with limits";
+    if (UNLIKELY(enable_logging_)) LogUpdate(bytes > 0, bytes);
+    all_trackers_[0]->consumption_->Update(bytes);
+  }
+
+  void ReleaseLocal(int64_t bytes) {
+    ConsumeLocal(-bytes);
+  }
+
   // Increases consumption of this tracker and its ancestors by 'bytes' only if
   // they can all consume 'bytes'. If this brings any of them over, none of them
   // are updated.

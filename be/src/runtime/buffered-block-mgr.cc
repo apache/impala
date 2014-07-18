@@ -26,16 +26,41 @@ using namespace boost;
 namespace impala {
 
 struct BufferedBlockMgr::Client {
-  Client(int num_reserved_buffers)
-    : num_reserved_buffers_(num_reserved_buffers),
+  Client(BufferedBlockMgr* mgr, int num_reserved_buffers, MemTracker* tracker)
+    : mgr_(mgr),
+      tracker_(tracker),
+      num_reserved_buffers_(num_reserved_buffers),
       num_pinned_buffers_(0) {
   }
+
+  // Unowned.
+  BufferedBlockMgr* mgr_;
+
+  // Tracker for this client. Can be NULL. Unowned.
+  // If this is set, when the client gets a buffer, we update the consumption on this
+  // tracker. However, we don't want to transfer the buffer from the block mgr to the
+  // client since (i.e. release from the block mgr), since the block mgr is where the
+  // block mem usage limit is enforced. Even when we give a buffer to a client, the
+  // buffer is still owned and counts against the block mgr tracker (i.e. there is a
+  // fixed pool of buffers regardless of if they are in the block mgr or the clients).
+  MemTracker* tracker_;
 
   // Number of buffers reserved by this client.
   int num_reserved_buffers_;
 
   // Number of buffers pinned by this client.
   int num_pinned_buffers_;
+
+  void PinBuffer() {
+    ++num_pinned_buffers_;
+    if (tracker_ != NULL) tracker_->ConsumeLocal(mgr_->block_size());
+  }
+
+  void UnpinBuffer() {
+    DCHECK_GT(num_pinned_buffers_, 0);
+    --num_pinned_buffers_;
+    if (tracker_ != NULL) tracker_->ReleaseLocal(mgr_->block_size());
+  }
 };
 
 // BufferedBlockMgr::Block methods.
@@ -130,9 +155,10 @@ Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
   return Status::OK;
 }
 
-Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers, Client** client) {
+Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers, MemTracker* tracker,
+    Client** client) {
   DCHECK_GE(num_reserved_buffers, 0);
-  *client = state_->obj_pool()->Add(new Client(num_reserved_buffers));
+  *client = state_->obj_pool()->Add(new Client(this, num_reserved_buffers, tracker));
   num_unreserved_buffers_ -= num_reserved_buffers;
   return Status::OK;
 }
@@ -271,11 +297,10 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
 }
 
 Status BufferedBlockMgr::UnpinBlock(Block* block) {
-  DCHECK(!block->is_deleted_);
+  DCHECK(!block->is_deleted_) << "Unpin for deleted block.";
   lock_guard<mutex> unpinned_lock(lock_);
   if (is_cancelled_) return Status::CANCELLED;
   if (!block->is_pinned_) return Status::OK;
-  DCHECK(!block->is_deleted_) << "Unpin for deleted block.";
   DCHECK(Validate()) << endl << DebugString();
   // Add 'block' to the list of unpinned blocks and set is_pinned_ to false.
   // Cache its position in the list for later removal.
@@ -286,7 +311,7 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   if (block->client_->num_pinned_buffers_ > block->client_->num_reserved_buffers_) {
     --num_unreserved_pinned_buffers_;
   }
-  --block->client_->num_pinned_buffers_;
+  block->client_->UnpinBuffer();
   RETURN_IF_ERROR(WriteUnpinnedBlocks());
   DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
@@ -377,6 +402,7 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
   DCHECK(!block->is_deleted_);
   lock_guard<mutex> lock(lock_);
   if (is_cancelled_) return Status::CANCELLED;
+  DCHECK(block->Validate()) << endl << DebugString();
 
   block->is_deleted_ = true;
   if (block->is_pinned_) {
@@ -384,13 +410,10 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
     if (block->client_->num_pinned_buffers_ > block->client_->num_reserved_buffers_) {
       --num_unreserved_pinned_buffers_;
     }
-    --block->client_->num_pinned_buffers_;
+    block->client_->UnpinBuffer();
   } else if (unpinned_blocks_.Contains(block)) {
     // Remove block from unpinned list.
     unpinned_blocks_.Remove(block);
-  } else {
-    // Otherwise, this block's buffer must have already been put on the free list.
-    DCHECK(block->buffer_desc_ == NULL);
   }
 
   if (block->in_write_) {
@@ -399,11 +422,12 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
   }
 
   if (block->buffer_desc_ != NULL) {
-    DCHECK(!free_buffers_.Contains(block->buffer_desc_));
-    free_buffers_.Enqueue(block->buffer_desc_);
+    if (!free_buffers_.Contains(block->buffer_desc_)) {
+      free_buffers_.Enqueue(block->buffer_desc_);
+      buffer_available_cv_.notify_one();
+    }
     block->buffer_desc_->block = NULL;
     block->buffer_desc_ = NULL;
-    buffer_available_cv_.notify_one();
   }
   ReturnUnusedBlock(block);
   DCHECK(Validate()) << endl << DebugString();
@@ -502,7 +526,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     buffer_desc->block = block;
     block->buffer_desc_ = buffer_desc;
   }
-  ++client->num_pinned_buffers_;
+  client->PinBuffer();
   if (is_optional_request) ++num_unreserved_pinned_buffers_;
 
   DCHECK_NOTNULL(block->buffer_desc_);
@@ -613,6 +637,8 @@ string BufferedBlockMgr::DebugString() const {
      << " Num writes outstanding " << outstanding_writes_counter_->value() << endl
      << " Num free buffers " << free_buffers_.size() << endl
      << " Num unpinned blocks " << unpinned_blocks_.size() << endl
+     << " Num unreserved buffers " << num_unreserved_buffers_ << endl
+     << " Num unreserved pinned buffers " << num_unreserved_pinned_buffers_ << endl
      << " Remaining memory " << mem_tracker_->SpareCapacity() << endl
      << " Block write threshold " << block_write_threshold_;
   return ss.str();

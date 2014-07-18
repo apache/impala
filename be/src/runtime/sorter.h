@@ -158,6 +158,7 @@ class Sorter {
   // The current unsorted run that is being collected. Is sorted and added to
   // sorted_runs_ after it is full (i.e. number of blocks allocated == max available
   // buffers) or after the input is complete. Owned and placed in obj_pool_.
+  // When it is added to sorted_runs_, it is set to NULL.
   Run* unsorted_run_;
 
   // List of sorted runs that have been produced but not merged. unsorted_run_ is added
@@ -180,6 +181,10 @@ class Sorter {
   // Only one merge is performed at a time. Will never be used if the input fits in
   // memory.
   boost::scoped_ptr<SortedRunMerger> merger_;
+
+  // Runs that are currently processed by the merge_.
+  // These runs can be deleted when we are done with the current merge.
+  std::list<Run*> merging_runs_;
 
   // Pool of owned Run objects.
   ObjectPool obj_pool_;

@@ -214,7 +214,8 @@ class BufferedBlockMgr {
   // queries and we don't want to fail all of them with mem limit exceeded.
   // The min reserved buffers is often independent of data size and we still want
   // to run small queries with very small limits.
-  Status RegisterClient(int num_reserved_buffers, Client** client);
+  // If tracker is non-NULL, buffers used by this client are reflected in tracker.
+  Status RegisterClient(int num_reserved_buffers, MemTracker* tracker, Client** client);
 
   // Lowers the buffer reservation of the client to num_buffers. This doesn't change
   // buffers that have already been given to this client.
@@ -252,6 +253,8 @@ class BufferedBlockMgr {
   RuntimeProfile* profile() { return profile_.get(); }
 
  private:
+  friend class Client;
+
   // Descriptor for a single memory buffer in the pool.
   struct BufferDescriptor : public InternalQueue<BufferDescriptor>::Node {
     // Start of the buffer
