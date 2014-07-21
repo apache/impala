@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+import pytest
 import re
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import TestDimension
@@ -44,7 +45,11 @@ class TestRowsAvailability(ImpalaTestSuite):
         vector.get_value('exec_option')['disable_codegen'] == False and\
         vector.get_value('exec_option')['num_nodes'] == 0
 
+  @pytest.mark.execute_serially
   def test_rows_availability(self, vector):
+    # This test is run serially because it requires the query to come back within
+    # some amount of time. Running this with other tests makes it hard to bound
+    # that time.
     query = vector.get_value('query')
     # Execute async to get a handle. Wait until the query has completed.
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
