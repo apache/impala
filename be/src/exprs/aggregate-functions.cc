@@ -16,6 +16,10 @@
 
 #include <math.h>
 #include <sstream>
+#include <algorithm>
+
+#include <boost/random/ranlux.hpp>
+#include <boost/random/uniform_int.hpp>
 
 #include "common/logging.h"
 #include "runtime/string-value.h"
@@ -23,6 +27,8 @@
 #include "exprs/anyval-util.h"
 
 using namespace std;
+using namespace boost;
+using namespace boost::random;
 
 // TODO: this file should be cross compiled and then all of the builtin
 // aggregate functions will have a codegen enabled path. Then we can remove
@@ -433,6 +439,267 @@ StringVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& 
   return dst;
 }
 
+// Histogram constants
+// TODO: Expose as constant argument parameters to the UDA.
+const static int NUM_BUCKETS = 100;
+const static int NUM_SAMPLES_PER_BUCKET = 200;
+const static int NUM_SAMPLES = NUM_BUCKETS * NUM_SAMPLES_PER_BUCKET;
+const static int MAX_STRING_SAMPLE_LEN = 10;
+
+template <typename T>
+struct ReservoirSample {
+  // Sample value
+  T val;
+  // Key on which the samples are sorted.
+  double key;
+
+  ReservoirSample() : key(-1) { }
+  ReservoirSample(const T& val) : val(val), key(-1) { }
+};
+
+// Template specialization for StringVal because we do not store the StringVal itself.
+// Instead, we keep fixed size arrays and truncate longer strings if necessary.
+template <>
+struct ReservoirSample<StringVal> {
+  uint8_t val[MAX_STRING_SAMPLE_LEN];
+  int len; // Size of string (up to MAX_STRING_SAMPLE_LEN)
+  double key;
+
+  ReservoirSample() : len(0), key(-1) { }
+
+  ReservoirSample(const StringVal& string_val) : key(-1) {
+    len = min(string_val.len, MAX_STRING_SAMPLE_LEN);
+    memcpy(&val[0], string_val.ptr, len);
+  }
+};
+
+template <typename T>
+struct ReservoirSampleState {
+  ReservoirSample<T> samples[NUM_SAMPLES];
+
+  // Number of collected samples.
+  int num_samples;
+
+  // Number of values over which the samples were collected.
+  int64_t source_size;
+
+  // Random number generator for generating 64-bit integers
+  // TODO: Replace with mt19937_64 when upgrading boost
+  ranlux64_3 rng;
+
+  int64_t GetNext64(int64_t max) {
+    uniform_int<int64_t> dist(0, max);
+    return dist(rng);
+  }
+};
+
+template <typename T>
+void AggregateFunctions::ReservoirSampleInit(FunctionContext* ctx, StringVal* dst) {
+  int str_len = sizeof(ReservoirSampleState<T>);
+  dst->is_null = false;
+  dst->ptr = ctx->Allocate(str_len);
+  dst->len = str_len;
+  memset(dst->ptr, 0, str_len);
+  *reinterpret_cast<ReservoirSampleState<T>*>(dst->ptr) = ReservoirSampleState<T>();
+}
+
+template <typename T>
+void AggregateFunctions::ReservoirSampleUpdate(FunctionContext* ctx, const T& src,
+    StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(ReservoirSampleState<T>));
+  ReservoirSampleState<T>* state = reinterpret_cast<ReservoirSampleState<T>*>(dst->ptr);
+
+  if (state->num_samples < NUM_SAMPLES) {
+    state->samples[state->num_samples++] = ReservoirSample<T>(src);
+  } else {
+    int64_t r = state->GetNext64(state->source_size);
+    if (r < NUM_SAMPLES) state->samples[r] = ReservoirSample<T>(src);
+  }
+  ++state->source_size;
+}
+
+template <typename T>
+const StringVal AggregateFunctions::ReservoirSampleSerialize(FunctionContext* ctx,
+    const StringVal& src) {
+  if (src.is_null) return src;
+  StringVal result(ctx, src.len);
+  memcpy(result.ptr, src.ptr, src.len);
+  ctx->Free(src.ptr);
+
+  ReservoirSampleState<T>* state = reinterpret_cast<ReservoirSampleState<T>*>(result.ptr);
+  // Assign keys to the samples that haven't been set (i.e. if serializing after
+  // Update()). In weighted reservoir sampling the keys are typically assigned as the
+  // sources are being sampled, but this requires maintaining the samples in sorted order
+  // (by key) and it accomplishes the same thing at this point because all data points
+  // coming into Update() get the same weight. When the samples are later merged, they do
+  // have different weights (set here) that are proportional to the source_size, i.e.
+  // samples selected from a larger stream are more likely to end up in the final sample
+  // set. In order to avoid the extra overhead in Update(), we approximate the keys by
+  // picking random numbers in the range [(SOURCE_SIZE - SAMPLE_SIZE)/(SOURCE_SIZE), 1].
+  // This weights the keys by SOURCE_SIZE and implies that the samples picked had the
+  // highest keys, because values not sampled would have keys between 0 and
+  // (SOURCE_SIZE - SAMPLE_SIZE)/(SOURCE_SIZE).
+  for (int i = 0; i < state->num_samples; ++i) {
+    if (state->samples[i].key >= 0) continue;
+    int r = rand() % state->num_samples;
+    state->samples[i].key = ((double) state->source_size - r) / state->source_size;
+  }
+  return result;
+}
+
+template <typename T>
+bool SampleValLess(const ReservoirSample<T>& i, const ReservoirSample<T>& j) {
+  return i.val.val < j.val.val;
+}
+
+template <>
+bool SampleValLess(const ReservoirSample<StringVal>& i,
+    const ReservoirSample<StringVal>& j) {
+  int n = min(i.len, j.len);
+  int result = memcmp(&i.val[0], &j.val[0], n);
+  if (result == 0) return i.len < j.len;
+  return result < 0;
+}
+
+template <>
+bool SampleValLess(const ReservoirSample<DecimalVal>& i,
+    const ReservoirSample<DecimalVal>& j) {
+  return i.val.val16 < j.val.val16;
+}
+
+template <>
+bool SampleValLess(const ReservoirSample<TimestampVal>& i,
+    const ReservoirSample<TimestampVal>& j) {
+  if (i.val.date == j.val.date) return i.val.time_of_day < j.val.time_of_day;
+  else return i.val.date < j.val.date;
+}
+
+template <typename T>
+bool SampleKeyGreater(const ReservoirSample<T>& i, const ReservoirSample<T>& j) {
+  return i.key > j.key;
+}
+
+template <typename T>
+void AggregateFunctions::ReservoirSampleMerge(FunctionContext* ctx,
+    const StringVal& src_val, StringVal* dst_val) {
+  if (src_val.is_null) return;
+  DCHECK(!dst_val->is_null);
+  DCHECK(!src_val.is_null);
+  DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
+  DCHECK_EQ(dst_val->len, sizeof(ReservoirSampleState<T>));
+  ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
+  ReservoirSampleState<T>* dst = reinterpret_cast<ReservoirSampleState<T>*>(dst_val->ptr);
+
+  int src_idx = 0;
+  int src_max = src->num_samples;
+  // First, fill up the dst samples if they don't already exist. The samples are now
+  // ordered as a min-heap on the key.
+  while (dst->num_samples < NUM_SAMPLES && src_idx < src_max) {
+    DCHECK_GE(src->samples[src_idx].key, 0);
+    dst->samples[dst->num_samples++] = src->samples[src_idx++];
+    push_heap(dst->samples, dst->samples + dst->num_samples, SampleKeyGreater<T>);
+  }
+  // Then for every sample from source, take the sample if the key is greater than
+  // the minimum key in the min-heap.
+  while (src_idx < src_max) {
+    DCHECK_GE(src->samples[src_idx].key, 0);
+    if (src->samples[src_idx].key > dst->samples[0].key) {
+      pop_heap(dst->samples, dst->samples + NUM_SAMPLES, SampleKeyGreater<T>);
+      dst->samples[NUM_SAMPLES - 1] = src->samples[src_idx];
+      push_heap(dst->samples, dst->samples + NUM_SAMPLES, SampleKeyGreater<T>);
+    }
+    ++src_idx;
+  }
+  dst->source_size += src->source_size;
+}
+
+template <typename T>
+void PrintSample(const ReservoirSample<T>& v, ostream* os) { *os << v.val.val; }
+
+template <>
+void PrintSample(const ReservoirSample<TinyIntVal>& v, ostream* os) {
+  *os << static_cast<int32_t>(v.val.val);
+}
+
+template <>
+void PrintSample(const ReservoirSample<StringVal>& v, ostream* os) {
+  string s(reinterpret_cast<const char*>(&v.val[0]), v.len);
+  *os << s;
+}
+
+template <>
+void PrintSample(const ReservoirSample<DecimalVal>& v, ostream* os) {
+  *os << v.val.val16;
+}
+
+template <>
+void PrintSample(const ReservoirSample<TimestampVal>& v, ostream* os) {
+  *os << TimestampValue::FromTimestampVal(v.val).DebugString();
+}
+
+template <typename T>
+StringVal AggregateFunctions::ReservoirSampleFinalize(FunctionContext* ctx,
+    const StringVal& src_val) {
+  DCHECK(!src_val.is_null);
+  DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
+  ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
+
+  stringstream out;
+  for (int i = 0; i < src->num_samples; ++i) {
+    PrintSample<T>(src->samples[i], &out);
+    if (i < (src->num_samples - 1)) out << ", ";
+  }
+  const string& out_str = out.str();
+  StringVal result_str(ctx, out_str.size());
+  memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  ctx->Free(src_val.ptr);
+  return result_str;
+}
+
+template <typename T>
+StringVal AggregateFunctions::HistogramFinalize(FunctionContext* ctx,
+    const StringVal& src_val) {
+  DCHECK(!src_val.is_null);
+  DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
+
+  ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
+  sort(src->samples, src->samples + src->num_samples, SampleValLess<T>);
+
+  stringstream out;
+  int num_buckets = min(src->num_samples, NUM_BUCKETS);
+  int samples_per_bucket = max(src->num_samples / NUM_BUCKETS, 1);
+  for (int bucket_idx = 0; bucket_idx < num_buckets; ++bucket_idx) {
+    int sample_idx = (bucket_idx + 1) * samples_per_bucket - 1;
+    PrintSample<T>(src->samples[sample_idx], &out);
+    if (bucket_idx < (num_buckets - 1)) out << ", ";
+  }
+  const string& out_str = out.str();
+  StringVal result_str(ctx, out_str.size());
+  memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  ctx->Free(src_val.ptr);
+  return result_str;
+}
+
+template <typename T>
+StringVal AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx,
+    const StringVal& src_val) {
+  DCHECK(!src_val.is_null);
+  DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
+
+  ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
+  sort(src->samples, src->samples + src->num_samples, SampleValLess<T>);
+
+  stringstream out;
+  PrintSample<T>(src->samples[src->num_samples / 2], &out);
+  const string& out_str = out.str();
+  StringVal result_str(ctx, out_str.size());
+  memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  ctx->Free(src_val.ptr);
+  return result_str;
+}
+
 void AggregateFunctions::HllInit(FunctionContext* ctx, StringVal* dst) {
   int str_len = HLL_LEN;
   dst->is_null = false;
@@ -698,6 +965,153 @@ template void AggregateFunctions::PcsaUpdate(
     FunctionContext*, const TimestampVal&, StringVal*);
 template void AggregateFunctions::PcsaUpdate(
     FunctionContext*, const DecimalVal&, StringVal*);
+
+template void AggregateFunctions::ReservoirSampleInit<BooleanVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::ReservoirSampleInit<TinyIntVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::ReservoirSampleInit<SmallIntVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::ReservoirSampleInit<IntVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::ReservoirSampleInit<BigIntVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::ReservoirSampleInit<FloatVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::ReservoirSampleInit<DoubleVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::ReservoirSampleInit<StringVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::ReservoirSampleInit<TimestampVal>(
+    FunctionContext*, StringVal*);
+template void AggregateFunctions::ReservoirSampleInit<DecimalVal>(
+    FunctionContext*, StringVal*);
+
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const BooleanVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const TinyIntVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const SmallIntVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const IntVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const BigIntVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const FloatVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const DoubleVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const TimestampVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleUpdate(
+    FunctionContext*, const DecimalVal&, StringVal*);
+
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<BooleanVal>(
+    FunctionContext*, const StringVal&);
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<TinyIntVal>(
+    FunctionContext*, const StringVal&);
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<SmallIntVal>(
+    FunctionContext*, const StringVal&);
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<IntVal>(
+    FunctionContext*, const StringVal&);
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<BigIntVal>(
+    FunctionContext*, const StringVal&);
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<FloatVal>(
+    FunctionContext*, const StringVal&);
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<DoubleVal>(
+    FunctionContext*, const StringVal&);
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<StringVal>(
+    FunctionContext*, const StringVal&);
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<TimestampVal>(
+    FunctionContext*, const StringVal&);
+template const StringVal AggregateFunctions::ReservoirSampleSerialize<DecimalVal>(
+    FunctionContext*, const StringVal&);
+
+template void AggregateFunctions::ReservoirSampleMerge<BooleanVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleMerge<TinyIntVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleMerge<SmallIntVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleMerge<IntVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleMerge<BigIntVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleMerge<FloatVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleMerge<DoubleVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleMerge<StringVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleMerge<TimestampVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+template void AggregateFunctions::ReservoirSampleMerge<DecimalVal>(
+    FunctionContext*, const StringVal&, StringVal*);
+
+template StringVal AggregateFunctions::ReservoirSampleFinalize<BooleanVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::ReservoirSampleFinalize<TinyIntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::ReservoirSampleFinalize<SmallIntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::ReservoirSampleFinalize<IntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::ReservoirSampleFinalize<BigIntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::ReservoirSampleFinalize<FloatVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::ReservoirSampleFinalize<DoubleVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::ReservoirSampleFinalize<StringVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::ReservoirSampleFinalize<TimestampVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::ReservoirSampleFinalize<DecimalVal>(
+    FunctionContext*, const StringVal&);
+
+template StringVal AggregateFunctions::HistogramFinalize<BooleanVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::HistogramFinalize<TinyIntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::HistogramFinalize<SmallIntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::HistogramFinalize<IntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::HistogramFinalize<BigIntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::HistogramFinalize<FloatVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::HistogramFinalize<DoubleVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::HistogramFinalize<StringVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::HistogramFinalize<TimestampVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::HistogramFinalize<DecimalVal>(
+    FunctionContext*, const StringVal&);
+
+template StringVal AggregateFunctions::AppxMedianFinalize<BooleanVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::AppxMedianFinalize<TinyIntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::AppxMedianFinalize<SmallIntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::AppxMedianFinalize<IntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::AppxMedianFinalize<BigIntVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::AppxMedianFinalize<FloatVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::AppxMedianFinalize<DoubleVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::AppxMedianFinalize<StringVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::AppxMedianFinalize<TimestampVal>(
+    FunctionContext*, const StringVal&);
+template StringVal AggregateFunctions::AppxMedianFinalize<DecimalVal>(
+    FunctionContext*, const StringVal&);
 
 template void AggregateFunctions::HllUpdate(
     FunctionContext*, const BooleanVal&, StringVal*);

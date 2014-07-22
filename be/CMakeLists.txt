@@ -199,7 +199,7 @@ set (IMPALA_LINK_LIBS
   Statestore
   TestUtil
   ThriftSaslTransport
-  Udf
+  # Udf or ImpalaUdf is added below to support the external udf library for tests
   Util
   Webserver
   -Wl,--end-group
@@ -242,12 +242,18 @@ if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} tcmallocstatic)
 endif()
 
-MESSAGE(STATUS, "Compiler Flags: ${CMAKE_CXX_FLAGS}")
-MESSAGE(STATUS, "Linker Libs: ${IMPALA_LINK_LIBS}")
+# Add ImpalaUdf for $UDF_TEST_LINK_LIBS and Udf for everything else
+set (UDF_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} ImpalaUdf)
+set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} Udf)
+set (IMPALA_LINK_LIBS_NO_TCMALLOC ${IMPALA_LINK_LIBS_NO_TCMALLOC} Udf)
 
 # Link libs for test executables.  Although not all tests need all libs,
 # the build time for the tests is rather small and not worth the trouble.
 set (IMPALA_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} gtest)
+set (UDF_TEST_LINK_LIBS ${UDF_TEST_LINK_LIBS} gtest)
+
+MESSAGE(STATUS, "Compiler Flags: ${CMAKE_CXX_FLAGS}")
+MESSAGE(STATUS, "Linker Libs: ${IMPALA_LINK_LIBS}")
 
 set(LLVM_IR_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/llvm-ir")
 file(MAKE_DIRECTORY ${LLVM_IR_OUTPUT_DIRECTORY})

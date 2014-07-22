@@ -22,6 +22,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 add_library(Exprs
   agg-fn-evaluator.cc
   aggregate-functions.cc
+  aggregate-functions-test.cc
   anyval-util.cc
   arithmetic-expr.cc
   binary-predicate.cc
@@ -61,3 +62,7 @@ add_executable(expr-benchmark expr-benchmark.cc)
 target_link_libraries(expr-benchmark ${IMPALA_TEST_LINK_LIBS})
 
 ADD_BE_TEST(expr-test)
+
+ADD_EXECUTABLE(aggregate-functions-test aggregate-functions-test.cc)
+TARGET_LINK_LIBRARIES(aggregate-functions-test ${UDF_TEST_LINK_LIBS})
+ADD_TEST(uda-test "${EXECUTABLE_OUTPUT_PATH}/aggregate-functions-test")

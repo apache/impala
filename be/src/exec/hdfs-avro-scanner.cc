@@ -17,7 +17,6 @@
 #include <avro/errors.h>
 #include <avro/legacy.h>
 #include <avro/schema.h>
-#include <boost/array.hpp>
 #include <boost/foreach.hpp>
 
 #include "codegen/llvm-codegen.h"

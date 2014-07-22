@@ -996,3 +996,73 @@ select COUNT(int_col is not null AND bool_col) - COUNT(bool_col) FROM alltypesag
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+select histogram(bool_col) from functional.alltypestiny;
+---- RESULTS
+'0, 0, 0, 0, 1, 1, 1, 1'
+---- TYPES
+STRING
+====
+---- QUERY
+select histogram(tinyint_col) from functional.alltypestiny;
+---- RESULTS
+'0, 0, 0, 0, 1, 1, 1, 1'
+---- TYPES
+STRING
+====
+---- QUERY
+select histogram(smallint_col) from functional.alltypestiny;
+---- RESULTS
+'0, 0, 0, 0, 1, 1, 1, 1'
+---- TYPES
+STRING
+====
+---- QUERY
+select histogram(int_col) from functional.alltypestiny;
+---- RESULTS
+'0, 0, 0, 0, 1, 1, 1, 1'
+---- TYPES
+STRING
+====
+---- QUERY
+select histogram(bigint_col) from functional.alltypestiny;
+---- RESULTS
+'0, 0, 0, 0, 10, 10, 10, 10'
+---- TYPES
+STRING
+====
+---- QUERY
+select histogram(float_col) from functional.alltypestiny;
+---- RESULTS
+'0, 0, 0, 0, 1.1, 1.1, 1.1, 1.1'
+---- TYPES
+STRING
+====
+---- QUERY
+select histogram(double_col) from functional.alltypestiny;
+---- RESULTS
+'0, 0, 0, 0, 10.1, 10.1, 10.1, 10.1'
+---- TYPES
+STRING
+====
+---- QUERY
+select histogram(string_col) from functional.alltypestiny;
+---- RESULTS
+'0, 0, 0, 0, 1, 1, 1, 1'
+---- TYPES
+STRING
+====
+---- QUERY
+select histogram(timestamp_col) from functional.alltypestiny;
+---- RESULTS
+'2009-01-01 00:00:00, 2009-01-01 00:01:00, 2009-02-01 00:00:00, 2009-02-01 00:01:00, 2009-03-01 00:00:00, 2009-03-01 00:01:00, 2009-04-01 00:00:00, 2009-04-01 00:01:00'
+---- TYPES
+STRING
+====
+---- QUERY
+select histogram(d1) from functional.decimal_tbl;
+---- RESULTS
+'1234, 2345, 12345, 12345, 132842'
+---- TYPES
+STRING
+====

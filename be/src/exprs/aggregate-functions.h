@@ -81,6 +81,42 @@ class AggregateFunctions {
   static StringVal PcFinalize(FunctionContext*, const StringVal& src);
   static StringVal PcsaFinalize(FunctionContext*, const StringVal& src);
 
+  // Reservoir sampling produces a uniform random sample without knowing the total number
+  // of items. ReservoirSample{Init, Update, Merge, Serialize} implement distributed
+  // reservoir sampling. Samples are first collected locally via reservoir sampling in
+  // Update(), and then all local samples are merged together in Merge() using weights
+  // proportional to the size of the local input, using 'weighted' reservoir sampling.
+  // See the following references for more details:
+  // http://dl.acm.org/citation.cfm?id=1138834
+  // http://gregable.com/2007/10/reservoir-sampling.html
+  template <typename T>
+  static void ReservoirSampleInit(FunctionContext*, StringVal* slot);
+  template <typename T>
+  static void ReservoirSampleUpdate(FunctionContext*, const T& src, StringVal* dst);
+  template <typename T>
+  static void ReservoirSampleMerge(FunctionContext*, const StringVal& src,
+      StringVal* dst);
+  template <typename T>
+  static const StringVal ReservoirSampleSerialize(FunctionContext*,
+      const StringVal& src);
+
+  // Returns 20,000 unsorted samples as a list of comma-separated values.
+  template <typename T>
+  static StringVal ReservoirSampleFinalize(FunctionContext*, const StringVal& src);
+
+  // Returns an approximate median using reservoir sampling.
+  // TODO: Return T when return type does not need to be the intermediate type
+  template <typename T>
+  static StringVal AppxMedianFinalize(FunctionContext*, const StringVal& src);
+
+  // Returns an equi-depth histogram computed from a sample of data produced via
+  // reservoir sampling. The result is a comma-separated list of up to 100 histogram
+  // bucket endpoints where each bucket contains the same number of elements. For
+  // example, "10, 50, 60, 100" would mean 25% of values are less than 10, 25% are
+  // between 10 and 50, etc.
+  template <typename T>
+  static StringVal HistogramFinalize(FunctionContext*, const StringVal& src);
+
   // Hyperloglog distinct estimate algorithm.
   // See these papers for more details.
   // 1) Hyperloglog: The analysis of a near-optimal cardinality estimation

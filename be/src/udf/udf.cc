@@ -329,7 +329,7 @@ uint8_t* FunctionContextImpl::AllocateLocal(int byte_size) {
 void FunctionContextImpl::FreeLocalAllocations() {
   if (VLOG_ROW_IS_ON) {
     stringstream ss;
-    ss << "Free local allocations: FunctionCteonxt=" << context_
+    ss << "Free local allocations: FunctionContext=" << context_
        << " pool=" << pool_ << endl;
     for (int i = 0; i < local_allocations_.size(); ++i) {
       ss << "  " << reinterpret_cast<void*>(local_allocations_[i]) << endl;
