@@ -215,6 +215,8 @@ TimestampValue TruncMinute(const date& orig_date, const time_duration& orig_time
 
 TimestampVal UdfBuiltins::Trunc(
     FunctionContext* context, const TimestampVal& tv, const StringVal &unit_str) {
+  if (tv.is_null) return TimestampVal::null();
+
   const TimestampValue& ts = TimestampValue::FromTimestampVal(tv);
   const date& orig_date = ts.get_date();
   const time_duration& orig_time = ts.get_time();
@@ -236,7 +238,27 @@ TimestampVal UdfBuiltins::Trunc(
 
   TimestampValue ret;
   TimestampVal ret_val;
+
+  // check for invalid or malformed timestamps
   switch (trunc_unit) {
+    case TruncUnit::YEAR:
+    case TruncUnit::QUARTER:
+    case TruncUnit::MONTH:
+    case TruncUnit::WW:
+    case TruncUnit::W:
+    case TruncUnit::DAY:
+    case TruncUnit::DAY_OF_WEEK:
+      if (orig_date.is_special()) return TimestampVal::null();
+      break;
+    case TruncUnit::HOUR:
+    case TruncUnit::MINUTE:
+      if (orig_time.is_special()) return TimestampVal::null();
+      break;
+    case TruncUnit::UNIT_INVALID:
+      DCHECK(false);
+  }
+
+  switch(trunc_unit) {
     case TruncUnit::YEAR:
       ret = TruncYear(orig_date);
       break;
@@ -269,6 +291,7 @@ TimestampVal UdfBuiltins::Trunc(
       context->SetError(Substitute("truncate unit $0 not supported", trunc_unit).c_str());
       return TimestampVal::null();
   }
+
   ret.ToTimestampVal(&ret_val);
   return ret_val;
 }
@@ -334,6 +357,8 @@ IntVal UdfBuiltins::Extract(
     FunctionContext* context, const TimestampVal& tv, const StringVal &unit_str) {
   // resolve extract_field using the prepared state if possible, o.w. parse now
   // ExtractPrepare() can only parse extract_field if user passes it as a string literal
+  if (tv.is_null) return IntVal::null();
+
   ExtractField::Type field;
   void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
   if (state != NULL) {
@@ -349,7 +374,25 @@ IntVal UdfBuiltins::Extract(
 
   const date& orig_date = *reinterpret_cast<const date*>(&tv.date);
   const time_duration& time = *reinterpret_cast<const time_duration*>(&tv.time_of_day);
-  if (orig_date.is_special()) return IntVal::null();
+
+  switch (field) {
+    case ExtractField::YEAR:
+    case ExtractField::MONTH:
+    case ExtractField::DAY:
+      if (orig_date.is_special()) return IntVal::null();
+      break;
+    case ExtractField::HOUR:
+    case ExtractField::MINUTE:
+    case ExtractField::SECOND:
+    case ExtractField::MILLISECOND:
+      if (time.is_special()) return IntVal::null();
+      break;
+    case ExtractField::EPOCH:
+      if (time.is_special() || orig_date.is_special()) return IntVal::null();
+      break;
+    case ExtractField::INVALID_FIELD:
+      DCHECK(false);
+  }
 
   switch (field) {
     case ExtractField::YEAR: {

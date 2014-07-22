@@ -88,6 +88,10 @@ class TimestampValue {
     *this = TimestampValue(boost::posix_time::from_time_t(t));
   }
 
+  bool valid() const { return valid_date() || valid_time(); }
+  bool valid_date() const { return ! date_.is_special(); }
+  bool valid_time() const { return ! time_of_day_.is_special(); }
+
   void set_date(boost::gregorian::date d) { date_ = d; }
   void set_time(boost::posix_time::time_duration t) { time_of_day_ = t; }
   const boost::gregorian::date& get_date() const { return date_; }
