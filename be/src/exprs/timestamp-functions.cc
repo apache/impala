@@ -42,9 +42,6 @@ using namespace impala_udf;
 
 namespace impala {
 
-local_time::tz_database TimezoneDatabase::tz_database_;
-vector<string> TimezoneDatabase::tz_region_list_;
-
 // Constant strings used for DayName function.
 const char* TimestampFunctions::SUNDAY = "Sunday";
 const char* TimestampFunctions::MONDAY = "Monday";
@@ -53,10 +50,6 @@ const char* TimestampFunctions::WEDNESDAY = "Wednesday";
 const char* TimestampFunctions::THURSDAY = "Thursday";
 const char* TimestampFunctions::FRIDAY = "Friday";
 const char* TimestampFunctions::SATURDAY = "Saturday";
-
-// Moscow Timezone No Daylight Savings Time (GMT+4), for use after March 2011
-const time_zone_ptr TIMEZONE_MSK_2011_NODST(time_zone_ptr(
-    new posix_time_zone(string("MSK+04MSK+00,M3.5.0,M10.5.0"))));
 
 void TimestampFunctions::UnixAndFromUnixPrepare(FunctionContext* context,
     FunctionContext::FunctionStateScope scope) {

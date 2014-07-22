@@ -14,7 +14,20 @@
 
 #include "timestamp-functions.h"
 
+using namespace boost;
+using namespace boost::posix_time;
+using namespace boost::local_time;
+using namespace boost::gregorian;
+using namespace std;
+
 namespace impala {
+
+local_time::tz_database TimezoneDatabase::tz_database_;
+vector<string> TimezoneDatabase::tz_region_list_;
+
+const time_zone_ptr TimezoneDatabase::TIMEZONE_MSK_2011_NODST(time_zone_ptr(
+    new posix_time_zone(string("MSK+04MSK+00,M3.5.0,M10.5.0"))));
+
 const char* TimezoneDatabase::TIMEZONE_DATABASE_STR = "\"ID\",\"STD ABBR\",\"STD NAME\",\"DST ABBR\",\"DST NAME\",\"GMT offset\",\"DST adjustment\",\"DST Start Date rule\",\"Start time\",\"DST End date rule\",\"End time\"\n\
 \"Africa/Abidjan\",\"GMT\",\"GMT\",\"\",\"\",\"+00:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"+00:00:00\"\n\
 \"Africa/Accra\",\"GMT\",\"GMT\",\"\",\"\",\"+00:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"+00:00:00\"\n\

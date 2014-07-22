@@ -134,6 +134,9 @@ class TimezoneDatabase {
   static boost::local_time::time_zone_ptr FindTimezone(const std::string& tz,
       const TimestampValue& tv);
 
+  // Moscow Timezone No Daylight Savings Time (GMT+4), for use after March 2011
+  static const boost::local_time::time_zone_ptr TIMEZONE_MSK_2011_NODST;
+
  private:
   static const char* TIMEZONE_DATABASE_STR;
   static boost::local_time::tz_database tz_database_;

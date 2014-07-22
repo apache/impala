@@ -46,6 +46,9 @@ add_library(CodeGen
 # this code gets cross compiled to a single IR module, impala.ll.  
 # Custom build commands don't seem to propagate dependencies correctly
 # list all the ir files 
+# Don't include any .cc files that contain the initialize for complex (i.e. boost)
+# static objects. These cannot be trimmed for the module and greatly increases
+# our runtime compile time.
 set(IR_DEPENDENT_FILES
   impala-ir.cc
   ../exec/aggregation-node-ir.cc
