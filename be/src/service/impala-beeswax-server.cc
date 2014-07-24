@@ -569,10 +569,8 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
     exec_state->query_events()->MarkEvent("First row fetched");
   }
 
-  if (exec_state->query_state() == QueryState::EXCEPTION) {
-    // we got cancelled or saw an error; either way, return now
-    return exec_state->query_status();
-  }
+  // Check for cancellation or an error.
+  RETURN_IF_ERROR(exec_state->query_status());
 
   // ODBC-190: set Beeswax's Results.columns to work around bug ODBC-190;
   // TODO: remove the block of code when ODBC-190 is resolved.

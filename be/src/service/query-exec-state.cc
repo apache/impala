@@ -741,8 +741,8 @@ Status ImpalaServer::QueryExecState::FetchNextBatch() {
   lock_.lock();
   if (!status.ok()) return status;
 
-  // Check if query_state_ changed during GetNext() call
-  if (query_state_ == QueryState::EXCEPTION) {
+  // Check if query status has changed during GetNext() call
+  if (!query_status_.ok()) {
     current_batch_ = NULL;
     return query_status_;
   }

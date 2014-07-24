@@ -255,10 +255,8 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
   lock_guard<mutex> frl(*exec_state->fetch_rows_lock());
   lock_guard<mutex> l(*exec_state->lock());
 
-  if (exec_state->query_state() == QueryState::EXCEPTION) {
-    // we got cancelled or saw an error; either way, return now
-    return exec_state->query_status();
-  }
+  // Check for cancellation or an error.
+  RETURN_IF_ERROR(exec_state->query_status());
 
   if (exec_state->num_rows_fetched() == 0) {
     exec_state->query_events()->MarkEvent("First row fetched");
