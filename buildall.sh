@@ -226,6 +226,9 @@ mvn package -DskipTests=true
 echo "Creating shell tarball"
 ${IMPALA_HOME}/shell/make_shell_tarball.sh
 
+echo "Creating test tarball"
+${IMPALA_HOME}/tests/make_test_tarball.sh
+
 # Create subdirectories for the test and data loading impalad logs.
 mkdir -p ${IMPALA_TEST_CLUSTER_LOG_DIR}/query_tests
 mkdir -p ${IMPALA_TEST_CLUSTER_LOG_DIR}/fe_tests
