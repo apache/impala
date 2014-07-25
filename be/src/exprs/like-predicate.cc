@@ -14,20 +14,38 @@
 
 #include "exprs/like-predicate.h"
 
-#include <sstream>
 #include <string.h>
-
 #include <re2/re2.h>
 #include <re2/stringpiece.h>
+#include <sstream>
 
 #include "gutil/strings/substitute.h"
 #include "runtime/string-value.inline.h"
 
 using namespace boost;
 using namespace std;
+using namespace boost;
+using namespace std;
 using namespace impala_udf;
+using namespace re2;
 
 namespace impala {
+// A regex to match any regex pattern is equivalent to a substring search.
+static const RE2 SUBSTRING_RE(
+    "(?:\\.\\*)*([^\\.\\^\\{\\[\\(\\|\\)\\]\\}\\+\\*\\?\\$\\\\]*)(?:\\.\\*)*");
+
+// A regex to match any regex pattern which is equivalent to matching a constant string
+// at the end of the string values.
+static const RE2 ENDS_WITH_RE(
+    "(?:\\.\\*)*([^\\.\\^\\{\\[\\(\\|\\)\\]\\}\\+\\*\\?\\$\\\\]*)\\$");
+
+// A regex to match any regex pattern which is equivalent to matching a constant string
+// at the end of the string values.
+static const RE2 STARTS_WITH_RE(
+    "\\^([^\\.\\^\\{\\[\\(\\|\\)\\]\\}\\+\\*\\?\\$\\\\]*)(?:\\.\\*)*");
+
+// A regex to match any regex pattern which is equivalent to a constant string match.
+static const RE2 EQUALS_RE("\\^([^\\.\\^\\{\\[\\(\\|\\)\\]\\}\\+\\*\\?\\$\\\\]*)\\$");
 
 LikePredicate::LikePredicate(const TExprNode& node)
   : Predicate(node) {
@@ -69,7 +87,7 @@ void LikePredicate::LikePrepare(FunctionContext* context,
       ConvertLikePattern(context,
           *reinterpret_cast<StringVal*>(context->GetConstantArg(1)), &re_pattern);
       state->regex_.reset(new RE2(re_pattern));
-      if(!state->regex_->ok()) {
+      if (!state->regex_->ok()) {
         context->SetError(
             strings::Substitute("Invalid regex: $0", pattern_val.ptr).c_str());
       }
@@ -98,28 +116,47 @@ void LikePredicate::RegexPrepare(FunctionContext* context,
   if (scope != FunctionContext::THREAD_LOCAL) return;
   LikePredicateState* state = new LikePredicateState();
   context->SetFunctionState(scope, state);
+  state->function_ = RegexFn;
   if (context->IsArgConstant(1)) {
     StringVal* pattern = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
     if (pattern->is_null) {
-      state->function_ = RegexFn;
       return;
     }
     string pattern_str(reinterpret_cast<const char*>(pattern->ptr), pattern->len);
-    state->regex_.reset(new RE2(pattern_str));
-    stringstream error;
-    if(!state->regex_->ok()) {
+    string search_string;
+    // The following four conditionals check if the pattern is a constant string,
+    // starts with a constant string and is followed by any number of wildcard characters,
+    // ends with a constant string and is preceded by any number of wildcard characters or
+    // has a constant substring surrounded on both sides by any number of wildcard
+    // characters. In any of these conditions, we can search for the pattern more
+    // efficiently by using our own string match functions rather than regex matching.
+    if (RE2::FullMatch(pattern_str, EQUALS_RE, &search_string)) {
+      state->SetSearchString(search_string);
+      state->function_ = ConstantEqualsFn;
+    } else if (RE2::FullMatch(pattern_str, STARTS_WITH_RE, &search_string)) {
+      state->SetSearchString(search_string);
+      state->function_ = ConstantStartsWithFn;
+    } else if (RE2::FullMatch(pattern_str, ENDS_WITH_RE, &search_string)) {
+      state->SetSearchString(search_string);
+      state->function_ = ConstantEndsWithFn;
+    } else if (RE2::FullMatch(pattern_str, SUBSTRING_RE, &search_string)) {
+      state->SetSearchString(search_string);
+      state->function_ = ConstantSubstringFn;
+    } else {
+      state->regex_.reset(new RE2(pattern_str));
       stringstream error;
-      error << "Invalid regex expression" << pattern->ptr;
-      context->SetError(error.str().c_str());
+      if (!state->regex_->ok()) {
+        stringstream error;
+        error << "Invalid regex expression" << pattern->ptr;
+        context->SetError(error.str().c_str());
+      }
+      state->function_ = ConstantRegexFnPartial;
     }
-    state->function_ = ConstantRegexFnPartial;
-  } else {
-    state->function_ = RegexFn;
   }
 }
 
 BooleanVal LikePredicate::Regex(FunctionContext* context, const StringVal& val,
-    const StringVal& pattern){
+    const StringVal& pattern) {
   LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
   return (state->function_)(context, val, pattern);
@@ -155,7 +192,7 @@ BooleanVal LikePredicate::ConstantSubstringFn(FunctionContext* context,
 }
 
 BooleanVal LikePredicate::ConstantStartsWithFn(FunctionContext* context,
-    const StringVal& val, const StringVal& pattern){
+    const StringVal& val, const StringVal& pattern) {
   if (val.is_null) return BooleanVal::null();
   LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
@@ -169,7 +206,7 @@ BooleanVal LikePredicate::ConstantStartsWithFn(FunctionContext* context,
 }
 
 BooleanVal LikePredicate::ConstantEndsWithFn(FunctionContext* context,
-    const StringVal& val, const StringVal& pattern){
+    const StringVal& val, const StringVal& pattern) {
   if (val.is_null) return BooleanVal::null();
   LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
@@ -177,7 +214,7 @@ BooleanVal LikePredicate::ConstantEndsWithFn(FunctionContext* context,
     return BooleanVal(false);
   } else {
     char* ptr =
-      reinterpret_cast<char*>(val.ptr) + val.len - state->search_string_sv_.len;
+        reinterpret_cast<char*>(val.ptr) + val.len - state->search_string_sv_.len;
     int len = state->search_string_sv_.len;
     StringValue v = StringValue(ptr, len);
     return BooleanVal(state->search_string_sv_.Eq(v));
@@ -211,12 +248,13 @@ BooleanVal LikePredicate::ConstantRegexFn(FunctionContext* context,
 }
 
 BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
-    const StringVal& operand_value, const StringVal& pattern_value, bool is_like_pattern) {
+    const StringVal& operand_value, const StringVal& pattern_value,
+    bool is_like_pattern) {
   if (operand_value.is_null || pattern_value.is_null) return BooleanVal::null();
   if (context->IsArgConstant(1)) {
     LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
         context->GetFunctionState(FunctionContext::THREAD_LOCAL));
-    if(is_like_pattern) {
+    if (is_like_pattern) {
       return RE2::FullMatch(re2::StringPiece(reinterpret_cast<const char*>(
           operand_value.ptr), operand_value.len), *state->regex_.get());
     } else {
@@ -235,10 +273,10 @@ BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
     if (re.ok()) {
       if (is_like_pattern) {
         return RE2::FullMatch(re2::StringPiece(
-             reinterpret_cast<const char*>(operand_value.ptr), operand_value.len), re);
+            reinterpret_cast<const char*>(operand_value.ptr), operand_value.len), re);
       } else {
         return RE2::PartialMatch(re2::StringPiece(
-             reinterpret_cast<const char*>(operand_value.ptr), operand_value.len), re);
+            reinterpret_cast<const char*>(operand_value.ptr), operand_value.len), re);
       }
     } else {
       context->SetError(
@@ -291,4 +329,4 @@ void LikePredicate::ConvertLikePattern(FunctionContext* context, const StringVal
   }
 }
 
-}
+}  // namespace impala

@@ -16,9 +16,9 @@
 #ifndef IMPALA_EXPRS_LIKE_PREDICATE_H_
 #define IMPALA_EXPRS_LIKE_PREDICATE_H_
 
-#include <string>
 #include <boost/scoped_ptr.hpp>
 #include <re2/re2.h>
+#include <string>
 
 #include "exprs/predicate.h"
 #include "gen-cpp/Exprs_types.h"
@@ -26,19 +26,17 @@
 #include "udf/udf.h"
 
 namespace re2 {
-  class RE2;
-};
+class RE2;
+}
 
 namespace impala {
 
 // This class handles the Like, Regexp, and Rlike predicates and uses the udf interface.
 class LikePredicate: public Predicate {
-
  public:
   ~LikePredicate();
 
  protected:
-
   friend class Expr;
   LikePredicate(const TExprNode& node);
 
@@ -144,6 +142,6 @@ class LikePredicate: public Predicate {
       const impala_udf::StringVal& pattern, std::string* re_pattern);
 };
 
-}
+}  // namespace impala
 
-#endif
+#endif  // IMPALA_EXPRS_LIKE_PREDICATE_H_

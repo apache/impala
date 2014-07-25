@@ -1120,7 +1120,7 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'abcde' LIKE 'abcde%'", TYPE_BOOLEAN, true);
   TestValue("'abcde' LIKE '%abcde'", TYPE_BOOLEAN, true);
   TestValue("'abcde' LIKE '%abcde%'", TYPE_BOOLEAN, true);
-  //Test multiple wildcard characters
+  // Test multiple wildcard characters
   TestValue("'abcde' LIKE '%%bc%%'", TYPE_BOOLEAN, true);
   TestValue("'abcde' LIKE '%%cb%%'", TYPE_BOOLEAN, false);
   TestValue("'abcde' LIKE 'abc%%'", TYPE_BOOLEAN, true);
@@ -1172,10 +1172,17 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'abxcy1234a' RLIKE 'a.x.y.*a'", TYPE_BOOLEAN, true);
   TestValue("'axcy1234a' REGEXP 'a.x.y.*a'", TYPE_BOOLEAN, false);
   TestValue("'axcy1234a' RLIKE 'a.x.y.*a'", TYPE_BOOLEAN, false);
+  // Regex patterns with constants strings
   TestValue("'english' REGEXP 'en'", TYPE_BOOLEAN, true);
   TestValue("'english' REGEXP 'lis'", TYPE_BOOLEAN, true);
   TestValue("'english' REGEXP 'english'", TYPE_BOOLEAN, true);
   TestValue("'english' REGEXP 'engilsh'", TYPE_BOOLEAN, false);
+  TestValue("'english' REGEXP '^english$'", TYPE_BOOLEAN, true);
+  TestValue("'english' REGEXP '^lish$'", TYPE_BOOLEAN, false);
+  TestValue("'english' REGEXP '^eng'", TYPE_BOOLEAN, true);
+  TestValue("'english' REGEXP '^ng'", TYPE_BOOLEAN, false);
+  TestValue("'english' REGEXP 'lish$'", TYPE_BOOLEAN, true);
+  TestValue("'english' REGEXP 'lis$'", TYPE_BOOLEAN, false);
   // regex escape chars; insert special character in the middle to prevent
   // it from being matched as a substring
   TestValue("'.[]{}()x\\\\*+?|^$' LIKE '.[]{}()_\\\\\\\\*+?|^$'", TYPE_BOOLEAN, true);
