@@ -138,7 +138,9 @@ DEFINE_int32(idle_session_timeout, 0, "The time, in seconds, that a session may 
     " sessions are never expired.");
 DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be idle for"
     " (i.e. no processing work is done and no updates are received from the client) "
-    "before it is cancelled. If 0, idle queries are never expired.");
+    "before it is cancelled. If 0, idle queries are never expired. The query option "
+    "QUERY_TIMEOUT_S overrides this setting, but, if set, --idle_query_timeout represents"
+    " the maximum allowable timeout.");
 
 DEFINE_string(local_nodemanager_url, "", "The URL of the local Yarn Node Manager's HTTP "
     "interface, used to detect if the Node Manager fails");
@@ -295,10 +297,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
             bind<void>(&ImpalaServer::ExpireSessions, this)));
   }
 
-  if (FLAGS_idle_query_timeout > 0) {
-    query_expiration_thread_.reset(new Thread("impala-server", "query-expirer",
-            bind<void>(&ImpalaServer::ExpireQueries, this)));
-  }
+  query_expiration_thread_.reset(new Thread("impala-server", "query-expirer",
+      bind<void>(&ImpalaServer::ExpireQueries, this)));
 
   is_offline_ = false;
   if (FLAGS_enable_rm) {
@@ -655,10 +655,18 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
     query_exec_state_map_.insert(make_pair(query_id, exec_state));
   }
 
-  if (FLAGS_idle_query_timeout > 0) {
+  int32_t timeout_s = max(0, FLAGS_idle_query_timeout);
+  if (exec_state->query_options().query_timeout_s > 0) {
+    timeout_s = min(timeout_s, exec_state->query_options().query_timeout_s);
+  }
+
+  if (timeout_s > 0) {
     lock_guard<mutex> l(query_expiration_lock_);
+    VLOG_QUERY << "Query " << PrintId(query_id) << " has timeout of "
+               << PrettyPrinter::Print(timeout_s * 1000L * 1000L * 1000L,
+                     TCounterType::TIME_NS);
     queries_by_timestamp_.insert(
-        make_pair(ms_since_epoch() + (1000 * FLAGS_idle_query_timeout), query_id));
+        make_pair(ms_since_epoch() + (1000L * timeout_s), query_id));
   }
   return Status::OK;
 }
@@ -991,6 +999,9 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         query_options->__set_rm_initial_mem(reservation_size);
         break;
       }
+      case TImpalaQueryOptions::QUERY_TIMEOUT_S:
+        query_options->__set_query_timeout_s(atoi(value.c_str()));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1272,6 +1283,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::RM_INITIAL_MEM:
         val << query_option.rm_initial_mem;
+        break;
+      case TImpalaQueryOptions::QUERY_TIMEOUT_S:
+        val << query_option.query_timeout_s;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
@@ -1754,7 +1768,6 @@ void ImpalaServer::ExpireSessions() {
 
 void ImpalaServer::ExpireQueries() {
   while (true) {
-    int64_t next_wakeup;
     // The following block accomplishes three things:
     //
     // 1. Update the ordered list of queries by checking the 'idle_time' parameter in
@@ -1770,10 +1783,11 @@ void ImpalaServer::ExpireQueries() {
     // 3. Compute the next time a query *might* expire, so that the sleep at the end of
     // this loop has an accurate duration to wait. If the list of queries is empty, the
     // default sleep duration is half the idle query timeout.
+    int64_t now;
     {
       lock_guard<mutex> l(query_expiration_lock_);
       ExpirationQueue::iterator expiration_event = queries_by_timestamp_.begin();
-      int64_t now = ms_since_epoch();
+      now = ms_since_epoch();
       while (expiration_event != queries_by_timestamp_.end()) {
         // If the last-observed expiration time for this query is still in the future, we
         // know that the true expiration time will be at least that far off. So we can
@@ -1788,8 +1802,14 @@ void ImpalaServer::ExpireQueries() {
         }
         // First, check the actual expiration time in case the query has updated it
         // since the last time we looked.
-        int64_t expiration =
-            query_state->last_active() + (FLAGS_idle_query_timeout * 1000);
+        int64_t timeout_ms = FLAGS_idle_query_timeout * 1000L;
+        if (query_state->query_options().query_timeout_s > 0) {
+          // FLAGS_idle_query_timeout is the maximum timeout (to prevent users from
+          // overriding with extremely long timeouts and consuming lots of resources)
+          timeout_ms = min(timeout_ms,
+              query_state->query_options().query_timeout_s * 1000L);
+        }
+        int64_t expiration = query_state->last_active() + timeout_ms;
         if (now < expiration) {
           // If the real expiration date is in the future we may need to re-insert the
           // query's expiration event at its correct location.
@@ -1812,7 +1832,8 @@ void ImpalaServer::ExpireQueries() {
           stringstream ss;
           ss << "Query " << PrintId(expiration_event->second)
              << " expired due to client inactivity " << "(timeout is "
-             << FLAGS_idle_query_timeout << "s)";
+             << PrettyPrinter::Print(timeout_ms * 1000L * 1000L, TCounterType::TIME_NS)
+             << ")";
 
           cancellation_thread_pool_->Offer(
               CancellationWork(expiration_event->second, Status(ss.str()), false));
@@ -1823,19 +1844,12 @@ void ImpalaServer::ExpireQueries() {
           ++expiration_event;
         }
       }
-      if (queries_by_timestamp_.size() > 0) {
-        next_wakeup = queries_by_timestamp_.begin()->first;
-      } else {
-        // If no queries, wake up in half the idle query timeout
-        next_wakeup = now + (FLAGS_idle_query_timeout * 500);
-      }
     }
-
-    // If the next expiration time is right now (because the query is active, and has
-    // taken longer than FLAGS_idle_query_timeout to perform a method call), rate limit
-    // the frequency with which we wake up to avoid busy waiting.
-    next_wakeup = max(2000L, next_wakeup - ms_since_epoch());
-    SleepForMs(next_wakeup);
+    // Since we only allow timeouts to be 1s or greater, the earliest that any new query
+    // could expire is in 1s time. An existing query may expire sooner, but we are
+    // comfortable with a maximum error of 1s as a trade-off for not frequently waking
+    // this thread.
+    SleepForMs(1000L);
   }
 }
 

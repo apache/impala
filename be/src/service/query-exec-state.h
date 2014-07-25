@@ -169,6 +169,7 @@ class ImpalaServer::QueryExecState {
   const TimestampValue& start_time() const { return start_time_; }
   const TimestampValue& end_time() const { return end_time_; }
   const std::string& sql_stmt() const { return query_ctx_.request.stmt; }
+  const TQueryOptions& query_options() const { return query_ctx_.request.query_options; }
 
   const std::vector<std::string>& GetAnalysisWarnings() const {
     return exec_request_.analysis_warnings;

@@ -930,16 +930,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // accessed during normal query execution and the benefit of that is there is no
   // competition for locks when ExpireQueries() walks this list to find expired queries.
   //
-  // In order to make the query expiration algorithm work, the following conditions always
-  // hold:
+  // In order to make the query expiration algorithm work, the following condition always
+  // holds:
   //
   // * For any pair (t, q) in the set, t is always a lower bound on the true expiration
-  // time of the query q (in q->idle_time()). Therefore it is always correct to sleep
-  // until t and then check q for expiration.
-  //
-  // * Any new pair (t, q) added to a non-empty set whose first value is (t', q') has t' <
-  // t. This guarantees that it is always safe to sleep until t' without missing any new
-  // expirations.
+  // time of the query q (in q->idle_time()). Therefore we can bound the expiration error
+  // by sleeping to no more than t + d for some small d (in our implementation, d is 1s).
   //
   // The reason that the expiration time saved in each entry here may not exactly match
   // the true expiration time of a query is because we wish to avoid accessing (and

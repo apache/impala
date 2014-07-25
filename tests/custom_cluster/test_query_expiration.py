@@ -26,31 +26,43 @@ class TestQueryExpiration(CustomClusterTestSuite):
   """Tests query expiration logic"""
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--idle_query_timeout=5")
+  @CustomClusterTestSuite.with_args("--idle_query_timeout=6")
   def test_query_expiration(self, vector):
     """Confirm that single queries expire if not fetched"""
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     num_expired = impalad.service.get_metric_value('impala-server.num-queries-expired')
-    handle = client.execute_async("SELECT SLEEP(3000000)")
+    handle = client.execute_async("SELECT SLEEP(1000000)")
+    client.execute("SET QUERY_TIMEOUT_S=1")
+    handle2 = client.execute_async("SELECT SLEEP(2000000)")
+
+    # Set a huge timeout, to check that the server bounds it by --idle_query_timeout
+    client.execute("SET QUERY_TIMEOUT_S=1000")
+    handle3 = client.execute_async("SELECT SLEEP(3000000)")
+
     before = time()
-    sleep(2)
-    assert num_expired == impalad.service.get_metric_value(
+    sleep(4)
+
+    # Query with timeout of 1 should have expired, other query should still be running.
+    assert num_expired + 1 == impalad.service.get_metric_value(
       'impala-server.num-queries-expired')
     impalad.service.wait_for_metric_value('impala-server.num-queries-expired',
-                                          num_expired + 1)
+                                          num_expired + 3)
 
     # Check that we didn't wait too long to be expired (double the timeout is sufficiently
     # large to avoid most noise in measurement)
-    assert time() - before < 10
+    assert time() - before < 12
     assert client.get_state(handle) == client.QUERY_STATES['EXCEPTION']
 
-    # A properly executed query should not be cancelled
+    client.execute("SET QUERY_TIMEOUT_S=0")
+    # Synchronous execution; calls fetch() and query should not time out.
     # Note: could be flakey if execute() takes too long to call fetch() etc after the
     # query completes.
     handle = client.execute("SELECT SLEEP(2500)")
+
+    # Confirm that no extra expirations happened
     assert impalad.service.get_metric_value('impala-server.num-queries-expired') \
-        == num_expired + 1
+        == num_expired + 3
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_query_timeout=1")

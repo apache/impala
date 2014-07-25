@@ -142,7 +142,12 @@ enum TImpalaQueryOptions {
   DISABLE_OUTERMOST_TOPN,
 
   // Size of initial memory reservation when RM is enabled
-  RM_INITIAL_MEM
+  RM_INITIAL_MEM,
+
+  // Time, in s, before a query will be timed out if it is inactive. May not exceed
+  // --idle_query_timeout if that flag > 0.
+  QUERY_TIMEOUT_S
+
 }
 
 // The summary of an insert.

@@ -87,6 +87,10 @@ struct TQueryOptions {
 
   // Override for initial memory reservation size if RM is enabled.
   25: optional i64 rm_initial_mem = 0
+
+  // Time, in s, before a query will be timed out if it is inactive. May not exceed
+  // --idle_query_timeout if that flag > 0.
+  26: optional i32 query_timeout_s = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
