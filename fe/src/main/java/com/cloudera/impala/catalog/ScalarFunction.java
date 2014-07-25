@@ -20,9 +20,11 @@ import java.util.List;
 import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TFunction;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TScalarFunction;
+import com.cloudera.impala.thrift.TSymbolType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -62,7 +64,7 @@ public class ScalarFunction extends Function {
   public static ScalarFunction createBuiltin(String name, ArrayList<Type> argTypes,
       boolean hasVarArgs, Type retType, String symbol, boolean udfInterface) {
     return createBuiltin(name, argTypes, hasVarArgs, retType,
-                         symbol, null, null, udfInterface);
+                         symbol, null, null, udfInterface, false);
   }
 
   /**
@@ -71,15 +73,28 @@ public class ScalarFunction extends Function {
    */
   public static ScalarFunction createBuiltin(String name, ArrayList<Type> argTypes,
       boolean hasVarArgs, Type retType, String symbol,
-      String prepareFnSymbol, String closeFnSymbol, boolean udfInterface) {
+      String prepareFnSymbol, String closeFnSymbol, boolean udfInterface,
+      boolean isOperator) {
     Preconditions.checkNotNull(symbol);
     FunctionArgs fnArgs = new FunctionArgs(argTypes, hasVarArgs);
     ScalarFunction fn =
         new ScalarFunction(new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, retType);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
-    fn.setUserVisible(true);
+    fn.setUserVisible(!isOperator);
     fn.udfInterface_ = udfInterface;
-    fn.symbolName_ = symbol;
+    if (fn.udfInterface_) {
+      try {
+        fn.symbolName_ = fn.lookupSymbol(symbol, TSymbolType.UDF_EVALUATE, null,
+            fn.hasVarArgs(), fn.getArgs());
+      } catch (AnalysisException e) {
+        // This should never happen
+        Preconditions.checkState(false, "Builtin symbol '" + symbol + "'" + argTypes
+            + " not found!" + e.getStackTrace());
+        throw new RuntimeException("Builtin symbol not found!", e);
+      }
+    } else {
+      fn.symbolName_ = symbol;
+    }
     fn.prepareFnSymbol_ = prepareFnSymbol;
     fn.closeFnSymbol_ = closeFnSymbol;
     return fn;

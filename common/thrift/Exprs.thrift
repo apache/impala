@@ -77,10 +77,6 @@ struct TIsNullPredicate {
   1: required bool is_not_null
 }
 
-struct TLikePredicate {
-  1: required string escape_char;
-}
-
 struct TLiteralPredicate {
   1: required bool value
   2: required bool is_null
@@ -116,12 +112,11 @@ struct TExprNode {
   10: optional TIntLiteral int_literal
   11: optional TInPredicate in_predicate
   12: optional TIsNullPredicate is_null_pred
-  13: optional TLikePredicate like_pred
-  14: optional TLiteralPredicate literal_pred
-  15: optional TSlotRef slot_ref
-  16: optional TStringLiteral string_literal
-  17: optional TTupleIsNullPredicate tuple_is_null_pred
-  18: optional TDecimalLiteral decimal_literal
+  13: optional TLiteralPredicate literal_pred
+  14: optional TSlotRef slot_ref
+  15: optional TStringLiteral string_literal
+  16: optional TTupleIsNullPredicate tuple_is_null_pred
+  17: optional TDecimalLiteral decimal_literal
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

@@ -24,7 +24,6 @@ import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TLikePredicate;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -47,18 +46,18 @@ public class LikePredicate extends Predicate {
   }
 
   public static void initBuiltins(Db db) {
-    db.addBuiltin(ScalarFunction.createBuiltinOperator(
-        Operator.LIKE.name(), "LikePredicate", "LikeFn",
-        Lists.<Type>newArrayList(Type.STRING, Type.STRING),
-        Type.BOOLEAN));
-    db.addBuiltin(ScalarFunction.createBuiltinOperator(
-        Operator.RLIKE.name(), "LikePredicate", "RegexFn",
-        Lists.<Type>newArrayList(Type.STRING, Type.STRING),
-        Type.BOOLEAN));
-    db.addBuiltin(ScalarFunction.createBuiltinOperator(
-        Operator.REGEXP.name(), "LikePredicate", "RegexFn",
-        Lists.<Type>newArrayList(Type.STRING, Type.STRING),
-        Type.BOOLEAN));
+    db.addBuiltin(ScalarFunction.createBuiltin(
+        Operator.LIKE.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
+        false, Type.BOOLEAN, "_ZN6impala13LikePredicate4LikeEPN10impala_udf15FunctionContextERKNS1_9StringValES6_", "_ZN6impala13LikePredicate11LikePrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
+        "_ZN6impala13LikePredicate9LikeCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true, true));
+    db.addBuiltin(ScalarFunction.createBuiltin(
+        Operator.RLIKE.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
+        false, Type.BOOLEAN, "_ZN6impala13LikePredicate5RegexEPN10impala_udf15FunctionContextERKNS1_9StringValES6_", "_ZN6impala13LikePredicate12RegexPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
+        "_ZN6impala13LikePredicate10RegexCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true, true));
+    db.addBuiltin(ScalarFunction.createBuiltin(
+        Operator.REGEXP.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
+        false, Type.BOOLEAN, "_ZN6impala13LikePredicate5RegexEPN10impala_udf15FunctionContextERKNS1_9StringValES6_", "_ZN6impala13LikePredicate12RegexPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
+        "_ZN6impala13LikePredicate10RegexCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true, true));
   }
 
   private final Operator op_;
@@ -95,8 +94,7 @@ public class LikePredicate extends Predicate {
 
   @Override
   protected void toThrift(TExprNode msg) {
-    msg.node_type = TExprNodeType.LIKE_PRED;
-    msg.like_pred = new TLikePredicate("\\");
+    msg.node_type = TExprNodeType.FUNCTION_CALL;
   }
 
   @Override

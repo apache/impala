@@ -41,6 +41,7 @@
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Descriptors_types.h"
+#include "service/fe-support.h"
 
 #include <iostream>
 
@@ -574,6 +575,7 @@ TEST_F(DataStreamTest, BasicTest) {
 
 int main(int argc, char **argv) {
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
+  InitFeSupport();
   impala::LlvmCodeGen::InitializeLlvm();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

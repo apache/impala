@@ -238,7 +238,7 @@ public class Db implements CatalogObject {
     Preconditions.checkState(isSystemDb());
     addBuiltin(ScalarFunction.createBuiltin(
         fnName, Lists.newArrayList(args), varArgs, retType,
-        symbol, prepareFnSymbol, closeFnSymbol, udfInterface));
+        symbol, prepareFnSymbol, closeFnSymbol, udfInterface, false));
   }
 
   /**

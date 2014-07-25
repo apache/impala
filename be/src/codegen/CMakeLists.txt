@@ -57,6 +57,7 @@ set(IR_DEPENDENT_FILES
   ../exprs/aggregate-functions.cc
   ../exprs/expr-ir.cc
   ../exprs/udf-builtins.cc
+  ../exprs/like-predicate.cc
   ../runtime/string-value-ir.cc
   ../udf/udf.cc
   ../util/hash-util-ir.cc
