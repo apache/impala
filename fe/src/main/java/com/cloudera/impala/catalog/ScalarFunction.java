@@ -59,16 +59,6 @@ public class ScalarFunction extends Function {
 
   /**
    * Creates a builtin scalar function. This is a helper that wraps a few steps
-   * into one call. This defaults to not using a Prepare/Close function.
-   */
-  public static ScalarFunction createBuiltin(String name, ArrayList<Type> argTypes,
-      boolean hasVarArgs, Type retType, String symbol, boolean udfInterface) {
-    return createBuiltin(name, argTypes, hasVarArgs, retType,
-                         symbol, null, null, udfInterface, false);
-  }
-
-  /**
-   * Creates a builtin scalar function. This is a helper that wraps a few steps
    * into one call.
    */
   public static ScalarFunction createBuiltin(String name, ArrayList<Type> argTypes,
@@ -109,40 +99,40 @@ public class ScalarFunction extends Function {
   public static ScalarFunction createBuiltinOperator(String name,
       ArrayList<Type> argTypes, Type retType) {
     // Operators have a well defined symbol based on the function name and type.
-    // Convert Add(TINYINT, TINYINT) --> Add_char_char
+    // Convert Add(TINYINT, TINYINT) --> Add_TinyIntVal_TinyIntVal
     String beFn = Character.toUpperCase(name.charAt(0)) + name.substring(1);
     boolean usesDecimal = false;
     for (int i = 0; i < argTypes.size(); ++i) {
       switch (argTypes.get(i).getPrimitiveType()) {
         case BOOLEAN:
-          beFn += "_bool";
+          beFn += "_BooleanVal";
           break;
         case TINYINT:
-          beFn += "_char";
+          beFn += "_TinyIntVal";
           break;
         case SMALLINT:
-          beFn += "_short";
+          beFn += "_SmallIntVal";
           break;
         case INT:
-          beFn += "_int";
+          beFn += "_IntVal";
           break;
         case BIGINT:
-          beFn += "_long";
+          beFn += "_BigIntVal";
           break;
         case FLOAT:
-          beFn += "_float";
+          beFn += "_FloatVal";
           break;
         case DOUBLE:
-          beFn += "_double";
+          beFn += "_DoubleVal";
           break;
         case STRING:
-          beFn += "_StringValue";
+          beFn += "_StringVal";
           break;
         case TIMESTAMP:
-          beFn += "_TimestampValue";
+          beFn += "_TimestampVal";
           break;
         case DECIMAL:
-          beFn += "_decimal";
+          beFn += "_DecimalVal";
           usesDecimal = true;
           break;
         default:
@@ -150,26 +140,38 @@ public class ScalarFunction extends Function {
               "Argument type not supported: " + argTypes.get(i).toSql());
       }
     }
+    String beClass;
+    boolean udfInterface = true;
     if (usesDecimal) {
-      return createBuiltin(
-          name, argTypes, false, retType, "impala::DecimalOperators::" + beFn, true);
+      beClass = "impala::DecimalOperators";
+    } else if (name == "case") {
+      beClass = "CaseExpr";
+      udfInterface = false;
+    } else {
+      beClass = "impala::Operators";
     }
-    return createBuiltinOperator(name, "ComputeFunctions", beFn, argTypes, retType);
+    return createBuiltinOperator(name, beClass, beFn, argTypes, retType, udfInterface);
   }
 
   /**
    * Create a builtin function with the symbol beClass::beFn
    */
   public static ScalarFunction createBuiltinOperator(String name,
-      String beClass, String beFn, ArrayList<Type> argTypes, Type retType) {
-    FunctionArgs fnArgs = new FunctionArgs(argTypes, false);
-    ScalarFunction fn =
-        new ScalarFunction(new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, retType);
-    fn.setBinaryType(TFunctionBinaryType.BUILTIN);
-    fn.setUserVisible(false);
-    fn.udfInterface_ = false;
-    fn.symbolName_ = GetComputeFnSymbol(beClass, beFn);
-    return fn;
+      String beClass, String beFn, ArrayList<Type> argTypes, Type retType,
+      boolean udfInterface) {
+    if (!udfInterface) {
+      // TODO(skye): remove in expr refactoring
+      FunctionArgs fnArgs = new FunctionArgs(argTypes, false);
+      ScalarFunction fn =
+          new ScalarFunction(new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, retType);
+      fn.setBinaryType(TFunctionBinaryType.BUILTIN);
+      fn.setUserVisible(false);
+      fn.udfInterface_ = false;
+      fn.symbolName_ = GetComputeFnSymbol(beClass, beFn);
+      return fn;
+    }
+    return createBuiltin(name, argTypes, false, retType, beClass + "::" + beFn,
+        null, null, true, true);
   }
 
   // Convert ComputeFunctions::Add_char_char

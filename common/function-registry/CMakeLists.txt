@@ -20,14 +20,11 @@ set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources/gen-java/com/cloudera
 
 # Set output files for dependency tracking
 set(CODE_GEN_OUTPUT
-  ${BE_OUTPUT_DIR}/opcode/functions.cc
-  ${BE_OUTPUT_DIR}/opcode/functions.h
   ${FE_OUTPUT_DIR}/builtins/ScalarBuiltins.java
 )
 
 # Source python files
 set(FUNCTION_REGISTRY_INPUT
-  gen_operators.py
   gen_builtins_catalog.py
   impala_functions.py
 )
@@ -35,7 +32,6 @@ set(FUNCTION_REGISTRY_INPUT
 # Run the python scripts
 add_custom_command(
   OUTPUT ${CODE_GEN_OUTPUT}
-  COMMAND ./gen_operators.py
   COMMAND ./gen_builtins_catalog.py
   DEPENDS ${FUNCTION_REGISTRY_INPUT}
   COMMENT "Generating files for builtins."

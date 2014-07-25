@@ -27,6 +27,7 @@
 #include "exprs/bool-literal.h"
 #include "exprs/case-expr.h"
 #include "exprs/cast-expr.h"
+#include "exprs/cast-functions.h"
 #include "exprs/char-literal.h"
 #include "exprs/compound-predicate.h"
 #include "exprs/conditional-functions.h"
@@ -44,6 +45,7 @@
 #include "exprs/math-functions.h"
 #include "exprs/native-udf-expr.h"
 #include "exprs/null-literal.h"
+#include "exprs/operators.h"
 #include "exprs/string-functions.h"
 #include "exprs/string-literal.h"
 #include "exprs/timestamp-functions.h"
@@ -59,7 +61,6 @@
 
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/ImpalaService_types.h"
-#include "opcode/functions.h"
 
 using namespace std;
 using namespace impala;
@@ -1015,11 +1016,12 @@ void Expr::InitBuiltinsDummy() {
   // from that class in.
   // TODO: is there a better way to do this?
   AggregateFunctions::InitNull(NULL, NULL);
-  ComputeFunctions::Add_char_char(NULL, NULL);
+  CastFunctions::CastToBooleanVal(NULL, TinyIntVal::null());
   ConditionalFunctions::IsNull(NULL, NULL);
   DecimalFunctions::Precision(NULL, DecimalVal::null());
   DecimalOperators::CastToDecimalVal(NULL, DecimalVal::null());
   MathFunctions::Pi(NULL, NULL);
+  Operators::Add_IntVal_IntVal(NULL, IntVal::null(), IntVal::null());
   StringFunctions::Length(NULL, NULL);
   TimestampFunctions::Year(NULL, TimestampVal::null());
   UdfBuiltins::Pi(NULL);

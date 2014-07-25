@@ -84,36 +84,26 @@ public class CastExpr extends Expr {
     return "castTo" + targetType.getPrimitiveType().toString();
   }
 
-  // TODO: this function can be simplified once the expr refactoring goes in
   public static void initBuiltins(Db db) {
-    for (Type t1: Type.getSupportedTypes()) {
-      if (t1.isDecimalOrNull()) continue;
-      for (Type t2: Type.getSupportedTypes()) {
-        if (t2.isDecimalOrNull()) continue;
-        // For some reason we don't allow string->bool.
-        // TODO: revisit
-        if (t1.isStringType() && t2.isBoolean()) continue;
-        db.addBuiltin(ScalarFunction.createBuiltinOperator(
-            CAST_FN_NAME, Lists.newArrayList(t1, t2), t2));
+    for (Type fromType: Type.getSupportedTypes()) {
+      if (fromType.isNull()) continue;
+      for (Type toType: Type.getSupportedTypes()) {
+        if (toType.isNull()) continue;
+        // Disable casting from string to boolean
+        if (fromType.isStringType() && toType.isBoolean()) continue;
+        // Disable casting from boolean/timestamp to decimal
+        if ((fromType.isBoolean() || fromType.isDateType()) && toType.isDecimal()) {
+          continue;
+        }
+        // Disable no-op casts
+        if (fromType.equals(toType) && !fromType.isDecimal()) continue;
+        String beClass = toType.isDecimal() || fromType.isDecimal() ?
+            "DecimalOperators" : "CastFunctions";
+        String beSymbol = "impala::" + beClass + "::CastTo" + Function.getUdfType(toType);
+        db.addBuiltin(ScalarFunction.createBuiltin(getFnName(toType),
+            Lists.newArrayList(fromType), false, toType, beSymbol,
+            null, null, true, true));
       }
-    }
-
-    // Decimal cast operators are implemented with the UDF interface
-    for (Type t : Type.getSupportedTypes()) {
-      if (t.isNull()) continue;
-      // Cast from decimal
-      db.addBuiltin(ScalarFunction.createBuiltin(getFnName(t),
-          Lists.newArrayList((Type)Type.DECIMAL), false, t,
-          "impala::DecimalOperators::CastTo" + Function.getUdfType(t),
-          null, null, true, true));
-      // Cast to decimal
-      // Disable casting from boolean/timestamp to decimal, and from registering decimal
-      // to decimal twice
-      if (t.isBoolean() || t.isDateType() || t.isDecimal()) continue;
-      db.addBuiltin(ScalarFunction.createBuiltin(getFnName(Type.DECIMAL),
-          Lists.newArrayList(t), false, Type.DECIMAL,
-          "impala::DecimalOperators::CastToDecimalVal",
-          null, null, true, true));
     }
   }
 
@@ -134,11 +124,7 @@ public class CastExpr extends Expr {
 
   @Override
   protected void toThrift(TExprNode msg) {
-    if (targetType_.isDecimal() || children_.get(0).type_.isDecimal()) {
-      msg.node_type = TExprNodeType.FUNCTION_CALL;
-    } else {
-      msg.node_type = TExprNodeType.CAST_EXPR;
-    }
+    msg.node_type = TExprNodeType.FUNCTION_CALL;
   }
 
   @Override
@@ -194,25 +180,8 @@ public class CastExpr extends Expr {
       return;
     }
 
-    FunctionName fnName;
-    Type[] args;
-    if (childType.isDecimal() || targetType_.isDecimal()) {
-      fnName = new FunctionName(Catalog.BUILTINS_DB, getFnName(targetType_));
-      args = new Type[1];
-      args[0] = childType;
-    } else {
-      fnName = new FunctionName(Catalog.BUILTINS_DB, CAST_FN_NAME);
-
-      // Our cast fn currently takes two arguments. The first is the value to cast and the
-      // second is a dummy of the type to cast to. We need this to be able to resolve the
-      // proper function.
-      //  e.g. to differentiate between cast(bool, int) and cast(bool, smallint).
-      // TODO: remove this when all casts use the UDF interface
-      args = new Type[2];
-      args[0] = childType;
-      args[1] = targetType_;
-    }
-
+    FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, getFnName(targetType_));
+    Type[] args = { childType };
     Function searchDesc = new Function(fnName, args, Type.INVALID, false);
     if (isImplicit_) {
       fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_SUPERTYPE_OF);

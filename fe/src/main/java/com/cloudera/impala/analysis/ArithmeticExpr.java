@@ -131,10 +131,11 @@ public class ArithmeticExpr extends Expr {
 
   @Override
   protected void toThrift(TExprNode msg) {
-    if (type_.isDecimal()) {
-      msg.node_type = TExprNodeType.FUNCTION_CALL;
-    } else {
+    if (fn_.getName().equals("_impala_builtins.fmod")) {
+      // fmod is a math function and not yet implemented as UDF
       msg.node_type = TExprNodeType.ARITHMETIC_EXPR;
+    } else {
+      msg.node_type = TExprNodeType.FUNCTION_CALL;
     }
   }
 

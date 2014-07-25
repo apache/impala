@@ -168,7 +168,6 @@ class AnyValUtil {
   }
 
   static FunctionContext::TypeDesc ColumnTypeToTypeDesc(const ColumnType& type);
-
   static ColumnType TypeDescToColumnType(const FunctionContext::TypeDesc& type);
 };
 

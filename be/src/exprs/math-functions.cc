@@ -20,9 +20,9 @@
 
 #include "exprs/expr.h"
 #include "exprs/expr-inline.h"
+#include "exprs/operators.h"
 #include "runtime/tuple-row.h"
 #include "util/string-parser.h"
-#include "opcode/functions.h"
 
 using namespace std;
 
@@ -560,8 +560,16 @@ void* MathFunctions::QuotientDouble(Expr* e, TupleRow* row) {
   return &e->result_.bigint_val;
 }
 
+// TODO(skye): replace this with ComputeFunctions::Int_divide_bigint_bigint when
+// converting math functions to UDF interface
 void* MathFunctions::QuotientBigInt(Expr* e, TupleRow* row) {
-  return ComputeFunctions::Int_divide_long_long(e, row);
+  Expr* op1 = e->children()[0];
+  int64_t* val1 = reinterpret_cast<int64_t*>(op1->GetValue(row));
+  Expr* op2 = e->children()[1];
+  int64_t* val2 = reinterpret_cast<int64_t*>(op2->GetValue(row));
+  if (val1 == NULL || val2 == NULL || *val2 == 0) return NULL;
+  e->result_.bigint_val = (*val1 / *val2);
+  return &e->result_.bigint_val;
 }
 
 template <typename T, bool ISLEAST>

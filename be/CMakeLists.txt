@@ -177,7 +177,6 @@ set (IMPALA_LINK_LIBS
   Exprs
   GlobalFlags
   ImpalaThrift
-  Opcode
   ResourceBroker
   Rpc
   Runtime
@@ -322,8 +321,6 @@ add_subdirectory(src/transport)
 
 add_subdirectory(src/benchmarks)
 add_subdirectory(src/experiments)
-
-add_subdirectory(generated-sources/opcode)
 
 # Thrift generated files have unused variables.  Ignore those compiler
 # warnings by adding this flag.  Note: impala subdirectories should be

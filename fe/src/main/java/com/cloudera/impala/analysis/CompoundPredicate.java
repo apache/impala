@@ -57,15 +57,13 @@ public class CompoundPredicate extends Predicate {
   public static void initBuiltins(Db db) {
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.AND.name(), "CompoundPredicate", "AndComputeFn",
-        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN),
-        Type.BOOLEAN));
+        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN), Type.BOOLEAN, false));
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.OR.name(), "CompoundPredicate", "OrComputeFn",
-        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN),
-        Type.BOOLEAN));
+        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN), Type.BOOLEAN, false));
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
         Operator.NOT.name(), "CompoundPredicate", "NotComputeFn",
-        Lists.<Type>newArrayList(Type.BOOLEAN), Type.BOOLEAN));
+        Lists.<Type>newArrayList(Type.BOOLEAN), Type.BOOLEAN, false));
   }
 
   public CompoundPredicate(Operator op, Expr e1, Expr e2) {

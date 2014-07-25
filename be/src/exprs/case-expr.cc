@@ -47,7 +47,6 @@ string CaseExpr::DebugString() const {
   return out.str();
 }
 
-
 // Sample IR output when there is a case expression and else expression
 // define i1 @CaseExpr(i8** %row, i8* %state_data, i1* %is_null) {
 // eval_case_expr:
@@ -213,4 +212,311 @@ Function* CaseExpr::Codegen(LlvmCodeGen* codegen) {
 
   return codegen->FinalizeFunction(function);
 }
+
+void* CaseExpr::Case_BooleanVal(Expr* e, TupleRow* row) {
+  CaseExpr* expr = static_cast<CaseExpr*>(e);
+  int num_children = e->GetNumChildren();
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
+  // Make sure we set the right compute function.
+  DCHECK_EQ(expr->has_case_expr(), true);
+  // Need at least case, when and then expr, and optionally an else.
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
+  // All case and when exprs return the same type (we guaranteed that during analysis).
+  void* case_val = e->children()[0]->GetValue(row);
+  if (case_val == NULL) {
+    if (expr->has_else_expr()) {
+      // Return else value.
+      return e->children()[num_children - 1]->GetValue(row);
+    } else {
+      return NULL;
+    }
+  }
+  for (int i = 1; i < loop_end; i += 2) {
+    bool* when_val =
+        reinterpret_cast<bool*>(e->children()[i]->GetValue(row));
+    if (when_val == NULL) continue;
+    if (*reinterpret_cast<bool*>(case_val) == *when_val) {
+      // Return then value.
+      return e->children()[i + 1]->GetValue(row);
+    }
+  }
+  if (expr->has_else_expr()) {
+    // Return else value.
+    return e->children()[num_children - 1]->GetValue(row);
+  }
+  return NULL;
+}
+
+void* CaseExpr::Case_TinyIntVal(Expr* e, TupleRow* row) {
+  CaseExpr* expr = static_cast<CaseExpr*>(e);
+  int num_children = e->GetNumChildren();
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
+  // Make sure we set the right compute function.
+  DCHECK_EQ(expr->has_case_expr(), true);
+  // Need at least case, when and then expr, and optionally an else.
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
+  // All case and when exprs return the same type (we guaranteed that during analysis).
+  void* case_val = e->children()[0]->GetValue(row);
+  if (case_val == NULL) {
+    if (expr->has_else_expr()) {
+      // Return else value.
+      return e->children()[num_children - 1]->GetValue(row);
+    } else {
+      return NULL;
+    }
+  }
+  for (int i = 1; i < loop_end; i += 2) {
+    int8_t* when_val =
+        reinterpret_cast<int8_t*>(e->children()[i]->GetValue(row));
+    if (when_val == NULL) continue;
+    if (*reinterpret_cast<int8_t*>(case_val) == *when_val) {
+      // Return then value.
+      return e->children()[i + 1]->GetValue(row);
+    }
+  }
+  if (expr->has_else_expr()) {
+    // Return else value.
+    return e->children()[num_children - 1]->GetValue(row);
+  }
+  return NULL;
+}
+
+void* CaseExpr::Case_SmallIntVal(Expr* e, TupleRow* row) {
+  CaseExpr* expr = static_cast<CaseExpr*>(e);
+  int num_children = e->GetNumChildren();
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
+  // Make sure we set the right compute function.
+  DCHECK_EQ(expr->has_case_expr(), true);
+  // Need at least case, when and then expr, and optionally an else.
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
+  // All case and when exprs return the same type (we guaranteed that during analysis).
+  void* case_val = e->children()[0]->GetValue(row);
+  if (case_val == NULL) {
+    if (expr->has_else_expr()) {
+      // Return else value.
+      return e->children()[num_children - 1]->GetValue(row);
+    } else {
+      return NULL;
+    }
+  }
+  for (int i = 1; i < loop_end; i += 2) {
+    int16_t* when_val =
+        reinterpret_cast<int16_t*>(e->children()[i]->GetValue(row));
+    if (when_val == NULL) continue;
+    if (*reinterpret_cast<int16_t*>(case_val) == *when_val) {
+      // Return then value.
+      return e->children()[i + 1]->GetValue(row);
+    }
+  }
+  if (expr->has_else_expr()) {
+    // Return else value.
+    return e->children()[num_children - 1]->GetValue(row);
+  }
+  return NULL;
+}
+
+void* CaseExpr::Case_IntVal(Expr* e, TupleRow* row) {
+  CaseExpr* expr = static_cast<CaseExpr*>(e);
+  int num_children = e->GetNumChildren();
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
+  // Make sure we set the right compute function.
+  DCHECK_EQ(expr->has_case_expr(), true);
+  // Need at least case, when and then expr, and optionally an else.
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
+  // All case and when exprs return the same type (we guaranteed that during analysis).
+  void* case_val = e->children()[0]->GetValue(row);
+  if (case_val == NULL) {
+    if (expr->has_else_expr()) {
+      // Return else value.
+      return e->children()[num_children - 1]->GetValue(row);
+    } else {
+      return NULL;
+    }
+  }
+  for (int i = 1; i < loop_end; i += 2) {
+    int32_t* when_val =
+        reinterpret_cast<int32_t*>(e->children()[i]->GetValue(row));
+    if (when_val == NULL) continue;
+    if (*reinterpret_cast<int32_t*>(case_val) == *when_val) {
+      // Return then value.
+      return e->children()[i + 1]->GetValue(row);
+    }
+  }
+  if (expr->has_else_expr()) {
+    // Return else value.
+    return e->children()[num_children - 1]->GetValue(row);
+  }
+  return NULL;
+}
+
+void* CaseExpr::Case_BigIntVal(Expr* e, TupleRow* row) {
+  CaseExpr* expr = static_cast<CaseExpr*>(e);
+  int num_children = e->GetNumChildren();
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
+  // Make sure we set the right compute function.
+  DCHECK_EQ(expr->has_case_expr(), true);
+  // Need at least case, when and then expr, and optionally an else.
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
+  // All case and when exprs return the same type (we guaranteed that during analysis).
+  void* case_val = e->children()[0]->GetValue(row);
+  if (case_val == NULL) {
+    if (expr->has_else_expr()) {
+      // Return else value.
+      return e->children()[num_children - 1]->GetValue(row);
+    } else {
+      return NULL;
+    }
+  }
+  for (int i = 1; i < loop_end; i += 2) {
+    int64_t* when_val =
+        reinterpret_cast<int64_t*>(e->children()[i]->GetValue(row));
+    if (when_val == NULL) continue;
+    if (*reinterpret_cast<int64_t*>(case_val) == *when_val) {
+      // Return then value.
+      return e->children()[i + 1]->GetValue(row);
+    }
+  }
+  if (expr->has_else_expr()) {
+    // Return else value.
+    return e->children()[num_children - 1]->GetValue(row);
+  }
+  return NULL;
+}
+
+void* CaseExpr::Case_FloatVal(Expr* e, TupleRow* row) {
+  CaseExpr* expr = static_cast<CaseExpr*>(e);
+  int num_children = e->GetNumChildren();
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
+  // Make sure we set the right compute function.
+  DCHECK_EQ(expr->has_case_expr(), true);
+  // Need at least case, when and then expr, and optionally an else.
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
+  // All case and when exprs return the same type (we guaranteed that during analysis).
+  void* case_val = e->children()[0]->GetValue(row);
+  if (case_val == NULL) {
+    if (expr->has_else_expr()) {
+      // Return else value.
+      return e->children()[num_children - 1]->GetValue(row);
+    } else {
+      return NULL;
+    }
+  }
+  for (int i = 1; i < loop_end; i += 2) {
+    float* when_val =
+        reinterpret_cast<float*>(e->children()[i]->GetValue(row));
+    if (when_val == NULL) continue;
+    if (*reinterpret_cast<float*>(case_val) == *when_val) {
+      // Return then value.
+      return e->children()[i + 1]->GetValue(row);
+    }
+  }
+  if (expr->has_else_expr()) {
+    // Return else value.
+    return e->children()[num_children - 1]->GetValue(row);
+  }
+  return NULL;
+}
+
+void* CaseExpr::Case_DoubleVal(Expr* e, TupleRow* row) {
+  CaseExpr* expr = static_cast<CaseExpr*>(e);
+  int num_children = e->GetNumChildren();
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
+  // Make sure we set the right compute function.
+  DCHECK_EQ(expr->has_case_expr(), true);
+  // Need at least case, when and then expr, and optionally an else.
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
+  // All case and when exprs return the same type (we guaranteed that during analysis).
+  void* case_val = e->children()[0]->GetValue(row);
+  if (case_val == NULL) {
+    if (expr->has_else_expr()) {
+      // Return else value.
+      return e->children()[num_children - 1]->GetValue(row);
+    } else {
+      return NULL;
+    }
+  }
+  for (int i = 1; i < loop_end; i += 2) {
+    double* when_val =
+        reinterpret_cast<double*>(e->children()[i]->GetValue(row));
+    if (when_val == NULL) continue;
+    if (*reinterpret_cast<double*>(case_val) == *when_val) {
+      // Return then value.
+      return e->children()[i + 1]->GetValue(row);
+    }
+  }
+  if (expr->has_else_expr()) {
+    // Return else value.
+    return e->children()[num_children - 1]->GetValue(row);
+  }
+  return NULL;
+}
+
+void* CaseExpr::Case_StringVal(Expr* e, TupleRow* row) {
+  CaseExpr* expr = static_cast<CaseExpr*>(e);
+  int num_children = e->GetNumChildren();
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
+  // Make sure we set the right compute function.
+  DCHECK_EQ(expr->has_case_expr(), true);
+  // Need at least case, when and then expr, and optionally an else.
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
+  // All case and when exprs return the same type (we guaranteed that during analysis).
+  void* case_val = e->children()[0]->GetValue(row);
+  if (case_val == NULL) {
+    if (expr->has_else_expr()) {
+      // Return else value.
+      return e->children()[num_children - 1]->GetValue(row);
+    } else {
+      return NULL;
+    }
+  }
+  for (int i = 1; i < loop_end; i += 2) {
+    StringValue* when_val =
+        reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
+    if (when_val == NULL) continue;
+    if (*reinterpret_cast<StringValue*>(case_val) == *when_val) {
+      // Return then value.
+      return e->children()[i + 1]->GetValue(row);
+    }
+  }
+  if (expr->has_else_expr()) {
+    // Return else value.
+    return e->children()[num_children - 1]->GetValue(row);
+  }
+  return NULL;
+}
+
+void* CaseExpr::Case_TimestampVal(Expr* e, TupleRow* row) {
+  CaseExpr* expr = static_cast<CaseExpr*>(e);
+  int num_children = e->GetNumChildren();
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
+  // Make sure we set the right compute function.
+  DCHECK_EQ(expr->has_case_expr(), true);
+  // Need at least case, when and then expr, and optionally an else.
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
+  // All case and when exprs return the same type (we guaranteed that during analysis).
+  void* case_val = e->children()[0]->GetValue(row);
+  if (case_val == NULL) {
+    if (expr->has_else_expr()) {
+      // Return else value.
+      return e->children()[num_children - 1]->GetValue(row);
+    } else {
+      return NULL;
+    }
+  }
+  for (int i = 1; i < loop_end; i += 2) {
+    TimestampValue* when_val =
+        reinterpret_cast<TimestampValue*>(e->children()[i]->GetValue(row));
+    if (when_val == NULL) continue;
+    if (*reinterpret_cast<TimestampValue*>(case_val) == *when_val) {
+      // Return then value.
+      return e->children()[i + 1]->GetValue(row);
+    }
+  }
+  if (expr->has_else_expr()) {
+    // Return else value.
+    return e->children()[num_children - 1]->GetValue(row);
+  }
+  return NULL;
+}
+
 }

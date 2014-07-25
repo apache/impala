@@ -128,11 +128,7 @@ public class BinaryPredicate extends Predicate {
                              getChild(1).getType().getPrimitiveType(),
         "child 0 type: " + getChild(0).getType() +
         " child 1 type: " + getChild(1).getType());
-    if (getChild(0).getType().isDecimal()) {
-      msg.node_type = TExprNodeType.FUNCTION_CALL;
-    } else {
-      msg.node_type = TExprNodeType.BINARY_PRED;
-    }
+    msg.node_type = TExprNodeType.FUNCTION_CALL;
   }
 
   @Override

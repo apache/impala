@@ -666,18 +666,18 @@ BooleanVal DecimalOperators::CastToBooleanVal(
     return BooleanVal::null(); \
   }
 
-DECIMAL_ARITHMETIC_OP(Add_decimal_decimal, Add)
-DECIMAL_ARITHMETIC_OP(Subtract_decimal_decimal, Subtract)
-DECIMAL_ARITHMETIC_OP(Multiply_decimal_decimal, Multiply)
-DECIMAL_ARITHMETIC_OP_CHECK_NAN(Divide_decimal_decimal, Divide)
-DECIMAL_ARITHMETIC_OP_CHECK_NAN(Mod_decimal_decimal, Mod)
+DECIMAL_ARITHMETIC_OP(Add_DecimalVal_DecimalVal, Add)
+DECIMAL_ARITHMETIC_OP(Subtract_DecimalVal_DecimalVal, Subtract)
+DECIMAL_ARITHMETIC_OP(Multiply_DecimalVal_DecimalVal, Multiply)
+DECIMAL_ARITHMETIC_OP_CHECK_NAN(Divide_DecimalVal_DecimalVal, Divide)
+DECIMAL_ARITHMETIC_OP_CHECK_NAN(Mod_DecimalVal_DecimalVal, Mod)
 
-DECIMAL_BINARY_OP(Eq_decimal_decimal, Eq)
-DECIMAL_BINARY_OP(Ne_decimal_decimal, Ne)
-DECIMAL_BINARY_OP(Ge_decimal_decimal, Ge)
-DECIMAL_BINARY_OP(Gt_decimal_decimal, Gt)
-DECIMAL_BINARY_OP(Le_decimal_decimal, Le)
-DECIMAL_BINARY_OP(Lt_decimal_decimal, Lt)
+DECIMAL_BINARY_OP(Eq_DecimalVal_DecimalVal, Eq)
+DECIMAL_BINARY_OP(Ne_DecimalVal_DecimalVal, Ne)
+DECIMAL_BINARY_OP(Ge_DecimalVal_DecimalVal, Ge)
+DECIMAL_BINARY_OP(Gt_DecimalVal_DecimalVal, Gt)
+DECIMAL_BINARY_OP(Le_DecimalVal_DecimalVal, Le)
+DECIMAL_BINARY_OP(Lt_DecimalVal_DecimalVal, Lt)
 
 void* DecimalOperators::Case_decimal(Expr* e, TupleRow* row) {
   CaseExpr* expr = static_cast<CaseExpr*>(e);

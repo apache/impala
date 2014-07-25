@@ -55,9 +55,11 @@ set(IR_DEPENDENT_FILES
   ../exec/hash-join-node-ir.cc
   ../exec/hdfs-scanner-ir.cc
   ../exprs/aggregate-functions.cc
+  ../exprs/cast-functions.cc
   ../exprs/decimal-functions.cc
   ../exprs/decimal-operators.cc
   ../exprs/expr-ir.cc
+  ../exprs/operators.cc
   ../exprs/udf-builtins.cc
   ../exprs/like-predicate.cc
   ../runtime/string-value-ir.cc

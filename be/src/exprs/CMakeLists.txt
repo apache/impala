@@ -28,6 +28,7 @@ add_library(Exprs
   bool-literal.cc
   case-expr.cc
   cast-expr.cc
+  cast-functions.cc
   char-literal.cc
   compound-predicate.cc
   conditional-functions.cc
@@ -45,6 +46,7 @@ add_library(Exprs
   like-predicate.cc
   math-functions.cc
   null-literal.cc
+  operators.cc
   slot-ref.cc
   string-literal.cc
   string-functions.cc

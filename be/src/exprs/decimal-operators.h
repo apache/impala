@@ -52,28 +52,28 @@ class DecimalOperators {
   static StringVal CastToStringVal(FunctionContext*, const DecimalVal&);
   static TimestampVal CastToTimestampVal(FunctionContext*, const DecimalVal&);
 
-  static DecimalVal Add_decimal_decimal(
+  static DecimalVal Add_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
-  static DecimalVal Subtract_decimal_decimal(
+  static DecimalVal Subtract_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
-  static DecimalVal Multiply_decimal_decimal(
+  static DecimalVal Multiply_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
-  static DecimalVal Divide_decimal_decimal(
+  static DecimalVal Divide_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
-  static DecimalVal Mod_decimal_decimal(
+  static DecimalVal Mod_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
 
-  static BooleanVal Eq_decimal_decimal(
+  static BooleanVal Eq_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
-  static BooleanVal Ne_decimal_decimal(
+  static BooleanVal Ne_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
-  static BooleanVal Ge_decimal_decimal(
+  static BooleanVal Ge_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
-  static BooleanVal Gt_decimal_decimal(
+  static BooleanVal Gt_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
-  static BooleanVal Le_decimal_decimal(
+  static BooleanVal Le_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
-  static BooleanVal Lt_decimal_decimal(
+  static BooleanVal Lt_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
 
   static void* Case_decimal(Expr* e, TupleRow* row);

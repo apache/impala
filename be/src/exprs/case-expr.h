@@ -41,6 +41,17 @@ class CaseExpr: public Expr {
   bool has_case_expr() { return has_case_expr_; }
   bool has_else_expr() { return has_else_expr_; }
 
+  // Temporary compute functions until expr refactoring goes in
+  static void* Case_BooleanVal(Expr* e, TupleRow* row);
+  static void* Case_TinyIntVal(Expr* e, TupleRow* row);
+  static void* Case_SmallIntVal(Expr* e, TupleRow* row);
+  static void* Case_IntVal(Expr* e, TupleRow* row);
+  static void* Case_BigIntVal(Expr* e, TupleRow* row);
+  static void* Case_FloatVal(Expr* e, TupleRow* row);
+  static void* Case_DoubleVal(Expr* e, TupleRow* row);
+  static void* Case_StringVal(Expr* e, TupleRow* row);
+  static void* Case_TimestampVal(Expr* e, TupleRow* row);
+
  private:
   const bool has_case_expr_;
   const bool has_else_expr_;
