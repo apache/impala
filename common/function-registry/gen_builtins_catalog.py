@@ -52,7 +52,8 @@ java_registry_epilogue = '\
   }\n\
 }\n'
 
-FE_PATH = "../../fe/generated-sources/gen-java/com/cloudera/impala/builtins/"
+FE_PATH = os.path.expandvars(
+  "$IMPALA_HOME/fe/generated-sources/gen-java/com/cloudera/impala/builtins/")
 
 # This contains all the metadata to describe all the builtins.
 # Each meta data entry is itself a map to store all the meta data
@@ -67,8 +68,9 @@ def add_function(fn_meta_data, udf_interface):
   entry["args"] = fn_meta_data[2]
   entry["symbol"] = fn_meta_data[3]
   entry["udf_interface"] = udf_interface
-  if len(fn_meta_data) >= 6:
+  if len(fn_meta_data) >= 5:
     entry["prepare"] = fn_meta_data[4]
+  if len(fn_meta_data) >= 6:
     entry["close"] = fn_meta_data[5]
   meta_data_entries.append(entry)
 
@@ -82,9 +84,11 @@ def generate_fe_entry(entry, name):
   java_output += ", \"" + entry["symbol"] + "\""
 
   if 'prepare' in entry:
-    assert 'close' in entry
     java_output += ', "%s"' % entry["prepare"]
-    java_output += ', "%s"' % entry["close"]
+    if 'close' in entry:
+      java_output += ', "%s"' % entry["close"]
+    else:
+      java_output += ', null'
 
   # Check the last entry for varargs indicator.
   if entry["args"] and entry["args"][-1] == "...":
@@ -120,7 +124,7 @@ for function in impala_functions.functions:
   add_function(function, False)
 
 for function in impala_functions.udf_functions:
-  assert len(function) == 4 or len(function) == 6, \
+  assert 4 <= len(function) <= 6, \
          "Invalid function entry in impala_functions.py:\n\t" + repr(function)
   add_function(function, True)
 

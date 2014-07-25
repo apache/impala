@@ -150,8 +150,11 @@ public class ScalarFunction extends Function {
               "Argument type not supported: " + argTypes.get(i).toSql());
       }
     }
-    String beClass = usesDecimal ? "DecimalOperators" : "ComputeFunctions";
-    return createBuiltinOperator(name, beClass, beFn, argTypes, retType);
+    if (usesDecimal) {
+      return createBuiltin(
+          name, argTypes, false, retType, "impala::DecimalOperators::" + beFn, true);
+    }
+    return createBuiltinOperator(name, "ComputeFunctions", beFn, argTypes, retType);
   }
 
   /**

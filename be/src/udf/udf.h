@@ -158,6 +158,10 @@ class FunctionContext {
   void SetFunctionState(FunctionStateScope scope, void* ptr);
   void* GetFunctionState(FunctionStateScope scope) const;
 
+  // Returns the return type information of this function. For UDAs, this is the final
+  // return type of the UDA (e.g., the type returned by the finalize function).
+  const TypeDesc& GetReturnType() const;
+
   // Returns the type information for the arg_idx-th argument (0-indexed, not including
   // the FunctionContext* argument). Returns NULL if arg_idx is invalid.
   const TypeDesc* GetArgType(int arg_idx) const;

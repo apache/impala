@@ -40,46 +40,67 @@ AnyVal* CreateAnyVal(ObjectPool* pool, const ColumnType& type) {
   }
 }
 
-void AnyValUtil::ColumnTypeToTypeDesc(
-    const ColumnType& type, FunctionContext::TypeDesc* out) {
+FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& type) {
+  FunctionContext::TypeDesc out;
   switch (type.type) {
     case TYPE_BOOLEAN:
-      out->type = FunctionContext::TYPE_BOOLEAN;
+      out.type = FunctionContext::TYPE_BOOLEAN;
       break;
     case TYPE_TINYINT:
-      out->type = FunctionContext::TYPE_TINYINT;
+      out.type = FunctionContext::TYPE_TINYINT;
       break;
     case TYPE_SMALLINT:
-      out->type = FunctionContext::TYPE_SMALLINT;
+      out.type = FunctionContext::TYPE_SMALLINT;
       break;
     case TYPE_INT:
-      out->type = FunctionContext::TYPE_INT;
+      out.type = FunctionContext::TYPE_INT;
       break;
     case TYPE_BIGINT:
-      out->type = FunctionContext::TYPE_BIGINT;
+      out.type = FunctionContext::TYPE_BIGINT;
       break;
     case TYPE_FLOAT:
-      out->type = FunctionContext::TYPE_FLOAT;
+      out.type = FunctionContext::TYPE_FLOAT;
       break;
     case TYPE_DOUBLE:
-      out->type = FunctionContext::TYPE_DOUBLE;
+      out.type = FunctionContext::TYPE_DOUBLE;
       break;
     case TYPE_TIMESTAMP:
-      out->type = FunctionContext::TYPE_TIMESTAMP;
+      out.type = FunctionContext::TYPE_TIMESTAMP;
       break;
     case TYPE_STRING:
-      out->type = FunctionContext::TYPE_STRING;
+      out.type = FunctionContext::TYPE_STRING;
       break;
     case TYPE_CHAR:
-      out->type = FunctionContext::TYPE_FIXED_BUFFER;
+      out.type = FunctionContext::TYPE_FIXED_BUFFER;
       break;
     case TYPE_DECIMAL:
-      out->type = FunctionContext::TYPE_DECIMAL;
-      out->precision = type.precision;
-      out->scale = type.scale;
+      out.type = FunctionContext::TYPE_DECIMAL;
+      out.precision = type.precision;
+      out.scale = type.scale;
       break;
     default:
       DCHECK(false) << "Unknown type: " << type;
+  }
+  return out;
+}
+
+ColumnType AnyValUtil::TypeDescToColumnType(const FunctionContext::TypeDesc& type) {
+  switch (type.type) {
+    case FunctionContext::TYPE_BOOLEAN: return ColumnType(TYPE_BOOLEAN);
+    case FunctionContext::TYPE_TINYINT: return ColumnType(TYPE_TINYINT);
+    case FunctionContext::TYPE_SMALLINT: return ColumnType(TYPE_SMALLINT);
+    case FunctionContext::TYPE_INT: return ColumnType(TYPE_INT);
+    case FunctionContext::TYPE_BIGINT: return ColumnType(TYPE_BIGINT);
+    case FunctionContext::TYPE_FLOAT: return ColumnType(TYPE_FLOAT);
+    case FunctionContext::TYPE_DOUBLE: return ColumnType(TYPE_DOUBLE);
+    case FunctionContext::TYPE_TIMESTAMP: return ColumnType(TYPE_TIMESTAMP);
+    case FunctionContext::TYPE_STRING: return ColumnType(TYPE_STRING);
+    case FunctionContext::TYPE_FIXED_BUFFER: return ColumnType(TYPE_CHAR);
+    case FunctionContext::TYPE_DECIMAL:
+      return ColumnType::CreateDecimalType(type.precision, type.scale);
+    default:
+      DCHECK(false) << "Unknown type: " << type.type;
+      return ColumnType(INVALID_TYPE);
   }
 }
 

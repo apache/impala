@@ -23,6 +23,8 @@
 #include "exec/hdfs-avro-scanner-ir.cc"
 #include "exec/hdfs-scanner-ir.cc"
 #include "exprs/aggregate-functions.cc"
+#include "exprs/decimal-functions.cc"
+#include "exprs/decimal-operators.cc"
 #include "exprs/expr-ir.cc"
 #include "exprs/udf-builtins.cc"
 #include "runtime/string-value-ir.cc"

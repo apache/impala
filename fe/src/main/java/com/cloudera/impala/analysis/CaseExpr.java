@@ -69,6 +69,7 @@ public class CaseExpr extends Expr {
 
   public static void initBuiltins(Db db) {
     for (Type t: Type.getSupportedTypes()) {
+      if (t.isDecimal()) continue; // TODO: implement case for decimals
       if (t.isNull()) continue;
       // TODO: case is special and the signature cannot be represented.
       // It is alternating varargs

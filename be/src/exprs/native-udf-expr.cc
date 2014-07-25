@@ -243,14 +243,15 @@ Status NativeUdfExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
     return Status(ss.str());
   }
 
-  vector<FunctionContext::TypeDesc> arg_types(children_.size());
+  FunctionContext::TypeDesc return_type = AnyValUtil::ColumnTypeToTypeDesc(type_);
+  vector<FunctionContext::TypeDesc> arg_types;
   for (int i = 0; i < children_.size(); ++i) {
-    AnyValUtil::ColumnTypeToTypeDesc(children_[i]->type_, &arg_types[i]);
+    arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(children_[i]->type_));
   }
 
   // TODO: this should come from the ExprContext
-  udf_context_.reset(
-      FunctionContextImpl::CreateContext(state, state->udf_pool(), arg_types));
+  udf_context_.reset(FunctionContextImpl::CreateContext(
+      state, state->udf_pool(), return_type, arg_types));
 
   if (vararg_start_idx_ != -1) {
     // Allocate a scratch buffer for all the variable args.

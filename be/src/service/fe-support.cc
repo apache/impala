@@ -152,42 +152,46 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
     }
   }
 
-  Status status =
-      LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol);
-  if (status.ok()) {
-    // The FE specified symbol exists, just use that.
-    result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
-    result->__set_symbol(params.symbol);
-    // TODO: we can demangle the user symbol here and validate it against
-    // params.arg_types. This would prevent someone from typing the wrong symbol
-    // by accident. This requires more string parsing of the symbol.
-    return;
-  }
-
-  // The input was already mangled and we couldn't find it, return the error.
   if (SymbolsUtil::IsMangled(params.symbol)) {
-    result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
-    stringstream ss;
-    ss << "Could not find symbol '" << params.symbol << "' in: " << params.location;
-    result->__set_error_msg(ss.str());
-    return;
+    DCHECK(params.fn_binary_type != TFunctionBinaryType::HIVE);
+    Status status =
+        LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol);
+    if (status.ok()) {
+      // The FE specified symbol exists, just use that.
+      result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
+      result->__set_symbol(params.symbol);
+      // TODO: we can demangle the user symbol here and validate it against
+      // params.arg_types. This would prevent someone from typing the wrong symbol
+      // by accident. This requires more string parsing of the symbol.
+      return;
+    } else {
+      // The input was already mangled and we couldn't find it, return the error.
+      result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
+      stringstream ss;
+      ss << "Could not find symbol '" << params.symbol << "' in: " << params.location;
+      result->__set_error_msg(ss.str());
+      return;
+    }
   }
 
-  // Mangle the user input and do another lookup.
-  string symbol;
+  string symbol = params.symbol;
   ColumnType ret_type(INVALID_TYPE);
   if (params.__isset.ret_arg_type) ret_type = ColumnType(params.ret_arg_type);
 
-  if (params.symbol_type == TSymbolType::UDF_EVALUATE) {
-    symbol = SymbolsUtil::MangleUserFunction(params.symbol,
-        arg_types, params.has_var_args, params.__isset.ret_arg_type ? &ret_type : NULL);
-  } else {
-    DCHECK(params.symbol_type == TSymbolType::UDF_PREPARE ||
-           params.symbol_type == TSymbolType::UDF_CLOSE);
-    symbol = SymbolsUtil::ManglePrepareOrCloseFunction(params.symbol);
+  if (params.fn_binary_type != TFunctionBinaryType::HIVE) {
+    // Mangle the user input
+    if (params.symbol_type == TSymbolType::UDF_EVALUATE) {
+      symbol = SymbolsUtil::MangleUserFunction(params.symbol,
+          arg_types, params.has_var_args, params.__isset.ret_arg_type ? &ret_type : NULL);
+    } else {
+      DCHECK(params.symbol_type == TSymbolType::UDF_PREPARE ||
+             params.symbol_type == TSymbolType::UDF_CLOSE);
+      symbol = SymbolsUtil::ManglePrepareOrCloseFunction(params.symbol);
+    }
   }
 
-  status = LibCache::instance()->CheckSymbolExists(params.location, type, symbol);
+  // Look up the symbol
+  Status status = LibCache::instance()->CheckSymbolExists(params.location, type, symbol);
   if (!status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
     stringstream ss;

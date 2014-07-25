@@ -167,8 +167,9 @@ class AnyValUtil {
     return result;
   }
 
-  static void ColumnTypeToTypeDesc(
-      const ColumnType& type, FunctionContext::TypeDesc* out);
+  static FunctionContext::TypeDesc ColumnTypeToTypeDesc(const ColumnType& type);
+
+  static ColumnType TypeDescToColumnType(const FunctionContext::TypeDesc& type);
 };
 
 // Creates the corresponding AnyVal subclass for type. The object is added to the pool.

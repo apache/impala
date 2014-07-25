@@ -264,7 +264,6 @@ public class FunctionCallExpr extends Expr {
           throw new AnalysisException("Cannot round/truncate to scales greater than " +
               ScalarType.MAX_SCALE + ".");
         }
-        children_.set(1, scaleLiteral.uncheckedCastTo(ScalarType.INT));
         // Round/Truncate to a negative scale means to round to the digit before
         // the decimal e.g. round(1234.56, -2) would be 1200.
         // The resulting scale is always 0.

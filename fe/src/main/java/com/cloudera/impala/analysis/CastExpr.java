@@ -80,19 +80,40 @@ public class CastExpr extends Expr {
     noOp_ = other.noOp_;
   }
 
+  private static String getFnName(Type targetType) {
+    return "castTo" + targetType.getPrimitiveType().toString();
+  }
+
+  // TODO: this function can be simplified once the expr refactoring goes in
   public static void initBuiltins(Db db) {
     for (Type t1: Type.getSupportedTypes()) {
-      if (t1.isNull()) continue;
+      if (t1.isDecimalOrNull()) continue;
       for (Type t2: Type.getSupportedTypes()) {
-        if (t2.isNull()) continue;
+        if (t2.isDecimalOrNull()) continue;
         // For some reason we don't allow string->bool.
         // TODO: revisit
         if (t1.isStringType() && t2.isBoolean()) continue;
-        // Disable casting from boolean/timestamp to decimal
-        if ((t1.isBoolean() || t1.isDateType()) && t2.isDecimal()) continue;
         db.addBuiltin(ScalarFunction.createBuiltinOperator(
             CAST_FN_NAME, Lists.newArrayList(t1, t2), t2));
       }
+    }
+
+    // Decimal cast operators are implemented with the UDF interface
+    for (Type t : Type.getSupportedTypes()) {
+      if (t.isNull()) continue;
+      // Cast from decimal
+      db.addBuiltin(ScalarFunction.createBuiltin(getFnName(t),
+          Lists.newArrayList((Type)Type.DECIMAL), false, t,
+          "impala::DecimalOperators::CastTo" + Function.getUdfType(t),
+          null, null, true, true));
+      // Cast to decimal
+      // Disable casting from boolean/timestamp to decimal, and from registering decimal
+      // to decimal twice
+      if (t.isBoolean() || t.isDateType() || t.isDecimal()) continue;
+      db.addBuiltin(ScalarFunction.createBuiltin(getFnName(Type.DECIMAL),
+          Lists.newArrayList(t), false, Type.DECIMAL,
+          "impala::DecimalOperators::CastToDecimalVal",
+          null, null, true, true));
     }
   }
 
@@ -113,7 +134,11 @@ public class CastExpr extends Expr {
 
   @Override
   protected void toThrift(TExprNode msg) {
-    msg.node_type = TExprNodeType.CAST_EXPR;
+    if (targetType_.isDecimal() || children_.get(0).type_.isDecimal()) {
+      msg.node_type = TExprNodeType.FUNCTION_CALL;
+    } else {
+      msg.node_type = TExprNodeType.CAST_EXPR;
+    }
   }
 
   @Override
@@ -154,23 +179,42 @@ public class CastExpr extends Expr {
       uncheckedCastChild(targetType_, 0);
     }
 
-    // Our cast fn currently takes two arguments. The first is the value to cast and the
-    // second is a dummy of the type to cast to. We need this to be able to resolve the
-    // proper function.
-    //  e.g. to differentiate between cast(bool, int) and cast(bool, smallint).
-    // TODO: this is not very intuitive. We could also call the functions castToInt(*)
-    Type[] args = new Type[2];
-    args[0] = children_.get(0).type_;
-    args[1] = targetType_;
-    if (args[0].equals(args[1])) {
+    // Ensure child has non-null type (even if it's a null literal). This is required
+    // for the UDF interface.
+    if (children_.get(0) instanceof NullLiteral) {
+      NullLiteral nullChild = (NullLiteral)(children_.get(0));
+      nullChild.uncheckedCastTo(targetType_);
+    }
+
+    Type childType = children_.get(0).type_;
+    Preconditions.checkState(!childType.isNull());
+    if (childType.equals(targetType_)) {
       noOp_ = true;
       type_ = targetType_;
       return;
     }
 
-    FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, CAST_FN_NAME);
+    FunctionName fnName;
+    Type[] args;
+    if (childType.isDecimal() || targetType_.isDecimal()) {
+      fnName = new FunctionName(Catalog.BUILTINS_DB, getFnName(targetType_));
+      args = new Type[1];
+      args[0] = childType;
+    } else {
+      fnName = new FunctionName(Catalog.BUILTINS_DB, CAST_FN_NAME);
+
+      // Our cast fn currently takes two arguments. The first is the value to cast and the
+      // second is a dummy of the type to cast to. We need this to be able to resolve the
+      // proper function.
+      //  e.g. to differentiate between cast(bool, int) and cast(bool, smallint).
+      // TODO: remove this when all casts use the UDF interface
+      args = new Type[2];
+      args[0] = childType;
+      args[1] = targetType_;
+    }
+
     Function searchDesc = new Function(fnName, args, Type.INVALID, false);
-    if (isImplicit_ || args[0].isNull()) {
+    if (isImplicit_) {
       fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_SUPERTYPE_OF);
       Preconditions.checkState(fn_ != null);
     } else {
@@ -178,7 +222,7 @@ public class CastExpr extends Expr {
     }
     if (fn_ == null) {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
-          " from " + args[0] + " to " + args[1]);
+          " from " + childType + " to " + targetType_);
     }
     Preconditions.checkState(targetType_.matchesType(fn_.getReturnType()),
         targetType_ + " != " + fn_.getReturnType());

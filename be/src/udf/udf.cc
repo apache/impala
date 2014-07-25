@@ -101,10 +101,12 @@ static const int MAX_WARNINGS = 1000;
 
 // Create a FunctionContext. The caller is responsible for calling delete on it.
 FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool,
+    const FunctionContext::TypeDesc& return_type,
     const vector<FunctionContext::TypeDesc>& arg_types, bool debug) {
   impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
   ctx->impl_->state_ = state;
   ctx->impl_->pool_ = new FreePool(pool);
+  ctx->impl_->return_type_ = return_type;
   ctx->impl_->arg_types_ = arg_types;
   ctx->impl_->debug_ = debug;
   VLOG_ROW << "Created FunctionContext: " << ctx
@@ -267,6 +269,9 @@ void FunctionContext::SetError(const char* error_msg) {
   }
 }
 
+// TODO: is there a way to tell the user the expr in a reasonable way?
+// Plumb the ToSql() from the FE?
+// TODO: de-dup warnings
 bool FunctionContext::AddWarning(const char* warning_msg) {
   if (impl_->num_warnings_++ >= MAX_WARNINGS) return false;
   stringstream ss;
@@ -359,6 +364,10 @@ AnyVal* FunctionContext::GetConstantArg(int i) const {
 const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const {
   if (arg_idx < 0 || arg_idx >= impl_->arg_types_.size()) return NULL;
   return &impl_->arg_types_[arg_idx];
+}
+
+const FunctionContext::TypeDesc& FunctionContext::GetReturnType() const {
+  return impl_->return_type_;
 }
 
 StringVal::StringVal(FunctionContext* context, int len)

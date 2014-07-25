@@ -368,4 +368,31 @@ public class Function implements CatalogObject {
     return lookupSymbol(symbol, symbolType, null, false);
   }
 
+  public static String getUdfType(Type t) {
+    switch (t.getPrimitiveType()) {
+    case BOOLEAN:
+      return "BooleanVal";
+    case TINYINT:
+      return "TinyIntVal";
+    case SMALLINT:
+      return "SmallIntVal";
+    case INT:
+      return "IntVal";
+    case BIGINT:
+      return "BigIntVal";
+    case FLOAT:
+      return "FloatVal";
+    case DOUBLE:
+      return "DoubleVal";
+    case STRING:
+      return "StringVal";
+    case TIMESTAMP:
+      return "TimestampVal";
+    case DECIMAL:
+      return "DecimalVal";
+    default:
+      Preconditions.checkState(false, t.toString());
+      return "";
+    }
+  }
 }

@@ -96,10 +96,12 @@ bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::Execute(
   error_msg_ = "";
   RESULT result;
 
-  std::vector<FunctionContext::TypeDesc> types; // TODO
+  FunctionContext::TypeDesc return_type;
+  std::vector<FunctionContext::TypeDesc> arg_types; // TODO
   if (mode == ALL || mode == SINGLE_NODE) {
     {
-      ScopedFunctionContext context(UdfTestHarness::CreateTestContext(types), this);
+      ScopedFunctionContext context(
+          UdfTestHarness::CreateTestContext(return_type, arg_types), this);
       result = ExecuteSingleNode(&context);
       if (error_msg_.empty() && !CheckResult(result, expected)) {
         std::stringstream ss;
@@ -115,7 +117,8 @@ bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::Execute(
   const int num_nodes[] = { 1, 2, 10, 20, 100 };
   if (mode == ALL || mode == ONE_LEVEL) {
     for (int i = 0; i < sizeof(num_nodes) / sizeof(int); ++i) {
-      ScopedFunctionContext context(UdfTestHarness::CreateTestContext(types), this);
+      ScopedFunctionContext context(
+          UdfTestHarness::CreateTestContext(return_type, arg_types), this);
       result = ExecuteOneLevel(num_nodes[i], &context);
       if (error_msg_.empty() && !CheckResult(result, expected)) {
         std::stringstream ss;
@@ -133,7 +136,8 @@ bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::Execute(
   if (mode == ALL || mode == TWO_LEVEL) {
     for (int i = 0; i < sizeof(num_nodes) / sizeof(int); ++i) {
       for (int j = 0; j <= i; ++j) {
-        ScopedFunctionContext context(UdfTestHarness::CreateTestContext(types), this);
+        ScopedFunctionContext context(
+            UdfTestHarness::CreateTestContext(return_type, arg_types), this);
         result = ExecuteTwoLevel(num_nodes[i], num_nodes[j], &context);
         if (error_msg_.empty() && !CheckResult(result, expected)) {
           std::stringstream ss;
@@ -181,10 +185,11 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes,
   std::vector<INTERMEDIATE> intermediates;
   contexts.resize(num_nodes);
 
-  std::vector<FunctionContext::TypeDesc> types; // TODO
+  FunctionContext::TypeDesc return_type;
+  std::vector<FunctionContext::TypeDesc> arg_types; // TODO
 
   for (int i = 0; i < num_nodes; ++i) {
-    FunctionContext* cxt = UdfTestHarness::CreateTestContext(types);
+    FunctionContext* cxt = UdfTestHarness::CreateTestContext(return_type, arg_types);
     contexts[i].reset(new ScopedFunctionContext(cxt, this));
     intermediates.push_back(UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
           cxt, fixed_buffer_byte_size_));
@@ -237,11 +242,12 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
   level1_contexts.resize(num1);
   level2_contexts.resize(num2);
 
-  std::vector<FunctionContext::TypeDesc> types; // TODO
+  FunctionContext::TypeDesc return_type;
+  std::vector<FunctionContext::TypeDesc> arg_types; // TODO
 
   // Initialize the intermediate contexts and intermediate result buffers
   for (int i = 0; i < num1; ++i) {
-    FunctionContext* cxt = UdfTestHarness::CreateTestContext(types);
+    FunctionContext* cxt = UdfTestHarness::CreateTestContext(return_type, arg_types);
     level1_contexts[i].reset(new ScopedFunctionContext(cxt, this));
     level1_intermediates.push_back(
         UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(
@@ -250,7 +256,7 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
     if (!CheckContext(cxt)) return RESULT::null();
   }
   for (int i = 0; i < num2; ++i) {
-    FunctionContext* cxt = UdfTestHarness::CreateTestContext(types);
+    FunctionContext* cxt = UdfTestHarness::CreateTestContext(return_type, arg_types);
     level2_contexts[i].reset(new ScopedFunctionContext(cxt, this));
     level2_intermediates.push_back(
         UdaTestHarnessUtil::CreateIntermediate<INTERMEDIATE>(

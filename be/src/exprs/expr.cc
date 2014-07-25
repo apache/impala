@@ -77,8 +77,7 @@ bool ParseString(const string& str, T* val) {
 }
 
 Expr::Expr(const ColumnType& type, bool is_slotref)
-    : state_(NULL),
-      cache_entry_(NULL),
+    : cache_entry_(NULL),
       is_udf_call_(false),
       compute_fn_(NULL),
       is_slotref_(is_slotref),
@@ -89,13 +88,11 @@ Expr::Expr(const ColumnType& type, bool is_slotref)
       adapter_fn_used_(false),
       scratch_buffer_size_(0),
       opened_(false),
-      overflow_logged_(false),
       jitted_compute_fn_(NULL) {
 }
 
 Expr::Expr(const TExprNode& node, bool is_slotref)
-    : state_(NULL),
-      cache_entry_(NULL),
+    : cache_entry_(NULL),
       is_udf_call_(false),
       compute_fn_(NULL),
       is_slotref_(is_slotref),
@@ -106,7 +103,6 @@ Expr::Expr(const TExprNode& node, bool is_slotref)
       adapter_fn_used_(false),
       scratch_buffer_size_(0),
       opened_(false),
-      overflow_logged_(false),
       jitted_compute_fn_(NULL) {
   if (node.__isset.fn) fn_ = node.fn;
 }
@@ -122,18 +118,6 @@ void Expr::Close(RuntimeState* state) {
   if (cache_entry_ != NULL) {
     LibCache::instance()->DecrementUseCount(cache_entry_);
     cache_entry_ = NULL;
-  }
-}
-
-void Expr::LogOverflow() {
-  if (!overflow_logged_) {
-    // TODO: this is a stop gap until we move to the UDF interface that has
-    // better mechanisms for doing this.
-    // TODO: is there a way to tell the user the expr in a reasonable way?
-    // Plumb the ToSql() from the FE?
-    DCHECK(state_ != NULL);
-    overflow_logged_ = true;
-    state_->LogError("Expression overflowed, returning NULL");
   }
 }
 
@@ -559,7 +543,6 @@ bool Expr::codegend_fn_thread_safe() const {
 }
 
 Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
-  state_ = state;
   RETURN_IF_ERROR(PrepareChildren(state, row_desc));
   if (is_udf_call_) return Status::OK;
 
@@ -1034,8 +1017,8 @@ void Expr::InitBuiltinsDummy() {
   AggregateFunctions::InitNull(NULL, NULL);
   ComputeFunctions::Add_char_char(NULL, NULL);
   ConditionalFunctions::IsNull(NULL, NULL);
-  DecimalFunctions::Precision(NULL, NULL);
-  DecimalOperators::Cast_decimal_decimal(NULL, NULL);
+  DecimalFunctions::Precision(NULL, DecimalVal::null());
+  DecimalOperators::CastToDecimalVal(NULL, DecimalVal::null());
   MathFunctions::Pi(NULL, NULL);
   StringFunctions::Length(NULL, NULL);
   TimestampFunctions::Year(NULL, TimestampVal::null());

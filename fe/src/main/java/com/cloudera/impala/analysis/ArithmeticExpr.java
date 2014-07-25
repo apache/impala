@@ -131,7 +131,11 @@ public class ArithmeticExpr extends Expr {
 
   @Override
   protected void toThrift(TExprNode msg) {
-    msg.node_type = TExprNodeType.ARITHMETIC_EXPR;
+    if (type_.isDecimal()) {
+      msg.node_type = TExprNodeType.FUNCTION_CALL;
+    } else {
+      msg.node_type = TExprNodeType.ARITHMETIC_EXPR;
+    }
   }
 
   /**

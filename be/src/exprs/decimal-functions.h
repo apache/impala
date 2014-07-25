@@ -16,6 +16,11 @@
 #ifndef IMPALA_EXPRS_DECIMAL_FUNCTIONS_H
 #define IMPALA_EXPRS_DECIMAL_FUNCTIONS_H
 
+#include "exprs/decimal-operators.h"
+#include "udf/udf.h"
+
+using namespace impala_udf;
+
 namespace impala {
 
 class Expr;
@@ -23,18 +28,39 @@ class TupleRow;
 
 class DecimalFunctions {
  public:
-  static void* Precision(Expr* e, TupleRow* row);
-  static void* Scale(Expr* e, TupleRow* row);
+  static IntVal Precision(FunctionContext* context, const DecimalVal& val);
+  static IntVal Scale(FunctionContext* context, const DecimalVal& val);
 
-  static void* Abs(Expr* e, TupleRow* row);
-  static void* Ceil(Expr* e, TupleRow* row);
-  static void* Floor(Expr* e, TupleRow* row);
+  static DecimalVal Abs(FunctionContext* context, const DecimalVal& val);
+  static DecimalVal Ceil(FunctionContext* context, const DecimalVal& val);
+  static DecimalVal Floor(FunctionContext* context, const DecimalVal& val);
 
-  static void* Round(Expr* e, TupleRow* row);
-  static void* RoundTo(Expr* e, TupleRow* row);
+  static DecimalVal Round(FunctionContext* context, const DecimalVal& val);
 
-  static void* Truncate(Expr* e, TupleRow* row);
-  static void* TruncateTo(Expr* e, TupleRow* row);
+  static DecimalVal RoundTo(
+      FunctionContext* context, const DecimalVal& val, const SmallIntVal& scale);
+  static DecimalVal RoundTo(
+      FunctionContext* context, const DecimalVal& val, const TinyIntVal& scale);
+  static DecimalVal RoundTo(
+      FunctionContext* context, const DecimalVal& val, const IntVal& scale);
+  static DecimalVal RoundTo(
+      FunctionContext* context, const DecimalVal& val, const BigIntVal& scale);
+
+  static DecimalVal Truncate(FunctionContext* context, const DecimalVal& val);
+
+  static DecimalVal TruncateTo(
+      FunctionContext* context, const DecimalVal& val, const SmallIntVal& scale);
+  static DecimalVal TruncateTo(
+      FunctionContext* context, const DecimalVal& val, const TinyIntVal& scale);
+  static DecimalVal TruncateTo(
+      FunctionContext* context, const DecimalVal& val, const IntVal& scale);
+  static DecimalVal TruncateTo(
+      FunctionContext* context, const DecimalVal& val, const BigIntVal& scale);
+
+ private:
+  // Implementation of RoundTo
+  static DecimalVal RoundTo(FunctionContext* context, const DecimalVal& val, int scale,
+                            DecimalOperators::DecimalRoundOp op);
 };
 
 }

@@ -39,6 +39,7 @@ class FunctionContextImpl {
  public:
   // Create a FunctionContext. The caller is responsible for calling delete on it.
   static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool,
+      const impala_udf::FunctionContext::TypeDesc& return_type,
       const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
       bool debug = false);
 
@@ -107,6 +108,9 @@ class FunctionContextImpl {
   // particularly for existing codebases (e.g. they use std::vector). Instead, they'll
   // have to track those allocations manually.
   int64_t external_bytes_tracked_;
+
+  // Type descriptor for the return type of the function.
+  impala_udf::FunctionContext::TypeDesc return_type_;
 
   // Type descriptors for each argument of the function.
   std::vector<impala_udf::FunctionContext::TypeDesc> arg_types_;

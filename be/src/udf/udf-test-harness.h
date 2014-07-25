@@ -32,7 +32,7 @@ class UdfTestHarness {
   // Create a test FunctionContext object. 'arg_types' should contain a TypeDesc for each
   // argument of the UDF not including the FunctionContext*. The caller is responsible
   // for calling delete on it. This context has additional debugging validation enabled.
-  static FunctionContext* CreateTestContext(
+  static FunctionContext* CreateTestContext(const FunctionContext::TypeDesc& return_type,
       const std::vector<FunctionContext::TypeDesc>& arg_types);
 
   // Use with test contexts to test use of IsArgConstant() and GetConstantArg().
@@ -63,8 +63,9 @@ class UdfTestHarness {
   static bool ValidateUdf(boost::function<RET(FunctionContext*)> fn,
       const RET& expected, UdfPrepare init_fn = NULL, UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types;
-    boost::scoped_ptr<FunctionContext> context(CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types;
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get());
@@ -78,8 +79,9 @@ class UdfTestHarness {
       const A1& a1, const RET& expected, UdfPrepare init_fn = NULL,
       UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1);
@@ -92,8 +94,9 @@ class UdfTestHarness {
       const std::vector<A1>& a1, const RET& expected, UdfPrepare init_fn = NULL,
       UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1.size(), &a1[0]);
@@ -107,8 +110,9 @@ class UdfTestHarness {
       const A1& a1, const A2& a2, const RET& expected, UdfPrepare init_fn = NULL,
       UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2);
@@ -122,8 +126,9 @@ class UdfTestHarness {
       const A1& a1, const std::vector<A2>& a2, const RET& expected,
       UdfPrepare init_fn = NULL, UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2.size(), &a2[0]);
@@ -137,8 +142,9 @@ class UdfTestHarness {
       const A1& a1, const A2& a2, const A3& a3, const RET& expected,
       UdfPrepare init_fn = NULL, UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2, a3);
@@ -152,8 +158,9 @@ class UdfTestHarness {
       const A1& a1, const A2& a2, const std::vector<A3>& a3, const RET& expected,
       UdfPrepare init_fn = NULL, UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2, a3.size(), &a3[0]);
@@ -168,8 +175,9 @@ class UdfTestHarness {
       const A1& a1, const A2& a2, const A3& a3, const A4& a4, const RET& expected,
       UdfPrepare init_fn = NULL, UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2, a3, a4);
@@ -184,8 +192,9 @@ class UdfTestHarness {
       const A1& a1, const A2& a2, const A3& a3, const std::vector<A4>& a4,
       const RET& expected, UdfPrepare init_fn = NULL, UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2, a3, a4.size(), &a4[0]);
@@ -201,8 +210,9 @@ class UdfTestHarness {
       const A1& a1, const A2& a2, const A3& a3, const A4& a4,const A5& a5,
       const RET& expected, UdfPrepare init_fn = NULL, UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2, a3, a4, a5);
@@ -219,8 +229,9 @@ class UdfTestHarness {
       const A6& a6, const RET& expected, UdfPrepare init_fn = NULL,
       UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2, a3, a4, a5, a6);
@@ -237,8 +248,9 @@ class UdfTestHarness {
       const A6& a6, const A7& a7, const RET& expected, UdfPrepare init_fn = NULL,
       UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2, a3, a4, a5, a6, a7);
@@ -255,8 +267,9 @@ class UdfTestHarness {
       const A6& a6, const A7& a7, const A8& a8, const RET& expected,
       UdfPrepare init_fn = NULL, UdfClose close_fn = NULL,
       const std::vector<AnyVal*>& constant_args = std::vector<AnyVal*>()) {
-    std::vector<FunctionContext::TypeDesc> types; // TODO
-    boost::scoped_ptr<FunctionContext> context(UdfTestHarness::CreateTestContext(types));
+    FunctionContext::TypeDesc return_type; // TODO
+    std::vector<FunctionContext::TypeDesc> arg_types; // TODO
+    boost::scoped_ptr<FunctionContext> context(CreateTestContext(return_type, arg_types));
     SetConstantArgs(context.get(), constant_args);
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get(), a1, a2, a3, a4, a5, a6, a7, a8);

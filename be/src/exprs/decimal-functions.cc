@@ -14,7 +14,7 @@
 
 #include "exprs/decimal-functions.h"
 
-#include "exprs/decimal-operators.h"
+#include "exprs/anyval-util.h"
 #include "exprs/expr.h"
 #include "exprs/function-call.h"
 
@@ -25,108 +25,100 @@ using namespace std;
 
 namespace impala {
 
-void* DecimalFunctions::Precision(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
-  e->result_.int_val = e->children()[0]->type().precision;
-  return &e->result_.int_val;
+IntVal DecimalFunctions::Precision(FunctionContext* context, const DecimalVal& val) {
+  return IntVal(context->GetArgType(0)->precision);
 }
 
-void* DecimalFunctions::Scale(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
-  e->result_.int_val = e->children()[0]->type().scale;
-  return &e->result_.int_val;
+IntVal DecimalFunctions::Scale(FunctionContext* context, const DecimalVal& val) {
+  return IntVal(context->GetArgType(0)->scale);
 }
 
-void* DecimalFunctions::Abs(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().scale, e->children()[0]->type().scale);
-  DCHECK_EQ(e->type().precision, e->children()[0]->type().precision);
-
-  void* v = e->children()[0]->GetValue(row);
-  if (v == NULL) return NULL;
-  switch (e->type().GetByteSize()) {
+DecimalVal DecimalFunctions::Abs(FunctionContext* context, const DecimalVal& val) {
+  if (val.is_null) return DecimalVal::null();
+  ColumnType type = AnyValUtil::TypeDescToColumnType(*context->GetArgType(0));
+  switch (type.GetByteSize()) {
     case 4:
-      e->result_.decimal4_val = reinterpret_cast<Decimal4Value*>(v)->Abs();
-      return &e->result_.decimal4_val;
+      return DecimalVal(abs(val.val4));
     case 8:
-      e->result_.decimal8_val = reinterpret_cast<Decimal8Value*>(v)->Abs();
-      return &e->result_.decimal8_val;
+      return DecimalVal(abs(val.val8));
     case 16:
-      e->result_.decimal16_val = reinterpret_cast<Decimal16Value*>(v)->Abs();
-      return &e->result_.decimal16_val;
+      return DecimalVal(abs(val.val16));
     default:
       DCHECK(false);
-      return NULL;
+      return DecimalVal::null();
   }
 }
 
-void* DecimalFunctions::Ceil(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().scale, 0);
-  return DecimalOperators::RoundDecimal(e, row, DecimalOperators::CEIL);
+DecimalVal DecimalFunctions::Ceil(FunctionContext* context, const DecimalVal& val) {
+  return DecimalOperators::RoundDecimal(context, val, DecimalOperators::CEIL);
 }
 
-void* DecimalFunctions::Floor(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().scale, 0);
-  return DecimalOperators::RoundDecimal(e, row, DecimalOperators::FLOOR);
+DecimalVal DecimalFunctions::Floor(FunctionContext* context, const DecimalVal& val) {
+  return DecimalOperators::RoundDecimal(context, val, DecimalOperators::FLOOR);
 }
 
-void* DecimalFunctions::Round(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().scale, 0);
-  return DecimalOperators::RoundDecimal(e, row, DecimalOperators::ROUND);
+DecimalVal DecimalFunctions::Round(FunctionContext* context, const DecimalVal& val) {
+  return DecimalOperators::RoundDecimal(context, val, DecimalOperators::ROUND);
 }
 
-void* DecimalFunctions::RoundTo(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 2);
-  DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
-  // We require that the second argument to Round() (the resulting scale) to be
-  // a constant, otherwise the resulting values will have variable scale.
-  DCHECK(e->children()[1]->IsConstant());
-  DCHECK_EQ(e->type().type, TYPE_DECIMAL);
-  FunctionCall* fn_call = reinterpret_cast<FunctionCall*>(e);
-  if (fn_call->scale() < 0) {
+inline DecimalVal DecimalFunctions::RoundTo(
+    FunctionContext* context, const DecimalVal& val, int scale,
+    DecimalOperators::DecimalRoundOp op) {
+  ColumnType val_type = AnyValUtil::TypeDescToColumnType(*context->GetArgType(0));
+  ColumnType return_type = AnyValUtil::TypeDescToColumnType(context->GetReturnType());
+  if (scale < 0) {
     return DecimalOperators::RoundDecimalNegativeScale(
-        e, row, DecimalOperators::ROUND, -fn_call->scale());
+        context, val, val_type, return_type, op, -scale);
   } else {
-    return DecimalOperators::RoundDecimal(e, row, DecimalOperators::ROUND);
+    return DecimalOperators::RoundDecimal(
+        context, val, val_type, return_type, op);
   }
 }
 
-void* DecimalFunctions::Truncate(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().type, TYPE_DECIMAL);
-  DCHECK_EQ(e->type().scale, 0);
-  DCHECK_LE(e->type().precision, e->children()[0]->type().precision);
-  return DecimalOperators::RoundDecimal(e, row, DecimalOperators::TRUNCATE);
+DecimalVal DecimalFunctions::RoundTo(
+    FunctionContext* context, const DecimalVal& val, const TinyIntVal& scale) {
+  DCHECK(!scale.is_null);
+  return RoundTo(context, val, scale.val, DecimalOperators::ROUND);
+}
+DecimalVal DecimalFunctions::RoundTo(
+    FunctionContext* context, const DecimalVal& val, const SmallIntVal& scale) {
+  DCHECK(!scale.is_null);
+  return RoundTo(context, val, scale.val, DecimalOperators::ROUND);
+}
+DecimalVal DecimalFunctions::RoundTo(
+    FunctionContext* context, const DecimalVal& val, const IntVal& scale) {
+  DCHECK(!scale.is_null);
+  return RoundTo(context, val, scale.val, DecimalOperators::ROUND);
+}
+DecimalVal DecimalFunctions::RoundTo(
+    FunctionContext* context, const DecimalVal& val, const BigIntVal& scale) {
+  DCHECK(!scale.is_null);
+  return RoundTo(context, val, scale.val, DecimalOperators::ROUND);
 }
 
-void* DecimalFunctions::TruncateTo(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 2);
-  DCHECK_EQ(e->children()[0]->type().type, TYPE_DECIMAL);
-  // We require that the second argument to Truncate() (the resulting scale) to be
-  // a constant, otherwise the resulting values will have variable scale.
-  DCHECK(e->children()[1]->IsConstant());
-  DCHECK_EQ(e->type().type, TYPE_DECIMAL);
-  FunctionCall* fn_call = reinterpret_cast<FunctionCall*>(e);
-  if (fn_call->scale() < 0) {
-    return DecimalOperators::RoundDecimalNegativeScale(
-        e, row, DecimalOperators::TRUNCATE, -fn_call->scale());
-  } else {
-    return DecimalOperators::RoundDecimal(e, row, DecimalOperators::TRUNCATE);
-  }
+DecimalVal DecimalFunctions::Truncate(FunctionContext* context, const DecimalVal& val) {
+  return DecimalOperators::RoundDecimal(context, val, DecimalOperators::TRUNCATE);
+}
+
+DecimalVal DecimalFunctions::TruncateTo(
+    FunctionContext* context, const DecimalVal& val, const TinyIntVal& scale) {
+  DCHECK(!scale.is_null);
+  return RoundTo(context, val, scale.val, DecimalOperators::TRUNCATE);
+}
+DecimalVal DecimalFunctions::TruncateTo(
+    FunctionContext* context, const DecimalVal& val, const SmallIntVal& scale) {
+  DCHECK(!scale.is_null);
+  return RoundTo(context, val, scale.val, DecimalOperators::TRUNCATE);
+}
+DecimalVal DecimalFunctions::TruncateTo(
+    FunctionContext* context, const DecimalVal& val, const IntVal& scale) {
+  DCHECK(!scale.is_null);
+  return RoundTo(context, val, scale.val, DecimalOperators::TRUNCATE);
+}
+DecimalVal DecimalFunctions::TruncateTo(
+    FunctionContext* context, const DecimalVal& val, const BigIntVal& scale) {
+  DCHECK(!scale.is_null);
+  return RoundTo(context, val, scale.val, DecimalOperators::TRUNCATE);
 }
 
 }

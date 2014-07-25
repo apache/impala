@@ -22,8 +22,9 @@ using namespace impala;
 using namespace std;
 
 FunctionContext* UdfTestHarness::CreateTestContext(
+    const FunctionContext::TypeDesc& return_type,
     const vector<FunctionContext::TypeDesc>& arg_types) {
-  return FunctionContextImpl::CreateContext(NULL, NULL, arg_types, true);
+  return FunctionContextImpl::CreateContext(NULL, NULL, return_type, arg_types, true);
 }
 
 void UdfTestHarness::SetConstantArgs(

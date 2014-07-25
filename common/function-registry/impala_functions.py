@@ -357,29 +357,6 @@ functions = [
    symbol('ConditionalFunctions', 'Coalesce')],
   [['coalesce'], 'DECIMAL', ['DECIMAL', '...'],
    symbol('ConditionalFunctions', 'Coalesce')],
-
-  # Decimal Functions
-  # TODO: oracle has decimal support for transcendental functions (e.g. sin()) to very
-  # high precisions. Do we need them? It's unclear if other databases do the same.
-  [['precision'], 'INT', ['DECIMAL'], symbol('DecimalFunctions', 'Precision')],
-  [['scale'], 'INT', ['DECIMAL'], symbol('DecimalFunctions', 'Scale')],
-  [['abs'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Abs')],
-  [['ceil', 'ceiling'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Ceil')],
-  [['floor'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Floor')],
-  [['round'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Round')],
-  [['round'], 'DECIMAL', ['DECIMAL', 'TINYINT'], symbol('DecimalFunctions', 'RoundTo')],
-  [['round'], 'DECIMAL', ['DECIMAL', 'SMALLINT'], symbol('DecimalFunctions', 'RoundTo')],
-  [['round'], 'DECIMAL', ['DECIMAL', 'INT'], symbol('DecimalFunctions', 'RoundTo')],
-  [['round'], 'DECIMAL', ['DECIMAL', 'BIGINT'], symbol('DecimalFunctions', 'RoundTo')],
-  [['truncate'], 'DECIMAL', ['DECIMAL'], symbol('DecimalFunctions', 'Truncate')],
-  [['truncate'], 'DECIMAL', ['DECIMAL', 'TINYINT'],
-      symbol('DecimalFunctions', 'TruncateTo')],
-  [['truncate'], 'DECIMAL', ['DECIMAL', 'SMALLINT'],
-      symbol('DecimalFunctions', 'TruncateTo')],
-  [['truncate'], 'DECIMAL', ['DECIMAL', 'INT'],
-      symbol('DecimalFunctions', 'TruncateTo')],
-  [['truncate'], 'DECIMAL', ['DECIMAL', 'BIGINT'],
-      symbol('DecimalFunctions', 'TruncateTo')],
 ]
 
 # These functions are implemented against the UDF interface.
@@ -540,5 +517,28 @@ udf_functions = [
       '_ZN6impala18TimestampFunctions8FromUnixIN10impala_udf9BigIntValEEENS2_9StringValEPNS2_15FunctionContextERKT_RKS4_',
       '_ZN6impala18TimestampFunctions22UnixAndFromUnixPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
       '_ZN6impala18TimestampFunctions20UnixAndFromUnixCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
-  [['now', 'current_timestamp'], 'TIMESTAMP', [], '_ZN6impala18TimestampFunctions3NowEPN10impala_udf15FunctionContextE']
+  [['now', 'current_timestamp'], 'TIMESTAMP', [], '_ZN6impala18TimestampFunctions3NowEPN10impala_udf15FunctionContextE'],
+
+  # Decimal Functions
+  # TODO: oracle has decimal support for transcendental functions (e.g. sin()) to very
+  # high precisions. Do we need them? It's unclear if other databases do the same.
+  [['precision'], 'INT', ['DECIMAL'], 'impala::DecimalFunctions::Precision'],
+  [['scale'], 'INT', ['DECIMAL'], 'impala::DecimalFunctions::Scale'],
+  [['abs'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Abs'],
+  [['ceil', 'ceiling'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Ceil'],
+  [['floor'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Floor'],
+  [['round'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Round'],
+  [['round'], 'DECIMAL', ['DECIMAL', 'TINYINT'], 'impala::DecimalFunctions::RoundTo'],
+  [['round'], 'DECIMAL', ['DECIMAL', 'SMALLINT'], 'impala::DecimalFunctions::RoundTo'],
+  [['round'], 'DECIMAL', ['DECIMAL', 'INT'], 'impala::DecimalFunctions::RoundTo'],
+  [['round'], 'DECIMAL', ['DECIMAL', 'BIGINT'], 'impala::DecimalFunctions::RoundTo'],
+  [['truncate'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Truncate'],
+  [['truncate'], 'DECIMAL', ['DECIMAL', 'TINYINT'],
+      'impala::DecimalFunctions::TruncateTo'],
+  [['truncate'], 'DECIMAL', ['DECIMAL', 'SMALLINT'],
+      'impala::DecimalFunctions::TruncateTo'],
+  [['truncate'], 'DECIMAL', ['DECIMAL', 'INT'],
+      'impala::DecimalFunctions::TruncateTo'],
+  [['truncate'], 'DECIMAL', ['DECIMAL', 'BIGINT'],
+      'impala::DecimalFunctions::TruncateTo'],
 ]

@@ -149,11 +149,13 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
     finalize_fn_ = NULL;
   }
 
-  vector<FunctionContext::TypeDesc> arg_types(input_exprs_.size());
+  FunctionContext::TypeDesc return_type = AnyValUtil::ColumnTypeToTypeDesc(return_type_);
+  vector<FunctionContext::TypeDesc> arg_types;
   for (int i = 0; i < input_exprs_.size(); ++i) {
-    AnyValUtil::ColumnTypeToTypeDesc(input_exprs_[i]->type(), &arg_types[i]);
+    arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(input_exprs_[i]->type()));
   }
-  ctx_.reset(FunctionContextImpl::CreateContext(state, state->udf_pool(), arg_types));
+  ctx_.reset(FunctionContextImpl::CreateContext(
+      state, state->udf_pool(), return_type, arg_types));
 
   return Status::OK;
 }

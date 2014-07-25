@@ -18,6 +18,9 @@
 
 #include <stdint.h>
 #include "runtime/decimal-value.h"
+#include "udf/udf.h"
+
+using namespace impala_udf;
 
 namespace impala {
 
@@ -29,38 +32,49 @@ class TupleRow;
 // arithmetic and binary operators.
 class DecimalOperators {
  public:
-  static void* Cast_decimal_decimal(Expr* e, TupleRow* row);
+  static DecimalVal CastToDecimalVal(FunctionContext*, const DecimalVal&);
 
-  static void* Cast_char_decimal(Expr* e, TupleRow* row);
-  static void* Cast_short_decimal(Expr* e, TupleRow* row);
-  static void* Cast_int_decimal(Expr* e, TupleRow* row);
-  static void* Cast_long_decimal(Expr* e, TupleRow* row);
-  static void* Cast_float_decimal(Expr* e, TupleRow* row);
-  static void* Cast_double_decimal(Expr* e, TupleRow* row);
-  static void* Cast_StringValue_decimal(Expr* e, TupleRow* row);
+  static DecimalVal CastToDecimalVal(FunctionContext*, const TinyIntVal&);
+  static DecimalVal CastToDecimalVal(FunctionContext*, const SmallIntVal&);
+  static DecimalVal CastToDecimalVal(FunctionContext*, const IntVal&);
+  static DecimalVal CastToDecimalVal(FunctionContext*, const BigIntVal&);
+  static DecimalVal CastToDecimalVal(FunctionContext*, const FloatVal&);
+  static DecimalVal CastToDecimalVal(FunctionContext*, const DoubleVal&);
+  static DecimalVal CastToDecimalVal(FunctionContext*, const StringVal&);
 
-  static void* Cast_decimal_bool(Expr* e, TupleRow* row);
-  static void* Cast_decimal_char(Expr* e, TupleRow* row);
-  static void* Cast_decimal_short(Expr* e, TupleRow* row);
-  static void* Cast_decimal_int(Expr* e, TupleRow* row);
-  static void* Cast_decimal_long(Expr* e, TupleRow* row);
-  static void* Cast_decimal_float(Expr* e, TupleRow* row);
-  static void* Cast_decimal_double(Expr* e, TupleRow* row);
-  static void* Cast_decimal_StringValue(Expr* e, TupleRow* row);
-  static void* Cast_decimal_TimestampValue(Expr* e, TupleRow* row);
+  static BooleanVal CastToBooleanVal(FunctionContext*, const DecimalVal&);
+  static TinyIntVal CastToTinyIntVal(FunctionContext*, const DecimalVal&);
+  static SmallIntVal CastToSmallIntVal(FunctionContext*, const DecimalVal&);
+  static IntVal CastToIntVal(FunctionContext*, const DecimalVal&);
+  static BigIntVal CastToBigIntVal(FunctionContext*, const DecimalVal&);
+  static FloatVal CastToFloatVal(FunctionContext*, const DecimalVal&);
+  static DoubleVal CastToDoubleVal(FunctionContext*, const DecimalVal&);
+  static StringVal CastToStringVal(FunctionContext*, const DecimalVal&);
+  static TimestampVal CastToTimestampVal(FunctionContext*, const DecimalVal&);
 
-  static void* Add_decimal_decimal(Expr* e, TupleRow* row);
-  static void* Subtract_decimal_decimal(Expr* e, TupleRow* row);
-  static void* Multiply_decimal_decimal(Expr* e, TupleRow* row);
-  static void* Divide_decimal_decimal(Expr* e, TupleRow* row);
-  static void* Mod_decimal_decimal(Expr* e, TupleRow* row);
+  static DecimalVal Add_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static DecimalVal Subtract_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static DecimalVal Multiply_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static DecimalVal Divide_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static DecimalVal Mod_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
 
-  static void* Eq_decimal_decimal(Expr* e, TupleRow* row);
-  static void* Ne_decimal_decimal(Expr* e, TupleRow* row);
-  static void* Ge_decimal_decimal(Expr* e, TupleRow* row);
-  static void* Gt_decimal_decimal(Expr* e, TupleRow* row);
-  static void* Le_decimal_decimal(Expr* e, TupleRow* row);
-  static void* Lt_decimal_decimal(Expr* e, TupleRow* row);
+  static BooleanVal Eq_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static BooleanVal Ne_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static BooleanVal Ge_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static BooleanVal Gt_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static BooleanVal Le_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static BooleanVal Lt_decimal_decimal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
 
   static void* Case_decimal(Expr* e, TupleRow* row);
 
@@ -83,12 +97,19 @@ class DecimalOperators {
     ROUND
   };
 
-  // Evaluates a round from e->children()[0] storing the result in e->result_, using
-  // the rounding rule of 'type'.
-  static void* RoundDecimal(Expr* e, TupleRow* row, const DecimalRoundOp& op);
+  // Evaluates a round from 'val' and returns the result, using the rounding rule of
+  // 'type'.
+  static DecimalVal RoundDecimal(
+      FunctionContext* context, const DecimalVal& val, const ColumnType& val_type,
+      const ColumnType& output_type, const DecimalRoundOp& op);
 
-  // Handles the case of rounding to a negative scale. This means rounding to
-  // a digit before the decimal point.
+  // Same as above but infers 'val_type' from the first argument type and 'output_type'
+  // from the return type according to 'context'.
+  static DecimalVal RoundDecimal(
+      FunctionContext* context, const DecimalVal& val, const DecimalRoundOp& op);
+
+  // Handles the case of rounding to a negative scale. This means rounding to a digit
+  // before the decimal point.
   // rounding_scale is the number of digits before the decimal to round to.
   // TODO: can this code be reorganized to combine the two version of RoundDecimal()?
   // The implementation is similar but not quite the same.
@@ -99,19 +120,27 @@ class DecimalOperators {
   //   Decimal8Value Round(const Decimal4Value&);
   //   Decimal4Value Round(const Decimal8Value&);
   //   etc.
-  static void* RoundDecimalNegativeScale(Expr* e, TupleRow* row,
-      const DecimalRoundOp& op, int rounding_scale);
+  static DecimalVal RoundDecimalNegativeScale(
+      FunctionContext* context, const DecimalVal& val, const ColumnType& val_type,
+      const ColumnType& output_type, const DecimalRoundOp& op, int64_t rounding_scale);
 
  private:
-  // Sets the value of v into e->result_ and returns the ptr to the result.
-  static void* SetDecimalVal(Expr* e, int64_t v);
-  static void* SetDecimalVal(Expr* e, double );
+  // Converts 'val' to a DecimalVal according to 'type'. 'type' must be a decimal type.
+  static DecimalVal IntToDecimalVal(
+      FunctionContext* context, const ColumnType& type, int64_t val);
+  static DecimalVal FloatToDecimalVal(
+      FunctionContext* context, const ColumnType& type, double val);
 
-  // Sets the value of v into e->result_. v_type is the type of v and the decimals
-  // are scaled as needed.
-  static void* SetDecimalVal(Expr* e, const ColumnType& v_type, const Decimal4Value& v);
-  static void* SetDecimalVal(Expr* e, const ColumnType& v_type, const Decimal8Value& v);
-  static void* SetDecimalVal(Expr* e, const ColumnType& v_type, const Decimal16Value& v);
+  // Returns the value of 'val' scaled to 'output_type'.
+  static DecimalVal ScaleDecimalValue(
+      FunctionContext* context, const Decimal4Value& val, const ColumnType& val_type,
+      const ColumnType& output_type);
+  static DecimalVal ScaleDecimalValue(
+      FunctionContext* context, const Decimal8Value& val, const ColumnType& val_type,
+      const ColumnType& output_type);
+  static DecimalVal ScaleDecimalValue(
+      FunctionContext* context, const Decimal16Value& val, const ColumnType& val_type,
+      const ColumnType& output_type);
 
   // Returns the delta that needs to be added when the source decimal is rounded to
   // target scale. Returns 0, if no rounding is necessary, or -1/1 if rounding
