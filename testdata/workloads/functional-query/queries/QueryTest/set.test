@@ -98,3 +98,38 @@ set
 ---- TYPES
 STRING, STRING
 ====
+---- QUERY
+set foo=bar
+---- CATCH
+Ignoring invalid configuration option: foo
+====
+---- QUERY
+set parquet_compression_codec=bar
+---- CATCH
+Invalid parquet compression codec: bar
+====
+# Test that SET actually does change the mem_limit.
+# First, show mem_limit is not hit.
+---- QUERY
+select 1
+---- RESULTS
+1
+====
+# Set mem_limit really small so that queries will fail.
+---- QUERY
+set mem_limit=1
+====
+---- QUERY
+select 1
+---- CATCH
+Memory limit exceeded
+====
+# Set mem_limit back to unlimited and query should succeed again.
+---- QUERY
+set mem_limit=0
+====
+---- QUERY
+select 1
+---- RESULTS
+1
+====

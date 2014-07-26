@@ -35,31 +35,3 @@ class TestSet(ImpalaTestSuite):
 
   def test_set(self, vector):
     self.run_test_case('QueryTest/set', vector)
-
-  def test_set_negative(self, vector):
-    # Test that SET with an invalid config option name fails
-    try:
-      self.execute_query('set foo=bar')
-      assert False, 'Expected to fail'
-    except ImpalaBeeswaxException as e:
-      assert "Ignoring invalid configuration option: foo" in str(e)
-
-    # Test that SET with an invalid config option value fails
-    try:
-      self.execute_query('set parquet_compression_codec=bar')
-      assert False, 'Expected to fail'
-    except ImpalaBeeswaxException as e:
-      assert "Invalid parquet compression codec: bar" in str(e)
-
-  @pytest.mark.execute_serially
-  def test_set_mem_limit(self, vector):
-    # Test that SET actually does change the mem_limit
-    self.execute_query('select 1')
-    self.execute_query('set mem_limit=1');
-    try:
-      self.execute_query('select 1')
-      assert False, 'Expected to fail'
-    except ImpalaBeeswaxException as e:
-      assert "Memory limit exceeded" in str(e)
-    self.execute_query('set mem_limit=0');
-    self.execute_query('select 1')

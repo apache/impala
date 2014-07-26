@@ -750,5 +750,6 @@ public class ToSqlTest extends AnalyzerTest {
   public void testSet() {
     testToSql("set a = 1", "SET a='1'");
     testToSql("set `a b` = \"x y\"", "SET `a b`='x y'");
+    testToSql("set", "SET");
   }
 }

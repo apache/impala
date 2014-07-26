@@ -33,6 +33,8 @@ public class SetStmt extends StatementBase {
 
   @Override
   public String toSql() {
+    if (key_ == null) return "SET";
+    Preconditions.checkNotNull(value_);
     return "SET " + ToSqlUtils.getIdentSql(key_) + "='" + value_ + "'";
   }
 
