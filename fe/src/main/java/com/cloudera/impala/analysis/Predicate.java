@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
@@ -40,8 +39,7 @@ public abstract class Predicate extends Expr {
   public void setIsEqJoinConjunct(boolean v) { isEqJoinConjunct_ = v; }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
     type_ = Type.BOOLEAN;

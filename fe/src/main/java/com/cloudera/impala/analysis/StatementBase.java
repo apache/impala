@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 
 /**
@@ -31,8 +30,7 @@ abstract class StatementBase implements ParseNode {
    * It is up to the analysis() implementation to ensure the maximum number of missing
    * tables/views get collected in the Analyzer before failing analyze().
    */
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isExplain_) analyzer.setIsExplain();
   }
 

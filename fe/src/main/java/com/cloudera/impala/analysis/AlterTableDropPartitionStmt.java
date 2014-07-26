@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAlterTableDropPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
@@ -61,8 +60,7 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     if (!ifExists_) partitionSpec_.setPartitionShouldExist();
     partitionSpec_.setPrivilegeRequirement(Privilege.ALTER);

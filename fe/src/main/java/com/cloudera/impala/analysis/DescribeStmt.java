@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
 import com.cloudera.impala.thrift.TDescribeTableParams;
@@ -53,8 +52,7 @@ public class DescribeStmt extends StatementBase {
   public TDescribeTableOutputStyle getOutputStyle() { return outputStyle_; }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (!tableName_.isFullyQualified()) {
       tableName_ = new TableName(analyzer.getDefaultDb(), tableName_.getTbl());
     }

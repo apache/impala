@@ -52,8 +52,7 @@ public class CatalogObjectToFromThriftTest {
   public static void cleanUp() { catalog_.close(); }
 
   @Test
-  public void TestPartitionedTable() throws DatabaseNotFoundException,
-      AuthorizationException, TableLoadingException {
+  public void TestPartitionedTable() throws CatalogException {
     String[] dbNames = {"functional", "functional_avro", "functional_parquet",
                         "functional_seq"};
     for (String dbName: dbNames) {
@@ -121,8 +120,7 @@ public class CatalogObjectToFromThriftTest {
    * definition will override any columns defined in the table.
    */
   @Test
-  public void TestMismatchedAvroAndTableSchemas() throws DatabaseNotFoundException,
-      TableNotFoundException, TableLoadingException {
+  public void TestMismatchedAvroAndTableSchemas() throws CatalogException {
     Table table = catalog_.getOrLoadTable("functional_avro_snap",
         "schema_resolution_test");
     TTable thriftTable = table.toThrift();
@@ -142,8 +140,7 @@ public class CatalogObjectToFromThriftTest {
   }
 
   @Test
-  public void TestHBaseTables() throws DatabaseNotFoundException,
-      TableNotFoundException, TableLoadingException {
+  public void TestHBaseTables() throws CatalogException {
     String dbName = "functional_hbase";
     Table table = catalog_.getOrLoadTable(dbName, "alltypes");
     TTable thriftTable = table.toThrift();
@@ -172,8 +169,7 @@ public class CatalogObjectToFromThriftTest {
 
   @Test
   public void TestHBaseTableWithBinaryEncodedCols()
-      throws DatabaseNotFoundException, TableNotFoundException,
-      TableLoadingException {
+      throws CatalogException {
     String dbName = "functional_hbase";
     Table table = catalog_.getOrLoadTable(dbName, "alltypessmallbinary");
     TTable thriftTable = table.toThrift();
@@ -232,8 +228,7 @@ public class CatalogObjectToFromThriftTest {
   }
 
   @Test
-  public void TestView() throws DatabaseNotFoundException,
-      TableNotFoundException, TableLoadingException {
+  public void TestView() throws CatalogException {
     Table table = catalog_.getOrLoadTable("functional", "view_view");
     TTable thriftTable = table.toThrift();
     Assert.assertEquals(thriftTable.tbl_name, "view_view");

@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.extdatasource.ApiVersion;
 import com.cloudera.impala.thrift.TCreateDataSourceParams;
@@ -50,8 +49,7 @@ public class CreateDataSrcStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (!MetaStoreUtils.validateName(dataSrcName_)) {
       throw new AnalysisException("Invalid data source name: " + dataSrcName_);
     }

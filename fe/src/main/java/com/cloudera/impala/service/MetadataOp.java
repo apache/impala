@@ -23,7 +23,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.TableName;
-import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
@@ -242,7 +241,7 @@ public class MetadataOp {
    * will not be populated.
    * If columns is null, then DbsTablesColumns.columns will not be populated.
    */
-  private static DbsMetadata getDbsMetadata(ImpaladCatalog catalog, String catalogName,
+  private static DbsMetadata getDbsMetadata(Frontend fe, String catalogName,
       String schemaName, String tableName, String columnName, String functionName,
       User user) throws ImpalaException {
     DbsMetadata result = new DbsMetadata();
@@ -259,10 +258,11 @@ public class MetadataOp {
     PatternMatcher columnPattern = PatternMatcher.createJdbcPatternMatcher(columnName);
     PatternMatcher fnPattern = PatternMatcher.createJdbcPatternMatcher(functionName);
 
-    for (String dbName: catalog.getDbNames(null, user)) {
+    ImpaladCatalog catalog = fe.getCatalog();
+    for (String dbName: fe.getDbNames(null, user)) {
       if (!schemaPattern.matches(dbName)) continue;
 
-      Db db = catalog.getDb(dbName, user, Privilege.ANY);
+      Db db = catalog.getDb(dbName);
 
       if (functionName != null) {
         // Get function metadata
@@ -272,14 +272,14 @@ public class MetadataOp {
         // Get table metadata
         List<String> tableList = Lists.newArrayList();
         List<List<Column>> tablesColumnsList = Lists.newArrayList();
-        for (String tabName: catalog.getTableNames(db.getName(), "*", user)) {
+        for (String tabName: fe.getTableNames(db.getName(), "*", user)) {
           if (!tablePattern.matches(tabName)) continue;
           tableList.add(tabName);
           List<Column> columns = Lists.newArrayList();
 
           Table table = null;
           try {
-            table = catalog.getTable(dbName, tabName, user, Privilege.ANY);
+            table = catalog.getTable(dbName, tabName);
           } catch (TableLoadingException e) {
             // Ignore exception (this table will be skipped).
           }
@@ -335,7 +335,7 @@ public class MetadataOp {
     // Get the list of schemas, tables, and columns that satisfy the search conditions.
     DbsMetadata dbsMetadata = null;
     while (dbsMetadata == null || !dbsMetadata.missingTbls.isEmpty()) {
-      dbsMetadata = getDbsMetadata(fe.getCatalog(), catalogName,
+      dbsMetadata = getDbsMetadata(fe, catalogName,
           schemaName, tableName, columnName, null, user);
       if (!fe.requestTblLoadAndWait(dbsMetadata.missingTbls)) {
         LOG.info("Timed out waiting for missing tables. Load request will be retried.");
@@ -393,12 +393,12 @@ public class MetadataOp {
    * pattern.
    * catalogName and schemaName are JDBC search patterns.
    */
-  public static TResultSet getSchemas(ImpaladCatalog catalog,
+  public static TResultSet getSchemas(Frontend fe,
       String catalogName, String schemaName, User user) throws ImpalaException {
     TResultSet result = createEmptyResultSet(GET_SCHEMAS_MD);
 
     // Get the list of schemas that satisfy the search condition.
-    DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
+    DbsMetadata dbsMetadata = getDbsMetadata(fe, catalogName,
         schemaName, null, null, null, user);
 
     for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
@@ -421,7 +421,7 @@ public class MetadataOp {
    * catalogName, schemaName and tableName are JDBC search patterns.
    * tableTypes specifies which table types to search for (TABLE, VIEW, etc).
    */
-  public static TResultSet getTables(ImpaladCatalog catalog, String catalogName,
+  public static TResultSet getTables(Frontend fe, String catalogName,
       String schemaName, String tableName, List<String> tableTypes, User user)
           throws ImpalaException{
     TResultSet result = createEmptyResultSet(GET_TABLES_MD);
@@ -442,7 +442,7 @@ public class MetadataOp {
     }
 
     // Get the list of schemas, tables that satisfy the search conditions.
-    DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
+    DbsMetadata dbsMetadata = getDbsMetadata(fe, catalogName,
         schemaName, tableName, null, null, user);
 
     for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
@@ -504,7 +504,7 @@ public class MetadataOp {
    * catalogName, schemaName and functionName are JDBC search patterns.
    * @throws ImpalaException
    */
-  public static TResultSet getFunctions(ImpaladCatalog catalog,
+  public static TResultSet getFunctions(Frontend fe,
       String catalogName, String schemaName, String functionName,
       User user) throws ImpalaException {
     TResultSet result = createEmptyResultSet(GET_FUNCTIONS_MD);
@@ -514,7 +514,7 @@ public class MetadataOp {
       return result;
     }
 
-    DbsMetadata dbsMetadata = getDbsMetadata(catalog, catalogName,
+    DbsMetadata dbsMetadata = getDbsMetadata(fe, catalogName,
         schemaName, null, null, functionName, user);
     for (List<Function> fns: dbsMetadata.functions) {
       for (Function fn: fns) {

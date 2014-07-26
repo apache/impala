@@ -29,6 +29,7 @@ import org.apache.sentry.provider.common.ProviderBackendContext;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import org.apache.sentry.provider.file.SimpleFileProviderBackend;
 
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.AuthorizationPolicy;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -100,6 +101,35 @@ public class AuthorizationChecker {
    */
   public AuthorizationConfig getConfig() {
     return config_;
+  }
+
+  /**
+   * Authorizes the PrivilegeRequest, throwing an Authorization exception if
+   * the user does not have sufficient privileges.
+   */
+  public void checkAccess(User user, PrivilegeRequest privilegeRequest)
+      throws AuthorizationException {
+    Preconditions.checkNotNull(privilegeRequest);
+
+    if (!hasAccess(user, privilegeRequest)) {
+      if (privilegeRequest.getAuthorizeable() instanceof AuthorizeableFn) {
+        throw new AuthorizationException(String.format(
+            "User '%s' does not have privileges to CREATE/DROP functions.",
+            user.getName()));
+      }
+
+      Privilege privilege = privilegeRequest.getPrivilege();
+      if (EnumSet.of(Privilege.ANY, Privilege.ALL, Privilege.VIEW_METADATA)
+          .contains(privilege)) {
+        throw new AuthorizationException(String.format(
+            "User '%s' does not have privileges to access: %s",
+            user.getName(), privilegeRequest.getName()));
+      } else {
+        throw new AuthorizationException(String.format(
+            "User '%s' does not have privileges to execute '%s' on: %s",
+            user.getName(), privilege, privilegeRequest.getName()));
+      }
+    }
   }
 
   /*

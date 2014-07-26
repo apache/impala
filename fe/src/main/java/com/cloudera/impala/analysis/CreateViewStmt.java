@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -35,8 +34,7 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     tableName_.analyze();
     // Enforce Hive column labels for view compatibility.
     analyzer.setUseHiveColLabels(true);

@@ -45,7 +45,6 @@ import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.HBaseTable;
@@ -235,7 +234,7 @@ public class Planner {
   private PlanFragment createPlanFragments(
       PlanNode root, Analyzer analyzer, boolean isPartitioned,
       long perNodeMemLimit, ArrayList<PlanFragment> fragments)
-      throws InternalException, NotImplementedException, AuthorizationException {
+      throws InternalException, NotImplementedException {
     ArrayList<PlanFragment> childFragments = Lists.newArrayList();
     for (PlanNode child: root.getChildren()) {
       // allow child fragments to be partitioned, unless they contain a limit clause
@@ -314,7 +313,7 @@ public class Planner {
   private PlanFragment createInsertFragment(
       PlanFragment inputFragment, InsertStmt insertStmt, Analyzer analyzer,
       ArrayList<PlanFragment> fragments)
-      throws AuthorizationException, InternalException {
+      throws InternalException {
     List<Expr> partitionExprs = insertStmt.getPartitionKeyExprs();
     Boolean partitionHint = insertStmt.isRepartition();
     if (partitionExprs.isEmpty()) return inputFragment;
@@ -376,7 +375,7 @@ public class Planner {
    */
   private PlanFragment createMergeFragment(
       PlanFragment inputFragment, Analyzer analyzer)
-      throws InternalException, AuthorizationException {
+      throws InternalException {
     Preconditions.checkState(inputFragment.isPartitioned());
     ExchangeNode mergePlan = new ExchangeNode(nodeIdGenerator_.getNextId());
     mergePlan.addChild(inputFragment.getPlanRoot(), false, analyzer);
@@ -407,7 +406,7 @@ public class Planner {
   private PlanFragment createCrossJoinFragment(CrossJoinNode node,
       PlanFragment rightChildFragment, PlanFragment leftChildFragment,
       long perNodeMemLimit, ArrayList<PlanFragment> fragments,
-      Analyzer analyzer) throws AuthorizationException, InternalException {
+      Analyzer analyzer) throws InternalException {
     // The rhs tree is going to send data through an exchange node which effectively
     // compacts the data. No reason to do it again at the rhs root node.
     rightChildFragment.getPlanRoot().setCompactData(false);
@@ -432,7 +431,7 @@ public class Planner {
       HashJoinNode node, PlanFragment rightChildFragment,
       PlanFragment leftChildFragment, long perNodeMemLimit,
       ArrayList<PlanFragment> fragments, Analyzer analyzer)
-      throws InternalException, AuthorizationException {
+      throws InternalException {
     // broadcast: send the rightChildFragment's output to each node executing
     // the leftChildFragment; the cost across all nodes is proportional to the
     // total amount of data sent
@@ -606,7 +605,7 @@ public class Planner {
    */
   private PlanFragment createUnionNodeFragment(UnionNode unionNode,
       ArrayList<PlanFragment> childFragments, ArrayList<PlanFragment> fragments,
-      Analyzer analyzer) throws InternalException, AuthorizationException {
+      Analyzer analyzer) throws InternalException {
     Preconditions.checkState(unionNode.getChildren().size() == childFragments.size());
 
     // A UnionNode could have no children or constant selects if all of its operands
@@ -679,7 +678,7 @@ public class Planner {
    * input from childFragment.
    */
   private void connectChildFragment(Analyzer analyzer, PlanNode node, int childIdx,
-      PlanFragment childFragment) throws InternalException, AuthorizationException {
+      PlanFragment childFragment) throws InternalException {
     ExchangeNode exchangeNode = new ExchangeNode(nodeIdGenerator_.getNextId());
     exchangeNode.addChild(childFragment.getPlanRoot(), false, analyzer);
     exchangeNode.init(analyzer);
@@ -699,7 +698,7 @@ public class Planner {
    */
   private PlanFragment createParentFragment(
       Analyzer analyzer, PlanFragment childFragment, DataPartition parentPartition)
-      throws InternalException, AuthorizationException {
+      throws InternalException {
     ExchangeNode exchangeNode = new ExchangeNode(nodeIdGenerator_.getNextId());
     exchangeNode.addChild(childFragment.getPlanRoot(), false, analyzer);
     exchangeNode.init(analyzer);
@@ -721,7 +720,7 @@ public class Planner {
    */
   private PlanFragment createAggregationFragment(AggregationNode node,
       PlanFragment childFragment, ArrayList<PlanFragment> fragments, Analyzer analyzer)
-      throws InternalException, AuthorizationException {
+      throws InternalException {
     if (!childFragment.isPartitioned()) {
       // nothing to distribute; do full aggregation directly within childFragment
       childFragment.addPlanRoot(node);
@@ -869,7 +868,7 @@ public class Planner {
    */
   private PlanFragment createOrderByFragment(SortNode node,
       PlanFragment childFragment, ArrayList<PlanFragment> fragments, Analyzer analyzer)
-      throws InternalException, AuthorizationException {
+      throws InternalException {
     node.setChild(0, childFragment.getPlanRoot());
     childFragment.addPlanRoot(node);
     if (!childFragment.isPartitioned()) return childFragment;
@@ -942,7 +941,7 @@ public class Planner {
    */
   private PlanNode addUnassignedConjuncts(
       Analyzer analyzer, List<TupleId> tupleIds, PlanNode root)
-      throws InternalException, AuthorizationException {
+      throws InternalException {
     Preconditions.checkNotNull(root);
     // TODO: standardize on logical tuple ids?
     List<Expr> conjuncts = analyzer.getUnassignedConjuncts(root);
@@ -1409,7 +1408,7 @@ public class Planner {
    * Create node for scanning all data files of a particular table.
    */
   private PlanNode createScanNode(Analyzer analyzer, TableRef tblRef)
-      throws InternalException, AuthorizationException {
+      throws InternalException {
     ScanNode scanNode = null;
     if (tblRef.getTable() instanceof HdfsTable) {
       scanNode = new HdfsScanNode(nodeIdGenerator_.getNextId(), tblRef.getDesc(),
@@ -1473,7 +1472,7 @@ public class Planner {
       Analyzer analyzer,
       List<TupleId> lhsIds, TableRef rhs,
       List<Pair<Expr, Expr>> joinConjuncts,
-      List<Expr> joinPredicates) throws AuthorizationException {
+      List<Expr> joinPredicates) {
     joinConjuncts.clear();
     joinPredicates.clear();
     TupleId rhsId = rhs.getId();

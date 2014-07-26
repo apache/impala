@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TUseDbParams;
@@ -38,8 +37,7 @@ public class UseStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (!database_.equalsIgnoreCase(Catalog.DEFAULT_DB)) {
       // USE <default> should always be allowed.
       analyzer.getDb(database_, Privilege.ANY);

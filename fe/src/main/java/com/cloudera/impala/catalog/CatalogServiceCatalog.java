@@ -586,7 +586,7 @@ public class CatalogServiceCatalog extends Catalog {
    * (not yet loaded table) will be returned.
    */
   public Table getOrLoadTable(String dbName, String tblName)
-      throws DatabaseNotFoundException {
+      throws CatalogException {
     TTableName tableName = new TTableName(dbName.toLowerCase(), tblName.toLowerCase());
     TableLoadingMgr.LoadRequest loadReq;
 

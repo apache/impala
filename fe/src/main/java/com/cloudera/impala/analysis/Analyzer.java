@@ -28,9 +28,15 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.AuthorizationChecker;
+import com.cloudera.impala.authorization.AuthorizeableDb;
+import com.cloudera.impala.authorization.AuthorizeableTable;
 import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.PrivilegeRequest;
+import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.DatabaseNotFoundException;
@@ -58,6 +64,8 @@ import com.cloudera.impala.util.DisjointSet;
 import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -81,6 +89,8 @@ import com.google.common.collect.Sets;
  * output tuple).
  * Implied equality predicates are registered with createAuxEquivPredicate(); they are
  * never assigned during plan generation.
+ * Also tracks each catalog object access, so authorization checks can be performed once
+ * analysis is complete.
  */
 public class Analyzer {
   // Common analysis error messages
@@ -109,6 +119,13 @@ public class Analyzer {
 
   // Flag indicating if this analyzer instance belongs to a subquery.
   private boolean isSubquery_ = false;
+
+  // If set, when privilege requests are registered they will use this error
+  // error message.
+  private String authErrorMsg_;
+
+  // If false, privilege requests will not be registered in the analyzer.
+  private boolean enablePrivChecks_ = true;
 
   public void setIsSubquery() { isSubquery_ = true; }
   public boolean isSubquery() { return isSubquery_; }
@@ -161,7 +178,17 @@ public class Analyzer {
     // map from slot id to the analyzer/block in which it was registered
     public final Map<SlotId, Analyzer> blockBySlot = Maps.newHashMap();
 
+    // Tracks all privilege requests on catalog objects.
+    private final List<PrivilegeRequest> privilegeReqs = Lists.newArrayList();
+
+    // List of PrivilegeRequest to custom authorization failure error message.
+    // Tracks all privilege requests on catalog objects that need a custom
+    // error message returned to avoid exposing existence of catalog objects.
+    private final List<Pair<PrivilegeRequest, String>> maskedPrivilegeReqs =
+        Lists.newArrayList();
+
     // accesses to catalog objects
+    // TODO: This can be inferred from privilegeReqs. They should be coalesced.
     public List<TAccessEvent> accessEvents = Lists.newArrayList();
 
     // Tracks all warnings (e.g. non-fatal errors) that were generated during analysis.
@@ -227,16 +254,15 @@ public class Analyzer {
   /**
    * Analyzer constructor for nested select block. GlobalState is inherited from the
    * parentAnalyzer.
-   * Performs the analysis as the given user that is required to be non null.
    */
-  public Analyzer(Analyzer parentAnalyzer, User user) {
-    this.ancestors_ = Lists.newArrayList(parentAnalyzer);
-    this.ancestors_.addAll(parentAnalyzer.ancestors_);
-    this.globalState_ = parentAnalyzer.globalState_;
-    this.missingTbls_ = parentAnalyzer.missingTbls_;
-
-    Preconditions.checkNotNull(user);
-    this.user_ = user;
+  public Analyzer(Analyzer parentAnalyzer) {
+    ancestors_ = Lists.newArrayList(parentAnalyzer);
+    ancestors_.addAll(parentAnalyzer.ancestors_);
+    globalState_ = parentAnalyzer.globalState_;
+    missingTbls_ = parentAnalyzer.missingTbls_;
+    user_ = parentAnalyzer.getUser();
+    authErrorMsg_ = parentAnalyzer.authErrorMsg_;
+    enablePrivChecks_ = parentAnalyzer.enablePrivChecks_;
   }
 
   public Set<TableName> getMissingTbls() { return missingTbls_; }
@@ -281,8 +307,7 @@ public class Analyzer {
    * Throws if an existing explicit alias or implicit fully-qualified alias
    * has already been registered for another table ref.
    */
-  public TupleDescriptor registerTableRef(TableRef ref)
-      throws AnalysisException, AuthorizationException {
+  public TupleDescriptor registerTableRef(TableRef ref) throws AnalysisException {
     // Alias is the explicit alias or the fully-qualified table name.
     String alias = ref.getAlias().toLowerCase();
     if (aliasMap_.containsKey(alias)) {
@@ -323,8 +348,7 @@ public class Analyzer {
    * Resolves the given table ref into a corresponding BaseTableRef or ViewRef. Returns
    * the new resolved table ref or the given table ref if it is already resolved.
    */
-  public TableRef resolveTableRef(TableRef tableRef)
-      throws AnalysisException, AuthorizationException {
+  public TableRef resolveTableRef(TableRef tableRef) throws AnalysisException {
     // Return the table if it is already resolved.
     if (tableRef.isResolved()) return tableRef;
     TableName tableName = tableRef.getName();
@@ -1396,8 +1420,7 @@ public class Analyzer {
    * Throw an AnalysisException if the types are incompatible,
    * returns compatible type otherwise.
    */
-  public Type castAllToCompatibleType(List<Expr> exprs)
-      throws AnalysisException, AuthorizationException {
+  public Type castAllToCompatibleType(List<Expr> exprs) throws AnalysisException {
     // Determine compatible type of exprs.
     Expr lastCompatibleExpr = exprs.get(0);
     Type compatibleType = null;
@@ -1453,13 +1476,19 @@ public class Analyzer {
   public User getUser() { return user_; }
   public TQueryCtx getQueryCtx() { return globalState_.queryCtx; }
 
+  public ImmutableList<PrivilegeRequest> getPrivilegeReqs() {
+    return ImmutableList.copyOf(globalState_.privilegeReqs);
+  }
+
   /**
    * Returns a list of the successful catalog object access events. Does not include
    * accesses that failed due to AuthorizationExceptions. In general, if analysis
    * fails for any reason this list may be incomplete.
    */
   public List<TAccessEvent> getAccessEvents() { return globalState_.accessEvents; }
-  public void addAccessEvent(TAccessEvent event) { globalState_.accessEvents.add(event); }
+  public void addAccessEvent(TAccessEvent event) {
+    globalState_.accessEvents.add(event);
+  }
 
   /**
    * Returns the Catalog Table object for the TableName at the given Privilege level.
@@ -1467,24 +1496,24 @@ public class Analyzer {
    * added to the set of table names in "missingTbls_" and an AnalysisException will be
    * thrown.
    *
-   * If the user does not have sufficient privileges to access the table an
-   * AuthorizationException is thrown. If the table or the db does not exist in the
-   * Catalog, an AnalysisError is thrown.
+   * If the table or the db does not exist in the Catalog, an AnalysisError is thrown.
    * If addAccessEvent is true, this call will add a new entry to accessEvents if the
    * catalog access was successful. If false, no accessEvent will be added.
    */
   public Table getTable(TableName tableName, Privilege privilege, boolean addAccessEvent)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
     Table table = null;
     tableName = new TableName(getTargetDbName(tableName), tableName.getTbl());
 
+    registerPrivReq(new PrivilegeRequestBuilder()
+        .onTable(tableName.getDb(), tableName.getTbl()).allOf(privilege).toRequest());
+
     // This may trigger a metadata load, in which case we want to return the errors as
     // AnalysisExceptions.
     try {
-      table = getCatalog().getTable(tableName.getDb(),
-          tableName.getTbl(), getUser(), privilege);
+      table = getCatalog().getTable(tableName.getDb(), tableName.getTbl());
       if (table == null) {
         throw new AnalysisException(TBL_DOES_NOT_EXIST_ERROR_MSG + tableName.toString());
       }
@@ -1510,6 +1539,8 @@ public class Analyzer {
       // TableLoadingExceptions.
       LOG.error(errorMsg + "\n" + e.getMessage());
       throw new AnalysisException(errorMsg, e);
+    } catch (CatalogException e) {
+      throw new AnalysisException("Error loading table: " + tableName.toString(), e);
     }
     Preconditions.checkNotNull(table);
     return table;
@@ -1524,22 +1555,34 @@ public class Analyzer {
    * If the table or the db does not exist in the Catalog, an AnalysisError is thrown.
    */
   public Table getTable(TableName tableName, Privilege privilege)
-      throws AuthorizationException, AnalysisException {
+      throws AnalysisException {
     return getTable(tableName, privilege, true);
   }
 
   /**
-   * Returns the Catalog Db object for the given database name at the given
-   * Privilege level.
+   * Returns the Catalog Db object for the given database at the given
+   * Privilege level. The privilege request is tracked in the analyzer
+   * and authorized post-analysis.
    *
-   * If the user does not have sufficient privileges to access the database an
-   * AuthorizationException is thrown.
    * If the database does not exist in the catalog an AnalysisError is thrown.
    */
-  public Db getDb(String dbName, Privilege privilege)
-      throws AnalysisException, AuthorizationException {
-    Db db = getCatalog().getDb(dbName, getUser(), privilege);
-    if (db == null) throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+  public Db getDb(String dbName, Privilege privilege) throws AnalysisException {
+    return getDb(dbName, privilege, true);
+  }
+
+  public Db getDb(String dbName, Privilege privilege, boolean throwIfDoesNotExist)
+      throws AnalysisException {
+    PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
+    if (privilege == Privilege.ANY) {
+      registerPrivReq(pb.any().onAnyTable(dbName).toRequest());
+    } else {
+      registerPrivReq(pb.allOf(privilege).onDb(dbName).toRequest());
+    }
+
+    Db db = getCatalog().getDb(dbName);
+    if (db == null && throwIfDoesNotExist) {
+      throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    }
     globalState_.accessEvents.add(new TAccessEvent(
         dbName, TCatalogObjectType.DATABASE, privilege.toString()));
     return db;
@@ -1554,9 +1597,15 @@ public class Analyzer {
    * If the database does not exist in the catalog an AnalysisError is thrown.
    */
   public boolean dbContainsTable(String dbName, String tableName, Privilege privilege)
-      throws AuthorizationException, AnalysisException {
+      throws AnalysisException {
+    registerPrivReq(new PrivilegeRequestBuilder().allOf(privilege)
+        .onTable(dbName,  tableName).toRequest());
     try {
-      return getCatalog().dbContainsTable(dbName, tableName, getUser(), privilege);
+      Db db = getCatalog().getDb(dbName);
+      if (db == null) {
+        throw new DatabaseNotFoundException("Database not found: " + dbName);
+      }
+      return db.containsTable(tableName);
     } catch (DatabaseNotFoundException e) {
       throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     }
@@ -1569,6 +1618,7 @@ public class Analyzer {
   public String getTargetDbName(TableName tableName) {
     return tableName.isFullyQualified() ? tableName.getDb() : getDefaultDb();
   }
+
   public String getTargetDbName(FunctionName fnName) {
     return fnName.isFullyQualified() ? fnName.getDb() : getDefaultDb();
   }
@@ -1582,6 +1632,10 @@ public class Analyzer {
     return new TableName(getDefaultDb(), tableName.getTbl());
   }
 
+  public void setEnablePrivChecks(boolean value) {
+    enablePrivChecks_ = value;
+  }
+  public void setAuthErrMsg(String errMsg) { authErrorMsg_ = errMsg; }
   public void setIsExplain() { globalState_.isExplain = true; }
   public boolean isExplain() { return globalState_.isExplain; }
   public void setUseHiveColLabels(boolean useHiveColLabels) {
@@ -1936,5 +1990,77 @@ public class Analyzer {
       String actualStr = actual.toString();
       return expectedStr.equals(actualStr);
     }
+  }
+
+  /**
+   * Registers a new PrivilegeRequest in the analyzer. If authErrorMsg_ is set,
+   * the privilege request will be added to the list of "masked" privilege requests,
+   * using authErrorMsg_ as the auth failure error message. Otherwise it will get
+   * added as a normal privilege request that will use the standard error message
+   * on authorization failure.
+   * If enablePrivChecks_ is false, the registration request will be ignored. This
+   * is used when analyzing catalog views since users should be able to query a view
+   * even if they do not have privileges on the underlying tables.
+   */
+  public void registerPrivReq(PrivilegeRequest privReq) {
+    if (!enablePrivChecks_) return;
+
+    if (Strings.isNullOrEmpty(authErrorMsg_)) {
+      globalState_.privilegeReqs.add(privReq);
+    } else {
+      globalState_.maskedPrivilegeReqs.add(Pair.create(privReq, authErrorMsg_));
+    }
+  }
+
+  /**
+   * Authorizes all privilege requests, throwing an AuthorizationException if
+   * the user does not have sufficient privileges for any of the requests. Generally
+   * called after analysis has completed.
+   */
+  public void authorize(AuthorizationChecker authzChecker) throws AuthorizationException {
+    for (PrivilegeRequest privReq: globalState_.privilegeReqs) {
+      // If this is a system database, some actions should always be allowed
+      // or disabled, regardless of what is in the auth policy.
+      String dbName = null;
+      if (privReq.getAuthorizeable() instanceof AuthorizeableDb) {
+        dbName = privReq.getName();
+      } else if (privReq.getAuthorizeable() instanceof AuthorizeableTable) {
+        AuthorizeableTable tbl = (AuthorizeableTable) privReq.getAuthorizeable();
+        dbName = tbl.getDbName();
+      }
+      if (dbName != null && checkSystemDbAccess(dbName, privReq.getPrivilege())) {
+        continue;
+      }
+
+      // Perform the authorization check.
+      authzChecker.checkAccess(getUser(), privReq);
+    }
+
+    for (Pair<PrivilegeRequest, String> maskedReq: globalState_.maskedPrivilegeReqs) {
+      // Perform the authorization check.
+      if (!authzChecker.hasAccess(getUser(), maskedReq.first)) {
+        throw new AuthorizationException(maskedReq.second);
+      }
+    }
+  }
+
+  /**
+   * Throws an authorization exception if the dbName is a system db
+   * and they are trying to modify it.
+   * Returns true if this is a system db and the action is allowed.
+   */
+  private boolean checkSystemDbAccess(String dbName, Privilege privilege)
+      throws AuthorizationException {
+    Db db = globalState_.catalog.getDb(dbName);
+    if (db != null && db.isSystemDb()) {
+      switch (privilege) {
+        case VIEW_METADATA:
+        case ANY:
+          return true;
+        default:
+          throw new AuthorizationException("Cannot modify system database.");
+      }
+    }
+    return false;
   }
 }

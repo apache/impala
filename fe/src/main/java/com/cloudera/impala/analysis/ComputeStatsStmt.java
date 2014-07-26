@@ -21,7 +21,6 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
@@ -76,8 +75,7 @@ public class ComputeStatsStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     table_ = analyzer.getTable(tableName_, Privilege.ALTER);
     String sqlTableName = table_.getTableName().toSql();
     if (table_ instanceof View) {

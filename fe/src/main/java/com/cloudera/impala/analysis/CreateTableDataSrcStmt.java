@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.RowFormat;
@@ -65,8 +64,7 @@ public class CreateTableDataSrcStmt extends CreateTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     String dataSourceName = getTblProperties().get(TBL_PROP_DATA_SRC_NAME);
     DataSource dataSource = analyzer.getCatalog().getDataSource(dataSourceName);

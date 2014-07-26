@@ -112,7 +112,7 @@ public class AuthorizationTest {
     catalog_ = new ImpaladTestCatalog(authzConfig_);
     queryCtx_ = TestUtils.createQueryContext(Catalog.DEFAULT_DB, USER.getName());
     analysisContext_ = new AnalysisContext(catalog_, queryCtx_);
-    fe_ = new Frontend(authzConfig_, new ImpaladTestCatalog(authzConfig_));
+    fe_ = new Frontend(authzConfig_, catalog_);
   }
 
   private void setup() throws Exception {
@@ -257,6 +257,17 @@ public class AuthorizationTest {
     AuthzError("select * from functional.complex_view_sub",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.complex_view_sub");
+
+    // User has SELECT privileges on the view and the join table.
+    AuthzOk("select a.id from functional.view_view a "
+        + "join functional.alltypesagg b ON (a.id = b.id)");
+
+    // User has SELECT privileges on the view, but does not have privileges
+    // to select join table.
+    AuthzError("select a.id from functional.view_view a "
+        + "join functional.alltypes b ON (a.id = b.id)",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypes");
 
     // Constant select.
     AuthzOk("select 1");
@@ -412,6 +423,11 @@ public class AuthorizationTest {
     AuthzError("explain with t as (select * from functional.complex_view) " +
         "select * from t",
         "User '%s' does not have privileges to EXPLAIN this statement.");
+
+    // User has permission on view in WITH clause, but not on underlying tables.
+    AuthzError("explain with t as (select * from functional.complex_view) " +
+        "select * from t",
+        "User '%s' does not have privileges to EXPLAIN this statement.");
     // User has permission on view and on view inside view,
     // but not on tables in view inside view.
     AuthzError("explain select * from functional.view_view",
@@ -419,6 +435,19 @@ public class AuthorizationTest {
     // User doesn't have permission on tables in view inside view.
     AuthzError("explain insert into functional_seq_snap.alltypes " +
         "partition(month,year) select * from functional.view_view",
+        "User '%s' does not have privileges to EXPLAIN this statement.");
+
+    // User has SELECT privileges on the view, but does not have privileges
+    // to select join table. Should get standard auth message back.
+    AuthzError("explain select a.id from functional.view_view a "
+        + "join functional.alltypes b ON (a.id = b.id)",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypes");
+
+    // User has privileges on tables inside the first view, but not the second
+    // view. Should get masked auth error back.
+    AuthzError("explain select a.id from functional.view_view a "
+        + "join functional.complex_view b ON (a.id = b.id)",
         "User '%s' does not have privileges to EXPLAIN this statement.");
   }
 
@@ -1052,8 +1081,8 @@ public class AuthorizationTest {
   public void TestShowDbResultsFiltered() throws ImpalaException {
     // These are the only dbs that should show up because they are the only
     // dbs the user has any permissions on.
-    List<String> expectedDbs = Lists.newArrayList("functional", "functional_parquet",
-        "functional_seq_snap", "tpcds", "tpch");
+    List<String> expectedDbs = Lists.newArrayList("default", "functional",
+        "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
 
     List<String> dbs = fe_.getDbNames("*", USER);
     Assert.assertEquals(expectedDbs, dbs);
@@ -1124,7 +1153,7 @@ public class AuthorizationTest {
     // Get all schema (databases).
     req.get_schemas_req.setSchemaName("%");
     TResultSet resp = fe_.execHiveServer2MetadataOp(req);
-    List<String> expectedDbs = Lists.newArrayList("functional",
+    List<String> expectedDbs = Lists.newArrayList("default", "functional",
         "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
@@ -1168,7 +1197,7 @@ public class AuthorizationTest {
         new User(USER.getName() + "/abc.host.com@REAL.COM"),
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {
-      ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig_);
+      ImpaladCatalog catalog = new ImpaladTestCatalog();
       AnalysisContext context = new AnalysisContext(catalog_,
           TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
 
@@ -1361,20 +1390,21 @@ public class AuthorizationTest {
     Assert.assertFalse(config.isEnabled());
   }
 
-  private static void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
+  private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws AnalysisException {
-    AnalysisContext ac = new AnalysisContext(new ImpaladTestCatalog(authzConfig),
+    Frontend fe = new Frontend(authzConfig, catalog_);
+    AnalysisContext ac = new AnalysisContext(new ImpaladTestCatalog(),
         TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
-    AuthzError(ac, "select * from functional.alltypesagg",
+    AuthzError(fe, ac, "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypesagg", user);
-    AuthzError(ac, "ALTER TABLE functional_seq_snap.alltypes ADD COLUMNS (c1 int)",
+    AuthzError(fe, ac, "ALTER TABLE functional_seq_snap.alltypes ADD COLUMNS (c1 int)",
         "User '%s' does not have privileges to execute 'ALTER' on: " +
         "functional_seq_snap.alltypes", user);
-    AuthzError(ac, "drop table tpch.lineitem",
+    AuthzError(fe, ac, "drop table tpch.lineitem",
         "User '%s' does not have privileges to execute 'DROP' on: tpch.lineitem",
         user);
-    AuthzError(ac, "show tables in functional",
+    AuthzError(fe, ac, "show tables in functional",
         "User '%s' does not have privileges to access: functional.*", user);
   }
 
@@ -1383,9 +1413,15 @@ public class AuthorizationTest {
     AuthzOk(analysisContext_, stmt);
   }
 
-  private static void AuthzOk(AnalysisContext context, String stmt)
+  private void AuthzOk(AnalysisContext context, String stmt)
+      throws AuthorizationException, AnalysisException {
+    AuthzOk(fe_, context, stmt);
+  }
+
+  private static void AuthzOk(Frontend fe, AnalysisContext context, String stmt)
       throws AuthorizationException, AnalysisException {
     context.analyze(stmt);
+    context.getAnalyzer().authorize(fe.getAuthzChecker());
   }
 
   /**
@@ -1397,11 +1433,20 @@ public class AuthorizationTest {
     AuthzError(analysisContext_, stmt, expectedErrorString, USER);
   }
 
-  private static void AuthzError(AnalysisContext analysisContext,
+  private void AuthzError(AnalysisContext analysisContext,
+      String stmt, String expectedErrorString, User user) throws AnalysisException {
+    AuthzError(fe_, analysisContext, stmt, expectedErrorString, user);
+  }
+
+  private static void AuthzError(Frontend fe, AnalysisContext analysisContext,
       String stmt, String expectedErrorString, User user) throws AnalysisException {
     Preconditions.checkNotNull(expectedErrorString);
     try {
-      analysisContext.analyze(stmt);
+      try {
+        analysisContext.analyze(stmt);
+      } finally {
+        analysisContext.getAnalyzer().authorize(fe.getAuthzChecker());
+      }
     } catch (AuthorizationException e) {
       // Insert the username into the error.
       expectedErrorString = String.format(expectedErrorString, user.getName());

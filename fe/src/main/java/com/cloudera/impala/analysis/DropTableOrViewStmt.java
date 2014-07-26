@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
@@ -69,8 +68,7 @@ public class DropTableOrViewStmt extends StatementBase {
    * that the table/view does not exist even if the table/view name is invalid.
    */
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     dbName_ = analyzer.getTargetDbName(tableName_);
     try {
       Table table = analyzer.getTable(tableName_, Privilege.DROP);
@@ -83,8 +81,6 @@ public class DropTableOrViewStmt extends StatementBase {
         throw new AnalysisException(String.format(
             "DROP VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
       }
-    } catch (AuthorizationException e) {
-      throw e;
     } catch (AnalysisException e) {
       if (ifExists_ && analyzer.getMissingTbls().isEmpty()) return;
       throw e;

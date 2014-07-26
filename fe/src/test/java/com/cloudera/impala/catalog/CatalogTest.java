@@ -17,10 +17,10 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.junit.Test;
 
-import com.cloudera.impala.analysis.NumericLiteral;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.analysis.NumericLiteral;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.testutil.CatalogServiceTestCatalog;
 import com.google.common.collect.Lists;
@@ -68,8 +68,7 @@ public class CatalogTest {
   }
 
   @Test
-  public void TestColSchema() throws TableLoadingException,
-      DatabaseNotFoundException {
+  public void TestColSchema() throws CatalogException {
     Db functionalDb = catalog_.getDb("functional");
     assertNotNull(functionalDb);
     assertEquals(functionalDb.getName(), "functional");
@@ -266,8 +265,7 @@ public class CatalogTest {
   }
 
   @Test
-  public void TestPartitions() throws TableLoadingException,
-      DatabaseNotFoundException {
+  public void TestPartitions() throws CatalogException {
     HdfsTable table =
         (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypes");
     List<HdfsPartition> partitions = table.getPartitions();
@@ -466,7 +464,7 @@ public class CatalogTest {
   }
 
   @Test
-  public void testInternalHBaseTable() throws DatabaseNotFoundException {
+  public void testInternalHBaseTable() throws CatalogException {
     // Cast will fail if table not an HBaseTable
    HBaseTable table = (HBaseTable)
        catalog_.getOrLoadTable("functional_hbase", "internal_hbase_table");
@@ -480,8 +478,7 @@ public class CatalogTest {
   }
 
   @Test
-  public void testCreateTableMetadata() throws TableLoadingException,
-      DatabaseNotFoundException {
+  public void testCreateTableMetadata() throws CatalogException {
     Table table = catalog_.getOrLoadTable("functional", "alltypes");
     // Tables are created via Impala so the metadata should have been populated properly.
     // alltypes is an external table.
@@ -496,7 +493,7 @@ public class CatalogTest {
   }
 
   @Test
-  public void testLoadingUnsupportedTableTypes() throws DatabaseNotFoundException {
+  public void testLoadingUnsupportedTableTypes() throws CatalogException {
     Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl");
     assertTrue(table instanceof IncompleteTable);
     IncompleteTable incompleteTable = (IncompleteTable) table;
@@ -527,7 +524,7 @@ public class CatalogTest {
   // This table has metadata set so the escape is \n, which is also the tuple delim. This
   // test validates that our representation of the catalog fixes this and removes the
   // escape char.
-  @Test public void TestTableWithBadEscapeChar() throws DatabaseNotFoundException {
+  @Test public void TestTableWithBadEscapeChar() throws CatalogException {
     HdfsTable table =
         (HdfsTable) catalog_.getOrLoadTable("functional", "escapechartesttable");
     List<HdfsPartition> partitions = table.getPartitions();

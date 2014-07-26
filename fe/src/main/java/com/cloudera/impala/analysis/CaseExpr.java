@@ -16,7 +16,6 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -113,8 +112,7 @@ public class CaseExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-       AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
 

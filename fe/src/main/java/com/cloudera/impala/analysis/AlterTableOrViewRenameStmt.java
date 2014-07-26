@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
@@ -66,8 +65,7 @@ public class AlterTableOrViewRenameStmt extends AlterTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     newTableName_.analyze();
     table_ = analyzer.getTable(tableName_, Privilege.ALTER);
     if (table_ instanceof View && renameTable_) {

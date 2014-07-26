@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.util.HashMap;
 
 import com.cloudera.impala.catalog.AggregateFunction;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
@@ -83,8 +82,7 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
 
     if (uda_.getNumArgs() == 0) {

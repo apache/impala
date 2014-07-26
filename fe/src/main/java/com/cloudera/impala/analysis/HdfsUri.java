@@ -23,7 +23,6 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import com.cloudera.impala.authorization.AuthorizeableUri;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequest;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.google.common.base.Preconditions;
@@ -48,7 +47,7 @@ public class HdfsUri {
   }
 
   public void analyze(Analyzer analyzer, Privilege privilege)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     if (location_.isEmpty()) {
       throw new AnalysisException("URI path cannot be empty.");
     }
@@ -69,9 +68,8 @@ public class HdfsUri {
 
     // Fully-qualify the path
     uriPath_ = FileSystemUtil.createFullyQualifiedPath(uriPath_);
-    PrivilegeRequest req = new PrivilegeRequest(
-        new AuthorizeableUri(uriPath_.toString()), privilege);
-    analyzer.getCatalog().checkAccess(analyzer.getUser(), req);
+    analyzer.registerPrivReq(new PrivilegeRequest(
+        new AuthorizeableUri(uriPath_.toString()), privilege));
   }
 
   @Override

@@ -16,7 +16,6 @@ package com.cloudera.impala.analysis;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
@@ -58,8 +57,7 @@ public class AlterTableChangeColStmt extends AlterTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     Table t = getTargetTable();
     // TODO: Support column-level DDL on HBase tables. Requires updating the column

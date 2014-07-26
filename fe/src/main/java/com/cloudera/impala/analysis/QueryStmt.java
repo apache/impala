@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.common.AnalysisException;
@@ -88,16 +87,14 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     this.analyzer_ = analyzer;
     analyzeLimit(analyzer);
     if (hasWithClause()) withClause_.analyze(analyzer);
   }
 
-  private void analyzeLimit(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  private void analyzeLimit(Analyzer analyzer) throws AnalysisException {
     if (limitElement_.getOffsetExpr() != null && !hasOrderByClause()) {
       throw new AnalysisException("OFFSET requires an ORDER BY clause: " +
           limitElement_.toSql().trim());
@@ -113,8 +110,7 @@ public abstract class QueryStmt extends StatementBase {
    * Sets evaluateOrderBy_ to false for ignored order-by w/o limit/offset in nested
    * queries.
    */
-  protected void createSortInfo(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  protected void createSortInfo(Analyzer analyzer) throws AnalysisException {
     // not computing order by
     if (orderByElements_ == null) {
       evaluateOrderBy_ = false;
@@ -236,7 +232,7 @@ public abstract class QueryStmt extends StatementBase {
    * expressions.
    */
   protected abstract void substituteOrdinals(List<Expr> exprs, String errorPrefix,
-      Analyzer analyzer) throws AnalysisException, AuthorizationException;
+      Analyzer analyzer) throws AnalysisException;
 
   /**
    * UnionStmt and SelectStmt have different implementations.

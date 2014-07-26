@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
@@ -96,8 +95,7 @@ class LimitElement {
     return sb.toString();
   }
 
-  public void analyze(Analyzer analyzer) throws AuthorizationException,
-      AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     isAnalyzed_ = true;
     if (limitExpr_ != null) {
       if (!limitExpr_.isConstant()) {

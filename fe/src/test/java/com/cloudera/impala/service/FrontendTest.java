@@ -41,8 +41,7 @@ import com.google.common.collect.Sets;
  */
 public class FrontendTest {
   private static Frontend fe_ = new Frontend(
-      AuthorizationConfig.createAuthDisabledConfig(),
-      new ImpaladTestCatalog(AuthorizationConfig.createAuthDisabledConfig()));
+      AuthorizationConfig.createAuthDisabledConfig(), new ImpaladTestCatalog());
 
   @Test
   public void TestCatalogNotReady() throws ImpalaException {

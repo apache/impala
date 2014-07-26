@@ -16,9 +16,8 @@ package com.cloudera.impala.analysis;
 
 import java.util.HashMap;
 
-import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.cloudera.impala.thrift.TSymbolType;
@@ -48,8 +47,7 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
 
     if (udf_.getBinaryType() == TFunctionBinaryType.HIVE) {

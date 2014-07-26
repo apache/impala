@@ -43,8 +43,7 @@ public class HdfsCachingOp implements ParseNode {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (cacheOp_.isSet_cached()) {
       String poolName = cacheOp_.getCache_pool_name();
       Preconditions.checkNotNull(poolName);

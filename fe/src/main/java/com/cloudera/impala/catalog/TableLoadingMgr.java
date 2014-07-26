@@ -285,7 +285,7 @@ public class TableLoadingMgr {
       // TODO: Instead of calling "getOrLoad" here we could call "loadAsync". We would
       // just need to add a mechanism for moving loaded tables into the Catalog.
       catalog_.getOrLoadTable(tblName.getDb_name(), tblName.getTable_name());
-    } catch (DatabaseNotFoundException e) {
+    } catch (CatalogException e) {
       // Ignore.
     }
   }

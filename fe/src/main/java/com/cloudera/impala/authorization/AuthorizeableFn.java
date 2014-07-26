@@ -21,22 +21,22 @@ import org.apache.sentry.core.model.db.DBModelAuthorizable;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
-/*
- * Class used to authorize access to a database.
+/**
+ * Class used to authorize access to a Function.
  */
-public class AuthorizeableDb implements Authorizeable {
-  private final org.apache.sentry.core.model.db.Database database_;
+public class AuthorizeableFn implements Authorizeable {
+  private final String fnName_;
 
-  public AuthorizeableDb(String dbName) {
-    Preconditions.checkState(dbName != null && !dbName.isEmpty());
-    database_ = new org.apache.sentry.core.model.db.Database(dbName);
+  public AuthorizeableFn(String fnName) {
+    Preconditions.checkState(fnName != null && !fnName.isEmpty());
+    fnName_ = fnName;
   }
 
   @Override
   public List<DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
-    return Lists.newArrayList((DBModelAuthorizable) database_);
+    return Lists.newArrayList();
   }
 
   @Override
-  public String getName() { return database_.getName(); }
+  public String getName() { return fnName_; }
 }

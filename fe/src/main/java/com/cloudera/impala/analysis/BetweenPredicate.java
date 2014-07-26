@@ -16,7 +16,6 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.google.common.base.Preconditions;
@@ -61,8 +60,7 @@ public class BetweenPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
     analyzer.castAllToCompatibleType(originalChildren_);
@@ -123,7 +121,7 @@ public class BetweenPredicate extends Predicate {
    */
   @Override
   protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
-      throws AuthorizationException, AnalysisException {
+      throws AnalysisException {
     BetweenPredicate clone = (BetweenPredicate) super.substituteImpl(smap, analyzer);
     Preconditions.checkNotNull(clone);
     clone.originalChildren_ = Expr.substituteList(originalChildren_, smap, analyzer);

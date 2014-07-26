@@ -17,11 +17,8 @@ package com.cloudera.impala.analysis;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TCreateDbParams;
 
 /**
@@ -79,8 +76,7 @@ public class CreateDbStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check whether the db name meets the Metastore's requirements.
     if (!MetaStoreUtils.validateName(dbName_)) {
       throw new AnalysisException("Invalid database name: " + dbName_);
@@ -90,12 +86,10 @@ public class CreateDbStmt extends StatementBase {
     // this Impala instance. If that happens, the caller will not get an
     // AnalysisException when creating the database, they will get a Hive
     // AlreadyExistsException once the request has been sent to the metastore.
-    Db db = analyzer.getCatalog().getDb(getDb(), analyzer.getUser(), Privilege.CREATE);
+    Db db = analyzer.getDb(getDb(), Privilege.CREATE, false);
     if (db != null && !ifNotExists_) {
       throw new AnalysisException(Analyzer.DB_ALREADY_EXISTS_ERROR_MSG + getDb());
     }
-    analyzer.addAccessEvent(new TAccessEvent(
-        getDb(), TCatalogObjectType.DATABASE, Privilege.CREATE.toString()));
 
     if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
   }

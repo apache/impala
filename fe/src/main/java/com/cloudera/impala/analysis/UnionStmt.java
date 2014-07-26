@@ -21,7 +21,6 @@ import java.util.ListIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -70,9 +69,8 @@ public class UnionStmt extends QueryStmt {
       this.qualifier_ = qualifier;
     }
 
-    public void analyze(Analyzer parent)
-        throws AnalysisException, AuthorizationException {
-      analyzer_ = new Analyzer(parent, parent.getUser());
+    public void analyze(Analyzer parent) throws AnalysisException {
+      analyzer_ = new Analyzer(parent);
       queryStmt_.analyze(analyzer_);
     }
 
@@ -136,8 +134,7 @@ public class UnionStmt extends QueryStmt {
    * union operands are union compatible, adding implicit casts if necessary.
    */
   @Override
-  public void analyze(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     try {
       super.analyze(analyzer);
     } catch (AnalysisException e) {
@@ -240,8 +237,7 @@ public class UnionStmt extends QueryStmt {
    * Fill distinct-/allOperands and performs possible unnesting of UnionStmt
    * operands in the process.
    */
-  private void unnestOperands(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  private void unnestOperands(Analyzer analyzer) throws AnalysisException {
     if (operands_.size() == 1) {
       // ValuesStmt for a single row.
       allOperands_.add(operands_.get(0));
@@ -444,7 +440,7 @@ public class UnionStmt extends QueryStmt {
    */
   @Override
   protected void substituteOrdinals(List<Expr> exprs, String errorPrefix,
-      Analyzer analyzer) throws AnalysisException, AuthorizationException {
+      Analyzer analyzer) throws AnalysisException {
     // Substitute ordinals.
     ListIterator<Expr> i = exprs.listIterator();
     while (i.hasNext()) {

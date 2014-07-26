@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.Set;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.RowFormat;
@@ -162,8 +161,7 @@ public class CreateTableStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     tableName_.analyze();
     dbName_ = analyzer.getTargetDbName(tableName_);

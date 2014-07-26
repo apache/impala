@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
@@ -38,8 +37,7 @@ public class ShowPartitionsStmt extends ShowStatsStmt {
   protected String getSqlPrefix() { return "SHOW PARTITIONS"; }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     Preconditions.checkNotNull(table_);
     if (!(table_ instanceof HdfsTable)) {

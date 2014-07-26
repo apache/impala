@@ -15,11 +15,8 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TAccessEvent;
-import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TDropDbParams;
 
 /**
@@ -59,14 +56,11 @@ public class DropDbStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
-    Db db = analyzer.getCatalog().getDb(dbName_, analyzer.getUser(), Privilege.DROP);
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    Db db = analyzer.getDb(dbName_, Privilege.DROP, false);
     if (db == null && !ifExists_) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName_);
     }
-    analyzer.addAccessEvent(new TAccessEvent(dbName_,
-        TCatalogObjectType.DATABASE, Privilege.DROP.toString()));
 
     if (analyzer.getDefaultDb().toLowerCase().equals(dbName_.toLowerCase())) {
       throw new AnalysisException("Cannot drop current default database: " + dbName_);

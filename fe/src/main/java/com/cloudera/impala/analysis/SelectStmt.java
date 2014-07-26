@@ -22,7 +22,6 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Type;
@@ -109,8 +108,7 @@ public class SelectStmt extends QueryStmt {
    * Creates resultExprs and baseTblResultExprs.
    */
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
 
     // Start out with table refs to establish aliases.
@@ -242,7 +240,7 @@ public class SelectStmt extends QueryStmt {
     * baseTblResultExprs.
     */
   protected void resolveInlineViewRefs(Analyzer analyzer)
-      throws AuthorizationException, AnalysisException {
+      throws AnalysisException {
     // Gather the inline view substitution maps from the enclosed inline views
     for (TableRef tblRef: tableRefs_) {
       if (tblRef instanceof InlineViewRef) {
@@ -268,8 +266,7 @@ public class SelectStmt extends QueryStmt {
   /**
    * Expand "*" select list item.
    */
-  private void expandStar(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  private void expandStar(Analyzer analyzer) throws AnalysisException {
     if (tableRefs_.isEmpty()) {
       throw new AnalysisException("'*' expression in select list requires FROM clause.");
     }
@@ -283,7 +280,7 @@ public class SelectStmt extends QueryStmt {
    * Expand "<tbl>.*" select list item.
    */
   private void expandStar(Analyzer analyzer, TableName tblName)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     TupleDescriptor tupleDesc = analyzer.getDescriptor(tblName);
     if (tupleDesc == null) {
       throw new AnalysisException("unknown table alias '" + tblName.toString() + "'");
@@ -296,7 +293,7 @@ public class SelectStmt extends QueryStmt {
    * analyzed slot refs for each column to selectListExprs.
    */
   private void expandStar(Analyzer analyzer, TableName tblName, TupleDescriptor desc)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     for (Column col: desc.getTable().getColumnsInHiveOrder()) {
       SlotRef slotRef = new SlotRef(tblName, col.getName());
       slotRef.analyze(analyzer);
@@ -312,7 +309,7 @@ public class SelectStmt extends QueryStmt {
    * given AggregationInfo's smap.
    */
   private void analyzeAggregation(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     if (groupingExprs_ == null && !selectList_.isDistinct()
         && !TreeNode.contains(resultExprs_, Expr.isAggregatePredicate())) {
       // we're not computing aggregates
@@ -496,7 +493,7 @@ public class SelectStmt extends QueryStmt {
    */
   private ExprSubstitutionMap createAvgSMap(
       ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     ExprSubstitutionMap result = new ExprSubstitutionMap();
     for (FunctionCallExpr aggExpr : aggExprs) {
       if (!aggExpr.getFnName().getFunction().equals("avg")) continue;
@@ -547,7 +544,7 @@ public class SelectStmt extends QueryStmt {
    */
   private ExprSubstitutionMap createCountAllMap(
       List<FunctionCallExpr> aggExprs, Analyzer analyzer)
-      throws AuthorizationException, AnalysisException {
+      throws AnalysisException {
     ExprSubstitutionMap scalarCountAllMap = new ExprSubstitutionMap();
 
     if (groupingExprs_ != null && !groupingExprs_.isEmpty()) {
@@ -613,7 +610,7 @@ public class SelectStmt extends QueryStmt {
    */
   @Override
   protected void substituteOrdinals(List<Expr> exprs, String errorPrefix,
-      Analyzer analyzer) throws AnalysisException, AuthorizationException {
+      Analyzer analyzer) throws AnalysisException {
     // substitute ordinals
     ListIterator<Expr> i = exprs.listIterator();
     while (i.hasNext()) {

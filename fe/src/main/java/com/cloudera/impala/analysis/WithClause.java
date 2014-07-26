@@ -17,7 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.catalog.AuthorizationException;
+import com.cloudera.impala.authorization.PrivilegeRequest;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Joiner;
@@ -57,8 +57,7 @@ public class WithClause implements ParseNode {
    * TableRefs to simplify the analysis of view references.
    */
   @Override
-  public void analyze(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     // Use a dummy root analyzer as to not pollute the analyzer's global state
     // with tuples, slots, conjuncts, etc. that will never be used. Every view ref
     // will register a new copy of such analysis state for itself.
@@ -66,7 +65,7 @@ public class WithClause implements ParseNode {
         new Analyzer(analyzer.getCatalog(), analyzer.getQueryCtx());
     if (analyzer.isExplain()) dummyRootAnalyzer.setIsExplain();
     for (View view: views_) {
-      Analyzer viewAnalyzer = new Analyzer(dummyRootAnalyzer, analyzer.getUser());
+      Analyzer viewAnalyzer = new Analyzer(dummyRootAnalyzer);
       view.getQueryStmt().analyze(viewAnalyzer);
       // Register this view so that the next view can reference it.
       dummyRootAnalyzer.registerLocalView(view);
@@ -78,6 +77,11 @@ public class WithClause implements ParseNode {
     // Record audit events because the resolved table references won't generate any
     // when a view is referenced.
     analyzer.getAccessEvents().addAll(dummyRootAnalyzer.getAccessEvents());
+
+    // Register all privilege requests made from the root analyzer.
+    for (PrivilegeRequest req: dummyRootAnalyzer.getPrivilegeReqs()) {
+      analyzer.registerPrivReq(req);
+    }
   }
 
   @Override

@@ -20,7 +20,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
@@ -240,15 +239,11 @@ public class AnalysisContext {
    * Parse and analyze 'stmt'. The result of analysis can be retrieved by calling
    * getAnalysisResult().
    *
-   * @throws AuthorizationException
-   *           If the user did not have privileges to access one or more catalog
-   *           objects.
    * @throws AnalysisException
    *           On any other error, including parsing errors. Also thrown when any
    *           missing tables are detected as a result of running analysis.
    */
-  public void analyze(String stmt) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(String stmt) throws AnalysisException {
     analysisResult_ = new AnalysisResult();
     analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_);
 
@@ -260,9 +255,6 @@ public class AnalysisContext {
       analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
     } catch (AnalysisException e) {
       // Don't wrap AnalysisExceptions in another AnalysisException
-      throw e;
-    } catch (AuthorizationException e) {
-      // Don't wrap AuthorizationExceptions in an AnalysisException
       throw e;
     } catch (Exception e) {
       throw new AnalysisException(parser.getErrorMsg(stmt), e);

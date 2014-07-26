@@ -47,7 +47,6 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.ToSqlUtils;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
-import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.Function;
@@ -360,8 +359,7 @@ public class JniFrontend {
     TTableName params = new TTableName();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftTableName);
     return ToSqlUtils.getCreateTableSql(frontend_.getCatalog().getTable(
-        params.getDb_name(), params.getTable_name(),
-        ImpalaInternalAdminUser.getInstance(), Privilege.ALL));
+        params.getDb_name(), params.getTable_name()));
   }
 
   /**

@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
@@ -44,8 +43,7 @@ public class BaseTableRef extends TableRef {
    * Register this table ref and then analyze the Join clause.
    */
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkNotNull(getPrivilegeRequirement());
     setFullyQualifiedTableName(analyzer);
     desc_ = analyzer.registerTableRef(this);
@@ -55,7 +53,7 @@ public class BaseTableRef extends TableRef {
 
   @Override
   public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor();
     result.setTable(table_);
     return result;

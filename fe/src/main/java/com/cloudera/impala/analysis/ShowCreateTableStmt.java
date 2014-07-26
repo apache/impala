@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TTableName;
@@ -39,8 +38,7 @@ public class ShowCreateTableStmt extends StatementBase {
   public String toSql() { return "SHOW CREATE TABLE " + tableName_; }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (!tableName_.isFullyQualified()) {
       tableName_ = new TableName(analyzer.getDefaultDb(), tableName_.getTbl());
     }

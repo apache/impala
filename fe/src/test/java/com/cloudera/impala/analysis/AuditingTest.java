@@ -25,6 +25,7 @@ import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TAccessEvent;
@@ -301,16 +302,17 @@ public class AuditingTest extends AnalyzerTest {
     AuthorizationConfig config = new AuthorizationConfig("server1", "/does/not/exist",
         "");
     ImpaladCatalog catalog = new ImpaladTestCatalog(config);
+    Frontend fe = new Frontend(config, catalog);
     Analyzer analyzer = new Analyzer(catalog, TestUtils.createQueryContext());
 
-    // Authorization of an object is performed immediately before auditing so
-    // the access events will not include the item that failed authorization.
+    // We should get an audit event even when an authorization failure occurs.
     try {
-      ParseNode node = ParsesOk("create table foo(i int)");
+      ParseNode node = ParsesOk("create table foo_does_not_exist(i int)");
       node.analyze(analyzer);
+      analyzer.authorize(fe.getAuthzChecker());
       Assert.fail("Expected AuthorizationException");
     } catch (AuthorizationException e) {
-      Assert.assertEquals(0, analyzer.getAccessEvents().size());
+      Assert.assertEquals(1, analyzer.getAccessEvents().size());
     }
   }
 

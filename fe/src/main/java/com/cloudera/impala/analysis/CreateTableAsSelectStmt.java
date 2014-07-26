@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.util.EnumSet;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -56,8 +55,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
   public String toSql() { return createStmt_.toSql() + " AS " + getQueryStmt().toSql(); }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
 
     // The analysis for CTAS happens in two phases - the first phase happens before
@@ -66,7 +64,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     // over the full INSERT statement. To avoid duplicate registrations of table/colRefs,
     // create a new analyzer and clone the query statement for this initial pass.
     QueryStmt tmpQueryStmt = insertStmt_.getQueryStmt().clone();
-    Analyzer tmpAnalyzer = new Analyzer(analyzer, analyzer.getUser());
+    Analyzer tmpAnalyzer = new Analyzer(analyzer);
     tmpAnalyzer.setUseHiveColLabels(true);
     tmpQueryStmt.analyze(tmpAnalyzer);
 
@@ -88,8 +86,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
     // The full privilege check for the database will be done as part of the INSERT
     // analysis.
-    Db db = analyzer.getCatalog().getDb(createStmt_.getDb(),
-        analyzer.getUser(), Privilege.ANY);
+    Db db = analyzer.getDb(createStmt_.getDb(), Privilege.ANY);
     if (db == null) {
       throw new AnalysisException(
           Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + createStmt_.getDb());

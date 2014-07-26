@@ -20,9 +20,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
-import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.InlineView;
@@ -103,40 +100,29 @@ public class InlineViewRef extends TableRef {
    * then performs join clause analysis.
    */
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
-    // Catalog views refs require special analysis for authorization.
-    // TODO: Find a better way to handle authorization of views and view definitions
-    // without the need for analyzeAsUser().
-    if (view_ != null && !view_.isLocalView()) {
-      // At this point we have established that the analyzer's user has privileges to
-      // access this view. If the user does not have privileges on the view's definition
-      // then we report a generic authorization exception so as not to reveal
-      // privileged information (e.g., the existence of a table).
-      if (analyzer.isExplain()) {
-        try {
-          analyzeAsUser(analyzer, analyzer.getUser(), true);
-        } catch (AuthorizationException e) {
-          throw new AuthorizationException(
-              String.format("User '%s' does not have privileges to " +
-                  "EXPLAIN this statement.", analyzer.getUser().getName()));
-        }
-        return;
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    // Analyze the inline view query statement with its own analyzer
+    inlineViewAnalyzer_ = new Analyzer(analyzer);
+
+    // Catalog views refs require special analysis settings for authorization.
+    boolean isCatalogView = (view_ != null && !view_.isLocalView());
+    if (isCatalogView) {
+      if (inlineViewAnalyzer_.isExplain()) {
+        // If the user does not have privileges on the view's definition
+        // then we report a masked authorization error so as not to reveal
+        // privileged information (e.g., the existence of a table).
+        inlineViewAnalyzer_.setAuthErrMsg(
+            String.format("User '%s' does not have privileges to " +
+            "EXPLAIN this statement.", analyzer.getUser().getName()));
+      } else {
+        // If this is not an EXPLAIN statement, auth checks for the view
+        // definition should be disabled.
+        inlineViewAnalyzer_.setEnablePrivChecks(false);
       }
-      // Use the super user to circumvent authorization checking during the
-      // analysis of this view's defining queryStmt.
-      analyzeAsUser(analyzer, ImpalaInternalAdminUser.getInstance(), true);
-      return;
     }
 
-    analyzeAsUser(analyzer, analyzer.getUser(), analyzer.useHiveColLabels());
-  }
-
-  protected void analyzeAsUser(Analyzer analyzer, User user, boolean useHiveColLabels)
-      throws AuthorizationException, AnalysisException {
-    // Analyze the inline view query statement with its own analyzer
-    inlineViewAnalyzer_ = new Analyzer(analyzer, user);
-    inlineViewAnalyzer_.setUseHiveColLabels(useHiveColLabels);
+    inlineViewAnalyzer_.setUseHiveColLabels(
+        isCatalogView ? true : analyzer.useHiveColLabels());
     queryStmt_.analyze(inlineViewAnalyzer_);
 
     inlineViewAnalyzer_.setHasLimitOffsetClause(
@@ -169,8 +155,9 @@ public class InlineViewRef extends TableRef {
 
       analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), colExpr.clone());
     }
-    LOG.info("inline view " + getAlias() + " smap: " + smap_.debugString());
-    LOG.info("inline view " + getAlias() + " baseTblSmap: " + baseTblSmap_.debugString());
+    LOG.trace("inline view " + getAlias() + " smap: " + smap_.debugString());
+    LOG.trace("inline view " + getAlias() + " baseTblSmap: " +
+        baseTblSmap_.debugString());
 
     // Now do the remaining join analysis
     analyzeJoin(analyzer);
@@ -228,7 +215,7 @@ public class InlineViewRef extends TableRef {
   }
 
   protected void makeOutputNullableHelper(Analyzer analyzer, ExprSubstitutionMap smap)
-      throws InternalException, AuthorizationException, AnalysisException {
+      throws InternalException, AnalysisException {
     // Gather all unique rhs SlotRefs into rhsSlotRefs
     List<SlotRef> rhsSlotRefs = Lists.newArrayList();
     TreeNode.collect(smap.getRhs(), Predicates.instanceOf(SlotRef.class), rhsSlotRefs);
@@ -259,8 +246,7 @@ public class InlineViewRef extends TableRef {
    * false otherwise.
    */
   private boolean requiresNullWrapping(Analyzer analyzer, Expr expr,
-      ExprSubstitutionMap nullSMap) throws InternalException, AuthorizationException,
-      AnalysisException {
+      ExprSubstitutionMap nullSMap) throws InternalException, AnalysisException {
     // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
     // then do not try to execute it.
     // TODO: return true in this case?

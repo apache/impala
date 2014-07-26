@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Set;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Joiner;
@@ -86,8 +85,7 @@ public class TableRef implements ParseNode {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     throw new AnalysisException("Unresolved table reference: " + tableRefToSql());
   }
 
@@ -97,7 +95,7 @@ public class TableRef implements ParseNode {
    * This method is called from the analyzer when registering this table reference.
    */
   public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     throw new AnalysisException("Unresolved table reference: " + tableRefToSql());
   }
 
@@ -250,8 +248,7 @@ public class TableRef implements ParseNode {
    * The join clause can only be analyzed after the left table has been analyzed
    * and the TupleDescriptor (desc) of this table has been created.
    */
-  public void analyzeJoin(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  public void analyzeJoin(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(desc_ != null);
     analyzeJoinHints();
     if (joinOp_ == JoinOperator.CROSS_JOIN) {

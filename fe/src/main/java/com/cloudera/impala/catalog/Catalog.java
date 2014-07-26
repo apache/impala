@@ -142,7 +142,7 @@ public abstract class Catalog {
    * metadata load if the table metadata is not yet cached.
    */
   public Table getTable(String dbName, String tableName) throws
-      DatabaseNotFoundException {
+      CatalogException {
     Db db = getDb(dbName);
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
@@ -180,6 +180,10 @@ public abstract class Catalog {
     return filterStringsByPattern(db.getAllTableNames(), tablePattern);
   }
 
+  /**
+   * Returns true if the table and the database exist in the Impala Catalog. Returns
+   * false if either the table or the database do not exist.
+   */
   public boolean containsTable(String dbName, String tableName) {
     Db db = getDb(dbName);
     return (db == null) ? false : db.containsTable(tableName);
@@ -355,8 +359,7 @@ public abstract class Catalog {
    * @throws TableLoadingException - If there is an error loading the table metadata.
    */
   public HdfsPartition getHdfsPartition(String dbName, String tableName,
-      List<TPartitionKeyValue> partitionSpec) throws DatabaseNotFoundException,
-      PartitionNotFoundException, TableNotFoundException, TableLoadingException {
+      List<TPartitionKeyValue> partitionSpec) throws CatalogException {
     String partitionNotFoundMsg =
         "Partition not found: " + Joiner.on(", ").join(partitionSpec);
     Table table = getTable(dbName, tableName);
@@ -379,8 +382,7 @@ public abstract class Catalog {
    * @throws TableLoadingException - If there is an error loading the table metadata.
    */
   public boolean containsHdfsPartition(String dbName, String tableName,
-      List<TPartitionKeyValue> partitionSpec) throws DatabaseNotFoundException,
-      TableNotFoundException, TableLoadingException {
+      List<TPartitionKeyValue> partitionSpec) throws CatalogException {
     try {
       return getHdfsPartition(dbName, tableName, partitionSpec) != null;
     } catch (PartitionNotFoundException e) {

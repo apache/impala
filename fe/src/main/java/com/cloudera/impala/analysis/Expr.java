@@ -23,7 +23,6 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Function.CompareMode;
@@ -136,8 +135,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Throws exception if any errors found.
    * @see com.cloudera.impala.parser.ParseNode#analyze(com.cloudera.impala.parser.Analyzer)
    */
-  public void analyze(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check the expr child limit.
     if (children_.size() > EXPR_CHILDREN_LIMIT) {
       String sql = toSql();
@@ -287,7 +285,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * cast to targetType.
    */
   private Expr convertNumericLiteralsToFloat(Analyzer analyzer, Expr child,
-      Type targetType) throws AnalysisException, AuthorizationException {
+      Type targetType) throws AnalysisException {
     if (!targetType.isFloatingPointType() && !targetType.isIntegerType()) return child;
     if (targetType.isIntegerType()) targetType = Type.DOUBLE;
     List<NumericLiteral> literals = Lists.newArrayList();
@@ -321,7 +319,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * TODO: another option is to do constant folding in the FE and then apply this rule.
    */
   protected void convertNumericLiteralsFromDecimal(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     Preconditions.checkState(this instanceof ArithmeticExpr ||
         this instanceof BinaryPredicate);
     Preconditions.checkState(children_.size() == 2);
@@ -348,7 +346,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Helper function: analyze list of exprs
    */
   public static void analyze(List<? extends Expr> exprs, Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     if (exprs == null) return;
     for (Expr expr: exprs) {
       expr.analyze(analyzer);
@@ -556,7 +554,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * If smap is null, this function is equivalent to clone().
    */
   public Expr trySubstitute(ExprSubstitutionMap smap, Analyzer analyzer)
-      throws AuthorizationException, AnalysisException {
+      throws AnalysisException {
     Expr result = clone();
     // Return clone to avoid removing casts.
     if (smap == null) return result;
@@ -582,7 +580,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public static ArrayList<Expr> trySubstituteList(Iterable<? extends Expr> exprs,
       ExprSubstitutionMap smap, Analyzer analyzer)
-          throws AuthorizationException, AnalysisException {
+          throws AnalysisException {
     if (exprs == null) return null;
     ArrayList<Expr> result = new ArrayList<Expr>();
     for (Expr e: exprs) {
@@ -607,7 +605,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * override this method and apply the substitution to such exprs as well.
    */
   protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
-    throws AuthorizationException, AnalysisException {
+      throws AnalysisException {
     if (isImplicitCast()) return getChild(0).substituteImpl(smap, analyzer);
     if (smap != null) {
       Expr substExpr = smap.get(this);

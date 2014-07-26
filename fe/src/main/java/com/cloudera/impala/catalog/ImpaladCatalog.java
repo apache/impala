@@ -14,16 +14,7 @@
 
 package com.cloudera.impala.catalog;
 
-import java.util.EnumSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -31,12 +22,6 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
-import com.cloudera.impala.authorization.AuthorizationChecker;
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.authorization.PrivilegeRequest;
-import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
-import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TCatalogObject;
@@ -50,21 +35,11 @@ import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 
 /**
- * Thread safe Catalog for an Impalad. The Impalad Catalog provides an interface to
- * access Catalog objects that this Impalad knows about and authorizes access requests
- * to these objects. It also manages reading and updating the authorization policy file
- * from HDFS. The Impalad Catalog provides APIs for checking whether a user is authorized
- * to access a particular catalog object. Any catalog access that requires privilege
- * checks should go through this class.
- * TODO: The CatalogService should also handle updating and disseminating the
- * authorization policy.
- * The Impalad catalog can be updated either via a StateStore heartbeat or by directly
- * applying the result of a catalog operation to the CatalogCache. All updates are
- * applied using the updateCatalog() function.
+ * Thread safe Catalog for an Impalad.  The Impalad catalog can be updated either via
+ * a StateStore heartbeat or by directly applying the result of a catalog operation to
+ * the CatalogCache. All updates are applied using the updateCatalog() function.
  * Table metadata is loaded lazily. The CatalogServer initially broadcasts (via the
  * statestore) the known table names (as IncompleteTables). These table names are added
  * to the Impalad catalog cache and when one of the tables is accessed, the impalad will
@@ -100,17 +75,6 @@ public class ImpaladCatalog extends Catalog {
   // contains some objects > than this version.
   private long lastSyncedCatalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
 
-  //TODO: Make the reload interval configurable.
-  private static final int AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS = 5 * 60;
-
-  private final ScheduledExecutorService policyReader_ =
-      Executors.newScheduledThreadPool(1);
-  private final AuthorizationConfig authzConfig_;
-  // Lock used to synchronize refreshing the AuthorizationChecker.
-  private final ReentrantReadWriteLock authzCheckerLock_ = new ReentrantReadWriteLock();
-  // Visibility is protected for testing.
-  protected AuthorizationChecker authzChecker_;
-
   // Flag to determine if the Catalog is ready to accept user requests. See isReady().
   private final AtomicBoolean isReady_ = new AtomicBoolean(false);
 
@@ -124,73 +88,8 @@ public class ImpaladCatalog extends Catalog {
    * C'tor used by tests that need to validate the ImpaladCatalog outside of the
    * CatalogServer.
    */
-  public ImpaladCatalog(AuthorizationConfig authzConfig) {
+  public ImpaladCatalog() {
     super(false);
-    authzConfig_ = authzConfig;
-    authzChecker_ = new AuthorizationChecker(authzConfig, authPolicy_);
-    if (authzConfig.isEnabled() && !Strings.isNullOrEmpty(authzConfig.getPolicyFile())) {
-      // If file based authorization is enabled, reload the policy file on a regular
-      // basis.
-
-      // Stagger the reads across nodes
-      Random randomGen = new Random(UUID.randomUUID().hashCode());
-      int delay = AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS + randomGen.nextInt(60);
-      policyReader_.scheduleAtFixedRate(
-          new AuthorizationPolicyReader(authzConfig),
-          delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
-    }
-  }
-
-  private class AuthorizationPolicyReader implements Runnable {
-    private final AuthorizationConfig config;
-
-    public AuthorizationPolicyReader(AuthorizationConfig config) {
-      this.config = config;
-    }
-
-    public void run() {
-      LOG.info("Reloading authorization policy file from: " + config.getPolicyFile());
-      authzCheckerLock_.writeLock().lock();
-      try {
-        authzChecker_ = new AuthorizationChecker(config, authPolicy_);
-      } finally {
-        authzCheckerLock_.writeLock().unlock();
-      }
-    }
-  }
-
-  /**
-   * Checks whether a given user has sufficient privileges to access an authorizeable
-   * object.
-   * @throws AuthorizationException - If the user does not have sufficient privileges.
-   */
-  public void checkAccess(User user, PrivilegeRequest privilegeRequest)
-      throws AuthorizationException {
-    Preconditions.checkNotNull(user);
-    Preconditions.checkNotNull(privilegeRequest);
-
-    if (!hasAccess(user, privilegeRequest)) {
-      Privilege privilege = privilegeRequest.getPrivilege();
-      if (EnumSet.of(Privilege.ANY, Privilege.ALL, Privilege.VIEW_METADATA)
-          .contains(privilege)) {
-        throw new AuthorizationException(String.format(
-            "User '%s' does not have privileges to access: %s",
-            user.getName(), privilegeRequest.getName()));
-      } else {
-        throw new AuthorizationException(String.format(
-            "User '%s' does not have privileges to execute '%s' on: %s",
-            user.getName(), privilege, privilegeRequest.getName()));
-      }
-    }
-  }
-
-  public void checkCreateDropFunctionAccess(User user) throws AuthorizationException {
-    Preconditions.checkNotNull(user);
-    if (!hasAccess(user, new PrivilegeRequest(Privilege.ALL))) {
-      throw new AuthorizationException(String.format(
-          "User '%s' does not have privileges to CREATE/DROP functions.",
-          user.getName()));
-    }
   }
 
   /**
@@ -273,88 +172,15 @@ public class ImpaladCatalog extends Catalog {
   }
 
   /**
-   * Gets the Db object from the Catalog using a case-insensitive lookup on the name.
-   * Returns null if no matching database is found.
+   * Returns the Table object for the given dbName/tableName. Returns null
+   * if the table does not exist. Will throw a TableLoadingException if the table's
+   * metadata was not able to be loaded successfully and DatabaseNotFoundException
+   * if the parent database does not exist.
    */
-  public Db getDb(String dbName, User user, Privilege privilege)
-      throws AuthorizationException {
-    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
-        "Null or empty database name given as argument to Catalog.getDb");
-    if (checkSystemDbAccess(dbName, privilege)) return getDb(dbName);
-    PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
-    if (privilege == Privilege.ANY) {
-      checkAccess(user, pb.any().onAnyTable(dbName).toRequest());
-    } else {
-      checkAccess(user, pb.allOf(privilege).onDb(dbName).toRequest());
-    }
-    return getDb(dbName);
-  }
-
-  /**
-   * Returns a list of databases that match dbPattern and the user has privilege to
-   * access. See filterStringsByPattern for details of the pattern matching semantics.
-   *
-   * dbPattern may be null (and thus matches everything).
-   *
-   * User is the user from the current session or ImpalaInternalUser for internal
-   * metadata requests (for example, populating the debug webpage Catalog view).
-   */
-  public List<String> getDbNames(String dbPattern, User user) {
-    List<String> matchingDbs = getDbNames(dbPattern);
-
-    // If authorization is enabled, filter out the databases the user does not
-    // have permissions on.
-    if (authzConfig_.isEnabled()) {
-      Iterator<String> iter = matchingDbs.iterator();
-      while (iter.hasNext()) {
-        String dbName = iter.next();
-        PrivilegeRequest request = new PrivilegeRequestBuilder()
-            .any().onAnyTable(dbName).toRequest();
-        if (!hasAccess(user, request)) {
-          iter.remove();
-        }
-      }
-    }
-    return matchingDbs;
-  }
-
-  /**
-   * Returns true if the table and the database exist in the Catalog. Returns
-   * false if the table does not exist in the database. Throws an exception if the
-   * database does not exist.
-   */
-  public boolean dbContainsTable(String dbName, String tableName, User user,
-      Privilege privilege) throws AuthorizationException, DatabaseNotFoundException {
-    if (checkSystemDbAccess(dbName, privilege)) {
-      return containsTable(dbName, tableName);
-    }
-
-    // Make sure the user has privileges to check if the table exists.
-    checkAccess(user, new PrivilegeRequestBuilder()
-        .allOf(privilege).onTable(dbName, tableName).toRequest());
-
-    Db db = getDb(dbName);
-    if (db == null) {
-      throw new DatabaseNotFoundException("Database not found: " + dbName);
-    }
-    return db.containsTable(tableName);
-  }
-
-  /**
-   * Returns the Table object for the given dbName/tableName. If the table is
-   * found to be uninitialized (does not yet have its metadata loaded) then this
-   * will attempt to load the table's metadata from the catalog server.
-   */
-  public Table getTable(String dbName, String tableName, User user,
-      Privilege privilege) throws AuthorizationException, DatabaseNotFoundException,
-      TableLoadingException {
-    if (checkSystemDbAccess(dbName, privilege)) {
-      return getTable(dbName, tableName);
-    }
-    checkAccess(user, new PrivilegeRequestBuilder()
-        .allOf(privilege).onTable(dbName, tableName).toRequest());
-
-    Table table = getTable(dbName, tableName);
+  @Override
+  public Table getTable(String dbName, String tableName)
+      throws CatalogException {
+    Table table = super.getTable(dbName, tableName);
     if (table == null) return null;
 
     if (table.isLoaded() && table instanceof IncompleteTable) {
@@ -365,47 +191,6 @@ public class ImpaladCatalog extends Catalog {
       throw new TableLoadingException("Missing metadata for table: " + tableName, cause);
     }
     return table;
-  }
-
-  /**
-   * Returns true if the table and the database exist in the Impala Catalog. Returns
-   * false if either the table or the database do not exist.
-   */
-  public boolean containsTable(String dbName, String tableName, User user,
-      Privilege privilege) throws AuthorizationException {
-    // Make sure the user has privileges to check if the table exists.
-    checkAccess(user, new PrivilegeRequestBuilder()
-        .allOf(privilege).onTable(dbName, tableName).toRequest());
-    return containsTable(dbName, tableName);
-  }
-
-  /**
-   * Returns a list of tables in the supplied database that match
-   * tablePattern and the user has privilege to access. See filterStringsByPattern
-   * for details of the pattern matching semantics.
-   *
-   * dbName must not be null. tablePattern may be null (and thus matches
-   * everything).
-   *
-   * User is the user from the current session or ImpalaInternalUser for internal
-   * metadata requests (for example, populating the debug webpage Catalog view).
-   *
-   * Table names are returned unqualified.
-   */
-  public List<String> getTableNames(String dbName, String tablePattern, User user)
-      throws DatabaseNotFoundException {
-    List<String> tables = getTableNames(dbName, tablePattern);
-    if (authzConfig_.isEnabled()) {
-      Iterator<String> iter = tables.iterator();
-      while (iter.hasNext()) {
-        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
-            .allOf(Privilege.ANY).onTable(dbName, iter.next()).toRequest();
-        if (!hasAccess(user, privilegeRequest)) {
-          iter.remove();
-        }
-      }
-    }
-    return tables;
   }
 
   /**
@@ -433,40 +218,6 @@ public class ImpaladCatalog extends Catalog {
     } finally {
       client.release();
     }
-  }
-
-  /**
-   * Checks whether the given User has permission to perform the given request.
-   * Returns true if the User has privileges, false if the User does not.
-   */
-  private boolean hasAccess(User user, PrivilegeRequest request) {
-    authzCheckerLock_.readLock().lock();
-    try {
-      Preconditions.checkNotNull(authzChecker_);
-      return authzChecker_.hasAccess(user, request);
-    } finally {
-      authzCheckerLock_.readLock().unlock();
-    }
-  }
-
-  /**
-   * Throws an authorization exception if the dbName is a system db
-   * and p is trying to modify it.
-   * Returns true if this is a system db and the action is allowed.
-   */
-  public boolean checkSystemDbAccess(String dbName, Privilege privilege)
-      throws AuthorizationException {
-    Db db = getDb(dbName);
-    if (db != null && db.isSystemDb()) {
-      switch (privilege) {
-        case VIEW_METADATA:
-        case ANY:
-          return true;
-        default:
-          throw new AuthorizationException("Cannot modify system database.");
-      }
-    }
-    return false;
   }
 
   /**
@@ -693,4 +444,5 @@ public class ImpaladCatalog extends Catalog {
 
   // Only used for testing.
   public void setIsReady() { isReady_.set(true); }
+  public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
 }

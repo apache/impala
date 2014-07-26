@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
@@ -54,8 +53,7 @@ public class NumericLiteral extends LiteralExpr {
     init(value);
   }
 
-  public NumericLiteral(String value, Type t)
-      throws AnalysisException, AuthorizationException {
+  public NumericLiteral(String value, Type t) throws AnalysisException {
     BigDecimal val = null;
     try {
       val = new BigDecimal(value);
@@ -154,8 +152,7 @@ public class NumericLiteral extends LiteralExpr {
   public BigDecimal getValue() { return value_; }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
     if (!explicitlyCast_) {

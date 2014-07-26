@@ -24,12 +24,11 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.planner.DataSink;
@@ -130,8 +129,7 @@ public class InsertStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isExplain_) analyzer.setIsExplain();
     try {
       if (withClause_ != null) withClause_.analyze(analyzer);
@@ -146,7 +144,7 @@ public class InsertStmt extends StatementBase {
       try {
         // Use a child analyzer for the query stmt to properly scope WITH-clause
         // views and to ignore irrelevant ORDER BYs.
-        Analyzer queryStmtAnalyzer = new Analyzer(analyzer, analyzer.getUser());
+        Analyzer queryStmtAnalyzer = new Analyzer(analyzer);
         queryStmt_.analyze(queryStmtAnalyzer);
         selectListExprs = Expr.cloneList(queryStmt_.getBaseTblResultExprs());
       } catch (AnalysisException e) {
@@ -273,8 +271,7 @@ public class InsertStmt extends StatementBase {
    * - Cannot insert into a view
    * Adds table_ to the analyzer's descriptor table if analysis succeeds.
    */
-  private void setTargetTable(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  private void setTargetTable(Analyzer analyzer) throws AnalysisException {
     // If the table has not yet been set, load it from the Catalog. This allows for
     // callers to set a table to analyze that may not actually be created in the Catalog.
     // One example use case is CREATE TABLE AS SELECT which must run analysis on the
@@ -288,9 +285,8 @@ public class InsertStmt extends StatementBase {
     } else {
       targetTableName_ = new TableName(table_.getDb().getName(), table_.getName());
       PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
-      analyzer.getCatalog().checkAccess(analyzer.getUser(),
-          pb.onTable(table_.getDb().getName(), table_.getName()).allOf(Privilege.INSERT)
-          .toRequest());
+      analyzer.registerPrivReq(pb.onTable(table_.getDb().getName(), table_.getName())
+          .allOf(Privilege.INSERT).toRequest());
     }
 
     // We do not support inserting into views.
@@ -433,7 +429,7 @@ public class InsertStmt extends StatementBase {
    */
   private void prepareExpressions(List<Column> selectExprTargetColumns,
       List<Expr> selectListExprs, Table tbl, Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     // Temporary lists of partition key exprs and names in an arbitrary order.
     List<Expr> tmpPartitionKeyExprs = new ArrayList<Expr>();
     List<String> tmpPartitionKeyNames = new ArrayList<String>();

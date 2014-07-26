@@ -14,10 +14,11 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.AuthorizeableFn;
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
-import com.cloudera.impala.catalog.Type;
+import com.cloudera.impala.authorization.PrivilegeRequest;
 import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDropFunctionParams;
 
@@ -62,16 +63,16 @@ public class DropFunctionStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    desc_.getFunctionName().analyze(analyzer);
+
     // For now, if authorization is enabled, the user needs ALL on the server
     // to drop functions.
     // TODO: this is not the right granularity but acceptable for now.
-    analyzer.getCatalog().checkCreateDropFunctionAccess(analyzer.getUser());
+    analyzer.registerPrivReq(new PrivilegeRequest(
+        new AuthorizeableFn(desc_.signatureString()), Privilege.ALL));
 
-    desc_.getFunctionName().analyze(analyzer);
-    if (analyzer.getCatalog().getDb(
-          desc_.dbName(), analyzer.getUser(), Privilege.DROP) == null && !ifExists_) {
+    if (analyzer.getDb(desc_.dbName(), Privilege.DROP, false) == null && !ifExists_) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + desc_.dbName());
     }
 

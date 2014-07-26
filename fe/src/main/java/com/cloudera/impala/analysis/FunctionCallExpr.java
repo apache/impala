@@ -18,7 +18,6 @@ import java.util.List;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AggregateFunction;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
@@ -208,8 +207,7 @@ public class FunctionCallExpr extends Expr {
    * TODO: this prevents UDFs from using wildcard decimals and is in general not scalable.
    * We should add a prepare_fn() to UDFs for doing this.
    */
-  private Type resolveDecimalReturnType(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  private Type resolveDecimalReturnType(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(type_.isWildcardDecimal());
     Preconditions.checkState(fn_.getBinaryType() == TFunctionBinaryType.BUILTIN);
     Preconditions.checkState(children_.size() > 0);
@@ -288,8 +286,7 @@ public class FunctionCallExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
     fnName_.analyze(analyzer);

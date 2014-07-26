@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TShowTablesParams;
 import com.google.common.base.Preconditions;
@@ -102,11 +101,9 @@ public class ShowTablesStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     postAnalysisDb_ = (parsedDb_ == null ? analyzer.getDefaultDb() : parsedDb_);
-    if (analyzer.getCatalog().getDb(
-        postAnalysisDb_, analyzer.getUser(), Privilege.ANY) == null) {
+    if (analyzer.getDb(postAnalysisDb_, Privilege.ANY) == null) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + postAnalysisDb_);
     }
   }

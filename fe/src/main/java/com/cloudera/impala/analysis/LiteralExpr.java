@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
@@ -49,8 +48,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   /**
    * Returns an analyzed literal of 'type'.
    */
-  public static LiteralExpr create(String value, Type type)
-      throws AnalysisException, AuthorizationException {
+  public static LiteralExpr create(String value, Type type) throws AnalysisException {
     Preconditions.checkArgument(type.isValid());
     LiteralExpr e = null;
     switch (type.getPrimitiveType()) {
@@ -151,7 +149,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
    * TODO: Support non-scalar types.
    */
   public static LiteralExpr create(Expr constExpr, TQueryCtx queryCtx)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     Preconditions.checkState(constExpr.isConstant());
     Preconditions.checkState(constExpr.getType().isValid());
     if (constExpr instanceof LiteralExpr) return (LiteralExpr) constExpr;

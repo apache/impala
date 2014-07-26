@@ -47,8 +47,7 @@ public class PlannerTest {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
   private final static boolean GENERATE_OUTPUT_FILE = true;
   private static Frontend frontend_ = new Frontend(
-      AuthorizationConfig.createAuthDisabledConfig(),
-      new ImpaladTestCatalog(AuthorizationConfig.createAuthDisabledConfig()));
+      AuthorizationConfig.createAuthDisabledConfig(), new ImpaladTestCatalog());
   private final String testDir_ = "functional-planner/queries/PlannerTest";
   private final String outDir_ = "/tmp/PlannerTest/";
 

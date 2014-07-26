@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
@@ -31,8 +30,7 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer)
-      throws AnalysisException, AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     // Enforce Hive column labels for view compatibility.
     analyzer.setUseHiveColLabels(true);
     viewDefStmt_.analyze(analyzer);

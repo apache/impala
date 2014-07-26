@@ -23,7 +23,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
@@ -92,8 +91,7 @@ public class LoadDataStmt extends StatementBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     dbName_ = analyzer.getTargetDbName(tableName_);
     Table table = analyzer.getTable(tableName_, Privilege.INSERT);
     if (!(table instanceof HdfsTable)) {
@@ -117,7 +115,7 @@ public class LoadDataStmt extends StatementBase {
   }
 
   private void analyzePaths(Analyzer analyzer, HdfsTable hdfsTable)
-      throws AnalysisException, AuthorizationException {
+      throws AnalysisException {
     // The user must have permission to access the source location. Since the files will
     // be moved from this location, the user needs to have all permission.
     sourceDataPath_.analyze(analyzer, Privilege.ALL);

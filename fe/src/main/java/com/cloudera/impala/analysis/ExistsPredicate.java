@@ -17,12 +17,8 @@ package com.cloudera.impala.analysis;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.Subquery;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
-
 import com.google.common.base.Preconditions;
 
 /**
@@ -51,8 +47,7 @@ public class ExistsPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
   }

@@ -29,7 +29,6 @@ import parquet.schema.OriginalType;
 import parquet.schema.PrimitiveType;
 
 import com.cloudera.impala.authorization.Privilege;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.HdfsCompression;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.RowFormat;
@@ -207,8 +206,7 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     schemaLocation_.analyze(analyzer, Privilege.ALL);
     switch (schemaFileFormat_) {
       case PARQUET:

@@ -15,20 +15,15 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.HashSet;
 
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-
 import com.cloudera.impala.catalog.ArrayType;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.StructField;
 import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -47,6 +42,7 @@ public class Subquery extends Expr {
   protected Analyzer analyzer_;
 
   public QueryStmt getStatement() { return stmt_; }
+  @Override
   public String toSqlImpl() { return "(" + stmt_.toSql() + ")"; }
 
   /**
@@ -70,15 +66,15 @@ public class Subquery extends Expr {
   /**
    * Analyzes the subquery in a child analyzer.
    */
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     if (!(stmt_ instanceof SelectStmt)) {
       throw new AnalysisException("A subquery must contain a single select block: " +
         toSql());
     }
     // The subquery is analyzed with its own analyzer.
-    analyzer_ = new Analyzer(analyzer, analyzer.getUser());
+    analyzer_ = new Analyzer(analyzer);
     analyzer_.setIsSubquery();
     stmt_.analyze(analyzer_);
 

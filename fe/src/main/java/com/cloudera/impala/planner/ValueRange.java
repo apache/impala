@@ -22,7 +22,6 @@ import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.CompoundPredicate;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
@@ -70,7 +69,7 @@ public class ValueRange {
    * backend for evaluation.
    */
   public boolean isInRange(Analyzer analyzer, Expr valueExpr) throws
-      InternalException, AuthorizationException {
+      InternalException {
     Preconditions.checkState(valueExpr.isConstant());
     Preconditions.checkState(lowerBound_ != null || upperBound_ != null);
 

@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequest;
 import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TTableName;
@@ -43,8 +42,7 @@ public class ResetMetadataStmt extends StatementBase {
   public boolean isRefresh() { return isRefresh_; }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException,
-      AuthorizationException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     if (tableName_ != null) {
       String dbName = analyzer.getTargetDbName(tableName_);
       tableName_ = new TableName(dbName, tableName_.getTbl());
@@ -61,13 +59,11 @@ public class ResetMetadataStmt extends StatementBase {
         }
       } else {
         // Verify the user has privileges to access this table.
-        analyzer.getCatalog().checkAccess(analyzer.getUser(),
-            new PrivilegeRequestBuilder().onTable(dbName, tableName_.getTbl())
-            .any().toRequest());
+        analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+            .onTable(dbName, tableName_.getTbl()).any().toRequest());
       }
     } else {
-      PrivilegeRequest privilegeRequest = new PrivilegeRequest(Privilege.ALL);
-      analyzer.getCatalog().checkAccess(analyzer.getUser(), privilegeRequest);
+      analyzer.registerPrivReq(new PrivilegeRequest(Privilege.ALL));
     }
   }
 

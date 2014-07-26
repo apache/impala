@@ -29,8 +29,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ImpaladCatalog;
@@ -50,8 +48,7 @@ import com.google.common.collect.Lists;
 
 public class AnalyzerTest {
   protected final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
-  protected static ImpaladCatalog catalog_ = new ImpaladTestCatalog(
-      AuthorizationConfig.createAuthDisabledConfig());
+  protected static ImpaladCatalog catalog_ = new ImpaladTestCatalog();
 
   protected Analyzer analyzer_;
 
@@ -258,8 +255,6 @@ public class AnalyzerTest {
           "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString,
           errorString.startsWith(expectedErrorString));
       return;
-    } catch (AuthorizationException e) {
-      fail("Authorization error: " + e.getMessage());
     }
     fail("Stmt didn't result in analysis error: " + stmt);
   }
@@ -289,7 +284,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestCompressedText() throws AnalysisException, AuthorizationException {
+  public void TestCompressedText() throws AnalysisException {
     AnalyzesOk("SELECT count(*) FROM functional_text_lzo.tinyinttable");
     // TODO: Disabling the text/{gzip,bzip,snap} analysis test until the corresponding
     //       databases are loaded.
@@ -299,14 +294,14 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestMemLayout() throws AnalysisException, AuthorizationException {
+  public void TestMemLayout() throws AnalysisException {
     testSelectStar();
     testNonNullable();
     testMixedNullable();
     testNonMaterializedSlots();
   }
 
-  private void testSelectStar() throws AnalysisException, AuthorizationException {
+  private void testSelectStar() throws AnalysisException {
     AnalyzesOk("select * from functional.AllTypes");
     DescriptorTable descTbl = analyzer_.getDescTbl();
     TupleDescriptor tupleD = descTbl.getTupleDesc(new TupleId(0));
@@ -430,7 +425,7 @@ public class AnalyzerTest {
    *    We do not support table partitioning on timestamp columns
    */
   @Test
-  public void TestUnsupportedTypes() throws AuthorizationException {
+  public void TestUnsupportedTypes() {
     // Select supported types from a table with mixed supported/unsupported types.
     AnalyzesOk("select int_col, str_col, bigint_col from functional.unsupported_types");
 
