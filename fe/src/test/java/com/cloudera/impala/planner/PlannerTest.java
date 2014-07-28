@@ -398,6 +398,11 @@ public class PlannerTest {
   }
 
   @Test
+  public void testEmpty() {
+    runPlannerTestFile("empty");
+  }
+
+  @Test
   public void testDistinct() {
     runPlannerTestFile("distinct");
   }

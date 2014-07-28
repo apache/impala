@@ -315,17 +315,7 @@ public class TableRef implements ParseNode {
         // The exception are conjuncts that only pertain to the nullable side
         // of the outer join; those can be evaluated directly when materializing tuples
         // without violating outer join semantics.
-        // TODO: remove this special case
-        if (getJoinOp().isOuterJoin()) {
-          if (lhsIsNullable && e.isBound(leftTblRef_.getId())
-              || rhsIsNullable && e.isBound(getId())) {
-            analyzer.registerConjuncts(e, this, false);
-          } else {
-            analyzer.registerConjuncts(e, this, false);
-          }
-        } else {
-          analyzer.registerConjuncts(e, null, false);
-        }
+        analyzer.registerOnClauseConjuncts(e, this);
         List<TupleId> tupleIds = Lists.newArrayList();
         e.getIds(tupleIds, null);
         onClauseTupleIds.addAll(tupleIds);

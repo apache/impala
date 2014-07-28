@@ -31,6 +31,7 @@ add_library(Exec STATIC
   data-sink.cc
   data-source-scan-node.cc
   delimited-text-parser.cc
+  empty-set-node.cc
   exec-node.cc
   external-data-source-executor.cc
   exchange-node.cc

@@ -144,7 +144,7 @@ public class Analyzer {
     // whether to use Hive's auto-generated column labels
     public boolean useHiveColLabels = false;
 
-    // all registered conjuncts (map from id to Predicate)
+    // all registered conjuncts (map from expr id to conjunct)
     public final Map<ExprId, Expr> conjuncts = Maps.newHashMap();
 
     // all registered conjuncts bound by a single tuple id; used in getBoundPredicates()
@@ -172,7 +172,7 @@ public class Analyzer {
 
     // map from registered conjunct to its containing outer join On clause (represented
     // by its right-hand side table ref); this is limited to conjuncts that can only be
-    // correctly evaluated by the originating outer join
+    // correctly evaluated by the originating outer join, including constant conjuncts
     public final Map<ExprId, TableRef> ojClauseByConjunct = Maps.newHashMap();
 
     // map from slot id to the analyzer/block in which it was registered
@@ -244,6 +244,15 @@ public class Analyzer {
 
   // Tracks the all tables/views found during analysis that were missing metadata.
   private Set<TableName> missingTbls_ = new HashSet<TableName>();
+
+  // Indicates whether this analyzer/block is guaranteed to have an empty result set
+  // due to a limit 0 or constant conjunct evaluating to false.
+  private boolean hasEmptyResultSet_ = false;
+
+  // Indicates whether the select-project-join (spj) portion of this query block
+  // is guaranteed to return an empty result set. Set due to a constant non-Having
+  // conjunct evaluating to false.
+  private boolean hasEmptySpjResultSet_ = false;
 
   public Analyzer(ImpaladCatalog catalog, TQueryCtx queryCtx) {
     this.ancestors_ = Lists.newArrayList();
@@ -419,6 +428,20 @@ public class Analyzer {
   public boolean isRootAnalyzer() { return ancestors_.isEmpty(); }
 
   /**
+   * Returns true if the query block corresponding to this analyzer is guaranteed
+   * to return an empty result set, e.g., due to a limit 0 or a constant predicate
+   * that evaluates to false.
+   */
+  public boolean hasEmptyResultSet() { return hasEmptyResultSet_; }
+  public void setHasEmptyResultSet() { hasEmptyResultSet_ = true; }
+
+  /**
+   * Returns true if the select-project-join portion of this query block returns
+   * an empty result set.
+   */
+  public boolean hasEmptySpjResultSet() { return hasEmptySpjResultSet_; }
+
+  /**
    * Checks that 'colName' references an existing column for a registered table alias;
    * if alias is empty, tries to resolve the column name in the context of any of the
    * registered tables. Creates and returns an empty SlotDescriptor if the
@@ -544,24 +567,25 @@ public class Analyzer {
   }
 
   /**
-   * Register all conjuncts in a list of predicates as Where clause conjuncts.
+   * Register all conjuncts in a list of predicates as Having-clause conjuncts.
    */
   public void registerConjuncts(List<Expr> l) {
     for (Expr e: l) {
-      registerConjuncts(e, null, true);
+      registerConjuncts(e, true);
     }
   }
 
   /**
-   * Register all conjuncts that make up the predicate and assign each conjunct an id.
-   * If rhsRef != null, rhsRef is expected to be the right-hand side of an outer join,
-   * and the conjuncts of p can only be evaluated by the node implementing that join
-   * (p is the On clause).
+   * Register all conjuncts that make up the On-clause 'e' of the given right-hand side
+   * of a join. Assigns each conjunct a unique id. If rhsRef is the right-hand side of
+   * an outer join, then the conjuncts conjuncts are registered such that they can only
+   * be evaluated by the node implementing that join.
    */
-  public void registerConjuncts(Expr e, TableRef rhsRef, boolean fromWhereClause) {
+  public void registerOnClauseConjuncts(Expr e, TableRef rhsRef) {
+    Preconditions.checkNotNull(rhsRef);
+    Preconditions.checkNotNull(e);
     List<ExprId> ojConjuncts = null;
-    if (rhsRef != null) {
-      Preconditions.checkState(rhsRef.getJoinOp().isOuterJoin());
+    if (rhsRef.getJoinOp().isOuterJoin()) {
       ojConjuncts = globalState_.conjunctsByOjClause.get(rhsRef);
       if (ojConjuncts == null) {
         ojConjuncts = Lists.newArrayList();
@@ -570,19 +594,58 @@ public class Analyzer {
     }
     for (Expr conjunct: e.getConjuncts()) {
       registerConjunct(conjunct);
-      if (rhsRef != null) {
+      if (rhsRef.getJoinOp().isOuterJoin()) {
         globalState_.ojClauseByConjunct.put(conjunct.getId(), rhsRef);
         ojConjuncts.add(conjunct.getId());
       }
-      if (fromWhereClause) conjunct.setIsWhereClauseConjunct();
+      markConstantConjunct(conjunct, false);
     }
   }
 
   /**
-   * Register individual conjunct with all tuple and slot ids it references
-   * and with the global conjunct list. Also assigns a new id.
+   * Register all conjuncts that make up 'e'. If fromHavingClause is false, this conjunct
+   * is assumed to originate from a Where clause.
    */
-  public void registerConjunct(Expr e) {
+  public void registerConjuncts(Expr e, boolean fromHavingClause) {
+    for (Expr conjunct: e.getConjuncts()) {
+      registerConjunct(conjunct);
+      if (!fromHavingClause) conjunct.setIsWhereClauseConjunct();
+      markConstantConjunct(conjunct, fromHavingClause);
+    }
+  }
+
+  /**
+   * If the given conjunct is a constant non-oj conjunct, marks it as assigned, and
+   * evaluates the conjunct. If the conjunct evaluates to false, marks this query
+   * block as having an empty result set or as having an empty select-project-join
+   * portion, if fromHavingClause is true or false, respectively.
+   * No-op if the conjunct is not constant or is outer joined.
+   */
+  private void markConstantConjunct(Expr conjunct, boolean fromHavingClause) {
+    if (!conjunct.isConstant() || isOjConjunct(conjunct)) return;
+    markConjunctAssigned(conjunct);
+    if ((!fromHavingClause && !hasEmptySpjResultSet_)
+        || (fromHavingClause && !hasEmptyResultSet_)) {
+      try {
+        if (!FeSupport.EvalPredicate(conjunct, globalState_.queryCtx)) {
+          if (fromHavingClause) {
+            hasEmptyResultSet_ = true;
+          } else {
+            hasEmptySpjResultSet_ = true;
+          }
+        }
+      } catch (InternalException ex) {
+        // Should never happen.
+        throw new IllegalStateException(ex);
+      }
+    }
+  }
+
+  /**
+   * Assigns a new id to the given conjunct and registers it with all tuple and slot ids
+   * it references and with the global conjunct list.
+   */
+  private void registerConjunct(Expr e) {
     // always generate a new expr id; this might be a cloned conjunct that already
     // has the id of its origin set
     e.setId(globalState_.conjunctIdGenerator.getNextId());
@@ -664,9 +727,9 @@ public class Analyzer {
   }
 
   /**
-   * Return all unassigned registered conjuncts that are fully bound by given
-   * list of tuple ids. If 'inclOjConjuncts' is false, conjuncts tied to an Outer Join
-   * clause are excluded.
+   * Return all unassigned non-constant registered conjuncts that are fully bound by
+   * given list of tuple ids. If 'inclOjConjuncts' is false, conjuncts tied to an
+   * Outer Join clause are excluded.
    */
   public List<Expr> getUnassignedConjuncts(
       List<TupleId> tupleIds, boolean inclOjConjuncts) {
@@ -676,7 +739,7 @@ public class Analyzer {
       if (e.isBoundByTupleIds(tupleIds)
           && !e.isAuxExpr()
           && !globalState_.assignedConjuncts.contains(e.getId())
-          && (inclOjConjuncts
+          && ((inclOjConjuncts && !e.isConstant())
               || !globalState_.ojClauseByConjunct.containsKey(e.getId()))) {
         result.add(e);
         LOG.trace("getUnassignedConjunct: " + e.toSql());
@@ -734,7 +797,7 @@ public class Analyzer {
     for (ExprId conjunctId: candidates) {
       if (!globalState_.assignedConjuncts.contains(conjunctId)) {
         Expr e = globalState_.conjuncts.get(conjunctId);
-        Preconditions.checkState(e != null);
+        Preconditions.checkNotNull(e);
         result.add(e);
         LOG.trace("getUnassignedOjConjunct: " + e.toSql());
       }

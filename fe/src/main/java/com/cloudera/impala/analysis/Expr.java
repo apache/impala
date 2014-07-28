@@ -78,7 +78,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   protected Type type_;  // result of analysis
   protected boolean isAnalyzed_;  // true after analyze() has been called
-  protected boolean isWhereClauseConjunct_;  // set by Analyzer
+  protected boolean isWhereClauseConjunct_; // set by analyzer
 
   // Flag to indicate whether to wrap this expr's toSql() in parenthesis. Set by parser.
   // Needed for properly capturing expr precedences in the SQL string.

@@ -151,20 +151,12 @@ public class UnionNode extends PlanNode {
    * result/const expr lists based on the materialized slots of this UnionNode's
    * produced tuple. The UnionNode doesn't need an smap: like a ScanNode, it
    * materializes an original tuple.
+   * There is no need to call assignConjuncts() because all non-constant conjuncts
+   * have already been assigned to the union operands, and all constant conjuncts have
+   * been evaluated during registration to set analyzer.hasEmptyResultSet_.
    */
   @Override
   public void init(Analyzer analyzer) throws InternalException {
-    assignConjuncts(analyzer);
-    // All non-constant conjuncts should have been assigned to children.
-    // This requirement is important to guarantee that conjuncts do not trigger
-    // materialization of slots in this UnionNode's tuple.
-    // TODO: It's possible to get constant conjuncts if a union operand
-    // consists of a select stmt on a constant inline view. We should
-    // drop the operand in such cases.
-    for (Expr conjunct: conjuncts_) {
-      Preconditions.checkState(conjunct.isConstant());
-    }
-
     computeMemLayout(analyzer);
     computeStats(analyzer);
 

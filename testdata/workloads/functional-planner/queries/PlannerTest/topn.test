@@ -101,33 +101,9 @@ group by 1
 order by 2,3 desc
 limit 0
 ---- PLAN
-02:TOP-N [LIMIT=0]
-|  order by: sum(float_col) ASC, min(float_col) DESC
-|
-01:AGGREGATE [FINALIZE]
-|  output: sum(float_col), min(float_col)
-|  group by: int_col
-|
-00:SCAN HBASE [functional_hbase.alltypessmall]
+00:EMPTYSET
 ---- DISTRIBUTEDPLAN
-05:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: sum(float_col) ASC, min(float_col) DESC
-|  limit: 0
-|
-02:TOP-N [LIMIT=0]
-|  order by: sum(float_col) ASC, min(float_col) DESC
-|
-04:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(float_col)), min(min(float_col))
-|  group by: int_col
-|
-03:EXCHANGE [HASH(int_col)]
-|
-01:AGGREGATE
-|  output: sum(float_col), min(float_col)
-|  group by: int_col
-|
-00:SCAN HBASE [functional_hbase.alltypessmall]
+00:EMPTYSET
 ====
 # Test correct identification of the implicit aliasing of int_col in the select
 # list to t1.int_col;

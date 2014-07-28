@@ -318,18 +318,6 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
       query_exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
   DCHECK(has_coordinator_fragment || query_exec_request.__isset.desc_tbl);
 
-  // If the first fragment has a "limit 0" and this is a query, simply set eos_
-  // to true and return.
-  // TODO: To be compatible with Hive, INSERT OVERWRITE must clear out target
-  // tables / static partitions even if no rows are written.
-  DCHECK(query_exec_request.fragments[0].__isset.plan);
-  if (query_exec_request.fragments[0].plan.nodes[0].limit == 0 &&
-      query_exec_request.stmt_type == TStmtType::QUERY) {
-    eos_ = true;
-    query_state_ = QueryState::FINISHED;
-    return Status::OK;
-  }
-
   if (FLAGS_enable_rm) {
     DCHECK(exec_env_->resource_broker() != NULL);
   }

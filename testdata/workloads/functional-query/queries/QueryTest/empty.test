@@ -20,3 +20,74 @@ select field from emptytable
 string
 ---- RESULTS
 ====
+---- QUERY
+# Constant conjunct.
+select t1.id, t2.id
+from functional.alltypestiny t1
+left outer join functional.alltypes t2
+on t1.id = t2.id
+where false
+---- TYPES
+int, int
+---- RESULTS
+====
+---- QUERY
+# Constant conjunct in query block with an aggregation.
+select count(int_col), avg(double_col), count(*)
+from functional.alltypes
+where null
+---- TYPES
+bigint, double, bigint
+---- RESULTS
+0,NULL,0
+====
+---- QUERY
+# Constant conjunct in inline view.
+select e.id, f.id
+from functional.alltypessmall f
+inner join
+  (select t1.id
+   from functional.alltypestiny t1
+   left outer join functional.alltypes t2
+   on t1.id = t2.id
+   where 1 + 3 > 10) e
+on e.id = f.id
+---- TYPES
+int, int
+---- RESULTS
+====
+---- QUERY
+# Limit 0
+select t1.id, t2.id
+from functional.alltypestiny t1
+left outer join functional.alltypes t2
+on t1.id = t2.id
+limit 0
+---- TYPES
+int, int
+---- RESULTS
+====
+---- QUERY
+# Limit 0 in query block with an aggregation
+select count(int_col), avg(double_col), count(*)
+from functional.alltypes
+limit 0
+---- TYPES
+bigint, double, bigint
+---- RESULTS
+====
+---- QUERY
+# Limit 0 in inline view
+select e.id, f.id
+from functional.alltypessmall f
+inner join
+  (select t1.id
+   from functional.alltypestiny t1
+   left outer join functional.alltypes t2
+   on t1.id = t2.id
+   limit 0) e
+on e.id = f.id
+---- TYPES
+int, int
+---- RESULTS
+====

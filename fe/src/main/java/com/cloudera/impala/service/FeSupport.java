@@ -25,7 +25,9 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.BoolLiteral;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TCacheJarParams;
@@ -171,6 +173,9 @@ public class FeSupport {
 
   public static boolean EvalPredicate(Expr pred, TQueryCtx queryCtx)
       throws InternalException {
+    // Shortcuts to avoid expensive BE evaluation.
+    if (pred instanceof BoolLiteral) return ((BoolLiteral) pred).getValue();
+    if (pred instanceof NullLiteral) return false;
     Preconditions.checkState(pred.getType().isBoolean());
     TColumnValue val = EvalConstExpr(pred, queryCtx);
     // Return false if pred evaluated to false or NULL. True otherwise.

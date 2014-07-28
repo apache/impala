@@ -26,6 +26,7 @@
 #include "exec/aggregation-node.h"
 #include "exec/cross-join-node.h"
 #include "exec/data-source-scan-node.h"
+#include "exec/empty-set-node.h"
 #include "exec/exchange-node.h"
 #include "exec/hash-join-node.h"
 #include "exec/hdfs-scan-node.h"
@@ -262,6 +263,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       break;
     case TPlanNodeType::CROSS_JOIN_NODE:
       *node = pool->Add(new CrossJoinNode(pool, tnode, descs));
+      break;
+    case TPlanNodeType::EMPTY_SET_NODE:
+      *node = pool->Add(new EmptySetNode(pool, tnode, descs));
       break;
     case TPlanNodeType::EXCHANGE_NODE:
       *node = pool->Add(new ExchangeNode(pool, tnode, descs));

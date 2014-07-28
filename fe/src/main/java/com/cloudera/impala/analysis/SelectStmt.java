@@ -173,7 +173,7 @@ public class SelectStmt extends QueryStmt {
             "aggregate function not allowed in WHERE clause");
       }
       whereClause_.checkReturnsBool("WHERE clause", false);
-      analyzer.registerConjuncts(whereClause_, null, true);
+      analyzer.registerConjuncts(whereClause_, false);
     }
 
     createSortInfo(analyzer);
@@ -183,6 +183,12 @@ public class SelectStmt extends QueryStmt {
     // Remember the SQL string before inline-view expression substitution.
     sqlString_ = toSql();
     resolveInlineViewRefs(analyzer);
+
+    // If this block's select-project-join portion returns an empty result set and the
+    // block has no aggregation, then mark this block as returning an empty result set.
+    if (analyzer.hasEmptySpjResultSet() && aggInfo_ == null) {
+      analyzer.setHasEmptyResultSet();
+    }
 
     if (aggInfo_ != null) LOG.debug("post-analysis " + aggInfo_.debugString());
   }
@@ -449,7 +455,7 @@ public class SelectStmt extends QueryStmt {
       Preconditions.checkState(!havingPred_.contains(
           Predicates.instanceOf(Subquery.class)));
       havingPred_ = havingPred_.substitute(combinedSMap, analyzer);
-      analyzer.registerConjuncts(havingPred_, null, false);
+      analyzer.registerConjuncts(havingPred_, true);
       LOG.debug("post-agg havingPred: " + havingPred_.debugString());
     }
     if (sortInfo_ != null) {

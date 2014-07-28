@@ -110,6 +110,7 @@ class LimitElement {
       }
       limit_ = evalIntegerExpr(analyzer, limitExpr_, "LIMIT");
     }
+    if (limit_ == 0) analyzer.setHasEmptyResultSet();
 
     if (offsetExpr_ != null) {
       if (!offsetExpr_.isConstant()) {

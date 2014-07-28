@@ -57,7 +57,6 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
-import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
@@ -272,6 +271,9 @@ public class Planner {
       result =
           createOrderByFragment((SortNode) root, childFragments.get(0), fragments,
               analyzer);
+    } else if (root instanceof EmptySetNode) {
+      result = new PlanFragment(
+          fragmentIdGenerator_.getNextId(), root, DataPartition.UNPARTITIONED);
     } else {
       throw new InternalException(
           "Cannot create plan fragment for this node type: " + root.getExplainString());
@@ -909,6 +911,14 @@ public class Planner {
    */
   private PlanNode createQueryPlan(QueryStmt stmt, Analyzer analyzer, boolean disableTopN)
       throws ImpalaException {
+    if (analyzer.hasEmptyResultSet()) {
+      ArrayList<TupleId> tupleIds = Lists.newArrayList();
+      stmt.getMaterializedTupleIds(tupleIds);
+      EmptySetNode node = new EmptySetNode(nodeIdGenerator_.getNextId(), tupleIds);
+      node.init(analyzer);
+      return node;
+    }
+
     PlanNode root;
     if (stmt instanceof SelectStmt) {
       root = createSelectPlan((SelectStmt) stmt, analyzer);
@@ -942,6 +952,8 @@ public class Planner {
   private PlanNode addUnassignedConjuncts(
       Analyzer analyzer, List<TupleId> tupleIds, PlanNode root)
       throws InternalException {
+    // No point in adding SelectNode on top of an EmptyNode.
+    if (root instanceof EmptySetNode) return root;
     Preconditions.checkNotNull(root);
     // TODO: standardize on logical tuple ids?
     List<Expr> conjuncts = analyzer.getUnassignedConjuncts(root);
@@ -1177,6 +1189,14 @@ public class Planner {
     //   repeats itself.
     selectStmt.materializeRequiredSlots(analyzer);
 
+    // return a plan that feeds the aggregation of selectStmt with an empty set,
+    // if the selectStmt's select-project-join portion returns an empty result set
+    if (analyzer.hasEmptySpjResultSet()) {
+      PlanNode emptySetNode = new EmptySetNode(nodeIdGenerator_.getNextId(), rowTuples);
+      emptySetNode.init(analyzer);
+      return createAggregationPlan(selectStmt, analyzer, emptySetNode);
+    }
+
     // create plans for our table refs; use a list here instead of a map to
     // maintain a deterministic order of traversing the TableRefs during join
     // plan generation (helps with tests)
@@ -1209,29 +1229,41 @@ public class Planner {
       root = addUnassignedConjuncts(analyzer, root.getTupleIds(), root);
     }
 
-    // add aggregation, if required
-    AggregateInfo aggInfo = selectStmt.getAggInfo();
-    if (aggInfo != null) {
-      root = new AggregationNode(nodeIdGenerator_.getNextId(), root, aggInfo);
-      root.init(analyzer);
-      Preconditions.checkState(root.hasValidStats());
-      // if we're computing DISTINCT agg fns, the analyzer already created the
-      // 2nd phase agginfo
-      if (aggInfo.isDistinctAgg()) {
-        ((AggregationNode)root).unsetNeedsFinalize();
-        root = new AggregationNode(
-            nodeIdGenerator_.getNextId(), root,
-            aggInfo.getSecondPhaseDistinctAggInfo());
-        root.init(analyzer);
-        Preconditions.checkState(root.hasValidStats());
-      }
-      // add Having clause
-      root.assignConjuncts(analyzer);
+    // add aggregation, if any
+    if (selectStmt.getAggInfo() != null) {
+      root = createAggregationPlan(selectStmt, analyzer, root);
     }
 
     // All the conjuncts_ should be assigned at this point.
     // TODO: Re-enable this check here and/or elswehere.
     //Preconditions.checkState(!analyzer.hasUnassignedConjuncts());
+    return root;
+  }
+
+  /**
+   * Returns a new AggregationNode that materializes the aggregation of the given stmt.
+   * Assigns conjuncts from the Having clause to the returned node.
+   */
+  private PlanNode createAggregationPlan(SelectStmt selectStmt, Analyzer analyzer,
+      PlanNode root) throws InternalException {
+    Preconditions.checkState(selectStmt.getAggInfo() != null);
+    // add aggregation, if required
+    AggregateInfo aggInfo = selectStmt.getAggInfo();
+    root = new AggregationNode(nodeIdGenerator_.getNextId(), root, aggInfo);
+    root.init(analyzer);
+    Preconditions.checkState(root.hasValidStats());
+    // if we're computing DISTINCT agg fns, the analyzer already created the
+    // 2nd phase agginfo
+    if (aggInfo.isDistinctAgg()) {
+      ((AggregationNode)root).unsetNeedsFinalize();
+      root = new AggregationNode(
+          nodeIdGenerator_.getNextId(), root,
+          aggInfo.getSecondPhaseDistinctAggInfo());
+      root.init(analyzer);
+      Preconditions.checkState(root.hasValidStats());
+    }
+    // add Having clause
+    root.assignConjuncts(analyzer);
     return root;
   }
 
@@ -1248,6 +1280,7 @@ public class Planner {
     TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor();
     tupleDesc.setIsMaterialized(true);
     UnionNode unionNode = new UnionNode(nodeIdGenerator_.getNextId(), tupleDesc.getId());
+
     // Analysis guarantees that selects without a FROM clause only have constant exprs.
     unionNode.addConstExprList(Lists.newArrayList(resultExprs));
 
@@ -1382,6 +1415,7 @@ public class Planner {
         analyzer.getTupleDesc(inlineViewRef.getId()).materializeSlots();
         UnionNode unionNode = new UnionNode(nodeIdGenerator_.getNextId(),
             inlineViewRef.getMaterializedTupleIds().get(0));
+        if (analyzer.hasEmptyResultSet()) return unionNode;
         unionNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
         unionNode.addConstExprList(selectStmt.getBaseTblResultExprs());
         unionNode.init(analyzer);
@@ -1659,26 +1693,14 @@ public class Planner {
     // the individual operands.
     // Do this prior to creating the operands' plan trees so they get a chance to
     // pick up propagated predicates.
-    // Drop operands that have constant conjuncts evaluating to false, and drop
-    // constant conjuncts evaluating to true.
     List<Expr> conjuncts =
         analyzer.getUnassignedConjuncts(unionStmt.getTupleId().asList(), false);
     for (UnionOperand op: unionStmt.getOperands()) {
       List<Expr> opConjuncts = Expr.substituteList(conjuncts, op.getSmap(), analyzer);
-      List<Expr> nonConstOpConjuncts = Lists.newArrayList();
-      for (int i = 0; i < opConjuncts.size(); ++i) {
-        Expr opConjunct = opConjuncts.get(i);
-        if (!opConjunct.isConstant()) {
-          nonConstOpConjuncts.add(opConjunct);
-          continue;
-        }
-        // Evaluate constant conjunct and drop operand if it evals to false.
-        if (!FeSupport.EvalPredicate(opConjunct, analyzer.getQueryCtx())) {
-          op.drop();
-          break;
-        }
-      }
-      if (!op.isDropped()) analyzer.registerConjuncts(nonConstOpConjuncts);
+      op.getAnalyzer().registerConjuncts(opConjuncts);
+      // Some of the opConjuncts have become constant and eval'd to false, or an ancestor
+      // block is already guaranteed to return empty results.
+      if (op.getAnalyzer().hasEmptyResultSet()) op.drop();
     }
     analyzer.markConjunctsAssigned(conjuncts);
 
