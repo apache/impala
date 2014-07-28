@@ -1805,7 +1805,7 @@ public class Planner {
         Preconditions.checkState(uniqueFragments.contains(fragment));
         sink.computeCosts();
         if (sink.getPerHostMemCost() < 0) {
-          LOG.warn(String.format("Invalid per-host memory requirement %s of sink %s.\n" +
+          LOG.warn(String.format("Invalid per-host memory requirement %s of sink %s.\n",
               sink.getPerHostMemCost(), sink.getClass().getSimpleName()));
         }
         perHostDataSinkMem += sink.getPerHostMemCost();
