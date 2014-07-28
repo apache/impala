@@ -1,13 +1,12 @@
 # - Find rapidjson headers and lib.
-# This module defines RAPIDJSON_INCLUDE_DIR, directory containing headers
+# This module defines RAPIDJSON_INCLUDE_DIR, the directory containing headers
 
 set(RAPIDJSON_SEARCH_HEADER_PATHS
-  ${CMAKE_SOURCE_DIR}/thirdparty/rapidjson/include/rapidjson
+  ${CMAKE_SOURCE_DIR}/thirdparty/rapidjson/include/
 )
 
-set(RAPIDJSON_INCLUDE_DIR
-  ${CMAKE_SOURCE_DIR}/thirdparty/rapidjson/include
-)
+find_path(RAPIDJSON_INCLUDE_DIR rapidjson/rapidjson.h HINTS
+  ${RAPIDJSON_SEARCH_HEADER_PATHS})
 
 if (RAPIDJSON_INCLUDE_DIR)
   set(RAPIDJSON_FOUND TRUE)
