@@ -136,8 +136,28 @@
   </ul>
 We encourage you to read the <a href="http://www.cloudera.com/content/support/en/documentation/cloudera-impala/cloudera-impala-documentation-v1-latest.html">documentation</a> for further exploration!
 </p>
+<h3>Roadmap</h3>
+<p>The next major release, Impala 2.0, is currently scheduled to contain the following features. This list captures only the bigger, most frequently requested features; it’s by no means complete.</p>
 
-</div>
+
+<ul>
+  <li>  SQL 2003-compliant analytic window functions (aggregation OVER PARTITION) – to provide more advanced SQL analytic capabilities</li>
+  <li> Additional authentication mechanisms – including the ability to specify username/passwords in addition to the already supported Kerberos authentication    </li>
+  <li>UDTFs (user-defined table functions) – for more advanced user functions and extensibility</li>
+  <li> Intra-node parallelized aggregations and joins – to provide even faster joins and aggregations on on top of the performance gains of Impala    </li>
+  <li>Nested data – enables queries on complex nested structures including maps, structs, and arrays    </li>
+  <li>Enhanced, production-ready, YARN-integrated resource manager    </li>
+  <li>Parquet enhancements – continued performance gains including index pages    </li>
+  <li>Additional data types – including DATE</li>
+</ul>
+<p>The following list of features are those that we currently anticipate will be present in 2.1 or  soon thereafter:  </p>
+<ul>
+  <li>Additional analytic SQL functionality – ROLLUP, CUBE, and GROUPING SET    </li>
+  <li>Apache HBase CRUD – allows use of Impala for inserts and updates into APache HBase    </li>
+  <li>External joins using disk – enables joins between tables to spill to disk for joins that require join tables larger than the aggregate memory size    </li>
+  <li>Subqueries inside WHERE clauses </li>
+</ul>
+    </div>
 </div>
 
 
