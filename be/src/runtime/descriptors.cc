@@ -265,6 +265,12 @@ RowDescriptor::RowDescriptor(const vector<TupleDescriptor*>& tuple_descs,
   InitTupleIdxMap();
 }
 
+RowDescriptor::RowDescriptor(TupleDescriptor* tuple_desc, bool is_nullable)
+  : tuple_desc_map_(1, tuple_desc),
+    tuple_idx_nullable_map_(1, is_nullable) {
+  InitTupleIdxMap();
+}
+
 void RowDescriptor::InitTupleIdxMap() {
   // find max id
   TupleId max_id = 0;

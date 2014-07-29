@@ -18,7 +18,6 @@ import java.util.List;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AggregateFunction;
-import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -26,6 +25,7 @@ import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
+import com.cloudera.impala.thrift.TAggregateExpr;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
@@ -38,10 +38,10 @@ public class FunctionCallExpr extends Expr {
   private final FunctionParams params_;
   private boolean isAnalyticFnCall_ = false;
 
-  // Indicates whether this is a merge aggregation function. This flag affects
-  // resetAnalysisState() which is used during expr substitution.
-  // TODO: Re-think how we generate the merge aggregation and remove this flag.
-  private boolean isMergeAggFn_ = false;
+  // Indicates whether this is a merge aggregation function that should use the merge
+  // instead of the update symbol. This flag also affects resetAnalysisState() which is
+  // used during expr substitution.
+  private final boolean isMergeAggFn_;
 
   public FunctionCallExpr(String functionName, List<Expr> params) {
     this(new FunctionName(functionName), new FunctionParams(false, params));
@@ -52,32 +52,43 @@ public class FunctionCallExpr extends Expr {
   }
 
   public FunctionCallExpr(FunctionName fnName, FunctionParams params) {
+    this(fnName, params, false);
+  }
+
+  private FunctionCallExpr(
+      FunctionName fnName, FunctionParams params, boolean isMergeAggFn) {
     super();
     fnName_ = fnName;
     params_ = params;
+    isMergeAggFn_ = isMergeAggFn;
     if (params.exprs() != null) children_.addAll(params.exprs());
   }
 
-  // Constructs the same agg function with new params.
-  public FunctionCallExpr(FunctionCallExpr e, FunctionParams params) {
-    Preconditions.checkState(e.isAnalyzed_);
-    Preconditions.checkState(e.isAggregateFunction());
-    fnName_ = e.fnName_;
-    params_ = params;
-    // Just inherit the function object from 'e'.
-    fn_ = e.fn_;
-    type_ = e.type_;
-    Preconditions.checkState(!type_.isWildcardDecimal());
-    if (params.exprs() != null) children_.addAll(params.exprs());
-  }
-
-  // This is a total hack because of how we remap count/avg aggregate functions.
-  // This needs to be removed when we stop doing the rewrites.
-  public FunctionCallExpr(String name, FunctionParams params) {
-    fnName_ = new FunctionName(Catalog.BUILTINS_DB, name);
-    params_ = params;
-    // Just inherit the function object from 'e'.
-    if (params.exprs() != null) children_.addAll(params.exprs());
+  /**
+   * Returns a new function call expr on the given params for performing the merge()
+   * step of the given aggregate function.
+   */
+  public static FunctionCallExpr createMergeAggCall(
+      FunctionCallExpr agg, List<Expr> params) {
+    Preconditions.checkState(agg.isAnalyzed_);
+    Preconditions.checkState(agg.isAggregateFunction());
+    FunctionCallExpr result = null;
+    if (agg.fnName_.getFunction().equals("count")) {
+      // Use SUM to merge counts.
+      // TODO: Should we implement a count merge fn instead? Or should we update
+      // the toSqlImpl() to reflect which symbol is being used such that the explain
+      // plan makes sense, e.g., count_update, count_merge, etc. Might also help uda
+      // developers understand how their function implementations are applied in a plan.
+      result = new FunctionCallExpr("sum", params);
+    } else {
+      result = new FunctionCallExpr(
+          agg.fnName_, new FunctionParams(false, params), true);
+      // Inherit the function object from 'agg'.
+      result.fn_ = agg.fn_;
+      result.type_ = agg.type_;
+    }
+    Preconditions.checkState(!result.type_.isWildcardDecimal());
+    return result;
   }
 
   /**
@@ -91,6 +102,8 @@ public class FunctionCallExpr extends Expr {
     // No need to deep clone the params, its exprs are already in children_.
     params_ = other.params_;
   }
+
+  public boolean isMergeAggFn() { return isMergeAggFn_; }
 
   @Override
   public void resetAnalysisState() {
@@ -150,14 +163,14 @@ public class FunctionCallExpr extends Expr {
     return params_.isDistinct();
   }
 
-  public void setIsMergeAggFn() { isMergeAggFn_ = true; }
   public FunctionName getFnName() { return fnName_; }
   public void setIsAnalyticFnCall(boolean v) { isAnalyticFnCall_ = v; }
 
   @Override
   protected void toThrift(TExprNode msg) {
-    if (Expr.isAggregatePredicate().apply(this) || isAnalyticFnCall_) {
+    if (isAggregateFunction() || isAnalyticFnCall_) {
       msg.node_type = TExprNodeType.AGGREGATE_EXPR;
+      if (!isAnalyticFnCall_) msg.setAgg_expr(new TAggregateExpr(isMergeAggFn_));
     } else {
       msg.node_type = TExprNodeType.FUNCTION_CALL;
     }
@@ -298,16 +311,14 @@ public class FunctionCallExpr extends Expr {
     super.analyze(analyzer);
     fnName_.analyze(analyzer);
 
-    if (fn_ != null && Expr.isAggregatePredicate().apply(this)) {
+    if (isMergeAggFn_) {
       // This is the function call expr after splitting up to a merge aggregation.
       // The function has already been analyzed so just do the minimal sanity
       // check here.
-      // TODO: rethink how we generate the merge aggregation.
       AggregateFunction aggFn = (AggregateFunction)fn_;
+      Preconditions.checkNotNull(aggFn);
       Type intermediateType = aggFn.getIntermediateType();
       if (intermediateType == null) intermediateType = type_;
-      // TODO: this needs to change when the intermediate type != the return type
-      Preconditions.checkArgument(intermediateType.equals(fn_.getReturnType()));
       Preconditions.checkState(!type_.isWildcardDecimal());
       return;
     }

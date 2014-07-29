@@ -88,6 +88,11 @@ struct TStringLiteral {
   1: required string value;
 }
 
+struct TAggregateExpr {
+  // Indicates whether this expr is the merge() of an aggregation.
+  1: required bool is_merge_agg
+}
+
 // This is essentially a union over the subclasses of Expr.
 struct TExprNode {
   1: required TExprNodeType node_type
@@ -96,6 +101,7 @@ struct TExprNode {
 
   // The function to execute. Not set for SlotRefs and Literals.
   4: optional Types.TFunction fn
+
   // If set, child[vararg_start_idx] is the first vararg child.
   5: optional i32 vararg_start_idx
 
@@ -111,6 +117,7 @@ struct TExprNode {
   15: optional TStringLiteral string_literal
   16: optional TTupleIsNullPredicate tuple_is_null_pred
   17: optional TDecimalLiteral decimal_literal
+  18: optional TAggregateExpr agg_expr
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

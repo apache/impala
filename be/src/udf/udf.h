@@ -166,6 +166,10 @@ class FunctionContext {
   // return type of the UDA (e.g., the type returned by the finalize function).
   const TypeDesc& GetReturnType() const;
 
+  // Returns the intermediate type for UDAs, i.e., the one returned by
+  // update and merge functions. Returns INVALID_TYPE for UDFs.
+  const TypeDesc& GetIntermediateType() const;
+
   // Returns the number of arguments to this function (not including the FunctionContext*
   // argument).
   int GetNumArgs() const;

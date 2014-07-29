@@ -4,18 +4,18 @@ avg(tinyint_col)
 from functional.alltypesagg
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col)
+|  output: count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), sum(count(tinyint_col)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col))
+|  output: sum(count(*)), sum(count(tinyint_col)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col)), avg(avg(tinyint_col))
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
-|  output: count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col)
+|  output: count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
@@ -27,7 +27,7 @@ from functional.alltypesagg
 group by 2, 1
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), count(tinyint_col)
+|  output: count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)
 |  group by: bigint_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -36,13 +36,13 @@ group by 2, 1
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col)), sum(count(tinyint_col))
+|  output: sum(count(*)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col)), avg(avg(tinyint_col))
 |  group by: bigint_col, tinyint_col
 |
 02:EXCHANGE [HASH(bigint_col,tinyint_col)]
 |
 01:AGGREGATE
-|  output: count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), count(tinyint_col)
+|  output: count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)
 |  group by: bigint_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -55,26 +55,26 @@ having count(id) > 0
 order by avg(zip) limit 10
 ---- PLAN
 02:TOP-N [LIMIT=10]
-|  order by: sum(zip) / count(zip) ASC
+|  order by: avg(zip) ASC
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum(id), count(id), sum(zip), count(zip)
+|  output: avg(id), count(id), avg(zip)
 |  having: count(id) > 0
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
 02:TOP-N [LIMIT=10]
-|  order by: sum(zip) / count(zip) ASC
+|  order by: avg(zip) ASC
 |
 04:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(id)), sum(count(id)), sum(sum(zip)), sum(count(zip))
+|  output: avg(avg(id)), sum(count(id)), avg(avg(zip))
 |  having: count(id) > 0
 |
 03:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
-|  output: sum(id), count(id), sum(zip), count(zip)
+|  output: avg(id), count(id), avg(zip)
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 size=0B
@@ -140,9 +140,9 @@ select 1 from
 where t.x > 10
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: sum(bigint_col), count(bigint_col)
+|  output: avg(bigint_col)
 |  group by: int_col
-|  having: sum(bigint_col) / count(bigint_col) > 10
+|  having: avg(bigint_col) > 10
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB

@@ -57,7 +57,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // to be used where we can't come up with a better estimate
   protected static double DEFAULT_SELECTIVITY = 0.1;
 
-  // returns true if an Expr is an aggregate.
+  // returns true if an Expr is a non-analytic aggregate.
   private final static com.google.common.base.Predicate<Expr> isAggregatePredicate_ =
       new com.google.common.base.Predicate<Expr>() {
         public boolean apply(Expr arg) {
@@ -431,6 +431,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public static com.google.common.base.Predicate<Expr> isAggregatePredicate() {
     return isAggregatePredicate_;
+  }
+
+  public boolean isAggregate() {
+    return isAggregatePredicate_.apply(this);
   }
 
   public List<String> childrenToSql() {

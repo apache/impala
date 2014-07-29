@@ -124,7 +124,7 @@ limit 100
 |  order by: i_item_id ASC
 |
 09:AGGREGATE [FINALIZE]
-|  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
+|  output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
 |  group by: i_item_id
 |
 08:HASH JOIN [INNER JOIN]
@@ -165,13 +165,13 @@ limit 100
 |  order by: i_item_id ASC
 |
 16:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(ss_quantity)), sum(count(ss_quantity)), sum(sum(ss_list_price)), sum(count(ss_list_price)), sum(sum(ss_coupon_amt)), sum(count(ss_coupon_amt)), sum(sum(ss_sales_price)), sum(count(ss_sales_price))
+|  output: avg(avg(ss_quantity)), avg(avg(ss_list_price)), avg(avg(ss_coupon_amt)), avg(avg(ss_sales_price))
 |  group by: i_item_id
 |
 15:EXCHANGE [HASH(i_item_id)]
 |
 09:AGGREGATE
-|  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
+|  output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
 |  group by: i_item_id
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -570,7 +570,7 @@ limit 100
 |  order by: i_item_id ASC, s_state ASC
 |
 09:AGGREGATE [FINALIZE]
-|  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
+|  output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
 |  group by: i_item_id, s_state
 |
 08:HASH JOIN [INNER JOIN]
@@ -611,13 +611,13 @@ limit 100
 |  order by: i_item_id ASC, s_state ASC
 |
 16:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(ss_quantity)), sum(count(ss_quantity)), sum(sum(ss_list_price)), sum(count(ss_list_price)), sum(sum(ss_coupon_amt)), sum(count(ss_coupon_amt)), sum(sum(ss_sales_price)), sum(count(ss_sales_price))
+|  output: avg(avg(ss_quantity)), avg(avg(ss_list_price)), avg(avg(ss_coupon_amt)), avg(avg(ss_sales_price))
 |  group by: i_item_id, s_state
 |
 15:EXCHANGE [HASH(i_item_id,s_state)]
 |
 09:AGGREGATE
-|  output: sum(ss_quantity), count(ss_quantity), sum(ss_list_price), count(ss_list_price), sum(ss_coupon_amt), count(ss_coupon_amt), sum(ss_sales_price), count(ss_sales_price)
+|  output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
 |  group by: i_item_id, s_state
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1873,10 +1873,10 @@ limit 100
 |
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_store_sk = ss_store_sk
-|  other predicates: sum(ss_sales_price) <= 0.1 * sum(revenue) / count(revenue)
+|  other predicates: sum(ss_sales_price) <= 0.1 * avg(revenue)
 |
 |--06:AGGREGATE [FINALIZE]
-|  |  output: sum(sum(ss_sales_price)), count(sum(ss_sales_price))
+|  |  output: avg(sum(ss_sales_price))
 |  |  group by: ss_store_sk
 |  |
 |  05:AGGREGATE [FINALIZE]
@@ -1928,18 +1928,18 @@ limit 100
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = ss_store_sk
-|  other predicates: sum(ss_sales_price) <= 0.1 * sum(revenue) / count(revenue)
+|  other predicates: sum(ss_sales_price) <= 0.1 * avg(revenue)
 |
 |--25:EXCHANGE [BROADCAST]
 |  |
 |  24:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(sum(revenue)), sum(count(revenue))
+|  |  output: avg(avg(revenue))
 |  |  group by: ss_store_sk
 |  |
 |  23:EXCHANGE [HASH(ss_store_sk)]
 |  |
 |  06:AGGREGATE
-|  |  output: sum(sum(ss_sales_price)), count(sum(ss_sales_price))
+|  |  output: avg(sum(ss_sales_price))
 |  |  group by: ss_store_sk
 |  |
 |  22:AGGREGATE [MERGE FINALIZE]

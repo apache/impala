@@ -372,6 +372,8 @@ class RowDescriptor {
   RowDescriptor(const std::vector<TupleDescriptor*>& tuple_descs,
       const std::vector<bool>& nullable_tuples);
 
+  RowDescriptor(TupleDescriptor* tuple_desc, bool is_nullable);
+
   // dummy descriptor, needed for the JNI EvalPredicate() function
   RowDescriptor() {}
 

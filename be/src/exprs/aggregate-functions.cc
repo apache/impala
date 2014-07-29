@@ -22,6 +22,7 @@
 #include <boost/random/uniform_int.hpp>
 
 #include "common/logging.h"
+#include "runtime/decimal-value.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "exprs/anyval-util.h"
@@ -88,6 +89,154 @@ void AggregateFunctions::CountUpdate(
 void AggregateFunctions::CountStarUpdate(FunctionContext*, BigIntVal* dst) {
   DCHECK(!dst->is_null);
   ++dst->val;
+}
+
+struct AvgState {
+  double sum;
+  int64_t count;
+};
+
+void AggregateFunctions::AvgInit(FunctionContext* ctx, StringVal* dst) {
+  dst->is_null = false;
+  dst->len = sizeof(AvgState);
+  dst->ptr = ctx->Allocate(dst->len);
+  memset(dst->ptr, 0, sizeof(AvgState));
+}
+
+template <typename T>
+void AggregateFunctions::AvgUpdate(FunctionContext* ctx, const T& src,
+    StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(dst->ptr != NULL);
+  DCHECK_EQ(sizeof(AvgState), dst->len);
+  AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
+  avg->sum += src.val;
+  ++avg->count;
+}
+
+void AggregateFunctions::AvgMerge(FunctionContext* ctx, const StringVal& src,
+    StringVal* dst) {
+  const AvgState* src_struct = reinterpret_cast<const AvgState*>(src.ptr);
+  DCHECK(dst->ptr != NULL);
+  DCHECK_EQ(sizeof(AvgState), dst->len);
+  AvgState* dst_struct = reinterpret_cast<AvgState*>(dst->ptr);
+  dst_struct->sum += src_struct->sum;
+  dst_struct->count += src_struct->count;
+}
+
+DoubleVal AggregateFunctions::AvgFinalize(FunctionContext* ctx, const StringVal& src) {
+  AvgState* val_struct = reinterpret_cast<AvgState*>(src.ptr);
+  if (val_struct->count == 0) {
+    ctx->Free(src.ptr);
+    return DoubleVal::null();
+  }
+  DoubleVal result(val_struct->sum / val_struct->count);
+  ctx->Free(src.ptr);
+  return result;
+}
+
+void AggregateFunctions::TimestampAvgUpdate(FunctionContext* ctx,
+    const TimestampVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(dst->ptr != NULL);
+  DCHECK_EQ(sizeof(AvgState), dst->len);
+  AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
+  double val = TimestampValue::FromTimestampVal(src);
+  avg->sum += val;
+  ++avg->count;
+}
+
+TimestampVal AggregateFunctions::TimestampAvgFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  AvgState* val_struct = reinterpret_cast<AvgState*>(src.ptr);
+  if (val_struct->count == 0) {
+    ctx->Free(src.ptr);
+    return TimestampVal::null();
+  }
+  TimestampValue tv(val_struct->sum / val_struct->count);
+  ctx->Free(src.ptr);
+  TimestampVal result;
+  tv.ToTimestampVal(&result);
+  return result;
+}
+
+struct DecimalAvgState {
+  DecimalVal sum; // only using val16
+  int64_t count;
+};
+
+void AggregateFunctions::DecimalAvgInit(FunctionContext* ctx, StringVal* dst) {
+  dst->is_null = false;
+  dst->len = sizeof(DecimalAvgState);
+  dst->ptr = ctx->Allocate(dst->len);
+  memset(dst->ptr, 0, sizeof(DecimalAvgState));
+}
+
+void AggregateFunctions::DecimalAvgUpdate(FunctionContext* ctx, const DecimalVal& src,
+    StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(dst->ptr != NULL);
+  DCHECK_EQ(sizeof(DecimalAvgState), dst->len);
+  DecimalAvgState* avg = reinterpret_cast<DecimalAvgState*>(dst->ptr);
+  const FunctionContext::TypeDesc* arg_desc = ctx->GetArgType(0);
+  DCHECK(arg_desc != NULL);
+  const ColumnType& arg_type = AnyValUtil::TypeDescToColumnType(*arg_desc);
+
+  // Since the src and dst are guaranteed to be the same scale, we can just
+  // do a simple add.
+  switch (arg_type.GetByteSize()) {
+    case 4:
+      avg->sum.val16 += src.val4;
+      break;
+    case 8:
+      avg->sum.val16 += src.val8;
+      break;
+    case 16:
+      avg->sum.val16 += src.val4;
+      break;
+    default:
+      DCHECK(false) << "Invalid byte size for type " << arg_type.DebugString();
+  }
+  ++avg->count;
+}
+
+void AggregateFunctions::DecimalAvgMerge(FunctionContext* ctx,
+    const StringVal& src, StringVal* dst) {
+  const DecimalAvgState* src_struct =
+      reinterpret_cast<const DecimalAvgState*>(src.ptr);
+  DCHECK(dst->ptr != NULL);
+  DCHECK_EQ(sizeof(DecimalAvgState), dst->len);
+  DecimalAvgState* dst_struct = reinterpret_cast<DecimalAvgState*>(dst->ptr);
+  dst_struct->sum.val16 += src_struct->sum.val16;
+  dst_struct->count += src_struct->count;
+}
+
+DecimalVal AggregateFunctions::DecimalAvgFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  DecimalAvgState* val_struct = reinterpret_cast<DecimalAvgState*>(src.ptr);
+  if (val_struct->count == 0) {
+    ctx->Free(src.ptr);
+    return DecimalVal::null();
+  }
+  const FunctionContext::TypeDesc& output_desc = ctx->GetReturnType();
+  DCHECK_EQ(FunctionContext::TYPE_DECIMAL, output_desc.type);
+  Decimal16Value sum(val_struct->sum.val16);
+  Decimal16Value count(val_struct->count);
+  ctx->Free(src.ptr);
+  // The scale of the accumulated sum must be the same as the scale of the return type.
+  // TODO: Investigate whether this is always the right thing to do. Does the current
+  // implementation result in an unacceptable loss of output precision?
+  ColumnType sum_type = ColumnType::CreateDecimalType(38, output_desc.scale);
+  ColumnType count_type = ColumnType::CreateDecimalType(38, 0);
+  bool is_nan, overflow;
+  Decimal16Value result = sum.Divide<int128_t>(sum_type, count, count_type,
+      output_desc.scale, &is_nan, &overflow);
+  if (UNLIKELY(is_nan)) return DecimalVal::null();
+  if (UNLIKELY(overflow)) {
+    ctx->AddWarning("Avg computation overflowed, returning NULL");
+    return DecimalVal::null();
+  }
+  return DecimalVal(result.value());
 }
 
 template<typename SRC_VAL, typename DST_VAL>
@@ -868,14 +1017,12 @@ void AggregateFunctions::KnuthVarMerge(FunctionContext* ctx, const StringVal& sr
   dst_state->count = sum_count;
 }
 
-StringVal AggregateFunctions::KnuthVarFinalize(FunctionContext* ctx,
-                                               const StringVal& state_sv) {
-  DCHECK(!state_sv.is_null);
-  KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  ctx->Free(state_sv.ptr);
-  if (state.count == 0) return StringVal::null();
-  double variance = ComputeKnuthVariance(state, false);
-  return ToStringVal(ctx, variance);
+DoubleVal AggregateFunctions::KnuthVarFinalize(
+    FunctionContext* ctx, const StringVal& state_sv) {
+  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  if (state->count == 0) return DoubleVal::null();
+  double variance = ComputeKnuthVariance(*state, false);
+  return DoubleVal(variance);
 }
 
 StringVal AggregateFunctions::KnuthVarPopFinalize(FunctionContext* ctx,
@@ -910,6 +1057,11 @@ StringVal AggregateFunctions::KnuthStddevPopFinalize(FunctionContext* ctx,
 
 // Stamp out the templates for the types we need.
 template void AggregateFunctions::InitZero<BigIntVal>(FunctionContext*, BigIntVal* dst);
+
+template void AggregateFunctions::AvgUpdate<BigIntVal>(
+    FunctionContext* ctx, const BigIntVal& input, StringVal* dst);
+template void AggregateFunctions::AvgUpdate<DoubleVal>(
+    FunctionContext* ctx, const DoubleVal& input, StringVal* dst);
 
 template void AggregateFunctions::Sum<TinyIntVal, BigIntVal>(
     FunctionContext*, const TinyIntVal& src, BigIntVal* dst);

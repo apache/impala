@@ -101,14 +101,27 @@ const char* FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME =
 
 static const int MAX_WARNINGS = 1000;
 
-// Create a FunctionContext. The caller is responsible for calling delete on it.
 FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool,
+    const FunctionContext::TypeDesc& return_type,
+    const vector<FunctionContext::TypeDesc>& arg_types,
+    int varargs_buffer_size, bool debug) {
+  FunctionContext::TypeDesc invalid_type;
+  invalid_type.type = FunctionContext::INVALID_TYPE;
+  invalid_type.precision = 0;
+  invalid_type.scale = 0;
+  return FunctionContextImpl::CreateContext(state, pool, invalid_type, return_type,
+      arg_types, varargs_buffer_size, debug);
+}
+
+FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool,
+    const FunctionContext::TypeDesc& intermediate_type,
     const FunctionContext::TypeDesc& return_type,
     const vector<FunctionContext::TypeDesc>& arg_types,
     int varargs_buffer_size, bool debug) {
   impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
   ctx->impl_->state_ = state;
   ctx->impl_->pool_ = new FreePool(pool);
+  ctx->impl_->intermediate_type_ = intermediate_type;
   ctx->impl_->return_type_ = return_type;
   ctx->impl_->arg_types_ = arg_types;
   // UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
@@ -124,7 +137,8 @@ FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool
 
 FunctionContext* FunctionContextImpl::Clone(MemPool* pool) {
   impala_udf::FunctionContext* new_context =
-      CreateContext(state_, pool, return_type_, arg_types_, varargs_buffer_size_, debug_);
+      CreateContext(state_, pool, intermediate_type_, return_type_, arg_types_,
+          varargs_buffer_size_, debug_);
   new_context->impl_->constant_args_ = constant_args_;
   new_context->impl_->fragment_local_fn_state_ = fragment_local_fn_state_;
   return new_context;

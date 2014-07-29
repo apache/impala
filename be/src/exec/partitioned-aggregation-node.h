@@ -99,12 +99,17 @@ class PartitionedAggregationNode : public ExecNode {
  private:
   struct Partition;
 
-  const TupleId agg_tuple_id_;
-  TupleDescriptor* agg_tuple_desc_;
+  // Tuple into which Update()/Merge()/Serialize() results are stored.
+  TupleId intermediate_tuple_id_;
+  TupleDescriptor* intermediate_tuple_desc_;
 
-  // If true, this aggregation node should use the aggregate evaluator's Merge()
-  // instead of Update()
-  const bool is_merge_;
+  // Row with the intermediate tuple as its only tuple.
+  boost::scoped_ptr<RowDescriptor> intermediate_row_desc_;
+
+  // Tuple into which Finalize() results are stored. Possibly the same as
+  // the intermediate tuple.
+  TupleId output_tuple_id_;
+  TupleDescriptor* output_tuple_desc_;
 
   // Certain aggregates require a finalize step, which is the final step of the
   // aggregate after consuming all input rows. The finalize step converts the aggregate
@@ -119,7 +124,7 @@ class PartitionedAggregationNode : public ExecNode {
   std::vector<ExprContext*> probe_expr_ctxs_;
 
   // Exprs used to insert constructed aggregation tuple into the hash table.
-  // All the exprs are simply SlotRefs for the agg tuple.
+  // All the exprs are simply SlotRefs for the intermediate tuple.
   std::vector<ExprContext*> build_expr_ctxs_;
 
   // True if the resulting tuple contains var-len agg/grouping expressions. This
@@ -137,7 +142,7 @@ class PartitionedAggregationNode : public ExecNode {
   bool singleton_output_tuple_returned_;
 
   // MemPool used to allocate memory for when we don't have grouping and don't initialize
-  // the partitioning structures.
+  // the partitioning structures, or during Close() when creating new output tuples.
   boost::scoped_ptr<MemPool> mem_pool_;
 
   // TODO: we use this hash table to hash rows. Remove when the hashing interface is
@@ -212,23 +217,30 @@ class PartitionedAggregationNode : public ExecNode {
   // or aggregated_partitions_, depending on if it was spilled or not.
   std::list<Partition*> aggregated_partitions_;
 
-  // Allocates a new allocated aggregation output tuple.
+  // Allocates a new allocated aggregation intermediate tuple.
   // initialized to grouping values computed over 'current_row_'.
   // Aggregation expr slots are set to their initial values.
   // Pool/Stream specify where the memory (tuple and var len slots) should be allocated
   // from. Only one can be set.
   // Returns NULL if there was not enough memory to allocate the tuple.
-  Tuple* ConstructAggTuple(MemPool* pool, BufferedTupleStream* stream);
+  Tuple* ConstructIntermediateTuple(MemPool* pool, BufferedTupleStream* stream);
 
-  // Updates the aggregation output tuple 'tuple' with aggregation values
-  // computed over 'row'.
-  // If merge is true, then row is an intermediate row, otherwise it is
-  // the original child(0) input.
-  void UpdateAggTuple(Tuple* tuple, TupleRow* row, bool merge);
+  // Updates the given aggregation intermediate tuple with aggregation values computed
+  // over 'row'. Whether the agg fn evaluator calls Update() or Merge() is controlled by
+  // the evaluator itself, unless enforced explicitly by passing in is_merge == true.
+  // The override is needed to merge spilled and non-spilled rows belonging to the same
+  // partition independent of whether the agg fn evaluators have is_merge() == true.
+  void UpdateTuple(Tuple* tuple, TupleRow* row, bool is_merge = false);
 
-  // Called when all rows have been aggregated for the aggregation tuple to compute final
-  // aggregate values
-  void FinalizeAggTuple(Tuple* tuple);
+  // Called on the intermediate tuple of each group after all input rows have been
+  // consumed and aggregated. Computes the final aggregate values to be returned in
+  // GetNext() using the agg fn evaluators' Serialize() or Finalize().
+  // For the Finalize() case if the output tuple is different from the intermediate
+  // tuple, then a new tuple is allocated from 'pool' to hold the final result.
+  // Returns the tuple holding the final aggregate values.
+  // TODO: Coordinate the allocation of new tuples with the release of memory
+  // so as not to make memory consumption blow up.
+  Tuple* FinalizeTuple(Tuple* tuple, MemPool* pool);
 
   // Do the aggregation for all tuple rows in the batch when there is no grouping.
   void ProcessRowBatchNoGrouping(RowBatch* batch);

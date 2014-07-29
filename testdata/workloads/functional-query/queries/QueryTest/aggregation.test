@@ -4,7 +4,7 @@
 # the exact result could vary slightly due to numeric instability
 # 0.001 is a conservative upperbound on the possible difference in results
 SELECT abs(cast(variance(tinyint_col) as double) - 6.66741) < 0.001,
- abs(cast(variance(double_col) as double) - 8470810) < 0.001
+ abs(cast(variance(double_col) as double) - 8470806.708) < 0.001
 from alltypesagg
 ---- RESULTS
 true,true
@@ -17,9 +17,9 @@ SELECT variance(tinyint_col), stddev(smallint_col), variance_pop(int_col),
 stddev_pop(bigint_col)
 from alltypesagg WHERE id = -9999999
 ---- RESULTS
-'NULL','NULL','NULL','NULL'
+NULL,'NULL','NULL','NULL'
 ---- TYPES
-string, string, string, string
+double, string, string, string
 ====
 ---- QUERY
 # exactly 1 tuple processed (variance & stddev are 0)
@@ -27,9 +27,9 @@ SELECT variance(tinyint_col), stddev(smallint_col), variance_pop(int_col),
 stddev_pop(bigint_col)
 from alltypesagg WHERE id = 1006
 ---- RESULTS
-'0','0','0','0'
+0,'0','0','0'
 ---- TYPES
-string, string, string, string
+double, string, string, string
 ====
 ---- QUERY
 # Includes one row which is null
@@ -37,9 +37,9 @@ SELECT variance(tinyint_col), variance(smallint_col), variance(int_col),
 variance(bigint_col), variance(float_col), variance(double_col)
 from alltypesagg WHERE id >= 1000 AND id < 1006
 ---- RESULTS
-'2.5','2.5','2.5','250','3.025','255.025'
+2.5,2.5,2.5,250,3.025,255.025
 ---- TYPES
-string, string, string, string, string, string
+double, double, double, double, double, double
 ====
 ---- QUERY
 SELECT variance_pop(tinyint_col), variance_pop(smallint_col), variance_pop(int_col),

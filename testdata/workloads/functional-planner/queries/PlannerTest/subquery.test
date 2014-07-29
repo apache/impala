@@ -345,7 +345,7 @@ from (select * from functional.alltypesagg) a
 group by 1
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: count(*), min(functional.alltypesagg.tinyint_col), max(functional.alltypesagg.tinyint_col), sum(functional.alltypesagg.tinyint_col), count(functional.alltypesagg.tinyint_col)
+|  output: count(*), min(functional.alltypesagg.tinyint_col), max(functional.alltypesagg.tinyint_col), sum(functional.alltypesagg.tinyint_col), avg(functional.alltypesagg.tinyint_col)
 |  group by: functional.alltypesagg.tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -367,13 +367,13 @@ NODE 0:
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col)), sum(count(tinyint_col))
+|  output: sum(count(*)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col)), avg(avg(tinyint_col))
 |  group by: tinyint_col
 |
 02:EXCHANGE [HASH(tinyint_col)]
 |
 01:AGGREGATE
-|  output: count(*), min(functional.alltypesagg.tinyint_col), max(functional.alltypesagg.tinyint_col), sum(functional.alltypesagg.tinyint_col), count(functional.alltypesagg.tinyint_col)
+|  output: count(*), min(functional.alltypesagg.tinyint_col), max(functional.alltypesagg.tinyint_col), sum(functional.alltypesagg.tinyint_col), avg(functional.alltypesagg.tinyint_col)
 |  group by: functional.alltypesagg.tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -388,7 +388,7 @@ group by 1
 ) a
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), count(tinyint_col)
+|  output: count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)
 |  group by: tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -397,13 +397,13 @@ group by 1
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col)), sum(count(tinyint_col))
+|  output: sum(count(*)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col)), avg(avg(tinyint_col))
 |  group by: tinyint_col
 |
 02:EXCHANGE [HASH(tinyint_col)]
 |
 01:AGGREGATE
-|  output: count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), count(tinyint_col)
+|  output: count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)
 |  group by: tinyint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -552,9 +552,9 @@ where c1 is not null
 and   c2 > 10
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: count(*), sum(functional.alltypesagg.int_col), count(functional.alltypesagg.int_col)
+|  output: count(*), avg(functional.alltypesagg.int_col)
 |  group by: functional.alltypesagg.int_col % 7
-|  having: sum(int_col) / count(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
+|  having: avg(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
@@ -562,14 +562,14 @@ and   c2 > 10
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), sum(sum(int_col)), sum(count(int_col))
+|  output: sum(count(*)), avg(avg(int_col))
 |  group by: int_col % 7
-|  having: sum(int_col) / count(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
+|  having: avg(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
 |
 02:EXCHANGE [HASH(int_col % 7)]
 |
 01:AGGREGATE
-|  output: count(*), sum(functional.alltypesagg.int_col), count(functional.alltypesagg.int_col)
+|  output: count(*), avg(functional.alltypesagg.int_col)
 |  group by: functional.alltypesagg.int_col % 7
 |
 00:SCAN HDFS [functional.alltypesagg]

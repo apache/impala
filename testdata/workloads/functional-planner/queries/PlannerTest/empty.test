@@ -36,7 +36,7 @@ from functional.alltypes
 where null
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: count(int_col), sum(double_col), count(double_col), count(*)
+|  output: count(int_col), avg(double_col), count(*)
 |
 00:EMPTYSET
 ====

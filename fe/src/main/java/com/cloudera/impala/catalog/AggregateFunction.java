@@ -27,6 +27,7 @@ import com.cloudera.impala.thrift.TFunctionBinaryType;
  * Internal representation of an aggregate function.
  */
 public class AggregateFunction extends Function {
+  // Set if different from retType_, null otherwise.
   private Type intermediateType_;
 
   // The symbol inside the binary at location_ that contains this particular.
@@ -58,7 +59,7 @@ public class AggregateFunction extends Function {
       String serializeFnSymbol, String mergeFnSymbol, String finalizeFnSymbol) {
     super(fnName, argTypes, retType, false);
     setLocation(location);
-    intermediateType_ = intermediateType;
+    intermediateType_ = (intermediateType.equals(retType)) ? null : intermediateType;
     updateFnSymbol_ = updateFnSymbol;
     initFnSymbol_ = initFnSymbol;
     serializeFnSymbol_ = serializeFnSymbol;
@@ -97,10 +98,14 @@ public class AggregateFunction extends Function {
   public String getSerializeFnSymbol() { return serializeFnSymbol_; }
   public String getMergeFnSymbol() { return mergeFnSymbol_; }
   public String getFinalizeFnSymbol() { return finalizeFnSymbol_; }
-  public Type getIntermediateType() { return intermediateType_; }
   public boolean ignoresDistinct() { return ignoresDistinct_; }
   public boolean needsAnalyticExpr() { return needsAnalyticExpr_; }
 
+  /**
+   * Returns the intermediate type of this aggregate function or null
+   * if it is identical to the return type.
+   */
+  public Type getIntermediateType() { return intermediateType_; }
   public void setUpdateFnSymbol(String fn) { updateFnSymbol_ = fn; }
   public void setInitFnSymbol(String fn) { initFnSymbol_ = fn; }
   public void setSerializeFnSymbol(String fn) { serializeFnSymbol_ = fn; }
@@ -117,7 +122,11 @@ public class AggregateFunction extends Function {
     if (serializeFnSymbol_ != null) agg_fn.setSerialize_fn_symbol(serializeFnSymbol_);
     agg_fn.setMerge_fn_symbol(mergeFnSymbol_);
     if (finalizeFnSymbol_  != null) agg_fn.setFinalize_fn_symbol(finalizeFnSymbol_);
-    agg_fn.setIntermediate_type(intermediateType_.toThrift());
+    if (intermediateType_ != null) {
+      agg_fn.setIntermediate_type(intermediateType_.toThrift());
+    } else {
+      agg_fn.setIntermediate_type(getReturnType().toThrift());
+    }
     agg_fn.setIgnores_distinct(ignoresDistinct_);
     fn.setAggregate_fn(agg_fn);
     return fn;

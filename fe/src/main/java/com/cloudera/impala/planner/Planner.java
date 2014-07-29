@@ -345,8 +345,9 @@ public class Planner {
     Expr.removeConstants(nonConstPartitionExprs);
     DataPartition inputPartition = inputFragment.getDataPartition();
 
-    // do nothing if the input fragment is already partitioned on partitionExprs
-    if (Expr.equalLists(inputPartition.getPartitionExprs(), nonConstPartitionExprs)) {
+    // do nothing if the input fragment is already appropriately partitioned
+    if (analyzer.isEquivSlots(inputPartition.getPartitionExprs(),
+        nonConstPartitionExprs)) {
       return inputFragment;
     }
 
@@ -753,6 +754,7 @@ public class Planner {
       // will get created in the next createAggregationFragment() call
       // for the parent AggregationNode
       childFragment.addPlanRoot(node);
+      node.setIntermediateTuple();
       return childFragment;
     }
 
@@ -764,9 +766,12 @@ public class Planner {
           && ((AggregationNode)(node.getChild(0))).getAggInfo().isDistinctAgg();
 
     if (!isDistinct) {
-      // the original aggregation goes into the child fragment,
-      // merge aggregation into a parent fragment
+      // the original aggregation materializes the intermediate agg tuple and goes
+      // into the child fragment; merge aggregation materializes the output agg tuple
+      // and goes into a parent fragment
       childFragment.addPlanRoot(node);
+      node.setIntermediateTuple();
+
       // if there is a limit, we need to transfer it from the pre-aggregation
       // node in the child fragment to the merge aggregation node in the parent
       long limit = node.getLimit();
@@ -780,8 +785,8 @@ public class Planner {
         // TODO: add infrastructure so that all PlanNodes have smaps to make this
         // process of turning exprs into executable exprs less ad-hoc; might even want to
         // introduce another mechanism that simply records a mapping of slots
-        List<Expr> partitionExprs =
-            Expr.substituteList(groupingExprs, node.getAggInfo().getSMap(), analyzer);
+        List<Expr> partitionExprs = Expr.substituteList(
+            groupingExprs, node.getAggInfo().getIntermediateSmap(), analyzer);
         parentPartition =
             new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
       } else {
@@ -815,6 +820,7 @@ public class Planner {
     // The first-phase aggregation node is already in the child fragment.
     Preconditions.checkState(node.getChild(0) == childFragment.getPlanRoot());
 
+    AggregateInfo firstPhaseAggInfo = ((AggregationNode) node.getChild(0)).getAggInfo();
     List<Expr> partitionExprs = null;
     if (hasGrouping) {
       // We need to do
@@ -823,9 +829,11 @@ public class Planner {
       // - merge fragment, hash-partitioned on grouping exprs:
       //   * merge agg of phase 1
       //   * phase 2 agg
-      // The output partition exprs of the child are the (input) grouping exprs
-      // of the parent.
-      partitionExprs = Expr.cloneList(groupingExprs);
+      // The output partition exprs of the child are the (input) grouping exprs of the
+      // parent. The grouping exprs reference the output tuple of the 1st phase, but the
+      // partitioning happens on the intermediate tuple of the 1st phase.
+      partitionExprs = Expr.substituteList(groupingExprs,
+          firstPhaseAggInfo.getOutputToIntermediateSmap(), analyzer);
     } else {
       // We need to do
       // - child fragment:
@@ -835,10 +843,8 @@ public class Planner {
       //   * phase 2 agg
       // - merge fragment 2, unpartitioned:
       //   * merge agg of phase 2
-      List<Expr> distinctExprs =
-          ((AggregationNode)(node.getChild(0))).getAggInfo().getGroupingExprs();
-      partitionExprs = Expr.substituteList(distinctExprs,
-          ((AggregationNode)(node.getChild(0))).getAggInfo().getSMap(), analyzer);
+      partitionExprs = Expr.substituteList(firstPhaseAggInfo.getGroupingExprs(),
+          firstPhaseAggInfo.getIntermediateSmap(), analyzer);
     }
     DataPartition mergePartition =
         new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
@@ -846,8 +852,7 @@ public class Planner {
     // place a merge aggregation step for the 1st phase in a new fragment
     PlanFragment mergeFragment =
         createParentFragment(analyzer, childFragment, mergePartition);
-    AggregateInfo mergeAggInfo =
-        ((AggregationNode)(node.getChild(0))).getAggInfo().getMergeAggInfo();
+    AggregateInfo mergeAggInfo = firstPhaseAggInfo.getMergeAggInfo();
     AggregationNode mergeAggNode =
         new AggregationNode(
             nodeIdGenerator_.getNextId(), node.getChild(0), mergeAggInfo);
@@ -865,6 +870,7 @@ public class Planner {
       fragments.add(mergeFragment);
 
       node.unsetNeedsFinalize();
+      node.setIntermediateTuple();
       mergeFragment =
           createParentFragment(analyzer, mergeFragment, DataPartition.UNPARTITIONED);
       mergeAggInfo = node.getAggInfo().getMergeAggInfo();

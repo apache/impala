@@ -181,14 +181,17 @@ struct TAggregationNode {
   // aggregate exprs. The root of each expr is the aggregate function. The
   // other exprs are the inputs to the aggregate function.
   2: required list<Exprs.TExpr> aggregate_functions
-  3: required Types.TTupleId agg_tuple_id
+
+  // Tuple id used for intermediate aggregations (with slots of agg intermediate types)
+  3: required Types.TTupleId intermediate_tuple_id
+
+  // Tupld id used for the aggregation output (with slots of agg output types)
+  // Equal to intermediate_tuple_id if intermediate type == output type for all
+  // aggregate functions.
+  4: required Types.TTupleId output_tuple_id
 
   // Set to true if this aggregation node needs to run the finalization step.
-  4: required bool need_finalize
-
-  // If true, this node is doing the merge phase of the aggregation (as opposed to the
-  // update phase).
-  5: optional bool is_merge
+  5: required bool need_finalize
 }
 
 struct TSortInfo {

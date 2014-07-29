@@ -223,7 +223,7 @@ public class UnionStmt extends QueryStmt {
       if (distinctAggInfo_ != null) {
         // also mark the corresponding slot in the distinct agg tuple as being
         // materialized
-        distinctAggInfo_.getAggTupleDesc().getSlots().get(i).setIsMaterialized(true);
+        distinctAggInfo_.getOutputTupleDesc().getSlots().get(i).setIsMaterialized(true);
       }
     }
     materializeSlots(analyzer, exprs);

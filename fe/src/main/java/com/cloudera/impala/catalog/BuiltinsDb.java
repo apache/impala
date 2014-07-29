@@ -497,7 +497,7 @@ public class BuiltinsDb extends Db {
             prefix + "22KnuthStddevPopFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             true));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance",
-            Lists.newArrayList(t), Type.STRING, Type.STRING,
+            Lists.newArrayList(t), Type.DOUBLE, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -540,18 +540,40 @@ public class BuiltinsDb extends Db {
         prefix + "8SumMergeEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPS4_",
         null, null, false));
 
-    for (Type t: Type.getNumericTypes()) {
-      // Avg
-      // TODO: because of avg rewrite, BE doesn't implement it yet.
-      db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
-          Lists.newArrayList(t), Type.DOUBLE, Type.DOUBLE,
-          "", "", "", null, "", false));
-    }
-    // Avg(Timestamp)
-    // TODO: why does this make sense? Avg(timestamp) returns a double.
+    // Avg
+    // TODO: switch to CHAR(sizeof(AvgIntermediateType) when that becomes available
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
-        Lists.<Type>newArrayList(Type.TIMESTAMP), Type.DOUBLE, Type.DOUBLE,
-        "", "", "", null, "", false));
+        Lists.<Type>newArrayList(Type.BIGINT), Type.DOUBLE, Type.STRING,
+        prefix + "7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + "9AvgUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE",
+        prefix + "8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        stringValSerializeOrFinalize,
+        prefix + "11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        false));
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
+        Lists.<Type>newArrayList(Type.DOUBLE), Type.DOUBLE, Type.STRING,
+        prefix + "7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + "9AvgUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE",
+        prefix + "8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        stringValSerializeOrFinalize,
+        prefix + "11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        false));
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
+        Lists.<Type>newArrayList(Type.DECIMAL), Type.DECIMAL, Type.STRING,
+        prefix + "14DecimalAvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + "16DecimalAvgUpdateEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPNS1_9StringValE",
+        prefix + "15DecimalAvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        stringValSerializeOrFinalize,
+        prefix + "18DecimalAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE", false));
+    // Avg(Timestamp)
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
+        Lists.<Type>newArrayList(Type.TIMESTAMP), Type.TIMESTAMP, Type.STRING,
+        prefix + "7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + "18TimestampAvgUpdateEPN10impala_udf15FunctionContextERKNS1_12TimestampValEPNS1_9StringValE",
+        prefix + "8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        stringValSerializeOrFinalize,
+        prefix + "20TimestampAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        false));
 
     // Group_concat(string)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "group_concat",

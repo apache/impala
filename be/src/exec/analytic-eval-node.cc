@@ -64,7 +64,10 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
       mem_tracker()));
 
   for (int i = 0; i < evaluators_.size(); ++i) {
+    // TODO: These should be different slots once we fully support
+    // different intermediate and output tuples.
     RETURN_IF_ERROR(evaluators_[i]->Prepare(state, child(0)->row_desc(),
+        output_tuple_desc_->slots()[i],
         output_tuple_desc_->slots()[i]));
   }
   RETURN_IF_ERROR(partition_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
@@ -146,7 +149,7 @@ void AnalyticEvalNode::FinalizeOutputTuple(bool reinitialize_current_tuple) {
   for (int i = 0; i < evaluators_.size(); ++i) {
     // TODO: Currently assumes UDAs can call Finalize() repeatedly, will need to change
     // for functions that have different intermediate state.
-    evaluators_[i]->Finalize(output_tuple);
+    evaluators_[i]->Finalize(output_tuple, output_tuple);
   }
   DCHECK(result_tuples_.empty() ||
       input_stream_->num_rows() > result_tuples_.back().first);
@@ -322,7 +325,7 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
 
   for (int i = 0; i < evaluators_.size(); ++i) {
     // Need to make sure finalize is called in case there is any state to clean up.
-    evaluators_[i]->Finalize(current_tuple_);
+    evaluators_[i]->Finalize(current_tuple_, current_tuple_);
     evaluators_[i]->Close(state);
   }
   partition_exprs_.Close(state);

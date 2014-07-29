@@ -361,29 +361,29 @@ group by 1
 order by avg(tinyint_col)
 ---- PLAN
 02:SORT
-|  order by: sum(tinyint_col) / count(tinyint_col) ASC
+|  order by: avg(tinyint_col) ASC
 |
 01:AGGREGATE [FINALIZE]
-|  output: count(*), sum(tinyint_col), count(tinyint_col)
+|  output: count(*), avg(tinyint_col)
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: sum(tinyint_col) / count(tinyint_col) ASC
+|  order by: avg(tinyint_col) ASC
 |
 02:SORT
-|  order by: sum(tinyint_col) / count(tinyint_col) ASC
+|  order by: avg(tinyint_col) ASC
 |
 04:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), sum(sum(tinyint_col)), sum(count(tinyint_col))
+|  output: sum(count(*)), avg(avg(tinyint_col))
 |  group by: int_col
 |
 03:EXCHANGE [HASH(int_col)]
 |
 01:AGGREGATE
-|  output: count(*), sum(tinyint_col), count(tinyint_col)
+|  output: count(*), avg(tinyint_col)
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypesagg]

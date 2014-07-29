@@ -23,8 +23,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -261,15 +259,15 @@ public class SelectStmt extends QueryStmt {
       // are already evaluated below this agg node (e.g., in a scan).
       Set<SlotId> groupBySlots = Sets.newHashSet();
       for (int i = 0; i < aggInfo_.getGroupingExprs().size(); ++i) {
-        groupBySlots.add(aggInfo_.getAggTupleDesc().getSlots().get(i).getId());
+        groupBySlots.add(aggInfo_.getOutputTupleDesc().getSlots().get(i).getId());
       }
       // Binding predicates are assigned to the final output tuple of the aggregation,
       // which is the tuple of the 2nd phase agg for distinct aggs.
       ArrayList<Expr> bindingPredicates =
-          analyzer.getBoundPredicates(aggInfo_.getOutputTupleId(), groupBySlots);
+          analyzer.getBoundPredicates(aggInfo_.getResultTupleId(), groupBySlots);
       havingConjuncts.addAll(bindingPredicates);
       havingConjuncts.addAll(
-          analyzer.getUnassignedConjuncts(aggInfo_.getOutputTupleId().asList(), false));
+          analyzer.getUnassignedConjuncts(aggInfo_.getResultTupleId().asList(), false));
       materializeSlots(analyzer, havingConjuncts);
       aggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
@@ -468,13 +466,6 @@ public class SelectStmt extends QueryStmt {
           aggExprs);
     }
 
-    // substitute AVG before constructing AggregateInfo
-    ExprSubstitutionMap avgSMap = createAvgSMap(aggExprs, analyzer);
-    ArrayList<Expr> substitutedAggs = Expr.substituteList(aggExprs, avgSMap, analyzer);
-
-    ArrayList<FunctionCallExpr> nonAvgAggExprs = Lists.newArrayList();
-    TreeNode.collect(substitutedAggs, Expr.isAggregatePredicate(), nonAvgAggExprs);
-
     // When DISTINCT aggregates are present, non-distinct (i.e. ALL) aggregates are
     // evaluated in two phases (see AggregateInfo for more details). In particular,
     // COUNT(c) in "SELECT COUNT(c), AGG(DISTINCT d) from R" is transformed to
@@ -485,8 +476,8 @@ public class SelectStmt extends QueryStmt {
     // Therefore, COUNT([ALL]) is transformed into zeroifnull(COUNT([ALL]) if
     // i) There is no GROUP-BY clause, and
     // ii) Other DISTINCT aggregates are present.
-    ExprSubstitutionMap countAllMap = createCountAllMap(nonAvgAggExprs, analyzer);
-    substitutedAggs = Expr.substituteList(nonAvgAggExprs, countAllMap, analyzer);
+    ExprSubstitutionMap countAllMap = createCountAllMap(aggExprs, analyzer);
+    List<Expr> substitutedAggs = Expr.substituteList(aggExprs, countAllMap, analyzer);
     aggExprs.clear();
     TreeNode.collect(substitutedAggs, Expr.isAggregatePredicate(), aggExprs);
     try {
@@ -503,10 +494,8 @@ public class SelectStmt extends QueryStmt {
           : aggInfo_;
 
     ExprSubstitutionMap combinedSMap =
-        ExprSubstitutionMap.compose(
-            ExprSubstitutionMap.compose(avgSMap, countAllMap, analyzer),
-            finalAggInfo.getSMap(), analyzer);
-    LOG.info("combined smap: " + combinedSMap.debugString());
+        ExprSubstitutionMap.compose(countAllMap, finalAggInfo.getOutputSmap(), analyzer);
+    LOG.debug("combined smap: " + combinedSMap.debugString());
 
     // change select list, having and ordering exprs to point to agg output. We need
     // to reanalyze the exprs at this point.
@@ -531,7 +520,7 @@ public class SelectStmt extends QueryStmt {
 
     // check that all post-agg exprs point to agg output
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
-      if (!resultExprs_.get(i).isBound(finalAggInfo.getAggTupleId())) {
+      if (!resultExprs_.get(i).isBound(finalAggInfo.getOutputTupleId())) {
         throw new AnalysisException(
             "select list expression not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
@@ -540,7 +529,8 @@ public class SelectStmt extends QueryStmt {
     }
     if (orderByElements_ != null) {
       for (int i = 0; i < orderByElements_.size(); ++i) {
-        if (!sortInfo_.getOrderingExprs().get(i).isBound(finalAggInfo.getAggTupleId())) {
+        if (!sortInfo_.getOrderingExprs().get(i).isBound(
+            finalAggInfo.getOutputTupleId())) {
           throw new AnalysisException(
               "ORDER BY expression not produced by aggregation output "
               + "(missing from GROUP BY clause?): "
@@ -549,7 +539,7 @@ public class SelectStmt extends QueryStmt {
       }
     }
     if (havingPred_ != null) {
-      if (!havingPred_.isBound(finalAggInfo.getAggTupleId())) {
+      if (!havingPred_.isBound(finalAggInfo.getOutputTupleId())) {
         throw new AnalysisException(
             "HAVING clause not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
@@ -559,54 +549,6 @@ public class SelectStmt extends QueryStmt {
   }
 
   /**
-   * Build smap AVG -> SUM/COUNT;
-   * assumes that select list and having clause have been analyzed.
-   */
-  private ExprSubstitutionMap createAvgSMap(
-      ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
-      throws AnalysisException {
-    ExprSubstitutionMap result = new ExprSubstitutionMap();
-    for (FunctionCallExpr aggExpr : aggExprs) {
-      if (!aggExpr.getFnName().getFunction().equals("avg")) continue;
-      // Transform avg(TIMESTAMP) to cast(avg(cast(TIMESTAMP as DOUBLE)) as TIMESTAMP)
-      CastExpr inCastExpr = null;
-      if (aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP) {
-        Expr aggExprClone = aggExpr.getChild(0).clone();
-        aggExprClone.analyze(analyzer);
-        inCastExpr = new CastExpr(Type.DOUBLE, aggExprClone, false);
-      }
-
-      List<Expr> sumInputExprs =
-          Lists.newArrayList(
-              aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP ?
-              inCastExpr : aggExpr.getChild(0).clone());
-      Expr.analyze(sumInputExprs, analyzer);
-      List<Expr> countInputExpr = Lists.newArrayList(aggExpr.getChild(0).clone());
-      Expr.analyze(countInputExpr, analyzer);
-
-      FunctionCallExpr sumExpr =
-          new FunctionCallExpr("sum",
-              new FunctionParams(aggExpr.isDistinct(), sumInputExprs));
-      FunctionCallExpr countExpr =
-          new FunctionCallExpr("count",
-              new FunctionParams(aggExpr.isDistinct(), countInputExpr));
-      ArithmeticExpr divExpr =
-          new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);
-
-      if (aggExpr.getChild(0).type_.getPrimitiveType() == PrimitiveType.TIMESTAMP) {
-        CastExpr outCastExpr = new CastExpr(Type.TIMESTAMP, divExpr, false);
-        outCastExpr.analyze(analyzer);
-        result.put(aggExpr, outCastExpr);
-      } else {
-        divExpr.analyze(analyzer);
-        result.put(aggExpr, divExpr);
-      }
-    }
-    LOG.debug("avg smap: " + result.debugString());
-    return result;
-  }
-
-  /*
    * Create a map from COUNT([ALL]) -> zeroifnull(COUNT([ALL])) if
    * i) There is no GROUP-BY, and
    * ii) There are other distinct aggregates to be evaluated.
@@ -814,7 +756,7 @@ public class SelectStmt extends QueryStmt {
       tupleIdList.add(sortInfo_.getSortTupleDescriptor().getId());
     } else if (aggInfo_ != null) {
       // Return the tuple id produced in the final aggregation step.
-      tupleIdList.add(aggInfo_.getOutputTupleId());
+      tupleIdList.add(aggInfo_.getResultTupleId());
     } else {
       for (TableRef tblRef: tableRefs_) {
         tupleIdList.addAll(tblRef.getMaterializedTupleIds());

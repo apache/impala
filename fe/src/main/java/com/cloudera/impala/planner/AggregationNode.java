@@ -63,7 +63,7 @@ public class AggregationNode extends PlanNode {
    * Create an agg node from aggInfo.
    */
   public AggregationNode(PlanNodeId id, PlanNode input, AggregateInfo aggInfo) {
-    super(id, aggInfo.getAggTupleId().asList(), "AGGREGATE");
+    super(id, aggInfo.getOutputTupleId().asList(), "AGGREGATE");
     aggInfo_ = aggInfo;
     children_.add(input);
     nullableTupleIds_.addAll(input.getNullableTupleIds());
@@ -88,6 +88,17 @@ public class AggregationNode extends PlanNode {
     needsFinalize_ = false;
   }
 
+  /**
+   * Have this node materialize the aggregation's intermediate tuple instead of
+   * the output tuple.
+   */
+  public void setIntermediateTuple() {
+    Preconditions.checkState(!tupleIds_.isEmpty());
+    Preconditions.checkState(tupleIds_.get(0).equals(aggInfo_.getOutputTupleId()));
+    tupleIds_.clear();
+    tupleIds_.add(aggInfo_.getIntermediateTupleId());
+  }
+
   @Override
   public void setCompactData(boolean on) { compactData_ = on; }
 
@@ -96,27 +107,16 @@ public class AggregationNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
-    // TODO: It seems wrong that the 2nd phase agg has aggInfo_.isMerge() == true.
-    // The reason for this is that the non-distinct aggregate functions need to use
-    // the merge function in the BE (see toThrift() of this class). Clean this up.
-    boolean isSecondPhaseAgg = false;
-    if (getChild(0) instanceof AggregationNode) {
-      AggregationNode childAggNode = (AggregationNode) getChild(0);
-      if (childAggNode.getAggInfo().getSecondPhaseDistinctAggInfo() == aggInfo_) {
-        isSecondPhaseAgg = true;
-      }
-    }
     // Assign predicates to the top-most agg in the single-node plan that can evaluate
     // them, as follows: For non-distinct aggs place them in the 1st phase agg node. For
     // distinct aggs place them in the 2nd phase agg node. The conjuncts are
     // transferred to the proper place in the multi-node plan via transferConjuncts().
-    if (tupleIds_.get(0).equals(aggInfo_.getOutputTupleId()) &&
-        (isSecondPhaseAgg || !aggInfo_.isMerge())) {
+    if (tupleIds_.get(0).equals(aggInfo_.getResultTupleId()) && !aggInfo_.isMerge()) {
       // Ignore predicates bound to a group-by slot because those
       // are already evaluated below this agg node (e.g., in a scan).
       Set<SlotId> groupBySlots = Sets.newHashSet();
       for (int i = 0; i < aggInfo_.getGroupingExprs().size(); ++i) {
-        groupBySlots.add(aggInfo_.getAggTupleDesc().getSlots().get(i).getId());
+        groupBySlots.add(aggInfo_.getOutputTupleDesc().getSlots().get(i).getId());
       }
       ArrayList<Expr> bindingPredicates =
           analyzer.getBoundPredicates(tupleIds_.get(0), groupBySlots);
@@ -127,7 +127,10 @@ public class AggregationNode extends PlanNode {
 
       analyzer.enforceSlotEquivalences(tupleIds_.get(0), conjuncts_, groupBySlots);
     }
-    computeMemLayout(analyzer);
+    // Compute the mem layout for both tuples here for simplicity.
+    aggInfo_.getOutputTupleDesc().computeMemLayout();
+    aggInfo_.getIntermediateTupleDesc().computeMemLayout();
+
     // do this at the end so it can take all conjuncts into account
     computeStats(analyzer);
 
@@ -136,7 +139,7 @@ public class AggregationNode extends PlanNode {
     // refer to our output
     ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();
     aggInfo_.substitute(combinedChildSmap, analyzer);
-    baseTblSmap_ = aggInfo_.getSMap();
+    baseTblSmap_ = aggInfo_.getOutputSmap();
     // assert consistent aggregate expr and slot materialization
     aggInfo_.checkConsistency();
   }
@@ -196,8 +199,8 @@ public class AggregationNode extends PlanNode {
     aggInfo_.checkConsistency();
     msg.agg_node = new TAggregationNode(
         aggregateFunctions,
-        aggInfo_.getAggTupleId().asInt(), needsFinalize_);
-    msg.agg_node.setIs_merge(aggInfo_.isMerge());
+        aggInfo_.getIntermediateTupleId().asInt(),
+        aggInfo_.getOutputTupleId().asInt(), needsFinalize_);
     List<Expr> groupingExprs = aggInfo_.getGroupingExprs();
     if (groupingExprs != null) {
       msg.agg_node.setGrouping_exprs(Expr.treesToThrift(groupingExprs));
@@ -206,16 +209,26 @@ public class AggregationNode extends PlanNode {
 
   @Override
   protected String getDisplayLabelDetail() {
-    if (aggInfo_.isMerge() || needsFinalize_) {
-      if (aggInfo_.isMerge() && needsFinalize_) {
-        return "MERGE FINALIZE";
-      } else if (aggInfo_.isMerge()) {
-        return "MERGE";
-      } else {
-        return "FINALIZE";
+    switch(aggInfo_.getAggPhase()) {
+      case FIRST: {
+        if (needsFinalize_) return "FINALIZE";
+        return null;
       }
+      case FIRST_MERGE: {
+        if (getChild(0) instanceof ExchangeNode &&
+            getChild(0).getChild(0) instanceof AggregationNode) {
+          AggregationNode child = (AggregationNode) getChild(0).getChild(0);
+          if (child.getAggInfo().isDistinctAgg()) return "MERGE";
+        }
+        return "MERGE FINALIZE";
+      }
+      case SECOND: {
+        if (needsFinalize_) return "MERGE FINALIZE";
+        return "MERGE";
+      }
+      case SECOND_MERGE: return "MERGE FINALIZE";
+      default: return null;
     }
-    return null;
   }
 
   @Override

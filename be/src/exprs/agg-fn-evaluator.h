@@ -72,8 +72,12 @@ class AggFnEvaluator {
 
   // Initializes the agg expr. 'desc' must be the row descriptor for the input TupleRow.
   // It is used to get the input values in the Update() and Merge() functions.
-  // 'output_slot_desc' is the slot that this evaluator should write to.
+  // 'intermediate_slot_desc' is the slot into which this evaluator should write the
+  // results of Update()/Merge()/Serialize().
+  // 'output_slot_desc' is the slot into which this evaluator should write the results
+  // of Finalize()
   Status Prepare(RuntimeState* state, const RowDescriptor& desc,
+      const SlotDescriptor* intermediate_slot_desc,
       const SlotDescriptor* output_slot_desc);
 
   ~AggFnEvaluator();
@@ -81,6 +85,7 @@ class AggFnEvaluator {
   Status Open(RuntimeState* state);
   void Close(RuntimeState* state);
 
+  bool is_merge() { return is_merge_; }
   AggregationOp agg_op() const { return agg_op_; }
   impala_udf::FunctionContext* ctx() { return ctx_.get(); }
   const std::vector<ExprContext*>& input_expr_ctxs() const { return input_expr_ctxs_; }
@@ -97,7 +102,7 @@ class AggFnEvaluator {
   void Update(TupleRow* src, Tuple* dst);
   void Merge(TupleRow* src, Tuple* dst);
   void Serialize(Tuple* dst);
-  void Finalize(Tuple* dst);
+  void Finalize(Tuple* src, Tuple* dst);
 
   // TODO: implement codegen path. These functions would return IR functions with
   // the same signature as the interpreted ones above.
@@ -109,20 +114,21 @@ class AggFnEvaluator {
 
  private:
   TFunction fn_;
-
-  const ColumnType return_type_;
-  const ColumnType intermediate_type_;
+  bool is_merge_; // indicates whether to Update() or Merge()
   std::vector<ExprContext*> input_expr_ctxs_;
 
   // The enum for some of the builtins that still require special cased logic.
   AggregationOp agg_op_;
 
-  // Unowned
+  // Slot into which Update()/Merge()/Serialize() write their result. Not owned.
+  const SlotDescriptor* intermediate_slot_desc_;
+
+  // Slot into which Finalize() results are written. Not owned. Identical to
+  // intermediate_slot_desc_ if this agg fn has the same intermediate and output type.
   const SlotDescriptor* output_slot_desc_;
 
-  // Context to run the aggregate functions.
-  // TODO: this and pool_ make this not thread safe but they are easy to duplicate
-  // per thread.
+  // Context to run all steps of this aggregation including Init(), Update()/Merge(),
+  // Serialize()/Finalize().
   boost::scoped_ptr<impala_udf::FunctionContext> ctx_;
 
   // Pool used by ctx_ for allocations.
@@ -133,7 +139,7 @@ class AggFnEvaluator {
   // These objects are allocated in the runtime state's object pool.
   // TODO: this is awful, remove this when exprs are updated.
   std::vector<impala_udf::AnyVal*> staging_input_vals_;
-  impala_udf::AnyVal* staging_output_val_;
+  impala_udf::AnyVal* staging_intermediate_val_;
 
   // Cache entry for the library containing the function ptrs.
   LibCache::LibCacheEntry* cache_entry_;
@@ -157,11 +163,15 @@ class AggFnEvaluator {
   void UpdateOrMerge(TupleRow* row, Tuple* dst, void* fn);
 
   // Sets up the arguments to call fn. This converts from the agg-expr signature,
-  // taking TupleRow to the UDA signature taking AnvVals.
-  void SerializeOrFinalize(Tuple* tuple, void* fn);
+  // taking TupleRow to the UDA signature taking AnvVals. Writes the serialize/finalize
+  // result to the given destination slot/tuple. The fn can be NULL to indicate the src
+  // value should simply be written into the destination.
+  void SerializeOrFinalize(Tuple* src, const SlotDescriptor* dst_slot_desc, Tuple* dst,
+      void* fn);
 
-  // Writes the result in src into dst pointed to by output_slot_desc_
-  void SetOutputSlot(const impala_udf::AnyVal* src, Tuple* dst);
+  // Writes the result in src into dst pointed to by dst_slot_desc
+  void SetDstSlot(const impala_udf::AnyVal* src, const SlotDescriptor* dst_slot_desc,
+      Tuple* dst);
 };
 
 }

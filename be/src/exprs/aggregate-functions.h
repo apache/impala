@@ -46,6 +46,27 @@ class AggregateFunctions {
   static void CountUpdate(FunctionContext*, const AnyVal& src, BigIntVal* dst);
   static void CountStarUpdate(FunctionContext*, BigIntVal* dst);
 
+  // Implementation of Avg.
+  // TODO: Change this to use a fixed-sized BufferVal as intermediate type.
+  static void AvgInit(FunctionContext* ctx, StringVal* dst);
+  template <typename T>
+  static void AvgUpdate(FunctionContext* ctx, const T& src, StringVal* dst);
+  static void AvgMerge(FunctionContext* ctx, const StringVal& src, StringVal* dst);
+  static DoubleVal AvgFinalize(FunctionContext* ctx, const StringVal& val);
+
+  // Avg for timestamp. Uses AvgInit() and AvgMerge().
+  static void TimestampAvgUpdate(FunctionContext* ctx, const TimestampVal& src,
+      StringVal* dst);
+  static TimestampVal TimestampAvgFinalize(FunctionContext* ctx, const StringVal& val);
+
+  // Avg for decimals.
+  static void DecimalAvgInit(FunctionContext* ctx, StringVal* dst);
+  static void DecimalAvgUpdate(FunctionContext* ctx, const DecimalVal& src,
+      StringVal* dst);
+  static void DecimalAvgMerge(FunctionContext* ctx, const StringVal& src,
+      StringVal* dst);
+  static DecimalVal DecimalAvgFinalize(FunctionContext* ctx, const StringVal& val);
+
   // SumUpdate, SumMerge
   template <typename SRC_VAL, typename DST_VAL>
   static void Sum(FunctionContext*, const SRC_VAL& src, DST_VAL* dst);
@@ -141,7 +162,7 @@ class AggregateFunctions {
   static void KnuthVarUpdate(FunctionContext* context, const T& input, StringVal* val);
   static void KnuthVarMerge(FunctionContext* context, const StringVal& src,
                             StringVal* dst);
-  static StringVal KnuthVarFinalize(FunctionContext* context, const StringVal& val);
+  static DoubleVal KnuthVarFinalize(FunctionContext* context, const StringVal& val);
 
   // Calculates the biased variance, uses KnuthVar Init-Update-Merge functions
   static StringVal KnuthVarPopFinalize(FunctionContext* context, const StringVal& val);

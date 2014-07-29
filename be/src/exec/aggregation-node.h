@@ -41,7 +41,7 @@ class TupleDescriptor;
 class SlotDescriptor;
 
 // Node for in-memory hash aggregation.
-// The node creates a hash set of aggregation output tuples, which
+// The node creates a hash set of aggregation intermediate tuples, which
 // contain slots for all grouping and aggregation exprs (the grouping
 // slots precede the aggregation expr slots in the output tuple descriptor).
 //
@@ -70,13 +70,21 @@ class AggregationNode : public ExecNode {
   // Exprs used to evaluate input rows
   std::vector<ExprContext*> probe_expr_ctxs_;
   // Exprs used to insert constructed aggregation tuple into the hash table.
-  // All the exprs are simply SlotRefs for the agg tuple.
+  // All the exprs are simply SlotRefs for the intermediate tuple.
   std::vector<ExprContext*> build_expr_ctxs_;
-  TupleId agg_tuple_id_;
-  TupleDescriptor* agg_tuple_desc_;
-  // Result of aggregation w/o GROUP BY.
+
+  // Tuple into which Update()/Merge()/Serialize() results are stored.
+  TupleId intermediate_tuple_id_;
+  TupleDescriptor* intermediate_tuple_desc_;
+
+  // Tuple into which Finalize() results are stored. Possibly the same as
+  // the intermediate tuple.
+  TupleId output_tuple_id_;
+  TupleDescriptor* output_tuple_desc_;
+
+  // Intermediate result of aggregation w/o GROUP BY.
   // Note: can be NULL even if there is no grouping if the result tuple is 0 width
-  Tuple* singleton_output_tuple_;
+  Tuple* singleton_intermediate_tuple_;
 
   boost::scoped_ptr<MemPool> tuple_pool_;
 
@@ -86,10 +94,6 @@ class AggregationNode : public ExecNode {
   typedef void (*ProcessRowBatchFn)(AggregationNode*, RowBatch*);
   // Jitted ProcessRowBatch function pointer.  Null if codegen is disabled.
   ProcessRowBatchFn process_row_batch_fn_;
-
-  // If true, this aggregation node should use the aggregate evaluator's Merge()
-  // instead of Update()
-  bool is_merge_;
 
   // Certain aggregates require a finalize step, which is the final step of the
   // aggregate after consuming all input rows. The finalize step converts the aggregate
@@ -106,18 +110,22 @@ class AggregationNode : public ExecNode {
   // Load factor in hash table
   RuntimeProfile::Counter* hash_table_load_factor_counter_;
 
-  // Constructs a new aggregation output tuple (allocated from tuple_pool_),
+  // Constructs a new aggregation intermediate tuple (allocated from tuple_pool_),
   // initialized to grouping values computed over 'current_row_'.
   // Aggregation expr slots are set to their initial values.
-  Tuple* ConstructAggTuple();
+  Tuple* ConstructIntermediateTuple();
 
-  // Updates the aggregation output tuple 'tuple' with aggregation values
+  // Updates the aggregation intermediate tuple 'tuple' with aggregation values
   // computed over 'row'.
-  void UpdateAggTuple(Tuple* tuple, TupleRow* row);
+  void UpdateTuple(Tuple* tuple, TupleRow* row);
 
-  // Called when all rows have been aggregated for the aggregation tuple to compute final
-  // aggregate values
-  void FinalizeAggTuple(Tuple* tuple);
+  // Called on the intermediate tuple of each group after all input rows have been
+  // consumed and aggregated. Computes the final aggregate values to be returned in
+  // GetNext() using the agg fn evaluators' Serialize() or Finalize().
+  // For the Finalize() case if the output tuple is different from the intermediate
+  // tuple, then a new tuple is allocated from 'pool' to hold the final result.
+  // Returns the tuple holding the final aggregate values.
+  Tuple* FinalizeTuple(Tuple* tuple, MemPool* pool);
 
   // Do the aggregation for all tuple rows in the batch
   void ProcessRowBatchNoGrouping(RowBatch* batch);
@@ -135,8 +143,8 @@ class AggregationNode : public ExecNode {
   llvm::Function* CodegenUpdateSlot(
       RuntimeState* state, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
 
-  // Codegen UpdateAggTuple.  Returns NULL if codegen is unsuccessful.
-  llvm::Function* CodegenUpdateAggTuple(RuntimeState* state);
+  // Codegen UpdateTuple(). Returns NULL if codegen is unsuccessful.
+  llvm::Function* CodegenUpdateTuple(RuntimeState* state);
 };
 
 }

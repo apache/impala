@@ -37,8 +37,16 @@ class RuntimeState;
 // Note: The actual user code does not include this file.
 class FunctionContextImpl {
  public:
-  // Create a FunctionContext. The caller is responsible for calling delete on it.
+  // Create a FunctionContext for a UDF. Caller is responsible for deleting it.
   static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool,
+      const impala_udf::FunctionContext::TypeDesc& return_type,
+      const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
+      int varargs_buffer_size = 0, bool debug = false);
+
+  // Create a FunctionContext for a UDA. Identical to the UDF version except for the
+  // intermediate type. Caller is responsible for deleting it.
+  static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool,
+      const impala_udf::FunctionContext::TypeDesc& intermediate_type,
       const impala_udf::FunctionContext::TypeDesc& return_type,
       const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
       int varargs_buffer_size = 0, bool debug = false);
@@ -125,6 +133,9 @@ class FunctionContextImpl {
   // particularly for existing codebases (e.g. they use std::vector). Instead, they'll
   // have to track those allocations manually.
   int64_t external_bytes_tracked_;
+
+  // Type descriptor for the intermediate type of a UDA. Set to INVALID_TYPE for UDFs.
+  impala_udf::FunctionContext::TypeDesc intermediate_type_;
 
   // Type descriptor for the return type of the function.
   impala_udf::FunctionContext::TypeDesc return_type_;

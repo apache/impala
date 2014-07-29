@@ -20,7 +20,7 @@ group by
   l_linestatus
 ---- PLAN
 01:AGGREGATE [FINALIZE]
-|  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), count(l_quantity), count(l_extendedprice), sum(l_discount), count(l_discount), count(1)
+|  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), avg(l_quantity), avg(l_extendedprice), avg(l_discount), count(1)
 |  group by: l_returnflag, l_linestatus
 |
 00:SCAN HDFS [tpch.lineitem]
@@ -30,13 +30,13 @@ group by
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(l_quantity)), sum(sum(l_extendedprice)), sum(sum(l_extendedprice * (1 - l_discount))), sum(sum(l_extendedprice * (1 - l_discount) * (1 + l_tax))), sum(count(l_quantity)), sum(count(l_extendedprice)), sum(sum(l_discount)), sum(count(l_discount)), sum(count(1))
+|  output: sum(sum(l_quantity)), sum(sum(l_extendedprice)), sum(sum(l_extendedprice * (1 - l_discount))), sum(sum(l_extendedprice * (1 - l_discount) * (1 + l_tax))), avg(avg(l_quantity)), avg(avg(l_extendedprice)), avg(avg(l_discount)), sum(count(1))
 |  group by: l_returnflag, l_linestatus
 |
 02:EXCHANGE [HASH(l_returnflag,l_linestatus)]
 |
 01:AGGREGATE
-|  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), count(l_quantity), count(l_extendedprice), sum(l_discount), count(l_discount), count(1)
+|  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), avg(l_quantity), avg(l_extendedprice), avg(l_discount), count(1)
 |  group by: l_returnflag, l_linestatus
 |
 00:SCAN HDFS [tpch.lineitem]
@@ -2123,7 +2123,7 @@ WRITE TO HDFS [tpch.q22_customer_tmp1, OVERWRITE=true]
 |  partitions=1
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum(c_acctbal), count(c_acctbal)
+|  output: avg(c_acctbal)
 |  group by: substr(c_name, 1, 1)
 |
 00:SCAN HDFS [tpch.customer c]
@@ -2134,13 +2134,13 @@ WRITE TO HDFS [tpch.q22_customer_tmp1, OVERWRITE=true]
 |  partitions=1
 |
 03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(c_acctbal)), sum(count(c_acctbal))
+|  output: avg(avg(c_acctbal))
 |  group by: substr(c_name, 1, 1)
 |
 02:EXCHANGE [HASH(substr(c_name, 1, 1))]
 |
 01:AGGREGATE
-|  output: sum(c_acctbal), count(c_acctbal)
+|  output: avg(c_acctbal)
 |  group by: substr(c_name, 1, 1)
 |
 00:SCAN HDFS [tpch.customer c]
