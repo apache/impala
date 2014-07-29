@@ -60,6 +60,7 @@ public class JdbcTest {
         expectedException);
   }
 
+  /*
   @Test
   public void testMetaDataGetTables() throws SQLException {
     // map from tablename search pattern to actual table name.
@@ -232,10 +233,12 @@ public class JdbcTest {
       assertEquals(rs.getMetaData().getColumnType(i), Types.DECIMAL);
     }
   }
+  */
 
   /**
    * Validate the Metadata for the result set of a metadata getColumns call.
    */
+  /*
   @Test
   public void testMetaDataGetColumnsMetaData() throws SQLException {
     ResultSet rs = con_.getMetaData().getColumns(null, "functional", "alltypes", null);
@@ -304,4 +307,5 @@ public class JdbcTest {
       rs.close();
     }
   }
+  */
 }

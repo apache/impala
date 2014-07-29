@@ -298,26 +298,6 @@ public class CatalogTest {
     assertEquals(months.size(), 24);
   }
 
-  @Test
-  public void TestInvalidDecimalPartitions() throws CatalogException {
-    // Test reading the metadata of a partitioned table that has invalid
-    // decimal partition key values.
-    Table table = catalog_.getOrLoadTable("functional", "invalid_decimal_part_tbl1");
-    assertTrue(table instanceof IncompleteTable);
-    IncompleteTable incompleteTable = (IncompleteTable) table;
-    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
-
-    table = catalog_.getOrLoadTable("functional", "invalid_decimal_part_tbl2");
-    assertTrue(table instanceof IncompleteTable);
-    incompleteTable = (IncompleteTable) table;
-    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
-
-    table = catalog_.getOrLoadTable("functional", "invalid_decimal_part_tbl3");
-    assertTrue(table instanceof IncompleteTable);
-    incompleteTable = (IncompleteTable) table;
-    assertTrue(incompleteTable.getCause() instanceof TableLoadingException);
-  }
-
   // TODO: All Hive-stats related tests are temporarily disabled because of an unknown,
   // sporadic issue causing stats of some columns to be absent in Jenkins runs.
   // Investigate this issue further.
@@ -424,8 +404,8 @@ public class CatalogTest {
       // Load some string stats data and use it to update the stats of different
       // typed columns.
       ColumnStatisticsData stringColStatsData = client.getHiveClient()
-          .getTableColumnStatistics("functional", "alltypesagg", "string_col")
-          .getStatsObj().get(0).getStatsData();
+          .getTableColumnStatistics("functional", "alltypesagg",
+           Lists.newArrayList("string_col")).get(0).getStatsData();
 
       assertTrue(!table.getColumn("int_col").updateStats(stringColStatsData));
       assertStatsUnknown(table.getColumn("int_col"));
@@ -438,8 +418,8 @@ public class CatalogTest {
 
       // Do the same thing, but apply bigint stats to a string column.
       ColumnStatisticsData bigIntCol = client.getHiveClient()
-          .getTableColumnStatistics("functional", "alltypes", "bigint_col")
-          .getStatsObj().get(0).getStatsData();
+          .getTableColumnStatistics("functional", "alltypes",
+          Lists.newArrayList("bigint_col")).get(0).getStatsData();
       assertTrue(!table.getColumn("string_col").updateStats(bigIntCol));
       assertStatsUnknown(table.getColumn("string_col"));
 

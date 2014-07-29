@@ -14,13 +14,6 @@ select udf_test.hive_bin(100)
 STRING
 ====
 ---- QUERY
-select udf_test.hive_trim(NULL)
----- RESULTS
-'NULL'
----- TYPES
-STRING
-====
----- QUERY
 select min(udf_test.hive_pi()) from functional.alltypesagg
 ---- RESULTS
 3.141592653589793

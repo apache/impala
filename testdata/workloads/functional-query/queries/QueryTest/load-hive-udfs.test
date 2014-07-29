@@ -6,7 +6,6 @@ drop function if exists udf_test.hive_floor(double);
 drop function if exists udf_test.hive_mod(int, int);
 drop function if exists udf_test.hive_bin(bigint);
 drop function if exists udf_test.hive_lower(string);
-drop function if exists udf_test.hive_trim(string);
 
 drop function if exists udf_test.identity(boolean);
 drop function if exists udf_test.identity(tinyint);
@@ -43,10 +42,6 @@ symbol='org.apache.hadoop.hive.ql.udf.UDFBin';
 create function udf_test.hive_lower(string) returns string
 location '/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFLower';
-
-create function udf_test.hive_trim(string) returns string
-location '/test-warehouse/hive-exec.jar'
-symbol='org.apache.hadoop.hive.ql.udf.UDFTrim';
 
 create function udf_test.identity(boolean) returns boolean
 location '/test-warehouse/impala-hive-udfs.jar'

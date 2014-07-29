@@ -475,7 +475,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100107.txt' OV
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100108.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=8);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100109.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=9);
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100110.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=10);
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, tinyint_col as day FROM {db_name}.{table_name} WHERE year=2010 and month=1 and day != '__HIVE_DEFAULT_PARTITION__' and tinyint_col IS NULL order by id;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, tinyint_col as day FROM {db_name}.{table_name} WHERE year=2010 and month=1 and day IS NOT NULL and tinyint_col IS NULL order by id;
 ====
 ---- DATASET
 functional
@@ -1302,42 +1302,6 @@ ${IMPALA_HOME}/testdata/data/decimal_tbl.txt /test-warehouse/decimal_tbl/d6=1/
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(d6)
 select * from functional.{table_name};
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-invalid_decimal_part_tbl1
----- COLUMNS
-c1 INT
----- PARTITION_COLUMNS
-d1 DECIMAL(4,2)
----- LOAD
--- To test reading from a partitioned table with invalid decimal partition values (see IMPALA-1040).
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(d1="str_value") select int_col from functional.alltypestiny;
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-invalid_decimal_part_tbl2
----- COLUMNS
-c1 INT
----- PARTITION_COLUMNS
-d1 DECIMAL(4,2)
----- LOAD
--- To test reading from a partitioned table with invalid decimal partition values (see IMPALA-1040).
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(d1=3.141) select int_col from functional.alltypestiny;
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-invalid_decimal_part_tbl3
----- COLUMNS
-c1 INT
----- PARTITION_COLUMNS
-d1 DECIMAL(4,2)
----- LOAD
--- To test reading from a partitioned table with invalid decimal partition values (see IMPALA-1040).
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(d1=314.1) select int_col from functional.alltypestiny;
 ====
 ---- DATASET
 functional

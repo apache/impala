@@ -58,6 +58,7 @@ class TestViewCompatibility(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)
 
+  @pytest.mark.xfail(run=False, reason='View compat tests broken with Hive .13')
   def test_view_compatibility(self, vector):
     self.__run_view_compat_test_case('QueryTest/views-compatibility', vector)
 

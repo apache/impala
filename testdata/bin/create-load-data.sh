@@ -184,7 +184,7 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/multiple_rowgroups.parquet \
                   /test-warehouse/bad_parquet_parquet
 
 # Remove an index file so we test an un-indexed LZO file
-hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/000013_0.lzo.index
+hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/000000_0.lzo.index
 
 # Add a sequence file that only contains a header (see IMPALA-362)
 hadoop fs -put -f ${IMPALA_HOME}/testdata/tinytable_seq_snap/tinytable_seq_snap_header_only \

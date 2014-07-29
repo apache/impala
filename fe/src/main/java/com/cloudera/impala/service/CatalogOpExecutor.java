@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.service;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -26,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
@@ -42,7 +42,6 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
-import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
@@ -461,6 +460,8 @@ public class CatalogOpExecutor {
       if (existingRowCount == null || !existingRowCount.equals(newRowCount)) {
         // The existing row count value wasn't set or has changed.
         msPartition.putToParameters(StatsSetupConst.ROW_COUNT, newRowCount);
+        msPartition.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
+            StatsSetupConst.TRUE);
         modifiedParts.add(msPartition);
       }
       ++numTargetedPartitions;
@@ -474,6 +475,8 @@ public class CatalogOpExecutor {
     // Update the table's ROW_COUNT parameter.
     msTbl.putToParameters(StatsSetupConst.ROW_COUNT,
         String.valueOf(params.getTable_stats().num_rows));
+    msTbl.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
+        StatsSetupConst.TRUE);
     return numTargetedPartitions;
   }
 
@@ -526,13 +529,13 @@ public class CatalogOpExecutor {
       case TIMESTAMP: // Hive and Impala use LongColumnStatsData for timestamps.
         // TODO: Gather and set the min/max values stats as well. The planner
         // currently does not rely on them.
-        colStatsData.setLongStats(new LongColumnStatsData(-1, -1, numNulls, ndvs));
+        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndvs));
         break;
       case FLOAT:
       case DOUBLE:
         // TODO: Gather and set the min/max values stats as well. The planner
         // currently does not rely on them.
-        colStatsData.setDoubleStats(new DoubleColumnStatsData(-1, -1, numNulls, ndvs));
+        colStatsData.setDoubleStats(new DoubleColumnStatsData(numNulls, ndvs));
         break;
       case STRING:
         long maxStrLen = colStats.getMax_size();
@@ -543,12 +546,8 @@ public class CatalogOpExecutor {
       case DECIMAL:
         // TODO: Gather and set the min/max values stats as well. The planner
         // currently does not rely on them.
-        org.apache.hadoop.hive.metastore.api.Decimal dummy =
-            new org.apache.hadoop.hive.metastore.api.Decimal();
-        dummy.setUnscaled(BigInteger.ZERO.toByteArray());
-        dummy.setScale((short)0);
         colStatsData.setDecimalStats(
-            new DecimalColumnStatsData(dummy, dummy, numNulls, ndvs));
+            new DecimalColumnStatsData(numNulls, ndvs));
         break;
       default:
         return null;

@@ -19,11 +19,11 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
-import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.analysis.TableName;
@@ -130,18 +130,20 @@ public abstract class Table implements CatalogObject {
 
   /**
    * Loads the column stats for col from the Hive Metastore.
+   * TODO: Load column stats in bulk using new getTableColumnStatistics API.
    */
   protected void loadColumnStats(Column col, HiveMetaStoreClient client) {
-    ColumnStatistics colStats = null;
+    List<ColumnStatisticsObj> colStats = Lists.newArrayList();
     try {
-      colStats = client.getTableColumnStatistics(db_.getName(), name_, col.getName());
+      colStats = client.getTableColumnStatistics(db_.getName(), name_,
+          Lists.newArrayList(col.getName()));
     } catch (Exception e) {
       // don't try to load stats for this column
       return;
     }
 
     // we should never see more than one ColumnStatisticsObj here
-    if (colStats.getStatsObj().size() > 1) return;
+    if (colStats.size() != 1) return;
 
     if (!ColumnStats.isSupportedColType(col.getType())) {
       LOG.warn(String.format("Column stats are available for table %s / " +
@@ -151,7 +153,7 @@ public abstract class Table implements CatalogObject {
     }
 
     // Update the column stats data
-    if (!col.updateStats(colStats.getStatsObj().get(0).getStatsData())) {
+    if (!col.updateStats(colStats.get(0).getStatsData())) {
       LOG.warn(String.format("Applying the column stats update to table %s / " +
           "column '%s' did not succeed because column type (%s) was not compatible " +
           "with the column stats data. Performance may suffer until column stats are" +

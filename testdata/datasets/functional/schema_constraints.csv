@@ -102,12 +102,6 @@ table_name:decimal_tiny, constraint:restrict_to, table_format:text/none/none
 table_name:decimal_tbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:decimal_tiny, constraint:restrict_to, table_format:parquet/none/none
 
-# invalid_decimal_part_tbl[1,2,3] tables are used for testing invalid decimal
-# partition key values (see IMPALA-1040)
-table_name:invalid_decimal_part_tbl1, constraint:restrict_to, table_format:text/none/none
-table_name:invalid_decimal_part_tbl2, constraint:restrict_to, table_format:text/none/none
-table_name:invalid_decimal_part_tbl3, constraint:restrict_to, table_format:text/none/none
-
 table_name:avro_decimal_tbl, constraint:restrict_to, table_format:avro/snap/block
 
 # hbase doesn't seem to like very wide tables

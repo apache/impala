@@ -510,15 +510,6 @@ set location '/test-warehouse/alltypes_seq_snap/year=2009/month=4'
 ---- RESULTS
 ====
 ---- QUERY
-select int_col from alltypes_test
-group by int_col order by 1 limit 100
----- RESULTS
-0
-NULL
----- TYPES
-int
-====
----- QUERY
 alter table alltypes_test partition(month=4, year=2009)
 set fileformat sequencefile
 ---- RESULTS
@@ -589,7 +580,7 @@ alter table alltypes_test set tblproperties ('numRows'='200')
 ---- QUERY
 # Test altering the 'numRows' table property of a partition.
 alter table alltypes_test partition(year=2009, month=4)
-set tblproperties ('numRows'='30')
+set tblproperties ('numRows'='30', 'STATS_GENERATED_VIA_STATS_TASK'='true')
 ---- RESULTS
 ====
 ---- QUERY

@@ -105,7 +105,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_co
 |  partitions=unavailable
 |
 00:SCAN HDFS [functional_seq_snap.alltypes]
-   partitions=2/24 size=11.34KB
+   partitions=2/24 size=11.40KB
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_col,int_col)]
 |  partitions=unavailable
@@ -113,7 +113,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_co
 01:EXCHANGE [HASH(int_col,int_col)]
 |
 00:SCAN HDFS [functional_seq_snap.alltypes]
-   partitions=2/24 size=11.34KB
+   partitions=2/24 size=11.40KB
 ====
 # insert into fully dynamic partitions;
 # partitioned output doesn't require repartitioning

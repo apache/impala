@@ -27,7 +27,8 @@ class TestShowCreateTable(ImpalaTestSuite):
   VALID_SECTION_NAMES = ["CREATE_TABLE", "QUERY", "RESULTS"]
   # Properties to filter before comparing results
   FILTER_TBL_PROPERTIES = ["transient_lastDdlTime", "numFiles", "numPartitions",\
-                           "numRows", "rawDataSize", "totalSize"]
+                           "numRows", "rawDataSize", "totalSize", "COLUMN_STATS_ACCURATE",
+                           "STATS_GENERATED_VIA_STATS_TASK"]
 
   @classmethod
   def get_workload(self):

@@ -182,18 +182,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestInvalidDecimalPartition() throws AnalysisException {
-    // Test reading from a partitioned table with invalid decimal partition key
-    // values (see IMPALA-1040).
-    AnalysisError("select * from functional.invalid_decimal_part_tbl1",
-        "Failed to load metadata for table: functional.invalid_decimal_part_tbl1");
-    AnalysisError("select * from functional.invalid_decimal_part_tbl2",
-        "Failed to load metadata for table: functional.invalid_decimal_part_tbl2");
-    AnalysisError("select * from functional.invalid_decimal_part_tbl3",
-        "Failed to load metadata for table: functional.invalid_decimal_part_tbl3");
-  }
-
-  @Test
   public void TestOrdinals() throws AnalysisException {
     // can't group or order on *
     AnalysisError("select * from functional.alltypes group by 1",

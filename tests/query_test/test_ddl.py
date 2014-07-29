@@ -260,10 +260,11 @@ class TestDdlStatements(ImpalaTestSuite):
         "('prop1'='val1', 'p2'='val2', 'p2'='val3', ''='')")
     properties = self.__get_tbl_properties('test_alter_tbl')
 
-    assert len(properties) == 5
     assert 'transient_lastDdlTime' in properties
-    del properties['transient_lastDdlTime']
-    assert {'p1': 'v1', 'prop1': 'val1', 'p2': 'val3', '': ''} == properties
+    assert properties['p1'] == 'v1'
+    assert properties['prop1'] == 'val1'
+    assert properties['p2'] == 'val3'
+    assert properties[''] == ''
 
   @classmethod
   def __use_multiple_impalad(cls, vector):
