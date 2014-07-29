@@ -54,6 +54,7 @@ add_library(Util
 # TODO: not supported on RHEL 5
 #  perf-counters.cc
   os-util.cc
+  summary-util.cc
   thread.cc
   time.cc
   progress-updater.cc

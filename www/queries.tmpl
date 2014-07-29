@@ -79,6 +79,7 @@ line parameter.</p>
     <th>State</th>
     <th># rows fetched</th>
     <th>Profile</th>
+    <th>Summary</th>
   </tr>
 {{#completed_queries}}
   <tr>
@@ -92,6 +93,7 @@ line parameter.</p>
     <td>{{state}}</td>
     <td>{{rows_fetched}}</td>
     <td><a href='/query_profile?query_id={{query_id}}'>Profile</a></td>
+    <td><a href='/query_summary?query_id={{query_id}}'>Summary</a></td>
   </tr>
 {{/completed_queries}}
 </table>

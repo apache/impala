@@ -450,6 +450,17 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
 
+  // Webserver callback. Produces a Json structure with query summary information.
+  // Example:
+  // { "summary": <....>,
+  //   "plan": <....>,
+  //   "stmt": "select count(*) from functional.alltypes"
+  //   "id": <...>,
+  //   "state": "FINISHED"
+  // }
+  void QuerySummaryCallback(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
+
   // Webserver callback. Cancels an in-flight query and writes the result to 'contents'.
   void CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
@@ -560,6 +571,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // SQL statement text
     std::string stmt;
 
+    // Text representation of plan
+    std::string plan;
+
     // DDL, DML etc.
     TStmtType::type stmt_type;
 
@@ -583,6 +597,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // Summary of execution for this query.
     TExecSummary exec_summary;
+
+    Status query_status;
 
     // Initialise from an exec_state. If copy_profile is true, print the query
     // profile to a string and copy that into this.profile (which is expensive),

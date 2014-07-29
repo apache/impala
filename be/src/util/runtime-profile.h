@@ -444,7 +444,7 @@ class RuntimeProfile {
 
   // Returns a pointer to the info string value for 'key'.  Returns NULL if
   // the key does not exist.
-  const std::string* GetInfoString(const std::string& key);
+  const std::string* GetInfoString(const std::string& key) const;
 
   // Returns the counter for the total elapsed time.
   Counter* total_time_counter() { return counter_map_[TOTAL_TIME_COUNTER_NAME]; }

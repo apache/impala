@@ -61,6 +61,7 @@
 #include "util/network-util.h"
 #include "util/parse-util.h"
 #include "util/string-parser.h"
+#include "util/summary-util.h"
 #include "util/uid-util.h"
 
 #include "gen-cpp/Types_types.h"
@@ -703,7 +704,7 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id, const Status* caus
   }
 
   if (exec_state->coord() != NULL) {
-    const string exec_summary = exec_state->coord()->PrintExecSummary();
+    const string& exec_summary = PrintExecSummary(exec_state->coord()->exec_summary());
     exec_state->summary_profile()->AddInfoString("ExecSummary", exec_summary);
 
     const unordered_set<TNetworkAddress>& unique_hosts =
@@ -1655,6 +1656,8 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   id = exec_state.query_id();
   const TExecRequest& request = exec_state.exec_request();
 
+  const string* plan_str = exec_state.summary_profile().GetInfoString("Plan");
+  if (plan_str != NULL) plan = *plan_str;
   stmt = exec_state.sql_stmt();
   stmt_type = request.stmt_type;
   effective_user = exec_state.effective_user();
@@ -1671,6 +1674,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   }
   query_state = exec_state.query_state();
   num_rows_fetched = exec_state.num_rows_fetched();
+  query_status = exec_state.query_status();
 
   if (copy_profile) {
     stringstream ss;

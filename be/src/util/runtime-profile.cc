@@ -413,7 +413,7 @@ void RuntimeProfile::AddInfoString(const string& key, const string& value) {
   }
 }
 
-const string* RuntimeProfile::GetInfoString(const string& key) {
+const string* RuntimeProfile::GetInfoString(const string& key) const {
   lock_guard<mutex> l(info_strings_lock_);
   InfoStrings::const_iterator it = info_strings_.find(key);
   if (it == info_strings_.end()) return NULL;

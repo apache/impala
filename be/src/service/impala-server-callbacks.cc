@@ -24,6 +24,7 @@
 
 #include "gen-cpp/beeswax_types.h"
 #include "thrift/protocol/TDebugProtocol.h"
+#include "util/summary-util.h"
 #include "util/url-coding.h"
 
 using namespace apache::thrift;
@@ -83,6 +84,11 @@ void ImpalaServer::RegisterWebserverCallbacks(Webserver* webserver) {
       bind<void>(mem_fn(&ImpalaServer::InflightQueryIdsUrlCallback), this, _1, _2);
   webserver->RegisterUrlCallback("/inflight_query_ids", "raw_text.tmpl",
       inflight_query_ids_callback, false);
+
+  Webserver::UrlCallback query_summary_callback =
+      bind<void>(mem_fn(&ImpalaServer::QuerySummaryCallback), this, _1, _2);
+  webserver->RegisterUrlCallback("/query_summary", "query_summary.tmpl",
+      query_summary_callback, false);
 }
 
 void ImpalaServer::HadoopVarzUrlCallback(const Webserver::ArgumentMap& args,
@@ -405,4 +411,48 @@ void ImpalaServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
         document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
   }
+}
+
+void ImpalaServer::QuerySummaryCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
+  TUniqueId query_id;
+  Status status = ParseQueryId(args, &query_id);
+  if (!status.ok()) {
+    Value json_error(status.GetErrorMsg().c_str(), document->GetAllocator());
+    document->AddMember("error", json_error, document->GetAllocator());
+    return;
+  }
+
+  TExecSummary summary;
+  string stmt;
+  string plan;
+  Status query_status;
+  {
+    lock_guard<mutex> l(query_log_lock_);
+    QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
+    if (query_record == query_log_index_.end()) {
+      string err = Substitute("Unknown query id: $0", PrintId(query_id));
+      Value json_error(err.c_str(), document->GetAllocator());
+      document->AddMember("error", json_error, document->GetAllocator());
+      return;
+    }
+    summary = query_record->second->exec_summary;
+    stmt = query_record->second->stmt;
+    plan = query_record->second->plan;
+    query_status = query_record->second->query_status;
+  }
+
+  const string& printed_summary = PrintExecSummary(summary);
+  Value json_summary(printed_summary.c_str(), document->GetAllocator());
+  document->AddMember("summary", json_summary, document->GetAllocator());
+  Value json_stmt(stmt.c_str(), document->GetAllocator());
+  document->AddMember("stmt", json_stmt, document->GetAllocator());
+  Value json_plan(plan.c_str(), document->GetAllocator());
+  document->AddMember("plan", json_plan, document->GetAllocator());
+
+  Value json_status(query_status.ok() ? "OK" : query_status.GetErrorMsg().c_str(),
+      document->GetAllocator());
+  document->AddMember("status", json_status, document->GetAllocator());
+  Value json_id(PrintId(query_id).c_str(), document->GetAllocator());
+  document->AddMember("query_id", json_id, document->GetAllocator());
 }
