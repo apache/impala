@@ -68,7 +68,7 @@ if [ $CREATE_METASTORE -eq 1 ]; then
   createdb -U hiveuser hive_$METASTORE_DB
 
   psql -U hiveuser -d hive_$METASTORE_DB \
-       -f ${HIVE_HOME}/scripts/metastore/upgrade/postgres/hive-schema-0.12.0.postgres.sql
+       -f ${HIVE_HOME}/scripts/metastore/upgrade/postgres/hive-schema-0.13.0.postgres.sql
 fi
 
 set +e
