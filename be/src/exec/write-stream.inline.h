@@ -25,7 +25,7 @@ using namespace std;
 
 namespace impala {
 
-inline int WriteByte(uint8_t val) {
+inline int WriteStream::WriteByte(uint8_t val) {
   return WriteByte(static_cast<char>(val));
 }
 
@@ -49,6 +49,18 @@ inline int WriteStream::WriteInt(uint32_t val) {
   uint8_t buf[sizeof(int32_t)];
   ReadWriteUtil::PutInt(static_cast<uint8_t*>(buf), val);
   return WriteBytes(sizeof(int32_t), buf);
+}
+
+inline int WriteStream::WriteZInt(int32_t val) {
+  uint8_t buf[ReadWriteUtil::MAX_ZINT_LEN];
+  int len = ReadWriteUtil::PutZInt(val, buf);
+  return WriteBytes(len, buf);
+}
+
+inline int WriteStream::WriteZLong(int64_t val) {
+  uint8_t buf[ReadWriteUtil::MAX_ZLONG_LEN];
+  int len = ReadWriteUtil::PutZLong(val, buf);
+  return WriteBytes(len, buf);
 }
 
 inline int WriteStream::WriteBytes(int length, const uint8_t* buf) {

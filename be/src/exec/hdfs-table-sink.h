@@ -145,7 +145,7 @@ class HdfsTableSink : public DataSink {
   static Status GetFileBlockSize(OutputPartition* output_partition, int64_t* size);
 
   virtual RuntimeProfile* profile() { return runtime_profile_; }
-
+  const HdfsTableDescriptor& TableDesc() { return *table_desc_; }
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
 
   RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }

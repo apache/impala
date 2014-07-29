@@ -1,0 +1,35 @@
+====
+---- QUERY
+drop table if exists __avro_write;
+====
+---- QUERY
+SET COMPRESSION_CODEC=NONE;
+create table __avro_write (i int, s string, d double)
+stored as AVRO
+TBLPROPERTIES ('avro.schema.literal'='{
+                  "name": "my_record",
+                  "type": "record",
+                  "fields": [
+                  {"name":"i", "type":["int", "null"]},
+                  {"name":"s", "type":["string", "null"]},
+                  {"name":"d", "type":["double", "null"]}]}');
+====
+---- QUERY
+SET COMPRESSION_CODEC=NONE;
+insert into __avro_write select 0, "a", 1.1;
+====
+---- QUERY
+SET COMPRESSION_CODEC=SNAPPY;
+insert into __avro_write select 1, "b", 2.2;
+====
+---- QUERY
+select * from __avro_write;
+---- RESULTS
+0,'a',1.1
+1,'b',2.2
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+drop table __avro_write;
+====

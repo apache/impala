@@ -49,6 +49,7 @@ add_library(Exec
   hdfs-rcfile-scanner.cc
   hdfs-sequence-scanner.cc
   hdfs-avro-scanner.cc
+  hdfs-avro-table-writer.cc
   hdfs-avro-scanner-ir.cc
   hdfs-text-scanner.cc
   hdfs-lzo-text-scanner.cc

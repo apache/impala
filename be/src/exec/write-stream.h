@@ -41,7 +41,10 @@ class WriteStream {
   inline int WriteByte(char val);
   inline int WriteVLong(int64_t val);
   inline int WriteBoolean(bool val);
-  // Writes the length as a VLong followed by the byte string
+  // Writes a zig-zag encoded integer
+  inline int WriteZInt(int32_t val);
+  inline int WriteZLong(int64_t val);
+  // Writes the length as a VLong follows by the byte string
   inline int WriteText(int32_t len, const uint8_t* buf);
   // Writes an empty string to the buffer (encoded as 1 byte)
   inline int WriteEmptyText();

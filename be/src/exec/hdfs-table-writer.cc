@@ -28,6 +28,9 @@ HdfsTableWriter::HdfsTableWriter(HdfsTableSink* parent,
     output_(output),
     table_desc_(table_desc),
     output_expr_ctxs_(output_expr_ctxs) {
+  int num_non_partition_cols =
+      table_desc_->num_cols() - table_desc_->num_clustering_cols();
+  DCHECK_GE(output_expr_ctxs_.size(), num_non_partition_cols) << parent_->DebugString();
 }
 
 Status HdfsTableWriter::Write(const uint8_t* data, int32_t len) {

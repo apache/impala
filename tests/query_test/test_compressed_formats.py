@@ -5,7 +5,7 @@ import pytest
 from os.path import join
 from subprocess import call
 from tests.common.test_vector import *
-from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.impala_test_suite import *
 
 # (file extension, table suffix) pairs
 compression_formats = [
@@ -110,6 +110,10 @@ class TestTableWriters(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTableWriters, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
 
   def test_seq_writer(self, vector):
     self.run_test_case('QueryTest/seq-writer', vector)
+
+  def test_avro_writer(self, vector):
+    self.run_test_case('QueryTest/avro-writer', vector)

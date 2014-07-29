@@ -136,6 +136,7 @@ class TestUnsupportedInsertFormats(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(lambda v: \
         not (v.get_value('table_format').file_format == 'parquet' or
              v.get_value('table_format').file_format == 'hbase' or
+             v.get_value('table_format').file_format == 'avro' or
              (v.get_value('table_format').file_format == 'text' and
               v.get_value('table_format').compression_codec == 'none')))
 

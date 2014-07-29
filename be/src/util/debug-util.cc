@@ -101,7 +101,16 @@ ostream& operator<<(ostream& os, const TUniqueId& id) {
 
 string PrintId(const TUniqueId& id, const string& separator) {
   stringstream out;
-  out << std::hex << id.hi << separator << id.lo;
+  out << hex << id.hi << separator << id.lo;
+  return out.str();
+}
+
+string PrintAsHex(const char* bytes, int64_t len) {
+  stringstream out;
+  out << hex << std::setfill('0');
+  for (int i = 0; i < len; ++i) {
+    out << setw(2) << static_cast<unsigned>(bytes[i]);
+  }
   return out.str();
 }
 
