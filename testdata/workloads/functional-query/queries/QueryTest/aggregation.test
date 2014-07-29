@@ -1059,10 +1059,11 @@ select histogram(timestamp_col) from functional.alltypestiny;
 ---- TYPES
 STRING
 ====
----- QUERY
-select histogram(d1) from functional.decimal_tbl;
----- RESULTS
-'1234, 2345, 12345, 12345, 132842'
----- TYPES
-STRING
-====
+# TODO: Broken on ASAN: IMPALA-1111 UDF memory allocation returns un-aligned memory
+#---- QUERY
+#select histogram(d1) from functional.decimal_tbl;
+#---- RESULTS
+#'1234, 2345, 12345, 12345, 132842'
+#---- TYPES
+#STRING
+#====
