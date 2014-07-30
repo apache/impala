@@ -141,9 +141,9 @@ class TestUnsupportedInsertFormats(ImpalaTestSuite):
       # TODO: Remove once the compressed text writers are in.
       if (vector.get_value('table_format').file_format == 'text' and
           vector.get_value('table_format').compression_codec != 'none'):
-        pytest.xfail("Until compressed text writers are implemented, inserting to text "
-                      "will ignore compression type and succeed by inserting "
-                      "uncompressed text.")
+        pytest.skip("Until compressed text writers are implemented, inserting to text "
+                    "will ignore compression type and succeed by inserting "
+                    "uncompressed text.")
       assert False, 'Query was expected to fail'
     except ImpalaBeeswaxException, e: pass
 
