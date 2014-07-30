@@ -38,7 +38,6 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
-import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.Type;
@@ -1415,6 +1414,39 @@ public class Analyzer {
       }
     }
     return compatibleType;
+  }
+
+  /**
+   * Casts the exprs in the given lists position-by-position such that for every i,
+   * the i-th expr among all expr lists is compatible.
+   * Throw an AnalysisException if the types are incompatible.
+   */
+  public void castToUnionCompatibleTypes(List<List<Expr>> exprLists)
+      throws AnalysisException {
+    if (exprLists == null || exprLists.size() < 2) return;
+
+    // Determine compatible types for exprs, position by position.
+    List<Expr> firstList = exprLists.get(0);
+    for (int i = 0; i < firstList.size(); ++i) {
+      // Type compatible with the i-th exprs of all expr lists.
+      // Initialize with type of i-th expr in first list.
+      Type compatibleType = firstList.get(i).getType();
+      // Remember last compatible expr for error reporting.
+      Expr lastCompatibleExpr = firstList.get(i);
+      for (int j = 1; j < exprLists.size(); ++j) {
+        Preconditions.checkState(exprLists.get(j).size() == firstList.size());
+        compatibleType = getCompatibleType(compatibleType,
+            lastCompatibleExpr, exprLists.get(j).get(i));
+        lastCompatibleExpr = exprLists.get(j).get(i);
+      }
+      // Now that we've found a compatible type, add implicit casts if necessary.
+      for (int j = 0; j < exprLists.size(); ++j) {
+        if (!exprLists.get(j).get(i).getType().equals(compatibleType)) {
+          Expr castExpr = exprLists.get(j).get(i).castTo(compatibleType);
+          exprLists.get(j).set(i, castExpr);
+        }
+      }
+    }
   }
 
   public String getDefaultDb() { return globalState_.queryCtx.session.database; }

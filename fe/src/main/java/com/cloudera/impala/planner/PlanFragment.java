@@ -24,6 +24,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.SlotRef;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
@@ -32,6 +33,8 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Lists;
 
 /**
  * A PlanFragment is part of a tree of such fragments that together make
@@ -44,6 +47,11 @@ import com.google.common.base.Preconditions;
  * are used to produce the output of the plan fragment, as well as output exprs,
  * destination node, etc. If there are no output exprs, the full row that is
  * is produced by the plan root is marked as materialized.
+ *
+ * A hash-partitioned plan fragment is the result of one or more hash-partitioning data
+ * streams being received by plan nodes in this fragment. In the future, a fragment's
+ * data partition could also be hash partitioned based on a scan node that is reading
+ * from a physically hash-partitioned table.
  *
  * The sequence of calls is:
  * - c'tor
@@ -110,6 +118,10 @@ public class PlanFragment {
 
   /**
    * Finalize plan tree and create stream sink, if needed.
+   * If this fragment is hash partitioned, ensures that the corresponding partition
+   * exprs of all hash-partitioning senders are cast to identical types.
+   * Otherwise, the hashes generated for identical partition values may differ
+   * among senders if the partition-expr types are not identical.
    */
   public void finalize(Analyzer analyzer)
       throws InternalException, NotImplementedException {
@@ -121,6 +133,40 @@ public class PlanFragment {
       DataStreamSink streamSink = new DataStreamSink(destNode_, outputPartition_);
       streamSink.setFragment(this);
       sink_ = streamSink;
+    }
+
+    if (!dataPartition_.isHashPartitioned()) return;
+
+    // This fragment is hash partitioned. Gather all exchange nodes and ensure
+    // that all hash-partitioning senders hash on exprs-values of the same type.
+    List<ExchangeNode> exchNodes = Lists.newArrayList();
+    planRoot_.collect(Predicates.instanceOf(ExchangeNode.class), exchNodes);
+
+    // Contains partition-expr lists of all hash-partitioning sender fragments.
+    List<List<Expr>> senderPartitionExprs = Lists.newArrayList();
+    for (ExchangeNode exchNode: exchNodes) {
+      Preconditions.checkState(!exchNode.getChildren().isEmpty());
+      PlanFragment senderFragment = exchNode.getChild(0).getFragment();
+      Preconditions.checkNotNull(senderFragment);
+      if (!senderFragment.getOutputPartition().isHashPartitioned()) continue;
+      List<Expr> partExprs = senderFragment.getOutputPartition().getPartitionExprs();
+      // All hash-partitioning senders must have compatible partition exprs, otherwise
+      // this fragment's data partition must not be hash partitioned.
+      Preconditions.checkState(
+          partExprs.size() == dataPartition_.getPartitionExprs().size());
+      senderPartitionExprs.add(partExprs);
+    }
+
+    // Cast all corresponding hash partition exprs of all hash-partitioning senders
+    // to their compatible types. Also cast the data partition's exprs for consistency,
+    // although not strictly necessary. They should already be type identical to the
+    // exprs of one of the senders and they are not directly used for hashing in the BE.
+    senderPartitionExprs.add(dataPartition_.getPartitionExprs());
+    try {
+      analyzer.castToUnionCompatibleTypes(senderPartitionExprs);
+    } catch (AnalysisException e) {
+      // Should never happen. Analysis should have ensured type compatibility already.
+      throw new IllegalStateException(e);
     }
   }
 

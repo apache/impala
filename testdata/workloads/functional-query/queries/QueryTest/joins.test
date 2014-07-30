@@ -516,3 +516,83 @@ where b.id < 5
 ---- TYPES
 INT, INT, STRING, STRING
 ====
+---- QUERY
+# Regression test for IMPALA-1123. Tests that hash exchanges feeding the same
+# hash-partitioned fragment use type-identical partition exprs.
+select straight_join count(*) from
+(select tinyint_col from functional.alltypessmall
+ union distinct
+ select tinyint_col from functional.alltypessmall) a
+inner join [shuffle]
+(select smallint_col from functional.alltypessmall
+ union distinct
+ select smallint_col from functional.alltypessmall) b
+on a.tinyint_col = b.smallint_col
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Regression test for IMPALA-1123. The plan below has one big hash-partitioned
+# fragment with two joins and a merge agg since their partition exprs are all
+# compatible. The single fragment is fed by multiple hash-partitioning senders,
+# and we need to ensure that the partition exprs used by the senders are cast
+# to identical types because the same value will have different hashes for
+# different types. Minimal explain plan:
+#
+# 15:AGGREGATE [MERGE FINALIZE]
+# 14:EXCHANGE [UNPARTITIONED]
+# 08:AGGREGATE
+# 07:HASH JOIN [INNER JOIN, PARTITIONED]
+# |--13:AGGREGATE [MERGE FINALIZE]
+# |  12:EXCHANGE [HASH(tinyint_col)]
+# |  05:AGGREGATE
+# |  04:SCAN HDFS [functional.alltypessmall]
+# 06:HASH JOIN [INNER JOIN, PARTITIONED]
+# |--03:HASH JOIN [INNER JOIN, PARTITIONED]
+# |  |--10:EXCHANGE [HASH(t2.smallint_col)]
+# |  |  02:SCAN HDFS [functional.alltypessmall t2]
+# |  09:EXCHANGE [HASH(t1.tinyint_col)]
+# |  01:SCAN HDFS [functional.alltypessmall t1]
+# 11:EXCHANGE [HASH(a.int_col)]
+# 00:SCAN HDFS [functional.alltypessmall a]
+#
+select straight_join count(*) from
+functional.alltypessmall a
+inner join [shuffle]
+  (select straight_join t2.* from
+   functional.alltypessmall t1
+   inner join [shuffle]
+   functional.alltypessmall t2
+   on t1.tinyint_col = t2.smallint_col) b
+on a.int_col = b.smallint_col
+inner join [shuffle]
+  (select distinct tinyint_col
+   from functional.alltypessmall) c
+on a.int_col = c.tinyint_col
+---- RESULTS
+11200
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Same query as above with broadcast joins. Results should be identical.
+select straight_join count(*) from
+functional.alltypessmall a
+inner join [broadcast]
+  (select straight_join t2.* from
+   functional.alltypessmall t1
+   inner join [broadcast]
+   functional.alltypessmall t2
+   on t1.tinyint_col = t2.smallint_col) b
+on a.int_col = b.smallint_col
+inner join [broadcast]
+  (select distinct tinyint_col
+   from functional.alltypessmall) c
+on a.int_col = c.tinyint_col
+---- RESULTS
+11200
+---- TYPES
+BIGINT
+====

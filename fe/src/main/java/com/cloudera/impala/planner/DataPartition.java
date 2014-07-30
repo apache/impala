@@ -25,7 +25,6 @@ import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
@@ -42,7 +41,7 @@ public class DataPartition {
   private final TPartitionType type_;
 
   // for hash partition: exprs used to compute hash value
-  private final ImmutableList<Expr> partitionExprs_;
+  private final List<Expr> partitionExprs_;
 
   public DataPartition(TPartitionType type, List<Expr> exprs) {
     Preconditions.checkNotNull(exprs);
@@ -50,14 +49,14 @@ public class DataPartition {
     Preconditions.checkState(type == TPartitionType.HASH_PARTITIONED
         || type == TPartitionType.RANGE_PARTITIONED);
     type_ = type;
-    partitionExprs_ = ImmutableList.copyOf(exprs);
+    partitionExprs_ = exprs;
   }
 
   public DataPartition(TPartitionType type) {
     Preconditions.checkState(type == TPartitionType.UNPARTITIONED
         || type == TPartitionType.RANDOM);
     type_ = type;
-    partitionExprs_ = ImmutableList.of();
+    partitionExprs_ = Lists.newArrayList();
   }
 
   public final static DataPartition UNPARTITIONED =
@@ -67,8 +66,9 @@ public class DataPartition {
       new DataPartition(TPartitionType.RANDOM);
 
   public boolean isPartitioned() { return type_ != TPartitionType.UNPARTITIONED; }
+  public boolean isHashPartitioned() { return type_ == TPartitionType.HASH_PARTITIONED; }
   public TPartitionType getType() { return type_; }
-  public ImmutableList<Expr> getPartitionExprs() { return partitionExprs_; }
+  public List<Expr> getPartitionExprs() { return partitionExprs_; }
 
   public TDataPartition toThrift() {
     TDataPartition result = new TDataPartition(type_);

@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
@@ -158,7 +157,9 @@ public class UnionStmt extends QueryStmt {
       if (analyzer.getMissingTbls().isEmpty()) throw e;
     }
 
+    List<List<Expr>> resultExprLists = Lists.newArrayList();
     List<Expr> firstQueryExprs = firstQuery.getBaseTblResultExprs();
+    resultExprLists.add(firstQueryExprs);
     for (int i = 1; i < operands_.size(); ++i) {
       QueryStmt query = operands_.get(i).getQueryStmt();
       try {
@@ -170,6 +171,7 @@ public class UnionStmt extends QueryStmt {
               firstQueryExprs.size() + " column(s)\n" +
               "'" + queryStmtToSql(query) + "' has " + exprs.size() + " column(s)");
         }
+        resultExprLists.add(exprs);
       } catch (AnalysisException e) {
         if (analyzer.getMissingTbls().isEmpty()) throw e;
       }
@@ -179,28 +181,7 @@ public class UnionStmt extends QueryStmt {
       throw new AnalysisException("Found missing tables. Aborting analysis.");
     }
 
-    // Determine compatible types for exprs, position by position.
-    for (int i = 0; i < firstQueryExprs.size(); ++i) {
-      // Type compatible with the i-th exprs of all selects.
-      // Initialize with type of i-th expr in first select.
-      Type compatibleType = firstQueryExprs.get(i).getType();
-      // Remember last compatible expr for error reporting.
-      Expr lastCompatibleExpr = firstQueryExprs.get(i);
-      for (int j = 1; j < operands_.size(); ++j) {
-        List<Expr> resultExprs = operands_.get(j).getQueryStmt().getBaseTblResultExprs();
-        compatibleType = analyzer.getCompatibleType(compatibleType,
-            lastCompatibleExpr, resultExprs.get(i));
-        lastCompatibleExpr = resultExprs.get(i);
-      }
-      // Now that we've found a compatible type, add implicit casts if necessary.
-      for (int j = 0; j < operands_.size(); ++j) {
-        List<Expr> resultExprs = operands_.get(j).getQueryStmt().getBaseTblResultExprs();
-        if (!resultExprs.get(i).getType().equals(compatibleType)) {
-          Expr castExpr = resultExprs.get(i).castTo(compatibleType);
-          resultExprs.set(i, castExpr);
-        }
-      }
-    }
+    analyzer.castToUnionCompatibleTypes(resultExprLists);
 
     // Create tuple descriptor materialized by this UnionStmt,
     // its resultExprs, and its sortInfo if necessary.
