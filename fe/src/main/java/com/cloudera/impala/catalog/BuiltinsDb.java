@@ -552,16 +552,25 @@ public class BuiltinsDb extends Db {
     // Group_concat(string)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "group_concat",
         Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING, initNullString,
-        prefix + "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-        prefix + "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-        stringValSerializeOrFinalize, stringValSerializeOrFinalize, false));
+        prefix +
+            "18StringConcatUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "17StringConcatMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        stringValSerializeOrFinalize,
+        prefix +
+            "20StringConcatFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        false));
     // Group_concat(string, string)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "group_concat",
         Lists.<Type>newArrayList(Type.STRING, Type.STRING), Type.STRING, Type.STRING,
         initNullString,
         prefix +
-            "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValES6_PS4_",
-        prefix + "12StringConcatEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-        stringValSerializeOrFinalize, stringValSerializeOrFinalize, false));
+            "18StringConcatUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValES6_PS4_",
+        prefix +
+            "17StringConcatMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        stringValSerializeOrFinalize,
+        prefix +
+            "20StringConcatFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        false));
   }
 }

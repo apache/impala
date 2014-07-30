@@ -931,6 +931,27 @@ select group_concat(string_col) from alltypesagg where string_col = NULL;
 string
 ====
 ---- QUERY
+# Test merge phase uses correct separator (IMPALA-1110).  The query needs to load data
+# from multiple nodes in order to exercise this path, however the merge order is
+# non-deterministic.  So, aggregate a string literal to make the result deterministic.
+select group_concat('abc', 'xy') from functional.alltypesagg where id % 1000 = day
+---- RESULTS
+'abcxyabcxyabcxyabcxyabcxyabcxyabcxyabcxyabcxyabc'
+---- TYPES
+string
+====
+---- QUERY
+# Test group_concat when separator varies by row.
+select group_concat(cast(id as string), cast ((10 - id) as string))
+from functional.alltypesagg
+where id < 10 and day != null
+group by day
+---- RESULTS
+'0918273645546372819'
+---- TYPES
+string
+====
+---- QUERY
 # Test correct removal of redundant group-by expressions (IMPALA-817)
 select int_col * int_col, int_col + int_col
 from functional.alltypesagg

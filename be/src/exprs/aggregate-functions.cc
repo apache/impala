@@ -218,30 +218,67 @@ void AggregateFunctions::Max(FunctionContext*,
   if (src_tv > dst_tv) *dst = src;
 }
 
-void AggregateFunctions::StringConcat(FunctionContext* ctx, const StringVal& src,
-      StringVal* result) {
-  StringConcat(ctx, src, DEFAULT_STRING_CONCAT_DELIM, result);
+// StringConcat intermediate state starts with the length of the first
+// separator, followed by the accumulated string.  The accumulated
+// string starts with the separator of the first value that arrived in
+// StringConcatUpdate().
+typedef int StringConcatHeader;
+
+void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx,
+    const StringVal& src, StringVal* result) {
+  StringConcatUpdate(ctx, src, DEFAULT_STRING_CONCAT_DELIM, result);
 }
 
-void AggregateFunctions::StringConcat(FunctionContext* ctx, const StringVal& src,
-      const StringVal& separator, StringVal* result) {
+void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx,
+    const StringVal& src, const StringVal& separator, StringVal* result) {
   if (src.is_null) return;
+  const StringVal* sep = separator.is_null ? &DEFAULT_STRING_CONCAT_DELIM : &separator;
   if (result->is_null) {
-    uint8_t* copy = ctx->Allocate(src.len);
-    memcpy(copy, src.ptr, src.len);
-    *result = StringVal(copy, src.len);
-    return;
+    // Header of the intermediate state holds the length of the first separator.
+    const int header_len = sizeof(StringConcatHeader);
+    DCHECK(header_len == sizeof(sep->len));
+    *result = StringVal(ctx->Allocate(header_len), header_len);
+    *reinterpret_cast<StringConcatHeader*>(result->ptr) = sep->len;
   }
-
-  const StringVal* sep_ptr = separator.is_null ? &DEFAULT_STRING_CONCAT_DELIM :
-      &separator;
-
-  int new_size = result->len + sep_ptr->len + src.len;
-  result->ptr = ctx->Reallocate(result->ptr, new_size);
-  memcpy(result->ptr + result->len, sep_ptr->ptr, sep_ptr->len);
-  result->len += sep_ptr->len;
+  int new_len = result->len + sep->len + src.len;
+  result->ptr = ctx->Reallocate(result->ptr, new_len);
+  memcpy(result->ptr + result->len, sep->ptr, sep->len);
+  result->len += sep->len;
   memcpy(result->ptr + result->len, src.ptr, src.len);
   result->len += src.len;
+  DCHECK(result->len == new_len);
+}
+
+void AggregateFunctions::StringConcatMerge(FunctionContext* ctx,
+    const StringVal& src, StringVal* result) {
+  if (src.is_null) return;
+  const int header_len = sizeof(StringConcatHeader);
+  if (result->is_null) {
+    // Copy the header from the first intermediate value.
+    *result = StringVal(ctx->Allocate(header_len), header_len);
+    *reinterpret_cast<StringConcatHeader*>(result->ptr) =
+        *reinterpret_cast<StringConcatHeader*>(src.ptr);
+  }
+  // Append the string portion of the intermediate src to result (omit src's header).
+  int new_len = result->len + src.len - header_len;
+  result->ptr = ctx->Reallocate(result->ptr, new_len);
+  memcpy(result->ptr + result->len, src.ptr + header_len, src.len - header_len);
+  result->len += src.len - header_len;
+  DCHECK(result->len == new_len);
+}
+
+StringVal AggregateFunctions::StringConcatFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  if (src.is_null) return src;
+  const int header_len = sizeof(StringConcatHeader);
+  DCHECK(src.len >= header_len);
+  int sep_len = *reinterpret_cast<StringConcatHeader*>(src.ptr);
+  DCHECK(src.len >= header_len + sep_len);
+  // Remove the header and the first separator.
+  StringVal result(ctx, src.len - header_len - sep_len);
+  memcpy(result.ptr, src.ptr + header_len + sep_len, result.len);
+  ctx->Free(src.ptr);
+  return result;
 }
 
 // Compute distinctpc and distinctpcsa using Flajolet and Martin's algorithm

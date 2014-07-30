@@ -63,9 +63,14 @@ class AggregateFunctions {
   static void Max(FunctionContext*, const T& src, T* dst);
 
   // String concat
-  static void StringConcat(FunctionContext*, const StringVal& src, StringVal* result);
-  static void StringConcat(FunctionContext*, const StringVal& src,
-      const StringVal& separator, StringVal* result);
+  static void StringConcatUpdate(FunctionContext*,
+      const StringVal& src, StringVal* result);
+  static void StringConcatUpdate(FunctionContext*,
+      const StringVal& src, const StringVal& separator, StringVal* result);
+  static void StringConcatMerge(FunctionContext*,
+      const StringVal& src, StringVal* result);
+  static StringVal StringConcatFinalize(FunctionContext*,
+      const StringVal& src);
 
   // Probabilistic Counting (PC), a distinct estimate algorithms.
   // Probabilistic Counting with Stochastic Averaging (PCSA) is a variant
