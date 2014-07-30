@@ -57,14 +57,14 @@ void TestCompression(int num, int min_len, int max_len, THdfsCompression::type c
   scoped_ptr<Codec> compressor;
   Codec::CreateCompressor(NULL, false, codec, &compressor);
 
-  int compressed_len = compressor->MaxOutputLen(offset);
+  int64_t compressed_len = compressor->MaxOutputLen(offset);
   uint8_t* compressed_buffer = (uint8_t*)malloc(compressed_len);
   compressor->ProcessBlock(true, offset, buffer, &compressed_len, &compressed_buffer);
 
-  int sorted_compressed_len = compressor->MaxOutputLen(offset);
+  int64_t sorted_compressed_len = compressor->MaxOutputLen(offset);
   uint8_t* sorted_compressed_buffer = (uint8_t*)malloc(sorted_compressed_len);
-  compressor->ProcessBlock(
-      true, offset, sorted_buffer, &sorted_compressed_len, &sorted_compressed_buffer);
+  compressor->ProcessBlock(true, offset, sorted_buffer, &sorted_compressed_len,
+                           &sorted_compressed_buffer);
 
   cout << "NumStrings=" << num << " MinLen=" << min_len << " MaxLen=" << max_len
        << " Codec=" << codec << endl;

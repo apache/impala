@@ -28,10 +28,9 @@ namespace impala {
 class GzipDecompressor : public Codec {
  public:
   virtual ~GzipDecompressor();
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+                              uint8_t* input, int64_t* output_length, uint8_t** output);
 
  private:
   friend class Codec;
@@ -52,10 +51,10 @@ class GzipDecompressor : public Codec {
 class BzipDecompressor : public Codec {
  public:
   virtual ~BzipDecompressor() { }
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+                              int64_t input_length, uint8_t* input,
+                              int64_t* output_length, uint8_t** output);
  private:
   friend class Codec;
   BzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
@@ -70,10 +69,9 @@ class SnappyDecompressor : public Codec {
   static const uint TRAILING_CHECKSUM_LEN = 4;
 
   virtual ~SnappyDecompressor() { }
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+                              uint8_t* input, int64_t* output_length, uint8_t** output);
 
  private:
   friend class Codec;
@@ -81,16 +79,15 @@ class SnappyDecompressor : public Codec {
   virtual Status Init() { return Status::OK; }
 };
 
-// Lz4 is a compression codec with similar compression ratios as snappy but much faster 
+// Lz4 is a compression codec with similar compression ratios as snappy but much faster
 // decompression. This decompressor is not able to decompress unless the output buffer
 // is allocated and will cause an error if asked to do so.
 class Lz4Decompressor : public Codec {
  public:
   virtual ~Lz4Decompressor() { }
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+                              uint8_t* input, int64_t* output_length, uint8_t** output);
 
  private:
   friend class Codec;
@@ -101,10 +98,9 @@ class Lz4Decompressor : public Codec {
 class SnappyBlockDecompressor : public Codec {
  public:
   virtual ~SnappyBlockDecompressor() { }
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+                              uint8_t* input, int64_t* output_length, uint8_t** output);
 
  private:
   friend class Codec;

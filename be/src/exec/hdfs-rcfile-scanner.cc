@@ -128,7 +128,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   if (rc_header->version == SEQ6) {
     // Validate class name key/value
     uint8_t* class_name_key;
-    int len;
+    int64_t len;
     RETURN_IF_FALSE(
         stream_->ReadText(&class_name_key, &len, &parse_status_));
     if (len != strlen(HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME) ||
@@ -171,7 +171,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   }
   if (header_->is_compressed) {
     uint8_t* codec_ptr;
-    int len;
+    int64_t len;
     // Read the codec and get the right decompressor class.
     RETURN_IF_FALSE(stream_->ReadText(&codec_ptr, &len, &parse_status_));
     header_->codec = string(reinterpret_cast<char*>(codec_ptr), len);
@@ -202,7 +202,7 @@ Status HdfsRCFileScanner::ReadNumColumnsMetadata() {
 
   for (int i = 0; i < map_size; ++i) {
     uint8_t* key, *value;
-    int key_len, value_len;
+    int64_t key_len, value_len;
     RETURN_IF_FALSE(stream_->ReadText(&key, &key_len, &parse_status_));
     RETURN_IF_FALSE(stream_->ReadText(&value, &value_len, &parse_status_));
 
@@ -317,7 +317,7 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
         compressed_key_length_, &compressed_buffer, &parse_status_));
     {
       SCOPED_TIMER(decompress_timer_);
-      RETURN_IF_ERROR(decompressor_->ProcessBlock(true, compressed_key_length_,
+      RETURN_IF_ERROR(decompressor_->ProcessBlock32(true, compressed_key_length_,
           compressed_buffer, &key_length_, &key_buffer));
       VLOG_FILE << "Decompressed " << compressed_key_length_ << " to " << key_length_;
     }
@@ -432,7 +432,7 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
       uint8_t* compressed_output = row_group_buffer_ + column.start_offset;
       {
         SCOPED_TIMER(decompress_timer_);
-        RETURN_IF_ERROR(decompressor_->ProcessBlock(true, column.buffer_len,
+        RETURN_IF_ERROR(decompressor_->ProcessBlock32(true, column.buffer_len,
             compressed_input, &column.uncompressed_buffer_len,
             &compressed_output));
         VLOG_FILE << "Decompressed " << column.buffer_len << " to "

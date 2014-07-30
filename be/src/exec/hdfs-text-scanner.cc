@@ -429,10 +429,11 @@ Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
     int64_t decompressed_len = 0;
     uint8_t* decompressed_buffer = NULL;
     SCOPED_TIMER(decompress_timer_);
-    // TODO: IMPALA-1116: Change the codec interface to get int64_t lengths.
+    // TODO: Once the writers are in, add tests with very large compressed files (4GB)
+    // that could overflow.
     RETURN_IF_ERROR(decompressor_->ProcessBlock(false, byte_buffer_read_size_,
-        reinterpret_cast<uint8_t*>(byte_buffer_ptr_),
-        reinterpret_cast<int*>(&decompressed_len), &decompressed_buffer));
+        reinterpret_cast<uint8_t*>(byte_buffer_ptr_), &decompressed_len,
+        &decompressed_buffer));
 
     // Inform stream_ that the buffer with the compressed text can be released.
     context_->ReleaseCompletedResources(NULL, true);

@@ -16,6 +16,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
+#include <limits> // for std::numeric_limits
 
 #include "common/object-pool.h"
 #include "exec/hdfs-scan-node.h"
@@ -457,7 +458,6 @@ static bool RequiresSkippedDictionaryHeaderCheck(
 
 Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
   Status status;
-
   uint8_t* buffer;
   int num_bytes;
 
@@ -476,7 +476,9 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
       break;
     }
 
-    RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &num_bytes));
+    int64_t buffer_size;
+    RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &buffer_size));
+    num_bytes = min(buffer_size, static_cast<int64_t>(MAX_PAGE_HEADER_SIZE));
     if (num_bytes == 0) {
       DCHECK(stream_->eosr());
       stringstream ss;
@@ -501,15 +503,15 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
       }
       // Stitch the header bytes that are split across buffers.
       uint8_t header_buffer[MAX_PAGE_HEADER_SIZE];
-      int header_first_part = header_size;
+      int32_t header_first_part = header_size;
       memcpy(header_buffer, buffer, header_first_part);
 
       if (!stream_->SkipBytes(header_first_part, &status)) return status;
-      RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &num_bytes));
+      RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &buffer_size));
+      num_bytes = min(buffer_size, static_cast<int64_t>(MAX_PAGE_HEADER_SIZE));
       if (num_bytes == 0) return status;
-
-      uint32_t header_second_part =
-          ::min(num_bytes, MAX_PAGE_HEADER_SIZE - header_first_part);
+      uint32_t header_second_part = ::min(num_bytes,
+                                          MAX_PAGE_HEADER_SIZE - header_first_part);
       memcpy(header_buffer + header_first_part, buffer, header_second_part);
       header_size = MAX_PAGE_HEADER_SIZE;
       status =
@@ -555,7 +557,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
       uint8_t* dict_values = NULL;
       if (decompressor_.get() != NULL) {
         dict_values = parent_->dictionary_pool_->Allocate(uncompressed_size);
-        RETURN_IF_ERROR(decompressor_->ProcessBlock(true, data_size, data_,
+        RETURN_IF_ERROR(decompressor_->ProcessBlock32(true, data_size, data_,
             &uncompressed_size, &dict_values));
         VLOG_FILE << "Decompressed " << data_size << " to " << uncompressed_size;
         data_size = uncompressed_size;
@@ -592,9 +594,9 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
     if (decompressor_.get() != NULL) {
       SCOPED_TIMER(parent_->decompress_timer_);
       uint8_t* decompressed_buffer = decompressed_data_pool_->Allocate(uncompressed_size);
-      RETURN_IF_ERROR(decompressor_->ProcessBlock(
-          true, current_page_header_.compressed_page_size, data_,
-          &uncompressed_size, &decompressed_buffer));
+      RETURN_IF_ERROR(decompressor_->ProcessBlock32(true,
+          current_page_header_.compressed_page_size, data_, &uncompressed_size,
+          &decompressed_buffer));
       VLOG_FILE << "Decompressed " << current_page_header_.compressed_page_size
                 << " to " << uncompressed_size;
       DCHECK_EQ(current_page_header_.uncompressed_page_size, uncompressed_size);
@@ -851,7 +853,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   *eosr = false;
 
   uint8_t* buffer;
-  int len;
+  int64_t len;
 
   RETURN_IF_ERROR(stream_->GetBuffer(false, &buffer, &len));
   DCHECK(stream_->eosr());

@@ -28,8 +28,8 @@ using namespace impala;
 // Handle the fast common path where all the bytes are in the first buffer.  This
 // is the path used by sequence/rc/parquet file formats to read a very small number
 // (i.e. single int) of bytes.
-inline bool ScannerContext::Stream::GetBytes(int requested_len, uint8_t** buffer,
-    int* out_len, Status* status, bool peek) {
+inline bool ScannerContext::Stream::GetBytes(int64_t requested_len, uint8_t** buffer,
+    int64_t* out_len, Status* status, bool peek) {
   if (UNLIKELY(requested_len < 0)) {
     *status = ReportInvalidRead(requested_len);
     return false;
@@ -53,9 +53,9 @@ inline bool ScannerContext::Stream::GetBytes(int requested_len, uint8_t** buffer
   return status->ok();
 }
 
-inline bool ScannerContext::Stream::ReadBytes(
-    int length, uint8_t** buf, Status* status, bool peek) {
-  int bytes_read;
+inline bool ScannerContext::Stream::ReadBytes(int64_t length, uint8_t** buf,
+    Status* status, bool peek) {
+  int64_t bytes_read;
   RETURN_IF_FALSE(GetBytes(length, buf, &bytes_read, status, peek));
   if (UNLIKELY(length != bytes_read)) {
     DCHECK_LT(bytes_read, length);
@@ -67,9 +67,9 @@ inline bool ScannerContext::Stream::ReadBytes(
 
 // TODO: consider implementing a Skip in the context/stream object that's more
 // efficient than GetBytes.
-inline bool ScannerContext::Stream::SkipBytes(int length, Status* status) {
+inline bool ScannerContext::Stream::SkipBytes(int64_t length, Status* status) {
   uint8_t* dummy_buf;
-  int bytes_read;
+  int64_t bytes_read;
   RETURN_IF_FALSE(GetBytes(length, &dummy_buf, &bytes_read, status));
   if (UNLIKELY(length != bytes_read)) {
     DCHECK_LT(bytes_read, length);
@@ -81,12 +81,13 @@ inline bool ScannerContext::Stream::SkipBytes(int length, Status* status) {
 
 inline bool ScannerContext::Stream::SkipText(Status* status) {
   uint8_t* dummy_buffer;
-  int bytes_read;
+  int64_t bytes_read;
   return ReadText(&dummy_buffer, &bytes_read, status);
 }
 
-inline bool ScannerContext::Stream::ReadText(uint8_t** buf, int* len, Status* status) {
-  RETURN_IF_FALSE(ReadVInt(len, status));
+inline bool ScannerContext::Stream::ReadText(uint8_t** buf, int64_t* len,
+    Status* status) {
+  RETURN_IF_FALSE(ReadVLong(len, status));
   RETURN_IF_FALSE(ReadBytes(*len, buf, status));
   return true;
 }

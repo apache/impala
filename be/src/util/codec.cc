@@ -14,6 +14,7 @@
 
 #include "util/codec.h"
 #include <boost/assign/list_of.hpp>
+#include <limits> // for std::numeric_limits
 
 #include "util/compress.h"
 #include "util/decompress.h"
@@ -115,7 +116,11 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse,
       break;
     default: {
       stringstream ss;
-      ss << "Unsupported codec: " << format;
+      if (format == THdfsCompression::LZO) {
+        ss << "For LZO we use an lzo library directly in the dynamically linked scanner.";
+      } else {
+        ss << "Unsupported codec: " << format;
+      }
       return Status(ss.str());
     }
   }
@@ -176,11 +181,13 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
     case THdfsCompression::LZ4:
       *decompressor = new Lz4Decompressor(mem_pool, reuse);
       break;
-    case THdfsCompression::LZO:
-      VLOG(2) << "The LZO codec is created as a linked library." ;
     default: {
       stringstream ss;
-      ss << "Unsupported codec: " << format;
+      if (format == THdfsCompression::LZO) {
+        ss << "For LZO we use an lzo library directly in the dynamically linked scanner.";
+      } else {
+        ss << "Unsupported codec: " << format;
+      }
       return Status(ss.str());
     }
   }
@@ -203,4 +210,22 @@ void Codec::Close() {
     DCHECK(memory_pool_ != NULL);
     memory_pool_->AcquireData(temp_memory_pool_.get(), false);
   }
+}
+
+Status Codec::ProcessBlock32(bool output_preallocated, int input_length, uint8_t* input,
+                             int* output_length, uint8_t** output) {
+  int64_t input_len64 = input_length;
+  int64_t output_len64 = *output_length;
+  RETURN_IF_ERROR(ProcessBlock(output_preallocated, input_len64, input, &output_len64,
+                               output));
+  // Check whether we are going to have an overflow if we are going to cast from int64_t
+  // to int.
+  // TODO: Is there a faster way to do this check?
+  if (UNLIKELY(output_len64 > numeric_limits<int>::max())) {
+    stringstream ss;
+    ss << "Arithmetic overflow in codec function. Output length is " << output_len64;
+    return Status(ss.str());
+  }
+  *output_length = static_cast<int32_t>(output_len64);
+  return Status::OK;
 }

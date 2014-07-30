@@ -546,10 +546,10 @@ Status HdfsAvroScanner::ProcessRange() {
         // decompressor_ doesn't expect this
         compressed_size -= SnappyDecompressor::TRAILING_CHECKSUM_LEN;
       }
-      int size;
+      int64_t size;
       SCOPED_TIMER(decompress_timer_);
-      RETURN_IF_ERROR(decompressor_->ProcessBlock(
-          false, compressed_size, compressed_data, &size, &data));
+      RETURN_IF_ERROR(decompressor_->ProcessBlock(false, compressed_size, compressed_data,
+                                                  &size, &data));
       VLOG_FILE << "Decompressed " << compressed_size << " to " << size;
     } else {
       data = compressed_data;

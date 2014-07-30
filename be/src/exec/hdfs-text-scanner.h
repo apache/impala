@@ -61,7 +61,7 @@ class HdfsTextScanner : public HdfsScanner {
   char* byte_buffer_end_;
 
   // Actual bytes received from last file read.
-  int byte_buffer_read_size_;
+  int64_t byte_buffer_read_size_;
 
  private:
   const static int NEXT_BLOCK_READ_SIZE = 1024; //bytes

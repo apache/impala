@@ -428,13 +428,13 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
         header.uncompressed_page_size);
     dict_encoder_base_->WriteDict(dict_buffer);
     if (compressor_.get() != NULL) {
-      int max_compressed_size =
+      int64_t max_compressed_size =
           compressor_->MaxOutputLen(header.uncompressed_page_size);
       DCHECK_GT(max_compressed_size, 0);
       uint8_t* compressed_data =
           parent_->per_file_mem_pool_->Allocate(max_compressed_size);
       header.compressed_page_size = max_compressed_size;
-      compressor_->ProcessBlock(true, header.uncompressed_page_size, dict_buffer,
+      compressor_->ProcessBlock32(true, header.uncompressed_page_size, dict_buffer,
           &header.compressed_page_size, &compressed_data);
       dict_buffer = compressed_data;
       // We allocated the output based on the guessed size, return the extra allocated
@@ -537,11 +537,12 @@ int64_t HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
     current_page_->data = reinterpret_cast<uint8_t*>(uncompressed_data);
     header.compressed_page_size = header.uncompressed_page_size;
   } else {
-    int max_compressed_size = compressor_->MaxOutputLen(header.uncompressed_page_size);
+    int64_t max_compressed_size =
+        compressor_->MaxOutputLen(header.uncompressed_page_size);
     DCHECK_GT(max_compressed_size, 0);
     uint8_t* compressed_data = parent_->per_file_mem_pool_->Allocate(max_compressed_size);
     header.compressed_page_size = max_compressed_size;
-    compressor_->ProcessBlock(true, header.uncompressed_page_size, uncompressed_data,
+    compressor_->ProcessBlock32(true, header.uncompressed_page_size, uncompressed_data,
         &header.compressed_page_size, &compressed_data);
     current_page_->data = compressed_data;
 

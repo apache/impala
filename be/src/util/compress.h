@@ -39,10 +39,10 @@ class GzipCompressor : public Codec {
   };
 
   virtual ~GzipCompressor();
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+                              int64_t input_length, uint8_t* input,
+                              int64_t* output_length, uint8_t** output);
 
  private:
   friend class Codec;
@@ -62,17 +62,17 @@ class GzipCompressor : public Codec {
   // at least big enough.
   // *output_length should be called with the length of the output buffer and on return
   // is the length of the output.
-  Status Compress(int input_length, uint8_t* input,
-      int* output_length, uint8_t* output);
+  Status Compress(int64_t input_length, uint8_t* input,
+      int64_t* output_length, uint8_t* output);
 };
 
 class BzipCompressor : public Codec {
  public:
   virtual ~BzipCompressor() { }
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+                              int64_t input_length, uint8_t* input,
+                              int64_t* output_length, uint8_t** output);
 
  private:
   friend class Codec;
@@ -83,10 +83,10 @@ class BzipCompressor : public Codec {
 class SnappyBlockCompressor : public Codec {
  public:
   virtual ~SnappyBlockCompressor() { }
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+                              int64_t input_length, uint8_t* input,
+                              int64_t* output_length, uint8_t** output);
 
  private:
   friend class Codec;
@@ -97,10 +97,10 @@ class SnappyBlockCompressor : public Codec {
 class SnappyCompressor : public Codec {
  public:
   virtual ~SnappyCompressor() { }
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+                              int64_t input_length, uint8_t* input,
+                              int64_t* output_length, uint8_t** output);
 
  private:
   friend class Codec;
@@ -115,10 +115,10 @@ class SnappyCompressor : public Codec {
 class Lz4Compressor : public Codec {
  public:
   virtual ~Lz4Compressor() { }
-  virtual int MaxOutputLen(int input_len, const uint8_t* input = NULL);
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated,
-                              int input_length, uint8_t* input,
-                              int* output_length, uint8_t** output);
+                              int64_t input_length, uint8_t* input,
+                              int64_t* output_length, uint8_t** output);
 
  private:
   friend class Codec;

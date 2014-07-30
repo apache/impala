@@ -109,7 +109,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
   RETURN_IF_FALSE(stream_->SkipBytes(current_key_length_, &parse_status_));
 
   if (header_->is_compressed) {
-    int in_size = current_block_length_ - current_key_length_;
+    int64_t in_size = current_block_length_ - current_key_length_;
     if (in_size < 0) {
       stringstream ss;
       ss << "Invalid record size: " << in_size;
@@ -119,7 +119,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     RETURN_IF_FALSE(
         stream_->ReadBytes(in_size, &compressed_data, &parse_status_));
 
-    int len;
+    int64_t len;
     {
       SCOPED_TIMER(decompress_timer_);
       RETURN_IF_ERROR(decompressor_->ProcessBlock(false, in_size, compressed_data,
@@ -357,7 +357,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   RETURN_IF_FALSE(stream_->SkipText(&parse_status_));
 
   uint8_t* class_name;
-  int len;
+  int64_t len;
   RETURN_IF_FALSE(stream_->ReadText(&class_name, &len, &parse_status_));
   if (memcmp(class_name, HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME, len)) {
     stringstream ss;
@@ -464,8 +464,8 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   RETURN_IF_FALSE(stream_->SkipText(&parse_status_));
 
   // Read the compressed value buffer from the unbuffered stream.
-  int block_size = 0;
-  RETURN_IF_FALSE(stream_->ReadVInt(&block_size, &parse_status_));
+  int64_t block_size = 0;
+  RETURN_IF_FALSE(stream_->ReadVLong(&block_size, &parse_status_));
   // Check for a reasonable size
   if (block_size > MAX_BLOCK_SIZE || block_size < 0) {
     stringstream ss;
@@ -477,7 +477,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   RETURN_IF_FALSE(stream_->ReadBytes(block_size, &compressed_data, &parse_status_));
 
   {
-    int len;
+    int64_t len;
     SCOPED_TIMER(decompress_timer_);
     RETURN_IF_ERROR(decompressor_->ProcessBlock(false, block_size, compressed_data,
                                                 &len, &unparsed_data_buffer_));

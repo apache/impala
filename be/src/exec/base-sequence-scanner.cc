@@ -182,9 +182,8 @@ Status BaseSequenceScanner::ReadSync() {
   finished_ = stream_->eosr();
 
   uint8_t* hash;
-  int out_len;
-  RETURN_IF_FALSE(
-      stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &parse_status_));
+  int64_t out_len;
+  RETURN_IF_FALSE(stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &parse_status_));
   if (out_len != SYNC_HASH_SIZE || memcmp(hash, header_->sync, SYNC_HASH_SIZE)) {
     stringstream ss;
     ss  << "Bad synchronization marker" << endl
@@ -223,7 +222,7 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
   // offset into current buffer of end of sync (once found, -1 until then)
   int offset = -1;
   uint8_t* buffer;
-  int buffer_len;
+  int64_t buffer_len;
   Status status;
 
   // Read buffers until we find a sync or reach the end of the scan range. If we read all
@@ -242,7 +241,7 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
     // then we read these bytes plus the first sync_size - 1 bytes of the next buffer.
     // This guarantees that we find any syncs that start in the current buffer and end in
     // the next buffer.
-    int to_skip = max(0, buffer_len - (sync_size - 1));
+    int64_t to_skip = max(static_cast<int64_t>(0), buffer_len - (sync_size - 1));
     RETURN_IF_FALSE(stream_->SkipBytes(to_skip, &parse_status_));
     // Peek so we don't advance stream_ into the next buffer. If we don't find a sync here
     // then we'll need to check all of the next buffer, including the first sync_size -1

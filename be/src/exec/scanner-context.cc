@@ -25,13 +25,13 @@ using namespace boost;
 using namespace impala;
 using namespace std;
 
-static const int DEFAULT_READ_PAST_SIZE = 1024; // in bytes
+static const int64_t DEFAULT_READ_PAST_SIZE = 1024; // in bytes
 
 // We always want output_buffer_bytes_left_ to be non-NULL, so we can avoid a NULL check
 // in GetBytes(). We use this variable, which is set to 0, to initialize
 // output_buffer_bytes_left_. After the first successful call to GetBytes(),
 // output_buffer_bytes_left_ will be set to something else.
-static const int OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
+static const int64_t OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
 
 ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNode* scan_node,
     HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range)
@@ -65,7 +65,8 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   stream->io_buffer_bytes_left_ = 0;
   stream->boundary_buffer_bytes_left_ = 0;
   stream->output_buffer_pos_ = NULL;
-  stream->output_buffer_bytes_left_ = const_cast<int*>(&OUTPUT_BUFFER_BYTES_LEFT_INIT);
+  stream->output_buffer_bytes_left_ =
+      const_cast<int64_t*>(&OUTPUT_BUFFER_BYTES_LEFT_INIT);
   stream->contains_tuple_data_ = !scan_node_->tuple_desc()->string_slots().empty();
   streams_.push_back(stream);
   return stream;
@@ -110,7 +111,7 @@ void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool don
   if (done) boundary_pool_->FreeAll();
 }
 
-Status ScannerContext::Stream::GetNextBuffer(int read_past_size) {
+Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
   if (parent_->cancelled()) return Status::CANCELLED;
 
   // io_buffer_ should only be null the first time this is called
@@ -134,8 +135,8 @@ Status ScannerContext::Stream::GetNextBuffer(int read_past_size) {
     SCOPED_TIMER(parent_->state_->total_storage_wait_timer());
     int64_t offset = file_offset() + boundary_buffer_bytes_left_;
 
-    int read_past_buffer_size = read_past_size_cb_.empty() ?
-                                DEFAULT_READ_PAST_SIZE : read_past_size_cb_(offset);
+    int64_t read_past_buffer_size = read_past_size_cb_.empty() ?
+        DEFAULT_READ_PAST_SIZE : read_past_size_cb_(offset);
     read_past_buffer_size = ::max(read_past_buffer_size, read_past_size);
 
     // TODO: we're reading past this scan range so this is likely a remote read.
@@ -154,7 +155,7 @@ Status ScannerContext::Stream::GetNextBuffer(int read_past_size) {
   return Status::OK;
 }
 
-Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int* len) {
+Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int64_t* len) {
   *out_buffer = NULL;
   *len = 0;
   if (eosr()) return Status::OK;
@@ -169,7 +170,7 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int* l
     DCHECK_EQ(output_buffer_bytes_left_, &boundary_buffer_bytes_left_);
     *out_buffer = boundary_buffer_pos_;
     // Don't return more bytes past eosr
-    *len = min(static_cast<int64_t>(boundary_buffer_bytes_left_), bytes_left());
+    *len = min(boundary_buffer_bytes_left_, bytes_left());
     DCHECK_GE(*len, 0);
     if (!peek) {
       boundary_buffer_pos_ += *len;
@@ -199,8 +200,8 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int* l
   return Status::OK;
 }
 
-Status ScannerContext::Stream::GetBytesInternal(
-    int requested_len, uint8_t** out_buffer, bool peek, int* out_len) {
+Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
+    uint8_t** out_buffer, bool peek, int64_t* out_len) {
   DCHECK_GT(requested_len, boundary_buffer_bytes_left_);
   *out_buffer = NULL;
 
@@ -228,9 +229,9 @@ Status ScannerContext::Stream::GetBytesInternal(
   }
 
   // We have enough bytes in io_buffer_ or couldn't read more bytes
-  int requested_bytes_left = requested_len - boundary_buffer_bytes_left_;
+  int64_t requested_bytes_left = requested_len - boundary_buffer_bytes_left_;
   DCHECK_GE(requested_len, 0);
-  int num_bytes = min(io_buffer_bytes_left_, requested_bytes_left);
+  int64_t num_bytes = min(io_buffer_bytes_left_, requested_bytes_left);
   *out_len = boundary_buffer_bytes_left_ + num_bytes;
   DCHECK_LE(*out_len, requested_len);
 
@@ -269,7 +270,7 @@ bool ScannerContext::cancelled() const {
   return scan_node_->done_;
 }
 
-Status ScannerContext::Stream::ReportIncompleteRead(int length, int bytes_read) {
+Status ScannerContext::Stream::ReportIncompleteRead(int64_t length, int64_t bytes_read) {
   stringstream ss;
   ss << "Tried to read " << length << " bytes but could only read "
      << bytes_read << " bytes. This may indicate data file corruption. "
@@ -277,7 +278,7 @@ Status ScannerContext::Stream::ReportIncompleteRead(int length, int bytes_read) 
   return Status(ss.str());
 }
 
-Status ScannerContext::Stream::ReportInvalidRead(int length) {
+Status ScannerContext::Stream::ReportInvalidRead(int64_t length) {
   stringstream ss;
   ss << "Invalid read of " << length << " bytes. This may indicate data file corruption. "
      << "(file: " << filename() << ", byte offset: " << file_offset() << ")";

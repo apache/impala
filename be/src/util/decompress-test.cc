@@ -76,61 +76,62 @@ class DecompressorTest : public ::testing::Test {
   }
 
   void CompressAndDecompress(Codec* compressor, Codec* decompressor,
-      int input_len, uint8_t* input) {
+      int64_t input_len, uint8_t* input) {
     // Non-preallocated output buffers
     uint8_t* compressed;
-    int compressed_length;
+    int64_t compressed_length;
     EXPECT_TRUE(compressor->ProcessBlock(false, input_len,
         input, &compressed_length, &compressed).ok());
     uint8_t* output;
-    int output_len;
-    EXPECT_TRUE(
-        decompressor->ProcessBlock(false, compressed_length,
+    int64_t output_len;
+    EXPECT_TRUE(decompressor->ProcessBlock(false, compressed_length,
         compressed, &output_len, &output).ok());
 
     EXPECT_EQ(output_len, input_len);
     EXPECT_EQ(memcmp(input, output, input_len), 0);
 
     // Preallocated output buffers
-    int max_compressed_length = compressor->MaxOutputLen(input_len, input);
+    int64_t max_compressed_length = compressor->MaxOutputLen(input_len, input);
 
     // Don't redo compression if compressor doesn't support MaxOutputLen()
     if (max_compressed_length != -1) {
       EXPECT_GE(max_compressed_length, 0);
       uint8_t* compressed = mem_pool_.Allocate(max_compressed_length);
       compressed_length = max_compressed_length;
-      EXPECT_TRUE(compressor->ProcessBlock(true, input_len,
-          input, &compressed_length, &compressed).ok());
+
+
+      EXPECT_TRUE(compressor->ProcessBlock(true, input_len, input, &compressed_length,
+                                           &compressed).ok());
     }
 
     output_len = decompressor->MaxOutputLen(compressed_length, compressed);
     if (output_len == -1) output_len = input_len;
     output = mem_pool_.Allocate(output_len);
 
-    EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length,
-        compressed, &output_len, &output).ok());
+    EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length, compressed,
+                                           &output_len, &output).ok());
 
     EXPECT_EQ(output_len, input_len);
     EXPECT_EQ(memcmp(input, output, input_len), 0);
   }
 
- // Only tests compressors and decompressors with allocated output.
+  // Only tests compressors and decompressors with allocated output.
   void CompressAndDecompressNoOutputAllocated(Codec* compressor,
-      Codec* decompressor, int input_len, uint8_t* input) {
+      Codec* decompressor, int64_t input_len, uint8_t* input) {
     // Preallocated output buffers for compressor
-    int max_compressed_length = compressor->MaxOutputLen(input_len, input);
+    int64_t max_compressed_length = compressor->MaxOutputLen(input_len, input);
     uint8_t* compressed = mem_pool_.Allocate(max_compressed_length);
-    int compressed_length = max_compressed_length;
+    int64_t compressed_length = max_compressed_length;
 
-    EXPECT_TRUE(compressor->ProcessBlock(true, input_len,
-        input, &compressed_length, &compressed).ok());
+    EXPECT_TRUE(compressor->ProcessBlock(true, input_len, input, &compressed_length,
+                                         &compressed).ok());
 
-    int output_len = decompressor->MaxOutputLen(compressed_length, compressed);
+    int64_t output_len = decompressor->MaxOutputLen(compressed_length, compressed);
     if (output_len == -1) output_len = input_len;
     uint8_t* output = mem_pool_.Allocate(output_len);
 
-    EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length,
-        compressed, &output_len, &output).ok());
+    EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length, compressed,
+                                           &output_len, &output).ok());
 
     EXPECT_EQ(output_len, input_len);
     EXPECT_EQ(memcmp(input, output, input_len), 0);
