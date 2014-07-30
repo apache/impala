@@ -207,6 +207,68 @@ struct TSortNode {
   3: optional i64 offset
 }
 
+enum TAnalyticWindowType {
+  // Specifies the window as a logical offset
+  RANGE,
+
+  // Specifies the window in physical units
+  ROWS
+}
+
+enum TAnalyticWindowBoundaryType {
+  // The window starts/ends at the current row.
+  CURRENT_ROW,
+
+  // The window starts/ends at an offset preceding current row.
+  PRECEDING,
+
+  // The window starts/ends at an offset following current row.
+  FOLLOWING
+}
+
+struct TAnalyticWindowBoundary {
+  1: required TAnalyticWindowBoundaryType type
+
+  // Expr to supply offset value when type is PRECEDING or FOLLOWING.
+  // This should be a numeric literal.
+  2: optional Exprs.TExpr offset_expr
+}
+
+struct TAnalyticWindow {
+  1: required TAnalyticWindowType window_type
+
+  // Absence indicates window start is UNBOUNDED PRECEDING.
+  2: optional TAnalyticWindowBoundary window_start
+
+  // Absence indicates window end is UNBOUNDED FOLLOWING.
+  3: optional TAnalyticWindowBoundary window_end
+}
+
+// Defines one or more analytic functions that share the same window, partitioning
+// expressions and order-by expressions.
+struct TAnalyticExprInfo {
+  // Exprs on which the analytic function input is partitioned. Input is already sorted
+  // on partitions and order by clauses, partition_exprs is used to identify partition
+  // boundaries. Empty if no partition clause is specified.
+  1: required list<Exprs.TExpr> partition_exprs
+
+  // Exprs specified by an order-by clause for RANGE windows. Used to evaluate RANGE
+  // window boundaries. Empty if no order-by clause is specified or for windows
+  // specifying ROWS.
+  2: required list<Exprs.TExpr> order_by_exprs
+
+  // Functions evaluated over the window for each input row. The root of each expr is
+  // the aggregate function. Child exprs are the inputs to the function.
+  3: required list<Exprs.TExpr> analytic_functions
+
+  // Window specification
+  4: optional TAnalyticWindow window
+}
+
+struct TAnalyticNode {
+  1: required list<TAnalyticExprInfo> analytic_exprs
+}
+
 struct TUnionNode {
   // A UnionNode materializes all const/result exprs into this tuple.
   1: required Types.TTupleId tuple_id
@@ -253,6 +315,7 @@ struct TPlanNode {
   13: optional TSortNode sort_node
   14: optional TUnionNode union_node
   15: optional TExchangeNode exchange_node
+  20: optional TAnalyticNode analytic_node
 
   // Label that should be used to print this node to the user.
   17: optional string label
