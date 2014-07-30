@@ -73,6 +73,7 @@ class TestInsertWideTable(ImpalaTestSuite):
         cluster_sizes=[0], disable_codegen_options=[True, False], batch_sizes=[0]))
 
     # Inserts only supported on text and parquet
+    # TODO: Enable 'text'/codec once the compressed text writers are in.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'parquet' or \
         v.get_value('table_format').file_format == 'text')
@@ -126,6 +127,7 @@ class TestUnsupportedInsertFormats(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestUnsupportedInsertFormats, cls).add_test_dimensions()
     # Only run on file formats we can't write to
+    # TODO: Remove the 'text'/codec combination once the compressed text writers are in.
     cls.TestMatrix.add_constraint(lambda v: \
         not (v.get_value('table_format').file_format == 'parquet' or
              v.get_value('table_format').file_format == 'hbase' or
@@ -136,6 +138,12 @@ class TestUnsupportedInsertFormats(ImpalaTestSuite):
     try:
       self.execute_query_using_client(
         self.client, 'insert into table tinytable values("hi", "there")', vector)
+      # TODO: Remove once the compressed text writers are in.
+      if (vector.get_value('table_format').file_format == 'text' and
+          vector.get_value('table_format').compression_codec != 'none'):
+        pytest.xfail("Until compressed text writers are implemented, inserting to text "
+                      "will ignore compression type and succeed by inserting "
+                      "uncompressed text.")
       assert False, 'Query was expected to fail'
     except ImpalaBeeswaxException, e: pass
 

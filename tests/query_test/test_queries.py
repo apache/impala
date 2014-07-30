@@ -15,8 +15,8 @@ class TestQueries(ImpalaTestSuite):
 
   def test_distinct(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
-      pytest.xfail(("HBase returns columns in alphabetical order for select distinct *, "
-                    "making result verication fail."))
+      pytest.xfail("HBase returns columns in alphabetical order for select distinct *, "
+                    "making result verication fail.")
     self.run_test_case('QueryTest/distinct', vector)
 
   def test_exprs(self, vector):
@@ -84,8 +84,8 @@ class TestQueries(ImpalaTestSuite):
 
   def test_subquery(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
-      pytest.xfail(("jointbl does not have columns with unique values, "
-                    "hbase collapses them"))
+      pytest.xfail("jointbl does not have columns with unique values, "
+                    "hbase collapses them")
     self.run_test_case('QueryTest/subquery', vector)
 
   def test_subquery_limit(self, vector):
