@@ -57,11 +57,20 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const vector<HdfsFileDesc*>& files) {
   vector<DiskIoMgr::ScanRange*> compressed_text_scan_ranges;
   vector<HdfsFileDesc*> lzo_text_files;
+  bool warning_written = false;
   for (int i = 0; i < files.size(); ++i) {
+    warning_written = false;
     THdfsCompression::type compression = files[i]->file_compression;
     switch (compression) {
+      case THdfsCompression::NONE:
+        // For uncompressed text we just issue all ranges at once.
+        // TODO: Lz4 is splittable, should be treated similarly.
+        RETURN_IF_ERROR(scan_node->AddDiskIoRanges(files[i]));
+        break;
+
       case THdfsCompression::GZIP:
       case THdfsCompression::SNAPPY:
+      case THdfsCompression::SNAPPY_BLOCKED:
       case THdfsCompression::BZIP2:
         for (int j = 0; j < files[i]->splits.size(); ++j) {
           // In order to decompress gzip-, snappy- and bzip2-compressed text files, we
@@ -71,12 +80,18 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 
           // We only process the split that starts at offset 0.
           if (split->offset() != 0) {
-            // We are expecting each file to be one hdfs block (so all the scan range
-            // offsets should be 0).  This is not incorrect but we will issue a warning.
-            stringstream ss;
-            ss << "Gzip- or Snappy-compressed file should not be split into multiple "
-               << "hdfs-blocks. file=" << files[i]->filename;
-            scan_node->runtime_state()->LogError(ss.str());
+            if (!warning_written) {
+              // We are expecting each file to be one hdfs block (so all the scan range
+              // offsets should be 0).  This is not incorrect but we will issue a warning.
+              // We write a single warning per file per impalad to reduce the number of
+              // log warnings.
+              stringstream ss;
+              ss << "For better performance, snappy, gzip and bzip-compressed files "
+                 << "should not be split into multiple hdfs-blocks. file="
+                 << files[i]->filename << " offset " << split->offset();
+              scan_node->runtime_state()->LogError(ss.str());
+              warning_written = true;
+            }
             // We assign the entire file to one scan range, so mark all but one split
             // (i.e. the first split) as complete.
             scan_node->RangeComplete(THdfsFileFormat::TEXT, compression);
@@ -102,9 +117,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
         break;
 
       default:
-        // For uncompressed text we just issue all ranges at once.
-        // TODO: Lz4 is splittable, should be treated similarly.
-        RETURN_IF_ERROR(scan_node->AddDiskIoRanges(files[i]));
+        DCHECK(false);
     }
   }
 
@@ -230,10 +243,10 @@ Status HdfsTextScanner::FinishScanRange() {
     }
 
     if (!status.ok() || byte_buffer_read_size_ == 0) {
-      stringstream ss;
       if (status.IsCancelled()) return status;
 
       if (!status.ok()) {
+        stringstream ss;
         ss << "Read failed while trying to finish scan range: " << stream_->filename()
            << ":" << stream_->file_offset() << endl << status.GetErrorMsg();
         if (state_->LogHasSpace()) state_->LogError(ss.str());
@@ -382,12 +395,14 @@ Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
 
     // For gzip and snappy it needs to read the entire file.
     if ((decompression_type_ == THdfsCompression::GZIP ||
-         decompression_type_ == THdfsCompression::SNAPPY) &&
+         decompression_type_ == THdfsCompression::SNAPPY ||
+         decompression_type_ == THdfsCompression::SNAPPY_BLOCKED ||
+         decompression_type_ == THdfsCompression::BZIP2) &&
         (file_size < byte_buffer_read_size_)) {
       stringstream ss;
-      ss << "Expected to read a gzip- and snappy-compressed file of size " << file_size
-         << " bytes. But only read " << byte_buffer_read_size_ << " bytes. This may "
-         << "indicate data file corruption. (file: " << stream_->filename() << ").";
+      ss << "Expected to read a compressed text file of size " << file_size << " bytes. "
+         << "But only read " << byte_buffer_read_size_ << " bytes. This may indicate "
+         << "data file corruption. (file: " << stream_->filename() << ").";
       return Status(ss.str());
     }
     if (decompression_type_ == THdfsCompression::SNAPPY) {
