@@ -193,6 +193,17 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   virtual void GetLog(apache::hive::service::cli::thrift::TGetLogResp& return_val,
       const apache::hive::service::cli::thrift::TGetLogReq& request);
 
+  // These function are not implemented.
+  virtual void GetDelegationToken(
+      apache::hive::service::cli::thrift::TGetDelegationTokenResp& return_val,
+      const apache::hive::service::cli::thrift::TGetDelegationTokenReq& req);
+  virtual void CancelDelegationToken(
+      apache::hive::service::cli::thrift::TCancelDelegationTokenResp& return_val,
+      const apache::hive::service::cli::thrift::TCancelDelegationTokenReq& req);
+  virtual void RenewDelegationToken(
+      apache::hive::service::cli::thrift::TRenewDelegationTokenResp& return_val,
+      const apache::hive::service::cli::thrift::TRenewDelegationTokenReq& req);
+
   // ImpalaService common extensions (implemented in impala-server.cc)
   // ImpalaInternalService rpcs
   virtual void ExecPlanFragment(

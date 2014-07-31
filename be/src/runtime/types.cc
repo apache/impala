@@ -110,29 +110,82 @@ string TypeToOdbcString(PrimitiveType t) {
   return "unknown";
 }
 
-TTypeId::type TypeToHiveServer2Type(PrimitiveType t) {
-  switch (t) {
+TTypeEntry ColumnType::ToHs2Type() const {
+  TTypeEntry result;
+  result.__isset.primitiveEntry = true;
+
+  switch (type) {
     // Map NULL_TYPE to BOOLEAN, otherwise Hive's JDBC driver won't
     // work for queries like "SELECT NULL" (IMPALA-914).
-    case TYPE_NULL: return TTypeId::BOOLEAN_TYPE;
-    case TYPE_BOOLEAN: return TTypeId::BOOLEAN_TYPE;
-    case TYPE_TINYINT: return TTypeId::TINYINT_TYPE;
-    case TYPE_SMALLINT: return TTypeId::SMALLINT_TYPE;
-    case TYPE_INT: return TTypeId::INT_TYPE;
-    case TYPE_BIGINT: return TTypeId::BIGINT_TYPE;
-    case TYPE_FLOAT: return TTypeId::FLOAT_TYPE;
-    case TYPE_DOUBLE: return TTypeId::DOUBLE_TYPE;
-    case TYPE_TIMESTAMP: return TTypeId::TIMESTAMP_TYPE;
-    case TYPE_STRING: return TTypeId::STRING_TYPE;
-    case TYPE_BINARY: return TTypeId::BINARY_TYPE;
-    case TYPE_DECIMAL: return TTypeId::DECIMAL_TYPE;
-    // TODO: update when hs2 has char(n)
-    case TYPE_CHAR: return TTypeId::STRING_TYPE;
+    case TYPE_NULL:
+      result.primitiveEntry.type = TTypeId::BOOLEAN_TYPE;
+      break;
+    case TYPE_BOOLEAN:
+      result.primitiveEntry.type = TTypeId::BOOLEAN_TYPE;
+      break;
+    case TYPE_TINYINT:
+      result.primitiveEntry.type = TTypeId::TINYINT_TYPE;
+      break;
+    case TYPE_SMALLINT:
+      result.primitiveEntry.type = TTypeId::SMALLINT_TYPE;
+      break;
+    case TYPE_INT:
+      result.primitiveEntry.type = TTypeId::INT_TYPE;
+      break;
+    case TYPE_BIGINT:
+      result.primitiveEntry.type = TTypeId::BIGINT_TYPE;
+      break;
+    case TYPE_FLOAT:
+      result.primitiveEntry.type = TTypeId::FLOAT_TYPE;
+      break;
+    case TYPE_DOUBLE:
+      result.primitiveEntry.type = TTypeId::DOUBLE_TYPE;
+      break;
+    case TYPE_TIMESTAMP:
+      result.primitiveEntry.type = TTypeId::TIMESTAMP_TYPE;
+      break;
+    case TYPE_STRING:
+      result.primitiveEntry.type = TTypeId::STRING_TYPE;
+      break;
+    case TYPE_BINARY:
+      result.primitiveEntry.type = TTypeId::BINARY_TYPE;
+      break;
+    case TYPE_DECIMAL: {
+      result.primitiveEntry.type = TTypeId::DECIMAL_TYPE;
+
+      TTypeQualifierValue tprecision;
+      tprecision.i32Value = precision;
+      tprecision.__isset.i32Value = true;
+
+      TTypeQualifierValue tscale;
+      tscale.i32Value = scale;
+      tscale.__isset.i32Value = true;
+
+      result.primitiveEntry.__isset.typeQualifiers = true;
+      // Note: these constants need to match what is the thrift file but the
+      // generated cpp doesn't seem to include the constants.
+      result.primitiveEntry.typeQualifiers.qualifiers["precision"] = tprecision;
+      result.primitiveEntry.typeQualifiers.qualifiers["scale"] = tscale;
+      break;
+    }
+    case TYPE_CHAR: {
+      result.primitiveEntry.type = TTypeId::CHAR_TYPE;
+
+      TTypeQualifierValue tmax_len;
+      tmax_len.i32Value = len;
+      tmax_len.__isset.i32Value = true;
+
+      result.primitiveEntry.__isset.typeQualifiers = true;
+      result.primitiveEntry.typeQualifiers.qualifiers["characterMaximumLength"] =
+          tmax_len;
+      break;
+    }
     default:
       // HiveServer2 does not have a type for invalid, date and datetime.
-      DCHECK(false) << "bad TypeToTValueType() type: " << TypeToString(t);
-      return TTypeId::STRING_TYPE;
+      DCHECK(false) << "bad TypeToTValueType() type: " << DebugString();
+      result.primitiveEntry.type = TTypeId::STRING_TYPE;
   };
+  return result;
 }
 
 string ColumnType::DebugString() const {

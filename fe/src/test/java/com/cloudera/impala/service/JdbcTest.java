@@ -222,6 +222,17 @@ public class JdbcTest {
     rs.close();
   }
 
+  @Test
+  public void testDecimalGetColumnTypes() throws SQLException {
+    // Table has 5 decimal columns
+    ResultSet rs = con_.createStatement().executeQuery(
+        "select * from functional.decimal_tbl");
+    assertEquals(rs.getMetaData().getColumnCount(), 6);
+    for (int i = 1; i <= 6; ++i) {
+      assertEquals(rs.getMetaData().getColumnType(i), Types.DECIMAL);
+    }
+  }
+
   /**
    * Validate the Metadata for the result set of a metadata getColumns call.
    */
@@ -279,7 +290,7 @@ public class JdbcTest {
   }
 
   @Test
-  public void testRegressions() throws SQLException {
+  public void testSelectNull() throws SQLException {
     // Regression test for IMPALA-914.
     ResultSet rs = con_.createStatement().executeQuery("select NULL");
     // Expect the column to be of type BOOLEAN to be compatible with Hive.

@@ -385,7 +385,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   return_val.__isset.configuration = true;
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
-  return_val.serverProtocolVersion = TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1;
+  return_val.serverProtocolVersion = TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V4;
 }
 
 void ImpalaServer::CloseSession(TCloseSessionResp& return_val,
@@ -756,10 +756,8 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
             result_set_md->columns[i].columnName);
         return_val.schema.columns[i].position = i;
         return_val.schema.columns[i].typeDesc.types.resize(1);
-        return_val.schema.columns[i].typeDesc.types[0].__isset.primitiveEntry = true;
-        ColumnType col_type(result_set_md->columns[i].columnType);
-        return_val.schema.columns[i].typeDesc.types[0].primitiveEntry.__set_type(
-            TypeToHiveServer2Type(col_type.type));
+        ColumnType t(result_set_md->columns[i].columnType);
+        return_val.schema.columns[i].typeDesc.types[0] = t.ToHs2Type();
       }
     }
   }
@@ -838,6 +836,27 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   return_val.log = ss.str();
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
+}
+
+void ImpalaServer::GetDelegationToken(TGetDelegationTokenResp& return_val,
+  const TGetDelegationTokenReq& req) {
+  return_val.status.__set_statusCode(
+      apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
+  return_val.status.__set_errorMessage("Not implemented");
+}
+
+void ImpalaServer::CancelDelegationToken(TCancelDelegationTokenResp& return_val,
+  const TCancelDelegationTokenReq& req) {
+  return_val.status.__set_statusCode(
+      apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
+  return_val.status.__set_errorMessage("Not implemented");
+}
+
+void ImpalaServer::RenewDelegationToken(TRenewDelegationTokenResp& return_val,
+  const TRenewDelegationTokenReq& req) {
+  return_val.status.__set_statusCode(
+      apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
+  return_val.status.__set_errorMessage("Not implemented");
 }
 
 void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col_val,
