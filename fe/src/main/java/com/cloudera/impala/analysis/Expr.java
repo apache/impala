@@ -829,7 +829,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     if (!targetType.isDecimal()) {
       // requested cast must be to assignment-compatible type
       // (which implies no loss of precision)
-      Preconditions.checkArgument(targetType.equals(type));
+      Preconditions.checkArgument(targetType.equals(type),
+          "targetType=" + targetType + " type=" + type);
     }
     return uncheckedCastTo(targetType);
   }

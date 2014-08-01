@@ -1385,6 +1385,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select a.smallint_col from functional.alltypes a " +
         "union select a.int_col from functional.alltypessmall",
         "unknown table alias 'a' in column reference 'a.int_col'");
+
+    // Regression test for IMPALA-1128, union of decimal and an int type that converts
+    // to the identical decimal.
+    AnalyzesOk("select CAST(1 AS BIGINT) UNION SELECT CAST(1 AS DECIMAL(19, 0))");
   }
 
   @Test
