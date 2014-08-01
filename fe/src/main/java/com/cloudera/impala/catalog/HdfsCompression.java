@@ -41,11 +41,8 @@ public enum HdfsCompression {
     }
 
     String suffix = fileName.substring(index + 1);
-    if (SUFFIX_MAP.containsKey(suffix)) {
-      return SUFFIX_MAP.get(suffix);
-    }
-
-    return NONE;
+    HdfsCompression compression = SUFFIX_MAP.get(suffix.toLowerCase());
+    return compression == null ? NONE : compression;
   }
 
   public THdfsCompression toThrift() {

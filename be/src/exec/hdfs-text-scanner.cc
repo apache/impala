@@ -111,9 +111,18 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 
       case THdfsCompression::LZO:
         // lzo-compressed text need to be processed by the specialized HdfsLzoTextScanner.
-        // Note that any LZO_INDEX files will filtered by the planner.
-        DCHECK(!ends_with(files[i]->filename, LZO_INDEX_SUFFIX));
-        lzo_text_files.push_back(files[i]);
+        // Note that any LZO_INDEX files (no matter what the case of their suffix) will be
+        // filtered by the planner.
+        {
+        #ifndef NDEBUG
+          // No straightforward way to do this in one line inside a DCHECK, so for once
+          // we'll explicitly use NDEBUG to avoid executing debug-only code.
+          string lower_filename = files[i]->filename;
+          to_lower(lower_filename);
+          DCHECK(!ends_with(lower_filename, LZO_INDEX_SUFFIX));
+        #endif
+          lzo_text_files.push_back(files[i]);
+        }
         break;
 
       default:
