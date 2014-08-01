@@ -118,10 +118,6 @@ class ImpalaShell(cmd.Cmd):
 
     self.set_query_options = {}
 
-    if options.strict_unicode:
-      self.utf8_encode_policy = 'strict'
-    else:
-      self.utf8_encode_policy = 'ignore'
     self._populate_command_list()
 
     self.imp_client = None;
@@ -367,7 +363,7 @@ class ImpalaShell(cmd.Cmd):
       # If cmdqueue is populated, then commands are executed from the cmdqueue, and user
       # input is ignored. Send an empty string as the user input just to be safe.
       return str()
-    return args.encode('utf-8', self.utf8_encode_policy)
+    return args.encode('utf-8')
 
   def postcmd(self, status, args):
     """Hack to make non interactive mode work"""
@@ -734,10 +730,10 @@ class ImpalaShell(cmd.Cmd):
     Should be called after the query has finished and before data is fetched. All data
     is left aligned.
     """
-    table = prettytable.PrettyTable()
-    if column_names is not None:
-      for column in column_names:
-        table.add_column(column, [])
+    table = ImpalaPrettyTable()
+    for column in column_names:
+      # Column names may be encoded as utf-8
+      table.add_column(column.decode('utf-8', 'ignore'), [])
     table.align = "l"
     return table
 

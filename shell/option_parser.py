@@ -134,11 +134,6 @@ def get_option_parser(defaults):
                           "Specifying this option within a config file will have "
                           "no effect. Only specify this as a option in the commandline."
                           ))
-  parser.add_option("--strict_unicode", dest="strict_unicode",
-                    action="store_true",
-                    help=("If true, non UTF-8 compatible input "
-                          "characters are rejected by the shell. If false, such characters are"
-                          " silently ignored."))
 
   # add default values to the help text
   for option in parser.option_list:
