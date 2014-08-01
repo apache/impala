@@ -130,6 +130,9 @@ class PlanFragmentExecutor {
   // Profile information for plan and output sink.
   RuntimeProfile* profile();
 
+  // Name of the counter that is tracking per query, per host peak mem usage.
+  static const std::string PER_HOST_PEAK_MEM_COUNTER;
+
  private:
   ExecEnv* exec_env_;  // not owned
   ExecNode* plan_;  // lives in runtime_state_->obj_pool()
@@ -178,6 +181,12 @@ class PlanFragmentExecutor {
   boost::scoped_ptr<RuntimeState> runtime_state_;
   boost::scoped_ptr<RowBatch> row_batch_;
   boost::scoped_ptr<TRowBatch> thrift_batch_;
+
+  // A counter for the per query, per host peak mem usage. Note that this is not the
+  // max of the peak memory of all fragments running on a host since it needs to take
+  // into account when they are running concurrently. All fragments for a single query
+  // on a single host will have the same value for this counter.
+  RuntimeProfile::Counter* per_host_mem_usage_;
 
   // Number of rows returned by this fragment
   RuntimeProfile::Counter* rows_produced_counter_;

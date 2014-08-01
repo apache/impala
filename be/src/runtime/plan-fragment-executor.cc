@@ -54,6 +54,8 @@ using namespace apache::thrift;
 
 namespace impala {
 
+const string PlanFragmentExecutor::PER_HOST_PEAK_MEM_COUNTER = "PerHostPeakMemUsage";
+
 PlanFragmentExecutor::PlanFragmentExecutor(ExecEnv* exec_env,
     const ReportStatusCallback& report_status_cb) :
     exec_env_(exec_env), plan_(NULL), report_status_cb_(report_status_cb),
@@ -252,6 +254,8 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   profile()->AddChild(plan_->runtime_profile());
   rows_produced_counter_ =
       ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
+  per_host_mem_usage_ =
+      ADD_COUNTER(profile(), PER_HOST_PEAK_MEM_COUNTER, TCounterType::BYTES);
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size(),
         runtime_state_->instance_mem_tracker()));
@@ -416,6 +420,9 @@ void PlanFragmentExecutor::SendReport(bool done) {
     lock_guard<mutex> l(status_lock_);
     status = status_;
   }
+
+  // Update the counter for the peak per host mem usage.
+  per_host_mem_usage_->Set(runtime_state()->query_mem_tracker()->peak_consumption());
 
   // This will send a report even if we are cancelled.  If the query completed correctly
   // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
