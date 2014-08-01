@@ -357,7 +357,8 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
     } else {
       stringstream buffer;
       buffer << tmpl.rdbuf();
-      RenderTemplate(buffer.str(), document, &output);
+      RenderTemplate(buffer.str(), Substitute("$0/", FLAGS_webserver_doc_root), document,
+          &output);
     }
   }
 
