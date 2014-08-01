@@ -1029,3 +1029,19 @@ where b.id < 5
 01:SCAN HDFS [functional.alltypessmall]
    partitions=1/4 size=1.57KB
 ====
+# Test joins with decimals with different precision and scale
+# Regression test for IMPALA-1121
+select count(*) from functional.decimal_tbl a join functional.decimal_tbl b on a.d1 = b.d5
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.d1 = b.d5
+|
+|--01:SCAN HDFS [functional.decimal_tbl b]
+|     partitions=1/1 size=195B compact
+|
+00:SCAN HDFS [functional.decimal_tbl a]
+   partitions=1/1 size=195B
+====

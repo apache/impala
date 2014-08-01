@@ -29,6 +29,8 @@ import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.Type;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TEqJoinCondition;
@@ -142,6 +144,26 @@ public class HashJoinNode extends PlanNode {
     for (Pair<Expr, Expr> c: eqJoinConjuncts_) {
       Expr eqPred = new BinaryPredicate(BinaryPredicate.Operator.EQ, c.first, c.second);
       eqPred = eqPred.substitute(combinedChildSmap, analyzer);
+      Type t0 = eqPred.getChild(0).getType();
+      Type t1 = eqPred.getChild(1).getType();
+      if (!t0.matchesType(t1)) {
+        // With decimal types, the child types do not have to match because the equality
+        // builtin handles it. However, they will not hash correctly so insert a cast.
+        Preconditions.checkState(t0.isDecimal());
+        Preconditions.checkState(t1.isDecimal());
+        Type compatibleType = Type.getAssignmentCompatibleType(t0, t1);
+        Preconditions.checkState(compatibleType.isDecimal());
+        try {
+          if (!t0.equals(compatibleType)) {
+            eqPred.setChild(0, eqPred.getChild(0).castTo(compatibleType));
+          }
+          if (!t1.equals(compatibleType)) {
+            eqPred.setChild(1, eqPred.getChild(1).castTo(compatibleType));
+          }
+        } catch (AnalysisException e) {
+          throw new InternalException("Should not happen", e);
+        }
+      }
       Preconditions.checkState(
           eqPred.getChild(0).getType().matchesType(eqPred.getChild(1).getType()));
       newEqJoinConjuncts.add(new Pair(eqPred.getChild(0), eqPred.getChild(1)));
