@@ -1,29 +1,34 @@
 ====
 ---- QUERY: TPCDS-Q3
 select
-  year(ss_date) as year_sold,
+  dt.d_year,
   item.i_brand_id brand_id,
   item.i_brand brand,
   sum(ss_ext_sales_price) sum_agg
 from
-  store_sales
-  join item on (store_sales.ss_item_sk = item.i_item_sk)
+  date_dim dt,
+  store_sales,
+  item
 where
-  item.i_manufact_id = 436
-  and (ss_date between '1998-12-01' and '1998-12-31'
-    or ss_date between '1999-12-01' and '1999-12-31'
-    or ss_date between '2000-12-01' and '2000-12-31'
-    or ss_date between '2001-12-01' and '2001-12-31'
-    or ss_date between '2002-12-01' and '2002-12-31')
+  dt.d_date_sk = store_sales.ss_sold_date_sk
+  and store_sales.ss_item_sk = item.i_item_sk
+  and item.i_manufact_id = 436
+  and dt.d_moy = 12
+  -- partition key filters
+  and (ss_sold_date_sk between 2451149 and 2451179
+    or ss_sold_date_sk between 2451514 and 2451544
+    or ss_sold_date_sk between 2451880 and 2451910
+    or ss_sold_date_sk between 2452245 and 2452275
+    or ss_sold_date_sk between 2452610 and 2452640)
 group by
-  year(ss_date),
+  dt.d_year,
   item.i_brand,
   item.i_brand_id
 order by
-  year_sold,
+  dt.d_year,
   sum_agg desc,
   brand_id
-limit 100
+limit 100;
 ---- RESULTS
 1998,2001001,'amalgimporto #1',7812.38
 1998,10014017,'edu packamalgamalg #17',888.61

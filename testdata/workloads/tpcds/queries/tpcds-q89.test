@@ -11,19 +11,22 @@ from
     s_company_name,
     d_moy,
     sum(ss_sales_price) sum_sales
+    -- avg(sum(ss_sales_price)) over (partition by i_category, i_brand, s_store_name, s_company_name) avg_monthly_sales
   from
-    store_sales
-    join item on (store_sales.ss_item_sk = item.i_item_sk)
-    join store on (store_sales.ss_store_sk = store.s_store_sk)
-    join date_dim on (store_sales.ss_sold_date_sk = date_dim.d_date_sk)
+    item,
+    store_sales,
+    date_dim,
+    store
   where
-    ss_date between '2000-01-01' and '2000-12-31'
-    and d_year in(2000)
-    and ((i_category in('Home', 'Books', 'Electronics')
-          and i_class in('wallpaper', 'parenting', 'musical'))
-        or (i_category in('Shoes', 'Jewelry', 'Men')
-            and i_class in('womens', 'birdal', 'pants'))
-        )
+    ss_item_sk = i_item_sk
+    and ss_sold_date_sk = d_date_sk
+    and ss_store_sk = s_store_sk
+    and d_year in (2000)
+    and ((i_category in ('Home', 'Books', 'Electronics')
+        and i_class in ('wallpaper', 'parenting', 'musical'))
+      or (i_category in ('Shoes', 'Jewelry', 'Men')
+        and i_class in ('womens', 'birdal', 'pants')))
+    and ss_sold_date_sk between 2451545 and 2451910  -- partition key filter
   group by
     i_category,
     i_class,
@@ -32,16 +35,18 @@ from
     s_company_name,
     d_moy
   ) tmp1
+-- where
+--   case when (avg_monthly_sales <> 0) then (abs(sum_sales - avg_monthly_sales) / avg_monthly_sales) else null end > 0.1
 order by
-  sum_sales,
-  s_store_name,
-  i_category
-limit 100
+  -- sum_sales - avg_monthly_sales,
+  sum_sales,  -- modification
+  s_store_name
+limit 100;
 ---- RESULTS
 'Electronics','musical','corpunivamalg #6','ation','Unknown',11,0.00
 'Books','parenting','corpmaxi #12','bar','Unknown',9,0.00
-'Home','wallpaper','exportinameless #6','bar','Unknown',7,0.00
 'Jewelry','birdal','amalgcorp #3','bar','Unknown',9,0.00
+'Home','wallpaper','exportinameless #6','bar','Unknown',7,0.00
 'Books','parenting','corpmaxi #8','ought','Unknown',4,0.10
 'Electronics','musical','corpunivamalg #17','ese','Unknown',9,0.12
 'Home','wallpaper','exportinameless #1','eing','Unknown',9,0.34
@@ -120,8 +125,8 @@ limit 100
 'Books','parenting','corpmaxi #5','ation','Unknown',1,4.73
 'Books','parenting','corpmaxi #2','bar','Unknown',1,4.79
 'Jewelry','birdal','amalgcorp #5','ation','Unknown',9,4.83
-'Electronics','musical','corpunivamalg #2','ought','Unknown',1,4.86
 'Home','wallpaper','exportinameless #8','ought','Unknown',11,4.86
+'Electronics','musical','corpunivamalg #2','ought','Unknown',1,4.86
 'Jewelry','birdal','amalgcorp #7','able','Unknown',8,4.89
 'Electronics','musical','corpunivamalg #7','bar','Unknown',10,5.20
 'Electronics','musical','corpunivamalg #7','ought','Unknown',11,5.20

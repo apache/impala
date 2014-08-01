@@ -9,63 +9,63 @@ CREATE TABLE store_sales_insert LIKE store_sales
 ====
 ---- QUERY: TPCDS-SS-INSERT-DAY
 # Insert a day's worth of data
-INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_date)
+INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_sold_date_sk)
 SELECT * FROM store_sales
-WHERE ss_date = '1999-03-01'
+WHERE ss_sold_date_sk = 2451239
 ---- RESULTS
-ss_date=1999-03-01/: 847
+ss_sold_date_sk=2451239/: 847
 ====
 ---- QUERY: TPCDS-SS-INSERT-MONTH
-INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_date)
+INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_sold_date_sk)
 SELECT * FROM store_sales
-WHERE ss_date >= '1999-04-01' and ss_date <= '1999-04-30'
+WHERE ss_sold_date_sk >= 2451270 and ss_sold_date_sk <= 2451299
 ---- RESULTS
-ss_date=1999-04-15/: 794
-ss_date=1999-04-01/: 822
+ss_sold_date_sk=2451284/: 794
+ss_sold_date_sk=2451270/: 822
 ====
 ---- QUERY: TPCDS-SS-INSERT-QUARTER
-INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_date)
+INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_sold_date_sk)
 SELECT * FROM store_sales
-WHERE ss_date >= '1999-09-01' and ss_date <= '1999-12-31'
+WHERE ss_sold_date_sk >= 2451423 and ss_sold_date_sk <= 2451544
 ---- RESULTS
-ss_date=1999-10-01/: 1941
-ss_date=1999-11-01/: 2075
-ss_date=1999-09-01/: 1881
-ss_date=1999-11-15/: 3007
-ss_date=1999-12-15/: 3144
-ss_date=1999-10-15/: 1908
-ss_date=1999-09-15/: 1989
-ss_date=1999-12-01/: 2980
+ss_sold_date_sk=2451437/: 1989
+ss_sold_date_sk=2451528/: 3144
+ss_sold_date_sk=2451423/: 1881
+ss_sold_date_sk=2451453/: 1941
+ss_sold_date_sk=2451467/: 1908
+ss_sold_date_sk=2451514/: 2980
+ss_sold_date_sk=2451484/: 2075
+ss_sold_date_sk=2451498/: 3007
 ====
 ---- QUERY: TPCDS-SS-INSERT-YEAR
-INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_date)
+INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_sold_date_sk)
 SELECT * FROM store_sales
-WHERE ss_date >= '2000-01-01' and ss_date < '2001-01-01'
+WHERE ss_sold_date_sk >= 2451545 and ss_sold_date_sk < 2451911
 ---- RESULTS
-ss_date=2000-08-15/: 1985
-ss_date=2000-02-01/: 819
-ss_date=2000-12-15/: 2999
-ss_date=2000-07-15/: 855
-ss_date=2000-01-15/: 867
-ss_date=2000-11-15/: 2975
-ss_date=2000-01-01/: 2743
-ss_date=2000-02-15/: 1004
-ss_date=2000-06-15/: 714
-ss_date=2000-11-01/: 2184
-ss_date=2000-05-15/: 953
-ss_date=2000-06-01/: 809
-ss_date=2000-08-01/: 1071
-ss_date=2000-09-15/: 2306
-ss_date=2000-10-01/: 1753
-ss_date=2000-09-01/: 1984
-ss_date=2000-04-01/: 1001
-ss_date=2000-10-15/: 1629
-ss_date=2000-04-15/: 751
-ss_date=2000-03-15/: 923
-ss_date=2000-03-01/: 707
-ss_date=2000-12-01/: 2966
-ss_date=2000-07-01/: 990
-ss_date=2000-05-01/: 868
+ss_sold_date_sk=2451789/: 1984
+ss_sold_date_sk=2451758/: 1071
+ss_sold_date_sk=2451850/: 2184
+ss_sold_date_sk=2451680/: 953
+ss_sold_date_sk=2451636/: 1001
+ss_sold_date_sk=2451590/: 1004
+ss_sold_date_sk=2451619/: 923
+ss_sold_date_sk=2451727/: 990
+ss_sold_date_sk=2451741/: 855
+ss_sold_date_sk=2451697/: 809
+ss_sold_date_sk=2451576/: 819
+ss_sold_date_sk=2451894/: 2999
+ss_sold_date_sk=2451650/: 751
+ss_sold_date_sk=2451864/: 2975
+ss_sold_date_sk=2451880/: 2966
+ss_sold_date_sk=2451772/: 1985
+ss_sold_date_sk=2451605/: 707
+ss_sold_date_sk=2451833/: 1629
+ss_sold_date_sk=2451666/: 868
+ss_sold_date_sk=2451545/: 2743
+ss_sold_date_sk=2451819/: 1753
+ss_sold_date_sk=2451711/: 714
+ss_sold_date_sk=2451559/: 867
+ss_sold_date_sk=2451803/: 2306
 ====
 ---- QUERY: TPCDS-SS-INSERT-VERIFY
 SELECT COUNT(*) FROM store_sales_insert

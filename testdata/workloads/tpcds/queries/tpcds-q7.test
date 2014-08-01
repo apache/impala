@@ -7,22 +7,28 @@ select
   avg(ss_coupon_amt) agg3,
   avg(ss_sales_price) agg4
 from
-  store_sales
-  join customer_demographics on (store_sales.ss_cdemo_sk = customer_demographics.cd_demo_sk)
-  join item on (store_sales.ss_item_sk = item.i_item_sk)
-  join promotion on (store_sales.ss_promo_sk = promotion.p_promo_sk)
+  store_sales,
+  customer_demographics,
+  date_dim,
+  item,
+  promotion
 where
-  cd_gender = 'F'
+  ss_sold_date_sk = d_date_sk
+  and ss_item_sk = i_item_sk
+  and ss_cdemo_sk = cd_demo_sk
+  and ss_promo_sk = p_promo_sk
+  and cd_gender = 'F'
   and cd_marital_status = 'W'
   and cd_education_status = 'Primary'
   and (p_channel_email = 'N'
     or p_channel_event = 'N')
-  and ss_date between '1998-01-01' and '1998-12-31'
+  and d_year = 1998
+  and ss_sold_date_sk between 2450815 and 2451179 -- partition key filter
 group by
   i_item_id
 order by
-  i_item_id 
-limit 100
+  i_item_id
+limit 100;
 ---- RESULTS
 'AAAAAAAAAAKBAAAA',7,87.58,64.06,16.64
 'AAAAAAAAAAPBAAAA',6,87.26,NULL,NULL

@@ -1,6 +1,6 @@
 ====
 ---- QUERY: TPCDS-Q46
-SELECT
+select
   c_last_name,
   c_first_name,
   ca_city,
@@ -8,448 +8,177 @@ SELECT
   ss_ticket_number,
   amt,
   profit
-FROM
-  (SELECT
+from
+  (select
     ss_ticket_number,
     ss_customer_sk,
     ca_city bought_city,
-    SUM(ss_coupon_amt) amt,
-    SUM(ss_net_profit) profit
-  FROM store_sales ss
-  JOIN date_dim d
-    ON (ss.ss_sold_date_sk = d.d_date_sk)
-  JOIN household_demographics hd
-    ON (ss.ss_hdemo_sk = hd.hd_demo_sk)
-  JOIN customer_address ca
-    ON (ss.ss_addr_sk = ca.ca_address_sk)
-  JOIN store s
-    ON (ss.ss_store_sk = s.s_store_sk)
-  WHERE
-    (hd.hd_dep_count = 9
-      OR hd.hd_vehicle_count = 0)
-    AND d.d_dow IN (6, 0)
-    AND d.d_year IN (1999, 1999 + 1, 1999 + 2)
-    AND s.s_city IN ('Oak Grove', 'Fairview', 'Midway', 'Five Points', 'Fairview')
-  GROUP BY
+    sum(ss_coupon_amt) amt,
+    sum(ss_net_profit) profit
+  from
+    store_sales,
+    date_dim,
+    store,
+    household_demographics,
+    customer_address
+  where
+    store_sales.ss_sold_date_sk = date_dim.d_date_sk
+    and store_sales.ss_store_sk = store.s_store_sk
+    and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+    and store_sales.ss_addr_sk = customer_address.ca_address_sk
+    and (household_demographics.hd_dep_count = 5
+      or household_demographics.hd_vehicle_count = 3)
+    and date_dim.d_dow in (6, 0)
+    and date_dim.d_year in (1999, 1999 + 1, 1999 + 2)
+    and store.s_city in ('Midway', 'Concord', 'Spring Hill', 'Brownsville', 'Greenville')
+    -- partition key filter
+    and ss_sold_date_sk in (2451181, 2451182, 2451188, 2451189, 2451195, 2451196, 2451202, 2451203, 2451209, 2451210, 2451216, 2451217, 
+                            2451223, 2451224, 2451230, 2451231, 2451237, 2451238, 2451244, 2451245, 2451251, 2451252, 2451258, 2451259, 
+                            2451265, 2451266, 2451272, 2451273, 2451279, 2451280, 2451286, 2451287, 2451293, 2451294, 2451300, 2451301, 
+                            2451307, 2451308, 2451314, 2451315, 2451321, 2451322, 2451328, 2451329, 2451335, 2451336, 2451342, 2451343, 
+                            2451349, 2451350, 2451356, 2451357, 2451363, 2451364, 2451370, 2451371, 2451377, 2451378, 2451384, 2451385, 
+                            2451391, 2451392, 2451398, 2451399, 2451405, 2451406, 2451412, 2451413, 2451419, 2451420, 2451426, 2451427, 
+                            2451433, 2451434, 2451440, 2451441, 2451447, 2451448, 2451454, 2451455, 2451461, 2451462, 2451468, 2451469, 
+                            2451475, 2451476, 2451482, 2451483, 2451489, 2451490, 2451496, 2451497, 2451503, 2451504, 2451510, 2451511, 
+                            2451517, 2451518, 2451524, 2451525, 2451531, 2451532, 2451538, 2451539, 2451545, 2451546, 2451552, 2451553, 
+                            2451559, 2451560, 2451566, 2451567, 2451573, 2451574, 2451580, 2451581, 2451587, 2451588, 2451594, 2451595, 
+                            2451601, 2451602, 2451608, 2451609, 2451615, 2451616, 2451622, 2451623, 2451629, 2451630, 2451636, 2451637, 
+                            2451643, 2451644, 2451650, 2451651, 2451657, 2451658, 2451664, 2451665, 2451671, 2451672, 2451678, 2451679, 
+                            2451685, 2451686, 2451692, 2451693, 2451699, 2451700, 2451706, 2451707, 2451713, 2451714, 2451720, 2451721, 
+                            2451727, 2451728, 2451734, 2451735, 2451741, 2451742, 2451748, 2451749, 2451755, 2451756, 2451762, 2451763, 
+                            2451769, 2451770, 2451776, 2451777, 2451783, 2451784, 2451790, 2451791, 2451797, 2451798, 2451804, 2451805, 
+                            2451811, 2451812, 2451818, 2451819, 2451825, 2451826, 2451832, 2451833, 2451839, 2451840, 2451846, 2451847, 
+                            2451853, 2451854, 2451860, 2451861, 2451867, 2451868, 2451874, 2451875, 2451881, 2451882, 2451888, 2451889, 
+                            2451895, 2451896, 2451902, 2451903, 2451909, 2451910, 2451916, 2451917, 2451923, 2451924, 2451930, 2451931, 
+                            2451937, 2451938, 2451944, 2451945, 2451951, 2451952, 2451958, 2451959, 2451965, 2451966, 2451972, 2451973, 
+                            2451979, 2451980, 2451986, 2451987, 2451993, 2451994, 2452000, 2452001, 2452007, 2452008, 2452014, 2452015, 
+                            2452021, 2452022, 2452028, 2452029, 2452035, 2452036, 2452042, 2452043, 2452049, 2452050, 2452056, 2452057, 
+                            2452063, 2452064, 2452070, 2452071, 2452077, 2452078, 2452084, 2452085, 2452091, 2452092, 2452098, 2452099, 
+                            2452105, 2452106, 2452112, 2452113, 2452119, 2452120, 2452126, 2452127, 2452133, 2452134, 2452140, 2452141, 
+                            2452147, 2452148, 2452154, 2452155, 2452161, 2452162, 2452168, 2452169, 2452175, 2452176, 2452182, 2452183, 
+                            2452189, 2452190, 2452196, 2452197, 2452203, 2452204, 2452210, 2452211, 2452217, 2452218, 2452224, 2452225, 
+                            2452231, 2452232, 2452238, 2452239, 2452245, 2452246, 2452252, 2452253, 2452259, 2452260, 2452266, 2452267, 
+                            2452273, 2452274)
+  group by
     ss_ticket_number,
     ss_customer_sk,
     ss_addr_sk,
     ca_city
-  ) dn
-JOIN customer c
-  ON (dn.ss_customer_sk = c.c_customer_sk)
-JOIN customer_address current_addr
-  ON (c.c_current_addr_sk = current_addr.ca_address_sk)
-WHERE
-  current_addr.ca_city <> dn.bought_city
-ORDER BY
+  ) dn,
+  customer,
+  customer_address current_addr
+where
+  ss_customer_sk = c_customer_sk
+  and customer.c_current_addr_sk = current_addr.ca_address_sk
+  and current_addr.ca_city <> bought_city
+order by
   c_last_name,
   c_first_name,
   ca_city,
   bought_city,
   ss_ticket_number
-LIMIT 400;
+limit 100;
 ---- RESULTS
+'','','','Bunker Hill',133136,4983.83,-11549.37
 '','','','Woodville',50899,8655.31,-10609.16
-'','','Concord','Riverside',65286,140.56,-9155.92
-'','','Fairfield','Buena Vista',206782,825.25,-14556.30
-'','','Glendale','Mount Pleasant',159389,2415.56,-12041.36
-'','','Harmony','Wilson',104502,259.16,1302.55
-'','','Jackson','Hopewell',231126,0.00,-2146.68
-'','','La Grange','Pleasant Valley',73175,4021.98,-14274.89
-'','','Lakewood','Woodland',135684,1519.51,-10024.95
+'','','Centerville','Providence',62604,156.21,-13626.64
+'','','Clifton','White Oak',59712,2292.43,-16908.54
+'','','Crossroads','Unionville',58203,1393.55,-11986.88
 '','','Louisville','Lakeside',139327,3800.99,-10089.61
+'','','Oakwood','Woodville',111282,359.16,-15852.70
 '','','Pleasant Hill','Waterloo',156554,277.78,-3118.59
-'','','Salem','Mechanicsburg',15465,51.48,2684.71
-'','','Springdale','Deerfield',13547,648.82,-6644.93
+'','','Pleasant Valley','Bunker Hill',18775,2344.98,-1692.61
+'','','Shiloh','Oakland',46266,1622.69,-10676.15
+'','','Shore Acres','Cedar Grove',115319,6113.17,-11527.49
 '','','Summit','Stringtown',11040,16067.32,-24193.00
-'','','Waterloo','Lakeview',29126,0.00,-5952.87
 '','Andrew','Oak Ridge','Enterprise',5925,5897.86,-24034.31
-'','Audrey','Forest Hills','Jackson',139918,42.57,-4681.99
-'','Brian','Union Hill','Bridgeport',234248,6723.13,-11090.06
-'','Elbert','Saint George','Woodland',213907,1857.63,-7518.82
-'','Joshua','Pleasant Grove','Woodlawn',108357,2509.28,-16268.28
+'','Ashley','Cedar Grove','Unionville',232883,3522.87,-15805.10
+'','Gary','Murray','Crystal',2581,564.43,-467.73
+'','George','Pleasant Grove','Shiloh',179953,3442.20,-15026.03
 '','Justin','Green Acres','Friendship',218888,36.82,-9620.22
+'','Kathleen','Little River','Woodlawn',189811,0.00,-10443.74
 '','Lakeesha','Clifton','Enterprise',218396,1423.91,-8880.27
-'','Larry','Bethel','Riverview',69692,4133.26,-10222.16
-'','Martha','Oakdale','Oakwood',161447,0.00,-2323.17
-'','Terrence','Woodlawn','Marion',167247,0.00,-3274.51
-'','Tommy','Woodland','Arlington',206023,65.42,-11577.93
-'Abraham','William','Friendship','Jackson',158129,2370.01,-6925.80
-'Acevedo','Grace','Springfield','Wilson',7573,954.88,-3648.52
-'Adam','Margarita','Hamilton','Clinton',137069,1306.87,-6794.20
-'Adam','Stephen','Florence','Silver Springs',152451,3695.47,-7734.03
-'Adams','Charles','Mountain View','Lakeview',37437,0.00,-8689.26
-'Aguilar','Veronica','Fairfield','Clifton',215259,0.00,-3769.78
+'','Ray','Five Forks','Woodbury',164665,1800.44,-5946.03
+'','Tabatha','Harmony','Greenfield',56102,3221.04,-11594.38
+'','Tyler','Pinecrest','Walnut Grove',122234,6583.23,-22140.99
+'Adams','Jacqueline','Gum Springs','Springdale',110641,4071.61,-23419.08
 'Aiello','Beth','Red Hill','Oak Ridge',116426,975.79,-8948.15
-'Akin','Sharon','Harmony','Union',76143,1277.50,-11659.57
-'Aleman','Margaret','Red Hill','New Hope',30018,2040.39,-10702.33
-'Alexander','Kristen','Spring Valley','Lakeville',51943,3863.88,-6781.90
 'Allen','Earl','Marion','Lincoln',64277,11935.26,-12108.31
-'Anderson','Jason','Liberty','Spring Valley',33724,3677.25,1347.04
-'Anderson','Jeremy','Bridgeport','Golden',148124,4154.95,-7994.12
+'Allen','Eric','Star','West Liberty',144009,878.68,135.47
+'Alves','Sam','Mount Olive','Union Hill',129660,38.36,-12463.53
+'Anderson','John','Pleasant Hill','Salem',96731,1631.83,-11010.09
 'Anderson','William','Macedonia','Wilson',97877,387.57,-12078.04
 'Andrews','Everett','Macedonia','Shiloh',96502,1004.97,-3638.15
-'Anthony','Ruth','Nichols','Glenwood',114445,2318.77,-9032.51
-'Apple','Robert','Plainview','Wilson',117418,1108.78,-9273.14
-'Arroyo','Douglas','Edgewood','Maple Grove',39927,1244.07,-513.87
-'Augustine','Tara','Shady Grove','Hopewell',145084,6505.22,-9920.19
+'Ashmore','Karen','Cedar Grove','Sulphur Springs',35216,4129.51,-13824.93
+'Augustine','Sylvia','','Ferguson',239026,112.07,-11058.47
 'Austin','Georgia','Woodville','Jamestown',157167,3108.93,-1302.69
-'Austin','Irene','Oakland','',29966,28.50,1935.89
-'Austin','Joseph','Enterprise','Ashland',139200,3379.35,-217.52
-'Avila','Gerald','Oak Ridge','Oak Grove',67910,1524.00,-10381.65
-'Bailey','Tisha','San Jose','Wildwood',230028,668.05,-8533.14
-'Bain','Salvador','Florence','New Hope',132989,2054.13,-6733.51
-'Baker','Kyung','Arlington','Newtown',173840,2317.54,-12384.42
-'Barnes','Lena','Mount Pleasant','Newtown',49049,204.12,-17557.82
+'Ayala','Ann','Oakland','Frankfort',28361,0.00,-5902.62
+'Baker','Richard','Five Forks','Greenfield',110320,264.71,-5730.45
+'Baldridge','Victor','Siloam','Mount Pleasant',46121,5460.48,-21175.89
+'Ball','Evelyn','Spring Valley','Five Points',205355,273.94,-15671.16
+'Banks','Tiffany','Greenfield','Tanglewood',163607,0.00,-3432.89
+'Barnett','Stacie','Wilson','Greenfield',90549,1991.13,-13073.98
+'Barth','Nicole','Cedar','Oak Ridge',175769,268.78,-2179.10
 'Bass','Rosalie','Fairview','Springdale',88499,572.81,-528.38
-'Baugh','Walter','Liberty','Marion',217161,0.00,-18558.58
-'Beane','Luisa','Spring Hill','Mount Zion',147824,2807.94,-6291.43
-'Beardsley','Mark','Deerfield','Carthage',21765,7262.77,-26963.72
-'Becker','Elsie','Lakeside','Franklin',51962,1263.09,-6807.25
-'Belcher','Carl','Wildwood','Fisher',101304,6118.90,-12732.62
-'Bell','James','Oakland','Proctor',85122,21.27,-10821.06
-'Benavides','Alaina','Shady Grove','Ashland',122466,8126.06,-11773.42
-'Betts','Robert','Mount Zion','Hillcrest',87578,520.01,-11299.24
-'Betz','Carolyn','Valley View','Maple Grove',178253,3411.95,-17301.38
-'Bigelow','John','Williamsville','Brownsville',196609,99.18,-2149.40
-'Bingham','John','Mount Olive','Spring Hill',221207,546.23,-7278.04
-'Black','Craig','Liberty','Hamilton',140998,85.33,-3878.16
-'Black','Seth','Glendale','Clifton',110339,2656.69,-4199.63
-'Boone','Sean','Crossroads','Lakeview',46921,1976.67,-14843.49
+'Beard','Brian','Edgewood','White Oak',152373,2468.60,-11237.00
+'Bishop','Daisy','Lakeside','Sulphur Springs',131728,775.04,-13097.37
+'Bivins','Tracy','Union Hill','Bethel',218867,548.08,-7750.72
+'Booker','Corrine','Crossroads','Midway',169619,3286.17,-6067.53
 'Boudreau','Joseph','Red Oak','Friendship',174139,2343.11,-10164.83
-'Bradshaw','Teresa','Lincoln','Jackson',62413,281.88,-15597.07
-'Brant','Melissa','Springdale','Springfield',197183,1926.99,-15138.29
-'Bray','Lori','Leesburg','Crossroads',235909,853.92,-3529.33
-'Breedlove','Daniel','Enterprise','Riverside',133763,6796.41,-12455.00
-'Bridges','Agnes','Whitney','Mount Pleasant',67257,3662.05,-9640.50
-'Bridges','Leo','Greenwood','Riverview',29094,863.05,-6966.62
-'Brockman','Doreen','Ashland','Greenfield',238138,5588.41,-20885.21
-'Brooks','Andrea','Forest Hills','Friendship',34106,1806.10,-14454.74
-'Brothers','Frank','Pleasant Hill','Mount Vernon',24266,1070.58,-1650.88
-'Brown','Laura','Oak Hill','White Oak',36895,3209.31,-10800.37
-'Browning','Betty','Midway','Sulphur Springs',212722,1910.85,-8394.84
-'Bryant','Charles','Woodville','Farmington',147897,0.00,-4217.88
-'Bryant','Charles','Woodville','Hopewell',105981,0.00,-3248.72
-'Buckner','Keith','Georgetown','Deerfield',149085,1283.87,-5131.09
-'Burdick','Daine','Mount Olive','Bunker Hill',195715,2534.46,-16526.78
-'Burks','Daryl','Forest Hills','Stringtown',189464,2777.10,-11974.76
-'Burks','Timothy','Oak Hill','',5757,685.44,-8593.69
-'Burns','Joseph','Highland Park','Oak Ridge',82578,419.11,-16492.32
-'Burns','Kevin','Oakland','Westgate',153186,35.52,-6600.79
-'Burton','Kathryn','Highland','Buena Vista',238169,274.93,-18031.15
-'Butler','Theodora','Walnut Grove','Pleasant Grove',132651,0.00,-9215.45
-'Caldwell','Jeffrey','Liberty','Glendale',60513,1732.11,-5023.40
-'Call','Michael','Greenfield','Clifton',98764,5851.40,-12143.14
-'Campbell','Charles','Pine Grove','Sunnyside',199890,10463.64,-26807.04
-'Cantrell','Jennifer','Deerfield','Riverside',25346,384.30,-7725.53
-'Carlson','Daren','Greenville','Sunnyside',147346,2207.18,-440.76
-'Carpenter','Sharon','Highland','Union',111261,1807.79,-10168.49
-'Carter','Richard','Greenwood','New Hope',109673,0.00,-587.22
-'Cary','Wanda','Springtown','Bunker Hill',137617,260.32,-15786.00
-'Castaneda','Karen','Riverside','Five Forks',70516,9804.83,-19502.60
+'Bowen','Ann','Spring Hill','Brownsville',43025,1410.63,-2604.28
+'Boyd','Greg','Arlington','Woodville',59295,2127.88,-8753.13
+'Boyer','Abby','Mount Pleasant','Stewart',129199,139.70,-3980.35
+'Bradley','Thomas','Greenfield','Lebanon',63539,8.91,-7548.69
+'Bradshaw','Rhonda','Union Hill','Forest Hills',175675,41.92,-12661.23
+'Braun','Sarah','Harmony','Highland Park',104345,4240.45,-6383.02
+'Brice','Jose','Oak Ridge','Five Points',117335,305.96,-11637.44
+'Briggs','Nathan','Wilson','Bloomingdale',52858,90.42,-5227.26
+'Brock','Allen','Liberty','Woodlawn',230289,133.36,-6088.19
+'Brooks','David','Hamilton','Brownsville',185597,699.59,-7221.99
+'Brown','Alfred','','Oak Hill',57190,1560.07,-16052.32
+'Brown','Cheryl','Jackson','Pleasant Hill',72269,794.26,-8431.77
+'Brown','Eddie','Harmony','Walnut Grove',174318,65.44,-12890.27
+'Brown','Martin','Mount Zion','Unionville',134030,0.00,-3140.24
+'Brown','Ronald','Cedar Grove','Deerfield',149812,45.75,-10436.23
+'Brown','Scott','Brownsville','Florence',152236,602.32,-2929.77
+'Brubaker','Russell','Rosewood','Five Points',24470,10045.43,-8561.03
+'Buck','Traci','Lakeview','Mechanicsburg',136261,608.57,-13695.30
+'Buckley','Linda','Riverside','Forest Hills',172509,1448.70,-11444.86
+'Bullard','Jason','Deerfield','Littleton',205526,9773.59,-13889.96
+'Bunn','Linda','Edgewood','Stringtown',92027,82.41,-4946.79
+'Burdick','Lewis','Lynn','Greenville',16444,2099.08,-3870.46
+'Burkhart','Hanna','Plainview','Shiloh',165655,1215.93,-14760.98
+'Bush','Samuel','New Hope','Mount Pleasant',142279,128.62,-4167.68
+'Butler','Eugene','Liberty','Crossroads',97955,25.74,-10790.20
+'Byrd','Elizabeth','Sleepy Hollow','Fairfield',224342,4824.27,-5421.49
+'Callahan','Delois','Brownsville','Providence',69902,1198.79,-5720.72
+'Campbell','Diane','Waterloo','Mount Olive',99261,0.00,-8538.40
+'Campbell','Ellen','Macedonia','Kingston',32082,0.00,-1155.34
+'Cardenas','Kevin','Fairfield','Pleasant Valley',10046,931.24,1126.28
+'Carmack','Francesca','Clinton','Oakwood',27967,8528.86,-22214.55
+'Carpenter','Douglas','Greenfield','Wilson',171407,1011.15,-1596.83
+'Carroll','Leon','Walnut Grove','Oak Ridge',211854,1721.50,-10222.65
+'Carter','Bonnie','Riverdale','Maple Grove',134966,4343.63,-17216.80
+'Carter','Johnny','Fairview','Union Hill',54872,2645.96,-18847.25
+'Carter','Leticia','Hamilton','Union Hill',189327,2149.88,-11896.18
+'Cary','Gary','Fairfield','Glenwood',30050,625.67,-1904.88
 'Castillo','Joseph','Mount Pleasant','Shady Grove',157459,918.21,-10050.74
-'Chan','Howard','Sunnyside','Blair',154992,1222.66,-8659.92
-'Chaney','David','Lakeside','Kingston',23862,159.28,-232.40
-'Chang','Deanna','Shiloh','Five Points',15078,3811.65,-11895.79
-'Chapin','Norman','Woodland','Wilson',214978,587.68,-7236.10
-'Chapman','James','Fairview','Walnut Grove',199219,6498.78,-14585.59
+'Castillo','Kirk','Lakeview','Antioch',230673,908.38,-3299.94
+'Castillo','Steven','Midway','Mount Vernon',227163,2489.24,-11455.15
+'Chadwick','Serena','Mount Vernon','Newport',28003,3242.87,-9634.14
+'Chambers','Rosalia','Newtown','Bunker Hill',122828,3806.49,-10758.68
+'Chavez','','Sulphur Springs','Summit',149341,72.69,3105.11
 'Chavez','Christina','Stratford','Oak Ridge',113094,1342.44,-8445.37
-'Chesser','Constance','Plainview','Bethel',47117,164.08,-3855.49
-'Chin','Charles','Mount Zion','Five Points',106705,1975.63,-11785.40
-'Chitwood','Ruth','Centerville','Lakeside',43016,0.00,-9063.81
-'Chong','Marie','Maple Grove','Lincoln',16281,858.32,-5254.43
-'Clifton','Roy','Farmington','Lone Oak',83823,1582.38,-8015.96
-'Cline','Walter','Mount Olive','Rockwood',183745,4787.60,-16613.18
-'Cloutier','Grace','Centerville','Hidden Valley',186161,7666.40,-10504.42
-'Coffey','Blanca','Newport','Leland',176153,1202.96,-2978.57
-'Coleman','Karen','Arlington','Lebanon',52854,6990.89,-8543.74
-'Collins','Rita','Farmington','Pleasant Grove',126041,3541.51,-14369.24
-'Collins','Thomas','Mountain View','Siloam',16788,0.00,-5418.65
-'Concepcion','Shanna','Lewis','Georgetown',200598,445.64,-112.40
+'Chester','Harriet','Unionville','Forest',104340,1290.81,-8642.99
+'Chin','Amado','Mount Zion','Glenwood',143471,3710.70,-10935.83
+'Christie','Ronald','Bridgeport','Woodville',168645,325.14,-6519.76
+'Clayton','Darrin','Brownsville','Midway',97011,9864.25,-10560.99
+'Clements','Stella','Bethel','Forest Hills',62395,1544.16,-3.32
+'Cloud','Jimmy','Spring Valley','Stringtown',180022,1700.78,-12476.49
+'Collins','Adolfo','Buena Vista','Fairview',96557,1457.91,-25595.81
+'Colvin','Angela','Fairview','Farmington',226567,842.08,-19485.16
 'Conklin','Florence','Riverside','Oakdale',160951,7125.31,-21542.41
-'Conn','Mariana','Cedar Grove','Oakdale',103154,1386.61,-9146.11
 'Conn','Nicole','The Meadows','Harmony',146652,2200.25,-9231.72
-'Connelly','Kristin','Fairview','Pleasant Valley',52384,3233.91,-6096.15
-'Conner','Amanda','Plainview','Lebanon',49636,720.01,-15801.42
-'Connolly','Pamela','Oakland','Springdale',239034,1084.54,-8877.18
-'Conrad','Earl','','Green Acres',56897,1018.88,-14496.95
-'Cooper','Eric','Lenox','Liberty',56089,1639.70,-11311.41
-'Corcoran','Rhoda','Springdale','Plainview',173359,473.65,-6177.11
-'Cordova','Jeanne','Woodlawn','Pleasant Valley',167933,1914.63,-6320.17
-'Corona','Megan','Arcola','Jamestown',91630,4.91,-1570.20
-'Cortez','Steven','Glenwood','Wesley',84041,401.96,-9506.94
-'Couture','Brenda','Sulphur Springs','Riverdale',106116,269.40,-6632.70
-'Cox','Ernest','Kingston','Ashland',82718,63.25,-3469.60
-'Crane','Kathy','Marion','Dunlap',33650,0.00,-3376.84
-'Crawford','June','Ferndale','Hamilton',136226,490.99,-6227.53
-'Crook','Barbara','Mount Zion','The Meadows',37516,877.03,-14296.49
-'Crum','Kathryn','Greenfield','Lakewood',150256,2339.97,-12651.91
-'Cruz','Alva','Summit','White Oak',110868,1041.10,-13311.89
-'Cruz','Gerald','Peoria','Mount Pleasant',139219,766.31,-12264.73
-'Culpepper','Danielle','Bethel','Silver Creek',179274,12361.59,-17547.08
-'Cummings','James','Oak Grove','Westminster',40099,8889.36,-10502.19
-'Cunningham','','Unionville','Mount Vernon',234888,735.52,-7233.57
-'Cunningham','Rodney','Pinhook','Ferndale',113466,1467.29,-17054.30
-'Curtis','Jacqueline','Riverside','',123953,660.17,-19174.89
-'Daniels','Ruth','Roxbury','Springfield',136479,246.64,-5471.44
-'Davidson','David','Glendale','Georgetown',165774,524.56,-1614.09
-'Davidson','Mark','Redland','Sunnyside',94070,0.00,-16795.72
-'Davis','Audrey','Ashland','Shiloh',169008,115.32,-11051.92
-'Davis','Hubert','Edgewood','Forest Hills',7042,15.12,-17172.50
-'Davis','Jake','Lenox','Lakewood',189836,47.90,-4560.45
-'Davis','Madeline','Spring Hill','Fairfield',62674,5045.39,-12124.37
-'Davis','Marc','New Hope','Hopewell',23890,1353.71,-3510.90
-'Davis','Tonia','Wildwood','Pleasant Valley',53448,2298.84,-5115.79
-'Davis','Vickie','Green Acres','Sunnyside',223940,0.33,-4267.77
-'Dawkins','Brenda','Kingston','Five Forks',44441,4227.78,-11800.58
-'Day','Alena','Lakeview','Clinton',116262,15296.18,-18933.87
-'Deal','Edward','Springfield','Woodville',237620,178.27,-4173.06
-'Dean','Preston','Edgewood','Antioch',113084,227.43,-5787.88
-'Denham','Emma','Kingston','Valley View',73073,3125.36,-7191.41
-'Dickey','Michael','Bridgeport','Belmont',216091,60.61,-4858.60
-'Dietrich','Saundra','Martinsville','Brookwood',1289,1156.85,-17162.83
-'Dodge','Rita','Lakewood','Shelby',104322,665.96,-3944.87
-'Doran','Merrill','Kingston','Unionville',95952,5305.87,-8765.27
-'Dorsey','Herbert','Lakeside','Maple Grove',229662,280.90,321.99
-'Dowdy','Ricky','Jamestown','Oakdale',207938,6045.06,-20477.62
-'Doyle','Dennis','Clifton','Greenville',235732,2325.49,-14124.74
-'Duckworth','Latasha','Newport','Liberty',213851,3560.92,-7105.57
-'Dugan','','Midway','Walnut Grove',58360,1294.99,1887.66
-'Dugan','Aaron','Waterloo','Newport',18473,8378.64,-12323.90
-'Dumas','Galen','Andover','Fairview',144323,2405.83,-1386.08
-'Dunham','Travis','Newport','Greenville',91137,608.35,-10716.16
-'Dunn','Matt','Oak Ridge','Wildwood',65641,6563.55,-8818.69
-'Dunn','Steven','Greenville','Unionville',111643,728.04,-19571.30
-'Duran','Leonard','Lakeside','Kingston',230282,2542.94,-7222.87
-'Eagle','Todd','Oak Grove','Greenfield',208606,0.00,-3949.46
-'Eaton','Marcus','Sunnyside','Salem',122459,0.00,-1725.39
-'Eck','David','Centerville','Friendship',175434,836.92,-3014.70
-'Edwards','Deborah','Plainview','Wolf Creek',224017,57.37,-8233.14
-'Edwards','Jose','Edgewood','Oak Hill',16657,71.98,-1770.44
-'Edwards','Marilyn','Providence','Kirkland',2642,0.00,2145.72
-'Egan','William','Perkins','Lincoln',204915,4847.32,-1057.17
-'Ellison','Anne','Jamestown','Liberty',169999,7508.33,-4830.94
-'Epstein','Tamara','Pleasant Hill','Greenwood',113140,2108.46,-9931.00
-'Ervin','Heather','Bridgeport','Macedonia',206882,1560.37,-17578.66
-'Fagan','Judith','Liberty','Clifton',59439,1291.95,-15729.19
-'Fair','David','Oakdale','Kingston',194875,5878.30,-24116.14
-'Farias','Tracy','Mount Vernon','Lebanon',230345,400.18,-7130.32
-'Farmer','Carolyn','Green Acres','Oak Hill',95454,967.94,-18315.50
-'Felix','Simone','Friendship','Oakland',169131,49.63,-11826.61
-'Ferguson','Chester','Jackson','Hopewell',201682,3484.11,-19355.95
-'Ferguson','Elmer','Woodland','Shiloh',201349,290.50,-6708.01
-'Fernandez','Denver','Enterprise','Red Hill',72982,2311.73,-3805.60
-'Fields','Estelle','Union','Glendale',71624,6394.46,-22935.94
-'Fisher','David','Edgewood','Wildwood',175673,765.39,-8840.75
-'Fleming','Jon','Riverdale','Valley View',7454,1743.40,-6743.50
-'Flores','Anna','Deerfield','Oak Hill',37158,700.11,-12495.74
-'Flowers','Robert','Farmington','Lebanon',198924,562.66,1056.28
-'Flynn','Lisa','Cherry Valley','Hopewell',1386,1945.79,-5326.36
-'Fontenot','James','Shady Grove','Fox',207753,18.42,-1757.88
-'Foreman','Valerie','Newport','Kingston',117015,0.00,-9529.40
-'Foster','Gil','Riverside','Phoenix',119886,2594.42,-5330.57
-'Foster','James','Salem','Stringtown',228365,4059.48,-12254.35
-'Foster','Tami','Belmont','Lebanon',169083,1271.89,-8246.36
-'Foust','Louis','Littleton','Clifton',157834,2030.44,-2279.69
-'Franks','Nora','Friendship','Springdale',109505,652.96,-12570.63
-'Freeman','Troy','Macedonia','Antioch',95164,391.11,-6115.37
-'Frey','Adrian','Redland','Farmington',153863,3772.92,-1546.33
-'Friend','Martha','Pleasant Grove','Lakeview',80370,4734.13,-15337.92
-'Frierson','Linda','Lincoln','Lakewood',185865,4706.69,-6894.69
-'Fritz','Ashley','Star','Concord',204041,178.15,-7657.08
-'Fry','Christopher','Bridgeport','Clifton',228122,2219.04,-8279.34
-'Fuentes','Michael','Newtown','Lincoln',151508,42.43,-9074.92
-'Gage','Charles','Argyle','Saint Clair',94891,3536.03,-2821.88
-'Galloway','Betty','Arlington','Newtown',10097,2908.63,-18694.63
-'Garcia','Henry','Concord','',202821,2930.95,-8592.32
-'Garland','Kenneth','Midway','Enterprise',222275,44.36,-542.39
-'Garrett','Jesus','Brownsville','Plainview',165117,41.63,2306.01
-'Gentry','Ricky','Waterloo','Liberty',6423,3548.42,-4086.81
-'Gibbs','Gordon','Glenwood','Georgetown',108350,0.00,-5000.60
-'Gill','Dana','Riverview','Price',236422,4724.47,-1241.69
-'Glass','Jorge','Glendale','Buena Vista',169173,504.15,-854.36
-'Glover','Harry','','Hillcrest',96026,2683.92,-9191.63
-'Gomez','Brooke','Wildwood','Hopewell',130974,78.82,-2437.48
-'Gomez','Gloria','Riley','',30028,0.00,-846.02
-'Gonzales','Christopher','Crossroads','Riverview',139140,3.32,-10466.10
-'Gonzales','Nicole','Jackson','Farmersville',80251,8737.06,-18373.90
-'Gonzalez','Simone','Pleasant Valley','Wilson',99302,1365.10,3451.84
-'Goodwin','Ellen','Frenchtown','Marion',25406,11575.56,-13465.57
-'Gordon','Monica','Pleasant Valley','Shiloh',115055,2111.92,-3160.33
-'Gordon','William','Clinton','Spring Hill',238163,13864.38,-14423.91
-'Goss','','Springfield','Florence',27208,24.60,-14421.20
-'Gould','Joseph','Oak Grove','Carpenter',158912,981.75,-9636.50
-'Graham','Wilma','Lakeside','Cedar Grove',73828,596.79,-8315.98
-'Graves','Nancy','Oak Ridge','Harmony',177634,372.73,-8609.12
-'Graves','Pam','Greenfield','Jackson',189347,4304.66,-8667.64
-'Green','Raymond','Green Acres','Wilson',136915,1015.25,-1916.23
-'Greer','Geraldine','Lakewood','Franklin',100918,159.02,-9663.08
-'Greer','Ida','Concord','',232383,1511.61,-1165.31
-'Greer','Stephani','Glenwood','Shady Grove',211455,958.66,-3763.76
-'Grimes','John','Unionville','Summit',67722,0.00,-4447.19
-'Gross','Andrew','Harmony','',25699,151.90,-8146.84
-'Gutierrez','John','Ruth','Greenwood',29305,3568.31,-18321.40
-'Guzman','Abby','Ludlow','Arlington',1207,318.53,-141.92
-'Guzman','David','Colfax','Shady Grove',113135,0.00,-11459.34
-'Hahn','Louis','Forest Hills','Lebanon',154785,0.00,-8381.19
-'Haley','Myles','Centerville','Maple Grove',235001,173.86,-6928.50
-'Hall','Claudia','Spring Valley','Summit',45102,7116.01,-17412.94
-'Hall','Kimberly','Lakeside','Vienna',96342,1810.41,-3570.30
-'Hamblin','Annie','Mount Pleasant','Yorktown',172606,3117.34,-19683.88
-'Hamby','Neil','Franklin','Concord',103007,17150.23,-18698.01
-'Hamilton','Monica','Salem','Plainview',80010,144.11,-8380.37
-'Hammond','Beverly','Florence','Walnut Grove',203351,0.00,-10489.89
-'Hancock','Heidy','Marion','',208048,5355.26,-18804.73
-'Handy','Tamara','Shady Grove','Georgetown',237140,2185.17,-12807.54
-'Harbin','Megan','Hillcrest','Providence',64090,2957.33,-16665.08
-'Harden','Evan','Salem','Macedonia',582,1135.64,-13226.49
-'Hardesty','James','Pleasant Valley','Greenwood',112698,632.43,-3642.41
-'Harper','Michael','Florence','Shady Grove',27037,9928.77,-29820.50
-'Harris','Anita','Oakdale','Pleasant Valley',20140,418.34,-10482.54
-'Harris','Betty','Clifton','Jackson',182764,4774.37,-6526.52
-'Harris','Catherine','Woodville','Highland Park',135299,2669.02,-15573.35
-'Harris','Robert','Sunnyside','Marion',156112,527.15,-6693.00
-'Harvey','Jimmy','Jackson','Clinton',28434,98.80,-5904.86
-'Hauser','Geraldine','Stringtown','Kingston',191467,2884.98,-16164.05
-'Hawkins','Sharon','Crossroads','Wilson',239524,2699.14,-6822.07
-'Hazel','David','Florence','Ellisville',168583,956.18,-12660.88
-'Hazel','John','Jackson','Liberty',60411,0.00,-4213.78
-'Heilman','Ruth','Woodlawn','Longwood',43689,77.32,-12541.27
-'Henry','Toni','Riverside','Pleasant Hill',4836,1492.95,-9806.58
-'Hernandez','Daniel','Maple Grove','Spring Hill',133552,1096.14,-18682.53
-'Hernandez','Richard','Hillcrest','Bridgeport',132669,6895.79,-16772.08
-'Hickman','Eugene','White Oak','Woodlawn',135524,2683.56,-5214.55
-'Hickman','Marlon','Franklin','Mechanicsburg',122641,0.00,-4464.75
-'Higgins','David','Lincoln','Greenwood',125701,5509.73,-12515.46
-'Higgins','Jake','Stringtown','Pleasant Grove',83704,0.00,-8960.60
-'Hill','Barry','Providence','Five Points',93952,6338.68,-7363.11
-'Hill','Clarence','Kingston','Forest Hills',132968,1422.71,-5912.90
-'Hill','Helen','Five Forks','Brownsville',12044,872.78,-18187.79
-'Hill','Jay','Valley View','Colonial Heights',202078,0.00,-1931.55
-'Hills','Danny','Clifton','Wilson',20951,3645.48,-7915.65
-'Hines','Craig','Five Points','Mount Olive',91585,0.00,-1197.71
-'Hines','Joseph','Glenwood','Arlington',235194,0.00,-5386.13
-'Hines','Lamar','Pleasant Valley','Clifford',22954,2511.24,-869.61
-'Hines','Pearl','Mount Vernon','New Hope',27151,312.58,-3600.78
-'Hoffman','Megan','Highland','Ashland',161699,6894.65,-6437.89
-'Holcomb','Perry','Five Forks','Oak Hill',207409,4462.94,-11174.13
-'Holland','Gerald','Salem','Brownsville',88671,1387.41,-13579.03
-'Holliday','Paul','Valley View','Oak Grove',217368,1967.64,-8919.88
-'Holt','Richard','Springdale','Glendale',199791,3411.27,-6049.75
-'Hoover','Clara','Fairfield','New Hope',72148,1121.85,1798.54
-'Houston','Bobby','Spring Valley','Mount Pleasant',115364,482.99,-8198.79
-'Hudson','Stephen','Belmont','Sunnyside',223025,0.00,-451.14
-'Humphrey','Alan','Concord','Oak Hill',148183,0.00,-11019.25
-'Hunt','Shawn','Jamestown','Springdale',221672,3545.94,-9897.64
-'James','Elizabeth','Macedonia','Greenwood',1960,695.58,-13523.16
-'Jasper','Betty','Stringtown','Willis',212162,2379.78,-17881.07
-'Jean','Teresa','Bennett','Lakeview',126475,1990.99,-7202.65
-'Jensen','Betty','Lebanon','Bunker Hill',2343,451.39,-18759.19
-'Jensen','Roscoe','Pine Grove','Valley View',10819,7355.99,-12295.27
-'Johnson','','Belmont','Mount Vernon',81066,1723.26,-4635.69
-'Johnson','Alvina','Mount Vernon','Peru',106479,650.87,-16120.90
-'Johnson','Anna','Buena Vista','Union Hill',51582,2036.47,-21830.76
-'Johnson','Dorothy','Shady Grove','Wildwood',199233,663.62,-5414.57
-'Johnson','Michael','Lincoln','Cedar Grove',110978,1636.66,-5232.47
-'Johnson','Morris','Proctor','Oakdale',29590,2512.76,-460.77
-'Johnson','Robert','Five Forks','Mount Pleasant',175297,94.08,-14884.70
-'Johnson','Samantha','Centerville','Summit',181553,1068.04,-8528.51
-'Johnson','Sandra','Bridgeport','Pleasant Grove',32068,1117.40,2294.35
-'Johnson','Tracy','Ashland','Newtown',179583,2595.77,-11142.30
-'Johnson','Trina','Oakdale','Jackson',5177,2629.40,-20638.66
-'Jones','Dorothy','Fisher','Oakland',172805,4372.52,-13932.53
-'Jones','Edward','Colfax','',102077,23.73,-10475.39
-'Jones','Gilbert','Hamilton','Buena Vista',175128,6185.31,-12209.23
-'Julian','Amy','Thompson','Barnes',99595,497.22,-12902.00
-'Kahn','Lori','Fairfield','Oakland',116983,2940.66,-18940.51
-'Kaiser','Louis','Oak Hill','Wildwood',173401,0.00,-1070.36
-'Kay','Brandi','Union','Ferguson',14467,5990.77,-2484.60
-'Kelly','Katie','Fairfield','Mountain View',56745,20.74,-4322.75
-'Kelly','Mattie','Valley View','',23179,5370.37,-8755.21
-'Keyes','Julian','Greenwood','',8803,3041.75,-6291.01
-'Kinney','Veronica','Shady Grove','Highland Park',235074,2667.17,-18265.24
-'Kirby','Charissa','Bridgeport','Valley View',194091,922.68,-15938.19
-'Knight','Ilse','Hillcrest','Riverdale',107823,2001.04,-9565.97
-'Knight','Rose','Lincoln','Shiloh',231776,1699.46,-9026.93
-'Knudson','Bessie','Hillcrest','Flint',123993,904.71,-12233.10
-'Krause','Jana','Newport','Shady Grove',29289,0.00,-4044.12
-'Krueger','Elsie','Shelby','Post Oak',175748,0.00,-1203.35
-'Lacy','Terresa','Sulphur Springs','Shady Grove',128048,466.25,-3061.82
-'Lang','Bruce','Salem','Allison',140951,0.00,-5966.97
-'Lanier','Kimberly','Lakeview','Cedar Grove',127928,1770.77,-10088.53
-'Larsen','Marvin','Greenville','Summit',216435,634.64,-2922.83
-'Lawrence','Minnie','Red Hill','Walnut Grove',198505,1077.36,-18106.11
-'Lawrence','Paul','Forest Hills','',90650,225.60,-10651.47
-'Layne','Stephanie','Newport','Concord',164618,1181.63,-12532.21
-'Le','Rodney','Georgetown','Deerfield',120851,2695.53,-17630.33
-'Leach','Anna','Springdale','Five Forks',201449,0.00,3403.80
-'Leal','Lori','Woodville','Valley View',69431,356.90,-5725.63
-'Lee','Bobby','Glendale','Springdale',140917,1049.83,-4400.40
-'Lee','Frank','Hopewell','Walnut Grove',16902,278.33,-4006.55
-'Lee','Victoria','Appleton','Pine Grove',142322,3300.81,-15874.43
-'Lennon','Amanda','Sunnyside','Lakeside',103584,0.00,-8861.03
-'Lewis','David','Stringtown','Woodland',162584,1413.16,-18192.11
-'Lewis','Julie','Union Hill','Deerfield',235701,1026.88,-6019.21
-'Lewis','Theresa','Valley View','Plainview',195369,0.00,-5260.58
-'Lindsey','Gloria','Saint Johns','Pine Grove',130601,4481.55,-15435.70
-'Linn','Arthur','Mount Olive','Glenwood',2027,941.73,-5874.73
-'Lloyd','Scott','Oakland','Pine Grove',222257,56.49,-12772.94
-'Lockhart','Agatha','Stringtown','Springdale',233914,0.00,-13606.62
-'Lofton','Brian','Glenwood','Liberty',236992,1479.50,-12897.71
-'Long','','Forest Hills','Florence',17810,3281.79,-12089.08
-'Lopez','Ernest','Lincoln','Newport',4480,1260.15,-7169.54
-'Lopez','Jack','Sulphur Springs','Riverdale',186838,2306.01,-7940.36
-'Lopez','William','Lakeside','Lebanon',132778,37.19,-654.83
-'Lott','Lori','Jamestown','Edgewood',92063,501.40,-6212.32
-'Love','Sean','Cedar','Rolling Hills',196652,13649.16,-19653.10
-'Love','Thomas','Mountain View','Shiloh',122258,893.11,-2897.27
-'Luther','Ira','Woodland','Riverview',29923,663.75,-4057.67
-'Ly','Michael','Macedonia','',190080,174.44,-11169.84
-'Magee','Christopher','Edwards','Salem',216385,6978.87,-8204.63
-'Major','Bridget','Bloomingdale','Clinton',13292,359.42,-3277.25
-'Maloney','Rodney','Guilford','Buena Vista',211900,182.08,-10406.01
-'Mangum','Felipe','Oak Hill','Post Oak',48579,2408.55,-9314.55
-'Maples','Lillian','Glendale','Mount Olive',19685,3673.69,-11560.77
-'Marquez','Carlos','Highland Park','Five Forks',137480,403.99,-15666.42
-'Marshall','Dawn','Union','Five Forks',226600,0.00,-11256.58
-'Martin','Clemencia','Ashland','Union',215952,84.43,-6650.65
-'Martin','George','Spring Valley','Macedonia',12999,1621.27,-7726.94
-'Martin','Harold','Newtown','Union Hill',182182,1039.32,-11936.82
-'Martin','Joseph','Riverdale','Newtown',21758,3709.42,-7265.97
-'Martin','Robert','Salem','Pleasant Hill',186238,49.48,-19142.84
-'Martinez','Carlos','Marion','Springdale',29075,205.33,-7897.73
-'Martinez','Chris','Franklin','Pleasant Hill',198437,0.00,-12227.91
-'Martinez','Jose','Woodlawn','Greenville',169220,2850.97,-2912.52
-'Martinez','Lucy','Greenfield','Harmony',155743,3654.82,-4940.73
-'Mason','Roberto','Cedar Grove','Enterprise',54374,8381.62,-18372.16
-'Mason','Sara','Midway','Clifton',41125,2606.39,-14337.69
-'Maynard','Michael','Greenwood','Providence',43622,1734.57,-6100.60
-'Mayo','Amanda','Bethel','Centerville',1864,2.59,-5609.70
-'Mccarty','Robert','Lakewood','Pine Grove',145375,5550.24,-14674.36
-'Mccauley','Brian','Hamilton','White Oak',59151,4779.88,-12611.58
-'Mcclure','Darnell','Bridgeport','Maple Grove',27971,3798.93,-24327.64
-'Mccreary','James','Jackson','Highland Park',83383,3172.84,-3528.29
-'Mcdaniel','Raymond','Antioch','Pleasant Valley',35318,4191.46,-15662.71
-'Mcdonald','Barbara','Red Hill','Wesley',72649,525.68,-14064.03
-'Mcfarlane','Robbin','Mount Olive','Greenfield',178546,4045.38,-7271.28
-'Mcgehee','David','Cherry Valley','Shelby',16071,10567.66,-34805.58
-'Mcginnis','Elizebeth','Fairview','Centerville',221575,5982.04,-17769.53
-'Mckee','Randy','Providence','Hamilton',78185,1333.48,-2530.77
-'Mckinley','William','Fox','Springfield',141269,143.70,-2697.44
-'Mcknight','Alex','Green Acres','Five Points',50941,1628.30,-10753.61
-'Mcmahon','Harry','Maple Grove','Pine Grove',214362,5119.53,-25362.33
-'Mcmanus','Victoria','Five Points','Riverside',84978,1152.41,-6841.54
-'Mcmillan','Philip','Midway','Cedar Grove',211273,3013.58,-8047.23
-'Mcneil','Christina','Enterprise','Empire',213436,0.00,-8965.32
-'Mcwilliams','Robert','Woodville','Fairview',140127,14845.46,-14561.84
-'Meador','Elizabeth','Walnut Grove','Jackson',153631,7845.70,-7120.29
-'Medina','Samuel','Fayetteville','Mountain View',24406,2952.18,-18807.56
-'Melendez','Clint','Sulphur Springs','Salem',111541,214.59,-5166.47
-'Melendez','Travis','Denmark','Providence',115247,0.00,-10892.32
-'Meyer','Marian','Kingston','Shiloh',150612,4831.27,-12062.19
-'Miles','Joseph','Hurricane','Belfast',120778,0.00,-6399.11
-'Miller','Catherine','','Clinton',8027,2004.81,-4874.36
 ---- TYPES
 STRING, STRING, STRING, STRING, INT, DECIMAL, DECIMAL
 ====

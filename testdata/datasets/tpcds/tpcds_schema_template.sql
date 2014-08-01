@@ -324,7 +324,6 @@ tpcds
 ---- BASE_TABLE_NAME
 store_sales
 ---- COLUMNS
-ss_sold_date_sk           bigint
 ss_sold_time_sk           bigint
 ss_item_sk                bigint
 ss_customer_sk            bigint
@@ -348,27 +347,119 @@ ss_net_paid               decimal(7,2)
 ss_net_paid_inc_tax       decimal(7,2)
 ss_net_profit             decimal(7,2)
 ---- PARTITION_COLUMNS
-ss_date string
+ss_sold_date_sk bigint
 ---- ROW_FORMAT
 delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
 -- Split the load into multiple steps to reduce total memory usage for larger
 -- scale factors. TODO: Dynamically scale this based on the scale factor?
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_date)
-SELECT * FROM {db_name}.{table_name}
-WHERE ss_date <= '1999-03-29';
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
+SELECT ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+FROM {db_name}.{table_name}
+WHERE ss_sold_date_sk < 2451272;
 
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_date)
-SELECT * FROM {db_name}.{table_name}
-WHERE ss_date > '1999-03-29' and ss_date <= '2000-06-21';
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
+SELECT ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+FROM {db_name}.{table_name}
+WHERE 2451272 <= ss_sold_date_sk and ss_sold_date_sk < 2451728;
 
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_date)
-SELECT * FROM {db_name}.{table_name}
-WHERE ss_date > '2000-06-21' and ss_date <= '2001-09-15';
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
+SELECT ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+FROM {db_name}.{table_name}
+WHERE 2451728 <= ss_sold_date_sk and ss_sold_date_sk < 2452184;
 
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_date)
-SELECT * FROM {db_name}.{table_name}
-WHERE ss_date > '2001-09-15';
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
+SELECT ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+FROM {db_name}.{table_name}
+WHERE 2452184 <= ss_sold_date_sk;
 ---- LOAD
 USE {db_name};
 
@@ -379,13 +470,32 @@ set hive.exec.max.dynamic.partitions=10000;
 set hive.exec.dynamic.partition.mode=nonstrict;
 set hive.exec.dynamic.partition=true;
 
-insert overwrite table {table_name} partition(ss_date)
-select ss.*, d.d_date as ss_date
-from date_dim d
-join store_sales_unpartitioned ss
-  on (ss.ss_sold_date_sk = d.d_date_sk)
-where ss.ss_sold_date_sk is not null
-distribute by ss_date;
+insert overwrite table {table_name} partition(ss_sold_date_sk)
+select ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+from store_sales_unpartitioned
+distribute by ss_sold_date_sk;
 ---- LOAD_LOCAL
 USE {db_name};
 
@@ -396,14 +506,37 @@ set hive.exec.max.dynamic.partitions=10000;
 set hive.exec.dynamic.partition.mode=nonstrict;
 set hive.exec.dynamic.partition=true;
 
-insert overwrite table {table_name} partition(ss_date)
-select ss.*, d.d_date as ss_date
+insert overwrite table store_sales partition(ss_sold_date_sk)
+select ss.ss_sold_time_sk,
+  ss.ss_item_sk,
+  ss.ss_customer_sk,
+  ss.ss_cdemo_sk,
+  ss.ss_hdemo_sk,
+  ss.ss_addr_sk,
+  ss.ss_store_sk,
+  ss.ss_promo_sk,
+  ss.ss_ticket_number,
+  ss.ss_quantity,
+  ss.ss_wholesale_cost,
+  ss.ss_list_price,
+  ss.ss_sales_price,
+  ss.ss_ext_discount_amt,
+  ss.ss_ext_sales_price,
+  ss.ss_ext_wholesale_cost,
+  ss.ss_ext_list_price,
+  ss.ss_ext_tax,
+  ss.ss_coupon_amt,
+  ss.ss_net_paid,
+  ss.ss_net_paid_inc_tax,
+  ss.ss_net_profit,
+  ss.ss_sold_date_sk
 from date_dim d
 join store_sales_unpartitioned ss
   on (ss.ss_sold_date_sk = d.d_date_sk)
-where ss.ss_sold_date_sk is not null
--- The filter below on d_date is needed to reduce the number of partitions generated for
--- local testing. This filter reduces the number of partitions from ~1800 to 120.
-and (d.d_date like '%-01' or d.d_date like '%-15')
-distribute by ss_date;
+-- The filter below reduced the number of partitions generated for local testing. This
+-- filter reduces the number of partitions from ~1800 to 120. We are doing a join with
+-- date_dim in order to select the 1st and 15th days of the month. No data in date_dim
+-- ends up in store_sales.
+where (d.d_date like '%-01' or d.d_date like '%-15')
+distribute by ss_sold_date_sk;
 ====

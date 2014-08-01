@@ -1,25 +1,27 @@
 ====
 ---- QUERY: TPCDS-Q55
-SELECT
-  i_brand_id,
-  i_brand,
-  SUM(ss_ext_sales_price) AS ext_price
-FROM store_sales ss
-JOIN date_dim d
-  ON (ss.ss_sold_date_sk = d.d_date_sk)
-JOIN item i
-  ON (ss.ss_item_sk = i.i_item_sk)
-WHERE
-  i_manager_id = 36
-  AND d_moy = 12
-  AND d_year = 2001
-GROUP BY
+select
+  i_brand_id brand_id,
+  i_brand brand,
+  sum(ss_ext_sales_price) ext_price
+from
+  date_dim,
+  store_sales,
+  item
+where
+  d_date_sk = ss_sold_date_sk
+  and ss_item_sk = i_item_sk
+  and i_manager_id = 36
+  and d_moy = 12
+  and d_year = 2001
+  and ss_sold_date_sk between 2452245 and 2452275 -- partition key filter
+group by
   i_brand,
   i_brand_id
-ORDER BY
-  ext_price DESC,
+order by
+  ext_price desc,
   i_brand_id
-LIMIT 100;
+limit 100;
 ---- RESULTS
 5004002,'edu packscholar #2',8314.04
 8008010,'namelessnameless #10',7463.64

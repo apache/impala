@@ -8,21 +8,8 @@ select
   i_wholesale_cost,
   i_brand
 from
-  (select
-    ss_store_sk,
-    ss_item_sk,
-    sum(ss_sales_price) as revenue
-  from
-    store_sales
-  where
-    ss_date between '2001-01-01' and '2001-12-31'
-  group by
-    ss_store_sk,
-    ss_item_sk
-  ) sc -- 7,858,212,382 rows
-  join item on (sc.ss_item_sk = item.i_item_sk)
-  join store on (sc.ss_store_sk = store.s_store_sk)
-  join 
+  store,
+  item,
   (select
     ss_store_sk,
     avg(revenue) as ave
@@ -32,22 +19,43 @@ from
       ss_item_sk,
       sum(ss_sales_price) as revenue
     from
-      store_sales
+      store_sales,
+      date_dim
     where
-      ss_date between '2001-01-01' and '2001-12-31'
+      ss_sold_date_sk = d_date_sk
+      and d_month_seq between 1212 and 1212 + 11
+      and ss_sold_date_sk between 2451911 and 2452275  -- partition key filter
     group by
       ss_store_sk,
       ss_item_sk
-    ) sa  -- 121,679,715 rows
+    ) sa
   group by
     ss_store_sk
-  ) sb on (sc.ss_store_sk = sb.ss_store_sk) -- 676 rows
+  ) sb,
+  (select
+    ss_store_sk,
+    ss_item_sk,
+    sum(ss_sales_price) as revenue
+  from
+    store_sales,
+    date_dim
+  where
+    ss_sold_date_sk = d_date_sk
+    and d_month_seq between 1212 and 1212 + 11
+    and ss_sold_date_sk between 2451911 and 2452275  -- partition key filter
+  group by
+    ss_store_sk,
+    ss_item_sk
+  ) sc
 where
-  sc.revenue <= 0.1 * sb.ave
+  sb.ss_store_sk = sc.ss_store_sk
+  and sc.revenue <= 0.1 * sb.ave
+  and s_store_sk = sc.ss_store_sk
+  and i_item_sk = sc.ss_item_sk
 order by
   s_store_name,
-  i_item_desc 
-limit 100
+  i_item_desc
+limit 100;
 ---- RESULTS
 'able','',2.98,6.51,16.20,'amalgedu pack #2'
 'able','A l',0.66,0.14,0.92,'importocorp #8'

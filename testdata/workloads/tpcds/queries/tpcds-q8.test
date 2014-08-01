@@ -21,7 +21,7 @@ from
     group by
       ca_zip
     having
-      count( *) > 10
+      count(*) > 10
     ) a 
     left semi join 
     (select
@@ -62,7 +62,7 @@ from
   on (a.ca_zip = b.ca_zip)
   ) v1 on (substr(store.s_zip, 1, 2) = substr(v1.ca_zip, 1, 2))
 where
-  ss_date between '2002-01-01' and '2002-04-01'
+  ss_sold_date_sk between 2452276 and 2452366
 group by
   s_store_name
 order by

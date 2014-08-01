@@ -1,28 +1,30 @@
 ====
 ---- QUERY: TPCDS-Q52
-SELECT
-  d.d_year,
-  i.i_brand_id AS brand_id,
-  i.i_brand AS brand,
-  SUM(ss_ext_sales_price) AS ext_price
-FROM store_sales ss
-JOIN date_dim d
-  ON (ss.ss_sold_date_sk = d.d_date_sk)
-JOIN item i
-  ON (ss.ss_item_sk = i.i_item_sk)
-WHERE
-  i.i_manager_id = 1
-  AND d.d_moy = 12
-  AND d.d_year = 1998
-GROUP BY
-  d.d_year,
-  i.i_brand,
-  i.i_brand_id
-ORDER BY
-  d_year,
-  ext_price DESC,
+select
+  dt.d_year,
+  item.i_brand_id brand_id,
+  item.i_brand brand,
+  sum(ss_ext_sales_price) ext_price
+from
+  date_dim dt,
+  store_sales,
+  item
+where
+  dt.d_date_sk = store_sales.ss_sold_date_sk
+  and store_sales.ss_item_sk = item.i_item_sk
+  and item.i_manager_id = 1
+  and dt.d_moy = 12
+  and dt.d_year = 1998
+  and ss_sold_date_sk between 2451149 and 2451179 -- added for partition pruning
+group by
+  dt.d_year,
+  item.i_brand,
+  item.i_brand_id
+order by
+  dt.d_year,
+  ext_price desc,
   brand_id
-LIMIT 100;
+limit 100;
 ---- RESULTS
 1998,2001002,'amalgimporto #2',17501.99
 1998,2004002,'edu packimporto #2',14472.43

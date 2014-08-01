@@ -1,29 +1,31 @@
 ====
 ---- QUERY: TPCDS-Q42
-SELECT
-  d.d_year,
-  i.i_category_id,
-  i.i_category,
-  SUM(ss_ext_sales_price) total_sales
-FROM store_sales ss
-JOIN date_dim d
-  ON (ss.ss_sold_date_sk = d.d_date_sk)
-JOIN item i
-  ON (ss.ss_item_sk = i.i_item_sk)
-WHERE
-  i.i_manager_id = 1
-  AND d.d_moy = 12
-  AND d.d_year = 1998
-GROUP BY
-  d.d_year,
-  i.i_category_id,
-  i.i_category
-ORDER BY
-  total_sales DESC,
-  d_year,
-  i_category_id,
-  i_category
-LIMIT 100
+select
+  dt.d_year,
+  item.i_category_id,
+  item.i_category,
+  sum(ss_ext_sales_price)
+from
+  date_dim dt,
+  store_sales,
+  item
+where
+  dt.d_date_sk = store_sales.ss_sold_date_sk
+  and store_sales.ss_item_sk = item.i_item_sk
+  and item.i_manager_id = 1
+  and dt.d_moy = 12
+  and dt.d_year = 1998
+  and ss_sold_date_sk between 2451149 and 2451179  -- partition key filter
+group by
+  dt.d_year,
+  item.i_category_id,
+  item.i_category
+order by
+  sum(ss_ext_sales_price) desc,
+  dt.d_year,
+  item.i_category_id,
+  item.i_category
+limit 100;
 ---- RESULTS
 1998,5,'Music',40451.03
 1998,2,'Men',39347.45
