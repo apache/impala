@@ -38,6 +38,10 @@ DEFINE_int32(num_threads_per_disk, 0, "number of threads per disk");
 DEFINE_int32(read_size, 8 * 1024 * 1024, "Read Size (in bytes)");
 DEFINE_int32(min_buffer_size, 1024, "The minimum read buffer size (in bytes)");
 
+// With 8MB buffers, this is up to 1GB of buffers.
+DEFINE_int32(max_free_io_buffers, 128,
+    "maximum number of io buffers the IoMgr will hold onto");
+
 // Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotational
 // don't have this penalty and benefit from multiple concurrent IO requests.
 static const int THREADS_PER_ROTATIONAL_DISK = 1;
@@ -683,7 +687,7 @@ void DiskIoMgr::ReturnFreeBuffer(char* buffer, int64_t buffer_size) {
   DCHECK_EQ(BitUtil::Ceil(buffer_size, min_buffer_size_) & ~(1 << idx), 0)
       << "buffer_size_ / min_buffer_size_ should be power of 2, got buffer_size = "
       << buffer_size << ", min_buffer_size_ = " << min_buffer_size_;
-  if (!FLAGS_disable_mem_pools) {
+  if (!FLAGS_disable_mem_pools && free_buffers_.size() < FLAGS_max_free_io_buffers) {
     unique_lock<mutex> lock(free_buffers_lock_);
     free_buffers_[idx].push_back(buffer);
   } else {
