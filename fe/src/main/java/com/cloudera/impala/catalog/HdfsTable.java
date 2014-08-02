@@ -1185,34 +1185,37 @@ public class HdfsTable extends Table {
 
   @Override
   public TTableDescriptor toThriftDescriptor() {
+    // Create thrift descriptors to send to the BE.  The BE does not
+    // need any information below the THdfsPartition level.
     TTableDescriptor tableDesc = new TTableDescriptor(id_.asInt(), TTableType.HDFS_TABLE,
         getColumns().size(), numClusteringCols_, name_, db_.getName());
-    tableDesc.setHdfsTable(getHdfsTable());
+    tableDesc.setHdfsTable(getTHdfsTable(false));
     tableDesc.setColNames(getColumnNames());
     return tableDesc;
   }
 
   @Override
   public TTable toThrift() {
+    // Send all metadata between the catalog service and the FE.
     TTable table = super.toThrift();
     table.setTable_type(TTableType.HDFS_TABLE);
-    table.setHdfs_table(getHdfsTable());
+    table.setHdfs_table(getTHdfsTable(true));
     return table;
   }
 
-  private THdfsTable getHdfsTable() {
+  private THdfsTable getTHdfsTable(boolean includeFileDesc) {
     Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
     for (HdfsPartition partition: partitions_) {
-      // TODO: Should we be sending the list of all partitions including *all* file
-      //       descriptors (includeFileDescriptorMetadata=true in partition.toThrift())?
-      //       IMPALA-978 tracks this issue.
-      idToPartition.put(partition.getId(), partition.toThrift(true));
+      idToPartition.put(partition.getId(), partition.toThrift(includeFileDesc));
     }
-
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition);
     hdfsTable.setAvroSchema(avroSchema_);
-    hdfsTable.setNetwork_addresses(hostList_);
+    if (includeFileDesc) {
+      // Network addresses are used only by THdfsFileBlocks which are inside
+      // THdfsFileDesc, so include network addreses only when including THdfsFileDesc.
+      hdfsTable.setNetwork_addresses(hostList_);
+    }
     return hdfsTable;
   }
 

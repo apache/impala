@@ -430,17 +430,17 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       }
     }
 
-    List<HdfsPartition.FileDescriptor> fileDescriptors_ = Lists.newArrayList();
+    List<HdfsPartition.FileDescriptor> fileDescriptors = Lists.newArrayList();
     if (thriftPartition.isSetFile_desc()) {
       for (THdfsFileDesc desc: thriftPartition.getFile_desc()) {
-        fileDescriptors_.add(HdfsPartition.FileDescriptor.fromThrift(desc));
+        fileDescriptors.add(HdfsPartition.FileDescriptor.fromThrift(desc));
       }
     }
 
     TAccessLevel accessLevel = thriftPartition.isSetAccess_level() ?
         thriftPartition.getAccess_level() : TAccessLevel.READ_WRITE;
     HdfsPartition partition = new HdfsPartition(table, null, literalExpr, storageDesc,
-        fileDescriptors_, id, thriftPartition.getLocation(), accessLevel);
+        fileDescriptors, id, thriftPartition.getLocation(), accessLevel);
     if (thriftPartition.isSetStats()) {
       partition.setNumRows(thriftPartition.getStats().getNum_rows());
     }
@@ -465,7 +465,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     }
   }
 
-  public THdfsPartition toThrift(boolean includeFileDescriptorMetadata) {
+  public THdfsPartition toThrift(boolean includeFileDesc) {
     List<TExpr> thriftExprs = Expr.treesToThrift(getPartitionValues());
 
     THdfsPartition thriftHdfsPart = new THdfsPartition(
@@ -481,7 +481,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     thriftHdfsPart.setAccess_level(accessLevel_);
     thriftHdfsPart.setIs_marked_cached(isMarkedCached_);
     thriftHdfsPart.setId(getId());
-    if (includeFileDescriptorMetadata) {
+    if (includeFileDesc) {
       // Add block location information
       for (FileDescriptor fd: fileDescriptors_) {
         thriftHdfsPart.addToFile_desc(fd.toThrift());
