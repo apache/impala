@@ -46,7 +46,8 @@ class TestImpalaShellInteractive(object):
   @pytest.mark.execute_serially
   def test_cancellation(self):
     command = "select sleep(10000);"
-    p = Popen(shlex.split(SHELL_CMD), shell=True, stdout=PIPE, stdin=PIPE, stderr=PIPE)
+    p = Popen(shlex.split(SHELL_CMD), shell=True,
+              stdout=PIPE, stdin=PIPE, stderr=PIPE)
     p.stdin.write(command + "\n")
     p.stdin.flush()
     sleep(1)
@@ -57,10 +58,25 @@ class TestImpalaShellInteractive(object):
     result = get_shell_cmd_result(p)
     assert "Cancelling Query" in result.stderr
 
+  @pytest.mark.execute_serially
+  def test_unicode_input(self):
+    "Test queries containing non-ascii input"
+    # test a unicode query spanning multiple lines
+    unicode_text = u'\ufffd'
+    args = "select '%s'\n;" % unicode_text.encode('utf-8')
+    result = run_impala_shell_interactive(args)
+    assert "Fetched 1 row(s)" in result.stderr
+
+
 def run_impala_shell_interactive(command, shell_args=''):
   """Runs a command in the Impala shell interactively."""
   cmd = "%s %s" % (SHELL_CMD, shell_args)
-  p = Popen(shlex.split(cmd), shell=True, stdout=PIPE, stdin=PIPE, stderr=PIPE)
+  # workaround to make Popen environment 'utf-8' compatible
+  # since piping defaults to ascii
+  my_env = os.environ
+  my_env['PYTHONIOENCODING'] = 'utf-8'
+  p = Popen(shlex.split(cmd), shell=True, stdout=PIPE,
+            stdin=PIPE, stderr=PIPE, env=my_env)
   p.stdin.write(command + "\n")
   p.stdin.flush()
   return get_shell_cmd_result(p)

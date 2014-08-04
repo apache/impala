@@ -328,7 +328,7 @@ class ImpalaShell(cmd.Cmd):
         # readline can properly restore the history (otherwise it interprets each newline
         # as a separate history item).
         self.readline.replace_history_item(current_history_len - 1,
-          completed_cmd.replace('\n', ' '))
+          completed_cmd.encode('utf-8').replace('\n', ' '))
       # Revert the prompt to its earlier state
       self.prompt = self.cached_prompt
     else:  # Input has a delimiter and partial_cmd is empty
