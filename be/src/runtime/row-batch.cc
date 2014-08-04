@@ -22,7 +22,7 @@
 #include "runtime/mem-tracker.h"
 #include "util/compress.h"
 #include "util/decompress.h"
-#include "gen-cpp/Data_types.h"
+#include "gen-cpp/Results_types.h"
 
 using namespace boost;
 using namespace std;

@@ -24,7 +24,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "util/runtime-profile.h"
-#include "gen-cpp/Data_types.h"  // for TRowBatch
+#include "gen-cpp/Results_types.h" // for TRowBatch
 
 namespace impala {
 

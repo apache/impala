@@ -15,7 +15,6 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 
-#include "gen-cpp/Data_types.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/row-batch.h"

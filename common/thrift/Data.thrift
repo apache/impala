@@ -15,33 +15,6 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-include "Types.thrift"
-include "CatalogObjects.thrift"
-
-// Serialized, self-contained version of a RowBatch (in be/src/runtime/row-batch.h).
-struct TRowBatch {
-  // total number of rows contained in this batch
-  1: required i32 num_rows
-
-  // row composition
-  2: required list<Types.TTupleId> row_tuples
-
-  // There are a total of num_rows * num_tuples_per_row offsets
-  // pointing into tuple_data.
-  // An offset of -1 records a NULL.
-  3: list<i32> tuple_offsets
-
-  // binary tuple data
-  // TODO: figure out how we can avoid copying the data during TRowBatch construction
-  4: string tuple_data
-
-  // Indicates the type of compression used
-  5: required CatalogObjects.THdfsCompression compression_type
-
-  // Indicates the uncompressed size
-  6:i32 uncompressed_size
-}
-
 // this is a union over all possible return types
 struct TColumnValue {
   1: optional bool bool_val
@@ -75,14 +48,3 @@ struct TColumnData {
   8: optional list<string> string_vals;
   9: optional list<binary> binary_vals;
 }
-
-struct TResultSetMetadata {
-  1: required list<CatalogObjects.TColumn> columns
-}
-
-// List of rows and metadata describing their columns.
-struct TResultSet {
-  1: required list<TResultRow> rows
-  2: required TResultSetMetadata schema
-}
-

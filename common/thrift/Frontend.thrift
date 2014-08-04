@@ -21,6 +21,7 @@ include "PlanNodes.thrift"
 include "Planner.thrift"
 include "Descriptors.thrift"
 include "Data.thrift"
+include "Results.thrift"
 include "Exprs.thrift"
 include "cli_service.thrift"
 include "Status.thrift"
@@ -289,7 +290,7 @@ struct TQueryExecRequest {
       per_node_scan_ranges
 
   // Metadata of the query result set (only for select)
-  5: optional Data.TResultSetMetadata result_set_metadata
+  5: optional Results.TResultSetMetadata result_set_metadata
 
   // Set if the query needs finalization after it executes
   6: optional TFinalizeParams finalize_params
@@ -435,7 +436,7 @@ struct TExecRequest {
   4: optional TCatalogOpRequest catalog_op_request
 
   // Metadata of the query result set (not set for DML)
-  5: optional Data.TResultSetMetadata result_set_metadata
+  5: optional Results.TResultSetMetadata result_set_metadata
 
   // Result of EXPLAIN. Set iff stmt_type is EXPLAIN
   6: optional TExplainResult explain_result

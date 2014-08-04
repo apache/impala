@@ -20,7 +20,8 @@
 
 #include "common/object-pool.h"
 #include "common/status.h"
-#include "gen-cpp/Types_types.h"  // for TUniqueId
+#include "gen-cpp/Types_types.h"   // for TUniqueId
+#include "gen-cpp/Results_types.h" // for TRowBatch
 #include "runtime/descriptors.h"
 #include "util/tuple-row-compare.h"
 

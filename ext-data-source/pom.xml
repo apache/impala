@@ -32,4 +32,8 @@
     <module>test</module>
   </modules>
 
+  <properties>
+    <thrift.version>0.9.0</thrift.version>
+    <guava.version>11.0.2</guava.version>
+  </properties>
 </project>

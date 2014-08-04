@@ -76,7 +76,6 @@ function(THRIFT_GEN VAR)
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${FIL}
         COMMAND ${THRIFT_COMPILER} ${JAVA_FE_ARGS} ${FIL}
-        COMMAND ${THRIFT_COMPILER} ${JAVA_EXT_DS_ARGS} ${FIL}
         COMMAND ${THRIFT_COMPILER} ${PYTHON_ARGS} ${FIL}
         DEPENDS ${ABS_FIL}
         COMMENT "Running thrift compiler on ${FIL}"
@@ -87,6 +86,31 @@ function(THRIFT_GEN VAR)
 
   set(${VAR} ${${VAR}} PARENT_SCOPE)
 endfunction(THRIFT_GEN)
+
+function(THRIFT_GEN_DS VAR)
+  IF (NOT ARGN)
+    MESSAGE(SEND_ERROR "Error: THRIFT_GEN_DS called without any src files")
+    RETURN()
+  ENDIF(NOT ARGN)
+
+  set(${VAR})
+  foreach(FIL ${ARGN})
+    get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+    get_filename_component(FIL_WE ${FIL} NAME_WE)
+
+    # This isn't the exact output file that's created, just a unique file
+    set(OUTPUT_FILE "${EXT_DS_OUTPUT_DIR}/${FIL_WE}.java")
+    list(APPEND ${VAR} ${OUTPUT_FILE})
+    add_custom_command(
+      OUTPUT ${OUTPUT_FILE}
+      COMMAND ${THRIFT_COMPILER} ${JAVA_EXT_DS_ARGS} ${FIL}
+      DEPENDS ${ABS_FIL}
+      COMMENT "Running thrift compiler for ext-data-source on ${FIL}"
+      VERBATIM
+    )
+  endforeach(FIL)
+  set(${VAR} ${${VAR}} PARENT_SCOPE)
+endfunction(THRIFT_GEN_DS)
 
 message("Using Thrift compiler: ${THRIFT_COMPILER}")
 set(THRIFT_INCLUDE_DIR_OPTION -I ${THRIFT_CONTRIB_DIR} -I $ENV{HIVE_HOME}/src/metastore/if)
@@ -106,6 +130,13 @@ set(JAVA_FE_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${FE_OUTPUT
 set(JAVA_EXT_DS_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${EXT_DS_OUTPUT_DIR})
 set(PYTHON_ARGS ${THRIFT_INCLUDE_DIR_OPTION} -r --gen py -o ${PYTHON_OUTPUT_DIR})
 
+set (EXT_DATA_SRC_FILES
+  ExternalDataSource.thrift
+  Data.thrift
+  Status.thrift
+  Types.thrift
+)
+
 set (SRC_FILES
   beeswax.thrift
   CatalogInternalService.thrift
@@ -113,7 +144,6 @@ set (SRC_FILES
   CatalogService.thrift
   cli_service.thrift
   DataSinks.thrift
-  Data.thrift
   Descriptors.thrift
   ExecStats.thrift
   Frontend.thrift
@@ -130,15 +160,18 @@ set (SRC_FILES
   Partitions.thrift
   parquet.thrift
   ResourceBrokerService.thrift
+  Results.thrift
   RuntimeProfile.thrift
   StatestoreService.thrift
-  Status.thrift
-  Types.thrift
+  ${EXT_DATA_SRC_FILES}
 )
+
 
 # Create a build command for each of the thrift src files and generate
 # a list of files they produce
-THRIFT_GEN(THRIFT_FILES ${SRC_FILES})
+THRIFT_GEN(THRIFT_ALL_FILES ${SRC_FILES})
+THRIFT_GEN_DS(THRIFT_DATA_SRC_FILES ${EXT_DATA_SRC_FILES})
 
 # Add a custom target that generates all the thrift files
-add_custom_target(thrift-cpp ALL DEPENDS ${THRIFT_FILES})
+add_custom_target(thrift-cpp ALL DEPENDS ${THRIFT_ALL_FILES})
+add_custom_target(thrift-ext-data-src ALL DEPENDS ${THRIFT_DATA_SRC_FILES})

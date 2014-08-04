@@ -19,7 +19,7 @@ include "CatalogObjects.thrift"
 include "JniCatalog.thrift"
 include "Types.thrift"
 include "Status.thrift"
-include "Data.thrift"
+include "Results.thrift"
 
 // CatalogServer service API and related structs.
 
@@ -109,7 +109,7 @@ struct TDdlExecResponse {
 
   // Result of DDL operation to be returned to the client. Currently only set
   // by COMPUTE STATS.
-  3: optional Data.TResultSet result_set
+  3: optional Results.TResultSet result_set
 }
 
 // Updates the metastore with new partition information and returns a response

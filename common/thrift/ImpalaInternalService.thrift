@@ -26,7 +26,7 @@ include "Descriptors.thrift"
 include "PlanNodes.thrift"
 include "Planner.thrift"
 include "DataSinks.thrift"
-include "Data.thrift"
+include "Results.thrift"
 include "RuntimeProfile.thrift"
 include "ImpalaService.thrift"
 include "Llama.thrift"
@@ -373,7 +373,7 @@ struct TTransmitDataParams {
   4: optional Types.TPlanNodeId dest_node_id
 
   // required in V1
-  5: optional Data.TRowBatch row_batch
+  5: optional Results.TRowBatch row_batch
 
   // if set to true, indicates that no more row batches will be sent
   // for this dest_node_id

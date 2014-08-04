@@ -72,6 +72,8 @@ set(SRC_FILES
   ResourceBrokerService_constants.cpp
   ResourceBrokerService_types.cpp
   ResourceBrokerService.cpp
+  Results_constants.cpp
+  Results_types.cpp
   Partitions_constants.cpp
   Partitions_types.cpp
   Planner_constants.cpp

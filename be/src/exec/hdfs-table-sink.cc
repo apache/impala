@@ -36,7 +36,6 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <stdlib.h>
 
-#include "gen-cpp/Data_types.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 
 using namespace std;

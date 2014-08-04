@@ -83,6 +83,7 @@ export IMPALA_SENTRY_VERSION=1.3.0-cdh5.1.0-SNAPSHOT
 export IMPALA_LLAMA_VERSION=1.0.0-cdh5.1.0-SNAPSHOT
 export IMPALA_AVRO_VERSION=1.7.4
 export IMPALA_PARQUET_VERSION=1.2.5-cdh5.1.0-SNAPSHOT
+# If the thrift version changes, please update ext-data-source/pom.xml
 export IMPALA_THRIFT_VERSION=0.9.0
 export IMPALA_LLVM_VERSION=3.3
 
