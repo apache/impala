@@ -15,7 +15,8 @@
 
 # This script makes a tarball of the Python-based tests and benchmark scripts
 # that can be unpacked and run out-of-the-box. The final tarball is left in
-# ${IMPALA_HOME}/tests/build.
+# ${IMPALA_HOME}/tests/build. Assumes Impala and /thirdparty have been built
+# built prior to running this script.
 
 if [ "x${IMPALA_HOME}" == "x" ]; then
   echo "\$IMPALA_HOME must be set"
@@ -71,6 +72,7 @@ if [ -z \${IMPALA_HOME} ]; then
 fi
 
 export IMPALA_WORKLOAD_DIR=\${IMPALA_HOME}/testdata/workloads
+export IMPALA_DATASET_DIR=\${IMPALA_HOME}/testdata/datasets
 export THRIFT_HOME=\${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}
 
 # Set these based on your cluster environment
@@ -78,6 +80,9 @@ export THRIFT_HOME=\${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}
 # export HIVE_CONF_DIR=/etc/hive/conf
 # export HADOOP_HOME=/usr/lib/hadoop/
 # export HADOOP_CONF_DIR=/etc/hadoop/conf
+# export HBASE_HOME=/usr/lib/hbase/
+# export HBASE_CONF_DIR=/etc/hbase/conf
+# export PATH=$HBASE_HOME/bin:$PATH
 
 # Build the Python path
 . \${IMPALA_HOME}/bin/set-pythonpath.sh
@@ -89,11 +94,13 @@ EOF
 
 echo "Copying required files and dependencies"
 cp ${IMPALA_VERSION_INFO_FILE} ${TARBALL_ROOT}/bin/
+cp ${IMPALA_HOME}/bin/load-data.py ${TARBALL_ROOT}/bin/
 cp ${IMPALA_HOME}/bin/run-workload.py ${TARBALL_ROOT}/bin/
 cp ${IMPALA_HOME}/bin/set-pythonpath.sh ${TARBALL_ROOT}/bin/
 cp -a ${IMPALA_HOME}/testdata/workloads/ ${TARBALL_ROOT}/testdata/
 cp -a ${IMPALA_HOME}/testdata/datasets/ ${TARBALL_ROOT}/testdata/
 cp -a ${IMPALA_HOME}/testdata/bin/ ${TARBALL_ROOT}/testdata/
+cp -a ${IMPALA_HOME}/testdata/avro_schema_resolution/ ${TARBALL_ROOT}/testdata/
 cp -a ${IMPALA_HOME}/tests/ ${TARBALL_ROOT}/
 cp -a ${IMPALA_HOME}/shell/ ${TARBALL_ROOT}/
 
@@ -102,6 +109,9 @@ cp -a ${THRIFT_HOME} ${TARBALL_ROOT}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}
 
 echo "Making tarball in ${TMP_ROOT_DIR} and copying to: ${OUTPUT_DIR}"
 pushd ${TMP_ROOT_DIR} 2>&1 > /dev/null
+# Exclude dirs that are not needed.
+rm -rf ${TMP_ROOT_DIR}/impala-tests-${VERSION}/tests/results/*
+rm -rf ${TMP_ROOT_DIR}/impala-tests-${VERSION}/tests/build/*
 tar czf ${TMP_ROOT_DIR}/impala-tests-${VERSION}.tar.gz ./impala-tests-${VERSION}/\
     --exclude="*.pyc" || popd 2>&1 > /dev/null
 cp ${TMP_ROOT_DIR}/impala-tests-${VERSION}.tar.gz ${OUTPUT_DIR}
