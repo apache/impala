@@ -356,6 +356,7 @@ Status PlanFragmentExecutor::OpenInternal() {
   // either in error or have returned a status report with done =
   // true, so tearing down any data stream state (a separate
   // channel) in Close is safe.
+  SCOPED_TIMER(profile()->total_time_counter());
   sink_->Close(runtime_state());
   done_ = true;
 
@@ -440,6 +441,10 @@ void PlanFragmentExecutor::StopReportThread() {
   report_thread_->Join();
 }
 
+// TODO: why can't we just put the total_time_counter() at the
+// beginning of Open() and GetNext(). This seems to really mess
+// the timer here, presumably because the data stream sender is
+// multithreaded and the timer we use gets confused.
 Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
   VLOG_FILE << "GetNext(): instance_id="
       << runtime_state_->fragment_instance_id();
