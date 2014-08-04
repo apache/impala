@@ -136,14 +136,15 @@ class TestUnsupportedInsertFormats(ImpalaTestSuite):
 
   def test_unsupported_formats(self, vector):
     try:
-      self.execute_query_using_client(
-        self.client, 'insert into table tinytable values("hi", "there")', vector)
-      # TODO: Remove once the compressed text writers are in.
+      # TODO: Once the compressed text writers are in, the text/codec combinations won't
+      # be unsupported anymore.
       if (vector.get_value('table_format').file_format == 'text' and
           vector.get_value('table_format').compression_codec != 'none'):
         pytest.skip("Until compressed text writers are implemented, inserting to text "
                     "will ignore compression type and succeed by inserting "
                     "uncompressed text.")
+      self.execute_query_using_client(
+        self.client, 'insert into table tinytable values("hi", "there")', vector)
       assert False, 'Query was expected to fail'
     except ImpalaBeeswaxException, e: pass
 
