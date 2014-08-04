@@ -235,12 +235,10 @@ if __name__ == "__main__":
     finally:
       key = "%s_%s" % (workload_runner.workload.name, workload_runner.scale_factor)
       result_map[key] = workload_runner.results
-
-  # Print the result for each workload/scale factor combination.
-  for k in result_map.keys():
-    workload, scale_factor = k.split('_')
-    print "\nWorkload: %s, Scale Factor: %s\n" % (workload.upper(), scale_factor)
-    print_result_summary(result_map[k])
+      # Print the results
+      print "\nWorkload: {0}, Scale Factor: {1}\n".format(
+          workload_runner.workload.name.upper(), workload_runner.scale_factor)
+      print_result_summary(workload_runner.results)
 
   # Store the results
   with open(options.results_json_file, 'w') as f:
