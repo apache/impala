@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -54,6 +55,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // The expr depth limit is mostly due to our recursive implementation of clone().
   public final static int EXPR_DEPTH_LIMIT = 1500;
 
+  // Name of the function that needs to be implemented by every Expr that
+  // supports negation.
+  private final static String NEGATE_FN = "negate";
+
   // to be used where we can't come up with a better estimate
   protected static double DEFAULT_SELECTIVITY = 0.1;
 
@@ -63,6 +68,43 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         public boolean apply(Expr arg) {
           return arg instanceof FunctionCallExpr &&
               ((FunctionCallExpr)arg).isAggregateFunction();
+        }
+      };
+
+  // Returns true if an Expr is a NOT CompoundPredicate.
+  public final static com.google.common.base.Predicate<Expr> IS_NOT_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof CompoundPredicate &&
+              ((CompoundPredicate)arg).getOp() == CompoundPredicate.Operator.NOT;
+        }
+      };
+
+  // Returns true if an Expr is an OR CompoundPredicate.
+  public final static com.google.common.base.Predicate<Expr> IS_OR_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof CompoundPredicate &&
+              ((CompoundPredicate)arg).getOp() == CompoundPredicate.Operator.OR;
+        }
+      };
+
+  // Returns true if an Expr is a subquery predicate.
+  public final static com.google.common.base.Predicate<Expr> IS_SUBQUERY_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof Predicate && ((Predicate)arg).isSubqueryPredicate();
+        }
+      };
+
+  public final static com.google.common.base.Predicate<Expr> IS_TRUE_LITERAL =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof BoolLiteral && ((BoolLiteral)arg).getValue();
         }
       };
 
@@ -926,6 +968,33 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     } else {
       return null;
     }
+  }
+
+  /**
+   * Pushes negation to the individual operands of a predicate
+   * tree rooted at 'root'.
+   */
+  public static Expr pushNegationToOperands(Expr root) {
+    Preconditions.checkNotNull(root);
+    if (Expr.IS_NOT_PREDICATE.apply(root)) {
+      try {
+        // Make sure we call function 'negate' only on classes that support it,
+        // otherwise we may recurse infinitely.
+        Method m = root.getChild(0).getClass().getMethod(NEGATE_FN);
+        return pushNegationToOperands(root.getChild(0).negate());
+      } catch (NoSuchMethodException e) {
+        // The 'negate' function is not implemented. Break the recursion.
+        return root;
+      }
+    }
+
+    if (root instanceof CompoundPredicate) {
+      Expr left = pushNegationToOperands(root.getChild(0));
+      Expr right = pushNegationToOperands(root.getChild(1));
+      return new CompoundPredicate(((CompoundPredicate)root).getOp(), left, right);
+    }
+
+    return root;
   }
 
   /**

@@ -80,6 +80,8 @@ public abstract class QueryStmt extends StatementBase {
   // Analyzer that was used to analyze this query statement.
   protected Analyzer analyzer_;
 
+  public Analyzer getAnalyzer() { return analyzer_; }
+
   QueryStmt(ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
     orderByElements_ = orderByElements;
     sortInfo_ = null;

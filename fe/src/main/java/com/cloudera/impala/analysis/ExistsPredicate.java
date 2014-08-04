@@ -29,6 +29,8 @@ public class ExistsPredicate extends Predicate {
       ExistsPredicate.class);
   private boolean notExists_ = false;
 
+  public boolean isNotExists() { return notExists_; }
+
   /**
    * C'tor that initializes an ExistsPredicate from a Subquery.
    */
@@ -36,6 +38,19 @@ public class ExistsPredicate extends Predicate {
     Preconditions.checkNotNull(subquery);
     children_.add(subquery);
     notExists_ = notExists;
+  }
+
+  @Override
+  public Expr negate() {
+    return new ExistsPredicate((Subquery)getChild(0), !notExists_);
+  }
+
+  @Override
+  public boolean isSubqueryPredicate() { return true; }
+
+  @Override
+  public Subquery getSubquery() {
+    return (Subquery)getChild(0);
   }
 
   /**

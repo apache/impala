@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.planner;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -89,9 +88,6 @@ public class HdfsScanNode extends ScanNode {
 
   // Partition batch size used during partition pruning
   private final static int PARTITION_PRUNING_BATCH_SIZE = 1024;
-
-  // Name of the function used to negate an Expr.
-  private final static String NEGATE_FN = "negate";
 
   private final HdfsTable tbl_;
 
@@ -486,7 +482,7 @@ public class HdfsScanNode extends ScanNode {
       Expr conjunct = it.next();
       if (conjunct.isBoundBySlotIds(partitionSlots)) {
         if (canEvalUsingPartitionMd(conjunct)) {
-          simpleFilterConjuncts.add(pushNegationToOperands(conjunct));
+          simpleFilterConjuncts.add(Expr.pushNegationToOperands(conjunct));
         } else {
           partitionFilters.add(new HdfsPartitionFilter(conjunct, tbl_, analyzer));
         }
@@ -528,32 +524,6 @@ public class HdfsScanNode extends ScanNode {
         descTbl.addReferencedPartition(tbl_, partition.getId());
       }
     }
-  }
-
-  /**
-   * Pushes negation to the individual operands of a predicate
-   * tree rooted at 'root'.
-   */
-  private static Expr pushNegationToOperands(Expr root) {
-    Preconditions.checkNotNull(root);
-    if (root instanceof CompoundPredicate) {
-      if (((CompoundPredicate)root).getOp() == CompoundPredicate.Operator.NOT) {
-        try {
-          // Make sure we call function 'negate' only on classes that support it,
-          // otherwise we may recurse infinitely.
-          Method m = root.getChild(0).getClass().getMethod(NEGATE_FN);
-          return pushNegationToOperands(root.getChild(0).negate());
-        } catch (NoSuchMethodException e) {
-          // The 'negate' function is not implemented. Break the recursion.
-          return root;
-        }
-      } else {
-        Expr left = pushNegationToOperands(root.getChild(0));
-        Expr right = pushNegationToOperands(root.getChild(1));
-        return new CompoundPredicate(((CompoundPredicate)root).getOp(), left, right);
-      }
-    }
-    return root;
   }
 
   /**

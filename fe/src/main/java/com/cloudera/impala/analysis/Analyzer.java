@@ -136,6 +136,12 @@ public class Analyzer {
   // On-clause of any such semi-join is not allowed to reference other semi-joined tuples
   // except its own. Therefore, only a single semi-joined tuple can be visible at a time.
   private TupleId visibleSemiJoinedTupleId_ = null;
+  public void setIsSubquery() {
+    isSubquery_ = true;
+    globalState_.containsSubquery = true;
+  }
+
+  public boolean isSubquery() { return isSubquery_; }
 
   // state shared between all objects of an Analyzer tree
   private static class GlobalState {
@@ -147,6 +153,9 @@ public class Analyzer {
     // True if we are analyzing an explain request. Should be set before starting
     // analysis.
     public boolean isExplain;
+
+    // True if at least one of the analyzers belongs to a subquery.
+    public boolean containsSubquery = false;
 
     // whether to use Hive's auto-generated column labels
     public boolean useHiveColLabels = false;
@@ -236,6 +245,8 @@ public class Analyzer {
 
   private final GlobalState globalState_;
 
+  public boolean containsSubquery() { return globalState_.containsSubquery; }
+
   // An analyzer stores analysis state for a single select block. A select block can be
   // a top level select statement, or an inline view select block.
   // ancestors contains the Analyzers of the enclosing select blocks of 'this'
@@ -290,9 +301,6 @@ public class Analyzer {
     enablePrivChecks_ = parentAnalyzer.enablePrivChecks_;
   }
 
-  public void setIsSubquery() { isSubquery_ = true; }
-  public boolean isSubquery() { return isSubquery_; }
-
   /**
    * Makes the given semi-joined tuple visible such that its slots can be referenced.
    * If tid is null, makes the currently visible semi-joined tuple invisible again.
@@ -305,6 +313,10 @@ public class Analyzer {
   }
 
   public Set<TableName> getMissingTbls() { return missingTbls_; }
+  public boolean hasAncestors() { return !ancestors_.isEmpty(); }
+  public Analyzer getParentAnalyzer() {
+    return hasAncestors() ? ancestors_.get(0) : null;
+  }
 
   /**
    * Returns a list of each warning logged, indicating if it was logged more than once.

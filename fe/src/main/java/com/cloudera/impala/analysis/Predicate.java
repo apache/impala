@@ -19,6 +19,8 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
 
+import com.google.common.base.Preconditions;
+
 public abstract class Predicate extends Expr {
   protected boolean isEqJoinConjunct_;
 
@@ -80,14 +82,29 @@ public abstract class Predicate extends Expr {
    * If predicate is of the form "<slotref> = <slotref>", returns both SlotRefs,
    * otherwise returns null.
    */
-  public Pair<SlotId, SlotId> getEqSlots() {
-    return null;
-  }
+  public Pair<SlotId, SlotId> getEqSlots() { return null; }
 
   /**
    * Returns the SlotRef bound by this Predicate.
    */
-  public SlotRef getBoundSlot() {
-    return null;
-  }
+  public SlotRef getBoundSlot() { return null; }
+
+  /**
+   * Returns true if this is a subquery predicate, i.e. a predicate that
+   * contains a Subquery among its children. Subclasses that can be used as
+   * subquery predicates need to override this function.
+   */
+  public boolean isSubqueryPredicate() { return false; }
+
+  /**
+   * Construct and return a join conjunct from a subquery predicate. Subclasses
+   * that can be used as subquery predicates need to override this function.
+   */
+  public Expr createJoinConjunct(InlineViewRef inlineView) { return null; }
+
+  /**
+   * Returns the subquery of a subquery predicate. Subclasses that can be used
+   * as subquery predicates need to override this function.
+   */
+  public Subquery getSubquery() { return null; }
 }

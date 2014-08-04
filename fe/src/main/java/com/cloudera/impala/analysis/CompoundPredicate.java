@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
@@ -183,6 +184,27 @@ public class CompoundPredicate extends Predicate {
     return new CompoundPredicate(newOp, negatedLeft, negatedRight);
   }
 
+  /**
+   * Creates a conjunctive predicate from a list of exprs.
+   */
+  public static Expr createConjunctivePredicate(List<Expr> conjuncts) {
+    Expr conjunctivePred = null;
+    for (Expr expr: conjuncts) {
+      if (conjunctivePred == null) {
+        conjunctivePred = expr;
+        continue;
+      }
+      conjunctivePred = new CompoundPredicate(CompoundPredicate.Operator.AND,
+          expr, conjunctivePred);
+    }
+    return conjunctivePred;
+  }
+
   @Override
   public Expr clone() { return new CompoundPredicate(this); }
+
+  public static Expr addConjunct(Expr conjunct, Expr dst) {
+    if (dst == null) return conjunct;
+    return new CompoundPredicate(Operator.AND, dst, conjunct);
+  }
 }

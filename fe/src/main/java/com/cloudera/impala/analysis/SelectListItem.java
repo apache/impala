@@ -49,6 +49,7 @@ class SelectListItem {
   public TableName getTblName() { return tblName_; }
   public Expr getExpr() { return expr_; }
   public String getAlias() { return alias_; }
+  public void setAlias(String alias) { alias_ = alias; }
 
   public String toSql() {
     if (!isStar_) {

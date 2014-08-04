@@ -45,7 +45,7 @@ public class InlineViewRef extends TableRef {
   private final View view_;
 
   // The select or union statement of the inline view
-  protected final QueryStmt queryStmt_;
+  protected QueryStmt queryStmt_;
 
   // queryStmt has its own analysis context
   protected Analyzer inlineViewAnalyzer_;
@@ -91,6 +91,21 @@ public class InlineViewRef extends TableRef {
     Preconditions.checkNotNull(other.queryStmt_);
     queryStmt_ = other.queryStmt_.clone();
     view_ = other.view_;
+  }
+
+  /**
+   * Rewrite all subqueries contained within the inline view. The inline view is
+   * modified in place and the rewrite should not alter its select list.
+   */
+  public void rewrite() throws AnalysisException {
+    if (!(queryStmt_ instanceof SelectStmt)) return;
+    int oldSelectListItemCnt =
+        ((SelectStmt)queryStmt_).getSelectList().getItems().size();
+    StmtRewriter.rewriteStatement((SelectStmt)queryStmt_, inlineViewAnalyzer_);
+    queryStmt_ = queryStmt_.clone();
+    int newSelectListItemCnt =
+        ((SelectStmt)queryStmt_).getSelectList().getItems().size();
+    Preconditions.checkState(oldSelectListItemCnt == newSelectListItemCnt);
   }
 
   /**

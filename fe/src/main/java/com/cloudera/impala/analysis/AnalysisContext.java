@@ -45,6 +45,7 @@ public class AnalysisContext {
   static public class AnalysisResult {
     private StatementBase stmt_;
     private Analyzer analyzer_;
+    private CreateTableStmt tmpCreateTableStmt_;
 
     public boolean isAlterTableStmt() { return stmt_ instanceof AlterTableStmt; }
     public boolean isAlterViewStmt() { return stmt_ instanceof AlterViewStmt; }
@@ -134,6 +135,10 @@ public class AnalysisContext {
     public CreateTableStmt getCreateTableStmt() {
       Preconditions.checkState(isCreateTableStmt());
       return (CreateTableStmt) stmt_;
+    }
+
+    public CreateTableStmt getTmpCreateTableStmt() {
+      return tmpCreateTableStmt_;
     }
 
     public CreateDbStmt getCreateDbStmt() {
@@ -233,10 +238,15 @@ public class AnalysisContext {
     public StatementBase getStmt() { return stmt_; }
     public Analyzer getAnalyzer() { return analyzer_; }
     public List<TAccessEvent> getAccessEvents() { return analyzer_.getAccessEvents(); }
+    public boolean requiresRewrite() { return analyzer_.containsSubquery(); }
   }
 
   /**
-   * Parse and analyze 'stmt'. The result of analysis can be retrieved by calling
+   * Parse and analyze 'stmt'. If 'stmt' is a nested query (i.e. query that
+   * contains subqueries), it is also rewritten by performing subquery unnesting.
+   * The transformed stmt is then re-analyzed in a new analysis context.
+   *
+   * The result of analysis can be retrieved by calling
    * getAnalysisResult().
    *
    * @throws AnalysisException
@@ -244,15 +254,48 @@ public class AnalysisContext {
    *           missing tables are detected as a result of running analysis.
    */
   public void analyze(String stmt) throws AnalysisException {
-    analysisResult_ = new AnalysisResult();
-    analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_);
+    Analyzer analyzer = new Analyzer(catalog_, queryCtx_);
+    analyze(stmt, analyzer);
 
+  }
+
+  /**
+   * Parse and analyze 'stmt' using a specified Analyzer.
+   */
+  public void analyze(String stmt, Analyzer analyzer) throws AnalysisException {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     try {
+      analysisResult_ = new AnalysisResult();
+      analysisResult_.analyzer_ = analyzer;
+      if (analysisResult_.analyzer_ == null) {
+        analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_);
+      }
       analysisResult_.stmt_ = (StatementBase) parser.parse().value;
       if (analysisResult_.stmt_ == null) return;
+
+      // For CTAS, we copy the create statement in case we have to create a new CTAS
+      // statement after a query rewrite.
+      if (analysisResult_.stmt_ instanceof CreateTableAsSelectStmt) {
+        analysisResult_.tmpCreateTableStmt_ =
+            ((CreateTableAsSelectStmt)analysisResult_.stmt_).getCreateStmt().clone();
+      }
+
       analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
+      boolean isExplain = analysisResult_.isExplainStmt();
+
+      // Check if we need to rewrite the statement.
+      if (analysisResult_.requiresRewrite()) {
+        StatementBase rewrittenStmt = StmtRewriter.rewrite(analysisResult_);
+        // Re-analyze the rewritten statement.
+        Preconditions.checkNotNull(rewrittenStmt);
+        analysisResult_ = new AnalysisResult();
+        analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_);
+        analysisResult_.stmt_ = rewrittenStmt;
+        analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
+        LOG.trace("rewrittenStmt: " + rewrittenStmt.toSql());
+        if (isExplain) analysisResult_.stmt_.setIsExplain();
+      }
     } catch (AnalysisException e) {
       // Don't wrap AnalysisExceptions in another AnalysisException
       throw e;

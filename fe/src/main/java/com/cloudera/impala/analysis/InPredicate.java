@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -29,6 +30,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
+/**
+ * Class representing a [NOT] IN predicate. It determines if a specified value
+ * (first child) matches any value in a subquery (second child) or a list
+ * of values (remaining children).
+ */
 public class InPredicate extends Predicate {
   private static final String IN = "in";
   private static final String NOT_IN = "not_in";
@@ -71,12 +77,38 @@ public class InPredicate extends Predicate {
     isNotIn_ = other.isNotIn_;
   }
 
+  /**
+   * Create a join conjunct from the comparison expr of the IN predicate (first
+   * child) and the first expr from the subquery's select list. 'viewAlias' is
+   * the table alias that is used to qualify the expr from the subquery select
+   * list. Returns an unanalyzed conjunct.
+   */
+  @Override
+  public Expr createJoinConjunct(InlineViewRef inlineView) {
+    Preconditions.checkNotNull(inlineView);
+    Preconditions.checkState(isSubqueryPredicate());
+    return new BinaryPredicate(Operator.EQ, getChild(0),
+        new SlotRef(new TableName(null, inlineView.getAlias()),
+        inlineView.getViewStmt().getColLabels().get(0)));
+  }
+
+  @Override
+  public boolean isSubqueryPredicate() {
+    return getChild(1) instanceof Subquery ? true : false;
+  }
+
+  @Override
+  public Subquery getSubquery() {
+    Preconditions.checkState(isSubqueryPredicate());
+    return (Subquery)getChild(1);
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
 
-    if (contains(Predicates.instanceOf(Subquery.class))) {
+    if (contains(Subquery.class)) {
       // An [NOT] IN predicate with a subquery must contain two children, the second of
       // which is a Subquery.
       Preconditions.checkState(children_.size() == 2);
@@ -136,7 +168,7 @@ public class InPredicate extends Predicate {
   @Override
   protected void toThrift(TExprNode msg) {
     // Can't serialize a predicate with a subquery
-    Preconditions.checkState(!contains(Predicates.instanceOf(Subquery.class)));
+    Preconditions.checkState(!contains(Subquery.class));
     msg.node_type = TExprNodeType.FUNCTION_CALL;
   }
 
@@ -145,7 +177,7 @@ public class InPredicate extends Predicate {
     StringBuilder strBuilder = new StringBuilder();
     String notStr = (isNotIn_) ? "NOT " : "";
     strBuilder.append(getChild(0).toSql() + " " + notStr + "IN ");
-    boolean hasSubquery = contains(Predicates.instanceOf(Subquery.class));
+    boolean hasSubquery = isSubqueryPredicate();
     if (!hasSubquery) strBuilder.append("(");
     for (int i = 1; i < children_.size(); ++i) {
       strBuilder.append(getChild(i).toSql());

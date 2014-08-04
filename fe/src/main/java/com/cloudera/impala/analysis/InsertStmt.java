@@ -128,6 +128,24 @@ public class InsertStmt extends StatementBase {
     table_ = null;
   }
 
+  /**
+   * C'tor used in clone().
+   */
+  public InsertStmt(InsertStmt other) {
+    withClause_ = other.withClause_ != null ? other.withClause_.clone() : null;
+    targetTableName_ = other.targetTableName_;
+    originalTableName_ = other.targetTableName_;
+    overwrite_ = other.overwrite_;
+    partitionKeyValues_ = other.partitionKeyValues_;
+    planHints_ = other.planHints_;
+    queryStmt_ = other.queryStmt_ != null ? other.queryStmt_.clone() : null;
+    needsGeneratedQueryStatement_ = other.needsGeneratedQueryStatement_;
+    columnPermutation_ = other.columnPermutation_;
+    table_ = other.table_;
+  }
+
+  public InsertStmt clone() { return new InsertStmt(this); }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isExplain_) analyzer.setIsExplain();
@@ -146,6 +164,15 @@ public class InsertStmt extends StatementBase {
         // views and to ignore irrelevant ORDER BYs.
         Analyzer queryStmtAnalyzer = new Analyzer(analyzer);
         queryStmt_.analyze(queryStmtAnalyzer);
+
+        if (analyzer.containsSubquery()) {
+          Preconditions.checkState(queryStmt_ instanceof SelectStmt);
+          StmtRewriter.rewriteStatement((SelectStmt)queryStmt_, queryStmtAnalyzer);
+          queryStmt_ = queryStmt_.clone();
+          queryStmtAnalyzer = new Analyzer(analyzer);
+          queryStmt_.analyze(queryStmtAnalyzer);
+        }
+
         selectListExprs = Expr.cloneList(queryStmt_.getBaseTblResultExprs());
       } catch (AnalysisException e) {
         if (analyzer.getMissingTbls().isEmpty()) throw e;
@@ -588,6 +615,7 @@ public class InsertStmt extends StatementBase {
    * Only valid after analysis
    */
   public QueryStmt getQueryStmt() { return queryStmt_; }
+  public void setQueryStmt(QueryStmt stmt) { queryStmt_ = stmt; }
   public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
   public Boolean isRepartition() { return isRepartition_; }
   public ArrayList<Expr> getResultExprs() { return resultExprs_; }

@@ -68,6 +68,22 @@ public class CreateTableAsSelectStmt extends StatementBase {
     tmpAnalyzer.setUseHiveColLabels(true);
     tmpQueryStmt.analyze(tmpAnalyzer);
 
+    if (analyzer.containsSubquery()) {
+      // The select statement of this CTAS is nested. Rewrite the
+      // statement to unnest all subqueries and re-analyze using a new analyzer.
+      Preconditions.checkState(tmpQueryStmt instanceof SelectStmt);
+      SelectStmt selectStmt = (SelectStmt)tmpQueryStmt;
+      StmtRewriter.rewriteStatement(selectStmt, tmpAnalyzer);
+      // Update the insert statement with the unanalyzed rewritten select stmt.
+      insertStmt_.setQueryStmt(selectStmt.clone());
+
+      // Re-analyze the select statement of the CTAS.
+      tmpQueryStmt = insertStmt_.getQueryStmt().clone();
+      tmpAnalyzer = new Analyzer(analyzer);
+      tmpAnalyzer.setUseHiveColLabels(true);
+      tmpQueryStmt.analyze(tmpAnalyzer);
+    }
+
     // Add the columns from the select statement to the create statement.
     int colCnt = tmpQueryStmt.getColLabels().size();
     for (int i = 0; i < colCnt; ++i) {

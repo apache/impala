@@ -1,500 +1,275 @@
 ====
 ---- QUERY
-# join between three tables, extra join predicates, extra scan predicates, nulls in joins
-# cols
-# (alltypesagg.tinyint_col contains nulls instead of 0s)
-select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
-from (
-       select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,
-              a.int_col int_col, a.month month,
-              b.float_col float_col, b.id id
-       from (
-              select *
-              from alltypesagg a
-              where month=1
-            ) a
-            join alltypessmall b
-            on (a.smallint_col = b.id)
-     ) x
-join alltypessmall c on (x.tinyint_col = c.id)
-where x.day=1
-and   x.int_col > 899
-and   x.float_col > 4.5
-and   c.string_col < '7'
-and   x.int_col + x.float_col + cast(c.string_col as float) < 1000
+# Uncorrelated IN subquery
+select a.id, a.int_col, a.string_col
+from functional.alltypessmall a
+where a.id in (select id from functional.alltypestiny where bool_col = false)
+and a.id < 5
 ---- RESULTS
-15,15,5,5,915,5.5,'5'
-16,16,6,6,916,6.599999904632568,'6'
-31,31,1,1,931,6.599999904632568,'1'
-32,32,2,2,932,7.699999809265137,'2'
-33,33,3,3,933,8.800000190734863,'3'
-34,34,4,4,934,9.899999618530273,'4'
-41,41,1,1,941,6.599999904632568,'1'
-42,42,2,2,942,7.699999809265137,'2'
-43,43,3,3,943,8.800000190734863,'3'
-44,44,4,4,944,9.899999618530273,'4'
-5,5,5,5,905,5.5,'5'
-55,55,5,5,955,5.5,'5'
-56,56,6,6,956,6.599999904632568,'6'
-6,6,6,6,906,6.599999904632568,'6'
-65,65,5,5,965,5.5,'5'
-66,66,6,6,966,6.599999904632568,'6'
-81,81,1,1,981,6.599999904632568,'1'
-82,82,2,2,982,7.699999809265137,'2'
-83,83,3,3,983,8.800000190734863,'3'
-84,84,4,4,984,9.899999618530273,'4'
-91,91,1,1,991,6.599999904632568,'1'
+1,1,'1'
+3,3,'3'
 ---- TYPES
-smallint, int, tinyint, int, int, float, string
+INT, INT, STRING
 ====
 ---- QUERY
-# Same join as above, but subquery on the RHS
-select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
-from alltypessmall c
-     join
-     (
-       select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,
-              a.int_col int_col, a.month month,
-              b.float_col float_col, b.id id
-       from alltypessmall b
-            join
-            (
-              select *
-              from alltypesagg a
-              where month=1
-            ) a
-            on (a.smallint_col = b.id)
-     ) x
-     on (x.tinyint_col = c.id)
-where x.day=1
-and   x.int_col > 899
-and   x.float_col > 4.5
-and   c.string_col < '7'
-and   x.int_col + x.float_col + cast(c.string_col as float) < 1000
+# Uncorrelated IN subquery with IS NOT NULL predicate
+select a.id, a.int_col, a.string_col
+from functional.alltypes a
+where a.int_col in (select int_col from functional.alltypesagg where int_col is not null)
+and a.id < 5
 ---- RESULTS
-15,15,5,5,915,5.5,'5'
-16,16,6,6,916,6.599999904632568,'6'
-31,31,1,1,931,6.599999904632568,'1'
-32,32,2,2,932,7.699999809265137,'2'
-33,33,3,3,933,8.800000190734863,'3'
-34,34,4,4,934,9.899999618530273,'4'
-41,41,1,1,941,6.599999904632568,'1'
-42,42,2,2,942,7.699999809265137,'2'
-43,43,3,3,943,8.800000190734863,'3'
-44,44,4,4,944,9.899999618530273,'4'
-5,5,5,5,905,5.5,'5'
-55,55,5,5,955,5.5,'5'
-56,56,6,6,956,6.599999904632568,'6'
-6,6,6,6,906,6.599999904632568,'6'
-65,65,5,5,965,5.5,'5'
-66,66,6,6,966,6.599999904632568,'6'
-81,81,1,1,981,6.599999904632568,'1'
-82,82,2,2,982,7.699999809265137,'2'
-83,83,3,3,983,8.800000190734863,'3'
-84,84,4,4,984,9.899999618530273,'4'
-91,91,1,1,991,6.599999904632568,'1'
+1,1,'1'
+2,2,'2'
+3,3,'3'
+4,4,'4'
 ---- TYPES
-smallint, int, tinyint, int, int, float, string
+INT, INT, STRING
 ====
 ---- QUERY
-# aggregate without group by
-select *
-from (
-       select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col),
-              sum(tinyint_col), avg(tinyint_col)
-       from (
-              select * from alltypesagg
-            ) a
-     ) b
+# Uncorrelated IN subquery with IS NULL predicate (empty result)
+select a.id, a.int_col, a.string_col
+from functional.alltypes a
+where a.id in (select int_col from functional.alltypesagg where int_col is null)
+and a.id < 5
 ---- RESULTS
-11000,9000,1,9,45000,5
 ---- TYPES
-bigint, bigint, tinyint, tinyint, bigint, double
+INT, INT, STRING
 ====
 ---- QUERY
-# aggregate with group-by, having
-select *
-from (
-       select int_col % 7 c1, count(*) c2, avg(int_col) c3
-       from (
-              select * from alltypesagg where day is not null
-            ) a
-       group by 1
-       having avg(int_col) > 500 or count(*) = 10
-     ) b
-where c1 is not null
-and   c2 > 10
+# Uncorrelated NOT IN subquery
+select id, year, month
+from functional.alltypessmall
+where id not in (select id from functional.alltypestiny where bool_col = false)
+and id < 5
 ---- RESULTS
-4,1430,501
-5,1430,502
-0,1420,500.5
+0,2009,1
 ---- TYPES
-int, bigint, double
+INT, INT, INT
 ====
 ---- QUERY
-# multiple levels of aggregation
-select c1, c3, m2
-from (
-       select c1, c3, max(c2) m2
-       from (
-              select c1, c2, c3
-              from (
-                     select int_col c1, tinyint_col c2, max(id) c3
-                     from functional_hbase.alltypessmall
-                     group by 1, 2
-                     order by 1,2
-                     limit 5
-                   ) x
-             ) x2
-       group by c1, c3
-       limit 10
-     ) t
-where c1 > 0
-order by 2, 1 desc
-limit 3
+# Correlated IN subquery
+select s.id, s.bool_col, s.int_col, s.date_string_col
+from functional.alltypessmall s
+where s.id in (select id from functional.alltypestiny t where t.int_col = s.int_col)
+and s.bool_col = false
 ---- RESULTS
-1,96,1
-2,97,2
-3,98,3
+1,false,1,'01/01/09'
 ---- TYPES
-int, int, tinyint
+INT, BOOLEAN, INT, STRING
 ====
 ---- QUERY
-# do not materialize the agg expr slot
-select c1, c2
-from (
-       select int_col c1, tinyint_col c2, min(float_col) c3
-       from functional_hbase.alltypessmall
-       group by 1, 2
-     ) x
+# Correlated NOT IN subquery
+select s.id, s.bool_col, s.int_col
+from functional.alltypessmall s
+where s.id not in
+  (select id
+   from functional.alltypestiny t
+   where s.int_col = t.int_col and t.bool_col = false)
+and s.id < 5
+order by s.id
+---- RESULTS
+0,true,0
+2,true,2
+3,false,3
+4,true,4
+---- TYPES
+INT, BOOLEAN, INT
+====
+---- QUERY
+# Correlated EXISTS subquery
+select count(*)
+from functional.alltypestiny t
+where exists (select * from functional.alltypessmall s where t.int_col = s.int_col)
+and id < 4
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Correlated NOT EXISTS subquery
+select id, int_col
+from functional.alltypessmall t
+where not exists (select 1 from functional.alltypestiny s where t.id = s.id)
+and month = 1 and int_col < 5
+order by id
+---- RESULTS
+20,0
+21,1
+22,2
+23,3
+24,4
+---- TYPES
+INT, INT
+====
+---- QUERY
+# Uncorrelated aggregate subquery
+select count(*) from
+functional.alltypessmall t
+where t.id < (select max(id) from functional.alltypestiny)
+and t.bool_col = true
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Uncorrelated aggregate subquery with count
+select id, int_col, year, month
+from functional.alltypessmall
+where int_col = (select count(*) from functional.alltypestiny)
+order by id
+---- RESULTS
+8,8,2009,1
+18,8,2009,1
+33,8,2009,2
+43,8,2009,2
+58,8,2009,3
+68,8,2009,3
+83,8,2009,4
+93,8,2009,4
+---- TYPES
+INT, INT, INT, INT
+====
+---- QUERY
+# Correlated aggregate subquery
+select id, int_col, year, month
+from functional.alltypessmall s
+where s.int_col = (select count(*) from functional.alltypestiny t where s.id = t.id)
+order by id
+---- RESULTS
+1,1,2009,1
+10,0,2009,1
+20,0,2009,1
+25,0,2009,2
+35,0,2009,2
+45,0,2009,2
+50,0,2009,3
+60,0,2009,3
+70,0,2009,3
+75,0,2009,4
+85,0,2009,4
+95,0,2009,4
+---- TYPES
+INT, INT, INT, INT
+====
+---- QUERY
+# Multiple subquery predicates
+select id, bool_col, int_col, date_string_col
+from functional.alltypessmall s
+where s.id in (select id from functional.alltypestiny where bool_col = true)
+and exists
+  (select *
+   from functional.alltypesagg g
+   where s.int_col = g.int_col and g.bigint_col < 100)
+and s.int_col < (select count(*) from functional.alltypes where month = 1)
+---- RESULTS
+2,true,2,'01/01/09'
+4,true,4,'01/01/09'
+6,true,6,'01/01/09'
+---- TYPES
+INT, BOOLEAN, INT, STRING
+====
+---- QUERY
+# Multiple nesting levels
+select month, count(*)
+from functional.alltypessmall s
+where id in
+  (select id
+   from functional.alltypestiny t
+   where t.int_col <
+     (select min(int_col)
+      from functional.alltypesagg a
+      where a.bool_col = false and exists
+      (select * from functional.alltypes b where b.id = a.id)))
+group by month
+---- RESULTS
+1,4
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# Multiple tables in outer select block and in subqueries
+select t.id, t.month, t.year
+from functional.alltypestiny t left outer join functional.alltypessmall s
+on s.id = t.id
+where t.int_col <
+  (select avg(a.int_col) * 2
+   from functional.alltypesagg a left outer join functional.alltypes b
+   on a.bigint_col = b.bigint_col
+   where a.id = t.id and b.int_col < 10)
+order by t.id
+---- RESULTS
+1,1,2009
+2,2,2009
+3,2,2009
+4,3,2009
+5,3,2009
+6,4,2009
+7,4,2009
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Subquery in the WITH clause
+with t as
+  (select *
+   from functional.alltypessmall
+   where id in
+     (select id
+      from functional.alltypestiny
+      where bool_col = false))
+select id, month, year from t where t.int_col =
+  (select count(*) from functional.alltypestiny where id < 5)
+---- RESULTS
+5,1,2009
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Subquery in an inline view
+select s.id, s.year
+from functional.alltypessmall s left outer join
+  (select *
+   from functional.alltypestiny t
+   where t.id in (select id from functional.alltypesagg)) b
+on (s.id = b.id)
+where s.int_col < (select max(int_col) from functional.alltypes) and s.id < 10
+order by s.id
+---- RESULTS
+0,2009
+1,2009
+2,2009
+3,2009
+4,2009
+5,2009
+6,2009
+7,2009
+8,2009
+---- TYPES
+INT, INT
+====
+---- QUERY
+# Subquery returning a decimal
+select id, double_col
+from functional.alltypestiny
+where double_col < (select min(d3) from functional.decimal_tbl)
+order by id
 ---- RESULTS
 0,0
-1,1
-2,2
-3,3
-4,4
-5,5
-6,6
-7,7
-8,8
-9,9
+2,0
+4,0
+6,0
 ---- TYPES
-int, tinyint
+INT, DOUBLE
 ====
 ---- QUERY
-# subquery with aggregation and order by/limit, as left-hand side of join;
-# having clause in subquery is transfered to merge agg step in distrib plan
-select *
-from (
-  select int_col, count(*)
-  from alltypessmall
-  where month = 1
-  group by int_col
-  having count(*) > 2
-  order by count(*) desc, int_col limit 5
-  ) t1
-join alltypes t2 on (t1.int_col = t2.id)
-where month = 1
+# Compare a decimal with the result of a subquery
+select d1, d2, d3
+from functional.decimal_tbl
+where d3 < (select max(double_col) from functional.alltypestiny)
 ---- RESULTS
-0,3,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
-1,3,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
-2,3,2,true,2,2,2,20,2.200000047683716,20.2,'01/01/09','2',2009-01-01 00:02:00.100000000,2009,1
-3,3,3,false,3,3,3,30,3.299999952316284,30.3,'01/01/09','3',2009-01-01 00:03:00.300000000,2009,1
-4,3,4,true,4,4,4,40,4.400000095367432,40.4,'01/01/09','4',2009-01-01 00:04:00.600000000,2009,1
+1234,2222,1.2345678900
 ---- TYPES
-int, bigint, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
-====
----- QUERY
-select distinct *
-from (
-       select bool_col, tinyint_col, count(*)
-       from alltypesagg
-       group by bool_col, tinyint_col
-       having bool_col = true
-     ) x
-where tinyint_col < 6
----- RESULTS
-true,2,1000
-true,4,1000
----- TYPES
-boolean, tinyint, bigint
-====
----- QUERY
-# distinct w/ explicit select list
-select *
-from (
-       select distinct bool_col, tinyint_col
-       from (
-              select * from alltypesagg where tinyint_col < 7
-            ) y
-     ) x
-where bool_col = true
----- RESULTS
-true,2
-true,4
-true,6
----- TYPES
-boolean, tinyint
-====
----- QUERY
-# semi-join on string
-select *
-from (
-       select d.*
-       from DimTbl d left semi join JoinTbl j on (j.test_name = d.name)
-     ) x
-where x.name > 'Name1'
----- RESULTS
-1002,'Name2',94611
-1003,'Name3',94612
-1004,'Name4',94612
-1005,'Name5',94613
-1006,'Name6',94613
----- TYPES
-bigint, string, int
-====
----- QUERY
-select j.*, d.*
-from (
-       select *
-       from JoinTbl a
-     ) j
-     left outer join
-     (
-       select *
-       from DimTbl b
-     ) d
-     on (j.test_name = d.name)
-where j.test_id <= 1006
----- RESULTS
-1001,'Name1',94611,5000,1001,'Name1',94611
-1002,'Name2',94611,5000,1002,'Name2',94611
-1003,'Name3',94611,5000,1003,'Name3',94612
-1004,'Name4',94611,5000,1004,'Name4',94612
-1005,'Name5',94611,5000,1005,'Name5',94613
-1006,'Name16',94612,15000,NULL,'NULL',NULL
-1006,'Name16',94612,5000,NULL,'NULL',NULL
-1006,'Name16',94616,15000,NULL,'NULL',NULL
-1006,'Name16',94616,5000,NULL,'NULL',NULL
-1006,'Name6',94616,15000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
----- TYPES
-bigint, string, int, int, bigint, string, int
-====
----- QUERY
-# TODO: If we apply predicate on d, the result will be incorrect. This is a general
-# predicate evaluation issue.
-#
-select j.*, d.*
-from (
-       select *
-       from JoinTbl a
-     ) j
-     left outer join
-     (
-       select *
-       from DimTbl b
-     ) d
-     on (j.test_name = d.name)
-where j.test_id <= 1006
----- RESULTS
-1001,'Name1',94611,5000,1001,'Name1',94611
-1002,'Name2',94611,5000,1002,'Name2',94611
-1003,'Name3',94611,5000,1003,'Name3',94612
-1004,'Name4',94611,5000,1004,'Name4',94612
-1005,'Name5',94611,5000,1005,'Name5',94613
-1006,'Name16',94612,15000,NULL,'NULL',NULL
-1006,'Name16',94612,5000,NULL,'NULL',NULL
-1006,'Name16',94616,15000,NULL,'NULL',NULL
-1006,'Name16',94616,5000,NULL,'NULL',NULL
-1006,'Name6',94616,15000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
----- TYPES
-bigint, string, int, int, bigint, string, int
-====
----- QUERY
-# Constant selects in subqueries
-select * from (select 1, 2) x
----- RESULTS
-1,2
----- TYPES
-tinyint, tinyint
-====
----- QUERY
-# Constant selects in subqueries
-select * from (select y from (select 1 y) a where y < 10) b
----- RESULTS
-1
----- TYPES
-tinyint
-====
----- QUERY
-# Constant selects in subqueries
-select * from (select 1 union all select 2 union all select * from (select 3) y) x
----- RESULTS
-1
-2
-3
----- TYPES
-tinyint
-====
----- QUERY
-# Join on inline views made up of unions of constant selects
-select * from
-(select 1 a, 2 b union all select 1 a, 2 b) x
-inner join
-(select 1 a, 3 b union all select 1 a, 2 b) y on x.a = y.a
-inner join
-(select 1 a, 3 b union all select 1 a, 3 b) z on z.b = y.b
----- RESULTS
-1,2,1,3,1,3
-1,2,1,3,1,3
-1,2,1,3,1,3
-1,2,1,3,1,3
----- TYPES
-tinyint, tinyint, tinyint, tinyint, tinyint, tinyint
-====
----- QUERY
-# Semi and inner join on a table and on inline views made up of constant selects
-select x.date_string_col, z.* from functional.alltypessmall x
-left semi join
-(select 1 a, 3 b union all select 1 a, 3 b) y on y.a = x.id
-inner join
-(select 1 a, 3 b union all select 1 a, 3 b) z on z.b = x.id + 2
----- RESULTS
-'01/01/09',1,3
-'01/01/09',1,3
----- TYPES
-string, tinyint, tinyint
-====
----- QUERY
-# Values statement in subqueries
-select * from (values(1, 2), (3, 4)) x
----- RESULTS
-1,2
-3,4
----- TYPES
-TINYINT, TINYINT
-====
----- QUERY
-# Values statement in subqueries
-select * from (select y from (values(1 as y), (11)) a where y < 10) b
----- RESULTS
-1
----- TYPES
-TINYINT
-====
----- QUERY
-# Values statement in subqueries with union
-select * from (values(1), (2) union all select * from (values(3)) y) x
----- RESULTS
-1
-2
-3
----- TYPES
-TINYINT
-====
----- QUERY
-# Join on inline views made up of values statements
-select * from
-(values(1 a, 2 b), (1, 2)) x
-inner join
-(values(1 a, 3 b), (1, 2)) y on x.a = y.a
-inner join
-(values(1 a, 3 b), (1, 3)) z on z.b = y.b
----- RESULTS
-1,2,1,3,1,3
-1,2,1,3,1,3
-1,2,1,3,1,3
-1,2,1,3,1,3
----- TYPES
-TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT
-====
----- QUERY
-# Semi and inner join on a table and on inline views made up of values statements
-select x.date_string_col, z.* from functional.alltypessmall x
-left semi join
-(values(1 a, 3 b), (1, 3)) y on y.a = x.id
-inner join
-(values(1 a, 3 b), (1, 3)) z on z.b = x.id + 2
----- RESULTS
-'01/01/09',1,3
-'01/01/09',1,3
----- TYPES
-STRING, TINYINT, TINYINT
-====
----- QUERY
-# Select constant with unreferenced aggregate in subquery
-select 1 from (select count(*) from functional.alltypessmall) x
----- RESULTS
-1
----- TYPES
-tinyint
-====
----- QUERY
-# Select constant with unreferenced distinct aggregate in subquery
-select 1 from (select count(distinct tinyint_col) from functional.alltypessmall) x
----- RESULTS
-1
----- TYPES
-tinyint
-====
----- QUERY
-# Select aggregate from unreferenced aggregate in subquery
-select count(*) from (select count(*) from functional.alltypessmall) x
----- RESULTS
-1
----- TYPES
-bigint
-====
----- QUERY
-# Select * from aggregate in subquery
-select * from (select count(*) from functional.alltypessmall) x
----- RESULTS
-100
----- TYPES
-bigint
-====
----- QUERY
-# Select from aliased aggregate in subquery
-select c from (select count(*) c from functional.alltypessmall) x
----- RESULTS
-100
----- TYPES
-bigint
-====
----- QUERY
-# Select aggregate from aliased aggregate in subquery
-select count(c) from (select count(*) c from functional.alltypessmall) x
----- RESULTS
-1
----- TYPES
-bigint
-====
----- QUERY
-# Select aggregate from aggregate of basetable column in subquery
-select count(1) from (select count(tinyint_col) from functional.alltypessmall) x
----- RESULTS
-1
----- TYPES
-bigint
-====
----- QUERY
-# Select aggregate from aggregate in subquery with group by
-select count(1) from
-(select count(*) from functional.alltypessmall group by tinyint_col) x
----- RESULTS
-10
----- TYPES
-bigint
-====
----- QUERY
-# Regression test for IMPALA-812
-select bool_col, count(*) from
-  (select bool_col FROM ( SELECT bool_col FROM alltypessmall t ) t WHERE bool_col ) t
-group by 1
----- RESULTS
-true,50
----- TYPES
-boolean, bigint
+DECIMAL, DECIMAL, DECIMAL
 ====

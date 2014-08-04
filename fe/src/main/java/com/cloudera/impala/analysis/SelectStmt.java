@@ -15,21 +15,31 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.BinaryPredicate.Operator;
+import com.cloudera.impala.analysis.CompoundPredicate;
+import com.cloudera.impala.analysis.Predicate;
+import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.ColumnAliasGenerator;
+import com.cloudera.impala.common.TableAliasGenerator;
 import com.cloudera.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -39,12 +49,12 @@ import com.google.common.collect.Sets;
 public class SelectStmt extends QueryStmt {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
 
-  private final SelectList selectList_;
-  private final ArrayList<String> colLabels_; // lower case column labels
-  private final List<TableRef> tableRefs_;
-  private final Expr whereClause_;
-  private final ArrayList<Expr> groupingExprs_;
-  private final Expr havingClause_;  // original having clause
+  protected SelectList selectList_;
+  protected final ArrayList<String> colLabels_; // lower case column labels
+  protected final List<TableRef> tableRefs_;
+  protected Expr whereClause_;
+  protected ArrayList<Expr> groupingExprs_;
+  protected final Expr havingClause_;  // original having clause
 
   // havingClause with aliases and agg output resolved
   private Expr havingPred_;
@@ -57,7 +67,7 @@ public class SelectStmt extends QueryStmt {
 
   // SQL string of this SelectStmt before inline-view expression substitution.
   // Set in analyze().
-  private String sqlString_;
+  protected String sqlString_;
 
   // substitutes all exprs in this select block to reference base tables
   // directly
@@ -99,12 +109,34 @@ public class SelectStmt extends QueryStmt {
   public Expr getHavingPred() { return havingPred_; }
 
   public List<TableRef> getTableRefs() { return tableRefs_; }
+  public boolean hasWhereClause() { return whereClause_ != null; }
+  public boolean hasGroupByClause() { return groupingExprs_ != null; }
   public Expr getWhereClause() { return whereClause_; }
+  public void setWhereClause(Expr whereClause) { whereClause_ = whereClause; }
   public AggregateInfo getAggInfo() { return aggInfo_; }
   public AnalyticInfo getAnalyticInfo() { return analyticInfo_; }
+  public boolean hasAggInfo() { return aggInfo_ != null; }
   @Override
   public ArrayList<String> getColLabels() { return colLabels_; }
   public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
+
+  // Column alias generator used during query rewriting.
+  private ColumnAliasGenerator columnAliasGenerator_ = null;
+  public ColumnAliasGenerator getColumnAliasGenerator() {
+    if (columnAliasGenerator_ == null) {
+      columnAliasGenerator_ = new ColumnAliasGenerator(colLabels_, null);
+    }
+    return columnAliasGenerator_;
+  }
+
+  // Table alias generator used during query rewriting.
+  private TableAliasGenerator tableAliasGenerator_ = null;
+  public TableAliasGenerator getTableAliasGenerator() {
+    if (tableAliasGenerator_ == null) {
+      tableAliasGenerator_ = new TableAliasGenerator(analyzer_, null);
+    }
+    return tableAliasGenerator_;
+  }
 
   /**
    * Creates resultExprs and baseTblResultExprs.

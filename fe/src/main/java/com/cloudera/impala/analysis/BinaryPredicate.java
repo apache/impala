@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,7 +122,7 @@ public class BinaryPredicate extends Predicate {
   protected void toThrift(TExprNode msg) {
     Preconditions.checkState(children_.size() == 2);
     // Cannot serialize a nested predicate.
-    Preconditions.checkState(!contains(Predicates.instanceOf(Subquery.class)));
+    Preconditions.checkState(!contains(Subquery.class));
     // This check is important because we often clone and/or evaluate predicates,
     // and it's easy to get the casting logic wrong, e.g., cloned predicates
     // with expr substitutions need to be re-analyzed with reanalyze().
@@ -164,9 +166,19 @@ public class BinaryPredicate extends Predicate {
       throw new AnalysisException(errMsg);
     }
     Preconditions.checkState(fn_.getReturnType().isBoolean());
+
+    ArrayList<Expr> subqueries = Lists.newArrayList();
+    collectAll(Predicates.instanceOf(Subquery.class), subqueries);
+    if (subqueries.size() > 1) {
+      // TODO Remove that restriction when we add support for independent subquery
+      // evaluation.
+      throw new AnalysisException("Multiple subqueries are not supported in binary " +
+          "predicates: " + toSql());
+    }
+
     // Don't perform any casting for predicates with subqueries here. Any casting
     // required will be performed when the subquery is unnested.
-    if (!contains(Predicates.instanceOf(Subquery.class))) castForFunctionCall(true);
+    if (!contains(Subquery.class)) castForFunctionCall(true);
 
     // determine selectivity
     // TODO: Compute selectivity for nested predicates
@@ -270,4 +282,42 @@ public class BinaryPredicate extends Predicate {
 
   @Override
   public Expr clone() { return new BinaryPredicate(this); }
+
+  /**
+   * Return true if this BinaryPredicate contains a Subquery, false
+   * otherwise.
+   */
+  @Override
+  public boolean isSubqueryPredicate() {
+    return contains(Subquery.class);
+  }
+
+  @Override
+  public Subquery getSubquery() {
+    Preconditions.checkState(isSubqueryPredicate());
+    ArrayList<Subquery> subqueries = Lists.newArrayList();
+    collect(Predicates.instanceOf(Subquery.class), subqueries);
+    Preconditions.checkState(subqueries.size() == 1);
+    return subqueries.get(0);
+  }
+
+  @Override
+  public Expr createJoinConjunct(InlineViewRef inlineView) {
+    Preconditions.checkNotNull(inlineView);
+    Preconditions.checkState(isSubqueryPredicate());
+    boolean converseOperator = false;
+    Expr cmpExpr = null;
+    if (getChild(0).contains(Subquery.class)) {
+      cmpExpr = getChild(1);
+      converseOperator = true;
+    } else {
+      cmpExpr = getChild(0);
+    }
+
+    Operator op = (converseOperator) ? op_.converse() : op_;
+    // Return an unanalyzed expr.
+    return new BinaryPredicate(op, cmpExpr,
+        new SlotRef(new TableName(null, inlineView.getAlias()),
+        inlineView.getViewStmt().getColLabels().get(0)));
+  }
 }

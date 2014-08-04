@@ -74,14 +74,17 @@ class TestQueries(ImpalaTestSuite):
     # We can get the sort tests for free from the top-n file
     self.run_test_case('QueryTest/top-n', vector)
 
-  def test_subquery(self, vector):
+  def test_inline_view(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail("jointbl does not have columns with unique values, "
                    "hbase collapses them")
-    self.run_test_case('QueryTest/subquery', vector)
+    self.run_test_case('QueryTest/inline-view', vector)
 
-  def test_subquery_limit(self, vector):
-    self.run_test_case('QueryTest/subquery-limit', vector)
+  def test_inline_view_limit(self, vector):
+    self.run_test_case('QueryTest/inline-view-limit', vector)
+
+  def test_subquery(self, vector):
+    self.run_test_case('QueryTest/subquery', vector)
 
   def test_empty(self, vector):
     self.run_test_case('QueryTest/empty', vector)

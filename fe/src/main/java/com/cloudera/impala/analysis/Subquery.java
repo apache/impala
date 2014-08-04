@@ -41,6 +41,7 @@ public class Subquery extends Expr {
   // A subquery has its own analysis context
   protected Analyzer analyzer_;
 
+  public Analyzer getAnalyzer() { return analyzer_; }
   public QueryStmt getStatement() { return stmt_; }
   @Override
   public String toSqlImpl() { return "(" + stmt_.toSql() + ")"; }
@@ -60,7 +61,6 @@ public class Subquery extends Expr {
   public Subquery(Subquery other) {
     super(other);
     stmt_ = other.stmt_.clone();
-    analyzer_ = other.analyzer_;
   }
 
   /**

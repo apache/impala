@@ -148,7 +148,6 @@ public class AnalyzerTest {
     }
   }
 
-
   /**
    * Parse 'stmt' and return the root ParseNode.
    */
@@ -183,24 +182,18 @@ public class AnalyzerTest {
 
   /**
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
-   */
-  public ParseNode AnalyzesOk(String stmt, Analyzer analyzer) {
-    return AnalyzesOk(stmt, analyzer, null);
-  }
-
-  /**
-   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    * If 'expectedWarning' is not null, asserts that a warning is produced.
    */
   public ParseNode AnalyzesOk(String stmt, Analyzer analyzer, String expectedWarning) {
-    this.analyzer_ = analyzer;
-    LOG.info("analyzing " + stmt);
-    ParseNode node = ParsesOk(stmt);
-    assertNotNull(node);
     try {
-      node.analyze(analyzer);
+      analyzer_ = analyzer;
+      AnalysisContext analysisCtx = new AnalysisContext(catalog_,
+          TestUtils.createQueryContext(Catalog.DEFAULT_DB,
+              System.getProperty("user.name")));
+      analysisCtx.analyze(stmt, analyzer);
+      AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
       if (expectedWarning != null) {
-        List<String> actualWarnings = analyzer.getWarnings();
+        List<String> actualWarnings = analysisResult.getAnalyzer().getWarnings();
         boolean matchedWarning = false;
         for (String actualWarning: actualWarnings) {
           if (actualWarning.startsWith(expectedWarning)) {
@@ -214,11 +207,27 @@ public class AnalyzerTest {
               expectedWarning, Joiner.on("\n").join(actualWarnings)));
         }
       }
-    } catch (ImpalaException e) {
+      Preconditions.checkNotNull(analysisResult.getStmt());
+      return analysisResult.getStmt();
+    } catch (Exception e) {
       e.printStackTrace();
       fail("Error:\n" + e.toString());
     }
-    return node;
+    return null;
+  }
+
+  /**
+   * Asserts if stmt passes analysis.
+   */
+  public void AnalysisError(String stmt) {
+    AnalysisError(stmt, null);
+  }
+
+  /**
+   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
+   */
+  public ParseNode AnalyzesOk(String stmt, Analyzer analyzer) {
+    return AnalyzesOk(stmt, analyzer, null);
   }
 
   /**
@@ -235,35 +244,22 @@ public class AnalyzerTest {
    */
   public void AnalysisError(String stmt, Analyzer analyzer, String expectedErrorString) {
     Preconditions.checkNotNull(expectedErrorString, "No expected error message given.");
-    this.analyzer_ = analyzer;
-    LOG.info("analyzing " + stmt);
-    SqlScanner input = new SqlScanner(new StringReader(stmt));
-    SqlParser parser = new SqlParser(input);
-    ParseNode node = null;
+    LOG.info("processing " + stmt);
     try {
-      node = (ParseNode) parser.parse().value;
+      AnalysisContext analysisCtx = new AnalysisContext(catalog_,
+          TestUtils.createQueryContext(Catalog.DEFAULT_DB,
+              System.getProperty("user.name")));
+      analysisCtx.analyze(stmt, analyzer);
+      AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
+      Preconditions.checkNotNull(analysisResult.getStmt());
     } catch (Exception e) {
-      System.err.println(e.toString());
-      fail("\nParser error:\n" + parser.getErrorMsg(stmt));
-    }
-    assertNotNull(node);
-    try {
-      node.analyze(analyzer);
-    } catch (AnalysisException e) {
       String errorString = e.getMessage();
       Assert.assertTrue(
           "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString,
           errorString.startsWith(expectedErrorString));
       return;
     }
-    fail("Stmt didn't result in analysis error: " + stmt);
-  }
-
-  /**
-   * Asserts if stmt passes analysis.
-   */
-  public void AnalysisError(String stmt) {
-    AnalysisError(stmt, null);
+    fail("Stmt didn't result in rewrite error: " + stmt);
   }
 
   /**

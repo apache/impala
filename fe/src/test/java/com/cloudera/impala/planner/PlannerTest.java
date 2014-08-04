@@ -593,13 +593,18 @@ public class PlannerTest {
   }
 
   @Test
-  public void testSubquery() {
-    runPlannerTestFile("subquery");
+  public void testInlineView() {
+    runPlannerTestFile("inline-view");
   }
 
   @Test
-  public void testSubqueryLimit() {
-    runPlannerTestFile("subquery-limit");
+  public void testInlineViewLimit() {
+    runPlannerTestFile("inline-view-limit");
+  }
+
+  @Test
+  public void testSubqueryRewrite() {
+    runPlannerTestFile("subquery-rewrite");
   }
 
   @Test

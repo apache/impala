@@ -101,6 +101,26 @@ public class CreateTableStmt extends StatementBase {
     unescapeProperties(serdeProperties_);
   }
 
+  /**
+   * Copy c'tor.
+   */
+  public CreateTableStmt(CreateTableStmt other) {
+    columnDefs_ = Lists.newArrayList(other.columnDefs_);
+    comment_ = other.comment_;
+    isExternal_ = other.isExternal_;
+    ifNotExists_ = other.ifNotExists_;
+    fileFormat_ = other.fileFormat_;
+    location_ = other.location_;
+    cachingOp_ = other.cachingOp_;
+    partitionColumnDescs_ = Lists.newArrayList(other.partitionColumnDescs_);
+    rowFormat_ = other.rowFormat_;
+    tableName_ = other.tableName_;
+    tblProperties_ = other.tblProperties_;
+    serdeProperties_ = other.serdeProperties_;
+  }
+
+  public CreateTableStmt clone() { return new CreateTableStmt(this); }
+
   public String getTbl() { return tableName_.getTbl(); }
   public TableName getTblName() { return tableName_; }
   public List<ColumnDesc> getColumnDescs() { return columnDefs_; }
