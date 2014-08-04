@@ -129,16 +129,18 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 def prettytable_print(results, failed=False):
   """Print a list of query results in prettytable"""
-  table = prettytable.PrettyTable()
-  column_names = ['Query', 'Start Time', 'Time Taken', 'Client ID']
+  column_names = ['Query', 'Start Time', 'Time Taken (s)', 'Client ID']
   if failed: column_names.append('Error')
-  for column_name in column_names: table.add_column(column_name, [])
+  table = prettytable.PrettyTable(column_names)
   table.align = 'l'
+  table.float_format = '.2'
   # Group the results by table format.
   for table_format_str, gr in groupby(results, lambda x: x.query.table_format_str):
     print "Table Format: %s" % table_format_str
     for result in gr:
-      row = [result.query.name, result.start_time, result.time_taken, result.client_name]
+      start_time = result.start_time.strftime("%Y-%m-%d %H:%M:%S") if result.start_time \
+          is not None else '-'
+      row = [result.query.name, start_time, result.time_taken, result.client_name]
       if failed: row.append(result.query_error)
       table.add_row(row)
     print table.get_string(sortby='Client ID')
