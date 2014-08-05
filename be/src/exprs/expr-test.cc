@@ -1135,6 +1135,24 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'abcde' LIKE 'abcde%'", TYPE_BOOLEAN, true);
   TestValue("'abcde' LIKE '%abcde'", TYPE_BOOLEAN, true);
   TestValue("'abcde' LIKE '%abcde%'", TYPE_BOOLEAN, true);
+  //Test multiple wildcard characters
+  TestValue("'abcde' LIKE '%%bc%%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE '%%cb%%'", TYPE_BOOLEAN, false);
+  TestValue("'abcde' LIKE 'abc%%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE 'cba%%'", TYPE_BOOLEAN, false);
+  TestValue("'abcde' LIKE '%%bcde'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE '%%cbde'", TYPE_BOOLEAN, false);
+  TestValue("'abcde' LIKE '%%bc%%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE '%%cb%%'", TYPE_BOOLEAN, false);
+  TestValue("'abcde' LIKE '%%abcde%%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE '%%edcba%%'", TYPE_BOOLEAN, false);
+  TestValue("'abcde' LIKE '%%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' NOT LIKE '%%'", TYPE_BOOLEAN, false);
+  TestValue("'abcde' LIKE '%%%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' NOT LIKE '%%%'", TYPE_BOOLEAN, false);
+  TestValue("'abcde' LIKE '%%cd%%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE '%%dc%%'", TYPE_BOOLEAN, false);
+  TestValue("'abcde' LIKE '%%_%%'", TYPE_BOOLEAN, true);
   // IMP-117
   TestValue("'ab' LIKE '%a'", TYPE_BOOLEAN, false);
   TestValue("'ab' NOT LIKE '%a'", TYPE_BOOLEAN, true);

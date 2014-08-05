@@ -46,20 +46,19 @@ void LikePredicate::LikePrepare(FunctionContext* context,
     StringVal pattern_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
     if (pattern_val.is_null) return;
     StringValue pattern = StringValue::FromStringVal(pattern_val);
-    re2::RE2 substring_re("(%+)([^%_]*)(%+)");
-    re2::RE2 ends_with_re("(%+)([^%_]*)");
-    re2::RE2 starts_with_re("([^%_]*)(%+)");
+    re2::RE2 substring_re("(?:%+)([^%_]*)(?:%+)");
+    re2::RE2 ends_with_re("(?:%+)([^%_]*)");
+    re2::RE2 starts_with_re("([^%_]*)(?:%+)");
     re2::RE2 equals_re("([^%_]*)");
     string pattern_str(pattern.ptr, pattern.len);
     string search_string;
-    void* no_arg = NULL;
-    if (RE2::FullMatch(pattern_str, substring_re, no_arg, &search_string, no_arg)) {
+    if (RE2::FullMatch(pattern_str, substring_re, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantSubstringFn;
-    } else if (RE2::FullMatch(pattern_str, starts_with_re, &search_string, no_arg)) {
+    } else if (RE2::FullMatch(pattern_str, starts_with_re, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantStartsWithFn;
-    } else if (RE2::FullMatch(pattern_str, ends_with_re, no_arg, &search_string)) {
+    } else if (RE2::FullMatch(pattern_str, ends_with_re, &search_string)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantEndsWithFn;
     } else if (RE2::FullMatch(pattern_str, equals_re, &search_string)) {
@@ -150,6 +149,7 @@ BooleanVal LikePredicate::ConstantSubstringFn(FunctionContext* context,
   if (val.is_null) return BooleanVal::null();
   LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+  if (state->search_string_sv_.len == 0) return BooleanVal(true);
   StringValue pattern_value = StringValue::FromStringVal(val);
   return BooleanVal(state->substring_pattern_.Search(&pattern_value) != -1);
 }
@@ -253,9 +253,8 @@ void LikePredicate::ConvertLikePattern(FunctionContext* context, const StringVal
   re_pattern->clear();
   LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
       context->GetFunctionState(FunctionContext::THREAD_LOCAL));
-  int i = 0;
   bool is_escaped = false;
-  for (i = 0; i < pattern.len; ++i) {
+  for (int i = 0; i < pattern.len; ++i) {
     if (!is_escaped && pattern.ptr[i] == '%') {
       re_pattern->append(".*");
     } else if (!is_escaped && pattern.ptr[i] == '_') {
