@@ -237,30 +237,40 @@ public class HashJoinNode extends PlanNode {
     }
 
     // Impose lower/upper bounds on the cardinality based on the join type.
+    long leftCard = getChild(0).cardinality_;
+    long rightCard = getChild(1).cardinality_;
     switch (joinOp_) {
       case LEFT_SEMI_JOIN: {
-        if (getChild(0).cardinality_ != -1) {
-          cardinality_ = Math.min(getChild(0).cardinality_, cardinality_);
+        if (leftCard != -1) {
+          cardinality_ = Math.min(leftCard, cardinality_);
         }
         break;
       }
       case LEFT_OUTER_JOIN: {
-        if (getChild(0).cardinality_ != -1) {
-          cardinality_ = Math.max(getChild(0).cardinality_, cardinality_);
+        if (leftCard != -1) {
+          cardinality_ = Math.max(leftCard, cardinality_);
         }
         break;
       }
       case RIGHT_OUTER_JOIN: {
-        if (getChild(1).cardinality_ != -1) {
-          cardinality_ = Math.max(getChild(1).cardinality_, cardinality_);
+        if (rightCard != -1) {
+          cardinality_ = Math.max(rightCard, cardinality_);
         }
         break;
       }
       case FULL_OUTER_JOIN: {
-        if (getChild(0).cardinality_ != -1 && getChild(1).cardinality_ != -1) {
-          long cardinalitySum = addCardinalities(getChild(0).cardinality_,
-              getChild(1).cardinality_);
+        if (leftCard != -1 && rightCard != -1) {
+          long cardinalitySum = addCardinalities(leftCard, rightCard);
           cardinality_ = Math.max(cardinalitySum, cardinality_);
+        }
+        break;
+      }
+      case ANTI_JOIN: {
+        if (leftCard != -1) {
+          cardinality_ = leftCard;
+          if (rightCard != -1) {
+            cardinality_ = Math.max(0, leftCard - rightCard);
+          }
         }
         break;
       }

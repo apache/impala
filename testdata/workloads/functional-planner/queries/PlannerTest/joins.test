@@ -1045,3 +1045,38 @@ select count(*) from functional.decimal_tbl a join functional.decimal_tbl b on a
 00:SCAN HDFS [functional.decimal_tbl a]
    partitions=1/1 size=195B
 ====
+# Test anti joins
+select j.* from functional.JoinTbl j anti join functional.DimTbl d on j.test_id = d.id
+---- PLAN
+02:HASH JOIN [ANTI JOIN]
+|  hash predicates: j.test_id = d.id
+|
+|--01:SCAN HDFS [functional.dimtbl d]
+|     partitions=1/1 size=171B compact
+|
+00:SCAN HDFS [functional.jointbl j]
+   partitions=1/1 size=433B
+====
+# Test query with anti join and inner join and predicates
+select count(*) from functional.JoinTbl j anti join functional.DimTbl d on j.test_id = d.id
+inner join functional.JoinTbl k on j.test_id = k.test_id and j.alltypes_id = 5000
+---- PLAN
+06:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: j.test_id = k.test_id
+|
+|--02:SCAN HDFS [functional.jointbl k]
+|     partitions=1/1 size=433B compact
+|
+04:HASH JOIN [ANTI JOIN]
+|  hash predicates: j.test_id = d.id
+|
+|--01:SCAN HDFS [functional.dimtbl d]
+|     partitions=1/1 size=171B compact
+|
+00:SCAN HDFS [functional.jointbl j]
+   partitions=1/1 size=433B compact
+   predicates: j.alltypes_id = 5000
+====

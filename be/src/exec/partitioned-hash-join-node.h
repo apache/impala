@@ -148,16 +148,17 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   //    move the partition to spilled_partitions_.
   Status CleanUpHashPartitions();
 
-  // Process probe rows from left_batch_. Returns either if out_batch is full or
-  // left_batch_ is entirely consumed.
+  // Process probe rows from probe_batch_. Returns either if out_batch is full or
+  // probe_batch_ is entirely consumed.
+  template<int const JoinOp>
   Status ProcessProbeBatch(RowBatch* out_batch);
 
   // Get the next row batch from child(0). If we are done consuming the input,
-  // sets left_batch_pos_ to -1, otherwise, sets it to 0.
+  // sets probe_batch_pos_ to -1, otherwise, sets it to 0.
   Status NextLeftChildRowBatch(RuntimeState*, RowBatch* out_batch);
 
   // Get the next row batch from input_partition_.
-  // If we are done consuming the input, sets left_batch_pos_ to -1,
+  // If we are done consuming the input, sets probe_batch_pos_ to -1,
   // otherwise, sets it to 0.
   Status NextSpilledRowBatch(RuntimeState*, RowBatch* out_batch);
 
@@ -201,7 +202,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // We need to split out the row hashing functionality from the HashTable.
   boost::scoped_ptr<HashTable> hash_tbl_;
 
-  // The iterator that corresponds to the look up of current_left_row_.
+  // The iterator that corresponds to the look up of current_probe_row_.
   HashTable::Iterator hash_tbl_iterator_;
 
   class Partition {

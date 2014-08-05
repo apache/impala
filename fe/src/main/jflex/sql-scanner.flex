@@ -55,6 +55,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("all", new Integer(SqlParserSymbols.KW_ALL));
     keywordMap.put("alter", new Integer(SqlParserSymbols.KW_ALTER));
     keywordMap.put("and", new Integer(SqlParserSymbols.KW_AND));
+    keywordMap.put("anti", new Integer(SqlParserSymbols.KW_ANTI));
     keywordMap.put("api_version", new Integer(SqlParserSymbols.KW_API_VERSION));
     keywordMap.put("array", new Integer(SqlParserSymbols.KW_ARRAY));
     keywordMap.put("as", new Integer(SqlParserSymbols.KW_AS));

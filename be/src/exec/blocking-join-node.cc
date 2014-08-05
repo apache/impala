@@ -36,7 +36,7 @@ BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type 
   : ExecNode(pool, tnode, descs),
     node_name_(node_name),
     join_op_(join_op),
-    can_add_left_child_filters_(false) {
+    can_add_probe_filters_(false) {
 }
 
 Status BlockingJoinNode::Init(const TPlanNode& tnode) {
@@ -45,8 +45,8 @@ Status BlockingJoinNode::Init(const TPlanNode& tnode) {
 }
 
 BlockingJoinNode::~BlockingJoinNode() {
-  // left_batch_ must be cleaned up in Close() to ensure proper resource freeing.
-  DCHECK(left_batch_ == NULL);
+  // probe_batch_ must be cleaned up in Close() to ensure proper resource freeing.
+  DCHECK(probe_batch_ == NULL);
 }
 
 Status BlockingJoinNode::Prepare(RuntimeState* state) {
@@ -55,10 +55,9 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
 
   build_pool_.reset(new MemPool(mem_tracker()));
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
-  left_child_timer_ = ADD_TIMER(runtime_profile(), "LeftChildTime");
+  probe_timer_ = ADD_TIMER(runtime_profile(), "ProbeTime");
   build_row_counter_ = ADD_COUNTER(runtime_profile(), "BuildRows", TCounterType::UNIT);
-  left_child_row_counter_ = ADD_COUNTER(runtime_profile(), "LeftChildRows",
-      TCounterType::UNIT);
+  probe_row_counter_ = ADD_COUNTER(runtime_profile(), "ProbeRows", TCounterType::UNIT);
 
   // Validate the row desc layout is what we expect. The join node returns a row
   // that is a concatenation of the left side and build side row desc's. For example if
@@ -80,10 +79,10 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
     DCHECK_EQ(num_left_tuples + i, row_desc().GetTupleIdx(desc->id()));
   }
 
-  left_tuple_row_size_ = num_left_tuples * sizeof(Tuple*);
+  probe_tuple_row_size_ = num_left_tuples * sizeof(Tuple*);
   build_tuple_row_size_ = num_build_tuples * sizeof(Tuple*);
 
-  left_batch_.reset(
+  probe_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
   return Status::OK;
 }
@@ -91,7 +90,7 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
 void BlockingJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (build_pool_.get() != NULL) build_pool_->FreeAll();
-  left_batch_.reset();
+  probe_batch_.reset();
   ExecNode::Close(state);
 }
 
@@ -146,20 +145,20 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
 
   // Seed left child in preparation for GetNext().
   while (true) {
-    RETURN_IF_ERROR(child(0)->GetNext(state, left_batch_.get(), &left_side_eos_));
-    COUNTER_UPDATE(left_child_row_counter_, left_batch_->num_rows());
-    left_batch_pos_ = 0;
-    if (left_batch_->num_rows() == 0) {
-      if (left_side_eos_) {
+    RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
+    COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+    probe_batch_pos_ = 0;
+    if (probe_batch_->num_rows() == 0) {
+      if (probe_side_eos_) {
         RETURN_IF_ERROR(InitGetNext(NULL /* eos */));
         eos_ = true;
         break;
       }
-      left_batch_->Reset();
+      probe_batch_->Reset();
       continue;
     } else {
-      current_left_row_ = left_batch_->GetRow(left_batch_pos_++);
-      RETURN_IF_ERROR(InitGetNext(current_left_row_));
+      current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+      RETURN_IF_ERROR(InitGetNext(current_probe_row_));
       break;
     }
   }
@@ -170,7 +169,7 @@ void BlockingJoinNode::DebugString(int indentation_level, stringstream* out) con
   *out << string(indentation_level * 2, ' ');
   *out << node_name_;
   *out << "(eos=" << (eos_ ? "true" : "false")
-       << " left_batch_pos=" << left_batch_pos_;
+       << " probe_batch_pos=" << probe_batch_pos_;
   AddToDebugString(indentation_level, out);
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
@@ -194,16 +193,16 @@ string BlockingJoinNode::GetLeftChildRowString(TupleRow* row) {
 }
 
 // This function is replaced by codegen
-void BlockingJoinNode::CreateOutputRow(TupleRow* out, TupleRow* left, TupleRow* build) {
+void BlockingJoinNode::CreateOutputRow(TupleRow* out, TupleRow* probe, TupleRow* build) {
   uint8_t* out_ptr = reinterpret_cast<uint8_t*>(out);
-  if (left == NULL) {
-    memset(out_ptr, 0, left_tuple_row_size_);
+  if (probe == NULL) {
+    memset(out_ptr, 0, probe_tuple_row_size_);
   } else {
-    memcpy(out_ptr, left, left_tuple_row_size_);
+    memcpy(out_ptr, probe, probe_tuple_row_size_);
   }
   if (build == NULL) {
-    memset(out_ptr + left_tuple_row_size_, 0, build_tuple_row_size_);
+    memset(out_ptr + probe_tuple_row_size_, 0, build_tuple_row_size_);
   } else {
-    memcpy(out_ptr + left_tuple_row_size_, build, build_tuple_row_size_);
+    memcpy(out_ptr + probe_tuple_row_size_, build, build_tuple_row_size_);
   }
 }

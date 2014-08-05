@@ -36,6 +36,8 @@ bool IR_NO_INLINE EvalOtherJoinConjuncts(Expr* const* exprs, int num_exprs,
 
 // CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by
 // codegen.
+// TODO: Perhaps add templatization on the JoinOp in order to reduce the branches of the
+// generated code (for example the handling of left semi-joins and left outer-joins).
 int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
     int max_added_rows) {
   // This path does not handle full outer or right outer joins
@@ -60,7 +62,7 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
     while (!hash_tbl_iterator_.AtEnd()) {
       TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
       hash_tbl_iterator_.Next<true>();
-      CreateOutputRow(out_row, current_left_row_, matched_build_row);
+      CreateOutputRow(out_row, current_probe_row_, matched_build_row);
 
       if (!EvalOtherJoinConjuncts(other_conjuncts, num_other_conjuncts, out_row)) {
         continue;
@@ -86,7 +88,7 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
 
     // Handle left outer-join
     if (!matched_probe_ && match_all_probe_) {
-      CreateOutputRow(out_row, current_left_row_, NULL);
+      CreateOutputRow(out_row, current_probe_row_, NULL);
       matched_probe_ = true;
       if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
         ++rows_returned;
@@ -99,9 +101,9 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
 
     if (hash_tbl_iterator_.AtEnd()) {
       // Advance to the next probe row
-      if (UNLIKELY(left_batch_pos_ == probe_rows)) goto end;
-      current_left_row_ = probe_batch->GetRow(left_batch_pos_++);
-      hash_tbl_iterator_ = hash_tbl_->Find(current_left_row_);
+      if (UNLIKELY(probe_batch_pos_ == probe_rows)) goto end;
+      current_probe_row_ = probe_batch->GetRow(probe_batch_pos_++);
+      hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
       matched_probe_ = false;
     }
   }

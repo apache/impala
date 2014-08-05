@@ -74,10 +74,17 @@ class HashJoinNode : public BlockingJoinNode {
   // non-equi-join conjuncts from the JOIN clause
   std::vector<Expr*> other_join_conjuncts_;
 
-  // derived from join_op_
-  bool match_all_probe_;  // output all rows coming from the probe input
-  bool match_one_build_;  // match at most one build row to each probe row
-  bool match_all_build_;  // output all rows coming from the build input
+  // Derived from join_op_
+  // Output all rows coming from the probe input. Used in LEFT_OUTER_JOIN and
+  // FULL_OUTER_JOIN.
+  bool match_all_probe_;
+
+  // Match at most one build row to each probe row. Used in LEFT_SEMI_JOIN.
+  bool match_one_build_;
+
+  // Output all rows coming from the build input. Used in RIGHT_OUTER_JOIN and
+  // FULL_OUTER_JOIN.
+  bool match_all_build_;
 
   bool matched_probe_;  // if true, we have matched the current probe row
   // llvm function for build batch

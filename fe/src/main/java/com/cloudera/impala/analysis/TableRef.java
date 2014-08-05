@@ -321,7 +321,8 @@ public class TableRef implements ParseNode {
         onClauseTupleIds.addAll(tupleIds);
       }
       onClauseTupleIds_.addAll(onClauseTupleIds);
-    } else if (getJoinOp().isOuterJoin() || getJoinOp() == JoinOperator.LEFT_SEMI_JOIN) {
+    } else if (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin() ||
+               getJoinOp().isAntiJoin()) {
       throw new AnalysisException(joinOpToSql() + " requires an ON or USING clause.");
     }
 
@@ -343,6 +344,7 @@ public class TableRef implements ParseNode {
       case RIGHT_OUTER_JOIN: return "RIGHT OUTER JOIN";
       case FULL_OUTER_JOIN: return "FULL OUTER JOIN";
       case CROSS_JOIN: return "CROSS JOIN";
+      case ANTI_JOIN: return "ANTI JOIN";
       default: return "bad join op: " + joinOp_.toString();
     }
   }

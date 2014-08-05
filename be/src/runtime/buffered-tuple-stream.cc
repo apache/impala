@@ -269,10 +269,10 @@ Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {
 
     // Update string slot ptrs.
     for (int j = 0; j < string_slots_.size(); ++j) {
-      Tuple* tuple = row->GetTuple(string_slots_[i].first);
+      Tuple* tuple = row->GetTuple(string_slots_[j].first);
       if (tuple == NULL) continue;
       for (int k = 0; k < string_slots_[j].second.size(); ++k) {
-        const SlotDescriptor* slot_desc = string_slots_[i].second[j];
+        const SlotDescriptor* slot_desc = string_slots_[j].second[k];
         if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
 
         StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());

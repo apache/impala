@@ -254,8 +254,12 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       *node = pool->Add(new AggregationNode(pool, tnode, descs));
       break;
     case TPlanNodeType::HASH_JOIN_NODE:
-      if (FLAGS_enable_partitioned_hash_join &&
-          tnode.hash_join_node.join_op == TJoinOp::INNER_JOIN) {
+      // Only the partitioned hash join impl supports anti-join
+      if ((tnode.hash_join_node.join_op == TJoinOp::ANTI_JOIN) ||
+          (FLAGS_enable_partitioned_hash_join &&
+           ((tnode.hash_join_node.join_op == TJoinOp::INNER_JOIN) ||
+            (tnode.hash_join_node.join_op == TJoinOp::LEFT_SEMI_JOIN) ||
+            (tnode.hash_join_node.join_op == TJoinOp::LEFT_OUTER_JOIN)))) {
         *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));
       } else {
         *node = pool->Add(new HashJoinNode(pool, tnode, descs));

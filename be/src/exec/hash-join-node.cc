@@ -44,13 +44,17 @@ HashJoinNode::HashJoinNode(
     process_build_batch_fn_(NULL),
     codegen_process_probe_batch_fn_(NULL),
     process_probe_batch_fn_(NULL) {
+  // The hash join node does not support cross or anti joins
+  DCHECK_NE(join_op_, TJoinOp::CROSS_JOIN);
+  DCHECK_NE(join_op_, TJoinOp::ANTI_JOIN);
+
   match_all_probe_ =
     (join_op_ == TJoinOp::LEFT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
   match_one_build_ = (join_op_ == TJoinOp::LEFT_SEMI_JOIN);
   match_all_build_ =
     (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
-  can_add_left_child_filters_ = tnode.hash_join_node.add_probe_filters;
-  can_add_left_child_filters_ &= FLAGS_enable_probe_side_filtering;
+  can_add_probe_filters_ = tnode.hash_join_node.add_probe_filters;
+  can_add_probe_filters_ &= FLAGS_enable_probe_side_filtering;
 }
 
 Status HashJoinNode::Init(const TPlanNode& tnode) {
@@ -174,7 +178,7 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   // so that the probe side can use this as an additional predicate.
   // We only do this if the build side is sufficiently small.
   // TODO: better heuristic?
-  if (can_add_left_child_filters_) {
+  if (can_add_probe_filters_) {
     if (hash_tbl_->size() < state->slot_filter_bitmap_size()) {
       AddRuntimeExecOption("Build-Side Filter Pushed Down");
       hash_tbl_->AddBitmapFilters();
@@ -223,7 +227,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
 
   // Explicitly manage the timer counter to avoid measuring time in the child
   // GetNext call.
-  ScopedTimer<MonotonicStopWatch> probe_timer(left_child_timer_);
+  ScopedTimer<MonotonicStopWatch> probe_timer(probe_timer_);
 
   while (!eos_) {
     // create output rows as long as:
@@ -235,7 +239,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       TupleRow* out_row = out_batch->GetRow(row_idx);
 
       TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
-      CreateOutputRow(out_row, current_left_row_, matched_build_row);
+      CreateOutputRow(out_row, current_probe_row_, matched_build_row);
       if (!EvalConjuncts(other_conjuncts, num_other_conjuncts, out_row)) {
         hash_tbl_iterator_.Next<true>();
         continue;
@@ -267,7 +271,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     if (match_all_probe_ && !matched_probe_) {
       int row_idx = out_batch->AddRow();
       TupleRow* out_row = out_batch->GetRow(row_idx);
-      CreateOutputRow(out_row, current_left_row_, NULL);
+      CreateOutputRow(out_row, current_probe_row_, NULL);
       if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
@@ -281,29 +285,29 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       }
     }
 
-    if (left_batch_pos_ == left_batch_->num_rows()) {
+    if (probe_batch_pos_ == probe_batch_->num_rows()) {
       // pass on resources, out_batch might still need them
-      left_batch_->TransferResourceOwnership(out_batch);
-      left_batch_pos_ = 0;
+      probe_batch_->TransferResourceOwnership(out_batch);
+      probe_batch_pos_ = 0;
       if (out_batch->AtCapacity()) return Status::OK;
       // get new probe batch
-      if (!left_side_eos_) {
+      if (!probe_side_eos_) {
         while (true) {
           probe_timer.Stop();
-          RETURN_IF_ERROR(child(0)->GetNext(state, left_batch_.get(), &left_side_eos_));
+          RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
           probe_timer.Start();
-          if (left_batch_->num_rows() == 0) {
+          if (probe_batch_->num_rows() == 0) {
             // Empty batches can still contain IO buffers, which need to be passed up to
             // the caller; transferring resources can fill up out_batch.
-            left_batch_->TransferResourceOwnership(out_batch);
-            if (left_side_eos_) {
+            probe_batch_->TransferResourceOwnership(out_batch);
+            if (probe_side_eos_) {
               eos_ = true;
               break;
             }
             if (out_batch->AtCapacity()) return Status::OK;
             continue;
           } else {
-            COUNTER_UPDATE(left_child_row_counter_, left_batch_->num_rows());
+            COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
             break;
           }
         }
@@ -319,10 +323,10 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     if (eos_) break;
 
     // join remaining rows in probe batch_
-    current_left_row_ = left_batch_->GetRow(left_batch_pos_++);
-    VLOG_ROW << "probe row: " << GetLeftChildRowString(current_left_row_);
+    current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+    VLOG_ROW << "probe row: " << GetLeftChildRowString(current_probe_row_);
     matched_probe_ = false;
-    hash_tbl_iterator_ = hash_tbl_->Find(current_left_row_);
+    hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
   }
 
   *eos = true;
@@ -359,7 +363,7 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     RowBatch* out_batch, bool* eos) {
   *eos = eos_;
 
-  ScopedTimer<MonotonicStopWatch> probe_timer(left_child_timer_);
+  ScopedTimer<MonotonicStopWatch> probe_timer(probe_timer_);
   while (!eos_) {
     // Compute max rows that should be added to out_batch
     int64_t max_added_rows = out_batch->capacity() - out_batch->num_rows();
@@ -368,12 +372,12 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     // Continue processing this row batch
     if (process_probe_batch_fn_ == NULL) {
       num_rows_returned_ +=
-          ProcessProbeBatch(out_batch, left_batch_.get(), max_added_rows);
+          ProcessProbeBatch(out_batch, probe_batch_.get(), max_added_rows);
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     } else {
       // Use codegen'd function
       num_rows_returned_ +=
-          process_probe_batch_fn_(this, out_batch, left_batch_.get(), max_added_rows);
+          process_probe_batch_fn_(this, out_batch, probe_batch_.get(), max_added_rows);
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     }
 
@@ -383,18 +387,18 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     }
 
     // Check to see if we're done processing the current probe batch
-    if (hash_tbl_iterator_.AtEnd() && left_batch_pos_ == left_batch_->num_rows()) {
-      left_batch_->TransferResourceOwnership(out_batch);
-      left_batch_pos_ = 0;
+    if (hash_tbl_iterator_.AtEnd() && probe_batch_pos_ == probe_batch_->num_rows()) {
+      probe_batch_->TransferResourceOwnership(out_batch);
+      probe_batch_pos_ = 0;
       if (out_batch->AtCapacity()) break;
-      if (left_side_eos_) {
+      if (probe_side_eos_) {
         *eos = eos_ = true;
         break;
       } else {
         probe_timer.Stop();
-        RETURN_IF_ERROR(child(0)->GetNext(state, left_batch_.get(), &left_side_eos_));
+        RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
         probe_timer.Start();
-        COUNTER_UPDATE(left_child_row_counter_, left_batch_->num_rows());
+        COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
       }
     }
   }
@@ -472,7 +476,7 @@ Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
   int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
 
   // Copy probe row
-  codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, left_tuple_row_size_);
+  codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, probe_tuple_row_size_);
   Value* build_row_idx[] = { codegen->GetIntConstant(TYPE_INT, num_probe_tuples) };
   Value* build_row_dst = builder.CreateGEP(out_row_arg, build_row_idx, "build_dst_ptr");
 

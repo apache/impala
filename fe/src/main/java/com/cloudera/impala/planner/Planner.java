@@ -1063,30 +1063,30 @@ public class Planner {
         LOG.trace(Integer.toString(i) + " considering ref " + ref.getAlias());
 
         // Determine whether we can or must consider this join at this point in the plan.
-        // Place outer/semi joins at a fixed position in the plan tree (IMPALA-860), s.t.
-        // all the tables appearing to the left/right of an outer/semi join in the
-        // original query still remain to the left/right after join ordering. This
-        // prevents join ordering across outer/semi joins which is generally incorrect.
-        // The checks below relies on remainingRefs being in the order as they originally
-        // appeared in the query.
+        // Place outer/semi/anti joins at a fixed position in the plan tree (IMPALA-860),
+        // s.t. all the tables appearing to the left/right of an outer/semi/anti join in
+        // the original query still remain to the left/right after join ordering. This
+        // prevents join ordering across outer/semi/anti joins which is generally
+        // incorrect. The checks below relies on remainingRefs being in the order as they
+        // originally appeared in the query.
         boolean fixedJoinPos = false;
         JoinOperator joinOp = ref.getJoinOp();
-        if (joinOp.isOuterJoin() || joinOp.isSemiJoin()) {
+        if (joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isAntiJoin()) {
           List<TupleId> currentTids = Lists.newArrayList(root.getTblRefIds());
           currentTids.add(ref.getId());
           // TODO: make this less restrictive by considering plans with inverted Outer
           // Join directions
-          // Place outer/semi joins at a fixed position in the plan tree. We know that
-          // the join resulting from 'ref' must become the new root if the current root
-          // materializes exactly those tuple ids corresponding to TableRefs appearing
-          // to the left of 'ref' in the original query.
+          // Place outer/semi/anti joins at a fixed position in the plan tree. We know
+          // that the join resulting from 'ref' must become the new root if the current
+          // root materializes exactly those tuple ids corresponding to TableRefs
+          // appearing to the left of 'ref' in the original query.
           List<TupleId> tableRefTupleIds = ref.getAllTupleIds();
-          if (currentTids.containsAll(tableRefTupleIds)
-              && tableRefTupleIds.containsAll(currentTids)) {
+          if (currentTids.containsAll(tableRefTupleIds) &&
+              tableRefTupleIds.containsAll(currentTids)) {
             fixedJoinPos = true;
           } else {
             // Do not consider the remaining table refs to prevent incorrect re-ordering
-            // of tables across outer/semi joins.
+            // of tables across outer/semi/anti joins.
             break;
           }
         } else if (ref.getJoinOp().isCrossJoin()) {

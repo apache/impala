@@ -156,7 +156,8 @@ enum TJoinOp {
   LEFT_SEMI_JOIN,
   RIGHT_OUTER_JOIN,
   FULL_OUTER_JOIN,
-  CROSS_JOIN
+  CROSS_JOIN,
+  ANTI_JOIN
 }
 
 struct THashJoinNode {

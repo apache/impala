@@ -735,6 +735,23 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // AnalysisError(
     // "select a.id, b.id from alltypes a left semi join alltypes b on (a.id = b.id)",
     // "x");
+
+    // anti join should analyze with an on or using clause
+    AnalyzesOk("select a.id from functional.alltypes a anti join " +
+        "functional.alltypes b on (a.id = b.id)");
+    AnalyzesOk("select a.id from functional.alltypes a anti join " +
+        "functional.alltypes b using (id)");
+    AnalysisError("select a.id from functional.alltypes a anti join " +
+        "functional.alltypes b",
+        "ANTI JOIN requires an ON or USING clause");
+    // TODO: Enable once IMPALA-677 is in.
+    // AnalysisError("select a.id from functional.alltypes a anti join " +
+    //     "functional.alltypes b using(id) anti join " +
+    //     "functional.alltypes c using(int_col)",
+    //     "Illegal column reference 'int_col' of anti-joined table 'b'");
+    // AnalysisError("select j.* from JoinTbl j anti join DimTbl d on j.test_id = d.id " +
+    //     "inner join JoinTbl k on d.id = k.test_id",
+    //     "Illegal column reference 'id' of anti-joined table 'd'");
   }
 
   @Test

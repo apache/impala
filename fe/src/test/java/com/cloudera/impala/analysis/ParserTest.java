@@ -206,6 +206,8 @@ public class ParserTest {
         "  src2.key = src3.key and src3.key < 10 " +
         "left semi join src src3 on " +
         "  src2.key = src3.key and src3.key < 10 " +
+        "anti join src src3 on " +
+        "  src2.key = src3.key and src3.key < 10 " +
         "join src src3 on " +
         "  src2.key = src3.key and src3.key < 10 " +
         "inner join src src3 on " +
@@ -221,6 +223,8 @@ public class ParserTest {
         "  (src2.key = src3.key and src3.key < 10) " +
         "left semi join src src3 on " +
         "  (src2.key = src3.key and src3.key < 10) " +
+        "anti join src src3 on " +
+        "  src2.key = src3.key and src3.key < 10 " +
         "join src src3 on " +
         "  (src2.key = src3.key and src3.key < 10) " +
         "inner join src src3 on " +
@@ -232,6 +236,7 @@ public class ParserTest {
         "right outer join src src3 using (d, e, f) " +
         "full outer join src src3 using (d, e, f) " +
         "left semi join src src3 using (d, e, f) " +
+        "anti join src src3 using (d, e, f) " +
         "join src src3 using (d, e, f) " +
         "inner join src src3 using (d, e, f) " +
         "where src2.bla = src3.bla " +
@@ -242,6 +247,7 @@ public class ParserTest {
         "right outer join src src3 on (NULL) " +
         "full outer join src src3 on NULL " +
         "left semi join src src3 on (NULL) " +
+        "anti join src src3 on (NULL) " +
         "join src src3 on NULL " +
         "inner join src src3 on (NULL) " +
         "where src2.bla = src3.bla " +
@@ -2212,7 +2218,7 @@ public class ParserTest {
         "select (i + 5)(1 - i) from t\n" +
         "              ^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, " +
+        "Expected: AND, ANTI, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, " +
         "FULL, GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, " +
         "OFFSET, OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
         "IDENTIFIER\n");
@@ -2222,7 +2228,7 @@ public class ParserTest {
         "(1 - i) from t\n" +
         "^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, " +
+        "Expected: AND, ANTI, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, " +
         "FULL, GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, " +
         "OFFSET, OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
         "IDENTIFIER\n");
@@ -2232,7 +2238,7 @@ public class ParserTest {
         "(1 - i)\n" +
         "^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, " +
+        "Expected: AND, ANTI, AS, ASC, BETWEEN, CROSS, DESC, DIV, ELSE, END, FROM, " +
         "FULL, GROUP, HAVING, IN, INNER, IS, JOIN, LEFT, LIKE, LIMIT, NOT, NULLS, " +
         "OFFSET, OR, ORDER, REGEXP, RIGHT, RLIKE, THEN, UNION, WHEN, WHERE, COMMA, " +
         "IDENTIFIER\n");
@@ -2243,7 +2249,7 @@ public class ParserTest {
         "... b, c,c,c,c,c,c,c,c,c,a a a,c,c,c,c,c,c,c,cd,c,d,d,,c,...\n" +
         "                             ^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
+        "Expected: ANTI, CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
         "ON, ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the start
@@ -2252,7 +2258,7 @@ public class ParserTest {
         "select a a a, b, c,c,c,c,c,c,c,c,c,c,c,...\n" +
         "           ^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
+        "Expected: ANTI, CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
         "ON, ORDER, RIGHT, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the end

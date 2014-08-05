@@ -65,27 +65,28 @@ class BlockingJoinNode : public ExecNode {
   bool eos_;  // if true, nothing left to return in GetNext()
   boost::scoped_ptr<MemPool> build_pool_;  // holds everything referenced from build side
 
-  // left_batch_ must be cleared before calling GetNext().  The child node
+  // probe_batch_ must be cleared before calling GetNext().  The child node
   // does not initialize all tuple ptrs in the row, only the ones that it
   // is responsible for.
-  boost::scoped_ptr<RowBatch> left_batch_;
-  int left_batch_pos_;  // current scan pos in left_batch_
-  bool left_side_eos_;  // if true, left child has no more rows to process
-  TupleRow* current_left_row_;
+  boost::scoped_ptr<RowBatch> probe_batch_;
+  int probe_batch_pos_;  // current scan pos in probe_batch_
+  bool probe_side_eos_;  // if true, left child has no more rows to process
+  TupleRow* current_probe_row_;
 
-  // Size of the TupleRow (just the Tuple ptrs) from the build and left side.
+  // Size of the TupleRow (just the Tuple ptrs) from the build (right) and probe (left)
+  // sides.
   // Cached because it is used in the hot path.
-  int left_tuple_row_size_;
+  int probe_tuple_row_size_;
   int build_tuple_row_size_;
 
-  // If true, this node can add filters to the left child node after processing
+  // If true, this node can add filters to the probe (left child) node after processing
   // the entire build side.
-  bool can_add_left_child_filters_;
+  bool can_add_probe_filters_;
 
   RuntimeProfile::Counter* build_timer_;   // time to prepare build side
-  RuntimeProfile::Counter* left_child_timer_;   // time to process left child batch
+  RuntimeProfile::Counter* probe_timer_;   // time to process the probe (left child) batch
   RuntimeProfile::Counter* build_row_counter_;   // num build rows
-  RuntimeProfile::Counter* left_child_row_counter_;   // num left child rows
+  RuntimeProfile::Counter* probe_row_counter_;   // num probe (left child) rows
 
   // Init the build-side state for a new left child row (e.g. hash table iterator or list
   // iterator) given the first row. Used in Open() to prepare for GetNext().
@@ -114,10 +115,10 @@ class BlockingJoinNode : public ExecNode {
   // doing the join.
   std::string GetLeftChildRowString(TupleRow* row);
 
-  // Write combined row, consisting of the left child's 'left_row' and right child's
+  // Write combined row, consisting of the left child's 'probe_row' and right child's
   // 'build_row' to 'out_row'.
   // This is replaced by codegen.
-  void CreateOutputRow(TupleRow* out_row, TupleRow* left_row, TupleRow* build_row);
+  void CreateOutputRow(TupleRow* out_row, TupleRow* probe_row, TupleRow* build_row);
 
  private:
   // Supervises ConstructBuildSide in a separate thread, and returns its status in the
