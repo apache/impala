@@ -1640,7 +1640,21 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("with t as (select * from functional.alltypes where exists " +
         "(select * from functional.alltypesagg where id = 1) and not exists " +
         "(select * from functional.alltypesagg where id = 1)) select * from t");
-}
+
+    // Deeply nested WITH clauses (see IMPALA-1106)
+    AnalyzesOk("with with_1 as (select 1 as int_col_1), with_2 as " +
+        "(select 1 as int_col_1 from (with with_3 as (select 1 as int_col_1 from " +
+        "with_1) select 1 as int_col_1 from with_3) as t1) select 1 as int_col_1 " +
+        "from with_2");
+    AnalyzesOk("with with_1 as (select 1 as int_col_1), with_2 as (select 1 as " +
+        "int_col_1 from (with with_3 as (select 1 as int_col_1 from with_1) " +
+        "select 1 as int_col_1 from with_3) as t1), with_4 as (select 1 as " +
+        "int_col_1 from with_2) select 1 as int_col_1 from with_4");
+    AnalyzesOk("with with_1 as (select 1 as int_col_1), with_2 as (with with_3 " +
+        "as (select 1 as int_col_1 from (with with_4 as (select 1 as int_col_1 " +
+        "from with_1) select 1 as int_col_1 from with_4) as t1) select 1 as " +
+        "int_col_1 from with_3) select 1 as int_col_1 from with_2");
+  }
 
   @Test
   public void TestViews() throws AnalysisException {

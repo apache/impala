@@ -52,40 +52,57 @@ public class WithClause implements ParseNode {
   }
 
   /**
+   * Copy c'tor.
+   */
+  public WithClause(WithClause other) {
+    Preconditions.checkNotNull(other);
+    views_ = Lists.newArrayList();
+    for (View view: other.views_) {
+      views_.add(new View(view.getName(), view.getQueryStmt().clone()));
+    }
+  }
+
+  /**
    * Analyzes all views and registers them with the analyzer. Enforces scoping rules.
    * All local views registered with the analyzer are have QueryStmts with resolved
    * TableRefs to simplify the analysis of view references.
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    // Use a dummy root analyzer as to not pollute the analyzer's global state
-    // with tuples, slots, conjuncts, etc. that will never be used. Every view ref
-    // will register a new copy of such analysis state for itself.
-    Analyzer dummyRootAnalyzer =
-        new Analyzer(analyzer.getCatalog(), analyzer.getQueryCtx());
-    if (analyzer.isExplain()) dummyRootAnalyzer.setIsExplain();
+    // Create an analyzer for the WITH clause. If this is the top-level WITH
+    // clause, the new analyzer uses its own global state and is not attached to
+    // the hierarchy of analyzers. Otherwise, it becomes a child of 'analyzer'
+    // to be able to resolve WITH-clause views registered in an ancestor of
+    // 'analyzer' (see IMPALA-1106).
+    Analyzer withClauseAnalyzer = null;
+    if (analyzer.isRootAnalyzer()) {
+      withClauseAnalyzer = new Analyzer(analyzer.getCatalog(), analyzer.getQueryCtx());
+    } else {
+      withClauseAnalyzer = new Analyzer(analyzer);
+    }
+    if (analyzer.isExplain()) withClauseAnalyzer.setIsExplain();
     for (View view: views_) {
-      Analyzer viewAnalyzer = new Analyzer(dummyRootAnalyzer);
+      Analyzer viewAnalyzer = new Analyzer(withClauseAnalyzer);
       view.getQueryStmt().analyze(viewAnalyzer);
       // Register this view so that the next view can reference it.
-      dummyRootAnalyzer.registerLocalView(view);
+      withClauseAnalyzer.registerLocalView(view);
     }
     // Register all local views with the analyzer.
-    for (View localView: dummyRootAnalyzer.getLocalViews().values()) {
+    for (View localView: withClauseAnalyzer.getLocalViews().values()) {
       analyzer.registerLocalView(localView);
     }
     // Record audit events because the resolved table references won't generate any
     // when a view is referenced.
-    analyzer.getAccessEvents().addAll(dummyRootAnalyzer.getAccessEvents());
+    analyzer.getAccessEvents().addAll(withClauseAnalyzer.getAccessEvents());
 
     // Register all privilege requests made from the root analyzer.
-    for (PrivilegeRequest req: dummyRootAnalyzer.getPrivilegeReqs()) {
+    for (PrivilegeRequest req: withClauseAnalyzer.getPrivilegeReqs()) {
       analyzer.registerPrivReq(req);
     }
   }
 
   @Override
-  public WithClause clone() { return new WithClause(views_); }
+  public WithClause clone() { return new WithClause(this); }
 
   @Override
   public String toSql() {
