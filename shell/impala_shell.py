@@ -798,6 +798,9 @@ class ImpalaShell(cmd.Cmd):
     result = self.__fetch_internal(query, start_time)
     self.__print_warning_log()
     close_result = self.__close_query()
+    # print the runtime profile after the query is closed
+    # this includes the summary in the profile
+    self.__print_runtime_profile_if_enabled()
     return result and close_result
 
   def __fetch_internal(self, query, start_time):
@@ -851,7 +854,6 @@ class ImpalaShell(cmd.Cmd):
     # Don't include the time to get the runtime profile or runtime state log in the query
     # execution time
     end_time = time.time()
-    self.__print_runtime_profile_if_enabled()
 
     self.__print_if_verbose(
       "Returned %d row(s) in %2.2fs" % (num_rows_fetched, end_time - start_time))

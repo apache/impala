@@ -229,6 +229,15 @@ class TestImpalaShell(object):
     assert result_describe.stdout == result_desc.stdout
 
   @pytest.mark.execute_serially
+  def test_runtime_profile(self):
+    # test summary is in both the profile printed by the
+    # -p option and the one printed by the profile command
+    args = "-p -q 'select 1; profile;'"
+    result_set = run_impala_shell_cmd(args)
+    summary = 'Operator   #Hosts  Avg Time'
+    assert result_set.stdout.count(summary) == 2
+
+  @pytest.mark.execute_serially
   def test_summary(self):
     args = "-q 'select count(*) from functional.alltypes; summary;'"
     result_set = run_impala_shell_cmd(args)
