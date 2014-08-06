@@ -188,6 +188,7 @@ fi
 # Build Snappy
 if [ $BUILD_ALL -eq 1 ] || [ $BUILD_SNAPPY -eq 1 ]; then
   build_preamble $IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION} Snappy
+  ./autogen.sh
   ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build
   make install
 fi
