@@ -154,6 +154,9 @@ class BufferedBlockMgr {
 
     bool is_pinned() const { return is_pinned_; }
 
+    // Debug helper method to print the state of a block.
+    std::string DebugString() const;
+
    private:
     friend class BufferedBlockMgr;
 
@@ -164,9 +167,6 @@ class BufferedBlockMgr {
 
     // Debug helper method to validate the state of a block.
     bool Validate() const;
-
-    // Debug helper method to print the state of a block.
-    std::string DebugString() const;
 
     // Pointer to the buffer associated with the block. NULL if the block is not in
     // memory and cannot be changed while the block is pinned or being written.

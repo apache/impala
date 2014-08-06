@@ -87,12 +87,31 @@ class BufferedTupleStreamTest : public testing::Test {
     return batch;
   }
 
+  void ReadValues(BufferedTupleStream* stream, vector<int32_t>* results,
+      int num_batches = -1) {
+    bool eos = false;
+    RowBatch batch(*desc_, BATCH_SIZE, &tracker_);
+    int batches_read = 0;
+    do {
+      batch.Reset();
+      Status status = stream->GetNext(&batch, &eos);
+      EXPECT_TRUE(status.ok());
+      ++batches_read;
+      for (int i = 0; i < batch.num_rows(); ++i) {
+        TupleRow* row = batch.GetRow(i);
+        Tuple* tuple = row->GetTuple(0);
+        int32_t v = *reinterpret_cast<int32_t*>(tuple);
+        results->push_back(v);
+      }
+    } while (!eos && (num_batches < 0 || batches_read <= num_batches));
+  }
+
   // Test adding num_batches of ints to the stream and reading them back.
   void TestIntValues(int num_batches) {
     BufferedTupleStream stream(runtime_state_.get(), *desc_, block_mgr_, client_);
     Status status = stream.Init();
     ASSERT_TRUE(status.ok());
-    status = stream.Unpin();
+    status = stream.UnpinAllBlocks();
     ASSERT_TRUE(status.ok());
 
     // Add rows to the stream
@@ -111,23 +130,44 @@ class BufferedTupleStreamTest : public testing::Test {
 
     // Read all the rows back
     vector<int32_t> results;
-    bool eos = false;
-    RowBatch batch(*desc_, BATCH_SIZE, &tracker_);
-    do {
-      batch.Reset();
-      status = stream.GetNext(&batch, &eos);
-      EXPECT_TRUE(status.ok());
-      for (int i = 0; i < batch.num_rows(); ++i) {
-        TupleRow* row = batch.GetRow(i);
-        Tuple* tuple = row->GetTuple(0);
-        int32_t v = *reinterpret_cast<int32_t*>(tuple);
-        results.push_back(v);
-      }
-    } while (!eos);
+    ReadValues(&stream, &results);
 
     // Verify result
     EXPECT_EQ(results.size(), BATCH_SIZE * num_batches);
-    sort(results.begin(), results.end());
+    for (int i = 0; i < results.size(); ++i) {
+      ASSERT_EQ(results[i], i);
+    }
+
+    stream.Close();
+  }
+
+  void TestIntValuesInterleaved(int num_batches, int num_batches_before_read) {
+    BufferedTupleStream stream(runtime_state_.get(), *desc_, block_mgr_, client_,
+        true,  // delete_on_read
+        true); // read_write
+    Status status = stream.Init();
+    ASSERT_TRUE(status.ok());
+    status = stream.UnpinAllBlocks();
+    ASSERT_TRUE(status.ok());
+
+    vector<int32_t> results;
+
+    for (int i = 0; i < num_batches; ++i) {
+      RowBatch* batch = CreateIntBatch(i * BATCH_SIZE, BATCH_SIZE);
+      for (int j = 0; j < batch->num_rows(); ++j) {
+        bool b = stream.AddRow(batch->GetRow(j));
+        ASSERT_TRUE(b);
+      }
+      // Reset the batch to make sure the stream handles the memory correctly.
+      batch->Reset();
+      if (i % num_batches_before_read == 0) {
+        ReadValues(&stream, &results, (rand() % num_batches_before_read) + 1);
+      }
+    }
+    ReadValues(&stream, &results);
+
+    // Verify result
+    EXPECT_EQ(results.size(), BATCH_SIZE * num_batches);
     for (int i = 0; i < results.size(); ++i) {
       ASSERT_EQ(results[i], i);
     }
@@ -153,6 +193,9 @@ TEST_F(BufferedTupleStreamTest, Basic) {
   TestIntValues(1);
   TestIntValues(10);
   TestIntValues(100);
+  TestIntValuesInterleaved(1, 1);
+  TestIntValuesInterleaved(10, 5);
+  TestIntValuesInterleaved(100, 15);
 }
 
 // Test with only 1 buffer.
@@ -171,6 +214,9 @@ TEST_F(BufferedTupleStreamTest, ManyBufferSpill) {
   TestIntValues(1);
   TestIntValues(10);
   TestIntValues(100);
+  TestIntValuesInterleaved(1, 1);
+  TestIntValuesInterleaved(10, 5);
+  TestIntValuesInterleaved(100, 15);
 }
 
 // TODO: more tests.

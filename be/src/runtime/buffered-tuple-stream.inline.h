@@ -24,16 +24,16 @@ namespace impala {
 
 // TODO: this really needs codegen
 inline bool BufferedTupleStream::DeepCopy(TupleRow* row) {
-  DCHECK(current_block_ != NULL);
-  DCHECK(current_block_->is_pinned());
+  DCHECK(write_block_ != NULL);
+  DCHECK(write_block_->is_pinned());
 
-  // Total bytes allocated in current_block_ for this row. Saved so we can roll
+  // Total bytes allocated in write_block_ for this row. Saved so we can roll
   // back if this row doesn't fit.
   int bytes_allocated = 0;
 
   // Copy the fixed len tuples.
-  if (UNLIKELY(current_block_->BytesRemaining() < fixed_tuple_row_size_)) return false;
-  uint8_t* tuple_buf = current_block_->Allocate<uint8_t>(fixed_tuple_row_size_);
+  if (UNLIKELY(write_block_->BytesRemaining() < fixed_tuple_row_size_)) return false;
+  uint8_t* tuple_buf = write_block_->Allocate<uint8_t>(fixed_tuple_row_size_);
   bytes_allocated += fixed_tuple_row_size_;
   for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
     int tuple_size = desc_.tuple_descriptors()[i]->byte_size();
@@ -53,11 +53,11 @@ inline bool BufferedTupleStream::DeepCopy(TupleRow* row) {
       if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
       StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
       if (LIKELY(sv->len > 0)) {
-        if (UNLIKELY(current_block_->BytesRemaining() < sv->len)) {
-          current_block_->ReturnAllocation(bytes_allocated);
+        if (UNLIKELY(write_block_->BytesRemaining() < sv->len)) {
+          write_block_->ReturnAllocation(bytes_allocated);
           return false;
         }
-        uint8_t* buf = current_block_->Allocate<uint8_t>(sv->len);
+        uint8_t* buf = write_block_->Allocate<uint8_t>(sv->len);
         bytes_allocated += sv->len;
         memcpy(buf, sv->ptr, sv->len);
       }
