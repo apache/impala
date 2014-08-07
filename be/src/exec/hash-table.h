@@ -112,28 +112,31 @@ class HashTable {
   // the limits to identify this case.
   // The 'row' is not copied by the hash table and the caller must guarantee it
   // stays in memory.
-  void IR_ALWAYS_INLINE Insert(TupleRow* row) {
-    if (UNLIKELY(mem_limit_exceeded_)) return;
+  // Returns false if there was not enough memory to insert the row.
+  bool IR_ALWAYS_INLINE Insert(TupleRow* row) {
+    if (UNLIKELY(mem_limit_exceeded_)) return false;
+    bool has_null = EvalBuildRow(row);
+    if (!stores_nulls_ && has_null) return true;
+
     if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
       // TODO: next prime instead of double?
       ResizeBuckets(num_buckets_ * 2);
-      if (UNLIKELY(mem_limit_exceeded_)) return;
+      if (UNLIKELY(mem_limit_exceeded_)) return false;
     }
-    bool has_null = EvalBuildRow(row);
-    if (!stores_nulls_ && has_null) return;
-    InsertImpl(row);
+    return InsertImpl(row);
   }
 
-  void IR_ALWAYS_INLINE Insert(Tuple* tuple) {
-    if (UNLIKELY(mem_limit_exceeded_)) return;
+  bool IR_ALWAYS_INLINE Insert(Tuple* tuple) {
+    if (UNLIKELY(mem_limit_exceeded_)) return false;
+    bool has_null = EvalBuildRow(reinterpret_cast<TupleRow*>(&tuple));
+    if (!stores_nulls_ && has_null) return true;
+
     if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
       // TODO: next prime instead of double?
       ResizeBuckets(num_buckets_ * 2);
-      if (UNLIKELY(mem_limit_exceeded_)) return;
+      if (UNLIKELY(mem_limit_exceeded_)) return false;
     }
-    bool has_null = EvalBuildRow(reinterpret_cast<TupleRow*>(&tuple));
-    if (!stores_nulls_ && has_null) return;
-    InsertImpl(tuple);
+    return InsertImpl(tuple);
   }
 
   // Evaluate and hash the build/probe row, returning in *hash. Returns false if this
@@ -147,7 +150,7 @@ class HashTable {
   // Returns the start iterator for all rows that match 'probe_row'.  'probe_row' is
   // evaluated with probe exprs.  The iterator can be iterated until HashTable::End()
   // to find all the matching rows.
-  // Only one scan be in progress at any time (i.e. it is not legal to call
+  // Only one scan can be in progress at any time (i.e. it is not legal to call
   // Find(), begin iterating through all the matches, call another Find(),
   // and continuing iterator from the first scan iterator).
   // Advancing the returned iterator will go to the next matching row.  The matching
@@ -156,13 +159,13 @@ class HashTable {
   Iterator IR_ALWAYS_INLINE Find(TupleRow* probe_row);
 
   // Returns number of elements in the hash table
-  int64_t size() { return num_nodes_; }
+  int64_t size() const { return num_nodes_; }
 
   // Returns the number of buckets
-  int64_t num_buckets() { return buckets_.size(); }
+  int64_t num_buckets() const { return buckets_.size(); }
 
   // Returns the load factor (the number of non-empty buckets)
-  float load_factor() {
+  float load_factor() const {
     return num_filled_buckets_ / static_cast<float>(buckets_.size());
   }
 
@@ -339,7 +342,7 @@ class HashTable {
   void ResizeBuckets(int64_t num_buckets);
 
   // Insert row into the hash table
-  void IR_ALWAYS_INLINE InsertImpl(void* data);
+  bool IR_ALWAYS_INLINE InsertImpl(void* data);
 
   // Chains the node at 'node_idx' to 'bucket'.  Nodes in a bucket are chained
   // as a linked list; this places the new node at the beginning of the list.
@@ -447,6 +450,7 @@ class HashTable {
   int node_remaining_current_page_;
 
   MemTracker* mem_tracker_;
+
   // Set to true if the hash table exceeds the memory limit. If this is set,
   // subsequent calls to Insert() will be ignored.
   bool mem_limit_exceeded_;

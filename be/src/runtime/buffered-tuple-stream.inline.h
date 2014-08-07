@@ -76,6 +76,20 @@ inline bool BufferedTupleStream::AddRow(TupleRow* row) {
   return DeepCopy(row);
 }
 
+inline uint8_t* BufferedTupleStream::AllocateRow(int size) {
+  DCHECK(write_block_ != NULL);
+  DCHECK(write_block_->is_pinned());
+  DCHECK_GE(size, fixed_tuple_row_size_);
+  if (UNLIKELY(write_block_->BytesRemaining() < size)) {
+    bool got_block = false;
+    status_ = NewBlockForWrite(&got_block);
+    if (!status_.ok() || !got_block) return NULL;
+  }
+  DCHECK_GE(write_block_->BytesRemaining(), size);
+  ++num_rows_;
+  return write_block_->Allocate<uint8_t>(size);
+}
+
 }
 
 #endif

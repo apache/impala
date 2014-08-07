@@ -57,6 +57,7 @@ add_library(Exec
   hdfs-parquet-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
+  partitioned-aggregation-node.cc
   partitioned-hash-join-node.cc
   read-write-util.cc
   scan-node.cc

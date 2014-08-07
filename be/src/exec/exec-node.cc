@@ -33,6 +33,7 @@
 #include "exec/hdfs-scan-node.h"
 #include "exec/hbase-scan-node.h"
 #include "exec/select-node.h"
+#include "exec/partitioned-aggregation-node.h"
 #include "exec/partitioned-hash-join-node.h"
 #include "exec/sort-node.h"
 #include "exec/topn-node.h"
@@ -49,8 +50,9 @@ using namespace llvm;
 using namespace std;
 using namespace boost;
 
-// TODO: remove when we remove hash-join-node.
+// TODO: remove when we remove hash-join-node.cc and aggregation-node.cc
 DEFINE_bool(enable_partitioned_hash_join, false, "Enable partitioned hash join");
+DEFINE_bool(enable_partitioned_aggregation, false, "Enable partitioned hash agg");
 
 namespace impala {
 
@@ -253,7 +255,11 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       *node = pool->Add(new DataSourceScanNode(pool, tnode, descs));
       break;
     case TPlanNodeType::AGGREGATION_NODE:
-      *node = pool->Add(new AggregationNode(pool, tnode, descs));
+      if (FLAGS_enable_partitioned_aggregation) {
+        *node = pool->Add(new PartitionedAggregationNode(pool, tnode, descs));
+      } else {
+        *node = pool->Add(new AggregationNode(pool, tnode, descs));
+      }
       break;
     case TPlanNodeType::HASH_JOIN_NODE:
       // Only the partitioned hash join impl supports anti-join
@@ -396,10 +402,10 @@ bool ExecNode::EvalConjuncts(ExprContext* const* ctxs, int num_ctxs, TupleRow* r
 //   %is_false7 = xor i1 %val6, true
 //   %return_false8 = or i1 %is_null5, %is_false7
 //   br i1 %return_false8, label %false, label %continue1
-// 
+//
 // continue1:                                        ; preds = %continue
 //   ret i1 true
-// 
+//
 // false:                                            ; preds = %continue, %entry
 //   ret i1 false
 // }

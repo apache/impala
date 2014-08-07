@@ -714,7 +714,6 @@ void HashTable::GrowNodeArray() {
 }
 
 void HashTable::MemLimitExceeded(int64_t allocation_size) {
-  DCHECK(!mem_limit_exceeded_);
   mem_limit_exceeded_ = true;
   if (state_ != NULL) state_->SetMemLimitExceeded(mem_tracker_, allocation_size);
 }

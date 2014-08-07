@@ -100,6 +100,10 @@ class BufferedTupleStream {
   // BufferedTupleStream will do a deep copy of the memory in the row.
   bool AddRow(TupleRow* row);
 
+  // Allocates space to store a row of size 'size'. Returns NULL if there is
+  // not enough memory. The returned memory is guaranteed to fit on one block.
+  uint8_t* AllocateRow(int size);
+
   // Prepares the stream for reading. If read_write_, this does not need to be called in
   // order to begin reading, otherwise this must be called after the last AddRow() and
   // before GetNext().

@@ -24,7 +24,6 @@ inline HashTable::Iterator HashTable::Find(TupleRow* probe_row) {
   uint32_t hash;
   if (!EvalAndHashProbe(probe_row, &hash)) return End();
   int64_t bucket_idx = hash & (num_buckets_ - 1);
-
   Bucket* bucket = &buckets_[bucket_idx];
   Node* node = bucket->node;
   while (node != NULL) {
@@ -33,7 +32,6 @@ inline HashTable::Iterator HashTable::Find(TupleRow* probe_row) {
     }
     node = node->next;
   }
-
   return End();
 }
 
@@ -71,19 +69,12 @@ inline HashTable::Bucket* HashTable::NextBucket(int64_t* bucket_idx) {
   return NULL;
 }
 
-inline void HashTable::InsertImpl(void* data) {
-  if (UNLIKELY(mem_limit_exceeded_)) return;
-  if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
-    // TODO: next prime instead of double?
-    ResizeBuckets(num_buckets_ * 2);
-    if (UNLIKELY(mem_limit_exceeded_)) return;
-  }
-
+inline bool HashTable::InsertImpl(void* data) {
   uint32_t hash = HashCurrentRow();
   int64_t bucket_idx = hash & (num_buckets_ - 1);
   if (node_remaining_current_page_ == 0) {
     GrowNodeArray();
-    if (UNLIKELY(mem_limit_exceeded_)) return;
+    if (UNLIKELY(mem_limit_exceeded_)) return false;
   }
   next_node_->hash = hash;
   next_node_->data = data;
@@ -93,6 +84,7 @@ inline void HashTable::InsertImpl(void* data) {
   --node_remaining_current_page_;
   ++next_node_;
   ++num_nodes_;
+  return true;
 }
 
 inline void HashTable::AddToBucket(Bucket* bucket, Node* node) {

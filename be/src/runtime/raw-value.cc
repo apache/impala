@@ -234,6 +234,57 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
   }
 }
 
+// TODO: can we remove some of this code duplication? Templated allocator?
+void RawValue::Write(const void* value, const ColumnType& type,
+    void* dst, uint8_t** buf) {
+  DCHECK(value != NULL);
+  switch (type.type) {
+    case TYPE_BOOLEAN:
+      *reinterpret_cast<bool*>(dst) = *reinterpret_cast<const bool*>(value);
+      break;
+    case TYPE_TINYINT:
+      *reinterpret_cast<int8_t*>(dst) = *reinterpret_cast<const int8_t*>(value);
+      break;
+    case TYPE_SMALLINT:
+      *reinterpret_cast<int16_t*>(dst) = *reinterpret_cast<const int16_t*>(value);
+      break;
+    case TYPE_INT:
+      *reinterpret_cast<int32_t*>(dst) = *reinterpret_cast<const int32_t*>(value);
+      break;
+    case TYPE_BIGINT:
+      *reinterpret_cast<int64_t*>(dst) = *reinterpret_cast<const int64_t*>(value);
+      break;
+    case TYPE_FLOAT:
+      *reinterpret_cast<float*>(dst) = *reinterpret_cast<const float*>(value);
+      break;
+    case TYPE_DOUBLE:
+      *reinterpret_cast<double*>(dst) = *reinterpret_cast<const double*>(value);
+      break;
+    case TYPE_TIMESTAMP:
+      *reinterpret_cast<TimestampValue*>(dst) =
+          *reinterpret_cast<const TimestampValue*>(value);
+      break;
+    case TYPE_STRING: {
+      DCHECK(buf != NULL);
+      const StringValue* src = reinterpret_cast<const StringValue*>(value);
+      StringValue* dest = reinterpret_cast<StringValue*>(dst);
+      dest->len = src->len;
+      dest->ptr = reinterpret_cast<char*>(*buf);
+      memcpy(dest->ptr, src->ptr, dest->len);
+      *buf += dest->len;
+      break;
+    }
+    case TYPE_CHAR:
+      memcpy(dst, value, type.len);
+      break;
+    case TYPE_DECIMAL:
+      memcpy(dst, value, type.GetByteSize());
+      break;
+    default:
+      DCHECK(false) << "RawValue::Write(): bad type: " << type.DebugString();
+  }
+}
+
 void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc,
                      MemPool* pool) {
   if (value == NULL) {
