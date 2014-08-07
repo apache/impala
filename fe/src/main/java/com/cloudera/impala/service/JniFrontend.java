@@ -28,6 +28,8 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.Maps;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
@@ -66,6 +68,7 @@ import com.cloudera.impala.thrift.TGetFunctionsParams;
 import com.cloudera.impala.thrift.TGetFunctionsResult;
 import com.cloudera.impala.thrift.TGetHadoopConfigRequest;
 import com.cloudera.impala.thrift.TGetHadoopConfigResponse;
+import com.cloudera.impala.thrift.TGetAllHadoopConfigsResponse;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TLoadDataReq;
@@ -390,33 +393,19 @@ public class JniFrontend {
    * Returns a string of all loaded Hadoop configuration parameters as a table of keys
    * and values. If asText is true, output in raw text. Otherwise, output in html.
    */
-  public String getHadoopConfig(boolean asText) {
-    StringBuilder output = new StringBuilder();
-    if (asText) {
-      output.append("Hadoop Configuration\n");
-      // Write the set of files that make up the configuration
-      output.append(CONF.toString());
-      output.append("\n\n");
-      // Write a table of key, value pairs
-      for (Map.Entry<String, String> e : CONF) {
-        output.append(e.getKey() + "=" + e.getValue() + "\n");
-      }
-      output.append("\n");
-    } else {
-      output.append("<h2>Hadoop Configuration</h2>");
-      // Write the set of files that make up the configuration
-      output.append(CONF.toString());
-      output.append("\n\n");
-      // Write a table of key, value pairs
-      output.append("<table class='table table-bordered table-hover'>");
-      output.append("<tr><th>Key</th><th>Value</th></tr>");
-      for (Map.Entry<String, String> e : CONF) {
-        output.append("<tr><td>" + e.getKey() + "</td><td>" + e.getValue() +
-            "</td></tr>");
-      }
-      output.append("</table>");
+  public byte[] getAllHadoopConfigs() throws ImpalaException {
+    Map<String, String> configs = Maps.newHashMap();
+    for (Map.Entry<String, String> e: CONF) {
+      configs.put(e.getKey(), e.getValue());
     }
-    return output.toString();
+    TGetAllHadoopConfigsResponse result = new TGetAllHadoopConfigsResponse();
+    result.setConfigs(configs);
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
   }
 
   /**

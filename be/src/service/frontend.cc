@@ -56,7 +56,7 @@ Frontend::Frontend() {
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "([B)[B", &get_hadoop_config_id_},
-    {"getHadoopConfig", "(Z)Ljava/lang/String;", &get_hadoop_configs_id_},
+    {"getAllHadoopConfigs", "()[B", &get_hadoop_configs_id_},
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
     {"updateCatalogCache", "([B)[B", &update_catalog_cache_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
@@ -191,20 +191,8 @@ Status Frontend::ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
   return JniUtil::CallJniMethod(fe_, exec_hs2_metadata_op_id_, request, result);
 }
 
-Status Frontend::RenderHadoopConfigs(bool as_text, stringstream* output) {
-  JNIEnv* jni_env = getJNIEnv();
-  JniLocalFrame jni_frame;
-  RETURN_IF_ERROR(jni_frame.push(jni_env));
-  jstring java_string = static_cast<jstring>(jni_env->CallObjectMethod(
-      fe_, get_hadoop_configs_id_, as_text));
-  RETURN_ERROR_IF_EXC(jni_env);
-  jboolean is_copy;
-  const char *str = jni_env->GetStringUTFChars(java_string, &is_copy);
-  RETURN_ERROR_IF_EXC(jni_env);
-  (*output) << str;
-  jni_env->ReleaseStringUTFChars(java_string, str);
-  RETURN_ERROR_IF_EXC(jni_env);
-  return Status::OK;
+Status Frontend::GetAllHadoopConfigs(TGetAllHadoopConfigsResponse* result) {
+  return JniUtil::CallJniMethod(fe_, get_hadoop_configs_id_, result);
 }
 
 Status Frontend::GetHadoopConfig(const TGetHadoopConfigRequest& request,

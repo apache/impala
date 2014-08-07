@@ -1,3 +1,7 @@
+{{?__raw__}}{{{contents}}}{{/__raw__}}
+
+{{^__raw__}}
+
 <!--
 Copyright 2012- Cloudera Inc.
 
@@ -14,8 +18,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 {{> www/common-header.tmpl }}
+{{?title}}<h2>{{title}}</h2>{{/title}}
+{{^error}}
+<pre>{{contents}}</pre>
+{{/error}}
 
-{{#thrift_string}}
-<pre>{{.}}</pre>
-{{/thrift_string}}
 {{> www/common-footer.tmpl }}
+
+{{/__raw__}}

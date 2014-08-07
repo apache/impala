@@ -79,9 +79,7 @@ static const uint32_t NOT_PROCESSED = 0;
 
 // Standard keys in the json document sent to templates for rendering. Must be kept in
 // sync with the templates themselves.
-static const string COMMON_JSON_KEY = "__common__";
-static const string PRERENDERED_JSON_KEY = "__prerendered__";
-static const string ENABLE_RAW_JSON_KEY = "__raw__";
+static const char* COMMON_JSON_KEY = "__common__";
 
 // Returns $IMPALA_HOME if set, otherwise /tmp/impala_www
 const char* GetDefaultDocumentRoot() {
@@ -99,6 +97,8 @@ const char* GetDefaultDocumentRoot() {
 }
 
 namespace impala {
+
+const char* Webserver::ENABLE_RAW_JSON_KEY = "__raw__";
 
 Webserver::Webserver() : context_(NULL) {
   http_address_ = MakeNetworkAddress(
@@ -226,10 +226,10 @@ Status Webserver::Start() {
     return Status(error_msg.str());
   }
 
-  JsonUrlCallback default_callback =
+  UrlCallback default_callback =
       bind<void>(mem_fn(&Webserver::RootHandler), this, _1, _2);
 
-  RegisterJsonUrlCallback("/", "root.tmpl", default_callback);
+  RegisterUrlCallback("/", "root.tmpl", default_callback);
 
   LOG(INFO) << "Webserver started";
   return Status::OK;
@@ -259,7 +259,7 @@ void Webserver::GetCommonJson(Document* document) {
   }
 
   obj.AddMember("navbar", lst, document->GetAllocator());
-  document->AddMember(COMMON_JSON_KEY.c_str(), obj, document->GetAllocator());
+  document->AddMember(COMMON_JSON_KEY, obj, document->GetAllocator());
 }
 
 int Webserver::LogMessageCallbackStatic(const struct sq_connection* connection,
@@ -310,46 +310,27 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
   // The output of this page is accumulated into this stringstream.
   stringstream output;
   bool raw_json = (arguments.find("json") != arguments.end());
-  if (raw_json && it->second.is_json())  {
-    // Json callbacks have the option of being rendered as text, pretty-printed Json
-    // document (mostly for debugging or integration with third-party tools).
+  if (raw_json) {
+    // Callbacks may optionally be rendered as a text-only, pretty-printed Json document
+    // (mostly for debugging or integration with third-party tools).
     StringBuffer strbuf;
     PrettyWriter<StringBuffer> writer(strbuf);
-    it->second.json_callback()(arguments, &document);
+    it->second.callback()(arguments, &document);
     document.Accept(writer);
     output << strbuf.GetString();
     send_html_headers = false;
   } else {
-    string template_filename = "static.tmpl";
-
-    // We may write 'prerendered' content into this string, then reference it from the
-    // RapidJson document rather than copy it (which requires a custom
-    // allocator...). Therefore this string must not be destroyed until after
-    // RenderTemplate() returns.
-    string prerendered_content;
-    if (it->second.is_json()) {
-      // This callback has its own template, and produces json.
-      it->second.json_callback()(arguments, &document);
-      template_filename = it->second.template_filename();
-    } else {
-      // If the callback doesn't have its own template, we'll render it using either the
-      // standard header+footer template, or, if the callback is unstyled, without any
-      // boilerplate at all. To do this, we add the text output from the callback to the
-      // __prerendered__ key in the json document, which is expected by the static
-      // template
-      stringstream prerendered_stream;
-      it->second.html_callback()(arguments, &prerendered_stream);
-      prerendered_content = prerendered_stream.str();
-      document.AddMember(PRERENDERED_JSON_KEY.c_str(), prerendered_content.c_str(),
-          document.GetAllocator());
-      if (!it->second.is_styled() || arguments.find("raw") != arguments.end()) {
-        document.AddMember(ENABLE_RAW_JSON_KEY.c_str(), "true", document.GetAllocator());
-      }
-      if (document.HasMember(ENABLE_RAW_JSON_KEY.c_str())) send_html_headers = false;
+    it->second.callback()(arguments, &document);
+    if (arguments.find("raw") != arguments.end()) {
+      document.AddMember(ENABLE_RAW_JSON_KEY, "true", document.GetAllocator());
+    }
+    if (document.HasMember(ENABLE_RAW_JSON_KEY)) {
+      send_html_headers = false;
     }
 
     const string& full_template_path =
-        Substitute("$0/$1/$2", FLAGS_webserver_doc_root, DOC_FOLDER, template_filename);
+        Substitute("$0/$1/$2", FLAGS_webserver_doc_root, DOC_FOLDER,
+            it->second.template_filename());
     ifstream tmpl(full_template_path.c_str());
     if (!tmpl.is_open()) {
       output << "Could not open template: " << full_template_path;
@@ -384,26 +365,15 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
   return PROCESSING_COMPLETE;
 }
 
-void Webserver::RegisterHtmlUrlCallback(const string& path,
-    const HtmlUrlCallback& callback, bool is_styled, bool is_on_nav_bar) {
-  upgrade_lock<shared_mutex> lock(url_handlers_lock_);
-  upgrade_to_unique_lock<shared_mutex> writer_lock(lock);
-  DCHECK(url_handlers_.find(path) == url_handlers_.end())
-      << "Duplicate Url handler for: " << path;
-
-  url_handlers_.insert(make_pair(path, UrlHandler(callback, is_styled, is_on_nav_bar)));
-}
-
-void Webserver::RegisterJsonUrlCallback(const string& path,
-    const string& template_filename, const JsonUrlCallback& callback, bool is_styled,
-    bool is_on_nav_bar) {
+void Webserver::RegisterUrlCallback(const string& path,
+    const string& template_filename, const UrlCallback& callback, bool is_on_nav_bar) {
   upgrade_lock<shared_mutex> lock(url_handlers_lock_);
   upgrade_to_unique_lock<shared_mutex> writer_lock(lock);
   DCHECK(url_handlers_.find(path) == url_handlers_.end())
       << "Duplicate Url handler for: " << path;
 
   url_handlers_.insert(
-      make_pair(path, UrlHandler(callback, template_filename, is_styled, is_on_nav_bar)));
+      make_pair(path, UrlHandler(callback, template_filename, is_on_nav_bar)));
 }
 
 }

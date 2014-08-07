@@ -603,3 +603,7 @@ struct TGetHadoopConfigResponse {
   // The corresponding value if one exists
   1: optional string value
 }
+
+struct TGetAllHadoopConfigsResponse {
+  1: optional map<string, string> configs;
+}

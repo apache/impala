@@ -20,121 +20,100 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
 #include <google/malloc_extension.h>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "runtime/mem-tracker.h"
 #include "util/debug-util.h"
-#include "util/pprof-path-handlers.cc"
+#include "util/pprof-path-handlers.h"
 #include "util/webserver.h"
 
 using namespace std;
 using namespace google;
 using namespace boost;
 using namespace impala;
+using namespace rapidjson;
+using namespace strings;
 
 DECLARE_bool(enable_process_lifetime_heap_profiling);
 DEFINE_int64(web_log_bytes, 1024 * 1024,
     "The maximum number of bytes to display on the debug webserver's log page");
 
-// Html/Text formatting tags
-struct Tags {
-  string pre_tag, end_pre_tag, line_break, header, end_header;
-
-  // If as_text is true, set the html tags to a corresponding raw text representation.
-  Tags(bool as_text) {
-    if (as_text) {
-      pre_tag = "";
-      end_pre_tag = "\n";
-      line_break = "\n";
-      header = "";
-      end_header = "";
-    } else {
-      pre_tag = "<pre>";
-      end_pre_tag = "</pre>";
-      line_break = "<br/>";
-      header = "<h2>";
-      end_header = "</h2>";
-    }
-  }
-};
-
 // Writes the last FLAGS_web_log_bytes of the INFO logfile to a webpage
 // Note to get best performance, set GLOG_logbuflevel=-1 to prevent log buffering
-void LogsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
-  Tags tags(args.find("raw") != args.end());
+void LogsHandler(const Webserver::ArgumentMap& args, Document* document) {
   string logfile;
   impala::GetFullLogFilename(google::INFO, &logfile);
-  (*output) << tags.header << "INFO logs" << tags.end_header << endl;
-  (*output) << "Log path is: " << logfile << endl;
+  Value log_path(logfile.c_str(), document->GetAllocator());
+  document->AddMember("logfile", log_path, document->GetAllocator());
 
   struct stat file_stat;
   if (stat(logfile.c_str(), &file_stat) == 0) {
     long size = file_stat.st_size;
     long seekpos = size < FLAGS_web_log_bytes ? 0L : size - FLAGS_web_log_bytes;
     ifstream log(logfile.c_str(), ios::in);
-    // Note if the file rolls between stat and seek, this could fail
-    // (and we could wind up reading the whole file). But because the
-    // file is likely to be small, this is unlikely to be an issue in
-    // practice.
+    // Note if the file rolls between stat and seek, this could fail (and we could wind up
+    // reading the whole file). But because the file is likely to be small, this is
+    // unlikely to be an issue in practice.
     log.seekg(seekpos);
-    (*output) << tags.line_break <<"Showing last " << FLAGS_web_log_bytes
-              << " bytes of log" << endl;
-    (*output) << tags.line_break << tags.pre_tag << log.rdbuf() << tags.end_pre_tag;
-
+    document->AddMember("num_bytes", FLAGS_web_log_bytes, document->GetAllocator());
+    stringstream ss;
+    ss << log.rdbuf();
+    Value log_json(ss.str().c_str(), document->GetAllocator());
+    document->AddMember("log", log_json, document->GetAllocator());
   } else {
-    (*output) << tags.line_break << "Couldn't open INFO log file: " << logfile;
+    Value error(Substitute("Couldn't open INFO log file: $0", logfile).c_str(),
+        document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
   }
 }
 
-// Registered to handle "/flags", and prints out all command-line flags and their values
-void FlagsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
-  Tags tags(args.find("raw") != args.end());
-  (*output) << tags.header << "Command-line Flags" << tags.end_header;
-  (*output) << tags.pre_tag << CommandlineFlagsIntoString() << tags.end_pre_tag;
+// Registered to handle "/flags", and produces Json with 'title" and 'contents' members
+// where the latter is a string with all the command-line flags and their values.
+void FlagsHandler(const Webserver::ArgumentMap& args, Document* document) {
+  Value title("Command-line Flags", document->GetAllocator());
+  document->AddMember("title", title, document->GetAllocator());
+  Value flags(CommandlineFlagsIntoString().c_str(), document->GetAllocator());
+  document->AddMember("contents", flags, document->GetAllocator());
 }
 
-// Registered to handle "/memz", and prints out memory allocation statistics.
+// Registered to handle "/memz"
 void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  Tags tags(false);
-
+    Document* document) {
   DCHECK(mem_tracker != NULL);
-  (*output) << tags.pre_tag
-            << "Mem Limit: "
-            << PrettyPrinter::Print(mem_tracker->limit(), TCounterType::BYTES)
-            << endl
-            << "Mem Consumption: "
-            << PrettyPrinter::Print(mem_tracker->consumption(), TCounterType::BYTES)
-            << endl
-            << tags.end_pre_tag;
+  Value mem_limit(PrettyPrinter::Print(mem_tracker->limit(), TCounterType::BYTES).c_str(),
+      document->GetAllocator());
+  document->AddMember("mem_limit", mem_limit, document->GetAllocator());
+  Value consumption(
+      PrettyPrinter::Print(mem_tracker->consumption(), TCounterType::BYTES).c_str(),
+      document->GetAllocator());
+  document->AddMember("consumption", consumption, document->GetAllocator());
 
-  (*output) << tags.pre_tag;
+  stringstream ss;
 #ifdef ADDRESS_SANITIZER
-  (*output) << "Memory tracking is not available with address sanitizer builds.";
+  ss << "Memory tracking is not available with address sanitizer builds.";
 #else
   char buf[2048];
   MallocExtension::instance()->GetStats(buf, 2048);
-  // Replace new lines with <br> for html
-  string tmp(buf);
-  replace_all(tmp, "\n", tags.line_break);
-  (*output) << tmp << tags.end_pre_tag;
+  ss << string(buf);
 #endif
+
+  Value overview(ss.str().c_str(), document->GetAllocator());
+  document->AddMember("overview", overview, document->GetAllocator());
 
   if (args.find("detailed") != args.end()) {
     // Dump all mem trackers.
-    (*output) << tags.pre_tag
-              << "Detailed usage: " << endl
-              << mem_tracker->LogUsage()
-              << tags.end_pre_tag;
+    Value detailed(mem_tracker->LogUsage().c_str(), document->GetAllocator());
+    document->AddMember("detailed", detailed, document->GetAllocator());
   }
 }
 
 void impala::AddDefaultUrlCallbacks(
     Webserver* webserver, MemTracker* process_mem_tracker) {
-  webserver->RegisterHtmlUrlCallback("/logs", LogsHandler);
-  webserver->RegisterHtmlUrlCallback("/varz", FlagsHandler);
+  webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler);
+  webserver->RegisterUrlCallback("/varz", "common-pre.tmpl", FlagsHandler);
   if (process_mem_tracker != NULL) {
-    webserver->RegisterHtmlUrlCallback("/memz",
+    webserver->RegisterUrlCallback("/memz","memz.tmpl",
         bind<void>(&MemUsageHandler, process_mem_tracker, _1, _2));
   }
 

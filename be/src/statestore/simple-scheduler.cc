@@ -180,9 +180,9 @@ Status SimpleScheduler::Init() {
   LOG(INFO) << "Starting simple scheduler";
 
   if (webserver_ != NULL) {
-    Webserver::JsonUrlCallback backends_callback =
+    Webserver::UrlCallback backends_callback =
         bind<void>(mem_fn(&SimpleScheduler::BackendsUrlCallback), this, _1, _2);
-    webserver_->RegisterJsonUrlCallback(BACKENDS_WEB_PAGE, BACKENDS_TEMPLATE,
+    webserver_->RegisterUrlCallback(BACKENDS_WEB_PAGE, BACKENDS_TEMPLATE,
         backends_callback);
   }
 

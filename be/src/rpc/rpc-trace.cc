@@ -26,6 +26,7 @@
 
 using namespace impala;
 using namespace boost;
+using namespace rapidjson;
 using namespace std;
 using namespace strings;
 
@@ -36,8 +37,11 @@ class RpcEventHandlerManager {
   // Adds an event handler to the list of those tracked
   void RegisterEventHandler(RpcEventHandler* event_handler);
 
-  // Renders /rpcz with summary information for all Rpc methods.
-  void WebCallback(const Webserver::ArgumentMap& args, stringstream* out);
+  // Produces Json for /rpcz with summary information for all Rpc methods.
+  // { "servers": [
+  //  .. list of output from RpcEventHandler::ToJson()
+  //  ] }
+  void JsonCallback(const Webserver::ArgumentMap& args, Document* document);
 
  private:
   // Protects event_handlers_
@@ -57,9 +61,9 @@ scoped_ptr<RpcEventHandlerManager> handler_manager;
 void impala::InitRpcEventTracing(Webserver* webserver) {
   handler_manager.reset(new RpcEventHandlerManager());
   if (webserver != NULL) {
-    Webserver::HtmlUrlCallback callback = bind<void>(
-        mem_fn(&RpcEventHandlerManager::WebCallback), handler_manager.get(), _1, _2);
-    webserver->RegisterHtmlUrlCallback("/rpcz", callback);
+    Webserver::UrlCallback json = bind<void>(
+        mem_fn(&RpcEventHandlerManager::JsonCallback), handler_manager.get(), _1, _2);
+    webserver->RegisterUrlCallback("/rpcz", "rpcz.tmpl", json);
   }
 }
 
@@ -69,12 +73,16 @@ void RpcEventHandlerManager::RegisterEventHandler(RpcEventHandler* event_handler
   event_handlers_.push_back(event_handler);
 }
 
-void RpcEventHandlerManager::WebCallback(const Webserver::ArgumentMap& args,
-    stringstream* out) {
+void RpcEventHandlerManager::JsonCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
   lock_guard<mutex> l(lock_);
+  Value servers(kArrayType);
   BOOST_FOREACH(RpcEventHandler* handler, event_handlers_) {
-    handler->WriteToHtml(out);
+    Value server(kObjectType);
+    handler->ToJson(&server, document);
+    servers.PushBack(server, document->GetAllocator());
   }
+  document->AddMember("servers", servers, document->GetAllocator());
 }
 
 RpcEventHandler::RpcEventHandler(const string& server_name, Metrics* metrics) :
@@ -82,18 +90,23 @@ RpcEventHandler::RpcEventHandler(const string& server_name, Metrics* metrics) :
   if (handler_manager.get() != NULL) handler_manager->RegisterEventHandler(this);
 }
 
-void RpcEventHandler::WriteToHtml(stringstream* out) {
+void RpcEventHandler::ToJson(Value* server, Document* document) {
   lock_guard<mutex> l(method_map_lock_);
-  (*out) << "<h3>" << server_name_ << "</h3>";
-  (*out) << "<table class='table table-hover table-bordered'><tr>"
-         << "<th>Method</th><th>Duration summary</th><th>In flight</th></tr>";
+  Value name(server_name_.c_str(), document->GetAllocator());
+  server->AddMember("name", name, document->GetAllocator());
+  Value methods(kArrayType);
   BOOST_FOREACH(const MethodMap::value_type& rpc, method_map_) {
-    (*out) << "<tr><td>" << rpc.first << "</td><td>";
-    rpc.second->time_stats->PrintValue(out);
-    (*out) << "</td><td>" << rpc.second->num_in_flight << "</td></tr>";
+    Value method(kObjectType);
+    Value method_name(rpc.first.c_str(), document->GetAllocator());
+    method.AddMember("name", method_name, document->GetAllocator());
+    stringstream ss;
+    rpc.second->time_stats->PrintValue(&ss);
+    Value summary(ss.str().c_str(), document->GetAllocator());
+    method.AddMember("summary", summary, document->GetAllocator());
+    method.AddMember("in_flight", rpc.second->num_in_flight, document->GetAllocator());
+    methods.PushBack(method, document->GetAllocator());
   }
-
-  (*out) << "</table>";
+  server->AddMember("methods", methods, document->GetAllocator());
 }
 
 void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {

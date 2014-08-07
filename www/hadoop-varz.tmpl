@@ -15,7 +15,17 @@ limitations under the License.
 -->
 {{> www/common-header.tmpl }}
 
-{{#thrift_string}}
-<pre>{{.}}</pre>
-{{/thrift_string}}
+<table class='table table-hover table-bordered'>
+<tr>
+  <th>Config</th>
+  <th>Value</th>
+</tr>
+{{#configs}}
+<tr>
+  <td>{{key}}</td>
+  <td>{{value}}</td>
+</tr>
+{{/configs}}
+</table>
+
 {{> www/common-footer.tmpl }}

@@ -1,0 +1,99 @@
+<!--
+Copyright 2012- Cloudera Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+{{> www/common-header.tmpl }}
+<h2>Queries</h2>
+<p>This page lists all running queries, plus any completed queries that are archived in
+memory. The size of that archive is controlled with the <tt>--query_log_size</tt> command
+line parameter.</p>
+
+<h3>{{num_in_flight_queries}} queries in flight</h3>
+
+<table class='table table-hover table-border'>
+  <tr>
+    <th>User</th>
+    <th>Default Db</th>
+    <th>Statement</th>
+    <th>Query Type</th>
+    <th>Start Time</th>
+    <th>Backend Progress</th>
+    <th>State</th>
+    <th># rows fetched</th>
+    <th>Profile</th>
+    <th>Action</th>
+  </tr>
+{{#in_flight_queries}}
+  <tr>
+    <td>{{effective_user}}</td>
+    <td>{{default_db}}</td>
+    <td>{{stmt}}</td>
+    <td>{{stmt_type}}</td>
+    <td>{{start_time}}</td>
+    <td>{{progress}}</td>
+    <td>{{state}}</td>
+    <td>{{rows_fetched}}</td>
+    <td><a href='/query_profile?query_id={{query_id}}'>Profile</a></td>
+    <td><a href='/cancel_query?query_id={{query_id}}'>Cancel</a></td>
+  </tr>
+{{/in_flight_queries}}
+</table>
+
+<h3>Query Locations</h3>
+
+<table class='table table-hover table-bordered'>
+  <tr>
+    <th>Location</th>
+    <th>Number of Fragments</th>
+  </tr>
+{{#query_locations}}
+  <tr>
+    <td>{{location}}</td>
+    <td>{{count}}</td>
+  </tr>
+{{/query_locations}}
+</table>
+
+<h3>Last {{completed_log_size}} Completed Queries</h3>
+
+<table class='table table-hover table-border'>
+  <tr>
+    <th>User</th>
+    <th>Default Db</th>
+    <th>Statement</th>
+    <th>Query Type</th>
+    <th>Start Time</th>
+    <th>End Time</th>
+    <th>Backend Progress</th>
+    <th>State</th>
+    <th># rows fetched</th>
+    <th>Profile</th>
+  </tr>
+{{#completed_queries}}
+  <tr>
+    <td>{{effective_user}}</td>
+    <td>{{default_db}}</td>
+    <td>{{stmt}}</td>
+    <td>{{stmt_type}}</td>
+    <td>{{start_time}}</td>
+    <td>{{end_time}}</td>
+    <td>{{progress}}</td>
+    <td>{{state}}</td>
+    <td>{{rows_fetched}}</td>
+    <td><a href='/query_profile?query_id={{query_id}}'>Profile</a></td>
+  </tr>
+{{/completed_queries}}
+</table>
+
+{{> www/common-footer.tmpl }}

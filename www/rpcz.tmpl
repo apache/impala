@@ -15,7 +15,23 @@ limitations under the License.
 -->
 {{> www/common-header.tmpl }}
 
-{{#thrift_string}}
-<pre>{{.}}</pre>
-{{/thrift_string}}
+{{#servers}}
+<h3>{{name}}</h3>
+
+<table class='table table-hover table-bordered'>
+<tr>
+  <th>Method</th>
+  <th>Duration summary</th>
+  <th>In Flight</th>
+</tr>
+{{#methods}}
+<tr>
+  <td>{{name}}</td>
+  <td>{{summary}}</td>
+  <td>{{in_flight}}</td>
+</tr>
+{{/methods}}
+</table>
+{{/servers}}
+
 {{> www/common-footer.tmpl }}

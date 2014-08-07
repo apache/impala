@@ -29,15 +29,18 @@
 namespace impala {
 
 // Wrapper class for the Squeasel web server library. Clients may register callback
-// methods which produce output for a given URL path
+// methods which produce Json documents which are rendered via a template file to either
+// HTML or text.
 class Webserver {
  public:
   typedef std::map<std::string, std::string> ArgumentMap;
-  typedef boost::function<void (const ArgumentMap& args, std::stringstream* output)>
-      HtmlUrlCallback;
-
   typedef boost::function<void (const ArgumentMap& args, rapidjson::Document* json)>
-      JsonUrlCallback;
+      UrlCallback;
+
+  // Any callback may add a member to their Json output with key ENABLE_RAW_JSON_KEY; this
+  // causes the result of the template rendering process to be sent to the browser as
+  // text, not HTML.
+  static const char* ENABLE_RAW_JSON_KEY;
 
   // Using this constructor, the webserver will bind to all available interfaces.
   Webserver(const int port);
@@ -54,23 +57,17 @@ class Webserver {
   // Stops the webserver synchronously.
   void Stop();
 
-  // Register a callback for a Url that produces a text string to write to the HTML page
-  // produced for that Url. Path should not include the http://hostname/ prefix. If
-  // is_styled is true, the page will be rendered with standard header and footer HTML. If
-  // is_on_nav_bar is true, the page will appear in the standard navigation bar rendered
-  // on all pages.
+  // Register a callback for a Url that produces a json document that will be rendered
+  // with the template at 'template_filename'. The URL 'path' should not include the
+  // http://hostname/ prefix. If is_on_nav_bar is true, the page will appear in the
+  // standard navigation bar rendered on all pages.
   //
-  // Only one callback may be registered per Url (this applies to both templated and
-  // non-templated callbacks).
-  void RegisterHtmlUrlCallback(const std::string& path, const HtmlUrlCallback& callback,
-      bool is_styled = true, bool is_on_nav_bar = true);
-
-  // Register a callback for a Url that produces a Json document which is used to render a
-  // template file. The path of the template file is relative to the webserver's document
-  // root. See RegisterHtmlUrlCallback() for more details.
-  void RegisterJsonUrlCallback(const std::string& path,
-      const std::string& template_filename, const JsonUrlCallback& callback,
-      bool is_styled = true, bool is_on_nav_bar = true);
+  // Only one callback may be registered per URL.
+  //
+  // The path of the template file is relative to the webserver's document
+  // root.
+  void RegisterUrlCallback(const std::string& path, const std::string& template_filename,
+      const UrlCallback& callback, bool is_on_nav_bar = true);
 
   const TNetworkAddress& http_address() { return http_address_; }
 
@@ -84,46 +81,25 @@ class Webserver {
   // directly into the output.
   class UrlHandler {
    public:
-    UrlHandler(const HtmlUrlCallback& cb, bool is_styled, bool is_on_nav_bar)
-        : is_styled_(is_styled), is_on_nav_bar_(is_on_nav_bar), callback_(cb),
-          is_json_(false) { }
+    UrlHandler(const UrlCallback& cb, const std::string& template_filename,
+        bool is_on_nav_bar)
+        : is_on_nav_bar_(is_on_nav_bar), template_callback_(cb),
+          template_filename_(template_filename) { }
 
-    UrlHandler(const JsonUrlCallback& cb, const std::string& template_filename,
-        bool is_styled, bool is_on_nav_bar)
-        : is_styled_(is_styled), is_on_nav_bar_(is_on_nav_bar), template_callback_(cb),
-          template_filename_(template_filename), is_json_(true) { }
-
-    bool is_styled() const { return is_styled_; }
     bool is_on_nav_bar() const { return is_on_nav_bar_; }
-    bool is_json() const { return is_json_; }
-    const HtmlUrlCallback& html_callback() const { return callback_; }
-    const JsonUrlCallback& json_callback() const { return template_callback_; }
+    const UrlCallback& callback() const { return template_callback_; }
     const std::string& template_filename() const { return template_filename_; }
 
    private:
-    // If true, the page is rendered with standard header and footer. If false, the page
-    // is rendered as plain text. If the page is templated, the result is the raw Json
-    // document that would be passed to the template as its context.
-    bool is_styled_;
-
     // If true, the page appears in the navigation bar.
     bool is_on_nav_bar_;
 
-    // Callback that produces an HTML string that is embedded directly in the page
-    // output. Valid only if is_json_ is false.
-    HtmlUrlCallback callback_;
-
-    // Callback to produce a Json document to render via a template. Valid only if
-    // is_json_ is true.
-    JsonUrlCallback template_callback_;
+    // Callback to produce a Json document to render via a template.
+    UrlCallback template_callback_;
 
     // Path to the file that contains the template to render, relative to the webserver's
     // document root.
     std::string template_filename_;
-
-    // True if this Url uses a Json callback that produces Json to be rendered by a
-    // template.
-    bool is_json_;
   };
 
   // Squeasel callback for log events. Returns squeasel success code.

@@ -1,0 +1,52 @@
+<!--
+Copyright 2012- Cloudera Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+{{> www/common-header.tmpl }}
+
+<h2>Sessions</h2>
+There are {{num_sessions}} active sessions.
+
+<table class='table table-bordered table-hover'>
+  <tr>
+    <th>Session Type</th>
+    <th>Open Queries</th>
+    <th>User</th>
+    <th>Delegated User</th>
+    <th>Session ID</th>
+    <th>Network Address</th>
+    <th>Default Database</th>
+    <th>Start Time</th>
+    <th>Last Accessed</th>
+    <th>Expired</th>
+    <th>Closed</th>
+    <th>Ref count</th>
+  </tr>
+{{#sessions}}
+  <td>{{type}}</td>
+  <td>{{num_queries}}</td>
+  <td>{{user}}</td>
+  <td>{{delegated_user}}</td>
+  <td>{{session_id}}</td>
+  <td>{{network_address}}</td>
+  <td>{{default_database}}</td>
+  <td>{{start_time}}</td>
+  <td>{{last_accessed}}</td>
+  <td>{{expired}}</td>
+  <td>{{closed}}</td>
+  <td>{{ref_count}}</td>
+{{/sessions}}
+</table>
+
+{{> www/common-footer.tmpl }}

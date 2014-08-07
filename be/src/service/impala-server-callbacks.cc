@@ -39,187 +39,209 @@ DECLARE_int32(query_log_size);
 void ImpalaServer::RegisterWebserverCallbacks(Webserver* webserver) {
   DCHECK(webserver != NULL);
 
-  Webserver::HtmlUrlCallback varz_callback =
-      bind<void>(mem_fn(&ImpalaServer::RenderHadoopConfigs), this, _1, _2);
-  webserver->RegisterHtmlUrlCallback("/hadoop-varz", varz_callback);
+  Webserver::UrlCallback hadoop_varz_callback =
+      bind<void>(mem_fn(&ImpalaServer::HadoopVarzUrlCallback), this, _1, _2);
+  webserver->RegisterUrlCallback("/hadoop-varz", "hadoop-varz.tmpl",
+      hadoop_varz_callback);
 
-  Webserver::HtmlUrlCallback query_callback =
+  Webserver::UrlCallback query_json_callback =
       bind<void>(mem_fn(&ImpalaServer::QueryStateUrlCallback), this, _1, _2);
-  webserver->RegisterHtmlUrlCallback("/queries", query_callback);
+  webserver->RegisterUrlCallback("/queries", "queries.tmpl",
+      query_json_callback);
 
-  Webserver::HtmlUrlCallback sessions_callback =
-      bind<void>(mem_fn(&ImpalaServer::SessionUrlCallback), this, _1, _2);
-  webserver->RegisterHtmlUrlCallback("/sessions", sessions_callback);
+  Webserver::UrlCallback sessions_json_callback =
+      bind<void>(mem_fn(&ImpalaServer::SessionsUrlCallback), this, _1, _2);
+  webserver->RegisterUrlCallback("/sessions", "sessions.tmpl",
+      sessions_json_callback);
 
-  Webserver::JsonUrlCallback catalog_callback =
+  Webserver::UrlCallback catalog_callback =
       bind<void>(mem_fn(&ImpalaServer::CatalogUrlCallback), this, _1, _2);
-  webserver->RegisterJsonUrlCallback("/catalog", "catalog.tmpl",
+  webserver->RegisterUrlCallback("/catalog", "catalog.tmpl",
       catalog_callback);
 
-  Webserver::JsonUrlCallback catalog_objects_callback =
+  Webserver::UrlCallback catalog_objects_callback =
       bind<void>(mem_fn(&ImpalaServer::CatalogObjectsUrlCallback), this, _1, _2);
-  webserver->RegisterJsonUrlCallback("/catalog_object", "catalog_object.tmpl",
-      catalog_objects_callback, true, false);
+  webserver->RegisterUrlCallback("/catalog_object", "catalog_object.tmpl",
+      catalog_objects_callback, false);
 
-  Webserver::HtmlUrlCallback profile_callback =
+  Webserver::UrlCallback profile_callback =
       bind<void>(mem_fn(&ImpalaServer::QueryProfileUrlCallback), this, _1, _2);
-  webserver-> RegisterHtmlUrlCallback("/query_profile", profile_callback, true, false);
+  webserver->RegisterUrlCallback("/query_profile", "common-pre.tmpl",
+      profile_callback, false);
 
-  Webserver::HtmlUrlCallback cancel_callback =
+  Webserver::UrlCallback cancel_callback =
       bind<void>(mem_fn(&ImpalaServer::CancelQueryUrlCallback), this, _1, _2);
-  webserver-> RegisterHtmlUrlCallback("/cancel_query", cancel_callback, true, false);
+  webserver->RegisterUrlCallback("/cancel_query", "common-pre.tmpl", cancel_callback,
+      false);
 
-  Webserver::HtmlUrlCallback profile_encoded_callback =
+  Webserver::UrlCallback profile_encoded_callback =
       bind<void>(mem_fn(&ImpalaServer::QueryProfileEncodedUrlCallback), this, _1, _2);
-  webserver->RegisterHtmlUrlCallback("/query_profile_encoded", profile_encoded_callback,
-      false, false);
+  webserver->RegisterUrlCallback("/query_profile_encoded", "raw_text.tmpl",
+      profile_encoded_callback, false);
 
-  Webserver::HtmlUrlCallback inflight_query_ids_callback =
+  Webserver::UrlCallback inflight_query_ids_callback =
       bind<void>(mem_fn(&ImpalaServer::InflightQueryIdsUrlCallback), this, _1, _2);
-  webserver->RegisterHtmlUrlCallback("/inflight_query_ids", inflight_query_ids_callback,
-      false, false);
+  webserver->RegisterUrlCallback("/inflight_query_ids", "raw_text.tmpl",
+      inflight_query_ids_callback, false);
 }
 
-void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  exec_env_->frontend()->RenderHadoopConfigs(args.find("raw") == args.end(), output);
+void ImpalaServer::HadoopVarzUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
+  TGetAllHadoopConfigsResponse response;
+  Status status  = exec_env_->frontend()->GetAllHadoopConfigs(&response);
+  if (!status.ok()) return;
+
+  Value configs(kArrayType);
+  typedef map<string, string> ConfigMap;
+  BOOST_FOREACH(const ConfigMap::value_type& config, response.configs) {
+    Value key(config.first.c_str(), document->GetAllocator());
+    Value value(config.second.c_str(), document->GetAllocator());
+    Value config_json(kObjectType);
+    config_json.AddMember("key", key, document->GetAllocator());
+    config_json.AddMember("value", value, document->GetAllocator());
+    configs.PushBack(config_json, document->GetAllocator());
+  }
+  document->AddMember("configs", configs, document->GetAllocator());
 }
 
 // We expect the query id to be passed as one parameter, 'query_id'.
 // Returns true if the query id was present and valid; false otherwise.
-static bool ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
+static Status ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
   Webserver::ArgumentMap::const_iterator it = args.find("query_id");
   if (it == args.end()) {
-    return false;
+    return Status("No 'query_id' argument found");
   } else {
-    return ParseId(it->second, id);
+    if (ParseId(it->second, id)) return Status::OK;
+    return Status(Substitute("Could not parse 'query_id' argument: $0", it->second));
   }
 }
 
 void ImpalaServer::CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
-    stringstream* output) {
+    Document* document) {
   TUniqueId unique_id;
-  if (!ParseQueryId(args, &unique_id)) {
-    (*output) << "Invalid query id";
+  Status parse_status = ParseQueryId(args, &unique_id);
+  if (!parse_status.ok()) {
+    Value error(parse_status.GetErrorMsg().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
     return;
   }
   Status status("Cancelled from Impala's debug web interface");
   if (UnregisterQuery(unique_id, &status)) {
-    (*output) << "Query cancellation successful";
+    Value message("Query cancellation successful", document->GetAllocator());
+    document->AddMember("contents", message, document->GetAllocator());
   } else {
-    (*output) << "Error cancelling query: " << unique_id << " not found";
+    Value error(
+        Substitute("Error cancelling query: $0 not found", PrintId(unique_id)).c_str(),
+        document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
   }
 }
 
 void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
-    stringstream* output) {
+    Document* document) {
   TUniqueId unique_id;
-  if (!ParseQueryId(args, &unique_id)) {
-    (*output) << "Invalid query id";
+  Status parse_status = ParseQueryId(args, &unique_id);
+  if (!parse_status.ok()) {
+    Value error(parse_status.GetErrorMsg().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
     return;
   }
 
-  (*output) << "<pre>";
   stringstream ss;
   Status status = GetRuntimeProfileStr(unique_id, false, &ss);
   if (!status.ok()) {
-    (*output) << status.GetErrorMsg();
-  } else {
-    EscapeForHtml(ss.str(), output);
-  }
-  (*output) << "</pre>";
-}
-
-void ImpalaServer::QueryProfileEncodedUrlCallback(const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  TUniqueId unique_id;
-  if (!ParseQueryId(args, &unique_id)) {
-    (*output) << "Invalid query id";
+    Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
     return;
   }
 
-  Status status = GetRuntimeProfileStr(unique_id, true, output);
-  if (!status.ok()) (*output) << status.GetErrorMsg();
+  Value profile(ss.str().c_str(), document->GetAllocator());
+  document->AddMember("contents", profile, document->GetAllocator());
 }
 
-void ImpalaServer::InflightQueryIdsUrlCallback(const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  lock_guard<mutex> l(query_exec_state_map_lock_);
-  BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
-    *output << exec_state.second->query_id() << "\n";
-  }
-}
-
-void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecord& record,
-    bool render_end_time, bool render_cancel, stringstream* output) {
-  (*output) << "<tr>"
-            << "<td>" << record.effective_user << "</td>"
-            << "<td>" << record.default_db << "</td>"
-            << "<td>" << record.stmt << "</td>"
-            << "<td>"
-            << _TStmtType_VALUES_TO_NAMES.find(record.stmt_type)->second
-            << "</td>";
-
-  // Output start/end times
-  (*output) << "<td>" << record.start_time.DebugString() << "</td>";
-  if (render_end_time) {
-    (*output) << "<td>" << record.end_time.DebugString() << "</td>";
-  }
-
-  // Output progress
-  (*output) << "<td>";
-  if (record.has_coord == false) {
-    (*output) << "N/A";
+void ImpalaServer::QueryProfileEncodedUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
+  TUniqueId unique_id;
+  stringstream ss;
+  Status status = ParseQueryId(args, &unique_id);
+  if (!status.ok()) {
+    ss << status.GetErrorMsg();
   } else {
-    (*output) << record.num_complete_fragments << " / " << record.total_fragments
-              << " (" << setw(4);
-    if (record.total_fragments == 0) {
-      (*output) << " (0%)";
-    } else {
-      (*output) <<
-          (100.0 * record.num_complete_fragments / (1.f * record.total_fragments))
-                << "%)";
+    Status status = GetRuntimeProfileStr(unique_id, true, &ss);
+    if (!status.ok()) {
+      ss.str(Substitute("Could not obtain runtime profile: $0", status.GetErrorMsg()));
     }
   }
 
-  // Output state and rows fetched
-  (*output) << "</td>"
-            << "<td>" << _QueryState_VALUES_TO_NAMES.find(record.query_state)->second
-            << "</td><td>" << record.num_rows_fetched << "</td>";
+  document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
+  Value profile(ss.str().c_str(), document->GetAllocator());
+  document->AddMember("contents", profile, document->GetAllocator());
+}
 
-  // Output profile
-  (*output) << "<td><a href='/query_profile?query_id=" << record.id
-            << "'>Profile</a></td>";
-  if (render_cancel) {
-    (*output) << "<td><a href='/cancel_query?query_id=" << record.id
-              << "'>Cancel</a></td>";
+void ImpalaServer::InflightQueryIdsUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
+  lock_guard<mutex> l(query_exec_state_map_lock_);
+  stringstream ss;
+  BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
+    ss << exec_state.second->query_id() << "\n";
   }
-  (*output) << "</tr>" << endl;
+  document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
+  Value query_ids(ss.str().c_str(), document->GetAllocator());
+  document->AddMember("contents", query_ids, document->GetAllocator());
+}
+
+void ImpalaServer::QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
+    Value* value, Document* document) {
+  Value user(record.effective_user.c_str(), document->GetAllocator());
+  value->AddMember("effective_user", user, document->GetAllocator());
+
+  Value default_db(record.default_db.c_str(), document->GetAllocator());
+  value->AddMember("default_db", default_db, document->GetAllocator());
+
+  Value stmt(record.stmt.c_str(), document->GetAllocator());
+  value->AddMember("stmt", stmt, document->GetAllocator());
+
+  Value stmt_type(_TStmtType_VALUES_TO_NAMES.find(record.stmt_type)->second,
+      document->GetAllocator());
+  value->AddMember("stmt_type", stmt_type, document->GetAllocator());
+
+  Value start_time(record.start_time.DebugString().c_str(), document->GetAllocator());
+  value->AddMember("start_time", start_time, document->GetAllocator());
+
+  Value end_time(record.end_time.DebugString().c_str(), document->GetAllocator());
+  value->AddMember("end_time", end_time, document->GetAllocator());
+
+  string progress = "N/A";
+  if (record.has_coord) {
+    stringstream ss;
+    ss << record.num_complete_fragments << " / " << record.total_fragments
+       << " (" << setw(4);
+    if (record.total_fragments == 0) {
+      ss << "0%)";
+    } else {
+      ss << (100.0 * record.num_complete_fragments / (1.f * record.total_fragments))
+         << "%)";
+    }
+    progress = ss.str();
+  }
+  Value progress_json(progress.c_str(), document->GetAllocator());
+  value->AddMember("progress", progress_json, document->GetAllocator());
+
+  Value state(_QueryState_VALUES_TO_NAMES.find(record.query_state)->second,
+      document->GetAllocator());
+  value->AddMember("state", state, document->GetAllocator());
+
+  value->AddMember("rows_fetched", record.num_rows_fetched, document->GetAllocator());
+
+  Value query_id(PrintId(record.id).c_str(), document->GetAllocator());
+  value->AddMember("query_id", query_id, document->GetAllocator());
 }
 
 void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
-    stringstream* output) {
+    Document* document) {
   set<QueryStateRecord, QueryStateRecord> sorted_query_records;
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
-    (*output) << "<h2>Queries</h2>";
-    (*output) << "This page lists all running queries, plus any completed queries that "
-              << "are archived in memory. The size of that archive is controlled with the"
-              << " --query_log_size command line parameter.";
-    (*output) << "<h3>" << query_exec_state_map_.size() << " queries in flight</h3>"
-              << endl;
-    (*output) << "<table class='table table-hover table-border'><tr>"
-              << "<th>User</th>" << endl
-              << "<th>Default Db</th>" << endl
-              << "<th>Statement</th>" << endl
-              << "<th>Query Type</th>" << endl
-              << "<th>Start Time</th>" << endl
-              << "<th>Backend Progress</th>" << endl
-              << "<th>State</th>" << endl
-              << "<th># rows fetched</th>" << endl
-              << "<th>Profile</th>" << endl
-              << "<th>Action</th>" << endl
-              << "</tr>";
     BOOST_FOREACH(
         const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
       // TODO: Do this in the browser so that sorts on other keys are possible.
@@ -227,98 +249,92 @@ void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,
     }
   }
 
+  Value in_flight_queries(kArrayType);
   BOOST_FOREACH(const QueryStateRecord& record, sorted_query_records) {
-    RenderSingleQueryTableRow(record, false, true, output);
+    Value record_json(kObjectType);
+    QueryStateToJson(record, &record_json, document);
+    in_flight_queries.PushBack(record_json, document->GetAllocator());
   }
+  document->AddMember("in_flight_queries", in_flight_queries, document->GetAllocator());
+  document->AddMember("num_in_flight_queries", sorted_query_records.size(),
+      document->GetAllocator());
 
-  (*output) << "</table>";
-
-  // Print the query location counts.
-  (*output) << "<h3>Query Locations</h3>";
-  (*output) << "<table class='table table-hover table-bordered'>";
-  (*output) << "<tr><th>Location</th><th>Number of Fragments</th></tr>" << endl;
-  {
-    lock_guard<mutex> l(query_locations_lock_);
-    BOOST_FOREACH(const QueryLocations::value_type& location, query_locations_) {
-      (*output) << "<tr><td>" << location.first << "<td><b>" << location.second.size()
-                << "</b></td></tr>";
-    }
-  }
-  (*output) << "</table>";
-
-  // Print the query log
-  if (FLAGS_query_log_size == 0) {
-    (*output) << "<h3>No queries archived in memory (--query_log_size is 0)</h3>";
-    return;
-  }
-
-  if (FLAGS_query_log_size > 0) {
-    (*output) << "<h3>Last " << FLAGS_query_log_size << " Completed Queries</h3>";
-  } else {
-    (*output) << "<h3>All Completed Queries</h3>";
-  }
-  (*output) << "<table class='table table-hover table-border'><tr>"
-            << "<th>User</th>" << endl
-            << "<th>Default Db</th>" << endl
-            << "<th>Statement</th>" << endl
-            << "<th>Query Type</th>" << endl
-            << "<th>Start Time</th>" << endl
-            << "<th>End Time</th>" << endl
-            << "<th>Backend Progress</th>" << endl
-            << "<th>State</th>" << endl
-            << "<th># rows fetched</th>" << endl
-            << "<th>Profile</th>" << endl
-            << "</tr>";
-
+  Value completed_queries(kArrayType);
   {
     lock_guard<mutex> l(query_log_lock_);
     BOOST_FOREACH(const QueryStateRecord& log_entry, query_log_) {
-      RenderSingleQueryTableRow(log_entry, true, false, output);
+      Value record_json(kObjectType);
+      QueryStateToJson(log_entry, &record_json, document);
+      completed_queries.PushBack(record_json, document->GetAllocator());
     }
   }
+  document->AddMember("completed_queries", completed_queries, document->GetAllocator());
+  document->AddMember("completed_log_size", FLAGS_query_log_size,
+      document->GetAllocator());
 
-  (*output) << "</table>";
+  Value query_locations(kArrayType);
+  {
+    lock_guard<mutex> l(query_locations_lock_);
+    BOOST_FOREACH(const QueryLocations::value_type& location, query_locations_) {
+      Value location_json(kObjectType);
+      Value location_name(lexical_cast<string>(location.first).c_str(),
+          document->GetAllocator());
+      location_json.AddMember("location", location_name, document->GetAllocator());
+      location_json.AddMember("count", location.second.size(),
+          document->GetAllocator());
+      query_locations.PushBack(location_json, document->GetAllocator());
+    }
+  }
+  document->AddMember("query_locations", query_locations, document->GetAllocator());
 }
 
-void ImpalaServer::SessionUrlCallback(const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  (*output) << "<h2>Sessions</h2>" << endl;
+
+void ImpalaServer::SessionsUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
   lock_guard<mutex> l(session_state_map_lock_);
-  (*output) << "There are " << session_state_map_.size() << " active sessions." << endl
-            << "<table class='table table-bordered table-hover'>"
-            << "<tr><th>Session Type</th>"
-            << "<th>Open Queries</th>"
-            << "<th>User</th>"
-            << "<th>Delegated User</th>"
-            << "<th>Session ID</th>"
-            << "<th>Network Address</th>"
-            << "<th>Default Database</th>"
-            << "<th>Start Time</th>"
-            << "<th>Last Accessed</th>"
-            << "<th>Expired</th>"
-            << "<th>Closed</th>"
-            << "<th>Ref count</th>"
-            <<"</tr>"
-            << endl;
-  (*output) << boolalpha;
+  Value sessions(kArrayType);
   BOOST_FOREACH(const SessionStateMap::value_type& session, session_state_map_) {
-    (*output) << "<tr>"
-              << "<td>" << PrintTSessionType(session.second->session_type) << "</td>"
-              << "<td>" << session.second->inflight_queries.size() << "</td>"
-              << "<td>" << session.second->connected_user << "</td>"
-              << "<td>" << session.second->do_as_user << "</td>"
-              << "<td>" << session.first << "</td>"
-              << "<td>" << session.second->network_address << "</td>"
-              << "<td>" << session.second->database << "</td>"
-              << "<td>" << session.second->start_time.DebugString() << "</td>"
-              << "<td>" << TimestampValue(
-                  session.second->last_accessed_ms / 1000).DebugString() << "</td>"
-              << "<td>" << session.second->expired << "</td>"
-              << "<td>" << session.second->closed << "</td>"
-              << "<td>" << session.second->ref_count << "</td>"
-              << "</tr>";
+    shared_ptr<SessionState> state = session.second;
+    Value session_json(kObjectType);
+    Value type(PrintTSessionType(state->session_type).c_str(),
+        document->GetAllocator());
+    session_json.AddMember("type", type, document->GetAllocator());
+
+    session_json.AddMember("num_queries", state->inflight_queries.size(),
+        document->GetAllocator());
+
+    Value user(state->connected_user.c_str(), document->GetAllocator());
+    session_json.AddMember("user", user, document->GetAllocator());
+
+    Value delegated_user(state->do_as_user.c_str(), document->GetAllocator());
+    session_json.AddMember("delegated_user", delegated_user, document->GetAllocator());
+
+    Value session_id(PrintId(session.first).c_str(), document->GetAllocator());
+    session_json.AddMember("session_id", session_id, document->GetAllocator());
+
+    Value network_address(lexical_cast<string>(state->network_address).c_str(),
+        document->GetAllocator());
+    session_json.AddMember("network_address", network_address, document->GetAllocator());
+
+    Value default_db(state->database.c_str(), document->GetAllocator());
+    session_json.AddMember("default_database", default_db, document->GetAllocator());
+
+    Value start_time(state->start_time.DebugString().c_str(), document->GetAllocator());
+    session_json.AddMember("start_time", start_time, document->GetAllocator());
+
+    Value last_accessed(
+        TimestampValue(session.second->last_accessed_ms / 1000).DebugString().c_str(),
+        document->GetAllocator());
+    session_json.AddMember("last_accessed", last_accessed, document->GetAllocator());
+
+    session_json.AddMember("expired", state->expired, document->GetAllocator());
+    session_json.AddMember("closed", state->closed, document->GetAllocator());
+    session_json.AddMember("ref_count", state->ref_count, document->GetAllocator());
+    sessions.PushBack(session_json, document->GetAllocator());
   }
-  (*output) << "</table>";
+
+  document->AddMember("sessions", sessions, document->GetAllocator());
+  document->AddMember("num_sessions", session_state_map_.size(), document->GetAllocator());
 }
 
 void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,

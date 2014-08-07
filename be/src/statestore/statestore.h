@@ -460,12 +460,33 @@ class Statestore {
   // True if the shutdown flag has been set true, false otherwise.
   bool ShouldExit();
 
-  // Webpage handler: prints the list of all topics and their
-  // subscription counts
-  void TopicsHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
+  // Webpage handler: upon return, 'document' will contain a list of topics as follows:
+  // "topics": [
+  // {
+  //   "topic_id": "catalog-update",
+  //   "num_entries": 1165,
+  //   "version": 2476,
+  //   "oldest_version": 2476,
+  //   "oldest_id": "henry-impala:26000",
+  //   "key_size": "42.94 KB",
+  //   "value_size": "9.54 MB",
+  //   "total_size": "9.58 MB"
+  // }, ]
+  void TopicsHandler(const Webserver::ArgumentMap& args, rapidjson::Document* document);
 
-  // Webpage handler: prints the list of subscribers
-  void SubscribersHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
+  // Webpage handler: upon return 'document' will contain a list of subscribers as
+  // follows:
+  // "subscribers": [
+  // {
+  //   "id": "henry-impala:26000",
+  //   "address": "henry-impala:23020",
+  //   "num_topics": 1,
+  //   "num_transient": 0,
+  //   "registration_id": "414d28c84930d987:abcffd70b3346fb7"
+  //   }
+  // ]
+  void SubscribersHandler(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
 
 };
 

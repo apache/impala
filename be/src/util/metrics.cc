@@ -20,6 +20,7 @@
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/math/special_functions/fpclassify.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "util/impalad-metrics.h"
@@ -28,81 +29,93 @@ using namespace impala;
 using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
+using namespace rapidjson;
+using namespace strings;
 
 Metrics::Metrics()
   : obj_pool_(new ObjectPool()) { }
 
 Status Metrics::Init(Webserver* webserver) {
   if (webserver != NULL) {
-    Webserver::HtmlUrlCallback default_callback =
+    Webserver::UrlCallback default_callback =
         bind<void>(mem_fn(&Metrics::TextCallback), this, _1, _2);
-    webserver->RegisterHtmlUrlCallback("/metrics", default_callback);
+    webserver->RegisterUrlCallback("/metrics", "common-pre.tmpl", default_callback);
 
-    Webserver::HtmlUrlCallback json_callback =
+    Webserver::UrlCallback json_callback =
         bind<void>(mem_fn(&Metrics::JsonCallback), this, _1, _2);
-    webserver->RegisterHtmlUrlCallback("/jsonmetrics", json_callback, false, false);
+    webserver->RegisterUrlCallback("/jsonmetrics", "common-pre.tmpl", json_callback,
+        false);
   }
 
   return Status::OK;
 }
 
 string Metrics::DebugString() {
-  stringstream ss;
   Webserver::ArgumentMap empty_map;
-  TextCallback(empty_map, &ss);
-  return ss.str();
+  Document document;
+  document.SetObject();
+  TextCallback(empty_map, &document);
+  return document["contents"].GetString();
 }
 
 string Metrics::DebugStringJson() {
-  stringstream ss;
   Webserver::ArgumentMap empty_map;
-  JsonCallback(empty_map, &ss);
-  return ss.str();
+  Document document;
+  document.SetObject();
+  JsonCallback(empty_map, &document);
+  return document["contents"].GetString();
 }
 
-void Metrics::TextCallback(const Webserver::ArgumentMap& args, stringstream* output) {
+void Metrics::TextCallback(const Webserver::ArgumentMap& args, Document* document) {
   Webserver::ArgumentMap::const_iterator metric_name = args.find("metric");
   lock_guard<mutex> l(lock_);
-  (*output) << "<pre>";
+  stringstream output;
   if (metric_name == args.end()) {
     BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
-      m.second->Print(output);
-      (*output) << endl;
+      m.second->Print(&output);
+      output << endl;
     }
   } else {
     MetricMap::const_iterator metric = metric_map_.find(metric_name->second);
     if (metric == metric_map_.end()) {
-      (*output) << "Metric '" << metric_name->second << "' not found";
-    } else {
-      metric->second->Print(output);
-      (*output) << endl;
+      Value error(Substitute("Metric '$0' not found", metric_name->second).c_str(),
+          document->GetAllocator());
+      document->AddMember("error", error, document->GetAllocator());
+      return;
     }
+    metric->second->Print(&output);
+    output << endl;
   }
-  (*output) << "</pre>";
+  Value contents(output.str().c_str(), document->GetAllocator());
+  document->AddMember("contents", contents, document->GetAllocator());
 }
 
-void Metrics::JsonCallback(const Webserver::ArgumentMap& args, stringstream* output) {
+void Metrics::JsonCallback(const Webserver::ArgumentMap& args, Document* document) {
   Webserver::ArgumentMap::const_iterator metric_name = args.find("metric");
   lock_guard<mutex> l(lock_);
-  (*output) << "{";
+  stringstream output;
+  output << "{";
   if (metric_name == args.end()) {
     bool first = true;
     BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
       if (first) {
         first = false;
       } else {
-        (*output) << ",\n";
+        output << ",\n";
       }
-      m.second->PrintJson(output);
+      m.second->PrintJson(&output);
     }
   } else {
     MetricMap::const_iterator metric = metric_map_.find(metric_name->second);
     if (metric != metric_map_.end()) {
-      metric->second->PrintJson(output);
-      (*output) << endl;
+      metric->second->PrintJson(&output);
+      output << endl;
     }
   }
-  (*output) << "}";
+  output << "}";
+  Value contents(output.str().c_str(), document->GetAllocator());
+  document->AddMember("contents", contents, document->GetAllocator());
+  document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
 }
 
 namespace impala {

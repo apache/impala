@@ -89,7 +89,7 @@ TEST(Webserver, SmokeTest) {
 }
 
 void AssertArgsCallback(bool* success, const Webserver::ArgumentMap& args,
-    stringstream* out) {
+    Document* document) {
   *success = args.find(TEST_ARG) != args.end();
 }
 
@@ -98,8 +98,8 @@ TEST(Webserver, ArgsTest) {
 
   const string ARGS_TEST_PATH = "/args-test";
   bool success = false;
-  Webserver::HtmlUrlCallback callback = bind<void>(AssertArgsCallback, &success , _1, _2);
-  webserver.RegisterHtmlUrlCallback(ARGS_TEST_PATH, callback);
+  Webserver::UrlCallback callback = bind<void>(AssertArgsCallback, &success , _1, _2);
+  webserver.RegisterUrlCallback(ARGS_TEST_PATH, "json-test.tmpl", callback);
 
   ASSERT_TRUE(webserver.Start().ok());
   stringstream contents;
@@ -109,23 +109,6 @@ TEST(Webserver, ArgsTest) {
   ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
       Substitute("$0?$1", ARGS_TEST_PATH, TEST_ARG), &contents).ok());
   ASSERT_TRUE(success) << "Did not find " << TEST_ARG;
-}
-
-void HtmlCallback(const Webserver::ArgumentMap& args, stringstream* out) {
-  (*out) << SALUTATION_VALUE;
-}
-
-TEST(Webserver, HtmlCallback) {
-  Webserver webserver(FLAGS_webserver_port);
-
-  const string HTML_TEST_PATH = "/html-test";
-  Webserver::HtmlUrlCallback callback = bind<void>(HtmlCallback, _1, _2);
-  webserver.RegisterHtmlUrlCallback(HTML_TEST_PATH, callback);
-
-  ASSERT_TRUE(webserver.Start().ok());
-  stringstream contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, HTML_TEST_PATH, &contents).ok());
-  ASSERT_TRUE(contents.str().find(SALUTATION_VALUE) != string::npos);
 }
 
 void JsonCallback(const Webserver::ArgumentMap& args, Document* document) {
@@ -138,9 +121,9 @@ TEST(Webserver, JsonTest) {
 
   const string JSON_TEST_PATH = "/json-test";
   const string NO_TEMPLATE_PATH = "/no-template";
-  Webserver::JsonUrlCallback callback = bind<void>(JsonCallback, _1, _2);
-  webserver.RegisterJsonUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback);
-  webserver.RegisterJsonUrlCallback(NO_TEMPLATE_PATH, "doesnt-exist.tmpl", callback);
+  Webserver::UrlCallback callback = bind<void>(JsonCallback, _1, _2);
+  webserver.RegisterUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback);
+  webserver.RegisterUrlCallback(NO_TEMPLATE_PATH, "doesnt-exist.tmpl", callback);
 
   ASSERT_TRUE(webserver.Start().ok());
   stringstream contents;

@@ -15,7 +15,16 @@ limitations under the License.
 -->
 {{> www/common-header.tmpl }}
 
-{{#thrift_string}}
-<pre>{{.}}</pre>
-{{/thrift_string}}
+<h2>Memory Usage</h2>
+
+Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_limit}}</strong>
+
+<h3>tcmalloc</h2>
+<pre>{{overview}}</pre>
+
+{{?detailed}}
+<h3>Breakdown</h3>
+<pre>{{detailed}}</pre>
+{{/detailed}}
+
 {{> www/common-footer.tmpl }}

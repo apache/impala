@@ -14,6 +14,7 @@
 
 #include "util/pprof-path-handlers.h"
 
+#include <boost/bind.hpp>
 #include <fstream>
 #include <sys/stat.h>
 #include <google/profiler.h>
@@ -26,10 +27,25 @@
 using namespace std;
 using namespace google;
 using namespace impala;
+using namespace rapidjson;
+using namespace boost;
 
 DECLARE_string(heap_profile_dir);
 
 const int PPROF_DEFAULT_SAMPLE_SECS = 30; // pprof default sample time in seconds.
+
+typedef boost::function<void
+    (const Webserver::ArgumentMap& args, std::stringstream* output)> PprofCallback;
+
+// Wrapper for all Pprof*Handler methods that want to write to a stringstream, this method
+// adds the output of the string to a Json document in the 'contents' member.
+void PprofJsonHandler(const PprofCallback& callback, const Webserver::ArgumentMap& args,
+    Document* document) {
+  stringstream ss;
+  callback(args, &ss);
+  Value output(ss.str().c_str(), document->GetAllocator());
+  document->AddMember("contents", output, document->GetAllocator());
+}
 
 // pprof asks for the url /pprof/cmdline to figure out what application it's profiling.
 // The server should respond by reading the contents of /proc/self/cmdline.
@@ -38,9 +54,10 @@ void PprofCmdLineHandler(const Webserver::ArgumentMap& args, stringstream* outpu
   if (!cmd_line_file.is_open()) {
     (*output) << "Unable to open file: /proc/self/cmdline";
     return;
+  } else {
+    (*output) << cmd_line_file.rdbuf();
+    cmd_line_file.close();
   }
-  (*output) << cmd_line_file.rdbuf();
-  cmd_line_file.close();
 }
 
 // pprof asks for the url /pprof/heap to get heap information. This should be implemented
@@ -133,10 +150,14 @@ void PprofSymbolHandler(const Webserver::ArgumentMap& args, stringstream* output
 void impala::AddPprofUrlCallbacks(Webserver* webserver) {
   // Path handlers for remote pprof profiling. For information see:
   // https://gperftools.googlecode.com/svn/trunk/doc/pprof_remote_servers.html
-  webserver->RegisterHtmlUrlCallback("/pprof/cmdline", PprofCmdLineHandler, false, false);
-  webserver->RegisterHtmlUrlCallback("/pprof/heap", PprofHeapHandler, false, false);
-  webserver->RegisterHtmlUrlCallback("/pprof/growth", PprofGrowthHandler, false, false);
-  webserver->RegisterHtmlUrlCallback("/pprof/profile", PprofCpuProfileHandler, false,
-      false);
-  webserver->RegisterHtmlUrlCallback("/pprof/symbol", PprofSymbolHandler, false, false);
+  webserver->RegisterUrlCallback("/pprof/cmdline", "raw_text.tmpl",
+      bind<void>(PprofJsonHandler, PprofCmdLineHandler, _1, _2), false);
+  webserver->RegisterUrlCallback("/pprof/heap", "raw_text.tmpl",
+      bind<void>(PprofJsonHandler, PprofHeapHandler, _1, _2), false);
+  webserver->RegisterUrlCallback("/pprof/growth", "raw_text.tmpl",
+      bind<void>(PprofJsonHandler, PprofGrowthHandler, _1, _2), false);
+  webserver->RegisterUrlCallback("/pprof/profile", "raw_text.tmpl",
+      bind<void>(PprofJsonHandler, PprofCpuProfileHandler, _1, _2), false);
+  webserver->RegisterUrlCallback("/pprof/symbol", "raw_text.tmpl",
+      bind<void>(PprofJsonHandler, PprofSymbolHandler, _1, _2), false);
 }

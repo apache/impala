@@ -120,9 +120,8 @@ class Frontend {
   Status ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
       TResultSet* result);
 
-  // Writes a table of all Hadoop configurations, either in text or as HTML per the
-  // as_text parameter, to the output stringstream.
-  Status RenderHadoopConfigs(bool as_text, std::stringstream* output);
+  // Returns all Hadoop configurations in key, value form in result.
+  Status GetAllHadoopConfigs(TGetAllHadoopConfigsResponse* result);
 
   // Returns (in the output parameter) the value for the given config. The returned Thrift
   // struct will indicate if the value was null or not found by not setting its 'value'
@@ -152,7 +151,7 @@ class Frontend {
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig(byte[])
-  jmethodID get_hadoop_configs_id_;  // JniFrontend.getHadoopConfig(bool)
+  jmethodID get_hadoop_configs_id_;  // JniFrontend.getAllHadoopConfigs()
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames

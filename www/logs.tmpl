@@ -14,8 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 {{> www/common-header.tmpl }}
+<h2>INFO logs</h2>
+Log path is: <strong>{{logfile}}</strong><br/>
+Showing last <strong>{{num_bytes}}</strong> bytes of log.<br/>
 
-{{#thrift_string}}
-<pre>{{.}}</pre>
-{{/thrift_string}}
+<pre>{{log}}</pre>
+
 {{> www/common-footer.tmpl }}

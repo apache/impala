@@ -23,6 +23,8 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 
+#include <rapidjson/document.h>
+
 namespace impala {
 
 class Webserver;
@@ -45,8 +47,24 @@ class RpcEventHandler : public apache::thrift::TProcessorEventHandler {
   // InvocationContext*.
   virtual void postWrite(void* ctx, const char* fn_name, uint32_t bytes);
 
-  // Helper method to dump all per-method statistics to HTML.
-  void WriteToHtml(std::stringstream* out);
+  // Helper method to dump all per-method summaries to Json
+  // Json produced looks like:
+  // {
+  //   "name": "beeswax",
+  //   "methods": [
+  //   {
+  //     "name": "BeeswaxService.get_state",
+  //     "summary": " count: 1, last: 0, min: 0, max: 0, mean: 0, stddev: 0",
+  //     "in_flight": 0
+  //     },
+  //   {
+  //     "name": "BeeswaxService.query",
+  //     "summary": " count: 1, last: 293, min: 293, max: 293, mean: 293, stddev: 0",
+  //     "in_flight": 0
+  //     },
+  //   ]
+  // }
+  void ToJson(rapidjson::Value* server, rapidjson::Document* document);
 
  private:
   // Per-method descriptor

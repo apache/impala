@@ -31,6 +31,7 @@ using namespace impala;
 using namespace std;
 using namespace boost;
 using namespace apache::thrift;
+using namespace rapidjson;
 
 DEFINE_int32(statestore_max_missed_heartbeats, 10, "Maximum number of consecutive "
     "heartbeats an impalad can miss before being declared failed by the "
@@ -217,65 +218,85 @@ Statestore::Statestore(Metrics* metrics)
 }
 
 void Statestore::RegisterWebpages(Webserver* webserver) {
-  Webserver::HtmlUrlCallback topics_callback =
+  Webserver::UrlCallback topics_callback =
       bind<void>(mem_fn(&Statestore::TopicsHandler), this, _1, _2);
-  webserver->RegisterHtmlUrlCallback("/topics", topics_callback);
+  webserver->RegisterUrlCallback("/topics", "statestore_topics.tmpl",
+      topics_callback);
 
-  Webserver::HtmlUrlCallback subscribers_callback =
+  Webserver::UrlCallback subscribers_callback =
       bind<void>(mem_fn(&Statestore::SubscribersHandler), this, _1, _2);
-  webserver->RegisterHtmlUrlCallback("/subscribers", subscribers_callback);
+  webserver->RegisterUrlCallback("/subscribers", "statestore_subscribers.tmpl",
+      subscribers_callback);
 }
 
 void Statestore::TopicsHandler(const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  (*output) << "<h2>Topics</h2>";
-  (*output) << "<table class='table table-striped'>"
-            << "<tr><th>Topic Id</th>"
-            << "<th>Number of entries</th>"
-            << "<th>Version</th>"
-            << "<th>Oldest subscriber version</th>"
-            << "<th>Oldest subscriber Id</th>"
-            << "<th>Size (keys/values/total)</th>"
-            << "</tr>";
-
+    Document* document) {
   lock_guard<mutex> l(subscribers_lock_);
   lock_guard<mutex> t(topic_lock_);
+
+  Value topics(kArrayType);
+
   BOOST_FOREACH(const TopicMap::value_type& topic, topics_) {
+    Value topic_json(kObjectType);
+
+    Value topic_id(topic.second.id().c_str(), document->GetAllocator());
+    topic_json.AddMember("topic_id", topic_id, document->GetAllocator());
+    topic_json.AddMember("num_entries", topic.second.entries().size(),
+        document->GetAllocator());
+    topic_json.AddMember("version", topic.second.last_version(), document->GetAllocator());
+
     SubscriberId oldest_subscriber_id;
     TopicEntry::Version oldest_subscriber_version =
         GetMinSubscriberTopicVersion(topic.first, &oldest_subscriber_id);
+
+    topic_json.AddMember("oldest_version", oldest_subscriber_version,
+        document->GetAllocator());
+    Value oldest_id(oldest_subscriber_id.c_str(), document->GetAllocator());
+    topic_json.AddMember("oldest_id", oldest_id, document->GetAllocator());
+
     int64_t key_size = topic.second.total_key_size_bytes();
     int64_t value_size = topic.second.total_value_size_bytes();
-    (*output) << "<tr><td>" << topic.second.id() << "</td><td>"
-              << topic.second.entries().size() << "</td><td>"
-              << topic.second.last_version() << "</td><td>"
-              << oldest_subscriber_version  << "</td><td>"
-              << oldest_subscriber_id << "</td><td>"
-              << PrettyPrinter::Print(key_size, TCounterType::BYTES) << " / "
-              << PrettyPrinter::Print(value_size, TCounterType::BYTES) << " / "
-              << PrettyPrinter::Print(key_size + value_size, TCounterType::BYTES)
-              << "</td></tr>";
+    Value key_size_json(PrettyPrinter::Print(key_size, TCounterType::BYTES).c_str(),
+        document->GetAllocator());
+    topic_json.AddMember("key_size", key_size_json, document->GetAllocator());
+    Value value_size_json(PrettyPrinter::Print(value_size, TCounterType::BYTES).c_str(),
+        document->GetAllocator());
+    topic_json.AddMember("value_size", value_size_json, document->GetAllocator());
+    Value total_size_json(
+        PrettyPrinter::Print(key_size + value_size, TCounterType::BYTES).c_str(),
+        document->GetAllocator());
+    topic_json.AddMember("total_size", total_size_json, document->GetAllocator());
+    topics.PushBack(topic_json, document->GetAllocator());
   }
-  (*output) << "</table>";
+  document->AddMember("topics", topics, document->GetAllocator());
 }
 
 void Statestore::SubscribersHandler(const Webserver::ArgumentMap& args,
-    stringstream* output) {
-  (*output) << "<h2>Subscribers</h2>";
-  (*output) << "<table class ='table table-striped'>"
-            << "<tr><th>Id</th><th>Address</th><th>Subscribed topics</th>"
-            << "<th>Transient entries</th>"
-            << "<th>Registration Id</th></tr>";
-
+    Document* document) {
   lock_guard<mutex> l(subscribers_lock_);
+  Value subscribers(kArrayType);
   BOOST_FOREACH(const SubscriberMap::value_type& subscriber, subscribers_) {
-    (*output) << "<tr><td>" << subscriber.second->id() << "</td><td>"
-              << subscriber.second->network_address() << "</td><td>"
-              << subscriber.second->subscribed_topics().size() << "</td><td>"
-              << subscriber.second->transient_entries().size() << "</td><td>"
-              << subscriber.second->registration_id() << "</td></tr>";
+    Value sub_json(kObjectType);
+
+    Value subscriber_id(subscriber.second->id().c_str(), document->GetAllocator());
+    sub_json.AddMember("id", subscriber_id, document->GetAllocator());
+
+    Value address(lexical_cast<string>(subscriber.second->network_address()).c_str(),
+        document->GetAllocator());
+    sub_json.AddMember("address", address, document->GetAllocator());
+
+    sub_json.AddMember("num_topics", subscriber.second->subscribed_topics().size(),
+        document->GetAllocator());
+    sub_json.AddMember("num_transient", subscriber.second->transient_entries().size(),
+        document->GetAllocator());
+
+    Value registration_id(PrintId(subscriber.second->registration_id()).c_str(),
+        document->GetAllocator());
+    sub_json.AddMember("registration_id", registration_id, document->GetAllocator());
+
+    subscribers.PushBack(sub_json, document->GetAllocator());
   }
-  (*output) << "</table>";
+  document->AddMember("subscribers", subscribers, document->GetAllocator());
 }
 
 Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,

@@ -15,7 +15,27 @@ limitations under the License.
 -->
 {{> www/common-header.tmpl }}
 
-{{#thrift_string}}
-<pre>{{.}}</pre>
-{{/thrift_string}}
+<h2>Subscribers</h2>
+
+<table class='table table-hover table-striped'>
+<tr>
+  <th>Id</th>
+  <th>Address</th>
+  <th>Subscribed topics</th>
+  <th>Transient entries</th>
+  <th>Registration ID</th>
+</tr>
+
+{{#subscribers}}
+<tr>
+  <td>{{id}}</td>
+  <td>{{address}}</td>
+  <td>{{num_topics}}</td>
+  <td>{{num_transient}}</td>
+  <td>{{registration_id}}</td>
+</tr>
+{{/subscribers}}
+
+</table>
+
 {{> www/common-footer.tmpl }}

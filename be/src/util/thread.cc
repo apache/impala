@@ -160,15 +160,15 @@ Status ThreadMgr::StartInstrumentation(Metrics* metrics, Webserver* webserver) {
   current_num_threads_metric_ = metrics->CreateAndRegisterPrimitiveMetric<int64_t>(
       "thread-manager.running-threads", 0L);
 
-  Webserver::JsonUrlCallback template_callback =
+  Webserver::UrlCallback template_callback =
       bind<void>(mem_fn(&ThreadMgr::ThreadOverviewUrlCallback), this, _1, _2);
-  webserver->RegisterJsonUrlCallback(THREADS_WEB_PAGE, THREADS_TEMPLATE,
+  webserver->RegisterUrlCallback(THREADS_WEB_PAGE, THREADS_TEMPLATE,
       template_callback);
 
-  Webserver::JsonUrlCallback overview_callback =
+  Webserver::UrlCallback overview_callback =
       bind<void>(mem_fn(&ThreadMgr::ThreadGroupUrlCallback), this, _1, _2);
-  webserver->RegisterJsonUrlCallback("/thread-group", "thread-group.tmpl",
-      overview_callback, true, false);
+  webserver->RegisterUrlCallback("/thread-group", "thread-group.tmpl",
+      overview_callback, false);
 
   return Status::OK;
 }

@@ -236,10 +236,10 @@ class Metrics {
   boost::mutex lock_;
 
   // Webserver callback (on /metrics), renders metrics as single text page
-  void TextCallback(const Webserver::ArgumentMap& args, std::stringstream* output);
+  void TextCallback(const Webserver::ArgumentMap& args, rapidjson::Document* output);
 
   // Webserver callback (on /jsonmetrics), renders metrics as a single json document
-  void JsonCallback(const Webserver::ArgumentMap& args, std::stringstream* output);
+  void JsonCallback(const Webserver::ArgumentMap& args, rapidjson::Document* document);
 };
 
 // Specialize int metrics to use atomics and avoid locking

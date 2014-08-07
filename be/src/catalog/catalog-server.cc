@@ -176,15 +176,15 @@ Status CatalogServer::Start() {
 }
 
 void CatalogServer::RegisterWebpages(Webserver* webserver) {
-  Webserver::JsonUrlCallback catalog_callback =
+  Webserver::UrlCallback catalog_callback =
       bind<void>(mem_fn(&CatalogServer::CatalogUrlCallback), this, _1, _2);
-  webserver->RegisterJsonUrlCallback(CATALOG_WEB_PAGE, CATALOG_TEMPLATE,
+  webserver->RegisterUrlCallback(CATALOG_WEB_PAGE, CATALOG_TEMPLATE,
       catalog_callback);
 
-  Webserver::JsonUrlCallback catalog_objects_callback =
+  Webserver::UrlCallback catalog_objects_callback =
       bind<void>(mem_fn(&CatalogServer::CatalogObjectsUrlCallback), this, _1, _2);
-  webserver->RegisterJsonUrlCallback(CATALOG_OBJECT_WEB_PAGE, CATALOG_OBJECT_TEMPLATE,
-      catalog_objects_callback, true, false);
+  webserver->RegisterUrlCallback(CATALOG_OBJECT_WEB_PAGE, CATALOG_OBJECT_TEMPLATE,
+      catalog_objects_callback, false);
 }
 
 void CatalogServer::UpdateCatalogTopicCallback(

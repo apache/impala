@@ -411,32 +411,79 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Returns the exec summary for this query.
   Status GetExecSummary(const TUniqueId& query_id, TExecSummary* result);
 
-  // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
-  void RenderHadoopConfigs(const Webserver::ArgumentMap& args, std::stringstream* output);
+  // Json callback for /hadoop-varz. Produces Json with a list, 'configs', of (key, value)
+  // pairs, one for each Hadoop configuration value.
+  void HadoopVarzUrlCallback(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
 
-  // Webserver callback. Prints a sorted table of current queries, including their states,
-  // types and IDs.
+  // Webserver callback. Returns two sorted lists of queries, one in-flight and one
+  // completed, as well as a list of active backends and their plan-fragment count.
+  //
+  // "in_flight_queries": [],
+  // "num_in_flight_queries": 0,
+  // "completed_queries": [
+  //       {
+  //         "effective_user": "henry",
+  //         "default_db": "default",
+  //         "stmt": "select sleep(10000)",
+  //         "stmt_type": "QUERY",
+  //         "start_time": "2014-08-07 18:37:47.923614000",
+  //         "end_time": "2014-08-07 18:37:58.146494000",
+  //         "progress": "0 / 0 (0%)",
+  //         "state": "FINISHED",
+  //         "rows_fetched": 1,
+  //         "query_id": "7c459a59fb8cefe3:8b7042d55bf19887"
+  //       }
+  // ],
+  // "completed_log_size": 25,
+  // "query_locations": [
+  //     {
+  //       "location": "henry-impala:22000",
+  //        "count": 0
+  //     }
+  // ]
   void QueryStateUrlCallback(const Webserver::ArgumentMap& args,
-      std::stringstream* output);
+      rapidjson::Document* document);
 
-  // Webserver callback.  Prints the query profile (via PrettyPrint)
+  // Json callback for /query_profile. Expects query_id as an argument, produces Json with
+  // 'profile' set to the profile string.
   void QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
-      std::stringstream* output);
+      rapidjson::Document* document);
 
-  // Webserver callback.  Cancels an in-flight query.
+  // Webserver callback. Cancels an in-flight query and writes the result to 'contents'.
   void CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
-      std::stringstream* output);
+      rapidjson::Document* document);
 
-  // Webserver callback.  Prints the query profile as a base64 encoded object.
+  // Webserver callback.  Upon return, 'document' will contain the query profile as a
+  // base64 encoded object in 'contents'.
   void QueryProfileEncodedUrlCallback(const Webserver::ArgumentMap& args,
-      std::stringstream* output);
+      rapidjson::Document* document);
 
-  // Webserver callback.  Prints the inflight query ids.
+  // Webserver callback. Produces a list of inflight query IDs printed as text in
+  // 'contents'.
   void InflightQueryIdsUrlCallback(const Webserver::ArgumentMap& args,
-      std::stringstream* output);
+      rapidjson::Document* document);
 
-  // Webserver callback that prints a table of active sessions.
-  void SessionUrlCallback(const Webserver::ArgumentMap& args, std::stringstream* output);
+  // Json callback for /sessions, which prints a table of active client sessions.
+  // "sessions": [
+  // {
+  //     "type": "BEESWAX",
+  //     "num_queries": 0,
+  //     "user": "",
+  //     "delegated_user": "",
+  //     "session_id": "6242f69b02e4d609:ac84df1fbb0e16a3",
+  //     "network_address": "127.0.0.1:46484",
+  //     "default_database": "default",
+  //     "start_time": "2014-08-07 22:50:49",
+  //     "last_accessed": "2014-08-07 22:50:49",
+  //     "expired": false,
+  //     "closed": false,
+  //     "ref_count": 0
+  //     }
+  // ],
+  // "num_sessions": 1
+  void SessionsUrlCallback(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
 
   // Webserver callback that prints a list of all known databases and tables
   void CatalogUrlCallback(const Webserver::ArgumentMap& args, rapidjson::Document* output);
@@ -552,10 +599,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     bool operator() (const QueryStateRecord& lhs, const QueryStateRecord& rhs) const;
   };
 
-  // Helper method to render a single QueryStateRecord as an HTML table
-  // row. Used by QueryStateUrlCallback().
-  void RenderSingleQueryTableRow(const QueryStateRecord& record, bool render_end_time,
-      bool render_cancel, std::stringstream* output);
+  // Helper method to render a single QueryStateRecord as a Json object
+  // Used by QueryStateUrlCallback().
+  void QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
+      rapidjson::Value* value, rapidjson::Document* document);
 
   // Beeswax private methods
 
