@@ -138,8 +138,10 @@ class HashTable {
   // Evaluate and hash the build/probe row, returning in *hash. Returns false if this
   // row should be rejected (doesn't need to be processed further) because it
   // contains NULL.
-  bool EvalAndHashBuild(TupleRow* row, uint32_t* hash);
-  bool EvalAndHashProbe(TupleRow* row, uint32_t* hash);
+  // These need to be inlined in the IR module so we can find and replace the calls to
+  // EvalBuildRow()/EvalProbeRow().
+  bool IR_ALWAYS_INLINE EvalAndHashBuild(TupleRow* row, uint32_t* hash);
+  bool IR_ALWAYS_INLINE EvalAndHashProbe(TupleRow* row, uint32_t* hash);
 
   // Returns the start iterator for all rows that match 'probe_row'.  'probe_row' is
   // evaluated with probe_exprs_.  The iterator can be iterated until HashTable::End()
