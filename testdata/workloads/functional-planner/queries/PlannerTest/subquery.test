@@ -942,10 +942,10 @@ select * from functional.alltypessmall x
 left semi join
 (select 1 a, 3 b union all select 1 a, 3 b) y on y.a = x.id
 inner join
-(select 1 a, 3 b union all select 1 a, 3 b) z on z.b = y.b
+(select 1 a, 3 b union all select 1 a, 3 b) z on z.b = x.id + 2
 ---- PLAN
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: b = b
+|  hash predicates: x.id + 2 = b
 |
 |--02:UNION
 |     constant-operands=2
@@ -962,7 +962,7 @@ inner join
 07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: b = b
+|  hash predicates: x.id + 2 = b
 |
 |--06:EXCHANGE [BROADCAST]
 |  |

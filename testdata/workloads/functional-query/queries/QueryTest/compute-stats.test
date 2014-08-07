@@ -125,8 +125,8 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
-# Add partitions with NULL values and check for stats.
 ---- QUERY
+# Add partitions with NULL values and check for stats.
 alter table compute_stats_db.alltypes add partition (year=NULL, month=NULL)
 ---- RESULTS
 ====
@@ -176,8 +176,8 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
-# Drop the partitions with NULL values and check for stats.
 ---- QUERY
+# Drop the partitions with NULL values and check for stats.
 alter table compute_stats_db.alltypes drop partition (year=NULL, month=NULL)
 ---- RESULTS
 ====
@@ -477,7 +477,7 @@ STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 # IMP-1227: Test computing stats on an HBase table that has a
 # complex-typed column that Impala does not yet support.
 create table compute_stats_db.allcomplextypes
-like functional_hbase.allcomplextypes;
+like functional_hbase.allcomplextypes
 ====
 ---- QUERY
 compute stats compute_stats_db.allcomplextypes

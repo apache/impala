@@ -288,9 +288,8 @@ public class TableRef implements ParseNode {
       }
     }
 
-    // at this point, both 'this' and leftTblRef have been analyzed
-    // and registered;
-    // we register the tuple ids of the TableRefs on the nullable side of an outer join
+    // at this point, both 'this' and leftTblRef have been analyzed and registered;
+    // register the tuple ids of the TableRefs on the nullable side of an outer join
     boolean lhsIsNullable = false;
     boolean rhsIsNullable = false;
     if (joinOp_ == JoinOperator.LEFT_OUTER_JOIN
@@ -304,9 +303,18 @@ public class TableRef implements ParseNode {
       lhsIsNullable = true;
     }
 
+    // register the tuple id of the rhs of a left semi join or anti join
+    TupleId semiJoinedTupleId = null;
+    if (joinOp_ == JoinOperator.LEFT_SEMI_JOIN || joinOp_ == JoinOperator.ANTI_JOIN) {
+      analyzer.registerSemiJoinedTid(getId(), this);
+      semiJoinedTupleId = getId();
+    }
+
     if (onClause_ != null) {
       Preconditions.checkState(joinOp_ != JoinOperator.CROSS_JOIN);
+      analyzer.setVisibleSemiJoinedTuple(semiJoinedTupleId);
       onClause_.analyze(analyzer);
+      analyzer.setVisibleSemiJoinedTuple(null);
       onClause_.checkReturnsBool("ON clause", true);
         if (onClause_.contains(Expr.isAggregatePredicate())) {
           throw new AnalysisException(
@@ -329,9 +337,8 @@ public class TableRef implements ParseNode {
         onClauseTupleIds.addAll(tupleIds);
       }
       onClauseTupleIds_.addAll(onClauseTupleIds);
-    } else if (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin() ||
-               getJoinOp().isAntiJoin()) {
-      throw new AnalysisException(joinOpToSql() + " requires an ON or USING clause.");
+    } else if (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin()) {
+      throw new AnalysisException(joinOp_.toString() + " requires an ON or USING clause.");
     }
 
     // Make constant expressions from inline view refs nullable in its substitution map.
@@ -340,20 +347,6 @@ public class TableRef implements ParseNode {
     }
     if (rhsIsNullable && this instanceof InlineViewRef) {
       ((InlineViewRef) this).makeOutputNullable(analyzer);
-    }
-  }
-
-  private String joinOpToSql() {
-    Preconditions.checkState(joinOp_ != null);
-    switch (joinOp_) {
-      case INNER_JOIN: return "INNER JOIN";
-      case LEFT_OUTER_JOIN: return "LEFT OUTER JOIN";
-      case LEFT_SEMI_JOIN: return "LEFT SEMI JOIN";
-      case RIGHT_OUTER_JOIN: return "RIGHT OUTER JOIN";
-      case FULL_OUTER_JOIN: return "FULL OUTER JOIN";
-      case CROSS_JOIN: return "CROSS JOIN";
-      case ANTI_JOIN: return "ANTI JOIN";
-      default: return "bad join op: " + joinOp_.toString();
     }
   }
 
@@ -373,7 +366,7 @@ public class TableRef implements ParseNode {
       return (leftTblRef_ != null ? ", " : "") + tableRefToSql();
     }
 
-    StringBuilder output = new StringBuilder(" " + joinOpToSql() + " ");
+    StringBuilder output = new StringBuilder(" " + joinOp_.toString() + " ");
     output.append(tableRefToSql());
     if (usingColNames_ != null) {
       output.append(" USING (").append(Joiner.on(", ").join(usingColNames_)).append(")");

@@ -27,10 +27,19 @@ import com.google.common.base.Preconditions;
 public class ToSqlTest extends AnalyzerTest {
 
   // Helpers for templated join tests.
-  private final String[] joinConditions_ =
+  private static final String[] joinConditions_ =
       new String[] {"USING (id)", "ON (a.id = b.id)"};
-  private final String[] joinTypes_ = new String[] {"INNER JOIN", "LEFT OUTER JOIN",
-      "RIGHT OUTER JOIN", "FULL OUTER JOIN", "LEFT SEMI JOIN"};
+
+  // All join types that take an ON or USING clause, i.e., all joins except CROSS JOIN.
+  private static final String[] joinTypes_;
+  static {
+    joinTypes_ = new String[JoinOperator.values().length - 1];
+    int i = 0;
+    for (JoinOperator op: JoinOperator.values()) {
+      if (op.isCrossJoin()) continue;
+      joinTypes_[i++] = op.toString();
+    }
+  }
 
   private static AnalysisContext.AnalysisResult analyze(String query, String defaultDb) {
     try {

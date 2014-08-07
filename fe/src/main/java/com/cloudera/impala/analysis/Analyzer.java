@@ -127,8 +127,13 @@ public class Analyzer {
   // If false, privilege requests will not be registered in the analyzer.
   private boolean enablePrivChecks_ = true;
 
-  public void setIsSubquery() { isSubquery_ = true; }
-  public boolean isSubquery() { return isSubquery_; }
+  // By default, all registered semi-joined tuples are invisible, i.e., their slots
+  // cannot be referenced. If set, this semi-joined tuple is made visible. Such a tuple
+  // should only be made visible for analyzing the On-clause of its semi-join.
+  // In particular, if there are multiple semi-joins in the same query block, then the
+  // On-clause of any such semi-join is not allowed to reference other semi-joined tuples
+  // except its own. Therefore, only a single semi-joined tuple can be visible at a time.
+  private TupleId visibleSemiJoinedTupleId_ = null;
 
   // state shared between all objects of an Analyzer tree
   private static class GlobalState {
@@ -162,9 +167,14 @@ public class Analyzer {
     public Set<ExprId> assignedConjuncts =
         Collections.newSetFromMap(new IdentityHashMap<ExprId, Boolean>());
 
-    // map from outer-joined tuple id, ie, one that is nullable,
+    // map from outer-joined tuple id, i.e., one that is nullable,
     // to the last Join clause (represented by its rhs table ref) that outer-joined it
     public final Map<TupleId, TableRef> outerJoinedTupleIds = Maps.newHashMap();
+
+    // Map from semi-joined tuple id, i.e., one that is invisible outside the join's
+    // On-clause, to its Join clause (represented by its rhs table ref). An anti-join is
+    // a kind of semi-join, so anti-joined tuples are also registered here.
+    public final Map<TupleId, TableRef> semiJoinedTupleIds = Maps.newHashMap();
 
     // map from right-hand side table ref of an outer join to the list of
     // conjuncts in its On clause
@@ -272,6 +282,20 @@ public class Analyzer {
     user_ = parentAnalyzer.getUser();
     authErrorMsg_ = parentAnalyzer.authErrorMsg_;
     enablePrivChecks_ = parentAnalyzer.enablePrivChecks_;
+  }
+
+  public void setIsSubquery() { isSubquery_ = true; }
+  public boolean isSubquery() { return isSubquery_; }
+
+  /**
+   * Makes the given semi-joined tuple visible such that its slots can be referenced.
+   * If tid is null, makes the currently visible semi-joined tuple invisible again.
+   */
+  public void setVisibleSemiJoinedTuple(TupleId tid) {
+    Preconditions.checkState(tid == null
+        || globalState_.semiJoinedTupleIds.containsKey(tid));
+    Preconditions.checkState(tid == null || visibleSemiJoinedTupleId_ == null);
+    visibleSemiJoinedTupleId_ = tid;
   }
 
   public Set<TableName> getMissingTbls() { return missingTbls_; }
@@ -396,6 +420,13 @@ public class Analyzer {
   }
 
   /**
+   * Register the given tuple id as being the invisible side of a semi-join.
+   */
+  public void registerSemiJoinedTid(TupleId tid, TableRef rhsRef) {
+    globalState_.semiJoinedTupleIds.put(tid, rhsRef);
+  }
+
+  /**
    * Return descriptor of registered table/alias or null if no matching descriptor was
    * found. Attempts to resolve name in the context of any of the registered tuples.
    * Throws an analysis exception if name is unqualified and could match multiple
@@ -464,6 +495,14 @@ public class Analyzer {
       throw new AnalysisException("couldn't resolve column reference: '" +
           colName + "'");
     }
+
+    // Forbid references to invisible tuples.
+    if (!isVisible(tupleDesc.getId())) {
+      throw new AnalysisException(String.format(
+          "Illegal column reference '%s' of semi-/anti-joined table '%s'",
+              colName, tupleDesc.getAlias()));
+    }
+
     col = tupleDesc.getTable().getColumn(colName);
     Preconditions.checkNotNull(col);
 
@@ -549,8 +588,10 @@ public class Analyzer {
       if (col != null) {
         // The same tuple descriptor may have been registered for multiple
         // implicit aliases, so only throw an error if the tuple descriptors
-        // are different.
-        if (result != null && result != tupleDesc) {
+        // are different. Prefer visible tuples over invisible ones, and don't
+        // simply ignore invisible tuples for better error reporting.
+        if (result != null && result != tupleDesc &&
+            !(!isVisible(result.getId()) && isVisible(tupleDesc.getId()))) {
           throw new AnalysisException(
               "unqualified column reference '" + colName + "' is ambiguous");
         }
@@ -1255,6 +1296,14 @@ public class Analyzer {
 
   public boolean isOuterJoined(TupleId tid) {
     return globalState_.outerJoinedTupleIds.containsKey(tid);
+  }
+
+  public boolean isSemiJoined(TupleId tid) {
+    return globalState_.semiJoinedTupleIds.containsKey(tid);
+  }
+
+  private boolean isVisible(TupleId tid) {
+    return tid == visibleSemiJoinedTupleId_ || !isSemiJoined(tid);
   }
 
   public boolean containsOuterJoinedTid(List<TupleId> tids) {

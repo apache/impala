@@ -146,11 +146,11 @@ group by c3 having c > 5.5 order by 1
 decimal
 ====
 ---- QUERY
-select a.c1, b.c3 from decimal_tiny a left semi join decimal_tiny b on a.c1=b.c3
+select a.c1 from decimal_tiny a left semi join decimal_tiny b on a.c1=b.c3
 ---- RESULTS
-0.0000,0.0
+0.0000
 ---- TYPES
-decimal,decimal
+decimal
 ====
 ---- QUERY
 select * from decimal_tiny

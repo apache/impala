@@ -290,7 +290,7 @@ public class SelectStmt extends QueryStmt {
   }
 
   /**
-   * Expand "*" select list item.
+   * Expand "*" select list item, ignoring semi-joined tables.
    */
   private void expandStar(Analyzer analyzer) throws AnalysisException {
     if (tableRefs_.isEmpty()) {
@@ -298,6 +298,7 @@ public class SelectStmt extends QueryStmt {
     }
     // expand in From clause order
     for (TableRef tableRef: tableRefs_) {
+      if (analyzer.isSemiJoined(tableRef.getId())) continue;
       expandStar(analyzer, tableRef.getAliasAsName(), tableRef.getDesc());
     }
   }
@@ -311,15 +312,21 @@ public class SelectStmt extends QueryStmt {
     if (tupleDesc == null) {
       throw new AnalysisException("unknown table alias '" + tblName.toString() + "'");
     }
+    if (analyzer.isSemiJoined(tupleDesc.getId())) {
+      throw new AnalysisException(String.format(
+          "'*' expression cannot reference semi-/anti-joined table '%s'",
+          tblName.toString()));
+    }
     expandStar(analyzer, tblName, tupleDesc);
   }
 
   /**
-   * Expand "*" for a particular tuple descriptor by appending
-   * analyzed slot refs for each column to selectListExprs.
+   * Expand "*" for a particular tuple descriptor by appending analyzed slot refs for
+   * each column to selectListExprs.
    */
   private void expandStar(Analyzer analyzer, TableName tblName, TupleDescriptor desc)
       throws AnalysisException {
+    Preconditions.checkState(!analyzer.isSemiJoined(desc.getId()));
     for (Column col: desc.getTable().getColumnsInHiveOrder()) {
       SlotRef slotRef = new SlotRef(tblName, col.getName());
       slotRef.analyze(analyzer);
@@ -392,7 +399,8 @@ public class SelectStmt extends QueryStmt {
         throw new AnalysisException("Column " + ambiguousAlias.toSql() +
             " in group by clause is ambiguous");
       }
-      groupingExprsCopy = Expr.substituteList(groupingExprsCopy, aliasSmap_, analyzer);
+      groupingExprsCopy =
+          Expr.trySubstituteList(groupingExprsCopy, aliasSmap_, analyzer);
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
         groupingExprsCopy.get(i).analyze(analyzer);
         if (groupingExprsCopy.get(i).contains(Expr.isAggregatePredicate())) {

@@ -787,7 +787,7 @@ functional.alltypestiny t1
 left join functional.alltypes t2 on (t1.id = t2.id)
 inner join functional.alltypessmall t3 on (t2.id = t3.id)
 left semi join functional.alltypesagg t4 on (t3.id = t4.id)
-inner join functional.alltypes t5 on (t4.id = t5.id)
+inner join functional.alltypes t5 on (t3.id = t5.id)
 right join functional.alltypestiny t6 on (t5.id = t6.id)
 ---- PLAN
 13:AGGREGATE [FINALIZE]
@@ -800,7 +800,7 @@ right join functional.alltypestiny t6 on (t5.id = t6.id)
 |     partitions=4/4 size=460B compact
 |
 11:HASH JOIN [INNER JOIN]
-|  hash predicates: t4.id = t5.id
+|  hash predicates: t3.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
 |     partitions=24/24 size=478.45KB compact
@@ -834,13 +834,13 @@ left join functional.alltypes t2 on (t1.id = t2.id)
 inner join functional.alltypesagg t3 on (t2.id = t3.id)
 inner join functional.alltypessmall t4 on (t3.id = t4.id)
 left semi join functional.alltypes t5 on (t4.id = t5.id)
-inner join functional.alltypestiny t6 on (t5.id = t6.id)
+inner join functional.alltypestiny t6 on (t3.id = t6.id)
 ---- PLAN
 13:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
 12:HASH JOIN [INNER JOIN]
-|  hash predicates: t5.id = t6.id
+|  hash predicates: t3.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 size=460B compact

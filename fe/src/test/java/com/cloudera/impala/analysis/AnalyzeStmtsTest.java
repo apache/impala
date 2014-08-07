@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import java.lang.reflect.Field;
@@ -174,11 +175,26 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select functional.alltypes.*, functional_seq.alltypes.* " +
         "from functional.alltypes, functional_seq.alltypes");
     AnalyzesOk("select * from functional.alltypes, functional_seq.alltypes");
+
     // '*' without from clause has no meaning.
     AnalysisError("select *", "'*' expression in select list requires FROM clause.");
     AnalysisError("select 1, *, 2+4",
         "'*' expression in select list requires FROM clause.");
     AnalysisError("select a.*", "unknown table alias 'a'");
+
+    for (String joinType: new String[] { "left semi join", "anti join" }) {
+      // ignore semi-/anti-joined tables in unqualified '*' expansion
+      SelectStmt stmt = (SelectStmt) AnalyzesOk(String.format(
+          "select * from functional.alltypes a " +
+          "%s functional.testtbl b on (a.id = b.id)", joinType));
+      // expect to have as many result exprs as alltypes has columns
+      assertEquals(13, stmt.getResultExprs().size());
+
+      // cannot expand '*" for a semi-/anti-joined table
+      AnalysisError(String.format("select a.*, b.* from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id)", joinType),
+          "'*' expression cannot reference semi-/anti-joined table 'b'");
+    }
   }
 
   /**
@@ -765,37 +781,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select * from functional.alltypes a full outer join " +
         "functional.alltypes b",
         "FULL OUTER JOIN requires an ON or USING clause");
-
-    // semi join requires ON/USING clause
-    AnalyzesOk("select a.id from functional.alltypes a left semi join " +
-        "functional.alltypes b on (a.id = b.id)");
-    AnalyzesOk("select a.id from functional.alltypes a left semi join " +
-        "functional.alltypes b using (id)");
-    AnalysisError("select a.id from functional.alltypes a " +
-        "left semi join functional.alltypes b",
-        "LEFT SEMI JOIN requires an ON or USING clause");
-    // TODO: enable when implemented
-    // must not reference semi-joined alias outside of join clause
-    // AnalysisError(
-    // "select a.id, b.id from alltypes a left semi join alltypes b on (a.id = b.id)",
-    // "x");
-
-    // anti join should analyze with an on or using clause
-    AnalyzesOk("select a.id from functional.alltypes a anti join " +
-        "functional.alltypes b on (a.id = b.id)");
-    AnalyzesOk("select a.id from functional.alltypes a anti join " +
-        "functional.alltypes b using (id)");
-    AnalysisError("select a.id from functional.alltypes a anti join " +
-        "functional.alltypes b",
-        "ANTI JOIN requires an ON or USING clause");
-    // TODO: Enable once IMPALA-677 is in.
-    // AnalysisError("select a.id from functional.alltypes a anti join " +
-    //     "functional.alltypes b using(id) anti join " +
-    //     "functional.alltypes c using(int_col)",
-    //     "Illegal column reference 'int_col' of anti-joined table 'b'");
-    // AnalysisError("select j.* from JoinTbl j anti join DimTbl d on j.test_id = d.id " +
-    //     "inner join JoinTbl k on d.id = k.test_id",
-    //     "Illegal column reference 'id' of anti-joined table 'd'");
   }
 
   @Test
@@ -818,6 +803,77 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select a.int_col from functional.alltypes a " +
          "join functional.alltypes b using (int_col, badcol)",
         "unknown column badcol for alias a ");
+  }
+
+  /**
+   * Tests the visibility of semi-/anti-joined table references.
+   */
+  @Test
+  public void TestSemiJoins() {
+    for (String joinType: new String[] { "left semi join", "anti join" }) {
+      // semi/anti join requires ON/USING clause
+      AnalyzesOk(String.format("select a.id from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id)", joinType));
+      AnalyzesOk(String.format("select a.id from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id) " +
+          "%s functional.alltypes c on (a.id = c.id)", joinType, joinType));
+      AnalyzesOk(String.format("select a.id from functional.alltypes a %s " +
+          "functional.alltypes b using (id)", joinType));
+      // unqualified column reference is not ambiguous outside of the On-clause
+      // because the semi/anti-joined tuple of 'b' is invisible
+      AnalyzesOk(String.format("select int_col from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id)", joinType));
+      AnalysisError(String.format("select * from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id and a.int_col = int_col)", joinType),
+          "unqualified column reference 'int_col' is ambiguous");
+      AnalysisError(String.format("select a.id from functional.alltypes a " +
+          "%s functional.alltypes b", joinType),
+          String.format("%s requires an ON or USING clause", joinType.toUpperCase()));
+      // must not reference semi/anti-joined alias outside of join clause
+      AnalysisError(String.format("select a.id, b.id from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id)", joinType),
+          "Illegal column reference 'id' of semi-/anti-joined table 'b'");
+      AnalysisError(String.format("select a.id from functional.alltypes a " +
+          "%s (select * from functional.alltypes) b " +
+          "on (a.id = b.id) where b.int_col > 10", joinType),
+          "Illegal column reference 'int_col' of semi-/anti-joined table 'b'");
+      AnalysisError(String.format("select a.id from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id) group by b.bool_col", joinType),
+          "Illegal column reference 'bool_col' of semi-/anti-joined table 'b'");
+      AnalysisError(String.format("select a.id from functional.alltypes a " +
+          "%s (select * from functional.alltypes) b " +
+          "on (a.id = b.id) order by b.string_col", joinType),
+          "Illegal column reference 'string_col' of semi-/anti-joined table 'b'");
+      // column of semi/anti-joined table is not visible in other On-clause
+      AnalysisError(String.format("select a.id from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id)" +
+          "left outer join functional.testtbl c on (b.id = c.id)", joinType),
+          "Illegal column reference 'id' of semi-/anti-joined table 'b'");
+      // column of semi/anti-joined table is not visible in other On-clause
+      AnalysisError(String.format("select a.id from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id)" +
+          "%s functional.testtbl c on (b.id = c.id)", joinType, joinType),
+          "Illegal column reference 'id' of semi-/anti-joined table 'b'");
+      // using clause always refers to lhs/rhs table
+      AnalysisError(String.format("select a.id from functional.alltypes a " +
+          "%s functional.alltypes b using(id) " +
+          "%s functional.alltypes c using(int_col)", joinType, joinType),
+          "Illegal column reference 'int_col' of semi-/anti-joined table 'b'");
+      // unqualified column reference is ambiguous in the On-clause of a semi/anti join
+      AnalysisError(String.format("select * from functional.alltypes a " +
+          "%s functional.alltypes b on (a.id = b.id and a.int_col = int_col)", joinType),
+          "unqualified column reference 'int_col' is ambiguous");
+      // illegal unqualified column reference against semi/anti-joined table
+      AnalysisError(String.format("select test_id from functional.alltypes a " +
+          "%s functional.jointbl b on (a.id = b.alltypes_id)", joinType),
+          "Illegal column reference 'test_id' of semi-/anti-joined table 'b'");
+      // unqualified table ref is ambiguous even if semi/anti-joined
+      AnalysisError(String.format("select alltypes.int_col from functional.alltypes " +
+          "%s functional_parquet.alltypes " +
+          "on (functional.alltypes.id = functional_parquet.alltypes.id)", joinType),
+          "unqualified table alias 'alltypes' in column reference 'alltypes.int_col' " +
+          "is ambiguous");
+    }
   }
 
   @Test
