@@ -71,21 +71,33 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
   // Clients are not ordinarily removed from the cache completely (in the future, they may
   // be); this is the only method where a client may be deleted and replaced with another.
   shared_ptr<ThriftClientImpl> client_impl;
+  ClientMap::iterator client;
   {
     lock_guard<mutex> lock(client_map_lock_);
-    ClientMap::iterator client = client_map_.find(*client_key);
+    client = client_map_.find(*client_key);
     DCHECK(client != client_map_.end());
     client_impl = client->second;
-    client_map_.erase(client);
   }
   client_impl->Close();
 
   // TODO: Thrift TBufferedTransport cannot be re-opened after Close() because it does not
   // clean up internal buffers it reopens. To work around this issue, create a new client
   // instead.
-  *client_key = NULL;
+  ClientKey* old_client_key = client_key;
   if (metrics_enabled_) total_clients_metric_->Increment(-1);
-  return CreateClient(client_impl->address(), factory_method, client_key);
+  Status status = CreateClient(client_impl->address(), factory_method, client_key);
+  // Only erase the existing client from the map if creation of the new one succeeded.
+  // This helps to ensure the proper accounting of metrics in the presence of
+  // re-connection failures (the original client should be released as usual).
+  if (status.ok()) {
+    lock_guard<mutex> lock(client_map_lock_);
+    client_map_.erase(client);
+  } else {
+    // Restore the client used before the failed re-opening attempt, so the caller can
+    // properly release it.
+    *client_key = *old_client_key;
+  }
+  return status;
 }
 
 Status ClientCacheHelper::CreateClient(const TNetworkAddress& address,

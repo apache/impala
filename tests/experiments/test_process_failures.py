@@ -74,7 +74,6 @@ class TestProcessFailures(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_kill_restart_worker(self, vector):
     """Verifies a worker is able to be killed"""
-    pytest.xfail("IMPALA-491 - Impala does not report node that died on failure")
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     self.execute_query_using_client(client, QUERY, vector)
@@ -84,7 +83,7 @@ class TestProcessFailures(CustomClusterTestSuite):
     print "Coordinator impalad: %s Worker impalad: %s" % (impalad, worker_impalad)
 
     # Start executing a query. It will be cancelled due to a killed worker.
-    handle = client.execute_query_async(QUERY)
+    handle = self.execute_query_async_using_client(client, QUERY, vector)
 
     statestored = self.cluster.statestored
     worker_impalad.kill()
@@ -105,14 +104,18 @@ class TestProcessFailures(CustomClusterTestSuite):
 
     # Wait for the query status on the query profile web page to contain the
     # expected failed hostport.
+    query_id = handle.get_handle().id
     failed_hostport = "%s:%s" % (worker_impalad.service.hostname,\
                                  worker_impalad.service.be_port)
     query_status_match =\
-      impalad.service.wait_for_query_status(client, handle.id, failed_hostport)
-    if not query_status_match:
-      query_profile_page = impalad.service.read_query_profile_page(handle.id)
-      assert False, "Query status did not contain expected hostport %s\n\n%s"\
-        % (failed_hostport, query_profile_page)
+      impalad.service.wait_for_query_status(client, query_id, failed_hostport)
+    try:
+      if not query_status_match:
+        query_profile_page = impalad.service.read_query_profile_page(query_id)
+        assert False, "Query status did not contain expected hostport %s\n\n%s"\
+          % (failed_hostport, query_profile_page)
+    finally:
+      self.close_query_using_client(client, handle)
 
     # Should work fine even if a worker is down.
     self.execute_query_using_client(client, QUERY, vector)

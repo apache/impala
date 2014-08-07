@@ -296,8 +296,8 @@ class ClientCache {
 
   // Close and delete the underlying transport. Return a new client connecting to the
   // same host/port.
-  // Return an error status if a new connection cannot be established and *client will be
-  // NULL in that case.
+  // Returns an error status if a new connection cannot be established and *client will
+  // be unaffected in that case.
   Status ReopenClient(T** client) {
     return client_cache_helper_.ReopenClient(client_factory_,
         reinterpret_cast<ClientKey*>(client));
