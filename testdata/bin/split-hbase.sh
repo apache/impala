@@ -24,6 +24,8 @@ while [ $RESULT -ne 0 ] && [ $RETRY_COUNT -le 10 ]; do
     $IMPALA_HOME/bin/start-impala-cluster.py
     $IMPALA_HOME/bin/load-data.py -w functional-query \
         --table_names=alltypesagg,alltypessmall --table_formats=hbase/none --force
+    $IMPALA_HOME/tests/util/compute_table_stats.py --db_names=functional_hbase \
+        --table_names=alltypesagg,alltypessmall
   fi
 done
 

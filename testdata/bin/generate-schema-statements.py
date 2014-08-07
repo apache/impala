@@ -306,7 +306,7 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
 def build_hbase_insert(db_name, db_suffix, table_name):
   hbase_insert = SET_HIVE_HBASE_BULK_LOAD + ';\n'
   hbase_insert += ("INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}"
-                   " SELECT * FROM {db_name}.{table_name};").\
+                   " SELECT * FROM {db_name}.{table_name};\n").\
                    format(db_name=db_name, db_suffix=db_suffix,table_name=table_name)
   return hbase_insert
 
