@@ -31,7 +31,7 @@ group by
   o_year
 order by
   nation,
-  o_year desc;
+  o_year desc
 ---- RESULTS
 'ALGERIA',1998,27136900.1803
 'ALGERIA',1997,48611833.4962

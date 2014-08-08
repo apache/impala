@@ -1,17 +1,23 @@
 ====
 ---- QUERY: TPCH-Q17
-select sum(l_extendedprice) / 7.0 as avg_yearly
-from lineitem l
-  join part p
-    on (p.p_partkey = l.l_partkey)
-  join ( select  l_partkey as t_partkey,
-                 0.2 * avg(l_quantity) as t_avg_quantity
-         from lineitem group by l_partkey ) as lt
-    on (lt.t_partkey = p.p_partkey)
+# Q17 - Small-Quantity-Order Revenue Query
+select
+  sum(l_extendedprice) / 7.0 as avg_yearly
+from
+  lineitem,
+  part
 where
-  p.p_brand = 'Brand#23' and
-  p.p_container = 'MED BOX' and
-  l.l_quantity  < lt.t_avg_quantity
+  p_partkey = l_partkey
+  and p_brand = 'Brand#23'
+  and p_container = 'MED BOX'
+  and l_quantity < (
+    select
+      0.2 * avg(l_quantity)
+    from
+      lineitem
+    where
+      l_partkey = p_partkey
+  )
 ---- RESULTS
 348406.05
 ---- TYPES

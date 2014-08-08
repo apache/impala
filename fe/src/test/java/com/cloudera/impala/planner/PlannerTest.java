@@ -644,17 +644,17 @@ public class PlannerTest {
     runPlannerTestFile("ddl");
   }
 
-/*
-  Disabled during rebase. We need to regenerate the reference results.
   @Test
   public void testTpch() {
     runPlannerTestFile("tpch-all");
   }
 
+  /* Commented out until the test file if fixed.
   @Test
   public void testTpcds() {
     // Join order has been optimized for Impala. Uses ss_date as partition key.
     runPlannerTestFile("tpcds-all", "tpcds");
   }
-*/
+  */
+
 }

@@ -1,18 +1,23 @@
 ====
 ---- QUERY: TPCH-Q4
 # Q4 - Order Priority Checking Query
-# Modifications: Converted selects from multiple tables to joins,
-# rewrote 'exists' as an inner join + count(distinct).
 select
   o_orderpriority,
-  count(distinct l_orderkey) as order_count
-from lineitem l
-inner join orders o
-  on (o.o_orderkey = l.l_orderkey and
-      l.l_commitdate < l.l_receiptdate)
+  count(*) as order_count
+from
+  orders
 where
-  o_orderdate >= '1993-07-01' and
-  o_orderdate < '1993-10-01'
+  o_orderdate >= '1993-07-01'
+  and o_orderdate < '1993-10-01'
+  and exists (
+    select
+      *
+    from
+      lineitem
+    where
+      l_orderkey = o_orderkey
+      and l_commitdate < l_receiptdate
+    )
 group by
   o_orderpriority
 order by

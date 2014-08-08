@@ -1,56 +1,38 @@
 ====
----- QUERY: TPCH-Q22_QUERY_1
+---- QUERY: TPCH-Q22
 # Q22 - Global Sales Opportunity Query
-# Modifications: Added a cust_name_char column that will always have
-# a constant value ('C') so that we can do a join between this table
-# in the main query. This was needed because we only support equi-joins
-# and had to have a column to join on.
-insert overwrite table q22_customer_tmp1
 select
-  avg(c_acctbal) avg_acctbal,
-  substr(c_name, 1, 1) as cust_name_char
-from customer c
-where
-   c.c_acctbal > 0.00 and
-   (substr(c.c_phone, 1, 2) = '13' or
-    substr(c.c_phone, 1, 2) = '31' or
-    substr(c.c_phone, 1, 2) = '23' or
-    substr(c.c_phone, 1, 2) = '29' or
-    substr(c.c_phone, 1, 2) = '30' or
-    substr(c.c_phone, 1, 2) = '18' or
-    substr(c.c_phone, 1, 2) = '17')
-group by
-  substr(c_name, 1, 1)
----- SETUP
-RESET q22_customer_tmp1
----- RESULTS
-: 1
-====
----- QUERY: TPCH-Q22_QUERY_2
-# Modifications: Updated to use LEFT OUTER JOIN instead of NOT EXISTS,
-# removed subquery by pushing aggregation up a level, added temp table
-# to remove another subquery that computed the average account balance.
-select
-  substring(c_phone, 1, 2) as cntrycode,
+  cntrycode,
   count(*) as numcust,
   sum(c_acctbal) as totacctbal
-from customer c
-  join q22_customer_tmp1 ct
-    on (substr(c.c_name, 1, 1) = ct.cust_name_char)
-  left outer join orders o
-    on (o.o_custkey = c.c_custkey)
-where
-  o_custkey is null and
-  c.c_acctbal > ct.avg_acctbal and
-  (substr(c.c_phone, 1, 2) = '13' or
-   substr(c.c_phone, 1, 2) = '31' or
-   substr(c.c_phone, 1, 2) = '23' or
-   substr(c.c_phone, 1, 2) = '29' or
-   substr(c.c_phone, 1, 2) = '30' or
-   substr(c.c_phone, 1, 2) = '18' or
-   substr(c.c_phone, 1, 2) = '17')
+from (
+  select
+    substr(c_phone, 1, 2) as cntrycode,
+    c_acctbal
+  from
+    customer
+  where
+    substr(c_phone, 1, 2) in ('13', '31', '23', '29', '30', '18', '17')
+    and c_acctbal > (
+      select
+        avg(c_acctbal)
+      from
+        customer
+      where
+        c_acctbal > 0.00
+        and substr(c_phone, 1, 2) in ('13', '31', '23', '29', '30', '18', '17')
+      )
+    and not exists (
+      select
+        *
+      from
+        orders
+      where
+        o_custkey = c_custkey
+    )
+  ) as custsale
 group by
-  substring(c_phone, 1, 2)
+  cntrycode
 order by
   cntrycode;
 ---- RESULTS

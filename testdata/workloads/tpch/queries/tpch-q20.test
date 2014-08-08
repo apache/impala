@@ -1,71 +1,40 @@
 ====
----- QUERY: TPCH-Q20_QUERY_1
+---- QUERY: TPCH-Q20
 # Q20 - Potential Part Promotion Query
-insert overwrite table q20_tmp1
-select distinct p_partkey
-from part
-where p_name like 'forest%'
----- SETUP
-RESET q20_tmp1
----- RESULTS
-: 2127
-====
----- QUERY: TPCH-Q20_QUERY_2
-insert overwrite table q20_tmp2
-select
-  l_partkey,
-  l_suppkey,
-  0.5 * sum(l_quantity)
-from lineitem
-where
-  l_shipdate >= '1994-01-01' and
-  l_shipdate < '1995-01-01'
-group by
-  l_partkey,
-  l_suppkey
----- SETUP
-RESET q20_tmp2
----- RESULTS
-: 543210
-====
----- QUERY: TPCH-Q20_QUERY_3
-insert overwrite table q20_tmp3
-select
-  ps_suppkey,
-  ps_availqty,
-  sum_quantity
-from partsupp ps
-  join q20_tmp2 t2
-    on (ps.ps_partkey = t2.l_partkey and ps.ps_suppkey = t2.l_suppkey)
-  join q20_tmp1 t1
-    on (ps.ps_partkey = t1.p_partkey)
----- SETUP
-RESET q20_tmp3
----- RESULTS
-: 5843
-====
----- QUERY: TPCH-Q20_QUERY_4
-# Modified to use subquery to work around IMP-127
-insert overwrite table q20_tmp4
-select ps_suppkey
-from q20_tmp3
-where ps_availqty > sum_quantity
-group by ps_suppkey
----- SETUP
-RESET q20_tmp4
----- RESULTS
-: 4397
-====
----- QUERY: TPCH-Q20_QUERY_5
 select
   s_name,
   s_address
-from supplier s
-  join nation n
-    on (s.s_nationkey = n.n_nationkey and
-        n.n_name = 'CANADA')
-join q20_tmp4 t4
-  on (s.s_suppkey = t4.ps_suppkey)
+from
+  supplier, nation
+where
+  s_suppkey in (
+    select
+      ps_suppkey
+    from
+      partsupp
+    where
+      ps_partkey in (
+        select
+          p_partkey
+        from
+          part
+        where
+          p_name like 'forest%'
+        )
+      and ps_availqty > (
+        select
+          0.5 * sum(l_quantity)
+        from
+          lineitem
+        where
+          l_partkey = ps_partkey
+          and l_suppkey = ps_suppkey
+          and l_shipdate >= '1994-01-01'
+          and l_shipdate < '1995-01-01'
+        )
+    )
+  and s_nationkey = n_nationkey
+  and n_name = 'CANADA'
 order by
   s_name;
 ---- RESULTS
