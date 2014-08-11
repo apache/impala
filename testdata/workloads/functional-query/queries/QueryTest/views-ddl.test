@@ -233,3 +233,21 @@ select * from ddl_test_db.paren_view
 ---- TYPES
 bigint
 ====
+---- QUERY
+# Create a view with decimal columns. Regression test for IMPALA-1021.
+create view ddl_test_db.decimal_view as
+select * from functional.decimal_tbl
+---- RESULTS
+====
+---- QUERY
+# Query a view with decimal columns. Regression test for IMPALA-1021.
+select * from ddl_test_db.decimal_view
+---- RESULTS
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
+12345,333,123.4567890000,0.12345678900000000000000000000000000000,11.22000,1
+12345,333,1234.5678900000,0.12345678900000000000000000000000000000,0.10000,1
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889,1
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100,1
+---- TYPES
+decimal,decimal,decimal,decimal,decimal,decimal
+====

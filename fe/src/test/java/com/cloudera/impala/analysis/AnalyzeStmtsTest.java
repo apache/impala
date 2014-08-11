@@ -181,6 +181,40 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select a.*", "unknown table alias 'a'");
   }
 
+  /**
+   * The root stmt may not return a complex-typed value directly because we'd need to
+   * serialize it in a meaningful way. We allow complex types in the select list for
+   * non-root stmts to support views.
+   */
+  @Test
+  public void TestComplexTypesInSelectList() {
+    // Legal complex-types result exprs in views.
+    AnalyzesOk("with t as (select * from functional.allcomplextypes) " +
+        "select t.id from t");
+    AnalyzesOk("select t.id " +
+        "from (select * from functional.allcomplextypes) t");
+    AnalyzesOk("select id from functional.allcomplextypes_view");
+    // Illegal complex-typed result expr in root stmt.
+    AnalysisError("select int_struct_col from functional.allcomplextypes",
+        "Expr 'int_struct_col' in select list of root statement returns " +
+        "a complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
+        "Only scalar types are allowed in the select list of the root statement.");
+    AnalysisError("select int_array_col from functional.allcomplextypes_view",
+        "Expr 'int_array_col' in select list of root statement returns a " +
+        "complex type 'ARRAY<INT>'.\n" +
+        "Only scalar types are allowed in the select list of the root statement.");
+    // Legal star expansion adds illegal complex-typed result expr in root stmt.
+    AnalysisError("select * from functional.allcomplextypes " +
+        "cross join functional_parquet.alltypes",
+        "Expr 'functional.allcomplextypes.int_array_col' in select list of " +
+        "root statement returns a complex type 'ARRAY<INT>'.\n" +
+        "Only scalar types are allowed in the select list of the root statement.");
+    AnalysisError("select * from functional.allcomplextypes_view ",
+        "Expr 'functional.allcomplextypes_view.int_array_col' in select list " +
+        "of root statement returns a complex type 'ARRAY<INT>'.\n" +
+        "Only scalar types are allowed in the select list of the root statement.");
+  }
+
   @Test
   public void TestOrdinals() throws AnalysisException {
     // can't group or order on *

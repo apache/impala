@@ -19,7 +19,6 @@ import java.util.List;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.serde.serdeConstants;
 
 import com.cloudera.impala.analysis.ParseNode;
 import com.cloudera.impala.analysis.QueryStmt;
@@ -87,12 +86,6 @@ public class View extends Table {
       List<FieldSchema> fieldSchemas = client.getFields(db_.getName(), name_);
       for (int i = 0; i < fieldSchemas.size(); ++i) {
         FieldSchema s = fieldSchemas.get(i);
-        // catch currently unsupported hive schema elements
-        if (!serdeConstants.PrimitiveTypes.contains(s.getType())) {
-          throw new TableLoadingException(
-              String.format("Failed to load metadata for table '%s' due to unsupported " +
-              "column type '%s' in column '%s'", getName(), s.getType(), s.getName()));
-        }
         Type type = parseColumnType(s);
         Column col = new Column(s.getName(), type, s.getComment(), i);
         addColumn(col);

@@ -748,6 +748,15 @@ AS SELECT * FROM {db_name}{db_suffix}.alltypes;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+allcomplextypes_view
+---- CREATE
+CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+AS SELECT * FROM {db_name}{db_suffix}.allcomplextypes;
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypes_hive_view
 ---- CREATE_HIVE
 -- Test that Impala can handle incorrect column metadata created by Hive (IMPALA-994).

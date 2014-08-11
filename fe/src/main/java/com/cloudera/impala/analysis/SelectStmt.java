@@ -165,6 +165,17 @@ public class SelectStmt extends QueryStmt {
         colLabels_.add(label);
       }
     }
+    // The root stmt may not return a complex-typed value directly because we'd need to
+    // serialize it in a meaningful way. We allow complex types in the select list for
+    // non-root stmts to support views.
+    for (Expr expr: resultExprs_) {
+      if (expr.getType().isComplexType() && analyzer.isRootAnalyzer()) {
+        throw new AnalysisException(String.format(
+            "Expr '%s' in select list of root statement returns a complex type '%s'.\n" +
+            "Only scalar types are allowed in the select list of the root statement.",
+            expr.toSql(), expr.getType().toSql()));
+      }
+    }
 
     if (whereClause_ != null) {
       whereClause_.analyze(analyzer);
