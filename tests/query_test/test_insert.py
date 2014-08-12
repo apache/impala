@@ -26,22 +26,26 @@ class TestInsertQueries(ImpalaTestSuite):
     # into the same table at the same time for the same file format).
     # TODO: When we do decide to run these tests in parallel we could create unique temp
     # tables for each test case to resolve the concurrency problems.
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
-        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
-        sync_ddl=[0, 1]))
-
-    cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
-
-    # Insert is currently only supported for text and parquet
-    # For parquet, we want to iterate through all the compression codecs
-    # TODO: each column in parquet can have a different codec.  We could
-    # test all the codecs in one table/file with some additional flags.
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'parquet' or \
-          (v.get_value('table_format').file_format == 'text' and \
-           v.get_value('compression_codec') == 'none'))
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').compression_codec == 'none')
+    if cls.exploration_strategy() == 'core':
+      cls.TestMatrix.add_dimension(create_exec_option_dimension(
+          cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
+          sync_ddl=[0]))
+      cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    else:
+      cls.TestMatrix.add_dimension(create_exec_option_dimension(
+          cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
+          sync_ddl=[0, 1]))
+      cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
+      # Insert is currently only supported for text and parquet
+      # For parquet, we want to iterate through all the compression codecs
+      # TODO: each column in parquet can have a different codec.  We could
+      # test all the codecs in one table/file with some additional flags.
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('table_format').file_format == 'parquet' or \
+            (v.get_value('table_format').file_format == 'text' and \
+            v.get_value('compression_codec') == 'none'))
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('table_format').compression_codec == 'none')
 
   @classmethod
   def setup_class(cls):
@@ -49,8 +53,9 @@ class TestInsertQueries(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_insert(self, vector):
-    vector.get_value('exec_option')['PARQUET_COMPRESSION_CODEC'] = \
-        vector.get_value('compression_codec')
+    if (vector.get_value('table_format').file_format == 'parquet'):
+      vector.get_value('exec_option')['PARQUET_COMPRESSION_CODEC'] = \
+          vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
@@ -172,3 +177,33 @@ class TestInsertPartKey(ImpalaTestSuite):
     """Test that partition column exprs are cast to the correct type. See IMPALA-875."""
     self.run_test_case('QueryTest/insert_part_key', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+
+class TestInsertNullQueries(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInsertNullQueries, cls).add_test_dimensions()
+    # Fix the exec_option vector to have a single value. This is needed should we decide
+    # to run the insert tests in parallel (otherwise there will be two tests inserting
+    # into the same table at the same time for the same file format).
+    # TODO: When we do decide to run these tests in parallel we could create unique temp
+    # tables for each test case to resolve the concurrency problems.
+    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
+
+    # These tests only make sense for inserting into a text table with special
+    # logic to handle all the possible ways NULL needs to be written as ascii
+    cls.TestMatrix.add_constraint(lambda v:\
+          (v.get_value('table_format').file_format == 'text' and \
+           v.get_value('table_format').compression_codec == 'none'))
+
+  @classmethod
+  def setup_class(cls):
+    super(TestInsertNullQueries, cls).setup_class()
+
+  @pytest.mark.execute_serially
+  def test_insert_null(self, vector):
+    self.run_test_case('QueryTest/insert_null', vector)

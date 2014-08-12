@@ -24,15 +24,12 @@ class TestInsertQueriesWithPermutation(ImpalaTestSuite):
     # into the same table at the same time for the same file format).
     # TODO: When we do decide to run these tests in parallel we could create unique temp
     # tables for each test case to resolve the concurrency problems.
+    # TODO: do we need to run with multiple file formats? This seems to be really
+    # targeting FE behavior.
     cls.TestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
-    # Insert is currently only supported for text and parquet
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format in ['text', 'parquet'])
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').compression_codec == 'none')
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
-  @pytest.mark.execute_serially
   def test_insert_permutation(self, vector):
     map(self.cleanup_db, ["insert_permutation_test"])
     self.run_test_case('QueryTest/insert_permutation', vector)

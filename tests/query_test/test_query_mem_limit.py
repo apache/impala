@@ -52,6 +52,9 @@ class TestQueryMemLimit(ImpalaTestSuite):
                 # invalid per-query memory limits
                 "-1234", "-3.14", "xyz", "100%", MAXINT_BYTES + "k", "k" + MAXINT_BYTES]
 
+  MEM_LIMITS_CORE = ["-1", "0", "10000", MAXINT_BYTES,
+                MAXINT_BYTES + "b", MAXINT_MB + "M", MAXINT_GB + "g"]
+
   @classmethod
   def get_workload(self):
     return 'tpch'
@@ -60,13 +63,16 @@ class TestQueryMemLimit(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestQueryMemLimit, cls).add_test_dimensions()
     # Only run the query for text
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text')
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').compression_codec == 'none')
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+
     # add mem_limit as a test dimension.
-    new_dimension = TestDimension('mem_limit', *TestQueryMemLimit.MEM_LIMITS)
-    cls.TestMatrix.add_dimension(new_dimension)
+    if cls.exploration_strategy() == 'core':
+      cls.TestMatrix.add_dimension(\
+          TestDimension('mem_limit', *TestQueryMemLimit.MEM_LIMITS_CORE))
+    else:
+      cls.TestMatrix.add_dimension(\
+          TestDimension('mem_limit', *TestQueryMemLimit.MEM_LIMITS))
+
     # Make query a test dimension so we can support more queries.
     cls.TestMatrix.add_dimension(TestDimension('query', *TestQueryMemLimit.QUERIES))
     # This query takes a very long time to finish with a bound on the batch_size.

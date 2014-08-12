@@ -820,14 +820,14 @@ tinyint, tinyint
 ====
 ---- QUERY
 # Test union merging only partitioned inputs.
-select id, bigint_col from functional.alltypestiny
+select id, bigint_col from alltypestiny
 union all
-select sum(int_col), bigint_col from functional.alltypes
+select sum(int_col), bigint_col from alltypes
   where year=2009 and month=2
   group by bigint_col
 union all
 select a.id, a.bigint_col
-  from functional.alltypestiny a inner join functional.alltypestiny b
+  from alltypestiny a inner join alltypestiny b
   on (a.id = b.id)
 union all
 (select 1000, 2000)
@@ -865,14 +865,14 @@ bigint, bigint
 ====
 ---- QUERY
 # Test union merging only unpartitioned inputs.
-select id, bigint_col from functional.alltypestiny
+select id, bigint_col from alltypestiny
 union all
-select sum(int_col), bigint_col from functional.alltypes
+select sum(int_col), bigint_col from alltypes
   where year=2009 and month=2
   group by bigint_col
 union all
 select a.id, a.bigint_col
-  from functional.alltypestiny a inner join functional.alltypestiny b
+  from alltypestiny a inner join alltypestiny b
   on (a.id = b.id)
 union all
 select 1000, 2000
@@ -909,18 +909,18 @@ bigint, bigint
 ====
 ---- QUERY
 # Test union merging only unpartitioned inputs.
-select count(id), sum(bigint_col) from functional.alltypes
+select count(id), sum(bigint_col) from alltypes
 union all
-select id, bigint_col from functional.alltypessmall order by id limit 10
+select id, bigint_col from alltypessmall order by id limit 10
 union all
-select id, bigint_col from functional.alltypestiny
+select id, bigint_col from alltypestiny
 union all
-select sum(int_col), bigint_col from functional.alltypes
+select sum(int_col), bigint_col from alltypes
   where year=2009 and month=2
   group by bigint_col
 union all
 select a.id, a.bigint_col
-  from functional.alltypestiny a inner join functional.alltypestiny b
+  from alltypestiny a inner join alltypestiny b
   on (a.id = b.id)
 union all
 select 1000, 2000

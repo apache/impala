@@ -12,6 +12,7 @@ from tests.util.test_file_parser import QueryTestSectionReader
 
 class TestLimit(ImpalaTestSuite):
   LIMIT_VALUES = [1, 2, 3, 4, 5, 10, 100, 5000]
+  LIMIT_VALUES_CORE = [1, 5, 10, 5000]
   QUERIES = ["select * from lineitem limit %d"]
 
   # TODO: we should be able to run count(*) in setup rather than hardcoding the values
@@ -27,8 +28,12 @@ class TestLimit(ImpalaTestSuite):
     super(TestLimit, cls).add_test_dimensions()
 
     # Add two more dimensions
-    cls.TestMatrix.add_dimension(
-        TestDimension('limit_value', *TestLimit.LIMIT_VALUES))
+    if cls.exploration_strategy() == 'core':
+      cls.TestMatrix.add_dimension(
+          TestDimension('limit_value', *TestLimit.LIMIT_VALUES_CORE))
+    else:
+      cls.TestMatrix.add_dimension(
+          TestDimension('limit_value', *TestLimit.LIMIT_VALUES))
     cls.TestMatrix.add_dimension(TestDimension('query', *TestLimit.QUERIES))
 
     # Don't run with large limits and tiny batch sizes.  This generates excessive

@@ -6,9 +6,17 @@ import logging
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader
 
 class TestQueries(ImpalaTestSuite):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestQueries, cls).add_test_dimensions()
+    if cls.exploration_strategy() == 'core':
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('table_format').file_format == 'parquet')
+
   @classmethod
   def get_workload(cls):
     return 'functional-query'
@@ -38,25 +46,6 @@ class TestQueries(ImpalaTestSuite):
   def test_hdfs_scan_node(self, vector):
     self.run_test_case('QueryTest/hdfs-scan-node', vector)
 
-  def test_distinct_estimate(self, vector):
-    # These results will vary slightly depending on how the values get split up
-    # so only run with 1 node and on text.
-    if vector.get_value('table_format').file_format != 'text':
-      pytest.skip()
-    vector.get_value('exec_option')['num_nodes'] = 1
-    self.run_test_case('QueryTest/distinct-estimate', vector)
-
-  def test_data_source_tables(self, vector):
-    # The test table is only created in uncompressed text format, so the test only works
-    # on 'text/none'
-    table_format = vector.get_value('table_format')
-    if table_format.file_format != 'text' or table_format.compression_codec != 'none':
-      pytest.skip()
-    self.run_test_case('QueryTest/data-source-tables', vector)
-
-  def test_scan_range(self, vector):
-    self.run_test_case('QueryTest/hdfs-partitions', vector)
-
   def test_file_partitions(self, vector):
     self.run_test_case('QueryTest/hdfs-partitions', vector)
 
@@ -71,6 +60,9 @@ class TestQueries(ImpalaTestSuite):
     # QueryTest/top-n is also run in test_sort with disable_outermost_topn = 1
     self.run_test_case('QueryTest/top-n', vector)
 
+  def test_union(self, vector):
+    self.run_test_case('QueryTest/union', vector)
+
   def test_sort(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
@@ -79,20 +71,14 @@ class TestQueries(ImpalaTestSuite):
     # We can get the sort tests for free from the top-n file
     self.run_test_case('QueryTest/top-n', vector)
 
-  def test_empty(self, vector):
-    self.run_test_case('QueryTest/empty', vector)
-
   def test_subquery(self, vector):
-    if vector.get_value('table_format').file_format == 'hbase':
-      pytest.xfail("jointbl does not have columns with unique values, "
-                    "hbase collapses them")
     self.run_test_case('QueryTest/subquery', vector)
 
   def test_subquery_limit(self, vector):
     self.run_test_case('QueryTest/subquery-limit', vector)
 
-  def test_mixed_format(self, vector):
-    self.run_test_case('QueryTest/mixed-format', vector)
+  def test_empty(self, vector):
+    self.run_test_case('QueryTest/empty', vector)
 
   def test_views(self, vector):
     if vector.get_value('table_format').file_format == "hbase":
@@ -103,12 +89,6 @@ class TestQueries(ImpalaTestSuite):
     if vector.get_value('table_format').file_format == "hbase":
       pytest.xfail("TODO: Enable with clause tests for hbase")
     self.run_test_case('QueryTest/with-clause', vector)
-
-  def test_values(self, vector):
-    # These tests do not read data from tables, so only run them a single time (text/none).
-    table_format = vector.get_value('table_format')
-    if (table_format.file_format == 'text' and table_format.compression_codec == 'none'):
-      self.run_test_case('QueryTest/values', vector)
 
   def test_misc(self, vector):
     table_format = vector.get_value('table_format')
@@ -123,8 +103,34 @@ class TestQueries(ImpalaTestSuite):
       pytest.xfail("null data does not appear to work in hbase")
     self.run_test_case('QueryTest/null_data', vector)
 
+# Tests in this class are only run against text/none either because that's the only
+# format that is supported, or the tests don't exercise the file format.
+class TestQueriesTextTables(ImpalaTestSuite):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestQueriesTextTables, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
   def test_overflow(self, vector):
-    table_format = vector.get_value('table_format')
-    if table_format.file_format != 'text' or table_format.compression_codec != 'none':
-      pytest.xfail("Test limited to text/none")
     self.run_test_case('QueryTest/overflow', vector)
+
+  def test_data_source_tables(self, vector):
+    self.run_test_case('QueryTest/data-source-tables', vector)
+
+  def test_distinct_estimate(self, vector):
+    # These results will vary slightly depending on how the values get split up
+    # so only run with 1 node and on text.
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/distinct-estimate', vector)
+
+  def test_mixed_format(self, vector):
+    self.run_test_case('QueryTest/mixed-format', vector)
+
+  def test_values(self, vector):
+    self.run_test_case('QueryTest/values', vector)
+
+

@@ -27,9 +27,10 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestScannersAllTableFormats, cls).add_test_dimensions()
-    # Exhaustively generate all table format vectors. This can still be overridden
-    # using the --table_formats flag.
-    cls.TestMatrix.add_dimension(cls.create_table_info_dimension('exhaustive'))
+    if cls.exploration_strategy() == 'core':
+      # The purpose of this test is to get some base coverage of all the file formats.
+      # Even in 'core', we'll test each format by using the pairwise strategy.
+      cls.TestMatrix.add_dimension(cls.create_table_info_dimension('pairwise'))
     cls.TestMatrix.add_dimension(
         TestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
 
@@ -48,9 +49,6 @@ class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestScannersAllTableFormatsWithLimit, cls).add_test_dimensions()
-    # Exhaustively generate all table format vectors. This can still be overridden
-    # using the --table_formats flag.
-    cls.TestMatrix.add_dimension(cls.create_table_info_dimension('exhaustive'))
 
   def test_limit(self, vector):
     # Use a small batch size so changing the limit affects the timing of cancellation
@@ -73,9 +71,6 @@ class TestUnmatchedSchema(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestUnmatchedSchema, cls).add_test_dimensions()
-    # TODO: Does it add anything to enumerate all the supported compression codecs
-    # for each table format?
-    cls.TestMatrix.add_dimension(cls.create_table_info_dimension('exhaustive'))
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
     # Avro has a more advanced schema evolution process which is covered in more depth
     # in the test_avro_schema_evolution test suite.
@@ -141,8 +136,8 @@ class TestWideRow(ImpalaTestSuite):
     # We need > 10 MB of memory because we're creating extra buffers:
     # - 10 MB table / 5 MB scan range = 2 scan ranges, each of which may allocate ~20MB
     # - Sync reads will allocate ~5MB of space
-    # The 80MB value used here was determined empirically by raising the limit until the query
-    # succeeded for all file formats -- I don't know exactly why we need this much.
+    # The 80MB value used here was determined empirically by raising the limit until the
+    # query succeeded for all file formats -- I don't know exactly why we need this much.
     # TODO: figure out exact breakdown of memory usage (IMPALA-681)
     new_vector.get_value('exec_option')['mem_limit'] = 80 * 1024 * 1024
     self.run_test_case('QueryTest/wide-row', new_vector)
@@ -197,3 +192,25 @@ class TestParquet(ImpalaTestSuite):
 
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
+
+# We use very small scan ranges to exercise corner cases in the HDFS scanner more
+# thoroughly. In particular, it will exercise:
+# 1. scan range with no tuple
+# 2. tuple that span across multiple scan ranges
+MAX_SCAN_RANGE_LENGTHS = [1, 2, 5]
+
+class TestScanRangeLengths(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestScanRangeLengths, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(
+        TestDimension('max_scan_range_length', *MAX_SCAN_RANGE_LENGTHS))
+
+  def test_scan_ranges(self, vector):
+    vector.get_value('exec_option')['max_scan_range_length'] =\
+        vector.get_value('max_scan_range_length')
+    self.run_test_case('QueryTest/hdfs-tiny-scan', vector)

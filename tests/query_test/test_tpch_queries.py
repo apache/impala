@@ -19,9 +19,10 @@ class TestTpchQuery(ImpalaTestSuite):
 
     # The tpch tests take a long time to execute so restrict the combinations they
     # execute over
+    # TODO: the planner tests are based on text and need this.
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format in ['parquet', 'text'])
+          v.get_value('table_format').file_format in ['text'])
 
   def test_tpch_q1(self, vector):
     self.run_test_case('tpch-q1', vector)
