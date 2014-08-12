@@ -92,13 +92,12 @@ set(SRC_FILES
   Types_types.cpp
 )
 
-# keep everything in one library, the object files reference 
+# keep everything in one library, the object files reference
 # each other
-add_library(ImpalaThrift STATIC ${SRC_FILES})
+add_library(ImpalaThrift ${SRC_FILES})
 
 # Setting these files as code-generated lets make clean and incremental builds work
 # correctly
 set_source_files_properties(${SRC_FILES} PROPERTIES GENERATED TRUE)
 
 add_dependencies(ImpalaThrift thrift-cpp)
-

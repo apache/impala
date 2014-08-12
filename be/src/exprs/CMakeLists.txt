@@ -22,7 +22,6 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 add_library(Exprs
   agg-fn-evaluator.cc
   aggregate-functions.cc
-  aggregate-functions-test.cc
   anyval-util.cc
   arithmetic-expr.cc
   binary-predicate.cc

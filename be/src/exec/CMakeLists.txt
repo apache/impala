@@ -21,7 +21,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 
-add_library(Exec STATIC
+add_library(Exec
   aggregation-node.cc
   aggregation-node-ir.cc
   base-sequence-scanner.cc

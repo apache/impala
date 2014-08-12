@@ -20,13 +20,13 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/common")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/common")
 
-add_library(Common STATIC
+add_library(Common
   init.cc
   logging.cc
   status.cc
 )
 
-add_library(GlobalFlags STATIC
+add_library(GlobalFlags
   global-flags.cc
 )
 

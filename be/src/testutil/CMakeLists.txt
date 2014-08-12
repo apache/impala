@@ -21,7 +21,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 
-add_library(TestUtil STATIC
+add_library(TestUtil
   impalad-query-executor.cc
   in-process-servers.cc
   desc-tbl-builder.cc
@@ -39,4 +39,3 @@ add_executable(mini-impala-cluster
 )
 
 target_link_libraries(mini-impala-cluster ${IMPALA_LINK_LIBS})
-

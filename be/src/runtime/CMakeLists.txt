@@ -19,7 +19,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 
-add_library(Runtime STATIC
+add_library(Runtime
   buffered-block-mgr.cc
   buffered-tuple-stream.cc
   client-cache.cc
@@ -44,7 +44,6 @@ add_library(Runtime STATIC
   plan-fragment-executor.cc
   types.cc
   raw-value.cc
-  raw-value-test.cc
   row-batch.cc
   runtime-state.cc
   sorted-run-merger.cc

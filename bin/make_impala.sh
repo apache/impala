@@ -24,6 +24,7 @@ set -e
 BUILD_TESTS=1
 CLEAN=0
 TARGET_BUILD_TYPE=${TARGET_BUILD_TYPE:-""}
+BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS:-""}
 
 # parse command line options
 for ARG in $*
@@ -38,12 +39,23 @@ do
     -build_type=*)
       TARGET_BUILD_TYPE="${ARG#*=}"
       ;;
+    -build_shared_libs)
+      BUILD_SHARED_LIBS="ON"
+      ;;
+    -build_static_libs)
+      BUILD_SHARED_LIBS="OFF"
+      ;;
     -help)
       echo "make_impala.sh [-build_type=<build type> -notests -clean]"
       echo "[-build_type] : Target build type. Examples: Debug, Release, Address_sanitizer."
       echo "                If omitted, the last build target is built incrementally"
+      echo "[-build_shared_libs] : Link all executables dynamically"
+      echo "[-build_static_libs] : Link all executables statically (the default)"
       echo "[-notests] : Omits building the tests."
       echo "[-clean] : Cleans previous build artifacts."
+      echo ""
+      echo "If either -build_type or -build_*_libs is set, cmake will be re-run for the "
+      echo "project. Otherwise the last cmake configuration will continue to take effect."
       exit
       ;;
   esac
@@ -54,15 +66,36 @@ echo " Building Impala "
 if [ "x${TARGET_BUILD_TYPE}" != "x" ];
 then
   echo " Build type: ${TARGET_BUILD_TYPE} "
+  if [ "x${BUILD_SHARED_LIBS}" == "x" ]
+  then
+      echo " Impala libraries will be STATICALLY linked"
+  fi
+fi
+if [ "x${BUILD_SHARED_LIBS}" == "xOFF" ]
+then
+  echo " Impala libraries will be STATICALLY linked"
+fi
+if [ "x${BUILD_SHARED_LIBS}" == "xON" ]
+then
+  echo " Impala libraries will be DYNAMICALLY linked"
 fi
 echo "********************************************************************************"
 
 cd ${IMPALA_HOME}
 
-if [ "x${TARGET_BUILD_TYPE}" != "x" ];
+if [ "x${TARGET_BUILD_TYPE}" != "x" ] || [ "x${BUILD_SHARED_LIBS}" != x]
 then
     rm -f ./CMakeCache.txt
-    cmake -DCMAKE_BUILD_TYPE=${TARGET_BUILD_TYPE}
+    CMAKE_ARGS=""
+    if [ "x${TARGET_BUILD_TYPE}" != "x" ]
+    then
+        CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=${TARGET_BUILD_TYPE}"
+    fi
+    if [ "x${BUILD_SHARED_LIBS}" != "x" ]
+    then
+        CMAKE_ARGS="${CMAKE_ARGS} -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}"
+    fi
+    cmake . ${CMAKE_ARGS}
 fi
 
 if [ $CLEAN -eq 1 ]

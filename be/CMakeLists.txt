@@ -190,7 +190,33 @@ set (IMPALA_LINK_LIBS
   Util
   Webserver
   -Wl,--end-group
-# Below are all external dependencies.  They should some after the impala libs.
+)
+
+# If using dynamic linking, -Wl does not have any effect (it's only for .a files). So we
+# need to add these redundant dependencies to resolve the circular references in our
+# libraries when dynamic linking is enabled.
+if ("${BUILD_SHARED_LIBS}" STREQUAL "ON")
+  set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
+    Runtime
+    Exec
+    CodeGen
+    Exprs
+    Opcode
+    Rpc
+    Service
+    Statestore
+    Scheduling
+    Catalog
+    ResourceBroker
+    Webserver
+    ImpalaThrift
+    GlobalFlags
+    Common
+    )
+endif ()
+
+# Add all external dependencies. They should come after the impala libs.
+set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${SNAPPY_STATIC_LIB}
   ${LZ4_STATIC_LIB}
   ${RE2_STATIC_LIB}

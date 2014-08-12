@@ -13,4 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-$IMPALA_HOME/bin/make_impala.sh -clean -build_type=Debug $*
+$IMPALA_HOME/bin/make_impala.sh -build_type=Debug -build_shared_libs $*
