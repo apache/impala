@@ -65,8 +65,9 @@ enum TDebugAction {
 
 // Specification of subsection of a single hdfs file.
 struct THdfsFileSplit {
-  // file path
-  1: required string path
+  // File name (not the full path).  The path is assumed to be the
+  // 'location' of the THdfsPartition referenced by partition_id.
+  1: required string file_name
 
   // starting offset
   2: required i64 offset
@@ -74,8 +75,7 @@ struct THdfsFileSplit {
   // length of split
   3: required i64 length
 
-  // ID of partition in parent THdfsScanNode. Meaningful only
-  // in the context of a single THdfsScanNode, may not be unique elsewhere.
+  // ID of partition within the THdfsTable associated with this scan node.
   4: required i64 partition_id
 
   // total size of the hdfs file

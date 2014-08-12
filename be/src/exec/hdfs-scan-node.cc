@@ -24,6 +24,7 @@
 #include <sstream>
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
+#include <boost/filesystem.hpp>
 
 #include <hdfs.h>
 
@@ -418,20 +419,22 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   for (int i = 0; i < scan_range_params_->size(); ++i) {
     DCHECK((*scan_range_params_)[i].scan_range.__isset.hdfs_file_split);
     const THdfsFileSplit& split = (*scan_range_params_)[i].scan_range.hdfs_file_split;
-    const string& path = split.path;
     partition_ids_.insert(split.partition_id);
+    HdfsPartitionDescriptor* partition_desc =
+        hdfs_table_->GetPartition(split.partition_id);
+    filesystem::path file_path(partition_desc->location());
+    file_path.append(split.file_name, filesystem::path::codecvt());
+    const string& native_file_path = file_path.native();
 
     HdfsFileDesc* file_desc = NULL;
-    FileDescMap::iterator file_desc_it = file_descs_.find(path);
+    FileDescMap::iterator file_desc_it = file_descs_.find(native_file_path);
     if (file_desc_it == file_descs_.end()) {
       // Add new file_desc to file_descs_ and per_type_files_
-      file_desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(path));
-      file_descs_[path] = file_desc;
+      file_desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(native_file_path));
+      file_descs_[native_file_path] = file_desc;
       file_desc->file_length = split.file_length;
       file_desc->file_compression = split.file_compression;
 
-      HdfsPartitionDescriptor* partition_desc =
-          hdfs_table_->GetPartition(split.partition_id);
       if (partition_desc == NULL) {
         stringstream ss;
         ss << "Could not find partition with id: " << split.partition_id;
