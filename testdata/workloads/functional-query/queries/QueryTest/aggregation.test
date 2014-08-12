@@ -802,12 +802,12 @@ NULL,NULL
 boolean, boolean
 ====
 ---- QUERY
-# Test group_concat with default delimiter
+# Test group_concat with default delimiter. Use a subquery with an ORDER BY to
+# ensure group_concat results are in a deterministic order.
 select day, group_concat(string_col)
-from alltypesagg
-where id % 100 = day
+from (select * from alltypesagg where id % 100 = day order by id limit 99999) a
 group by day
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 3,'3, 103, 203, 303, 403, 503, 603, 703, 803, 903'
 5,'5, 105, 205, 305, 405, 505, 605, 705, 805, 905'
 8,'8, 108, 208, 308, 408, 508, 608, 708, 808, 908'
@@ -824,10 +824,9 @@ int, string
 ---- QUERY
 # Test group_concat with NULL (default) delimiter
 select day, group_concat(string_col, NULL)
-from alltypesagg
-where id % 100 = day
+from (select * from alltypesagg where id % 100 = day order by id limit 99999) a
 group by day
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 3,'3, 103, 203, 303, 403, 503, 603, 703, 803, 903'
 5,'5, 105, 205, 305, 405, 505, 605, 705, 805, 905'
 8,'8, 108, 208, 308, 408, 508, 608, 708, 808, 908'
@@ -844,10 +843,9 @@ int, string
 ---- QUERY
 # Test group_concat with both args as NULL
 select day, group_concat(NULL, NULL)
-from alltypesagg
-where id % 100 = day
+from (select * from alltypesagg where id % 100 = day order by id limit 99999) a
 group by day
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 3,'NULL'
 5,'NULL'
 8,'NULL'
@@ -864,10 +862,9 @@ int, string
 ---- QUERY
 # Test group_concat with arrow delimiter
 select day, group_concat(string_col, "->")
-from alltypesagg
-where id % 100 = day
+from (select * from alltypesagg where id % 100 = day order by id limit 99999) a
 group by day
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 3,'3->103->203->303->403->503->603->703->803->903'
 5,'5->105->205->305->405->505->605->705->805->905'
 8,'8->108->208->308->408->508->608->708->808->908'
@@ -885,10 +882,9 @@ int, string
 # Test group_concat with column delimiter
 # Will cause all columns save first to be duplicated
 select day, group_concat(trim(string_col), trim(string_col))
-from alltypesagg
-where id % 200 = day
+from (select * from alltypesagg where id % 200 = day order by id limit 99999) a
 group by day
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 3,'3203203403403603603803803'
 5,'5205205405405605605805805'
 8,'8208208408408608608808808'
@@ -905,10 +901,9 @@ int, string
 ---- QUERY
 # Test group_concat with multiple agg columns
 select day, group_concat(string_col, '->'), group_concat(date_string_col)
-from alltypesagg
-where id % 250 = day
+from (select * from alltypesagg where id % 250 = day order by id limit 99999) a
 group by day
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 3,'3->253->503->753','01/03/10, 01/03/10, 01/03/10, 01/03/10'
 5,'5->255->505->755','01/05/10, 01/05/10, 01/05/10, 01/05/10'
 8,'8->258->508->758','01/08/10, 01/08/10, 01/08/10, 01/08/10'
@@ -929,6 +924,14 @@ select group_concat(string_col) from alltypesagg where string_col = NULL;
 'NULL'
 ---- TYPES
 string
+====
+---- QUERY
+# Test group_concat with merge node
+select group_concat(string_col) from alltypesagg where int_col = 1
+---- RESULTS
+'1, 1, 1, 1, 1, 1, 1, 1, 1, 1'
+---- TYPES
+STRING
 ====
 ---- QUERY
 # Test merge phase uses correct separator (IMPALA-1110).  The query needs to load data
