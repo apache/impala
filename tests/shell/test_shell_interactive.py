@@ -67,6 +67,16 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive(args)
     assert "Fetched 1 row(s)" in result.stderr
 
+  @pytest.mark.execute_serially
+  def test_welcome_string(self):
+    """Test that the shell's welcome message is only printed once
+    when the shell is started. Ensure it is not reprinted on errors.
+    Regression test for IMPALA-1153
+    """
+    result = run_impala_shell_interactive('asdf;')
+    assert result.stdout.count("Welcome to the Impala shell") == 1
+    result = run_impala_shell_interactive('select * from non_existent_table;')
+    assert result.stdout.count("Welcome to the Impala shell") == 1
 
 def run_impala_shell_interactive(command, shell_args=''):
   """Runs a command in the Impala shell interactively."""

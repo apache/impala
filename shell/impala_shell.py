@@ -48,6 +48,16 @@ try:
 except Exception:
   pass
 
+class CmdStatus:
+  """Values indicate the execution status of a command to the cmd shell driver module
+  SUCCESS and ERROR continue running the shell and ABORT exits the shell
+  Since SUCCESS == None, successful commands do not need to explicitly return
+  anything on completion
+  """
+  SUCCESS = None
+  ABORT = True
+  ERROR = False
+
 class ImpalaPrettyTable(prettytable.PrettyTable):
   """Patched version of PrettyTable that TODO"""
   def _unicode(self, value):
@@ -107,7 +117,6 @@ class ImpalaShell(cmd.Cmd):
     # Stores the old prompt while the user input is incomplete.
     self.cached_prompt = str()
 
-    self.output_file = options.output_file
     self.show_profiles = options.show_profiles
 
     # Output formatting flags/options
@@ -180,7 +189,7 @@ class ImpalaShell(cmd.Cmd):
       os.system(args)
     except Exception, e:
       print_to_stderr('Error running command : %s' % e)
-    return True
+      return CmdStatus.ERROR
 
   def sanitise_input(self, args, interactive=True):
     """Convert the command to lower case, so it's recognized"""
@@ -366,15 +375,9 @@ class ImpalaShell(cmd.Cmd):
     return args.encode('utf-8')
 
   def postcmd(self, status, args):
-    """Hack to make non interactive mode work"""
-    # cmd expects return of False to keep going, and True to quit.
-    # Shell commands return True on success, False on error, and None to quit, so
-    # translate between them.
-    # TODO : Remove in the future once shell and Impala query processing can be separated.
-    if status == None:
-      return True
-    else:
-      return False
+    # status conveys to shell how the shell should continue execution
+    # should always be a CmdStatus
+    return status
 
   def do_summary(self, args):
     summary = None
@@ -396,8 +399,6 @@ class ImpalaShell(cmd.Cmd):
     formatter = PrettyOutputFormatter(table)
     self.output_stream = OutputStream(formatter, filename=self.output_file)
     self.output_stream.write(output)
-    return True
-
 
   def do_set(self, args):
     """Set or display query options.
@@ -412,43 +413,40 @@ class ImpalaShell(cmd.Cmd):
     if len(args) == 0:
       print "Query options (defaults shown in []):"
       self._print_options(self.imp_client.default_query_options, self.set_query_options);
-      return True
+      return CmdStatus.SUCCESS
 
     # Remove any extra spaces surrounding the tokens.
     # Allows queries that have spaces around the = sign.
     tokens = [arg.strip() for arg in args.split("=")]
     if len(tokens) != 2:
       print_to_stderr("Error: SET <option>=<value>")
-      return False
+      return CmdStatus.ERROR
     option_upper = tokens[0].upper()
     if option_upper not in self.imp_client.default_query_options.keys():
       print "Unknown query option: %s" % (tokens[0])
       print "Available query options, with their values (defaults shown in []):"
       self._print_options(self.imp_client.default_query_options, self.set_query_options)
-      return False
+      return CmdStatus.ERROR
     self.set_query_options[option_upper] = tokens[1]
     self._print_if_verbose('%s set to %s' % (option_upper, tokens[1]))
-    return True
 
   def do_unset(self, args):
     """Unset a query option"""
     if len(args.split()) != 1:
       print 'Usage: unset <option>'
-      return False
+      return CmdStatus.ERROR
     option = args.upper()
     if self.set_query_options.get(option):
       print 'Unsetting %s' % option
       del self.set_query_options[option]
     else:
       print "No option called %s is set" % args
-    return True
 
   def do_quit(self, args):
     """Quit the Impala shell"""
     self._print_if_verbose("Goodbye " + self.user)
     self.is_alive = False
-    # None is crutch to tell shell loop to quit
-    return None
+    return CmdStatus.ABORT
 
   def do_exit(self, args):
     """Exit the impala shell"""
@@ -470,7 +468,7 @@ class ImpalaShell(cmd.Cmd):
     if (':' in tokens[0] and len(host_port) != 2):
       print_to_stderr("Connection string must either be empty, or of the form "
                       "<hostname[:port]>")
-      return False
+      return CmdStatus.ERROR
     elif len(host_port) == 1:
       host_port.append('21000')
     self.impalad = tuple(host_port)
@@ -517,7 +515,6 @@ class ImpalaShell(cmd.Cmd):
         print ('%s is not supported for the impalad being '
                'connected to, ignoring.' % set_option)
         del self.set_query_options[set_option]
-    return True
 
   def _connect(self):
     try:
@@ -574,9 +571,7 @@ class ImpalaShell(cmd.Cmd):
     Otherwise, the table is split into db/table name parts and returned.
     If an invalid format is provided, None is returned.
     """
-    if not arg:
-      return None
-
+    if not arg: return
     # If a multi-line argument, the name might be split across lines
     arg = arg.replace('\n', '')
     # Get the database and table name, using the current database if the table name
@@ -591,37 +586,41 @@ class ImpalaShell(cmd.Cmd):
       return db_table_name
 
   def do_alter(self, args):
-    return self._execute_stmt(self.imp_client.create_beeswax_query("alter %s" % args,
-                                                                     self.set_query_options))
+    query = self.imp_client.create_beeswax_query("alter %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query)
 
   def do_create(self, args):
-    return self._execute_stmt(self.imp_client.create_beeswax_query("create %s" % args,
-                                                                    self.set_query_options))
+    query = self.imp_client.create_beeswax_query("create %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query)
 
   def do_drop(self, args):
-    return self._execute_stmt(self.imp_client.create_beeswax_query("drop %s" % args,
-                                                                    self.set_query_options))
+    query = self.imp_client.create_beeswax_query("drop %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query)
 
   def do_load(self, args):
-    return self._execute_stmt(self.imp_client.create_beeswax_query("load %s" % args,
-                                                                    self.set_query_options))
+    query = self.imp_client.create_beeswax_query("load %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query)
 
   def do_profile(self, args):
     """Prints the runtime profile of the last INSERT or SELECT query executed."""
     if len(args) > 0:
       print_to_stderr("'profile' does not accept any arguments")
-      return False
+      return CmdStatus.ERROR
     elif self.last_query_handle is None:
       print_to_stderr('No previous query available to profile')
-      return False
+      return CmdStatus.ERROR
     profile = self.imp_client.get_runtime_profile(self.last_query_handle)
-    self.print_runtime_profile(profile, True)
-    return True
+    return self.print_runtime_profile(profile, True)
 
   def do_select(self, args):
     """Executes a SELECT... query, fetching all rows"""
-    return self._execute_stmt(self.imp_client.create_beeswax_query("select %s" % args,
-                                                                    self.set_query_options))
+    query = self.imp_client.create_beeswax_query("select %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query)
 
   def _format_outputstream(self):
     column_names = self.imp_client.get_column_names(self.last_query_handle)
@@ -663,7 +662,7 @@ class ImpalaShell(cmd.Cmd):
         # impalad does not support the fetching of metadata for certain types of queries.
         if not self.imp_client.expect_result_metadata(query.query):
           self.query_handle_closed = True
-          return True
+          return CmdStatus.SUCCESS
 
         self._format_outputstream()
         # fetch returns a generator
@@ -690,8 +689,7 @@ class ImpalaShell(cmd.Cmd):
 
       profile = self.imp_client.get_runtime_profile(self.last_query_handle)
       self.print_runtime_profile(profile)
-
-      return True
+      return CmdStatus.SUCCESS
     except RPCException, e:
       # could not complete the rpc successfully
       # suppress error if reason is cancellation
@@ -722,6 +720,7 @@ class ImpalaShell(cmd.Cmd):
       print_to_stderr('Unknown Exception : %s' % (u,))
       self.imp_client.connected = False
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
+    return CmdStatus.ERROR
 
   def _no_cancellation_error(self, error):
     if ImpalaShell.CANCELLATION_ERROR not in str(error):
@@ -730,8 +729,8 @@ class ImpalaShell(cmd.Cmd):
   def construct_table_header(self, column_names):
     """ Constructs the table header for a given query handle.
 
-    Should be called after the query has finished and before data is fetched. All data
-    is left aligned.
+    Should be called after the query has finished and before data is fetched.
+    All data is left aligned.
     """
     table = ImpalaPrettyTable()
     for column in column_names:
@@ -742,12 +741,14 @@ class ImpalaShell(cmd.Cmd):
 
   def do_values(self, args):
     """Executes a VALUES(...) query, fetching all rows"""
-    return self._execute_stmt(self.imp_client.create_beeswax_query("values %s" % args,
-                                                                    self.set_query_options))
+    query = self.imp_client.create_beeswax_query("values %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query)
 
   def do_with(self, args):
     """Executes a query with a WITH clause, fetching all rows"""
-    query = self.imp_client.create_beeswax_query("with %s" % args, self.set_query_options)
+    query = self.imp_client.create_beeswax_query("with %s" % args,
+                                                 self.set_query_options)
     # Set posix=True and add "'" to escaped quotes
     # to deal with escaped quotes in string literals
     lexer = shlex.shlex(query.query.lstrip(), posix=True)
@@ -761,34 +762,39 @@ class ImpalaShell(cmd.Cmd):
 
   def do_use(self, args):
     """Executes a USE... query"""
-    result = self._execute_stmt(self.imp_client.create_beeswax_query("use %s" % args,
-                                                                      self.set_query_options))
-    if result: self.current_db = args
-    return result
+    query = self.imp_client.create_beeswax_query("use %s" % args,
+                                                 self.set_query_options)
+    if self._execute_stmt(query) is CmdStatus.SUCCESS:
+      self.current_db = args
+    else:
+      return CmdStatus.ERROR
 
   def do_show(self, args):
     """Executes a SHOW... query, fetching all rows"""
-    return self._execute_stmt(self.imp_client.create_beeswax_query("show %s" % args,
-                                                                    self.set_query_options))
+    query = self.imp_client.create_beeswax_query("show %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query)
 
   def do_describe(self, args):
     """Executes a DESCRIBE... query, fetching all rows"""
-    return self._execute_stmt(self.imp_client.create_beeswax_query("describe %s" % args,
-                                                                    self.set_query_options))
+    query = self.imp_client.create_beeswax_query("describe %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query)
 
   def do_desc(self, args):
     return self.do_describe(args)
 
   def do_insert(self, args):
     """Executes an INSERT query"""
-    return self._execute_stmt(self.imp_client.create_beeswax_query("insert %s" % args,
-                                                                    self.set_query_options),
-        is_insert=True)
+    query = self.imp_client.create_beeswax_query("insert %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query, is_insert=True)
 
   def do_explain(self, args):
     """Explain the query execution plan"""
-    return self._execute_stmt(self.imp_client.create_beeswax_query("explain %s" % args,
-                                                                    self.set_query_options))
+    query = self.imp_client.create_beeswax_query("explain %s" % args,
+                                                 self.set_query_options)
+    return self._execute_stmt(query)
 
   def do_history(self, args):
     """Display command history"""
@@ -801,7 +807,6 @@ class ImpalaShell(cmd.Cmd):
     else:
       print_to_stderr("The readline module was either not found or disabled. Command "
                       "history will not be collected.")
-    return True
 
   def preloop(self):
     """Load the history file if it exists"""
@@ -830,18 +835,16 @@ class ImpalaShell(cmd.Cmd):
         self._disable_readline()
 
   def default(self, args):
-    return self._execute_stmt(self.imp_client.create_beeswax_query(args,
-                                                                    self.set_query_options))
+    query = self.imp_client.create_beeswax_query(args, self.set_query_options)
+    return self._execute_stmt(query)
 
   def emptyline(self):
     """If an empty line is entered, do nothing"""
-    return True
 
   def do_version(self, args):
     """Prints the Impala build version"""
     print_to_stderr("Shell version: %s" % VERSION_STRING)
     print_to_stderr("Server version: %s" % self.server_version)
-    return True
 
   def completenames(self, text, *ignored):
     """Make tab completion of commands case agnostic
@@ -902,7 +905,8 @@ def execute_queries_non_interactive_mode(options):
   for query in queries:
     sanitized_queries.append(shell.sanitise_input(query, interactive=False))
   for query in sanitized_queries:
-    if not shell.onecmd(query):
+    # check if an error was encountered
+    if shell.onecmd(query) is CmdStatus.ERROR:
       print_to_stderr('Could not execute command: %s' % query)
       if not options.ignore_query_failure:
         sys.exit(1)
@@ -1008,9 +1012,20 @@ if __name__ == "__main__":
         shell.imp_client.connected = False
         shell.prompt = shell.DISCONNECTED_PROMPT
     except DisconnectedException, e:
+      # the client has lost the connection
       print_to_stderr(e)
       shell.imp_client.connected = False
       shell.prompt = shell.DISCONNECTED_PROMPT
+    except QueryStateException, e:
+      # an exception occurred while executing the query
+      if shell._no_cancellation_error(e):
+        shell.imp_client.close_query(shell.last_query_handle,
+                                     shell.query_handle_closed)
+        print_to_stderr(e)
     except RPCException, e:
+      # could not complete the rpc successfully
+      # suppress error if reason is cancellation
       if shell._no_cancellation_error(e):
         print_to_stderr(e)
+    finally:
+      intro = ''
