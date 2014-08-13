@@ -37,6 +37,8 @@
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
     <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>
     <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
+    <!-- Impala does not currently support the Hive .13 JDBC driver -->
+    <hive-jdbc.version>0.12.0-cdh5.1.0</hive-jdbc.version>
   </properties>
 
   <dependencies>
@@ -211,8 +213,10 @@
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-jdbc</artifactId>
-      <version>${hive.version}</version>
+      <version>${hive-jdbc.version}</version>
+      <scope>test</scope>
     </dependency>
+
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-metastore</artifactId>
@@ -399,6 +403,7 @@
             </goals>
             <configuration>
               <excludeTypes>pom</excludeTypes>
+              <includeScope>runtime</includeScope>
             </configuration>
           </execution>
         </executions>

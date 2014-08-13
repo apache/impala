@@ -219,7 +219,6 @@ mvn install -DskipTests
 
 # build frontend and copy dependencies
 cd ${IMPALA_FE_DIR}
-mvn dependency:copy-dependencies
 mvn package -DskipTests=true
 
 # Build the shell tarball
