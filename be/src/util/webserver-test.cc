@@ -35,6 +35,9 @@ using namespace strings;
 const string TEST_ARG = "test-arg";
 const string SALUTATION_KEY = "Salutation";
 const string SALUTATION_VALUE = "Hello!";
+const string TO_ESCAPE_KEY = "ToEscape";
+const string TO_ESCAPE_VALUE = "<script language='javascript'>";
+const string ESCAPED_VALUE = "&lt;script language=&apos;javascript&apos;&gt;";
 
 // Adapted from:
 // http://stackoverflow.com/questions/10982717/get-html-without-header-with-boostasio
@@ -111,21 +114,31 @@ TEST(Webserver, ArgsTest) {
   ASSERT_TRUE(success) << "Did not find " << TEST_ARG;
 }
 
-void JsonCallback(const Webserver::ArgumentMap& args, Document* document) {
+void JsonCallback(bool always_text, const Webserver::ArgumentMap& args,
+    Document* document) {
   document->AddMember(SALUTATION_KEY.c_str(), SALUTATION_VALUE.c_str(),
       document->GetAllocator());
+  document->AddMember(TO_ESCAPE_KEY.c_str(), TO_ESCAPE_VALUE.c_str(),
+      document->GetAllocator());
+  if (always_text) {
+    document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
+  }
 }
 
 TEST(Webserver, JsonTest) {
   Webserver webserver(FLAGS_webserver_port);
 
   const string JSON_TEST_PATH = "/json-test";
+  const string RAW_TEXT_PATH = "/text";
   const string NO_TEMPLATE_PATH = "/no-template";
-  Webserver::UrlCallback callback = bind<void>(JsonCallback, _1, _2);
+  Webserver::UrlCallback callback = bind<void>(JsonCallback, false, _1, _2);
   webserver.RegisterUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback);
   webserver.RegisterUrlCallback(NO_TEMPLATE_PATH, "doesnt-exist.tmpl", callback);
 
+  Webserver::UrlCallback text_callback = bind<void>(JsonCallback, true, _1, _2);
+  webserver.RegisterUrlCallback(RAW_TEXT_PATH, "json-test.tmpl", text_callback);
   ASSERT_TRUE(webserver.Start().ok());
+
   stringstream contents;
   ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents).ok());
   ASSERT_TRUE(contents.str().find(SALUTATION_VALUE) != string::npos);
@@ -140,6 +153,31 @@ TEST(Webserver, JsonTest) {
   ASSERT_TRUE(
       HttpGet("localhost", FLAGS_webserver_port, NO_TEMPLATE_PATH, &error_contents).ok());
   ASSERT_TRUE(error_contents.str().find("Could not open template: ") != string::npos);
+
+  // Adding ?raw should send text
+  stringstream raw_contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
+          Substitute("$0?raw", JSON_TEST_PATH), &raw_contents).ok());
+  ASSERT_TRUE(raw_contents.str().find("text/plain") != string::npos);
+
+  // Any callback that includes ENABLE_RAW_JSON_KEY should always return text.
+  stringstream raw_cb_contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, RAW_TEXT_PATH,
+      &raw_cb_contents).ok());
+  ASSERT_TRUE(raw_cb_contents.str().find("text/plain") != string::npos);
+}
+
+TEST(Webserver, EscapingTest) {
+  Webserver webserver(FLAGS_webserver_port);
+
+  const string JSON_TEST_PATH = "/json-test";
+  Webserver::UrlCallback callback = bind<void>(JsonCallback, false, _1, _2);
+  webserver.RegisterUrlCallback(JSON_TEST_PATH, "json-test.tmpl", callback);
+  ASSERT_TRUE(webserver.Start().ok());
+  stringstream contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents).ok());
+  ASSERT_TRUE(contents.str().find(ESCAPED_VALUE) != string::npos);
+  ASSERT_TRUE(contents.str().find(TO_ESCAPE_VALUE) == string::npos);
 }
 
 TEST(Webserver, StartWithPasswordFileTest) {
