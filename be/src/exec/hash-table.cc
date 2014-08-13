@@ -672,11 +672,11 @@ void HashTable::ResizeBuckets(int64_t num_buckets) {
     Bucket* bucket = &buckets_[i];
     Bucket* sister_bucket = &buckets_[i + old_num_buckets];
     Node* last_node = NULL;
-    Node* node = bucket->node_;
+    Node* node = bucket->node;
 
     while (node != NULL) {
-      Node* next = node->next_;
-      uint32_t hash = node->hash_;
+      Node* next = node->next;
+      uint32_t hash = node->hash;
 
       bool node_must_move;
       Bucket* move_to;
@@ -719,22 +719,27 @@ void HashTable::MemLimitExceeded(int64_t allocation_size) {
   if (state_ != NULL) state_->SetMemLimitExceeded(mem_tracker_, allocation_size);
 }
 
-string HashTable::DebugString(bool skip_empty, const RowDescriptor* desc) {
+string HashTable::DebugString(bool skip_empty, bool show_match,
+    const RowDescriptor* desc) {
   stringstream ss;
   ss << endl;
   for (int i = 0; i < buckets_.size(); ++i) {
-    Node* node = buckets_[i].node_;
+    Node* node = buckets_[i].node;
     bool first = true;
     if (skip_empty && node == NULL) continue;
     ss << i << ": ";
     while (node != NULL) {
       if (!first) ss << ",";
-      if (desc == NULL) {
-        ss << node << "(" << node->data_ << ")";
-      } else {
-        ss << node->data_ << " " << PrintRow(GetRow(node), *desc);
+      ss << node << "(" << node->data << ")";
+      if (desc != NULL) ss << " " << PrintRow(GetRow(node), *desc);
+      if (show_match) {
+        if (node->matched) {
+          ss << " [M]";
+        } else {
+          ss << " [U]";
+        }
       }
-      node = node->next_;
+      node = node->next;
       first = false;
     }
     ss << endl;

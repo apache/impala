@@ -69,9 +69,14 @@ class BlockingJoinNode : public ExecNode {
   // does not initialize all tuple ptrs in the row, only the ones that it
   // is responsible for.
   boost::scoped_ptr<RowBatch> probe_batch_;
-  int probe_batch_pos_;  // current scan pos in probe_batch_
+
   bool probe_side_eos_;  // if true, left child has no more rows to process
-  TupleRow* current_probe_row_;
+
+  // TODO: These variables should move to a join control block struct, which is local to
+  // each probing thread.
+  int probe_batch_pos_;  // current scan pos in probe_batch_
+  TupleRow* current_probe_row_;  // The row currently being probed
+  bool matched_probe_;  // if true, the current probe row is matched
 
   // Size of the TupleRow (just the Tuple ptrs) from the build (right) and probe (left)
   // sides.

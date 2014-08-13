@@ -112,13 +112,15 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   // input (while repartitioning) or to contain the hash table.
   int num_reserved_buffers = PARTITION_FANOUT + 1;
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
-      num_reserved_buffers, join_node_mem_tracker(), &client_));
+      num_reserved_buffers, join_node_mem_tracker(), &block_mgr_client_));
 
   // Construct the dummy hash table used to evaluate hashes of rows.
   // TODO: this is obviously not the right abstraction. We need a Hash utility class of
   // some kind.
+  bool should_store_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
+      join_op_ == TJoinOp::FULL_OUTER_JOIN;
   hash_tbl_.reset(new HashTable(state, build_expr_ctxs_, probe_expr_ctxs_,
-      child(1)->row_desc().tuple_descriptors().size(), false, false,
+      child(1)->row_desc().tuple_descriptors().size(), should_store_nulls, false,
       state->fragment_hash_seed(), mem_tracker()));
   return Status::OK;
 }
@@ -146,9 +148,11 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
     is_closed_(false),
     level_(level),
     build_rows_(new BufferedTupleStream(
-        state, parent_->child(1)->row_desc(), state->block_mgr(), parent_->client_)),
+        state, parent_->child(1)->row_desc(), state->block_mgr(),
+        parent_->block_mgr_client_)),
     probe_rows_(new BufferedTupleStream(
-        state, parent_->child(0)->row_desc(), state->block_mgr(), parent_->client_)) {
+        state, parent_->child(0)->row_desc(),
+        state->block_mgr(), parent_->block_mgr_client_)) {
 }
 
 PartitionedHashJoinNode::Partition::~Partition() {
@@ -181,9 +185,12 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
   if (!*built) return Status::OK;
   RETURN_IF_ERROR(build_rows_->PrepareForRead());
 
+  bool should_store_nulls = parent_->join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
+      parent_->join_op_ == TJoinOp::FULL_OUTER_JOIN;
   hash_tbl_.reset(new HashTable(state, parent_->build_expr_ctxs_,
       parent_->probe_expr_ctxs_, parent_->child(1)->row_desc().tuple_descriptors().size(),
-      false, false, state->fragment_hash_seed(), parent_->join_node_mem_tracker()));
+      should_store_nulls, false, state->fragment_hash_seed(),
+      parent_->join_node_mem_tracker()));
 
   bool eos = false;
   RowBatch batch(parent_->child(1)->row_desc(), state->batch_size(),
@@ -242,7 +249,7 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
   // Do a full scan of child(1) and partition the rows.
   RETURN_IF_ERROR(child(1)->Open(state));
   RETURN_IF_ERROR(ProcessBuildInput(state));
-  UpdateState(PROCESSING_LEFT_CHILD);
+  UpdateState(PROCESSING_PROBE);
   return Status::OK;
 }
 
@@ -276,20 +283,21 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state) {
 
 Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch, int level) {
   for (int i = 0; i < build_batch->num_rows(); ++i) {
-    TupleRow* row = build_batch->GetRow(i);
+    TupleRow* build_row = build_batch->GetRow(i);
     uint32_t hash;
     // TODO: plumb level through when we change the hashing interface. We need different
     // hash functions.
-    if (!hash_tbl_->EvalAndHashBuild(row, &hash)) continue;
+    if (!hash_tbl_->EvalAndHashBuild(build_row, &hash)) continue;
     Partition* partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
     // TODO: Should we maintain a histogram with the size of each partition?
-    bool result = AppendRow(partition->build_rows(), row);
+    bool result = AppendRow(partition->build_rows(), build_row);
     if (UNLIKELY(!result)) return status_;
   }
   return Status::OK;
 }
 
-inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream, TupleRow* row) {
+inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream,
+    TupleRow* row) {
   if (LIKELY(stream->AddRow(row))) return true;
   status_ = stream->status();
   if (!status_.ok()) return false;
@@ -305,20 +313,13 @@ inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream, Tupl
 }
 
 Status PartitionedHashJoinNode::InitGetNext(TupleRow* first_probe_row) {
-  if (first_probe_row == NULL) return Status::OK;
-  uint32_t hash;
-  if (!hash_tbl_->EvalAndHashProbe(first_probe_row, &hash)) return Status::OK;
-  Partition* partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
-  if (partition->hash_tbl() == NULL) {
-    // This partition is not in memory, spill the probe row.
-    AppendRow(partition->probe_rows(), first_probe_row);
-  } else {
-    hash_tbl_iterator_= partition->hash_tbl()->Find(first_probe_row);
-  }
-  return status_;
+  // TODO: Move this reset to blocking-join. Not yet though because of hash-join.
+  probe_batch_pos_ = 0;
+  matched_probe_ = true;
+  return Status::OK;
 }
 
-Status PartitionedHashJoinNode::NextLeftChildRowBatch(
+Status PartitionedHashJoinNode::NextProbeRowBatch(
     RuntimeState* state, RowBatch* out_batch) {
   DCHECK_EQ(probe_batch_pos_, probe_batch_->num_rows());
   while (true) {
@@ -326,6 +327,7 @@ Status PartitionedHashJoinNode::NextLeftChildRowBatch(
     if (UNLIKELY(probe_batch_pos_ == probe_batch_->num_rows())) {
       probe_batch_->TransferResourceOwnership(out_batch);
       probe_batch_pos_ = 0;
+      matched_probe_ = true;
       if (probe_side_eos_) break;
       RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
       continue;
@@ -337,7 +339,7 @@ Status PartitionedHashJoinNode::NextLeftChildRowBatch(
   return Status::OK;
 }
 
-Status PartitionedHashJoinNode::NextSpilledRowBatch(
+Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
     RuntimeState* state, RowBatch* out_batch) {
   DCHECK(input_partition_ != NULL);
   BufferedTupleStream* probe_rows = input_partition_->probe_rows();
@@ -345,13 +347,24 @@ Status PartitionedHashJoinNode::NextSpilledRowBatch(
     // Common case, continue from the current probe stream.
     probe_batch_->TransferResourceOwnership(out_batch);
     probe_batch_pos_ = 0;
+    matched_probe_ = true;
     bool eos = false;
     RETURN_IF_ERROR(input_partition_->probe_rows()->GetNext(probe_batch_.get(), &eos));
     DCHECK_GT(probe_batch_->num_rows(), 0);
   } else {
-    // Done with this partition, close it.
-    input_partition_->Close();
-    input_partition_ = NULL;
+    // Done with this partition.
+    if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
+      // In case of right-outer or full-outer joins, we move this partition to the list
+      // of partitions that we need to output their unmatched build rows.
+      DCHECK(output_build_partitions_.empty());
+      DCHECK(input_partition_->hash_tbl_.get() != NULL);
+      hash_tbl_iterator_ = input_partition_->hash_tbl_->FirstUnmatched();
+      output_build_partitions_.push_back(input_partition_);
+    } else {
+      // In any other case, just close the input partition.
+      input_partition_->Close();
+      input_partition_ = NULL;
+    }
     current_probe_row_ = NULL;
     probe_batch_pos_ = -1;
   }
@@ -393,25 +406,62 @@ template<int const JoinOp>
 Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
   ExprContext* const* other_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
   int num_other_conjuncts = other_join_conjunct_ctxs_.size();
+  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
+  int num_conjuncts = conjunct_ctxs_.size();
 
   int num_rows_added = 0;
   while (probe_batch_pos_ >= 0) {
-    if (JoinOp != TJoinOp::LEFT_ANTI_JOIN) {
-      while (!hash_tbl_iterator_.AtEnd()) {
-        DCHECK(current_probe_row_ != NULL);
-        TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
+    while (!hash_tbl_iterator_.AtEnd()) {
+      DCHECK(current_probe_row_ != NULL);
+      TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
+      int idx = out_batch->AddRow();
+      TupleRow* out_row = out_batch->GetRow(idx);
+      CreateOutputRow(out_row, current_probe_row_, matched_build_row);
+
+      if (!ExecNode::EvalConjuncts(other_conjunct_ctxs, num_other_conjuncts, out_row)) {
         hash_tbl_iterator_.Next<true>();
-        int idx = out_batch->AddRow();
-        TupleRow* out_row = out_batch->GetRow(idx);
-        CreateOutputRow(out_row, current_probe_row_, matched_build_row);
+        continue;
+      }
 
-        if (JoinOp == TJoinOp::LEFT_SEMI_JOIN) hash_tbl_iterator_ = hash_tbl_->End();
+      // At this point the probe is considered matched.
+      matched_probe_ = true;
+      if (JoinOp == TJoinOp::LEFT_ANTI_JOIN) {
+        // In this case we can safely ignore this probe row for {left anti, left outer,
+        // full outer} joins.
+        break;
+      }
+      if (JoinOp == TJoinOp::RIGHT_OUTER_JOIN || JoinOp == TJoinOp::FULL_OUTER_JOIN) {
+        // There is a match for this row, mark it as matched in case of right-outer and
+        // full-outer joins.
+        hash_tbl_iterator_.set_matched(true);
+      }
+      if (JoinOp == TJoinOp::LEFT_SEMI_JOIN) {
+        hash_tbl_iterator_ = hash_tbl_->End();
+      } else {
+        hash_tbl_iterator_.Next<true>();
+      }
 
-        if (ExecNode::EvalConjuncts(other_conjunct_ctxs, num_other_conjuncts, out_row)) {
-          out_batch->CommitLastRow();
-          ++num_rows_added;
-          if (out_batch->AtCapacity()) goto end;
-        }
+      if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+        out_batch->CommitLastRow();
+        ++num_rows_added;
+        if (out_batch->AtCapacity()) goto end;
+      }
+    }
+
+    if ((JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_OUTER_JOIN ||
+         JoinOp == TJoinOp::FULL_OUTER_JOIN) &&
+        !matched_probe_) {
+      // No match for this row, we need to output it in the case of anti, left-outer and
+      // full-outer joins.
+      int idx = out_batch->AddRow();
+      TupleRow* out_row = out_batch->GetRow(idx);
+      CreateOutputRow(out_row, current_probe_row_, NULL);
+      if (ExecNode::EvalConjuncts(other_conjunct_ctxs, num_other_conjuncts, out_row) &&
+          ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+        out_batch->CommitLastRow();
+        ++num_rows_added;
+        matched_probe_ = true;
+        if (out_batch->AtCapacity()) goto end;
       }
     }
 
@@ -423,6 +473,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
 
     // Establish current_probe_row_ and find its corresponding partition.
     current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+    matched_probe_ = false;
     Partition* partition = NULL;
     if (input_partition_ != NULL) {
       // We are probing a row from a spilled partition, no need to hash to find
@@ -439,7 +490,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
     if (partition->hash_tbl() == NULL) {
       if (partition->is_closed()) {
         // This partition is closed, meaning the build side for this partition was empty.
-        DCHECK_EQ(state_, PROCESSING_LEFT_CHILD);
+        DCHECK_EQ(state_, PROCESSING_PROBE);
         continue;
       }
       // This partition is not in memory, spill the probe row.
@@ -448,21 +499,8 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
       }
     } else {
       // Perform the actual probe in the hash table for the current probe (left) row.
-      // TODO: At this point it would be good to do some prefetching
+      // TODO: At this point it would be good to do some prefetching.
       hash_tbl_iterator_= partition->hash_tbl()->Find(current_probe_row_);
-      if ((JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_OUTER_JOIN) &&
-          hash_tbl_iterator_.AtEnd()) {
-        // No match for this row, we need to output it in the case of anti or left-outer
-        // joins.
-        int idx = out_batch->AddRow();
-        TupleRow* out_row = out_batch->GetRow(idx);
-        CreateOutputRow(out_row, current_probe_row_, NULL);
-        if (ExecNode::EvalConjuncts(other_conjunct_ctxs, num_other_conjuncts, out_row)) {
-          out_batch->CommitLastRow();
-          ++num_rows_added;
-          if (out_batch->AtCapacity()) goto end;
-        }
-      }
     }
   }
 
@@ -480,6 +518,22 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     DCHECK_NE(state_, PARTITIONING_BUILD) << "Should not be in GetNext()";
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(state->CheckQueryState());
+
+    if ((join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) &&
+        !output_build_partitions_.empty())  {
+      // In case of right-outer and full-outer joins, flush the remaining unmatched build
+      // rows of any partition we are done processing, before processing the next batch.
+      RETURN_IF_ERROR(OutputUnmatchedBuild(out_batch));
+      if (!output_build_partitions_.empty()) break;
+
+      // Finished to output unmatched build rows, move to next partition.
+      DCHECK(hash_partitions_.empty());
+      RETURN_IF_ERROR(PrepareNextPartition(state));
+      if (input_partition_ == NULL) {
+        *eos = true;
+        break;
+      }
+    }
 
     // Finish up the current batch.
     switch (join_op_) {
@@ -512,17 +566,22 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
 
     // Try to continue from the current probe side input.
     if (input_partition_ == NULL) {
-      RETURN_IF_ERROR(NextLeftChildRowBatch(state, out_batch));
+      RETURN_IF_ERROR(NextProbeRowBatch(state, out_batch));
     } else {
-      RETURN_IF_ERROR(NextSpilledRowBatch(state, out_batch));
+      RETURN_IF_ERROR(NextSpilledProbeRowBatch(state, out_batch));
     }
 
     // Got a batch, just keep going.
     if (probe_batch_pos_ == 0) continue;
     DCHECK_EQ(probe_batch_pos_, -1);
+
     // Finished up all probe rows for hash_partitions_.
     RETURN_IF_ERROR(CleanUpHashPartitions());
-
+    if ((join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) &&
+        !output_build_partitions_.empty()) {
+      // There are some partitions that need to flush their unmatched build rows.
+      break;
+    }
     // Move onto the next partition.
     RETURN_IF_ERROR(PrepareNextPartition(state));
     if (input_partition_ == NULL) {
@@ -532,6 +591,47 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
   }
 
   if (ReachedLimit()) *eos = true;
+  return Status::OK;
+}
+
+Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
+  DCHECK(join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
+  DCHECK(!output_build_partitions_.empty());
+  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
+  int num_conjuncts = conjunct_ctxs_.size();
+  int num_rows_added = 0;
+
+  while (!out_batch->AtCapacity() && !hash_tbl_iterator_.AtEnd()) {
+    // Output remaining unmatched build rows.
+    DCHECK(!hash_tbl_iterator_.matched());
+    TupleRow* build_row = hash_tbl_iterator_.GetRow();
+    int row_idx = out_batch->AddRow();
+    TupleRow* out_row = out_batch->GetRow(row_idx);
+    CreateOutputRow(out_row, NULL, build_row);
+    if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+      out_batch->CommitLastRow();
+      ++num_rows_added;
+    }
+    // Move to the next unmatched entry
+    hash_tbl_iterator_.NextUnmatched();
+  }
+
+  // If we reached the end of the hash table, then there are no other unmatched build
+  // rows for this partition. In that case we need to close the partition, and move to the
+  // next. If we have not reached the end of the hash table, it means that we reached
+  // out_batch capacity and we need to continue to output unmatched build rows, without
+  // closing the partition.
+  if (hash_tbl_iterator_.AtEnd()) {
+    output_build_partitions_.front()->Close();
+    output_build_partitions_.pop_front();
+    // Move to the next partition to output unmatched rows.
+    if (!output_build_partitions_.empty()) {
+      hash_tbl_iterator_ = output_build_partitions_.front()->hash_tbl_->FirstUnmatched();
+    }
+  }
+
+  num_rows_returned_ += num_rows_added;
+  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK;
 }
 
@@ -594,10 +694,15 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
 
 Status PartitionedHashJoinNode::CleanUpHashPartitions() {
   DCHECK_EQ(probe_batch_pos_, -1);
-  // At this point all the rows have been read from the the probe side for all
-  // partitions in hash_partitions_.
+  // At this point all the rows have been read from the probe side for all partitions in
+  // hash_partitions_.
   LOG(ERROR) << "Probe Side Consumed\n" << DebugString();
+
   // Walk the partitions that had hash tables built for the probe phase and close them.
+  // In the case of right outer and full outer joins, instead of closing those partitions,
+  // add them to the list of partitions that need to output any unmatched build rows.
+  // Thise partition will be closed by the function that actually outputs unmatched build
+  // rows.
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     if (hash_partitions_[i]->is_closed()) continue;
     if (hash_partitions_[i]->hash_tbl() == NULL) {
@@ -607,7 +712,14 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions() {
     } else {
       DCHECK_EQ(hash_partitions_[i]->probe_rows()->num_rows(), 0)
         << "No probe rows should have been spilled for this partition.";
-      hash_partitions_[i]->Close();
+      if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
+        if (output_build_partitions_.empty()) {
+          hash_tbl_iterator_ = hash_partitions_[i]->hash_tbl_->FirstUnmatched();
+        }
+        output_build_partitions_.push_back(hash_partitions_[i]);
+      } else {
+        hash_partitions_[i]->Close();
+      }
     }
   }
   hash_partitions_.clear();
@@ -632,7 +744,7 @@ void PartitionedHashJoinNode::UpdateState(State s) {
 string PartitionedHashJoinNode::PrintState() const {
   switch (state_) {
     case PARTITIONING_BUILD: return "PartitioningBuild";
-    case PROCESSING_LEFT_CHILD: return "ProcessingLeftChild";
+    case PROCESSING_PROBE: return "ProcessingProbe";
     case PROBING_SPILLED_PARTITION: return "ProbingSpilledPartitions";
     case REPARTITIONING: return "Repartioning";
     default: DCHECK(false);
@@ -653,12 +765,12 @@ string PartitionedHashJoinNode::DebugString() const {
       continue;
     }
     ss << endl
-       << "   Spilled Build Rows: "
+       << "   (Spilled) Build Rows: "
        << hash_partitions_[i]->build_rows()->num_rows() << endl;
     if (hash_partitions_[i]->hash_tbl() != NULL) {
       ss << "   Hash Table Rows: " << hash_partitions_[i]->hash_tbl()->size() << endl;
     }
-    ss << "   Spilled Probe Rows: "
+    ss << "   (Spilled) Probe Rows: "
        << hash_partitions_[i]->probe_rows()->num_rows() << endl;
   }
   return ss.str();

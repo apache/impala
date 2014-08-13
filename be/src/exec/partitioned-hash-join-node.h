@@ -86,18 +86,18 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   //      side need to be partitioned and we just perform the join.
   //
   // States:
-  // The transition goes from PARTITIONING_BUILD -> PROCESSING_LEFT_CHILD ->
+  // The transition goes from PARTITIONING_BUILD -> PROCESSING_PROBE ->
   //    PROBING_SPILLED_PARTITION/REPARTITIONING.
   // The last two steps will switch back and forth as many times as we need to
   // repartition.
   enum State {
-    // Partitioning the build child's input. Corresponds to mode 1 above but
+    // Partitioning the build (right) child's input. Corresponds to mode 1 above but
     // only when consuming from child(1).
     PARTITIONING_BUILD,
 
-    // Processing the left child input. Corresponds to mode 2 but only when consuming
-    // child(0).
-    PROCESSING_LEFT_CHILD,
+    // Processing the probe (left) child's input. Corresponds to mode 2 above but
+    // only when consuming from child(0).
+    PROCESSING_PROBE,
 
     // Probing a spilled partition. The hash table for this partition fits in memory.
     // Corresponds to mode 3.
@@ -141,9 +141,18 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // structures.
   Status BuildHashTables(RuntimeState* state);
 
+  // Sweep the hash_tbl_ of the partition that it is in the front of
+  // flush_build_partitions_, using hash_tbl_iterator_ and output any unmatched build
+  // rows. If reaches the end of the hash table it closes that partition, removes it from
+  // flush_build_partitions_ and moves hash_tbl_iterator_ to the beginning of the
+  // partition in the front of flush_build_partitions_.
+  Status OutputUnmatchedBuild(RowBatch* out_batch);
+
   // Call at the end of consuming the probe rows. Walks hash_partitions_ and
   //  - If this partition had a hash table, close it. This partition is fully processed
   //    on both the build and probe sides.
+  //    In the case of right-outer and full-outer joins, instead of closing this partition
+  //    we put it on a list of partitions that we need to flush their unmatched rows.
   //  - If this partition did not have a hash table, meaning both sides were spilled,
   //    move the partition to spilled_partitions_.
   Status CleanUpHashPartitions();
@@ -153,14 +162,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   template<int const JoinOp>
   Status ProcessProbeBatch(RowBatch* out_batch);
 
-  // Get the next row batch from child(0). If we are done consuming the input,
-  // sets probe_batch_pos_ to -1, otherwise, sets it to 0.
-  Status NextLeftChildRowBatch(RuntimeState*, RowBatch* out_batch);
+  // Get the next row batch from the probe (left) side (child(0)). If we are done
+  // consuming the input, sets probe_batch_pos_ to -1, otherwise, sets it to 0.
+  Status NextProbeRowBatch(RuntimeState*, RowBatch* out_batch);
 
-  // Get the next row batch from input_partition_.
-  // If we are done consuming the input, sets probe_batch_pos_ to -1,
-  // otherwise, sets it to 0.
-  Status NextSpilledRowBatch(RuntimeState*, RowBatch* out_batch);
+  // Get the next probe row batch from input_partition_. If we are done consuming the
+  // input, sets probe_batch_pos_ to -1, otherwise, sets it to 0.
+  Status NextSpilledProbeRowBatch(RuntimeState*, RowBatch* out_batch);
 
   // Moves onto the next spilled partition and initializes input_partition_. This
   // function processes the entire build side of input_partition_ and when this function
@@ -195,7 +203,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   boost::scoped_ptr<MemTracker> join_node_mem_tracker_;
 
   // Client to the buffered block mgr.
-  BufferedBlockMgr::Client* client_;
+  BufferedBlockMgr::Client* block_mgr_client_;
 
   // TODO: this has to go. This is only used to hash the current row to figure out
   // which partition the row belongs to (and then uses the hash table in that partition).
@@ -269,6 +277,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // This partition can either serve as the source for a repartitioning step, or
   // if the hash table fits in memory, the source of the probe rows.
   Partition* input_partition_;
+
+  // In the case of right-outer and full-outer joins, this is the list of the partitions
+  // that we need to output their unmatched build rows. We always flush the unmatched
+  // rows of the partition that it is in the front.
+  std::list<Partition*> output_build_partitions_;
 };
 
 }

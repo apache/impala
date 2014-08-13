@@ -86,7 +86,6 @@ class HashJoinNode : public BlockingJoinNode {
   // FULL_OUTER_JOIN.
   bool match_all_build_;
 
-  bool matched_probe_;  // if true, we have matched the current probe row
   // llvm function for build batch
   llvm::Function* codegen_process_build_batch_fn_;
 

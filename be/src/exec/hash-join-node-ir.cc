@@ -36,8 +36,6 @@ bool IR_NO_INLINE EvalOtherJoinConjuncts(
 
 // CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by
 // codegen.
-// TODO: Perhaps add templatization on the JoinOp in order to reduce the branches of the
-// generated code (for example the handling of left semi-joins and left outer-joins).
 int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
     int max_added_rows) {
   // This path does not handle full outer or right outer joins
@@ -121,4 +119,3 @@ void HashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
     hash_tbl_->Insert(build_batch->GetRow(i));
   }
 }
-

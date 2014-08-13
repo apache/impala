@@ -204,9 +204,13 @@ class HashTable {
   // but will have false positives.
   void AddBitmapFilters();
 
-  // Return beginning of hash table.  Advancing this iterator will traverse all
-  // elements.
+  // Returns an iterator at the beginning of the hash table.  Advancing this iterator
+  // will traverse all elements.
   Iterator Begin();
+
+  // Return an iterator pointing to the first element in the hash table that does not
+  // have its matched flag set. Used in right-outer and full-outer joins.
+  Iterator FirstUnmatched();
 
   // Returns end marker
   Iterator End() { return Iterator(); }
@@ -227,9 +231,10 @@ class HashTable {
   static const char* LLVM_CLASS_NAME;
 
   // Dump out the entire hash table to string.  If skip_empty, empty buckets are
-  // skipped.  If build_desc is non-null, the build rows will be output.  Otherwise
-  // just the build row addresses.
-  std::string DebugString(bool skip_empty, const RowDescriptor* build_desc);
+  // skipped.  If show_match, it also prints the matched flag of each node. If build_desc
+  // is non-null, the build rows will be output.  Otherwise just the build row addresses.
+  std::string DebugString(bool skip_empty, bool show_match,
+      const RowDescriptor* build_desc);
 
   // stl-like iterator interface.
   class Iterator {
@@ -243,28 +248,33 @@ class HashTable {
     template<bool check_match>
     void IR_ALWAYS_INLINE Next();
 
+    // Iterates to the next element that does not have its matched flag set. Returns false
+    // if it reaches the end of the table without finding an unmatched element. Used in
+    // right-outer and full-outer joins.
+    bool NextUnmatched();
+
     // Returns the current row. Callers must check the iterator is not AtEnd() before
     // calling GetRow().
     TupleRow* GetRow() {
       DCHECK(!AtEnd());
       DCHECK(!table_->stores_tuples_);
-      return reinterpret_cast<TupleRow*>(node_->data_);
+      return reinterpret_cast<TupleRow*>(node_->data);
     }
 
     Tuple* GetTuple() {
       DCHECK(!AtEnd());
       DCHECK(table_->stores_tuples_);
-      return reinterpret_cast<Tuple*>(node_->data_);
+      return reinterpret_cast<Tuple*>(node_->data);
     }
 
     void set_matched(bool v) {
       DCHECK(!AtEnd());
-      node_->matched_ = v;
+      node_->matched = v;
     }
 
     bool matched() const {
       DCHECK(!AtEnd());
-      return node_->matched_;
+      return node_->matched;
     }
 
     // Returns true if this iterator is at the end, i.e. GetRow() cannot be called.
@@ -286,11 +296,14 @@ class HashTable {
     }
 
     HashTable* table_;
+
     // Current bucket idx
     int64_t bucket_idx_;
+
     // Current node idx (within current bucket)
     Node* node_;
-    // cached hash value for the row passed to Find()()
+
+    // Cached hash value for the row passed to Find()
     uint32_t scan_hash_;
   };
 
@@ -306,16 +319,16 @@ class HashTable {
     // From an abstraction point of view, this is an awkward place to store this
     // information but it is very efficient here. This space is otherwise unused
     // (and we can bitpack this more in the future).
-    bool matched_;
+    bool matched;
 
-    uint32_t hash_;   // Cache of the hash for data_
-    Node* next_;      // chain to next node for collisions
-    void* data_;      // Either the Tuple* or TupleRow*
+    uint32_t hash;   // Cache of the hash for data_
+    Node* next;      // Chain to next node for collisions
+    void* data;      // Either the Tuple* or TupleRow*
   };
 
   struct Bucket {
-    Node* node_;
-    Bucket() : node_(NULL) { }
+    Node* node;
+    Bucket() : node(NULL) { }
   };
 
   // Returns the next non-empty bucket and updates idx to be the index of that bucket.
@@ -371,9 +384,9 @@ class HashTable {
 
   TupleRow* GetRow(Node* node) const {
     if (stores_tuples_) {
-      return reinterpret_cast<TupleRow*>(&node->data_);
+      return reinterpret_cast<TupleRow*>(&node->data);
     } else {
-      return reinterpret_cast<TupleRow*>(node->data_);
+      return reinterpret_cast<TupleRow*>(node->data);
     }
   }
 

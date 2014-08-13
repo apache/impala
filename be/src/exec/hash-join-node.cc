@@ -164,7 +164,7 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
     } else {
       process_build_batch_fn_(this, &build_batch);
     }
-    VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
+    VLOG_ROW << hash_tbl_->DebugString(true, false, &child(1)->row_desc());
 
     COUNTER_SET(build_row_counter_, hash_tbl_->size());
     COUNTER_SET(build_buckets_counter_, hash_tbl_->num_buckets());
