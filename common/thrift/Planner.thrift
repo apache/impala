@@ -58,7 +58,8 @@ struct TPlanFragment {
 
 // location information for a single scan range
 struct TScanRangeLocation {
-  1: required Types.TNetworkAddress server
+  // Index into TQueryExecRequest.host_list.
+  1: required i32 host_idx;
 
   // disk volume identifier of a particular scan range at 'server';
   // -1 indicates an unknown volume id;

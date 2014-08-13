@@ -59,8 +59,10 @@ import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.util.DisjointSet;
+import com.cloudera.impala.util.ListMap;
 import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -221,6 +223,10 @@ public class Analyzer {
 
     private final List<Pair<SlotId, SlotId>> registeredValueTransfers =
         Lists.newArrayList();
+
+    // Bidirectional map between Integer index and TNetworkAddress.
+    // Decreases the size of the scan range locations.
+    private final ListMap<TNetworkAddress> hostIndex = new ListMap<TNetworkAddress>();
 
     public GlobalState(ImpaladCatalog catalog, TQueryCtx queryCtx) {
       this.catalog = catalog;
@@ -1587,6 +1593,7 @@ public class Analyzer {
   public String getDefaultDb() { return globalState_.queryCtx.session.database; }
   public User getUser() { return user_; }
   public TQueryCtx getQueryCtx() { return globalState_.queryCtx; }
+  public ListMap<TNetworkAddress> getHostIndex() { return globalState_.hostIndex; }
 
   public ImmutableList<PrivilegeRequest> getPrivilegeReqs() {
     return ImmutableList.copyOf(globalState_.privilegeReqs);

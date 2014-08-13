@@ -23,6 +23,7 @@ import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
@@ -30,6 +31,9 @@ import com.google.common.collect.Lists;
  */
 abstract public class ScanNode extends PlanNode {
   protected final TupleDescriptor desc_;
+
+  // List of scan-range locations. Populated in init().
+  protected List<TScanRangeLocations> scanRanges_;
 
   public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
     super(id, desc.getId().asList(), displayName);
@@ -41,7 +45,10 @@ abstract public class ScanNode extends PlanNode {
   /**
    * Returns all scan ranges plus their locations.
    */
-  abstract public List<TScanRangeLocations> getScanRangeLocations();
+  public List<TScanRangeLocations> getScanRangeLocations() {
+    Preconditions.checkNotNull(scanRanges_, "Need to call init() first.");
+    return scanRanges_;
+  }
 
   @Override
   protected String debugString() {

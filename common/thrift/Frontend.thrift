@@ -312,6 +312,9 @@ struct TQueryExecRequest {
   // Estimated per-host CPU requirements in YARN virtual cores.
   // Used for resource management.
   11: optional i16 per_host_vcores
+
+  // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.
+  12: required list<Types.TNetworkAddress> host_list
 }
 
 enum TCatalogOpType {

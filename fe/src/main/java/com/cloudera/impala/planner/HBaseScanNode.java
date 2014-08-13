@@ -49,6 +49,7 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THBaseFilter;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THBaseScanNode;
+import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TQueryOptions;
@@ -101,9 +102,6 @@ public class HBaseScanNode extends ScanNode {
   // HBase config; Common across all object instance.
   private static Configuration hbaseConf_ = HBaseConfiguration.create();
 
-  // List of scan-range locations. Populated in init().
-  private List<TScanRangeLocations> scanRanges_;
-
   public HBaseScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc, "SCAN HBASE");
     desc_ = desc;
@@ -127,7 +125,7 @@ public class HBaseScanNode extends ScanNode {
     computeMemLayout(analyzer);
     computeStats(analyzer);
 
-    computeScanRangeLocations();
+    computeScanRangeLocations(analyzer);
   }
 
   /**
@@ -284,7 +282,7 @@ public class HBaseScanNode extends ScanNode {
    * relevant region, and the created TScanRange will contain all the relevant regions
    * of that region server.
    */
-  private void computeScanRangeLocations() {
+  private void computeScanRangeLocations(Analyzer analyzer) {
     scanRanges_ = Lists.newArrayList();
 
     // For empty scan node, return an empty list.
@@ -338,8 +336,9 @@ public class HBaseScanNode extends ScanNode {
           setKeyRangeEnd(keyRange, curRegEndKey);
 
           TScanRangeLocations scanRangeLocation = new TScanRangeLocations();
+          TNetworkAddress networkAddress = addressToTNetworkAddress(locEntry.getKey());
           scanRangeLocation.addToLocations(
-              new TScanRangeLocation(addressToTNetworkAddress(locEntry.getKey())));
+              new TScanRangeLocation(analyzer.getHostIndex().getIndex(networkAddress)));
           scanRanges_.add(scanRangeLocation);
 
           TScanRange scanRange = new TScanRange();
@@ -349,12 +348,6 @@ public class HBaseScanNode extends ScanNode {
         prevEndKey = curRegEndKey;
       }
     }
-  }
-
-  @Override
-  public List<TScanRangeLocations> getScanRangeLocations() {
-    Preconditions.checkNotNull(scanRanges_, "Need to call init() first.");
-    return scanRanges_;
   }
 
   /**

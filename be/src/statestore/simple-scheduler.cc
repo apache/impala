@@ -449,15 +449,16 @@ Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec
     FragmentScanRangeAssignment* assignment =
         &(*schedule->exec_params())[fragment_idx].scan_range_assignment;
     RETURN_IF_ERROR(ComputeScanRangeAssignment(
-        entry->first, entry->second, exec_at_coord, schedule->query_options(),
-        assignment));
+        entry->first, entry->second, exec_request.host_list, exec_at_coord,
+        schedule->query_options(), assignment));
     schedule->AddScanRanges(entry->second.size());
   }
   return Status::OK;
 }
 
 Status SimpleScheduler::ComputeScanRangeAssignment(
-    PlanNodeId node_id, const vector<TScanRangeLocations>& locations, bool exec_at_coord,
+    PlanNodeId node_id, const vector<TScanRangeLocations>& locations,
+    const vector<TNetworkAddress>& host_list, bool exec_at_coord,
     const TQueryOptions& query_options, FragmentScanRangeAssignment* assignment) {
   // If cached reads are enabled, we will always prefer cached replicas over non-cached
   // replicas. Since it is likely that only one replica is cached, this could generate
@@ -484,11 +485,13 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     int volume_id = -1;
     bool is_cached = false;
     BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
+      DCHECK_LT(location.host_idx, host_list.size());
+      const TNetworkAddress& replica_host = host_list[location.host_idx];
       // Deprioritize non-collocated datanodes by assigning a very high initial bytes
       uint64_t initial_bytes =
-          (!HasLocalBackend(location.server)) ? numeric_limits<int64_t>::max() : 0L;
+          !HasLocalBackend(replica_host) ? numeric_limits<int64_t>::max() : 0L;
       uint64_t* assigned_bytes =
-          FindOrInsert(&assigned_bytes_per_host, location.server, initial_bytes);
+          FindOrInsert(&assigned_bytes_per_host, replica_host, initial_bytes);
 
       // Adjust whether or not this replica should count as being cached based on
       // the query option and whether it is collocated. If the DN is not collocated
@@ -505,7 +508,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
       // a less busy host.
       if ((is_replica_cached && !is_cached) || *assigned_bytes < min_assigned_bytes) {
         min_assigned_bytes = *assigned_bytes;
-        data_host = &location.server;
+        data_host = &replica_host;
         volume_id = location.volume_id;
         is_cached = is_replica_cached;
       }

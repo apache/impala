@@ -42,6 +42,7 @@ import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.THdfsTable;
+import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TQueryCtx;
@@ -160,8 +161,10 @@ public class PlannerTest {
         }
         if (locations.scan_range.isSetHbase_key_range()) {
           THBaseKeyRange keyRange = locations.scan_range.getHbase_key_range();
+          Integer hostIdx = locations.locations.get(0).host_idx;
+          TNetworkAddress networkAddress = execRequest.getHost_list().get(hostIdx);
           result.append("HBASE KEYRANGE ");
-          result.append("port=" + locations.locations.get(0).server.port+" ");
+          result.append("port=" + networkAddress.port + " ");
           if (keyRange.isSetStartKey()) {
             result.append(HBaseScanNode.printKey(keyRange.getStartKey().getBytes()));
           } else {

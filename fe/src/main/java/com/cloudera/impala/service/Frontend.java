@@ -782,6 +782,7 @@ public class Frontend {
         tablesMissingStats.add(scanNode.getTupleDesc().getTableName().toThrift());
       }
     }
+    queryExecRequest.setHost_list(analysisResult.getAnalyzer().getHostIndex().getList());
     for (TTableName tableName: tablesMissingStats) {
       queryCtx.addToTables_missing_stats(tableName);
     }
