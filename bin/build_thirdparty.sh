@@ -130,7 +130,7 @@ if [ $BUILD_ALL -eq 1 ] || [ $BUILD_THRIFT -eq 1 ]; then
     ./configure --with-pic --prefix=${THRIFT_HOME} \
     --with-php=no --with-java=no --with-perl=no --with-erlang=no \
     --with-ruby=no --with-haskell=no --with-erlang=no --with-d=no \
-    --with-qt4=no --with-libevent=no ${PIC_LIB_OPTIONS:-}
+    --with-go=no --with-qt4=no --with-libevent=no ${PIC_LIB_OPTIONS:-}
   make # Make with -j fails
   make install
   cd ${THRIFT_SRC_DIR}/contrib/fb303
@@ -138,7 +138,7 @@ if [ $BUILD_ALL -eq 1 ] || [ $BUILD_THRIFT -eq 1 ]; then
   ./bootstrap.sh
   chmod 755 configure
   CPPFLAGS="-I${THRIFT_HOME}/include" PY_PREFIX=${THRIFT_HOME}/python ./configure \
-    --prefix=${THRIFT_HOME} --with-thriftpath=${THRIFT_HOME}
+    --with-java=no --with-php=no --prefix=${THRIFT_HOME} --with-thriftpath=${THRIFT_HOME}
   make
   make install
 fi
@@ -208,7 +208,7 @@ fi
 # Build Ldap
 if [ $BUILD_ALL -eq 1 ] || [ $BUILD_LDAP -eq 1 ]; then
     build_preamble $IMPALA_HOME/thirdparty/openldap-${IMPALA_OPENLDAP_VERSION} Openldap
-    ./configure --enable-slapd=no --prefix=`pwd`/install --enable-static --with-pic
+    ./configure --enable-slapd=no --prefix=`pwd`/impala_install --enable-static --with-pic
     make -j4
     make -j4 depend
     make install
