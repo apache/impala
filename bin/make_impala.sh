@@ -83,7 +83,7 @@ echo "**************************************************************************
 
 cd ${IMPALA_HOME}
 
-if [ "x${TARGET_BUILD_TYPE}" != "x" ] || [ "x${BUILD_SHARED_LIBS}" != x]
+if [ "x${TARGET_BUILD_TYPE}" != "x" ] || [ "x${BUILD_SHARED_LIBS}" != "x" ]
 then
     rm -f ./CMakeCache.txt
     CMAKE_ARGS=""
