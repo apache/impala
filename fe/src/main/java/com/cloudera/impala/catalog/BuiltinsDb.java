@@ -22,6 +22,8 @@ import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.CaseExpr;
 import com.cloudera.impala.analysis.CastExpr;
 import com.cloudera.impala.analysis.CompoundPredicate;
+import com.cloudera.impala.analysis.InPredicate;
+import com.cloudera.impala.analysis.IsNullPredicate;
 import com.cloudera.impala.analysis.LikePredicate;
 import com.cloudera.impala.builtins.ScalarBuiltins;
 import com.google.common.collect.ImmutableMap;
@@ -47,6 +49,8 @@ public class BuiltinsDb extends Db {
     CastExpr.initBuiltins(this);
     CaseExpr.initBuiltins(this);
     CompoundPredicate.initBuiltins(this);
+    InPredicate.initBuiltins(this);
+    IsNullPredicate.initBuiltins(this);
     LikePredicate.initBuiltins(this);
     ScalarBuiltins.initBuiltins(this);
   }

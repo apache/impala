@@ -20,11 +20,9 @@
 
 namespace impala {
 
-// Helper class to Prepare() , Open() and Close() the ordering expressions used
-// to perform comparisons in a sort. Used by TopNNode, SortNode, and MergingExchangeNode.
-// When two rows are compared, the ordering expressions are evaluated once for each
-// side. Since the result of the evaluation is stored in the Expr itself, two copies
-// of the ordering expressions are maintained so these can be compared without copying.
+// Helper class to Prepare() , Open() and Close() the ordering expressions used to perform
+// comparisons in a sort. Used by TopNNode, SortNode, and MergingExchangeNode.  When two
+// rows are compared, the ordering expressions are evaluated once for each side.
 // TopN and Sort materialize input rows into a single tuple before sorting.
 // If materialize_tuple_ is true, SortExecExprs also stores the slot expressions used to
 // materialize the sort tuples.
@@ -43,20 +41,23 @@ class SortExecExprs {
   // Close all expressions used for sorting and tuple materialization.
   void Close(RuntimeState* state);
 
-  const std::vector<Expr*>& sort_tuple_slot_exprs() const {
-    return sort_tuple_slot_exprs_;
+  const std::vector<ExprContext*>& sort_tuple_slot_expr_ctxs() const {
+    return sort_tuple_slot_expr_ctxs_;
   }
-  const std::vector<Expr*>& lhs_ordering_exprs() const {
-    return lhs_ordering_exprs_;
+
+  // Can only be used after calling Prepare()
+  const std::vector<ExprContext*>& lhs_ordering_expr_ctxs() const {
+    return lhs_ordering_expr_ctxs_;
   }
-  const std::vector<Expr*>& rhs_ordering_exprs() const {
-    return rhs_ordering_exprs_;
+  // Can only be used after calling Open()
+  const std::vector<ExprContext*>& rhs_ordering_expr_ctxs() const {
+    return rhs_ordering_expr_ctxs_;
   }
 
  private:
-  // Two copies of the ordering expressions. (See class comment)
-  std::vector<Expr*> lhs_ordering_exprs_;
-  std::vector<Expr*> rhs_ordering_exprs_;
+  // Create two ExprContexts for evaluating over the TupleRows.
+  std::vector<ExprContext*> lhs_ordering_expr_ctxs_;
+  std::vector<ExprContext*> rhs_ordering_expr_ctxs_;
 
   // If true, the tuples to be sorted are materialized by
   // sort_tuple_slot_exprs_ before the actual sort is performed.
@@ -65,7 +66,7 @@ class SortExecExprs {
   // Expressions used to materialize slots in the tuples to be sorted.
   // One expr per slot in the materialized tuple. Valid only if
   // materialize_tuple_ is true.
-  std::vector<Expr*> sort_tuple_slot_exprs_;
+  std::vector<ExprContext*> sort_tuple_slot_expr_ctxs_;
 };
 
 }

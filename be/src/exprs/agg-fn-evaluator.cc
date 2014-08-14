@@ -20,6 +20,7 @@
 #include "common/logging.h"
 #include "exec/aggregation-node.h"
 #include "exprs/aggregate-functions.h"
+#include "exprs/expr-context.h"
 #include "exprs/anyval-util.h"
 #include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
@@ -66,9 +67,10 @@ Status AggFnEvaluator::Create(ObjectPool* pool, const TExpr& desc,
   for (int i = 0; i < desc.nodes[0].num_children; ++i) {
     ++node_idx;
     Expr* expr = NULL;
+    ExprContext* ctx = NULL;
     RETURN_IF_ERROR(Expr::CreateTreeFromThrift(
-        pool, desc.nodes, NULL, &node_idx, &expr));
-    (*result)->input_exprs_.push_back(expr);
+        pool, desc.nodes, NULL, &node_idx, &expr, &ctx));
+    (*result)->input_expr_ctxs_.push_back(ctx);
   }
   return Status::OK;
 }
@@ -107,11 +109,12 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   DCHECK(output_slot_desc_ == NULL);
   output_slot_desc_ = output_slot_desc;
 
-  RETURN_IF_ERROR(Expr::Prepare(input_exprs_, state, desc, false));
+  RETURN_IF_ERROR(Expr::Prepare(input_expr_ctxs_, state, desc));
 
   ObjectPool* obj_pool = state->obj_pool();
-  for (int i = 0; i < input_exprs().size(); ++i) {
-    staging_input_vals_.push_back(CreateAnyVal(obj_pool, input_exprs()[i]->type()));
+  for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
+    staging_input_vals_.push_back(
+        CreateAnyVal(obj_pool, input_expr_ctxs_[i]->root()->type()));
   }
   staging_output_val_ = CreateAnyVal(obj_pool, output_slot_desc_->type());
 
@@ -149,32 +152,36 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
     finalize_fn_ = NULL;
   }
 
+  ctx_pool_.reset(new MemPool(state->udf_mem_tracker()));
+
   FunctionContext::TypeDesc return_type = AnyValUtil::ColumnTypeToTypeDesc(return_type_);
   vector<FunctionContext::TypeDesc> arg_types;
-  for (int i = 0; i < input_exprs_.size(); ++i) {
-    arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(input_exprs_[i]->type()));
+  for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
+    arg_types.push_back(
+        AnyValUtil::ColumnTypeToTypeDesc(input_expr_ctxs_[i]->root()->type()));
   }
-  ctx_.reset(FunctionContextImpl::CreateContext(
-      state, state->udf_pool(), return_type, arg_types));
+
+  ctx_.reset(
+      FunctionContextImpl::CreateContext(state, ctx_pool_.get(), return_type, arg_types));
 
   return Status::OK;
 }
 
 Status AggFnEvaluator::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(Expr::Open(input_exprs_, state));
+  RETURN_IF_ERROR(Expr::Open(input_expr_ctxs_, state));
   // Now that we have opened all our input exprs, it is safe to evaluate any constant
   // values for the UDA's FunctionContext (we cannot evaluate exprs before calling Open()
   // on them).
-  vector<AnyVal*> constant_args(input_exprs_.size());
-  for (int i = 0; i < input_exprs_.size(); ++i) {
-    constant_args[i] = input_exprs_[i]->GetConstVal();
+  vector<AnyVal*> constant_args(input_expr_ctxs_.size());
+  for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
+    constant_args[i] = input_expr_ctxs_[i]->root()->GetConstVal(input_expr_ctxs_[i]);
   }
   ctx_->impl()->SetConstantArgs(constant_args);
   return Status::OK;
 }
 
 void AggFnEvaluator::Close(RuntimeState* state) {
-  Expr::Close(input_exprs_, state);
+  Expr::Close(input_expr_ctxs_, state);
 
   if (ctx_.get() != NULL) {
     bool previous_error = ctx_->has_error();
@@ -186,75 +193,11 @@ void AggFnEvaluator::Close(RuntimeState* state) {
       state->LogError(ss.str());
     }
   }
+  if (ctx_pool_.get() != NULL) ctx_pool_->FreeAll();
 
   if (cache_entry_ != NULL) {
     LibCache::instance()->DecrementUseCount(cache_entry_);
     cache_entry_ = NULL;
-  }
-}
-
-// Utility to put val into an AnyVal struct
-inline void AggFnEvaluator::SetAnyVal(const void* slot,
-    const ColumnType& type, AnyVal* dst) {
-  if (slot == NULL) {
-    dst->is_null = true;
-    return;
-  }
-
-  dst->is_null = false;
-  switch (type.type) {
-    case TYPE_NULL: return;
-    case TYPE_BOOLEAN:
-      reinterpret_cast<BooleanVal*>(dst)->val = *reinterpret_cast<const bool*>(slot);
-      return;
-    case TYPE_TINYINT:
-      reinterpret_cast<TinyIntVal*>(dst)->val = *reinterpret_cast<const int8_t*>(slot);
-      return;
-    case TYPE_SMALLINT:
-      reinterpret_cast<SmallIntVal*>(dst)->val = *reinterpret_cast<const int16_t*>(slot);
-      return;
-    case TYPE_INT:
-      reinterpret_cast<IntVal*>(dst)->val = *reinterpret_cast<const int32_t*>(slot);
-      return;
-    case TYPE_BIGINT:
-      reinterpret_cast<BigIntVal*>(dst)->val = *reinterpret_cast<const int64_t*>(slot);
-      return;
-    case TYPE_FLOAT:
-      reinterpret_cast<FloatVal*>(dst)->val = *reinterpret_cast<const float*>(slot);
-      return;
-    case TYPE_DOUBLE:
-      reinterpret_cast<DoubleVal*>(dst)->val = *reinterpret_cast<const double*>(slot);
-      return;
-    case TYPE_STRING:
-      reinterpret_cast<const StringValue*>(slot)->ToStringVal(
-          reinterpret_cast<StringVal*>(dst));
-      return;
-    case TYPE_TIMESTAMP:
-      reinterpret_cast<const TimestampValue*>(slot)->ToTimestampVal(
-          reinterpret_cast<TimestampVal*>(dst));
-      return;
-    case TYPE_DECIMAL:
-      switch (type.GetByteSize()) {
-        case 4:
-          reinterpret_cast<DecimalVal*>(dst)->val4 =
-              *reinterpret_cast<const int32_t*>(slot);
-          return;
-        case 8:
-          reinterpret_cast<DecimalVal*>(dst)->val8 =
-              *reinterpret_cast<const int64_t*>(slot);
-          return;
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-        case 16:
-          memcpy(&reinterpret_cast<DecimalVal*>(dst)->val4, slot, type.GetByteSize());
-#else
-          DCHECK(false) << "Not implemented.";
-#endif
-          return;
-        default:
-          break;
-      }
-    default:
-      DCHECK(false) << "NYI: " << type;
   }
 }
 
@@ -341,17 +284,18 @@ void AggFnEvaluator::UpdateOrMerge(TupleRow* row, Tuple* dst, void* fn) {
   bool dst_null = dst->IsNull(output_slot_desc_->null_indicator_offset());
   void* dst_slot = NULL;
   if (!dst_null) dst_slot = dst->GetSlot(output_slot_desc_->tuple_offset());
-  SetAnyVal(dst_slot, output_slot_desc_->type(), staging_output_val_);
+  AnyValUtil::SetAnyVal(dst_slot, output_slot_desc_->type(), staging_output_val_);
 
-  for (int i = 0; i < input_exprs().size(); ++i) {
-    void* src_slot = input_exprs()[i]->GetValue(row);
-    SetAnyVal(src_slot, input_exprs()[i]->type(), staging_input_vals_[i]);
+  for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
+    void* src_slot = input_expr_ctxs_[i]->GetValue(row);
+    AnyValUtil::SetAnyVal(
+        src_slot, input_expr_ctxs_[i]->root()->type(), staging_input_vals_[i]);
   }
 
   // TODO: this part is not so good and not scalable. It can be replaced with
   // codegen but we can also consider leaving it for the first few cases for
   // debugging.
-  switch (input_exprs().size()) {
+  switch (input_expr_ctxs_.size()) {
     case 0:
       reinterpret_cast<UpdateFn0>(fn)(ctx_.get(), staging_output_val_);
       break;
@@ -421,7 +365,7 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* tuple, void* fn) {
   bool slot_null = tuple->IsNull(output_slot_desc_->null_indicator_offset());
   void* slot = NULL;
   if (!slot_null) slot = tuple->GetSlot(output_slot_desc_->tuple_offset());
-  SetAnyVal(slot, output_slot_desc_->type(), staging_output_val_);
+  AnyValUtil::SetAnyVal(slot, output_slot_desc_->type(), staging_output_val_);
 
   switch (return_type_.type) {
     case TYPE_BOOLEAN: {
@@ -504,10 +448,9 @@ string AggFnEvaluator::DebugString(const vector<AggFnEvaluator*>& exprs) {
 string AggFnEvaluator::DebugString() const {
   stringstream out;
   out << "AggFnEvaluator(op=" << agg_op_;
-  for (int i = 0; i < input_exprs_.size(); ++i) {
-    out << " " << input_exprs_[i]->DebugString() << ")";
+  for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
+    out << " " << input_expr_ctxs_[i]->root()->DebugString() << ")";
   }
   out << ")";
   return out.str();
 }
-

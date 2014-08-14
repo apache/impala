@@ -80,23 +80,13 @@ HdfsAvroScanner::HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state)
     codegend_decode_avro_data_(NULL) {
 }
 
-HdfsAvroScanner::~HdfsAvroScanner() {
-  DCHECK(codegend_decode_avro_data_ == NULL);
-}
-
-Function* HdfsAvroScanner::Codegen(HdfsScanNode* node, const vector<Expr*>& conjuncts) {
+Function* HdfsAvroScanner::Codegen(HdfsScanNode* node,
+                                   const vector<ExprContext*>& conjunct_ctxs) {
   if (!node->runtime_state()->codegen_enabled()) return NULL;
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
   Function* materialize_tuple_fn = CodegenMaterializeTuple(node, codegen);
   if (materialize_tuple_fn == NULL) return NULL;
-  return CodegenDecodeAvroData(codegen, materialize_tuple_fn, conjuncts);
-}
-
-void HdfsAvroScanner::Close() {
-  scan_node_->ReleaseCodegenFn(
-      THdfsFileFormat::AVRO, reinterpret_cast<void*>(codegend_decode_avro_data_));
-  codegend_decode_avro_data_ = NULL;
-  BaseSequenceScanner::Close();
+  return CodegenDecodeAvroData(node->runtime_state(), materialize_tuple_fn, conjunct_ctxs);
 }
 
 BaseSequenceScanner::FileHeader* HdfsAvroScanner::AllocateFileHeader() {
@@ -850,9 +840,9 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
   return codegen->FinalizeFunction(fn);
 }
 
-Function* HdfsAvroScanner::CodegenDecodeAvroData(LlvmCodeGen* codegen,
-                                                 Function* materialize_tuple_fn,
-                                                 const vector<Expr*>& conjuncts) {
+Function* HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
+    Function* materialize_tuple_fn, const vector<ExprContext*>& conjunct_ctxs) {
+  LlvmCodeGen* codegen = state->codegen();
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(materialize_tuple_fn != NULL);
 
@@ -862,15 +852,11 @@ Function* HdfsAvroScanner::CodegenDecodeAvroData(LlvmCodeGen* codegen,
       materialize_tuple_fn, "MaterializeTuple", &replaced);
   DCHECK_EQ(replaced, 1);
 
-  // TODO: If skipping fields in a record becomes more efficient than reading fields,
-  // interleave reading and evaluating the conjuncts for a field so we can skip more
-  // unneeded fields
-  Function* eval_conjuncts_fn = ExecNode::CodegenEvalConjuncts(codegen, conjuncts);
-  if (eval_conjuncts_fn != NULL) {
-    decode_avro_data_fn = codegen->ReplaceCallSites(decode_avro_data_fn, false,
-        eval_conjuncts_fn, "EvalConjuncts", &replaced);
-    DCHECK_EQ(replaced, 1);
-  }
+  Function* eval_conjuncts_fn = ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs);
+  decode_avro_data_fn = codegen->ReplaceCallSites(decode_avro_data_fn, false,
+      eval_conjuncts_fn, "EvalConjuncts", &replaced);
+  DCHECK_EQ(replaced, 1);
+  decode_avro_data_fn->setName("DecodeAvroData");
 
-  return codegen->FinalizeFunction(decode_avro_data_fn);
+  return codegen->OptimizeFunctionWithExprs(decode_avro_data_fn);
 }

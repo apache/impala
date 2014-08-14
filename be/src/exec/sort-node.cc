@@ -60,9 +60,11 @@ Status SortNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
 
   RETURN_IF_ERROR(CreateBlockMgr(state));
-  TupleRowComparator less_than(sort_exec_exprs_.lhs_ordering_exprs(),
-      sort_exec_exprs_.rhs_ordering_exprs(), is_asc_order_, nulls_first_);
-  sorter_.reset(new Sorter(less_than, sort_exec_exprs_.sort_tuple_slot_exprs(),
+  TupleRowComparator less_than(
+      sort_exec_exprs_.lhs_ordering_expr_ctxs(), sort_exec_exprs_.rhs_ordering_expr_ctxs(),
+      is_asc_order_, nulls_first_);
+  sorter_.reset(new Sorter(
+      less_than, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
       &row_descriptor_, mem_tracker(), runtime_profile(), state));
 
   // The child has been opened and the sorter created. Sort the input.
@@ -124,7 +126,7 @@ void SortNode::Close(RuntimeState* state) {
 void SortNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "SortNode("
-       << Expr::DebugString(sort_exec_exprs_.lhs_ordering_exprs());
+       << Expr::DebugString(sort_exec_exprs_.lhs_ordering_expr_ctxs());
   for (int i = 0; i < is_asc_order_.size(); ++i) {
     *out << (i > 0 ? " " : "")
          << (is_asc_order_[i] ? "asc" : "desc")

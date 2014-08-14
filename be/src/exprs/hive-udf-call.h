@@ -21,6 +21,8 @@
 
 #include "exprs/expr.h"
 
+using namespace impala_udf;
+
 namespace impala {
 
 class TExprNode;
@@ -54,8 +56,25 @@ class RuntimeState;
 // If the UDF ran into an error, the FE throws an exception.
 class HiveUdfCall : public Expr {
  public:
-  virtual ~HiveUdfCall();
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
+                         ExprContext* ctx);
+  virtual Status Open(RuntimeState* state, ExprContext* context,
+      FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
+  virtual void Close(RuntimeState* state, ExprContext* context,
+      FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
+
+  virtual BooleanVal GetBooleanVal(ExprContext* ctx, TupleRow*);
+  virtual TinyIntVal GetTinyIntVal(ExprContext* ctx, TupleRow*);
+  virtual SmallIntVal GetSmallIntVal(ExprContext* ctx, TupleRow*);
+  virtual IntVal GetIntVal(ExprContext* ctx, TupleRow*);
+  virtual BigIntVal GetBigIntVal(ExprContext* ctx, TupleRow*);
+  virtual FloatVal GetFloatVal(ExprContext* ctx, TupleRow*);
+  virtual DoubleVal GetDoubleVal(ExprContext* ctx, TupleRow*);
+  virtual StringVal GetStringVal(ExprContext* ctx, TupleRow*);
+  virtual TimestampVal GetTimestampVal(ExprContext* ctx, TupleRow*);
+  virtual DecimalVal GetDecimalVal(ExprContext* ctx, TupleRow*);
+
+  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
 
  protected:
   friend class Expr;
@@ -65,16 +84,17 @@ class HiveUdfCall : public Expr {
   virtual std::string DebugString() const;
 
  private:
-  static void* Evaluate(Expr* e, TupleRow* row);
+  AnyVal* Evaluate(ExprContext* ctx, TupleRow* row);
 
-  RuntimeState* state_;
-
-  struct JniContext;
-  boost::scoped_ptr<JniContext> jni_context_;
+  // The path on the local FS to the UDF's jar
+  std::string local_location_;
 
   // input_byte_offsets_[i] is the byte offset child ith's input argument should
   // be written to.
   std::vector<int> input_byte_offsets_;
+
+  // The size of the buffer for passing in input arguments.
+  int input_buffer_size_;
 };
 
 }

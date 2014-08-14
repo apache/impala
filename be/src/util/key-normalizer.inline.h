@@ -161,11 +161,11 @@ inline bool KeyNormalizer::NormalizeKeyColumn(const ColumnType& type, uint8_t nu
 inline bool KeyNormalizer::NormalizeKey(TupleRow* row, uint8_t* dst,
     int* key_idx_over_budget) {
   int bytes_left = key_len_;
-  for (int i = 0; i < key_exprs_.size(); ++i) {
-    uint8_t* key = reinterpret_cast<uint8_t*>(key_exprs_[i]->GetValue(row));
+  for (int i = 0; i < key_expr_ctxs_.size(); ++i) {
+    uint8_t* key = reinterpret_cast<uint8_t*>(key_expr_ctxs_[i]->GetValue(row));
     int offset = key_len_ - bytes_left;
-    bool went_over = NormalizeKeyColumn(key_exprs_[i]->type(), !nulls_first_[i],
-                                        is_asc_[i], key, dst + offset, &bytes_left);
+    bool went_over = NormalizeKeyColumn(key_expr_ctxs_[i]->root()->type(),
+        !nulls_first_[i], is_asc_[i], key, dst + offset, &bytes_left);
     if (went_over) {
       if (key_idx_over_budget != NULL) *key_idx_over_budget = i;
       return true;

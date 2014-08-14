@@ -22,6 +22,7 @@
 #include <boost/regex.hpp>
 #include <boost/scoped_ptr.hpp>
 
+#include "codegen/impala-ir.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scan-node.h"
 #include "exec/scanner-context.h"
@@ -106,8 +107,7 @@ class HdfsScanner {
   virtual Status ProcessSplit() = 0;
 
   // Release all resources the scanner has allocated.  This is the last chance for the
-  // scanner to attach any resources to the ScannerContext object. Subclasses overriding
-  // this function must call HdfsScanner::Close().
+  // scanner to attach any resources to the ScannerContext object.
   virtual void Close();
 
   // Scanner subclasses must implement these static functions as well.  Unfortunately,
@@ -149,12 +149,9 @@ class HdfsScanner {
   // The first stream for context_
   ScannerContext::Stream* stream_;
 
-  // Conjuncts for this scanner.  Multiple scanners from multiple threads can
-  // be scanning and Exprs are currently not thread safe.
-  std::vector<Expr*>* conjuncts_;
-
-  // Cache of conjuncts_->size()
-  int num_conjuncts_;
+  // ExprContext for each conjunct. Each scanner has its own ExprContexts so the
+  // conjuncts can be safely evaluated in parallel.
+  std::vector<ExprContext*> conjunct_ctxs_;
 
   // A partially materialized tuple with only partition key slots set.
   // The non-partition key slots are set to NULL.  The template tuple
@@ -263,6 +260,13 @@ class HdfsScanner {
     if (commit_batch) CommitRows(0);
   }
 
+  // Convenience function for evaluating conjuncts using this scanner's ExprContexts.
+  // This must always be inlined so we can correctly replace the call to
+  // ExecNode::EvalConjuncts() during codegen.
+  bool IR_ALWAYS_INLINE EvalConjuncts(TupleRow* row)  {
+    return ExecNode::EvalConjuncts(&conjunct_ctxs_[0], conjunct_ctxs_.size(), row);
+  }
+
   // Utility method to write out tuples when there are no materialized
   // fields (e.g. select count(*) or only partition keys).
   //   num_tuples - Total number of tuples to write out.
@@ -333,7 +337,7 @@ class HdfsScanner {
   // Codegen function to replace WriteCompleteTuple. Should behave identically
   // to WriteCompleteTuple.
   static llvm::Function* CodegenWriteCompleteTuple(HdfsScanNode*, LlvmCodeGen*,
-      const std::vector<Expr*>& conjuncts);
+      const std::vector<ExprContext*>& conjunct_ctxs);
 
   // Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross compiled
   // to IR.  This function loads the precompiled IR function, modifies it and returns the
@@ -365,6 +369,10 @@ class HdfsScanner {
     uint8_t* mem = reinterpret_cast<uint8_t*>(r);
     return reinterpret_cast<TupleRow*>(mem + batch_->row_byte_size());
   }
+
+  // Simple wrapper around conjunct_ctxs_. Used in the codegen'd version of
+  // WriteCompleteTuple() because it's easier than writing IR to access conjunct_ctxs_.
+  ExprContext* GetConjunctCtx(int idx) const;
 };
 
 }

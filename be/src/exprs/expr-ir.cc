@@ -17,12 +17,8 @@
 
 #ifdef IR_COMPILE
 
-// Generate a llvm loadable function for calling GetValue on an Expr.  This is
-// used as an adapter for Expr's that do not have an IR implementation.
-extern "C"
-void* IrExprGetValue(Expr* expr, TupleRow* row) {
-  return expr->GetValue(row);
-}
+// Compile ExprContext declaration to IR so we can use it in codegen'd functions
+#include "exprs/expr-context.h"
 
 // Dummy function to force compilation of UDF types.
 // The arguments are pointers to prevent Clang from lowering the struct types
@@ -30,9 +26,47 @@ void* IrExprGetValue(Expr* expr, TupleRow* row) {
 void dummy(impala_udf::FunctionContext*, impala_udf::BooleanVal*, impala_udf::TinyIntVal*,
            impala_udf::SmallIntVal*, impala_udf::IntVal*, impala_udf::BigIntVal*,
            impala_udf::FloatVal*, impala_udf::DoubleVal*, impala_udf::StringVal*,
-           impala_udf::TimestampVal*, impala_udf::DecimalVal*) { }
-
-#else
-#error "This file should only be compiled by clang."
+           impala_udf::TimestampVal*, impala_udf::DecimalVal*, ExprContext*) { }
 #endif
 
+
+// The following are compute functions that are cross-compiled to both native and IR
+// libraries. In the interpreted path, these functions are executed as-is from the native
+// code. In the codegen'd path, we load the IR functions and replace the Get*Val() calls
+// with the appropriate child's codegen'd compute function.
+
+using namespace impala;
+using namespace impala_udf;
+// Static wrappers around Get*Val() functions. We'd like to be able to call these from
+// directly from native code as well as from generated IR functions.
+
+BooleanVal Expr::GetBooleanVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetBooleanVal(context, row);
+}
+TinyIntVal Expr::GetTinyIntVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetTinyIntVal(context, row);
+}
+SmallIntVal Expr::GetSmallIntVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetSmallIntVal(context, row);
+}
+IntVal Expr::GetIntVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetIntVal(context, row);
+}
+BigIntVal Expr::GetBigIntVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetBigIntVal(context, row);
+}
+FloatVal Expr::GetFloatVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetFloatVal(context, row);
+}
+DoubleVal Expr::GetDoubleVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetDoubleVal(context, row);
+}
+StringVal Expr::GetStringVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetStringVal(context, row);
+}
+TimestampVal Expr::GetTimestampVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetTimestampVal(context, row);
+}
+DecimalVal Expr::GetDecimalVal(Expr* expr, ExprContext* context, TupleRow* row) {
+  return expr->GetDecimalVal(context, row);
+}

@@ -16,9 +16,6 @@ package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -34,8 +31,6 @@ import com.google.common.collect.Lists;
  *
  */
 public class CompoundPredicate extends Predicate {
-  private final static Logger LOG = LoggerFactory.getLogger(CompoundPredicate.class);
-
   public enum Operator {
     AND("AND"),
     OR("OR"),
@@ -55,15 +50,16 @@ public class CompoundPredicate extends Predicate {
   private final Operator op_;
 
   public static void initBuiltins(Db db) {
+    // AND and OR are implemented as custom exprs, so they do not have a function symbol.
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
-        Operator.AND.name(), "CompoundPredicate", "AndComputeFn",
-        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN), Type.BOOLEAN, false));
+        Operator.AND.name(), "",
+        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN), Type.BOOLEAN));
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
-        Operator.OR.name(), "CompoundPredicate", "OrComputeFn",
-        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN), Type.BOOLEAN, false));
+        Operator.OR.name(), "",
+        Lists.<Type>newArrayList(Type.BOOLEAN, Type.BOOLEAN), Type.BOOLEAN));
     db.addBuiltin(ScalarFunction.createBuiltinOperator(
-        Operator.NOT.name(), "CompoundPredicate", "NotComputeFn",
-        Lists.<Type>newArrayList(Type.BOOLEAN), Type.BOOLEAN, false));
+        Operator.NOT.name(), "impala::CompoundPredicate::Not",
+        Lists.<Type>newArrayList(Type.BOOLEAN), Type.BOOLEAN));
   }
 
   public CompoundPredicate(Operator op, Expr e1, Expr e2) {

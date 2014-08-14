@@ -19,6 +19,7 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "codegen/llvm-codegen.h"
+#include "exprs/slot-ref.h"
 #include "rpc/auth-provider.h"
 #include "rpc/thrift-server.h"
 #include "runtime/row-batch.h"
@@ -148,8 +149,8 @@ class DataStreamTest : public testing::Test {
   }
 
   virtual void TearDown() {
-    lhs_slot_->Close(NULL);
-    rhs_slot_->Close(NULL);
+    lhs_slot_ctx_->Close(NULL);
+    rhs_slot_ctx_->Close(NULL);
     exec_env_.impalad_client_cache()->TestShutdown();
     StopBackend();
   }
@@ -275,14 +276,18 @@ class DataStreamTest : public testing::Test {
 
   // Create a tuple comparator to sort in ascending order on the single bigint column.
   void CreateTupleComparator() {
-    lhs_slot_ = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
-    rhs_slot_ = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
-    Expr::Prepare(lhs_slot_, NULL, *row_desc_);
-    Expr::Prepare(rhs_slot_, NULL, *row_desc_);
-    lhs_slot_->Open(NULL);
-    rhs_slot_->Open(NULL);
-    less_than_ = obj_pool_.Add(new TupleRowComparator(vector<Expr*>(1, lhs_slot_),
-        vector<Expr*>(1, rhs_slot_), vector<bool>(1, true), vector<bool>(1, false)));
+    SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
+    lhs_slot_ctx_ = obj_pool_.Add(new ExprContext(lhs_slot));
+    SlotRef* rhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
+    rhs_slot_ctx_ = obj_pool_.Add(new ExprContext(rhs_slot));
+
+    lhs_slot_ctx_->Prepare(NULL, *row_desc_, &tracker_);
+    rhs_slot_ctx_->Prepare(NULL, *row_desc_, &tracker_);
+    lhs_slot_ctx_->Open(NULL);
+    rhs_slot_ctx_->Open(NULL);
+    less_than_ = obj_pool_.Add(new TupleRowComparator(
+        vector<ExprContext*>(1, lhs_slot_ctx_), vector<ExprContext*>(1, rhs_slot_ctx_),
+        vector<bool>(1, true), vector<bool>(1, false)));
   }
 
   // Create batch_, but don't fill it with data yet. Assumes we created row_desc_.
@@ -466,6 +471,7 @@ class DataStreamTest : public testing::Test {
               TPartitionType::type partition_type) {
     RuntimeState state(TPlanFragmentInstanceCtx(), "", &exec_env_);
     state.set_desc_tbl(desc_tbl_);
+    state.InitMemTrackers(TUniqueId(), NULL, -1);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataStreamSink& sink = GetSink(partition_type);
     DataStreamSender sender(
@@ -507,8 +513,8 @@ class DataStreamTest : public testing::Test {
   }
 
  private:
-  SlotRef* lhs_slot_;
-  SlotRef* rhs_slot_;
+  ExprContext* lhs_slot_ctx_;
+  ExprContext* rhs_slot_ctx_;
 };
 
 TEST_F(DataStreamTest, UnknownSenderSmallResult) {
@@ -575,9 +581,9 @@ TEST_F(DataStreamTest, BasicTest) {
 }
 
 int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
   InitFeSupport();
   impala::LlvmCodeGen::InitializeLlvm();
-  ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

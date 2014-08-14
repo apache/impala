@@ -17,23 +17,34 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TInPredicate;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.collect.Lists;
 
 public class InPredicate extends Predicate {
-  private final static Logger LOG = LoggerFactory.getLogger(InPredicate.class);
+  private static final String IN = "in";
+  private static final String NOT_IN = "not_in";
   private final boolean isNotIn_;
 
   public boolean isNotIn() { return isNotIn_; }
+
+  public static void initBuiltins(Db db) {
+    for (Type t: Type.getSupportedTypes()) {
+      if (t.isNull()) continue;
+      db.addBuiltin(ScalarFunction.createBuiltin(IN, "impala::InPredicate::In",
+          Lists.newArrayList(t, t), true, Type.BOOLEAN, false));
+      db.addBuiltin(ScalarFunction.createBuiltin(NOT_IN, "impala::InPredicate::NotIn",
+          Lists.newArrayList(t, t), true, Type.BOOLEAN, false));
+    }
+  }
 
   // First child is the comparison expr for which we
   // should check membership in the inList (the remaining children).
@@ -85,6 +96,7 @@ public class InPredicate extends Predicate {
       Expr subqueryExpr = subqueryExprs.get(0);
       analyzer.getCompatibleType(compareExpr.getType(), compareExpr, subqueryExpr);
     } else {
+      Preconditions.checkState(getChildren().size() >= 2);
       analyzer.castAllToCompatibleType(children_);
       if (children_.get(0).getType().isNull()) {
         // Make sure the BE never sees TYPE_NULL by picking an arbitrary type
@@ -92,6 +104,19 @@ public class InPredicate extends Predicate {
           uncheckedCastChild(Type.BOOLEAN, i);
         }
       }
+
+      // Only lookup fn_ if all subqueries have been rewritten. If the second child is a
+      // subquery, it will have type ArrayType, which cannot be resolved to a builtin
+      // function and will fail analysis.
+      Type[] argTypes = {getChild(0).type_, getChild(1).type_};
+      if (isNotIn_) {
+        fn_ = getBuiltinFunction(analyzer, NOT_IN, argTypes, CompareMode.IS_SUPERTYPE_OF);
+      } else {
+        fn_ = getBuiltinFunction(analyzer, IN, argTypes, CompareMode.IS_SUPERTYPE_OF);
+      }
+      Preconditions.checkNotNull(fn_);
+      Preconditions.checkState(fn_.getReturnType().isBoolean());
+      castForFunctionCall(false);
     }
 
     // TODO: Fix selectivity_ for nested predicate
@@ -112,8 +137,7 @@ public class InPredicate extends Predicate {
   protected void toThrift(TExprNode msg) {
     // Can't serialize a predicate with a subquery
     Preconditions.checkState(!contains(Predicates.instanceOf(Subquery.class)));
-    msg.in_predicate = new TInPredicate(isNotIn_);
-    msg.node_type = TExprNodeType.IN_PRED;
+    msg.node_type = TExprNodeType.FUNCTION_CALL;
   }
 
   @Override

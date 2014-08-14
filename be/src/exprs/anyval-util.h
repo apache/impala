@@ -173,10 +173,77 @@ class AnyValUtil {
 
   static FunctionContext::TypeDesc ColumnTypeToTypeDesc(const ColumnType& type);
   static ColumnType TypeDescToColumnType(const FunctionContext::TypeDesc& type);
+
+  // Utility to put val into an AnyVal struct
+  static void SetAnyVal(const void* slot, const ColumnType& type, AnyVal* dst) {
+    if (slot == NULL) {
+      dst->is_null = true;
+      return;
+    }
+
+    dst->is_null = false;
+    switch (type.type) {
+      case TYPE_NULL: return;
+      case TYPE_BOOLEAN:
+        reinterpret_cast<BooleanVal*>(dst)->val = *reinterpret_cast<const bool*>(slot);
+        return;
+      case TYPE_TINYINT:
+        reinterpret_cast<TinyIntVal*>(dst)->val = *reinterpret_cast<const int8_t*>(slot);
+        return;
+      case TYPE_SMALLINT:
+        reinterpret_cast<SmallIntVal*>(dst)->val = *reinterpret_cast<const int16_t*>(slot);
+        return;
+      case TYPE_INT:
+        reinterpret_cast<IntVal*>(dst)->val = *reinterpret_cast<const int32_t*>(slot);
+        return;
+      case TYPE_BIGINT:
+        reinterpret_cast<BigIntVal*>(dst)->val = *reinterpret_cast<const int64_t*>(slot);
+        return;
+      case TYPE_FLOAT:
+        reinterpret_cast<FloatVal*>(dst)->val = *reinterpret_cast<const float*>(slot);
+        return;
+      case TYPE_DOUBLE:
+        reinterpret_cast<DoubleVal*>(dst)->val = *reinterpret_cast<const double*>(slot);
+        return;
+      case TYPE_STRING:
+        reinterpret_cast<const StringValue*>(slot)->ToStringVal(
+            reinterpret_cast<StringVal*>(dst));
+        return;
+      case TYPE_TIMESTAMP:
+        reinterpret_cast<const TimestampValue*>(slot)->ToTimestampVal(
+            reinterpret_cast<TimestampVal*>(dst));
+        return;
+      case TYPE_DECIMAL:
+        switch (type.GetByteSize()) {
+          case 4:
+            reinterpret_cast<DecimalVal*>(dst)->val4 =
+                *reinterpret_cast<const int32_t*>(slot);
+            return;
+          case 8:
+            reinterpret_cast<DecimalVal*>(dst)->val8 =
+                *reinterpret_cast<const int64_t*>(slot);
+            return;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+          case 16:
+            memcpy(&reinterpret_cast<DecimalVal*>(dst)->val4, slot, type.GetByteSize());
+#else
+            DCHECK(false) << "Not implemented.";
+#endif
+            return;
+          default:
+            break;
+        }
+      default:
+        DCHECK(false) << "NYI: " << type;
+    }
+  }
 };
 
 // Creates the corresponding AnyVal subclass for type. The object is added to the pool.
 impala_udf::AnyVal* CreateAnyVal(ObjectPool* pool, const ColumnType& type);
+
+// Creates the corresponding AnyVal subclass for type. The object is owned by the caller.
+impala_udf::AnyVal* CreateAnyVal(const ColumnType& type);
 
 }
 

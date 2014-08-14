@@ -12,30 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "udf/udf-internal.h"
 
-#ifndef IMPALA_EXPRS_TIMESTAMP_LITERAL_H_
-#define IMPALA_EXPRS_TIMESTAMP_LITERAL_H_
+using namespace impala;
+using namespace impala_udf;
 
-#include <string>
-#include "exprs/expr.h"
-
-namespace impala {
-
-class TExprNode;
-
-class TimestampLiteral: public Expr {
- protected:
-  friend class Expr;
-
-  TimestampLiteral(double d);
-
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
-  virtual std::string DebugString() const;
-
- private:
-  static void* ComputeFn(Expr* e, TupleRow* row);
-};
-
+bool FunctionContext::IsArgConstant(int i) const {
+  if (i < 0 || i >= impl_->constant_args_.size()) return false;
+  return impl_->constant_args_[i] != NULL;
 }
 
-#endif
+AnyVal* FunctionContext::GetConstantArg(int i) const {
+  if (i < 0 || i >= impl_->constant_args_.size()) return NULL;
+  return impl_->constant_args_[i];
+}
+
+int FunctionContext::GetNumArgs() const {
+  return impl_->arg_types_.size();
+}
+
+const FunctionContext::TypeDesc& FunctionContext::GetReturnType() const {
+  return impl_->return_type_;
+}

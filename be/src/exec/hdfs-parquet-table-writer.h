@@ -49,10 +49,10 @@ class TupleRow;
 class HdfsParquetTableWriter : public HdfsTableWriter {
  public:
   HdfsParquetTableWriter(HdfsTableSink* parent,
-                        RuntimeState* state, OutputPartition* output_partition,
-                        const HdfsPartitionDescriptor* part_desc,
-                        const HdfsTableDescriptor* table_desc,
-                        const std::vector<Expr*>& output_exprs);
+                         RuntimeState* state, OutputPartition* output_partition,
+                         const HdfsPartitionDescriptor* part_desc,
+                         const HdfsTableDescriptor* table_desc,
+                         const std::vector<ExprContext*>& output_expr_ctxs);
 
   ~HdfsParquetTableWriter();
 

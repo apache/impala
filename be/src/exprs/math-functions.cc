@@ -20,7 +20,6 @@
 
 #include "exprs/anyval-util.h"
 #include "exprs/expr.h"
-#include "exprs/expr-inline.h"
 #include "exprs/operators.h"
 #include "util/string-parser.h"
 

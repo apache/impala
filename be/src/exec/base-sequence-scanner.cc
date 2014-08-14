@@ -92,8 +92,6 @@ void BaseSequenceScanner::Close() {
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
   }
-  scan_node_->ReleaseCodegenFn(file_format(), reinterpret_cast<void*>(write_tuples_fn_));
-  write_tuples_fn_ = NULL;
   HdfsScanner::Close();
 }
 
@@ -103,12 +101,6 @@ Status BaseSequenceScanner::ProcessSplit() {
   if (header_ == NULL) {
     // This is the initial scan range just to parse the header
     only_parsing_header_ = true;
-
-    // Release our conjuncts so threads responsible for actually processing a split can
-    // use them.
-    scan_node_->ReleaseConjuncts(conjuncts_);
-    conjuncts_ = NULL;
-
     header_ = state_->obj_pool()->Add(AllocateFileHeader());
     Status status = ReadFileHeader();
     if (!status.ok()) {

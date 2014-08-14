@@ -69,15 +69,14 @@ public class CaseExpr extends Expr {
 
   public static void initBuiltins(Db db) {
     for (Type t: Type.getSupportedTypes()) {
-      if (t.isDecimal()) continue; // TODO: implement case for decimals
       if (t.isNull()) continue;
       // TODO: case is special and the signature cannot be represented.
       // It is alternating varargs
       // e.g. case(bool, type, bool type, bool type, etc).
-      // Instead we just add a version for each of the when types
+      // Instead we just add a version for each of the return types
       // e.g. case(BOOLEAN), case(INT), etc
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          "case", Lists.newArrayList(t), t));
+          "case", "", Lists.newArrayList(t), t));
     }
   }
 

@@ -82,8 +82,8 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
 }
 
 bool SelectNode::CopyRows(RowBatch* output_batch) {
-  Expr** conjuncts = &conjuncts_[0];
-  int num_conjuncts = conjuncts_.size();
+  ExprContext** conjunct_ctxs = &conjunct_ctxs_[0];
+  int num_conjunct_ctxs = conjunct_ctxs_.size();
 
   for (; child_row_idx_ < child_row_batch_->num_rows(); ++child_row_idx_) {
     // Add a new row to output_batch
@@ -92,7 +92,7 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
     TupleRow* dst_row = output_batch->GetRow(dst_row_idx);
     TupleRow* src_row = child_row_batch_->GetRow(child_row_idx_);
 
-    if (EvalConjuncts(conjuncts, num_conjuncts, src_row)) {
+    if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, src_row)) {
       output_batch->CopyRow(src_row, dst_row);
       output_batch->CommitLastRow();
       ++num_rows_returned_;

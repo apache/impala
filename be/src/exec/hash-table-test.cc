@@ -22,6 +22,8 @@
 #include "common/compiler-util.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
+#include "exprs/slot-ref.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
@@ -41,8 +43,8 @@ class HashTableTest : public testing::Test {
   ObjectPool pool_;
   MemTracker tracker_;
   MemPool mem_pool_;
-  vector<Expr*> build_expr_;
-  vector<Expr*> probe_expr_;
+  vector<ExprContext*> build_expr_ctxs_;
+  vector<ExprContext*> probe_expr_ctxs_;
 
   virtual void SetUp() {
     RowDescriptor desc;
@@ -51,22 +53,24 @@ class HashTableTest : public testing::Test {
     // Not very easy to test complex tuple layouts so this test will use the
     // simplest.  The purpose of these tests is to exercise the hash map
     // internals so a simple build/probe expr is fine.
-    build_expr_.push_back(pool_.Add(new SlotRef(TYPE_INT, 0)));
-    status = Expr::Prepare(build_expr_, NULL, desc);
+    Expr* expr = pool_.Add(new SlotRef(TYPE_INT, 0));
+    build_expr_ctxs_.push_back(pool_.Add(new ExprContext(expr)));
+    status = Expr::Prepare(build_expr_ctxs_, NULL, desc, &tracker_);
     EXPECT_TRUE(status.ok());
-    status = Expr::Open(build_expr_, NULL);
+    status = Expr::Open(build_expr_ctxs_, NULL);
     EXPECT_TRUE(status.ok());
 
-    probe_expr_.push_back(pool_.Add(new SlotRef(TYPE_INT, 0)));
-    status = Expr::Prepare(probe_expr_, NULL, desc);
+    expr = pool_.Add(new SlotRef(TYPE_INT, 0));
+    probe_expr_ctxs_.push_back(pool_.Add(new ExprContext(expr)));
+    status = Expr::Prepare(probe_expr_ctxs_, NULL, desc, &tracker_);
     EXPECT_TRUE(status.ok());
-    status = Expr::Open(probe_expr_, NULL);
+    status = Expr::Open(probe_expr_ctxs_, NULL);
     EXPECT_TRUE(status.ok());
   }
 
   virtual void TearDown() {
-    Expr::Close(build_expr_, NULL);
-    Expr::Close(probe_expr_, NULL);
+    Expr::Close(build_expr_ctxs_, NULL);
+    Expr::Close(probe_expr_ctxs_, NULL);
   }
 
   TupleRow* CreateTupleRow(int32_t val) {
@@ -93,7 +97,7 @@ class HashTableTest : public testing::Test {
     HashTable::Iterator iter = table->Begin();
     while (iter != table->End()) {
       TupleRow* row = iter.GetRow();
-      int32_t val = *reinterpret_cast<int32_t*>(build_expr_[0]->GetValue(row));
+      int32_t val = *reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(row));
       EXPECT_GE(val, min);
       EXPECT_LT(val, max);
       if (all_unique) EXPECT_TRUE(results[val] == NULL);
@@ -107,8 +111,10 @@ class HashTableTest : public testing::Test {
   // evaluated over build_exprs
   void ValidateMatch(TupleRow* probe_row, TupleRow* build_row) {
     EXPECT_TRUE(probe_row != build_row);
-    int32_t build_val = *reinterpret_cast<int32_t*>(build_expr_[0]->GetValue(probe_row));
-    int32_t probe_val = *reinterpret_cast<int32_t*>(probe_expr_[0]->GetValue(build_row));
+    int32_t build_val =
+        *reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(probe_row));
+    int32_t probe_val =
+        *reinterpret_cast<int32_t*>(probe_expr_ctxs_[0]->GetValue(build_row));
     EXPECT_EQ(build_val, probe_val);
   }
 
@@ -155,15 +161,19 @@ TEST_F(HashTableTest, SetupTest) {
   TupleRow* probe_row3 = CreateTupleRow(3);
   TupleRow* probe_row4 = CreateTupleRow(4);
 
-  int32_t* val_row1 = reinterpret_cast<int32_t*>(build_expr_[0]->GetValue(build_row1));
-  int32_t* val_row2 = reinterpret_cast<int32_t*>(build_expr_[0]->GetValue(build_row2));
-  int32_t* val_row3 = reinterpret_cast<int32_t*>(probe_expr_[0]->GetValue(probe_row3));
-  int32_t* val_row4 = reinterpret_cast<int32_t*>(probe_expr_[0]->GetValue(probe_row4));
-
+  int32_t* val_row1 =
+      reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(build_row1));
   EXPECT_EQ(*val_row1, 1);
+  int32_t* val_row2 =
+      reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(build_row2));
   EXPECT_EQ(*val_row2, 2);
+  int32_t* val_row3 =
+      reinterpret_cast<int32_t*>(probe_expr_ctxs_[0]->GetValue(probe_row3));
   EXPECT_EQ(*val_row3, 3);
+  int32_t* val_row4 =
+      reinterpret_cast<int32_t*>(probe_expr_ctxs_[0]->GetValue(probe_row4));
   EXPECT_EQ(*val_row4, 4);
+
   mem_pool_.FreeAll();
 }
 
@@ -188,7 +198,8 @@ TEST_F(HashTableTest, BasicTest) {
 
   // Create the hash table and insert the build rows
   MemTracker tracker;
-  HashTable hash_table(NULL, build_expr_, probe_expr_, 1, false, false, 0, &tracker);
+  HashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
+                       1, false, false, 0, &tracker);
   for (int i = 0; i < 5; ++i) {
     hash_table.Insert(build_rows[i]);
   }
@@ -229,7 +240,8 @@ TEST_F(HashTableTest, BasicTest) {
 // This tests makes sure we can scan ranges of buckets
 TEST_F(HashTableTest, ScanTest) {
   MemTracker tracker;
-  HashTable hash_table(NULL, build_expr_, probe_expr_, 1, false, false, 0, &tracker);
+  HashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
+                       1, false, false, 0, &tracker);
   // Add 1 row with val 1, 2 with val 2, etc
   vector<TupleRow*> build_rows;
   ProbeTestData probe_rows[15];
@@ -274,8 +286,8 @@ TEST_F(HashTableTest, GrowTableTest) {
   int num_to_add = 4;
   int expected_size = 0;
   MemTracker tracker(100 * 1024 * 1024);
-  HashTable hash_table(
-      NULL, build_expr_, probe_expr_, 1, false, false, 0, &tracker, false, num_to_add);
+  HashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
+                       1, false, false, 0, &tracker, false, num_to_add);
   EXPECT_FALSE(hash_table.mem_limit_exceeded());
   EXPECT_TRUE(!tracker.LimitExceeded());
 

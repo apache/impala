@@ -32,6 +32,7 @@ namespace llvm {
 namespace impala {
 
 class Expr;
+class ExprContext;
 class LlvmCodeGen;
 class MemTracker;
 class RowDescriptor;
@@ -96,15 +97,15 @@ class HashTable {
   //  - initial_seed: Initial seed value to use when computing hashes for rows
   //  - stores_tuples: If true, the hash table stores tuples, otherwise it stores tuple
   //    rows.
-  HashTable(RuntimeState* state, const std::vector<Expr*>& build_exprs,
-      const std::vector<Expr*>& probe_exprs, int num_build_tuples,
+  HashTable(RuntimeState* state, const std::vector<ExprContext*>& build_expr_ctxs,
+      const std::vector<ExprContext*>& probe_expr_ctxs, int num_build_tuples,
       bool stores_nulls, bool finds_nulls, int32_t initial_seed,
       MemTracker* mem_tracker, bool stores_tuples = false, int64_t num_buckets = 1024);
 
   // Call to cleanup any resources. Must be called once.
   void Close();
 
-  // Insert row into the hash table.  Row will be evaluated over build_exprs_
+  // Insert row into the hash table.  Row will be evaluated over build exprs.
   // This will grow the hash table if necessary.
   // If the hash table has or needs to go over the mem limit, the Insert will
   // be ignored. The caller is assumed to periodically (e.g. per row batch) check
@@ -144,7 +145,7 @@ class HashTable {
   bool IR_ALWAYS_INLINE EvalAndHashProbe(TupleRow* row, uint32_t* hash);
 
   // Returns the start iterator for all rows that match 'probe_row'.  'probe_row' is
-  // evaluated with probe_exprs_.  The iterator can be iterated until HashTable::End()
+  // evaluated with probe exprs.  The iterator can be iterated until HashTable::End()
   // to find all the matching rows.
   // Only one scan be in progress at any time (i.e. it is not legal to call
   // Find(), begin iterating through all the matches, call another Find(),
@@ -213,15 +214,15 @@ class HashTable {
   // Codegen for evaluating a tuple row.  Codegen'd function matches the signature
   // for EvalBuildRow and EvalTupleRow.
   // if build_row is true, the codegen uses the build_exprs, otherwise the probe_exprs
-  llvm::Function* CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build_row);
+  llvm::Function* CodegenEvalTupleRow(RuntimeState* state, bool build_row);
 
   // Codegen for hashing the expr values in 'expr_values_buffer_'.  Function
   // prototype matches HashCurrentRow identically.
-  llvm::Function* CodegenHashCurrentRow(LlvmCodeGen* codegen);
+  llvm::Function* CodegenHashCurrentRow(RuntimeState* state);
 
   // Codegen for evaluating a TupleRow and comparing equality against
   // 'expr_values_buffer_'.  Function signature matches HashTable::Equals()
-  llvm::Function* CodegenEquals(LlvmCodeGen* codegen);
+  llvm::Function* CodegenEquals(RuntimeState* state);
 
   static const char* LLVM_CLASS_NAME;
 
@@ -240,7 +241,7 @@ class HashTable {
     // from a Find, this will lazily evaluate that bucket, only returning
     // TupleRows that match the current scan row. No-op if the iterator is at the end.
     template<bool check_match>
-    void Next();
+    void IR_ALWAYS_INLINE Next();
 
     // Returns the current row. Callers must check the iterator is not AtEnd() before
     // calling GetRow().
@@ -339,21 +340,20 @@ class HashTable {
   // Evaluate the exprs over row and cache the results in 'expr_values_buffer_'.
   // Returns whether any expr evaluated to NULL
   // This will be replaced by codegen
-  bool EvalRow(TupleRow* row, const std::vector<Expr*>& exprs);
+  bool EvalRow(TupleRow* row, const std::vector<ExprContext*>& ctxs);
 
-  // Evaluate 'row' over build_exprs_ caching the results in 'expr_values_buffer_'
-  // This will be replaced by codegen.  We do not want this function inlined when
-  // cross compiled because we need to be able to differentiate between EvalBuildRow
-  // and EvalProbeRow by name and the build_exprs_/probe_exprs_ are baked into
-  // the codegen'd function.
+  // Evaluate 'row' over build exprs caching the results in 'expr_values_buffer_' This
+  // will be replaced by codegen.  We do not want this function inlined when cross
+  // compiled because we need to be able to differentiate between EvalBuildRow and
+  // EvalProbeRow by name and the build/probe exprs are baked into the codegen'd function.
   bool IR_NO_INLINE EvalBuildRow(TupleRow* row) {
-    return EvalRow(row, build_exprs_);
+    return EvalRow(row, build_expr_ctxs_);
   }
 
-  // Evaluate 'row' over probe_exprs_ caching the results in 'expr_values_buffer_'
+  // Evaluate 'row' over probe exprs caching the results in 'expr_values_buffer_'
   // This will be replaced by codegen.
   bool IR_NO_INLINE EvalProbeRow(TupleRow* row) {
-    return EvalRow(row, probe_exprs_);
+    return EvalRow(row, probe_expr_ctxs_);
   }
 
   // Compute the hash of the values in expr_values_buffer_.
@@ -400,8 +400,8 @@ class HashTable {
 
   RuntimeState* state_;
 
-  const std::vector<Expr*>& build_exprs_;
-  const std::vector<Expr*>& probe_exprs_;
+  const std::vector<ExprContext*>& build_expr_ctxs_;
+  const std::vector<ExprContext*>& probe_expr_ctxs_;
 
   // Number of Tuple* in the build tuple row
   const int num_build_tuples_;

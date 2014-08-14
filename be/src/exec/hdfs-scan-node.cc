@@ -31,7 +31,7 @@
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
-#include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-state.h"
@@ -81,7 +81,6 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       unknown_disk_id_warned_(false),
       initial_ranges_issued_(false),
       scanner_thread_bytes_required_(0),
-      num_interpreted_conjuncts_copies_(0),
       num_partition_keys_(0),
       disks_accessed_bitmap_(TCounterType::UNIT, 0),
       done_(false),
@@ -171,17 +170,6 @@ Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, b
   return Status::OK;
 }
 
-Status HdfsScanNode::CreateConjuncts(vector<Expr*>* expr, bool disable_codegen) {
-  // This is only used when codegen is not possible for this node.  We don't want to
-  // codegen the copy of the expr.
-  // TODO: we really need to stop having to create copies of exprs
-  RETURN_IF_ERROR(Expr::CreateExprTrees(runtime_state_->obj_pool(),
-      thrift_plan_node_->conjuncts, expr));
-  all_conjuncts_copies_.push_back(expr);
-  RETURN_IF_ERROR(Expr::Prepare(*expr, runtime_state_, row_desc(), disable_codegen));
-  return Status::OK;
-}
-
 DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t len,
     int64_t offset, int64_t partition_id, int disk_id, bool try_cache) {
   DCHECK_GE(disk_id, -1);
@@ -224,44 +212,7 @@ void* HdfsScanNode::GetFileMetadata(const string& filename) {
 void* HdfsScanNode::GetCodegenFn(THdfsFileFormat::type type) {
   CodegendFnMap::iterator it = codegend_fn_map_.find(type);
   if (it == codegend_fn_map_.end()) return NULL;
-  if (codegend_conjuncts_thread_safe_) {
-    DCHECK_EQ(it->second.size(), 1);
-    return it->second.front();
-  } else {
-    unique_lock<mutex> l(codgend_fn_map_lock_);
-    // If all the codegen'd fn's are used, return NULL.  This disables codegen for
-    // this scanner.
-    if (it->second.empty()) return NULL;
-    void* fn = it->second.front();
-    it->second.pop_front();
-    DCHECK(fn != NULL);
-    return fn;
-  }
-}
-
-void HdfsScanNode::ReleaseCodegenFn(THdfsFileFormat::type type, void* fn) {
-  if (fn == NULL) return;
-  if (codegend_conjuncts_thread_safe_) return;
-
-  CodegendFnMap::iterator it = codegend_fn_map_.find(type);
-  DCHECK(it != codegend_fn_map_.end());
-  unique_lock<mutex> l(codgend_fn_map_lock_);
-  it->second.push_back(fn);
-}
-
-vector<Expr*>* HdfsScanNode::GetConjuncts() {
-  ScopedSpinLock l(&interpreted_conjuncts_copies_lock_);
-  DCHECK(!interpreted_conjuncts_copies_.empty());
-  vector<Expr*>* conjuncts = interpreted_conjuncts_copies_.back();
-  interpreted_conjuncts_copies_.pop_back();
-  return conjuncts;
-}
-
-void HdfsScanNode::ReleaseConjuncts(vector<Expr*>* conjuncts) {
-  DCHECK(conjuncts != NULL);
-  ScopedSpinLock l(&interpreted_conjuncts_copies_lock_);
-  interpreted_conjuncts_copies_.push_back(conjuncts);
-  DCHECK_LE(interpreted_conjuncts_copies_.size(), num_interpreted_conjuncts_copies_);
+  return it->second;
 }
 
 HdfsScanner* HdfsScanNode::CreateAndPrepareScanner(HdfsPartitionDescriptor* partition,
@@ -305,10 +256,10 @@ HdfsScanner* HdfsScanNode::CreateAndPrepareScanner(HdfsPartitionDescriptor* part
 }
 
 Tuple* HdfsScanNode::InitTemplateTuple(RuntimeState* state,
-    const vector<Expr*>& expr_values) {
+                                       const vector<ExprContext*>& value_ctxs) {
   if (partition_key_slots_.empty()) return NULL;
 
-  // Look to protect access to partition_key_pool_ and expr_values
+  // Look to protect access to partition_key_pool_ and value_ctxs
   // TODO: we can push the lock to the mempool and exprs_values should not
   // use internal memory.
   Tuple* template_tuple = InitEmptyTemplateTuple();
@@ -317,7 +268,7 @@ Tuple* HdfsScanNode::InitTemplateTuple(RuntimeState* state,
   for (int i = 0; i < partition_key_slots_.size(); ++i) {
     const SlotDescriptor* slot_desc = partition_key_slots_[i];
     // Exprs guaranteed to be literals, so can safely be evaluated without a row context
-    void* value = expr_values[slot_desc->col_pos()]->GetValue(NULL);
+    void* value = value_ctxs[slot_desc->col_pos()]->GetValue(NULL);
     RawValue::Write(value, template_tuple, slot_desc, NULL);
   }
   return template_tuple;
@@ -508,13 +459,35 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   PrintHdfsSplitStats(per_volume_stats, &str);
   runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
 
-  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::TEXT));
-  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::RC_FILE));
-  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::SEQUENCE_FILE));
-  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::AVRO));
-  RETURN_IF_ERROR(CreateConjunctsCopies(THdfsFileFormat::PARQUET));
+  // Initialize conjunct exprs
+  RETURN_IF_ERROR(Expr::CreateExprTrees(
+      runtime_state_->obj_pool(), thrift_plan_node_->conjuncts, &conjunct_ctxs_));
+  RETURN_IF_ERROR(Expr::Prepare(conjunct_ctxs_, runtime_state_, row_desc()));
 
-  num_interpreted_conjuncts_copies_ = interpreted_conjuncts_copies_.size();
+  // Create reusable codegen'd functions for each file type type needed
+  for (int format = THdfsFileFormat::TEXT;
+       format <= THdfsFileFormat::PARQUET; ++format) {
+    if (per_type_files_[static_cast<THdfsFileFormat::type>(format)].empty()) continue;
+    Function* fn;
+    switch (format) {
+      case THdfsFileFormat::TEXT:
+        fn = HdfsTextScanner::Codegen(this, conjunct_ctxs_);
+        break;
+      case THdfsFileFormat::SEQUENCE_FILE:
+        fn = HdfsSequenceScanner::Codegen(this, conjunct_ctxs_);
+        break;
+      case THdfsFileFormat::AVRO:
+        fn = HdfsAvroScanner::Codegen(this, conjunct_ctxs_);
+        break;
+      default:
+        // No codegen for this format
+        fn = NULL;
+    }
+    if (fn != NULL) {
+      runtime_state_->codegen()->AddFunctionToJit(
+          fn, &codegend_fn_map_[static_cast<THdfsFileFormat::type>(format)]);
+    }
+  }
 
   return Status::OK;
 }
@@ -555,10 +528,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   }
 
   // Open all conjuncts
-  for (list<vector<Expr*>*>::iterator it = all_conjuncts_copies_.begin();
-     it != all_conjuncts_copies_.end(); ++it) {
-    RETURN_IF_ERROR(Expr::Open(**it, state));
-  }
+  Expr::Open(conjunct_ctxs_, state);
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterContext(
       hdfs_connection_, &reader_context_, mem_tracker()));
@@ -632,11 +602,6 @@ void HdfsScanNode::Close(RuntimeState* state) {
   state->resource_pool()->SetThreadAvailableCb(NULL);
   scanner_threads_.JoinAll();
 
-  // All conjuncts should have been released
-  DCHECK_EQ(interpreted_conjuncts_copies_.size(), num_interpreted_conjuncts_copies_)
-      << "interpreted_conjuncts_copies_ leak, check that ReleaseConjuncts() "
-      << "is being called";
-
   num_owned_io_buffers_ -= materialized_row_batches_->Cleanup();
   DCHECK_EQ(num_owned_io_buffers_, 0) << "ScanNode has leaked io buffers";
 
@@ -659,10 +624,7 @@ void HdfsScanNode::Close(RuntimeState* state) {
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
   // Close all conjuncts
-  for (list<vector<Expr*>*>::iterator it = all_conjuncts_copies_.begin();
-     it != all_conjuncts_copies_.end(); ++it) {
-    Expr::Close(**it, state);
-  }
+  Expr::Close(conjunct_ctxs_, state);
 
   // Close all the partitions scanned by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
@@ -697,6 +659,10 @@ void HdfsScanNode::MarkFileDescIssued(const HdfsFileDesc* desc) {
 
 void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
   materialized_row_batches_->AddBatch(row_batch);
+}
+
+Status HdfsScanNode::GetConjunctCtxs(vector<ExprContext*>* ctxs) {
+  return Expr::Clone(conjunct_ctxs_, runtime_state_, ctxs);
 }
 
 // For controlling the amount of memory used for scanners, we approximate the
@@ -946,7 +912,7 @@ void HdfsScanNode::SetDone() {
 }
 
 void HdfsScanNode::ComputeSlotMaterializationOrder(vector<int>* order) const {
-  const vector<Expr*>& conjuncts = ExecNode::conjuncts();
+  const vector<ExprContext*>& conjuncts = ExecNode::conjunct_ctxs();
   // Initialize all order to be conjuncts.size() (after the last conjunct)
   order->insert(order->begin(), materialized_slots().size(), conjuncts.size());
 
@@ -955,7 +921,7 @@ void HdfsScanNode::ComputeSlotMaterializationOrder(vector<int>* order) const {
   vector<SlotId> slot_ids;
   for (int conjunct_idx = 0; conjunct_idx < conjuncts.size(); ++conjunct_idx) {
     slot_ids.clear();
-    int num_slots = conjuncts[conjunct_idx]->GetSlotIds(&slot_ids);
+    int num_slots = conjuncts[conjunct_idx]->root()->GetSlotIds(&slot_ids);
     for (int j = 0; j < num_slots; ++j) {
       SlotDescriptor* slot_desc = desc_tbl.GetSlotDescriptor(slot_ids[j]);
       int slot_idx = GetMaterializedSlotIdx(slot_desc->col_pos());
@@ -1056,72 +1022,4 @@ void HdfsScanNode::PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
      (*ss) << i->first << ":" << i->second.first << "/"
          << PrettyPrinter::Print(i->second.second, TCounterType::BYTES) << " ";
   }
-}
-
-Status HdfsScanNode::CreateConjunctsCopies(THdfsFileFormat::type format) {
-  // Nothing to do
-  if (per_type_files_[format].empty()) return Status::OK;
-
-  // This query's current thread quota
-  int num_threads = runtime_state_->resource_pool()->num_available_threads();
-  // The number of splits for this format
-  int num_splits = 0;
-  BOOST_FOREACH(HdfsFileDesc* desc, per_type_files_[format]) {
-    num_splits += desc->splits.size();
-  }
-
-  // If codegen function is thread safe, we can just use a single copy of the conjuncts
-  int num_codegen_copies = 1;
-  if (!codegend_conjuncts_thread_safe_) {
-    // If the codegen'd conjuncts are not thread safe, we need to make copies of the exprs
-    // and codegen those as well.
-    num_codegen_copies = min(num_threads, num_splits);
-  }
-
-  for (int i = 0; i < num_codegen_copies; ++i) {
-    vector<Expr*>* conjuncts = pool_->Add(new vector<Expr*>());
-    RETURN_IF_ERROR(CreateConjuncts(conjuncts, false));
-    Function* fn;
-    switch (format) {
-      case THdfsFileFormat::TEXT:
-        fn = HdfsTextScanner::Codegen(this, *conjuncts);
-        break;
-      case THdfsFileFormat::SEQUENCE_FILE:
-        fn = HdfsSequenceScanner::Codegen(this, *conjuncts);
-        break;
-      case THdfsFileFormat::AVRO:
-        fn = HdfsAvroScanner::Codegen(this, *conjuncts);
-        break;
-      default:
-        // No codegen for this format
-        fn = NULL;
-    }
-    if (fn != NULL) {
-      // This pointer will be updated to the JIT'd function in FinalizeModule().
-      codegend_fn_map_[format].push_back(NULL);
-      runtime_state_->codegen()->AddFunctionToJit(fn, &codegend_fn_map_[format].back());
-    } else {
-      break;
-    }
-  }
-
-  // In addition to the codegen'd functions, create non-codegen'd copies of the conjuncts
-  // for use with EvalConjuncts(), or as a fallback if our thread quota increases or one
-  // of the Codegen() calls fails.
-
-  // Since this is the fallback, create the maximum number of copies we'll possibly
-  // need.
-  int max_threads = runtime_state_->exec_env()->thread_mgr()->system_threads_quota();
-  int num_noncodegen_copies = min(max_threads, num_splits);
-
-  // No point making more copies than the maximum possible number of threads
-  while (num_noncodegen_copies > 0 &&
-      interpreted_conjuncts_copies_.size() < max_threads) {
-    vector<Expr*>* conjuncts = pool_->Add(new vector<Expr*>());
-    RETURN_IF_ERROR(CreateConjuncts(conjuncts, true));
-    interpreted_conjuncts_copies_.push_back(conjuncts);
-    --num_noncodegen_copies;
-  }
-
-  return Status::OK;
 }

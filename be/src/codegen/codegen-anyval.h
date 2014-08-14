@@ -46,6 +46,9 @@ namespace impala {
 // TYPE_DOUBLE/DoubleVal: { i8, double }
 // TYPE_STRING/StringVal: { i64, i8* }
 // TYPE_TIMESTAMP/TimestampVal: { i64, i64 }
+//
+// TODO:
+// - unit tests
 class CodegenAnyVal {
  public:
   static const char* LLVM_BOOLEANVAL_NAME;
@@ -71,21 +74,39 @@ class CodegenAnyVal {
   //
   // 'name' optionally specifies the name of the returned value.
   static llvm::Value* CreateCall(LlvmCodeGen* cg, LlvmCodeGen::LlvmBuilder* builder,
-      llvm::Function* fn, llvm::ArrayRef<llvm::Value*> args, const std::string& name = "",
+      llvm::Function* fn, llvm::ArrayRef<llvm::Value*> args, const char* name = "",
+      llvm::Value* result_ptr = NULL);
+
+  // Same as above but wraps the result in a CodegenAnyVal.
+  static CodegenAnyVal CreateCallWrapped(LlvmCodeGen* cg,
+      LlvmCodeGen::LlvmBuilder* builder, const ColumnType& type, llvm::Function* fn,
+      llvm::ArrayRef<llvm::Value*> args, const char* name = "",
       llvm::Value* result_ptr = NULL);
 
   // Returns the lowered AnyVal type associated with 'type'.
   // E.g.: TYPE_BOOLEAN (which corresponds to a BooleanVal) => i16
   static llvm::Type* GetLoweredType(LlvmCodeGen* cg, const ColumnType& type);
 
+  // Returns the lowered AnyVal pointer type associated with 'type'.
+  // E.g.: TYPE_BOOLEAN => i16*
+  static llvm::Type* GetLoweredPtrType(LlvmCodeGen* cg, const ColumnType& type);
+
   // Returns the unlowered AnyVal type associated with 'type'.
   // E.g.: TYPE_BOOLEAN => %"struct.impala_udf::BooleanVal"
   static llvm::Type* GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type);
+
+  // Returns the unlowered AnyVal pointer type associated with 'type'.
+  // E.g.: TYPE_BOOLEAN => %"struct.impala_udf::BooleanVal"*
+  static llvm::Type* GetUnloweredPtrType(LlvmCodeGen* cg, const ColumnType& type);
 
   // Return the constant type-lowered value corresponding to a null *Val.
   // E.g.: passing TYPE_DOUBLE (corresponding to the lowered DoubleVal { i8, double })
   // returns the constant struct { 1, 0.0 }
   static llvm::Value* GetNullVal(LlvmCodeGen* codegen, const ColumnType& type);
+
+  // Return the constant type-lowered value corresponding to a null *Val.
+  // 'val_type' must be a lowered type (i.e. one of the types returned by GetType)
+  static llvm::Value* GetNullVal(LlvmCodeGen* codegen, llvm::Type* val_type);
 
   // Return the constant type-lowered value corresponding to a non-null *Val.
   // E.g.: TYPE_DOUBLE (lowered DoubleVal: { i8, double }) => { 0, 0 }
@@ -114,7 +135,7 @@ class CodegenAnyVal {
   llvm::Value* value() { return value_; }
 
   // Gets the 'is_null' field of the *Val.
-  llvm::Value* GetIsNull();
+  llvm::Value* GetIsNull(const char* name = "is_null");
 
   // Get the 'val' field of the *Val. Do not call if this represents a StringVal or
   // TimestampVal. If this represents a DecimalVal, returns 'val4', 'val8', or 'val16'
@@ -128,6 +149,16 @@ class CodegenAnyVal {
   // Sets the 'val' field of the *Val. Do not call if this represents a StringVal or
   // TimestampVal.
   void SetVal(llvm::Value* val);
+
+  // Sets the 'val' field of the *Val. The *Val must correspond to the argument type.
+  void SetVal(bool val);
+  void SetVal(int8_t val);
+  void SetVal(int16_t val);
+  void SetVal(int32_t val);
+  void SetVal(int64_t val);
+  void SetVal(int128_t val);
+  void SetVal(float val);
+  void SetVal(double val);
 
   // Getters for StringVals.
   llvm::Value* GetPtr();
@@ -145,6 +176,10 @@ class CodegenAnyVal {
   void SetDate(llvm::Value* date);
   void SetTimeOfDay(llvm::Value* time_of_day);
 
+  // Allocas and stores this value in an unlowered pointer, and returns the pointer. This
+  // *Val should be non-null.
+  llvm::Value* GetUnloweredPtr();
+
   // Set this *Val's value based on 'raw_val'. 'raw_val' should be a native type,
   // StringValue, or TimestampValue.
   void SetFromRawValue(llvm::Value* raw_val);
@@ -156,7 +191,25 @@ class CodegenAnyVal {
 
   // Converts this *Val's value to a native type, StringValue, TimestampValue, etc.
   // This should only be used if this *Val is not null.
-  llvm::Value* ToRawValue();
+  llvm::Value* ToNativeValue();
+
+  // Sets 'native_ptr' to this *Val's value. 'native_ptr' should be a pointer to a native
+  // type, StringValue, TimestampValue, etc. This should only be used if this *Val is not
+  // null.
+  void ToNativePtr(llvm::Value* native_ptr);
+
+  // Returns the i1 result of this == other. this and other must be non-null.
+  llvm::Value* Eq(CodegenAnyVal* other);
+
+  // Compares this *Val to the value of 'native_ptr'. 'native_ptr' should be a pointer to
+  // a native type, StringValue, or TimestampValue. This *Val should match 'native_ptr's
+  // type (e.g. if this is an IntVal, 'native_ptr' should have type i32*). Returns the i1
+  // result of the equality comparison.
+  llvm::Value* EqToNativePtr(llvm::Value* native_ptr);
+
+  // Ctor for created an uninitialized CodegenAnYVal that can be assigned to later.
+  CodegenAnyVal()
+    : type_(INVALID_TYPE), value_(NULL), name_(NULL), codegen_(NULL), builder_(NULL) { }
 
  private:
   ColumnType type_;

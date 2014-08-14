@@ -21,23 +21,10 @@
 
 namespace impala {
 
-class TExprNode;
-
-class IsNullPredicate: public Predicate {
+class IsNullPredicate {
  public:
-  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
-
- protected:
-  friend class Expr;
-
-  IsNullPredicate(const TExprNode& node);
-  
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
-  virtual std::string DebugString() const;
-
- private:
-  const bool is_not_null_;
-  static void* ComputeFn(Expr* e, TupleRow* row);
+  template<typename T> static BooleanVal IsNull(FunctionContext* ctx, const T& val);
+  template<typename T> static BooleanVal IsNotNull(FunctionContext* ctx, const T& val);
 };
 
 }

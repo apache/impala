@@ -29,6 +29,11 @@ void TestDemangling(const string& mangled, const string& expected_demangled) {
   EXPECT_EQ(result, expected_demangled);
 }
 
+void TestDemanglingNameOnly(const string& mangled, const string& expected_demangled) {
+  string result = SymbolsUtil::DemangleNameOnly(mangled);
+  EXPECT_EQ(result, expected_demangled);
+}
+
 // Test mangling (name, var_args, args, ret_arg_type), validating the mangled
 // string and then the unmangled (~function signature) results.
 void TestMangling(const string& name, bool var_args, const vector<ColumnType> args,
@@ -70,6 +75,22 @@ TEST(SymbolsUtil, Demangling) {
       "_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE",
       "VarSumMultiply(impala_udf::FunctionContext*, impala_udf::DoubleVal const&, int, "
           "impala_udf::IntVal const*)");
+  TestDemangling("FooBar", "");
+}
+
+// Not very thoroughly tested since our implementation is just a wrapper around
+// the gcc library.
+TEST(SymbolsUtil, DemanglingNameOnly) {
+  TestDemanglingNameOnly("_Z6NoArgsPN10impala_udf15FunctionContextE", "NoArgs");
+  TestDemanglingNameOnly("_Z8IdentityPN10impala_udf15FunctionContextERKNS_10TinyIntValE",
+      "Identity");
+  TestDemanglingNameOnly("_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE",
+      "Identity");
+  TestDemanglingNameOnly("_ZN3Foo4TESTEPN10impala_udf15FunctionContextERKNS0_6IntValES5_",
+      "TEST");
+  TestDemanglingNameOnly(
+      "_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE",
+      "VarSumMultiply");
   TestDemangling("FooBar", "");
 }
 

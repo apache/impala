@@ -90,8 +90,9 @@ class Tuple {
   // slots and the total length of the string slots are returned in var_values
   // and total_var_len.
   template <bool collect_string_vals>
-  void MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
-      const std::vector<Expr*>& materialize_exprs, MemPool* pool,
+  void MaterializeExprs(
+      TupleRow* row, const TupleDescriptor& desc,
+      const std::vector<ExprContext*>& materialize_expr_ctxs, MemPool* pool,
       std::vector<StringValue*>* non_null_var_len_values = NULL,
       int* total_var_len = NULL);
 

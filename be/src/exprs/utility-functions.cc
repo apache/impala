@@ -14,87 +14,91 @@
 
 #include "exprs/utility-functions.h"
 
-#include "exprs/function-call.h"
-#include "exprs/expr.h"
+#include "exprs/anyval-util.h"
+#include "runtime/runtime-state.h"
+#include "udf/udf-internal.h"
 #include "util/debug-util.h"
 #include "util/time.h"
-#include "runtime/tuple-row.h"
 
 using namespace std;
 
 namespace impala {
 
-void* UtilityFunctions::FnvHashString(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  StringValue* input_val =
-      reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
-  if (input_val == NULL) return NULL;
-  e->result_.bigint_val = HashUtil::FnvHash64(input_val->ptr, input_val->len,
-      HashUtil::FNV_SEED);
-  return &e->result_.bigint_val;
+BigIntVal UtilityFunctions::FnvHashString(FunctionContext* ctx,
+                                          const StringVal& input_val) {
+  if (input_val.is_null) return BigIntVal::null();
+  return BigIntVal(HashUtil::FnvHash64(input_val.ptr, input_val.len, HashUtil::FNV_SEED));
 }
 
-template<int BYTE_SIZE>
-void* UtilityFunctions::FnvHash(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  void* input_val = e->children()[0]->GetValue(row);
-  if (input_val == NULL) return NULL;
-  e->result_.bigint_val = HashUtil::FnvHash64(input_val, BYTE_SIZE, HashUtil::FNV_SEED);
-  return &e->result_.bigint_val;
+BigIntVal UtilityFunctions::FnvHashTimestamp(FunctionContext* ctx,
+                                             const TimestampVal& input_val) {
+  if (input_val.is_null) return BigIntVal::null();
+  TimestampValue tv = TimestampValue::FromTimestampVal(input_val);
+  return BigIntVal(HashUtil::FnvHash64(&tv, 12, HashUtil::FNV_SEED));
+}
+
+template<typename T>
+BigIntVal UtilityFunctions::FnvHash(FunctionContext* ctx, const T& input_val) {
+  if (input_val.is_null) return BigIntVal::null();
+  return BigIntVal(
+      HashUtil::FnvHash64(&input_val.val, sizeof(input_val.val), HashUtil::FNV_SEED));
 }
 
 // Note that this only hashes the unscaled value and not the scale or precision, so this
-// function is only valid when using over a single decimal type.
-void* UtilityFunctions::FnvHashDecimal(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  void* input_val = e->children()[0]->GetValue(row);
-  if (input_val == NULL) return NULL;
-  int byte_size = e->children()[0]->type().GetByteSize();
-  e->result_.bigint_val = HashUtil::FnvHash64(input_val, byte_size, HashUtil::FNV_SEED);
-  return &e->result_.bigint_val;
+// function is only valid when used over a single decimal type.
+BigIntVal UtilityFunctions::FnvHashDecimal(FunctionContext* ctx,
+                                           const DecimalVal& input_val) {
+  if (input_val.is_null) return BigIntVal::null();
+  ColumnType input_type = AnyValUtil::TypeDescToColumnType(*ctx->GetArgType(0));
+  int byte_size = input_type.GetByteSize();
+  return BigIntVal(HashUtil::FnvHash64(&input_val.val16, byte_size, HashUtil::FNV_SEED));
 }
 
-template void* UtilityFunctions::FnvHash<1>(Expr* e, TupleRow* row);
-template void* UtilityFunctions::FnvHash<2>(Expr* e, TupleRow* row);
-template void* UtilityFunctions::FnvHash<4>(Expr* e, TupleRow* row);
-template void* UtilityFunctions::FnvHash<8>(Expr* e, TupleRow* row);
-template void* UtilityFunctions::FnvHash<12>(Expr* e, TupleRow* row);
+template BigIntVal UtilityFunctions::FnvHash(
+    FunctionContext* ctx, const BooleanVal& input_val);
+template BigIntVal UtilityFunctions::FnvHash(
+    FunctionContext* ctx, const TinyIntVal& input_val);
+template BigIntVal UtilityFunctions::FnvHash(
+    FunctionContext* ctx, const SmallIntVal& input_val);
+template BigIntVal UtilityFunctions::FnvHash(
+    FunctionContext* ctx, const IntVal& input_val);
+template BigIntVal UtilityFunctions::FnvHash(
+    FunctionContext* ctx, const BigIntVal& input_val);
+template BigIntVal UtilityFunctions::FnvHash(
+    FunctionContext* ctx, const FloatVal& input_val);
+template BigIntVal UtilityFunctions::FnvHash(
+    FunctionContext* ctx, const DoubleVal& input_val);
 
-void* UtilityFunctions::User(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 0);
-  // An empty string indicates the user wasn't set in the session
-  // or in the query request.
-  return (e->result_.string_val.len > 0) ? &e->result_.string_val : NULL;
+StringVal UtilityFunctions::User(FunctionContext* ctx) {
+  StringVal user(ctx->user());
+  // An empty string indicates the user wasn't set in the session or in the query request.
+  return (user.len > 0) ? user : StringVal::null();
 }
 
-void* UtilityFunctions::Version(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 0);
-  e->result_.SetStringVal(GetVersionString());
-  return &e->result_.string_val;
+StringVal UtilityFunctions::Version(FunctionContext* ctx) {
+  return AnyValUtil::FromString(ctx, GetVersionString());
 }
 
-void* UtilityFunctions::Pid(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 0);
-  // Set in FunctionCall::Prepare(), will be -1 if the PID could not be determined
-  if (e->result_.int_val == -1) return NULL;
+IntVal UtilityFunctions::Pid(FunctionContext* ctx) {
+  int pid = ctx->impl()->state()->query_ctx().pid;
+  // Will be -1 if the PID could not be determined
+  if (pid == -1) return IntVal::null();
   // Otherwise the PID should be greater than 0
-  DCHECK(e->result_.int_val > 0);
-  return &e->result_.int_val;
+  DCHECK(pid > 0);
+  return IntVal(pid);
 }
 
-void* UtilityFunctions::Sleep(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
-  int* milliseconds = reinterpret_cast<int*>(e->children()[0]->GetValue(row));
-  if (milliseconds == NULL) return NULL;
-  SleepForMs(*milliseconds);
-  e->result_.bool_val = true;
-  return &e->result_.bool_val;
+BooleanVal UtilityFunctions::Sleep(FunctionContext* ctx, const IntVal& milliseconds ) {
+  if (milliseconds.is_null) return BooleanVal::null();
+  SleepForMs(milliseconds.val);
+  return BooleanVal(true);
 }
 
-void* UtilityFunctions::CurrentDatabase(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 0);
+StringVal UtilityFunctions::CurrentDatabase(FunctionContext* ctx) {
+  StringVal database =
+      AnyValUtil::FromString(ctx, ctx->impl()->state()->query_ctx().session.database);
   // An empty string indicates the current database wasn't set.
-  return (e->result_.string_val.len > 0) ? &e->result_.string_val : NULL;
+  return (database.len > 0) ? database : StringVal::null();
 }
 
 

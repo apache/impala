@@ -153,14 +153,7 @@ public class FunctionCallExpr extends Expr {
     if (Expr.isAggregatePredicate().apply(this)) {
       msg.node_type = TExprNodeType.AGGREGATE_EXPR;
     } else {
-      ScalarFunction fn = (ScalarFunction)fn_;
-      if (fn.getBinaryType() == TFunctionBinaryType.BUILTIN &&
-          !fn.isUdfInterface()) {
-        msg.node_type = TExprNodeType.COMPUTE_FUNCTION_CALL;
-      } else {
-        msg.node_type = TExprNodeType.FUNCTION_CALL;
-      }
-
+      msg.node_type = TExprNodeType.FUNCTION_CALL;
     }
   }
 

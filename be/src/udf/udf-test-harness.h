@@ -70,7 +70,6 @@ class UdfTestHarness {
     if (!RunPrepareFn(init_fn, context.get())) return false;
     RET ret = fn(context.get());
     RunCloseFn(close_fn, context.get());
-    CloseContext(context.get());
     return Validate(context.get(), expected, ret);
   }
 

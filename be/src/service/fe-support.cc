@@ -24,6 +24,7 @@
 #include "common/status.h"
 #include "exec/catalog-op-executor.h"
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -79,6 +80,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs(
 
   DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch);
   DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx);
+  query_ctx.request.query_options.disable_codegen = true;
   RuntimeState state(query_ctx);
 
   THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
@@ -88,30 +90,32 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs(
   THROW_IF_ERROR_RET(state.InitMemTrackers(TUniqueId(), NULL, -1), env,
                      JniUtil::internal_exc_class(), result_bytes);
 
-  vector<TExpr>& exprs = expr_batch.exprs;
-  // Prepate the exprs
-  vector<Expr*> prepared_exprs;
-  for (vector<TExpr>::iterator it = exprs.begin(); it != exprs.end(); it++) {
-    Expr* e;
-    THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, *it, &e), env,
+  vector<TExpr>& texprs = expr_batch.exprs;
+  // Prepare the exprs
+  vector<ExprContext*> expr_ctxs;
+  for (vector<TExpr>::iterator it = texprs.begin(); it != texprs.end(); it++) {
+    ExprContext* ctx;
+    THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, *it, &ctx), env,
                        JniUtil::internal_exc_class(), result_bytes);
-    THROW_IF_ERROR_RET(Expr::Prepare(e, &state, RowDescriptor()), env,
+    THROW_IF_ERROR_RET(ctx->Prepare(&state, RowDescriptor()), env,
                        JniUtil::internal_exc_class(), result_bytes);
-    prepared_exprs.push_back(e);
+    expr_ctxs.push_back(ctx);
   }
 
   // Optimize the module so any UDF functions are jit'd
-  if (state.codegen() != NULL) state.codegen()->FinalizeModule();
+  if (state.codegen() != NULL) {
+    state.codegen()->EnableOptimizations(false);
+    state.codegen()->FinalizeModule();
+  }
 
   vector<TColumnValue> results;
-  // Evaluate the exprs
-  for (vector<Expr*>::iterator it = prepared_exprs.begin();
-       it != prepared_exprs.end(); it++) {
+  // Open and evaluate the exprs
+  for (int i = 0; i < expr_ctxs.size(); ++i) {
     TColumnValue val;
-    THROW_IF_ERROR_RET((*it)->Open(&state), env,
+    THROW_IF_ERROR_RET(expr_ctxs[i]->Open(&state), env,
                        JniUtil::internal_exc_class(), result_bytes);
-    (*it)->GetValue(NULL, false, &val);
-    (*it)->Close(&state);
+    expr_ctxs[i]->GetValue(NULL, false, &val);
+    expr_ctxs[i]->Close(&state);
     results.push_back(val);
   }
   expr_results.__set_colVals(results);

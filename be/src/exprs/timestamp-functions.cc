@@ -20,7 +20,6 @@
 
 #include "exprs/timestamp-functions.h"
 #include "exprs/expr.h"
-#include "exprs/function-call.h"
 #include "exprs/anyval-util.h"
 
 #include "runtime/tuple-row.h"
@@ -280,12 +279,10 @@ IntVal TimestampFunctions::Second(FunctionContext* context, const TimestampVal& 
 }
 
 TimestampVal TimestampFunctions::Now(FunctionContext* context) {
-  TimestampValue default_tv;
-  TimestampValue* tv = &default_tv;
-  default_tv = TimestampValue(context->impl()->state()->now());
-  if (tv->date().is_special()) return TimestampVal::null();
+  const TimestampValue* now = context->impl()->state()->now();
+  if (now->NotADateTime()) return TimestampVal::null();
   TimestampVal return_val;
-  default_tv.ToTimestampVal(&return_val);
+  now->ToTimestampVal(&return_val);
   return return_val;
 }
 
@@ -338,6 +335,9 @@ IntVal TimestampFunctions::DateDiff(FunctionContext* context,
   return IntVal((ts_value1.get_date() - ts_value2.get_date()).days());
 }
 
+// This function uses inline asm functions, which we believe to be from the boost library.
+// Inline asm is not currently supported by JIT, so this function should always be run in
+// the interpreted mode. This is handled in ScalarFnCall::GetUdf().
 TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
@@ -365,60 +365,8 @@ TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
 }
 
 // This function uses inline asm functions, which we believe to be from the boost library.
-// Inline asm is not currently supported by JIT. The UDFs for FromUTC are included in this
-// file and have been tested, but the function symbols were not changed in
-// impala_functions.py because it will cause a failure when running codegen.
-void* TimestampFunctions::FromUtc(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 2);
-  Expr* op1 = e->children()[0];
-  Expr* op2 = e->children()[1];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op1->GetValue(row));
-  StringValue* tz = reinterpret_cast<StringValue*>(op2->GetValue(row));
-  if (tv == NULL || tz == NULL) return NULL;
-
-  if (tv->NotADateTime()) return NULL;
-
-  time_zone_ptr timezone = TimezoneDatabase::FindTimezone(tz->DebugString(), *tv);
-  if (timezone == NULL) {
-    // This should return null. Hive just ignores it.
-    LOG(ERROR) << "Unknown timezone '" << *tz << "'" << endl;
-    e->result_.timestamp_val = *tv;
-    return &e->result_.timestamp_val;
-  }
-  ptime temp;
-  tv->ToPtime(&temp);
-  local_date_time lt(temp, timezone);
-  e->result_.timestamp_val = lt.local_time();
-  return &e->result_.timestamp_val;
-}
-
-// This function uses inline asm functions, which we believe to be from the boost library.
-// Inline asm is not currently supported by JIT. The UDFs for ToUTC are included in this
-// file and have been tested, but the function symbols were not changed in
-// impala_functions.py because it will cause a failure when running codegen.
-void* TimestampFunctions::ToUtc(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 2);
-  Expr* op1 = e->children()[0];
-  Expr* op2 = e->children()[1];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op1->GetValue(row));
-  StringValue* tz = reinterpret_cast<StringValue*>(op2->GetValue(row));
-  if (tv == NULL || tz == NULL) return NULL;
-
-  if (tv->NotADateTime()) return NULL;
-
-  time_zone_ptr timezone = TimezoneDatabase::FindTimezone(tz->DebugString(), *tv);
-  // This should raise some sort of error or at least null. Hive just ignores it.
-  if (timezone == NULL) {
-    LOG(ERROR) << "Unknown timezone '" << *tz << "'" << endl;
-    e->result_.timestamp_val = *tv;
-    return &e->result_.timestamp_val;
-  }
-  local_date_time lt(tv->date(), tv->time_of_day(),
-      timezone, local_date_time::NOT_DATE_TIME_ON_ERROR);
-  e->result_.timestamp_val = TimestampValue(lt.utc_time());
-  return &e->result_.timestamp_val;
-}
-
+// Inline asm is not currently supported by JIT, so this function should always be run in
+// the interpreted mode. This is handled in ScalarFnCall::GetUdf().
 TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();

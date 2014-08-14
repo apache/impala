@@ -84,10 +84,10 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   static const uint8_t AVRO_VERSION_HEADER[4];
 
   HdfsAvroScanner(HdfsScanNode* scan_node, RuntimeState* state);
-  virtual ~HdfsAvroScanner();
 
   // Codegen parsing records, writing tuples and evaluating predicates.
-  static llvm::Function* Codegen(HdfsScanNode*, const std::vector<Expr*>& conjuncts);
+  static llvm::Function* Codegen(HdfsScanNode*,
+                                 const std::vector<ExprContext*>& conjunct_ctxs);
 
  protected:
   // Implementation of BaseSeqeunceScanner super class methods
@@ -96,7 +96,6 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   virtual Status ReadFileHeader();
   virtual Status InitNewRange();
   virtual Status ProcessRange();
-  virtual void Close();
 
   virtual THdfsFileFormat::type file_format() const {
     return THdfsFileFormat::AVRO;
@@ -206,9 +205,9 @@ class HdfsAvroScanner : public BaseSequenceScanner {
 
   // Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
   // functions.
-  static llvm::Function* CodegenDecodeAvroData(LlvmCodeGen* codegen,
-                                               llvm::Function* materialize_tuple_fn,
-                                               const std::vector<Expr*>& conjuncts);
+  static llvm::Function* CodegenDecodeAvroData(
+      RuntimeState* state, llvm::Function* materialize_tuple_fn,
+      const std::vector<ExprContext*>& conjunct_ctxs);
 
   // Codegens a version of MaterializeTuple() that reads records based on the table
   // schema.

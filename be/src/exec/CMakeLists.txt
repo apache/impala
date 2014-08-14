@@ -33,8 +33,8 @@ add_library(Exec
   delimited-text-parser.cc
   empty-set-node.cc
   exec-node.cc
-  external-data-source-executor.cc
   exchange-node.cc
+  external-data-source-executor.cc
   hash-join-node.cc
   hash-join-node-ir.cc
   hash-table.cc

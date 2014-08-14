@@ -289,7 +289,7 @@ static void ProcessQueryOptions(
       << "because nodes cannot be cancelled in Close()";
 }
 
-Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
+Status Coordinator::Exec(QuerySchedule& schedule, vector<ExprContext*>* output_expr_ctxs) {
   const TQueryExecRequest& request = schedule.request();
   DCHECK_GT(request.fragments.size(), 0);
   needs_finalization_ = request.__isset.finalize_params;
@@ -334,12 +334,12 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<Expr*>* output_exprs) {
         (*fragment_exec_params)[0], 0, coord, &rpc_params);
     RETURN_IF_ERROR(executor_->Prepare(rpc_params));
 
-    // Prepare output_exprs before optimizing the LLVM module. The other exprs of this
+    // Prepare output_expr_ctxs before optimizing the LLVM module. The other exprs of this
     // coordinator fragment have been prepared in executor_->Prepare().
-    DCHECK(output_exprs != NULL);
+    DCHECK(output_expr_ctxs != NULL);
     RETURN_IF_ERROR(Expr::CreateExprTrees(
-        runtime_state()->obj_pool(), request.fragments[0].output_exprs, output_exprs));
-    RETURN_IF_ERROR(Expr::Prepare(*output_exprs, runtime_state(), row_desc()));
+        runtime_state()->obj_pool(), request.fragments[0].output_exprs, output_expr_ctxs));
+    RETURN_IF_ERROR(Expr::Prepare(*output_expr_ctxs, runtime_state(), row_desc()));
   } else {
     // The coordinator instance may require a query mem tracker even if there is no
     // coordinator fragment. For example, result-caching tracks memory via the query mem

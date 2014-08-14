@@ -68,11 +68,11 @@ class HashJoinNode : public BlockingJoinNode {
 
   // our equi-join predicates "<lhs> = <rhs>" are separated into
   // build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
-  std::vector<Expr*> probe_exprs_;
-  std::vector<Expr*> build_exprs_;
+    std::vector<ExprContext*> probe_expr_ctxs_;
+    std::vector<ExprContext*> build_expr_ctxs_;
 
   // non-equi-join conjuncts from the JOIN clause
-  std::vector<Expr*> other_join_conjuncts_;
+  std::vector<ExprContext*> other_join_conjunct_ctxs_;
 
   // Derived from join_op_
   // Output all rows coming from the probe input. Used in LEFT_OUTER_JOIN and
@@ -94,9 +94,6 @@ class HashJoinNode : public BlockingJoinNode {
   // HashJoinNode::ProcessBuildBatch
   typedef void (*ProcessBuildBatchFn)(HashJoinNode*, RowBatch*);
   ProcessBuildBatchFn process_build_batch_fn_;
-
-  // llvm function object for probe batch
-  llvm::Function* codegen_process_probe_batch_fn_;
 
   // HashJoinNode::ProcessProbeBatch() exactly
   typedef int (*ProcessProbeBatchFn)(HashJoinNode*, RowBatch*, RowBatch*, int);
@@ -128,13 +125,13 @@ class HashJoinNode : public BlockingJoinNode {
   // hash_fn is the codegen'd function for computing hashes over tuple rows in the
   // hash table.
   // Returns NULL if codegen was not possible.
-  llvm::Function* CodegenProcessBuildBatch(LlvmCodeGen*, llvm::Function* hash_fn);
+  llvm::Function* CodegenProcessBuildBatch(RuntimeState* state, llvm::Function* hash_fn);
 
   // Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
   // hash_fn is the codegen'd function for computing hashes over tuple rows in the
   // hash table.
   // Returns NULL if codegen was not possible.
-  llvm::Function* CodegenProcessProbeBatch(LlvmCodeGen*, llvm::Function* hash_fn);
+  llvm::Function* CodegenProcessProbeBatch(RuntimeState* state, llvm::Function* hash_fn);
 };
 
 }

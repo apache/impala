@@ -22,12 +22,12 @@ HdfsTableWriter::HdfsTableWriter(HdfsTableSink* parent,
                                  RuntimeState* state, OutputPartition* output,
                                  const HdfsPartitionDescriptor* partition_desc,
                                  const HdfsTableDescriptor* table_desc,
-                                 const vector<Expr*>& output_exprs)
+                                 const vector<ExprContext*>& output_expr_ctxs)
   : parent_(parent),
     state_(state),
     output_(output),
     table_desc_(table_desc),
-    output_exprs_(output_exprs) {
+    output_expr_ctxs_(output_expr_ctxs) {
 }
 
 Status HdfsTableWriter::Write(const uint8_t* data, int32_t len) {

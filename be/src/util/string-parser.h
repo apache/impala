@@ -101,6 +101,13 @@ class StringParser {
   // On overflow or invalid values, the return value is undefined.
   // On underflow, the truncated value is returned.
   template <typename T>
+  static inline DecimalValue<T> StringToDecimal(const uint8_t* s, int len,
+      const ColumnType& type, StringParser::ParseResult* result) {
+    return StringToDecimal<T>(reinterpret_cast<const char*>(s), len, type, result);
+  }
+
+  // Parses a decimal from s, storing the result in *v.
+  template <typename T>
   static inline DecimalValue<T> StringToDecimal(const char* s, int len,
       const ColumnType& type, StringParser::ParseResult* result) {
     bool negative = false;

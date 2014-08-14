@@ -32,7 +32,7 @@ class RowBatch;
 // The client API for Sorter is as follows:
 // AddBatch() is used to add input rows to be sorted. Multiple tuples in an input row are
 // materialized into a row with a single tuple (the sort tuple) using the materialization
-// exprs in sort_tuple_slot_exprs_. The sort tuples are sorted according to the sort
+// exprs in sort_tuple_slot_expr_ctxs_. The sort tuples are sorted according to the sort
 // parameters and output by the sorter.
 // AddBatch() can be called multiple times.
 //
@@ -86,7 +86,7 @@ class Sorter {
   // merge_batch_size_ is the size of the batches created to provide rows to the merger
   // and retrieve rows from an intermediate merger.
   Sorter(const TupleRowComparator& compare_less_than,
-      const std::vector<Expr*>& sort_tuple_slot_exprs,
+      const std::vector<ExprContext*>& sort_tuple_slot_expr_ctxs,
       RowDescriptor* output_row_desc, MemTracker* mem_tracker,
       RuntimeProfile* profile, RuntimeState* state);
 
@@ -172,7 +172,7 @@ class Sorter {
 
   // Expressions used to materialize the sort tuple. Contains one expr per slot in the
   // tuple.
-  std::vector<Expr*> sort_tuple_slot_exprs_;
+  std::vector<ExprContext*> sort_tuple_slot_expr_ctxs_;
 
   // Mem tracker for batches created during merge. Not owned by Sorter.
   MemTracker* mem_tracker_;

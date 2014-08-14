@@ -24,18 +24,26 @@ class TExprNode;
 
 class NullLiteral: public Expr {
  public:
-  NullLiteral(PrimitiveType type);
-  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
+  NullLiteral(PrimitiveType type) : Expr(type) { }
+  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+
+  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext*, TupleRow*);
+  virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext*, TupleRow*);
+  virtual impala_udf::SmallIntVal GetSmallIntVal(ExprContext*, TupleRow*);
+  virtual impala_udf::IntVal GetIntVal(ExprContext*, TupleRow*);
+  virtual impala_udf::BigIntVal GetBigIntVal(ExprContext*, TupleRow*);
+  virtual impala_udf::FloatVal GetFloatVal(ExprContext*, TupleRow*);
+  virtual impala_udf::DoubleVal GetDoubleVal(ExprContext*, TupleRow*);
+  virtual impala_udf::StringVal GetStringVal(ExprContext*, TupleRow*);
+  virtual impala_udf::TimestampVal GetTimestampVal(ExprContext*, TupleRow*);
+  virtual impala_udf::DecimalVal GetDecimalVal(ExprContext*, TupleRow*);
+
+  virtual std::string DebugString() const;
 
  protected:
   friend class Expr;
   
-  NullLiteral(const TExprNode& node);
-
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
-
- private:
-  static void* ReturnValue(Expr* e, TupleRow* row);
+  NullLiteral(const TExprNode& node) : Expr(node) { }
 };
 
 }

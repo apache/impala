@@ -44,6 +44,7 @@ class TSlotDescriptor;
 class TTable;
 class TTupleDescriptor;
 class Expr;
+class ExprContext;
 class RuntimeState;
 
 struct LlvmTupleStruct {
@@ -169,7 +170,9 @@ class HdfsPartitionDescriptor {
   char collection_delim() const { return collection_delim_; }
   char escape_char() const { return escape_char_; }
   THdfsFileFormat::type file_format() const { return file_format_; }
-  const std::vector<Expr*>& partition_key_values() const { return partition_key_values_; }
+  const std::vector<ExprContext*>& partition_key_value_ctxs() const {
+    return partition_key_value_ctxs_;
+  }
   int block_size() const { return block_size_; }
   const std::string& location() const { return location_; }
   int64_t id() const { return id_; }
@@ -196,11 +199,9 @@ class HdfsPartitionDescriptor {
   bool exprs_opened_;
   bool exprs_closed_;
 
-  // List of literal (and therefore constant) expressions for each
-  // partition key. The Expr objects are owned by the local object
-  // pool. Their order corresponds to the first num_clustering_cols of
-  // the parent table.
-  std::vector<Expr*> partition_key_values_;
+  // List of literal (and therefore constant) expressions for each partition key. Their
+  // order corresponds to the first num_clustering_cols of the parent table.
+  std::vector<ExprContext*> partition_key_value_ctxs_;
 
   // The format (e.g. text, sequence file etc.) of data in the files in this partition
   THdfsFileFormat::type file_format_;

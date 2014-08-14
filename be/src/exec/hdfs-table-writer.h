@@ -42,7 +42,7 @@ class HdfsTableWriter {
                   RuntimeState* state, OutputPartition* output_partition,
                   const HdfsPartitionDescriptor* partition_desc,
                   const HdfsTableDescriptor* table_desc,
-                  const std::vector<Expr*>& output_exprs);
+                  const std::vector<ExprContext*>& output_expr_ctxs);
 
   virtual ~HdfsTableWriter() { }
 
@@ -118,7 +118,7 @@ class HdfsTableWriter {
   const HdfsTableDescriptor* table_desc_;
 
   // Expressions that materialize output values.
-  std::vector<Expr*> output_exprs_;
+  std::vector<ExprContext*> output_expr_ctxs_;
 
   // Subclass should populate any file format specific stats.
   TInsertStats stats_;

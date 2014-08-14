@@ -24,7 +24,7 @@ using namespace std;
 FunctionContext* UdfTestHarness::CreateTestContext(
     const FunctionContext::TypeDesc& return_type,
     const vector<FunctionContext::TypeDesc>& arg_types) {
-  return FunctionContextImpl::CreateContext(NULL, NULL, return_type, arg_types, true);
+  return FunctionContextImpl::CreateContext(NULL, NULL, return_type, arg_types, 0, true);
 }
 
 void UdfTestHarness::SetConstantArgs(

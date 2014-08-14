@@ -89,9 +89,12 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CFLAGS}")
 # Thrift requires these definitions for some types that we use
 add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
 
-# Set clang to IR cross compile flags
-# IR_COMPILE is #defined for the cross compile to remove code that bloats the IR
-set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-O3" "-c" "-DIR_COMPILE" "-DNDEBUG"
+# Set clang flags for cross-compiling to IR.
+# IR_COMPILE is #defined for the cross compile to remove code that bloats the IR.
+# Note that we don't enable any optimization. We want unoptimized IR since we will be
+# modifying it at runtime, then re-compiling (and optimizing) the modified code. The final
+# optimizations will be less effective if the initial code is also optimized.
+set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-DIR_COMPILE" "-DNDEBUG"
   "-DHAVE_INTTYPES_H" "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 
 # setup doc generation with Doxygen

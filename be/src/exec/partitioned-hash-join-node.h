@@ -179,12 +179,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   std::string DebugString() const;
 
   // our equi-join predicates "<lhs> = <rhs>" are separated into
-  // build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
-  std::vector<Expr*> probe_exprs_;
-  std::vector<Expr*> build_exprs_;
+  // build_expr_ctxs_ (over child(1)) and probe_expr_ctxs_ (over child(0))
+  std::vector<ExprContext*> probe_expr_ctxs_;
+  std::vector<ExprContext*> build_expr_ctxs_;
 
   // non-equi-join conjuncts from the JOIN clause
-  std::vector<Expr*> other_join_conjuncts_;
+  std::vector<ExprContext*> other_join_conjunct_ctxs_;
 
   // State of the algorithm. Used just for debugging.
   State state_;

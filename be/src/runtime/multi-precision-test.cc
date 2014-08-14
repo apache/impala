@@ -70,6 +70,16 @@ TEST(MultiPrecisionIntTest, Conversion) {
   EXPECT_FALSE(overflow);
 }
 
+TEST(MultiPrecisionIntTest, HighLowBits) {
+  // x = 0x0f0e0d0c0b0a09080706050403020100
+  int128_t x;
+  for (int i = 0; i < sizeof(x); ++i) {
+    *(reinterpret_cast<uint8_t*>(&x) + i) = i;
+  }
+  EXPECT_EQ(LowBits(x), 0x0706050403020100);
+  EXPECT_EQ(HighBits(x), 0x0f0e0d0c0b0a0908);
+}
+
 // Simple example of adding and subtracting numbers that use more than
 // 64 bits.
 TEST(MultiPrecisionIntTest, Example) {

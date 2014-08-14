@@ -144,6 +144,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   LOG(INFO) << OsInfo::DebugString();
   LOG(INFO) << "Process ID: " << getpid();
 
+  // Required for the FE's Catalog
   impala::LibCache::Init();
   impala::HdfsFsCache::Init();
 

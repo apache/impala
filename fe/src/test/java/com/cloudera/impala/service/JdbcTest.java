@@ -252,7 +252,7 @@ public class JdbcTest {
   @Test
   public void testMetaDataGetFunctions() throws SQLException {
     // Look up the 'substring' function.
-    // We support 4 overloaded version of it.
+    // We support 2 overloaded version of it.
     ResultSet rs = con_.getMetaData().getFunctions(
         null, null, "substring");
     int numFound = 0;
@@ -265,7 +265,7 @@ public class JdbcTest {
       assertTrue(fnSignature.startsWith("substring("));
       ++numFound;
     }
-    assertEquals(numFound, 4);
+    assertEquals(numFound, 2);
     rs.close();
 
     // substring is not in default db

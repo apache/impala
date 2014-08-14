@@ -38,8 +38,6 @@ public class CastExpr extends Expr {
   // True if this cast does not change the type.
   private boolean noOp_ = false;
 
-  private static final String CAST_FN_NAME = "cast";
-
   public CastExpr(Type targetType, Expr e, boolean isImplicit) {
     super();
     Preconditions.checkArgument(targetType.isValid());
@@ -85,9 +83,9 @@ public class CastExpr extends Expr {
   }
 
   public static void initBuiltins(Db db) {
-    for (Type fromType: Type.getSupportedTypes()) {
+    for (Type fromType : Type.getSupportedTypes()) {
       if (fromType.isNull()) continue;
-      for (Type toType: Type.getSupportedTypes()) {
+      for (Type toType : Type.getSupportedTypes()) {
         if (toType.isNull()) continue;
         // Disable casting from string to boolean
         if (fromType.isStringType() && toType.isBoolean()) continue;
@@ -102,7 +100,7 @@ public class CastExpr extends Expr {
         String beSymbol = "impala::" + beClass + "::CastTo" + Function.getUdfType(toType);
         db.addBuiltin(ScalarFunction.createBuiltin(getFnName(toType),
             Lists.newArrayList(fromType), false, toType, beSymbol,
-            null, null, true, true));
+            null, null, true));
       }
     }
   }

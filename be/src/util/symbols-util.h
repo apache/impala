@@ -31,6 +31,11 @@ class SymbolsUtil {
   // Returns the empty string if the name is not valid.
   static std::string Demangle(const std::string& name);
 
+  // Returns the function name of the demangled symbol (i.e., it strips the arguments and
+  // any namespace/class qualifiers).
+  // Returns the empty string if the name is not valid.
+  static std::string DemangleNameOnly(const std::string& symbol);
+
   // Mangles fn_name with 'arg_types' to the function signature for user functions.
   // This maps types to AnyVal* and automatically adds the FunctionContext*
   // as the first argument.

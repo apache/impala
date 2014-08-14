@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "codegen/codegen-anyval.h"
-#include "exprs/anyval-util.h"
 
 using namespace impala;
 using namespace impala_udf;
@@ -60,6 +59,10 @@ Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& type) {
   }
 }
 
+Type* CodegenAnyVal::GetLoweredPtrType(LlvmCodeGen* cg, const ColumnType& type) {
+  return GetLoweredType(cg, type)->getPointerTo();
+}
+
 Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type) {
   Type* result;
   switch(type.type) {
@@ -101,16 +104,20 @@ Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type) {
   return result;
 }
 
+Type* CodegenAnyVal::GetUnloweredPtrType(LlvmCodeGen* cg, const ColumnType& type) {
+  return GetUnloweredType(cg, type)->getPointerTo();
+}
+
 Value* CodegenAnyVal::CreateCall(
     LlvmCodeGen* cg, LlvmCodeGen::LlvmBuilder* builder, Function* fn,
-    ArrayRef<Value*> args, const string& name, Value* result_ptr) {
+    ArrayRef<Value*> args, const char* name, Value* result_ptr) {
   if (fn->getReturnType()->isVoidTy()) {
     // Void return type indicates that this function returns a DecimalVal via the first
     // argument (which should be a DecimalVal*).
     Function::arg_iterator ret_arg = fn->arg_begin();
     DCHECK(ret_arg->getType()->isPointerTy());
     Type* ret_type = ret_arg->getType()->getPointerElementType();
-    DCHECK_EQ(ret_type, GetLoweredType(cg, ColumnType::CreateDecimalType(1, 0)));
+    DCHECK_EQ(ret_type, cg->GetType(LLVM_DECIMALVAL_NAME));
 
     // We need to pass a DecimalVal pointer to 'fn' that will be populated with the result
     // value. Use 'result_ptr' if specified, otherwise alloca one.
@@ -124,17 +131,20 @@ Value* CodegenAnyVal::CreateCall(
     if (result_ptr != NULL) return NULL;
     return builder->CreateLoad(ret_ptr, name);
   } else {
-    // Function returns *Val normally
-    // Note that 'fn' may return a DecimalVal. We generate non-ABI-compliant functions
-    // internally, rather than special-casing DecimalVal everywhere. This is ok as long as
-    // the non-compliant functions are called only by other code-generated functions,
-    // since LLVM is aware of the non-compliant function signature and will generate the
-    // correct call instructions.
+    // Function returns *Val normally (note that it could still be returning a DecimalVal,
+    // since we generate non-complaint functions)
     Value* ret = builder->CreateCall(fn, args, name);
     if (result_ptr == NULL) return ret;
     builder->CreateStore(ret, result_ptr);
     return NULL;
   }
+}
+
+CodegenAnyVal CodegenAnyVal::CreateCallWrapped(
+    LlvmCodeGen* cg, LlvmCodeGen::LlvmBuilder* builder, const ColumnType& type,
+    Function* fn, ArrayRef<Value*> args, const char* name, Value* result_ptr) {
+  Value* v = CreateCall(cg, builder, fn, args, name, result_ptr);
+  return CodegenAnyVal(cg, builder, type, v, name);
 }
 
 CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmCodeGen::LlvmBuilder* builder,
@@ -153,23 +163,40 @@ CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmCodeGen::LlvmBuilder* bui
   DCHECK_EQ(value_->getType(), value_type);
 }
 
-Value* CodegenAnyVal::GetIsNull() {
-  if (type_.type == TYPE_BIGINT || type_.type == TYPE_DOUBLE) {
-    // Lowered type is of form { i8, * }. Get the i8 value.
-    Value* is_null_i8 = builder_->CreateExtractValue(value_, 0, name_);
-    DCHECK(is_null_i8->getType() == codegen_->tinyint_type());
-    return builder_->CreateTrunc(is_null_i8, codegen_->boolean_type());
+Value* CodegenAnyVal::GetIsNull(const char* name) {
+  switch (type_.type) {
+    case TYPE_BIGINT:
+    case TYPE_DOUBLE: {
+      // Lowered type is of form { i8, * }. Get the i8 value.
+      Value* is_null_i8 = builder_->CreateExtractValue(value_, 0);
+      DCHECK(is_null_i8->getType() == codegen_->tinyint_type());
+      return builder_->CreateTrunc(is_null_i8, codegen_->boolean_type(), name);
+    }
+    case TYPE_DECIMAL: {
+      // Lowered type is of the form { {i8}, ... }
+      uint32_t idxs[] = {0, 0};
+      Value* is_null_i8 = builder_->CreateExtractValue(value_, idxs);
+      DCHECK(is_null_i8->getType() == codegen_->tinyint_type());
+      return builder_->CreateTrunc(is_null_i8, codegen_->boolean_type(), name);
+    }
+    case TYPE_STRING:
+    case TYPE_TIMESTAMP: {
+      // Lowered type is of form { i64, *}. Get the first byte of the i64 value.
+      Value* v = builder_->CreateExtractValue(value_, 0);
+      DCHECK(v->getType() == codegen_->bigint_type());
+      return builder_->CreateTrunc(v, codegen_->boolean_type(), name);
+    }
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_FLOAT:
+      // Lowered type is an integer. Get the first byte.
+      return builder_->CreateTrunc(value_, codegen_->boolean_type(), name);
+    default:
+      DCHECK(false);
+      return NULL;
   }
-
-  if (type_.type == TYPE_STRING || type_.type == TYPE_TIMESTAMP) {
-    // Lowered type is of form { i64, *}. Get the first byte of the i64 value.
-    Value* v = builder_->CreateExtractValue(value_, 0);
-    DCHECK(v->getType() == codegen_->bigint_type());
-    return builder_->CreateTrunc(v, codegen_->boolean_type());
-  }
-
-  // Lowered type is an integer. Get the first byte.
-  return builder_->CreateTrunc(value_, codegen_->boolean_type());
 }
 
 void CodegenAnyVal::SetIsNull(Value* is_null) {
@@ -251,7 +278,8 @@ Value* CodegenAnyVal::GetVal(const char* name) {
       // Lowered type is of form { {i8}, [15 x i8], {i128} }. Get the i128 value and
       // truncate it to the correct size. (The {i128} corresponds to the union of the
       // different width int types.)
-      Value* val = builder_->CreateExtractValue(value_, 2, name);
+      uint32_t idxs[] = {2, 0};
+      Value* val = builder_->CreateExtractValue(value_, idxs, name);
       return builder_->CreateTrunc(val, codegen_->GetType(type_), name);
       break;
     }
@@ -269,7 +297,7 @@ void CodegenAnyVal::SetVal(Value* val) {
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
-    case TYPE_INT:{
+    case TYPE_INT: {
       // Lowered type is an integer. Set the high bytes to 'val'.
       int num_bits = type_.GetByteSize() * 8;
       value_ = SetHighBits(num_bits, val, value_, name_);
@@ -297,6 +325,52 @@ void CodegenAnyVal::SetVal(Value* val) {
     default:
       DCHECK(false) << "Unsupported type: " << type_;
   }
+}
+
+void CodegenAnyVal::SetVal(bool val) {
+  DCHECK_EQ(type_.type, TYPE_BOOLEAN);
+  SetVal(builder_->getInt1(val));
+}
+
+void CodegenAnyVal::SetVal(int8_t val) {
+  DCHECK_EQ(type_.type, TYPE_TINYINT);
+  SetVal(builder_->getInt8(val));
+}
+
+void CodegenAnyVal::SetVal(int16_t val) {
+  DCHECK_EQ(type_.type, TYPE_SMALLINT);
+  SetVal(builder_->getInt16(val));
+}
+
+void CodegenAnyVal::SetVal(int32_t val) {
+  DCHECK(type_.type == TYPE_INT || type_.type == TYPE_DECIMAL);
+  SetVal(builder_->getInt32(val));
+}
+
+void CodegenAnyVal::SetVal(int64_t val) {
+  DCHECK(type_.type == TYPE_BIGINT || type_.type == TYPE_DECIMAL);
+  SetVal(builder_->getInt64(val));
+}
+
+void CodegenAnyVal::SetVal(int128_t val) {
+  DCHECK_EQ(type_.type, TYPE_DECIMAL);
+  // TODO: is there a better way to do this?
+  // Set high bits
+  Value* ir_val = ConstantInt::get(codegen_->i128_type(), HighBits(val));
+  ir_val = builder_->CreateShl(ir_val, 64, "tmp");
+  // Set low bits
+  ir_val = builder_->CreateOr(ir_val, LowBits(val), "tmp");
+  SetVal(ir_val);
+}
+
+void CodegenAnyVal::SetVal(float val) {
+  DCHECK_EQ(type_.type, TYPE_FLOAT);
+  SetVal(ConstantFP::get(builder_->getFloatTy(), val));
+}
+
+void CodegenAnyVal::SetVal(double val) {
+  DCHECK_EQ(type_.type, TYPE_DOUBLE);
+  SetVal(ConstantFP::get(builder_->getDoubleTy(), val));
 }
 
 Value* CodegenAnyVal::GetPtr() {
@@ -353,6 +427,12 @@ void CodegenAnyVal::SetDate(Value* date) {
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
 }
 
+Value* CodegenAnyVal::GetUnloweredPtr() {
+  Value* value_ptr = builder_->CreateAlloca(value_->getType());
+  builder_->CreateStore(value_, value_ptr);
+  return builder_->CreateBitCast(value_ptr, GetUnloweredPtrType(codegen_, type_));
+}
+
 void CodegenAnyVal::SetFromRawPtr(Value* raw_ptr) {
   Value* val_ptr =
       builder_->CreateBitCast(raw_ptr, codegen_->GetPtrType(type_), "val_ptr");
@@ -407,7 +487,7 @@ void CodegenAnyVal::SetFromRawValue(Value* raw_val) {
   }
 }
 
-Value* CodegenAnyVal::ToRawValue() {
+Value* CodegenAnyVal::ToNativeValue() {
   Type* raw_type = codegen_->GetType(type_);
   Value* raw_val = Constant::getNullValue(raw_type);
   switch (type_.type) {
@@ -446,6 +526,73 @@ Value* CodegenAnyVal::ToRawValue() {
   return raw_val;
 }
 
+void CodegenAnyVal::ToNativePtr(Value* native_ptr) {
+  builder_->CreateStore(ToNativeValue(), native_ptr);
+}
+
+Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
+  DCHECK_EQ(type_, other->type_);
+  switch (type_.type) {
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+    case TYPE_DECIMAL:
+      return builder_->CreateICmpEQ(GetVal(), other->GetVal(), "eq");
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+      return builder_->CreateFCmpUEQ(GetVal(), other->GetVal(), "eq");
+    case TYPE_STRING: {
+      Function* eq_fn = codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VAL_EQ);
+      return builder_->CreateCall2(
+          eq_fn, GetUnloweredPtr(), other->GetUnloweredPtr(), "eq");
+    }
+    case TYPE_TIMESTAMP: {
+      Function* eq_fn =
+          codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_TIMESTAMP_VAL_EQ);
+      return builder_->CreateCall2(
+          eq_fn, GetUnloweredPtr(), other->GetUnloweredPtr(), "eq");
+    }
+    default:
+      DCHECK(false) << "NYI: " << type_.DebugString();
+      return NULL;
+  }
+}
+
+Value* CodegenAnyVal::EqToNativePtr(Value* native_ptr) {
+  Value* val = NULL;
+  if (type_.type != TYPE_STRING) {
+     val = builder_->CreateLoad(native_ptr);
+  }
+  switch (type_.type) {
+    case TYPE_NULL:
+      return codegen_->false_value();
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+    case TYPE_DECIMAL:
+      return builder_->CreateICmpEQ(GetVal(), val, "cmp_raw");
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+      return builder_->CreateFCmpUEQ(GetVal(), val, "cmp_raw");
+    case TYPE_STRING: {
+      Function* eq_fn = codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VALUE_EQ);
+      return builder_->CreateCall2(eq_fn, GetUnloweredPtr(), native_ptr, "cmp_raw");
+    }
+    case TYPE_TIMESTAMP: {
+      Function* eq_fn =
+          codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_TIMESTAMP_VALUE_EQ);
+      return builder_->CreateCall2(eq_fn, GetUnloweredPtr(), native_ptr, "cmp_raw");
+    }
+    default:
+      DCHECK(false) << "NYI: " << type_.DebugString();
+      return NULL;
+  }
+}
+
 Value* CodegenAnyVal::GetHighBits(int num_bits, Value* v, const char* name) {
   DCHECK_EQ(v->getType()->getIntegerBitWidth(), num_bits * 2);
   Value* shifted = builder_->CreateAShr(v, num_bits);
@@ -460,24 +607,44 @@ Value* CodegenAnyVal::GetHighBits(int num_bits, Value* v, const char* name) {
 // %dst2 = or i16 %3, %2  ; set the top of half of dst to src
 Value* CodegenAnyVal::SetHighBits(int num_bits, Value* src, Value* dst,
                                   const char* name) {
+  DCHECK_LE(src->getType()->getIntegerBitWidth(), num_bits);
+  DCHECK_EQ(dst->getType()->getIntegerBitWidth(), num_bits * 2);
   Value* extended_src =
       builder_->CreateZExt(src, IntegerType::get(codegen_->context(), num_bits * 2));
   Value* shifted_src = builder_->CreateShl(extended_src, num_bits);
-  Value* masked_dst = builder_->CreateAnd(dst, (1 << num_bits) - 1);
+  Value* masked_dst = builder_->CreateAnd(dst, (1LL << num_bits) - 1);
   return builder_->CreateOr(masked_dst, shifted_src, name);
 }
 
 Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, const ColumnType& type) {
   Type* val_type = GetLoweredType(codegen, type);
+  return GetNullVal(codegen, val_type);
+}
+
+Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, Type* val_type) {
   if (val_type->isStructTy()) {
+    StructType* struct_type = cast<StructType>(val_type);
+    if (struct_type->getNumElements() == 3) {
+      DCHECK_EQ(val_type, codegen->GetType(LLVM_DECIMALVAL_NAME));
+      // Return the struct { {1}, 0, 0 } (the 'is_null' byte, i.e. the first value's first
+      // byte, is set to 1, the other bytes don't matter)
+      StructType* anyval_struct_type = cast<StructType>(struct_type->getElementType(0));
+      Type* is_null_type = anyval_struct_type->getElementType(0);
+      Value* null_anyval =
+          ConstantStruct::get(anyval_struct_type, ConstantInt::get(is_null_type, 1));
+      Type* type2 = struct_type->getElementType(1);
+      Type* type3 = struct_type->getElementType(2);
+      return ConstantStruct::get(struct_type, null_anyval, Constant::getNullValue(type2),
+                                 Constant::getNullValue(type3), NULL);
+    }
     // Return the struct { 1, 0 } (the 'is_null' byte, i.e. the first value's first byte,
     // is set to 1, the other bytes don't matter)
-    StructType* struct_type = cast<StructType>(val_type);
     DCHECK_EQ(struct_type->getNumElements(), 2);
     Type* type1 = struct_type->getElementType(0);
+    DCHECK(type1->isIntegerTy()) << LlvmCodeGen::Print(type1);
     Type* type2 = struct_type->getElementType(1);
     return ConstantStruct::get(
-        struct_type, ConstantInt::get(type1, 1), ConstantInt::get(type2, 0), NULL);
+        struct_type, ConstantInt::get(type1, 1), Constant::getNullValue(type2), NULL);
   }
   // Return the int 1 ('is_null' byte is 1, other bytes don't matter)
   DCHECK(val_type->isIntegerTy());

@@ -17,6 +17,7 @@
 #define IMPALA_UTIL_TUPLE_ROW_COMPARE_H_
 
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "runtime/descriptors.h"
@@ -30,47 +31,40 @@ class TupleRowComparator {
   // sort order.
   // We use nulls_first to determine, for each expr, if nulls should come before
   // or after all other values.
-  TupleRowComparator(const std::vector<Expr*>& key_exprs_lhs,
-      const std::vector<Expr*>& key_exprs_rhs,
+  TupleRowComparator(
+      const std::vector<ExprContext*>& key_expr_ctxs_lhs,
+      const std::vector<ExprContext*>& key_expr_ctxs_rhs,
       const std::vector<bool>& is_asc,
       const std::vector<bool>& nulls_first)
-      : key_exprs_lhs_(key_exprs_lhs), key_exprs_rhs_(key_exprs_rhs) {
-    DCHECK_EQ(key_exprs_lhs.size(), key_exprs_rhs.size());
-    DCHECK_EQ(key_exprs_lhs.size(), is_asc.size());
-    DCHECK_EQ(key_exprs_lhs.size(), nulls_first.size());
-    is_asc_.reserve(key_exprs_lhs.size());
-    nulls_first_.reserve(key_exprs_lhs.size());
-    for (int i = 0; i < key_exprs_lhs.size(); ++i) {
+      : key_expr_ctxs_lhs_(key_expr_ctxs_lhs),
+        key_expr_ctxs_rhs_(key_expr_ctxs_rhs) {
+    DCHECK_EQ(key_expr_ctxs_lhs.size(), key_expr_ctxs_rhs.size());
+    DCHECK_EQ(key_expr_ctxs_lhs.size(), is_asc.size());
+    DCHECK_EQ(key_expr_ctxs_lhs.size(), nulls_first.size());
+    is_asc_.reserve(key_expr_ctxs_lhs.size());
+    nulls_first_.reserve(key_expr_ctxs_lhs.size());
+    for (int i = 0; i < key_expr_ctxs_lhs.size(); ++i) {
       is_asc_.push_back(is_asc[i] ? 1 : 0);
       nulls_first_.push_back(nulls_first[i] ? 1 : 0);
     }
   }
 
   // Returns true if lhs is strictly less than rhs.
-  // All exprs (key_exprs_lhs_ and key_exprs_rhs_) must have been prepared and opened
-  // before calling this.
+  // All exprs (key_expr_ctxs_lhs_ and key_expr_ctxs_rhs_) must have been prepared and
+  // opened before calling this.
   bool operator() (TupleRow* lhs, TupleRow* rhs) const {
-    std::vector<Expr*>::const_iterator lhs_expr_iter = key_exprs_lhs_.begin();
-    std::vector<Expr*>::const_iterator rhs_expr_iter = key_exprs_rhs_.begin();
-    std::vector<uint8_t>::const_iterator is_asc_iter = is_asc_.begin();
-    std::vector<uint8_t>::const_iterator nulls_first_iter = nulls_first_.begin();
-
-    for (;lhs_expr_iter != key_exprs_lhs_.end();
-         ++lhs_expr_iter, ++rhs_expr_iter, ++is_asc_iter, ++nulls_first_iter) {
-      Expr* lhs_expr = *lhs_expr_iter;
-      Expr* rhs_expr = *rhs_expr_iter;
-      void* lhs_value = lhs_expr->GetValue(lhs);
-      void* rhs_value = rhs_expr->GetValue(rhs);
-      bool less_than = static_cast<bool>(*is_asc_iter);
-      bool nulls_first = static_cast<bool>(*nulls_first_iter);
+    for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
+      void* lhs_value = key_expr_ctxs_lhs_[i]->GetValue(lhs);
+      void* rhs_value = key_expr_ctxs_rhs_[i]->GetValue(rhs);
 
       // The sort order of NULLs is independent of asc/desc.
       if (lhs_value == NULL && rhs_value == NULL) continue;
-      if (lhs_value == NULL && rhs_value != NULL) return nulls_first;
-      if (lhs_value != NULL && rhs_value == NULL) return !nulls_first;
+      if (lhs_value == NULL && rhs_value != NULL) return nulls_first_[i];
+      if (lhs_value != NULL && rhs_value == NULL) return !nulls_first_[i];
 
-      int result = RawValue::Compare(lhs_value, rhs_value, lhs_expr->type());
-      if (!less_than) result = -result;
+      int result = RawValue::Compare(lhs_value, rhs_value, 
+                                     key_expr_ctxs_lhs_[i]->root()->type());
+      if (!is_asc_[i]) result = -result;
       if (result > 0) return false;
       if (result < 0) return true;
       // Otherwise, try the next Expr
@@ -85,8 +79,8 @@ class TupleRowComparator {
   }
 
  private:
-  std::vector<Expr*> key_exprs_lhs_;
-  std::vector<Expr*> key_exprs_rhs_;
+  std::vector<ExprContext*> key_expr_ctxs_lhs_;
+  std::vector<ExprContext*> key_expr_ctxs_rhs_;
   std::vector<uint8_t> is_asc_;
   std::vector<uint8_t> nulls_first_;
 };

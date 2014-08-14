@@ -28,6 +28,7 @@
 namespace impala {
 
 class Expr;
+class ExprContext;
 class ObjectPool;
 class Counters;
 class RowBatch;
@@ -116,18 +117,16 @@ class ExecNode {
   // Collect all scan node types.
   void CollectScanNodes(std::vector<ExecNode*>* nodes);
 
-  // Evaluate exprs over row.  Returns true if all exprs return true.
+  // Evaluate ExprContexts over row.  Returns true if all exprs return true.
   // TODO: This doesn't use the vector<Expr*> signature because I haven't figured
   // out how to deal with declaring a templated std:vector type in IR
-  static bool EvalConjuncts(Expr* const* exprs, int num_exprs, TupleRow* row);
+  static bool EvalConjuncts(ExprContext* const* ctxs, int num_ctxs, TupleRow* row);
 
-  // Codegen function to evaluate the conjuncts.  Returns NULL if codegen was
-  // not supported for the conjunct exprs.
-  // Codegen'd signature is bool EvalConjuncts(Expr** exprs, int num_exprs, TupleRow*);
-  // The first two arguments are ignored (the Expr's are baked into the codegen)
-  // but it is included so the signature can match EvalConjuncts.
-  static llvm::Function* CodegenEvalConjuncts(LlvmCodeGen* codegen,
-      const std::vector<Expr*>& conjuncts);
+  // Returns a codegen'd version of EvalConjuncts(), or NULL if the function couldn't be
+  // codegen'd. The codegen'd version uses inlined, codegen'd GetBooleanVal() functions.
+  static llvm::Function* CodegenEvalConjuncts(
+      RuntimeState* state, const std::vector<ExprContext*>& conjunct_ctxs,
+      const char* name = "EvalConjuncts");
 
   // Returns a string representation in DFS order of the plan rooted at this.
   std::string DebugString() const;
@@ -139,8 +138,7 @@ class ExecNode {
   // Output parameters:
   //   out: Stream to accumulate debug string.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
-
-  const std::vector<Expr*>& conjuncts() const { return conjuncts_; }
+  const std::vector<ExprContext*>& conjunct_ctxs() const { return conjunct_ctxs_; }
 
   int id() const { return id_; }
   TPlanNodeType::type type() const { return type_; }
@@ -199,13 +197,7 @@ class ExecNode {
   int id_;  // unique w/in single plan tree
   TPlanNodeType::type type_;
   ObjectPool* pool_;
-  std::vector<Expr*> conjuncts_;
-
-  // True if the codegen'd function for 'conjuncts_' is thread safe.  If not, copies
-  // of the conjuncts_ need to be made if the conjuncts will be evaluated by multiple
-  // threads.
-  // TODO: we need to make Expr's always thread safe and this can be removed.
-  bool codegend_conjuncts_thread_safe_;
+  std::vector<ExprContext*> conjunct_ctxs_;
 
   std::vector<ExecNode*> children_;
   RowDescriptor row_descriptor_;
@@ -240,8 +232,6 @@ class ExecNode {
 
   static Status CreateTreeHelper(ObjectPool* pool, const std::vector<TPlanNode>& tnodes,
       const DescriptorTbl& descs, ExecNode* parent, int* node_idx, ExecNode** root);
-
-  Status PrepareConjuncts(RuntimeState* state);
 
   virtual bool IsScanNode() const { return false; }
 

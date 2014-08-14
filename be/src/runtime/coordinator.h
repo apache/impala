@@ -52,6 +52,7 @@ class ObjectPool;
 class RuntimeState;
 class ImpalaInternalServiceClient;
 class Expr;
+class ExprContext;
 class ExecEnv;
 class TUpdateCatalogRequest;
 class TQueryExecRequest;
@@ -92,10 +93,10 @@ class Coordinator {
   // as all plan fragments have started executing at their respective backends.
   // 'schedule' must contain at least a coordinator plan fragment (ie, can't
   // be for a query like 'SELECT 1').
-  // Populates and prepares output_exprs from the coordinator's fragment if there is one,
-  // and LLVM optimizes them together with the fragment's other exprs.
+  // Populates and prepares output_expr_ctxs from the coordinator's fragment if there is
+  // one, and LLVM optimizes them together with the fragment's other exprs.
   // A call to Exec() must precede all other member function calls.
-  Status Exec(QuerySchedule& schedule, std::vector<Expr*>* output_exprs);
+  Status Exec(QuerySchedule& schedule, std::vector<ExprContext*>* output_expr_ctxs);
 
   // Blocks until result rows are ready to be retrieved via GetNext(), or, if the
   // query doesn't return rows, until the query finishes or is cancelled.

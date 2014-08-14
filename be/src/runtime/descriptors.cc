@@ -105,12 +105,12 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_pa
     object_pool_(pool) {
 
   for (int i = 0; i < thrift_partition.partitionKeyExprs.size(); ++i) {
-    Expr* expr;
+    ExprContext* ctx; 
     // TODO: Move to dedicated Init method and treat Status return correctly
     Status status = Expr::CreateExprTree(object_pool_,
-        thrift_partition.partitionKeyExprs[i], &expr);
+        thrift_partition.partitionKeyExprs[i], &ctx);
     DCHECK(status.ok());
-    partition_key_values_.push_back(expr);
+    partition_key_value_ctxs_.push_back(ctx);
   }
 }
 
@@ -119,7 +119,7 @@ Status HdfsPartitionDescriptor::PrepareExprs(RuntimeState* state) {
     // TODO: RowDescriptor should arguably be optional in Prepare for known literals
     exprs_prepared_ = true;
     // Partition exprs are not used in the codegen case.  Don't codegen them.
-    RETURN_IF_ERROR(Expr::Prepare(partition_key_values_, state, RowDescriptor()));
+    RETURN_IF_ERROR(Expr::Prepare(partition_key_value_ctxs_, state, RowDescriptor()));
   }
   return Status::OK;
 }
@@ -127,13 +127,13 @@ Status HdfsPartitionDescriptor::PrepareExprs(RuntimeState* state) {
 Status HdfsPartitionDescriptor::OpenExprs(RuntimeState* state) {
   if (exprs_opened_) return Status::OK;
   exprs_opened_ = true;
-  return Expr::Open(partition_key_values_, state);
+  return Expr::Open(partition_key_value_ctxs_, state);
 }
 
 void HdfsPartitionDescriptor::CloseExprs(RuntimeState* state) {
   if (exprs_closed_) return;
   exprs_closed_ = true;
-  Expr::Close(partition_key_values_, state);
+  Expr::Close(partition_key_value_ctxs_, state);
 }
 
 string HdfsPartitionDescriptor::DebugString() const {

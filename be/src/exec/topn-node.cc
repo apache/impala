@@ -45,7 +45,8 @@ Status TopNNode::Init(const TPlanNode& tnode) {
   is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
   nulls_first_ = tnode.sort_node.sort_info.nulls_first;
 
-  DCHECK_EQ(conjuncts_.size(), 0) << "TopNNode should never have predicates to evaluate.";
+  DCHECK_EQ(conjunct_ctxs_.size(), 0)
+      << "TopNNode should never have predicates to evaluate.";
 
   return Status::OK;
 }
@@ -55,11 +56,6 @@ Status TopNNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_pool_.reset(new MemPool(mem_tracker()));
   RETURN_IF_ERROR(sort_exec_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
-  tuple_row_less_than_.reset(new TupleRowComparator(sort_exec_exprs_.lhs_ordering_exprs(),
-      sort_exec_exprs_.rhs_ordering_exprs(), is_asc_order_, nulls_first_));
-  priority_queue_.reset(
-      new priority_queue<Tuple*, vector<Tuple*>, TupleRowComparator>(
-          *tuple_row_less_than_));
   materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   // Allocate memory for a temporary tuple.
   tmp_tuple_ = reinterpret_cast<Tuple*>(
@@ -73,6 +69,14 @@ Status TopNNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
   RETURN_IF_ERROR(sort_exec_exprs_.Open(state));
+
+  tuple_row_less_than_.reset(new TupleRowComparator(
+      sort_exec_exprs_.lhs_ordering_expr_ctxs(), sort_exec_exprs_.rhs_ordering_expr_ctxs(),
+      is_asc_order_, nulls_first_));
+  priority_queue_.reset(
+      new priority_queue<Tuple*, vector<Tuple*>, TupleRowComparator>(
+          *tuple_row_less_than_));
+
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // Limit of 0, no need to fetch anything from children.
@@ -134,12 +138,12 @@ void TopNNode::InsertTupleRow(TupleRow* input_row) {
     insert_tuple = reinterpret_cast<Tuple*>(
         tuple_pool_->Allocate(materialized_tuple_desc_->byte_size()));
     insert_tuple->MaterializeExprs<false>(input_row, *materialized_tuple_desc_,
-        sort_exec_exprs_.sort_tuple_slot_exprs(), tuple_pool_.get());
+        sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), tuple_pool_.get());
   } else {
     DCHECK(!priority_queue_->empty());
     Tuple* top_tuple = priority_queue_->top();
     tmp_tuple_->MaterializeExprs<false>(input_row, *materialized_tuple_desc_,
-            sort_exec_exprs_.sort_tuple_slot_exprs(), NULL);
+            sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), NULL);
     if ((*tuple_row_less_than_)(tmp_tuple_, top_tuple)) {
       // TODO: DeepCopy() will allocate new buffers for the string data. This needs
       // to be fixed to use a freelist
@@ -170,7 +174,7 @@ void TopNNode::PrepareForOutput() {
 void TopNNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "TopNNode("
-      << Expr::DebugString(sort_exec_exprs_.lhs_ordering_exprs());
+      << Expr::DebugString(sort_exec_exprs_.lhs_ordering_expr_ctxs());
   for (int i = 0; i < is_asc_order_.size(); ++i) {
     *out << (i > 0 ? " " : "")
          << (is_asc_order_[i] ? "asc" : "desc")

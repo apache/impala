@@ -42,7 +42,8 @@ class HdfsTextScanner : public HdfsScanner {
                                    const std::vector<HdfsFileDesc*>& files);
 
   // Codegen writing tuples and evaluating predicates.
-  static llvm::Function* Codegen(HdfsScanNode*, const std::vector<Expr*>& conjuncts);
+  static llvm::Function* Codegen(HdfsScanNode*,
+                                 const std::vector<ExprContext*>& conjunct_ctxs);
 
   // Suffix for lzo index files.
   const static std::string LZO_INDEX_SUFFIX;

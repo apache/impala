@@ -51,21 +51,28 @@ add_library(CodeGen
 # our runtime compile time.
 set(IR_DEPENDENT_FILES
   impala-ir.cc
+  codegen-anyval-ir.cc
   ../exec/aggregation-node-ir.cc
   ../exec/hash-join-node-ir.cc
+  ../exec/hdfs-avro-scanner-ir.cc
   ../exec/hdfs-scanner-ir.cc
   ../exprs/aggregate-functions.cc
   ../exprs/cast-functions.cc
+  ../exprs/compound-predicates-ir.cc
+  ../exprs/conditional-functions-ir.cc
   ../exprs/decimal-functions.cc
   ../exprs/decimal-operators.cc
   ../exprs/expr-ir.cc
+  ../exprs/in-predicate-ir.cc
+  ../exprs/is-null-predicate.cc
+  ../exprs/like-predicate.cc
   ../exprs/math-functions.cc
   ../exprs/operators.cc
   ../exprs/string-functions.cc
+  ../exprs/timestamp-functions.cc
   ../exprs/udf-builtins.cc
-  ../exprs/like-predicate.cc
-  ../runtime/string-value-ir.cc
-  ../udf/udf.cc
+  ../exprs/utility-functions.cc
+  ../udf/udf-ir.cc
   ../util/hash-util-ir.cc
 )
 

@@ -22,17 +22,15 @@ using namespace std;
 
 namespace impala {
 
-void* TupleIsNullPredicate::ComputeFn(Expr* e, TupleRow* row) {
-  TupleIsNullPredicate* p = static_cast<TupleIsNullPredicate*>(e);
-  // Return true if all of the tuples in tuple_idxs_ are NULL.
-  p->result_.bool_val = true;
-  for (int i = 0; i < p->tuple_idxs_.size(); ++i) {
-    if (row->GetTuple(p->tuple_idxs_[i]) != NULL) {
-      p->result_.bool_val = false;
+BooleanVal TupleIsNullPredicate::GetBooleanVal(ExprContext* ctx, TupleRow* row) {
+  bool result = true;
+  for (int i = 0; i < tuple_idxs_.size(); ++i) {
+    if (row->GetTuple(tuple_idxs_[i]) != NULL) {
+      result = false;
       break;
     }
   }
-  return &p->result_.bool_val;
+  return BooleanVal(result);
 }
 
 TupleIsNullPredicate::TupleIsNullPredicate(const TExprNode& node)
@@ -41,16 +39,21 @@ TupleIsNullPredicate::TupleIsNullPredicate(const TExprNode& node)
                node.tuple_is_null_pred.tuple_ids.end()) {
 }
 
-Status TupleIsNullPredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
-  RETURN_IF_ERROR(Expr::PrepareChildren(state, row_desc));
+Status TupleIsNullPredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
+                                     ExprContext* ctx) {
+  RETURN_IF_ERROR(Expr::Prepare(state, row_desc, ctx));
   DCHECK_EQ(0, children_.size());
   // Resolve tuple ids to tuple indexes.
   for (int i = 0; i < tuple_ids_.size(); ++i) {
     int32_t tuple_idx = row_desc.GetTupleIdx(tuple_ids_[i]);
     if (row_desc.TupleIsNullable(tuple_idx)) tuple_idxs_.push_back(tuple_idx);
   }
-  compute_fn_ = ComputeFn;
   return Status::OK;
+}
+
+Status TupleIsNullPredicate::GetCodegendComputeFn(RuntimeState* state,
+                                                  llvm::Function** fn) {
+  return GetCodegendComputeFnWrapper(state, fn);
 }
 
 string TupleIsNullPredicate::DebugString() const {

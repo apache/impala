@@ -38,11 +38,6 @@ public class ScalarFunction extends Function {
   private String prepareFnSymbol_;
   private String closeFnSymbol_;
 
-  // If true, this function is implemented with the Udf interface. Otherwise,
-  // it is implemented using the old ComputeFn interface.
-  // TODO: remove when ComputeFn interface is removed.
-  private boolean udfInterface_;
-
   public ScalarFunction(FunctionName fnName, FunctionArgs args, Type retType) {
     super(fnName, args.argTypes, retType, args.hasVarArgs);
   }
@@ -63,27 +58,21 @@ public class ScalarFunction extends Function {
    */
   public static ScalarFunction createBuiltin(String name, ArrayList<Type> argTypes,
       boolean hasVarArgs, Type retType, String symbol,
-      String prepareFnSymbol, String closeFnSymbol, boolean udfInterface,
-      boolean isOperator) {
+      String prepareFnSymbol, String closeFnSymbol, boolean isOperator) {
     Preconditions.checkNotNull(symbol);
     FunctionArgs fnArgs = new FunctionArgs(argTypes, hasVarArgs);
     ScalarFunction fn =
         new ScalarFunction(new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, retType);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.setUserVisible(!isOperator);
-    fn.udfInterface_ = udfInterface;
-    if (fn.udfInterface_) {
-      try {
-        fn.symbolName_ = fn.lookupSymbol(symbol, TSymbolType.UDF_EVALUATE, null,
-            fn.hasVarArgs(), fn.getArgs());
-      } catch (AnalysisException e) {
-        // This should never happen
-        Preconditions.checkState(false, "Builtin symbol '" + symbol + "'" + argTypes
-            + " not found!" + e.getStackTrace());
-        throw new RuntimeException("Builtin symbol not found!", e);
-      }
-    } else {
-      fn.symbolName_ = symbol;
+    try {
+      fn.symbolName_ = fn.lookupSymbol(symbol, TSymbolType.UDF_EVALUATE, null,
+          fn.hasVarArgs(), fn.getArgs());
+    } catch (AnalysisException e) {
+      // This should never happen
+      Preconditions.checkState(false, "Builtin symbol '" + symbol + "'" + argTypes
+          + " not found!" + e.getStackTrace());
+      throw new RuntimeException("Builtin symbol not found!", e);
     }
     fn.prepareFnSymbol_ = prepareFnSymbol;
     fn.closeFnSymbol_ = closeFnSymbol;
@@ -140,49 +129,34 @@ public class ScalarFunction extends Function {
               "Argument type not supported: " + argTypes.get(i).toSql());
       }
     }
-    String beClass;
-    boolean udfInterface = true;
-    if (usesDecimal) {
-      beClass = "impala::DecimalOperators";
-    } else if (name == "case") {
-      beClass = "CaseExpr";
-      udfInterface = false;
-    } else {
-      beClass = "impala::Operators";
-    }
-    return createBuiltinOperator(name, beClass, beFn, argTypes, retType, udfInterface);
+    String beClass = usesDecimal ? "DecimalOperators" : "Operators";
+    String symbol = "impala::" + beClass + "::" + beFn;
+    return createBuiltinOperator(name, symbol, argTypes, retType);
   }
 
-  /**
-   * Create a builtin function with the symbol beClass::beFn
-   */
-  public static ScalarFunction createBuiltinOperator(String name,
-      String beClass, String beFn, ArrayList<Type> argTypes, Type retType,
-      boolean udfInterface) {
-    if (!udfInterface) {
-      // TODO(skye): remove in expr refactoring
-      FunctionArgs fnArgs = new FunctionArgs(argTypes, false);
-      ScalarFunction fn =
-          new ScalarFunction(new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, retType);
-      fn.setBinaryType(TFunctionBinaryType.BUILTIN);
-      fn.setUserVisible(false);
-      fn.udfInterface_ = false;
-      fn.symbolName_ = GetComputeFnSymbol(beClass, beFn);
-      return fn;
-    }
-    return createBuiltin(name, argTypes, false, retType, beClass + "::" + beFn,
-        null, null, true, true);
+  public static ScalarFunction createBuiltinOperator(String name, String symbol,
+      ArrayList<Type> argTypes, Type retType) {
+    return createBuiltin(name, symbol, argTypes, false, retType, false);
   }
 
-  // Convert ComputeFunctions::Add_char_char
-  // '_ZN6impala16ComputeFunctions13Add_char_charEPNS_4ExprEPNS_8TupleRowE'
-  // TODO: this needs to be updated when we retire the ComputeFunction interface.
-  private static String GetComputeFnSymbol(String beClass, String beFn) {
-    String result = "_ZN6impala";
-    result += beClass.length() + beClass;
-    result += beFn.length() + beFn;
-    result += "EPNS_4ExprEPNS_8TupleRowE";
-    return result;
+  public static ScalarFunction createBuiltin(String name, String symbol,
+      ArrayList<Type> argTypes, boolean hasVarArgs, Type retType,
+      boolean userVisible) {
+    FunctionArgs fnArgs = new FunctionArgs(argTypes, hasVarArgs);
+    ScalarFunction fn =
+        new ScalarFunction(new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, retType);
+    fn.setBinaryType(TFunctionBinaryType.BUILTIN);
+    fn.setUserVisible(userVisible);
+    try {
+      fn.symbolName_ = fn.lookupSymbol(symbol, TSymbolType.UDF_EVALUATE, null,
+          fn.hasVarArgs(), fn.getArgs());
+    } catch (AnalysisException e) {
+      // This should never happen
+      Preconditions.checkState(false, "Builtin symbol '" + symbol + "'" + argTypes
+          + " not found!" + e.getStackTrace());
+      throw new RuntimeException("Builtin symbol not found!", e);
+    }
+    return fn;
   }
 
   /**
@@ -207,8 +181,6 @@ public class ScalarFunction extends Function {
   public String getSymbolName() { return symbolName_; }
   public String getPrepareFnSymbol() { return prepareFnSymbol_; }
   public String getCloseFnSymbol() { return closeFnSymbol_; }
-
-  public boolean isUdfInterface() { return udfInterface_; }
 
   @Override
   public TFunction toThrift() {

@@ -32,6 +32,7 @@ namespace impala {
 
 class AggregationNode;
 class Expr;
+class ExprContext;
 class MemPool;
 class MemTracker;
 class ObjectPool;
@@ -82,9 +83,9 @@ class AggFnEvaluator {
 
   AggregationOp agg_op() const { return agg_op_; }
   impala_udf::FunctionContext* ctx() { return ctx_.get(); }
-  const std::vector<Expr*>& input_exprs() const { return input_exprs_; }
+  const std::vector<ExprContext*>& input_expr_ctxs() const { return input_expr_ctxs_; }
   bool is_count_star() const {
-    return agg_op_ == COUNT && input_exprs_.empty();
+    return agg_op_ == COUNT && input_expr_ctxs_.empty();
   }
   bool is_builtin() const { return fn_.binary_type == TFunctionBinaryType::BUILTIN; }
 
@@ -111,7 +112,7 @@ class AggFnEvaluator {
 
   const ColumnType return_type_;
   const ColumnType intermediate_type_;
-  std::vector<Expr*> input_exprs_;
+  std::vector<ExprContext*> input_expr_ctxs_;
 
   // The enum for some of the builtins that still require special cased logic.
   AggregationOp agg_op_;
@@ -123,6 +124,9 @@ class AggFnEvaluator {
   // TODO: this and pool_ make this not thread safe but they are easy to duplicate
   // per thread.
   boost::scoped_ptr<impala_udf::FunctionContext> ctx_;
+
+  // Pool used by ctx_ for allocations.
+  boost::scoped_ptr<MemPool> ctx_pool_;
 
   // Created to a subclass of AnyVal for type(). We use this to convert values
   // from the UDA interface to the Expr interface.
@@ -158,8 +162,6 @@ class AggFnEvaluator {
 
   // Writes the result in src into dst pointed to by output_slot_desc_
   void SetOutputSlot(const impala_udf::AnyVal* src, Tuple* dst);
-  // Sets 'dst' to the value from 'slot'.
-  void SetAnyVal(const void* slot, const ColumnType& type, impala_udf::AnyVal* dst);
 };
 
 }

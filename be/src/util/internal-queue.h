@@ -244,7 +244,7 @@ class InternalQueue {
   }
 
  private:
-  friend class Node;
+  friend struct Node;
   mutable SpinLock lock_;
   Node* head_, *tail_;
   int size_;

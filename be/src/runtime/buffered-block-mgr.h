@@ -256,7 +256,7 @@ class BufferedBlockMgr {
   RuntimeProfile* profile() { return profile_.get(); }
 
  private:
-  friend class Client;
+  friend struct Client;
 
   // Descriptor for a single memory buffer in the pool.
   struct BufferDescriptor : public InternalQueue<BufferDescriptor>::Node {

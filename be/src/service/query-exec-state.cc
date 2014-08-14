@@ -18,6 +18,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "service/impala-server.h"
@@ -347,7 +348,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     summary_profile_.AddInfoString("Granted resource reservation", reservation_ss.str());
     query_events_->MarkEvent("Resources reserved");
   }
-  status = coord_->Exec(*schedule_,  &output_exprs_);
+  status = coord_->Exec(*schedule_, &output_expr_ctxs_);
   {
     lock_guard<mutex> l(lock_);
     RETURN_IF_ERROR(UpdateQueryStatus(status));
@@ -429,7 +430,7 @@ void ImpalaServer::QueryExecState::Done() {
   query_events_->MarkEvent("Unregister query");
 
   if (coord_.get() != NULL) {
-    Expr::Close(output_exprs_, coord_->runtime_state());
+    Expr::Close(output_expr_ctxs_, coord_->runtime_state());
     // Release any reserved resources.
     Status status = exec_env_->scheduler()->Release(schedule_.get());
     if (!status.ok()) {
@@ -493,7 +494,7 @@ Status ImpalaServer::QueryExecState::WaitInternal() {
   RETURN_IF_ERROR(WaitForChildQueries());
   if (coord_.get() != NULL) {
     RETURN_IF_ERROR(coord_->Wait());
-    RETURN_IF_ERROR(Expr::Open(output_exprs_, coord_->runtime_state()));
+    RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, coord_->runtime_state()));
     RETURN_IF_ERROR(UpdateCatalog());
   }
 
@@ -597,7 +598,7 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
 
   // List of expr values to hold evaluated rows from the query
   vector<void*> result_row;
-  result_row.resize(output_exprs_.size());
+  result_row.resize(output_expr_ctxs_.size());
 
   // List of scales for floating point values in result_row
   vector<int> scales;
@@ -669,10 +670,10 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
 
 Status ImpalaServer::QueryExecState::GetRowValue(TupleRow* row, vector<void*>* result,
                                                  vector<int>* scales) {
-  DCHECK(result->size() >= output_exprs_.size());
-  for (int i = 0; i < output_exprs_.size(); ++i) {
-    (*result)[i] = output_exprs_[i]->GetValue(row);
-    (*scales)[i] = output_exprs_[i]->output_scale();
+  DCHECK(result->size() >= output_expr_ctxs_.size());
+  for (int i = 0; i < output_expr_ctxs_.size(); ++i) {
+    (*result)[i] = output_expr_ctxs_[i]->GetValue(row);
+    (*scales)[i] = output_expr_ctxs_[i]->root()->output_scale();
   }
   return Status::OK;
 }

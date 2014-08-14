@@ -14,21 +14,25 @@
 
 package com.cloudera.impala.analysis;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TIsNullPredicate;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 public class IsNullPredicate extends Predicate {
-  private final static Logger LOG = LoggerFactory.getLogger(IsNullPredicate.class);
   private final boolean isNotNull_;
+
+  private static final String IS_NULL = "is_null_pred";
+  private static final String IS_NOT_NULL = "is_not_null_pred";
 
   public IsNullPredicate(Expr e, boolean isNotNull) {
     super();
@@ -46,6 +50,28 @@ public class IsNullPredicate extends Predicate {
   }
 
   public boolean isNotNull() { return isNotNull_; }
+
+  public static void initBuiltins(Db db) {
+    for (Type t: Type.getSupportedTypes()) {
+      if (t.isNull()) continue;
+      String isNullSymbol;
+      if (t.isBoolean()) {
+        isNullSymbol = "_ZN6impala15IsNullPredicate6IsNullIN10impala_udf10BooleanValE" +
+            "EES3_PNS2_15FunctionContextERKT_";
+      } else {
+        String udfType = Function.getUdfType(t);
+        isNullSymbol = "_ZN6impala15IsNullPredicate6IsNullIN10impala_udf" +
+            udfType.length() + udfType +
+            "EEENS2_10BooleanValEPNS2_15FunctionContextERKT_";
+      }
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          IS_NULL, isNullSymbol, Lists.newArrayList(t), Type.BOOLEAN));
+
+      String isNotNullSymbol = isNullSymbol.replace("6IsNull", "9IsNotNull");
+      db.addBuiltin(ScalarFunction.createBuiltinOperator(
+          IS_NOT_NULL, isNotNullSymbol, Lists.newArrayList(t), Type.BOOLEAN));
+    }
+  }
 
   @Override
   public boolean equals(Object obj) {
@@ -66,6 +92,14 @@ public class IsNullPredicate extends Predicate {
     // Make sure the BE never sees TYPE_NULL
     if (getChild(0).getType().isNull()) {
       uncheckedCastChild(ScalarType.BOOLEAN, 0);
+    }
+
+    if (isNotNull_) {
+      fn_ = getBuiltinFunction(
+          analyzer, IS_NOT_NULL, collectChildReturnTypes(), CompareMode.IS_IDENTICAL);
+    } else {
+      fn_ = getBuiltinFunction(
+          analyzer, IS_NULL, collectChildReturnTypes(), CompareMode.IS_IDENTICAL);
     }
 
     // determine selectivity
@@ -91,8 +125,7 @@ public class IsNullPredicate extends Predicate {
 
   @Override
   protected void toThrift(TExprNode msg) {
-    msg.node_type = TExprNodeType.IS_NULL_PRED;
-    msg.is_null_pred = new TIsNullPredicate(isNotNull_);
+    msg.node_type = TExprNodeType.FUNCTION_CALL;
   }
 
   /*

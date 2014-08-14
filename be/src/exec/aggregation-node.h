@@ -68,10 +68,10 @@ class AggregationNode : public ExecNode {
 
   std::vector<AggFnEvaluator*> aggregate_evaluators_;
   // Exprs used to evaluate input rows
-  std::vector<Expr*> probe_exprs_;
+  std::vector<ExprContext*> probe_expr_ctxs_;
   // Exprs used to insert constructed aggregation tuple into the hash table.
   // All the exprs are simply SlotRefs for the agg tuple.
-  std::vector<Expr*> build_exprs_;
+  std::vector<ExprContext*> build_expr_ctxs_;
   TupleId agg_tuple_id_;
   TupleDescriptor* agg_tuple_desc_;
   // Result of aggregation w/o GROUP BY.
@@ -128,15 +128,15 @@ class AggregationNode : public ExecNode {
   // codegen'd to IR.  This function will modify the loop subsituting the
   // UpdateAggTuple function call with the (inlined) codegen'd 'update_tuple_fn'.
   llvm::Function* CodegenProcessRowBatch(
-      LlvmCodeGen* codegen, llvm::Function* update_tuple_fn);
+      RuntimeState* state, llvm::Function* update_tuple_fn);
 
   // Codegen for updating aggregate_exprs at slot_idx. Returns NULL if unsuccessful.
   // slot_idx is the idx into aggregate_exprs_ (does not include grouping exprs).
   llvm::Function* CodegenUpdateSlot(
-      LlvmCodeGen* codegen, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
+      RuntimeState* state, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
 
   // Codegen UpdateAggTuple.  Returns NULL if codegen is unsuccessful.
-  llvm::Function* CodegenUpdateAggTuple(LlvmCodeGen* codegen);
+  llvm::Function* CodegenUpdateAggTuple(RuntimeState* state);
 };
 
 }

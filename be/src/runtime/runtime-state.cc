@@ -82,7 +82,6 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
 
 RuntimeState::~RuntimeState() {
   if (block_mgr_.get() != NULL) block_mgr_->Close();
-  if (udf_pool_.get() != NULL) udf_pool_->FreeAll();
   // query_mem_tracker_ must be valid as long as instance_mem_tracker_ is so
   // delete instance_mem_tracker_ first.
   // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded.
@@ -143,10 +142,8 @@ Status RuntimeState::InitMemTrackers(const TUniqueId& query_id, const string* po
   instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1, -1,
       runtime_profile()->name(), query_mem_tracker_.get()));
 
-  // TODO: this is a stopgap until we implement ExprContext
   udf_mem_tracker_.reset(
       new MemTracker(-1, -1, "UDFs", instance_mem_tracker_.get()));
-  udf_pool_.reset(new MemPool(udf_mem_tracker_.get()));
   return Status::OK;
 }
 

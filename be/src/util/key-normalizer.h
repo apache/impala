@@ -53,9 +53,9 @@ class KeyNormalizer {
  public:
   // Initializes the normalizer with the key exprs and length alloted to each normalized
   // key.
-  KeyNormalizer(const std::vector<Expr*>& key_exprs, int key_len,
+  KeyNormalizer(const std::vector<ExprContext*>& key_exprs_ctxs, int key_len,
       const std::vector<bool>& is_asc, const std::vector<bool>& nulls_first)
-      : key_exprs_(key_exprs), key_len_(key_len), is_asc_(is_asc),
+      : key_expr_ctxs_(key_expr_ctxs), key_len_(key_len), is_asc_(is_asc),
         nulls_first_(nulls_first) {
   }
 
@@ -97,7 +97,7 @@ class KeyNormalizer {
   static bool NormalizeKeyColumn(const ColumnType& type, uint8_t null_bit, bool is_asc,
       uint8_t* value, uint8_t* dst, int* bytes_left);
 
-  std::vector<Expr*> key_exprs_;
+  std::vector<ExprContext*> key_expr_ctxs_;
   int key_len_;
   std::vector<bool> is_asc_;
   std::vector<bool> nulls_first_;

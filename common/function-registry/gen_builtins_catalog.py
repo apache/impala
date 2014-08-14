@@ -61,13 +61,12 @@ FE_PATH = os.path.expandvars(
 meta_data_entries = []
 
 # Read in the function and add it to the meta_data_entries map
-def add_function(fn_meta_data, udf_interface):
+def add_function(fn_meta_data):
   entry = {}
   entry["sql_names"] = fn_meta_data[0]
   entry["ret_type"] = fn_meta_data[1]
   entry["args"] = fn_meta_data[2]
   entry["symbol"] = fn_meta_data[3]
-  entry["udf_interface"] = udf_interface
   if len(fn_meta_data) >= 5:
     entry["prepare"] = fn_meta_data[4]
   if len(fn_meta_data) >= 6:
@@ -76,11 +75,7 @@ def add_function(fn_meta_data, udf_interface):
 
 def generate_fe_entry(entry, name):
   java_output = ""
-  if entry["udf_interface"]:
-    java_output += "true"
-  else:
-    java_output += "false"
-  java_output += ", \"" + name + "\""
+  java_output += "\"" + name + "\""
   java_output += ", \"" + entry["symbol"] + "\""
 
   if 'prepare' in entry:
@@ -118,15 +113,9 @@ def generate_fe_registry_init(filename):
 
 # Read the function metadata inputs
 for function in impala_functions.functions:
-  if len(function) != 4 and len(function) != 6:
-    print "Invalid function entry in impala_functions.py:\n\t" + repr(function)
-    sys.exit(1)
-  add_function(function, False)
-
-for function in impala_functions.udf_functions:
   assert 4 <= len(function) <= 6, \
          "Invalid function entry in impala_functions.py:\n\t" + repr(function)
-  add_function(function, True)
+  add_function(function)
 
 if not os.path.exists(FE_PATH):
   os.makedirs(FE_PATH)

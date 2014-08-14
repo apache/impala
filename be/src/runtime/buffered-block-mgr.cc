@@ -14,6 +14,7 @@
 
 #include "runtime/runtime-state.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/mem-pool.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 #include "util/runtime-profile.h"

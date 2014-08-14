@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "runtime/raw-value.h"
@@ -73,8 +74,9 @@ void Tuple::DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
 }
 
 template <bool collect_string_vals>
-void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
-    const vector<Expr*>& materialize_exprs, MemPool* pool,
+void Tuple::MaterializeExprs(
+    TupleRow* row, const TupleDescriptor& desc,
+    const vector<ExprContext*>& materialize_expr_ctxs, MemPool* pool,
     vector<StringValue*>* non_null_var_len_values, int* total_var_len) {
   if (collect_string_vals) {
     non_null_var_len_values->clear();
@@ -90,8 +92,8 @@ void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
     // when necessary, but does not do this for slot descs.
     // TODO: revisit this logic in the FE
     DCHECK(slot_desc->type().type == TYPE_NULL ||
-           slot_desc->type() == materialize_exprs[mat_expr_index]->type());
-    void* src = materialize_exprs[mat_expr_index]->GetValue(row);
+           slot_desc->type() == materialize_expr_ctxs[mat_expr_index]->root()->type());
+    void* src = materialize_expr_ctxs[mat_expr_index]->GetValue(row);
     if (src != NULL) {
       void* dst = GetSlot(slot_desc->tuple_offset());
       RawValue::Write(src, dst, slot_desc->type(), pool);
@@ -106,14 +108,14 @@ void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
     ++mat_expr_index;
   }
 
-  DCHECK_EQ(mat_expr_index, materialize_exprs.size());
+  DCHECK_EQ(mat_expr_index, materialize_expr_ctxs.size());
 }
 
 template void Tuple::MaterializeExprs<false>(TupleRow* row, const TupleDescriptor& desc,
-    const vector<Expr*>& materialize_exprs, MemPool* pool,
+    const vector<ExprContext*>& materialize_expr_ctxs, MemPool* pool,
     vector<StringValue*>* non_null_var_values, int* total_var_len);
 
 template void Tuple::MaterializeExprs<true>(TupleRow* row, const TupleDescriptor& desc,
-    const vector<Expr*>& materialize_exprs, MemPool* pool,
+    const vector<ExprContext*>& materialize_expr_ctxs, MemPool* pool,
     vector<StringValue*>* non_null_var_values, int* total_var_len);
 }

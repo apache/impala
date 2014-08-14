@@ -41,7 +41,7 @@ namespace impala {
 class HBaseTableWriter {
  public:
   HBaseTableWriter(HBaseTableDescriptor* table_desc,
-                   const std::vector<Expr*>& output_exprs,
+                   const std::vector<ExprContext*>& output_expr_ctxs,
                    RuntimeProfile* profile);
   Status AppendRowBatch(RowBatch* batch);
 
@@ -86,9 +86,9 @@ class HBaseTableWriter {
   boost::scoped_ptr<HBaseTable> table_;
 
   // The expressions that are run to create tuples to be written to hbase.
-  const std::vector<Expr*> output_exprs_;
+  const std::vector<ExprContext*> output_expr_ctxs_;
 
-  // output_exprs_byte_sizes_[i] is the byte size of output_exprs_[i]'s type.
+  // output_exprs_byte_sizes_[i] is the byte size of output_expr_ctxs_[i]->root()'s type.
   std::vector<int> output_exprs_byte_sizes_;
 
   // jni ArrayList<Put>

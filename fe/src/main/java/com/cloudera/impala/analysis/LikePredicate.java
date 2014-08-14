@@ -49,15 +49,15 @@ public class LikePredicate extends Predicate {
     db.addBuiltin(ScalarFunction.createBuiltin(
         Operator.LIKE.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
         false, Type.BOOLEAN, "_ZN6impala13LikePredicate4LikeEPN10impala_udf15FunctionContextERKNS1_9StringValES6_", "_ZN6impala13LikePredicate11LikePrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
-        "_ZN6impala13LikePredicate9LikeCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true, true));
+        "_ZN6impala13LikePredicate9LikeCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true));
     db.addBuiltin(ScalarFunction.createBuiltin(
         Operator.RLIKE.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
         false, Type.BOOLEAN, "_ZN6impala13LikePredicate5RegexEPN10impala_udf15FunctionContextERKNS1_9StringValES6_", "_ZN6impala13LikePredicate12RegexPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
-        "_ZN6impala13LikePredicate10RegexCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true, true));
+        "_ZN6impala13LikePredicate10RegexCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true));
     db.addBuiltin(ScalarFunction.createBuiltin(
         Operator.REGEXP.name(), Lists.<Type>newArrayList(Type.STRING, Type.STRING),
         false, Type.BOOLEAN, "_ZN6impala13LikePredicate5RegexEPN10impala_udf15FunctionContextERKNS1_9StringValES6_", "_ZN6impala13LikePredicate12RegexPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE",
-        "_ZN6impala13LikePredicate10RegexCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true, true));
+        "_ZN6impala13LikePredicate10RegexCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE", true));
   }
 
   private final Operator op_;

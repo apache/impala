@@ -40,9 +40,9 @@ HBaseTableSink::HBaseTableSink(const RowDescriptor& row_desc,
 Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
   // From the thrift expressions create the real exprs.
   RETURN_IF_ERROR(Expr::CreateExprTrees(state->obj_pool(), select_list_texprs_,
-      &output_exprs_));
+                                        &output_expr_ctxs_));
   // Prepare the exprs to run.
-  RETURN_IF_ERROR(Expr::Prepare(output_exprs_, state, row_desc_));
+  RETURN_IF_ERROR(Expr::Prepare(output_expr_ctxs_, state, row_desc_));
   return Status::OK;
 }
 
@@ -57,8 +57,8 @@ Status HBaseTableSink::Prepare(RuntimeState* state) {
   // Prepare the expressions.
   RETURN_IF_ERROR(PrepareExprs(state));
   // Now that expressions are ready to materialize tuples, create the writer.
-  hbase_table_writer_.reset(new HBaseTableWriter(table_desc_, output_exprs_,
-      runtime_profile_));
+  hbase_table_writer_.reset(
+      new HBaseTableWriter(table_desc_, output_expr_ctxs_, runtime_profile_));
 
   // Try and init the table writer.  This can create connections to HBase and
   // to zookeeper.
@@ -75,7 +75,7 @@ Status HBaseTableSink::Prepare(RuntimeState* state) {
 }
 
 Status HBaseTableSink::Open(RuntimeState* state) {
-  return Expr::Open(output_exprs_, state);
+  return Expr::Open(output_expr_ctxs_, state);
 }
 
 Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
@@ -95,7 +95,7 @@ void HBaseTableSink::Close(RuntimeState* state) {
     hbase_table_writer_->Close(state);
     hbase_table_writer_.reset(NULL);
   }
-  Expr::Close(output_exprs_, state);
+  Expr::Close(output_expr_ctxs_, state);
   closed_ = true;
 }
 

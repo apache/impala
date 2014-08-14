@@ -1593,6 +1593,16 @@ select round(float_col, 3), round(float_col, 4) from functional.alltypestiny lim
 ---- TYPES
 double,double
 ====
+# Test that round outputs correct number of decimal places despite floating-point
+# imprecisions
+---- QUERY
+select round(cast(1.1 as float), 2), round(cast(1.2 as float), 4),
+       round(cast(1.111 as double), 2);
+---- RESULTS
+1.1,1.2,1.11
+---- TYPES
+double,double,double
+====
 ---- QUERY
 # Test a fix of codegen/non-codegen exprs(IMPALA-350)
 # Test having a thread-safe expr followed by a non thread-safe one and

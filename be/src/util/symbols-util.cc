@@ -61,6 +61,15 @@ string SymbolsUtil::Demangle(const string& name) {
   return result;
 }
 
+string SymbolsUtil::DemangleNameOnly(const string& symbol) {
+  string fn_name = Demangle(symbol);
+  // Chop off argument list (e.g. "foo(int)" => "foo")
+  fn_name = fn_name.substr(0, fn_name.find('('));
+  // Chop off namespace and/or class name if present (e.g. "impala::foo" => "foo")
+  fn_name = fn_name.substr(fn_name.find_last_of(':') + 1);
+  return fn_name;
+}
+
 // Appends <Length><String> to the stream.
 // e.g. Hello --> "5Hello"
 static void AppendMangledToken(const string& s, stringstream* out) {

@@ -18,13 +18,9 @@ namespace java com.cloudera.impala.thrift
 include "Types.thrift"
 
 enum TExprNodeType {
-  ARITHMETIC_EXPR,
-  BINARY_PRED,
   BOOL_LITERAL,
   CASE_EXPR,
-  CAST_EXPR,
   COMPOUND_PRED,
-  DATE_LITERAL,
   FLOAT_LITERAL,
   INT_LITERAL,
   IN_PRED,
@@ -37,8 +33,6 @@ enum TExprNodeType {
   TUPLE_IS_NULL_PRED,
   FUNCTION_CALL,
   AGGREGATE_EXPR,
-  // TODO: old style compute functions. this will be deprecated
-  COMPUTE_FUNCTION_CALL,
   DECIMAL_LITERAL,
 }
 

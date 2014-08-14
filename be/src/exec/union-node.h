@@ -19,6 +19,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/exec-node.h"
+#include "exprs/expr.h"
 #include "runtime/mem-pool.h"
 #include <boost/scoped_ptr.hpp>
 
@@ -52,13 +53,13 @@ class UnionNode : public ExecNode {
   std::vector<SlotDescriptor*> materialized_slots_;
 
   // Const exprs materialized by this node. These exprs don't refer to any children.
-  std::vector<std::vector<Expr*> > const_result_expr_lists_;
+  std::vector<std::vector<ExprContext*> > const_result_expr_ctx_lists_;
 
   // Index of current const result expr list.
   int const_result_expr_idx_;
 
   // Exprs materialized by this node. The i-th result expr list refers to the i-th child.
-  std::vector<std::vector<Expr*> > result_expr_lists_;
+  std::vector<std::vector<ExprContext*> > result_expr_ctx_lists_;
 
   // Index of current child.
   int child_idx_;
@@ -85,8 +86,8 @@ class UnionNode : public ExecNode {
   // Only commits tuples to row_batch if they are not filtered by conjuncts.
   // Returns true if row_batch should be returned to caller or limit has been
   // reached, false otherwise.
-  bool EvalAndMaterializeExprs(const std::vector<Expr*>& exprs, bool const_exprs,
-      Tuple** tuple, RowBatch* row_batch);
+  bool EvalAndMaterializeExprs( const std::vector<ExprContext*>& ctxs,
+                                bool const_exprs, Tuple** tuple, RowBatch* row_batch);
 };
 
 }

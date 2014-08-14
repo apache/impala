@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "exprs/expr.h"  // contains SlotRef definition
+#include "exprs/slot-ref.h"
 
 #include <sstream>
 
+#include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/runtime-state.h"
 
+using namespace impala_udf;
 using namespace std;
 using namespace llvm;
 
@@ -41,6 +43,14 @@ SlotRef::SlotRef(const SlotDescriptor* desc)
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
+SlotRef::SlotRef(const SlotDescriptor* desc, const ColumnType& type)
+  : Expr(type, true),
+    slot_offset_(-1),
+    null_indicator_offset_(0, 0),
+    slot_id_(desc->id()) {
+    // slot_/null_indicator_offset_ are set in Prepare()
+}
+
 SlotRef::SlotRef(const ColumnType& type, int offset)
   : Expr(type, true),
     tuple_idx_(0),
@@ -49,7 +59,8 @@ SlotRef::SlotRef(const ColumnType& type, int offset)
     slot_id_(-1) {
 }
 
-Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
+                        ExprContext* context) {
   DCHECK_EQ(children_.size(), 0);
   if (slot_id_ == -1) return Status::OK;
 
@@ -99,50 +110,56 @@ string SlotRef::DebugString() const {
   return out.str();
 }
 
-// IR Generation for SlotRef.  The resulting IR looks like:
-// TODO: We could generate a typed struct (and not a char*) for Tuple for llvm.
-// We know the types from the TupleDesc.  It will likey make this code simpler
-// to reason about.
+// There are four possible cases we may generate:
+//   1. Tuple is non-nullable and slot is non-nullable
+//   2. Tuple is non-nullable and slot is nullable
+//   3. Tuple is nullable and slot is non-nullable (when the aggregate output is the
+//      "nullable" side of an outer join).
+//   4. Tuple is nullable and slot is nullable
 //
-// Note: some of the casts that look like no-ops are because certain offsets are 0
-// is this slot descriptor.
+// Resulting IR for a bigint slotref:
+// (Note: some of the GEPs that look like no-ops are because certain offsets are 0
+// in this slot descriptor.)
 //
-// There are 4 cases that we've to generate:
-//   1. tuple is not nullable and slot is not nullable
-//   2. tuple is not nullable and slot is nullable
-//   3. tuple is nullable and slot is not nullable (it is the case when the aggregate
-//      output is the "nullable" side of an outer join).
-//   4. tuple is nullable and slot is nullable
-//
-// define i8 @SlotRef1(i8** %row, i8* %state_data, i1* %is_null) {
+// define { i8, i64 } @GetSlotRef(i8** %context, %"class.impala::TupleRow"* %row) {
 // entry:
-//   %tuple_addr1 = bitcast i8** %row to i8**
-//   %tuple_ptr = load i8** %tuple_addr1
-//   %tuple_is_null = icmp eq i8* %tuple_ptr, null
-//   br i1 %tuple_is_null, label %null_ret, label %check_slot_null
+//   %cast_row_ptr = bitcast %"class.impala::TupleRow"* %row to i8**
+//   %tuple_addr = getelementptr i8** %cast_row_ptr, i32 0
+//   %tuple_ptr = load i8** %tuple_addr
+//   br label %check_slot_null
 //
-// check_slot_null:                                   ; preds = %entry
-//   %null_ptr2 = bitcast i8* %tuple_ptr to i8*
-//   %null_byte = load i8* %null_ptr2
-//   %null_byte_set = and i8 %null_byte, 1
+// check_slot_null:                                  ; preds = %entry
+//   %null_ptr = getelementptr i8* %tuple_ptr, i32 0
+//   %null_byte = load i8* %null_ptr
+//   %null_byte_set = and i8 %null_byte, 2
 //   %slot_is_null = icmp ne i8 %null_byte_set, 0
-//   br i1 %slot_is_null, label %null_ret, label %get_slot
+//   br i1 %slot_is_null, label %ret, label %get_slot
 //
 // get_slot:                                         ; preds = %check_slot_null
-//   %slot_addr = getelementptr i8* %tuple_ptr, i32 1
-//   %slot_value = load i8* %slot_addr
-//   store i1 false, i1* %is_null
+//   %slot_addr = getelementptr i8* %tuple_ptr, i32 8
+//   %val_ptr = bitcast i8* %slot_addr to i64*
+//   %val = load i64* %val_ptr
 //   br label %ret
 //
-// null_ret:                                         ; preds = %check_slot_null, %entry
-//   store i1 true, i1* %is_null
-//   br label %ret
-//
-// ret:                                              ; preds = %null_ret, %get_slot
-//   %tmp_phi = phi i8 [ 0, %null_ret ], [ %slot_value, %get_slot ]
-//   ret i8 %tmp_phi
+// ret:                                              ; preds = %get_slot, %check_slot_null
+//   %is_null_phi = phi i8 [ 1, %check_slot_null ], [ 0, %get_slot ]
+//   %val_phi = phi i64 [ 0, %check_slot_null ], [ %val, %get_slot ]
+//   %result = insertvalue { i8, i64 } zeroinitializer, i8 %is_null_phi, 0
+//   %result1 = insertvalue { i8, i64 } %result, i64 %val_phi, 1
+//   ret { i8, i64 } %result1
 // }
-Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
+//
+// TODO: We could generate a typed struct (and not a char*) for Tuple for llvm.  We know
+// the types from the TupleDesc.  It will likey make this code simpler to reason about.
+Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
+  if (ir_compute_fn_ != NULL) {
+    *fn = ir_compute_fn_;
+    return Status::OK;
+  }
+
+  DCHECK_EQ(GetNumChildren(), 0);
+  LlvmCodeGen* codegen = state->codegen();
+
   // SlotRefs are based on the slot_id and tuple_idx.  Combine them to make a
   // query-wide unique id. We also need to combine whether the tuple is nullable. For
   // example, in an outer join the scan node could have the same tuple id and slot id
@@ -153,51 +170,40 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   int64_t unique_slot_id = slot_id_ | ((int64_t)tuple_idx_) << 32;
   DCHECK_EQ(unique_slot_id & TUPLE_NULLABLE_MASK, 0);
   if (tuple_is_nullable_) unique_slot_id |= TUPLE_NULLABLE_MASK;
-  Function* cached_fn = codegen->GetRegisteredExprFn(unique_slot_id);
-  if (cached_fn != NULL) {
-    codegen_fn_ = cached_fn;
-    return cached_fn;
+  Function* ir_compute_fn_ = codegen->GetRegisteredExprFn(unique_slot_id);
+  if (ir_compute_fn_ != NULL) {
+    *fn = ir_compute_fn_;
+    return Status::OK;
   }
 
-  DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  Value* args[2];
+  *fn = CreateIrFunctionPrototype(codegen, "GetSlotRef", &args);
+  Value* row_ptr = args[1];
 
-  Type* return_type = GetLlvmReturnType(codegen);
-  Function* function = CreateComputeFnPrototype(codegen, "SlotRef");
-
-  Function::arg_iterator func_args = function->arg_begin();
-  Value* row_ptr = func_args;
-
-  Type* int_type = codegen->GetType(TYPE_INT);
-  Value* tuple_offset[] = {
-    ConstantInt::get(int_type, tuple_idx_)
-  };
-  Value* null_byte_offset[] = {
-    ConstantInt::get(int_type, null_indicator_offset_.byte_offset)
-  };
-  Value* slot_offset[] = {
-    ConstantInt::get(int_type, slot_offset_)
-  };
+  Value* tuple_offset = ConstantInt::get(codegen->int_type(), tuple_idx_);
+  Value* null_byte_offset =
+    ConstantInt::get(codegen->int_type(), null_indicator_offset_.byte_offset);
+  Value* slot_offset = ConstantInt::get(codegen->int_type(), slot_offset_);
   Value* null_mask =
-      ConstantInt::get(context, APInt(8, null_indicator_offset_.bit_mask, true));
+      ConstantInt::get(codegen->tinyint_type(), null_indicator_offset_.bit_mask);
   Value* zero = ConstantInt::get(codegen->GetType(TYPE_TINYINT), 0);
-  Type* result_type = codegen->GetType(type());
-  PointerType* result_ptr_type = PointerType::get(result_type, 0);
+  Value* one = ConstantInt::get(codegen->GetType(TYPE_TINYINT), 1);
 
-  BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
+  BasicBlock* entry_block = BasicBlock::Create(context, "entry", *fn);
   BasicBlock* check_slot_null_indicator_block = NULL;
   if (null_indicator_offset_.bit_mask != 0) {
     check_slot_null_indicator_block =
-        BasicBlock::Create(context, "check_slot_null", function);
+        BasicBlock::Create(context, "check_slot_null", *fn);
   }
-  BasicBlock* get_slot_block = BasicBlock::Create(context, "get_slot", function);
-  BasicBlock* null_ret_block = BasicBlock::Create(context, "null_ret", function);
-  BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
+  BasicBlock* get_slot_block = BasicBlock::Create(context, "get_slot", *fn);
+  BasicBlock* ret_block = BasicBlock::Create(context, "ret", *fn);
 
-  builder.SetInsertPoint(entry_block);
+  LlvmCodeGen::LlvmBuilder builder(entry_block);
   // Get the tuple offset addr from the row
-  Value* tuple_addr = builder.CreateGEP(row_ptr, tuple_offset, "tuple_addr");
+  Value* cast_row_ptr = builder.CreateBitCast(
+      row_ptr, PointerType::get(codegen->ptr_type(), 0), "cast_row_ptr");
+  Value* tuple_addr = builder.CreateGEP(cast_row_ptr, tuple_offset, "tuple_addr");
   // Load the tuple*
   Value* tuple_ptr = builder.CreateLoad(tuple_addr, "tuple_ptr");
 
@@ -206,10 +212,9 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
     Value* tuple_is_null = builder.CreateIsNull(tuple_ptr, "tuple_is_null");
     // Check slot is null only if the null indicator bit is set
     if (null_indicator_offset_.bit_mask == 0) {
-      builder.CreateCondBr(tuple_is_null, null_ret_block, get_slot_block);
+      builder.CreateCondBr(tuple_is_null, ret_block, get_slot_block);
     } else {
-      builder.CreateCondBr(tuple_is_null, null_ret_block,
-          check_slot_null_indicator_block);
+      builder.CreateCondBr(tuple_is_null, ret_block, check_slot_null_indicator_block);
     }
   } else {
     if (null_indicator_offset_.bit_mask == 0) {
@@ -226,38 +231,221 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
     Value* null_val = builder.CreateLoad(null_addr, "null_byte");
     Value* slot_null_mask = builder.CreateAnd(null_val, null_mask, "null_byte_set");
     Value* is_slot_null = builder.CreateICmpNE(slot_null_mask, zero, "slot_is_null");
-    builder.CreateCondBr(is_slot_null, null_ret_block, get_slot_block);
+    builder.CreateCondBr(is_slot_null, ret_block, get_slot_block);
   }
 
   // Branch for slot != NULL
   builder.SetInsertPoint(get_slot_block);
   Value* slot_ptr = builder.CreateGEP(tuple_ptr, slot_offset, "slot_addr");
-  Value* result = NULL;
-  Value* slot_cast = builder.CreatePointerCast(slot_ptr, result_ptr_type);
-  // For non-native types, we return a pointer to the struct
-  if (type().type == TYPE_STRING || type().type == TYPE_TIMESTAMP) {
-    result = slot_cast;
+  Value* val_ptr = builder.CreateBitCast(slot_ptr, codegen->GetPtrType(type_), "val_ptr");
+  // Depending on the type, load the values we need
+  Value* val = NULL;
+  Value* ptr = NULL;
+  Value* len = NULL;
+  Value* time_of_day = NULL;
+  Value* date = NULL;
+  if (type_.type == TYPE_STRING) {
+    Value* ptr_ptr = builder.CreateStructGEP(val_ptr, 0, "ptr_ptr");
+    ptr = builder.CreateLoad(ptr_ptr, "ptr");
+    Value* len_ptr = builder.CreateStructGEP(val_ptr, 1, "len_ptr");
+    len = builder.CreateLoad(len_ptr, "len");
+  } else if (type() == TYPE_TIMESTAMP) {
+    Value* time_of_day_ptr = builder.CreateStructGEP(val_ptr, 0, "time_of_day_ptr");
+    // Cast boost::posix_time::time_duration to i64
+    Value* time_of_day_cast =
+        builder.CreateBitCast(time_of_day_ptr, codegen->GetPtrType(TYPE_BIGINT));
+    time_of_day = builder.CreateLoad(time_of_day_cast, "time_of_day");
+    Value* date_ptr = builder.CreateStructGEP(val_ptr, 1, "date_ptr");
+    // Cast boost::gregorian::date to i32
+    Value* date_cast = builder.CreateBitCast(date_ptr, codegen->GetPtrType(TYPE_INT));
+    date = builder.CreateLoad(date_cast, "date");
   } else {
-    result = builder.CreateLoad(slot_cast, "slot_value");
+    // val_ptr is a native type
+    val = builder.CreateLoad(val_ptr, "val");
   }
-  CodegenSetIsNullArg(codegen, get_slot_block, false);
   builder.CreateBr(ret_block);
 
-  // Branch to set is_null to true
-  builder.SetInsertPoint(null_ret_block);
-  CodegenSetIsNullArg(codegen, null_ret_block, true);
-  builder.CreateBr(ret_block);
-
-  // Ret block
+  // Return block
   builder.SetInsertPoint(ret_block);
-  PHINode* phi_node = builder.CreatePHI(return_type, 2, "tmp_phi");
-  phi_node->addIncoming(GetNullReturnValue(codegen), null_ret_block);
-  phi_node->addIncoming(result, get_slot_block);
-  builder.CreateRet(phi_node);
+  PHINode* is_null_phi = builder.CreatePHI(codegen->tinyint_type(), 2, "is_null_phi");
+  if (tuple_is_nullable_) is_null_phi->addIncoming(one, entry_block);
+  if (check_slot_null_indicator_block != NULL) {
+    is_null_phi->addIncoming(one, check_slot_null_indicator_block);
+  }
+  is_null_phi->addIncoming(zero, get_slot_block);
 
-  function = codegen->FinalizeFunction(function);
-  codegen->RegisterExprFn(unique_slot_id, function);
-  return function;
+  // Depending on the type, create phi nodes for each value needed to populate the return
+  // *Val. The optimizer does a better job when there is a phi node for each value, rather
+  // than having get_slot_block generate an AnyVal and having a single phi node over that.
+  // TODO: revisit this code, can possibly be simplified
+  if (type() == TYPE_STRING) {
+    DCHECK(ptr != NULL);
+    DCHECK(len != NULL);
+    PHINode* ptr_phi = builder.CreatePHI(ptr->getType(), 2, "ptr_phi");
+    Value* null = Constant::getNullValue(ptr->getType());
+    if (tuple_is_nullable_) {
+      ptr_phi->addIncoming(null, entry_block);
+    }
+    if (check_slot_null_indicator_block != NULL) {
+      ptr_phi->addIncoming(null, check_slot_null_indicator_block);
+    }
+    ptr_phi->addIncoming(ptr, get_slot_block);
+
+    PHINode* len_phi = builder.CreatePHI(len->getType(), 2, "len_phi");
+    null = ConstantInt::get(len->getType(), 0);
+    if (tuple_is_nullable_) {
+      len_phi->addIncoming(null, entry_block);
+    }
+    if (check_slot_null_indicator_block != NULL) {
+      len_phi->addIncoming(null, check_slot_null_indicator_block);
+    }
+    len_phi->addIncoming(len, get_slot_block);
+
+    CodegenAnyVal result =
+        CodegenAnyVal::GetNonNullVal(codegen, &builder, type(), "result");
+    result.SetIsNull(is_null_phi);
+    result.SetPtr(ptr_phi);
+    result.SetLen(len_phi);
+    builder.CreateRet(result.value());
+  } else if (type() == TYPE_TIMESTAMP) {
+    DCHECK(time_of_day != NULL);
+    DCHECK(date != NULL);
+    PHINode* time_of_day_phi =
+        builder.CreatePHI(time_of_day->getType(), 2, "time_of_day_phi");
+    Value* null = ConstantInt::get(time_of_day->getType(), 0);
+    if (tuple_is_nullable_) {
+      time_of_day_phi->addIncoming(null, entry_block);
+    }
+    if (check_slot_null_indicator_block != NULL) {
+      time_of_day_phi->addIncoming(null, check_slot_null_indicator_block);
+    }
+    time_of_day_phi->addIncoming(time_of_day, get_slot_block);
+
+    PHINode* date_phi = builder.CreatePHI(date->getType(), 2, "date_phi");
+    null = ConstantInt::get(date->getType(), 0);
+    if (tuple_is_nullable_) {
+      date_phi->addIncoming(null, entry_block);
+    }
+    if (check_slot_null_indicator_block != NULL) {
+      date_phi->addIncoming(null, check_slot_null_indicator_block);
+    }
+    date_phi->addIncoming(date, get_slot_block);
+
+    CodegenAnyVal result =
+        CodegenAnyVal::GetNonNullVal(codegen, &builder, type(), "result");
+    result.SetIsNull(is_null_phi);
+    result.SetTimeOfDay(time_of_day_phi);
+    result.SetDate(date_phi);
+    builder.CreateRet(result.value());
+  } else {
+    DCHECK(val != NULL);
+    PHINode* val_phi = builder.CreatePHI(val->getType(), 2, "val_phi");
+    Value* null = Constant::getNullValue(val->getType());
+    if (tuple_is_nullable_) {
+      val_phi->addIncoming(null, entry_block);
+    }
+    if (check_slot_null_indicator_block != NULL) {
+      val_phi->addIncoming(null, check_slot_null_indicator_block);
+    }
+    val_phi->addIncoming(val, get_slot_block);
+
+    CodegenAnyVal result =
+        CodegenAnyVal::GetNonNullVal(codegen, &builder, type(), "result");
+    result.SetIsNull(is_null_phi);
+    result.SetVal(val_phi);
+    builder.CreateRet(result.value());
+  }
+
+  *fn = codegen->FinalizeFunction(*fn);
+  codegen->RegisterExprFn(unique_slot_id, *fn);
+  ir_compute_fn_ = *fn;
+  return Status::OK;
+}
+
+BooleanVal SlotRef::GetBooleanVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_BOOLEAN);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return BooleanVal::null();
+  return BooleanVal(*reinterpret_cast<bool*>(t->GetSlot(slot_offset_)));
+}
+
+TinyIntVal SlotRef::GetTinyIntVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_TINYINT);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return TinyIntVal::null();
+  return TinyIntVal(*reinterpret_cast<int8_t*>(t->GetSlot(slot_offset_)));
+}
+
+SmallIntVal SlotRef::GetSmallIntVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_SMALLINT);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return SmallIntVal::null();
+  return SmallIntVal(*reinterpret_cast<int16_t*>(t->GetSlot(slot_offset_)));
+}
+
+IntVal SlotRef::GetIntVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_INT);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return IntVal::null();
+  return IntVal(*reinterpret_cast<int32_t*>(t->GetSlot(slot_offset_)));
+}
+
+BigIntVal SlotRef::GetBigIntVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_BIGINT);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return BigIntVal::null();
+  return BigIntVal(*reinterpret_cast<int64_t*>(t->GetSlot(slot_offset_)));
+}
+
+FloatVal SlotRef::GetFloatVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_FLOAT);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return FloatVal::null();
+  return FloatVal(*reinterpret_cast<float*>(t->GetSlot(slot_offset_)));
+}
+
+DoubleVal SlotRef::GetDoubleVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_DOUBLE);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return DoubleVal::null();
+  return DoubleVal(*reinterpret_cast<double*>(t->GetSlot(slot_offset_)));
+}
+
+StringVal SlotRef::GetStringVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_STRING);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return StringVal::null();
+  StringValue* sv = reinterpret_cast<StringValue*>(t->GetSlot(slot_offset_));
+  StringVal result;
+  sv->ToStringVal(&result);
+  return result;
+}
+
+TimestampVal SlotRef::GetTimestampVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return TimestampVal::null();
+  TimestampValue* tv = reinterpret_cast<TimestampValue*>(t->GetSlot(slot_offset_));
+  TimestampVal result;
+  tv->ToTimestampVal(&result);
+  return result;
+}
+
+DecimalVal SlotRef::GetDecimalVal(ExprContext* context, TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_DECIMAL);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return DecimalVal::null();
+  switch (type_.GetByteSize()) {
+    case 4:
+      return DecimalVal(*reinterpret_cast<int32_t*>(t->GetSlot(slot_offset_)));
+    case 8:
+      return DecimalVal(*reinterpret_cast<int64_t*>(t->GetSlot(slot_offset_)));
+    case 16:
+      return DecimalVal(*reinterpret_cast<int128_t*>(t->GetSlot(slot_offset_)));
+    default:
+      DCHECK(false);
+      return DecimalVal::null();
+  }
 }
 
 }

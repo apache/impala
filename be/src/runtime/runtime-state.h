@@ -31,7 +31,6 @@
 #include "runtime/exec-env.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
 #include "runtime/disk-io-mgr.h"  // for DiskIoMgr::RequestContext
-#include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
 #include "gen-cpp/PlanNodes_types.h"
@@ -138,6 +137,7 @@ class RuntimeState {
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
   MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
   MemTracker* query_mem_tracker() { return query_mem_tracker_.get(); }
+  MemTracker* udf_mem_tracker() { return udf_mem_tracker_.get(); }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
@@ -207,8 +207,6 @@ class RuntimeState {
     boost::lock_guard<boost::mutex> l(query_status_lock_);
     return query_status_;
   };
-
-  MemPool* udf_pool() { return udf_pool_.get(); };
 
   // Appends error to the error_log_ if there is space. Returns true if there was space
   // and the error was logged.
@@ -358,10 +356,8 @@ class RuntimeState {
   boost::mutex query_status_lock_;
   Status query_status_;
 
-  // Memory tracker and pool for UDFs
-  // TODO: this is a stopgap until we implement ExprContext
+  // Memory tracker for UDFs
   boost::scoped_ptr<MemTracker> udf_mem_tracker_;
-  boost::scoped_ptr<MemPool> udf_pool_;
 
   // Query-wide resource manager for resource expansion etc. Not owned by us; owned by the
   // ResourceBroker instead.

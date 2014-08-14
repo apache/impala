@@ -24,6 +24,9 @@
 
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
+#include "udf/udf.h"
+
+using namespace impala_udf;
 
 using namespace impala_udf;
 
@@ -42,15 +45,12 @@ class TimestampFunctions {
   static void UnixAndFromUnixClose(FunctionContext* context,
       FunctionContext::FunctionStateScope scope);
 
-  // With 0 arguments, returns the current time.
-  // With 1 argument, converts it to a unix time_t
-  // With 2 arguments, the second argument is the format of the timestamp string.
-  static void* Unix(Expr* e, TupleRow* row);
-
-  // Unix UDF functions.
+  // Parses 'string_val' based on the format 'fmt'.
   static IntVal Unix(FunctionContext* context, const StringVal& string_val,
       const StringVal& fmt);
+  // Converts 'tv_val' to a unix time_t
   static IntVal Unix(FunctionContext* context, const TimestampVal& tv_val);
+  // Returns the current time.
   static IntVal Unix(FunctionContext* context);
 
   static IntVal UnixFromString(FunctionContext* context, const StringVal& sv);
@@ -65,11 +65,8 @@ class TimestampFunctions {
       const StringVal& fmt);
 
   // Convert a timestamp to or from a particular timezone based time.
-  // Still need non-UDF version because of inline asm JIT issue
-  static void* FromUtc(Expr* e, TupleRow* row);
   static TimestampVal FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val);
-  static void* ToUtc(Expr* e, TupleRow* row);
   static TimestampVal ToUtc(FunctionContext* context,
       const TimestampVal& ts_val, const StringVal& tz_string_val);
 

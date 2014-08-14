@@ -35,10 +35,10 @@ namespace impala {
 // Tuples in a run may be sorted in place (in-memory) and merged using a merger.
 class Sorter::Run {
  public:
-  // materialize_slots is true for runs constructed from input rows. The input rows
-  // are materialized into single sort tuples using the expressions in
-  // sort_tuple_slot_exprs_. For intermediate merges, the tuples are already materialized
-  // so materialize_slots is false.
+  // materialize_slots is true for runs constructed from input rows. The input rows are
+  // materialized into single sort tuples using the expressions in
+  // sort_tuple_slot_expr_ctxs_. For intermediate merges, the tuples are already
+  // materialized so materialize_slots is false.
   Run(Sorter* parent, TupleDescriptor* sort_tuple_desc, bool materialize_slots);
 
   // Initialize the run for input rows by allocating the minimum number of required
@@ -51,7 +51,7 @@ class Sorter::Run {
   // of rows actually added in num_processed. If the run is full (no more blocks can
   // be allocated), num_processed may be less than the number of rows in the batch.
   // If materialize_slots_ is true, materializes the input rows using the expressions
-  // in sorter_->sort_tuple_slot_exprs_, else just copies the input rows.
+  // in sorter_->sort_tuple_slot_expr_ctxs_, else just copies the input rows.
   template <bool has_var_len_data>
   Status AddBatch(RowBatch* batch, int start_index, int* num_processed);
 
@@ -396,7 +396,7 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
       Tuple* new_tuple = cur_fixed_len_block->Allocate<Tuple>(sort_tuple_size_);
       if (materialize_slots_) {
         new_tuple->MaterializeExprs<has_var_len_data>(input_row, *sort_tuple_desc_,
-            sorter_->sort_tuple_slot_exprs_, NULL, &var_values, &total_var_len);
+            sorter_->sort_tuple_slot_expr_ctxs_, NULL, &var_values, &total_var_len);
         if (total_var_len > sorter_->block_mgr_->block_size()) {
           return Status(TStatusCode::INTERNAL_ERROR, Substitute(
               "Variable length data in a single tuple larger than block size $0 > $1",
@@ -847,13 +847,14 @@ inline void Sorter::TupleSorter::Swap(uint8_t* left, uint8_t* right) {
 
 // Sorter methods
 Sorter::Sorter(const TupleRowComparator& compare_less_than,
-    const vector<Expr*>& slot_materialize_exprs, RowDescriptor* output_row_desc,
-    MemTracker* mem_tracker, RuntimeProfile* profile, RuntimeState* state)
+    const vector<ExprContext*>& slot_materialize_expr_ctxs, 
+    RowDescriptor* output_row_desc, MemTracker* mem_tracker,
+    RuntimeProfile* profile, RuntimeState* state)
   : state_(state),
     compare_less_than_(compare_less_than),
     block_mgr_(state->block_mgr()),
     output_row_desc_(output_row_desc),
-    sort_tuple_slot_exprs_(slot_materialize_exprs),
+    sort_tuple_slot_expr_ctxs_(slot_materialize_expr_ctxs),
     mem_tracker_(mem_tracker),
     profile_(profile) {
   TupleDescriptor* sort_tuple_desc = output_row_desc->tuple_descriptors()[0];

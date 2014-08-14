@@ -176,13 +176,7 @@ void HdfsTextScanner::Close() {
   }
   AttachPool(data_buffer_pool_.get(), false);
   AddFinalRowBatch();
-  scan_node_->RangeComplete(THdfsFileFormat::TEXT,
-    stream_->file_desc()->file_compression);
-
-  scan_node_->ReleaseCodegenFn(
-      THdfsFileFormat::TEXT, reinterpret_cast<void*>(write_tuples_fn_));
-  write_tuples_fn_ = NULL;
-
+  scan_node_->RangeComplete(THdfsFileFormat::TEXT, stream_->file_desc()->file_compression);
   HdfsScanner::Close();
 }
 
@@ -489,10 +483,12 @@ Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
 // Codegen for materializing parsed data into tuples.  The function WriteCompleteTuple is
 // codegen'd using the IRBuilder for the specific tuple description.  This function
 // is then injected into the cross-compiled driving function, WriteAlignedTuples().
-Function* HdfsTextScanner::Codegen(HdfsScanNode* node, const vector<Expr*>& conjuncts) {
+Function* HdfsTextScanner::Codegen(HdfsScanNode* node,
+                                   const vector<ExprContext*>& conjunct_ctxs) {
   if (!node->runtime_state()->codegen_enabled()) return NULL;
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
-  Function* write_complete_tuple_fn = CodegenWriteCompleteTuple(node, codegen, conjuncts);
+  Function* write_complete_tuple_fn =
+      CodegenWriteCompleteTuple(node, codegen, conjunct_ctxs);
   if (write_complete_tuple_fn == NULL) return NULL;
   return CodegenWriteAlignedTuples(node, codegen, write_complete_tuple_fn);
 }
@@ -583,7 +579,7 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
       ++num_tuples_processed;
       --num_tuples;
 
-      if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, tuple_row)) {
+      if (EvalConjuncts(tuple_row)) {
         ++num_tuples_materialized;
         tuple_ = next_tuple(tuple_);
         tuple_row = next_row(tuple_row);

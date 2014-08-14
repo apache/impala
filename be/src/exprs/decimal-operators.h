@@ -76,8 +76,6 @@ class DecimalOperators {
   static BooleanVal Lt_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
 
-  static void* Case_decimal(Expr* e, TupleRow* row);
-
   // The rounding rule when converting decimals. These only apply going from a higher
   // scale to a lower one.
   enum DecimalRoundOp {

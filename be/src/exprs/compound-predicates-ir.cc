@@ -12,35 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "exprs/compound-predicates.h"
 
-#ifndef IMPALA_EXPRS_BOOL_LITERAL_H_
-#define IMPALA_EXPRS_BOOL_LITERAL_H_
+using namespace impala;
+using namespace impala_udf;
 
-#include <string>
-#include "exprs/expr.h"
-
-namespace impala {
-
-class TExprNode;
-
-class BoolLiteral: public Expr {
- public:
-  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
-
- protected:
-  friend class Expr;
-
-  // Construct a BoolLiteral expr from b
-  BoolLiteral(bool b);
-  BoolLiteral(const TExprNode& node);
-
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
-  virtual std::string DebugString() const;
-
- private:
-  static void* ReturnValue(Expr* e, TupleRow* row);
-};
-
+BooleanVal CompoundPredicate::Not(FunctionContext* context, const BooleanVal& v) {
+  if (v.is_null) return BooleanVal::null();
+  return BooleanVal(!v.val);
 }
 
-#endif

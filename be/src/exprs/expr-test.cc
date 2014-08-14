@@ -25,15 +25,11 @@
 #include "runtime/raw-value.h"
 #include "runtime/string-value.h"
 #include "gen-cpp/Exprs_types.h"
-#include "exprs/bool-literal.h"
-#include "exprs/char-literal.h"
-#include "exprs/float-literal.h"
-#include "exprs/function-call.h"
-#include "exprs/int-literal.h"
+#include "exprs/expr-context.h"
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"
+#include "exprs/literal.h"
 #include "exprs/null-literal.h"
-#include "exprs/string-literal.h"
 #include "codegen/llvm-codegen.h"
 #include "util/debug-util.h"
 #include "util/string-parser.h"
@@ -195,8 +191,7 @@ class ExprTest : public testing::Test {
         // We convert the expected result to string.
       case TYPE_FLOAT:
       case TYPE_DOUBLE:
-        expr_value_.string_data = value;
-        expr_value_.SyncStringVal();
+        expr_value_.string_val = value;
         return &expr_value_.string_val;
       case TYPE_TINYINT:
         expr_value_.tinyint_val =
@@ -718,32 +713,35 @@ void ExprTest::TestCast(const string& stmt, const char* val) {
   }
 }
 
-void TestSingleLiteralConstruction(const ColumnType& type, const void* value,
-    const string& string_val) {
+template <typename T> void TestSingleLiteralConstruction(
+    const ColumnType& type, const T& value, const string& string_val) {
   ObjectPool pool;
   RowDescriptor desc;
   RuntimeState state(TPlanFragmentInstanceCtx(), "", NULL);
+  MemTracker tracker;
 
-  Expr* expr = Expr::CreateLiteral(&pool, type, const_cast<void*>(value));
-  EXPECT_TRUE(expr != NULL);
-  Status status = Expr::Prepare(expr, &state, desc, disable_codegen_);
+  Expr* expr = pool.Add(new Literal(type, value));
+  ExprContext ctx(expr);
+  ctx.Prepare(&state, desc, &tracker);
+  Status status = ctx.Open(&state);
   EXPECT_TRUE(status.ok());
-  status = expr->Open(&state);
-  EXPECT_TRUE(status.ok());
-  EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
-  expr->Close(&state);
+  EXPECT_EQ(RawValue::Compare(ctx.GetValue(NULL), &value, type), 0)
+      << "type: " << type << ", value: " << value;
+  ctx.Close(&state);
 }
 
 TEST_F(ExprTest, NullLiteral) {
   for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
     NullLiteral expr(static_cast<PrimitiveType>(type));
+    ExprContext ctx(&expr);
     RuntimeState state(TPlanFragmentInstanceCtx(), "", NULL);
-    Status status = Expr::Prepare(&expr, &state, RowDescriptor(), disable_codegen_);
+    MemTracker tracker;
+    Status status = ctx.Prepare(&state, RowDescriptor(), &tracker);
     EXPECT_TRUE(status.ok());
-    status = expr.Open(&state);
+    status = ctx.Open(&state);
     EXPECT_TRUE(status.ok());
-    EXPECT_TRUE(expr.GetValue(NULL) == NULL);
-    expr.Close(&state);
+    EXPECT_TRUE(ctx.GetValue(NULL) == NULL);
+    ctx.Close(&state);
   }
 }
 
@@ -760,25 +758,24 @@ TEST_F(ExprTest, LiteralConstruction) {
   string str_input = "Hello";
   StringValue str_val(const_cast<char*>(str_input.data()), str_input.length());
 
-  TestSingleLiteralConstruction(TYPE_BOOLEAN, &b_val, "1");
-  TestSingleLiteralConstruction(TYPE_TINYINT, &c_val, "f");
-  TestSingleLiteralConstruction(TYPE_SMALLINT, &s_val, "123");
-  TestSingleLiteralConstruction(TYPE_INT, &i_val, "234");
-  TestSingleLiteralConstruction(TYPE_INT, &i_val, "+234");
-  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "1234");
-  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "+1234");
-  TestSingleLiteralConstruction(TYPE_FLOAT, &f_val, "3.14");
-  TestSingleLiteralConstruction(TYPE_FLOAT, &f_val, "+3.14");
-  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_1, "1.23");
-  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_1, "+1.23");
-  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_2, "7e6");
-  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_2, "+7e6");
-  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_3, "5.9e-3");
-  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val_3, "+5.9e-3");
-  TestSingleLiteralConstruction(TYPE_STRING, &str_val, "Hello");
-  TestSingleLiteralConstruction(TYPE_NULL, NULL, "NULL");
-  TestSingleLiteralConstruction(ColumnType::CreateCharType(5), "HelloWorld", "Hello");
-  TestSingleLiteralConstruction(ColumnType::CreateCharType(1), "H", "H");
+  TestSingleLiteralConstruction(TYPE_BOOLEAN, b_val, "1");
+  TestSingleLiteralConstruction(TYPE_TINYINT, c_val, "f");
+  TestSingleLiteralConstruction(TYPE_SMALLINT, s_val, "123");
+  TestSingleLiteralConstruction(TYPE_INT, i_val, "234");
+  TestSingleLiteralConstruction(TYPE_INT, i_val, "+234");
+  TestSingleLiteralConstruction(TYPE_BIGINT, l_val, "1234");
+  TestSingleLiteralConstruction(TYPE_BIGINT, l_val, "+1234");
+  TestSingleLiteralConstruction(TYPE_FLOAT, f_val, "3.14");
+  TestSingleLiteralConstruction(TYPE_FLOAT, f_val, "+3.14");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_1, "1.23");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_1, "+1.23");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_2, "7e6");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_2, "+7e6");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_3, "5.9e-3");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_3, "+5.9e-3");
+  TestSingleLiteralConstruction(TYPE_STRING, str_val, "Hello");
+  TestSingleLiteralConstruction(ColumnType::CreateCharType(5), string("HelloWorld"), "Hello");
+  TestSingleLiteralConstruction(ColumnType::CreateCharType(1), string("H"), "H");
 
   // Min/Max Boundary value test for tiny/small/int/long
   c_val = 127;
@@ -787,10 +784,10 @@ TEST_F(ExprTest, LiteralConstruction) {
   s_val = 32767;
   i_val = 2147483647;
   l_val = 9223372036854775807l;
-  TestSingleLiteralConstruction(TYPE_TINYINT, &c_val, c_input_max);
-  TestSingleLiteralConstruction(TYPE_SMALLINT, &s_val, "32767");
-  TestSingleLiteralConstruction(TYPE_INT, &i_val, "2147483647");
-  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "9223372036854775807");
+  TestSingleLiteralConstruction(TYPE_TINYINT, c_val, c_input_max);
+  TestSingleLiteralConstruction(TYPE_SMALLINT, s_val, "32767");
+  TestSingleLiteralConstruction(TYPE_INT, i_val, "2147483647");
+  TestSingleLiteralConstruction(TYPE_BIGINT, l_val, "9223372036854775807");
 
   const char c_array_min[] = {(const char)(-128)}; // avoid implicit casting
   string c_input_min(c_array_min, 1);
@@ -798,10 +795,10 @@ TEST_F(ExprTest, LiteralConstruction) {
   s_val = -32768;
   i_val = -2147483648;
   l_val = -9223372036854775807l-1;
-  TestSingleLiteralConstruction(TYPE_TINYINT, &c_val, c_input_min);
-  TestSingleLiteralConstruction(TYPE_SMALLINT, &s_val, "-32768");
-  TestSingleLiteralConstruction(TYPE_INT, &i_val, "-2147483648");
-  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "-9223372036854775808");
+  TestSingleLiteralConstruction(TYPE_TINYINT, c_val, c_input_min);
+  TestSingleLiteralConstruction(TYPE_SMALLINT, s_val, "-32768");
+  TestSingleLiteralConstruction(TYPE_INT, i_val, "-2147483648");
+  TestSingleLiteralConstruction(TYPE_BIGINT, l_val, "-9223372036854775808");
 }
 
 
@@ -1379,13 +1376,19 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("reverse('abcdefg')", "gfedcba");
   TestStringValue("reverse('')", "");
   TestIsNull("reverse(NULL)", TYPE_STRING);
+  TestStringValue("strleft('abcdefg', 0)", "");
   TestStringValue("strleft('abcdefg', 3)", "abc");
   TestStringValue("strleft('abcdefg', cast(10 as bigint))", "abcdefg");
+  TestStringValue("strleft('abcdefg', -1)", "");
+  TestStringValue("strleft('abcdefg', cast(-9 as bigint))", "");
   TestIsNull("strleft(NULL, 3)", TYPE_STRING);
   TestIsNull("strleft('abcdefg', NULL)", TYPE_STRING);
   TestIsNull("strleft(NULL, NULL)", TYPE_STRING);
+  TestStringValue("strright('abcdefg', 0)", "");
   TestStringValue("strright('abcdefg', 3)", "efg");
   TestStringValue("strright('abcdefg', cast(10 as bigint))", "abcdefg");
+  TestStringValue("strright('abcdefg', -1)", "");
+  TestStringValue("strright('abcdefg', cast(-9 as bigint))", "");
   TestIsNull("strright(NULL, 3)", TYPE_STRING);
   TestIsNull("strright('abcdefg', NULL)", TYPE_STRING);
   TestIsNull("strright(NULL, NULL)", TYPE_STRING);
@@ -1567,6 +1570,7 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestStringValue("regexp_extract('abxcy1234a', 'a.x', cast(2 as bigint))", "");
   TestStringValue("regexp_extract('abxcy1234a', 'a.x.*a', 1)", "");
   TestStringValue("regexp_extract('abxcy1234a', 'a.x.y.*a', 5)", "");
+  TestStringValue("regexp_extract('abxcy1234a', 'a.x', -1)", "");
   // Multiple groups enclosed in ().
   TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 0)", "abxcy1234a");
   TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 1)", "abx");
@@ -1951,10 +1955,8 @@ TEST_F(ExprTest, NonFiniteFloats) {
   TestValue("is_nan(1/0)", TYPE_BOOLEAN, false);
   TestValue("is_nan(0/0)", TYPE_BOOLEAN, true);
 
-  // TODO(skye): cast(1/0 as timestamp) gives different results if codegen is
-  // enabled/disabled
-  // TestCast("1/0", numeric_limits<double>::infinity());
-  // TestCast("CAST(1/0 AS FLOAT)", numeric_limits<float>::infinity());
+  TestCast("1/0", numeric_limits<double>::infinity());
+  TestCast("CAST(1/0 AS FLOAT)", numeric_limits<float>::infinity());
   TestValue("CAST('inf' AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
   TestValue("CAST('inf' AS DOUBLE)", TYPE_DOUBLE, numeric_limits<double>::infinity());
   TestValue("CAST('Infinity' AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
@@ -3351,7 +3353,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
     expected_offsets.clear();
     // With one expr, all offsets should be 0.
     expected_offsets[t.GetByteSize()] = list_of(0);
-    exprs.push_back(Expr::CreateLiteral(&pool, t, "0"));
+    exprs.push_back(pool.Add(Literal::CreateLiteral(t, "0")));
     if (t.type == TYPE_STRING) {
       ValidateLayout(exprs, 16, 0, expected_offsets);
     } else {
@@ -3366,44 +3368,44 @@ TEST_F(ExprTest, ResultsLayoutTest) {
 
   // Test layout adding a bunch of exprs.  This is designed to trigger padding.
   // The expected result is computed along the way
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_BOOLEAN, "0"));
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_TINYINT, "0"));
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_TINYINT, "0"));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BOOLEAN, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TINYINT, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TINYINT, "0")));
   expected_offsets[1].insert(expected_byte_size);
   expected_offsets[1].insert(expected_byte_size + 1);
   expected_offsets[1].insert(expected_byte_size + 2);
   expected_byte_size += 3 * 1 + 1;  // 1 byte of padding
 
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_SMALLINT, "0"));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_SMALLINT, "0")));
   expected_offsets[2].insert(expected_byte_size);
   expected_byte_size += 1 * 2 + 2;  // 2 bytes of padding
 
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_INT, "0"));
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_FLOAT, "0"));
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_FLOAT, "0"));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_INT, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_FLOAT, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_FLOAT, "0")));
   expected_offsets[4].insert(expected_byte_size);
   expected_offsets[4].insert(expected_byte_size + 4);
   expected_offsets[4].insert(expected_byte_size + 8);
   expected_byte_size += 3 * 4 + 4;  // 4 bytes of padding
 
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_BIGINT, "0"));
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_BIGINT, "0"));
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_BIGINT, "0"));
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_DOUBLE, "0"));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_DOUBLE, "0")));
   expected_offsets[8].insert(expected_byte_size);
   expected_offsets[8].insert(expected_byte_size + 8);
   expected_offsets[8].insert(expected_byte_size + 16);
   expected_offsets[8].insert(expected_byte_size + 24);
   expected_byte_size += 4 * 8;      // No more padding
 
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_TIMESTAMP, "0"));
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_TIMESTAMP, "0"));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
   expected_offsets[16].insert(expected_byte_size);
   expected_offsets[16].insert(expected_byte_size + 16);
   expected_byte_size += 2 * 16;
 
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_STRING, "0"));
-  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_STRING, "0"));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_STRING, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_STRING, "0")));
   expected_offsets[0].insert(expected_byte_size);
   expected_offsets[0].insert(expected_byte_size + 16);
   expected_var_begin = expected_byte_size;

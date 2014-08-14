@@ -21,7 +21,6 @@
 #include "exprs/anyval-util.h"
 #include "exprs/case-expr.h"
 #include "exprs/expr.h"
-#include "exprs/expr-inline.h"
 #include "runtime/tuple-row.h"
 #include "util/decimal-util.h"
 #include "util/string-parser.h"
@@ -679,59 +678,4 @@ DECIMAL_BINARY_OP(Gt_DecimalVal_DecimalVal, Gt)
 DECIMAL_BINARY_OP(Le_DecimalVal_DecimalVal, Le)
 DECIMAL_BINARY_OP(Lt_DecimalVal_DecimalVal, Lt)
 
-void* DecimalOperators::Case_decimal(Expr* e, TupleRow* row) {
-  CaseExpr* expr = static_cast<CaseExpr*>(e);
-  int num_children = e->GetNumChildren();
-  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;
-  // Make sure we set the right compute function.
-  DCHECK_EQ(expr->has_case_expr(), true);
-  // Need at least case, when and then expr, and optionally an else.
-  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);
-  // All case and when exprs return the same type (we guaranteed that during analysis).
-  void* case_val = e->children()[0]->GetValue(row);
-  int num_bytes = e->children()[0]->type().GetByteSize();
-  if (case_val == NULL) {
-    if (expr->has_else_expr()) {
-      // Return else value.
-      return e->children()[num_children - 1]->GetValue(row);
-    } else {
-      return NULL;
-    }
-  }
-  for (int i = 1; i < loop_end; i += 2) {
-    void* when_val = e->children()[i]->GetValue(row);
-    if (when_val == NULL) continue;
-    switch (num_bytes) {
-      case 4:
-        if (*reinterpret_cast<Decimal4Value*>(when_val) ==
-            *reinterpret_cast<Decimal4Value*>(case_val)) {
-          return e->children()[i + 1]->GetValue(row);
-        }
-        break;
-      case 8:
-        if (*reinterpret_cast<Decimal8Value*>(when_val) ==
-            *reinterpret_cast<Decimal8Value*>(case_val)) {
-          return e->children()[i + 1]->GetValue(row);
-        }
-        break;
-      case 16:
-        if (*reinterpret_cast<Decimal16Value*>(when_val) ==
-            *reinterpret_cast<Decimal16Value*>(case_val)) {
-          return e->children()[i + 1]->GetValue(row);
-        }
-        break;
-      default:
-        DCHECK(false) << e->children()[0]->type();
-        return NULL;
-    }
-  }
-  if (expr->has_else_expr()) {
-    // Return else value.
-    return e->children()[num_children - 1]->GetValue(row);
-  }
-  return NULL;
 }
-
-
-}
-

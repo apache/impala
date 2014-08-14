@@ -18,24 +18,96 @@
 
 #include <string>
 #include "exprs/predicate.h"
+#include "udf/udf.h"
 
 namespace impala {
 
 class InPredicate : public Predicate {
  public:
-  virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::BooleanVal& val,
+      int num_args, const impala_udf::BooleanVal* args);
 
- protected:
-  friend class Expr;
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::BooleanVal& val,
+      int num_args, const impala_udf::BooleanVal* args);
 
-  InPredicate(const TExprNode& node);
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::TinyIntVal& val,
+      int num_args, const impala_udf::TinyIntVal* args);
 
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc);
-  virtual std::string DebugString() const;
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::TinyIntVal& val,
+      int num_args, const impala_udf::TinyIntVal* args);
+
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::SmallIntVal& val,
+      int num_args, const impala_udf::SmallIntVal* args);
+
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::SmallIntVal& val,
+      int num_args, const impala_udf::SmallIntVal* args);
+
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::IntVal& val,
+      int num_args, const impala_udf::IntVal* args);
+
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::IntVal& val,
+      int num_args, const impala_udf::IntVal* args);
+
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::BigIntVal& val,
+      int num_args, const impala_udf::BigIntVal* args);
+
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::BigIntVal& val,
+      int num_args, const impala_udf::BigIntVal* args);
+
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::FloatVal& val,
+      int num_args, const impala_udf::FloatVal* args);
+
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::FloatVal& val,
+      int num_args, const impala_udf::FloatVal* args);
+
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::DoubleVal& val,
+      int num_args, const impala_udf::DoubleVal* args);
+
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::DoubleVal& val,
+      int num_args, const impala_udf::DoubleVal* args);
+
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::StringVal& val,
+      int num_args, const impala_udf::StringVal* args);
+
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::StringVal& val,
+      int num_args, const impala_udf::StringVal* args);
+
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::TimestampVal& val,
+      int num_args, const impala_udf::TimestampVal* args);
+
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::TimestampVal& val,
+      int num_args, const impala_udf::TimestampVal* args);
+
+  static impala_udf::BooleanVal In(
+      impala_udf::FunctionContext* context, const impala_udf::DecimalVal& val,
+      int num_args, const impala_udf::DecimalVal* args);
+
+  static impala_udf::BooleanVal NotIn(
+      impala_udf::FunctionContext* context, const impala_udf::DecimalVal& val,
+      int num_args, const impala_udf::DecimalVal* args);
 
  private:
-   const bool is_not_in_;
-   static void* ComputeFn(Expr* e, TupleRow* row);
+  template<typename T, bool not_in>
+  static inline impala_udf::BooleanVal TemplatedIn(
+      impala_udf::FunctionContext* context, const T& val, int num_args, const T* args);
 };
 
 }

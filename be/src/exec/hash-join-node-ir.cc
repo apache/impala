@@ -29,9 +29,9 @@ using namespace impala;
 // we will not be able to replace the functions with codegen'd versions.
 // TODO: explicitly set the calling convention?
 // TODO: investigate using fastcc for all codegen internal functions?
-bool IR_NO_INLINE EvalOtherJoinConjuncts(Expr* const* exprs, int num_exprs,
-    TupleRow* row) {
-  return ExecNode::EvalConjuncts(exprs, num_exprs, row);
+bool IR_NO_INLINE EvalOtherJoinConjuncts(
+    ExprContext* const* ctxs, int num_ctxs, TupleRow* row) {
+  return ExecNode::EvalConjuncts(ctxs, num_ctxs, row);
 }
 
 // CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by
@@ -51,11 +51,11 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
   int rows_returned = 0;
   int probe_rows = probe_batch->num_rows();
 
-  Expr* const* other_conjuncts = &other_join_conjuncts_[0];
-  int num_other_conjuncts = other_join_conjuncts_.size();
+  ExprContext* const* other_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
+  int num_other_conjunct_ctxs = other_join_conjunct_ctxs_.size();
 
-  Expr* const* conjuncts = &conjuncts_[0];
-  int num_conjuncts = conjuncts_.size();
+  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
+  int num_conjunct_ctxs = conjunct_ctxs_.size();
 
   while (true) {
     // Create output row for each matching build row
@@ -64,13 +64,14 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
       hash_tbl_iterator_.Next<true>();
       CreateOutputRow(out_row, current_probe_row_, matched_build_row);
 
-      if (!EvalOtherJoinConjuncts(other_conjuncts, num_other_conjuncts, out_row)) {
+      if (!EvalOtherJoinConjuncts(
+              other_conjunct_ctxs, num_other_conjunct_ctxs, out_row)) {
         continue;
       }
 
       matched_probe_ = true;
 
-      if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
+      if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, out_row)) {
         ++rows_returned;
         // Filled up out batch or hit limit
         if (UNLIKELY(rows_returned == max_added_rows)) goto end;
@@ -90,7 +91,7 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
     if (!matched_probe_ && match_all_probe_) {
       CreateOutputRow(out_row, current_probe_row_, NULL);
       matched_probe_ = true;
-      if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
+      if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, out_row)) {
         ++rows_returned;
         if (UNLIKELY(rows_returned == max_added_rows)) goto end;
         // Advance to next out row

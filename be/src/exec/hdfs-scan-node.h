@@ -138,6 +138,10 @@ class HdfsScanNode : public ScanNode {
 
   const static int SKIP_COLUMN = -1;
 
+  // Creates a clone of conjunct_ctxs_. 'ctxs' should be non-NULL and empty.
+  // The returned contexts must be closed by the caller.
+  Status GetConjunctCtxs(std::vector<ExprContext*>* ctxs);
+
   // Returns index into materialized_slots with 'col_idx'.  Returns SKIP_COLUMN if
   // that column is not materialized.
   int GetMaterializedSlotIdx(int col_idx) const {
@@ -153,17 +157,6 @@ class HdfsScanNode : public ScanNode {
   // Returns the per format codegen'd function.  Scanners call this to get the
   // codegen'd function to use.  Returns NULL if codegen should not be used.
   void* GetCodegenFn(THdfsFileFormat::type);
-
-  // Each call to GetCodegenFn() must call ReleaseCodegenFn().
-  void ReleaseCodegenFn(THdfsFileFormat::type type, void* fn);
-
-  // Returns a prepared copy of the query's conjunct exprs. Scanners use the conjunct
-  // exprs directly when they cannot use a codegen'd function.
-  std::vector<Expr*>* GetConjuncts();
-
-  // Each call to GetConjuncts() must call ReleaseConjuncts().
-  // TODO: this won't be necessary when exprs are threadsafe.
-  void ReleaseConjuncts(std::vector<Expr*>* conjuncts);
 
   inline void IncNumScannersCodegenEnabled() {
     ++num_scanners_codegen_enabled_;
@@ -203,7 +196,8 @@ class HdfsScanNode : public ScanNode {
   // the partition columns for the current scan range
   // Returns NULL if there are no materialized partition keys.
   // TODO: cache the tuple template in the partition object.
-  Tuple* InitTemplateTuple(RuntimeState* state, const std::vector<Expr*>& expr_values);
+  Tuple* InitTemplateTuple(RuntimeState* state,
+                           const std::vector<ExprContext*>& value_ctxs);
 
   // Allocates and return an empty template tuple (i.e. with no values filled in).
   // Scanners can use this method to initialize a template tuple even if there are no
@@ -322,30 +316,13 @@ class HdfsScanNode : public ScanNode {
   typedef std::map<THdfsFileFormat::type, HdfsScanner*> ScannerMap;
   ScannerMap scanner_map_;
 
-  // Per scanner type codegen'd fn.  If the scan node only contains conjuncts that are
-  // thread safe, there is only one entry in the list and the function is shared by all
-  // scanners.  If the codegen'd fn is not thread safe, there is a number of these
-  // functions that are shared by the scanner threads.  The number of entries in the list
-  // is based on the maximum number of parallel scan ranges possible, which is in turn
-  // based on the number of cpu cores.
-  boost::mutex codgend_fn_map_lock_;
-  typedef std::map<THdfsFileFormat::type, std::list<void*> > CodegendFnMap;
+  // Per scanner type codegen'd fn.
+  typedef std::map<THdfsFileFormat::type, void*> CodegendFnMap;
   CodegendFnMap codegend_fn_map_;
 
-  // All conjunct copies that are created, including codegen'd and noncodegen'd
-  // conjuncts.
-  // TODO: remove when exprs are threadsafe
-  std::list<std::vector<Expr*>*> all_conjuncts_copies_;
-
-  // Copies of the conjuncts for use by the scanners when they cannot use codegen'd
-  // functions.
-  // TODO: We will only need one copy once exprs are threadsafe.
-  SpinLock interpreted_conjuncts_copies_lock_;
-  std::list<std::vector<Expr*>*> interpreted_conjuncts_copies_;
-
-  // The number of non-codegen'd conjuncts copies we made in CreateConjunctsCopies(). Used
-  // for debugging.
-  int num_interpreted_conjuncts_copies_;
+  // Contexts for each conjunct. These are cloned by the scanners so conjuncts can be
+  // safely evaluated in parallel.
+  std::vector<ExprContext*> conjunct_ctxs_;
 
   // Total number of partition slot descriptors, including non-materialized ones.
   int num_partition_keys_;
@@ -451,14 +428,6 @@ class HdfsScanNode : public ScanNode {
   // If true, counters are actively running and need to be reported in the runtime
   // profile.
   bool counters_running_;
-
-  // Creates the necessary codegen functions and conjuncts copies for format. Codegen
-  // functions are stored in codegend_fn_map_[format] and non-codegen'd conjuncts are
-  // stored in conjuncts_copies_.
-  Status CreateConjunctsCopies(THdfsFileFormat::type format);
-
-  // Create a prepared copy of the conjuncts for this node.
-  Status CreateConjuncts(std::vector<Expr*>* exprs, bool disable_codegen);
 
   // Called when scanner threads are available for this scan node. This will
   // try to spin up as many scanner threads as the quota allows.

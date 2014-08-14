@@ -303,8 +303,8 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
   int tuple_buffer_size = row_batch->capacity() * tuple_desc_->byte_size();
   void* tuple_buffer = tuple_pool->Allocate(tuple_buffer_size);
   tuple_ = reinterpret_cast<Tuple*>(tuple_buffer);
-  Expr** conjuncts = &conjuncts_[0];
-  int num_conjuncts = conjuncts_.size();
+  ExprContext** ctxs = &conjunct_ctxs_[0];
+  int num_ctxs = conjunct_ctxs_.size();
 
   while (true) {
     {
@@ -317,7 +317,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
         TupleRow* tuple_row = row_batch->GetRow(row_idx);
         tuple_row->SetTuple(tuple_idx_, tuple_);
 
-        if (ExecNode::EvalConjuncts(conjuncts, num_conjuncts, tuple_row)) {
+        if (ExecNode::EvalConjuncts(ctxs, num_ctxs, tuple_row)) {
           row_batch->CommitLastRow();
           char* new_tuple = reinterpret_cast<char*>(tuple_);
           new_tuple += tuple_desc_->byte_size();

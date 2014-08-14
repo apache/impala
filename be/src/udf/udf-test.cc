@@ -104,7 +104,7 @@ IntVal NumVarArgs(FunctionContext*, const BigIntVal& dummy, int n, const IntVal*
 
 IntVal ValidateUdf(FunctionContext* context) {
   EXPECT_EQ(context->version(), FunctionContext::v1_3);
-  EXPECT_FALSE(context->has_error());
+  EXPECT_FALSE(context->has_error()) << context->error_msg();
   EXPECT_TRUE(context->error_msg() == NULL);
   return IntVal::null();
 }

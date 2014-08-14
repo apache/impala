@@ -145,23 +145,6 @@ public class StringLiteral extends LiteralExpr {
         "Failed to convert string literal '" + value_ + "' to number.");
   }
 
-
-  /**
-   * Convert a string literal to a date literal
-   *
-   * @param targetType
-   *          is the desired type
-   * @return new converted literal (not null)
-   * @throws AnalysisException
-   *           when entire given string cannot be transformed into a date
-   */
-  private LiteralExpr convertToDate(Type targetType)
-      throws AnalysisException {
-    LiteralExpr newLiteral = null;
-    newLiteral = new DateLiteral(value_, targetType);
-    return newLiteral;
-  }
-
   @Override
   public int compareTo(LiteralExpr o) {
     if (!(o instanceof StringLiteral)) return -1;

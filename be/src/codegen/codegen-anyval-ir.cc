@@ -14,38 +14,36 @@
 
 #ifdef IR_COMPILE
 #include "runtime/string-value.inline.h"
+#include "runtime/timestamp-value.h"
+#include "udf/udf.h"
 
 using namespace impala;
+using namespace impala_udf;
 
-extern "C" 
-bool StringValueEQ(const StringValue* s1, const StringValue* s2) {
-  return s1->Eq(*s2);
+// Note: we explicitly pass by reference because passing by value has special ABI rules
+
+// Used by CodegenAnyVal::Eq()
+
+bool StringValEq(const StringVal& x, const StringVal& y) {
+  return x == y;
 }
 
-extern "C"
-bool StringValueNE(const StringValue* s1, const StringValue* s2) {
-  return s1->Ne(*s2);
+bool TimestampValEq(const TimestampVal& x, const TimestampVal& y) {
+  return x == y;
 }
 
-extern "C"
-bool StringValueLT(const StringValue* s1, const StringValue* s2) {
-  return s1->Lt(*s2);
+// Used by CodegenAnyVal::EqToNativePtr()
+
+bool StringValueEq(const StringVal& x, const StringValue& y) {
+  StringValue sv = StringValue::FromStringVal(x);
+  return sv.Eq(y);
 }
 
-extern "C"
-bool StringValueLE(const StringValue* s1, const StringValue* s2) {
-  return s1->Le(*s2);
+bool TimestampValueEq(const TimestampVal& x, const TimestampValue& y) {
+  TimestampValue tv = TimestampValue::FromTimestampVal(x);
+  return tv == y;
 }
 
-extern "C"
-bool StringValueGT(const StringValue* s1, const StringValue* s2) {
-  return s1->Gt(*s2);
-}
-
-extern "C"
-bool StringValueGE(const StringValue* s1, const StringValue* s2) {
-  return s1->Ge(*s2);
-}
 #else
 #error "This file should only be used for cross compiling to IR."
 #endif

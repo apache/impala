@@ -13,9 +13,11 @@
 // limitations under the License.
 
 #include "udf/udf.h"
+
 #include <iostream>
 #include <sstream>
 #include <assert.h>
+#include <gutil/port.h> // for aligned_malloc
 
 // Be careful what this includes since this needs to be linked into the UDF's
 // binary. For example, it would be unfortunate if they had a random dependency
@@ -102,16 +104,30 @@ static const int MAX_WARNINGS = 1000;
 // Create a FunctionContext. The caller is responsible for calling delete on it.
 FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool,
     const FunctionContext::TypeDesc& return_type,
-    const vector<FunctionContext::TypeDesc>& arg_types, bool debug) {
+    const vector<FunctionContext::TypeDesc>& arg_types,
+    int varargs_buffer_size, bool debug) {
   impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
   ctx->impl_->state_ = state;
   ctx->impl_->pool_ = new FreePool(pool);
   ctx->impl_->return_type_ = return_type;
   ctx->impl_->arg_types_ = arg_types;
+  // UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
+  // that require 16-byte memory alignment.
+  ctx->impl_->varargs_buffer_ =
+      reinterpret_cast<uint8_t*>(aligned_malloc(varargs_buffer_size, 16));
+  ctx->impl_->varargs_buffer_size_ = varargs_buffer_size;
   ctx->impl_->debug_ = debug;
   VLOG_ROW << "Created FunctionContext: " << ctx
            << " with pool " << ctx->impl_->pool_;
   return ctx;
+}
+
+FunctionContext* FunctionContextImpl::Clone(MemPool* pool) {
+  impala_udf::FunctionContext* new_context =
+      CreateContext(state_, pool, return_type_, arg_types_, varargs_buffer_size_, debug_);
+  new_context->impl_->constant_args_ = constant_args_;
+  new_context->impl_->fragment_local_fn_state_ = fragment_local_fn_state_;
+  return new_context;
 }
 
 FunctionContext::FunctionContext() : impl_(new FunctionContextImpl(this)) {
@@ -124,7 +140,13 @@ FunctionContext::~FunctionContext() {
 }
 
 FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
-  : context_(parent), debug_(false), version_(FunctionContext::v1_3),
+  : varargs_buffer_(NULL),
+    varargs_buffer_size_(0),
+    context_(parent),
+    pool_(NULL),
+    state_(NULL),
+    debug_(false),
+    version_(FunctionContext::v1_3),
     num_warnings_(0),
     thread_local_fn_state_(NULL),
     fragment_local_fn_state_(NULL),
@@ -133,6 +155,7 @@ FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
 }
 
 void FunctionContextImpl::Close() {
+  assert(!closed_ && "FunctionContextImpl::Close() called twice");
   stringstream error_ss;
   if (!allocations_.empty()) {
     int bytes = 0;
@@ -166,6 +189,8 @@ void FunctionContextImpl::Close() {
 
   // Local allocations cannot be leaked (at least not by the UDF)
   FreeLocalAllocations();
+  free(varargs_buffer_);
+  varargs_buffer_ = NULL;
   closed_ = true;
 }
 
@@ -351,29 +376,14 @@ void FunctionContextImpl::SetConstantArgs(const vector<AnyVal*>& constant_args) 
   constant_args_ = constant_args;
 }
 
-bool FunctionContext::IsArgConstant(int i) const {
-  if (i < 0 || i >= impl_->constant_args_.size()) return false;
-  return impl_->constant_args_[i] != NULL;
+// Note: this function crashes LLVM's JIT in expr-test if it's xcompiled. Do not move to
+// expr-ir.cc. This could probably use further investigation.
+StringVal::StringVal(FunctionContext* context, int len)
+  : len(len), ptr(context->impl()->AllocateLocal(len)) {
 }
 
-AnyVal* FunctionContext::GetConstantArg(int i) const {
-  if (i < 0 || i >= impl_->constant_args_.size()) return NULL;
-  return impl_->constant_args_[i];
-}
-
+// TODO: why doesn't libudasample.so build if this in udf-ir.cc?
 const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const {
   if (arg_idx < 0 || arg_idx >= impl_->arg_types_.size()) return NULL;
   return &impl_->arg_types_[arg_idx];
-}
-
-int FunctionContext::GetNumArgs() const {
-  return impl_->arg_types_.size();
-}
-
-const FunctionContext::TypeDesc& FunctionContext::GetReturnType() const {
-  return impl_->return_type_;
-}
-
-StringVal::StringVal(FunctionContext* context, int len)
-  : len(len), ptr(context->impl()->AllocateLocal(len)) {
 }

@@ -14,6 +14,7 @@
 
 #include "exec/union-node.h"
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/raw-value.h"
@@ -37,19 +38,19 @@ UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
 Status UnionNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(ExecNode::Init(tnode));
   DCHECK(tnode.__isset.union_node);
-  // Create const_expr_lists_ from thrift exprs.
+  // Create const_expr_ctx_lists_ from thrift exprs.
   const vector<vector<TExpr> >& const_texpr_lists = tnode.union_node.const_expr_lists;
   for (int i = 0; i < const_texpr_lists.size(); ++i) {
-    vector<Expr*> exprs;
-    RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, const_texpr_lists[i], &exprs));
-    const_result_expr_lists_.push_back(exprs);
+    vector<ExprContext*> ctxs;
+    RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, const_texpr_lists[i], &ctxs));
+    const_result_expr_ctx_lists_.push_back(ctxs);
   }
-  // Create result_expr_lists_ from thrift exprs.
+  // Create result_expr_ctx_lists_ from thrift exprs.
   const vector<vector<TExpr> >& result_texpr_lists = tnode.union_node.result_expr_lists;
   for (int i = 0; i < result_texpr_lists.size(); ++i) {
-    vector<Expr*> exprs;
-    RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, result_texpr_lists[i], &exprs));
-    result_expr_lists_.push_back(exprs);
+    vector<ExprContext*> ctxs;
+    RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, result_texpr_lists[i], &ctxs));
+    result_expr_ctx_lists_.push_back(ctxs);
   }
   return Status::OK;
 }
@@ -66,15 +67,15 @@ Status UnionNode::Prepare(RuntimeState* state) {
   }
 
   // Prepare const expr lists.
-  for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare(const_result_expr_lists_[i], state, row_desc()));
-    DCHECK_EQ(const_result_expr_lists_[i].size(), materialized_slots_.size());
+  for (int i = 0; i < const_result_expr_ctx_lists_.size(); ++i) {
+    RETURN_IF_ERROR(Expr::Prepare(const_result_expr_ctx_lists_[i], state, row_desc()));
+    DCHECK_EQ(const_result_expr_ctx_lists_[i].size(), materialized_slots_.size());
   }
 
   // Prepare result expr lists.
-  for (int i = 0; i < result_expr_lists_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare(result_expr_lists_[i], state, child(i)->row_desc()));
-    DCHECK_EQ(result_expr_lists_[i].size(), materialized_slots_.size());
+  for (int i = 0; i < result_expr_ctx_lists_.size(); ++i) {
+    RETURN_IF_ERROR(Expr::Prepare(result_expr_ctx_lists_[i], state, child(i)->row_desc()));
+    DCHECK_EQ(result_expr_ctx_lists_[i].size(), materialized_slots_.size());
   }
   return Status::OK;
 }
@@ -82,12 +83,12 @@ Status UnionNode::Prepare(RuntimeState* state) {
 Status UnionNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   // Open const expr lists.
-  for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Open(const_result_expr_lists_[i], state));
+  for (int i = 0; i < const_result_expr_ctx_lists_.size(); ++i) {
+    RETURN_IF_ERROR(Expr::Open(const_result_expr_ctx_lists_[i], state));
   }
   // Open result expr lists.
-  for (int i = 0; i < result_expr_lists_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Open(result_expr_lists_[i], state));
+  for (int i = 0; i < result_expr_ctx_lists_.size(); ++i) {
+    RETURN_IF_ERROR(Expr::Open(result_expr_ctx_lists_[i], state));
   }
 
   // Open and fetch from the first child if there is one. Ensures that rows are
@@ -126,8 +127,8 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     // Start (or continue) consuming row batches from current child.
     while (true) {
       // Continue materializing exprs on child_row_batch_ into row batch.
-      if (EvalAndMaterializeExprs(result_expr_lists_[child_idx_], false, &tuple,
-          row_batch)) {
+      if (EvalAndMaterializeExprs(
+              result_expr_ctx_lists_[child_idx_], false, &tuple, row_batch)) {
         *eos = ReachedLimit();
         return Status::OK;
       }
@@ -151,11 +152,12 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   }
 
   // Evaluate and materialize the const expr lists exactly once.
-  while (const_result_expr_idx_ < const_result_expr_lists_.size()) {
+  while (const_result_expr_idx_ < const_result_expr_ctx_lists_.size()) {
     // Only evaluate the const expr lists by the first fragment instance.
     if (state->fragment_ctx().fragment_instance_idx == 0) {
       // Materialize expr results into row_batch.
-      EvalAndMaterializeExprs(const_result_expr_lists_[const_result_expr_idx_], true,
+      EvalAndMaterializeExprs(
+          const_result_expr_ctx_lists_[const_result_expr_idx_], true,
           &tuple, row_batch);
     }
     ++const_result_expr_idx_;
@@ -170,25 +172,25 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 void UnionNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   child_row_batch_.reset();
-  for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
-    Expr::Close(const_result_expr_lists_[i], state);
+  for (int i = 0; i < const_result_expr_ctx_lists_.size(); ++i) {
+    Expr::Close(const_result_expr_ctx_lists_[i], state);
   }
-  for (int i = 0; i < result_expr_lists_.size(); ++i) {
-    Expr::Close(result_expr_lists_[i], state);
+  for (int i = 0; i < result_expr_ctx_lists_.size(); ++i) {
+    Expr::Close(result_expr_ctx_lists_[i], state);
   }
   ExecNode::Close(state);
 }
 
-bool UnionNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
-    bool const_exprs, Tuple** tuple, RowBatch* row_batch) {
+bool UnionNode::EvalAndMaterializeExprs(const vector<ExprContext*>& ctxs, bool const_exprs,
+                                        Tuple** tuple, RowBatch* row_batch) {
   // Make sure there are rows left in the batch.
   if (!const_exprs && child_row_idx_ >= child_row_batch_->num_rows()) {
     return false;
   }
   // Execute the body at least once.
   bool done = true;
-  Expr* const* conjuncts = &conjuncts_[0];
-  int num_conjuncts = conjuncts_.size();
+  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
+  int num_conjunct_ctxs = conjunct_ctxs_.size();
 
   do {
     TupleRow* child_row = NULL;
@@ -207,15 +209,15 @@ bool UnionNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
     row->SetTuple(0, *tuple);
 
     // Materialize expr results into tuple.
-    DCHECK_EQ(exprs.size(), materialized_slots_.size());
-    for (int i = 0; i < exprs.size(); ++i) {
+    DCHECK_EQ(ctxs.size(), materialized_slots_.size());
+    for (int i = 0; i < ctxs.size(); ++i) {
       // our exprs correspond to materialized slots
       SlotDescriptor* slot_desc = materialized_slots_[i];
-      RawValue::Write(exprs[i]->GetValue(child_row), *tuple, slot_desc,
+      RawValue::Write(ctxs[i]->GetValue(child_row), *tuple, slot_desc,
           row_batch->tuple_data_pool());
     }
 
-    if (EvalConjuncts(conjuncts, num_conjuncts, row)) {
+    if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, row)) {
       row_batch->CommitLastRow();
       ++num_rows_returned_;
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);

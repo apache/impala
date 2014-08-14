@@ -65,6 +65,7 @@ namespace llvm {
 
 namespace impala {
 
+class CodegenAnyVal;
 class SubExprElimination;
 
 // LLVM code generator.  This is the top level object to generate jitted code.
@@ -273,11 +274,14 @@ class LlvmCodeGen {
   // NULL, otherwise, it will optimize and return the function object.
   llvm::Function* FinalizeFunction(llvm::Function* function);
 
-  // Inline all function calls for 'fn'.  'fn' is modified in place.  Returns
-  // the number of functions inlined.  This is *not* called recursively
-  // (i.e. second level function calls are not inlined).  This can be called
-  // again to inline those until this returns 0.
-  int InlineAllCallSites(llvm::Function* fn, bool skip_registered_fns);
+  // Inlines all function calls for 'fn' that are marked as always inline.
+  // (We can't inline all call sites since pulling in boost/other libs could have
+  // recursion.  Instead, we just inline our functions and rely on the llvm inliner to
+  // pick the rest.)
+  // 'fn' is modified in place. Returns the number of functions inlined.  This is *not*
+  // called recursively (i.e. second level function calls are not inlined). This can be
+  // called again to inline those until this returns 0.
+  int InlineCallSites(llvm::Function* fn, bool skip_registered_fns);
 
   // Optimizes the function in place.  This uses a combination of llvm optimization
   // passes as well as some custom heuristics.  This should be called for all
@@ -343,8 +347,6 @@ class LlvmCodeGen {
   // called from anywhere and will add a stack allocation for 'var' at the beginning of
   // the function.  This would be used, for example, if a function needed a temporary
   // struct allocated.  The allocated variable is scoped to the function.
-  // This is not related to GetScratchBuffer which is used for structs that are returned
-  // to the caller.
   //
   // This should always be used instead of calling LlvmBuilder::CreateAlloca directly.
   // LLVM doesn't optimize alloca's occuring in the middle of functions very well (e.g, an
@@ -361,21 +363,12 @@ class LlvmCodeGen {
       llvm::BasicBlock** if_block, llvm::BasicBlock** else_block,
       llvm::BasicBlock* insert_before = NULL);
 
-  // Returns offset into scratch buffer: offset points to area of size 'byte_size'
-  // Called by expr generation to request scratch buffer.  This is used for struct
-  // types (i.e. StringValue) where data cannot be returned by registers.
-  // For example, to jit the expr "strlen(str_col)", we need a temporary StringValue
-  // struct from the inner SlotRef expr node.  The SlotRef node would call
-  // GetScratchBuffer(sizeof(StringValue)) and output the intermediate struct at
-  // scratch_buffer (passed in as argument to compute function) + offset.
-  int GetScratchBuffer(int byte_size);
-
   // Create a llvm pointer value from 'ptr'.  This is used to pass pointers between
   // c-code and code-generated IR.  The resulting value will be of 'type'.
   llvm::Value* CastPtrToLlvmPtr(llvm::Type* type, const void* ptr);
 
   // Returns the constant 'val' of 'type'
-  llvm::Value* GetIntConstant(const ColumnType& type, int64_t val);
+  llvm::Value* GetIntConstant(PrimitiveType type, int64_t val);
 
   // Returns true/false constants (bool type)
   llvm::Value* true_value() { return true_value_; }
@@ -393,6 +386,7 @@ class LlvmCodeGen {
   llvm::Type* string_val_type() { return string_val_type_; }
   llvm::PointerType* ptr_type() { return ptr_type_; }
   llvm::Type* void_type() { return void_type_; }
+  llvm::Type* i128_type() { return llvm::Type::getIntNTy(context(), 128); }
 
   // Fills 'functions' with all the functions that are defined in the module.
   // Note: this does not include functions that are just declared
@@ -407,15 +401,6 @@ class LlvmCodeGen {
   // Codegen to call llvm memcpy intrinsic at the current builder location
   // dst & src must be pointer types.  size is the number of bytes to copy.
   void CodegenMemcpy(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, int size);
-
-  // Codegen computing v1 == v2.  Returns the result.  v1 and v2 must be the same type
-  llvm::Value* CodegenEquals(LlvmBuilder*, llvm::Value* v1, llvm::Value* v2,
-      const ColumnType& type);
-
-  // Codegen for do *dst = src.  For native types, this is just a store, for structs
-  // we need to assign the fields one by one
-  void CodegenAssign(LlvmBuilder*, llvm::Value* dst, llvm::Value* src,
-      const ColumnType&);
 
   // Loads an LLVM module. 'file' should be the local path to the LLVM bitcode (.ll)
   // file. If 'file_size' is not NULL, it will be set to the size of 'file'.
@@ -448,16 +433,11 @@ class LlvmCodeGen {
   // Returns NULL if the function is invalid.
   // Note that this will compile, but not optimize, function if necessary.
   //
-  // scratch_size will be set to the buffer size required to call the function.
-  // scratch_size is the total size from all LlvmCodeGen::GetScratchBuffer calls (with
-  // some additional bytes for alignment).
-  // This function is thread safe.
-  //
   // This function shouldn't be called after calling FinalizeModule(). Instead use
   // AddFunctionToJit() to register a function pointer. This is because FinalizeModule()
   // may remove any functions not registered in AddFunctionToJit(). As such, this
   // function is mostly useful for tests that do not call FinalizeModule() at all.
-  void* JitFunction(llvm::Function* function, int* scratch_size = NULL);
+  void* JitFunction(llvm::Function* function);
 
   // Optimizes the module. This includes pruning the module of any unused functions.
   void OptimizeModule();
@@ -501,9 +481,6 @@ class LlvmCodeGen {
 
   // Execution/Jitting engine.
   boost::scoped_ptr<llvm::ExecutionEngine> execution_engine_;
-
-  // current offset into scratch buffer
-  int scratch_buffer_offset_;
 
   // Keeps track of all the functions that have been jit compiled and linked into
   // the process. Special care needs to be taken if we need to modify these functions.

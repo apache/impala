@@ -128,7 +128,7 @@ bool SubExprElimination::Run(Function* fn) {
   int num_inlined;
   do {
     // This assumes that all redundant exprs have been registered.
-    num_inlined = codegen_->InlineAllCallSites(fn, true);
+    num_inlined = codegen_->InlineCallSites(fn, true);
   } while (num_inlined > 0);
 
   // Mapping of (expr eval function, its 'row' arg) to cached result.  We want to remove
@@ -203,7 +203,7 @@ bool SubExprElimination::Run(Function* fn) {
   }
 
   // Step 3:
-  codegen_->InlineAllCallSites(fn, false);
+  codegen_->InlineCallSites(fn, false);
   return true;
 }
 

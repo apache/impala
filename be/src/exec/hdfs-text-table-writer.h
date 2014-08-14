@@ -41,7 +41,7 @@ class HdfsTextTableWriter : public HdfsTableWriter {
                       RuntimeState* state, OutputPartition* output,
                       const HdfsPartitionDescriptor* partition,
                       const HdfsTableDescriptor* table_desc,
-                      const std::vector<Expr*>& output_exprs);
+                      const std::vector<ExprContext*>& output_expr_ctxs);
 
   ~HdfsTextTableWriter() { }
 

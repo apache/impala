@@ -102,6 +102,14 @@ inline int128_t ConvertToInt128(int256_t x, int128_t max_value, bool* overflow) 
 // native int types in templates.
 inline int128_t abs(const int128_t& x) { return (x < 0) ? -x : x; }
 
+// Get the high and low bits of an int128_t
+inline uint64_t HighBits(int128_t x) {
+  return x >> 64;
+}
+inline uint64_t LowBits(int128_t x) {
+  return x & 0xffffffffffffffff;
+}
+
 // Prints v in base 10.
 std::ostream& operator<<(std::ostream& os, const int128_t& val);
 

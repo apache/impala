@@ -24,12 +24,11 @@
 
 #include <gutil/strings/substitute.h>
 
+using namespace impala;
 using namespace std;
 using namespace boost::gregorian;
 using namespace boost::posix_time;
 using namespace strings;
-
-namespace impala {
 
 DoubleVal UdfBuiltins::Abs(FunctionContext* context, const DoubleVal& v) {
   if (v.is_null) return v;
@@ -414,7 +413,6 @@ void UdfBuiltins::ExtractClose(FunctionContext* ctx,
   }
 }
 
-
 bool ValidateMADlibVector(FunctionContext* context, const StringVal& arr) {
   if (arr.ptr == NULL) {
     context->SetError("MADlib vector is null");
@@ -515,5 +513,3 @@ StringVal UdfBuiltins::DecodeVector(FunctionContext* context, const StringVal& a
   InplaceDoubleDecode(reinterpret_cast<char*>(result.ptr), arr.len);
   return result;
 }
-
-} // namespace impala

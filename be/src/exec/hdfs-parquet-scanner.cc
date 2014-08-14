@@ -785,7 +785,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
         }
         if (conjuncts_failed) continue;
         row->SetTuple(scan_node_->tuple_idx(), tuple);
-        if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, row)) {
+        if (EvalConjuncts(row)) {
           row = next_row(row);
           tuple = next_tuple(tuple);
           ++num_to_commit;
@@ -798,7 +798,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
       DCHECK_GT(num_rows, 0);
       InitTuple(template_tuple_, tuple);
       row->SetTuple(scan_node_->tuple_idx(), tuple);
-      if (ExecNode::EvalConjuncts(&(*conjuncts_)[0], num_conjuncts_, row)) {
+      if (EvalConjuncts(row)) {
         row = next_row(row);
         tuple = next_tuple(tuple);
 

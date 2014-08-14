@@ -23,38 +23,31 @@ add_library(Exprs
   agg-fn-evaluator.cc
   aggregate-functions.cc
   anyval-util.cc
-  arithmetic-expr.cc
-  binary-predicate.cc
-  bool-literal.cc
   case-expr.cc
-  cast-expr.cc
   cast-functions.cc
-  char-literal.cc
-  compound-predicate.cc
+  compound-predicates.cc
+  compound-predicates-ir.cc
   conditional-functions.cc
-  date-literal.cc
+  conditional-functions-ir.cc
   decimal-functions.cc
-  decimal-literal.cc
   decimal-operators.cc
   expr.cc
-  float-literal.cc
-  function-call.cc
+  expr-context.cc
+  expr-ir.cc
   hive-udf-call.cc
-  in-predicate.cc
-  int-literal.cc
+  in-predicate-ir.cc
   is-null-predicate.cc
   like-predicate.cc
+  literal.cc
   math-functions.cc
   null-literal.cc
   operators.cc
   slot-ref.cc
-  string-literal.cc
   string-functions.cc
   timestamp-functions.cc
-  timestamp-literal.cc
   timezone_db.cc
   tuple-is-null-predicate.cc
-  native-udf-expr.cc
+  scalar-fn-call.cc
   udf-builtins.cc
   utility-functions.cc
 )

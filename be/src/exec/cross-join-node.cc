@@ -138,14 +138,14 @@ int CrossJoinNode::ProcessLeftChildBatch(RowBatch* output_batch, RowBatch* batch
   TupleRow* output_row = reinterpret_cast<TupleRow*>(output_row_mem);
 
   int rows_returned = 0;
-  Expr* const* conjuncts = &conjuncts_[0];
+  ExprContext* const* ctxs = &conjunct_ctxs_[0];
 
   while (true) {
     while (!current_build_row_.AtEnd()) {
       CreateOutputRow(output_row, current_probe_row_, current_build_row_.GetRow());
       current_build_row_.Next();
 
-      if (!EvalConjuncts(conjuncts, conjuncts_.size(), output_row)) continue;
+      if (!EvalConjuncts(ctxs, conjunct_ctxs_.size(), output_row)) continue;
       ++rows_returned;
       // Filled up out batch or hit limit
       if (UNLIKELY(rows_returned == max_added_rows)) goto end;

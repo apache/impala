@@ -19,6 +19,7 @@
 #include <sstream>
 
 #include "common/logging.h"
+#include "exprs/expr-context.h"
 #include "runtime/hbase-table-factory.h"
 #include "util/bit-util.h"
 #include "util/jni-util.h"
@@ -40,11 +41,11 @@ jmethodID HBaseTableWriter::list_add_id_ = NULL;
 jmethodID HBaseTableWriter::put_add_id_ = NULL;
 
 HBaseTableWriter::HBaseTableWriter(HBaseTableDescriptor* table_desc,
-                                   const vector<Expr*>& output_exprs,
+                                   const vector<ExprContext*>& output_expr_ctxs,
                                    RuntimeProfile* profile)
     : table_desc_(table_desc),
       table_(NULL),
-      output_exprs_(output_exprs),
+      output_expr_ctxs_(output_expr_ctxs),
       put_list_(NULL),
       runtime_profile_(profile) {
 };
@@ -67,7 +68,7 @@ Status HBaseTableWriter::Init(RuntimeState* state) {
   cf_arrays_.reserve(num_col - 1);
   qual_arrays_.reserve(num_col - 1);
   for (int i = 0; i < num_col; ++i) {
-    output_exprs_byte_sizes_[i] = output_exprs_[i]->type().GetByteSize();
+    output_exprs_byte_sizes_[i] = output_expr_ctxs_[i]->root()->type().GetByteSize();
 
     if (i == 0) continue;
 
@@ -133,20 +134,20 @@ Status HBaseTableWriter::AppendRowBatch(RowBatch* batch) {
       TupleRow* current_row = batch->GetRow(idx_batch);
       jobject put = NULL;
 
-      if (output_exprs_[0]->GetValue(current_row) == NULL) {
+      if (output_expr_ctxs_[0]->GetValue(current_row) == NULL) {
         // HBase row key must not be null.
         return Status("Cannot insert into HBase with a null row key.");
       }
 
       for (int j = 0; j < num_cols; j++) {
         const HBaseTableDescriptor::HBaseColumnDescriptor& col = table_desc_->cols()[j];
-        void* value = output_exprs_[j]->GetValue(current_row);
+        void* value = output_expr_ctxs_[j]->GetValue(current_row);
 
         if (value != NULL) {
           if (!col.binary_encoded) {
             // Text encoded
             string_value.clear();
-            output_exprs_[j]->PrintValue(value, &string_value);
+            output_expr_ctxs_[j]->PrintValue(value, &string_value);
             data = string_value.data();
             data_len = string_value.length();
           } else {

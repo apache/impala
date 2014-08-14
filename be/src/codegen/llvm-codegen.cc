@@ -19,8 +19,9 @@
 #include <sstream>
 #include <boost/thread/mutex.hpp>
 
-#include <llvm/Analysis/Passes.h>
+#include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/InstructionSimplify.h>
+#include <llvm/Analysis/Passes.h>
 #include <llvm/Bitcode/ReaderWriter.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JIT.h>
@@ -30,10 +31,12 @@
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/NoFolder.h>
+#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/system_error.h>
-#include "llvm/Transforms/IPO.h"
+#include <llvm/Target/TargetLibraryInfo.h>
+#include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
@@ -96,7 +99,6 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
   context_(new llvm::LLVMContext()),
   module_(NULL),
   execution_engine_(NULL),
-  scratch_buffer_offset_(0),
   debug_trace_fn_(NULL) {
 
   DCHECK(llvm_initialized) << "Must call LlvmCodeGen::InitializeLlvm first.";
@@ -210,6 +212,7 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
         if (codegen->loaded_functions_[FN_MAPPINGS[j].fn] != NULL) {
           return Status("Duplicate definition found for function: " + fn_name);
         }
+        functions[i]->addFnAttr(Attribute::AlwaysInline);
         codegen->loaded_functions_[FN_MAPPINGS[j].fn] = functions[i];
         ++parsed_functions;
       }
@@ -343,10 +346,8 @@ Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, const void* ptr) {
   return ConstantExpr::getIntToPtr(const_int, type);
 }
 
-Value* LlvmCodeGen::GetIntConstant(const ColumnType& type, int64_t val) {
-  switch (type.type) {
-    case TYPE_NULL:
-      return ConstantInt::get(context(), APInt(8, val));
+Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, int64_t val) {
+  switch (type) {
     case TYPE_TINYINT:
       return ConstantInt::get(context(), APInt(8, val));
     case TYPE_SMALLINT:
@@ -499,10 +500,10 @@ Function* LlvmCodeGen::CloneFunction(Function* fn) {
   return fn_clone;
 }
 
-// TODO: revisit this.  Inlining all call sites might not be the right call.  We
+// TODO: revisit this. Inlining all call sites might not be the right call.  We
 // probably need to make this more complicated and somewhat cost based or write
 // our own optimization passes.
-int LlvmCodeGen::InlineAllCallSites(Function* fn, bool skip_registered_fns) {
+int LlvmCodeGen::InlineCallSites(Function* fn, bool skip_registered_fns) {
   int functions_inlined = 0;
   // Collect all call sites
   vector<CallInst*> call_sites;
@@ -519,6 +520,10 @@ int LlvmCodeGen::InlineAllCallSites(Function* fn, bool skip_registered_fns) {
       if (CallInst::classof(instr)) {
         CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
         Function* called_fn = call_instr->getCalledFunction();
+        // called_fn will be NULL if it's a virtual function call, etc.
+        if (called_fn == NULL || !called_fn->hasFnAttribute(Attribute::AlwaysInline)) {
+          continue;
+        }
         if (skip_registered_fns) {
           if (registered_exprs_.find(called_fn) != registered_exprs_.end()) {
             continue;
@@ -541,12 +546,21 @@ int LlvmCodeGen::InlineAllCallSites(Function* fn, bool skip_registered_fns) {
 }
 
 Function* LlvmCodeGen::OptimizeFunctionWithExprs(Function* fn) {
-  SubExprElimination subexpr_elim(this);
-  subexpr_elim.Run(fn);
+  int num_inlined;
+  do {
+    // This assumes that all redundant exprs have been registered.
+    num_inlined = InlineCallSites(fn, false);
+  } while (num_inlined > 0);
+
+  // TODO(skye): fix subexpression elimination
+  // SubExprElimination subexpr_elim(this);
+  // subexpr_elim.Run(fn);
   return FinalizeFunction(fn);
 }
 
 Function* LlvmCodeGen::FinalizeFunction(Function* function) {
+  function->addFnAttr(llvm::Attribute::AlwaysInline);
+
   if (!VerifyFunction(function)) {
     function->eraseFromParent(); // deletes function
     return NULL;
@@ -679,14 +693,9 @@ void LlvmCodeGen::AddFunctionToJit(Function* fn, void** fn_ptr) {
   fns_to_jit_compile_.push_back(make_pair(fn, fn_ptr));
 }
 
-void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
+void* LlvmCodeGen::JitFunction(Function* function) {
   if (is_corrupt_) return NULL;
 
-  if (scratch_size == NULL) {
-    DCHECK_EQ(scratch_buffer_offset_, 0);
-  } else {
-    *scratch_size = scratch_buffer_offset_;
-  }
   // TODO: log a warning if the jitted function is too big (larger than I cache)
   void* jitted_function = execution_engine_->getPointerToFunction(function);
   lock_guard<mutex> l(jitted_functions_lock_);
@@ -694,15 +703,6 @@ void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
     jitted_functions_[function] = true;
   }
   return jitted_function;
-}
-
-int LlvmCodeGen::GetScratchBuffer(int byte_size) {
-  // TODO: this is not yet implemented/tested
-  DCHECK(false);
-  int result = scratch_buffer_offset_;
-  // TODO: alignment?
-  result += byte_size;
-  return result;
 }
 
 // Wrapper around printf to make it easier to call from IR
@@ -837,29 +837,6 @@ Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
   return fn;
 }
 
-Value* LlvmCodeGen::CodegenEquals(LlvmBuilder* builder, Value* v1, Value* v2,
-    const ColumnType& type) {
-  switch (type.type) {
-    case TYPE_NULL: return false_value();
-    case TYPE_BOOLEAN:
-    case TYPE_TINYINT:
-    case TYPE_SMALLINT:
-    case TYPE_INT:
-    case TYPE_BIGINT:
-      return builder->CreateICmpEQ(v1, v2, "tmp_eq");
-    case TYPE_FLOAT:
-    case TYPE_DOUBLE:
-      return builder->CreateFCmpUEQ(v1, v2, "tmp_eq");
-    case TYPE_STRING: {
-      Function* str_fn = GetFunction(IRFunction::STRING_VALUE_EQ);
-      return builder->CreateCall2(str_fn, v1, v2, "tmp_eq");
-    }
-    default:
-      DCHECK(false) << "Type is not implemented for codegen.";
-      return NULL;
-  }
-}
-
 // Intrinsics are loaded one by one.  Some are overloaded (e.g. memcpy) and the types must
 // be specified.
 // TODO: is there a better way to do this?
@@ -921,24 +898,6 @@ void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, in
     false_value()                       // is_volatile.
   };
   builder->CreateCall(memcpy_fn, args);
-}
-
-void LlvmCodeGen::CodegenAssign(LlvmBuilder* builder,
-    Value* dst, Value* src, const ColumnType& type) {
-  switch (type.type) {
-    case TYPE_STRING:  {
-      CodegenMemcpy(builder, dst, src, sizeof(StringValue));
-      break;
-    }
-    case TYPE_CHAR:
-    case TYPE_TIMESTAMP:
-    case TYPE_DECIMAL:
-      DCHECK(false) << "NYI"; // TODO
-      break;
-    default:
-      builder->CreateStore(src, dst);
-      break;
-  }
 }
 
 void LlvmCodeGen::ClearHashFns() {

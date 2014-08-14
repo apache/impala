@@ -70,8 +70,8 @@ class LlvmCodeGenTest : public testing:: Test {
   }
 
   static void* JitFunction(
-      LlvmCodeGen* codegen, Function* function, int* scratch_size = NULL) {
-    return codegen->JitFunction(function, scratch_size);
+      LlvmCodeGen* codegen, Function* function) {
+    return codegen->JitFunction(function);
   }
 };
 
@@ -171,9 +171,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   EXPECT_TRUE(loop->getName().find(loop_name) != string::npos);
   EXPECT_EQ(loop->arg_size(), 1);
 
-  int scratch_size;
-  void* original_loop = LlvmCodeGenTest::JitFunction(codegen.get(), loop, &scratch_size);
-  EXPECT_EQ(scratch_size, 0);
+  void* original_loop = LlvmCodeGenTest::JitFunction(codegen.get(), loop);
   EXPECT_TRUE(original_loop != NULL);
   
   TestLoopFn original_loop_fn = reinterpret_cast<TestLoopFn>(original_loop); 
@@ -200,8 +198,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   EXPECT_TRUE(codegen->VerifyFunction(jitted_loop));
 
   // Part4: Call the new loop and verify results
-  void* new_loop = LlvmCodeGenTest::JitFunction(codegen.get(), jitted_loop, &scratch_size);
-  EXPECT_EQ(scratch_size, 0);
+  void* new_loop = LlvmCodeGenTest::JitFunction(codegen.get(), jitted_loop);
   EXPECT_TRUE(new_loop != NULL);
 
   TestLoopFn new_loop_fn = reinterpret_cast<TestLoopFn>(new_loop);
@@ -220,8 +217,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
 
   // Part6: Call new loop
   void* new_loop2 =
-      LlvmCodeGenTest::JitFunction(codegen.get(), jitted_loop2, &scratch_size);
-  EXPECT_EQ(scratch_size, 0);
+      LlvmCodeGenTest::JitFunction(codegen.get(), jitted_loop2);
   EXPECT_TRUE(new_loop2 != NULL);
 
   TestLoopFn new_loop_fn2 = reinterpret_cast<TestLoopFn>(new_loop2);

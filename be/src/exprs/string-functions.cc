@@ -21,7 +21,6 @@
 
 #include "exprs/anyval-util.h"
 #include "exprs/expr.h"
-#include "exprs/function-call.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/url-parser.h"
@@ -321,8 +320,7 @@ re2::RE2* CompileRegex(const StringVal& pattern, string* error_str) {
 
 void StringFunctions::RegexpPrepare(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-  // TODO(skye): change this to FRAGMENT_LOCAL in expr refactoring patch
-  if (scope != FunctionContext::THREAD_LOCAL) return;
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
   if (!context->IsArgConstant(1)) return;
   DCHECK_EQ(context->GetArgType(1)->type, FunctionContext::TYPE_STRING);
   StringVal* pattern = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
@@ -339,19 +337,18 @@ void StringFunctions::RegexpPrepare(
 
 void StringFunctions::RegexpClose(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::THREAD_LOCAL) return;
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
   re2::RE2* re = reinterpret_cast<re2::RE2*>(context->GetFunctionState(scope));
   delete re;
 }
 
 StringVal StringFunctions::RegexpExtract(FunctionContext* context, const StringVal& str,
     const StringVal& pattern, const BigIntVal& index) {
-  if (str.is_null || pattern.is_null || index.is_null || index.val < 0) {
-    return StringVal::null();
-  }
+  if (str.is_null || pattern.is_null || index.is_null) return StringVal::null();
+  if (index.val < 0) return StringVal();
 
   re2::RE2* re = reinterpret_cast<re2::RE2*>(
-      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+      context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
   scoped_ptr<re2::RE2> scoped_re; // destroys re if we have to locally compile it
   if (re == NULL) {
     DCHECK(!context->IsArgConstant(1));
@@ -383,7 +380,7 @@ StringVal StringFunctions::RegexpReplace(FunctionContext* context, const StringV
   if (str.is_null || pattern.is_null || replace.is_null) return StringVal::null();
 
   re2::RE2* re = reinterpret_cast<re2::RE2*>(
-      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+      context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
   scoped_ptr<re2::RE2> scoped_re; // destroys re if state->re is NULL
   if (re == NULL) {
     DCHECK(!context->IsArgConstant(1));
@@ -467,8 +464,7 @@ IntVal StringFunctions::FindInSet(FunctionContext* context, const StringVal& str
 
 void StringFunctions::ParseUrlPrepare(
     FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
-  // TODO(skye): change this to FRAGMENT_LOCAL in expr refactoring patch
-  if (scope != FunctionContext::THREAD_LOCAL) return;
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
   if (!ctx->IsArgConstant(1)) return;
   DCHECK_EQ(ctx->GetArgType(1)->type, FunctionContext::TYPE_STRING);
   StringVal* part = reinterpret_cast<StringVal*>(ctx->GetConstantArg(1));
@@ -489,7 +485,7 @@ void StringFunctions::ParseUrlPrepare(
 StringVal StringFunctions::ParseUrl(
     FunctionContext* ctx, const StringVal& url, const StringVal& part) {
   if (url.is_null || part.is_null) return StringVal::null();
-  void* state = ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  void* state = ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL);
   UrlParser::UrlPart url_part;
   if (state != NULL) {
     url_part = *reinterpret_cast<UrlParser::UrlPart*>(state);
@@ -519,7 +515,7 @@ StringVal StringFunctions::ParseUrl(
 
 void StringFunctions::ParseUrlClose(
     FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::THREAD_LOCAL) return;
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
   UrlParser::UrlPart* url_part =
       reinterpret_cast<UrlParser::UrlPart*>(ctx->GetFunctionState(scope));
   if (url_part == NULL) return;
@@ -529,7 +525,7 @@ void StringFunctions::ParseUrlClose(
 StringVal StringFunctions::ParseUrlKey(FunctionContext* ctx, const StringVal& url,
                                        const StringVal& part, const StringVal& key) {
   if (url.is_null || part.is_null || key.is_null) return StringVal::null();
-  void* state = ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  void* state = ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL);
   UrlParser::UrlPart url_part;
   if (state != NULL) {
     url_part = *reinterpret_cast<UrlParser::UrlPart*>(state);

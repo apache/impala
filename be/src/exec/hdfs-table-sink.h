@@ -179,7 +179,7 @@ class HdfsTableSink : public DataSink {
   // Generates string key for hash_tbl_ as a concatenation
   // of all evaluated exprs, evaluated against current_row_.
   // The generated string is much shorter than the full Hdfs file name.
-  void GetHashTblKey(const std::vector<Expr*>& exprs, std::string* key);
+  void GetHashTblKey(const std::vector<ExprContext*>& ctxs, std::string* key);
 
   // Given a hashed partition key, get the output partition structure from
   // the partition_keys_to_output_partitions_.
@@ -210,7 +210,7 @@ class HdfsTableSink : public DataSink {
   const HdfsPartitionDescriptor* default_partition_;
 
   // Exprs that materialize output values
-  std::vector<Expr*> output_exprs_;
+  std::vector<ExprContext*> output_expr_ctxs_;
 
   // Current row from the current RowBatch to output
   TupleRow* current_row_;
@@ -233,7 +233,7 @@ class HdfsTableSink : public DataSink {
   const std::vector<TExpr>& partition_key_texprs_;
 
   // Exprs of partition keys.
-  std::vector<Expr*> partition_key_exprs_;
+  std::vector<ExprContext*> partition_key_expr_ctxs_;
 
   // Indicates whether the existing partitions should be overwritten.
   bool overwrite_;
@@ -253,9 +253,9 @@ class HdfsTableSink : public DataSink {
   // OutputPartition in the map to simplify the code.
   PartitionMap partition_keys_to_output_partitions_;
 
-  // Subset of partition_key_exprs_ which are not constant. Set in Prepare().
+  // Subset of partition_key_expr_ctxs_ which are not constant. Set in Prepare().
   // Used for generating the string key of hash_tbl_.
-  std::vector<Expr*> dynamic_partition_key_exprs_;
+  std::vector<ExprContext*> dynamic_partition_key_expr_ctxs_;
 
   // Map from row key (i.e. concatenated non-constant partition keys) to
   // partition descriptor. We don't own the HdfsPartitionDescriptors, they

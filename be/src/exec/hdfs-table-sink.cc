@@ -19,6 +19,7 @@
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "util/hdfs-util.h"
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
@@ -67,22 +68,22 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   // Prepare select list expressions.
   // Disable codegen for these - they would be unused anyway.
   // TODO: codegen table sink
-  RETURN_IF_ERROR(Expr::Prepare(output_exprs_, state, row_desc_, true));
-  RETURN_IF_ERROR(Expr::Prepare(partition_key_exprs_, state, row_desc_, true));
+  RETURN_IF_ERROR(Expr::Prepare(output_expr_ctxs_, state, row_desc_));
+  RETURN_IF_ERROR(Expr::Prepare(partition_key_expr_ctxs_, state, row_desc_));
 
   // Prepare partition key exprs and gather dynamic partition key exprs.
-  for (size_t i = 0; i < partition_key_exprs_.size(); ++i) {
+  for (size_t i = 0; i < partition_key_expr_ctxs_.size(); ++i) {
     // Remember non-constant partition key exprs for building hash table of Hdfs files.
-    if (!partition_key_exprs_[i]->IsConstant()) {
-      dynamic_partition_key_exprs_.push_back(partition_key_exprs_[i]);
+    if (!partition_key_expr_ctxs_[i]->root()->IsConstant()) {
+      dynamic_partition_key_expr_ctxs_.push_back(partition_key_expr_ctxs_[i]);
     }
   }
   // Sanity check.
-  DCHECK_LE(partition_key_exprs_.size(), table_desc_->col_names().size())
+  DCHECK_LE(partition_key_expr_ctxs_.size(), table_desc_->col_names().size())
     << DebugString();
-  DCHECK_EQ(partition_key_exprs_.size(), table_desc_->num_clustering_cols())
+  DCHECK_EQ(partition_key_expr_ctxs_.size(), table_desc_->num_clustering_cols())
     << DebugString();
-  DCHECK_GE(output_exprs_.size(),
+  DCHECK_GE(output_expr_ctxs_.size(),
       table_desc_->num_cols() - table_desc_->num_clustering_cols()) << DebugString();
 
   // Prepare literal partition key exprs
@@ -109,10 +110,10 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
   VLOG_QUERY << "Random seed: " << seed;
   srand(seed);
 
-  RETURN_IF_ERROR(Expr::CreateExprTrees(state->obj_pool(),
-      partition_key_texprs_, &partition_key_exprs_));
-  RETURN_IF_ERROR(Expr::CreateExprTrees(state->obj_pool(), select_list_texprs_,
-      &output_exprs_));
+  RETURN_IF_ERROR(Expr::CreateExprTrees(
+      state->obj_pool(), partition_key_texprs_, &partition_key_expr_ctxs_));
+  RETURN_IF_ERROR(Expr::CreateExprTrees(
+      state->obj_pool(), select_list_texprs_, &output_expr_ctxs_));
 
   // Resolve table id and set input tuple descriptor.
   table_desc_ = static_cast<const HdfsTableDescriptor*>(
@@ -148,8 +149,8 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
 }
 
 Status HdfsTableSink::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(Expr::Open(output_exprs_, state));
-  RETURN_IF_ERROR(Expr::Open(partition_key_exprs_, state));
+  RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, state));
+  RETURN_IF_ERROR(Expr::Open(partition_key_expr_ctxs_, state));
   // Open literal partition key exprs
   BOOST_FOREACH(
       const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc,
@@ -180,12 +181,14 @@ Status HdfsTableSink::Open(RuntimeState* state) {
       // Only relevant partitions are remembered in partition_descriptor_map_.
       bool relevant_partition = true;
       HdfsPartitionDescriptor* partition = id_to_desc.second;
-      DCHECK_EQ(partition->partition_key_values().size(), partition_key_exprs_.size());
-      vector<Expr*> dynamic_partition_key_values;
-      for (size_t i = 0; i < partition_key_exprs_.size(); ++i) {
+      DCHECK_EQ(partition->partition_key_value_ctxs().size(),
+                partition_key_expr_ctxs_.size());
+      vector<ExprContext*> dynamic_partition_key_value_ctxs;
+      for (size_t i = 0; i < partition_key_expr_ctxs_.size(); ++i) {
         // Remember non-constant partition key exprs for building hash table of Hdfs files
-        if (!partition_key_exprs_[i]->IsConstant()) {
-          dynamic_partition_key_values.push_back(partition->partition_key_values()[i]);
+        if (!partition_key_expr_ctxs_[i]->root()->IsConstant()) {
+          dynamic_partition_key_value_ctxs.push_back(
+              partition->partition_key_value_ctxs()[i]);
         } else {
           // Deal with the following: one partition has (year=2009, month=3); another has
           // (year=2010, month=3).
@@ -194,14 +197,14 @@ Status HdfsTableSink::Open(RuntimeState* state) {
           // partition keys. So only keep a reference to the partition which matches
           // partition_key_values for constant values, since only that is written to.
           void* table_partition_key_value =
-              partition->partition_key_values()[i]->GetValue(NULL);
-          void* target_partition_key_value = partition_key_exprs_[i]->GetValue(NULL);
+              partition->partition_key_value_ctxs()[i]->GetValue(NULL);
+          void* target_partition_key_value = partition_key_expr_ctxs_[i]->GetValue(NULL);
           if (table_partition_key_value == NULL && target_partition_key_value == NULL) {
             continue;
           }
           if (table_partition_key_value == NULL || target_partition_key_value == NULL
               || !RawValue::Eq(table_partition_key_value, target_partition_key_value,
-                  partition_key_exprs_[i]->type())) {
+                               partition_key_expr_ctxs_[i]->root()->type())) {
             relevant_partition = false;
             break;
           }
@@ -212,7 +215,7 @@ Status HdfsTableSink::Open(RuntimeState* state) {
         // It's ok if current_row_ is NULL (which it should be here), since all of these
         // expressions are constant, and can therefore be evaluated without a valid row
         // context.
-        GetHashTblKey(dynamic_partition_key_values, &key);
+        GetHashTblKey(dynamic_partition_key_value_ctxs, &key);
         DCHECK(partition_descriptor_map_.find(key) == partition_descriptor_map_.end())
             << "Partitions with duplicate 'static' keys found during INSERT";
         partition_descriptor_map_[key] = partition;
@@ -312,15 +315,15 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   // Build the unique name for this partition from the partition keys, e.g. "j=1/f=foo/"
   // etc.
   stringstream partition_name_ss;
-  for (int j = 0; j < partition_key_exprs_.size(); ++j) {
+  for (int j = 0; j < partition_key_expr_ctxs_.size(); ++j) {
     partition_name_ss << table_desc_->col_names()[j] << "=";
-    void* value = partition_key_exprs_[j]->GetValue(current_row_);
+    void* value = partition_key_expr_ctxs_[j]->GetValue(current_row_);
     // NULL partition keys get a special value to be compatible with Hive.
     if (value == NULL) {
       partition_name_ss << table_desc_->null_partition_key_value();
     } else {
       string value_str;
-      partition_key_exprs_[j]->PrintValue(value, &value_str);
+      partition_key_expr_ctxs_[j]->PrintValue(value, &value_str);
       // Directory names containing partition-key values need to be UrlEncoded, in
       // particular to avoid problems when '/' is part of the key value (which might
       // occur, for example, with date strings). Hive will URL decode the value
@@ -346,14 +349,16 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   switch (partition_descriptor.file_format()) {
     case THdfsFileFormat::TEXT: {
       output_partition->writer.reset(
-          new HdfsTextTableWriter(this, state, output_partition,
-                                  &partition_descriptor, table_desc_, output_exprs_));
+          new HdfsTextTableWriter(
+              this, state, output_partition, &partition_descriptor, table_desc_,
+              output_expr_ctxs_));
       break;
     }
     case THdfsFileFormat::PARQUET: {
       output_partition->writer.reset(
-          new HdfsParquetTableWriter(this, state, output_partition,
-                                    &partition_descriptor, table_desc_, output_exprs_));
+          new HdfsParquetTableWriter(
+              this, state, output_partition, &partition_descriptor, table_desc_,
+              output_expr_ctxs_));
       break;
     }
     default:
@@ -375,11 +380,11 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   return CreateNewTmpFile(state, output_partition);
 }
 
-void HdfsTableSink::GetHashTblKey(const vector<Expr*>& exprs, string* key) {
+void HdfsTableSink::GetHashTblKey(const vector<ExprContext*>& ctxs, string* key) {
   stringstream hash_table_key;
-  for (int i = 0; i < dynamic_partition_key_exprs_.size(); ++i) {
-    RawValue::PrintValueAsBytes(exprs[i]->GetValue(current_row_),
-                                exprs[i]->type(), &hash_table_key);
+  for (int i = 0; i < ctxs.size(); ++i) {
+    RawValue::PrintValueAsBytes(
+        ctxs[i]->GetValue(current_row_), ctxs[i]->root()->type(), &hash_table_key);
     // Additionally append "/" to avoid accidental key collisions.
     hash_table_key << "/";
   }
@@ -436,7 +441,7 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   // If there are no partition keys then just pass the whole batch to one partition.
-  if (dynamic_partition_key_exprs_.empty()) {
+  if (dynamic_partition_key_expr_ctxs_.empty()) {
     // If there are no dynamic keys just use an empty key.
     PartitionPair* partition_pair;
     RETURN_IF_ERROR(GetOutputPartition(state, ROOT_PARTITION_KEY, &partition_pair));
@@ -458,7 +463,7 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
       current_row_ = batch->GetRow(i);
 
       string key;
-      GetHashTblKey(dynamic_partition_key_exprs_, &key);
+      GetHashTblKey(dynamic_partition_key_expr_ctxs_, &key);
       PartitionPair* partition_pair = NULL;
       RETURN_IF_ERROR(GetOutputPartition(state, key, &partition_pair));
       partition_pair->second.push_back(i);
@@ -542,8 +547,8 @@ void HdfsTableSink::Close(RuntimeState* state) {
     HdfsPartitionDescriptor* partition = id_to_desc.second;
     partition->CloseExprs(state);
   }
-  Expr::Close(output_exprs_, state);
-  Expr::Close(partition_key_exprs_, state);
+  Expr::Close(output_expr_ctxs_, state);
+  Expr::Close(partition_key_expr_ctxs_, state);
   closed_ = true;
 }
 
@@ -566,8 +571,8 @@ string HdfsTableSink::DebugString() const {
   stringstream out;
   out << "HdfsTableSink(overwrite=" << (overwrite_ ? "true" : "false")
       << " table_desc=" << table_desc_->DebugString()
-      << " partition_key_exprs=" << Expr::DebugString(partition_key_exprs_)
-      << " output_exprs=" << Expr::DebugString(output_exprs_)
+      << " partition_key_exprs=" << Expr::DebugString(partition_key_expr_ctxs_)
+      << " output_exprs=" << Expr::DebugString(output_expr_ctxs_)
       << ")";
   return out.str();
 }

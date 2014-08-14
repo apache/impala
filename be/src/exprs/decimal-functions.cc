@@ -16,7 +16,6 @@
 
 #include "exprs/anyval-util.h"
 #include "exprs/expr.h"
-#include "exprs/function-call.h"
 
 #include <ctype.h>
 #include <math.h>
