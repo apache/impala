@@ -159,8 +159,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   }
 
   DCHECK(!params.request_pool.empty());
-  RETURN_IF_ERROR(runtime_state_->InitMemTrackers(query_id_, &params.request_pool,
-          bytes_limit, rm_reservation_size_bytes));
+  runtime_state_->InitMemTrackers(query_id_, &params.request_pool,
+      bytes_limit, rm_reservation_size_bytes);
+  RETURN_IF_ERROR(runtime_state_->CreateBlockMgr());
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();

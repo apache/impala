@@ -20,12 +20,7 @@
 
 using namespace std;
 
-DEFINE_int64(max_sort_memory, 1532 * 1024 * 1024,
-    "Maximum sort memory to use if no query/process limit is specified.");
-
 namespace impala {
-
-const float SortNode::SORT_MEM_FRACTION = 0.80f;
 
 SortNode::SortNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
@@ -59,7 +54,6 @@ Status SortNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(state->CheckQueryState());
   RETURN_IF_ERROR(child(0)->Open(state));
 
-  RETURN_IF_ERROR(CreateBlockMgr(state));
   TupleRowComparator less_than(
       sort_exec_exprs_.lhs_ordering_expr_ctxs(), sort_exec_exprs_.rhs_ordering_expr_ctxs(),
       is_asc_order_, nulls_first_);
@@ -148,42 +142,6 @@ Status SortNode::SortInput(RuntimeState* state) {
 
   RETURN_IF_ERROR(sorter_->InputDone());
   return Status::OK;
-}
-
-Status SortNode::CreateBlockMgr(RuntimeState* state) {
-  int64_t mem_remaining = mem_tracker()->SpareCapacity();
-  int min_blocks_required = BufferedBlockMgr::GetNumReservedBlocks() +
-      Sorter::MinBuffersRequired(&row_descriptor_);
-  int block_size = state->io_mgr()->max_read_buffer_size();
-  int64_t block_mgr_limit;
-  if (mem_remaining > FLAGS_max_sort_memory &&
-      !state->query_mem_tracker()->has_limit()) {
-    block_mgr_limit = FLAGS_max_sort_memory;
-  } else if (mem_remaining < 0) {
-    return state->SetMemLimitExceeded(mem_tracker());
-  } else {
-    // Estimate the memory overhead for a merge based on the available memory and block
-    // size, and subtract it from the block manager's budget.
-    uint64_t max_merge_mem = Sorter::EstimateMergeMem(mem_remaining / block_size,
-        &row_descriptor_, state->batch_size());
-    uint64_t min_mem_required = max_merge_mem + (block_size * min_blocks_required);
-    if (mem_remaining < min_mem_required) {
-      stringstream ss;
-      ss << "Sort Memory " << mem_remaining << " bytes is less than minimum "
-         << "required memory " << min_mem_required << " bytes."
-         << " block size = " << block_size << " bytes.";
-      state->LogError(ss.str());
-      return state->SetMemLimitExceeded(mem_tracker(), min_mem_required);
-    } else {
-      mem_remaining = min<int64_t>(SORT_MEM_FRACTION * mem_remaining,
-          mem_remaining - SORT_MEM_UNUSED);
-      mem_remaining = max<int64_t>(mem_remaining, min_mem_required);
-    }
-
-    mem_remaining -= max_merge_mem;
-    block_mgr_limit = mem_remaining;
-  }
-  return state->CreateBlockMgr(block_mgr_limit);
 }
 
 }

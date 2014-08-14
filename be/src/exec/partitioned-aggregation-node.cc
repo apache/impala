@@ -130,10 +130,11 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   intermediate_row_desc_.reset(new RowDescriptor(intermediate_tuple_desc_, false));
   RETURN_IF_ERROR(Expr::Prepare(build_expr_ctxs_, state, *intermediate_row_desc_));
 
-  RETURN_IF_ERROR(state_->CreateBlockMgr(mem_tracker()->SpareCapacity() * 0.8));
+  // We need two buffers per partition.
+  // TODO: this can probably be cut down to 1.
   int min_buffers = PARTITION_FAN_OUT * 2;
   RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
-        min_buffers, mem_tracker(), &block_mgr_client_));
+        min_buffers, mem_tracker(), state, &block_mgr_client_));
 
   agg_fn_ctxs_.resize(aggregate_evaluators_.size());
   int j = probe_expr_ctxs_.size();

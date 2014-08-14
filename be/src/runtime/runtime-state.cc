@@ -46,6 +46,19 @@ using namespace llvm;
 using namespace std;
 using namespace boost::algorithm;
 
+// The fraction of the query mem limit that is used for the block mgr. Operators
+// that accumulate memory all use the block mgr so the majority of the memory should
+// be allocated to the block mgr. The remaining memory is used by the non-spilling
+// operators and should be independent of data size.
+static const float BLOCK_MGR_MEM_FRACTION = 0.8f;
+
+// The minimum amount of memory that must be left after the block mgr reserves the
+// BLOCK_MGR_MEM_FRACTION. The block limit is:
+// min(query_limit * BLOCK_MGR_MEM_FRACTION, query_limit - BLOCK_MGR_MEM_MIN_REMAINING)
+// TODO: this value was picked arbitrarily and the tests are written to rely on this
+// for the minimum memory required to run the query. Revisit.
+static const int64_t BLOCK_MGR_MEM_MIN_REMAINING = 100 * 1024 * 1024;
+
 namespace impala {
 
 RuntimeState::RuntimeState(const TPlanFragmentInstanceCtx& fragment_instance_ctx,
@@ -81,7 +94,7 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
 }
 
 RuntimeState::~RuntimeState() {
-  if (block_mgr_.get() != NULL) block_mgr_->Close();
+  block_mgr_.reset();
   // query_mem_tracker_ must be valid as long as instance_mem_tracker_ is so
   // delete instance_mem_tracker_ first.
   // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded.
@@ -129,7 +142,7 @@ Status RuntimeState::Init(ExecEnv* exec_env) {
   return Status::OK;
 }
 
-Status RuntimeState::InitMemTrackers(const TUniqueId& query_id, const string* pool_name,
+void RuntimeState::InitMemTrackers(const TUniqueId& query_id, const string* pool_name,
     int64_t query_bytes_limit, int64_t query_rm_reservation_limit_bytes) {
   MemTracker* query_parent_tracker = exec_env_->process_mem_tracker();
   if (pool_name != NULL) {
@@ -144,6 +157,26 @@ Status RuntimeState::InitMemTrackers(const TUniqueId& query_id, const string* po
 
   udf_mem_tracker_.reset(
       new MemTracker(-1, -1, "UDFs", instance_mem_tracker_.get()));
+}
+
+Status RuntimeState::CreateBlockMgr() {
+  DCHECK(block_mgr_.get() == NULL);
+
+  // Compute the max memory the block mgr will use.
+  int64_t block_mgr_limit = query_mem_tracker_->SpareCapacity();
+  if (block_mgr_limit < 0) block_mgr_limit = numeric_limits<int64_t>::max();
+  block_mgr_limit = min(static_cast<int64_t>(block_mgr_limit * BLOCK_MGR_MEM_FRACTION),
+      block_mgr_limit - BLOCK_MGR_MEM_MIN_REMAINING);
+  if (block_mgr_limit < 0) block_mgr_limit = 0;
+  if (query_options().__isset.max_block_mgr_memory) {
+    block_mgr_limit = query_options().max_block_mgr_memory;
+    LOG(ERROR) << "Block mgr mem limit: "
+               << PrettyPrinter::Print(block_mgr_limit, TCounterType::BYTES);
+  }
+
+  RETURN_IF_ERROR(BufferedBlockMgr::Create(this, query_mem_tracker(),
+        runtime_profile(), block_mgr_limit, io_mgr()->max_read_buffer_size(),
+        &block_mgr_));
   return Status::OK;
 }
 
@@ -156,15 +189,6 @@ Status RuntimeState::CreateCodegen() {
   RETURN_IF_ERROR(LlvmCodeGen::LoadImpalaIR(obj_pool_.get(), &codegen_));
   codegen_->EnableOptimizations(true);
   profile_.AddChild(codegen_->runtime_profile());
-  return Status::OK;
-}
-
-Status RuntimeState::CreateBlockMgr(int64_t mem_limit) {
-  if (block_mgr_.get() != NULL) return Status::OK;
-  BufferedBlockMgr* block_mgr;
-  RETURN_IF_ERROR(BufferedBlockMgr::Create(this, query_mem_tracker(),
-      runtime_profile(), mem_limit, io_mgr()->max_read_buffer_size(), &block_mgr));
-  block_mgr_.reset(block_mgr);
   return Status::OK;
 }
 

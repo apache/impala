@@ -46,18 +46,6 @@ class SortNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
-  // Fraction of total remaining memory that can be assigned to all sort nodes in a
-  // query. That is, the memory allocated to all sort nodes cannot exceed
-  // available * SORT_MEM_FRACTION, unless that is lower than the minimum required for
-  // the sort.
-  const static float SORT_MEM_FRACTION;
-
-  // Minimum number of bytes of memory that must be available after a sort node has
-  // acquired memory for itself. That is, the memory allocated cannot exceed
-  // (available - SORT_MEM_UNUSED), unless that is lower than the minimum required for
-  // the sort.
-  const static int SORT_MEM_UNUSED = 100 * 1024 * 1024;
-
   // Fetch input rows and feed them to the sorter until the input is exhausted.
   Status SortInput(RuntimeState* state);
 

@@ -20,15 +20,21 @@
 #include "util/runtime-profile.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
+#include "util/uid-util.h"
 
 using namespace std;
 using namespace boost;
 
 namespace impala {
 
+BufferedBlockMgr::BlockMgrsMap BufferedBlockMgr::query_to_block_mgrs_;
+mutex BufferedBlockMgr::static_block_mgrs_lock_;
+
 struct BufferedBlockMgr::Client {
-  Client(BufferedBlockMgr* mgr, int num_reserved_buffers, MemTracker* tracker)
+  Client(BufferedBlockMgr* mgr, int num_reserved_buffers, MemTracker* tracker,
+      RuntimeState* state)
     : mgr_(mgr),
+      state_(state),
       tracker_(tracker),
       num_reserved_buffers_(num_reserved_buffers),
       num_pinned_buffers_(0) {
@@ -36,6 +42,9 @@ struct BufferedBlockMgr::Client {
 
   // Unowned.
   BufferedBlockMgr* mgr_;
+
+  // Unowned.
+  RuntimeState* state_;
 
   // Tracker for this client. Can be NULL. Unowned.
   // If this is set, when the client gets a buffer, we update the consumption on this
@@ -135,11 +144,19 @@ string BufferedBlockMgr::Block::DebugString() const {
   return ss.str();
 }
 
-// BufferedBlockMgr methods.
 Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
     RuntimeProfile* profile, int64_t mem_limit, int64_t block_size,
-    BufferedBlockMgr** block_mgr) {
-  *block_mgr = new BufferedBlockMgr(state, parent, mem_limit, block_size);
+    shared_ptr<BufferedBlockMgr>* block_mgr) {
+
+  lock_guard<mutex> lock(static_block_mgrs_lock_);
+  BlockMgrsMap::iterator it = query_to_block_mgrs_.find(state->query_id());
+  if ((it != query_to_block_mgrs_.end())) {
+    *block_mgr = it->second.lock();
+    return Status::OK;
+  }
+
+  block_mgr->reset(new BufferedBlockMgr(state, parent, mem_limit, block_size));
+  query_to_block_mgrs_[state->query_id()] = *block_mgr;
 
   // Initialize the tmp files and the initial file to use.
   int num_tmp_devices = TmpFileMgr::num_tmp_devices();
@@ -161,9 +178,9 @@ Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
 }
 
 Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers, MemTracker* tracker,
-    Client** client) {
+    RuntimeState* state, Client** client) {
   DCHECK_GE(num_reserved_buffers, 0);
-  *client = state_->obj_pool()->Add(new Client(this, num_reserved_buffers, tracker));
+  *client = obj_pool_.Add(new Client(this, num_reserved_buffers, tracker, state));
   num_unreserved_buffers_ -= num_reserved_buffers;
   return Status::OK;
 }
@@ -174,6 +191,15 @@ void BufferedBlockMgr::LowerBufferReservation(Client* client, int num_buffers) {
   int delta = client->num_reserved_buffers_ - num_buffers;
   client->num_reserved_buffers_ = num_buffers;
   num_unreserved_buffers_ += delta;
+}
+
+void BufferedBlockMgr::Cancel() {
+  lock_guard<mutex> lock(lock_);
+  if (is_cancelled_) return;
+  is_cancelled_ = true;
+
+  // Cancel to the underlying io mgr to unblock any waiting threads.
+  io_mgr_->CancelContext(io_request_context_);
 }
 
 Status BufferedBlockMgr::GetNewBlock(Client* client, Block** block) {
@@ -198,40 +224,33 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block** block) {
   return Status::OK;
 }
 
-void BufferedBlockMgr::Close() {
-  DiskIoMgr::RequestContext* unregister_context = NULL;
+BufferedBlockMgr::~BufferedBlockMgr() {
   {
-    lock_guard<mutex> lock(lock_);
-    is_cancelled_ = true;
-    unregister_context = io_request_context_;
-    io_request_context_ = NULL;
+    lock_guard<mutex> lock(static_block_mgrs_lock_);
+    DCHECK(query_to_block_mgrs_.find(query_id_) != query_to_block_mgrs_.end());
+    query_to_block_mgrs_.erase(query_id_);
   }
 
-  // Relinquish the lock before unregistering since WriteComplete() may be called
-  // on UnregisterContext() for outstanding writes. UnregisterContext() is called
-  // before any resources are cleaned up to ensure that memory buffers remain valid
-  // for any in-progress writes.
-  if (unregister_context != NULL) {
-    io_mgr_->UnregisterContext(unregister_context);
+  if (io_request_context_ != NULL) {
+    io_mgr_->UnregisterContext(io_request_context_);
   }
 
-  {
-    lock_guard<mutex> lock(lock_);
-    DCHECK(io_request_context_ == NULL);
-    // Delete tmp files.
-    BOOST_FOREACH(TmpFileMgr::File& file, tmp_files_) {
-      file.Remove();
-    }
-    tmp_files_.clear();
+  // Grab this lock to synchronize with io threads in WriteComplete(). We need those
+  // to finish to ensure that memory buffers remain valid for any in-progress writes.
+  lock_guard<mutex> lock(lock_);
+  // Delete tmp files.
+  BOOST_FOREACH(TmpFileMgr::File& file, tmp_files_) {
+    file.Remove();
+  }
+  tmp_files_.clear();
 
-    // Free memory resources.
-    if (buffer_pool_ != NULL) {
-      buffer_pool_->FreeAll();
-      buffer_pool_.reset();
-      DCHECK_EQ(mem_tracker_->consumption(), 0);
-      mem_tracker_->UnregisterFromParent();
-      mem_tracker_.reset();
-    }
+  // Free memory resources.
+  if (buffer_pool_ != NULL) {
+    buffer_pool_->FreeAll();
+    buffer_pool_.reset();
+    DCHECK_EQ(mem_tracker_->consumption(), 0);
+    mem_tracker_->UnregisterFromParent();
+    mem_tracker_.reset();
   }
 }
 
@@ -239,10 +258,10 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
     int64_t mem_limit, int64_t block_size)
   : block_size_(block_size),
     block_write_threshold_(TmpFileMgr::num_tmp_devices()),
+    query_id_(state->query_id()),
     num_outstanding_writes_(0),
     io_mgr_(state->io_mgr()),
-    is_cancelled_(false),
-    state_(state) {
+    is_cancelled_(false) {
   DCHECK(parent != NULL);
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(new MemTracker(mem_limit, -1, "Block Manager", parent));
@@ -282,7 +301,7 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
   SCOPED_TIMER(disk_read_timer_);
   // Create a ScanRange to perform the read.
   DiskIoMgr::ScanRange* scan_range =
-      state_->obj_pool()->Add(new DiskIoMgr::ScanRange());
+      obj_pool_.Add(new DiskIoMgr::ScanRange());
   scan_range->Reset(block->write_range_->file(), block->write_range_->len(),
       block->write_range_->offset(), block->write_range_->disk_id(), false, block);
   vector<DiskIoMgr::ScanRange*> ranges(1, scan_range);
@@ -347,7 +366,7 @@ Status BufferedBlockMgr::WriteUnpinnedBlocks() {
       disk_id %= io_mgr_->num_disks();
       DiskIoMgr::WriteRange::WriteDoneCallback callback =
           bind(mem_fn(&BufferedBlockMgr::WriteComplete), this, block_to_write, _1);
-      block_to_write->write_range_ = state_->obj_pool()->Add(new DiskIoMgr::WriteRange(
+      block_to_write->write_range_ = obj_pool_.Add(new DiskIoMgr::WriteRange(
           tmp_file.path(), file_offset, disk_id, callback));
     }
 
@@ -379,7 +398,7 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   if (is_cancelled_) return;
   // Check for an error. Set cancelled and wake up waiting threads if an error occurred.
   if (!write_status.ok()) {
-    state_->LogError(write_status);
+    block->client_->state_->LogError(write_status);
     is_cancelled_ = true;
     buffer_available_cv_.notify_all();
     return;
@@ -496,7 +515,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
       uint8_t* new_buffer = buffer_pool_->TryAllocate(block_size_);
       if (new_buffer != NULL) {
         mem_used_counter_->Update(block_size_);
-        buffer_desc = state_->obj_pool()->Add(new BufferDescriptor(new_buffer));
+        buffer_desc = obj_pool_.Add(new BufferDescriptor(new_buffer));
         all_buffers_.push_back(buffer_desc);
       }
     }
@@ -548,7 +567,7 @@ BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock(Client* client) {
   DCHECK(client != NULL);
   Block* new_block;
   if (unused_blocks_.empty()) {
-    new_block = state_->obj_pool()->Add(new Block(this));
+    new_block = obj_pool_.Add(new Block(this));
     new_block->Init();
     created_block_counter_->Update(1);
   } else {
@@ -650,7 +669,7 @@ string BufferedBlockMgr::DebugString() const {
 }
 
 void BufferedBlockMgr::InitCounters(RuntimeProfile* profile) {
-  profile_.reset(new RuntimeProfile(state_->obj_pool(), "BlockMgr"));
+  profile_.reset(new RuntimeProfile(&obj_pool_, "BlockMgr"));
   profile->AddChild(profile_.get());
 
   mem_limit_counter_ = ADD_COUNTER(profile_.get(), "MemoryLimit", TCounterType::BYTES);

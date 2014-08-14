@@ -847,7 +847,7 @@ inline void Sorter::TupleSorter::Swap(uint8_t* left, uint8_t* right) {
 
 // Sorter methods
 Sorter::Sorter(const TupleRowComparator& compare_less_than,
-    const vector<ExprContext*>& slot_materialize_expr_ctxs, 
+    const vector<ExprContext*>& slot_materialize_expr_ctxs,
     RowDescriptor* output_row_desc, MemTracker* mem_tracker,
     RuntimeProfile* profile, RuntimeState* state)
   : state_(state),
@@ -867,9 +867,9 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
   in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
   sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TCounterType::BYTES);
 
-  int min_blocks_required = BufferedBlockMgr::GetNumReservedBlocks() +
-      Sorter::MinBuffersRequired(output_row_desc_);
-  block_mgr_->RegisterClient(min_blocks_required, mem_tracker_, &block_mgr_client_);
+  int min_blocks_required = Sorter::MinBuffersRequired(output_row_desc_);
+  block_mgr_->RegisterClient(min_blocks_required, mem_tracker_, state,
+      &block_mgr_client_);
 
   unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
   unsorted_run_->Init();

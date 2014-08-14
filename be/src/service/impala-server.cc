@@ -1016,9 +1016,12 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::QUERY_TIMEOUT_S:
         query_options->__set_query_timeout_s(atoi(value.c_str()));
         break;
-      case TImpalaQueryOptions::MAX_JOIN_MEMORY:
-        query_options->__set_max_join_memory(atoi(value.c_str()));
+      case TImpalaQueryOptions::MAX_BLOCK_MGR_MEMORY: {
+        int64_t mem;
+        RETURN_IF_ERROR(ParseMemValue(value, "block mgr memory limit", &mem));
+        query_options->__set_max_block_mgr_memory(mem);
         break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1304,8 +1307,8 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
       case TImpalaQueryOptions::QUERY_TIMEOUT_S:
         val << query_option.query_timeout_s;
         break;
-      case TImpalaQueryOptions::MAX_JOIN_MEMORY:
-        val << query_option.max_join_memory;
+      case TImpalaQueryOptions::MAX_BLOCK_MGR_MEMORY:
+        val << query_option.max_block_mgr_memory;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

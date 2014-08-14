@@ -15,6 +15,8 @@
 #ifndef IMPALA_RUNTIME_BUFFERED_BLOCK_MGR
 #define IMPALA_RUNTIME_BUFFERED_BLOCK_MGR
 
+#include <boost/shared_ptr.hpp>
+
 #include "runtime/disk-io-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 
@@ -204,11 +206,13 @@ class BufferedBlockMgr {
     bool is_deleted_;
   }; // class Block
 
-  // Create a block manager with the specified mem_limit.
-  // The returned block manager is owned by the caller.
+  // Create a block manager with the specified mem_limit. If a block mgr with the
+  // same query id has already been created, that block mgr is returned.
   static Status Create(RuntimeState* state, MemTracker* parent,
       RuntimeProfile* profile, int64_t mem_limit, int64_t buffer_size,
-      BufferedBlockMgr** block_mgr);
+      boost::shared_ptr<BufferedBlockMgr>* block_mgr);
+
+  ~BufferedBlockMgr();
 
   // Registers a client with num_reserved_buffers. The returned client is owned
   // by the BufferedBlockMgr and has the same lifetime as it.
@@ -218,7 +222,8 @@ class BufferedBlockMgr {
   // The min reserved buffers is often independent of data size and we still want
   // to run small queries with very small limits.
   // If tracker is non-NULL, buffers used by this client are reflected in tracker.
-  Status RegisterClient(int num_reserved_buffers, MemTracker* tracker, Client** client);
+  Status RegisterClient(int num_reserved_buffers, MemTracker* tracker,
+      RuntimeState* state, Client** client);
 
   // Lowers the buffer reservation of the client to num_buffers. This doesn't change
   // buffers that have already been given to this client.
@@ -238,8 +243,9 @@ class BufferedBlockMgr {
   // Otherwise it will (conceptually) write out a unpinned block and use that memory.
   Status GetNewBlock(Client* client, Block** block);
 
-  // Release all resources associated with this block manager. Is idempotent.
-  void Close();
+  // Cancels the block mgr. All subsequent calls fail with Status::CANCELLED.
+  // Idempotent.
+  void Cancel();
 
   int num_free_buffers() const {
     return free_buffers_.size();
@@ -332,6 +338,9 @@ class BufferedBlockMgr {
   // The number of unreserved buffers that are currently pinned. Must be >= 0.
   AtomicInt<int> num_unreserved_pinned_buffers_;
 
+  TUniqueId query_id_;
+  ObjectPool obj_pool_;
+
   // Track buffers allocated by the block manager.
   boost::scoped_ptr<MemTracker> mem_tracker_;
 
@@ -384,10 +393,6 @@ class BufferedBlockMgr {
   // Status::CANCELLED. Set to true on Close() or if there was an error writing a block.
   bool is_cancelled_;
 
-  // Runtime state objects with which this instance is initialized. Used for logging
-  // errors. Not owned.
-  RuntimeState* state_;
-
   // Counters and timers to track behavior.
   boost::scoped_ptr<RuntimeProfile> profile_;
 
@@ -416,6 +421,18 @@ class BufferedBlockMgr {
 
   // Number of writes outstanding (issued but not completed)
   RuntimeProfile::Counter* outstanding_writes_counter_;
+
+  // Protects query_to_block_mgrs_
+  static boost::mutex static_block_mgrs_lock_;
+
+  // All per-query BufferedBlockMgr objects that are in use.  For memory management, this
+  // map contains only weak ptrs. BufferedBlockMgrs that are handed out are shared ptrs.
+  // When all the shared ptrs are no longer referenced, the BufferedBlockMgr
+  // d'tor will be called at which point the weak ptr will be removed from the map.
+  typedef boost::unordered_map<TUniqueId, boost::weak_ptr<BufferedBlockMgr> >
+      BlockMgrsMap;
+  static BlockMgrsMap query_to_block_mgrs_;
+
 }; // class BufferedBlockMgr
 
 } // namespace impala.

@@ -79,8 +79,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
     EXPECT_TRUE(*reinterpret_cast<int32_t*>(block->buffer()) == data);
   }
 
-  BufferedBlockMgr* CreateMgr(int max_buffers) {
-    BufferedBlockMgr* mgr = NULL;
+  shared_ptr<BufferedBlockMgr> CreateMgr(int max_buffers) {
+    shared_ptr<BufferedBlockMgr> mgr;
     BufferedBlockMgr::Create(runtime_state_.get(),
         block_mgr_parent_tracker_.get(), runtime_state_->runtime_profile(),
         max_buffers * block_size_, block_size_, &mgr);
@@ -112,9 +112,9 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
 TEST_F(BufferedBlockMgrTest, GetNewBlock) {
   int max_num_blocks = 5;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_blocks));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_blocks);
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 
@@ -132,16 +132,16 @@ TEST_F(BufferedBlockMgrTest, GetNewBlock) {
   EXPECT_TRUE(new_block == NULL);
   EXPECT_EQ(block_mgr->bytes_allocated(), max_num_blocks * block_size_);
 
-  block_mgr->Close();
+  block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
 // Test that pinning more blocks than the max available buffers.
 TEST_F(BufferedBlockMgrTest, Pin) {
   int max_num_blocks = 5;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_blocks));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_blocks);
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -181,7 +181,7 @@ TEST_F(BufferedBlockMgrTest, Pin) {
   EXPECT_TRUE(status.ok());
   EXPECT_FALSE(pinned);
 
-  block_mgr->Close();
+  block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
@@ -189,9 +189,9 @@ TEST_F(BufferedBlockMgrTest, Pin) {
 // the max available buffers are allocated. Writes must be issued in LIFO order.
 TEST_F(BufferedBlockMgrTest, Eviction) {
   int max_num_buffers = 5;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -236,15 +236,16 @@ TEST_F(BufferedBlockMgrTest, Eviction) {
   }
   EXPECT_GE(buffered_pin->value(),  buffered_pins_expected);
 
-  block_mgr->Close();
+  block_mgr.reset();
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
 // Test deletion and reuse of blocks.
 TEST_F(BufferedBlockMgrTest, Deletion) {
   int max_num_buffers = 5;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -264,24 +265,23 @@ TEST_F(BufferedBlockMgrTest, Deletion) {
   EXPECT_TRUE(created_cnt->value() == max_num_buffers);
   EXPECT_TRUE(recycled_cnt->value() == max_num_buffers);
 
-  block_mgr->Close();
+  block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
 // Test that all APIs return cancelled after close.
 TEST_F(BufferedBlockMgrTest, Close) {
   int max_num_buffers = 5;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), client, max_num_buffers, &blocks);
 
-  block_mgr->Close();
-  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+  block_mgr->Cancel();
 
   BufferedBlockMgr::Block* new_block;
   status = block_mgr->GetNewBlock(client, &new_block);
@@ -294,6 +294,9 @@ TEST_F(BufferedBlockMgrTest, Close) {
   EXPECT_TRUE(status.IsCancelled());
   status = blocks[1]->Delete();
   EXPECT_TRUE(status.IsCancelled());
+
+  block_mgr.reset();
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
 // Test that the block manager behaves correctly after a write error
@@ -302,9 +305,9 @@ TEST_F(BufferedBlockMgrTest, Close) {
 TEST_F(BufferedBlockMgrTest, WriteError) {
   int max_num_buffers = 2;
   const int write_wait_millis = 500;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -343,7 +346,8 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   status = block_mgr->GetNewBlock(client, &new_block);
   EXPECT_TRUE(new_block == NULL);
   EXPECT_TRUE(status.IsCancelled());
-  block_mgr->Close();
+  block_mgr.reset();
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
 // Create two clients with different number of reserved buffers.
@@ -352,15 +356,17 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   int client2_buffers = 5;
   int max_num_buffers = client1_buffers + client2_buffers;
 
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
   BufferedBlockMgr::Client* client1;
   BufferedBlockMgr::Client* client2;
   Status status;
 
-  status = block_mgr->RegisterClient(client1_buffers, NULL, &client1);
+  status = block_mgr->RegisterClient(client1_buffers, NULL, runtime_state_.get(),
+      &client1);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, NULL, &client2);
+  status = block_mgr->RegisterClient(client2_buffers, NULL, runtime_state_.get(),
+      &client2);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
 
@@ -397,7 +403,7 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block != NULL);
 
-  block_mgr->Close();
+  block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
@@ -407,16 +413,18 @@ TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
   int client2_buffers = 1;
   int max_num_buffers = client1_buffers + client2_buffers + 2;
 
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
   BufferedBlockMgr::Client* client1;
   BufferedBlockMgr::Client* client2;
   Status status;
   BufferedBlockMgr::Block* block;
 
-  status = block_mgr->RegisterClient(client1_buffers, NULL, &client1);
+  status = block_mgr->RegisterClient(client1_buffers, NULL, runtime_state_.get(),
+      &client1);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, NULL, &client2);
+  status = block_mgr->RegisterClient(client2_buffers, NULL, runtime_state_.get(),
+      &client2);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
 
@@ -444,7 +452,7 @@ TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block == NULL);
 
-  block_mgr->Close();
+  block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
@@ -454,16 +462,18 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   int client2_buffers = 2;
   int max_num_buffers = 2;
 
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(max_num_buffers));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
   BufferedBlockMgr::Client* client1;
   BufferedBlockMgr::Client* client2;
   Status status;
   BufferedBlockMgr::Block* block;
 
-  status = block_mgr->RegisterClient(client1_buffers, NULL, &client1);
+  status = block_mgr->RegisterClient(client1_buffers, NULL, runtime_state_.get(),
+      &client1);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client1 != NULL);
-  status = block_mgr->RegisterClient(client2_buffers, NULL, &client2);
+  status = block_mgr->RegisterClient(client2_buffers, NULL, runtime_state_.get(),
+      &client2);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
 
@@ -489,7 +499,8 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   EXPECT_TRUE(block == NULL);
   EXPECT_TRUE(status.IsMemLimitExceeded());
 
-  block_mgr->Close();
+  block_mgr.reset();
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
 // Test that randomly issues GetFreeBlock(), Pin(), Unpin(), Delete() and Close()
@@ -507,9 +518,9 @@ TEST_F(BufferedBlockMgrTest, Random) {
 
   typedef enum { Pin, New, Unpin, Delete, Close } ApiFunction;
   ApiFunction api_function;
-  scoped_ptr<BufferedBlockMgr> block_mgr(CreateMgr(num_buffers));
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(num_buffers);
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, &client);
+  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
@@ -606,13 +617,13 @@ TEST_F(BufferedBlockMgrTest, Random) {
         pinned_block_map[pinned_blocks[rand_pick].first] = rand_pick;
         break;
       case Close:
-        block_mgr->Close();
+        block_mgr->Cancel();
         close_called = true;
         break;
     } // end switch (apiFunction)
   } // end for ()
 
-  block_mgr->Close();
+  block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 

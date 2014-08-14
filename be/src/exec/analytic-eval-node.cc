@@ -111,10 +111,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
   RETURN_IF_ERROR(child(0)->Open(state));
-  // Hack to create the BufferedBlockMgr if it doesn't exist (child is not a SortNode).
-  // TODO: Remove this once the block mgr is created in a single, shared place
-  RETURN_IF_ERROR(state->CreateBlockMgr(mem_tracker()->SpareCapacity() * 0.5));
-  RETURN_IF_ERROR(state->block_mgr()->RegisterClient(2, mem_tracker(), &client_));
+  RETURN_IF_ERROR(state->block_mgr()->RegisterClient(2, mem_tracker(), state, &client_));
   input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
       state->block_mgr(), client_, true /* delete_on_read */, true /* read_write */));
   RETURN_IF_ERROR(input_stream_->Init());

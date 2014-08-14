@@ -93,17 +93,6 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
 
-  // Note: For easier testing of the spilling paths, use just 80% of what is left.
-  // That is, multiple SpareCapacity() * 0.8f.
-  int64_t max_join_mem = mem_tracker()->SpareCapacity();
-  if (state->query_options().max_join_memory > 0) {
-    max_join_mem = state->query_options().max_join_memory;
-  }
-  LOG(ERROR) << "Max join memory: "
-             << PrettyPrinter::Print(max_join_mem, TCounterType::BYTES);
-  join_node_mem_tracker_.reset(new MemTracker(
-      state->query_options().max_join_memory, -1, "Hash Join Mem Limit", mem_tracker()));
-
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively
   RETURN_IF_ERROR(Expr::Prepare(build_expr_ctxs_, state, child(1)->row_desc()));
@@ -113,12 +102,11 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   // node
   RETURN_IF_ERROR(Expr::Prepare(other_join_conjunct_ctxs_, state, row_descriptor_));
 
-  RETURN_IF_ERROR(state->CreateBlockMgr(join_node_mem_tracker()->SpareCapacity()));
   // We need one output buffer per partition and one additional buffer either for the
   // input (while repartitioning) or to contain the hash table.
   int num_reserved_buffers = PARTITION_FANOUT + 1;
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
-      num_reserved_buffers, join_node_mem_tracker(), &block_mgr_client_));
+      num_reserved_buffers, mem_tracker(), state, &block_mgr_client_));
 
   // Construct the dummy hash table used to evaluate hashes of rows.
   // TODO: this is obviously not the right abstraction. We need a Hash utility class of
@@ -240,7 +228,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
   // Allocate the partition-local hash table.
   hash_tbl_.reset(new HashTable(state,
       parent_->child(1)->row_desc().tuple_descriptors().size(),
-      parent_->join_node_mem_tracker()));
+      parent_->mem_tracker()));
 
   bool eos = false;
   RowBatch batch(parent_->child(1)->row_desc(), state->batch_size(),
@@ -414,7 +402,7 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   if (spilled_partitions_.empty()) return Status::OK;
   LOG(ERROR) << "PrepareNextPartition\n" << DebugString();
 
-  int64_t mem_limit = join_node_mem_tracker()->SpareCapacity();
+  int64_t mem_limit = mem_tracker()->SpareCapacity();
   mem_limit -= state->block_mgr()->block_size();
 
   input_partition_ = spilled_partitions_.front();
@@ -716,7 +704,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     }
   }
 
-  int64_t max_mem_build_tables = join_node_mem_tracker()->SpareCapacity();
+  int64_t max_mem_build_tables = mem_tracker()->SpareCapacity();
   int num_tables_built = 0;
 
   if (max_mem_build_tables == -1) max_mem_build_tables = numeric_limits<int64_t>::max();

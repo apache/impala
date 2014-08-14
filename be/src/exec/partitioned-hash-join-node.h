@@ -109,8 +109,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     REPARTITIONING,
   };
 
-  MemTracker* join_node_mem_tracker() { return join_node_mem_tracker_.get(); }
-
   // Append the row to stream. In the common case, the row is just in memory. If we
   // run out of memory, this will spill a partition and try to add the row again.
   // returns true if the row was added and false otherwise. If false is returned,
@@ -216,10 +214,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // State of the algorithm. Used just for debugging.
   State state_;
   Status status_;
-
-  // TODO: stop gap to limit the memory this join node can use. Set by debugging query
-  // option. This should be replaced by having a quota on a shared BufferedBlockMgr.
-  boost::scoped_ptr<MemTracker> join_node_mem_tracker_;
 
   // Client to the buffered block mgr.
   BufferedBlockMgr::Client* block_mgr_client_;

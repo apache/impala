@@ -94,7 +94,7 @@ class DataStreamTest : public testing::Test {
   DataStreamTest()
     : runtime_state_(TPlanFragmentInstanceCtx(), "", &exec_env_),
       next_val_(0) {
-    // Intiialize Mem trackers for use by the data stream receiver.
+    // Initialize Mem trackers for use by the data stream receiver.
     exec_env_.InitForFeTests();
     runtime_state_.InitMemTrackers(TUniqueId(), NULL, -1);
   }

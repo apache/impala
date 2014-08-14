@@ -20,6 +20,7 @@
 #include "common/object-pool.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 #include <vector>
@@ -84,8 +85,11 @@ class RuntimeState {
   // when they are initialized. This function also initializes a user function mem
   // tracker (in the fifth level). If 'request_pool' is null, no request pool mem
   // tracker is set up, i.e. query pools will have the process mem pool as the parent.
-  Status InitMemTrackers(const TUniqueId& query_id, const std::string* request_pool,
+  void InitMemTrackers(const TUniqueId& query_id, const std::string* request_pool,
       int64_t query_bytes_limit, int64_t query_rm_reservation_limit_bytes = -1);
+
+  // Gets/Creates the query wide block mgr.
+  Status CreateBlockMgr();
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
@@ -190,13 +194,6 @@ class RuntimeState {
   // state is created. If codegen is disabled for the query, this is created
   // on first use.
   Status CreateCodegen();
-
-  // Creates the buffered block mgr with mem_limit.
-  // TODO: this should be made private and created during the Prepare() phase once
-  // the join and agg nodes use this. The limit would then be some (large) fraction of
-  // the query limit. Right now, we need the sort to create it with the fraction of
-  // the limit the sort node should use.
-  Status CreateBlockMgr(int64_t mem_limit);
 
   BufferedBlockMgr* block_mgr() {
     DCHECK(block_mgr_.get() != NULL);
@@ -368,7 +365,8 @@ class RuntimeState {
 
   // BufferedBlockMgr object used to allocate and manage blocks of input data in memory
   // with a fixed memory budget.
-  boost::scoped_ptr<BufferedBlockMgr> block_mgr_;
+  // The block mgr is shared by all fragments for this query.
+  boost::shared_ptr<BufferedBlockMgr> block_mgr_;
 
   // This is the node id of the root node for this plan fragment. This is used as the
   // hash seed and has two useful properties:

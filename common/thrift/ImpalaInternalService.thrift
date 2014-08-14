@@ -92,8 +92,8 @@ struct TQueryOptions {
   // --idle_query_timeout if that flag > 0.
   26: optional i32 query_timeout_s = 0
 
-  // test hook to force joins to spill to disk
-  27: optional i64 max_join_memory = -1
+  // test hook to cap max memory for spilling operators (to force them to spill).
+  27: optional i64 max_block_mgr_memory
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

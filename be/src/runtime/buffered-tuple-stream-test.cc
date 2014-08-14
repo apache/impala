@@ -56,7 +56,6 @@ static const int NUM_STRINGS = sizeof(STRINGS) / sizeof(StringValue);
 class BufferedTupleStreamTest : public testing::Test {
  protected:
   virtual void SetUp() {
-    block_mgr_ = NULL;
     exec_env_.reset(new ExecEnv);
     exec_env_->disk_io_mgr()->Init(&tracker_);
     runtime_state_.reset(
@@ -79,11 +78,10 @@ class BufferedTupleStreamTest : public testing::Test {
   }
 
   virtual void TearDown() {
-    if (block_mgr_ != NULL) block_mgr_->Close();
+    block_mgr_.reset();
     block_mgr_parent_tracker_.reset();
     runtime_state_.reset();
     exec_env_.reset();
-    delete block_mgr_;
     mem_pool_->FreeAll();
   }
 
@@ -91,7 +89,7 @@ class BufferedTupleStreamTest : public testing::Test {
     Status status = BufferedBlockMgr::Create(runtime_state_.get(),
         &tracker_, runtime_state_->runtime_profile(), limit, block_size, &block_mgr_);
     EXPECT_TRUE(status.ok());
-    status = block_mgr_->RegisterClient(0, NULL, &client_);
+    status = block_mgr_->RegisterClient(0, NULL, runtime_state_.get(), &client_);
     EXPECT_TRUE(status.ok());
   }
 
@@ -173,7 +171,7 @@ class BufferedTupleStreamTest : public testing::Test {
   // Test adding num_batches of ints to the stream and reading them back.
   template <typename T>
   void TestValues(int num_batches, RowDescriptor* desc) {
-    BufferedTupleStream stream(runtime_state_.get(), *desc, block_mgr_, client_);
+    BufferedTupleStream stream(runtime_state_.get(), *desc, block_mgr_.get(), client_);
     Status status = stream.Init();
     ASSERT_TRUE(status.ok());
     status = stream.UnpinAllBlocks();
@@ -214,7 +212,8 @@ class BufferedTupleStreamTest : public testing::Test {
   }
 
   void TestIntValuesInterleaved(int num_batches, int num_batches_before_read) {
-    BufferedTupleStream stream(runtime_state_.get(), *int_desc_, block_mgr_, client_,
+    BufferedTupleStream stream(runtime_state_.get(), *int_desc_, block_mgr_.get(),
+        client_,
         true,  // delete_on_read
         true); // read_write
     Status status = stream.Init();
@@ -251,7 +250,7 @@ class BufferedTupleStreamTest : public testing::Test {
   scoped_ptr<RuntimeState> runtime_state_;
   scoped_ptr<MemTracker> block_mgr_parent_tracker_;
 
-  BufferedBlockMgr* block_mgr_;
+  shared_ptr<BufferedBlockMgr> block_mgr_;
   BufferedBlockMgr::Client* client_;
 
   MemTracker tracker_;
@@ -309,7 +308,7 @@ TEST_F(BufferedTupleStreamTest, UnpinPin) {
   int buffer_size = 100 * sizeof(int32_t);
   CreateMgr(3 * buffer_size, buffer_size);
 
-  BufferedTupleStream stream(runtime_state_.get(), *int_desc_, block_mgr_, client_);
+  BufferedTupleStream stream(runtime_state_.get(), *int_desc_, block_mgr_.get(), client_);
   Status status = stream.Init();
   ASSERT_TRUE(status.ok());
 
@@ -349,7 +348,7 @@ TEST_F(BufferedTupleStreamTest, UnpinPin) {
 }
 
 // TODO: more tests.
-//  - The stream can operate with many modes and
+//  - The stream can operate with many modes
 
 }
 
