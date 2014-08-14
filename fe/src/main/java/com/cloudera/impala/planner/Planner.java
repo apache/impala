@@ -1622,16 +1622,22 @@ public class Planner {
     }
     analyzer.markConjunctsAssigned(eqJoinPredicates);
 
-    List<Expr> ojConjuncts = Lists.newArrayList();
+    List<Expr> otherJoinConjuncts = Lists.newArrayList();
     if (innerRef.getJoinOp().isOuterJoin()) {
-      // Also assign conjuncts_ from On clause. All remaining unassigned conjuncts_
+      // Also assign conjuncts from On clause. All remaining unassigned conjuncts
       // that can be evaluated by this join are assigned in createSelectPlan().
-      ojConjuncts = analyzer.getUnassignedOjConjuncts(innerRef);
-      analyzer.markConjunctsAssigned(ojConjuncts);
+      otherJoinConjuncts = analyzer.getUnassignedOjConjuncts(innerRef);
+    } else if (innerRef.getJoinOp().isSemiJoin()) {
+      // Unassigned conjuncts bound by the rhs tuple id of a semi join must have come
+      // from the join's On-clause, and therefore, must be added to the other join
+      // conjuncts to produce correct results.
+      otherJoinConjuncts =
+          analyzer.getUnassignedConjuncts(innerRef.getAllTupleIds(), false);
     }
+    analyzer.markConjunctsAssigned(otherJoinConjuncts);
 
     HashJoinNode result =
-        new HashJoinNode(outer, inner, innerRef, eqJoinConjuncts, ojConjuncts);
+        new HashJoinNode(outer, inner, innerRef, eqJoinConjuncts, otherJoinConjuncts);
     result.init(analyzer);
 
     // build side of join copies data to a compact representation in the tuple buffer

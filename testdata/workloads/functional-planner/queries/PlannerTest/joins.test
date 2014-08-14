@@ -1045,17 +1045,39 @@ select count(*) from functional.decimal_tbl a join functional.decimal_tbl b on a
 00:SCAN HDFS [functional.decimal_tbl a]
    partitions=1/1 size=195B
 ====
-# Test anti joins
-select j.* from functional.JoinTbl j anti join functional.DimTbl d on j.test_id = d.id
+# Test left semi join including correct predicate assignment and propagation
+select j.* from functional.jointbl j left semi join functional.dimtbl d
+  on (j.test_id = d.id and j.test_zip < d.zip and d.name = 'Name2')
+where j.test_id < 10
 ---- PLAN
-02:HASH JOIN [ANTI JOIN]
+02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: j.test_id = d.id
+|  other join predicates: j.test_zip < d.zip
 |
 |--01:SCAN HDFS [functional.dimtbl d]
 |     partitions=1/1 size=171B compact
+|     predicates: d.name = 'Name2', d.id < 10
 |
 00:SCAN HDFS [functional.jointbl j]
    partitions=1/1 size=433B
+   predicates: j.test_id < 10
+====
+# Test anti join including correct predicate assignment and propagation
+select j.* from functional.jointbl j anti join functional.dimtbl d
+  on (j.test_id = d.id and j.test_zip < d.zip and d.name = 'Name2')
+where j.test_id < 10
+---- PLAN
+02:HASH JOIN [ANTI JOIN]
+|  hash predicates: j.test_id = d.id
+|  other join predicates: j.test_zip < d.zip
+|
+|--01:SCAN HDFS [functional.dimtbl d]
+|     partitions=1/1 size=171B compact
+|     predicates: d.name = 'Name2', d.id < 10
+|
+00:SCAN HDFS [functional.jointbl j]
+   partitions=1/1 size=433B
+   predicates: j.test_id < 10
 ====
 # Test query with anti join and inner join and predicates
 select count(*) from functional.JoinTbl j anti join functional.DimTbl d on j.test_id = d.id

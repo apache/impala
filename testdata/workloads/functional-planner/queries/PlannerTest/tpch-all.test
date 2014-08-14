@@ -2002,7 +2002,7 @@ limit 100
 |
 09:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: l1.l_orderkey = l2.l_orderkey
-|  other predicates: l2.l_suppkey != l1.l_suppkey
+|  other join predicates: l2.l_suppkey != l1.l_suppkey
 |
 |--04:SCAN HDFS [tpch.lineitem l2]
 |     partitions=1/1 size=718.94MB compact
@@ -2060,7 +2060,7 @@ limit 100
 |
 09:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: l1.l_orderkey = l2.l_orderkey
-|  other predicates: l2.l_suppkey != l1.l_suppkey
+|  other join predicates: l2.l_suppkey != l1.l_suppkey
 |
 |--16:EXCHANGE [BROADCAST]
 |  |
