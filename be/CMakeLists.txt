@@ -203,7 +203,6 @@ if ("${BUILD_SHARED_LIBS}" STREQUAL "ON")
     Exec
     CodeGen
     Exprs
-    Opcode
     Rpc
     Service
     Statestore
