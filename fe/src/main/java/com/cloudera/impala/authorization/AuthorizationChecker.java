@@ -17,13 +17,13 @@ package com.cloudera.impala.authorization;
 import java.util.EnumSet;
 import java.util.List;
 
+import org.apache.commons.lang.reflect.ConstructorUtils;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.core.common.Subject;
 import org.apache.sentry.core.model.db.DBModelAction;
 import org.apache.sentry.core.model.db.DBModelAuthorizable;
 import org.apache.sentry.policy.db.SimpleDBPolicyEngine;
 import org.apache.sentry.provider.cache.SimpleCacheProviderBackend;
-import org.apache.sentry.provider.common.HadoopGroupResourceAuthorizationProvider;
 import org.apache.sentry.provider.common.ProviderBackend;
 import org.apache.sentry.provider.common.ProviderBackendContext;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
@@ -86,9 +86,10 @@ public class AuthorizationChecker {
 
       // Try to create an instance of the specified policy provider class.
       // Re-throw any exceptions that are encountered.
-      return new HadoopGroupResourceAuthorizationProvider(config.getPolicyFile(),
-          engine);
-
+      String policyFile = config.getPolicyFile() == null ? "" : config.getPolicyFile();
+      return (ResourceAuthorizationProvider) ConstructorUtils.invokeConstructor(
+          Class.forName(config.getPolicyProviderClassName()),
+          new Object[] {policyFile, engine});
     } catch (Exception e) {
       // Re-throw as unchecked exception.
       throw new IllegalStateException(

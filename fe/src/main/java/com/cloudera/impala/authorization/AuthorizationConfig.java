@@ -14,6 +14,11 @@
 
 package com.cloudera.impala.authorization;
 
+
+import org.apache.sentry.provider.common.HadoopGroupResourceAuthorizationProvider;
+import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
+
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
 /*
@@ -24,19 +29,42 @@ public class AuthorizationConfig {
   // Set only if the policy provider is file-based.
   private final String policyFile_;
   private final SentryConfig sentryConfig_;
+  private final String policyProviderClassName_;
 
+  /**
+   * Creates a new authorization configuration object.
+   * @param serverName - The name of this Impala server.
+   * @param policyFile - The path to the authorization policy file or null if
+   *                     the policy engine is not file based.
+   * @param sentryConfigFile - Absolute path and file name of the sentry service.
+   * @param policyProviderClassName - Class name of the policy provider to use.
+   */
   public AuthorizationConfig(String serverName, String policyFile,
-      String sentryConfigFile) {
+      String sentryConfigFile, String policyProviderClassName) {
     serverName_ = serverName;
     policyFile_ = policyFile;
     sentryConfig_ = new SentryConfig(sentryConfigFile);
+    if (!Strings.isNullOrEmpty(policyProviderClassName)) {
+      policyProviderClassName = policyProviderClassName.trim();
+    }
+    policyProviderClassName_ = policyProviderClassName;
   }
 
   /**
    * Returns an AuthorizationConfig object that has authorization disabled.
    */
   public static AuthorizationConfig createAuthDisabledConfig() {
-    return new AuthorizationConfig(null, null, null);
+    return new AuthorizationConfig(null, null, null, null);
+  }
+
+  /**
+   * Returns an AuthorizationConfig object configured to use Hadoop user->group mappings
+   * for the authorization provider.
+   */
+  public static AuthorizationConfig createHadoopGroupAuthConfig(String serverName,
+      String policyFile, String sentryConfigFile) {
+    return new AuthorizationConfig(serverName, policyFile, sentryConfigFile,
+        HadoopGroupResourceAuthorizationProvider.class.getName());
   }
 
   /*
@@ -45,9 +73,7 @@ public class AuthorizationConfig {
    */
   public void validateConfig() throws IllegalArgumentException {
     // If authorization is not enabled, config checks are skipped.
-    if (!isEnabled()) {
-      return;
-    }
+    if (!isEnabled()) return;
 
     // Only load the sentry configuration if a sentry-site.xml configuration file was
     // specified. It is optional for impalad.
@@ -59,6 +85,28 @@ public class AuthorizationConfig {
       throw new IllegalArgumentException(
           "Authorization is enabled but the server name is null or empty. Set the " +
           "server name using the impalad --server_name flag.");
+    }
+    if (Strings.isNullOrEmpty(policyProviderClassName_)) {
+      throw new IllegalArgumentException("Authorization is enabled but the " +
+          "authorization policy provider class name is null or empty. Set the class " +
+          "name using the --authorization_policy_provider_class impalad flag.");
+    }
+
+    Class<?> providerClass = null;
+    try {
+      // Get the Class object without performing any initialization.
+      providerClass = Class.forName(policyProviderClassName_, false,
+          this.getClass().getClassLoader());
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException(String.format("The authorization policy " +
+          "provider class '%s' was not found.", policyProviderClassName_), e);
+    }
+    Preconditions.checkNotNull(providerClass);
+    if (!ResourceAuthorizationProvider.class.isAssignableFrom(providerClass)) {
+      throw new IllegalArgumentException(String.format("The authorization policy " +
+          "provider class '%s' must be a subclass of '%s'.",
+          policyProviderClassName_,
+          ResourceAuthorizationProvider.class.getName()));
     }
   }
 
@@ -93,4 +141,5 @@ public class AuthorizationConfig {
    * The Sentry configuration.
    */
   public SentryConfig getSentryConfig() { return sentryConfig_; }
+  public String getPolicyProviderClassName() { return policyProviderClassName_; }
 }

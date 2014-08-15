@@ -28,6 +28,8 @@ import junit.framework.Assert;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
+import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
+import org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -102,7 +104,7 @@ public class AuthorizationTest {
   }
 
   public AuthorizationTest(String policyFile) throws Exception {
-    authzConfig_ = new AuthorizationConfig("server1", policyFile,
+    authzConfig_ = AuthorizationConfig.createHadoopGroupAuthConfig("server1", policyFile,
         System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
     authzConfig_.validateConfig();
     if (!isSetup_ && policyFile == null) {
@@ -1301,11 +1303,11 @@ public class AuthorizationTest {
   public void TestServerNameAuthorized() throws AnalysisException {
     if (authzConfig_.isFileBasedPolicy()) {
       // Authorization config that has a different server name from policy file.
-      TestWithIncorrectConfig(new AuthorizationConfig("differentServerName",
-          AUTHZ_POLICY_FILE, ""),
+      TestWithIncorrectConfig(AuthorizationConfig.createHadoopGroupAuthConfig(
+          "differentServerName", AUTHZ_POLICY_FILE, ""),
           new User(System.getProperty("user.name")));
     } // TODO: Test using policy server.
- }
+  }
 
   @Test
   public void TestNoPermissionsWhenPolicyFileDoesNotExist() throws AnalysisException {
@@ -1315,8 +1317,8 @@ public class AuthorizationTest {
     // Validate a non-existent policy file.
     // Use a HadoopGroupProvider in this case so the user -> group mappings can still be
     // resolved in the absence of the policy file.
-    TestWithIncorrectConfig(
-        new AuthorizationConfig("server1", AUTHZ_POLICY_FILE + "_does_not_exist", ""),
+    TestWithIncorrectConfig(AuthorizationConfig.createHadoopGroupAuthConfig("server1",
+        AUTHZ_POLICY_FILE + "_does_not_exist", ""),
         new User(System.getProperty("user.name")));
   }
 
@@ -1324,20 +1326,22 @@ public class AuthorizationTest {
   public void TestConfigValidation() throws InternalException {
     String sentryConfig = authzConfig_.getSentryConfig().getConfigFile();
     // Valid configs pass validation.
-    AuthorizationConfig config = new AuthorizationConfig("server1",
-        AUTHZ_POLICY_FILE, sentryConfig);
+    AuthorizationConfig config = AuthorizationConfig.createHadoopGroupAuthConfig(
+        "server1", AUTHZ_POLICY_FILE, sentryConfig);
     config.validateConfig();
     Assert.assertTrue(config.isEnabled());
     Assert.assertTrue(config.isFileBasedPolicy());
 
-    config = new AuthorizationConfig("server1", null, sentryConfig);
+    config = AuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
+        sentryConfig);
     config.validateConfig();
     Assert.assertTrue(config.isEnabled());
     Assert.assertTrue(!config.isFileBasedPolicy());
 
     // Invalid configs
     // No sentry configuration file.
-    config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, null);
+    config = AuthorizationConfig.createHadoopGroupAuthConfig(
+        "server1", AUTHZ_POLICY_FILE, null);
     Assert.assertTrue(config.isEnabled());
     try {
       config.validateConfig();
@@ -1347,7 +1351,8 @@ public class AuthorizationTest {
     }
 
     // Empty / null server name.
-    config = new AuthorizationConfig("", AUTHZ_POLICY_FILE, sentryConfig);
+    config = AuthorizationConfig.createHadoopGroupAuthConfig(
+        "", AUTHZ_POLICY_FILE, sentryConfig);
     Assert.assertTrue(config.isEnabled());
     try {
       config.validateConfig();
@@ -1357,7 +1362,8 @@ public class AuthorizationTest {
           "Authorization is enabled but the server name is null or empty. Set the " +
           "server name using the impalad --server_name flag.");
     }
-    config = new AuthorizationConfig(null, AUTHZ_POLICY_FILE, sentryConfig);
+    config = AuthorizationConfig.createHadoopGroupAuthConfig(null, AUTHZ_POLICY_FILE,
+        sentryConfig);
     Assert.assertTrue(config.isEnabled());
     try {
       config.validateConfig();
@@ -1369,7 +1375,8 @@ public class AuthorizationTest {
     }
 
     // Sentry config file does not exist.
-    config = new AuthorizationConfig("server1", "", "/path/does/not/exist.xml");
+    config = AuthorizationConfig.createHadoopGroupAuthConfig("server1", "",
+        "/path/does/not/exist.xml");
     Assert.assertTrue(config.isEnabled());
     try {
       config.validateConfig();
@@ -1379,15 +1386,76 @@ public class AuthorizationTest {
           "Sentry configuration file does not exist: /path/does/not/exist.xml");
     }
 
+    // Invalid ResourcePolicyProvider class name.
+    config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, "",
+        "ClassDoesNotExist");
+    Assert.assertTrue(config.isEnabled());
+    try {
+      config.validateConfig();
+      fail("Expected configuration to fail.");
+    } catch (IllegalArgumentException e) {
+      Assert.assertEquals(e.getMessage(),
+          "The authorization policy provider class 'ClassDoesNotExist' was not found.");
+    }
+
+    // Valid class name, but class is not derived from ResourcePolicyProvider
+    config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, "",
+        this.getClass().getName());
+    Assert.assertTrue(config.isEnabled());
+    try {
+      config.validateConfig();
+      fail("Expected configuration to fail.");
+    } catch (IllegalArgumentException e) {
+      Assert.assertEquals(e.getMessage(), String.format("The authorization policy " +
+          "provider class '%s' must be a subclass of '%s'.", this.getClass().getName(),
+          ResourceAuthorizationProvider.class.getName()));
+    }
+
     // Config validations skipped if authorization disabled
-    config = new AuthorizationConfig("", "", "");
+    config = new AuthorizationConfig("", "", "", "");
     Assert.assertFalse(config.isEnabled());
-    config = new AuthorizationConfig(null, "", "");
+    config = new AuthorizationConfig(null, "", "", null);
     Assert.assertFalse(config.isEnabled());
-    config = new AuthorizationConfig("", null, "");
+    config = new AuthorizationConfig("", null, "", "");
     Assert.assertFalse(config.isEnabled());
-    config = new AuthorizationConfig(null, null, null);
+    config = new AuthorizationConfig(null, null, null, null);
     Assert.assertFalse(config.isEnabled());
+  }
+
+  @Test
+  public void TestLocalGroupPolicyProvider() throws AnalysisException,
+      AuthorizationException {
+    if (!authzConfig_.isFileBasedPolicy()) return;
+    // Use an authorization configuration that uses the
+    // LocalGroupResourceAuthorizationProvider.
+    AuthorizationConfig authzConfig = new AuthorizationConfig("server1",
+        AUTHZ_POLICY_FILE, "",
+        LocalGroupResourceAuthorizationProvider.class.getName());
+    ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig);
+
+    // Create an analysis context + FE with the test user (as defined in the policy file)
+    User user = new User("test_user");
+    AnalysisContext context = new AnalysisContext(catalog,
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
+    Frontend fe = new Frontend(authzConfig, catalog);
+
+    // Can select from table that user has privileges on.
+    AuthzOk(fe, context, "select * from functional.alltypesagg");
+    // Does not have privileges to execute a query
+    AuthzError(fe, context, "select * from functional.alltypes",
+        "User '%s' does not have privileges to execute 'SELECT' on: functional.alltypes",
+        user);
+
+    // Verify with the admin user
+    user = new User("admin_user");
+    context = new AnalysisContext(catalog,
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
+    fe = new Frontend(authzConfig, catalog);
+
+    // Admin user should have privileges to do anything
+    AuthzOk(fe, context, "select * from functional.alltypesagg");
+    AuthzOk(fe, context, "select * from functional.alltypes");
+    AuthzOk(fe, context, "invalidate metadata");
   }
 
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)

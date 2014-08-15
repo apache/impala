@@ -49,6 +49,36 @@ class TestAuthorization(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--server_name=server1\
       --authorization_policy_file=/test-warehouse/authz-policy.ini\
+      --authorization_policy_provider_class=%s" %
+      "org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider")
+  def test_custom_authorization_provider(self):
+    from tests.hs2.test_hs2 import TestHS2
+    open_session_req = TCLIService.TOpenSessionReq()
+    # User is 'test_user' (defined in the authorization policy file)
+    open_session_req.username = 'test_user'
+    open_session_req.configuration = dict()
+    resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(resp)
+
+    # Try to query a table we are not authorized to access.
+    self.session_handle = resp.sessionHandle
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "describe tpch_seq.lineitem"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    assert 'User \'%s\' does not have privileges to access' % 'test_user' in\
+        str(execute_statement_resp)
+
+    # Now try the same operation on a table we are authorized to access.
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "describe tpch.lineitem"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--server_name=server1\
+      --authorization_policy_file=/test-warehouse/authz-policy.ini\
       --authorized_proxy_user_config=hue=%s\
       --audit_event_log_dir=%s" % (getuser(), AUDIT_LOG_DIR))
   def test_impersonation(self):

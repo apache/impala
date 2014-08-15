@@ -40,8 +40,8 @@ DEFINE_string(authorization_policy_file, "", "HDFS path to the authorization pol
     "file. If set, authorization will be enabled and the authorization policy will be "
     "read from a file.");
 DEFINE_string(authorization_policy_provider_class,
-    "org.apache.sentry.provider.file.HadoopGroupResourceAuthorizationProvider",
-    "(Deprecated) Advanced: The authorization policy provider class name.");
+    "org.apache.sentry.provider.common.HadoopGroupResourceAuthorizationProvider",
+    "Advanced: The authorization policy provider class name.");
 DEFINE_string(authorized_proxy_user_config, "",
     "Specifies the set of authorized proxy users (users who can delegate to other "
     "users during authorization) and whom they are allowed to delegate. "
@@ -52,7 +52,8 @@ DEFINE_string(authorized_proxy_user_config, "",
 
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {
-    {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V", &fe_ctor_},
+    {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;"
+        "Ljava/lang/String;II)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "([B)[B", &get_hadoop_config_id_},
@@ -88,8 +89,10 @@ Frontend::Frontend() {
       jni_env->NewStringUTF(FLAGS_server_name.c_str());
   jstring sentry_config =
       jni_env->NewStringUTF(FLAGS_sentry_config.c_str());
+  jstring auth_provider_class =
+      jni_env->NewStringUTF(FLAGS_authorization_policy_provider_class.c_str());
   jobject fe = jni_env->NewObject(fe_class_, fe_ctor_, lazy, server_name,
-      policy_file_path, sentry_config, FlagToTLogLevel(FLAGS_v),
+      policy_file_path, sentry_config, auth_provider_class, FlagToTLogLevel(FLAGS_v),
       FlagToTLogLevel(FLAGS_non_impala_java_vlog));
   EXIT_IF_EXC(jni_env);
   EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
