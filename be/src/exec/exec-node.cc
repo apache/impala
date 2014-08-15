@@ -257,7 +257,7 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       break;
     case TPlanNodeType::HASH_JOIN_NODE:
       // Only the partitioned hash join impl supports anti-join
-      if ((tnode.hash_join_node.join_op == TJoinOp::ANTI_JOIN) ||
+      if ((tnode.hash_join_node.join_op == TJoinOp::LEFT_ANTI_JOIN) ||
           (FLAGS_enable_partitioned_hash_join &&
            ((tnode.hash_join_node.join_op == TJoinOp::INNER_JOIN) ||
             (tnode.hash_join_node.join_op == TJoinOp::LEFT_SEMI_JOIN) ||
@@ -386,7 +386,7 @@ bool ExecNode::EvalConjuncts(ExprContext* const* ctxs, int num_ctxs, TupleRow* r
 //   %is_false = xor i1 %val, true
 //   %return_false = or i1 %is_null, %is_false
 //   br i1 %return_false, label %false, label %continue
-// 
+//
 // continue:                                         ; preds = %entry
 //   %ctx_ptr2 = getelementptr %"class.impala::ExprContext"** %ctxs, i32 1
 //   %ctx3 = load %"class.impala::ExprContext"** %ctx_ptr2

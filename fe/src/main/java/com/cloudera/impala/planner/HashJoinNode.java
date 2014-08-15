@@ -265,7 +265,7 @@ public class HashJoinNode extends PlanNode {
         }
         break;
       }
-      case ANTI_JOIN: {
+      case LEFT_ANTI_JOIN: {
         if (leftCard != -1) {
           cardinality_ = leftCard;
           if (rightCard != -1) {

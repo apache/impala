@@ -396,7 +396,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
 
   int num_rows_added = 0;
   while (probe_batch_pos_ >= 0) {
-    if (JoinOp != TJoinOp::ANTI_JOIN) {
+    if (JoinOp != TJoinOp::LEFT_ANTI_JOIN) {
       while (!hash_tbl_iterator_.AtEnd()) {
         DCHECK(current_probe_row_ != NULL);
         TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
@@ -450,7 +450,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
       // Perform the actual probe in the hash table for the current probe (left) row.
       // TODO: At this point it would be good to do some prefetching
       hash_tbl_iterator_= partition->hash_tbl()->Find(current_probe_row_);
-      if ((JoinOp == TJoinOp::ANTI_JOIN || JoinOp == TJoinOp::LEFT_OUTER_JOIN) &&
+      if ((JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_OUTER_JOIN) &&
           hash_tbl_iterator_.AtEnd()) {
         // No match for this row, we need to output it in the case of anti or left-outer
         // joins.
@@ -483,8 +483,8 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
 
     // Finish up the current batch.
     switch (join_op_) {
-      case TJoinOp::ANTI_JOIN:
-        RETURN_IF_ERROR(ProcessProbeBatch<TJoinOp::ANTI_JOIN>(out_batch));
+      case TJoinOp::LEFT_ANTI_JOIN:
+        RETURN_IF_ERROR(ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(out_batch));
         break;
       case TJoinOp::INNER_JOIN:
         RETURN_IF_ERROR(ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch));

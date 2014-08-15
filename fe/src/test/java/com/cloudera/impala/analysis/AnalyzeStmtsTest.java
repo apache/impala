@@ -182,7 +182,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "'*' expression in select list requires FROM clause.");
     AnalysisError("select a.*", "unknown table alias 'a'");
 
-    for (String joinType: new String[] { "left semi join", "anti join" }) {
+    for (String joinType: new String[] { "left semi join", "left anti join" }) {
       // ignore semi-/anti-joined tables in unqualified '*' expansion
       SelectStmt stmt = (SelectStmt) AnalyzesOk(String.format(
           "select * from functional.alltypes a " +
@@ -810,7 +810,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   @Test
   public void TestSemiJoins() {
-    for (String joinType: new String[] { "left semi join", "anti join" }) {
+    for (String joinType: new String[] { "left semi join", "left anti join" }) {
       // semi/anti join requires ON/USING clause
       AnalyzesOk(String.format("select a.id from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id)", joinType));

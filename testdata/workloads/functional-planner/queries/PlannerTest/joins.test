@@ -1064,11 +1064,11 @@ where j.test_id < 10
    predicates: j.test_id < 10
 ====
 # Test anti join including correct predicate assignment and propagation
-select j.* from functional.jointbl j anti join functional.dimtbl d
+select j.* from functional.jointbl j left anti join functional.dimtbl d
   on (j.test_id = d.id and j.test_zip < d.zip and d.name = 'Name2')
 where j.test_id < 10
 ---- PLAN
-02:HASH JOIN [ANTI JOIN]
+02:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: j.test_id = d.id
 |  other join predicates: j.test_zip < d.zip
 |
@@ -1081,7 +1081,8 @@ where j.test_id < 10
    predicates: j.test_id < 10
 ====
 # Test query with anti join and inner join and predicates
-select count(*) from functional.JoinTbl j anti join functional.DimTbl d on j.test_id = d.id
+select count(*) from functional.JoinTbl j
+left anti join functional.DimTbl d on j.test_id = d.id
 inner join functional.JoinTbl k on j.test_id = k.test_id and j.alltypes_id = 5000
 ---- PLAN
 06:AGGREGATE [FINALIZE]
@@ -1093,7 +1094,7 @@ inner join functional.JoinTbl k on j.test_id = k.test_id and j.alltypes_id = 500
 |--02:SCAN HDFS [functional.jointbl k]
 |     partitions=1/1 size=433B compact
 |
-04:HASH JOIN [ANTI JOIN]
+04:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: j.test_id = d.id
 |
 |--01:SCAN HDFS [functional.dimtbl d]
