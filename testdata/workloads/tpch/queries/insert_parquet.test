@@ -1,6 +1,6 @@
 ====
-# Tests using a larger table.
 ---- QUERY
+# Tests using a larger table.
 create table if not exists orders_insert_test like orders;
 insert overwrite table orders_insert_test select * from tpch.orders
 ---- RESULTS

@@ -107,13 +107,14 @@ class HdfsParquetTableWriter::BaseColumnWriter {
 
   virtual ~BaseColumnWriter() {}
 
-  // Append the row to this column.  This buffers the value into a data page.
-  // Returns the (estimated) delta in file size in bytes.
+  // Appends the row to this column.  This buffers the value into a data page.
+  // Increments 'file_size_estimate' with the (estimated) delta in bytes. Returns error if
+  // the space needed for the encoded value is larger than the data page size.
   // TODO: this needs to be batch based, instead of row based for better
   // performance.  This is a bit trickier to handle the case where only a
   // partial row batch can be output to the current file because it reaches
   // the max file size.  Enabling codegen would also solve this problem.
-  int AppendRow(TupleRow* row);
+  Status AppendRow(TupleRow* row, int64_t* file_size_estimate);
 
   // Flushes all buffered data pages to the file.
   // *file_pos is an output parameter and will be incremented by
@@ -159,8 +160,10 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // caller should create a new page and try again with the same value.
   // *bytes_added is incremented by the number of bytes used to encode this
   // value.
+  // *bytes_needed will contain the (estimated) number of bytes needed to successfully
+  // encode the value in the page.
   // Implemented in the subclass.
-  virtual bool EncodeValue(void* value, int* bytes_added) = 0;
+  virtual bool EncodeValue(void* value, int64_t* bytes_added, int64_t* bytes_needed) = 0;
 
   // Encodes out all data for the current page and updates the metadata. Returns
   // the number of bytes added to the current page (e.g. definition/repetition bits,
@@ -252,9 +255,10 @@ class HdfsParquetTableWriter::ColumnWriter :
   }
 
  protected:
-  virtual bool EncodeValue(void* value, int* bytes_added) {
+  virtual bool EncodeValue(void* value, int64_t* bytes_added, int64_t* bytes_needed) {
     if (current_encoding_ == Encoding::PLAIN_DICTIONARY) {
-      *bytes_added += dict_encoder_->Put(*reinterpret_cast<T*>(value));
+      *bytes_needed = dict_encoder_->Put(*reinterpret_cast<T*>(value));
+      *bytes_added += *bytes_needed;
 
       // If the dictionary contains the maximum number of values, switch to plain
       // encoding.  The current dictionary encoded page is written out.
@@ -271,17 +275,17 @@ class HdfsParquetTableWriter::ColumnWriter :
       }
     } else if (current_encoding_ == Encoding::PLAIN) {
       T* v = reinterpret_cast<T*>(value);
-      int encoded_len = encoded_value_size_ < 0 ?
+      *bytes_needed = encoded_value_size_ < 0 ?
           ParquetPlainEncoder::ByteSize<T>(*v) : encoded_value_size_;
-      if (current_page_->header.uncompressed_page_size + encoded_len > DATA_PAGE_SIZE) {
+      if (current_page_->header.uncompressed_page_size + *bytes_needed > DATA_PAGE_SIZE) {
         return false;
       }
       uint8_t* dst_ptr = values_buffer_ + current_page_->header.uncompressed_page_size;
-      int written_len =
+      int64_t written_len =
           ParquetPlainEncoder::Encode(dst_ptr, encoded_value_size_, *v);
-      DCHECK_EQ(encoded_len, written_len);
+      DCHECK_EQ(*bytes_needed, written_len);
       *bytes_added += written_len;
-      current_page_->header.uncompressed_page_size += encoded_len;
+      current_page_->header.uncompressed_page_size += written_len;
     } else {
       // TODO: support other encodings here
       DCHECK(false);
@@ -306,7 +310,7 @@ class HdfsParquetTableWriter::ColumnWriter :
   int num_values_since_dict_size_check_;
 
   // Size of each encoded value. -1 if the size is type is variable-length.
-  int encoded_value_size_;
+  int64_t encoded_value_size_;
 };
 
 // Bools are encoded a bit differently so subclass it explicitly.
@@ -325,7 +329,7 @@ class HdfsParquetTableWriter::BoolColumnWriter :
   }
 
  protected:
-  virtual bool EncodeValue(void* value, int* bytes_added) {
+  virtual bool EncodeValue(void* value, int64_t* bytes_added, int64_t* bytes_needed) {
     return bool_values_->PutValue(*reinterpret_cast<bool*>(value), 1);
   }
 
@@ -352,8 +356,9 @@ class HdfsParquetTableWriter::BoolColumnWriter :
 
 }
 
-inline int HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row) {
-  int bytes_added = 0;
+inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row,
+    int64_t* file_size_estimate) {
+  int64_t bytes_added = 0;
   ++num_values_;
   void* value = expr_ctx_->GetValue(row);
   if (current_page_ == NULL) NewPage();
@@ -371,15 +376,26 @@ inline int HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row) {
     if (value == NULL) break;
     ++current_page_->num_non_null;
 
-    if (EncodeValue(value, &bytes_added)) break;
+    int64_t bytes_needed = 0;
+    if (EncodeValue(value, &bytes_added, &bytes_needed)) break;
 
+    // Check how much space it is needed to write this value. If that is larger than the
+    // page size then throw error instead of using/allocating a new page.
+    // TODO: Add a test case with a very large value.
+    if (UNLIKELY(bytes_needed > DATA_PAGE_SIZE)) {
+      stringstream ss;
+      ss << "Cannot write value that needs " << bytes_needed << " bytes to a Parquet "
+         << "data page of size " << DATA_PAGE_SIZE << ".";
+      return Status(ss.str());
+    }
     // Value didn't fit on page, try again on a new page.
     bytes_added += FinalizeCurrentPage();
     NewPage();
   }
 
   ++current_page_->header.data_page_header.num_values;
-  return bytes_added;
+  *file_size_estimate += bytes_added;
+  return Status::OK;
 }
 
 inline int HdfsParquetTableWriter::BaseColumnWriter::WriteDictDataPage() {
@@ -811,8 +827,7 @@ Status HdfsParquetTableWriter::InitNewFile() {
 }
 
 Status HdfsParquetTableWriter::AppendRowBatch(RowBatch* batch,
-                                             const vector<int32_t>& row_group_indices,
-                                             bool* new_file) {
+    const vector<int32_t>& row_group_indices, bool* new_file) {
   SCOPED_TIMER(parent_->encode_timer());
   *new_file = false;
   int limit;
@@ -827,7 +842,7 @@ Status HdfsParquetTableWriter::AppendRowBatch(RowBatch* batch,
     TupleRow* current_row = all_rows ?
         batch->GetRow(row_idx_) : batch->GetRow(row_group_indices[row_idx_]);
     for (int j = 0; j < columns_.size(); ++j) {
-      file_size_estimate_ += columns_[j]->AppendRow(current_row);
+      RETURN_IF_ERROR(columns_[j]->AppendRow(current_row, &file_size_estimate_));
     }
     ++row_idx_;
     ++row_count_;
