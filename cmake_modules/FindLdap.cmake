@@ -13,7 +13,7 @@ set(LDAP_SEARCH_LIB_PATH
 )
 
 set(LDAP_INCLUDE_DIR
-  ${THIRDPARTY_LDAP}/install/include
+  ${THIRDPARTY_LDAP}/impala_install/include
 )
 
 find_library(LDAP_LIB_PATH NAMES ldap
