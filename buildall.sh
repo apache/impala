@@ -30,6 +30,7 @@ FORMAT_METASTORE=0
 TARGET_BUILD_TYPE=Debug
 EXPLORATION_STRATEGY=core
 SNAPSHOT_FILE=
+MAKE_IMPALA_ARGS=""
 
 # Exit on reference to uninitialized variable
 set -u
@@ -60,6 +61,12 @@ do
       ;;
     -skiptests)
       TESTS_ACTION=0
+      ;;
+    -build_shared_libs)
+      ;;
+    -so)
+      MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_shared_libs"
+      shift
       ;;
     -notests)
       TESTS_ACTION=0
@@ -111,6 +118,7 @@ do
       echo "[-testdata] : Loads test data. Implied as true if -snapshot_file is "\
            "specified. If -snapshot_file is not specified, data will be regenerated."
       echo "[-snapshot_file <file name>] : Load test data from a snapshot file"
+      echo "[-so|-build_shared_libs] : Dynamically link executables (default is static)"
       echo "-----------------------------------------------------------------------------
 Examples of common tasks:
 
@@ -206,7 +214,9 @@ else
 fi
 
 # build common and backend
-$IMPALA_HOME/bin/make_impala.sh -build_type=${TARGET_BUILD_TYPE} $*
+MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${TARGET_BUILD_TYPE} $*"
+echo "Calling make_impala.sh ${MAKE_IMPALA_ARGS}"
+$IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS}
 
 if [ -e $IMPALA_LZO ]
 then
