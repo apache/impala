@@ -1962,8 +1962,13 @@ TEST_F(ExprTest, NonFiniteFloats) {
   TestValue("is_nan(1/0)", TYPE_BOOLEAN, false);
   TestValue("is_nan(0/0)", TYPE_BOOLEAN, true);
 
-  TestCast("1/0", numeric_limits<double>::infinity());
-  TestCast("CAST(1/0 AS FLOAT)", numeric_limits<float>::infinity());
+  TestValue("CAST(1/0 AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
+  TestValue("CAST(1/0 AS DOUBLE)", TYPE_DOUBLE, numeric_limits<double>::infinity());
+  TestValue("CAST(CAST(1/0 as FLOAT) as DOUBLE)", TYPE_DOUBLE,
+            numeric_limits<double>::infinity());
+  TestStringValue("CAST(1/0 AS STRING)", "inf");
+  TestStringValue("CAST(CAST(1/0 AS FLOAT) AS STRING)", "inf");
+
   TestValue("CAST('inf' AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
   TestValue("CAST('inf' AS DOUBLE)", TYPE_DOUBLE, numeric_limits<double>::infinity());
   TestValue("CAST('Infinity' AS FLOAT)", TYPE_FLOAT, numeric_limits<float>::infinity());
