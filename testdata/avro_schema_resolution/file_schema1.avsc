@@ -1,7 +1,9 @@
 {"name": "a",
  "type": "record",
- "comment": "Contains a field not in the table and none of the table fields",
+ "comment": "Contains fields not in the table and none of the table fields",
  "fields": [
-    {"name":"boolean2", "type": {"type": "boolean", "note": "alternate primitive syntax"}}
+    {"name":"boolean2", "type": {"type": "boolean", "note": "alternate primitive syntax"}},
+    {"name":"bytes", "type": "bytes",
+     "note": "bytes is an invalid column type but can be read as a non-materialized field"}
 ]
 }
