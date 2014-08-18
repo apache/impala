@@ -19,7 +19,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
 
-add_library(Statestore STATIC
+add_library(Statestore
   failure-detector.cc
   query-resource-mgr.cc
   simple-scheduler.cc
