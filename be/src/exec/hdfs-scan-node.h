@@ -429,6 +429,10 @@ class HdfsScanNode : public ScanNode {
   // profile.
   bool counters_running_;
 
+  // The id of the callback added to the query resource manager when RM is enabled. Used
+  // to remove the callback before this scan node is destroyed.
+  int32_t rm_callback_id_;
+
   // Called when scanner threads are available for this scan node. This will
   // try to spin up as many scanner threads as the quota allows.
   // This is also called whenever a new range is added to the IoMgr to 'pull'
