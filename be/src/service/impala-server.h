@@ -888,8 +888,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Returns session state for given session_id.
   // If not found, session_state will be NULL and an error status will be returned.
-  // If keep_alive is true, also checks if the session is expired or closed and increments
-  // the session's reference counter if it is still alive.
+  // If mark_active is true, also checks if the session is expired or closed and
+  // increments the session's reference counter if it is still alive.
   Status GetSessionState(const TUniqueId& session_id,
       boost::shared_ptr<SessionState>* session_state, bool mark_active = false);
 
