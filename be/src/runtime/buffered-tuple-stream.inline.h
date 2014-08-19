@@ -24,7 +24,7 @@ namespace impala {
 
 // TODO: this really needs codegen
 inline bool BufferedTupleStream::DeepCopy(TupleRow* row) {
-  DCHECK(write_block_ != NULL);
+  if (UNLIKELY(write_block_ == NULL)) return false;
   DCHECK(write_block_->is_pinned());
 
   // Total bytes allocated in write_block_ for this row. Saved so we can roll

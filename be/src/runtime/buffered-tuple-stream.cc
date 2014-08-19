@@ -157,7 +157,7 @@ Status BufferedTupleStream::NextBlockForRead() {
 
   if (read_block_ != blocks_.end()) {
     if (!(*read_block_)->is_pinned()) {
-      DCHECK(!pinned_); // Should already be pinned if pinned_
+      DCHECK(!pinned_) << DebugString(); // Should already be pinned if pinned_
       bool pinned;
       RETURN_IF_ERROR((*read_block_)->Pin(&pinned));
       DCHECK(pinned) << "Should have reserved enough blocks";
@@ -171,10 +171,9 @@ Status BufferedTupleStream::NextBlockForRead() {
 }
 
 Status BufferedTupleStream::PrepareForRead() {
-  if (!read_write_) {
-    DCHECK(write_block_ != NULL);
+  if (!read_write_ && write_block_ != NULL) {
     DCHECK(write_block_->is_pinned());
-    if (write_block_ != blocks_.front()) {
+    if (!pinned_ && write_block_ != blocks_.front()) {
       write_block_->Unpin();
       --num_pinned_;
     }
@@ -235,26 +234,30 @@ Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {
   DCHECK(batch->row_desc().Equals(desc_));
   DCHECK_EQ(batch->num_rows(), 0);
   *eos = (rows_returned_ == num_rows_);
-  int64_t rows_left = num_rows_ - rows_returned_;
+  if (*eos) return Status::OK;
 
+  int64_t rows_left = num_rows_ - rows_returned_;
   int rows_to_fill = std::min(static_cast<int64_t>(batch->capacity()), rows_left);
   batch->AddRows(rows_to_fill);
   uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(batch->GetRow(0));
 
-  const int64_t data_len = (*read_block_)->valid_data_len();
+  int64_t data_len = (*read_block_)->valid_data_len();
   if (UNLIKELY((data_len - read_bytes_) < fixed_tuple_row_size_)) {
     // Get the next block in the stream. We need to do this at the beginning of
     // the GetNext() call to ensure the buffer management semantics. NextBlockForRead()
     // will recycle the memory for the rows returned from the *previous* call to
     // GetNext().
     RETURN_IF_ERROR(NextBlockForRead());
+    data_len = (*read_block_)->valid_data_len();
   }
+
+  DCHECK(read_block_ != blocks_.end());
+  DCHECK((*read_block_)->is_pinned());
+  DCHECK(read_ptr_ != NULL);
 
   int i = 0;
   // Produce tuple rows from the current block.
   for (; i < rows_to_fill; ++i) {
-    DCHECK(read_block_ != blocks_.end());
-    DCHECK(read_ptr_ != NULL);
     // Check if current block is done.
     if (UNLIKELY((data_len - read_bytes_) < fixed_tuple_row_size_)) break;
 
@@ -276,9 +279,10 @@ Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {
         if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
 
         StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
-        DCHECK(sv->len <= (data_len - read_bytes_));
+        DCHECK_LE(sv->len, data_len - read_bytes_) << DebugString();
         sv->ptr = reinterpret_cast<char*>(read_ptr_);
         read_ptr_ += sv->len;
+        read_bytes_ += sv->len;
       }
     }
   }
