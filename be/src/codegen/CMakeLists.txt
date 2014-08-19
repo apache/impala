@@ -23,6 +23,7 @@ add_library(CodeGen
   codegen-anyval.cc
   llvm-codegen.cc
   subexpr-elimination.cc
+  instruction-counter.cc
 )
 
 # output cross compile to ir metadata
@@ -107,4 +108,5 @@ add_custom_target(compile_to_ir_sse ALL DEPENDS ${IR_SSE_OUTPUT_FILE})
 add_custom_target(compile_to_ir_no_sse ALL DEPENDS ${IR_NO_SSE_OUTPUT_FILE})
 
 ADD_BE_TEST(llvm-codegen-test)
+ADD_BE_TEST(instruction-counter-test)
 

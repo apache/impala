@@ -45,6 +45,7 @@
 #include "common/logging.h"
 #include "codegen/codegen-anyval.h"
 #include "codegen/subexpr-elimination.h"
+#include "codegen/instruction-counter.h"
 #include "impala-ir/impala-ir-names.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "util/cpu-info.h"
@@ -54,6 +55,9 @@
 using namespace boost;
 using namespace llvm;
 using namespace std;
+
+DEFINE_bool(print_llvm_ir_instruction_count, false,
+    "if true, prints the instruction counts of all JIT'd functions");
 
 DEFINE_bool(disable_optimization_passes, false,
     "if true, disables llvm optimization passes (used for testing)");
@@ -658,6 +662,14 @@ void LlvmCodeGen::OptimizeModule() {
   module_pass_manager->add(new DataLayout(data_layout_str));
   pass_builder.populateModulePassManager(*module_pass_manager);
   module_pass_manager->run(*module_);
+  if (FLAGS_print_llvm_ir_instruction_count) {
+    for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
+      InstructionCounter counter;
+      counter.visit(*fns_to_jit_compile_[i].first);
+      VLOG(1) << fns_to_jit_compile_[i].first->getName().str();
+      VLOG(1) << counter.PrintCounters();
+    }
+  }
 }
 
 void LlvmCodeGen::AddFunctionToJit(Function* fn, void** fn_ptr) {
