@@ -215,5 +215,36 @@ service ImpalaService extends beeswax.BeeswaxService {
 }
 
 // Impala HiveServer2 service
+
+struct TGetExecSummaryReq {
+  1: optional cli_service.TOperationHandle operationHandle
+
+  2: optional cli_service.TSessionHandle sessionHandle
+}
+
+struct TGetExecSummaryResp {
+  1: required cli_service.TStatus status
+
+  2: optional ExecStats.TExecSummary summary
+}
+
+struct TGetRuntimeProfileReq {
+  1: optional cli_service.TOperationHandle operationHandle
+
+  2: optional cli_service.TSessionHandle sessionHandle
+}
+
+struct TGetRuntimeProfileResp {
+  1: required cli_service.TStatus status
+
+  2: optional string profile
+}
+
+
 service ImpalaHiveServer2Service extends cli_service.TCLIService {
+  // Returns the exec summary for the given query
+  TGetExecSummaryResp GetExecSummary(1:TGetExecSummaryReq req);
+
+  // Returns the runtime profile string for the given query
+  TGetRuntimeProfileResp GetRuntimeProfile(1:TGetRuntimeProfileReq req);
 }

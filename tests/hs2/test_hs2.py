@@ -18,6 +18,8 @@
 import pytest
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session, operation_id_to_query_id
 from cli_service import TCLIService
+from ImpalaService import ImpalaHiveServer2Service
+from ExecStats.ttypes import TExecState
 
 class TestHS2(HS2TestSuite):
   def test_open_session(self):
@@ -204,3 +206,51 @@ class TestHS2(HS2TestSuite):
     # Test overflow warning
     log = self.get_log("select cast(1000 as decimal(2, 1))")
     assert "Expression overflowed, returning NULL" in log
+
+  @needs_session
+  def test_get_exec_summary(self):
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "SELECT COUNT(1) FROM functional.alltypes"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    exec_summary_req = ImpalaHiveServer2Service.TGetExecSummaryReq()
+    exec_summary_req.operationHandle = execute_statement_resp.operationHandle
+    exec_summary_req.sessionHandle = self.session_handle
+    exec_summary_resp = self.hs2_client.GetExecSummary(exec_summary_req)
+
+    # GetExecSummary() only works for closed queries
+    TestHS2.check_response(exec_summary_resp, TCLIService.TStatusCode.ERROR_STATUS)
+
+    close_operation_req = TCLIService.TCloseOperationReq()
+    close_operation_req.operationHandle = execute_statement_resp.operationHandle
+    TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
+
+    exec_summary_resp = self.hs2_client.GetExecSummary(exec_summary_req)
+    TestHS2.check_response(exec_summary_resp)
+    assert len(exec_summary_resp.summary.nodes) > 0
+
+  @needs_session
+  def test_get_profile(self):
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "SELECT COUNT(2) FROM functional.alltypes"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    get_profile_req = ImpalaHiveServer2Service.TGetRuntimeProfileReq()
+    get_profile_req.operationHandle = execute_statement_resp.operationHandle
+    get_profile_req.sessionHandle = self.session_handle
+    get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
+    TestHS2.check_response(get_profile_resp)
+    assert execute_statement_req.statement in get_profile_resp.profile
+
+    close_operation_req = TCLIService.TCloseOperationReq()
+    close_operation_req.operationHandle = execute_statement_resp.operationHandle
+    TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
+
+    get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
+    TestHS2.check_response(get_profile_resp)
+
+    assert execute_statement_req.statement in get_profile_resp.profile

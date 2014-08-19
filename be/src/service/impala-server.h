@@ -68,6 +68,8 @@ class TClientRequest;
 class TExecRequest;
 class TSessionState;
 class TQueryOptions;
+class TGetExecSummaryResp;
+class TGetExecSummaryReq;
 
 // An ImpalaServer contains both frontend and backend functionality;
 // it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)
@@ -192,6 +194,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       const apache::hive::service::cli::thrift::TFetchResultsReq& request);
   virtual void GetLog(apache::hive::service::cli::thrift::TGetLogResp& return_val,
       const apache::hive::service::cli::thrift::TGetLogReq& request);
+  virtual void GetExecSummary(TGetExecSummaryResp& return_val,
+      const TGetExecSummaryReq& request);
+  virtual void GetRuntimeProfile(TGetRuntimeProfileResp& return_val,
+      const TGetRuntimeProfileReq& request);
 
   // These function are not implemented.
   virtual void GetDelegationToken(

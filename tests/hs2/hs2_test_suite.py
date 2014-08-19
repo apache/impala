@@ -17,6 +17,7 @@
 
 from getpass import getuser
 from cli_service import TCLIService
+from ImpalaService import ImpalaHiveServer2Service
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
@@ -58,7 +59,7 @@ class HS2TestSuite(ImpalaTestSuite):
     self.transport = TBufferedTransport(self.socket)
     self.transport.open()
     self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
-    self.hs2_client = TCLIService.Client(self.protocol)
+    self.hs2_client = ImpalaHiveServer2Service.Client(self.protocol)
 
   def teardown(self):
     self.cleanup_db(self.TEST_DB)
@@ -67,8 +68,8 @@ class HS2TestSuite(ImpalaTestSuite):
 
   @staticmethod
   def check_response(response,
-                       expected_status_code = TCLIService.TStatusCode.SUCCESS_STATUS,
-                       expected_error_prefix = None):
+                     expected_status_code = TCLIService.TStatusCode.SUCCESS_STATUS,
+                     expected_error_prefix = None):
     assert response.status.statusCode == expected_status_code
     if expected_status_code != TCLIService.TStatusCode.SUCCESS_STATUS\
        and expected_error_prefix is not None:

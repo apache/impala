@@ -535,8 +535,7 @@ void ImpalaServer::GetCatalogs(TGetCatalogsResp& return_val,
   VLOG_QUERY << "GetCatalogs(): return_val=" << ThriftDebugString(return_val);
 }
 
-void ImpalaServer::GetSchemas(
-    TGetSchemasResp& return_val,
+void ImpalaServer::GetSchemas(TGetSchemasResp& return_val,
     const TGetSchemasReq& request) {
   VLOG_QUERY << "GetSchemas(): request=" << ThriftDebugString(request);
 
@@ -554,8 +553,7 @@ void ImpalaServer::GetSchemas(
   VLOG_QUERY << "GetSchemas(): return_val=" << ThriftDebugString(return_val);
 }
 
-void ImpalaServer::GetTables(
-    TGetTablesResp& return_val,
+void ImpalaServer::GetTables(TGetTablesResp& return_val,
     const TGetTablesReq& request) {
   VLOG_QUERY << "GetTables(): request=" << ThriftDebugString(request);
 
@@ -573,8 +571,7 @@ void ImpalaServer::GetTables(
   VLOG_QUERY << "GetTables(): return_val=" << ThriftDebugString(return_val);
 }
 
-void ImpalaServer::GetTableTypes(
-    TGetTableTypesResp& return_val,
+void ImpalaServer::GetTableTypes(TGetTableTypesResp& return_val,
     const TGetTableTypesReq& request) {
   VLOG_QUERY << "GetTableTypes(): request=" << ThriftDebugString(request);
 
@@ -593,8 +590,7 @@ void ImpalaServer::GetTableTypes(
 
 }
 
-void ImpalaServer::GetColumns(
-    TGetColumnsResp& return_val,
+void ImpalaServer::GetColumns(TGetColumnsResp& return_val,
     const TGetColumnsReq& request) {
   VLOG_QUERY << "GetColumns(): request=" << ThriftDebugString(request);
 
@@ -612,8 +608,7 @@ void ImpalaServer::GetColumns(
   VLOG_QUERY << "GetColumns(): return_val=" << ThriftDebugString(return_val);
 }
 
-void ImpalaServer::GetFunctions(
-    TGetFunctionsResp& return_val,
+void ImpalaServer::GetFunctions(TGetFunctionsResp& return_val,
     const TGetFunctionsReq& request) {
   VLOG_QUERY << "GetFunctions(): request=" << ThriftDebugString(request);
 
@@ -631,8 +626,7 @@ void ImpalaServer::GetFunctions(
   VLOG_QUERY << "GetFunctions(): return_val=" << ThriftDebugString(return_val);
 }
 
-void ImpalaServer::GetOperationStatus(
-    TGetOperationStatusResp& return_val,
+void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
     const TGetOperationStatusReq& request) {
   if (request.operationHandle.operationId.guid.size() == 0) {
     // An empty operation handle identifier means no execution and no result for this
@@ -857,6 +851,52 @@ void ImpalaServer::RenewDelegationToken(TRenewDelegationTokenResp& return_val,
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::ERROR_STATUS);
   return_val.status.__set_errorMessage("Not implemented");
+}
+
+void ImpalaServer::GetExecSummary(TGetExecSummaryResp& return_val,
+    const TGetExecSummaryReq& request) {
+  TUniqueId session_id;
+  TUniqueId secret;
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
+  ScopedSessionState session_handle(this);
+  shared_ptr<SessionState> session;
+  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
+      SQLSTATE_GENERAL_ERROR);
+
+  TUniqueId query_id;
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+
+  TExecSummary summary;
+  Status status = GetExecSummary(query_id, &summary);
+  HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+  return_val.__set_summary(summary);
+  return_val.status.__set_statusCode(
+      apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
+}
+
+void ImpalaServer::GetRuntimeProfile(TGetRuntimeProfileResp& return_val,
+    const TGetRuntimeProfileReq& request) {
+  TUniqueId session_id;
+  TUniqueId secret;
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
+  ScopedSessionState session_handle(this);
+  shared_ptr<SessionState> session;
+  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
+      SQLSTATE_GENERAL_ERROR);
+
+  TUniqueId query_id;
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
+
+  stringstream ss;
+  HS2_RETURN_IF_ERROR(return_val, GetRuntimeProfileStr(query_id, false, &ss),
+      SQLSTATE_GENERAL_ERROR);
+  return_val.__set_profile(ss.str());
+  return_val.status.__set_statusCode(
+      apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 }
 
 void ImpalaServer::TColumnValueToHiveServer2TColumnValue(const TColumnValue& col_val,
